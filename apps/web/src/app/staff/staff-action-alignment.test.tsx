@@ -72,6 +72,12 @@ vi.mock('@/lib/api', () => {
   return {
     ApiError,
     fetchApi: vi.fn(),
+    // R497-SAVE-WORDING: page が保存catchで使う。本物（api.ts）の
+    // 非ApiError分岐と同一。この画面が流す入力は全てこの分岐に落ちる。
+    describeSaveFailure: (err: unknown) => {
+      if (err instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(err.message)) return err.message
+      return '保存できませんでした。通信が切れている可能性があります。接続を確かめて、もう一度お試しください。'
+    },
     api: {
       staff: {
         list: async () => ({ success: true, data: state.members }),
@@ -103,9 +109,11 @@ vi.mock('@/lib/api', () => {
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: StaffPage } = await import('./page')
+const { default: ToastHost, clearToastsForTest } = await import('@/components/shared/toast')
 
 async function mount() {
-  await act(async () => { render(<StaffPage />) })
+  // 保存の知らせは Toast（右下・4秒）で出す。置き場所も一緒に描く。
+  await act(async () => { render(<><StaffPage /><ToastHost /></>) })
   await waitFor(() => expect(screen.getByText('対象者')).toBeTruthy())
 }
 
@@ -116,6 +124,7 @@ function rowFor(name: string): HTMLTableRowElement {
 beforeEach(() => {
   fixture.updateStaff.mockReset().mockResolvedValue({ success: true, data: state.members[0] })
   fixture.deleteStaff.mockReset().mockResolvedValue({ success: true, data: state.members[0] })
+  clearToastsForTest()
 })
 
 afterEach(() => cleanup())
@@ -137,7 +146,11 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledTimes(1))
     // N-424: bundle名をそのまま送る（roleへ潰すと受付/運用が区別できない）。
-    expect(fixture.updateStaff).toHaveBeenCalledWith('target', { roleBundle: 'view_only', permissionScope: undefined, emailMask: undefined }, undefined)
+    // R498/R499: 同じ保存の送り直しに備えて要求キー、同時編集の競合検出に版を付ける。
+    expect(fixture.updateStaff).toHaveBeenCalledWith('target', expect.objectContaining({ roleBundle: 'view_only', permissionScope: undefined, emailMask: undefined }), undefined)
+    const sent = fixture.updateStaff.mock.calls[0][1] as Record<string, unknown>
+    expect(typeof sent.idempotencyKey).toBe('string')
+    expect(sent.expectedPolicyVersion).toBe(1)
   })
 
   it('「項目ごとに決める」を触ると3択表ごと更新口へ送る（N-424）', async () => {
@@ -173,6 +186,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     }))
     await mount()
     fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+    // R497: 何も変えない保存は更新要求を送らない。二度押しの検証は変更ありで行う。
+    fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
 
     const save = screen.getByRole('button', { name: /見せる範囲を保存/ })
     await act(async () => {
@@ -207,7 +222,10 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     }))
     await mount()
 
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: 'この人を外す' }))
+    /* 外すは行の「…」の中。開いてから項目を押す（確認フロー自体は変えない）。
+       項目は最上層（MenuPortal→document.body）に出るので画面全体で探す。 */
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '対象者のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'この人を外す' }))
     expect(fixture.deleteStaff).not.toHaveBeenCalled()
 
     const confirm = screen.getByRole('button', { name: '外す' })
@@ -226,7 +244,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fixture.deleteStaff.mockRejectedValue(new Error('最後の管理者は外せません'))
     await mount()
 
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: 'この人を外す' }))
+    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '対象者のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'この人を外す' }))
     fireEvent.click(screen.getByRole('button', { name: '外す' }))
 
     await waitFor(() => expect(screen.getByText('最後の管理者は外せません')).toBeTruthy())
@@ -252,6 +271,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
   it('見せる範囲の保存は再ログインを確認し、取消・成功・失敗を正しく出す', async () => {
     await mount()
     fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
+    // R497: 何も変えない保存は確認窓を出さず閉じるだけ。確認の検証は変更ありで行う。
+    fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
     fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
 
     expect(screen.getByText('保存すると、対象者のすべてのログインが終了します。新しい権限で使うには、対象者がもう一度ログインする必要があります。')).toBeTruthy()

@@ -14,6 +14,21 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: fixture.routerPush }),
 }))
+/*
+ * R16: 本文欄に差し込みボタン (InsertToolbar) を置いたため、
+ * 描画にアカウントの文脈が要る。本体では提供者が渡す。
+ * ここでは選び中のアカウントがあるものとして描く。
+ */
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
+}))
+/*
+ * R16: 差し込みボタンは任意機能の有無で出し分けるが、読み込みの成否は
+ * この試験の対象外。名前・配信日・その他だけ出す状態で描く。
+ */
+vi.mock('@/lib/use-feature-visibility', () => ({
+  useFeatureVisibility: () => ({ status: 'ready' as const, features: null, enabled: () => false }),
+}))
 vi.mock('@/lib/api', () => {
   class MockApiError extends Error {
     constructor(public status: number, message: string) {
@@ -141,14 +156,14 @@ describe('通知ステップの複数通編集', () => {
     render(<Issue469ReminderStepEditor reminderId="r-1" />)
     await screen.findByRole('button', { name: /1通目のお知らせ/ })
 
-    fireEvent.click(screen.getByRole('button', { name: '通知を追加' }))
+    fireEvent.click(screen.getByRole('button', { name: '通知を追加する' }))
     await screen.findByRole('button', { name: /3通目のお知らせ/ })
 
     // 新しい通が選ばれて本文は空。空のままでは保存ボタンを押せない。
     const saveButton = screen.getByRole('button', { name: '送信設定へ' }) as HTMLButtonElement
     expect(saveButton.disabled).toBe(true)
 
-    fireEvent.click(screen.getByRole('button', { name: 'この通知を削除' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この通知を削除する' }))
     await waitFor(() => expect(screen.queryByRole('button', { name: /3通目のお知らせ/ })).toBeNull())
   })
 
@@ -158,7 +173,7 @@ describe('通知ステップの複数通編集', () => {
     }))
     render(<Issue469ReminderStepEditor reminderId="r-1" />)
     await screen.findByRole('button', { name: /1通目のお知らせ/ })
-    expect((screen.getByRole('button', { name: 'この通知を削除' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'この通知を削除する' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('前へ移動で順番を入れ替えられる', async () => {
@@ -205,8 +220,21 @@ describe('通知ステップの複数通編集', () => {
     await screen.findByText('保存していない変更があります')
     expect(fixture.routerPush).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: '保存せずに移動' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
     await waitFor(() => expect(fixture.routerPush).toHaveBeenCalledWith('/reminders'))
+  })
+
+  it('R148: 開いたときの版時刻も保存時に送り、版IDが同じでも先勝ちを見逃さない', async () => {
+    fixture.getDraft.mockResolvedValue(draftResponse({ updatedAt: '2026-09-27T10:00:00.000+09:00' }))
+    const { container } = render(<Issue469ReminderStepEditor reminderId="r-1" />)
+    await waitFor(() => expect(bodyTextarea(container).value).toBe('前日のお知らせ本文'))
+
+    fireEvent.change(bodyTextarea(container), { target: { value: '改稿' } })
+    fireEvent.click(screen.getByRole('button', { name: '送信設定へ' }))
+    await waitFor(() => expect(fixture.saveDraft).toHaveBeenCalled())
+
+    const options = fixture.saveDraft.mock.calls[0][2]
+    expect(options).toEqual({ expectedVersionId: 'v-1', expectedUpdatedAt: '2026-09-27T10:00:00.000+09:00' })
   })
 
   it('別画面で先に更新されていたら409を知らせ、読み直しを案内する', async () => {
@@ -214,7 +242,7 @@ describe('通知ステップの複数通編集', () => {
     const { container } = render(<Issue469ReminderStepEditor reminderId="r-1" />)
     await waitFor(() => expect(bodyTextarea(container).value).toBe('前日のお知らせ本文'))
 
-    fireEvent.change(bodyTextarea(container), { target: { value: '古い画面からの保存' } })
+    fireEvent.change(bodyTextarea(container), { target: { value: '古い画面からの保存する' } })
     fireEvent.click(screen.getByRole('button', { name: '送信設定へ' }))
 
     await screen.findByText(/別の画面で先に更新されました/)

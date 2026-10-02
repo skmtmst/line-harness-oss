@@ -8,6 +8,11 @@ compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 account_id = "55f40f5577bd68828d67716f8d900642"
 
+# 他社向けサービス用の本番APIドメイン。既存の workers.dev URL も併存して使える。
+routes = [
+  { pattern = "api.musubo.jp", custom_domain = true }
+]
+
 # Worker runs before static assets so bot UAs get OGP HTML injection;
 # normal UAs fall through to the SPA via env.ASSETS.fetch().
 [assets]
@@ -27,21 +32,28 @@ bucket_name = "nen-line-images"
 [ai]
 binding = "AI"
 
+# バナー生成の用途寸法への整形（Cloudflare Images・R120）。
+# R2 の `IMAGES` と名前が重なるため `CF_IMAGES` にしている。
+# 注意: Images の有効化が必要か・変換回ごとの料金を、配備の前にオーナーへ確認する。
+[images]
+binding = "CF_IMAGES"
+
 [triggers]
 # :00/:05... は時刻厳守の通知・配信、:01/:06... は再実行可能な重い集計。
 # 6時間処理も別 invocation にして、走査の遅延を通知へ波及させない。
 crons = ["*/5 * * * *", "1-56/5 * * * *", "0 */6 * * *"]
 
 [vars]
+DEPLOY_ENV = "production"
 RESTAURANT_TEST_ENABLED = "false"
 WORKER_NAME = "nen-line"
 ADMIN_PAGES_PROJECT = "nen-line-admin-98712679"
 LIFF_PAGES_PROJECT = ""
 D1_DATABASE_ID = "5b0fcea8-e05e-42bf-9efa-f2bc4c459552"
 MANIFEST_URL = "https://github.com/Shudesu/line-harness-oss/releases/latest/download/release-manifest.json"
-WORKER_PUBLIC_URL = "https://nen-line.skmtmst.workers.dev"
-ADMIN_PUBLIC_URL = "https://nen-line-admin-98712679.pages.dev"
-LIFF_PUBLIC_URL = "https://nen-line.skmtmst.workers.dev"
+WORKER_PUBLIC_URL = "https://api.musubo.jp"
+ADMIN_PUBLIC_URL = "https://admin.musubo.jp"
+LIFF_PUBLIC_URL = "https://api.musubo.jp"
 CF_ACCOUNT_ID = "55f40f5577bd68828d67716f8d900642"
 MEDIA_R2_BUCKET_NAME = "nen-line-images"
 NEN_EC_BASE_URL = "https://nen-petfood.com"

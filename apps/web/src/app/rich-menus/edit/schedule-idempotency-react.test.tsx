@@ -27,6 +27,30 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   useRouter: () => ({ push: () => {}, replace: () => {} }),
 }))
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ日時の中身なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => (
+    <select
+      aria-label={label}
+      value={value}
+      onChange={(e: { target: { value: string } }) => onChange(e.target.value)}
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  ),
+}))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -155,13 +179,6 @@ async function flush() {
   })
 }
 
-/** React が値の変化を見落とさないように、ネイティブの setter で入れる。 */
-function typeInto(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
-  setter?.call(input, value)
-  input.dispatchEvent(new Event('input', { bubbles: true }))
-}
-
 function findByText<T extends Element>(selector: string, text: string): T {
   const found = [...container.querySelectorAll(selector)].find((node) =>
     (node.textContent ?? '').includes(text),
@@ -170,15 +187,57 @@ function findByText<T extends Element>(selector: string, text: string): T {
   return found as T
 }
 
+/** 出しはじめを日時の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm。 */
+async function pickStartsAt(startsAt: string) {
+  const [date, time] = startsAt.split('T')
+  const [hour, minute] = time.split(':')
+  const [y, mo, d] = date.split('-').map(Number)
+  const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
+  await act(async () => {
+    container.querySelector<HTMLElement>('button[aria-label="出しはじめ"]')!.click()
+  })
+  // 日時の選択箱は最上層（MenuPortal→document.body）に出る。器の中にはいない。
+  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  await act(async () => {
+    picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
+  })
+  for (let i = 0; i < 24; i += 1) {
+    const grid = document.querySelector('[role="grid"]')
+    if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
+    const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
+    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : y * 12 + mo
+    const nav = [...document.querySelectorAll('button')].find(
+      (b) => b.getAttribute('aria-label') === (y * 12 + mo >= current ? '次の月' : '前の月'),
+    )!
+    await act(async () => {
+      nav.click()
+    })
+  }
+  await act(async () => {
+    [...document.querySelectorAll('button')].find((b) =>
+      (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
+    )!.click()
+  })
+  const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  await act(async () => {
+    const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
+    hourSelect.value = hour
+    hourSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    const minuteSelect = reopened.querySelector('select[aria-label="分"]') as HTMLSelectElement
+    minuteSelect.value = minute
+    minuteSelect.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await act(async () => {
+    [...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!.click()
+  })
+}
+
 async function fillScheduleForm(startsAt: string) {
   const modeRadio = [...container.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')][1]
   await act(async () => {
     modeRadio.click()
   })
-  const startsAtInput = container.querySelector<HTMLInputElement>('input[aria-label="出しはじめ"]')!
-  await act(async () => {
-    typeInto(startsAtInput, startsAt)
-  })
+  await pickStartsAt(startsAt)
 }
 
 async function pressReserve() {

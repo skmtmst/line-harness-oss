@@ -13,6 +13,8 @@ const apiMocks = vi.hoisted(() => ({
   listOccurrenceSelector: vi.fn(),
   getOccurrenceApplicants: vi.fn(),
   promoteOccurrenceWaitlist: vi.fn(),
+  reorderOccurrenceWaitlist: vi.fn(),
+  skipOccurrenceWaitlist: vi.fn(),
   downloadOccurrenceApplicantsCsv: vi.fn(async () => undefined),
   previewOccurrenceBroadcast: vi.fn(),
   sendOccurrenceBroadcast: vi.fn(),
@@ -43,17 +45,22 @@ vi.mock('@/components/shared/confirm-dialog', () => ({
   ),
 }))
 vi.mock('@/components/shared/button', () => ({
-  default: ({ children, ...props }: React.ComponentProps<'button'>) => (
-    <button {...props}>{children}</button>
+  default: ({ children, href, ...props }: React.ComponentProps<'button'> & { href?: string }) => (
+    href !== undefined ? <a href={href} {...props}>{children}</a> : <button {...props}>{children}</button>
   ),
 }))
 vi.mock('@/components/shared/list-state', () => ({
   default: ({ kind }: { kind: string }) => <div>{kind}</div>,
 }))
 vi.mock('@/components/shared/pagination', () => ({ default: () => <div>ページ送り</div> }))
-vi.mock('@/components/shared/select-field', () => ({
-  default: ({ options, ...props }: React.ComponentProps<'select'> & { options: Array<{ value: string; label: string }> }) => (
-    <select {...props}>
+vi.mock('@/components/shared/select', () => ({
+  default: ({ value, onChange, options, size: _size, ...props }: {
+    value: string
+    onChange?: (value: string) => void
+    options: Array<{ value: string; label: string }>
+    size?: string
+  } & React.ComponentProps<'select'>) => (
+    <select value={value} onChange={(event) => onChange?.(event.target.value)} {...props}>
       {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
   ),
@@ -365,6 +372,20 @@ async function click(button: FakeElement): Promise<void> {
   await flush()
 }
 
+/** U: 待ち操作の確認窓に理由を書いて確認する。 */
+async function confirmWaitlistDialog(container: FakeElement, reason: string): Promise<void> {
+  const area = elements(container).find((element) => (
+    element.tagName === 'TEXTAREA' && propsOf(element)['aria-label'] === '操作の理由'
+  ))
+  if (!area) throw new Error('reason textarea not found')
+  await act(async () => {
+    const onChange = propsOf(area).onChange as (event: { target: { value: string } }) => void
+    onChange({ target: { value: reason } })
+  })
+  await flush()
+  await click(elements(container).find((element) => element.getAttribute('data-confirm-dialog') === 'confirm')!)
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void
   let reject!: (reason: unknown) => void
@@ -409,15 +430,18 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(view.container.textContent).toContain('案内中')
     expect(view.container.textContent).not.toContain('キャンセル待ち 1番')
     expect(view.container.textContent).toContain('待機 花子')
-    expect(view.container.textContent).toContain('2099/05/04')
+    expect(view.container.textContent).toContain('2099年5月4日')
     const talk = elements(view.container).find((element) => element.tagName === 'A' && element.textContent === '個別トーク')
     expect(talk && propsOf(talk).href).toBe('/chats?friend=friend-waiting')
 
     const button = occurrenceActionButton(view.container, 'promote-waitlist')
     await click(button)
     await click(button)
+    // U: 理由の確認窓が先。理由なしでは送らない。
+    expect(apiMocks.promoteOccurrenceWaitlist).toHaveBeenCalledTimes(0)
+    await confirmWaitlistDialog(view.container, '空きが出たため順番どおり案内します')
     expect(apiMocks.promoteOccurrenceWaitlist).toHaveBeenCalledTimes(1)
-    expect(apiMocks.promoteOccurrenceWaitlist).toHaveBeenCalledWith('account-a', 'slot-1', 4)
+    expect(apiMocks.promoteOccurrenceWaitlist).toHaveBeenCalledWith('account-a', 'slot-1', 4, '空きが出たため順番どおり案内します')
     sending.resolve({ kind: 'promoted' })
     await flush()
   })
@@ -525,10 +549,55 @@ describe('Issue #684 イベント予約の実操作', () => {
     const readsBeforeAction = apiMocks.getOccurrenceApplicants.mock.calls.length
 
     await click(occurrenceActionButton(view.container, 'promote-waitlist'))
+    await confirmWaitlistDialog(view.container, '空きが出たため順番どおり案内します')
 
     expect(apiMocks.getOccurrenceApplicants).toHaveBeenCalledTimes(readsBeforeAction + 1)
-    expect(view.container.textContent).toContain('案内を更新できませんでした。ほかの操作で順番や空席が変わった可能性があります。')
+    // 失敗しても窓は閉じず、書いた理由は残る（確認試験の窓は error を描かないため、窓と理由で見る）。
+    expect(elements(view.container).some((element) => element.getAttribute('data-confirm-dialog') === 'confirm')).toBe(true)
+    const area = elements(view.container).find((element) => (
+      element.tagName === 'TEXTAREA' && propsOf(element)['aria-label'] === '操作の理由'
+    ))!
+    expect(propsOf(area).value).toBe('空きが出たため順番どおり案内します')
     expect(view.container.textContent).toContain('待機 花子')
+  })
+
+  it('U: 理由なしでは送らず、見送りは理由つきで送る', async () => {
+    apiMocks.skipOccurrenceWaitlist.mockResolvedValue({ success: true, occurrence_version: 5, waitlist_id: 'wait-1', log_id: 'log-1' })
+    const view = await mount(<EventBookingsPage />)
+    await click(buttonByText(view.container, '見送る'))
+    // 理由が空のままは確認が押せない（本物の窓では確認ボタン自体が出ない）。
+    const confirm = elements(view.container).find((element) => element.getAttribute('data-confirm-dialog') === 'confirm')!
+    expect(typeof propsOf(confirm).onClick).not.toBe('function')
+    expect(apiMocks.skipOccurrenceWaitlist).not.toHaveBeenCalled()
+    await confirmWaitlistDialog(view.container, '連絡がつかないため今回は見送ります')
+    expect(apiMocks.skipOccurrenceWaitlist).toHaveBeenCalledWith('account-a', 'slot-1', {
+      waitlist_id: 'wait-1',
+      expectedVersion: 4,
+      reason: '連絡がつかないため今回は見送ります',
+    })
+  })
+
+  it('U: 上へで2人の順番を入れ替える', async () => {
+    apiMocks.getOccurrenceApplicants.mockResolvedValue({
+      occurrence: { id: 'slot-1', eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 1, version: 4 },
+      summary: { bookingCount: 0, waitingCount: 2, activeSeats: 1 },
+      snapshotId: 'snapshot-1', snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
+      applicants: [
+        { source: 'waitlist', id: 'wait-1', friendId: 'friend-1', displayName: '待機 一郎', pictureUrl: null, status: 'waiting', partySize: 1, appliedAt: '2099-05-01T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
+        { source: 'waitlist', id: 'wait-2', friendId: 'friend-2', displayName: '待機 二郎', pictureUrl: null, status: 'waiting', partySize: 1, appliedAt: '2099-05-02T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
+      ],
+    })
+    apiMocks.reorderOccurrenceWaitlist.mockResolvedValue({ success: true, occurrence_version: 5, order: ['wait-2', 'wait-1'], log_id: 'log-2' })
+    const view = await mount(<EventBookingsPage />)
+    const upButtons = elements(view.container).filter((element) => element.tagName === 'BUTTON' && element.textContent === '上へ')
+    expect(upButtons).toHaveLength(2)
+    await click(upButtons[1])
+    await confirmWaitlistDialog(view.container, '車いすの方を先にします')
+    expect(apiMocks.reorderOccurrenceWaitlist).toHaveBeenCalledWith('account-a', 'slot-1', {
+      ordered_ids: ['wait-2', 'wait-1'],
+      expectedVersion: 4,
+      reason: '車いすの方を先にします',
+    })
   })
 
   it('owner/adminだけが申込者への一斉送信を操作できる', async () => {
@@ -641,8 +710,9 @@ describe('Issue #684 イベント予約の実操作', () => {
     const promote = occurrenceActionButton(view.container, 'promote-waitlist')
     expect(propsOf(promote).disabled).toBe(false)
     await click(promote)
+    await confirmWaitlistDialog(view.container, 'Bの空きを案内します')
 
-    expect(apiMocks.promoteOccurrenceWaitlist).toHaveBeenCalledWith('account-b', 'slot-1', 4)
+    expect(apiMocks.promoteOccurrenceWaitlist).toHaveBeenCalledWith('account-b', 'slot-1', 4, 'Bの空きを案内します')
   })
 
   it('切替前の待ち案内処理中でも、新しいアカウントで待ち案内をやり直せる', async () => {
@@ -650,14 +720,164 @@ describe('Issue #684 イベント予約の実操作', () => {
     apiMocks.promoteOccurrenceWaitlist.mockReturnValueOnce(oldPromotion.promise)
     const view = await mount(<EventBookingsPage />)
     await click(occurrenceActionButton(view.container, 'promote-waitlist'))
+    await confirmWaitlistDialog(view.container, 'Aの空きを案内します')
 
     accountMock.selectedAccountId = 'account-b'
     await view.rerender(<EventBookingsPage />)
     const promote = occurrenceActionButton(view.container, 'promote-waitlist')
     expect(propsOf(promote).disabled).toBe(false)
     await click(promote)
+    await confirmWaitlistDialog(view.container, 'Bの空きを案内します')
 
-    expect(apiMocks.promoteOccurrenceWaitlist).toHaveBeenCalledWith('account-b', 'slot-1', 4)
+    expect(apiMocks.promoteOccurrenceWaitlist).toHaveBeenCalledWith('account-b', 'slot-1', 4, 'Bの空きを案内します')
+  })
+
+  it('開催回を切り替えた後に古いpreviewが返っても、新しい開催回の確認・送信に使えない', async () => {
+    apiMocks.listOccurrenceSelector.mockResolvedValue({
+      items: [
+        { id: 'slot-1', starts_at: '2099-06-01T01:00:00.000Z', ends_at: '2099-06-01T02:00:00.000Z', is_active: 1 },
+        { id: 'slot-2', starts_at: '2099-06-08T01:00:00.000Z', ends_at: '2099-06-08T02:00:00.000Z', is_active: 1 },
+      ],
+    })
+    apiMocks.getOccurrenceApplicants.mockImplementation(async (_accountId: string, occurrenceId: string) => ({
+      occurrence: { id: occurrenceId, eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 1, version: 4 },
+      summary: { bookingCount: 1, waitingCount: 0, activeSeats: 1 },
+      snapshotId: `snapshot-${occurrenceId}`, snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
+      applicants: [],
+    }))
+    const oldPreview = deferred<{ broadcastId: string; recipientCount: number }>()
+    apiMocks.previewOccurrenceBroadcast.mockReturnValueOnce(oldPreview.promise)
+    const view = await mount(<EventBookingsPage />)
+    const message = elements(view.container).find((element) => (
+      element.tagName === 'TEXTAREA' && propsOf(element)['aria-label'] === '申込者へ送るメッセージ'
+    ))!
+    await act(async () => {
+      const onChange = propsOf(message).onChange as (event: { target: { value: string } }) => void
+      onChange({ target: { value: '開催回のご案内です' } })
+    })
+    await flush()
+    await click(buttonByText(view.container, '対象と内容を確認'))
+    expect(apiMocks.previewOccurrenceBroadcast).toHaveBeenCalledWith(
+      'account-a', 'slot-1', expect.objectContaining({ snapshotId: 'snapshot-slot-1' }), expect.any(String),
+    )
+
+    // 開催回2へ切り替え、申込者の表示が切り替わるのを待つ。
+    const selector = elements(view.container).find((element) => (
+      element.tagName === 'SELECT' && propsOf(element)['aria-label'] === '開催回を選ぶ'
+    ))!
+    await act(async () => {
+      const onChange = propsOf(selector).onChange as (event: { target: { value: string } }) => void
+      onChange({ target: { value: 'slot-2' } })
+    })
+    await flush()
+    expect(apiMocks.getOccurrenceApplicants).toHaveBeenLastCalledWith('account-a', 'slot-2')
+
+    // 切り替え前の古いpreview応答が今返る。
+    oldPreview.resolve({ broadcastId: 'slot-1-draft', recipientCount: 97 })
+    await flush()
+
+    expect(view.container.textContent).not.toContain('送信対象 97人')
+    expect(elements(view.container).some((element) => (
+      element.tagName === 'BUTTON' && element.textContent === '送信前の最終確認へ'
+    ))).toBe(false)
+    expect(apiMocks.sendOccurrenceBroadcast).not.toHaveBeenCalled()
+  })
+
+  it('Aへ戻って押し直した後に古いpreviewが返っても最新の対象を置き換えない', async () => {
+    apiMocks.listOccurrenceSelector.mockResolvedValue({
+      items: [
+        { id: 'slot-1', starts_at: '2099-06-01T01:00:00.000Z', ends_at: '2099-06-01T02:00:00.000Z', is_active: 1 },
+        { id: 'slot-2', starts_at: '2099-06-08T01:00:00.000Z', ends_at: '2099-06-08T02:00:00.000Z', is_active: 1 },
+      ],
+    })
+    apiMocks.getOccurrenceApplicants.mockImplementation(async (_accountId: string, occurrenceId: string) => ({
+      occurrence: { id: occurrenceId, eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 1, version: 4 },
+      summary: { bookingCount: 1, waitingCount: 0, activeSeats: 1 },
+      snapshotId: `snapshot-${occurrenceId}`, snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
+      applicants: [],
+    }))
+    const oldPreview = deferred<{ broadcastId: string; recipientCount: number }>()
+    apiMocks.previewOccurrenceBroadcast.mockReturnValueOnce(oldPreview.promise)
+    const view = await mount(<EventBookingsPage />)
+    const message = elements(view.container).find((element) => (
+      element.tagName === 'TEXTAREA' && propsOf(element)['aria-label'] === '申込者へ送るメッセージ'
+    ))!
+    await act(async () => {
+      const onChange = propsOf(message).onChange as (event: { target: { value: string } }) => void
+      onChange({ target: { value: '開催回のご案内です' } })
+    })
+    await flush()
+    const selectOccurrence = async (id: string) => {
+      const selector = elements(view.container).find((element) => (
+        element.tagName === 'SELECT' && propsOf(element)['aria-label'] === '開催回を選ぶ'
+      ))!
+      await act(async () => {
+        const onChange = propsOf(selector).onChange as (event: { target: { value: string } }) => void
+        onChange({ target: { value: id } })
+      })
+      await flush()
+    }
+    await click(buttonByText(view.container, '対象と内容を確認'))
+    await selectOccurrence('slot-2')
+    await selectOccurrence('slot-1')
+    apiMocks.previewOccurrenceBroadcast.mockResolvedValueOnce({ broadcastId: 'fresh-A', recipientCount: 2 })
+    await click(buttonByText(view.container, '対象と内容を確認'))
+    expect(view.container.textContent).toContain('送信対象 2人')
+
+    // 1回目の古い応答が今返っても、最新のAの対象を置き換えない。
+    oldPreview.resolve({ broadcastId: 'obsolete-A', recipientCount: 97 })
+    await flush()
+    expect(view.container.textContent).not.toContain('送信対象 97人')
+    expect(view.container.textContent).toContain('送信対象 2人')
+    expect(apiMocks.sendOccurrenceBroadcast).not.toHaveBeenCalled()
+  })
+
+  it('古いAの後片付けで処理中のBの操作中表示を消さない', async () => {
+    apiMocks.listOccurrenceSelector.mockResolvedValue({
+      items: [
+        { id: 'slot-1', starts_at: '2099-06-01T01:00:00.000Z', ends_at: '2099-06-01T02:00:00.000Z', is_active: 1 },
+        { id: 'slot-2', starts_at: '2099-06-08T01:00:00.000Z', ends_at: '2099-06-08T02:00:00.000Z', is_active: 1 },
+      ],
+    })
+    apiMocks.getOccurrenceApplicants.mockImplementation(async (_accountId: string, occurrenceId: string) => ({
+      occurrence: { id: occurrenceId, eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 1, version: 4 },
+      summary: { bookingCount: 1, waitingCount: 0, activeSeats: 1 },
+      snapshotId: `snapshot-${occurrenceId}`, snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
+      applicants: [],
+    }))
+    const oldPreview = deferred<{ broadcastId: string; recipientCount: number }>()
+    const freshPreview = deferred<{ broadcastId: string; recipientCount: number }>()
+    apiMocks.previewOccurrenceBroadcast.mockReturnValueOnce(oldPreview.promise).mockReturnValueOnce(freshPreview.promise)
+    const view = await mount(<EventBookingsPage />)
+    const message = elements(view.container).find((element) => (
+      element.tagName === 'TEXTAREA' && propsOf(element)['aria-label'] === '申込者へ送るメッセージ'
+    ))!
+    await act(async () => {
+      const onChange = propsOf(message).onChange as (event: { target: { value: string } }) => void
+      onChange({ target: { value: '開催回のご案内です' } })
+    })
+    await flush()
+    await click(buttonByText(view.container, '対象と内容を確認'))
+    const selector = elements(view.container).find((element) => (
+      element.tagName === 'SELECT' && propsOf(element)['aria-label'] === '開催回を選ぶ'
+    ))!
+    await act(async () => {
+      const onChange = propsOf(selector).onChange as (event: { target: { value: string } }) => void
+      onChange({ target: { value: 'slot-2' } })
+    })
+    await flush()
+    await click(buttonByText(view.container, '対象と内容を確認'))
+    expect(propsOf(buttonByText(view.container, '対象と内容を確認')).disabled).toBe(true)
+
+    // 古いAの応答が返っても、Bの処理中表示は残る。
+    oldPreview.resolve({ broadcastId: 'old-A', recipientCount: 97 })
+    await flush()
+    expect(propsOf(buttonByText(view.container, '対象と内容を確認')).disabled).toBe(true)
+    freshPreview.resolve({ broadcastId: 'new-B', recipientCount: 2 })
+    await flush()
+    expect(view.container.textContent).toContain('送信対象 2人')
+    expect(view.container.textContent).not.toContain('送信対象 97人')
+    expect(apiMocks.sendOccurrenceBroadcast).not.toHaveBeenCalled()
   })
 
   it('同じ行を連打しても更新は1回だけ送る', async () => {
@@ -893,13 +1113,21 @@ describe('Issue #684 イベント予約の実操作', () => {
   })
 
   it('一覧上部の件数は「表示のみ」で、タブやボタンとして扱わない', async () => {
+    // ★V7: 集計帯は下の集計カードとの重複なので出さない。上部の件数は集計カードで見る。
     const view = await mount(<EventsListPage />)
-    const summary = elements(view.container).find((element) => (
-      element.getAttribute('data-event-count-summary') !== null
+    const kpis = elements(view.container).find((element) => (
+      element.getAttribute('data-design') === 'KPIs'
     ))
-    expect(summary).toBeDefined()
-    expect(summary?.getAttribute('aria-label')).toBe('一覧の集計（表示のみ）')
-    expect(summary?.textContent).toContain('一覧の集計（表示のみ）')
-    expect(summary && elements(summary).some((element) => ['BUTTON', 'A'].includes(element.tagName))).toBe(false)
+    expect(kpis).toBeDefined()
+    expect(kpis?.textContent).toContain('これからの回')
+    /*
+     * R79/R80: 数の数え方は見出し横の「？」へ入れる（共通ルール 2-1b）。
+     * 「？」は補足の開閉だけで、数自体を押させはしない。タブ・リンク・
+     * 操作ボタンは引き続き置かない。
+     */
+    const pressable = kpis ? elements(kpis).filter((element) => ['BUTTON', 'A'].includes(element.tagName)) : []
+    const nonHelp = pressable.filter((element) => element.getAttribute('aria-label')?.endsWith('の説明') !== true)
+    expect(nonHelp).toHaveLength(0)
+    expect(pressable.length).toBeGreaterThan(0)
   })
 })

@@ -7,9 +7,10 @@ import { csvCell } from '@/lib/presentation'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import StickyBar from '@/components/shared/sticky-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { characterCountText } from './change-impact'
+import { formatNumber } from '@/lib/format'
 
 // 呼び名は口（COMMON_VAR_USAGE_KIND_LABELS）とそろえる。ずれると
 // 同じものを別物に読み違える。口側を変えたらここも変える。
@@ -28,7 +29,7 @@ const KIND_LABELS: Record<string, string> = {
 export function impactBreakdown(impact: CommonVarChangeImpact): string {
   const values = Object.entries(impact.byKind)
     .filter(([, count]) => count > 0)
-    .map(([kind, count]) => `${KIND_LABELS[kind] ?? kind}${count.toLocaleString('ja-JP')}`)
+    .map(([kind, count]) => `${KIND_LABELS[kind] ?? kind}${formatNumber(count)}`)
   return values.length > 0 ? values.join('・') : '種類別の内訳はありません'
 }
 
@@ -106,14 +107,14 @@ export default function ImpactReview({
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard
+        <KpiCard
           title="変わる場所"
           value={impact.blockingTotal}
           unit="か所"
           detail={impactBreakdown(impact)}
           variant="v6"
         />
-        <SummaryCard
+        <KpiCard
           title="すぐ効くもの"
           value={urgent}
           unit="件"
@@ -123,7 +124,7 @@ export default function ImpactReview({
           badgeTone="neutral"
           variant="v6"
         />
-        <SummaryCard
+        <KpiCard
           title="文字数が上限を超えるもの"
           value={overLimit}
           unit="件"
@@ -131,14 +132,14 @@ export default function ImpactReview({
           badgeTone={overLimit > 0 ? 'danger' : 'neutral'}
           variant="v6"
         />
-        <SummaryCard
+        <KpiCard
           title="送信済みの文"
           value={impact.historicalTotal}
           unit="件"
           // 送信を始めた配信は値の写しを持つので、保存しても変わらない
           // （IDEA-14）。送信済みと同じ「変わらない」側として断りを入れる。
           detail={impact.sendingFixedTotal > 0
-            ? `変わりません。送信を始めた配信${impact.sendingFixedTotal.toLocaleString('ja-JP')}件は、送信開始時の値で固定済みです`
+            ? `変わりません。送信を始めた配信${formatNumber(impact.sendingFixedTotal)}件は、送信開始時の値で固定済みです`
             : '変わりません。過去に送った文はそのときの値のままです'}
           variant="v6"
         />
@@ -179,20 +180,19 @@ export default function ImpactReview({
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <p className="text-ink-faint text-xs">
-          {impact.blockingTotal.toLocaleString('ja-JP')}か所中 {rows.length === 0 ? 0 : (page - 1) * 6 + 1}〜{Math.min(page * 6, rows.length).toLocaleString('ja-JP')}件を表示
+          {formatNumber(impact.blockingTotal)}か所中 {rows.length === 0 ? 0 : (page - 1) * 6 + 1}〜{formatNumber(Math.min(page * 6, rows.length))}件を表示
         </p>
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
       </div>
 
       <StickyBar
         status={overLimit > 0
-          ? `文字数が上限を超えるものが ${overLimit.toLocaleString('ja-JP')}件あります。先に直してください。`
+          ? `文字数が上限を超えるものが ${formatNumber(overLimit)}件あります。先に直してください。`
           : '保存を止める問題は見つかりませんでした。'}
         actions={(
           <>
             <Button type="button" onClick={onBack}>編集に戻る</Button>
-            <Button type="button" variant="primary" disabled={busy || !impact.canSave} onClick={onSave}>
-              {busy ? '保存中…' : 'このまま保存する'}
+            <Button type="button" variant="primary" disabled={busy || !impact.canSave} onClick={onSave} busy={busy}>このまま保存する
             </Button>
           </>
         )}

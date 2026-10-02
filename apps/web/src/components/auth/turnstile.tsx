@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { TURNSTILE_SITE_KEY } from '@/lib/auth-email'
+import Notice from '@/components/shared/notice'
 
 /**
  * Cloudflare Turnstile（ロボット対策）の部品。★V6 36-4 の「ロボット対策」枠。
@@ -104,9 +105,9 @@ export default function Turnstile({
 
   if (!TURNSTILE_SITE_KEY) {
     return (
-      <div role="note" className="w-full rounded-control bg-status-warn-soft px-4 py-3 text-caption text-status-warn-deep">
+      <Notice tone="warn" className="w-full">
         ロボット対策の設定が済んでいないため、この環境では送信できません。運営にお問い合わせください。
-      </div>
+      </Notice>
     )
   }
   return <div ref={hostRef} className="w-full" aria-label="ロボットでないことの確認" />

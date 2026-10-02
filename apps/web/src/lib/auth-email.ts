@@ -50,6 +50,18 @@ export async function authRequest<T>(path: string, body?: unknown, method: 'GET'
   }
 }
 
+/**
+ * 公開入口（ログイン・本登録）の失敗文。Worker が書いた利用者向けの日本語は
+ * そのまま返す。`audit_unavailable` のような内部コードだけ、日本語の失敗理由と
+ * 再試行案内へ変える。呼び出し側は `?? res.error ?? 従来文言` で使う。
+ */
+export function internalAuthFailureCopy(status: number, error: string | undefined): string | null {
+  if (error && /[぀-ヿ一-鿿]/.test(error)) return null
+  if (status === 429) return '混み合っています。少し待ってから、もう一度お試しください。'
+  if (status === 401) return 'メールアドレスかパスワードが違います。もう一度お試しください。'
+  return '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度お試しください。'
+}
+
 /** メールの形。Worker と同じ「@ の両側に何かあり、空白が無い」程度。 */
 export function emailError(value: string): string | null {
   const email = value.trim()
@@ -117,6 +129,13 @@ export const LEGAL_LINKS = {
   privacy: process.env.NEXT_PUBLIC_PRIVACY_URL || null,
   commerce: process.env.NEXT_PUBLIC_COMMERCE_LAW_URL || null,
 }
+
+/**
+ * ログイン前に開けるお問い合わせの口。サービスサイトの /contact/ へつなぐ。
+ * 新しい公開フォームは作らない（監査 m18e・2026-09-27 司令塔の決定）。
+ * 管理画面の /hq/support はログインが要るので、ログイン前の導線には使わない。
+ */
+export const CONTACT_URL = process.env.NEXT_PUBLIC_CONTACT_URL || 'https://nen-petfood.com/contact/'
 
 export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null
 

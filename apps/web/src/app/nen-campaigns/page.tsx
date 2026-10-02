@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
@@ -18,6 +18,7 @@ import {
   type NenDeliveryList,
   type NenFlowMetrics,
 } from '@/lib/api'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { NenOverview, type ColumnDeliveryPlan, type FriendOption, type NenCoupon, type NenKpis, type NenTab } from './nen-overview'
 import { defaultScheduleLocal, jstMonthRange } from './nen-period'
 
@@ -229,7 +230,19 @@ export default function NenCampaignsPage() {
       await api.nenCampaigns.setEnabled(selectedAccountId, setting.campaignKey, nextEnabled)
       updateDraft(setting.campaignKey, { isEnabled: nextEnabled })
       setNotice({ tone: 'success', text: `${setting.label}を${nextEnabled ? '動かしました' : '止めました'}。` })
-    } catch { setNotice({ tone: 'error', text: `${setting.label}を切り替えられませんでした。` }) }
+    } catch (caught) {
+      /*
+       * M501: 混雑（429）の案内は共通部品に任せる。画面で状態を見分けて
+       * 文言を書き分けず、失敗そのままを渡す（Retry-After は口が返さない
+       * ため、共通部品の「少し待ってから」の案内を使う）。
+       */
+      setNotice({
+        tone: 'error',
+        text: describeApiFailure(caught, `${setting.label}の切り替え`, {
+          forbidden: `${setting.label}を切り替える権限がありません。権限を確認してください。`,
+        }),
+      })
+    }
     finally { setSaving(null) }
   }
   const testSend = async (setting: NenCampaignSetting) => {
@@ -282,10 +295,27 @@ export default function NenCampaignsPage() {
     } catch { setNotice({ tone: 'error', text: 'ECのコラムを取り込めませんでした。通信の状態を確認して、もう一度お試しください。' }) }
     finally { setImporting(false) }
   }
+  /*
+   * M506: 複製中はボタンを押せなくし、要求キーで二重押し・再送を1本に収める。
+   * キーは複製元ごとに持ち回り、成功したら捨てる（次の複製は別の試行）。
+   */
+  const [duplicatingColumnId, setDuplicatingColumnId] = useState<string | null>(null)
+  const duplicateKeysRef = useRef<Record<string, string>>({})
   const duplicateColumn = async (column: NenColumn) => {
-    if (!selectedAccountId) return
-    try { const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId); if (!result.success) throw new Error(); setNotice({ tone: 'success', text: `「${column.title}」を下書きへ複製しました。` }); await loadTab('columns'); setSelectedColumnId(result.data.id) }
+    if (!selectedAccountId || duplicatingColumnId) return
+    setDuplicatingColumnId(column.id)
+    const requestKey = duplicateKeysRef.current[column.id]
+      ?? (duplicateKeysRef.current[column.id] = crypto.randomUUID())
+    try {
+      const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId, { idempotencyKey: requestKey })
+      if (!result.success) throw new Error()
+      delete duplicateKeysRef.current[column.id]
+      setNotice({ tone: 'success', text: result.replayed ? `「${column.title}」の複製は既にありました。複製を開きました。` : `「${column.title}」を下書きへ複製しました。` })
+      await loadTab('columns')
+      setSelectedColumnId(result.data.id)
+    }
     catch { setNotice({ tone: 'error', text: 'コラムを複製できませんでした。' }) }
+    finally { setDuplicatingColumnId(null) }
   }
   const testColumn = async (column: NenColumn) => {
     if (!selectedAccountId || !testFriendId) { setNotice({ tone: 'error', text: 'テスト送信先を選択してください。' }); return }
@@ -365,31 +395,35 @@ export default function NenCampaignsPage() {
     if (!loadedTabs.current.has(next)) void loadTab(next)
   }
 
-  if (loading && loadedTabs.current.size === 0) return <main className="p-6"><ListState kind="loading" /></main>
+  if (loading && loadedTabs.current.size === 0) return <div className="p-6"><ListState kind="loading" /></div>
 
   /*
     ヘッダー操作。★V6 37-6 の「配信を追加」は、自動配信の種類が実キー固定（追加口が無い）
     ため置かない。コラムは ★V6 37-6-A どおり「ECのコラムを取り込む」（未割り当て分の割り当て）。
+    #618: 一覧に件数があっても未選択でも届くよう、新規作成入口「コラムを書く」
+    （/nen-campaigns/columns/new・日時あり下書き保存）をヘッダーに置く。
   */
-  const headerAction = tab === 'columns' ? <Button type="button" variant="primary" disabled={importing || !selectedAccountId} onClick={() => void importColumns()}>{importing ? '取り込んでいます…' : 'ECのコラムを取り込む'}</Button>
+  const headerAction = tab === 'columns' ? (
+    <span className="flex flex-wrap items-center justify-end gap-2">
+      <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
+      <Button type="button" disabled={importing || !selectedAccountId} onClick={() => void importColumns()} busy={importing} busyLabel="取り込んでいます…">ECのコラムを取り込む</Button>
+    </span>
+  )
     : tab === 'history' ? <Button type="button" disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>
       : null
 
   return (
     <>
-      {tabErrors[tab] ? (
-        <div className="mx-auto w-full px-4 pt-4 sm:px-6" style={{ maxWidth: 1600 }}>
-          <NoteBar
-            tone="danger"
-            action={<Button type="button" onClick={() => void loadTab(tab)}>もう一度読み込む</Button>}
-          >
-            {tabErrors[tab]}
-          </NoteBar>
-        </div>
-      ) : null}
+      {/*
+        ★V7 `x63W5x`：タブの失敗をページ上の帯に出さない。一覧の場所の
+        ListState error だけにまとめる（同じ失敗を2回出さない）。
+        失敗の文言（`tabErrors`）と取り直し（`loadTab`）は NenOverview へ渡す。
+      */}
       <NenOverview
         topAction={headerAction}
         tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
+        tabError={tabErrors[tab]} onRetryTab={() => loadTab(tab)}
+        kpisFailed={kpis === null && (tabErrors.auto !== '' || tabErrors.columns !== '' || tabErrors.paused !== '')}
         flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
         friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId}
         loading={loading} notice={notice}
@@ -402,16 +436,14 @@ export default function NenCampaignsPage() {
         plan={plan} onPlanChange={setPlan}
         introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
         onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
-        onDuplicateColumn={(column) => void duplicateColumn(column)} onTestColumn={(column) => void testColumn(column)}
+        onDuplicateColumn={(column) => void duplicateColumn(column)} duplicatingColumnId={duplicatingColumnId} onTestColumn={(column) => void testColumn(column)}
         onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
         onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
       />
       {/* #935 N-301: 紹介文の入力途中で画面を離れる／別コラムへ移るときの確認。 */}
-      <ConfirmDialog
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="入力した紹介文が保存されていません"
-        description="このまま移動すると、入力した紹介文は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
+        subject="入力した紹介文"
         cancelLabel="書き続ける"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}

@@ -4,6 +4,9 @@ const dbMocks = vi.hoisted(() => ({
   getFriendById: vi.fn(),
   isOperationCapabilityStopped: vi.fn(async () => false),
   getLineAccountById: vi.fn(),
+  listLineAccountsWithTenantStatus: vi.fn(async () => [
+    { id: 'account-1', tenant_status: 'active' },
+  ]),
   jstNow: vi.fn(() => '2026-08-10T20:00:00+09:00'),
 }));
 vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
@@ -75,7 +78,7 @@ describe('processWebinarFollowups', () => {
             return { results: [] };
           },
           async first() {
-            if (sql.includes('SELECT id, retry_key, status FROM webinar_followups')) {
+            if (sql.includes('SELECT id, retry_key, status, last_error FROM webinar_followups')) {
               return { id: 'followup-1', retry_key: 'retry-1', status: 'pending' };
             }
             return null;

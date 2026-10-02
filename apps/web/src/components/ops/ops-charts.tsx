@@ -1,21 +1,25 @@
 'use client'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 運営ダッシュボード（★V6 37-2）の絵。棒グラフ `月ごとの売上` とドーナツ `プラン別の契約`。
  *
  * 色は CSS の色トークンだけを使う（Pencil のトークン表に無い色は作らない）。
- * - 今月の棒とスタンダード: accent-deep ／ 過去の棒: surface-pearl
- * - ライト: status-info ／ プロ: chip-alt ／ トライアル: status-warn
+ * - 今月の棒: accent-deep ／ 過去の棒: surface-pearl
+ * - ライト: status-info ／ スタンダード: ink ／ プロ: chip-alt ／ トライアル: status-warn
+ * プランの分類色に緑は使わない（緑は「正常」の意味だけ）。
  */
 
 export function formatYen(yen: number): string {
-  return `¥${Math.round(yen).toLocaleString('ja-JP')}`
+  // 数字でない値が来ても「¥NaN」を出さない。未取得は「—」が決まり。
+  if (typeof yen !== 'number' || !Number.isFinite(yen)) return '—'
+  return `¥${formatNumber(Math.round(yen))}`
 }
 
 /** 軸の目盛り。¥450万 のように「万」で丸める。 */
 export function formatYenShort(yen: number): string {
   if (yen === 0) return '¥0'
-  if (yen >= 10_000) return `¥${Math.round(yen / 10_000).toLocaleString('ja-JP')}万`
+  if (yen >= 10_000) return `¥${formatNumber(Math.round(yen / 10_000))}万`
   return formatYen(yen)
 }
 
@@ -60,7 +64,7 @@ export function RevenueBars({ rows, width = 920, height = 220 }: { rows: Array<{
             {r.current && current ? (
               <g>
                 <rect x={x + barW / 2 - 44} y={Math.max(y - 30, 2)} width={88} height={24} rx={6} fill="var(--color-ink)" />
-                <text x={x + barW / 2} y={Math.max(y - 30, 2) + 16} textAnchor="middle" fontSize={12} fontWeight={700} fill="var(--color-on-accent)">{formatYen(current.yen)}</text>
+                <text x={x + barW / 2} y={Math.max(y - 30, 2) + 16} textAnchor="middle" fontSize={12} fontWeight={600} fill="var(--color-on-accent)">{formatYen(current.yen)}</text>
               </g>
             ) : null}
           </g>
@@ -72,7 +76,7 @@ export function RevenueBars({ rows, width = 920, height = 220 }: { rows: Array<{
 
 const SHARE_COLORS: Record<string, string> = {
   light: 'var(--color-status-info)',
-  standard: 'var(--color-accent-deep)',
+  standard: 'var(--color-ink)',
   pro: 'var(--color-chip-alt)',
   trial: 'var(--color-status-warn)',
 }
@@ -111,7 +115,7 @@ export function PlanDonut({ rows, total, size = 190 }: { rows: Array<{ key: stri
           return el
         })
         : null}
-      <text x={c} y={c - 2} textAnchor="middle" fontSize={26} fontWeight={700} fill="var(--color-ink)">{total}</text>
+      <text x={c} y={c - 2} textAnchor="middle" fontSize={26} fontWeight={600} fill="var(--color-ink)">{total}</text>
       <text x={c} y={c + 20} textAnchor="middle" fontSize={12} fill="var(--color-ink-secondary)">契約先</text>
     </svg>
   )

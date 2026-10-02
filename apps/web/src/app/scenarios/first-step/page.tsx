@@ -28,18 +28,24 @@ import QuestionEditor, {
 import { ConditionDialog, describeCondition } from '@/components/scenarios/scenario-dialogs'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
+import { TimeField } from '@/components/shared/date-time-field'
 import StepPreview from '@/components/scenarios/step-preview'
 import CharCounter, { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter'
 import styles from './first-step.module.css'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
 import { pruneCondition } from '@/lib/segment-condition'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Notice from '@/components/shared/notice'
+import TargetMissing from '@/components/shared/target-missing'
+import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   restoreFirstStep,
   scheduleToPayload,
 } from './first-step-form'
+import { formatNumber } from '@/lib/format'
 
 /**
  * ステップの作成（設計の3段目）。
@@ -83,6 +89,8 @@ function FirstStepContent() {
   const [loadState, setLoadState] = useState<LoadState>('idle')
   /** 失敗したあとの「再読み込み」で effect を回し直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [loadMissing, setLoadMissing] = useState(false)
   /**
    * 取得の世代番号。id が切り替わったあとに古い応答が解決しても、
    * 別のシナリオの本文やstepIdを新しい画面へ流し込まないための番兵
@@ -178,6 +186,7 @@ function FirstStepContent() {
     setScenario(null)
     setLoadState('loading')
     setError('')
+    setLoadMissing(false)
     resetForm()
     void (async () => {
       try {
@@ -191,6 +200,17 @@ function FirstStepContent() {
           return
         }
         setScenario(res.data)
+        // R23横展開: 対象タグ・テンプレートの候補はこのシナリオのアカウントだけ。
+        // 読み直したシナリオから所属を取る（取り直しは1回だけ）。
+        const candidateAccountId = res.data.lineAccountId ?? undefined
+        void scenarioReferenceData.tags(candidateAccountId).then((tagRes) => {
+          if (seq !== loadSeq.current) return
+          if (tagRes.success) setTags(tagRes.data)
+        })
+        void scenarioReferenceData.templates(candidateAccountId).then((tplRes) => {
+          if (seq !== loadSeq.current) return
+          if (tplRes.success) setTemplates(tplRes.data as unknown as Template[])
+        })
         const first = [...res.data.steps].sort((a, b) => a.stepOrder - b.stepOrder)[0]
         if (first) {
           // 作成フローを途中で閉じて戻った場合は、既存の1通目を再表示する。
@@ -216,19 +236,18 @@ function FirstStepContent() {
           setRestoreNotice(restored.restoreNotice)
         }
         setLoadState('ready')
-      } catch {
+      } catch (caught) {
         if (seq !== loadSeq.current) return
         scenarioReferenceData.invalidateScenario(id)
-        setError('シナリオを読み込めませんでした。通信状態を確認して、もう一度お試しください。')
+        if (caught instanceof ApiError && caught.status === 404) {
+          setError('')
+          setLoadMissing(true)
+        } else {
+          setError('シナリオを読み込めませんでした。通信状態を確認して、もう一度お試しください。')
+        }
         setLoadState('error')
       }
     })()
-    void scenarioReferenceData.tags().then(res => {
-      if (res.success) setTags(res.data)
-    })
-    void scenarioReferenceData.templates().then(res => {
-      if (res.success) setTemplates(res.data as unknown as Template[])
-    })
   }, [id, reloadKey])
 
   const mode: DeliveryMode = scenario?.deliveryMode ?? 'absolute_time'
@@ -439,18 +458,19 @@ function FirstStepContent() {
 
   if (!id) {
     return (
-      <div className="text-ink-faint py-12 text-center text-sm">
-        シナリオが指定されていません。
-        <Link href="/scenarios" className="text-accent ml-2 underline">
-          シナリオ一覧へ
-        </Link>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="1通目を作るシナリオが指定されていません"
+        description="一覧から、1通目を作るシナリオを選び直してください。"
+        backHref="/scenarios"
+        backLabel="シナリオ一覧へ戻る"
+      />
     )
   }
 
   return (
-    <div data-design-node="kk8dz">
-      <div data-design="Head" className="mb-7 flex items-center justify-between">
+    <div data-design-node="kk8dz" className="flex flex-col gap-4">
+      <div data-design="Head" className="flex items-center justify-between">
         <nav data-design="Crumb" className="text-ink-faint text-xs">
           <Link href="/scenarios" className="hover:underline">
             シナリオ配信
@@ -458,56 +478,63 @@ function FirstStepContent() {
           <span className="mx-1.5">/</span>
           <span>1通目を設定</span>
         </nav>
-        <Link
-          href="/scenarios"
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
-        >
+        <Button variant="secondary" className="text-ink-secondary items-center px-3 py-2 font-medium h-auto whitespace-normal" href="/scenarios">
           ✕ キャンセル
-        </Link>
+        </Button>
       </div>
 
-      <ol
-        aria-label="シナリオ作成の進み方"
-        className="bg-canvas border-hairline mb-4 flex flex-wrap items-center gap-3 rounded-card border px-4 py-3 text-xs"
-      >
-        <StepMark n={1} label="シナリオ情報" state="done" />
-        <StepLine />
-        <StepMark n={2} label="配信方式" state="done" />
-        <StepLine />
-        <StepMark n={3} label="1通目を設定" state="current" />
-      </ol>
-
-      <div data-design="Notice" className="space-y-2">
-        <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
-          配信方式：{modeLabel[mode]}　・　シナリオ：{scenario?.name ?? '読み込み中'}
-        </p>
-        {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
-      </div>
-
-      {loadState !== 'ready' ? (
-        /*
-         * シナリオが確定するまでフォームは出さない（SCENARIO-04）。
-         * 取得前に入力を許すと、届いた既存の1通目が入力を上書きするか、
-         * まだ知らない既存通へ重ねて保存してしまう。失敗したときは
-         * 理由と「再読み込み」を同じ場所に出す。
-         */
-        <div className="bg-canvas rounded-card border-hairline mt-4 border p-8 text-center">
-          {loadState === 'error' ? (
-            <>
-              <p className="text-ink text-sm font-bold">シナリオを読み込めませんでした</p>
-              <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-                1通目の作成・保存はできません。通信状態を確認して、もう一度読み込んでください。
-              </p>
-              <Button onClick={() => setReloadKey(k => k + 1)} className="mt-4">
-                再読み込み
-              </Button>
-            </>
-          ) : (
-            <p className="text-ink-faint text-sm">シナリオを読み込んでいます…</p>
-          )}
-        </div>
+      {/*
+        対象が無い（取得失敗）ときは、進み方・案内・入力のどれも出さない。
+        代わりに ★V7 TargetMissing を出す（設計 `x5cgUH`）。
+      */}
+      {loadState === 'error' ? (
+        loadMissing || !error ? (
+          <TargetMissing
+            kind="not-found"
+            title="このシナリオは見つかりません"
+            description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
+            backHref="/scenarios"
+            backLabel="シナリオ一覧へ戻る"
+          />
+        ) : (
+          <TargetMissing
+            kind="error"
+            title="シナリオを読み込めませんでした"
+            description="1通目の作成・保存はできません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+            onRetry={() => setReloadKey((k) => k + 1)}
+          />
+        )
       ) : (
-        <>
+        <div className="flex flex-col gap-4">
+          <ol
+            aria-label="シナリオ作成の進み方"
+            className="bg-canvas border-hairline flex flex-wrap items-center gap-3 rounded-card border px-4 py-3 text-xs"
+          >
+            <StepMark n={1} label="シナリオ情報" state="done" />
+            <StepLine />
+            <StepMark n={2} label="配信方式" state="done" />
+            <StepLine />
+            <StepMark n={3} label="1通目を設定" state="current" />
+          </ol>
+
+          <div data-design="Notice" className="space-y-2">
+            <Notice tone="success">
+              配信方式：{modeLabel[mode]}　・　シナリオ：{scenario?.name ?? '読み込み中'}
+            </Notice>
+            {error && <Notice tone="danger" message={error} />}
+          </div>
+
+          {loadState !== 'ready' ? (
+            /*
+             * シナリオが確定するまでフォームは出さない（SCENARIO-04）。
+             * 取得前に入力を許すと、届いた既存の1通目が入力を上書きするか、
+             * まだ知らない既存通へ重ねて保存してしまう。
+             */
+            <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
+              <p className="text-ink-faint text-sm">シナリオを読み込んでいます…</p>
+            </div>
+          ) : (
+        <div className="flex flex-col gap-4">
       {/*
         左に入力、右にプレビュー。プレビューは付いてくる（sticky）ので、
         下の選択肢を書いているあいだも、届く形と時刻が視界に残る。
@@ -529,7 +556,7 @@ function FirstStepContent() {
             この1通目を誰に送るかを決めます。開始のきっかけは、このあとの編集画面で決められます。
           </p>
 
-          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <RadioCardGroup legend="この1通目を誰に送るか" className="mt-4">
             {(
               [
                 { value: 'all', label: 'シナリオ購読中の全員に配信する' },
@@ -537,28 +564,28 @@ function FirstStepContent() {
                 { value: 'advanced', label: '詳細条件で絞り込んで配信する' },
               ] as const
             ).map(opt => (
-              <label key={opt.value} className="text-ink flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="targetMode"
-                  checked={targetMode === opt.value}
-                  onChange={() => setTargetMode(opt.value)}
-                />
-                {opt.label}
-              </label>
+              <RadioCard
+                key={opt.value}
+                name="targetMode"
+                value={opt.value}
+                checked={targetMode === opt.value}
+                onChange={() => setTargetMode(opt.value)}
+                title={opt.label}
+              />
             ))}
-          </div>
+          </RadioCardGroup>
 
           {targetMode === 'tag' && (
             <label className="mt-4 block">
               <span className="text-ink-secondary mb-1 block text-xs font-medium">
                 タグで絞り込み <span className="text-danger">*</span>
               </span>
-              <SelectField
+              <Select
                 value={targetTagId}
-                onChange={e => setTargetTagId(e.target.value)}
+                onChange={value => setTargetTagId(value)}
                 aria-label="絞り込みに使うタグ"
-                className="border-hairline rounded-control bg-canvas text-ink w-full max-w-md border px-3 py-2 text-sm"
+                size="full"
+                className="max-w-md"
                 options={[
                   { value: '', label: '-- 選んでください --' },
                   ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
@@ -604,15 +631,14 @@ function FirstStepContent() {
               </div>
             </label>
             {mode === 'absolute_time' ? (
-              <label className="block">
+              <span className="block">
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">配信する時刻</span>
-                <input
-                  type="time"
+                <TimeField
                   value={deliveryTime}
-                  onChange={e => setDeliveryTime(e.target.value)}
-                  className={`${styles.timeField} border-hairline rounded-control bg-canvas text-ink border px-3`}
+                  onChange={setDeliveryTime}
+                  aria-label="配信する時刻"
                 />
-              </label>
+              </span>
             ) : (
               <label className="block">
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">さらに</span>
@@ -650,29 +676,26 @@ function FirstStepContent() {
             この管理画面で送れないことが分からない）。
           */}
           <div className="mt-5">
-            <div className="mb-3 flex flex-wrap items-center gap-4">
+            <RadioCardGroup legend="配信内容の作り方" className="mb-3 flex flex-wrap gap-4">
               {(
                 [
                   { value: 'compose', label: 'この画面で作る' },
                   { value: 'template', label: 'テンプレートから選ぶ' },
                 ] as const
               ).map(o => (
-                <label key={o.value} className="text-ink flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="contentMode"
-                    checked={contentMode === o.value}
-                    onChange={() => changeContentMode(o.value)}
-                  />
-                  {o.label}
-                </label>
+                <RadioCard
+                  key={o.value}
+                  name="contentMode"
+                  value={o.value}
+                  checked={contentMode === o.value}
+                  onChange={() => changeContentMode(o.value)}
+                  title={o.label}
+                />
               ))}
-            </div>
+            </RadioCardGroup>
 
             {preserved && restoreNotice && (
-              <p className="bg-warning-bg text-ink-secondary rounded-card mb-3 px-4 py-3 text-xs leading-relaxed">
-                {restoreNotice}
-              </p>
+              <Notice tone="warn" message={restoreNotice} className="mb-3" />
             )}
 
             {contentMode === 'compose' ? (
@@ -740,11 +763,12 @@ function FirstStepContent() {
               <div>
                 <label className="block">
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">テンプレート</span>
-                  <SelectField
+                  <Select
                     value={templateId}
-                    onChange={e => editTemplateId(e.target.value)}
+                    onChange={value => editTemplateId(value)}
                     aria-label="配信するテンプレート"
-                    className="border-hairline rounded-control bg-canvas text-ink w-full max-w-md border px-3 py-2 text-sm"
+                    size="full"
+                    className="max-w-md"
                     options={[
                       { value: '', label: '選んでください' },
                       ...templates.map((template) => ({
@@ -809,31 +833,37 @@ function FirstStepContent() {
         理由を操作のそばに置く。「押したのに何も起きない」を作らない。
       */}
       {bodyOverLimit && (
-        <p className="bg-danger-bg text-danger rounded-card mt-4 px-4 py-3 text-sm">
-          本文が {LINE_TEXT_LIMIT.toLocaleString('en-US')} 字を超えています。
+        <Notice tone="danger" className="mt-4">
+          本文が {formatNumber(LINE_TEXT_LIMIT)} 字を超えています。
           LINEが受け付けないため、この状態では保存できません。
-        </p>
+        </Notice>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={saving || bodyOverLimit || loadState !== 'ready'}
-          className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-5 py-3 text-sm font-bold transition-colors disabled:opacity-50"
-        >
-          {saving ? '保存中…' : '作成して編集へ →'}
-        </button>
-        <button
-          type="button"
-          onClick={() => void skip()}
-          disabled={saving}
-          className="text-ink-secondary hover:text-ink text-sm disabled:opacity-50"
-        >
-          1通目はあとで書く
-        </button>
-      </div>
-        </>
+      {/*
+        保存系の操作は本文の最下部の追従バーにだけ置く
+        （`docs/v6-common-rules.md` §1-6、#642）。左は削除・状態用に
+        空け、操作群は中央へ揃える。
+      */}
+      <StickyBar
+        actions={(
+          <>
+            <button
+              type="button"
+              onClick={() => void skip()}
+              disabled={saving}
+              className="text-ink-secondary hover:text-ink text-sm disabled:opacity-50"
+            >
+              1通目はあとで書く
+            </button>
+            <Button variant="primary" className="px-5 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void submit()} disabled={saving || bodyOverLimit || loadState !== 'ready'}>
+              {saving ? '保存中…' : '作って編集へ →'}
+            </Button>
+          </>
+        )}
+      />
+        </div>
+      )}
+        </div>
       )}
 
       {/* 詳細条件。中身はシナリオ編集と同じ部品を使う。 */}
@@ -864,11 +894,11 @@ function StepMark({
   return (
     <li className="flex items-center gap-2">
       <span
-        className={`rounded-pill flex h-6 w-6 items-center justify-center text-xs font-bold ${
+        className={`rounded-pill flex h-6 w-6 items-center justify-center text-xs font-medium ${
           state === 'done'
             ? 'bg-accent-deep text-on-accent'
             : state === 'current'
-              ? 'border-accent text-accent border-2'
+              ? 'border-accent text-accent-deep border-2'
               : 'border-hairline text-ink-faint border'
         }`}
       >

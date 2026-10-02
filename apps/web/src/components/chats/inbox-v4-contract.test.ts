@@ -59,9 +59,11 @@ describe('受信箱V4で既存機能を失わない', () => {
     expect(TEMPLATE_PICKER).toContain('z-[100]')
   })
 
-  it('カード影は右1px・下1pxに統一する', () => {
-    expect(PAGE).toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
-    expect(TEMPLATE_PICKER).toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
+  it('カード影は共通トークン shadow-card に統一する（#673）', () => {
+    expect(PAGE).toContain('shadow-card')
+    expect(TEMPLATE_PICKER).toContain('shadow-card')
+    expect(PAGE).not.toContain('shadow-[1px_1px_2px')
+    expect(TEMPLATE_PICKER).not.toContain('shadow-[1px_1px_2px')
   })
 })
 
@@ -102,7 +104,8 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain("{item.key === 'all' && item.label}")
     expect(PAGE).not.toContain('{item.label}\n                </button>')
     expect(PAGE).toContain('data-inbox-sort="fixed"')
-    expect(PAGE).toContain('並び順：新しい順')
+    // オーナー指示 (m13d)：未読の会話を先に並べる。文言で固定していた旧表示は新表示へ。
+    expect(PAGE).toContain('並び順：未読が先・新しい順')
     expect(PAGE).not.toContain('aria-label="並び順"')
     expect(PAGE).not.toContain('defaultValue="newest"')
     expect(PAGE).toContain('shrink-0 items-center')
@@ -113,7 +116,9 @@ describe('受信箱V4の画面契約', () => {
   it('見出しと会話まわりの余分な高さを詰める', () => {
     expect(PAGE).not.toContain('返信が必要な会話を見つけ、担当・期限・顧客情報を見ながら対応できます。')
     expect(FRIEND_INFO).not.toContain('対応に必要な情報をまとめて確認できます')
-    expect(FRIEND_INFO).toContain('inline-flex h-8 shrink-0 items-center justify-center')
+    // V8 移行 ①: 共通 Button は inline-flex を部品側が持つので、画面側の
+    // クラス列は寸法と揃えだけを見る。
+    expect(FRIEND_INFO).toContain('h-8 shrink-0 items-center justify-center')
     expect(PAGE).toContain("isOutgoing ? 'items-end justify-end' : 'items-start justify-start'")
     expect(PAGE).toContain('flex w-24 shrink-0 flex-col items-center')
   })

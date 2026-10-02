@@ -1,22 +1,26 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { api, type EventBookingMine } from '../lib/api.js';
+import { api, type EventBookingMine, type EventSlot } from '../lib/api.js';
+import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
+import { logFailure } from '../lib/user-message.js';
+import LoadErrorView from '../components/LoadErrorView.js';
+import LoadingView from '../components/LoadingView.js';
+import Card from '../components/ui/Card.js';
+import Badge from '../components/ui/Badge.js';
+import Button from '../components/ui/Button.js';
+import ConfirmDialog from '../components/ui/ConfirmDialog.js';
+import Icon from '../components/ui/Icon.js';
+import PageHeader from '../components/ui/PageHeader.js';
+import StatusView from '../components/ui/StatusView.js';
 
-function formatJp(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', weekday: 'short',
-  });
-}
-
-const statusLabel: Record<string, { text: string; cls: string }> = {
-  requested: { text: '承認待ち', cls: 'bg-yellow-100 text-yellow-800' },
-  confirmed: { text: '確定', cls: 'bg-green-100 text-green-800' },
-  rejected: { text: '見送り', cls: 'bg-gray-200 text-gray-700' },
-  cancelled: { text: 'キャンセル', cls: 'bg-gray-100 text-gray-600' },
-  expired: { text: '期限切れ', cls: 'bg-gray-100 text-gray-500' },
-  attended: { text: '参加済', cls: 'bg-blue-100 text-blue-800' },
-  no_show: { text: '不参加', cls: 'bg-red-100 text-red-700' },
+/** 札の文字は設計どおり (参加・承認待ち…)。意味は今の状態名のまま変えない。 */
+const statusMeta: Record<string, { text: string; tone: 'confirmed' | 'pending' | 'neutral' }> = {
+  confirmed: { text: '参加', tone: 'confirmed' },
+  requested: { text: '承認待ち', tone: 'pending' },
+  rejected: { text: '見送り', tone: 'neutral' },
+  cancelled: { text: 'キャンセル', tone: 'neutral' },
+  expired: { text: '期限切れ', tone: 'neutral' },
+  attended: { text: '参加済', tone: 'neutral' },
+  no_show: { text: '不参加', tone: 'neutral' },
 };
 
 function canCancel(b: EventBookingMine): boolean {
@@ -26,21 +30,31 @@ function canCancel(b: EventBookingMine): boolean {
   return deadlineMs > Date.now();
 }
 
+/**
+ * 3-b 自分のイベント。「これから／これまで」の切り替え。
+ * キャンセルは期限まで。確認の出し方と失敗の文言はそのまま。
+ * 見た目だけ ★V7 (日付の四角＋名前＋札＋補足)。
+ */
 export default function EventBookings() {
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const [items, setItems] = useState<EventBookingMine[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 読み込みの失敗と、キャンセル操作の失敗は別に持つ。
+  // 混ぜると失敗を「予約0件」と言ってしまう。
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setLoadFailed(false);
+    setActionError(null);
     try {
       const res = await api.myEventBookings(tab);
       setItems(res.items);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      logFailure('event-bookings', e);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -50,91 +64,345 @@ export default function EventBookings() {
     void refresh();
   }, [refresh]);
 
-  async function cancel(b: EventBookingMine) {
-    if (!confirm(`「${b.event_name}」の予約をキャンセルしますか？`)) return;
+  // 取り消す予約。開いている間だけ持つ。ブラウザの `confirm()` は使わず、
+  // 共通の確認窓で聞く (やめるを選ぶとここが空のまま終わる)。
+  const [pendingCancel, setPendingCancel] = useState<EventBookingMine | null>(null);
+
+  /**
+   * U-3: 開催回を変える予約。窓を開けている間だけ持つ。
+   * 冪等鍵は窓を開けたときに1つ作り、失敗後の再試行でも使い回す
+   * (応答を失った成功を二重にしない)。
+   */
+  const [pendingChange, setPendingChange] = useState<{
+    booking: EventBookingMine;
+    slots: EventSlot[] | null;
+    slotsFailed: boolean;
+    selectedSlotId: string | null;
+    idempotencyKey: string;
+    changeError: string | null;
+  } | null>(null);
+
+  // 自分の予約一覧には枠 ID が無いため、今の時間は開始日時で見分ける。
+  function isCurrentSlot(booking: EventBookingMine, slot: EventSlot): boolean {
+    return slot.starts_at === booking.slot_starts_at;
+  }
+
+  async function openChange(booking: EventBookingMine) {
+    if (busy) return;
+    setActionError(null);
+    setPendingChange({
+      booking,
+      slots: null,
+      slotsFailed: false,
+      selectedSlotId: null,
+      idempotencyKey: crypto.randomUUID(),
+      changeError: null,
+    });
+    try {
+      const res = await api.getEventSlots(booking.event_id);
+      setPendingChange((current) => {
+        if (!current || current.booking.id !== booking.id) return current;
+        const first = res.items.find(
+          (s) => !isCurrentSlot(booking, s) && s.remaining !== 0,
+        );
+        return { ...current, slots: res.items, selectedSlotId: first?.id ?? null };
+      });
+    } catch (e) {
+      logFailure('change-event-booking-slots', e);
+      setPendingChange((current) =>
+        current && current.booking.id === booking.id ? { ...current, slotsFailed: true } : current,
+      );
+    }
+  }
+
+  async function runChange() {
+    const target = pendingChange;
+    if (!target || !target.selectedSlotId || busy) return;
+    const selected = target.slots?.find((s) => s.id === target.selectedSlotId);
+    // 今の時間そのものは選ばせない (API も same_slot で止める)。
+    if (!selected || isCurrentSlot(target.booking, selected)) return;
     setBusy(true);
-    setError(null);
+    setActionError(null);
+    try {
+      await api.changeMyEventBooking(
+        target.booking.id,
+        target.selectedSlotId,
+        target.idempotencyKey,
+      );
+      setPendingChange(null);
+      await refresh();
+    } catch (err) {
+      logFailure('change-event-booking', err);
+      const e = err as { body?: { error?: string } };
+      const msg = (() => {
+        switch (e.body?.error) {
+          case 'slot_full': return '選んだ時間は満席になりました。別の時間を選んでください。';
+          case 'change_deadline_passed': return '変更期限を過ぎています。LINE で運営にご連絡ください。';
+          case 'change_not_allowed': return 'このイベントは LIFF からの変更に対応していません。LINE で運営にご連絡ください。';
+          case 'slot_inactive':
+          case 'slot_started':
+          case 'entry_closed': return '選んだ時間は受付を終えています。別の時間を選んでください。';
+          case 'same_slot': return '今と同じ時間です。別の時間を選んでください。';
+          case 'over_friend_limit':
+          case 'duplicate_friend_booking': return '申込の上限に達しているため変えられません。LINE で運営にご連絡ください。';
+          case 'invalid_state': return 'この予約は既に変更・キャンセル済みのため変えられません。一覧を開き直してください。';
+          case 'send_in_flight_retry': return '送信の直前でした。少し待ってから、もう一度お試しください。';
+          default: return '変えられませんでした。時間をおいて、もう一度お試しください。';
+        }
+      })();
+      setPendingChange((current) =>
+        current && current.booking.id === target.booking.id ? { ...current, changeError: msg } : current,
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runCancel() {
+    const b = pendingCancel;
+    if (!b || busy) return;
+    setPendingCancel(null);
+    setBusy(true);
+    setActionError(null);
     try {
       await api.cancelMyEventBooking(b.id);
       await refresh();
     } catch (err) {
+      logFailure('cancel-event-booking', err);
       const e = err as { body?: { error?: string } };
       const msg = (() => {
         switch (e.body?.error) {
           case 'cancel_deadline_passed': return 'キャンセル期限を過ぎています。';
           case 'cancel_not_allowed': return 'このイベントは LIFF からのキャンセルに対応していません。LINE で運営にご連絡ください。';
           case 'invalid_state': return 'この予約は既にキャンセル済 / 確定外のためキャンセルできません。';
-          default: return err instanceof Error ? err.message : String(err);
+          default: return 'キャンセルできませんでした。時間をおいて、もう一度お試しください。';
         }
       })();
-      setError(msg);
+      setActionError(msg);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="pb-16">
-      <div className="border-b sticky top-0 bg-white z-10">
-        <div className="flex">
-          {(['upcoming', 'past'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 py-3 text-sm ${tab === t ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-600'}`}
-            >
-              {t === 'upcoming' ? 'これから' : '過去'}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="p-3 space-y-3">
-        {error && <div className="bg-red-50 text-red-700 p-2 rounded text-sm">{error}</div>}
+    <div className="min-h-screen bg-ground">
+      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
+        <PageHeader title="自分のイベント" />
         {loading ? (
-          <div className="text-center text-gray-500 py-8">読み込み中...</div>
-        ) : items.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            {tab === 'upcoming' ? 'これからの予約はありません' : '過去の予約はありません'}
-          </div>
+          <LoadingView />
+        ) : loadFailed ? (
+          <LoadErrorView note="申し込みはなくなっていません。" onRetry={() => void refresh()} />
         ) : (
-          items.map((b) => {
-            const s = statusLabel[b.status] ?? { text: b.status, cls: 'bg-gray-100' };
-            return (
-              <div key={b.id} className="border rounded overflow-hidden">
-                <div className="flex">
-                  {b.event_image_url ? (
-                    <img src={b.event_image_url} alt="" className="w-20 h-20 object-cover bg-gray-100" />
-                  ) : (
-                    <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-blue-200" />
-                  )}
-                  <div className="flex-1 p-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="font-semibold text-sm line-clamp-2">{b.event_name}</div>
-                      <span className={`text-xs px-2 py-0.5 rounded shrink-0 ${s.cls}`}>{s.text}</span>
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">{formatJp(b.slot_starts_at)}</div>
-                    {b.venue_name && <div className="text-xs text-gray-600">📍 {b.venue_name}</div>}
-                  </div>
-                </div>
-                {canCancel(b) && (
-                  <div className="border-t p-2 text-right">
-                    <button
-                      onClick={() => cancel(b)}
-                      disabled={busy}
-                      className="text-sm text-red-600 hover:underline disabled:opacity-50"
-                    >
-                      キャンセルする
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })
+          <>
+            <div
+              className="flex rounded-xl bg-hairline/40 p-1"
+              role="tablist"
+              aria-label="イベントの期間"
+            >
+              {(
+                [
+                  { key: 'upcoming', label: 'これから' },
+                  { key: 'past', label: 'これまで' },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`min-h-11 flex-1 rounded-lg px-2 text-sm focus-visible:outline-2 focus-visible:outline-ink ${
+                    tab === t.key
+                      ? 'bg-canvas font-bold text-ink shadow-sm'
+                      : 'text-ink-secondary'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            {actionError && (
+              <p role="alert" className="text-sm leading-6 text-danger">
+                {actionError}
+              </p>
+            )}
+            {items.length === 0 ? (
+              tab === 'upcoming' ? (
+                <StatusView icon="calendar" title="これからのイベントはありません" />
+              ) : (
+                <StatusView icon="calendar" title="これまでのイベントはありません" />
+              )
+            ) : (
+              <ul className="space-y-2">
+                {items.map((b) => {
+                  const meta = statusMeta[b.status] ?? { text: b.status, tone: 'neutral' as const };
+                  return (
+                    <li key={b.id}>
+                      <Card className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="flex w-13 shrink-0 flex-col items-center"
+                            aria-label={`${utcToJstMd(b.slot_starts_at)} ${utcToJstHm(b.slot_starts_at)}`}
+                          >
+                            <span className="text-base font-bold whitespace-nowrap text-ink">
+                              {utcToJstMd(b.slot_starts_at)}
+                            </span>
+                            <span className="text-xs text-ink-secondary">
+                              {utcToJstHm(b.slot_starts_at)}
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-semibold text-ink" title={b.event_name}>
+                              {b.event_name}
+                            </div>
+                            {b.venue_name && (
+                              <div
+                                className="mt-0.5 truncate text-sm text-ink-secondary"
+                                title={b.venue_name}
+                              >
+                                {b.venue_name}
+                              </div>
+                            )}
+                          </div>
+                          <Badge tone={meta.tone}>{meta.text}</Badge>
+                        </div>
+                        {canCancel(b) && (
+                          <div className="mt-2 flex items-center gap-4 text-left">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void openChange(b);
+                              }}
+                              disabled={busy}
+                              className="inline-flex min-h-11 items-center gap-0.5 text-sm font-semibold text-info-link focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                            >
+                              時間を変える
+                              <Icon name="chevron-right" className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActionError(null);
+                                setPendingCancel(b);
+                              }}
+                              disabled={busy}
+                              className="inline-flex min-h-11 items-center gap-0.5 text-sm font-semibold text-info-link focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                            >
+                              キャンセルする
+                              <Icon name="chevron-right" className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                      </Card>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
         )}
       </div>
-      <div className="text-center mt-4">
-        <Link to="/booking" className="text-xs text-gray-500 underline">サロン予約はこちら</Link>
-      </div>
+      <ConfirmDialog
+        open={pendingCancel !== null}
+        title={pendingCancel ? `「${pendingCancel.event_name}」の予約をキャンセルしますか？` : ''}
+        description={
+          pendingCancel
+            ? `${utcToJstMd(pendingCancel.slot_starts_at)} ${utcToJstHm(pendingCancel.slot_starts_at)}${pendingCancel.venue_name ? `・${pendingCancel.venue_name}` : ''}の予約を取り消します。`
+            : ''
+        }
+        confirmLabel="キャンセルする"
+        cancelLabel="やめる"
+        destructive
+        busy={busy}
+        onCancel={() => {
+          if (!busy) setPendingCancel(null);
+        }}
+        onConfirm={() => void runCancel()}
+      />
+      <ConfirmDialog
+        open={pendingChange !== null}
+        title={pendingChange ? `「${pendingChange.booking.event_name}」の時間を変えますか？` : ''}
+        description={
+          pendingChange
+            ? '新しい時間の席を取れたときだけ、今の予約を取り消します。満席の時間へは変えられません。'
+            : ''
+        }
+        confirmLabel="この時間に変える"
+        cancelLabel="やめる"
+        busy={busy}
+        error={pendingChange?.changeError ?? undefined}
+        onCancel={() => {
+          if (!busy) setPendingChange(null);
+        }}
+        onConfirm={
+          pendingChange?.selectedSlotId && !busy ? () => void runChange() : undefined
+        }
+      >
+        {pendingChange && (
+          <div className="mt-3">
+            {pendingChange.slots === null && !pendingChange.slotsFailed && (
+              <p className="text-sm text-ink-secondary">時間を読み込んでいます…</p>
+            )}
+            {pendingChange.slotsFailed && (
+              <div className="space-y-2">
+                <p className="text-sm text-ink-secondary">
+                  時間を読み込めませんでした。予約はなくなっていません。
+                </p>
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void openChange(pendingChange.booking)}
+                >
+                  読み直す
+                </Button>
+              </div>
+            )}
+            {pendingChange.slots !== null && (
+              <ul className="space-y-2">
+                {pendingChange.slots.map((s) => {
+                  const current = isCurrentSlot(pendingChange.booking, s);
+                  const full = s.remaining === 0;
+                  const disabled = current || full || busy;
+                  const selected = pendingChange.selectedSlotId === s.id;
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        aria-pressed={selected}
+                        onClick={() =>
+                          setPendingChange((prev) =>
+                            prev ? { ...prev, selectedSlotId: s.id, changeError: null } : prev,
+                          )
+                        }
+                        className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${
+                          disabled
+                            ? 'border-hairline bg-shell-gray'
+                            : selected
+                              ? 'border-accent-deep bg-ok-bg'
+                              : 'border-hairline bg-canvas'
+                        }`}
+                      >
+                        <span
+                          className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-ok-ink' : 'text-ink'}`}
+                        >
+                          {utcToJstMd(s.starts_at)} {utcToJstHm(s.starts_at)}〜
+                          {utcToJstHm(s.ends_at)}
+                        </span>
+                        <span
+                          className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-ok-ink' : 'text-ink-secondary'}`}
+                        >
+                          {current ? '今の時間' : full ? '満席' : '空きあり'}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

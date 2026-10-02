@@ -7,6 +7,7 @@ import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import { authRequest, confirmError, passwordError } from '@/lib/auth-email'
 
 /**
@@ -106,9 +107,7 @@ function ResetInner() {
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
-          <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-status-danger">
-            {error}
-          </p>
+          <Notice tone="danger" message={error} />
         ) : null}
         <AuthField label="メールアドレス" hint="この権限者のパスワードを変えます" htmlFor="reset-email">
           <div id="reset-email" className="flex h-11 w-full items-center justify-between rounded-control border border-hairline bg-surface-pearl px-3 text-label text-ink-secondary">
@@ -122,8 +121,7 @@ function ResetInner() {
         <AuthField label="パスワード（確認）" htmlFor="reset-confirm" error={messages.confirm}>
           <PasswordField id="reset-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(messages.confirm)} autoComplete="new-password" />
         </AuthField>
-        <Button type="submit" variant="primary" disabled={busy} className="w-full">
-          {busy ? '設定しています…' : 'パスワードを設定してログインへ'}
+        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="設定しています…">パスワードを設定してログインへ
         </Button>
       </form>
     </AuthCard>

@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import type { Chat, Reminder, Scenario, Tag, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
+import { runOptimistic, runUndoable } from '@/lib/undoable'
+import DateTimeField from '@/components/shared/date-time-field'
+import Select from '@/components/shared/select'
+import Button from '@/components/shared/button'
 
 /**
  * 1人だけ選んだときの操作（設計 `BulkBar` の6つ）。
@@ -43,12 +47,24 @@ export default function SingleFriendActions({
   friendId,
   friendName,
   tags,
+  accountId,
   onDone,
+  friendTags,
+  onFriendTagsChange,
 }: {
   friendId: string
   friendName: string
   tags: Tag[]
+  /** この友だちの所属アカウント。候補はこのアカウントだけに絞る（R23横展開）。 */
+  accountId: string | null
   onDone: () => void
+  /** その友だちに今付いているタグ（楽観的更新の起点）。 */
+  friendTags?: Tag[]
+  /**
+   * タグの付け外しを先に画面へ反映する（★V7 sTJsh §1）。返す関数を
+   * 呼ぶと変更前へ戻る。省略したらタグ操作は従来どおり返事を待つ。
+   */
+  onFriendTagsChange?: (next: Tag[]) => () => void
 }) {
   const [open, setOpen] = useState<Action | null>(null)
   const [busy, setBusy] = useState(false)
@@ -75,23 +91,17 @@ export default function SingleFriendActions({
     <div className="w-full">
       <div className="flex flex-wrap gap-2">
         {(Object.keys(LABELS) as Action[]).map((a) => (
-          <button
-            key={a}
-            type="button"
-            onClick={() => {
-              setOpen(open === a ? null : a)
-              setError('')
-              setMessage('')
-            }}
-            aria-pressed={open === a}
-            className={`rounded-control border px-2.5 py-1 text-xs ${
+          <Button variant="primary" className={(`rounded-control border px-2.5 py-1 text-xs ${
               open === a
                 ? 'border-accent bg-accent-deep text-on-accent'
                 : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
-            }`}
-          >
+            }`) + ' h-auto whitespace-normal'} key={a} type="button" onClick={() => {
+              setOpen(open === a ? null : a)
+              setError('')
+              setMessage('')
+            }} aria-pressed={open === a}>
             {LABELS[a]}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -104,9 +114,20 @@ export default function SingleFriendActions({
             {friendName} に「{LABELS[open]}」
           </p>
           {open === 'status' && <StatusPanel friendId={friendId} busy={busy} run={run} />}
-          {open === 'template' && <TemplatePanel friendId={friendId} busy={busy} run={run} />}
-          {open === 'scenario' && <ScenarioPanel friendId={friendId} busy={busy} run={run} />}
-          {open === 'tag' && <TagPanel friendId={friendId} tags={tags} busy={busy} run={run} />}
+          {open === 'template' && <TemplatePanel friendId={friendId} accountId={accountId} busy={busy} run={run} />}
+          {open === 'scenario' && <ScenarioPanel friendId={friendId} accountId={accountId} busy={busy} run={run} />}
+          {open === 'tag' && (
+            <TagPanel
+              friendId={friendId}
+              tags={tags}
+              friendTags={friendTags ?? []}
+              onTagsChange={onFriendTagsChange}
+              onDone={onDone}
+              closePanel={() => setOpen(null)}
+              busy={busy}
+              run={run}
+            />
+          )}
           {open === 'field' && <FieldPanel friendId={friendId} busy={busy} run={run} />}
           {open === 'reminder' && <ReminderPanel friendId={friendId} busy={busy} run={run} />}
         </div>
@@ -126,14 +147,9 @@ function Row({ children }: { children: React.ReactNode }) {
 
 function Go({ busy, onClick, label = '実行' }: { busy: boolean; onClick: () => void; label?: string }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={busy}
-      className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-3 py-1.5 text-xs font-bold disabled:opacity-50"
-    >
+    <Button variant="primary" className="px-3 py-1.5 text-xs font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={onClick} disabled={busy}>
       {busy ? '実行中…' : label}
-    </button>
+    </Button>
   )
 }
 
@@ -144,29 +160,38 @@ function StatusPanel({ friendId, busy, run }: { friendId: string; busy: boolean;
   const [status, setStatus] = useState<Chat['status']>('resolved')
   return (
     <Row>
-      <select value={status} onChange={(e) => setStatus(e.target.value as Chat['status'])} className={SELECT}>
-        <option value="unread">未対応</option>
-        <option value="in_progress">対応中</option>
-        <option value="resolved">対応済み</option>
-      </select>
+      {/* R117: 読み上げで何を変える欄か分かるよう、共通Selectでも固有の名前を付ける。 */}
+      <Select
+        aria-label="対応状況"
+        value={status}
+        onChange={(value) => setStatus(value as Chat['status'])}
+        options={[
+          { value: 'unread', label: '未対応' },
+          { value: 'in_progress', label: '対応中' },
+          { value: 'resolved', label: '対応済み' },
+        ]}
+      />
       {/* 友だちIDでも引ける（resolveOrCreateChat）。トークが無い人にも当てられる。 */}
       <Go busy={busy} onClick={() => void run(() => api.chats.update(friendId, { status }), '対応状況を変えました')} />
     </Row>
   )
 }
 
-function TemplatePanel({ friendId, busy, run }: { friendId: string; busy: boolean; run: Run }) {
+function TemplatePanel({ friendId, accountId, busy, run }: { friendId: string; accountId: string | null; busy: boolean; run: Run }) {
   const [templates, setTemplates] = useState<Template[]>([])
   const [id, setId] = useState('')
   const sendKeysRef = useRef(new IdempotencyKeyStore())
   useEffect(() => {
-    void api.templates.list().then((res) => {
+    // R23横展開: 送る文の候補はこの友だちのアカウントだけ。切替で取り直し、残った選択は外す。
+    setTemplates([])
+    setId('')
+    void api.templates.list(undefined, accountId ?? undefined).then((res) => {
       if (res.success) {
         // 文字のものだけ。画像やカードは中身がJSONで、そのまま送ると文字になる。
         setTemplates((res.data as unknown as Template[]).filter((t) => t.messageType === 'text'))
       }
     })
-  }, [])
+  }, [accountId])
   const picked = templates.find((t) => t.id === id)
   const sendPicked = async () => {
     if (!picked) return { success: false, error: 'テンプレートを選んでください' }
@@ -182,12 +207,12 @@ function TemplatePanel({ friendId, busy, run }: { friendId: string; busy: boolea
   return (
     <div className="space-y-2">
       <Row>
-        <select value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
-          <option value="">テンプレートを選ぶ</option>
-          {templates.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
+        <Select
+          aria-label="テンプレート"
+          value={id}
+          onChange={setId}
+          options={[{ value: '', label: 'テンプレートを選ぶ' }, ...templates.map((t) => ({ value: t.id, label: t.name }))]}
+        />
         <Go
           busy={busy || !picked}
           onClick={() =>
@@ -206,22 +231,25 @@ function TemplatePanel({ friendId, busy, run }: { friendId: string; busy: boolea
   )
 }
 
-function ScenarioPanel({ friendId, busy, run }: { friendId: string; busy: boolean; run: Run }) {
+function ScenarioPanel({ friendId, accountId, busy, run }: { friendId: string; accountId: string | null; busy: boolean; run: Run }) {
   const [items, setItems] = useState<Scenario[]>([])
   const [id, setId] = useState('')
   useEffect(() => {
-    void api.scenarios.list().then((res) => {
+    // R23横展開: 始めるシナリオの候補はこの友だちのアカウントだけ。切替で取り直し、残った選択は外す。
+    setItems([])
+    setId('')
+    void api.scenarios.list(accountId ? { accountId } : undefined).then((res) => {
       if (res.success) setItems(res.data)
     })
-  }, [])
+  }, [accountId])
   return (
     <Row>
-      <select value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
-        <option value="">シナリオを選ぶ</option>
-        {items.map((s) => (
-          <option key={s.id} value={s.id}>{s.name}</option>
-        ))}
-      </select>
+      <Select
+        aria-label="シナリオ"
+        value={id}
+        onChange={setId}
+        options={[{ value: '', label: 'シナリオを選ぶ' }, ...items.map((s) => ({ value: s.id, label: s.name }))]}
+      />
       <Go
         busy={busy || !id}
         onClick={() => void run(() => api.scenarios.enroll(id, friendId), 'シナリオを開始しました')}
@@ -231,39 +259,92 @@ function ScenarioPanel({ friendId, busy, run }: { friendId: string; busy: boolea
   )
 }
 
+/*
+ * タグの付け外しは取り消せる軽い操作（★V7 sTJsh §1・§4）。
+ * 付ける: 押した瞬間に一覧へ反映して裏で保存し、失敗したら元に戻す。
+ * 外す: 先に外した形にして、サーバーへは5秒後に送る。
+ *       知らせの「元に戻す」で止めたら送らず、付いたままに戻す。
+ * 親が `onTagsChange` を渡さない限り、従来どおり返事を待つ動きのまま。
+ */
 function TagPanel({
   friendId,
   tags,
+  friendTags,
+  onTagsChange,
+  onDone,
+  closePanel,
   busy,
   run,
 }: {
   friendId: string
   tags: Tag[]
+  friendTags: Tag[]
+  onTagsChange?: (next: Tag[]) => () => void
+  onDone: () => void
+  closePanel: () => void
   busy: boolean
   run: Run
 }) {
   const [id, setId] = useState('')
+  const picked = tags.find((t) => t.id === id)
+
+  const attach = () => {
+    if (!picked || !onTagsChange) {
+      void run(() => api.friends.addTag(friendId, id), 'タグを付けました')
+      return
+    }
+    if (friendTags.some((tag) => tag.id === picked.id)) {
+      closePanel()
+      return
+    }
+    const revert = onTagsChange([...friendTags, picked])
+    closePanel()
+    runOptimistic({
+      request: () => api.friends.addTag(friendId, picked.id),
+      revert,
+      failureMessage: `「${picked.name}」を付けられませんでした。`,
+      retry: attach,
+      onSuccess: onDone,
+    })
+  }
+
+  const detach = () => {
+    if (!onTagsChange) {
+      void run(() => api.friends.removeTag(friendId, id), 'タグを外しました')
+      return
+    }
+    if (!picked) return
+    if (!friendTags.some((tag) => tag.id === picked.id)) {
+      closePanel()
+      return
+    }
+    const revert = onTagsChange(friendTags.filter((tag) => tag.id !== picked.id))
+    closePanel()
+    runUndoable({
+      message: `「${picked.name}」を外しました`,
+      commit: () => api.friends.removeTag(friendId, picked.id),
+      undo: revert,
+      onCommitError: () => {
+        revert()
+        onDone()
+      },
+      failureMessage: `「${picked.name}」を外せませんでした。`,
+      onCommitted: onDone,
+    })
+  }
+
   return (
     <Row>
-      <select value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
-        <option value="">タグを選ぶ</option>
-        {tags.map((t) => (
-          <option key={t.id} value={t.id}>{t.name}</option>
-        ))}
-      </select>
-      <Go
-        busy={busy || !id}
-        onClick={() => void run(() => api.friends.addTag(friendId, id), 'タグを付けました')}
-        label="付ける"
+      <Select
+        aria-label="タグ"
+        value={id}
+        onChange={setId}
+        options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
       />
-      <button
-        type="button"
-        disabled={busy || !id}
-        onClick={() => void run(() => api.friends.removeTag(friendId, id), 'タグを外しました')}
-        className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-1.5 text-xs disabled:opacity-50"
-      >
+      <Go busy={busy || !id} onClick={attach} label="付ける" />
+      <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs disabled:opacity-50 h-auto whitespace-normal" type="button" disabled={busy || !id} onClick={detach}>
         外す
-      </button>
+      </Button>
     </Row>
   )
 }
@@ -274,12 +355,14 @@ function FieldPanel({ friendId, busy, run }: { friendId: string; busy: boolean; 
   return (
     <Row>
       <input
+        aria-label="項目名"
         value={key}
         onChange={(e) => setKey(e.target.value)}
         placeholder="項目名"
         className={SELECT}
       />
       <input
+        aria-label="値"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="値"
@@ -312,19 +395,17 @@ function ReminderPanel({ friendId, busy, run }: { friendId: string; busy: boolea
   }, [])
   return (
     <Row>
-      <select value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
-        <option value="">リマインダを選ぶ</option>
-        {items.map((r) => (
-          <option key={r.id} value={r.id}>{r.name}</option>
-        ))}
-      </select>
-      <input
-        type="datetime-local"
+      <Select
+        aria-label="リマインダ"
+        value={id}
+        onChange={setId}
+        options={[{ value: '', label: 'リマインダを選ぶ' }, ...items.map((r) => ({ value: r.id, label: r.name }))]}
+      />
+      <DateTimeField
         value={targetDate}
-        onChange={(e) => setTargetDate(e.target.value)}
+        onChange={setTargetDate}
         aria-label="ゴール日時"
-        title="予約日や開催日。ここから逆算して届きます"
-        className={SELECT}
+        className="w-60"
       />
       <Go
         busy={busy || !id || !targetDate}

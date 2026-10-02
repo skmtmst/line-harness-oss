@@ -85,16 +85,23 @@ afterEach(async () => {
 })
 const render = async () => { await act(async () => root.render(<ChatsPage />)) }
 async function click(text: string) {
-  const button = [...host.querySelectorAll('button')].find(b => b.textContent?.trim().startsWith(text) || b.getAttribute('aria-label') === text)
+  const button = [...document.querySelectorAll('button')].find(b => b.textContent?.trim().startsWith(text) || b.getAttribute('aria-label') === text)
   expect(button, text).toBeTruthy()
   await act(async () => { button!.click() })
 }
 async function selectAssignee(value: string) {
-  if (!host.querySelector('[aria-label="担当者で絞り込む（パネル）"]')) await click('絞り込み')
+  if (!document.querySelector('[aria-label="担当者で絞り込む（パネル）"]')) await click('絞り込み')
+  // 担当者の選択は候補つき入力へ移した。表示名を打って候補を押す。
+  const label = value === 'unassigned' ? '未割り当て' : '担当T'
   await act(async () => {
-    const select = host.querySelector<HTMLSelectElement>('[aria-label="担当者で絞り込む（パネル）"]')!
-    select.value = value
-    select.dispatchEvent(new Event('change', { bubbles: true }))
+    const field = document.querySelector<HTMLInputElement>('[aria-label="担当者で絞り込む（パネル）"]')!
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, label)
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => {
+    const option = [...document.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes(label))
+    expect(option, label).toBeTruthy()
+    ;(option as HTMLElement).click()
   })
 }
 const listCalls = (channel: Channel) => calls.filter(url => listChannel(url) === channel)
@@ -107,7 +114,7 @@ test('実UIから担当・未割当・未読・要返信・期限を両APIへ送
   await selectAssignee('unassigned')
   expect(listCalls('line').at(-1)?.searchParams.get('operatorId')).toBe('unassigned')
   expect(listCalls('email').at(-1)?.searchParams.get('assignee')).toBe('unassigned')
-  await act(async () => { host.querySelector<HTMLInputElement>('[aria-label="未読だけ表示"]')!.click() })
+  await act(async () => { document.querySelector<HTMLInputElement>('[aria-label="未読だけ表示"]')!.click() })
   for (const channel of ['line', 'email'] as const) expect(listCalls(channel).at(-1)?.searchParams.get('unreadOnly')).toBe('1')
   await click('絞り込みを閉じる')
   await click('要返信')

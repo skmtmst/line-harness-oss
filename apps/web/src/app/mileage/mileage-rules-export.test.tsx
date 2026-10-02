@@ -38,13 +38,28 @@ function stubFetch() {
           draftUpdatedAt: '2026-09-01',
           publishedVersion: null,
           published: { name: '決めごと', eventType: 'friend_added', source: null, amount: 10, initialStatus: 'available', validFrom: null, validUntil: null, status: 'published', updatedAt: '2026-09-01' },
-          metrics30d: { eligible: 0, granted: 0, excluded: 0 },
+          metrics30d: { eligible: 0, granted: 0, grantedMiles: 0, excluded: 0 },
         }],
         pagination: { total: 1 },
         unassignedLegacyCount: 0,
       }
       : text.includes('/friends')
-        ? { items: [], summary: { totalMembers: 0, withBalanceCount: 0, available: 0, pending: 0 }, pagination: { total: 0, limit: 1, offset: 0 } }
+        /* D022: 見本は実APIの形に合わせる（monthChange・rankCounts・expiringMiles30d・nextExpiringAt・measuredAt は必須）。 */
+        ? {
+          items: [],
+          summary: {
+            totalMembers: 0,
+            withBalanceCount: 0,
+            available: 0,
+            pending: 0,
+            monthChange: 0,
+            rankCounts: [],
+            expiringMiles30d: null,
+            nextExpiringAt: null,
+          },
+          pagination: { total: 0, limit: 1, offset: 0 },
+          measuredAt: '2026-09-01T00:00:00.000Z',
+        }
         : text.includes('/history')
           ? { summary: { byType: [] } }
           : {}

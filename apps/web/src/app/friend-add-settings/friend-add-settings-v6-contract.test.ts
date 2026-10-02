@@ -30,10 +30,11 @@ describe('V6 友だち追加時配信 7画面の契約', () => {
     expect(LIST_PAGE).toContain('api.friendAddRules.archive(selectedAccountId, deleting.id)')
     expect(EDITOR).toContain('api.friendAddRules.createDraft(payload, saveIdempotencyKey.current)')
     expect(EDITOR).toContain('api.friendAddRules.saveDraft(ruleId, payload, saveIdempotencyKey.current)')
-    expect(EDITOR).toContain('api.friendAddRules.test(selectedAccountId, activeId)')
+    // R262: テストは試す流入リンク・想定日時・友だちを実行側の判定へ渡す。
+    expect(EDITOR).toContain('api.friendAddRules.test(selectedAccountId, activeId, {')
     expect(API).toContain("'/api/friend-add-rules/drafts'")
     expect(API).toContain("'/api/friend-add-rules/test'")
-    expect(API).toContain('JSON.stringify({ accountId, ruleId })')
+    expect(API).toContain('friendId: input?.friendId')
   })
 
   it('読込中・空・失敗と再読込を用意する', () => {
@@ -129,11 +130,12 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
   })
 
   it('実際に配信するシナリオを編集画面で選べる(FRIENDADD-01)', () => {
-    // scenarioId は保存の必須項目だが、以前は変更する入力が無かった。
-    // 「次に流すシナリオ」欄で、このアカウントのシナリオだけを選ぶ。
+    // scenarioId は公開・テストの必須項目だが、以前は変更する入力が無かった。
+    // 下書きの保存では後からでよい(R30)。「次に流すシナリオ」欄で、
+    // このアカウントのシナリオだけを選ぶ。
     expect(EDITOR).toContain('次に流すシナリオ')
     expect(EDITOR).toContain('value={definition.scenarioId ??')
-    expect(EDITOR).toContain('scenarioId: event.target.value || null')
+    expect(EDITOR).toContain('scenarioId: value || null')
     expect(EDITOR).toContain('scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))')
   })
 
@@ -169,7 +171,7 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
     expect(EDITOR).toContain('updateTimeWindow(current.timeWindows, index')
     expect(EDITOR).toContain('removeTimeWindow(current.timeWindows, index')
     expect(EDITOR).toContain('addTimeWindow(current.timeWindows)')
-    expect(EDITOR).toContain('時間帯を追加')
+    expect(EDITOR).toContain('時間帯を追加する')
     expect(EDITOR).not.toContain('timeWindows: [{ ...window')
   })
 
@@ -194,8 +196,11 @@ describe('V6 友だち追加時配信の保存の取りこぼし防止(#501 重�
 describe('V6 友だち追加時配信の監査修正(#946)', () => {
   it('N-107: 「その他操作」は実画面へつなぐメニューを開く', () => {
     // 押しても何も起きないボタンにしない。テスト・有効化・実行結果は実在する画面。
-    expect(LIST_PAGE).toContain('setOpenMenuId')
-    expect(LIST_PAGE).toContain('<ActionMenu')
+    // ★V7 `Xn1Mz`（行の「…」統一）：手書きの開閉（setOpenMenuId＋ActionMenu直置き）
+    // ではなく共通 RowActions の menuItems へそろえた。行き先の守りは残す。
+    expect(LIST_PAGE).toContain('<RowActions')
+    expect(LIST_PAGE).toContain('menuItems={')
+    expect(LIST_PAGE).not.toContain('setOpenMenuId')
     expect(LIST_PAGE).toContain("label: 'テストを実行'")
     expect(LIST_PAGE).toContain("label: '最終確認・有効化へ進む'")
     expect(LIST_PAGE).toContain("label: 'この設定の実行結果'")

@@ -1,16 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
+import { SIDEBAR_TOGGLE_EVENT, UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
-import { HQ_MENU_SECTIONS, menuOwnerForScreen, orderedMenuSections, type MenuItem } from '@/lib/menu'
+import { HQ_MENU_SECTIONS, menuOwnerForScreen, orderedMenuSections, type MenuItem, type MenuSection } from '@/lib/menu'
+import { HQ_TEMPLATE_DISTRIBUTION_ENABLED } from '@/lib/hq-template-availability'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import SidebarIdentity from './sidebar-identity'
+import SidebarVersion from './sidebar-version'
+import Notice from '@/components/shared/notice'
 import HqAccountMenu from '@/components/hq/account-menu'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
@@ -18,6 +22,27 @@ import {
   SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
 import styles from './sidebar.module.css'
+
+/* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
+   反映するため同型のエイリアスを使う（描画後の1回分のズレを防ぐ）。 */
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
+
+/** ★V8（夕44-A）：はじめから開く4組。ほかは見出しだけで畳む。 */
+const V8_GROUPS_OPEN_BY_DEFAULT = new Set(['basic', 'delivery', 'contents', 'booking'])
+
+/** 組の開閉を覚えるキー（ブラウザごと）。 */
+const SIDEBAR_GROUPS_KEY = 'lh-sidebar-groups'
+
+/** 左メニューのいちばん下の「設定」（夕41・部品 njl8e）。歯車は予約設定と同じ形。 */
+const SETTINGS_GEAR_ICON = 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31-.826 2.37-2.37 1.04-.6 2.296-.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
+
+/** 配布の受け口が無いあいだ、統括サイドバーから外す4画面。 */
+const HQ_UNAVAILABLE_DISTRIBUTION_HREFS = new Set([
+  '/hq/friend-attributes',
+  '/hq/templates',
+  '/hq/rich-menus',
+  '/hq/form-submissions',
+])
 
 // ─── メニュー定義 ───
 //
@@ -87,6 +112,100 @@ export default function Sidebar({
   const { title: chromeTitle } = usePageChrome()
   const mobileTitle = chromeTitle ?? defaultTitleForPath(pathname ?? '')
   const [isOpen, setIsOpen] = useState(false)
+  /*
+   * ★V8（夕44-A・部品 T7XSI6）：組の開閉と V2 モードの扱いにテーマが要る。
+   * SSR・最初の描画は v7 の形（hydration を一致させるため）で、
+   * レイアウト効果の中で本当のテーマへ揃える。
+   */
+  const isV8 = useAdminTheme() === 'v8'
+  /*
+   * V2 の友だち属性モード（移行中だけの特別な形）で組を丸ごと隠すのは
+   * V8 では真似しない（MIGRATION-RISKS §1-2）。V8 では組の見出しは常に出て、
+   * 中身の開閉だけが変わる。
+   */
+  const attrV2Mode = friendAttributesV2Mode && !isV8
+
+  /*
+   * ★V8（夕44-A）：メイン・配信・コンテンツ・予約は開いた形、それ以外は
+   * 見出しだけで畳む。押すと開き、開いた状態はブラウザが覚える
+   * （lh-sidebar-groups）。いまの画面の組は常に開く。
+   */
+  const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>({})
+  useIsoLayoutEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(SIDEBAR_GROUPS_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved) as unknown
+        if (isBooleanRecord(parsed)) setGroupOpen(parsed)
+      }
+    } catch {
+      // localStorage が使えないときは既定の開閉だけで動かす
+    }
+  }, [])
+  const groupOpenByDefault = (section: MenuSection) =>
+    V8_GROUPS_OPEN_BY_DEFAULT.has(section.id)
+  const groupIsOpen = (section: MenuSection) =>
+    groupOpen[section.id] ?? groupOpenByDefault(section)
+  const toggleGroup = (section: MenuSection) => {
+    setGroupOpen((current) => {
+      const next = { ...current, [section.id]: !(current[section.id] ?? groupOpenByDefault(section)) }
+      try {
+        window.localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify(next))
+      } catch {
+        // 覚えられなくても開閉自体は動かす
+      }
+      return next
+    })
+  }
+
+  /*
+   * ★V8 外側：左メニューの畳み（幅 64・アイコンだけ）。
+   * 上の帯のボタンと ⌘\ が SIDEBAR_TOGGLE_EVENT を投げ、ここで受ける。
+   * 状態はブラウザに覚える（lh-sidebar-collapsed）。保存がなければ
+   * 1280px 未満では畳んだ形で開く。v7 では見た目を変えないので、
+   * data-collapsed が立っていても v7 の見た目は動かない。
+   */
+  const [collapsed, setCollapsed] = useState(false)
+  const collapsedInitRef = useRef(false)
+  useIsoLayoutEffect(() => {
+    if (collapsedInitRef.current) return
+    collapsedInitRef.current = true
+    try {
+      const saved = window.localStorage.getItem('lh-sidebar-collapsed')
+      if (saved !== null) {
+        setCollapsed(saved === '1')
+      } else {
+        setCollapsed(window.innerWidth < 1280)
+      }
+    } catch {
+      // localStorage が使えないときは展開のまま
+    }
+  }, [])
+  useEffect(() => {
+    const toggle = () => {
+      /* v7 では畳み機能を出さない。テーマが v7 のときは無視する。 */
+      if (document.documentElement.dataset.theme !== 'v8') return
+      setCollapsed((current) => {
+        const next = !current
+        try {
+          window.localStorage.setItem('lh-sidebar-collapsed', next ? '1' : '0')
+        } catch {
+          // 覚えられなくても畳み自体は動かす
+        }
+        return next
+      })
+    }
+    /*
+     * ⌘\ / Ctrl+\ の受け口は TopBar の keydown が投げる
+     * SIDEBAR_TOGGLE_EVENT に一本化する。ここでも keydown を受けると
+     * 同じ押下で2回畳みが走り、開閉が元に戻る(V8-1085-KEYBOARD-01)。
+     */
+    window.addEventListener(SIDEBAR_TOGGLE_EVENT, toggle)
+    return () => {
+      window.removeEventListener(SIDEBAR_TOGGLE_EVENT, toggle)
+    }
+  }, [])
+
   const [staffName, setStaffName] = useState<string | null>(null)
   const [staffRole, setStaffRole] = useState<string | null>(null)
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
@@ -178,8 +297,8 @@ export default function Sidebar({
     setVisibilityAccountId(null)
     setVisibilityStatus('loading')
     const loadSettings = () => {
-      void Promise.all([import('@/lib/api'), import('@/lib/feature-visibility-cache')])
-        .then(async ([{ api }, { loadFeatureVisibility }]) => {
+      void Promise.all([import('@/lib/feature-visibility-cache'), import('@/lib/feature-settings-cache')])
+        .then(async ([{ loadFeatureVisibility }, { loadFeatureSettings }]) => {
           // 画面側の useFeatureVisibility と同じ答えを共有する（V6R-S0-b）。
           const visibility = await loadFeatureVisibility(accountId)
           const features = visibility.success ? visibility.data?.features : undefined
@@ -195,7 +314,8 @@ export default function Sidebar({
           }
           if (!canManageFeatureSettings) return
           try {
-            const settings = await api.featureSettings.get(accountId)
+            // 機能設定画面と同じ答えを共有する。保存の合図で捨てられる。
+            const settings = await loadFeatureSettings(accountId)
             if (!cancelled && settings.success) {
               setSectionOrder(settings.data.sidebarOrder)
               setItemOrder(settings.data.sidebarItemOrder)
@@ -238,12 +358,18 @@ export default function Sidebar({
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
+        /*
+         * ★V7 C6: 統括のひな形配布（4画面）は Worker の受け口が無いあいだ
+         * 「利用できません」だけのページになるため、サイドバーには出さない。
+         * ページ自体は残し、配布が有効になれば再表示する。
+         */
+        if (isHq && !HQ_TEMPLATE_DISTRIBUTION_ENABLED && HQ_UNAVAILABLE_DISTRIBUTION_HREFS.has(item.href)) return false
         if (isHq) return true
         // 移行中のV2画面では、承認画像どおり「友だち属性」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
-        if (friendAttributesV2Mode && item.href === '/tags') return false
-        if (friendAttributesV2Mode && item.href === '/conversions') return false
-        if (friendAttributesV2Mode && item.href === '/analytics') return false
+        if (attrV2Mode && item.href === '/tags') return false
+        if (attrV2Mode && item.href === '/conversions') return false
+        if (attrV2Mode && item.href === '/analytics') return false
         if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
         // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
@@ -260,7 +386,7 @@ export default function Sidebar({
       }),
     }))
     .filter((section) => section.items.length > 0)
-    .filter((section) => !friendAttributesV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
+    .filter((section) => !attrV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
 
   /*
    * PERF-08: バッジ用の件数は「出す項目があるもの」だけを購読する。
@@ -371,6 +497,33 @@ export default function Sidebar({
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
 
+  /*
+   * スマホのメニューの焦点（★V7 修正方針 §2）。
+   * 開いたら中の先頭へ、Esc で閉じ、閉じたら焦点をハンバーガーへ戻す。
+   * 閉じている間は aside に inert を付け、画面外の項目へ Tab が行かないようにする
+   * （以前は閉じても11項目が Tab で選べ、焦点が見えない所へ行っていた）。
+   */
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const drawerRef = useRef<HTMLElement>(null)
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (isOpen) {
+      wasOpen.current = true
+      drawerRef.current?.querySelector<HTMLElement>('a[href], button')?.focus()
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') setIsOpen(false)
+      }
+      document.addEventListener('keydown', onKeyDown)
+      return () => document.removeEventListener('keydown', onKeyDown)
+    }
+    if (wasOpen.current) {
+      wasOpen.current = false
+      if (!document.activeElement || document.activeElement === document.body || drawerRef.current?.contains(document.activeElement)) {
+        menuButtonRef.current?.focus()
+      }
+    }
+  }, [isOpen])
+
   /**
    * 項目に出す数。0 のときは出さない（仕様 §5）。
    *
@@ -401,10 +554,7 @@ export default function Sidebar({
    * 「共通情報」(/contents/vars) を開くと「登録メディア一覧」(/contents) も
    * 選ばれて見えていた。当たるもののうち、いちばん長いものだけを選ぶ。
    */
-  // 比較専用ルートも、実際に確認する「友だち属性V2」を選択中として写す。
-  const activePathname = pathname === '/visual-qa/friend-attributes-v2'
-    ? '/tags-v2'
-    : pathname
+  const activePathname = pathname
   const activeHref = (() => {
     let best: string | null = null
     for (const section of sections) {
@@ -430,11 +580,15 @@ export default function Sidebar({
    * UID移行 `/accounts?tab=migration` は友だちタブの1枚なので、
    * 「LINEアカウント」ではなく「友だち」が選ばれる。
    * 宣言先の項目がメニューに無いときは通常のパス一致へ戻す。
+   *
+   * Issue #708: 宣言が複数候補を持つ画面（受付枠など）では、
+   * いまの人に見えている項目のうち最初のものを選ぶ。見えている
+   * 項目だけを対象にするのは、担当者専用項目（自分の勤務）が
+   * 管理者のメニューには無いため。
    */
   const ownerItemId = menuOwnerForScreen(activePathname, currentSearch)
-  const hasOwnerItem = ownerItemId
-    ? sections.some((section) => section.items.some((item) => item.id === ownerItemId))
-    : false
+    ?.find((id) => visibleSections.some((section) => section.items.some((item) => item.id === id)))
+  const hasOwnerItem = Boolean(ownerItemId)
 
   const isActive = (item: MenuItem) => {
     const href = item.href
@@ -451,6 +605,14 @@ export default function Sidebar({
     return !siblingQueries.some((siblingQuery) => currentSearch === `?${siblingQuery}`)
   }
 
+  /*
+   * ★V8（夕41）：左メニューのいちばん下の「設定」（歯車）は、設定の組の
+   * どこかの画面を開いているとき選ばれた形にする。
+   */
+  const settingsActive = Boolean(
+    sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item)),
+  )
+
   /**
    * 中身は1つ。ドロワーでも常時表示でも同じものを出す。
    *
@@ -463,16 +625,16 @@ export default function Sidebar({
   const sidebarContent = (drawer: boolean) => (
     <>
       {drawer ? (
-        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-4 pr-16">
+        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-hairline px-4 pr-16">
           {brand.iconUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
-            <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-xl object-cover" />
+            <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-card object-cover" />
           ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-gray-900">{brand.name ?? '然-NEN- LINE管理システム'}</p>
-            <p className="mt-0.5 text-[11px] font-medium text-gray-400">管理メニュー</p>
+            <p className="truncate text-sm font-bold text-ink">{brand.name ?? '然-NEN- LINE管理システム'}</p>
+            <p className="mt-0.5 text-micro font-medium text-ink-faint">管理メニュー</p>
           </div>
         </div>
       ) : (
@@ -480,20 +642,20 @@ export default function Sidebar({
       )}
 
       {isHq ? (
-        <div className="px-3 pb-3 pt-4">
+        <div className={`px-3 pb-3 pt-4 ${styles.collapseHide}`}>
           <div className="rounded-card border border-hairline bg-canvas px-4 py-3">
-            <p className="text-xs font-semibold text-accent">musubo</p>
+            <p className="text-xs font-semibold text-accent-deep">musubo</p>
             <p className="mt-1 text-sm font-bold text-ink">統括コンソール</p>
           </div>
         </div>
       ) : preview ? (
-        <div className="px-[13px] pb-[9px] pt-[18px]">
+        <div className={`px-[13px] pb-[9px] pt-[18px] ${styles.collapseHide}`}>
           <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
-          <div className="flex h-[66px] items-center rounded-[12px] border border-hairline bg-canvas px-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-[14px] font-semibold text-accent">然</div>
+          <div className="flex h-[66px] items-center rounded-card border border-hairline bg-canvas px-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-[14px] font-semibold text-accent-deep">然</div>
             <div className="ml-3 min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold text-ink">然-NEN- TEST</p>
-              <p className="mt-0.5 truncate text-[10px] text-ink-faint">コミュニケーション</p>
+              <p className="mt-0.5 truncate text-micro text-ink-faint">コミュニケーション</p>
             </div>
           </div>
         </div>
@@ -504,31 +666,71 @@ export default function Sidebar({
 
       {/* ナビゲーション */}
       <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq">
+        {/*
+          ★V7 `x63W5x`：補助のデータ（表示可否）の失敗は、その場所の
+          小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の
+          失敗の1枚が使う言葉なので、ここは短い「もう一度」にして
+          1画面に同じ読み直しボタンを2つ出さない。
+        */}
         {visibilityStatus === 'error' && selectedAccountId && (
-          <div className="mx-3 mb-2 rounded-control border border-warning bg-warning-bg px-3 py-2 text-xs text-ink-secondary">
-            <p>機能設定を読み込めませんでした。</p>
-            <button
-              type="button"
-              onClick={() => setVisibilityRetry((current) => current + 1)}
-              className="mt-1 cursor-pointer font-bold text-action underline"
-            >
-              もう一度読み込む
-            </button>
-          </div>
-        )}
-        {visibleSections.map((section, si) => (
-          <div key={si} className={styles.section}>
-            {section.label && (
-              <div className={friendAttributesV2Mode ? 'flex h-[20px] items-center px-3' : styles.sectionHeading}>
-                <p>{section.label}</p>
-              </div>
+          <Notice
+            tone="warn"
+            className="mx-3 mb-2"
+            action={(
+              <button
+                type="button"
+                onClick={() => setVisibilityRetry((current) => current + 1)}
+                className="cursor-pointer font-bold text-action underline"
+              >
+                もう一度
+              </button>
             )}
-            {section.items.map((item) => {
+          >
+            機能設定を読み込めませんでした。
+          </Notice>
+        )}
+        {visibleSections.map((section) => {
+          /*
+           * ★V8（夕44-A）：組の見出しは押せる開閉。畳んだ組は見出しだけ
+           * 残るので、組が丸ごと消えることはない。見出しの無い組（統括）は
+           * 畳めない。いまいる画面の組は常に開く。アイコンだけの帯では
+           * 見出し自体が無いので、畳みは効かせず全部のアイコンを出す。
+           */
+          const collapsible = isV8 && Boolean(section.label)
+          const sectionOpen =
+            !collapsible || groupIsOpen(section) || section.items.some((item) => isActive(item))
+          const hideItems = isV8 && !sectionOpen && !(collapsed && !drawer)
+          return (
+          <div key={section.id} className={styles.section}>
+            {section.label && (
+              isV8 ? (
+                <button
+                  type="button"
+                  className={styles.sectionToggle}
+                  onClick={() => toggleGroup(section)}
+                  aria-expanded={sectionOpen}
+                >
+                  <span className="min-w-0 flex-1 truncate text-left">{section.label}</span>
+                  <svg
+                    className={`${styles.sectionChevron} ${sectionOpen ? '' : styles.sectionChevronClosed}`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+              ) : (
+                <div className={attrV2Mode ? 'flex h-[20px] items-center px-3' : styles.sectionHeading}>
+                  <p>{section.label}</p>
+                </div>
+              )
+            )}
+            {!hideItems && section.items.map((item) => {
               const active = isActive(item)
               const isDanger = 'danger' in item && item.danger
-              const visibleLabel = friendAttributesV2Mode && item.href === '/tags-v2'
-                ? '友だち属性'
-                : item.label
+              const visibleLabel = item.label
               return (
                 <Link
                   key={item.href}
@@ -541,11 +743,11 @@ export default function Sidebar({
                     なって一覧の中でそこだけ浮き、目が先にそこへ行く。
                     印は「いまここ」を示せれば足りる。
                   */
-                  className={`${styles.item} ${friendAttributesV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} border border-transparent text-[13px]` : ''} ${
+                  className={`${styles.item} ${attrV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} border border-transparent text-[13px]` : ''} ${
                     active
                       ? isDanger
                         ? `${styles.active} ${styles.danger}`
-                        : friendAttributesV2Mode
+                        : attrV2Mode
                           ? `${styles.active} border-accent`
                           : styles.active
                       : isDanger
@@ -554,7 +756,7 @@ export default function Sidebar({
                   }`}
                 >
                   <span className="shrink-0"><NavIcon d={item.icon} /></span>
-                  <span className="min-w-0 flex-1 truncate">{visibleLabel}</span>
+                  <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>{visibleLabel}</span>
                   {badgeCount(item) > 0 && (
                     <>
                       {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
@@ -563,15 +765,43 @@ export default function Sidebar({
                       <span className={styles.badge}>
                         {badgeCount(item) > 99 ? '99+' : badgeCount(item)}
                       </span>
-                      <span className="sr-only">{badgeCount(item)} 件</span>
+                      {/* 読み上げは「33件」と続け、数字と単位の間に空白を入れない（§2-6）。 */}
+                      <span className="sr-only">{badgeCount(item)}件</span>
                     </>
                   )}
                 </Link>
               )
             })}
           </div>
-        ))}
+          )
+        })}
       </nav>
+
+      {/*
+        ★V8（夕41・部品 njl8e）：左メニューのいちばん下、版の上に「設定」。
+        オーナー・管理者にだけ出す。設定の画面ではここが選ばれた形にする。
+        nav は中身が多いときだけ縦に送り、この入口と版は下端に固定される。
+      */}
+      {isV8 && !isHq && !preview && (staffRole === 'owner' || staffRole === 'admin') && (
+        <div className={styles.settingsEntry}>
+          <Link
+            href="/settings"
+            title="設定"
+            className={`${styles.item} ${settingsActive ? styles.active : ''}`}
+          >
+            <span className="shrink-0"><NavIcon d={SETTINGS_GEAR_ICON} /></span>
+            <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>設定</span>
+          </Link>
+        </div>
+      )}
+
+      {/*
+        メニューの下の版の表示（★V7 監査の直し E）。いま動いている版・
+        commit・配備日時と環境。取れないときは「版の情報なし」。
+        移行中の見た目承認（preview）は版の取得をしない。
+        V8 でメニューを畳んだときは枠ごと隠す（`styles.collapseHide`）。
+      */}
+      {preview ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
@@ -582,7 +812,7 @@ export default function Sidebar({
         押すとメンバー管理・お問い合わせ・ログアウトのメニューが上に開く。
         正本は ★V6 36-1 `qAvlC`。中身は `components/hq/account-menu.tsx` が持つ。
       */}
-      {isHq ? <HqAccountMenu /> : <div className={styles.footer} />}
+      {isHq ? <div className={styles.collapseHide}><HqAccountMenu /></div> : <div className={styles.footer} />}
     </>
   )
 
@@ -595,28 +825,33 @@ export default function Sidebar({
       */}
       <div className={`${styles.mobileHeader} ${styles.mobileOnly}`}>
         <button
+          ref={menuButtonRef}
           onClick={() => setIsOpen(!isOpen)}
-          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-control hover:bg-shell transition-colors"
           aria-label="メニュー"
+          aria-expanded={isOpen}
+          aria-controls="mobile-menu"
         >
-          <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6 text-ink-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {isOpen
               ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             }
           </svg>
         </button>
-        {/* いま開いている画面の名前。取れない画面はアカウント名で埋める。 */}
-        <p className={styles.mobileTitle} title={mobileTitle || brand.name || undefined}>
+        {/* いま開いている画面の名前。取れない画面はアカウント名で埋める。
+            1280px 未満では PC のトップバー（画面の唯一の <h1>）を畳むので、
+            現在地を h1 で持つのはここ（#734: 390px で全画面 h1 が消えていた）。 */}
+        <h1 className={styles.mobileTitle} title={mobileTitle || brand.name || undefined}>
           {mobileTitle || brand.name || '然-NEN- LINE管理システム'}
-        </p>
+        </h1>
         {/* 公式アカウントの印。名前は画面名が持つので、ここはアイコンだけ。 */}
         <div className={styles.mobileBrand}>
           {brand.iconUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
-            <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-lg object-cover" />
+            <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-control object-cover" />
           ) : (
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="w-7 h-7 rounded-control flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
           )}
         </div>
       </div>
@@ -633,12 +868,15 @@ export default function Sidebar({
         レールは残したまま、その幅でもここを開けるようにした。
       */}
       <aside
+        id="mobile-menu"
+        ref={drawerRef}
         aria-label="管理メニュー"
+        inert={!isOpen}
         className={`${styles.drawer} ${styles.mobileOnly} ${isOpen ? '' : styles.drawerClosed}`}
       >
         <div className="absolute right-3 top-2.5 z-10">
-          <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100" aria-label="閉じる">
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-control hover:bg-shell" aria-label="閉じる">
+            <svg className="w-5 h-5 text-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -656,7 +894,7 @@ export default function Sidebar({
 
         中身は常に展開表示。幅で文字を出し分ける必要がなくなった。
       */}
-      <aside className={styles.desktop} data-design-node="J33xq">
+      <aside className={styles.desktop} data-design-node="J33xq" data-collapsed={collapsed ? '' : undefined}>
         {sidebarContent(false)}
       </aside>
     </>

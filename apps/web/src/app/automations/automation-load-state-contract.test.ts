@@ -30,8 +30,9 @@ describe('V6 オートメーション一覧の状態', () => {
 
   it('未取得の件数を0件として表示しない', () => {
     expect(PAGE).toContain("loadStatus === 'ready' ? automations.filter((item) => item.isActive).length : null")
-    expect(PAGE).toContain("estimatedHoursSaved !== null")
-    expect(PAGE).toContain("failedRuns?.toLocaleString('ja-JP') ?? '—'")
+    // 監査6 #674: 未取得は null のまま MetricValue へ渡し、「—」と0を区別する
+    expect(PAGE).toContain('<MetricValue value={estimatedHoursSaved}')
+    expect(PAGE).toContain('<MetricValue value={failedRuns ?? null}')
   })
 
   it('一覧契約の集計から30日の実行・失敗と削減時間を読む', () => {
@@ -42,13 +43,21 @@ describe('V6 オートメーション一覧の状態', () => {
   })
 
   it('各行の実行回数・失敗回数と詳細導線を表示する', () => {
-    expect(PAGE).toContain("automation.executionCount30d.toLocaleString('ja-JP')")
+    expect(PAGE).toContain("formatNumber(automation.executionCount30d)")
     expect(PAGE).toContain('automation.failureCount30d > 0')
     // #942 N-352: 編集は公開版を写した下書きを作ってから開く。実行記録への
     // 導線は行の名前を検索語に載せる。
     expect(PAGE).toContain('api.automations.createDraftFromAutomation(')
     expect(PAGE).toContain('router.push(`/automations/drafts?id=')
-    expect(PAGE).toContain('href={`/automations/runs?search=')
+    /*
+     * #670 25: 行の2ボタンが折返しで縦に積まれ行高を支配していたため、
+     * 記録の導線はメニュー先頭へ移した(閲覧のみにはボタンを残す)。
+     */
+    expect(PAGE).toContain("id: 'runs'")
+    expect(PAGE).toContain("label: '動いた記録を見る'")
+    expect(PAGE).toContain('onViewRuns')
+    expect(PAGE).toContain('href={runsHref}')
+    expect(PAGE).toContain('runsHref = `/automations/runs?search=')
   })
 
   it('編集用の下書きを作れなかった理由を失敗の種類で分ける（AUTOMATION-05）', () => {
@@ -100,10 +109,10 @@ describe('V6 オートメーション一覧の状態', () => {
 
   it('ページ送りは操作でき、7件目以降へ行ける（#554 点検#519中1・中9）', () => {
     expect(PAGE).toContain('pagedAutomations')
-    expect(PAGE).toContain('aria-label="ページ送り"')
-    expect(PAGE).toContain('setPage(currentPage - 1)')
-    expect(PAGE).toContain('setPage(currentPage + 1)')
-    expect(PAGE).toContain('本中')
+    // 共通のページ送りへ寄せたため、操作は Pagination・件数は ListRange が担う。
+    expect(PAGE).toContain('<Pagination')
+    expect(PAGE).toContain('onPageChange={setPage}')
+    expect(PAGE).toContain('<ListRange')
     expect(PAGE).not.toContain('slice(0, 6)')
     expect(PAGE).not.toContain('2　3　次へ')
   })

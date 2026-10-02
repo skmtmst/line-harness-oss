@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { EC_EVENT_LABELS, type EcEventType } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
+import Select from '@/components/shared/select'
 import { ApiError, api, type EcConnector, type EcConnectorOverview } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { formatEcDateTimeWithYear as dateTime } from './ec-datetime'
@@ -178,7 +181,7 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
             <h2 className={styles.cardTitle}>つなぎ先の情報</h2>
             <p className={styles.cardNote}>鍵は保存後に読み戻せません。画面には最後の4文字だけを出します。</p>
             <div className={styles.fields}>
-              <label className={styles.field}>ネットショップの種類<select className={styles.select} value={form.provider} onChange={(event) => setForm({ ...form, provider: event.target.value as Form['provider'] })}><option value="shopify">Shopify</option><option value="ec_cube">EC-CUBE</option></select></label>
+              <label className={styles.field}>ネットショップの種類<Select aria-label="ネットショップの種類" value={form.provider} onChange={(value) => setForm({ ...form, provider: value as Form['provider'] })} options={[{ value: 'shopify', label: 'Shopify' }, { value: 'ec_cube', label: 'EC-CUBE' }]} size="full" /></label>
               <label className={styles.field}>ショップのアドレス<input className={styles.input} value={form.shopDomain} onChange={(event) => setForm({ ...form, shopDomain: event.target.value })} placeholder="nen-store.myshopify.com" /></label>
               <label className={styles.field}>つなぐための鍵<input className={styles.input} type="password" autoComplete="new-password" value={form.inboundSecret} onChange={(event) => setForm({ ...form, inboundSecret: event.target.value })} placeholder={connector?.secretConfigured ? `設定済み（末尾 ${connector.secretLastFour ?? '----'}）` : '32文字以上'} /><span className={styles.cardNote}>{connector?.secretUpdatedAt ? `${dateTime(connector.secretUpdatedAt)} に更新。鍵そのものは表示しません` : '鍵そのものは表示しません'}</span></label>
             </div>
@@ -187,16 +190,16 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>どこの出来事を取り込むか</h2>
             <p className={styles.cardNote}>チェックを外すと、その出来事を起点にした配信や集計も止まります。</p>
-            <div className={styles.checks}>{CONNECTOR_EVENT_TYPES.map((value) => <label className={styles.check} key={value}><input type="checkbox" checked={form.eventTypes.includes(value)} onChange={() => toggle('eventTypes', value)} /><span>{EC_EVENT_LABELS[value]}</span></label>)}</div>
+            <div className={styles.checks}>{CONNECTOR_EVENT_TYPES.map((value) => <Checkbox key={value} checked={form.eventTypes.includes(value)} onCheckedChange={() => toggle('eventTypes', value)}>{EC_EVENT_LABELS[value]}</Checkbox>)}</div>
           </section>
 
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>どうやって人を見分けるか</h2>
             <p className={styles.cardNote}>上から照らし合わせます。名前だけで自動では結びつけません。</p>
-            <div className={styles.ruleList}>{IDENTITY_RULES.map(([value, label, note], index) => <label className={styles.rule} key={value}><input type="checkbox" checked={form.identityRules.includes(value)} onChange={() => toggle('identityRules', value)} /><span className={styles.ruleNumber}>{index + 1}</span><span><strong>{label}</strong><small>{note}</small></span></label>)}</div>
+            <div className={styles.ruleList}>{IDENTITY_RULES.map(([value, label, note], index) => <Checkbox key={value} checked={form.identityRules.includes(value)} onCheckedChange={() => toggle('identityRules', value)} description={note}>{`順番${index + 1}：${label}`}</Checkbox>)}</div>
             <div className={styles.actions}>
               {connector ? <Button type="button" onClick={() => setForm({ ...form, status: form.status === 'paused' ? 'connected' : 'paused' })}>{form.status === 'paused' ? '取り込みを再開する' : '取り込みを止める'}</Button> : null}
-              <Button type="button" variant="primary" disabled={saving || !form.shopDomain || (!connector?.secretConfigured && form.inboundSecret.length < 32)} onClick={requestSave}>{saving ? '保存しています…' : '設定を保存'}</Button>
+              <Button type="button" variant="primary" disabled={saving || !form.shopDomain || (!connector?.secretConfigured && form.inboundSecret.length < 32)} onClick={requestSave} busy={saving} busyLabel="保存しています…">設定を保存する</Button>
             </div>
             {saveBlockReason ? <p className="mt-1 text-caption leading-relaxed text-ink-faint" role="note">{saveBlockReason}</p> : null}
           </section>
@@ -206,10 +209,10 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>取り込みのようす</h2>
             <div className={styles.compactKpis}>
-              <SummaryCard variant="v6" title="今日" value={data?.health.today ?? null} unit="件" detail="届いた出来事" />
-              <SummaryCard variant="v6" title="この30日" value={data?.health.last30Days ?? null} unit="件" detail="届いた出来事" />
-              <SummaryCard variant="v6" title="失敗" value={data?.health.failed ?? null} unit="件" detail="確認が必要" />
-              <SummaryCard variant="v6" title="最後に成功" value={null} unit="" detail={dateTime(data?.health.lastSucceededAt ?? null)} badge="日時" badgeTone="neutral" />
+              <KpiCard variant="v6" title="今日" value={data?.health.today ?? null} unit="件" detail="" help="今日届いた出来事の件数です" />
+              <KpiCard variant="v6" title="この30日" value={data?.health.last30Days ?? null} unit="件" detail="" help="この30日に届いた出来事の件数です" />
+              <KpiCard variant="v6" title="失敗" value={data?.health.failed ?? null} unit="件" detail="確認が必要" />
+              <KpiCard variant="v6" title="最後に成功" value={null} unit="" detail={dateTime(data?.health.lastSucceededAt ?? null)} badge="日時" badgeTone="neutral" />
             </div>
           </section>
           <section className={styles.card}>
@@ -267,15 +270,13 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
         }}
       />
       {/* #948 N-322: 止める変更を保存せずに離れるときの確認。 */}
-      <ConfirmDialog
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
         description={pendingStatusChange
           ? (form.status === 'paused'
-            ? '「取り込みを止める」はまだ保存されていません。このまま移動すると、取り込みは止まりません。移動しますか？'
-            : '「取り込みを再開する」はまだ保存されていません。このまま移動すると、取り込みは再開しません。移動しますか？')
-          : 'このまま移動すると、入力した内容は保存されません。移動しますか？'}
-        confirmLabel="保存せずに移動"
+            ? '「取り込みを止める」はまだ保存されていません。このまま移ると、取り込みは止まりません。移りますか？'
+            : '「取り込みを再開する」はまだ保存されていません。このまま移ると、取り込みは再開しません。移りますか？')
+          : 'このまま移ると、入力した内容は保存されません。移りますか？'}
         cancelLabel="設定に戻る"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}

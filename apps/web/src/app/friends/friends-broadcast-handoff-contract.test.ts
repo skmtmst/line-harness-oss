@@ -24,7 +24,9 @@ describe('一覧 → 配信作成の条件引き継ぎ', () => {
   })
 
   it('配信リンクは権限のある人だけに出す（canRunBulk と同じ線引き）', () => {
-    expect(LIST_PAGE).toContain('canRunBulk(selectedAccount?.role)')
+    // R115: 本人の役割で判定する。アカウントの役割メモは使わない。
+    expect(LIST_PAGE).toContain('canRunBulk(staffRole)')
+    expect(LIST_PAGE).not.toContain('canRunBulk(selectedAccount')
     expect(LIST_PAGE).toContain('data-broadcast-handoff')
   })
 

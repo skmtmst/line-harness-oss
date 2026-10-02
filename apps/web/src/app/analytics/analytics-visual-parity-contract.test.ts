@@ -7,7 +7,8 @@ describe('V6 機能20の画面比較で直した契約', () => {
   it('概要4画面に設計の判断材料を残す', () => {
     for (const text of [
       '日ごとの増減（この{days}日）',
-      '送った時間ごとの「押された回数」',
+      // 監査 R71: 集計はクリック時刻の時間帯。送った時刻ではないので名前を実態に合わせた。
+      '押された時間帯ごとの回数',
       '売上から広告費を引いた残り',
       '項目が多いほど良い、ではありません',
     ]) expect(PAGE).toContain(text)
@@ -41,5 +42,18 @@ describe('V6 機能20の画面比較で直した契約', () => {
     expect(PAGE).not.toContain('overflow-x-auto')
     expect(PAGE).not.toContain('min-w-[600px]')
     expect(PAGE).not.toContain('min-w-[760px]')
+  })
+
+  it('監査 R225: シナリオの送信通数は人数と分けて出す', () => {
+    // 送信ログは「届いた人数」ではない。通数は対象の下に併記し、
+    // 到達の列・合計には混ぜない。
+    expect(PAGE).toContain('送信 <MetricCell metric={item.sentMessages} />通')
+    expect(PAGE).toContain("'送信通数'")
+    expect(PAGE).toContain('一斉配信で届いた人数です。シナリオは届いた人数が取れないため「—」です')
+  })
+
+  it('監査 R226: 保存済み分析の絞り込み0件は一覧の空とは区別する', () => {
+    expect(PAGE).toContain('条件に合う保存済み分析はありません')
+    expect(PAGE).toContain('一覧から分析を選んでください')
   })
 })

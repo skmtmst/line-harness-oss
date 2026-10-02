@@ -6,6 +6,24 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { OperationHistoryEntry } from '@/lib/api'
 import EmergencyPage from './page'
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の期間集計の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => (
+    <select aria-label={label} id={id} value={value} onChange={(e) => onChange((e.target as HTMLSelectElement).value)}>
+      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+  ),
+}))
+
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
@@ -91,7 +109,8 @@ describe('運用履歴の期間集計(N-454)', () => {
     // 既定「この1年」: 2件とも数える
     expect(summaryCard('止めた回数').getByText('2回')).toBeTruthy()
     expect(summaryCard('止めた回数').getByText('この1年')).toBeTruthy()
-    expect(summaryCard('いちばん長かった停止').getByText('120分')).toBeTruthy()
+    // 監査6 #674: 分の生値は眺める画面で読めないため「約2時間」へ人間化
+    expect(summaryCard('いちばん長かった停止').getByText('約2時間')).toBeTruthy()
     expect(screen.getByText('理由-recent')).toBeTruthy()
     expect(screen.getByText('理由-old')).toBeTruthy()
 

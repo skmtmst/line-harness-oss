@@ -25,9 +25,12 @@ function fnBody(src: string, decl: string): string {
 function dialog(src: string): string {
   const from = src.indexOf('<ConfirmDialog')
   if (from < 0) throw new Error('<ConfirmDialog が見つかりません')
-  const to = src.indexOf('</ConfirmDialog>', from)
-  if (to < 0) throw new Error('</ConfirmDialog> が見つかりません')
-  return src.slice(from, to)
+  // #820 で削除確認の中身（断り書き）を消し、自己閉じになった。
+  const selfClosed = src.indexOf('/>', from)
+  const closed = src.indexOf('</ConfirmDialog>', from)
+  if (selfClosed >= 0 && (closed < 0 || selfClosed < closed)) return src.slice(from, selfClosed)
+  if (closed < 0) throw new Error('</ConfirmDialog> が見つかりません')
+  return src.slice(from, closed)
 }
 
 describe('テンプレート詳細の削除確認', () => {
@@ -67,15 +70,17 @@ describe('テンプレート詳細の削除確認', () => {
     expect(jsx, '処理中に閉じられてしまう').toContain('if (deleting) return')
   })
 
-  it('数えられていない参照があることを窓の中で断る', () => {
+  it('#820: 一斉配信も数えるので、数えられない断り書きを出さない', () => {
     const jsx = dialog(PAGE)
     /*
-     * 集計はリマインダまで数えている（#497 軽5）。数えていないのは
-     * 一斉配信からの直接の参照だけなので、その断りを残す。
+     * #820 で一斉配信の参照を参照表から数えるようになった。
+     * 数えられていない参照はもう無いので、断り書きは消す。
+     * （「0か所と見せるな」の意図は、数え残しが無いことで満たす）
      */
-    expect(jsx, '数えきれていないことを言わずに0か所と見せている').toContain(
+    expect(jsx, '数えられるようになったのに断り書きが残っている').not.toContain(
       '一斉配信からの直接の参照は、まだ数えられません。',
     )
+    expect(PAGE, '一斉配信の使用先を数えていない').toContain('broadcastRefs')
   })
 
   // 2026-09-02: development (#433) が覚えの名前を confirmOpen → deleteOpen に

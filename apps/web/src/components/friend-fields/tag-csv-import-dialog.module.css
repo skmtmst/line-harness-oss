@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   overflow-y: auto;
-  background: #11182755;
+  background: var(--color-scrim);
   padding: 16px;
 }
 
@@ -18,9 +18,9 @@
   gap: 18px;
   overflow: hidden;
   border: 1px solid var(--color-hairline);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: 0 18px 50px rgb(15 23 42 / 18%);
+  box-shadow: var(--shadow-overlay);
   padding: 28px;
   color: var(--color-ink);
 }
@@ -74,7 +74,7 @@
 .title {
   margin: 0;
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
 }
 
@@ -124,7 +124,7 @@
   padding: 7px 12px;
   color: var(--color-ink);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .fileField:focus-within .fileButton {
@@ -161,7 +161,7 @@
   border-radius: var(--radius-control);
   background: var(--color-status-danger-soft);
   padding: 10px 12px;
-  color: var(--color-status-danger);
+  color: var(--color-danger);
   font-size: 13px;
 }
 
@@ -206,17 +206,17 @@
 
 .summaryValue {
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
 }
 
 /* 設計 `sfTEW`：通る数は緑、直す数は赤。数の意味を色でも先に伝える。 */
 .summaryReady {
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
 }
 
 .summaryInvalid {
-  color: var(--color-status-danger);
+  color: var(--color-danger);
 }
 
 .summaryDetail {
@@ -240,7 +240,7 @@
 .warnTitle {
   margin: 0;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.6;
 }
 
@@ -257,21 +257,7 @@
   flex-shrink: 0;
 }
 
-.filter {
-  border: 1px solid var(--color-hairline);
-  border-radius: 999px;
-  background: var(--color-canvas);
-  padding: 6px 12px;
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.filterOn {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-}
+/* m13i: 絞り込み札は共通 FilterChip 1つにそろえた（形・色は部品が持つ）。 */
 
 .tableFrame {
   min-height: 0;
@@ -294,7 +280,7 @@
   z-index: 1;
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .table th,
@@ -319,17 +305,17 @@
   display: inline-flex;
   min-height: 24px;
   align-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 9px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   white-space: nowrap;
 }
 
-.ready { background: var(--color-accent-soft); color: var(--color-accent); }
+.ready { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .skipped { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
 .invalid,
-.failed { background: var(--color-status-danger-soft); color: var(--color-status-danger); }
+.failed { background: var(--color-status-danger-soft); color: var(--color-danger); }
 
 .footerRow {
   display: flex;
@@ -351,7 +337,7 @@
   border-radius: var(--radius-control);
   background: var(--color-accent-soft);
   padding: 14px 16px;
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
 }
 
 .warningBanner {
@@ -362,7 +348,7 @@
 .resultTitle {
   margin: 0;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
 }
 

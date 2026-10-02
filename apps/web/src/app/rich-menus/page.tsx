@@ -1,7 +1,7 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
-import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import ListRange from '@/components/ui/list-range'
 import { useDeferredValue, useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -13,10 +13,16 @@ import { RICH_MENU_DIMENSIONS, type Folder } from '@line-crm/shared'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { RowActions } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import StatusBadge from '@/components/shared/status-badge'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   audienceReason,
@@ -34,6 +40,7 @@ import {
 import {
   moveTargetingGroup,
 } from './targeting-order'
+import { formatDay, formatNumber } from '@/lib/format'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -130,15 +137,18 @@ type RichMenuGroupListItem = {
   updatedAt: string
 }
 
-function StatusBadge({ status }: { status: 'draft' | 'published' }) {
-  const cls =
-    status === 'published'
-      ? 'bg-success-bg text-success'
-      : 'bg-canvas-sunken text-ink-secondary'
+function MenuStatusBadge({ group }: { group: Pick<RichMenuGroupListItem, 'status' | 'publishingAt'> }) {
+  if (group.publishingAt) {
+    return (
+      <StatusBadge tone="warning" size="compact">
+        {formatDay(group.publishingAt)} に公開
+      </StatusBadge>
+    )
+  }
   return (
-    <span className={`text-xs px-2 py-0.5 rounded ${cls}`}>
-      {status === 'published' ? '公開中' : '下書き'}
-    </span>
+    <StatusBadge tone={group.status === 'published' ? 'success' : 'neutral'} size="compact">
+      {group.status === 'published' ? '公開中' : '下書き'}
+    </StatusBadge>
   )
 }
 
@@ -191,6 +201,8 @@ export default function RichMenusListPage() {
     lineMenus: LineMenu[]
   } | null>(null)
   const [loading, setLoading] = useState(true)
+  /** m23m: 捕まえた一覧の読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [externalError, setExternalError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [applyTo, setApplyTo] = useState<RichMenuGroupListItem | null>(null)
@@ -284,6 +296,7 @@ export default function RichMenusListPage() {
     const accountId = selectedAccount.id
     setLoading(true)
     setError(null)
+    setLoadError(null)
     try {
       const groupsRes = await api.richMenuGroups.listPage(accountId, {
         page: reordering ? 1 : page,
@@ -301,6 +314,7 @@ export default function RichMenusListPage() {
     } catch (e) {
       if (activeAccountRef.current === accountId) {
         setError(richMenuError(e, 'load'))
+        setLoadError(e)
       }
     } finally {
       if (activeAccountRef.current === accountId) setLoading(false)
@@ -370,10 +384,14 @@ export default function RichMenusListPage() {
   }, [loadList, loadTapStats, loadExternal])
 
   const loadFolders = useCallback(async () => {
-    // #730: 選択中の1件に閉じた母集団で数える。未選択時は付けず、件数は不明（—）のまま。
-    const accountId = selectedAccount?.id ?? undefined
-    const res = await api.folders.list('rich_menu', accountId)
-    if (res.success) setFolders(res.data)
+    try {
+      // #730: 選択中の1件に閉じた母集団で数える。未選択時は付けず、件数は不明（—）のまま。
+      const accountId = selectedAccount?.id ?? undefined
+      const res = await api.folders.list('rich_menu', accountId)
+      if (res.success) setFolders(res.data)
+    } catch {
+      // m23m: 置き場が取れなくても一覧は出す。取れない失敗で画面を落とさない。
+    }
   }, [selectedAccount?.id])
 
   useEffect(() => {
@@ -624,6 +642,17 @@ export default function RichMenusListPage() {
   const currentPage = Math.min(page, pageCount)
   const shownGroups = groups
 
+  /**
+   * R173: 検索・絞り込み・フォルダのいずれかが効いているか。
+   * 効いているときの0件は「まだありません」と言わず、条件を外す口を出す。
+   */
+  const richMenuFilterActive = query.trim() !== '' || savedFilter !== '' || folderFilter !== ''
+  const clearRichMenuFilters = () => {
+    setQuery('')
+    setSavedFilter('')
+    setFolderFilter('')
+  }
+
   useEffect(() => {
     setPage(1)
   }, [folderFilter, pageSize, query, savedFilter, sortKey])
@@ -633,7 +662,7 @@ export default function RichMenusListPage() {
   }, [page, pageCount])
 
   return (
-    <main data-design-node="GO8RQ" className="mx-auto max-w-[1584px] p-6">
+    <div data-design-node="GO8RQ" className="mx-auto flex max-w-[1584px] flex-col gap-4">
       <span hidden>メニュー名・ボタン名で検索・保存した条件・公開中のみ</span>
       {showExternal && selectedAccount ? (
         /*
@@ -658,24 +687,27 @@ export default function RichMenusListPage() {
         data-design="KPIs"
         data-group-kpi-state={groupKpiState}
         data-tap-kpi-state={tapKpiState}
-        className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">メニュー</p>
+          {/* R12: 総数は「すべて」の行とページ送りだけにし、KPIの主数値は公開中にする。 */}
+          <p className="text-ink-faint text-xs">公開中</p>
           <p className={`${groupKpiReady ? 'text-ink' : 'text-ink-faint'} mt-1 text-2xl font-bold tabular-nums`}>
-            {groupKpiReady ? (groupFacets?.total ?? groupTotal) : '—'}
+            {groupKpiReady ? (groupFacets?.published ?? '—') : '—'}
             {groupKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {groupKpiReady
-              ? `公開中 ${groupFacets?.published ?? '—'}`
-              : `公開中 —・${groupKpiUnavailableText}`}
+              ? groupFacets?.published != null
+                ? `下書き ${(groupFacets?.total ?? groupTotal) - groupFacets.published}件`
+                : `下書き —`
+              : `下書き —・${groupKpiUnavailableText}`}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月のタップ</p>
           <p className={`mt-1 text-2xl font-bold tabular-nums ${tapKpiReady ? 'text-ink' : 'text-ink-faint'}`}>
-            {tapKpiReady ? (tapStats?.total ?? '—') : '—'}
+            {tapKpiReady ? (tapStats?.total != null ? formatNumber(tapStats.total) : '—') : '—'}
             {tapKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
@@ -692,9 +724,12 @@ export default function RichMenusListPage() {
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {topArea
-              ? `${topArea.taps}回・タップ数の内訳は編集画面で見られます`
+              ? `${formatNumber(topArea.taps)}回・タップ数の内訳は編集画面で見られます`
               : tapKpiReady
-                ? 'まだ押されていません'
+                ? // ★V7：今月のタップが1回以上あるのに「まだ押されていません」と矛盾していた。
+                  (tapStats?.total ?? 0) > 0
+                  ? '内訳はまだ集まっていません'
+                  : 'まだ押されていません'
                 : tapKpiUnavailableText}
           </p>
         </div>
@@ -716,15 +751,12 @@ export default function RichMenusListPage() {
 
       <div
         data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 border p-3"
+        className="bg-canvas rounded-card border-hairline border p-3"
       >
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/rich-menus/new"
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
-          >
-            メニューを作る
-          </Link>
+          <Button href="/rich-menus/new" variant="primary">
+            ＋ メニューを作る
+          </Button>
           <Button
             onClick={() => {
               // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。
@@ -739,66 +771,61 @@ export default function RichMenusListPage() {
           </Button>
         </div>
         {/*
-          検索は独立した全幅の行にする（U015）。作成操作・並び順と
-          同じ行に押し込むと、狭い幅で入力した語が読めないほど潰れる。
+          ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+          右端に並び順と表示件数。U015 の潰れ対策の意図はそのまま
+          （検索は320・下限240で折り返す）。
         */}
-        <div data-search-row className="mt-2">
-          <SearchField
-            value={query}
-            onChange={setQuery}
-            onClear={() => setQuery('')}
-            placeholder="メニュー名・ボタン名で検索"
-            aria-label="メニュー名・ボタン名で検索"
-            className="w-full"
-          />
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-          <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
-          <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-          <SelectField
-            size="compact"
-            value={pageSize}
-            onChange={(e) => setPageSize(Number(e.target.value))}
-            aria-label="表示件数"
-            options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
-          />
-        </div>
+        <ListToolbar
+          search={{ placeholder: 'メニュー名・ボタン名で検索', value: query, onChange: setQuery }}
+          filters={
+            <>
+              <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+              {SAVED_FILTERS.map((f) => (
+                <FilterChip key={f.key} selected={savedFilter === f.key} onChange={() => setSavedFilter(savedFilter === f.key && f.key ? '' : f.key)}>
+                  {f.label}
+                </FilterChip>
+              ))}
+            </>
+          }
+          trailing={
+            <>
+              <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+              <Select value={sortKey} onChange={(value) => setSortKey(value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} />
+              <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
+              <Select
+                size="page-size"
+                value={String(pageSize)}
+                onChange={(value) => setPageSize(Number(value))}
+                aria-label="表示件数"
+                options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
+              />
+            </>
+          }
+        />
+        {/* ★V7：緑の帯は「正常」と読めるので、並び順の横の注記にする。 */}
+        <p className="text-ink-faint mb-3 min-w-0 text-xs leading-relaxed">
+          上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、
+          いちばん上の1つだけが出ます。
+        </p>
       </div>
 
-      <div className="bg-accent-soft text-ink-secondary mb-3 rounded-control px-3 py-2 text-xs leading-relaxed">
-        上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、
-        いちばん上の1つだけが出ます。
-      </div>
 
+      {/*
+        ★V7：「保存した検索」と書いていたが、中身は状態の絞り込み。保存はできないので名前を合わせる。
+        「管理画面の外」は絞り込みではなく別の画面を開く操作なので、札の列から出して枠つきボタンにする。
+      */}
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs whitespace-nowrap">保存した検索</span>
-        {SAVED_FILTERS.map((f) => {
-          const on = savedFilter === f.key
-          return (
-            <button
-              key={f.key}
-              onClick={() => setSavedFilter(on ? '' : f.key)}
-              aria-pressed={on}
-              title={f.note}
-              className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
-                on
-                  ? 'border-accent bg-accent-soft text-ink'
-                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-              }`}
-            >
-              {f.label}
-            </button>
-          )
-        })}
-        <button
-          type="button"
-          data-qa-open="TL7tp"
-          onClick={() => setShowExternal(true)}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-pill border px-3 py-1 text-xs transition-colors"
-        >
-          管理画面の外
-        </button>
+        <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+        {SAVED_FILTERS.map((f) => (
+          <FilterChip key={f.key} selected={savedFilter === f.key} onChange={() => setSavedFilter(savedFilter === f.key && f.key ? '' : f.key)}>
+            {f.label}
+          </FilterChip>
+        ))}
+        <span className="ml-auto">
+          <Button data-qa-open="TL7tp" onClick={() => setShowExternal(true)} title="LINEの画面で直接作ったメニューを見て、取り込めます">
+            管理画面の外のメニュー
+          </Button>
+        </span>
       </div>
 
       {!selectedAccount && (
@@ -820,7 +847,7 @@ export default function RichMenusListPage() {
       {selectedAccount && (
         <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
           <FolderPanel
-            total={`${folders.length + 1}`}
+            /* 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。 */
             activeId={folderFilter}
             onSelect={setFolderFilter}
             onAddFolder={() => setFolderDialogOpen(true)}
@@ -850,46 +877,65 @@ export default function RichMenusListPage() {
               <ListState
                 kind="error"
                 title="表示できませんでした"
-                description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+                // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+                // それ以外は画面の文のまま。
+                description={isForbiddenOrRateLimited(loadError) ? undefined : '再読み込みしても直らないときは、エラー報告へお知らせください。'}
+                error={loadError ?? undefined}
                 onRetry={() => void reload()}
               />
             ) : shownGroups.length === 0 ? (
-              <ListState
-                kind="empty"
-                title="まだリッチメニューがありません"
-                description="トークの下に出すメニューを作れます。"
-                action={<Button href="/rich-menus/new" variant="primary">メニューを作る</Button>}
-              />
+              richMenuFilterActive ? (
+                /* R173: 検索・絞り込み・フォルダの結果0件。元データ0件と分け、条件を外す口を出す。 */
+                <ListState
+                  kind="empty"
+                  emptyPreset="filtered"
+                  action={<Button variant="secondary" onClick={clearRichMenuFilters}>条件をクリア</Button>}
+                />
+              ) : (
+                <ListState
+                  kind="empty"
+                  title="まだリッチメニューがありません"
+                  description="トークの下に出すメニューを作れます。"
+                  action={<Button href="/rich-menus/new" variant="primary">＋ メニューを作る</Button>}
+                />
+              )
             ) : (
               <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
-                <table className="w-full table-fixed text-left text-sm">
+                {/* #641: 操作列が広くなった分は表だけが横に流れる */}
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] table-fixed text-left text-sm">
                   <colgroup>
-                    <col style={{ width: '27%' }} />
+                    {/*
+                      操作列はボタン幅で固定し、残りはメニューの列で吸収する。
+                      26%にすると右に余白が残り、枠にくっついて見える。
+                    */}
+                    <col style={{ width: '24%' }} />
                     <col style={{ width: '12%' }} />
-                    <col style={{ width: '19%' }} />
-                    <col style={{ width: '15%' }} />
-                    <col style={{ width: '10%' }} />
                     <col style={{ width: '17%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '12rem' }} />
                   </colgroup>
                   <thead>
                     <TableHeadRow>
-                      <Th>メニュー</Th>
+                      <Th className="pl-5">メニュー</Th>
                       <Th>状態</Th>
                       <Th>誰に出るか</Th>
                       <Th align="right">今月のタップ</Th>
                       <Th>更新</Th>
-                      <Th>操作</Th>
+                      {/* 表が横に流れる帯でも操作列は右端に留める。 */}
+                      <Th className="bg-canvas-sunken sticky right-0 pr-5">操作</Th>
                     </TableHeadRow>
                   </thead>
                   <tbody className="divide-hairline divide-y">
                     {shownGroups.map((g) => (
                       <tr key={g.id} className="h-[76px] align-middle">
-                        <td className="px-4 py-3">
+                        <td className="py-3 pr-4 pl-5">
                           <div className="flex items-center gap-2">
                             {reordering ? (
                               <div className="flex shrink-0 gap-1">
-                                <button type="button" onClick={() => void moveGroup(g, -1)} disabled={reorderBusy} aria-label={`${g.name}を上へ`} className="border-hairline rounded-control border px-1.5 py-1 text-xs disabled:opacity-40">↑</button>
-                                <button type="button" onClick={() => void moveGroup(g, 1)} disabled={reorderBusy} aria-label={`${g.name}を下へ`} className="border-hairline rounded-control border px-1.5 py-1 text-xs disabled:opacity-40">↓</button>
+                                <Button variant="secondary" className="px-1.5 py-1 text-xs h-auto whitespace-normal" type="button" onClick={() => void moveGroup(g, -1)} disabled={reorderBusy} aria-label={`${g.name}を上へ`}>↑</Button>
+                                <Button variant="secondary" className="px-1.5 py-1 text-xs h-auto whitespace-normal" type="button" onClick={() => void moveGroup(g, 1)} disabled={reorderBusy} aria-label={`${g.name}を下へ`}>↓</Button>
                               </div>
                             ) : null}
                             <div className="min-w-0">
@@ -903,7 +949,7 @@ export default function RichMenusListPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          {g.publishingAt ? <span className="text-warning text-xs font-semibold">{new Date(g.publishingAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })} に公開</span> : <StatusBadge status={g.status} />}
+                          <MenuStatusBadge group={g} />
                         </td>
                         <td className="px-4 py-3 text-xs text-ink-secondary">
                           {g.isDefaultForAll ? 'すべての友だち（既定）' : g.targetingEnabled && g.targetingCondition ? '条件で出し分け' : g.status === 'draft' ? '公開前' : 'すべての友だち'}
@@ -911,40 +957,67 @@ export default function RichMenusListPage() {
                         <td className="px-4 py-3 text-right">
                           <p className="text-ink font-semibold tabular-nums">
                             {g.monthlyStats
-                              ? `${g.monthlyStats.taps.toLocaleString('ja-JP')}回`
+                              ? `${formatNumber(g.monthlyStats.taps)}回`
                               : tapStats
-                                ? `${(tapsByGroup.get(g.id) ?? 0).toLocaleString('ja-JP')}回`
+                                ? `${formatNumber((tapsByGroup.get(g.id) ?? 0))}回`
                                 : '—'}
                           </p>
                           <p className="text-ink-faint mt-1 text-micro">
                             {g.monthlyStats?.uniqueAudience.value == null
                               ? 'のべ人数は未取得'
-                              : `のべ${g.monthlyStats.uniqueAudience.value.toLocaleString('ja-JP')}人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`}
+                              : `のべ${formatNumber(g.monthlyStats.uniqueAudience.value)}人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`}
                           </p>
                         </td>
                         <td className="px-4 py-3 text-xs text-ink-secondary tabular-nums">
-                          {new Date(g.updatedAt).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })}
+                          {formatDay(g.updatedAt)}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                            {g.status === 'published' ? <button type="button" onClick={() => setApplyTo(g)} className="text-action font-semibold hover:underline">表示先</button> : null}
-                            <Link href={`/rich-menus/edit?id=${g.id}`} className="text-action font-semibold hover:underline">編集</Link>
-                            <button type="button" onClick={() => { setDuplicateError(null); setDuplicateTarget(g) }} className="text-action font-semibold hover:underline">複製</button>
-                            <Link href={`/rich-menus/connections?id=${encodeURIComponent(g.id)}`} className="text-ink-secondary hover:underline">切替のつながりを見る</Link>
-                            <button type="button" onClick={() => handleDelete(g)} data-qa-open={g.status === 'published' ? 'szXsT' : 'szXsT-draft'} className="text-danger hover:underline" title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}>削除</button>
+                        <td className="bg-canvas sticky right-0 py-3 pr-5 pl-4">
+                          {/*
+                            ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。
+                            削除はメニューの中の危ない操作へ。ゴミ箱のアイコン
+                            だけのボタンは行に直に置かない。撮影口（szXsT）は
+                            「…」ボタンへ移す（2段操作の1段目）。
+                          */}
+                          <div className="relative flex w-full items-center justify-end gap-1.5">
+                            <RowActions
+                              subjectName={g.name}
+                              edit={{ href: `/rich-menus/edit?id=${g.id}` }}
+                              menuItems={[
+                                ...(g.status === 'published'
+                                  ? [{ id: 'apply', label: '表示先', onSelect: () => setApplyTo(g) }]
+                                  : []),
+                                {
+                                  id: 'duplicate',
+                                  label: '複製',
+                                  onSelect: () => { setDuplicateError(null); setDuplicateTarget(g) },
+                                },
+                                {
+                                  id: 'connections',
+                                  label: '切替のつながりを見る',
+                                  onSelect: () => router.push(`/rich-menus/connections?id=${encodeURIComponent(g.id)}`),
+                                },
+                              ]}
+                              destructiveItem={{
+                                id: 'delete',
+                                label: '削除する',
+                                onSelect: () => handleDelete(g),
+                              }}
+                              menuButtonProps={{ 'data-qa-open': g.status === 'published' ? 'szXsT' : 'szXsT-draft' }}
+                            />
                           </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                </div>
               </section>
             )}
 
             {!loading && !error && groupTotal > 0 ? (
               <div className="mt-4 flex items-center justify-between gap-4">
-                <p className="text-ink-faint text-xs">
-                  {groupTotal}件中 {(currentPage - 1) * effectivePageSize + 1}〜{Math.min(currentPage * effectivePageSize, groupTotal)}件を表示
+                <p>
+                  <ListRange total={groupTotal} first={(currentPage - 1) * effectivePageSize + 1} last={Math.min(currentPage * effectivePageSize, groupTotal)} />
                 </p>
                 <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="リッチメニューのページ送り" />
               </div>
@@ -1075,7 +1148,7 @@ export default function RichMenusListPage() {
               {deleteTarget.group.status === 'draft' ? <li>
                  <strong className="text-danger">元に戻せません。</strong>
               </li> : <>
-                <li><strong className="text-accent">取り下げは、もう一度公開すれば戻せます。</strong></li>
+                <li><strong className="text-ink">取り下げは、もう一度公開すれば戻せます。</strong></li>
                 <li>取り下げたあと、管理画面から削除できます。</li>
               </>}
             </ul>
@@ -1143,7 +1216,7 @@ export default function RichMenusListPage() {
           </ul>
         )}
       </ConfirmDialog>
-    </main>
+    </div>
   )
 }
 
@@ -1168,8 +1241,9 @@ function ExternalImportWorkspace({
   const areas = selected ? Array.from({ length: Math.min(selected.areasCount, 6) }, (_, index) => String.fromCharCode(65 + index)) : []
 
   return (
-    <div data-design-node="TL7tp" className="mx-auto max-w-[1584px]">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div data-design-node="TL7tp" className="mx-auto flex max-w-[1584px] flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs">
           <button type="button" className="text-action hover:underline" onClick={onBack}>リッチメニュー</button>
           <span className="mx-2">›</span>
@@ -1181,7 +1255,9 @@ function ExternalImportWorkspace({
       {loading ? <ListState kind="loading" title="LINEのメニューを読み込んでいます" /> : null}
       {!loading && error && !external ? <ListState kind="error" title="LINEのメニューを表示できませんでした" onRetry={onReload} /> : null}
       {!loading && !error && unmanaged.length === 0 ? (
-        <ListState kind="empty" title="管理画面の外のメニューはありません" description="LINE側だけにあるメニューが見つかると、ここに表示します。" />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title="管理画面の外のメニューはありません" description="LINE側だけにあるメニューが見つかると、ここに表示します。" />
+        </div>
       ) : null}
 
       {!loading && unmanaged.length > 0 ? (
@@ -1205,9 +1281,9 @@ function ExternalImportWorkspace({
                     >
                       <span className="bg-canvas-sunken text-ink-faint flex h-10 items-center justify-center rounded-control">▧</span>
                       <span className="min-w-0"><strong className="text-ink block truncate text-sm">{menu.name || '名前なし'}</strong><span className="text-ink-faint block truncate text-xs">{menu.areasCount}面・切替なし・画像あり</span></span>
-                      <span className="text-ink hidden text-sm font-bold sm:block">—<small className="text-ink-faint block text-micro font-normal">今月</small></span>
+                      <span className="text-ink hidden text-sm font-semibold sm:block">—<small className="text-ink-faint block text-micro font-normal">今月</small></span>
                       <span className="text-ink-secondary hidden text-xs sm:block">作成日不明</span>
-                      <span className="border-action text-action justify-self-end rounded-control border px-3 py-2 text-xs font-bold whitespace-nowrap">取り込む</span>
+                      <span className="border-action text-action justify-self-end rounded-control border px-3 py-2 text-xs font-medium whitespace-nowrap">取り込む</span>
                     </button>
                   )
                 })}
@@ -1221,7 +1297,7 @@ function ExternalImportWorkspace({
                 <li>✓ 「誰に出すか」の条件を付けられます（いまは全員に出ています）</li>
                 <li>✓ 面ごとのタップ数が取れるようになります</li>
               </ul>
-              <p className="bg-info-bg text-info mt-4 rounded-control p-3 text-xs font-semibold">ⓘ 取り込んでも、お客さまに出ているメニューは変わりません。中身をこちらで持つようになるだけです。</p>
+              <Notice tone="info" className="mt-4">ⓘ 取り込んでも、お客さまに出ているメニューは変わりません。中身をこちらで持つようになるだけです。</Notice>
             </section>
           </div>
 
@@ -1231,7 +1307,7 @@ function ExternalImportWorkspace({
                 <h2 className="text-ink text-sm font-bold">選んだメニューの中身</h2>
                 <p className="text-ink mt-3 text-sm font-semibold">{selected.name || '名前なし'}</p>
                 <div className="border-hairline bg-canvas-sunken mt-3 grid grid-cols-3 overflow-hidden rounded-control border" style={{ aspectRatio: `${selected.size.width} / ${selected.size.height}` }}>
-                  {areas.map((area) => <span key={area} className="border-hairline text-ink-faint flex items-center justify-center border text-xs font-bold">{area}</span>)}
+                  {areas.map((area) => <span key={area} className="border-hairline text-ink-faint flex items-center justify-center border text-xs font-medium">{area}</span>)}
                 </div>
                 <h3 className="text-ink-secondary mt-3 text-xs font-bold">面ごとの動き（LINEから読んだもの）</h3>
                 {selected.areas?.length ? (
@@ -1250,11 +1326,11 @@ function ExternalImportWorkspace({
                 )}
                 <Button type="button" variant="primary" className="mt-4" onClick={() => onImport(selected)}>この内容で取り込む</Button>
               </section>
-              <section className="bg-warning-bg text-warning rounded-card p-4 text-xs leading-6">
-                <h2 className="mb-1 font-bold">気をつけること</h2>
-                <p>・LINE側で作られたメニューは、名前が無いことがあります</p>
-                <p>・取り込まずに「LINEから削除」すると、お客さまのメニューがすぐ消えます</p>
-              </section>
+              <Notice tone="warn">
+                <h2 className="mb-1 text-xs font-bold">気をつけること</h2>
+                <p className="text-xs">・LINE側で作られたメニューは、名前が無いことがあります</p>
+                <p className="text-xs">・取り込まずに「LINEから削除」すると、お客さまのメニューがすぐ消えます</p>
+              </Notice>
             </aside>
           ) : null}
         </div>

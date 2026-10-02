@@ -23,6 +23,8 @@ describe('users tenant and account access scope', () => {
         phone TEXT,
         external_id TEXT,
         display_name TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        archived_at TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -37,7 +39,9 @@ describe('users tenant and account access scope', () => {
         ('account-a1', '${DEFAULT_TENANT_ID}'),
         ('account-a2', '${DEFAULT_TENANT_ID}'),
         ('account-b', 'tenant-b');
-      INSERT INTO users VALUES
+      INSERT INTO users
+        (id, tenant_id, email, phone, external_id, display_name, created_at, updated_at)
+        VALUES
         ('user-a1', '${DEFAULT_TENANT_ID}', 'a1@example.com', '09000000001', NULL, 'A1', '2026-09-01', '2026-09-01'),
         ('user-a2', '${DEFAULT_TENANT_ID}', 'a2@example.com', '09000000002', NULL, 'A2', '2026-09-02', '2026-09-02'),
         ('user-b', 'tenant-b', 'secret@example.com', '09099999999', NULL, 'B', '2026-09-03', '2026-09-03'),

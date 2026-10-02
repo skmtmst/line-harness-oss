@@ -7,45 +7,44 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 
 /**
- * U015: リッチメニューの検索欄の潰れ（外部UI監査 ab9d80b07）。
+ * U015 → ★V7 `Xn1Mz`（2026-09-27 オーナー指摘）。
  *
- * 390pxで作成操作・並び順・表示件数と同じ行に押し込まれ、検索欄が
- * 潰れて検索対象の説明も入力内容も読めなかった。検索は独立した
- * 全幅の行にし、並び順・表示件数は次の行へ。
- *
- * ブラウザの実測幅は vitest では取れないので、**潰れない構造**を
- * 契約として見る: 検索欄が `data-search-row` の専用行に1つだけあり、
- * 全幅（`w-full`）で、同じ行に他の操作を置かないこと。
+ * U015（外部UI監査 ab9d80b07）の旧処方は「検索を独立した全幅の行に」
+ * だったが、正本を「検索は幅320で1行目、2行目は左に絞り込み・右端に
+ * 並び順と表示件数」に変えた。潰れ対策の意図は残す：検索は320
+ * （狭い時は240まで）で折り返し、読めないほど潰さない。幅の実数は
+ * 共通 ListToolbar の契約テストで守る。
  */
 const barBlock = PAGE.slice(PAGE.indexOf('data-design="Bar"'), PAGE.indexOf('data-design="Saved"'))
-const searchRowBlock = (): string => {
-  const start = barBlock.indexOf('data-search-row')
-  const end = barBlock.indexOf('</div>', start)
-  return barBlock.slice(start, end)
-}
 
-describe('リッチメニューの検索行（U015）', () => {
-  it('検索欄は独立した全幅の行に1つだけ置く', () => {
-    const row = searchRowBlock()
-    expect(row).toContain('メニュー名・ボタン名で検索')
-    expect(row, '検索欄が全幅でない').toContain('className="w-full"')
-    // 同じ行に他の操作を押し込まない（潰れの再発防止）。
-    expect(row).not.toContain('SelectField')
-    expect(row).not.toContain('Button')
-    expect(row).not.toContain('Link')
+describe('リッチメニューの検索行（U015 → ★V7 Xn1Mz）', () => {
+  it('検索は共通 ListToolbar の1行目に置く', () => {
+    expect(PAGE).toContain("import ListToolbar from '@/components/shared/list-toolbar'")
+    expect(barBlock).toContain('<ListToolbar')
+    expect(barBlock).toContain("search={{ placeholder: 'メニュー名・ボタン名で検索'")
   })
 
-  it('共通の検索部品を使う', () => {
-    expect(PAGE).toContain("import SearchField from '@/components/shared/search-field'")
+  it('検索を横いっぱいに伸ばさない（裸の全幅 input を置かない）', () => {
+    expect(PAGE).not.toContain('data-search-row')
+    expect(PAGE).not.toContain('type="search"')
+    expect(PAGE).not.toMatch(/<SearchField[\s\S]*?className="w-full"/)
   })
 
-  it('作成操作→検索→並び順・表示件数の順に別行へ分ける', () => {
+  it('共通の検索部品を使う（ListToolbar の中の SearchField）', () => {
+    expect(PAGE).toContain('<ListToolbar')
+  })
+
+  it('作成操作→検索→絞り込み→並び順・表示件数の順に並べる', () => {
     // 既存契約（rich-menus-v6-contract.test.ts）の道具列順を保ったまま、
-    // 検索は作成操作の次・並び順の前の独立行にする。
-    expect(barBlock.indexOf('メニューを作る')).toBeLessThan(barBlock.indexOf('出す順番を変える'))
-    expect(barBlock.indexOf('出す順番を変える')).toBeLessThan(barBlock.indexOf('data-search-row'))
-    const rowEnd = barBlock.indexOf('</div>', barBlock.indexOf('data-search-row'))
-    expect(barBlock.indexOf('aria-label="並び順"')).toBeGreaterThan(rowEnd)
-    expect(barBlock.indexOf('aria-label="表示件数"')).toBeGreaterThan(rowEnd)
+    // 検索は作成操作の次、絞り込み・並び順の前に置く。
+    expect(barBlock.indexOf('メニューを作る')).toBeLessThan(barBlock.indexOf('<ListToolbar'))
+    const toolbarAt = barBlock.indexOf('<ListToolbar')
+    const filtersAt = barBlock.indexOf('filters={', toolbarAt)
+    const trailingAt = barBlock.indexOf('trailing={', toolbarAt)
+    expect(filtersAt).toBeGreaterThan(toolbarAt)
+    expect(trailingAt).toBeGreaterThan(filtersAt)
+    expect(barBlock.indexOf('よく使う絞り込み', filtersAt)).toBeGreaterThan(filtersAt)
+    expect(barBlock.indexOf('aria-label="並び順"', trailingAt)).toBeGreaterThan(trailingAt)
+    expect(barBlock.indexOf('aria-label="表示件数"', trailingAt)).toBeGreaterThan(trailingAt)
   })
 })

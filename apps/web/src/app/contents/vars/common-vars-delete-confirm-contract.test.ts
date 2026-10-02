@@ -58,6 +58,6 @@ describe('共通情報の削除確認', () => {
     expect(PAGE).toContain('deleteRequestRef.current.accountId === request.accountId')
     expect(PAGE).toContain('deleteRequestRef.current.generation === request.generation')
     expect(PAGE).toContain('api.commonVars.deleteImpact(id, request.accountId)')
-    expect(PAGE).toContain('api.commonVars.delete(target.id, request.accountId)')
+    expect(PAGE).toContain('api.commonVars.delete(target.id, request.accountId, batchReason.trim())')
   })
 })

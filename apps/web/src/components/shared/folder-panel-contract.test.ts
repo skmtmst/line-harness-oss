@@ -11,7 +11,7 @@ describe('共通フォルダ欄', () => {
 
   it('フォルダ追加操作を一覧の下へ出す', () => {
     expect(PANEL).toContain('onAddFolder?: () => void')
-    expect(PANEL).toContain("addFolderLabel = 'フォルダを追加'")
+    expect(PANEL).toContain("addFolderLabel = 'フォルダを追加する'")
     expect(PANEL.indexOf('{rows.map')).toBeLessThan(PANEL.indexOf('onClick={onAddFolder}'))
     expect(PANEL).toContain('className="w-full"')
   })
@@ -21,5 +21,9 @@ describe('共通フォルダ欄', () => {
     expect(PANEL).toContain('heading?: string')
     expect(PANEL).toContain('aria-label="フォルダ"')
     expect(PANEL).toContain('>{heading}</p>')
+  })
+
+  it('R37: 狭い幅では操作メニューを常に出す（スマホでも名前変更・削除に届く）', () => {
+    expect(PANEL).toContain('max-lg:opacity-100')
   })
 })

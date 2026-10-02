@@ -29,18 +29,20 @@ import {
   createWebhookInteraction,
   finishWebhookInteraction,
   isOperationCapabilityStopped,
-  type WebhookInteractionFailureReason,
 } from '@line-crm/db';
 import {
   buildOutgoingWebhookBody,
   buildOutgoingWebhookHeaders,
   claimOutgoingDelivery,
+  deliverOnce,
   deliverWebhook,
   enqueueOutgoingWebhookDelivery,
+  failureReasonForDelivery,
   finishOutgoingDelivery,
   outgoingAttemptOf,
   outgoingDeliveryMaxAttempts,
   postWebhookSafely,
+  releaseOutgoingDelivery,
   recordDeliveryOutcome,
 } from './outgoing-webhook-delivery.js';
 import { LineClient } from '@line-crm/line-sdk';
@@ -125,6 +127,11 @@ export async function fireEvent(
   lineAccessToken?: string,
   lineAccountId?: string | null,
   execution?: IncomingWebhookExecution,
+  /**
+   * 広告連携の秘密の復号鍵。無いときは暗号化された行の即時送信を見送り、
+   * 待ち行列に残して定期 drain に任せる（旧行の平文はそのまま送る）。
+   */
+  credentialKey?: string,
 ): Promise<void> {
   db = execution?.db ?? db;
   let outgoingWebhookLineAccountId = lineAccountId;
@@ -154,6 +161,7 @@ export async function fireEvent(
         // 通貨・単位が分かるときだけ渡す。無いときは円・主単位扱い。
         currency: adConversion.currency,
         amountInMinorUnit: adConversion.amountInMinorUnit,
+        credentialKey,
       }),
     );
   }
@@ -252,8 +260,11 @@ async function reevaluateRichMenuTargeting(
   }
 }
 
-/** 送信Webhookへの通知 */
-async function fireOutgoingWebhooks(
+/**
+ * 送信Webhookへの通知。fireEvent を通る出来事はここへ流れ、
+ * 個別の発火点（フォーム回答・予約）からも直接呼べる。
+ */
+export async function fireOutgoingWebhooks(
   db: D1Database,
   eventType: string,
   payload: EventPayload,
@@ -321,6 +332,17 @@ async function fireOutgoingWebhooks(
         // 積んだまま初回配送を送らない。pending の行は復旧後に sweep の
         // cron が届けるので、出来事自体は失われない。
         if (await isOperationCapabilityStopped(db, deliveryAccountId, 'webhook_outgoing')) return;
+        // N-369: 再送は Worker 内で sleep せず台帳の next_retry_at へ積む。
+        // ここでは1回だけ送る。失敗しても行は retry_wait で残り、delivery
+        // レーンの cron が決められた時刻に送り直す。
+        const lease = await claimOutgoingDelivery(db, queued);
+        if (!lease) return; // 別の実行が取り掛かった
+        // d23b R413: 取り掛かり〜送信のあいだに緊急停止へ切り替わった分は、
+        // lease を外して送る前の状態へ戻す。sweep側と同じ再確認。
+        if (await isOperationCapabilityStopped(db, deliveryAccountId, 'webhook_outgoing')) {
+          await releaseOutgoingDelivery(db, queued, lease);
+          return;
+        }
         if (lineAccountId) {
           try {
             const interaction = await createWebhookInteraction(db, {
@@ -339,12 +361,7 @@ async function fireOutgoingWebhooks(
             console.error(`送信Webhook ${wh.id} の記録開始に失敗:`, logError);
           }
         }
-        // N-369: 再送は Worker 内で sleep せず台帳の next_retry_at へ積む。
-        // ここでは1回だけ送る。失敗しても行は retry_wait で残り、delivery
-        // レーンの cron が決められた時刻に送り直す。
-        const lease = await claimOutgoingDelivery(db, queued);
-        if (!lease) return; // 別の実行が取り掛かった
-        const result = await deliverWebhook({ ...wh, max_retries: 0 }, body, { idempotencyKey });
+        const result = await deliverOnce(wh, body, { idempotencyKey });
         const outcome = await finishOutgoingDelivery(db, queued, lease, outgoingAttemptOf(result));
         if (outcome !== 'delivered') {
           console.error(
@@ -358,7 +375,7 @@ async function fireOutgoingWebhooks(
               responseStatus: result.lastStatus,
               attemptCount: result.attempts,
               durationMs: Date.now() - started,
-              failureReason: outcome === 'delivered' ? null : outgoingFailureReason(result.lastStatus),
+              failureReason: outcome === 'delivered' ? null : failureReasonForDelivery(result),
             });
           } catch (logError) {
             // 届いた通知を、台帳更新の失敗だけで「送信失敗」とは扱わない。
@@ -398,14 +415,6 @@ async function fireOutgoingWebhooks(
     console.error('fireOutgoingWebhooks error:', err);
     if (execution) throw err;
   }
-}
-
-function outgoingFailureReason(status: number | null): WebhookInteractionFailureReason {
-  if (status === null) return 'connection_failed';
-  if (status === 429) return 'response_429';
-  if (status >= 500) return 'response_5xx';
-  if (status >= 400) return 'response_4xx';
-  return 'unknown';
 }
 
 /** スコアリングルール適用 */

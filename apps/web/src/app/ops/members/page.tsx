@@ -11,7 +11,7 @@ import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
@@ -34,6 +34,8 @@ export default function OpsMembersPage() {
   const [inviting, setInviting] = useState(false)
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
+  // ★V7：一覧の失敗は一覧の場所の1枚で出す。操作の知らせと混ぜない。
+  const [listFailed, setListFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [me, setMe] = useState<string | null>(null)
   const [toggling, setToggling] = useState<OpsMember | null>(null)
@@ -42,11 +44,12 @@ export default function OpsMembersPage() {
 
   const load = useCallback(async () => {
     setError('')
+    setListFailed(false)
     // fetchApi は 4xx/5xx を例外にするので、両方とも opsCall で受ける。
     // 生の Promise.all だと片方の拒否で load ごと落ち、「読み込んでいます」のまま固まる。
     const [res, meRes] = await Promise.all([opsCall(api.ops.members()), opsCall(api.ops.me())])
     setLoaded(true)
-    if (!res.success) { setError(res.error || '読み込めませんでした'); return }
+    if (!res.success) { setError(res.error || '読み込めませんでした'); setListFailed(true); return }
     setMembers(res.data)
     setSummary(res.summary)
     if (meRes.success) setMe(meRes.data.id)
@@ -93,27 +96,37 @@ export default function OpsMembersPage() {
   const totpMissing = summary ? summary.members - summary.totpEnabled : 0
 
   return (
-    <div data-design-node="POteo">
+    <div data-design-node="POteo" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader title="メンバー管理" />
-      <div className="mb-4">
+      <div>
         <Tabs
           items={[
             { label: '権限者', current: tab === 'members', onClick: () => setTab('members') },
             { label: '運営の情報', current: tab === 'info', onClick: () => setTab('info') },
           ]}
-          actions={
-            tab === 'members' ? (
-              <Button variant="primary" onClick={() => setInviting((v) => !v)}>
-                <Plus aria-hidden="true" className="h-4 w-4" />
-                運営メンバーを招待
-              </Button>
-            ) : undefined
-          }
         />
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <KpiCard variant="v6" title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `招待中 ${summary.invited}・2要素認証待ち ${summary.awaitingTotp}` : '—'} loading={!loaded} />
+        <KpiCard variant="v6" title="2要素認証" value={summary ? summary.totpEnabled : null} unit={summary ? `/ ${summary.members}人` : '人'} detail={totpMissing > 0 ? `未設定 ${totpMissing}人` : '全員設定済み'} badge={totpMissing > 0 ? '要対応' : undefined} badgeTone="danger" loading={!loaded} />
+        <KpiCard variant="v6" title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail={summary ? `書き込み ${summary.writeImpersonationsThisMonth}回` : '—'} loading={!loaded} />
+        <KpiCard variant="v6" title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="理由の記録あり" loading={!loaded} />
+      </div>
+
+      {/* 作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。 */}
+      {tab === 'members' ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="primary" onClick={() => setInviting((v) => !v)}>
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            運営メンバーを招待
+          </Button>
+        </div>
+      ) : null}
+
       {inviting ? (
-        <form onSubmit={(event) => void invite(event)} className="mb-4 flex items-center gap-2 rounded-card border border-hairline bg-canvas px-4 py-3">
+        <form onSubmit={(event) => void invite(event)} className="flex items-center gap-2 rounded-card border border-hairline bg-canvas px-4 py-3">
           <div className="flex-1">
             <TextField
               type="email"
@@ -124,24 +137,20 @@ export default function OpsMembersPage() {
               required
             />
           </div>
+          <Button onClick={() => setInviting(false)}>キャンセル</Button>
           <Button type="submit" variant="primary" disabled={busy}>招待メールを送る</Button>
-          <Button onClick={() => setInviting(false)}>やめる</Button>
         </form>
       ) : null}
 
-      <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `招待中 ${summary.invited}・2要素認証待ち ${summary.awaitingTotp}` : '—'} loading={!loaded} />
-        <SummaryCard variant="v6" title="2要素認証" value={summary ? summary.totpEnabled : null} unit={summary ? `/ ${summary.members}人` : '人'} detail={totpMissing > 0 ? `未設定 ${totpMissing}人` : '全員設定済み'} badge={totpMissing > 0 ? '要対応' : undefined} badgeTone="danger" loading={!loaded} />
-        <SummaryCard variant="v6" title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail={summary ? `書き込み ${summary.writeImpersonationsThisMonth}回` : '—'} loading={!loaded} />
-        <SummaryCard variant="v6" title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="理由の記録あり" loading={!loaded} />
-      </div>
-
-      <div className="mb-4">
+      <div>
         <NoteBar tone="warn">運営メンバーはメールで招待します。招待された人はパスワードを設定し、2要素認証の登録が終わるまで運営コンソールに入れません。自分自身は変えられません。</NoteBar>
       </div>
 
-      {notice ? <p role="status" className="mb-3 text-caption text-accent-deep">{notice}</p> : null}
-      {error ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
+      {notice ? <p role="status" className="text-caption text-accent-deep">{notice}</p> : null}
+      {/*
+        ★V7：一覧の失敗は一覧の場所の1枚で出すので、ここでは操作の知らせだけ出す。
+      */}
+      {error && !listFailed ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
       {tab === 'members' ? (
         !loaded ? (
@@ -149,33 +158,45 @@ export default function OpsMembersPage() {
         ) : error && members.length === 0 ? (
           <ListState kind="error" title="運営メンバーを表示できませんでした" onRetry={() => void load()} />
         ) : members.length === 0 ? (
-          <ListState kind="empty" title="運営メンバーがいません" description="最初の 1 人は、自分のメールアドレスを「運営メンバーを招待」に入れて登録します。" />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState kind="empty" title="運営メンバーがいません" description="最初の 1 人は、自分のメールアドレスを「運営メンバーを招待」に入れて登録します。" />
+          </div>
         ) : (
           <DataTable>
             <thead>
               <TableHeadRow>
-                <Th className="w-72">名前</Th>
-                <Th className="w-72">メール</Th>
+                {/*
+                  ★V7: 操作列は入る幅で固定する（「再送」「停止」の2つ＋送信中の表示）。
+                  1440px で合計が枠に収まるよう、メール・最終ログインは詰める（1行省略＋全文は title）。
+                */}
+                {/*
+                  名前・メールは幅を切らずに残りで吸収する。固定の合計が
+                  枠を超えると表だけ横スクロールし、左右の余白がずれる。
+                */}
+                <Th>名前</Th>
+                <Th>メール</Th>
                 <Th className="w-36">2要素認証</Th>
                 <Th className="w-28">状態</Th>
-                <Th className="w-44">最終ログイン</Th>
-                <Th align="right">操作</Th>
+                <Th className="w-36">最終ログイン</Th>
+                <Th className="w-48" align="right">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody>
               {members.map((m) => (
                 <Tr key={m.staffId}>
-                  <Td><span className="block truncate text-label font-bold text-ink" title={m.name}>{m.name}{m.staffId === me ? '（あなた）' : ''}</span></Td>
+                  <Td><span className="block truncate text-label font-medium text-ink" title={m.name}>{m.name}{m.staffId === me ? '（あなた）' : ''}</span></Td>
                   <Td><span className="block truncate text-caption text-ink-secondary" title={m.email ?? ''}>{m.email ?? '—'}</span></Td>
                   <Td>{m.totpEnabled ? <Chip tone="ok">設定済み</Chip> : <Chip tone="danger">未設定</Chip>}</Td>
                   <Td>{memberStateChip(m)}</Td>
                   <Td><span className="text-caption text-ink-secondary">{formatDateTime(m.lastLoginAt)}</span></Td>
                   <Td align="right">
-                    {m.staffId === me ? null : (
+                    {m.staffId === me ? (
+                      /* 自分自身への操作は無い。空のままにすると右端の余白が0に見えるため「—」を置く。 */
+                      <span className="text-ink-faint text-xs">—</span>
+                    ) : (
                       <span className="inline-flex gap-2">
                         {m.isActive && m.activationState !== 'active' ? (
-                          <Button size="field" onClick={() => void resend(m)} disabled={resendingId !== null}>
-                            {resendingId === m.staffId ? '送信中…' : '再送'}
+                          <Button size="field" onClick={() => void resend(m)} disabled={resendingId !== null} busy={resendingId === m.staffId} busyLabel="送信中…">再送
                           </Button>
                         ) : null}
                         <Button size="field" onClick={() => setToggling(m)} disabled={busy}>
@@ -193,7 +214,7 @@ export default function OpsMembersPage() {
         <div className="grid gap-4">
           <NoticeLineAccountCard />
           <div className="rounded-card border border-hairline bg-canvas px-5 py-4 text-label text-ink-secondary">
-            運営メンバーは <code className="rounded bg-canvas-sunken px-1">platform_admins</code> で管理しています。
+            運営メンバーは <code className="rounded-mini bg-canvas-sunken px-1">platform_admins</code> で管理しています。
             LINE でログインする場合は、各メンバーの権限者アカウントに LINE を紐づけてください。
           </div>
         </div>

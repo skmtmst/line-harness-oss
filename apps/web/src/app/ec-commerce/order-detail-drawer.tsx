@@ -29,6 +29,7 @@ import {
   SETTLEMENT_STATE_TEXT,
 } from '../affiliates/affiliate-display'
 import styles from './ec-commerce-v6.module.css'
+import { formatNumber } from '@/lib/format'
 
 /*
  * IDEA-23: 注文1件の処理状況パネル。取り込みの記録の各行から「この注文の
@@ -61,11 +62,11 @@ const DISPATCH_STATUS: Record<string, string> = {
 
 function money(currency: string, amount: number | null): string | null {
   if (amount === null) return null
-  return `${currency === 'JPY' ? '¥' : ''}${amount.toLocaleString('ja-JP')}`
+  return `${currency === 'JPY' ? '¥' : ''}${formatNumber(amount)}`
 }
 
 function signedAmount(amount: number): string {
-  return `${amount > 0 ? '+' : '−'}${Math.abs(amount).toLocaleString('ja-JP')}`
+  return `${amount > 0 ? '+' : '−'}${formatNumber(Math.abs(amount))}`
 }
 
 function amountText(detail: EcOrderDetail): string | null {
@@ -109,7 +110,7 @@ function EventBlock({
                   ?? (action.status === 'succeeded' ? '完了しました'
                     : action.status === 'skipped' ? '見送りました'
                     : action.status === 'pending' || action.status === 'processing' ? '処理中です'
-                    : '失敗しました')}
+                    : '失敗しました。通信を確かめて、もう一度お試しください。')}
                 {kind ? `（${kind.label}）` : ''}
               </p>
               <p className={styles.cellSub}>
@@ -121,8 +122,7 @@ function EventBlock({
               ) : null}
             </div>
             {action.retryAvailable ? (
-              <Button type="button" disabled={retryingId === action.id} onClick={() => onRetry(action)}>
-                {retryingId === action.id ? '戻しています…' : 'もう一度やる'}
+              <Button type="button" disabled={retryingId === action.id} onClick={() => onRetry(action)} busy={retryingId === action.id} busyLabel="戻しています…">もう一度やる
               </Button>
             ) : null}
           </div>
@@ -225,8 +225,7 @@ export default function OrderDetailDrawer({
                   ? <Link className={styles.textLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}`}>{order.customerName ?? '友だちを見る'}</Link>
                   : order.customerName ?? <span className="text-ink-faint">LINEの友だちと結びついていません</span>}
                 {friendId ? null : (
-                  <span className={styles.cellSub}>
-                    {'　'}<Link className={styles.textLink} href="/ec-commerce/identity-candidates">会員のつき合わせへ</Link>
+                  <span className={styles.cellSub}>　<Link className={styles.textLink} href="/ec-commerce/identity-candidates">会員のつき合わせへ</Link>
                   </span>
                 )}
               </dd></div>
@@ -302,13 +301,13 @@ export default function OrderDetailDrawer({
                   <div key={conversion.id} className="min-w-0">
                     <p className="truncate text-caption text-ink-faint">
                       成果：{conversion.pointName ?? '計測地点'} を記録
-                      {conversion.value !== null ? `（¥${conversion.value.toLocaleString('ja-JP')}）` : ''}
+                      {conversion.value !== null ? `（¥${formatNumber(conversion.value)}）` : ''}
                       {conversion.approvalStatus === 'pending' ? '・承認待ち' : conversion.approvalStatus === 'approved' ? '・承認済み' : conversion.approvalStatus === 'rejected' ? '・却下' : ''}
                       （{dateTime(conversion.createdAt)}）
                     </p>
                     <p className="truncate text-caption text-ink-faint">
                       {conversion.affiliateName ? `紹介者：${conversion.affiliateName}　` : ''}
-                      報酬：{conversion.rewardAmount != null ? `¥${conversion.rewardAmount.toLocaleString('ja-JP')}` : '未確定'}
+                      報酬：{conversion.rewardAmount != null ? `¥${formatNumber(conversion.rewardAmount)}` : '未確定'}
                       {conversion.rewardEntryStatus ? `・支払い確定：${REWARD_ENTRY_STATUS_TEXT[conversion.rewardEntryStatus] ?? conversion.rewardEntryStatus}` : ''}
                       {conversion.settlementState ? `・締め：${SETTLEMENT_STATE_TEXT[conversion.settlementState] ?? conversion.settlementState}` : ''}
                       {conversion.payoutBatchState ? `・支払いCSV：${PAYOUT_BATCH_STATE_TEXT[conversion.payoutBatchState] ?? conversion.payoutBatchState}` : ''}
@@ -316,11 +315,11 @@ export default function OrderDetailDrawer({
                     </p>
                     {conversion.reversedAmount != null ? (
                       <p className="truncate text-caption text-ink-faint">
-                        確定後の取消：−¥{conversion.reversedAmount.toLocaleString('ja-JP')}（次の支払いで差し引かれます）
+                        確定後の取消：−¥{formatNumber(conversion.reversedAmount)}（次の支払いで差し引かれます）
                       </p>
                     ) : null}
                     {conversion.duplicateCandidate ? (
-                      <p className="mt-1.5 text-caption font-semibold text-status-danger">
+                      <p className="mt-1.5 text-caption font-semibold text-danger">
                         同じ注文・同じ成果地点の成果がほかにもあります。二重に認めないか注文番号で確かめてください。
                       </p>
                     ) : null}

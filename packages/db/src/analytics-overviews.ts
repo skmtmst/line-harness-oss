@@ -1,5 +1,7 @@
 import { FEATURE_IDS, type FeatureId } from '@line-crm/shared';
 import { getTrackedLinkStats } from './analytics.js';
+import { getAdCostTotalsByRoute } from './ad-costs.js';
+import { analyticsWindow, analyticsWindowWhere } from './utils.js';
 
 export type AnalyticsMetricState =
   | 'available'
@@ -32,6 +34,10 @@ interface ReactionCampaign {
   sentAt: string;
   targetPeople: AnalyticsMetric<number>;
   delivered: AnalyticsMetric<number>;
+  // 監査 R225: シナリオは「届いた人数」が取れず、手元にあるのは
+  // 送信ログの通数だけ。人数と通数を同じ列で出すと読み違えるので、
+  // 通数はこの欄に分けて持つ（一斉配信は人数で数えるため null）。
+  sentMessages: AnalyticsMetric<number>;
   opened: AnalyticsMetric<number>;
   lineClicked: AnalyticsMetric<number>;
   outcomes: AnalyticsMetric<number>;
@@ -155,6 +161,7 @@ export async function getAnalyticsFriendsOverview(
   db: D1Database,
   context: AnalyticsOverviewContext,
 ) {
+  const win = analyticsWindow(context.from, context.toExclusive);
   const [addCoverage, unfollowCoverage, current, addTotals, dailyRows, reconciliation, campaigns] = await Promise.all([
     getCoverage(db, context.lineAccountId, 'friend_add', context.from),
     getCoverage(db, context.lineAccountId, 'friend_unfollow', context.from),
@@ -168,9 +175,8 @@ export async function getAnalyticsFriendsOverview(
               SUM(CASE WHEN friend_kind = 'returning' THEN 1 ELSE 0 END) AS returning_count
          FROM friend_add_events
         WHERE line_account_id = ?
-          AND julianday(occurred_at) >= julianday(?)
-          AND julianday(occurred_at) < julianday(?)`,
-    ).bind(context.lineAccountId, context.from, context.toExclusive).first<{
+          ${analyticsWindowWhere('occurred_at')}`,
+    ).bind(context.lineAccountId, win.lo, win.hi, win.fromIso, win.toIso).first<{
       total: number; first_time: number | null; returning_count: number | null;
     }>(),
     db.prepare(
@@ -248,22 +254,23 @@ export async function getAnalyticsFriendsOverview(
 }
 
 async function loadCampaignMarkers(db: D1Database, context: AnalyticsOverviewContext) {
+  const win = analyticsWindow(context.from, context.toExclusive);
   const [broadcasts, scenarios] = await Promise.all([
     db.prepare(
       `SELECT id, title AS name, sent_at AS occurred_at
          FROM broadcasts
         WHERE line_account_id = ? AND sent_at IS NOT NULL
-          AND julianday(sent_at) >= julianday(?) AND julianday(sent_at) < julianday(?)`,
-    ).bind(context.lineAccountId, context.from, context.toExclusive)
+          ${analyticsWindowWhere('sent_at')}`,
+    ).bind(context.lineAccountId, win.lo, win.hi, win.fromIso, win.toIso)
       .all<{ id: string; name: string; occurred_at: string }>(),
     db.prepare(
       `SELECT s.id, s.name, MIN(m.created_at) AS occurred_at
          FROM messages_log m JOIN scenario_steps ss ON ss.id = m.scenario_step_id
          JOIN scenarios s ON s.id = ss.scenario_id
         WHERE m.line_account_id = ? AND m.direction = 'outgoing'
-          AND julianday(m.created_at) >= julianday(?) AND julianday(m.created_at) < julianday(?)
+          ${analyticsWindowWhere('m.created_at')}
         GROUP BY s.id, s.name`,
-    ).bind(context.lineAccountId, context.from, context.toExclusive)
+    ).bind(context.lineAccountId, win.lo, win.hi, win.fromIso, win.toIso)
       .all<{ id: string; name: string; occurred_at: string }>(),
   ]);
   return [
@@ -286,6 +293,7 @@ export async function getAnalyticsReactionsOverview(
   db: D1Database,
   context: AnalyticsOverviewContext,
 ) {
+  const win = analyticsWindow(context.from, context.toExclusive);
   const [broadcastRows, scenarioRows, clickRows, outcomeCoverage] = await Promise.all([
     db.prepare(
       `SELECT b.id, b.title, b.sent_at, b.total_count, b.success_count,
@@ -297,9 +305,9 @@ export async function getAnalyticsReactionsOverview(
             ORDER BY bi.created_at DESC, bi.id DESC LIMIT 1
          )
         WHERE b.line_account_id = ? AND b.sent_at IS NOT NULL
-          AND julianday(b.sent_at) >= julianday(?) AND julianday(b.sent_at) < julianday(?)
+          ${analyticsWindowWhere('b.sent_at')}
         ORDER BY b.sent_at DESC, b.id DESC LIMIT ${REACTION_CAMPAIGN_LIMIT + 1}`,
-    ).bind(context.lineAccountId, context.from, context.toExclusive).all<{
+    ).bind(context.lineAccountId, win.lo, win.hi, win.fromIso, win.toIso).all<{
       id: string; title: string; sent_at: string; total_count: number; success_count: number;
       delivered: number | null; unique_impression: number | null; unique_click: number | null;
       insight_status: 'pending' | 'ready' | 'failed' | null; fetched_at: string | null;
@@ -310,18 +318,18 @@ export async function getAnalyticsReactionsOverview(
          FROM messages_log m JOIN scenario_steps ss ON ss.id = m.scenario_step_id
          JOIN scenarios s ON s.id = ss.scenario_id
         WHERE m.line_account_id = ? AND m.direction = 'outgoing'
-          AND julianday(m.created_at) >= julianday(?) AND julianday(m.created_at) < julianday(?)
+          ${analyticsWindowWhere('m.created_at')}
         GROUP BY s.id, s.name ORDER BY sent_at DESC LIMIT ${REACTION_CAMPAIGN_LIMIT + 1}`,
-    ).bind(context.lineAccountId, context.from, context.toExclusive).all<{
+    ).bind(context.lineAccountId, win.lo, win.hi, win.fromIso, win.toIso).all<{
       id: string; name: string; sent_at: string; sent_count: number; target_count: number;
     }>(),
     db.prepare(
       `SELECT c.clicked_at
          FROM link_clicks c JOIN tracked_links l ON l.id = c.tracked_link_id
         WHERE l.line_account_id = ?
-          AND julianday(c.clicked_at) >= julianday(?) AND julianday(c.clicked_at) < julianday(?)
+          ${analyticsWindowWhere('c.clicked_at')}
         ORDER BY c.clicked_at LIMIT 50001`,
-    ).bind(context.lineAccountId, context.from, context.toExclusive).all<{ clicked_at: string }>(),
+    ).bind(context.lineAccountId, win.lo, win.hi, win.fromIso, win.toIso).all<{ clicked_at: string }>(),
     getCoverage(db, context.lineAccountId, 'conversion_approved', context.from),
   ]);
 
@@ -352,6 +360,7 @@ export async function getAnalyticsReactionsOverview(
       sentAt: row.sent_at,
       targetPeople: metric(Number(row.total_count ?? 0)),
       delivered: metric(row.delivered == null ? null : Number(row.delivered), insightState, reason),
+      sentMessages: metric<number>(null, 'unavailable', '一斉配信は人数で集計します'),
       opened: metric(row.unique_impression == null ? null : Number(row.unique_impression), insightState, reason),
       lineClicked: metric(row.unique_click == null ? null : Number(row.unique_click), insightState, reason),
       outcomes: metric<number>(null, outcomeCoverage.state, outcomeCoverage.reason),
@@ -364,7 +373,10 @@ export async function getAnalyticsReactionsOverview(
     kind: 'scenario' as const,
     sentAt: row.sent_at,
     targetPeople: metric(Number(row.target_count ?? 0)),
-    delivered: metric(Number(row.sent_count ?? 0)),
+    // 送信ログは「送った」記録であって相手の端末への到達ではない。
+    // 通数は sentMessages に出し、届いた人数は取れないと正直に返す。
+    delivered: metric<number>(null, 'unavailable', 'シナリオは送信ログだけなので、届いた人数は分かりません'),
+    sentMessages: metric(Number(row.sent_count ?? 0)),
     opened: metric<number>(null, 'unavailable', 'シナリオ配信はLINE Insightsの配信単位を持ちません'),
     lineClicked: metric<number>(null, 'unavailable', 'シナリオ配信はLINE Insightsの配信単位を持ちません'),
     outcomes: metric<number>(null, outcomeCoverage.state, outcomeCoverage.reason),
@@ -421,6 +433,7 @@ export async function getAnalyticsRoutesOverview(
   db: D1Database,
   context: AnalyticsOverviewContext,
 ) {
+  const win = analyticsWindow(context.from, context.toExclusive);
   const rows = await db.prepare(
     `WITH ranked_touch AS (
        SELECT friend_id, entry_route_id, ref_code, occurred_at,
@@ -444,13 +457,13 @@ export async function getAnalyticsRoutesOverview(
        SELECT entry_route_id AS route_id, COUNT(*) AS count
          FROM friend_add_attribution_candidates
         WHERE line_account_id = ? AND entry_route_id IS NOT NULL
-          AND julianday(occurred_at) >= julianday(?) AND julianday(occurred_at) < julianday(?)
+          ${analyticsWindowWhere('occurred_at')}
         GROUP BY entry_route_id
      ), adds AS (
        SELECT entry_route_id AS route_id, COUNT(*) AS count
          FROM friend_add_events
         WHERE line_account_id = ? AND entry_route_id IS NOT NULL
-          AND julianday(occurred_at) >= julianday(?) AND julianday(occurred_at) < julianday(?)
+          ${analyticsWindowWhere('occurred_at')}
         GROUP BY entry_route_id
      ), connected AS (
        SELECT ft.entry_route_id AS route_id, COUNT(*) AS count
@@ -462,7 +475,7 @@ export async function getAnalyticsRoutesOverview(
          FROM first_touch ft JOIN analytics_events a ON a.friend_id = ft.friend_id
         WHERE a.line_account_id = ?
           AND a.event_type IN ('message_received','postback_received','url_clicked')
-          AND julianday(a.occurred_at) >= julianday(?) AND julianday(a.occurred_at) < julianday(?)
+          ${analyticsWindowWhere('a.occurred_at')}
         GROUP BY ft.entry_route_id
      ), conversions AS (
        SELECT er.id AS route_id,
@@ -475,7 +488,7 @@ export async function getAnalyticsRoutesOverview(
          JOIN conversion_points cp ON cp.id = ce.conversion_point_id
          JOIN entry_routes er ON er.ref_code = ce.attributed_ref_code
         WHERE f.line_account_id = ?
-          AND julianday(ce.created_at) >= julianday(?) AND julianday(ce.created_at) < julianday(?)
+          ${analyticsWindowWhere('ce.created_at')}
         GROUP BY er.id
      )
      SELECT er.id, er.ref_code, er.name,
@@ -491,44 +504,79 @@ export async function getAnalyticsRoutesOverview(
   ).bind(
     context.lineAccountId,
     context.lineAccountId, context.lineAccountId, context.lineAccountId,
-    context.lineAccountId, context.from, context.toExclusive,
-    context.lineAccountId, context.from, context.toExclusive,
+    context.lineAccountId, win.lo, win.hi, win.fromIso, win.toIso,
+    context.lineAccountId, win.lo, win.hi, win.fromIso, win.toIso,
     context.lineAccountId,
-    context.lineAccountId, context.from, context.toExclusive,
-    context.lineAccountId, context.from, context.toExclusive,
+    context.lineAccountId, win.lo, win.hi, win.fromIso, win.toIso,
+    context.lineAccountId, win.lo, win.hi, win.fromIso, win.toIso,
   ).all<{
     id: string; ref_code: string; name: string; clicks: number; friend_adds: number;
     connected: number; reactions: number; approved: number; pending: number;
     rejected: number; revenue: number;
   }>();
-  const [missing, attribution] = await Promise.all([
+  const [missing, attribution, costTotals] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS adds FROM friend_add_events
         WHERE line_account_id = ? AND attribution_status = 'unavailable'
-          AND julianday(occurred_at) >= julianday(?) AND julianday(occurred_at) < julianday(?)`,
-    ).bind(context.lineAccountId, context.from, context.toExclusive).first<{ adds: number }>(),
+          ${analyticsWindowWhere('occurred_at')}`,
+    ).bind(context.lineAccountId, win.lo, win.hi, win.fromIso, win.toIso).first<{ adds: number }>(),
     getCoverage(db, context.lineAccountId, 'friend_add', context.from),
+    getAdCostTotalsByRoute(db, {
+      lineAccountId: context.lineAccountId,
+      from: context.fromDate,
+      to: context.toDate,
+    }),
   ]);
-  const costReason = '広告費の取込台帳は「18 流入と計測」で接続予定です';
-  const routes: AnalyticsRouteOverviewItem[] = rows.results.map((row) => ({
-    id: row.id,
-    refCode: row.ref_code,
-    name: row.name,
-    clicks: metric(Number(row.clicks), 'partial', 'ログイン・LIFF・短縮リンクで識別できた接触のみです'),
-    friendAdds: metric(Number(row.friend_adds), attribution.state, attribution.reason),
-    currentFriends: metric(Number(row.connected), attribution.state, attribution.reason),
-    reactionPeople: metric(Number(row.reactions), 'partial', '記録開始後の受信・ボタン・URL反応です'),
-    conversions: {
-      approved: metric(Number(row.approved)),
-      pending: metric(Number(row.pending)),
-      rejected: metric(Number(row.rejected)),
-      revenue: metric(Number(row.revenue)),
-    },
-    adCost: metric<number>(null, 'unavailable', costReason),
-    costPerFriend: metric<number>(null, 'unavailable', costReason),
-    costPerConversion: metric<number>(null, 'unavailable', costReason),
-    profitAfterAdCost: metric<number>(null, 'unavailable', costReason),
-  }));
+  // 広告費は最小通貨単位で来る。表示は円だけ扱うので、JPY以外や
+  // 複数通貨が混ざる経路は換算根拠がない旨を理由にして出さない。
+  const costMetric = (routeId: string) => {
+    const totals = costTotals.get(routeId);
+    if (!totals || totals.length === 0) {
+      return metric<number>(null, 'unavailable', 'この経路の広告費は取り込まれていません');
+    }
+    if (totals.length > 1 || totals[0].currency !== 'JPY') {
+      return metric<number>(null, 'unavailable', '通貨が複数あるか円以外のため、換算なしでは合計できません');
+    }
+    return metric<number>(totals[0].amountMinor, 'available', null);
+  };
+  const costPerFriendMetric = (routeId: string, friendAdds: number, state: AnalyticsMetricState, reason: string | null) => {
+    const cost = costMetric(routeId);
+    if (cost.value === null) return metric<number>(null, cost.state, cost.reason);
+    if (state !== 'available') return metric<number>(null, state, reason);
+    if (friendAdds === 0) return metric<number>(null, 'unavailable', 'この期間の友だち追加が0件のため割れません');
+    return metric<number>(Math.round((cost.value / friendAdds) * 100) / 100, 'available', null);
+  };
+  const routes: AnalyticsRouteOverviewItem[] = rows.results.map((row) => {
+    const adCost = costMetric(row.id);
+    const costPerFriend = costPerFriendMetric(row.id, Number(row.friend_adds), attribution.state, attribution.reason);
+    const approved = Number(row.approved);
+    const revenue = Number(row.revenue);
+    return {
+      id: row.id,
+      refCode: row.ref_code,
+      name: row.name,
+      clicks: metric(Number(row.clicks), 'partial', 'ログイン・LIFF・短縮リンクで識別できた接触のみです'),
+      friendAdds: metric(Number(row.friend_adds), attribution.state, attribution.reason),
+      currentFriends: metric(Number(row.connected), attribution.state, attribution.reason),
+      reactionPeople: metric(Number(row.reactions), 'partial', '記録開始後の受信・ボタン・URL反応です'),
+      conversions: {
+        approved: metric(approved),
+        pending: metric(Number(row.pending)),
+        rejected: metric(Number(row.rejected)),
+        revenue: metric(revenue),
+      },
+      adCost,
+      costPerFriend,
+      costPerConversion: adCost.value === null
+        ? metric<number>(null, adCost.state, adCost.reason)
+        : approved === 0
+          ? metric<number>(null, 'unavailable', 'この期間の成果が0件のため割れません')
+          : metric<number>(Math.round((adCost.value / approved) * 100) / 100, 'available', null),
+      profitAfterAdCost: adCost.value === null
+        ? metric<number>(null, adCost.state, adCost.reason)
+        : metric<number>(revenue - adCost.value, 'available', null),
+    };
+  });
   if (Number(missing?.adds ?? 0) > 0) {
     routes.push({
       id: '__unknown__', refCode: null, name: '経路不明',
@@ -542,10 +590,10 @@ export async function getAnalyticsRoutesOverview(
         rejected: metric<number>(null, 'partial', '第一接触が不明なため経路へ帰属できません'),
         revenue: metric<number>(null, 'partial', '第一接触が不明なため経路へ帰属できません'),
       },
-      adCost: metric<number>(null, 'unavailable', costReason),
-      costPerFriend: metric<number>(null, 'unavailable', costReason),
-      costPerConversion: metric<number>(null, 'unavailable', costReason),
-      profitAfterAdCost: metric<number>(null, 'unavailable', costReason),
+      adCost: metric<number>(null, 'unavailable', '経路が分からない分には広告費を帰属できません'),
+      costPerFriend: metric<number>(null, 'unavailable', '経路が分からない分には広告費を帰属できません'),
+      costPerConversion: metric<number>(null, 'unavailable', '経路が分からない分には広告費を帰属できません'),
+      profitAfterAdCost: metric<number>(null, 'unavailable', '経路が分からない分には広告費を帰属できません'),
     });
   }
   return envelope(context, {
@@ -560,15 +608,18 @@ export async function getAnalyticsUrlClicksOverview(
   db: D1Database,
   context: AnalyticsOverviewContext,
   limit = 200,
+  query?: string,
 ) {
   const safeLimit = Math.min(200, Math.max(1, limit));
   const inclusiveTo = new Date(new Date(context.toExclusive).getTime() - 1).toISOString();
+  const win = analyticsWindow(context.from, context.toExclusive);
   const [allStats, coverage] = await Promise.all([
     getTrackedLinkStats(
       db,
       context.lineAccountId,
       { from: context.from, to: inclusiveTo },
       safeLimit + 1,
+      query,
     ),
     db.prepare(
       `SELECT available_from, state, reason
@@ -606,8 +657,7 @@ export async function getAnalyticsUrlClicksOverview(
                  WHERE c.tracked_link_id = e.tracked_link_id
                    AND c.friend_id = e.friend_id
                    AND julianday(c.clicked_at) >= julianday(e.sent_at)
-                   AND julianday(c.clicked_at) >= julianday(?)
-                   AND julianday(c.clicked_at) < julianday(?)
+                   ${analyticsWindowWhere('c.clicked_at')}
               ) THEN e.friend_id END) AS clicked_people,
               SUM(CASE WHEN e.audience_state = 'unknown' THEN 1 ELSE 0 END) AS unknown_audiences,
               MIN(e.sent_at) AS first_sent_at,
@@ -615,15 +665,18 @@ export async function getAnalyticsUrlClicksOverview(
               GROUP_CONCAT(DISTINCT e.source_kind) AS source_kinds
          FROM analytics_url_exposures e
         WHERE e.line_account_id = ?
-          AND julianday(e.sent_at) >= julianday(?)
-          AND julianday(e.sent_at) < julianday(?)
+          ${analyticsWindowWhere('e.sent_at')}
           AND e.tracked_link_id IN (${placeholders})
         GROUP BY e.tracked_link_id`,
         )
         .bind(
+          win.lo,
+          win.hi,
           context.from,
           context.toExclusive,
           context.lineAccountId,
+          win.lo,
+          win.hi,
           context.from,
           context.toExclusive,
           ...chunk.map((item) => item.trackedLinkId),

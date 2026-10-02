@@ -123,6 +123,25 @@ describe('N-434: 7日間ログインを保持する選択', () => {
 })
 
 describe('N-426: 二段階認証の初回設定へ進む', () => {
+  it('R507: twoFactor 応答なら合言葉とメール経路の印付きで /login/two-factor へ進む', async () => {
+    fixture.loginResponse = { success: true, data: { twoFactor: true, challengeToken: 'verify-tok-1' }, csrfToken: 'csrf-1' }
+    await render()
+    const email = field('#login-email') as HTMLInputElement
+    const password = field('#login-password') as HTMLInputElement
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+      setter.call(email, 'owner@example.com'); email.dispatchEvent(new Event('input', { bubbles: true }))
+      setter.call(password, 'Abcdefg1'); password.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const form = host.querySelector('form')!
+    await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+    await flush()
+    expect(window.location.pathname).toBe('/login/two-factor')
+    const params = new URLSearchParams(window.location.hash.slice(1))
+    expect(params.get('lh_2fa')).toBe('verify-tok-1')
+    expect(params.get('lh_method')).toBe('password')
+  })
+
   it('twoFactorSetup 応答なら /login/two-factor/setup へ合言葉付きで進む', async () => {
     await render()
     const email = field('#login-email') as HTMLInputElement

@@ -10,6 +10,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EventItem, EventSlot } from '@/lib/api'
 
@@ -45,6 +46,23 @@ vi.mock('@/contexts/account-context', () => ({
     selectedAccountId: 'acc-1',
     loading: false,
   }),
+}))
+
+/*
+ * 時刻の選び欄は共通 Select（listbox）。ここで見たいのは選んだ後の
+ * 予約枠の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
 }))
 
 // api.ts は読み込み時に NEXT_PUBLIC_API_URL を要求する。画面の
@@ -109,12 +127,12 @@ async function renderForm() {
 }
 
 function button(text: string): HTMLButtonElement | undefined {
-  return [...host.querySelectorAll('button')].find((b) => b.textContent === text && !b.disabled)
+  return [...document.querySelectorAll('button')].find((b) => b.textContent === text && !b.disabled)
 }
 
 /** タブは見出し＋補足が1つのボタンに入っているので先頭一致で探す。 */
 function tabButton(label: string): HTMLButtonElement | undefined {
-  return [...host.querySelectorAll('button')].find((b) => b.textContent?.startsWith(label) && !b.disabled)
+  return [...document.querySelectorAll('button')].find((b) => b.textContent?.startsWith(label) && !b.disabled)
 }
 
 async function click(target: Element) {
@@ -131,7 +149,7 @@ function setInput(input: HTMLInputElement, value: string) {
 }
 
 function dialog(): HTMLElement | null {
-  return host.querySelector('.fixed.inset-0')
+  return document.querySelector('.fixed.inset-0')
 }
 
 function dialogInput(kind: string, index = 0): HTMLInputElement {
@@ -140,9 +158,38 @@ function dialogInput(kind: string, index = 0): HTMLInputElement {
   return inputs[index]
 }
 
+/** 窓の中の日付・時刻の選択（★V7）。欄は押し口で、値は日本語で読む。 */
+function dialogDateTrigger(): HTMLButtonElement {
+  const found = dialog()?.querySelector('button[aria-label="日付（JST）"]')
+  expect(found, '日付の選択がある').toBeTruthy()
+  return found as HTMLButtonElement
+}
+
+function dialogTimeTriggers(): HTMLButtonElement[] {
+  const found = [...(dialog()?.querySelectorAll('button[aria-label="開始"],button[aria-label="終了"]') ?? [])]
+  expect(found, '開始と終了の選択がある').toHaveLength(2)
+  return found as HTMLButtonElement[]
+}
+
+/** 時刻の選択で「HH:mm」を選ぶ。値は今までどおり HH:mm（日本時間）。 */
+async function pickTime(trigger: Element, value: string) {
+  const [hour, minute] = value.split(':')
+  await act(async () => {
+    trigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    for (let step = 0; step < 10; step += 1) await Promise.resolve()
+  })
+  // 時刻の選択箱は最上層（MenuPortal→document.body）に出る。窓の中にはいない。
+  const picker = document.querySelector('[role="dialog"][aria-label="時刻を選ぶ"]')
+  expect(picker, '時刻の選択箱がある').toBeTruthy()
+  await act(async () => {
+    fireEvent.change(picker!.querySelector('select[aria-label="時"]')!, { target: { value: hour } })
+    fireEvent.change(picker!.querySelector('select[aria-label="分"]')!, { target: { value: minute } })
+  })
+}
+
 /** 窓の中の「保存」。ページ側の「保存して次へ」と取り違えないよう窓の中だけ探す。 */
 function dialogSaveButton(): HTMLButtonElement {
-  const found = [...(dialog()?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '保存')
+  const found = [...(dialog()?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '保存する')
   expect(found, '窓の「保存」がある').toBeTruthy()
   return found!
 }
@@ -157,9 +204,9 @@ describe('予約枠の編集（入口29）', () => {
 
   it('「編集」で保存済みの日時・定員が入った窓が開く', async () => {
     await openEdit()
-    expect(dialogInput('date').value).toBe('2026-10-01')
-    expect(dialogInput('time', 0).value).toBe('14:00')
-    expect(dialogInput('time', 1).value).toBe('15:30')
+    expect(dialogDateTrigger().textContent).toContain('2026年10月1日（木）')
+    expect(dialogTimeTriggers()[0].textContent).toContain('14:00')
+    expect(dialogTimeTriggers()[1].textContent).toContain('15:30')
     expect(dialogInput('number').value).toBe('8')
     // 予約が入っているので、動かすとリマインドも動くことを先に伝える。
     expect(host.textContent).toContain('3件の予約')
@@ -174,20 +221,20 @@ describe('予約枠の編集（入口29）', () => {
       starts_at: '2026-10-01T05:00:00.000Z',
       ends_at: '2026-10-01T06:30:00.000Z',
       capacity: 10,
-    })
+    }, 1)
     // 窓が閉じて、一覧を取り直している。
     expect(listSlots).toHaveBeenCalledTimes(2)
   })
 
   it('開始時刻を動かすと JST→UTC に戻して送る', async () => {
     await openEdit()
-    await act(async () => { setInput(dialogInput('time', 0), '13:00') })
+    await pickTime(dialogTimeTriggers()[0], '13:00')
     await click(dialogSaveButton())
     expect(updateSlot).toHaveBeenCalledWith('acc-1', 'ev-1', 'slot-1', {
       starts_at: '2026-10-01T04:00:00.000Z',
       ends_at: '2026-10-01T06:30:00.000Z',
       capacity: 8,
-    })
+    }, 1)
   })
 
   it('予約数より小さい定員には下げられない', async () => {
@@ -200,9 +247,24 @@ describe('予約枠の編集（入口29）', () => {
 
   it('開始が終了以降のままでは保存できない', async () => {
     await openEdit()
-    await act(async () => { setInput(dialogInput('time', 0), '16:00') })
+    await pickTime(dialogTimeTriggers()[0], '16:00')
     await click(dialogSaveButton())
     expect(updateSlot).not.toHaveBeenCalled()
     expect(host.textContent).toContain('開始時刻 < 終了時刻')
+  })
+
+  it('競合（409）では窓に最新の差分を出し、一覧を読み直す（m26g R577）', async () => {
+    const { ApiError } = await import('@/lib/api')
+    await openEdit()
+    updateSlot.mockRejectedValueOnce(
+      new ApiError(409, 'version_conflict', 'version_conflict', {
+        current: { ...bookedSlot, capacity: 12, is_active: 0 },
+      }),
+    )
+    await click(dialogSaveButton())
+    // 敗者に差分（最新の枠）を見せる。窓は開いたまま、一覧は裏で読み直す。
+    expect(host.textContent).toContain('ほかの画面でこの枠が更新されました')
+    expect(host.textContent).toContain('定員12')
+    expect(listSlots).toHaveBeenCalledTimes(2)
   })
 })

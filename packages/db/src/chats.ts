@@ -147,14 +147,23 @@ export async function updateChat(
 }
 
 /** 友だちからメッセージ受信時にチャットを作成/更新 */
-export async function upsertChatOnMessage(db: D1Database, friendId: string): Promise<ChatRow> {
+export async function upsertChatOnMessage(
+  db: D1Database,
+  friendId: string,
+  /**
+   * LINEイベントの timestamp (JST文字列)。一覧の並びは起こった順を正と
+   * するため last_message_at にはこちらを入れる。対応期限の時計
+   * (last_incoming_at / last_customer_message_at) は届いた時刻のまま。
+   */
+  eventAt?: string | null,
+): Promise<ChatRow> {
   const now = jstNow();
   // createChat はレースで負けた場合も相手が作った行を返すので、必ずその行に対して
   // 受信時の更新 (resolved→unread, last_message_at) を適用する。挿入直後の自行にも
   // 適用されるが no-op 相当なので害はない。
   const chat = (await getChatByFriendId(db, friendId)) ?? (await createChat(db, { friendId }));
   const newStatus = chat.status === 'resolved' || chat.status === 'on_hold' ? 'unread' : chat.status;
-  await updateChat(db, chat.id, { status: newStatus, lastMessageAt: now });
+  await updateChat(db, chat.id, { status: newStatus, lastMessageAt: eventAt ?? now });
 
   // 受信の時刻を残し、初回返信の時計を巻き直す（107）。
   //

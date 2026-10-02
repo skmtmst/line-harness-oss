@@ -5,8 +5,10 @@ import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { petAnimalTypeLabel, type NenHealthSummaryData } from '@/lib/nen-pets-api'
 import type { SummaryStatus } from './page'
+import { formatDay } from '@/lib/format'
 import './print.css'
 
 const SKIN_LABELS: Record<string, string> = { normal: '問題なし', itchy: 'かゆそう', red: '赤み', other: 'その他' }
@@ -29,6 +31,7 @@ export default function SummaryDrawer({
   open,
   status,
   summary,
+  error,
   onClose,
   onRetry,
   onPrint,
@@ -36,6 +39,12 @@ export default function SummaryDrawer({
   open: boolean
   status: SummaryStatus
   summary: NenHealthSummaryData | null
+  /**
+   * 取得で捕まえた失敗（M034）。`error` のときだけ見る。
+   * 403 は権限の案内にし、押しても直らない再試行の口は出さない。
+   * 429 は待ち案内を添え、再試行の口は残す。
+   */
+  error?: unknown
   onClose: () => void
   onRetry: () => void
   onPrint: () => void
@@ -48,12 +57,19 @@ export default function SummaryDrawer({
       title="30日のまとめ"
       description={summary ? `${summary.pet.callName || summary.pet.name}（${petAnimalTypeLabel(summary.pet.animalType)}${summary.pet.breed ? `・${summary.pet.breed}` : ''}・${summary.pet.ageLabel}）／飼い主 ${summary.owner.name}` : undefined}
       onClose={onClose}
-      footer={ready ? <Button type="button" variant="primary" onClick={onPrint}>印刷・PDFに保存</Button> : undefined}
+      footer={ready ? <Button type="button" variant="primary" onClick={onPrint}>印刷・PDFに保存する</Button> : undefined}
     >
       {status === 'loading' ? (
         <ListState kind="loading" title="まとめを作っています" />
       ) : status === 'error' || !summary || !s ? (
-        <ListState kind="error" title="まとめを作れませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
+        <ListState
+          kind="error"
+          title="まとめを作れませんでした"
+          // M034: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。それ以外は画面の文のまま。
+          description={isForbiddenOrRateLimited(error) ? undefined : '通信の状態を確認して、もう一度お試しください。'}
+          error={error ?? undefined}
+          onRetry={onRetry}
+        />
       ) : (
         <div className="flex flex-col gap-4">
           <dl className="grid grid-cols-2 gap-3">
@@ -82,7 +98,7 @@ export default function SummaryDrawer({
             <div className="flex flex-col gap-1 border-t border-hairline pt-2"><dt className="text-micro text-ink-faint">涙やけ</dt><dd className="text-caption text-ink">{countText(s.tearStain, TEAR_LABELS)}</dd></div>
           </dl>
           <section>
-            <h3 className="text-label font-bold text-ink">メモ</h3>
+            <h3 className="text-label font-semibold text-ink">メモ</h3>
             {s.notes.length === 0 ? (
               <p className="mt-1 text-caption text-ink-faint">メモはありません</p>
             ) : (
@@ -114,7 +130,7 @@ export function SummarySheet({ summary }: { summary: NenHealthSummaryData }) {
   return createPortal(
     <div data-print-sheet="" aria-hidden="true">
       <p><strong>健康日記 30日のまとめ</strong></p>
-      <p>{summary.pet.callName || summary.pet.name}（{kind}{summary.pet.breed ? `・${summary.pet.breed}` : ''}・{summary.pet.ageLabel}）／飼い主 {summary.owner.name}／作成 {summary.generatedAt.slice(0, 10)}</p>
+      <p>{summary.pet.callName || summary.pet.name}（{kind}{summary.pet.breed ? `・${summary.pet.breed}` : ''}・{summary.pet.ageLabel}）／飼い主 {summary.owner.name}／作成 {formatDay(summary.generatedAt)}</p>
       <p>
         記録 {s.records}件／{s.days}日。
         体重 {s.weight ? `${s.weight.first}kg → ${s.weight.last}kg（最小 ${s.weight.min}・最大 ${s.weight.max}）` : '記録なし'}。

@@ -1,16 +1,21 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
+import Checkbox from '@/components/shared/checkbox'
 import { useEffect, useRef, useState } from 'react'
 import type { Tag, Scenario } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import CreatePage, {
   AsideCard,
   Field,
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import { formatNumber } from '@/lib/format'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -34,17 +39,8 @@ function rewardIntegerError(value: string, kind: 'amount' | 'miles'): string | n
  * タグとシナリオは**成果が確定したときに実行するもの**で、成果の条件ではない。
  * ここを取り違えると、紹介の成果がいつまでも確定しない設定ができてしまう。
  */
-function Unavailable({ label, reason }: { label: string; reason: string }) {
-  return (
-    <div className="border-hairline rounded-control bg-canvas-sunken border px-3 py-2">
-      <p className="text-ink-secondary text-label font-semibold">{label}</p>
-      <p className="text-ink text-label">—</p>
-      <p className="text-ink-faint text-micro mt-0.5">{reason}</p>
-    </div>
-  )
-}
-
 export default function NewAffiliateOfferPage() {
+  usePageTitle('案件を作る')
   const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -56,6 +52,13 @@ export default function NewAffiliateOfferPage() {
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
+  /*
+   * R524: 候補の取得状態を1件ずつ持つ。失敗を「（なし）」に化けさせない。
+   * 失敗中は保存も止め、画面内の「もう一度読み込む」で取り直す。
+   */
+  const [tagsFetch, setTagsFetch] = useState<'loading' | 'ready' | 'failed'>('loading')
+  const [scenariosFetch, setScenariosFetch] = useState<'loading' | 'ready' | 'failed'>('loading')
+  const [candidateSeq, setCandidateSeq] = useState(0)
   // 作成の再送で二重登録にしないための、この登録試行1回分の安定した操作
   // UUID（Issue #686）。押し直しても同じ値のままにするため onSave では
   // 作らず、ここと onReset だけで作り直す。
@@ -83,36 +86,76 @@ export default function NewAffiliateOfferPage() {
     let cancelled = false
     // N-211: 選択accountのタグ・シナリオだけを選べるようにする。
     // 保存時の所属再検査はサーバーが済ませている(案件routeの参照検査)。
-    const accountParams = selectedAccountId ? { accountId: selectedAccountId } : undefined
+    // R50: アカウントを切り替えたら旧アカウントの候補を捨てて取り直す。
+    if (!selectedAccountId) {
+      setTags([])
+      setScenarios([])
+      setTagsFetch('ready')
+      setScenariosFetch('ready')
+      return () => { cancelled = true }
+    }
+    // 取り直しの間は古いアカウントの候補を選ばせない。失敗は空に化けさせず
+    // 失敗のまま残す（R524）。
+    setTags([])
+    setScenarios([])
+    setTagsFetch('loading')
+    setScenariosFetch('loading')
+    const accountParams = { accountId: selectedAccountId }
     void Promise.allSettled([api.tags.list(accountParams), api.scenarios.list(accountParams)]).then(
       ([t, s]) => {
         if (cancelled) return
-        if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
+        if (t.status === 'fulfilled' && t.value.success) {
+          setTags(t.value.data)
+          setTagsFetch('ready')
+        } else {
+          setTags([])
+          setTagsFetch('failed')
+        }
         if (s.status === 'fulfilled' && s.value.success) {
           setScenarios(s.value.data as unknown as Scenario[])
+          setScenariosFetch('ready')
+        } else {
+          setScenarios([])
+          setScenariosFetch('failed')
         }
       },
     )
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId, candidateSeq])
 
   const yen = rewardAmount ? Number(rewardAmount) : 0
   const miles = rewardMiles ? Number(rewardMiles) : 0
+
+  /*
+   * 作成途中の離脱確認。案件名・説明・報酬・タグ・シナリオのどれかに手を
+   * 付けていたら、キャンセルや左メニューで確認窓を出す。作成が終わると
+   * 一覧へ router.push するので、成功後に警告は出ない。
+   */
+  const dirty = Boolean(
+    name || description || rewardAmount || rewardMiles || tagId || scenarioId || !publishNow
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   return (
     <CreatePage
       title="案件を作る"
       description="何を成果として数え、いくら払うかを決めます。"
+      showHeader={false}
       parent={['案件', OFFER_LIST_PATH]}
       successHref={(id) => `${OFFER_LIST_PATH}&highlight=${encodeURIComponent(String(id))}`}
-      saveLabel={createdId ? '変更を保存する' : publishNow ? '公開する' : '下書きに保存'}
+      saveLabel={createdId ? '変更を保存する' : publishNow ? '公開する' : '下書きを保存する'}
       variant="v6"
       designNode="GPWzq"
       validate={() => {
         if (!name.trim()) return '案件名を入力してください'
         if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
+        // R524: 候補の取得失敗を「（なし）」のつもりで確定させない。
+        // 取り直してから保存する。
+        if (tagsFetch === 'failed' || scenariosFetch === 'failed') {
+          return 'タグまたはシナリオの候補を読み込めませんでした。「もう一度読み込む」で取り直してから保存してください'
+        }
         if (!rewardAmount && !rewardMiles) return '報酬（円かマイル）のどちらかを入れてください'
         const amountError = rewardIntegerError(rewardAmount, 'amount')
         if (amountError) return amountError
@@ -188,10 +231,10 @@ export default function NewAffiliateOfferPage() {
                 <p className="text-ink-faint mt-1 text-xs leading-relaxed">{description}</p>
               )}
               <p className="text-ink mt-2 text-sm font-semibold tabular-nums">
-                ¥{yen.toLocaleString()}
+                ¥{formatNumber(yen)}
                 {miles > 0 && (
                   <span className="text-ink-secondary ml-1 text-xs">
-                    ＋ {miles.toLocaleString()}マイル
+                    ＋ {formatNumber(miles)}マイル
                   </span>
                 )}
               </p>
@@ -200,7 +243,7 @@ export default function NewAffiliateOfferPage() {
               </p>
               {miles > 0 && (
                 <p className="text-ink-faint mt-1 text-xs">
-                  成果が認められると {miles.toLocaleString()} マイルも付与します
+                  成果が認められると {formatNumber(miles)} マイルも付与します
                 </p>
               )}
               <p className="bg-accent-deep text-on-accent rounded-control mt-3 px-3 py-2 text-center text-xs font-medium">
@@ -253,26 +296,7 @@ export default function NewAffiliateOfferPage() {
         </div>
       </FormSection>
 
-      <FormSection
-        step={2}
-        label="何をもって成果とするか"
-        note="成果地点はコンバージョンで作成・管理します。"
-      >
-        <div className="grid gap-3 lg:grid-cols-2">
-          <Unavailable
-            label="成果地点"
-            reason="まだ繋がっていません。案件と成果地点の紐づけAPIが接続されると選べます。"
-          />
-          <Unavailable
-            label="紹介とみなす期間"
-            reason="まだ繋がっていません。成果を数える期間が接続されると表示されます（例：友だち追加から30日以内）。"
-          />
-          <Unavailable label="同じ友だちを数える回数" reason="まだ繋がっていません。二重計上を防ぐ設定が接続されると表示されます。" />
-          <Unavailable label="成果の自動承認" reason="まだ繋がっていません。確認不要の条件が接続されると表示されます。" />
-        </div>
-      </FormSection>
-
-      <FormSection step={3} label="いくら払うか" note="現金とマイルは併用できます。">
+      <FormSection step={2} label="いくら払うか" note="現金とマイルは併用できます。">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="報酬額（円）" htmlFor="of-amount">
             <input
@@ -323,18 +347,44 @@ export default function NewAffiliateOfferPage() {
       </FormSection>
 
       <FormSection
-        step={4}
+        step={3}
         label="成果を認めたときにすること"
         note="成果が確定したタイミングで実行されます。"
       >
         <div className="grid gap-3 lg:grid-cols-2">
         <Field label="付けるタグ" htmlFor="of-tag" note="あとで配信の絞り込みに使えます。">
-          <SelectField
+          <Select
+            aria-label="付けるタグ"
             id="of-tag"
             value={tagId}
-            onChange={(e) => setTagId(e.target.value)}
-            options={[{ value: '', label: '（なし）' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
+            onChange={(value) => setTagId(value)}
+            options={[
+              { value: '', label: '（なし）' },
+              // 保管済みのタグは成果承認の時点で付けられない。選べるように見せて
+              // あとで失敗させるより、候補から外す（編集モーダルと同じ決まり #798）。
+              ...tags.filter((t) => (t.status ?? 'active') === 'active').map((t) => ({ value: t.id, label: t.name })),
+            ]}
+            size="standard"
           />
+          {/*
+            R524: 失敗を「（なし）」と区別する。読み込み中も一言出し、
+            候補が無いのか・まだ読んでいるのかを取り違えさせない。
+          */}
+          {tagsFetch === 'loading' ? (
+            <p className="text-ink-faint mt-1 text-xs">タグの候補を読み込んでいます</p>
+          ) : null}
+          {tagsFetch === 'failed' ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <p className="text-danger">タグの候補を読み込めませんでした。</p>
+              <button
+                type="button"
+                onClick={() => setCandidateSeq((n) => n + 1)}
+                className="text-accent-deep hover:bg-accent-soft rounded-control px-3 py-1 font-semibold"
+              >
+                もう一度読み込む
+              </button>
+            </div>
+          ) : null}
         </Field>
 
         <Field
@@ -342,30 +392,46 @@ export default function NewAffiliateOfferPage() {
           htmlFor="of-scenario"
           note="選ばなければ何も送りません。"
         >
-          <SelectField
+          <Select
+            aria-label="開始するシナリオ"
             id="of-scenario"
             value={scenarioId}
-            onChange={(e) => setScenarioId(e.target.value)}
-            options={[{ value: '', label: '（なし）' }, ...scenarios.map((s) => ({ value: s.id, label: s.name }))]}
+            onChange={(value) => setScenarioId(value)}
+            options={[
+              { value: '', label: '（なし）' },
+              // 停止中のシナリオは成果承認時に始まらないので候補から外す。
+              ...scenarios.filter((s) => s.isActive !== false).map((s) => ({ value: s.id, label: s.name })),
+            ]}
+            size="standard"
           />
+          {/* R524: タグ側と同じく、失敗は「（なし）」と区別して再試行を出す。 */}
+          {scenariosFetch === 'loading' ? (
+            <p className="text-ink-faint mt-1 text-xs">シナリオの候補を読み込んでいます</p>
+          ) : null}
+          {scenariosFetch === 'failed' ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <p className="text-danger">シナリオの候補を読み込めませんでした。</p>
+              <button
+                type="button"
+                onClick={() => setCandidateSeq((n) => n + 1)}
+                className="text-accent-deep hover:bg-accent-soft rounded-control px-3 py-1 font-semibold"
+              >
+                もう一度読み込む
+              </button>
+            </div>
+          ) : null}
         </Field>
         </div>
 
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={publishNow}
-            onChange={(e) => setPublishNow(e.target.checked)}
-          />
-          <span>
-            作成したらすぐ公開する
-            <span className="text-ink-faint block text-xs">
-              オフにすると下書きとして保存され、アフィリエイターに表示されません。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={publishNow}
+          onCheckedChange={setPublishNow}
+          description="オフにすると下書きとして保存され、アフィリエイターに表示されません。"
+        >
+          <span className="text-ink-secondary text-sm">作成したらすぐ公開する</span>
+        </Checkbox>
       </FormSection>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した案件" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
   )
 }

@@ -105,7 +105,8 @@ describe('V6 機能20 分析', () => {
     expect(PAGE).toContain('友だち情報欄を読み込めませんでした。')
     expect(PAGE).toContain('ファネルを読み込めませんでした。')
     // 開き直ししかできなかったエラー面には、同じ条件で読み直す導線を付ける。
-    expect(PAGE).toContain('もう一度読み込む')
+    // ★V7 `x63W5x`：ボタンの文言は共通部品（ListState）が持つ。ここでは口があることだけ見る。
+    expect(PAGE).toContain('onRetry')
     expect(PAGE).toContain('fieldsReload')
     expect(PAGE).toContain('funnelsReload')
     expect(PAGE).toContain('savedReload')
@@ -119,7 +120,8 @@ describe('V6 機能20 分析', () => {
 
   it('200件で切れるときは注意を出し、CSVも範囲内と書く(点検#508の中5)', () => {
     expect(PAGE).toContain('overview.hasMore')
-    expect(PAGE).toContain('200件まで表示しています。探す言葉を足して絞ってください。CSVの書き出しも、表示している範囲だけが入ります。')
+    // 監査 R72: 検索は200件の外へも届くようになったので、注意文もその旨に更新した。
+    expect(PAGE).toContain('条件に合うもののうち200件までを表示しています。探す言葉で絞るとこの中だけではなく全体から探します。CSVの書き出しも、表示している範囲だけが入ります。')
   })
 
   it('未集計のファネルは壊れた表示にせず案内を出す(点検#508軽13)', () => {

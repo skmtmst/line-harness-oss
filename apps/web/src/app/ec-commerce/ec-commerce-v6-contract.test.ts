@@ -37,6 +37,19 @@ describe('V6 EC integration screens', () => {
     expect(tabsView).not.toContain('api.ecCommerce.subscriptions')
   })
 
+  it('keeps badges off green/red and the sort select wide (V7 touch-up)', () => {
+    // 1段だけのパンくずは画面名と重複するので出さない。
+    expect(page).not.toContain("label: '専用機能'")
+    // 「確認」「つき合わせ」の札は注意・中立にし、緑（正常の意味だけ）は使わない。
+    expect(page).toContain('badge="つき合わせ" badgeTone="neutral"')
+    expect(page).toContain('badge="確認" badgeTone="neutral"')
+    expect(page).not.toContain('badgeTone="danger"')
+    // 並び順の欄は共通 Select の full 幅で、外側で sm:w-64 を持つ。
+    expect(page).toContain('aria-label="取り込みの並び順"')
+    expect(page).toContain('size="full"')
+    expect(page).toContain('w-full sm:w-64')
+  })
+
   it('shows the V6 decision information without inventing unavailable values', () => {
     for (const wording of ['今日 取り込んだ', 'つながっていない注文', '取り込みに失敗', '最後に届いた']) {
       expect(page).toContain(wording)
@@ -45,7 +58,7 @@ describe('V6 EC integration screens', () => {
       expect(identity).toContain(wording)
     }
     expect(page).toContain('order.orderLines.map')
-    expect(page).toContain('order.totalAmount.toLocaleString')
+    expect(page).toContain('formatNumber(order.totalAmount')
     expect(identity).toContain('operations?.summary.linked')
     expect(identity).toContain('operations?.summary.potentialRevenue')
     expect(identity).toContain('過去のLINE送信は再送しません')
@@ -139,6 +152,30 @@ describe('V6 EC integration screens', () => {
     expect(page).not.toContain('function dateTime(')
     expect(connector).not.toContain('function dateTime(')
     expect(subscriptions).not.toContain('function shortDate(')
+  })
+
+  /*
+   * R166: LINEへ何も送らない処理（会員情報の更新・注文取り消し・返金の
+   * 反映）の成功を「送信完了」と出さない。データ反映とLINE送信を
+   * 見分けられないと「お客さまへ連絡済み」と誤認する。
+   */
+  it('LINE送信をしない出来事の成功は送信完了と表示しない（R166）', () => {
+    expect(page).toContain('NON_SENDING_STATUS_LABEL')
+    expect(page).toContain("'ec.customer.profile_updated': '更新完了'")
+    expect(page).toContain("'ec.order.cancelled': '反映完了'")
+    expect(page).toContain("'ec.order.refunded': '反映完了'")
+    expect(page).toContain('actionStatusLabel(action)')
+    // 集計タブも送信を含まない完了数なので「送信完了」とは名付けない。
+    expect(page).toContain("['succeeded', '処理完了', listedSummary?.succeeded]")
+    /*
+     * R599: 一覧由来の状態別件数は、取れるまで出さない。`?? 0` の足し算は
+     * 未取得を「0件」に見せるので、ready・empty のときだけ数を渡す。
+     * （実際の見え方は ec-commerce-events-panel-mount.test.tsx の R599 が守る）
+     */
+    expect(page).toContain('const listedSummary =')
+    expect(page).toContain('listedSummary ? listedSummary.pending + listedSummary.processing : undefined')
+    expect(page).toContain('listedSummary ? listedSummary.retryable_failed + listedSummary.permanent_failed : undefined')
+    expect(page).not.toContain('actionSummary?.pending ?? 0')
   })
 
   it('filters subscriptions with the shared Tabs and types impact metrics (#580)', () => {

@@ -2,12 +2,14 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useState } from 'react'
-import { api, type Recipe } from '@/lib/api'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { api, ApiError, type Recipe } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
-import SelectField from '@/components/shared/select-field'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
+import TargetMissing from '@/components/shared/target-missing'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
@@ -38,45 +40,98 @@ function RecipeClone() {
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   const [recipe, setRecipe] = useState<Recipe | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
+  /*
+   * M044: 捕まえた取得失敗は共通部品へ渡す。403 は権限の案内になり、
+   * 押しても直らない再試行は出ない。429 は待ち秒数を添えた案内になる。
+   */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [prefix, setPrefix] = useState('')
   const [cloneState, setCloneState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
+  /** 同じ作成意図の再送で使い回すキー（監査 R126）。 */
+  const cloneKeyRef = useRef<{ intent: string; key: string } | null>(null)
 
   usePageTitle(recipe ? `${recipe.name}を作る` : null)
 
-  useEffect(() => {
-    if (accountLoading) return
-    let alive = true
-    setStatus('loading')
-    void api.recipes
-      .get(id, selectedAccountId ?? undefined)
-      .then((res) => {
-        if (!alive) return
-        if (!res.success) {
-          setStatus('error')
-          return
-        }
-        setRecipe(res.data)
-        setStatus('ready')
-      })
-      .catch(() => {
-        if (alive) setStatus('error')
-      })
-    return () => {
-      alive = false
+  const reload = useCallback(async (): Promise<'ok' | 'missing' | 'error'> => {
+    try {
+      const res = await api.recipes.get(id, selectedAccountId ?? undefined)
+      if (!res.success || !res.data) {
+        setLoadError(null)
+        return 'error'
+      }
+      setRecipe(res.data)
+      setLoadError(null)
+      return 'ok'
+    } catch (caught: unknown) {
+      if (caught instanceof ApiError && caught.status === 404) return 'missing'
+      setLoadError(caught)
+      return 'error'
     }
-  }, [accountLoading, id, selectedAccountId])
+  }, [id, selectedAccountId])
 
+  const refresh = useCallback(() => {
+    setStatus('loading')
+    setMissing(false)
+    setLoadError(null)
+    void reload().then((outcome) => {
+      if (outcome === 'missing') {
+        setMissing(true)
+        setStatus('ready')
+        return
+      }
+      setStatus(outcome === 'ok' ? 'ready' : 'error')
+    })
+  }, [reload])
+
+  useEffect(() => {
+    if (accountLoading || !id) return
+    refresh()
+  }, [accountLoading, id, refresh])
+
+  /*
+    id なしで開くと取得が始まらず、後段で空のまま数えて落ちていた。
+    対象未指定は失敗ではないので、一覧へ戻して選び直させる。
+  */
+  if (!id) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="作るレシピが指定されていません"
+        description="一覧から、作りたいレシピを選び直してください。"
+        backHref="/recipes"
+        backLabel="レシピ一覧へ戻る"
+      />
+    )
+  }
+
+  if (missing || (status === 'ready' && !recipe)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このレシピは見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/recipes"
+        backLabel="レシピ一覧へ戻る"
+      />
+    )
+  }
+
+  /*
+   * M044: 403・429だけ共通文へ切り替える（権限・混雑の案内。再試行の
+   * 有無は `loadFailureCopy` が決める）。それ以外は画面の文のまま。
+   */
+  const cloneFailure = loadError ? loadFailureCopy(loadError, 'レシピ') : null
+  const useCommonCopy = loadError ? isForbiddenOrRateLimited(loadError) : false
   if (status === 'error') {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
-        title="レシピを読み込めませんでした"
-        description="時間をおいてもう一度お試しください。"
-        action={
-          <Link href="/recipes" className={styles.backLink}>
-            レシピ一覧へ
-          </Link>
-        }
+        title={useCommonCopy && cloneFailure ? cloneFailure.title : 'レシピを読み込めませんでした'}
+        description={useCommonCopy && cloneFailure ? cloneFailure.description : '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
+        error={loadError ?? undefined}
+        onRetry={() => refresh()}
       />
     )
   }
@@ -90,11 +145,21 @@ function RecipeClone() {
   const clone = async () => {
     if (!selectedAccountId || !canClone || cloneState === 'saving') return
     setCloneState('saving')
+    /*
+      監査 R126: 同じ作成のやり直しには同じ再送キーを使う。
+      応答だけが切れたあと新しいキーで送ると別の依頼になり、先に作った
+      下書きと名前がぶつかって失敗する。宛先・名前のあたま・レシピが
+      変わったら別の依頼なので、その時だけ新しいキーにする。
+    */
+    const intent = `${recipe.id}:${selectedAccountId}:${prefix}`
+    if (cloneKeyRef.current?.intent !== intent) {
+      cloneKeyRef.current = { intent, key: crypto.randomUUID() }
+    }
     try {
       const result = await api.recipes.clone(
         recipe.id,
         { accountId: selectedAccountId, namePrefix: prefix || null, expectedVersion: recipe.version },
-        crypto.randomUUID(),
+        cloneKeyRef.current.key,
       )
       setCloneState(result.success ? 'success' : 'error')
     } catch {
@@ -130,11 +195,13 @@ function RecipeClone() {
                 <label className={styles.accountLabel} htmlFor="recipe-clone-account">
                   どのLINEアカウントに作るか<RequiredBadge />
                 </label>
-                <SelectField
+                <Select
+                  aria-label="どのLINEアカウントに作るか"
                   id="recipe-clone-account"
-                  className={styles.accountSelect}
+                  size="full"
                   value={selectedAccountId ?? ''}
                   disabled={!selectedAccountId}
+                  onChange={() => undefined}
                   options={[{
                     value: selectedAccountId ?? '',
                     label: selectedAccount?.name ?? 'アカウントが選ばれていません',

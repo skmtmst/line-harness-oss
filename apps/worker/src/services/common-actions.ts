@@ -1,4 +1,9 @@
-import type { ActionDefinition } from './automation-engine.js';
+import {
+  COMMON_ACTION_MAX_BRANCH_DEPTH,
+  COMMON_ACTION_MAX_DEPTH,
+  COMMON_ACTION_MAX_STEPS,
+  type ActionDefinition,
+} from './automation-engine.js';
 
 const SUPPORTED_ACTION_TYPES = new Set([
   'add_tag',
@@ -66,6 +71,7 @@ interface VersionRow {
   version_number: number;
   status: 'draft' | 'published';
   action_config: string;
+  draft_revision: number;
   created_by: string | null;
   created_at: string;
   published_at: string | null;
@@ -76,6 +82,8 @@ export interface CommonActionVersion {
   versionNumber: number;
   status: 'draft' | 'published';
   actions: ActionDefinition[];
+  /* 監査 R473・R477: 保存ごとに進む改訂番号。古い読み取りからの保存・公開を止める。 */
+  draftRevision: number;
   createdBy: string | null;
   createdAt: string;
   publishedAt: string | null;
@@ -92,6 +100,9 @@ export interface CommonActionBinding {
   hasNewerVersion: boolean;
   runningCount: number | null;
   waitingCount: number | null;
+  /* 監査 R471: 切替後に旧版のまま進んでいる実行。現在版の件数とは分ける。 */
+  olderRunningCount: number | null;
+  olderWaitingCount: number | null;
   updatedAt: string;
 }
 
@@ -137,6 +148,19 @@ function requiredString(value: unknown, field: string, label: string): string {
     throw new CommonActionValidationError('required', `${label}を入力してください`, field);
   }
   return value.trim();
+}
+
+/*
+ * 監査 R473・R477: 読み取り時の改訂番号。保存・公開のたびに照合し、
+ * 古い画面からの上書きを止める。利用者に入力させる項目ではない。
+ */
+function requiredDraftRevision(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    throw new CommonActionValidationError(
+      'required', '編集中の版を確認してください', 'expectedDraftRevision',
+    );
+  }
+  return value;
 }
 
 function parseStoredActions(raw: string): ActionDefinition[] {
@@ -354,11 +378,78 @@ export async function validateTagAddedActionResources(
   return actions;
 }
 
+async function resolveLatestPublishedReference(
+  db: D1Database,
+  lineAccountId: string,
+  commonActionId: string,
+  field: string,
+): Promise<{ id: string; version_id: string }> {
+  const referenced = await db.prepare(
+    `SELECT ca.id, ca.current_published_version_id AS version_id
+       FROM common_actions ca
+       JOIN common_action_versions cav
+         ON cav.id = ca.current_published_version_id AND cav.common_action_id = ca.id
+        AND cav.status = 'published'
+      WHERE ca.id = ? AND ca.line_account_id = ? AND ca.status = 'published'`,
+  ).bind(commonActionId, lineAccountId).first<{ id: string; version_id: string }>();
+  if (!referenced) {
+    throw new CommonActionValidationError('common_action_not_published', '呼び出す共通アクションに公開版がありません', `${field}.commonActionId`);
+  }
+  return referenced;
+}
+
+/*
+ * 監査 R479: 確認後に参照先が更新されていたら、別の内容を再確認なしで
+ * 公開しない。保存時に固定した版と現在の公開版を突き合わせる。
+ */
+async function collectReferenceDrifts(
+  db: D1Database,
+  lineAccountId: string,
+  actions: ActionDefinition[],
+): Promise<Array<{ actionId: string; name: string; fromVersion: number; toVersion: number }>> {
+  const drifts: Array<{ actionId: string; name: string; fromVersion: number; toVersion: number }> = [];
+  const visit = async (steps: ActionDefinition[]): Promise<void> => {
+    for (const step of steps) {
+      if (step.type === 'branch') {
+        const params = step.params as { then?: unknown; else?: unknown };
+        if (Array.isArray(params.then)) await visit(params.then as ActionDefinition[]);
+        if (Array.isArray(params.else)) await visit(params.else as ActionDefinition[]);
+        continue;
+      }
+      if (step.type !== 'common_action') continue;
+      const actionId = step.params.commonActionId;
+      const pinnedId = step.params.commonActionVersionId;
+      if (typeof actionId !== 'string' || !actionId
+        || typeof pinnedId !== 'string' || !pinnedId) continue;
+      const row = await db.prepare(
+        `SELECT ca.name AS name,
+                (SELECT version_number FROM common_action_versions WHERE id = ?) AS pinned_version,
+                cav.version_number AS latest_version
+           FROM common_actions ca
+           JOIN common_action_versions cav ON cav.id = ca.current_published_version_id
+          WHERE ca.id = ? AND ca.line_account_id = ?`,
+      ).bind(pinnedId, actionId, lineAccountId).first<{
+        name: string; pinned_version: number | null; latest_version: number | null;
+      }>();
+      if (!row || row.pinned_version === null || row.latest_version === null) continue;
+      if (row.latest_version > row.pinned_version
+        && !drifts.some((drift) => drift.actionId === actionId)) {
+        drifts.push({
+          actionId, name: row.name, fromVersion: row.pinned_version, toVersion: row.latest_version,
+        });
+      }
+    }
+  };
+  await visit(actions);
+  return drifts;
+}
+
 async function pinAndValidateReferences(
   db: D1Database,
   lineAccountId: string,
   ownerId: string,
   actions: ActionDefinition[],
+  options?: { keepPins?: boolean },
 ): Promise<ActionDefinition[]> {
   const pinned: ActionDefinition[] = [];
   for (const [index, action] of actions.entries()) {
@@ -432,19 +523,34 @@ async function pinAndValidateReferences(
       if (commonActionId === ownerId) {
         throw new CommonActionValidationError('common_action_cycle', '共通アクションは自分自身を呼び出せません', `${field}.commonActionId`);
       }
-      const referenced = await db.prepare(
-        `SELECT ca.id, ca.current_published_version_id AS version_id
-           FROM common_actions ca
-           JOIN common_action_versions cav
-             ON cav.id = ca.current_published_version_id AND cav.common_action_id = ca.id
-            AND cav.status = 'published'
-          WHERE ca.id = ? AND ca.line_account_id = ? AND ca.status = 'published'`,
-      ).bind(commonActionId, lineAccountId).first<{ id: string; version_id: string }>();
-      if (!referenced) {
-        throw new CommonActionValidationError('common_action_not_published', '呼び出す共通アクションに公開版がありません', `${field}.commonActionId`);
+      /*
+       * 監査 R479: 公開時は保存時に確認した版を保持し、最新へ自動で置き換えない。
+       * 保存時は最新へ固定する（編集画面の表示と保存値を一致させる）。
+       */
+      const pinnedId = typeof params.commonActionVersionId === 'string' && params.commonActionVersionId.trim()
+        ? params.commonActionVersionId.trim()
+        : null;
+      if (options?.keepPins && pinnedId) {
+        const kept = await db.prepare(
+          `SELECT cav.id AS version_id
+             FROM common_action_versions cav
+             JOIN common_actions ca ON ca.id = cav.common_action_id
+            WHERE cav.id = ? AND cav.common_action_id = ? AND cav.status = 'published'
+              AND ca.line_account_id = ?`,
+        ).bind(pinnedId, commonActionId, lineAccountId).first<{ version_id: string }>();
+        if (kept) {
+          params.commonActionId = commonActionId;
+          params.commonActionVersionId = kept.version_id;
+        } else {
+          const fallback = await resolveLatestPublishedReference(db, lineAccountId, commonActionId, field);
+          params.commonActionId = fallback.id;
+          params.commonActionVersionId = fallback.version_id;
+        }
+      } else {
+        const referenced = await resolveLatestPublishedReference(db, lineAccountId, commonActionId, field);
+        params.commonActionId = referenced.id;
+        params.commonActionVersionId = referenced.version_id;
       }
-      params.commonActionId = referenced.id;
-      params.commonActionVersionId = referenced.version_id;
     } else if (action.type === 'branch') {
       const condition = params.condition as { rules?: Array<{ type?: unknown; value?: unknown }> };
       for (const [ruleIndex, rule] of (condition.rules ?? []).entries()) {
@@ -466,6 +572,130 @@ async function pinAndValidateReferences(
   }
   await assertNoCycle(db, lineAccountId, ownerId, pinned);
   return pinned;
+}
+
+/*
+ * 監査 R478: 公開前に参照先の固定版まで展開し、実行計画と同じ制限を検査する。
+ * 公開だけ通って開始時に失敗する内容を、理由と対象経路を示して止める。
+ * 制限値は automation-engine の buildExecutionPlan と同じ定数を使う。
+ * - 共通アクションの呼び出し: 20段まで（利用先から1段使う前提で深さ1から数える）
+ * - 条件分岐の入れ子: 3段まで
+ * - 展開後の処理総数: 1000個まで（呼び出し自体も1個に数える。
+ *   利用側の呼び出し1件分を先に数え、実行時に1件足りなくなる公開を止める）
+ */
+
+async function resolvePublishedVersionActions(
+  db: D1Database,
+  lineAccountId: string,
+  actionId: string,
+  pinnedVersionId: unknown,
+): Promise<{ versionId: string; actions: ActionDefinition[] } | null> {
+  if (typeof pinnedVersionId === 'string' && pinnedVersionId.trim()) {
+    const pinned = await db.prepare(
+      `SELECT cav.id, cav.action_config
+         FROM common_action_versions cav
+         JOIN common_actions ca ON ca.id = cav.common_action_id
+        WHERE cav.id = ? AND cav.common_action_id = ? AND cav.status = 'published'
+          AND ca.line_account_id = ?`,
+    ).bind(pinnedVersionId, actionId, lineAccountId).first<{ id: string; action_config: string }>();
+    if (pinned) return { versionId: pinned.id, actions: parseStoredActions(pinned.action_config) };
+  }
+  const current = await db.prepare(
+    `SELECT cav.id, cav.action_config
+       FROM common_actions ca
+       JOIN common_action_versions cav
+         ON cav.id = ca.current_published_version_id AND cav.common_action_id = ca.id
+        AND cav.status = 'published'
+      WHERE ca.id = ? AND ca.line_account_id = ? AND ca.status = 'published'`,
+  ).bind(actionId, lineAccountId).first<{ id: string; action_config: string }>();
+  if (!current) return null;
+  return { versionId: current.id, actions: parseStoredActions(current.action_config) };
+}
+
+async function assertPublishableExpansion(
+  db: D1Database,
+  lineAccountId: string,
+  actions: ActionDefinition[],
+): Promise<void> {
+  /*
+   * 監査 R478: 実行時は利用側の呼び出し1件が先に1件数えられる。
+   * 公開検査でも同じ1件を先に数え、1000件ちょうどの公開が
+   * 実行時に1001件で失敗しないようにする（深さの1段予約と同じ考え）。
+   */
+  const state = { count: 1 };
+  await walkExpansion(db, lineAccountId, actions, {
+    depth: 1,
+    branchDepth: 0,
+    chain: [],
+    ids: [],
+    state,
+  });
+}
+
+async function walkExpansion(
+  db: D1Database,
+  lineAccountId: string,
+  actions: ActionDefinition[],
+  context: { depth: number; branchDepth: number; chain: string[]; ids: string[]; state: { count: number } },
+): Promise<void> {
+  if (context.depth > COMMON_ACTION_MAX_DEPTH) {
+    throw new CommonActionValidationError(
+      'common_action_too_deep',
+      `共通アクションの呼び出しが深すぎます（${COMMON_ACTION_MAX_DEPTH}段まで）。経路：${context.chain.join('→')}`,
+      'actions',
+    );
+  }
+  for (const action of actions) {
+    context.state.count += 1;
+    if (context.state.count > COMMON_ACTION_MAX_STEPS) {
+      throw new CommonActionValidationError(
+        'execution_plan_too_large',
+        `実行する処理が多すぎます（${COMMON_ACTION_MAX_STEPS}個まで）。経路：${context.chain.join('→')}`,
+        'actions',
+      );
+    }
+    if (action.type === 'branch') {
+      if (context.branchDepth >= COMMON_ACTION_MAX_BRANCH_DEPTH) {
+        throw new CommonActionValidationError(
+          'branch_too_deep',
+          `条件分岐の入れ子は${COMMON_ACTION_MAX_BRANCH_DEPTH}段までです。経路：${context.chain.join('→')}`,
+          'actions',
+        );
+      }
+      const params = action.params as { then?: unknown; else?: unknown };
+      const thenActions = Array.isArray(params.then) ? params.then as ActionDefinition[] : [];
+      const elseActions = Array.isArray(params.else) ? params.else as ActionDefinition[] : [];
+      await walkExpansion(db, lineAccountId, thenActions, { ...context, branchDepth: context.branchDepth + 1 });
+      await walkExpansion(db, lineAccountId, elseActions, { ...context, branchDepth: context.branchDepth + 1 });
+      continue;
+    }
+    if (action.type !== 'common_action') continue;
+    const actionId = action.params.commonActionId;
+    if (typeof actionId !== 'string' || !actionId.trim()) continue;
+    if (context.ids.includes(actionId)) {
+      throw new CommonActionValidationError(
+        'common_action_cycle', '共通アクションの呼び出しを循環させることはできません', 'actions',
+      );
+    }
+    const resolved = await resolvePublishedVersionActions(
+      db, lineAccountId, actionId, action.params.commonActionVersionId,
+    );
+    // 公開できる参照先があることは pin で保証済み。無いものは飛ばす。
+    if (!resolved) continue;
+    const nameRow = await db.prepare(
+      `SELECT name FROM common_actions WHERE id = ? AND line_account_id = ?`,
+    ).bind(actionId, lineAccountId).first<{ name: string }>();
+    context.chain.push(nameRow?.name ?? actionId);
+    context.ids.push(actionId);
+    await walkExpansion(db, lineAccountId, resolved.actions, {
+      ...context,
+      depth: context.depth + 1,
+      chain: context.chain,
+      ids: context.ids,
+    });
+    context.chain.pop();
+    context.ids.pop();
+  }
 }
 
 async function assertNoCycle(
@@ -513,6 +743,39 @@ async function assertNoCycle(
   }
 }
 
+/*
+ * 監査 R125: 実行回数・失敗数・最終実行を行ごとの相関副問合せ3本で取ると、
+ * 実行履歴の増加に応じて一覧と集計の両方が遅くなっていた。アカウント内の
+ * 実行台帳を1回だけ走査してアクション単位に集計し、一覧側は結合で受ける。
+ * 一覧と集計で同じ式を共有し、内訳がずれないようにする。
+ *   execution_count_this_month: 今月始めた本番の実行数（1人テストを含まない）
+ *   failure_count_this_month:   今月のうち、その目印の下の手順が失敗した実行数
+ *   last_run_at:                全期間の最終実行
+ */
+const COMMON_ACTION_RUN_METRICS_SQL = `
+       SELECT metric_version.common_action_id AS action_id,
+              COUNT(DISTINCT CASE
+                WHEN strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now') THEN r.id END
+              ) AS execution_count_this_month,
+              COUNT(DISTINCT CASE
+                WHEN strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')
+                 AND failed_step.id IS NOT NULL THEN r.id END
+              ) AS failure_count_this_month,
+              MAX(r.created_at) AS last_run_at
+         FROM automation_run_steps marker
+         JOIN automation_runs r ON r.id = marker.automation_run_id
+         JOIN common_action_versions metric_version
+           ON metric_version.id = marker.common_action_version_id
+         LEFT JOIN automation_run_steps failed_step
+           ON failed_step.automation_run_id = r.id
+          AND failed_step.status = 'failed'
+          AND substr(failed_step.step_key, 1, length(marker.step_key) + 1)
+              = marker.step_key || '/'
+        WHERE marker.action_type = 'common_action_marker'
+          AND r.is_test = 0
+          AND r.line_account_id = ?
+        GROUP BY metric_version.common_action_id`;
+
 export async function listCommonActions(
   db: D1Database,
   input: { lineAccountId: string; status?: string; query?: string; limit?: number; offset?: number },
@@ -526,16 +789,29 @@ export async function listCommonActions(
     if (input.status === 'old_version') {
       where.push(`EXISTS (SELECT 1 FROM common_action_bindings ob WHERE ob.common_action_id = ca.id AND ob.common_action_version_id <> ca.current_published_version_id)`);
     } else if (input.status === 'unused') {
+      // 監査 R480: 保管済みは「保管」タブで見る。「呼ばれていない」には出さない。
+      where.push(`ca.status <> 'archived'`);
       where.push(`NOT EXISTS (SELECT 1 FROM common_action_bindings ub WHERE ub.common_action_id = ca.id)`);
     } else {
       where.push(`ca.status = ?`);
       binds.push(input.status);
     }
+  } else {
+    // 監査 R480: 通常一覧（すべて）から保管済みを外す。保管タブで見る。
+    where.push(`ca.status <> 'archived'`);
   }
   if (input.query?.trim()) {
-    where.push(`(ca.name LIKE ? ESCAPE '\\' OR COALESCE(ca.description, '') LIKE ? ESCAPE '\\')`);
+    /*
+     * 監査 R124: 画面は「アクション名・中の処理で探す」と案内しているので、
+     * 名前と説明だけでなく各版の処理内容（action_config）も検索対象にする。
+     * 版は増えても数件程度なので EXISTS で済ませ、一覧の件数と同じ条件を使う。
+     */
+    where.push(`(ca.name LIKE ? ESCAPE '\\' OR COALESCE(ca.description, '') LIKE ? ESCAPE '\\'
+      OR EXISTS (SELECT 1 FROM common_action_versions cv
+                  WHERE cv.common_action_id = ca.id
+                    AND cv.action_config LIKE ? ESCAPE '\\'))`);
     const escaped = input.query.trim().replace(/[\\%_]/g, '\\$&');
-    binds.push(`%${escaped}%`, `%${escaped}%`);
+    binds.push(`%${escaped}%`, `%${escaped}%`, `%${escaped}%`);
   }
   const total = await db.prepare(
     `SELECT COUNT(*) AS count FROM common_actions ca WHERE ${where.join(' AND ')}`,
@@ -545,55 +821,27 @@ export async function listCommonActions(
   const rows = await db.prepare(
     `SELECT ca.id, ca.name, ca.description, ca.status, ca.updated_at,
             dv.version_number AS draft_version, pv.version_number AS published_version,
-            COALESCE(json_array_length(COALESCE(dv.action_config, pv.action_config, '[]')), 0) AS action_count,
+            /* 監査 R470: 公開中行は公開版の処理数と版番号をそろえる。
+               下書き優先で数えると編集中の数が公開内容に見える。 */
+            COALESCE(json_array_length(CASE WHEN ca.status = 'published'
+              THEN COALESCE(pv.action_config, '[]')
+              ELSE COALESCE(dv.action_config, pv.action_config, '[]') END), 0) AS action_count,
             COUNT(DISTINCT b.id) AS binding_count,
             COUNT(DISTINCT CASE
               WHEN ca.current_published_version_id IS NOT NULL
                AND b.common_action_version_id <> ca.current_published_version_id THEN b.id END) AS old_binding_count
-            ,(SELECT COUNT(DISTINCT r.id)
-                FROM automation_run_steps marker
-                JOIN automation_runs r ON r.id = marker.automation_run_id
-                JOIN common_action_versions metric_version
-                  ON metric_version.id = marker.common_action_version_id
-               WHERE metric_version.common_action_id = ca.id
-                 AND marker.action_type = 'common_action_marker'
-                 AND r.is_test = 0
-                 AND r.line_account_id = ca.line_account_id
-                 AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS execution_count_this_month
-            ,(SELECT COUNT(DISTINCT r.id)
-                FROM automation_run_steps marker
-                JOIN automation_runs r ON r.id = marker.automation_run_id
-                JOIN common_action_versions metric_version
-                  ON metric_version.id = marker.common_action_version_id
-               WHERE metric_version.common_action_id = ca.id
-                 AND marker.action_type = 'common_action_marker'
-                 AND r.is_test = 0
-                 AND r.line_account_id = ca.line_account_id
-                 AND EXISTS (
-                   SELECT 1 FROM automation_run_steps failed_step
-                    WHERE failed_step.automation_run_id = r.id
-                      AND failed_step.status = 'failed'
-                      AND substr(failed_step.step_key, 1, length(marker.step_key) + 1)
-                          = marker.step_key || '/'
-                 )
-                 AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS failure_count_this_month
-            ,(SELECT MAX(r.created_at)
-                FROM automation_run_steps marker
-                JOIN automation_runs r ON r.id = marker.automation_run_id
-                JOIN common_action_versions metric_version
-                  ON metric_version.id = marker.common_action_version_id
-               WHERE metric_version.common_action_id = ca.id
-                 AND marker.action_type = 'common_action_marker'
-                 AND r.is_test = 0
-                 AND r.line_account_id = ca.line_account_id) AS last_run_at
+            ,COALESCE(run_metrics.execution_count_this_month, 0) AS execution_count_this_month
+            ,COALESCE(run_metrics.failure_count_this_month, 0) AS failure_count_this_month
+            ,run_metrics.last_run_at AS last_run_at
        FROM common_actions ca
        LEFT JOIN common_action_versions dv ON dv.id = ca.current_draft_version_id
        LEFT JOIN common_action_versions pv ON pv.id = ca.current_published_version_id
        LEFT JOIN common_action_bindings b ON b.common_action_id = ca.id
+       LEFT JOIN (${COMMON_ACTION_RUN_METRICS_SQL}) run_metrics ON run_metrics.action_id = ca.id
       WHERE ${where.join(' AND ')}
       GROUP BY ca.id
       ORDER BY ca.updated_at DESC, ca.id DESC${paginationSql}`,
-  ).bind(...binds, ...paginationBinds).all<{
+  ).bind(input.lineAccountId, ...binds, ...paginationBinds).all<{
     id: string; name: string; description: string | null; status: CommonActionSummary['status'];
     updated_at: string; draft_version: number | null; published_version: number | null;
     action_count: number; binding_count: number; old_binding_count: number;
@@ -623,6 +871,7 @@ export async function listCommonActions(
  * 画面は件数表示のために全件取得をもう1回投げていたが、行単価の高い
  * 月次集計サブクエリ4本が行ごとに走るため、表示1回で2倍走っていた。
  * 集計はページ送り・絞り込みに依らずアカウント全体で数える。
+ * 保管済みは通常一覧に出さないため、合計からは外して件数だけ別に数える。
  * 行ごとの内訳式は `listCommonActions` と同じにし、画面の合計と一致させる。
  */
 export async function getCommonActionsSummary(
@@ -634,6 +883,7 @@ export async function getCommonActionsSummary(
   draft: number;
   oldVersion: number;
   unused: number;
+  archived: number;
   actions: number;
   bindings: number;
   outdated: number;
@@ -641,12 +891,20 @@ export async function getCommonActionsSummary(
   executions: number;
   failures: number;
 }> {
+  // 監査 R480: 集計は通常一覧と同じ範囲（保管済みを除く）。保管は件数だけ別に数える。
+  const archivedRow = await db.prepare(
+    `SELECT COUNT(*) AS archived FROM common_actions
+      WHERE line_account_id = ? AND status = 'archived'`,
+  ).bind(lineAccountId).first<{ archived: number }>();
   const row = await db.prepare(
     `SELECT COUNT(*) AS total,
             SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) AS published,
             SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) AS draft,
             SUM(CASE WHEN old_binding_count > 0 THEN 1 ELSE 0 END) AS old_version,
-            SUM(CASE WHEN status = 'published' AND binding_count = 0 THEN 1 ELSE 0 END) AS unused,
+            /* 監査 R123: 「呼ばれていない」の件数は一覧の絞り込み（呼び出し元なし）と
+               同じ定義に揃える。以前は公開中だけを数えたため、下書き・保管の未使用が
+               札の数だけ増えて一覧と合わなかった。 */
+            SUM(CASE WHEN binding_count = 0 THEN 1 ELSE 0 END) AS unused,
             SUM(action_count) AS actions,
             SUM(binding_count) AS bindings,
             SUM(old_binding_count) AS outdated,
@@ -654,45 +912,23 @@ export async function getCommonActionsSummary(
             SUM(execution_count_this_month) AS executions,
             SUM(failure_count_this_month) AS failures
        FROM (SELECT ca.status AS status,
-                    COALESCE(json_array_length(COALESCE(dv.action_config, pv.action_config, '[]')), 0) AS action_count,
+                    COALESCE(json_array_length(CASE WHEN ca.status = 'published'
+                      THEN COALESCE(pv.action_config, '[]')
+                      ELSE COALESCE(dv.action_config, pv.action_config, '[]') END), 0) AS action_count,
                     COUNT(DISTINCT b.id) AS binding_count,
                     COUNT(DISTINCT CASE
                       WHEN ca.current_published_version_id IS NOT NULL
                        AND b.common_action_version_id <> ca.current_published_version_id THEN b.id END) AS old_binding_count
-                    ,(SELECT COUNT(DISTINCT r.id)
-                        FROM automation_run_steps marker
-                        JOIN automation_runs r ON r.id = marker.automation_run_id
-                        JOIN common_action_versions metric_version
-                          ON metric_version.id = marker.common_action_version_id
-                       WHERE metric_version.common_action_id = ca.id
-                         AND marker.action_type = 'common_action_marker'
-                         AND r.is_test = 0
-                         AND r.line_account_id = ca.line_account_id
-                         AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS execution_count_this_month
-                    ,(SELECT COUNT(DISTINCT r.id)
-                        FROM automation_run_steps marker
-                        JOIN automation_runs r ON r.id = marker.automation_run_id
-                        JOIN common_action_versions metric_version
-                          ON metric_version.id = marker.common_action_version_id
-                       WHERE metric_version.common_action_id = ca.id
-                         AND marker.action_type = 'common_action_marker'
-                         AND r.is_test = 0
-                         AND r.line_account_id = ca.line_account_id
-                         AND EXISTS (
-                           SELECT 1 FROM automation_run_steps failed_step
-                            WHERE failed_step.automation_run_id = r.id
-                              AND failed_step.status = 'failed'
-                              AND substr(failed_step.step_key, 1, length(marker.step_key) + 1)
-                                  = marker.step_key || '/'
-                         )
-                         AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS failure_count_this_month
+                    ,COALESCE(run_metrics.execution_count_this_month, 0) AS execution_count_this_month
+                    ,COALESCE(run_metrics.failure_count_this_month, 0) AS failure_count_this_month
                FROM common_actions ca
                LEFT JOIN common_action_versions dv ON dv.id = ca.current_draft_version_id
                LEFT JOIN common_action_versions pv ON pv.id = ca.current_published_version_id
                LEFT JOIN common_action_bindings b ON b.common_action_id = ca.id
-              WHERE ca.line_account_id = ?
+               LEFT JOIN (${COMMON_ACTION_RUN_METRICS_SQL}) run_metrics ON run_metrics.action_id = ca.id
+              WHERE ca.line_account_id = ? AND ca.status <> 'archived'
               GROUP BY ca.id)`,
-  ).bind(lineAccountId).first<{
+  ).bind(lineAccountId, lineAccountId).first<{
     total: number; published: number | null; draft: number | null; old_version: number | null;
     unused: number | null; actions: number | null; bindings: number | null; outdated: number | null;
     outdated_items: number | null; executions: number | null; failures: number | null;
@@ -703,6 +939,7 @@ export async function getCommonActionsSummary(
     draft: Number(row?.draft ?? 0),
     oldVersion: Number(row?.old_version ?? 0),
     unused: Number(row?.unused ?? 0),
+    archived: Number(archivedRow?.archived ?? 0),
     actions: Number(row?.actions ?? 0),
     bindings: Number(row?.bindings ?? 0),
     outdated: Number(row?.outdated ?? 0),
@@ -840,34 +1077,83 @@ export async function listCommonActionResources(
   };
 }
 
+/*
+ * 監査 R475: 保存確定後の応答消失からの再試行で二重作成にしない。
+ * 作成画面が初回から再試行まで同じ鍵を送り、鍵が同じ要求は最初の作成を返す。
+ */
+async function findByRequestKey(
+  db: D1Database,
+  lineAccountId: string,
+  requestKey: string,
+): Promise<{ id: string; draftVersionId: string; versionNumber: number } | null> {
+  const row = await db.prepare(
+    `SELECT ca.id AS id, ca.current_draft_version_id AS draft_id, cav.version_number AS version_number
+       FROM common_actions ca
+       JOIN common_action_versions cav ON cav.id = ca.current_draft_version_id
+      WHERE ca.line_account_id = ? AND ca.client_request_key = ?`,
+  ).bind(lineAccountId, requestKey).first<{
+    id: string; draft_id: string | null; version_number: number | null;
+  }>();
+  if (!row || !row.draft_id) return null;
+  return { id: row.id, draftVersionId: row.draft_id, versionNumber: Number(row.version_number ?? 1) };
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('UNIQUE constraint failed');
+}
+
 export async function createCommonAction(
   db: D1Database,
-  input: { lineAccountId: string; name: unknown; description?: unknown; actions: unknown; createdBy?: string | null },
+  input: {
+    lineAccountId: string; name: unknown; description?: unknown; actions: unknown;
+    createdBy?: string | null; clientRequestKey?: unknown;
+  },
 ): Promise<{ id: string; draftVersionId: string; versionNumber: number }> {
+  // 同じ鍵の再試行は最初の作成へ戻す。鍵なしの従来の作成は今の動きのまま。
+  const requestKey = input.clientRequestKey === undefined || input.clientRequestKey === null
+    ? null
+    : requiredString(input.clientRequestKey, 'clientRequestKey', '作成の再試行鍵');
+  if (requestKey) {
+    const existing = await findByRequestKey(db, input.lineAccountId, requestKey);
+    if (existing) return existing;
+  }
   const name = requiredString(input.name, 'name', '共通アクション名');
   if (name.length > 120) throw new CommonActionValidationError('name_too_long', '共通アクション名は120文字までです', 'name');
   const description = typeof input.description === 'string' && input.description.trim()
     ? input.description.trim()
     : null;
-  const actions = validateActionShape(input.actions);
   const id = crypto.randomUUID();
+  // 監査 R479: 参照先は保存時に公開版へ固定する（表示と保存値を一致させる）。
+  const actions = await pinAndValidateReferences(
+    db, input.lineAccountId, id, validateActionShape(input.actions),
+  );
   const versionId = crypto.randomUUID();
   const now = new Date().toISOString();
-  await db.batch([
-    db.prepare(
-      `INSERT INTO common_actions
-         (id, line_account_id, name, description, status, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'draft', ?, ?, ?)`,
-    ).bind(id, input.lineAccountId, name, description, input.createdBy ?? null, now, now),
-    db.prepare(
-      `INSERT INTO common_action_versions
-         (id, common_action_id, version_number, status, action_config, created_by, created_at)
-       VALUES (?, ?, 1, 'draft', ?, ?, ?)`,
-    ).bind(versionId, id, JSON.stringify(actions), input.createdBy ?? null, now),
-    db.prepare(
-      `UPDATE common_actions SET current_draft_version_id = ? WHERE id = ?`,
-    ).bind(versionId, id),
-  ]);
+  try {
+    await db.batch([
+      db.prepare(
+        `INSERT INTO common_actions
+           (id, line_account_id, name, description, status, client_request_key, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
+      ).bind(id, input.lineAccountId, name, description, requestKey, input.createdBy ?? null, now, now),
+      db.prepare(
+        `INSERT INTO common_action_versions
+           (id, common_action_id, version_number, status, action_config, created_by, created_at)
+         VALUES (?, ?, 1, 'draft', ?, ?, ?)`,
+      ).bind(versionId, id, JSON.stringify(actions), input.createdBy ?? null, now),
+      db.prepare(
+        `UPDATE common_actions SET current_draft_version_id = ? WHERE id = ?`,
+      ).bind(versionId, id),
+    ]);
+  } catch (error) {
+    // 同時到達で先に作られていたら、作り直さず最初の作成へ戻す。
+    if (requestKey && isUniqueViolation(error)) {
+      const existing = await findByRequestKey(db, input.lineAccountId, requestKey);
+      if (existing) return existing;
+    }
+    throw error;
+  }
   return { id, draftVersionId: versionId, versionNumber: 1 };
 }
 
@@ -905,6 +1191,7 @@ export async function updateCommonActionDraft(
   db: D1Database,
   input: {
     id: string; lineAccountId: string; expectedDraftVersionId: unknown;
+    expectedDraftRevision: unknown;
     name: unknown; description?: unknown; actions: unknown;
   },
 ): Promise<void> {
@@ -914,24 +1201,47 @@ export async function updateCommonActionDraft(
   if (!owner.current_draft_version_id || owner.current_draft_version_id !== expected) {
     throw new CommonActionValidationError('version_conflict', '別の人が新版を作りました。再読み込みしてください');
   }
+  // 監査 R473: 版IDは編集を重ねても変わらない。改訂番号で先行保存を検知する。
+  const expectedRevision = requiredDraftRevision(input.expectedDraftRevision);
   const name = requiredString(input.name, 'name', '共通アクション名');
   const description = typeof input.description === 'string' && input.description.trim()
     ? input.description.trim()
     : null;
-  const actions = validateActionShape(input.actions);
+  // 監査 R479: 参照先は保存時に公開版へ固定する（表示と保存値を一致させる）。
+  const actions = await pinAndValidateReferences(
+    db, input.lineAccountId, owner.id, validateActionShape(input.actions),
+  );
   const now = new Date().toISOString();
+  /*
+   * 監査 R473: 2文とも改訂番号で条件付けし、競合時はどちらも
+   * 書き換えない。親行を先に触り、版行の番号上げは後に回す。
+   * 逆順にすると成功時でも親行の条件が新しい番号を見て外れる。
+   */
   const result = await db.batch([
     db.prepare(
-      `UPDATE common_action_versions SET action_config = ?
-        WHERE id = ? AND common_action_id = ? AND status = 'draft'`,
-    ).bind(JSON.stringify(actions), expected, owner.id),
-    db.prepare(
       `UPDATE common_actions SET name = ?, description = ?, updated_at = ?
-        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?`,
-    ).bind(name, description, now, owner.id, input.lineAccountId, expected),
+        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?
+          AND EXISTS (
+            SELECT 1 FROM common_action_versions
+             WHERE id = ? AND common_action_id = ? AND status = 'draft'
+               AND draft_revision = ?
+          )`,
+    ).bind(
+      name, description, now, owner.id, input.lineAccountId, expected,
+      expected, owner.id, expectedRevision,
+    ),
+    db.prepare(
+      `UPDATE common_action_versions
+          SET action_config = ?, draft_revision = draft_revision + 1
+        WHERE id = ? AND common_action_id = ? AND status = 'draft'
+          AND draft_revision = ?`,
+    ).bind(JSON.stringify(actions), expected, owner.id, expectedRevision),
   ]);
   if ((result[0].meta?.changes ?? 0) !== 1 || (result[1].meta?.changes ?? 0) !== 1) {
-    throw new CommonActionValidationError('version_conflict', '編集中の版が変わりました。再読み込みしてください');
+    throw new CommonActionValidationError(
+      'draft_revision_conflict',
+      '別の担当者が先に保存しました。読み込み直して差分を確認してください',
+    );
   }
 }
 
@@ -983,7 +1293,7 @@ export async function createCommonActionDraft(
 
 export async function publishCommonActionDraft(
   db: D1Database,
-  input: { id: string; lineAccountId: string; draftVersionId: unknown },
+  input: { id: string; lineAccountId: string; draftVersionId: unknown; expectedDraftRevision: unknown },
 ): Promise<{ versionId: string; versionNumber: number }> {
   const owner = await getOwnedAction(db, input.id, input.lineAccountId);
   if (!owner) throw new CommonActionValidationError('not_found', '共通アクションが見つかりません');
@@ -991,30 +1301,68 @@ export async function publishCommonActionDraft(
   if (owner.current_draft_version_id !== draftVersionId) {
     throw new CommonActionValidationError('version_conflict', '公開対象の下書きが変わりました。再読み込みしてください');
   }
+  // 監査 R477: 公開の読取後に保存が入ったら、古い読取の公開で上書きしない。
+  const expectedRevision = requiredDraftRevision(input.expectedDraftRevision);
   const draft = await db.prepare(
-    `SELECT id, common_action_id, version_number, status, action_config, created_by, created_at, published_at
+    `SELECT id, common_action_id, version_number, status, action_config, draft_revision,
+            created_by, created_at, published_at
        FROM common_action_versions
       WHERE id = ? AND common_action_id = ? AND status = 'draft'`,
   ).bind(draftVersionId, owner.id).first<VersionRow>();
   if (!draft) throw new CommonActionValidationError('draft_not_found', '公開する下書きが見つかりません');
+  if (Number(draft.draft_revision) !== expectedRevision) {
+    throw new CommonActionValidationError(
+      'draft_revision_conflict',
+      '公開前に下書きが更新されました。差分を確認し直してください',
+    );
+  }
   const actions = validateActionShape(JSON.parse(draft.action_config));
-  const pinned = await pinAndValidateReferences(db, input.lineAccountId, owner.id, actions);
+  // 監査 R479: 確認後に参照先が更新されていたら、別の内容を再確認なしで公開しない。
+  const drifts = await collectReferenceDrifts(db, input.lineAccountId, actions);
+  if (drifts.length > 0) {
+    const [first] = drifts;
+    throw new CommonActionValidationError(
+      'reference_updated',
+      `参照先「${first.name}」に新しい版があります（v${first.fromVersion}→v${first.toVersion}）。編集画面で内容を確認して保存し直してください`,
+    );
+  }
+  // 保存時に固定した版を保持し、最新へ自動で置き換えない。
+  const pinned = await pinAndValidateReferences(db, input.lineAccountId, owner.id, actions, { keepPins: true });
+  // 監査 R478: 参照を展開した深さ・総数も公開前に検査する。
+  await assertPublishableExpansion(db, input.lineAccountId, pinned);
   const now = new Date().toISOString();
+  /*
+   * 監査 R477: 保存と同じく2文とも改訂番号で条件付けし、競合時は
+   * 親行の版ポインタも版行の状態も変えない。親行を先に触り、
+   * 版行の公開切替は後に回す（成功時の条件外れを防ぐ）。
+   */
   const result = await db.batch([
-    db.prepare(
-      `UPDATE common_action_versions
-          SET status = 'published', action_config = ?, published_at = ?
-        WHERE id = ? AND common_action_id = ? AND status = 'draft'`,
-    ).bind(JSON.stringify(pinned), now, draft.id, owner.id),
     db.prepare(
       `UPDATE common_actions
           SET status = 'published', current_draft_version_id = NULL,
               current_published_version_id = ?, updated_at = ?
-        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?`,
-    ).bind(draft.id, now, owner.id, input.lineAccountId, draft.id),
+        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?
+          AND EXISTS (
+            SELECT 1 FROM common_action_versions
+             WHERE id = ? AND common_action_id = ? AND status = 'draft'
+               AND draft_revision = ?
+          )`,
+    ).bind(
+      draft.id, now, owner.id, input.lineAccountId, draft.id,
+      draft.id, owner.id, expectedRevision,
+    ),
+    db.prepare(
+      `UPDATE common_action_versions
+          SET status = 'published', action_config = ?, published_at = ?
+        WHERE id = ? AND common_action_id = ? AND status = 'draft'
+          AND draft_revision = ?`,
+    ).bind(JSON.stringify(pinned), now, draft.id, owner.id, expectedRevision),
   ]);
   if ((result[0].meta?.changes ?? 0) !== 1 || (result[1].meta?.changes ?? 0) !== 1) {
-    throw new CommonActionValidationError('version_conflict', '公開直前に版が変わりました。再読み込みしてください');
+    throw new CommonActionValidationError(
+      'draft_revision_conflict',
+      '公開前に下書きが更新されました。差分を確認し直してください',
+    );
   }
   return { versionId: draft.id, versionNumber: draft.version_number };
 }
@@ -1031,7 +1379,7 @@ export async function getCommonActionDetail(
   if (!owner) throw new CommonActionValidationError('not_found', '共通アクションが見つかりません');
   const [versionsResult, bindingsResult] = await Promise.all([
     db.prepare(
-      `SELECT id, common_action_id, version_number, status, action_config,
+      `SELECT id, common_action_id, version_number, status, action_config, draft_revision,
               created_by, created_at, published_at
          FROM common_action_versions WHERE common_action_id = ?
         ORDER BY version_number DESC`,
@@ -1040,11 +1388,17 @@ export async function getCommonActionDetail(
       `SELECT b.id, b.consumer_type, b.consumer_id, b.consumer_path,
               b.common_action_version_id, b.updated_at, v.version_number,
               pv.version_number AS latest_version_number,
+              /* 監査 R472: 利用先の呼び出し箇所と実行の目印を突き合わせる。
+                 自動化IDと版だけでは、動かしていない箇所に同じ実行を
+                 重ねて数えてしまう。空の箇所は全体とみなす。 */
               CASE WHEN b.consumer_type = 'automation' THEN (
                 SELECT COUNT(DISTINCT r.id) FROM automation_runs r
                 JOIN automation_run_steps s ON s.automation_run_id = r.id
                 WHERE r.automation_id = b.consumer_id
                   AND s.common_action_version_id = b.common_action_version_id
+                  AND (b.consumer_path = ''
+                    OR s.step_key = b.consumer_path
+                    OR substr(s.step_key, 1, length(b.consumer_path) + 1) = b.consumer_path || '/')
                   AND r.status = 'running'
               ) END AS running_count,
               CASE WHEN b.consumer_type = 'automation' THEN (
@@ -1052,8 +1406,39 @@ export async function getCommonActionDetail(
                 JOIN automation_run_steps s ON s.automation_run_id = r.id
                 WHERE r.automation_id = b.consumer_id
                   AND s.common_action_version_id = b.common_action_version_id
+                  AND (b.consumer_path = ''
+                    OR s.step_key = b.consumer_path
+                    OR substr(s.step_key, 1, length(b.consumer_path) + 1) = b.consumer_path || '/')
                   AND r.status = 'waiting'
-              ) END AS waiting_count
+              ) END AS waiting_count,
+              /* 監査 R471: 新版へ切り替えたあとも、旧版のまま進んでいる
+                 実行を別に数える。0と混ぜると監視から漏れる。 */
+              CASE WHEN b.consumer_type = 'automation' THEN (
+                SELECT COUNT(DISTINCT r.id) FROM automation_runs r
+                JOIN automation_run_steps s ON s.automation_run_id = r.id
+                WHERE r.automation_id = b.consumer_id
+                  AND s.common_action_version_id <> b.common_action_version_id
+                  AND s.common_action_version_id IN (
+                    SELECT v2.id FROM common_action_versions v2
+                     WHERE v2.common_action_id = b.common_action_id)
+                  AND (b.consumer_path = ''
+                    OR s.step_key = b.consumer_path
+                    OR substr(s.step_key, 1, length(b.consumer_path) + 1) = b.consumer_path || '/')
+                  AND r.status = 'running'
+              ) END AS older_running_count,
+              CASE WHEN b.consumer_type = 'automation' THEN (
+                SELECT COUNT(DISTINCT r.id) FROM automation_runs r
+                JOIN automation_run_steps s ON s.automation_run_id = r.id
+                WHERE r.automation_id = b.consumer_id
+                  AND s.common_action_version_id <> b.common_action_version_id
+                  AND s.common_action_version_id IN (
+                    SELECT v2.id FROM common_action_versions v2
+                     WHERE v2.common_action_id = b.common_action_id)
+                  AND (b.consumer_path = ''
+                    OR s.step_key = b.consumer_path
+                    OR substr(s.step_key, 1, length(b.consumer_path) + 1) = b.consumer_path || '/')
+                  AND r.status = 'waiting'
+              ) END AS older_waiting_count
          FROM common_action_bindings b
          JOIN common_action_versions v ON v.id = b.common_action_version_id
          LEFT JOIN common_action_versions pv ON pv.id = ?
@@ -1063,6 +1448,7 @@ export async function getCommonActionDetail(
       id: string; consumer_type: string; consumer_id: string; consumer_path: string;
       common_action_version_id: string; updated_at: string; version_number: number;
       latest_version_number: number | null; running_count: number | null; waiting_count: number | null;
+      older_running_count: number | null; older_waiting_count: number | null;
     }>(),
   ]);
   const versions = (versionsResult.results ?? []).map((row) => ({
@@ -1070,6 +1456,7 @@ export async function getCommonActionDetail(
     versionNumber: row.version_number,
     status: row.status,
     actions: parseStoredActions(row.action_config),
+    draftRevision: Number(row.draft_revision ?? 1),
     createdBy: row.created_by,
     createdAt: row.created_at,
     publishedAt: row.published_at,
@@ -1085,6 +1472,8 @@ export async function getCommonActionDetail(
     hasNewerVersion: row.latest_version_number !== null && row.latest_version_number > row.version_number,
     runningCount: row.running_count === null ? null : Number(row.running_count),
     waitingCount: row.waiting_count === null ? null : Number(row.waiting_count),
+    olderRunningCount: row.older_running_count === null ? null : Number(row.older_running_count),
+    olderWaitingCount: row.older_waiting_count === null ? null : Number(row.older_waiting_count),
     updatedAt: row.updated_at,
   }));
   return {
@@ -1154,4 +1543,62 @@ export async function updateCommonActionBindingVersion(
     if (!binding) throw new CommonActionValidationError('binding_not_found', '利用先が見つかりません');
     throw new CommonActionValidationError('version_conflict', '利用先の固定版が変わりました。再読み込みしてください');
   }
+}
+
+const ARCHIVE_CONSUMER_LABELS: Record<string, string> = {
+  automation: 'オートメーション',
+  scenario: 'シナリオ配信',
+  form: '回答フォーム',
+  auto_reply: '自動応答',
+  rich_menu: 'リッチメニュー',
+};
+
+/*
+ * 監査 R480: 未使用の共通アクションを保管する。利用中は件数と利用先を
+ * 示して拒否する。保管は一方通行ではなく、戻す操作も用意する。
+ * 実行記録は残る（物理削除ではない）。
+ */
+export async function archiveCommonAction(
+  db: D1Database,
+  input: { id: string; lineAccountId: string },
+): Promise<void> {
+  const owner = await getOwnedAction(db, input.id, input.lineAccountId);
+  if (!owner) throw new CommonActionValidationError('not_found', '共通アクションが見つかりません');
+  if (owner.status === 'archived') return;
+  const bindings = await db.prepare(
+    `SELECT consumer_type, consumer_id
+       FROM common_action_bindings
+      WHERE common_action_id = ? AND line_account_id = ?
+      ORDER BY consumer_type, consumer_id`,
+  ).bind(owner.id, input.lineAccountId).all<{ consumer_type: string; consumer_id: string }>();
+  const rows = bindings.results ?? [];
+  if (rows.length > 0) {
+    const kinds = [...new Set(rows.map((row) => ARCHIVE_CONSUMER_LABELS[row.consumer_type] ?? row.consumer_type))];
+    throw new CommonActionValidationError(
+      'binding_exists',
+      `利用中のため保管できません（${kinds.join('・')} ${rows.length}か所）。先に利用先を外してください`,
+    );
+  }
+  const now = new Date().toISOString();
+  await db.prepare(
+    `UPDATE common_actions SET status = 'archived', archived_at = ?, updated_at = ?
+      WHERE id = ? AND line_account_id = ?`,
+  ).bind(now, now, owner.id, input.lineAccountId).run();
+}
+
+export async function unarchiveCommonAction(
+  db: D1Database,
+  input: { id: string; lineAccountId: string },
+): Promise<void> {
+  const owner = await getOwnedAction(db, input.id, input.lineAccountId);
+  if (!owner) throw new CommonActionValidationError('not_found', '共通アクションが見つかりません');
+  if (owner.status !== 'archived') {
+    throw new CommonActionValidationError('version_conflict', '保管中ではありません。再読み込みしてください');
+  }
+  const status = owner.current_published_version_id ? 'published' : 'draft';
+  const now = new Date().toISOString();
+  await db.prepare(
+    `UPDATE common_actions SET status = ?, archived_at = NULL, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND status = 'archived'`,
+  ).bind(status, now, owner.id, input.lineAccountId).run();
 }

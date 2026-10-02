@@ -1,4 +1,5 @@
 import { ApiError } from '@/lib/api'
+import { formatTime } from '@/lib/format'
 
 type SendFailureData = {
   retryable?: boolean
@@ -19,9 +20,7 @@ function describeWaitUntil(nextRetryAt: string | null | undefined, now: Date): s
   if (diffMs <= 0) return 'まもなく'
   const minutes = Math.ceil(diffMs / 60_000)
   if (minutes <= 90) return `約${minutes}分後`
-  const jst = new Date(target).toLocaleTimeString('ja-JP', {
-    timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit',
-  })
+  const jst = formatTime(target)
   return `${jst}（日本時間）`
 }
 

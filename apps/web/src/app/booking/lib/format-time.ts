@@ -1,3 +1,4 @@
+import { formatDay } from '@/lib/format'
 type TimeInterval = { start: string; end: string }
 type BusinessHoursDay = { weekday: number; intervals: TimeInterval[] }
 
@@ -47,10 +48,20 @@ export function businessHourSummary(
 
 export function bookingWindowEnd(days: number, now = new Date()): string {
   const date = new Date(now)
-  date.setDate(date.getDate() + Math.max(0, days - 1))
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    timeZone: 'Asia/Tokyo',
-  }).format(date)
+  // (a): 受付期間の終わりの日は判定（空き計算の最終日＝今日＋日数）と同じにする。
+  // 1を引くと表示だけ1日短くなり、判定で取れる最終日と食い違う。
+  date.setDate(date.getDate() + Math.max(0, days))
+  return formatDay(date)
+}
+
+/**
+ * 分の期限を、時間・日の単位へ読み替える（監査6 #710）。
+ * 例: 90 → 1時間30分前、1440 → 24時間前、2880 → 2日前。
+ * 60分未満は分のままが一番読みやすいので読み替えを返さない。
+ */
+export function minutesBeforeLabel(minutes: number): string | null {
+  if (!Number.isFinite(minutes) || minutes < 60) return null
+  if (minutes % 1440 === 0 && minutes > 1440) return `${minutes / 1440}日前`
+  if (minutes % 60 === 0) return `${minutes / 60}時間前`
+  return `${Math.floor(minutes / 60)}時間${minutes % 60}分前`
 }

@@ -7,7 +7,19 @@ import { bookingApi, type BookingMenu, type BookingStaff, type StaffMenuMatrix }
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import Notice from '@/components/shared/notice'
+import { isForbiddenOrRateLimited, loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
+import ListState from '@/components/shared/list-state'
+import { describeSaveFailure } from '@/lib/api'
+import { canEditFeature } from '@/lib/staff-capability'
+import StatusBadge from '@/components/shared/status-badge'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { notifyToast } from '@/components/shared/toast'
+/* R309: 標準の料金は一覧・スタッフ追加の候補と同じ共通表示にする。 */
+import { menuPriceLabel } from '../../lib/menu-price'
 
 /**
  * メニューごとの担当スタッフ（設計 V2 8-2-4 / node B88kuI）。
@@ -39,12 +51,27 @@ function MenuStaffMatrixContent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [savedAt, setSavedAt] = useState<number | null>(null)
+  /** R537: 捕まえた読み込み失敗。403・429の出し分けと再試行の有無に使う。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
+  /*
+   * R538: 担当割当の変更は '/booking/menus' の実効permission。閲覧のみの
+   * 担当者は読めるが変えられない。Worker の一括PUTも同じ鍵で守られている。
+   */
+  const [canEditMenus] = useState(() =>
+    typeof window === 'undefined' ? true : canEditFeature('/booking/menus'))
+  /*
+   * R538: スタッフ追加の行き先は予約設定の権限。鍵の無い人には入口を
+   * 出さず、行き先の画面で権限不足にぶつかる手間を省く。
+   */
+  const [canAddStaff] = useState(() =>
+    typeof window === 'undefined' ? true : canEditFeature('booking.settings'))
+
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
     setLoading(true)
     setError(null)
+    setLoadError(null)
     // 前アカウントの内容が残ったまま保存すると、別アカウントの設定を
     // 上書きする事故になる。先に空にする。
     setMenus([])
@@ -94,7 +121,16 @@ function MenuStaffMatrixContent() {
       setGrid(next)
       setSavedGrid(next)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+      // それ以外は画面の文のまま。生の `API error: NNN` は出さない。
+      // R537: 失敗をそのまま残し、再試行の有無と空状態の出し分けに使う。
+      setLoadError(e)
+      if (isForbiddenOrRateLimited(e)) {
+        setError(loadFailureNotice(e, '担当スタッフの割り当て'))
+      } else {
+        const message = e instanceof Error ? e.message : ''
+        setError(message && !/^API error: /.test(message) ? message : '読み込めませんでした。画面を再読み込みして確認してください。')
+      }
     } finally {
       setLoading(false)
     }
@@ -133,20 +169,26 @@ function MenuStaffMatrixContent() {
       )
       /* #975 U075: 保存できた時点の表を新しい基準にする。以後の差分が未保存。 */
       setSavedGrid(grid)
-      setSavedAt(Date.now())
+      notifyToast('保存しました')
     } catch (e) {
       // 全件不適用のはずだが、画面の表示とDBの状態が食い違う可能性を
       // 残さないため再読み込みを促す。
+      // m23m: 生の内部文は出さず、共通の保存失敗文にする。
       setError(
-        `${e instanceof Error ? e.message : String(e)}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
+        `${describeSaveFailure(e)}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
       )
     } finally {
       setSaving(false)
     }
   }
 
-  /** メニューID → 担当できる人数。 */
-  const offeredCounts = useMemo(() => {
+  /*
+   * R308: 「割ってある人数」と「いま受付できる人数」を分ける。
+   * 非公開（is_active=0）の担当は割当としては数えるが、受付できる数には
+   * 入れない。受付できない担当だけを見て「足りている」と見逃さないため。
+   */
+  /** メニューID → 割ってある人数（非公開の担当を含む）。 */
+  const assignedCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const m of menus) {
       let n = 0
@@ -155,9 +197,24 @@ function MenuStaffMatrixContent() {
     }
     return counts
   }, [menus, staff, grid])
+  /** メニューID → いま受付できる人数（稼働中の担当だけ）。 */
+  const availableCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const m of menus) {
+      let n = 0
+      for (const s of staff) if (s.is_active && grid[s.id]?.[m.id]?.is_offered) n += 1
+      counts.set(m.id, n)
+    }
+    return counts
+  }, [menus, staff, grid])
 
-  const orphans = menus.filter((m) => (offeredCounts.get(m.id) ?? 0) === 0)
-  const assigned = [...offeredCounts.values()].reduce((a, b) => a + b, 0)
+  /** 受付できる担当がいないメニュー。誰も割っていない場合と、非公開しかいない場合。 */
+  const orphans = menus.filter((m) => (availableCounts.get(m.id) ?? 0) === 0)
+  /** 誰にも割っていないメニュー。 */
+  const unassigned = orphans.filter((m) => (assignedCounts.get(m.id) ?? 0) === 0)
+  /** 割ってはあるが非公開の担当しかいないメニュー。 */
+  const inactiveOnly = orphans.filter((m) => (assignedCounts.get(m.id) ?? 0) > 0)
+  const assigned = [...assignedCounts.values()].reduce((a, b) => a + b, 0)
   const pairs = menus.length * staff.length
 
   /*
@@ -173,6 +230,13 @@ function MenuStaffMatrixContent() {
    * 左メニュー・画面内リンク・戻る操作・再読込を同じ確認対話へ寄せる。
    */
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+  /*
+   * R537: 読み込みに失敗して表が無いときの出し分け。失敗を「未登録」と
+   * 混ぜない。403は押しても直らないので再試行なし、429と通信失敗は
+   * 同じ画面から取り直せる。
+   */
+  const loadFailed = error !== null && savedGrid === null
+  const loadFailure = loadError ? loadFailureCopy(loadError, '担当スタッフの割り当て') : null
   const saveStateLabel = loading
     ? '読み込み中…'
     : error
@@ -186,8 +250,9 @@ function MenuStaffMatrixContent() {
           : '変更はありません'
 
   return (
-    <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav data-design="Crumb" className="text-ink-faint text-xs">
         <Link href="/booking/menus" className="hover:underline">
           予約設定
         </Link>
@@ -195,84 +260,124 @@ function MenuStaffMatrixContent() {
         <span>担当スタッフ</span>
       </nav>
 
-      <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
-          <Link
-            href="/booking/staff/new"
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
-          >
-            スタッフを追加
-          </Link>
-          <button
-            onClick={saveAll}
-            // error が出ている間は押させない。読み込みに失敗した状態で
-            // 保存すると、空の割り当てで上書きしてしまう。
-            // #975 U075: 差分がないときも押させない（押しても変わらない）。
-            disabled={saving || !selectedAccountId || loading || Boolean(error) || !dirty}
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium disabled:opacity-50"
-          >
-            {saving ? '保存中…' : dirty ? '変更を保存' : '変更なし'}
-          </button>
+      <div data-design="Actions" className="flex flex-wrap items-center gap-2">
+          {/*
+            * R538: スタッフ追加の行き先は予約設定の権限。鍵の無い人には押せない
+            * 姿で置き、理由を行き先ではなくこの場で言う。
+            */}
+          {canAddStaff ? (
+            <Button variant="secondary" className="text-ink-secondary px-3 py-2 h-auto whitespace-normal" href="/booking/staff/new">
+              スタッフを追加する
+            </Button>
+          ) : (
+            <span
+              aria-disabled="true"
+              title="予約設定の変更権限がありません"
+              className="border-hairline text-ink-faint rounded-control cursor-not-allowed border px-3 py-2 text-sm opacity-50"
+            >
+              スタッフを追加する
+            </span>
+          )}
+          {/*
+            * #975 U075: 差分がないときは保存の押し口自体を出さず、中立の札で
+            * 状態だけ言う。押せない緑の塗りボタンは主役に見えてしまう。
+            * error が出ている間は押させない。読み込みに失敗した状態で
+            * 保存すると、空の割り当てで上書きしてしまう。
+            */}
+          {/*
+            * R538: 閲覧のみの担当者には保存の押し口を出さない。入力欄も
+            * 押せないので dirty にはならないが、ここでも鍵を見る。
+            */}
+          {canEditMenus && (saving || dirty) ? (
+            <Button
+              variant="primary"
+              onClick={saveAll}
+              disabled={saving || !selectedAccountId || loading || Boolean(error) || !dirty} busy={saving}>保存する
+            </Button>
+          ) : (
+            <StatusBadge tone="neutral" size="compact">変更なし</StatusBadge>
+          )}
           {/* #975 U075: 未保存・保存済み・失敗を色だけでなく文字で出す。 */}
           <span className="text-ink-faint self-center text-xs" role="status" aria-live="polite">
             {saveStateLabel}
           </span>
+          {!canEditMenus && (
+            <span className="text-ink-faint self-center text-xs">
+              担当割当の変更権限がありません。変更は予約メニューの権限を持つログインユーザーが行ってください。
+            </span>
+          )}
       </div>
 
-      <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      {/*
+        * R537: 読み込みに失敗したときは0ではなく「—」。取れていない数を
+        * 0件・0人と出すと、未登録と誤読される。
+        */}
+      <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           title="メニュー"
-          value={String(menus.length)}
+          value={loadFailed ? '—' : String(menus.length)}
           unit="件"
-          detail={`公開中 ${menus.filter((m) => m.is_active).length}`}
+          detail={loadFailed ? '—' : `公開中 ${menus.filter((m) => m.is_active).length}`}
         />
         <Kpi
           title="担当スタッフ"
-          value={String(staff.length)}
+          value={loadFailed ? '—' : String(staff.length)}
           unit="人"
-          detail={`稼働中 ${staff.filter((s) => s.is_active).length}`}
+          detail={loadFailed ? '—' : `稼働中 ${staff.filter((s) => s.is_active).length}`}
         />
         <Kpi
           title="割り当て済み"
-          value={String(assigned)}
+          value={loadFailed ? '—' : String(assigned)}
           unit="組"
-          detail={`全${pairs}組のうち`}
+          detail={loadFailed ? '—' : `全${pairs}組のうち`}
         />
+        {/*
+         * R308: 非公開しかいない場合もここに入るため、「誰も担当していない」
+         * では言葉がずれる。受付できる担当がいない、と言い換える。
+         */}
         <Kpi
-          title="誰も担当していない"
-          value={String(orphans.length)}
+          title="受付できる担当がいない"
+          value={loadFailed ? '—' : String(orphans.length)}
           unit="件"
-          detail={orphans.length === 0 ? 'なし' : orphans.map((m) => m.name).join('・')}
+          detail={loadFailed ? '—' : orphans.length === 0 ? 'なし' : orphans.map((m) => m.name).join('・')}
         />
       </div>
 
-      {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
-      )}
-      {savedAt && Date.now() - savedAt < 3000 && (
-        <div className="bg-success-bg text-success mb-4 rounded-lg p-3 text-sm">保存しました</div>
+      {/*
+        * R537: 読み込み自体に失敗したときは、下の表の場所に共通の失敗の1枚を
+        * 出すので、ここでは帯を重ねない。保存の失敗（表あり）のときだけ帯を出す。
+        */}
+      {error && !loadFailed && (
+        <Notice tone="danger" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
       {orphans.length > 0 && (
         <div
           data-design="Warn"
-          className="bg-warning-bg rounded-card mb-4 flex flex-wrap items-center justify-between gap-2 p-4"
+          className="bg-warning-bg rounded-card flex flex-wrap items-center justify-between gap-2 p-4"
         >
           <div>
-            <p className="text-warning text-sm font-medium">
-              「{orphans.map((m) => m.name).join('」「')}」は担当できるスタッフがいません。
-            </p>
+            {unassigned.length > 0 && (
+              <p className="text-warning text-sm font-medium">
+                「{unassigned.map((m) => m.name).join('」「')}」は担当できるスタッフがいません。
+              </p>
+            )}
+            {inactiveOnly.length > 0 && (
+              <p className="text-warning text-sm font-medium">
+                「{inactiveOnly.map((m) => m.name).join('」「')}」は非公開の担当しかいません。
+              </p>
+            )}
             <p className="text-ink-secondary mt-0.5 text-xs">
               このままでは予約フォームに枠が出ません。
             </p>
           </div>
-          <a
+          <Button
             href={`#menu-${orphans[0].id}`}
-            className="bg-accent-deep text-on-accent rounded-control px-3 py-2 text-xs font-medium"
+            variant="secondary"
+            size="field"
           >
             割り当てる
-          </a>
+          </Button>
         </div>
       )}
 
@@ -284,51 +389,63 @@ function MenuStaffMatrixContent() {
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
           読み込み中…
         </div>
+      ) : loadFailed ? (
+        // R537: 取得の失敗は「未登録」と別の1枚にする。共通の失敗表示が
+        // 403（再試行なし）と429・通信失敗（再試行あり）を言い分ける。
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="error"
+            title={loadFailure?.title}
+            description={loadFailure?.description}
+            error={loadError ?? undefined}
+            onRetry={loadFailure?.retryable ? () => void load() : undefined}
+          />
+        </div>
       ) : staff.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
           先にスタッフを登録してください
         </div>
       ) : (
-        <div
-          data-design="Table"
-          className="bg-canvas rounded-card border-hairline overflow-hidden border"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px]">
+        <DataTable data-design="Table">
               <thead>
-                <tr className="bg-canvas-sunken border-hairline border-b">
-                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                <TableHeadRow>
+                  <Th>
                     メニュー
-                  </th>
-                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                  </Th>
+                  <Th>
                     標準の設定
-                  </th>
+                  </Th>
                   {staff.map((s) => (
-                    <th
+                    <Th
                       key={s.id}
-                      className="text-ink-faint px-4 py-3 text-left text-xs font-semibold"
                     >
                       {s.display_name || s.name}
+                      {/* R308: 列見出しで非公開と分かるようにする。 */}
+                      {!s.is_active && (
+                        <span className="text-ink-faint text-micro block font-normal">
+                          非公開
+                        </span>
+                      )}
                       {s.is_designation_optional === 1 && (
                         <span className="text-ink-faint block text-[10px] font-normal">
                           指名なし
                         </span>
                       )}
-                    </th>
+                    </Th>
                   ))}
-                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">
+                  <Th align="right">
                     提供できる数
-                  </th>
-                </tr>
+                  </Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {menus.map((m) => (
-                  <tr
+                  <Tr
                     key={m.id}
                     id={`menu-${m.id}`}
                     className={focusMenuId === m.id ? 'bg-accent-soft' : undefined}
                   >
-                    <td className="px-4 py-3 align-top text-sm">
+                    <Td className="align-top">
                       <p className="text-ink font-medium">{m.name}</p>
                       <p className="mt-1">
                         {m.is_active ? (
@@ -341,37 +458,32 @@ function MenuStaffMatrixContent() {
                           </span>
                         )}
                       </p>
-                    </td>
-                    <td className="text-ink-secondary px-4 py-3 align-top text-xs tabular-nums">
+                    </Td>
+                    <Td className="text-ink-secondary align-top text-xs tabular-nums">
                       {m.duration_minutes} 分
-                      <br />¥{m.base_price.toLocaleString()}
-                    </td>
+                      <br />{menuPriceLabel(m)}
+                    </Td>
                     {staff.map((s) => {
                       const row = grid[s.id]?.[m.id]
                       const offered = Boolean(row?.is_offered)
                       const overridden =
                         row?.override_duration_minutes != null || row?.override_price != null
                       return (
-                        <td key={s.id} className="px-4 py-3 align-top">
-                          <label className="flex cursor-pointer items-center gap-1.5 text-xs">
-                            <input
-                              type="checkbox"
-                              checked={offered}
-                              onChange={(e) =>
-                                update(s.id, m.id, { is_offered: e.target.checked ? 1 : 0 })
-                              }
-                              className="accent-accent"
-                            />
-                            <span className={offered ? 'text-ink' : 'text-ink-faint'}>
-                              {offered ? '対応できる' : '対応しない'}
-                            </span>
-                          </label>
+                        <Td key={s.id} className="align-top">
+                          <Checkbox
+                            checked={offered}
+                            disabled={!canEditMenus}
+                            onCheckedChange={(checked) =>
+                              update(s.id, m.id, { is_offered: checked ? 1 : 0 })
+                            }
+                          >{offered ? '対応できる' : '対応しない'}</Checkbox>
                           {offered ? (
                             <>
                               <div className="mt-1.5 flex items-center gap-1">
                                 <input
                                   type="number"
                                   min={1}
+                                  disabled={!canEditMenus}
                                   value={row?.override_duration_minutes ?? ''}
                                   onChange={(e) =>
                                     update(s.id, m.id, {
@@ -381,13 +493,14 @@ function MenuStaffMatrixContent() {
                                   }
                                   placeholder={String(m.duration_minutes)}
                                   aria-label={`${s.display_name || s.name} の ${m.name} の所要時間`}
-                                  className="border-hairline rounded-control w-14 border px-1.5 py-1 text-xs tabular-nums"
+                                  className="border-hairline rounded-control h-8 w-14 border px-1.5 text-xs tabular-nums"
                                 />
                                 <span className="text-ink-faint text-[10px]">分</span>
                                 <span className="text-ink-faint text-[10px]">・¥</span>
                                 <input
                                   type="number"
                                   min={0}
+                                  disabled={!canEditMenus}
                                   value={row?.override_price ?? ''}
                                   onChange={(e) =>
                                     update(s.id, m.id, {
@@ -397,7 +510,7 @@ function MenuStaffMatrixContent() {
                                   }
                                   placeholder={String(m.base_price)}
                                   aria-label={`${s.display_name || s.name} の ${m.name} の料金`}
-                                  className="border-hairline rounded-control w-20 border px-1.5 py-1 text-xs tabular-nums"
+                                  className="border-hairline rounded-control h-8 w-20 border px-1.5 text-xs tabular-nums"
                                 />
                               </div>
                               {overridden && (
@@ -409,28 +522,35 @@ function MenuStaffMatrixContent() {
                           ) : (
                             <p className="text-ink-faint mt-1.5 text-xs">—</p>
                           )}
-                        </td>
+                        </Td>
                       )
                     })}
-                    <td className="px-4 py-3 text-right align-top text-sm tabular-nums">
+                    <Td align="right" className="align-top text-sm tabular-nums">
+                      {/*
+                       * R308: 「提供できる数」は稼働中の担当だけ。非公開の割当が
+                       * あるときは割当数も添えて、両者を区別できるようにする。
+                       */}
                       <span
                         className={
-                          (offeredCounts.get(m.id) ?? 0) === 0 ? 'text-warning' : 'text-ink'
+                          (availableCounts.get(m.id) ?? 0) === 0 ? 'text-warning' : 'text-ink'
                         }
                       >
-                        {offeredCounts.get(m.id) ?? 0} 人
+                        {availableCounts.get(m.id) ?? 0} 人
                       </span>
-                    </td>
-                  </tr>
+                      {(assignedCounts.get(m.id) ?? 0) > (availableCounts.get(m.id) ?? 0) && (
+                        <span className="text-ink-faint text-micro block">
+                          割当{assignedCounts.get(m.id)}（非公開{(assignedCounts.get(m.id) ?? 0) - (availableCounts.get(m.id) ?? 0)}）
+                        </span>
+                      )}
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        </div>
+        </DataTable>
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-ink-faint text-xs">全 {menus.length} 件</span>
+        <span className="text-ink-faint text-xs">{loadFailed ? '—' : `全 ${menus.length} 件`}</span>
         <span className="text-ink-faint text-xs">
           チェックを外すと、そのスタッフはこのメニューの予約枠に出なくなります。
         </span>
@@ -449,15 +569,7 @@ function MenuStaffMatrixContent() {
         </ul>
       </div>
 
-      <ConfirmDialog
-        open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、担当割り当てへの変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="担当割り当てへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

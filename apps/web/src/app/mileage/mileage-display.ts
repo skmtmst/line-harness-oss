@@ -1,4 +1,5 @@
 import type { MileageAdminHistoryItem, MileageHistoryItem } from '@/lib/api'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 const ENTRY_TYPE_LABELS: Record<MileageHistoryItem['entryType'], string> = {
   grant: '付与',
@@ -96,6 +97,9 @@ export function friendHistoryItem(item: MileageAdminHistoryItem): MileageDetailH
     ruleName: item.ruleName,
     mode: item.mode,
     executedByStaffName: item.executedByStaffName,
+    lineAccountId: item.lineAccountId ?? null,
+    notificationStatus: item.notificationStatus ?? null,
+    notificationErrorCode: item.notificationErrorCode ?? null,
     balanceAfter: item.balanceAfter,
     occurredAt: item.occurredAt,
   }
@@ -123,7 +127,7 @@ export function actionScoreReasonLabel(reason: string | null) {
 }
 
 export function formatMileageChange(value: number): string {
-  const number = Math.abs(value).toLocaleString('ja-JP')
+  const number = formatNumber(Math.abs(value))
   if (value > 0) return `+${number}`
   if (value < 0) return `−${number}`
   return '0'
@@ -132,21 +136,42 @@ export function formatMileageChange(value: number): string {
 /** 数を日本語の桁区切りで出す。取れていない数・壊れた数は「—」にする。 */
 export function formatMileageNumber(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value)
-    ? new Intl.NumberFormat('ja-JP').format(value)
+    ? formatNumber(value)
     : '—'
+}
+
+/**
+ * R54: ランクの進みの1行目・2行目。未公開（今のランクも次のランクもなし。
+ * 口の決まりでは公開中のランクが無いときだけ起きる）と、最高ランク到達を
+ * 区別する。未公開の2行目は null を返し、呼び出し側で作り先の案内を出す
+ * （理由の重ね書きにしない）。
+ */
+export function mileageRankProgress(input: {
+  rank: string | null | undefined
+  rankReason: string | null | undefined
+  nextRankLabel: string | null | undefined
+  milesToNextRank: number | null | undefined
+}): { headline: string; detail: string | null; unpublished: boolean } {
+  const rank = input.rank ?? null
+  const nextRankLabel = input.nextRankLabel ?? null
+  const loaded = input.rankReason != null
+  const unpublished = loaded && !rank && !nextRankLabel
+  const headline = nextRankLabel
+    ? `次は「${nextRankLabel}」`
+    : rank
+      ? 'いちばん上のランクです'
+      : (input.rankReason ?? 'ランク情報を確認できません')
+  const detail = input.milesToNextRank != null
+    ? `あと ${formatNumber(input.milesToNextRank)} マイル`
+    : unpublished
+      ? null
+      : (input.rankReason ?? 'ランク情報を確認できません')
+  return { headline, detail, unpublished }
 }
 
 export function formatMileageDate(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }

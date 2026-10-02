@@ -9,6 +9,12 @@ const mocks = {
   getFriendFieldByIdForScope: vi.fn(),
   createFriendField: vi.fn(),
   createFriendFieldForScope: vi.fn(),
+  createFriendFieldIdempotent: vi.fn(),
+  FriendFieldCreateError: class FriendFieldCreateError extends Error {
+    constructor(public readonly code: string, message: string) {
+      super(message);
+    }
+  },
   updateFriendField: vi.fn(),
   reorderFriendFields: vi.fn(),
   deleteFriendField: vi.fn(),
@@ -30,6 +36,8 @@ const mocks = {
   getFriendById: vi.fn(),
   setFriendFieldValue: vi.fn(),
   setFriendFieldValuesBulk: vi.fn(),
+  // M046: 単票 PUT は1件ずつ書かず、1人の複数項目を1回の batch で書く。
+  setFriendFieldValuesForFriend: vi.fn(),
   jstNow: () => '2026-09-14T00:00:00.000+09:00',
   recordLoginAudit: vi.fn(),
   validateFriendFieldValue: vi.fn(),
@@ -93,15 +101,23 @@ function req(
   path: string,
   method: string,
   body?: unknown,
+  headers: Record<string, string> = {},
 ) {
   return app.fetch(
     new Request(`https://example.com${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
     env,
   );
+}
+
+/** 項目作成の口を叩く。R515で要求キーが必須になったため、鍵を付けて送る。 */
+function createReq(app: ReturnType<typeof makeApp>, body: unknown, key = 'field-key-1') {
+  return req(app, '/api/friend-fields?lineAccountId=account-1', 'POST', body, {
+    'Idempotency-Key': key,
+  });
 }
 
 const FIELD = {
@@ -135,6 +151,10 @@ beforeEach(() => {
   mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
   mocks.createFriendField.mockResolvedValue(FIELD);
   mocks.createFriendFieldForScope.mockResolvedValue({ ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
+  mocks.createFriendFieldIdempotent.mockResolvedValue({
+    field: { ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 },
+    replayed: false,
+  });
   mocks.updateFriendField.mockResolvedValue(FIELD);
   mocks.reorderFriendFields.mockResolvedValue(undefined);
   mocks.countFriendFieldValues.mockResolvedValue(0);
@@ -158,26 +178,61 @@ beforeEach(() => {
 
 describe('項目の作成', () => {
   it('差し込み名の形が正しければ作れる', async () => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: 'ペットの名前',
       fieldKey: 'pet_name',
       type: 'text',
     });
     expect(res.status).toBe(201);
+    expect(mocks.createFriendFieldIdempotent).toHaveBeenCalledWith(
+      env.DB,
+      expect.anything(),
+      expect.objectContaining({ name: 'ペットの名前', fieldKey: 'pet_name' }),
+      'field-key-1',
+    );
+  });
+
+  it('R515: 要求キーなしの作成は実行しない', async () => {
+    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+      name: 'ペットの名前',
+      fieldKey: 'pet_name',
+      type: 'text',
+    });
+    expect(res.status).toBe(400);
+    expect(mocks.createFriendFieldIdempotent).not.toHaveBeenCalled();
+  });
+
+  it('R515: 同じ要求キーの再送は保存済みを200で返す', async () => {
+    mocks.createFriendFieldIdempotent.mockResolvedValue({
+      field: { ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 },
+      replayed: true,
+    });
+    const res = await createReq(makeApp(), { name: 'ペットの名前', fieldKey: 'pet_name', type: 'text' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { id: 'ff-1' } });
+  });
+
+  it('R515: 同じ要求キーに異なる内容は409で止める', async () => {
+    mocks.createFriendFieldIdempotent.mockRejectedValue(
+      new mocks.FriendFieldCreateError('idempotency_conflict', '同じ要求キーに異なる内容が指定されました'),
+    );
+    const res = await createReq(makeApp(), { name: '別の名前', fieldKey: 'other_key', type: 'text' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'idempotency_conflict' });
   });
 
   it('差し込み名の形が違えば422', async () => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: 'x',
       fieldKey: 'ペット',
       type: 'text',
     });
     expect(res.status).toBe(422);
-    expect(mocks.createFriendFieldForScope).not.toHaveBeenCalled();
+    expect(mocks.createFriendFieldIdempotent).not.toHaveBeenCalled();
   });
 
   it('知らない種類は422', async () => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: 'x',
       fieldKey: 'x',
       type: 'rating',
@@ -186,7 +241,7 @@ describe('項目の作成', () => {
   });
 
   it('選択肢は文字列の配列だけ', async () => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: 'x',
       fieldKey: 'x',
       type: 'select',
@@ -196,8 +251,8 @@ describe('項目の作成', () => {
   });
 
   it('差し込み名が重複したら409', async () => {
-    mocks.createFriendFieldForScope.mockRejectedValue(new Error('UNIQUE constraint failed'));
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    mocks.createFriendFieldIdempotent.mockRejectedValue(new Error('UNIQUE constraint failed'));
+    const res = await createReq(makeApp(), {
       name: 'x',
       fieldKey: 'dup',
       type: 'text',
@@ -206,25 +261,74 @@ describe('項目の作成', () => {
   });
 
   it.each(['datetime', 'image', 'pdf'])('V6の%s項目を作れる', async (type) => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: type,
       fieldKey: `field_${type}`,
       type,
     });
     expect(res.status).toBe(201);
-    expect(mocks.createFriendFieldForScope).toHaveBeenCalledWith(
+    expect(mocks.createFriendFieldIdempotent).toHaveBeenCalledWith(
       env.DB,
       expect.anything(),
       expect.objectContaining({ type }),
+      expect.anything(),
     );
   });
 
+describe('R181 既定値は個別値と同じ物差しで検証する', () => {
+  async function createDefault(type: string, defaultValue: unknown) {
+    return createReq(makeApp(), {
+      name: '検査項目', fieldKey: `check_${type}`, type, defaultValue,
+    });
+  }
+
+  it('存在しない日付の既定値は422', async () => {
+    const res = await createDefault('date', '2026-02-31');
+    expect(res.status).toBe(422);
+    expect(mocks.createFriendFieldIdempotent).not.toHaveBeenCalled();
+  });
+
+  it('うるう日の既定値は作れる', async () => {
+    const res = await createDefault('date', '2028-02-29');
+    expect(res.status).toBe(201);
+  });
+
+  it('存在しない日時の既定値は422', async () => {
+    const res = await createDefault('datetime', '2026-02-31T10:00:00+09:00');
+    expect(res.status).toBe(422);
+    expect(mocks.createFriendFieldIdempotent).not.toHaveBeenCalled();
+  });
+
+  it('数字のない電話番号の既定値は422', async () => {
+    const res = await createDefault('tel', '--------');
+    expect(res.status).toBe(422);
+    expect(mocks.createFriendFieldIdempotent).not.toHaveBeenCalled();
+  });
+
+  it('正しい電話番号の既定値は作れる', async () => {
+    const res = await createDefault('tel', '090-1234-5678');
+    expect(res.status).toBe(201);
+  });
+
+  it('個別値でも存在しない日時・数字なし電話番号は422', async () => {
+    mocks.getFriendFields.mockResolvedValue([
+      { ...FIELD, id: 'ff-dt', field_key: 'at', type: 'datetime' },
+      { ...FIELD, id: 'ff-tel', field_key: 'tel', type: 'tel' },
+    ]);
+    for (const values of [{ 'ff-dt': '2026-02-31T10:00:00+09:00' }, { 'ff-tel': '--------' }]) {
+      const res = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', { values });
+      expect(res.status).toBe(422);
+    }
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+});
+
   it('選択肢を不変ID付きで保存する', async () => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: '都道府県', fieldKey: 'prefecture', type: 'select', options: ['東京', '大阪'], defaultValue: '東京',
     });
     expect(res.status).toBe(201);
-    const input = mocks.createFriendFieldForScope.mock.calls.at(-1)?.[2] as { optionsJson: string; defaultValue: string };
+    const input = mocks.createFriendFieldIdempotent.mock.calls.at(-1)?.[2] as { optionsJson: string; defaultValue: string };
     const options = JSON.parse(input.optionsJson) as Array<{ id: string; label: string }>;
     expect(options.map((item) => item.label)).toEqual(['東京', '大阪']);
     expect(options.every((item) => item.id.length > 0)).toBe(true);
@@ -232,11 +336,11 @@ describe('項目の作成', () => {
   });
 
   it('画像・PDFの既定値と本文差し込みを拒否する', async () => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: '本人確認', fieldKey: 'identity_file', type: 'pdf', defaultValue: 'media-1', allowTextInsertion: true,
     });
     expect(res.status).toBe(422);
-    expect(mocks.createFriendFieldForScope).not.toHaveBeenCalled();
+    expect(mocks.createFriendFieldIdempotent).not.toHaveBeenCalled();
   });
 
   it('staffは定義を作れない', async () => {
@@ -307,6 +411,22 @@ describe('項目の更新', () => {
     });
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ code: 'VERSION_CONFLICT' });
+  });
+
+  it('R517: 版の衝突では最新の内容を付けて返す', async () => {
+    mocks.updateFriendField.mockResolvedValue(null);
+    mocks.getFriendFieldByIdForScope.mockResolvedValue({
+      ...FIELD, id: 'ff-1', name: 'Bの名前', version: 2,
+      line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0,
+    });
+    const res = await req(makeApp(), '/api/friend-fields/ff-1?lineAccountId=account-1', 'PATCH', {
+      version: 1, name: 'Aの名前',
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'VERSION_CONFLICT',
+      data: { latest: { id: 'ff-1', name: 'Bの名前', version: 2 } },
+    });
   });
 });
 
@@ -539,6 +659,7 @@ describe('友だちのLINEアカウント境界', () => {
     expect(res.status).toBe(404);
     expect(mocks.getFriendFieldsWithValues).not.toHaveBeenCalled();
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).not.toHaveBeenCalled();
   });
 });
 
@@ -836,20 +957,17 @@ describe('値の型検証（N-042 単票）', () => {
       values: { 'ff-num': '1,000', 'ff-sel': '柴犬' },
     });
     expect(res.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
+    // M046: 1件ずつ書かず、正規化ずみを1回の batch にまとめる。
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledTimes(1);
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), {
       friendId: 'f-1',
-      fieldId: 'ff-num',
-      value: '1000',
+      entries: [
+        { fieldId: 'ff-num', value: '1000' },
+        { fieldId: 'ff-sel', value: 'opt-1' },
+      ],
       updatedBy: 'u-1',
-      field: expect.objectContaining({ type: 'number' }),
-    });
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
-      friendId: 'f-1',
-      fieldId: 'ff-sel',
-      value: 'opt-1',
-      updatedBy: 'u-1',
-      field: expect.objectContaining({ type: 'select' }),
+      now: '2026-09-14T00:00:00.000+09:00',
     });
   });
 
@@ -891,13 +1009,13 @@ describe('値の型検証（N-042 単票）', () => {
     const second = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', body);
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
-    expect(mocks.setFriendFieldValue).toHaveBeenLastCalledWith(expect.anything(), {
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledTimes(2);
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenLastCalledWith(expect.anything(), {
       friendId: 'f-1',
-      fieldId: 'ff-num',
-      value: '1000',
+      entries: [{ fieldId: 'ff-num', value: '1000' }],
       updatedBy: 'u-1',
-      field: expect.objectContaining({ type: 'number' }),
+      now: '2026-09-14T00:00:00.000+09:00',
     });
   });
 
@@ -907,12 +1025,12 @@ describe('値の型検証（N-042 単票）', () => {
       values: { 'ff-1': '' },
     });
     expect(res.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), {
       friendId: 'f-1',
-      fieldId: 'ff-1',
-      value: null,
+      entries: [{ fieldId: 'ff-1', value: null }],
       updatedBy: 'u-1',
-      field: expect.objectContaining({ type: 'text' }),
+      now: '2026-09-14T00:00:00.000+09:00',
     });
   });
 });
@@ -1027,6 +1145,7 @@ describe('個人情報の個別権限（N-045）', () => {
     });
     expect(res.status).toBe(403);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).not.toHaveBeenCalled();
   });
 
   it('view キーだけでは保存できない', async () => {
@@ -1037,6 +1156,7 @@ describe('個人情報の個別権限（N-045）', () => {
     );
     expect(res.status).toBe(403);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).not.toHaveBeenCalled();
   });
 
   it('edit キーを持つ staff は個人情報の項目を保存できる', async () => {
@@ -1047,10 +1167,10 @@ describe('個人情報の個別権限（N-045）', () => {
       { values: { 'ff-2': '080-0000-0000' } },
     );
     expect(res.status).toBe(200);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       friendId: 'f-1',
-      fieldId: 'ff-2',
-      value: '080-0000-0000',
+      entries: [{ fieldId: 'ff-2', value: '080-0000-0000' }],
     }));
   });
 
@@ -1065,8 +1185,12 @@ describe('個人情報の個別権限（N-045）', () => {
     const body = (await res.json()) as { data: { updated: number }; warnings: string[] };
     expect(body.data.updated).toBe(1);
     expect(body.warnings[0]).toContain('ペットの名前');
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(1);
-    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ fieldId: 'ff-2' }));
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledTimes(1);
+    expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      friendId: 'f-1',
+      entries: [{ fieldId: 'ff-2', value: '080-0000-0000' }],
+    }));
   });
 
   it('一括変更: edit キーを持つ staff は個人情報の項目だけ実行できる', async () => {

@@ -28,6 +28,12 @@ interface ConfirmDialogProps {
   /** この確認画面に対応するPencilの実Node。 */
   designNode?: string
   /**
+   * 主にする操作。`'cancel'` は取消（残る方）を主の緑にし、実行を枠線にする。
+   * 未保存の離脱確認で使い、うっかり Enter や緑で入力が消える向きにしない。
+   * 印も付けない（緑のチェックは「完了・成功」の意味のため）。
+   */
+  primaryAction?: 'confirm' | 'cancel'
+  /**
    * `undefined` を渡すと**確認のボタンそのものが出ない**（`Dialog` の作り）。
    * 数えられていない人数のまま送らせない、といった止め方に使う。
    */
@@ -49,12 +55,20 @@ export default function ConfirmDialog({
   titleIcon,
   confirmIcon,
   designNode,
+  primaryAction = 'confirm',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  const shownTitleIcon = titleIcon ?? (destructive
-    ? <TriangleAlert size={22} />
-    : <CircleCheck size={22} />)
+  /*
+   * 未保存の離脱確認（主が取消）は印を付けない。緑のチェックは
+   * 「完了・成功」の意味なので、まだ何も済んでいない窓には出さない。
+   * 危険な操作の警告印は従来どおり残す。
+   */
+  const shownTitleIcon = titleIcon ?? (primaryAction === 'cancel'
+    ? undefined
+    : destructive
+      ? <TriangleAlert size={22} />
+      : <CircleCheck size={22} />)
   const shownConfirmIcon = confirmIcon ?? (destructive ? <Trash2 size={16} /> : undefined)
 
   return (
@@ -67,6 +81,7 @@ export default function ConfirmDialog({
       cancelLabel={cancelLabel}
       busy={busy}
       error={error}
+      primaryAction={primaryAction}
       titleIcon={shownTitleIcon}
       confirmIcon={shownConfirmIcon}
       designNode={designNode}

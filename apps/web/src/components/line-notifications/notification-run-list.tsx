@@ -8,8 +8,10 @@ import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import Notice from '@/components/shared/notice'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 const PAGE_SIZE = 20
 
@@ -60,10 +62,7 @@ function formatJst(value: string | null): string {
   }
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -443,24 +442,24 @@ export default function NotificationRunList({
     <section className="space-y-4" data-design-node={nodeId} data-list-state={listState} aria-label={title}>
       <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${mode === 'history' ? 'xl:grid-cols-4' : ''}`}>
         {mode === 'failures' ? <>
-          <SummaryCard title="届かなかった" value={summary?.failed ?? null} unit="通" detail={summaryDetail('確認と連絡が必要')} variant="v6" loading={visibleState === 'loading'} badgeTone="danger" />
-          <SummaryCard title="送信対象外" value={summary?.excluded ?? null} unit="通" detail={summaryDetail('つながりや設定を確認')} variant="v6" loading={visibleState === 'loading'} />
+          <KpiCard title="届かなかった" value={summary?.failed ?? null} unit="通" detail={summaryDetail('確認と連絡が必要')} variant="v6" loading={visibleState === 'loading'} badgeTone="danger" />
+          <KpiCard title="送信対象外" value={summary?.excluded ?? null} unit="通" detail={summaryDetail('つながりや設定を確認')} variant="v6" loading={visibleState === 'loading'} />
         </> : <>
-          <SummaryCard title="お知らせの記録" value={lineAccountId && visibleState === 'ready' ? scopedTotal : null} unit="件" detail={summaryDetail('選択中のLINEアカウント')} variant="v6" loading={visibleState === 'loading'} />
-          <SummaryCard title="LINE API受付済み" value={summary?.accepted ?? null} unit="通" detail={summaryDetail('LINEへの受付まで確認')} variant="v6" loading={visibleState === 'loading'} />
-          <SummaryCard title="送信処理中" value={summary?.pending ?? null} unit="通" detail={summaryDetail('送信台帳に記録済み')} variant="v6" loading={visibleState === 'loading'} />
-          <SummaryCard title="送れなかった" value={summary?.failed ?? null} unit="通" detail={summaryDetail('対応が必要なもの')} variant="v6" loading={visibleState === 'loading'} badgeTone="danger" />
+          <KpiCard title="お知らせの記録" value={lineAccountId && visibleState === 'ready' ? scopedTotal : null} unit="件" detail={summaryDetail('選択中のLINEアカウント')} variant="v6" loading={visibleState === 'loading'} />
+          <KpiCard title="LINE API受付済み" value={summary?.accepted ?? null} unit="通" detail={summaryDetail('LINEへの受付まで確認')} variant="v6" loading={visibleState === 'loading'} />
+          <KpiCard title="送信処理中" value={summary?.pending ?? null} unit="通" detail={summaryDetail('送信台帳に記録済み')} variant="v6" loading={visibleState === 'loading'} />
+          <KpiCard title="送れなかった" value={summary?.failed ?? null} unit="通" detail={summaryDetail('対応が必要なもの')} variant="v6" loading={visibleState === 'loading'} badgeTone="danger" />
         </>}
       </div>
 
-      <div className="rounded-control border border-warning bg-warning-bg px-4 py-3 text-sm leading-6 text-warning">
+      <Notice tone="warn">
         {mode === 'failures'
           ? '発送や返金のお知らせが届いていない場合は、その日のうちに受信箱など別の手だてで連絡してください。確認を終えた記録は、この一覧で対応済みにできます。'
           : '選択中のLINEアカウントと結び付きを確認できたEC通知だけを表示します。個人の既読は取得せず、押されたかどうかは自社の短縮URLだけで数えます。'}
         <span className="mt-1 block text-xs">個人の既読は取得できません。試行回数と次の再試行予定は送信台帳の記録を表示します。</span>
-      </div>
+      </Notice>
 
-      {visibleNotice ? <div className={`rounded-control border px-4 py-3 text-sm ${visibleNotice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{visibleNotice.text}</div> : null}
+      {visibleNotice ? <Notice tone={visibleNotice.tone === 'success' ? 'success' : 'danger'}>{visibleNotice.text}</Notice> : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="min-w-64 flex-1">
@@ -560,7 +559,7 @@ export default function NotificationRunList({
                     ) : null}
                     {(item.attemptHistory?.length ?? 0) > 0 ? (
                       <details className="mt-2 text-xs text-ink-secondary">
-                        <summary className="cursor-pointer font-semibold text-accent">試行履歴を確認</summary>
+                        <summary className="cursor-pointer font-semibold text-action">試行履歴を確認</summary>
                         <ul className="mt-1 space-y-1">
                           {item.attemptHistory!.map((attempt) => (
                             <li key={`${item.id}-${attempt.number}`}>
@@ -572,24 +571,20 @@ export default function NotificationRunList({
                       </details>
                     ) : null}
                     {mode === 'failures' && item.friendId ? (
-                      <Link href={`/chats?friend=${encodeURIComponent(item.friendId)}`} className="mt-1 inline-block whitespace-nowrap text-xs font-semibold text-accent hover:underline">
+                      <Link href={`/chats?friend=${encodeURIComponent(item.friendId)}`} className="mt-1 inline-block whitespace-nowrap text-xs font-semibold text-action hover:underline">
                         受信箱で連絡
                       </Link>
                     ) : null}
                     {mode === 'failures' && item.retryAvailable && canRetry ? (
-                      <Button className="mt-2" disabled={visibleRetryingId !== null} onClick={() => void retry(item)}>
-                        {visibleRetryingId === item.id ? '再試行中' : '送信を再試行'}
+                      <Button className="mt-2" disabled={visibleRetryingId !== null} onClick={() => void retry(item)} busy={visibleRetryingId === item.id} busyLabel="再試行中">送信を再試行する
                       </Button>
                     ) : null}
                     {mode === 'failures' && canResolve ? (
                       <Button
                         className="mt-2"
                         disabled={visibleRetryingId !== null}
-                        onClick={() => void resolve(item, !item.resolved)}
-                      >
-                        {visibleRetryingId === item.id
-                          ? '保存中'
-                          : item.resolved ? '未対応に戻す' : '対応済みにする'}
+                        onClick={() => void resolve(item, !item.resolved)} busy={visibleRetryingId === item.id} busyLabel="保存中">
+                        {item.resolved ? '未対応に戻す' : '対応済みにする'}
                       </Button>
                     ) : null}
                   </Td>
@@ -599,7 +594,7 @@ export default function NotificationRunList({
           </DataTable>
           <div className="flex items-center justify-between gap-4">
             <p className="text-xs text-ink-faint">
-              {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, scopedTotal)}件 / 全{scopedTotal.toLocaleString('ja-JP')}件
+              {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, scopedTotal)}件 / 全{formatNumber(scopedTotal)}件
             </p>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
           </div>

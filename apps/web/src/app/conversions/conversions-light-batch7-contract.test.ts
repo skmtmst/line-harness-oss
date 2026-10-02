@@ -44,8 +44,9 @@ describe('点検・軽 第7便コンバージョン(#585)', () => {
   })
 
   it('空状態の案内はPencil V6実ノードのボタン名と一致する(#513 L8)', () => {
-    expect(PAGE).toContain('右上の「成果地点をつくる」から登録すると、ここに出ます。')
+    expect(PAGE).toContain('「＋ 成果地点を作る」から登録すると、ここに出ます。')
     expect(PAGE).not.toContain('右上の「成果地点を追加」')
+    expect(PAGE).not.toContain('右上の「成果地点をつくる」')
   })
 
   it('読まれない深掘り受け渡しを付けない(#513 L9)', () => {

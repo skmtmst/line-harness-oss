@@ -80,11 +80,13 @@ vi.mock('@/lib/api', () => ({
   ApiError: MockApiError,
   fetchApi: vi.fn(),
   api: {
+    auth: {
+      stepUp: (...args: unknown[]) => fixture.staffStepUp(...args),
+    },
     staff: {
       list: async () => ({ success: true, data: state.members }),
       me: async () => ({ success: true, data: member({ id: 'me-1', name: '管理者', email: 'me@example.test', role: 'admin' }) }),
       update: (...args: unknown[]) => fixture.staffUpdate(...args),
-      stepUp: (...args: unknown[]) => fixture.staffStepUp(...args),
       loginSummary: async () => ({ success: true, data: { loginCount: 0 } }),
       lastLogins: async () => ({ success: true, data: {} }),
     },
@@ -112,11 +114,13 @@ vi.mock('@/lib/api', () => ({
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: StaffPage } = await import('./page')
+const { default: ToastHost, clearToastsForTest } = await import('@/components/shared/toast')
 
 const locationAssign = vi.fn()
 
 async function mount() {
-  await act(async () => { render(<StaffPage />) })
+  // 保存の知らせは Toast（右下・4秒）で出す。置き場所も一緒に描く。
+  await act(async () => { render(<><StaffPage /><ToastHost /></>) })
   await waitFor(() => expect(screen.getByText('対象の人')).toBeTruthy())
   await waitFor(() => expect(screen.getByText('ログイン中の端末')).toBeTruthy())
 }
@@ -135,6 +139,7 @@ beforeEach(() => {
     configurable: true,
     value: { ...window.location, assign: locationAssign },
   })
+  clearToastsForTest()
 })
 afterEach(() => { cleanup() })
 
@@ -181,7 +186,10 @@ describe('ログイン中の端末 (N-427)', () => {
 describe('権限変更の直前再認証 (N-427)', () => {
   async function openEditModal() {
     await mount()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '変更する' })) })
+    // ★V7: 変更するは行に直接出す（「…」メニューはやめた）。
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '変更する' }))
+    })
     await screen.findByText('見せる範囲を決める')
   }
 
@@ -194,7 +202,7 @@ describe('権限変更の直前再認証 (N-427)', () => {
     await openEditModal()
     // 役割を「管理者」へ変えて保存
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '管理者' })) })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /変更を保存/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '✓ 保存する' })) })
 
     // 1回目は grant 無しで止められ、本人確認の窓が立つ
     await screen.findByText('認証アプリで本人確認')
@@ -202,10 +210,11 @@ describe('権限変更の直前再認証 (N-427)', () => {
     expect(fixture.staffUpdate.mock.calls[0][2]).toBeUndefined()
 
     // 6桁コードを入れると grant を取り、同じ保存へ token を付けてやり直す
-    fireEvent.change(screen.getByPlaceholderText('000000'), { target: { value: '123456' } })
+    // 認証コード入力（★V7 xHzFK）の1マス目へまとめて入れると、6マスへ振り分けられる。
+    fireEvent.change(screen.getByLabelText('1桁目'), { target: { value: '123456' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '本人確認して実行' })) })
 
-    expect(fixture.staffStepUp).toHaveBeenCalledWith('123456', 'staff.permissions.change')
+    expect(fixture.staffStepUp).toHaveBeenCalledWith({ method: 'totp', value: '123456', purpose: 'staff.permissions.change' })
     await waitFor(() => expect(fixture.staffUpdate).toHaveBeenCalledTimes(2))
     expect(fixture.staffUpdate.mock.calls[1][2]).toBe('grant-token-1')
     expect(screen.queryByText('認証アプリで本人確認')).toBeNull()
@@ -215,7 +224,7 @@ describe('権限変更の直前再認証 (N-427)', () => {
     fixture.staffUpdate.mockResolvedValue({ success: true, data: member({}) })
     await openEditModal()
     fireEvent.change(screen.getByDisplayValue('member@example.test'), { target: { value: 'new@example.test' } })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /変更を保存/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '✓ 保存する' })) })
     await waitFor(() => expect(fixture.staffUpdate).toHaveBeenCalledTimes(1))
     expect(fixture.staffStepUp).not.toHaveBeenCalled()
     expect(screen.queryByText('認証アプリで本人確認')).toBeNull()

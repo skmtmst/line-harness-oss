@@ -1,13 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { api } from '@/lib/api'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import {
   AccountFormSections,
   emptyAccountFormState,
   type AccountFormState,
 } from './account-form-fields'
 import AccountSetupUrls from './account-setup-urls'
+import Button from '@/components/shared/button'
 
 interface Props {
   accountId: string
@@ -21,6 +24,12 @@ interface Props {
   initialFriendCapacity?: number | null
   initialCapacityWarnAt?: number | null
   initialIconUrl?: string | null
+  /**
+   * R73。詳細画面の「編集する」は `basic`（名前などの登録内容）、
+   * 「差し替える」は `credentials`（Messaging の鍵・トークンの入力欄を
+   * 開いた状態）で開く。どちらも同じ保存口（PATCH/PUT 振り分け）を使う。
+   */
+  initialSection?: 'basic' | 'credentials'
   onClose: () => void
   onSaved: () => void
 }
@@ -42,6 +51,7 @@ export default function AccountEditModal({
   initialFriendCapacity = null,
   initialCapacityWarnAt = null,
   initialIconUrl = null,
+  initialSection = 'basic',
   onClose,
   onSaved,
 }: Props) {
@@ -66,22 +76,26 @@ export default function AccountEditModal({
   )
   const [iconUrl, setIconUrl] = useState(initialIconUrl ?? '')
   const [saving, setSaving] = useState(false)
+  const modalTitleId = useId()
   const [error, setError] = useState('')
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
 
-  // Lock background scroll while modal open. Restore on unmount so navigation
-  // away mid-edit doesn't leave the page in a non-scrollable state.
-  useEffect(() => {
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [])
+  /*
+   * 本人確認（StepUpPrompt）の窓が重なっている間は、Escape を
+   * 最上位の窓だけへ効かせるため外側の閉じる処理を止める。
+   * hook の依存にすると効果の掛け直しでフォーカスが飛ぶので ref 越しに見る。
+   * 背面のスクロール停止もこの hook が担う。
+   */
+  const stepUpOpenRef = useRef(false)
+  stepUpOpenRef.current = stepUp != null
+  const panelRef = useOverlayFocus(true, () => {
+    if (!stepUpOpenRef.current) onClose()
+  }, saving)
 
   const update = (partial: Partial<AccountFormState>) =>
     setState((s) => ({ ...s, ...partial }))
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent, stepUpToken?: string) => {
     e.preventDefault()
     setSaving(true)
     setError('')
@@ -149,15 +163,20 @@ export default function AccountEditModal({
     }
 
     try {
-      const res = await api.lineAccounts.update(accountId, payload)
+      const res = await api.lineAccounts.update(accountId, payload, stepUpToken)
       if (res.success) {
         onSaved()
         onClose()
       } else {
-        setError(res.error || '保存に失敗しました')
+        setError(res.error || '保存に失敗しました。通信を確かめて、もう一度お試しください。')
       }
-    } catch {
-      setError('保存に失敗しました')
+    } catch (caught) {
+      // 接続情報の書き換えは大事な操作。本人確認を求められたら窓を立てる（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'line_account.credentials', action: '接続情報を変更する', retry: (token) => handleSave(e, token) })
+        return
+      }
+      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -165,19 +184,23 @@ export default function AccountEditModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-2 sm:p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim p-2 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="my-2 w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl sm:my-4"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={modalTitleId}
+        className="my-2 w-full max-w-2xl overflow-hidden rounded-control bg-canvas shadow-float sm:my-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
-          <h2 className="text-base font-bold text-gray-900">アカウント編集</h2>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-canvas px-4 py-4 sm:px-6">
+          <h2 id={modalTitleId} className="text-base font-bold text-ink">{initialSection === 'credentials' ? '資格情報を差し替える' : '登録の内容を編集する'}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+            className="text-ink-faint hover:text-ink-secondary text-xl leading-none"
             aria-label="閉じる"
           >
             ×
@@ -186,11 +209,11 @@ export default function AccountEditModal({
 
         <form onSubmit={handleSave} className="space-y-4 p-4 sm:p-6">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">アカウント名</label>
+            <label className="block text-xs font-medium text-ink-secondary mb-1">アカウント名</label>
             <input
               value={state.name}
               onChange={(e) => update({ name: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
               required
             />
           </div>
@@ -201,7 +224,7 @@ export default function AccountEditModal({
             showMessagingRequired={false}
             channelIdEditable={false}
             defaultOpen={{
-              messaging: false,
+              messaging: initialSection === 'credentials',
               // Open Login/LIFF by default in edit mode if they're empty,
               // since "I want to fill these in" is the most common edit
               // intent now that they were previously SQL-only.
@@ -211,7 +234,7 @@ export default function AccountEditModal({
           />
 
           {/* 上限とアイコン。鍵ではないので、この画面に置いても閲覧権限で困らない。 */}
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
+          <div className="border-hairline space-y-3 rounded-control border p-3">
             <p className="text-ink-secondary text-sm font-semibold">友だち数とアイコン</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
@@ -276,30 +299,27 @@ export default function AccountEditModal({
           />
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+            <div className="p-3 bg-danger-bg border border-status-danger-border rounded-mini text-danger text-xs">
               {error}
             </div>
           )}
 
-          <div className="sticky bottom-0 -mx-4 flex justify-end gap-2 border-t border-gray-100 bg-white px-4 pb-1 pt-3 sm:-mx-6 sm:px-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 hover:bg-gray-50"
-            >
+          <div className="sticky bottom-0 -mx-4 flex justify-end gap-2 border-t border-divider-soft bg-canvas px-4 pb-1 pt-3 sm:-mx-6 sm:px-6">
+            <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl h-auto whitespace-normal" type="button" onClick={onClose}>
               キャンセル
-            </button>
+            </Button>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50"
+              className="px-4 py-2 rounded-control text-on-accent text-sm font-medium disabled:opacity-50"
               style={{ backgroundColor: 'var(--color-accent)' }}
             >
-              {saving ? '保存中...' : '保存'}
+              {saving ? '保存中...' : '保存する'}
             </button>
           </div>
         </form>
       </div>
+      {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </div>
   )
 }

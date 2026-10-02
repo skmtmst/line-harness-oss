@@ -74,15 +74,38 @@ describe('GET /api/chats/quick-counts (INBOX-09)', () => {
     seedEmail('mail-unread-old', { age: 2 * 3600_000 });
     seedEmail('mail-resolved', { status: 'resolved' });
 
-    const { status, body } = await counts({ lineAccountId: 'account-a' });
-    expect(status).toBe(200);
-    // lineAccountId を渡すとメール一覧と同じくメールは対象外。
-    expect(body.data).toMatchObject({ all: 3, reply: 2, overdue: 1 });
+    // メールはLINEアカウントに所属しない。アカウント選択中も一覧と同じく数える。
+    const selected = await counts({ lineAccountId: 'account-a' });
+    expect(selected.status).toBe(200);
+    expect(selected.body.data).toMatchObject({ all: 5, reply: 3, overdue: 2 });
+    expect(selected.body.data?.email.all).toBe(2);
 
     const all = await counts();
     expect(all.body.data).toMatchObject({ all: 5, reply: 3, overdue: 2 });
     expect(all.body.data?.line.all).toBe(3);
     expect(all.body.data?.email.all).toBe(2);
+  });
+
+  test('メールを見られない担当者の件数にはメールが入らない', async () => {
+    seedLine('line-unread', {});
+    seedEmail('mail-unread', {});
+    db.raw.prepare(
+      `INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope)
+       VALUES ('scoped-reader', 'scoped-reader', 'staff', 'key-scoped', NULL, 'accounts')`,
+    ).run();
+    db.raw.prepare(
+      'INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at) VALUES (?, ?, ?)',
+    ).run('scoped-reader', 'account-a', new Date(NOW).toISOString());
+
+    // アカウント選択の有無に関わらず、見られない人の件数にメールは入らない。
+    for (const filters of [{}, { lineAccountId: 'account-a' }] as Array<Record<string, string>>) {
+      const { status, body } = await counts(filters, 'scoped-reader');
+      expect(status).toBe(200);
+      expect(body.data).toMatchObject({ all: 1, reply: 1 });
+      expect(body.data?.email.all).toBe(0);
+    }
+    const mailOnly = await counts({ channel: 'email' }, 'scoped-reader');
+    expect(mailOnly.body.data?.all).toBe(0);
   });
 
   test('経路の絞り込みで片側だけを数える', async () => {
@@ -112,6 +135,33 @@ describe('GET /api/chats/quick-counts (INBOX-09)', () => {
     seedLine('boundary', { age: 3600_000 });
     const { body } = await counts();
     expect(body.data).toMatchObject({ all: 2, reply: 2, overdue: 1 });
+  });
+
+  test('R111 遅れて届いた受信は件数と一覧で同じ待ち時間になる', async () => {
+    const seedDelayed = (id: string, eventAgeMs: number, storedAgeMs: number) => {
+      const storedAt = new Date(NOW - storedAgeMs).toISOString();
+      const eventAt = new Date(NOW - eventAgeMs).toISOString();
+      db.raw.prepare('INSERT INTO friends(id,line_user_id,display_name,line_account_id) VALUES (?,?,?,?)')
+        .run(id, id, id, 'account-a');
+      db.raw.prepare(`INSERT INTO chats(id,friend_id,operator_id,status,last_message_at,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?)`).run(id, id, null, 'unread', storedAt, storedAt, storedAt);
+      db.raw.prepare(`INSERT INTO messages_log(id,friend_id,direction,message_type,content,created_at,line_event_at)
+        VALUES (?,?,'incoming','text',?,?,?)`).run(id, id, `msg-${id}`, storedAt, eventAt);
+    };
+    // 8時の受信が10時に保存 → 10分後の時点で待ち2時間10分。件数と一覧の
+    // どちらでも1時間以上待ちになる（受信時刻を正とする）。
+    seedDelayed('delayed', 2 * 3600_000 + 10 * 60_000, 10 * 60_000);
+    // 逆（保存が古く受信が新しい）はどちらでも1時間以上にしない。
+    seedDelayed('backfill', 10 * 60_000, 2 * 3600_000);
+
+    const { body } = await counts({ lineAccountId: 'account-a' });
+    expect(body.data).toMatchObject({ all: 2, reply: 2, overdue: 1 });
+
+    const listRes = await app().request(
+      '/api/chats?quickFilter=overdue&lineAccountId=account-a&limit=200', {}, { DB: db.db });
+    expect(listRes.status).toBe(200);
+    const listBody = await listRes.json() as { success: boolean; data: Array<{ friendId: string }> };
+    expect(listBody.data.map((row) => row.friendId)).toEqual(['delayed']);
   });
 
   test('チャネル値が不正なら400、権限外アカウントなら404', async () => {

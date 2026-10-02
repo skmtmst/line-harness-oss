@@ -1,9 +1,10 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
-import Link from 'next/link'
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 import AutomationDraftEditor from '@/components/automations/automation-draft-editor'
+import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 /*
@@ -19,33 +20,26 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 */
 function AutomationDraftPageInner() {
   usePageTitle('見本から作った下書き')
-  const [draftId, setDraftId] = useState<string | null | undefined>(undefined)
-
-  useEffect(() => {
-    setDraftId(new URLSearchParams(window.location.search).get('id'))
-  }, [])
-
-  /* 読み終えるまでは何も描かない。一瞬だけ「ありません」が見えるのを避ける。 */
-  if (draftId === undefined) return null
+  /*
+   * R531: 対象IDはURLから反応的に読む。開いたままIDがA→Bへ変わったら、
+   * 前の下書きの表示と保存先を残さない。`key` で編集器ごと作り直すので、
+   * 古い入力・版・保存先がBへ混ざらない。
+   */
+  const draftId = useSearchParams().get('id')
 
   if (!draftId) {
     return (
-      <div className="rounded-card border-hairline bg-canvas border p-8 text-center">
-        <p className="text-ink text-sm font-bold">どの下書きかが指定されていません</p>
-        <p className="text-ink-secondary mt-2 text-xs leading-5">
-          見本の一覧から選び直してください。下書きは消えていません。
-        </p>
-        <Link
-          href="/automations?tab=templates"
-          className="text-accent mt-4 inline-block text-sm font-medium underline"
-        >
-          見本の一覧へ
-        </Link>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="開く下書きが指定されていません"
+        description="見本の一覧から選び直してください。下書きは消えていません。"
+        backHref="/automations?tab=templates"
+        backLabel="見本の一覧へ戻る"
+      />
     )
   }
 
-  return <AutomationDraftEditor draftId={draftId} />
+  return <AutomationDraftEditor key={draftId} draftId={draftId} />
 }
 
 export default function AutomationDraftPage() {

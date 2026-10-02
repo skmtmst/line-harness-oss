@@ -13,6 +13,8 @@
  */
 
 import { useState } from 'react'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Button from '@/components/shared/button'
 
 export type MessageKind = 'location' | 'video' | 'audio' | 'sticker'
 
@@ -33,48 +35,123 @@ export function emptyMessageKindState(): MessageKindState {
 }
 
 /**
+ * 緯度・経度の取れる範囲。地図上に無い数字を「入力済み」にしない
+ * （監査 R210）。Worker 側の検査とそろえている。
+ */
+export const LOCATION_LATITUDE_RANGE = { min: -90, max: 90 } as const
+export const LOCATION_LONGITUDE_RANGE = { min: -180, max: 180 } as const
+
+/**
+ * 位置情報の緯度・経度が範囲外のとき、利用者への直し方を返す。
+ * 空文字なら問題なし（「まだ書けていない」は呼ぶ側の文言に任せる）。
+ */
+export function locationRangeError(state: MessageKindState['location']): string {
+  if (state.latitude.trim() === '' || state.longitude.trim() === '') return ''
+  const lat = Number(state.latitude)
+  const lng = Number(state.longitude)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return ''
+  if (lat < LOCATION_LATITUDE_RANGE.min || lat > LOCATION_LATITUDE_RANGE.max) {
+    return `緯度は${LOCATION_LATITUDE_RANGE.min}〜${LOCATION_LATITUDE_RANGE.max}で入力してください`
+  }
+  if (lng < LOCATION_LONGITUDE_RANGE.min || lng > LOCATION_LONGITUDE_RANGE.max) {
+    return `経度は${LOCATION_LONGITUDE_RANGE.min}〜${LOCATION_LONGITUDE_RANGE.max}で入力してください`
+  }
+  return ''
+}
+
+/**
+ * まだ送れる形になっていない理由。送れるなら null。
+ *
+ * R234: 空っぽだけでなく「入っているが送れない」もここで止める。
+ * 形式だけの検査（https・番号の形・秒数・緯度経度の範囲）にし、実在の確認
+ * （番号の組み合わせが本当に送れるか・URLの先に音声があるか）はしない。
+ * 実在は送る直前の検査と LINE 側の応答に任せる。
+ */
+export function messageKindProblem(kind: MessageKind, state: MessageKindState): string | null {
+  switch (kind) {
+    case 'location': {
+      const v = state.location
+      if (v.latitude.trim() === '' || v.longitude.trim() === '') return '位置情報の緯度と経度を入力してください'
+      const lat = Number(v.latitude)
+      const lng = Number(v.longitude)
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return '位置情報の緯度と経度を数で入力してください'
+      // R210: 地図上に無い数字も完成扱いにしない。文言は locationRangeError と同じ。
+      return locationRangeError(v) || null
+    }
+    case 'video': {
+      const v = state.video
+      if (!v.originalContentUrl.trim() || !v.previewImageUrl.trim()) return '動画のURLとサムネイル画像のURLを入力してください'
+      return null
+    }
+    case 'audio': {
+      const v = state.audio
+      const url = v.originalContentUrl.trim()
+      // LINE は https で公開された音声しか受けない。not-a-url のような値は
+      // 保存できても送信で断られるので、書いた時点で止める。
+      if (!url) return '音声のURLを入力してください'
+      if (!url.toLowerCase().startsWith('https://')) return '音声のURLは https:// から始めてください'
+      const duration = Number(v.duration)
+      if (v.duration.trim() === '' || !Number.isFinite(duration) || duration <= 0) {
+        return '音声の長さ（秒）を 0 より大きい数で入力してください'
+      }
+      return null
+    }
+    case 'sticker': {
+      const v = state.sticker
+      const packageId = v.packageId.trim()
+      const stickerId = v.stickerId.trim()
+      if (!packageId || !stickerId) return 'スタンプを選んでください'
+      // LINE の番号はどちらも数字だけ。not-a-package のような文字は
+      // 保存できても送信で断られるので、書いた時点で止める。
+      if (!/^\d+$/.test(packageId) || !/^\d+$/.test(stickerId)) {
+        return 'スタンプの番号が正しくありません。一覧から選び直してください'
+      }
+      return null
+    }
+  }
+}
+
+/**
  * 入力欄の値を、配信側が読む形の JSON にする。
  *
- * 足りないものがあれば null。呼ぶ側は「まだ書けていない」として扱う。
+ * 足りない・送れないものがあれば null。呼ぶ側は「まだ書けていない」として扱う。
+ * 判定は messageKindProblem と同じ（別々に書くと、帯は済みなのに保存で
+ * 断られる形になる。broadcast-form.tsx の bubblesError と同じ考え）。
+ * 範囲外の緯度・経度も null（R210。地図上に無い数字を完成扱いにしない）。
  */
 export function serializeMessageKind(kind: MessageKind, state: MessageKindState): string | null {
   switch (kind) {
     case 'location': {
+      if (messageKindProblem(kind, state)) return null
       const v = state.location
-      const lat = Number(v.latitude)
-      const lng = Number(v.longitude)
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
-      if (v.latitude.trim() === '' || v.longitude.trim() === '') return null
       return JSON.stringify({
         title: v.title.trim() || '場所',
         address: v.address.trim(),
-        latitude: lat,
-        longitude: lng,
+        latitude: Number(v.latitude),
+        longitude: Number(v.longitude),
       })
     }
     case 'video': {
+      if (messageKindProblem(kind, state)) return null
       const v = state.video
       // LINE はサムネイルも必須。片方だけでは送れない。
-      if (!v.originalContentUrl.trim() || !v.previewImageUrl.trim()) return null
       return JSON.stringify({
         originalContentUrl: v.originalContentUrl.trim(),
         previewImageUrl: v.previewImageUrl.trim(),
       })
     }
     case 'audio': {
+      if (messageKindProblem(kind, state)) return null
       const v = state.audio
-      const duration = Number(v.duration)
-      if (!v.originalContentUrl.trim()) return null
-      if (!Number.isFinite(duration) || duration <= 0) return null
       return JSON.stringify({
         originalContentUrl: v.originalContentUrl.trim(),
         // 画面は秒で聞き、LINEはミリ秒で受ける。
-        duration: Math.round(duration * 1000),
+        duration: Math.round(Number(v.duration) * 1000),
       })
     }
     case 'sticker': {
+      if (messageKindProblem(kind, state)) return null
       const v = state.sticker
-      if (!v.packageId.trim() || !v.stickerId.trim()) return null
       return JSON.stringify({ packageId: v.packageId.trim(), stickerId: v.stickerId.trim() })
     }
   }
@@ -263,6 +340,7 @@ export default function MessageKindFields({ kind, value, onChange }: MessageKind
         </div>
         <p className={hintClass}>
           緯度と経度は、Googleマップで場所を右クリックすると出る数字です（左が緯度、右が経度）。
+          緯度は-90〜90、経度は-180〜180の範囲で入力してください。
         </p>
       </div>
     )
@@ -355,42 +433,34 @@ export default function MessageKindFields({ kind, value, onChange }: MessageKind
         LINE側の決まりで送れません。
       </p>
 
-      <div className="flex flex-wrap gap-4">
+      <RadioCardGroup legend="スタンプの決め方" className="flex flex-wrap gap-4">
         {(
           [
             { value: 'pick' as const, label: '一覧から選ぶ' },
             { value: 'manual' as const, label: '番号を直接入れる' },
           ]
         ).map((o) => (
-          <label key={o.value} className="text-ink flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name="stickerMode"
-              checked={stickerMode === o.value}
-              onChange={() => setStickerMode(o.value)}
-            />
-            {o.label}
-          </label>
+          <RadioCard
+            key={o.value}
+            name="stickerMode"
+            value={o.value}
+            checked={stickerMode === o.value}
+            onChange={() => setStickerMode(o.value)}
+            title={o.label}
+          />
         ))}
-      </div>
+      </RadioCardGroup>
 
       {stickerMode === 'pick' ? (
         <div className="flex flex-wrap gap-2">
           {BASIC_STICKERS.map((s) => {
             const on = s.packageId === v.packageId && s.stickerId === v.stickerId
             return (
-              <button
-                key={`${s.packageId}-${s.stickerId}`}
-                type="button"
-                onClick={() => set({ packageId: s.packageId, stickerId: s.stickerId })}
-                title={s.label}
-                aria-pressed={on}
-                className={`rounded-card border p-1.5 transition-colors ${
+              <Button variant="secondary" className={(`rounded-card border p-1.5 transition-colors ${
                   on ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
-                }`}
-              >
+                }`) + ' h-auto whitespace-normal'} key={`${s.packageId}-${s.stickerId}`} type="button" onClick={() => set({ packageId: s.packageId, stickerId: s.stickerId })} title={s.label} aria-pressed={on}>
                 <StickerThumb stickerId={s.stickerId} label={s.label} />
-              </button>
+              </Button>
             )
           })}
         </div>

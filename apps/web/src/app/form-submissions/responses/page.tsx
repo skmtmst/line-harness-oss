@@ -6,13 +6,17 @@ import { useSearchParams } from 'next/navigation'
 import type { FormLayout } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import TargetMissing from '@/components/shared/target-missing'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { fetchApi } from '@/lib/api'
+import { fetchApi, ApiError } from '@/lib/api'
+import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
 import { csvCell } from '@/lib/presentation'
+import ListRange from '@/components/ui/list-range'
 import {
   completedDestinationWrites,
   destinationWriteText,
@@ -23,6 +27,7 @@ import {
   type FormSubmissionSummary,
   type SubmissionPostActions,
 } from './response-summary'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type Submission = {
   id: string
@@ -76,7 +81,7 @@ function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labe
     lines.push([
       row.id,
       row.friendName ?? '不明',
-      new Date(row.createdAt).toLocaleString('ja-JP'),
+      formatDateTime(row.createdAt),
       ...fieldKeys.map((key) => data[key]),
     ].map(csvCell).join(','))
   }
@@ -86,6 +91,24 @@ function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labe
   anchor.download = filename
   anchor.click()
   URL.revokeObjectURL(url)
+}
+
+/*
+ * M004：後処理の再実行の失敗理由。状態の言い分けは共通部品に任せ、
+ * 画面で状態を見分けて文言を書き分けない。ただし口が返した日本語の
+ * 理由（記録なし等）はそのまま出す。内部文・英語文は出さない。
+ */
+function retryEffectsFailureText(error: unknown): string {
+  if (error instanceof ApiError) {
+    return describeApiFailure(error, '後処理の再実行', {
+      forbidden: '後処理を再実行する権限がありません。選んでいるアカウントと権限を確認してください。',
+    })
+  }
+  if (error instanceof Error && error.message && error.message !== 'retry_failed'
+    && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) {
+    return error.message
+  }
+  return describeApiFailure(error, '後処理の再実行')
 }
 
 function FormResponsesInner() {
@@ -100,6 +123,10 @@ function FormResponsesInner() {
   const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [formMissing, setFormMissing] = useState(false)
+  /** 403で権限不足のとき。再試行は出さない（M005）。 */
+  const [formForbidden, setFormForbidden] = useState(false)
   const [query, setQuery] = useState('')
   const [view, setView] = useState<'rows' | 'summary'>('rows')
   const [selected, setSelected] = useState<Submission | null>(null)
@@ -124,6 +151,8 @@ function FormResponsesInner() {
     const request = ++loadRequest.current
     setLoading(true)
     setError('')
+    setFormMissing(false)
+    setFormForbidden(false)
     try {
       const account = `account_id=${encodeURIComponent(selectedAccountId)}`
       const needle = (searchText ?? queryRef.current).trim()
@@ -143,9 +172,16 @@ function FormResponsesInner() {
       setPage(responseResult.data.page)
       setPageSize(responseResult.data.limit)
       setSelected(null)
-    } catch {
+    } catch (caught) {
       if (request !== loadRequest.current) return
-      setError('集まった回答を読み込めませんでした。')
+      if (caught instanceof ApiError && caught.status === 404) {
+        setFormMissing(true)
+      } else if (classifyApiFailure(caught) === 'forbidden') {
+        // M005：権限不足は通信障害ではない。再試行を出さず理由を示す。
+        setFormForbidden(true)
+      } else {
+        setError('集まった回答を読み込めませんでした。')
+      }
       setItems([])
       setSummary(null)
       setTotal(null)
@@ -210,7 +246,7 @@ function FormResponsesInner() {
   const exportAll = async () => {
     if (!selectedAccountId || !form || exporting) return
     if (total !== null && total > MAX_EXPORT_ROWS) {
-      setExportError(`回答が${total.toLocaleString('ja-JP')}件あり、一度に書き出せる上限（${MAX_EXPORT_ROWS.toLocaleString('ja-JP')}件）を超えています。`)
+      setExportError(`回答が${formatNumber(total)}件あり、一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)}件）を超えています。`)
       return
     }
     setExporting(true)
@@ -231,7 +267,7 @@ function FormResponsesInner() {
         expected = result.data.total
         if (expected > MAX_EXPORT_ROWS) throw new Error('export_too_many')
         all.push(...result.data.items.map(normalizedSubmission))
-        setExportProgress(`${Math.min(all.length, expected).toLocaleString('ja-JP')} / ${expected.toLocaleString('ja-JP')}件を取得中`)
+        setExportProgress(`${formatNumber(Math.min(all.length, expected))} / ${formatNumber(expected)}件を取得中`)
         currentPage += 1
       } while (all.length < expected && currentPage <= 1001)
       if (all.length < expected) throw new Error('export_incomplete')
@@ -240,7 +276,7 @@ function FormResponsesInner() {
     } catch (error) {
       setExportError(
         error instanceof Error && error.message === 'export_too_many'
-          ? `回答が一度に書き出せる上限（${MAX_EXPORT_ROWS.toLocaleString('ja-JP')}件）を超えています。`
+          ? `回答が一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)}件）を超えています。`
           : 'CSVを書き出せませんでした。もう一度お試しください。',
       )
     } finally {
@@ -270,11 +306,7 @@ function FormResponsesInner() {
       setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)))
       setSelected(updated)
     } catch (error) {
-      setRetryError(
-        error instanceof Error && error.message && error.message !== 'retry_failed'
-          ? error.message
-          : '後処理の再実行に失敗しました。もう一度お試しください。',
-      )
+      setRetryError(retryEffectsFailureText(error))
     } finally {
       setRetrying(false)
     }
@@ -285,10 +317,54 @@ function FormResponsesInner() {
     U097: 対象未指定・見つからない画面には、文で案内するだけでなく
     一覧へ戻る操作を置く。
   */
-  if (!formId) return <ListState kind="empty" title="回答フォームが指定されていません" description="一覧から回答を見るフォームを選び直してください。" action={<Button href="/form-submissions">回答フォーム一覧へ戻る</Button>} />
+  if (!formId) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="見る回答フォームが指定されていません"
+        description="一覧から回答を見るフォームを選び直してください。"
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" />
-  if (error) return <ListState kind="error" title={error} description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load(page, pageSize)} />
-  if (!form) return <ListState kind="empty" title="回答フォームが見つかりません" description="削除されたか、リンクが古くなっています。一覧から選び直してください。" action={<Button href="/form-submissions">回答フォーム一覧へ戻る</Button>} />
+  /*
+   * M005：権限不足は通信障害ではない。再試行ボタンは出さず、
+   * アカウントの選び直しと管理者への確認を案内する。
+   */
+  if (formForbidden) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="集まった回答を見る権限がありません"
+        description="選んでいるアカウントでは見られません。アカウントを選び直すか、管理者に権限を確認してください。"
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
+  if (formMissing || (!error && !form)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この回答フォームは見つかりません"
+        description="削除されたか、リンクが古くなっています。一覧から選び直してください。"
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
+  if (error || !form) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="集まった回答を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load(page, pageSize)}
+      />
+    )
+  }
 
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
   const destinationWriteCount = completedDestinationWrites(summary)
@@ -297,8 +373,8 @@ function FormResponsesInner() {
   const nextVisitCount = nextVisitPeople(summary)
 
   return (
-    <div data-design-node="v9tYhl">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div data-design-node="v9tYhl" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs">
           <Link href="/form-submissions" className="text-action hover:underline">回答フォーム</Link>
           <span className="mx-2">/</span>
@@ -308,44 +384,43 @@ function FormResponsesInner() {
         </nav>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => document.getElementById('form-response-filter')?.focus()}>絞り込む</Button>
-          <Button onClick={() => void exportAll()} disabled={exporting || total === 0}>
-            {exporting ? (exportProgress || 'CSVを準備しています') : 'CSVで書き出す'}
+          <Button onClick={() => void exportAll()} disabled={exporting || total === 0} busy={exporting} busyLabel={(exportProgress || 'CSVを準備しています')}>CSVで書き出す
           </Button>
           <Button href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} variant="primary">フォームを編集</Button>
         </div>
       </div>
 
-      <div className="border-hairline mb-4 flex items-center gap-6 border-b">
-        <button type="button" onClick={() => setView('rows')} className={`border-b-2 px-1 py-3 text-sm font-semibold ${view === 'rows' ? 'border-accent-deep text-accent-deep' : 'border-transparent text-ink-faint'}`}>1件ずつ見る　{total === null ? '—' : `${total.toLocaleString('ja-JP')}件`}</button>
+      <div className="border-hairline flex items-center gap-6 border-b">
+        <button type="button" onClick={() => setView('rows')} className={`border-b-2 px-1 py-3 text-sm font-semibold ${view === 'rows' ? 'border-accent-deep text-accent-deep' : 'border-transparent text-ink-faint'}`}>1件ずつ見る　{total === null ? '—' : `${formatNumber(total)}件`}</button>
         <button type="button" onClick={() => setView('summary')} className={`border-b-2 px-1 py-3 text-sm font-semibold ${view === 'summary' ? 'border-accent-deep text-accent-deep' : 'border-transparent text-ink-faint'}`}>まとめて見る</button>
       </div>
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="回答" value={total === null ? '—' : `${total.toLocaleString('ja-JP')}件`} note="現在保存されている回答" />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="回答" value={total === null ? '—' : `${formatNumber(total)}件`} note="現在保存されている回答" />
         <Kpi
           label="開いた人のうち答えた割合"
-          value={summary?.completionRate == null ? '—' : `${summary.completionRate.toLocaleString('ja-JP')}%`}
-          note={summary ? `${summary.startedUnique.toLocaleString('ja-JP')}人が開いて、${summary.submitted.toLocaleString('ja-JP')}人が答えた` : '開始数の集計を取得できませんでした'}
+          value={summary?.completionRate == null ? '—' : `${formatNumber(summary.completionRate)}%`}
+          note={summary ? `${formatNumber(summary.startedUnique)}人が開いて、${formatNumber(summary.submitted)}人が答えた` : '開始数の集計を取得できませんでした'}
         />
         <Kpi
           label="友だち情報欄への書き込み"
-          value={destinationWriteCount == null ? '—' : `${destinationWriteCount.toLocaleString('ja-JP')}件`}
-          note={failedDestinationWrites == null ? '書き込み結果を取得できませんでした' : failedDestinationWrites > 0 ? `${failedDestinationWrites.toLocaleString('ja-JP')}件は欄が消えていて書けていません` : 'すべて書き込み済みです'}
+          value={destinationWriteCount == null ? '—' : `${formatNumber(destinationWriteCount)}件`}
+          note={failedDestinationWrites == null ? '書き込み結果を取得できませんでした' : failedDestinationWrites > 0 ? `${formatNumber(failedDestinationWrites)}件は欄が消えていて書けていません` : 'すべて書き込み済みです'}
         />
         <Kpi
           label="次回の予定が入った人"
-          value={nextVisitCount == null ? '—' : `${nextVisitCount.toLocaleString('ja-JP')}人`}
+          value={nextVisitCount == null ? '—' : `${formatNumber(nextVisitCount)}人`}
           note={nextVisitSummary ? `${nextVisitSummary.label}を全回答から集計` : summary ? '日付の回答を全回答から集計' : '日付項目の集計を取得できませんでした'}
         />
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <label className="text-ink-secondary text-xs" htmlFor="form-response-filter">名前・回答内容で検索（全件から探す）</label>
         <input id="form-response-filter" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・回答内容で検索" className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm sm:w-72" />
       </div>
-      {exportError && <p className="text-danger mb-3 text-sm">{exportError}</p>}
+      {exportError && <p className="text-danger text-sm">{exportError}</p>}
       {exporting && exportProgress && (
-        <p className="text-ink-secondary mb-3 text-sm" role="status">{exportProgress}</p>
+        <p className="text-ink-secondary text-sm" role="status">{exportProgress}</p>
       )}
 
       {total === 0 && !query.trim() ? (
@@ -373,7 +448,7 @@ function FormResponsesInner() {
                 {shown.map((item) => (
                   <tr key={item.id} className="hover:bg-canvas-sunken cursor-pointer" onClick={() => setSelected(item)}>
                     <td className="px-3 py-3"><p className="text-ink truncate text-sm font-semibold" title={item.friendName ?? '不明'}>{item.friendName ?? '不明'}</p><p className="text-ink-faint mt-1 truncate text-xs" title={valueText(Object.values(item.data as Record<string, unknown>)[0])}>{valueText(Object.values(item.data as Record<string, unknown>)[0])}</p>{postActionsNeedRetry(item.postActions) && <p className="text-danger mt-1 text-xs">後処理に未完があります</p>}</td>
-                    <td className="text-ink-secondary px-3 py-3 text-xs whitespace-nowrap">{new Date(item.createdAt).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className="text-ink-secondary px-3 py-3 text-xs whitespace-nowrap">{formatDateTime(item.createdAt)}</td>
                     {fieldKeys.slice(0, 3).map((key) => <td key={key} className="text-ink-secondary truncate px-3 py-3 text-sm" title={valueText((item.data as Record<string, unknown>)[key])}>{valueText((item.data as Record<string, unknown>)[key])}</td>)}
                     <td className="text-ink-faint px-3 py-3 text-center">•••</td>
                   </tr>
@@ -382,7 +457,7 @@ function FormResponsesInner() {
             </table>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-ink-faint text-xs">{total === null ? '—' : `${total.toLocaleString('ja-JP')}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total)}件を表示`}</p>
+            <p>{total === null ? '—' : <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />}</p>
             <div className="flex items-center gap-2">
               <Select aria-label="回答の表示件数" size="page-size" value={String(pageSize)} options={[10, 20, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))} onChange={(value) => void load(1, Number(value))} />
               <Pagination page={page} pageCount={pageCount} disabled={loading} ariaLabel="回答一覧のページ送り" onPageChange={(next) => void load(next, pageSize)} />
@@ -416,7 +491,7 @@ export default function FormResponsesPage() {
 }
 
 function Kpi({ label, value, note }: { label: string; value: string; note: string }) {
-  return <section className="bg-canvas rounded-card border-hairline border p-4"><p className="text-ink-faint text-xs font-medium">{label}</p><p className="text-ink mt-2 text-2xl font-bold tabular-nums">{value}</p><p className="text-ink-faint mt-1 text-xs">{note}</p></section>
+  return <section className="bg-canvas rounded-card border-hairline border p-4"><p className="text-ink-faint text-xs font-medium">{label}</p><p className="text-ink mt-2 text-2xl font-semibold tabular-nums">{value}</p><p className="text-ink-faint mt-1 text-xs">{note}</p></section>
 }
 
 function ResponseDetail({
@@ -436,14 +511,17 @@ function ResponseDetail({
   retryError: string
   onRetryPostActions: () => void
 }) {
+  // 詳細の引き出しも窓と同じ約束: Escapeで閉じる・Tabは中だけ・
+  // 閉じたら起点へ戻す。背景の閉じるボタンは循環に入れないよう aside 側へ。
+  const panelRef = useOverlayFocus(true, onClose)
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <button type="button" className="bg-ink/30 absolute inset-0" onClick={onClose} aria-label="回答詳細を閉じる" />
-      <aside className="bg-canvas relative h-full w-full max-w-md overflow-y-auto p-5 shadow-xl">
+      <aside ref={panelRef} role="dialog" aria-modal="true" aria-label="回答詳細" className="bg-canvas relative h-full w-full max-w-md overflow-y-auto p-5 shadow-float">
         <div className="border-hairline flex items-center justify-between border-b pb-4"><h2 className="text-ink text-base font-bold">回答詳細</h2><button type="button" onClick={onClose} className="text-ink-faint text-xl" aria-label="閉じる">×</button></div>
         <dl className="mt-5 space-y-4">
           <Detail label="答えた人" value={item.friendName ?? '不明'} />
-          <Detail label="答えた日時" value={new Date(item.createdAt).toLocaleString('ja-JP')} />
+          <Detail label="答えた日時" value={formatDateTime(item.createdAt)} />
           <Detail label="フォームの版" value="—（回答単位の版は未取得）" />
           {fieldKeys.map((key) => <Detail key={key} label={labels[key] ?? key} value={valueText((item.data as Record<string, unknown>)[key])} />)}
           <Detail label="友だち情報欄への書き込み" value={destinationWriteText(item.destinationWrite)} />
@@ -452,8 +530,7 @@ function ResponseDetail({
             <dd className="text-ink mt-1 break-words text-sm whitespace-pre-wrap">{postActionsText(item.postActions)}</dd>
             {postActionsNeedRetry(item.postActions) && (
               <div className="mt-2">
-                <Button onClick={onRetryPostActions} disabled={retrying}>
-                  {retrying ? '再実行しています' : '未完の工程だけ再実行する'}
+                <Button onClick={onRetryPostActions} disabled={retrying} busy={retrying} busyLabel="再実行しています">未完の工程だけ再実行する
                 </Button>
                 {retryError && <p className="text-danger mt-2 text-xs">{retryError}</p>}
               </div>

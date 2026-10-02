@@ -95,6 +95,9 @@ function makeMockLineClient(opts: { currentDefault?: string | null } = {}): Mock
       calls.push('create');
       return { richMenuId: `lm-${calls.filter((c) => c === 'create').length}` };
     }),
+    validateRichMenu: vi.fn(async () => {
+      calls.push('validate');
+    }),
     listRichMenus: vi.fn(async () => []),
     uploadRichMenuImage: vi.fn(async () => {
       calls.push('upload');
@@ -264,6 +267,20 @@ describe('validateRichMenuGroupForPublish', () => {
 
     it('1000文字ちょうどは許可する', () => {
       accepts(groupWith('uri', { uri: `https://x.example/${'a'.repeat(981)}` }));
+    });
+
+    it('URLではない文字列は、どの面かを伝えて拒否する', () => {
+      rejects(groupWith('uri', { uri: 'not-a-url' }), 'URLの形が正しくありません');
+      rejects(groupWith('uri', { uri: 'not-a-url' }), '「ボタン」');
+    });
+
+    it('LINEのuriアクションが通せない scheme は拒否する', () => {
+      rejects(groupWith('uri', { uri: 'javascript:alert(1)' }), 'https://・http://・tel:・mailto:');
+    });
+
+    it('https:// 以外に LINE が通す tel: と mailto: は許可する', () => {
+      accepts(groupWith('uri', { uri: 'tel:0312345678' }));
+      accepts(groupWith('uri', { uri: 'mailto:info@example.com' }));
     });
   });
 
@@ -759,10 +776,11 @@ describe('unpublishRichMenuGroup', () => {
     expect(line.calls).not.toContain('clear-default');
   });
 
-  it('richmenuId なし page でも alias 削除は行う (404 OK)', async () => {
+  it('richmenuId なし page でも alias 削除は行う (404 は成功扱い)', async () => {
     const line = makeMockLineClient();
+    // 実クライアントは 404 を飲む（既に消えている）。ここでも解決させる。
     line.deleteRichMenuAlias = vi.fn(async () => {
-      throw new Error('404 Not Found');
+      line.calls.push('delete-alias');
     });
     const result = await unpublishRichMenuGroup(
       {
@@ -773,8 +791,61 @@ describe('unpublishRichMenuGroup', () => {
       },
       line,
     );
-    // delete-alias は throw されたので warnings に記録される
-    expect(result.warnings.some((w) => w.includes('delete alias'))).toBe(true);
+    expect(line.calls).toContain('delete-alias');
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('M953: alias 削除の失敗は throw（成功扱いにしない）', async () => {
+    const line = makeMockLineClient();
+    line.deleteRichMenuAlias = vi.fn(async () => {
+      throw new Error('LINE deleteRichMenuAlias failed: 500 fail');
+    });
+    await expect(unpublishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+        pages: [
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: null, imageContentType: null, lineRichMenuId: 'lm-1', areas: [VALID_AREA] },
+        ],
+      },
+      line,
+    )).rejects.toThrow('LINE上のメニューの削除に失敗しました');
+  });
+
+  it('M953: richmenu 削除の一部失敗でも throw（残存を成功にしない）', async () => {
+    const line = makeMockLineClient();
+    line.deleteRichMenu = vi.fn(async () => {
+      line.calls.push('delete-old');
+      throw new Error('LINE deleteRichMenu failed: 500 fail');
+    });
+    await expect(unpublishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+        pages: [
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: null, imageContentType: null, lineRichMenuId: 'lm-1', areas: [VALID_AREA] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: null, imageContentType: null, lineRichMenuId: 'lm-2', areas: [VALID_AREA] },
+        ],
+      },
+      line,
+    )).rejects.toThrow('LINE上に残っています');
+    // 止めずに最後まで試す（もう片方も消しに行く）。
+    expect(line.calls.filter((c) => c === 'delete-old')).toHaveLength(2);
+  });
+
+  it('M953: 標準表示の解除の失敗だけは警告に留める（取り下げ自体は成功）', async () => {
+    const line = makeMockLineClient({ currentDefault: 'lm-mine' });
+    line.clearDefaultRichMenu = vi.fn(async () => {
+      throw new Error('LINE clearDefaultRichMenu failed: 500 fail');
+    });
+    const result = await unpublishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+        pages: [
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: null, imageContentType: null, lineRichMenuId: 'lm-mine', areas: [VALID_AREA] },
+        ],
+      },
+      line,
+    );
+    expect(result.warnings.some((w) => w.includes('default lookup/clear'))).toBe(true);
   });
 });
 
@@ -1103,6 +1174,48 @@ describe('intent の入力チェック', () => {
         r2,
       ),
     ).rejects.toThrowError(/送るテンプレートを選んでください/);
+  });
+
+  it('「URLを開く」に URL でない文字列なら、LINE を呼ぶ前に止める', async () => {
+    const line = makeMockLineClient();
+    await expect(
+      publishRichMenuGroup(
+        groupWithAreas([
+          {
+            id: 'a1',
+            bounds: BOUNDS,
+            actionType: 'uri',
+            actionData: { uri: 'not-a-url' },
+            intent: 'url',
+            label: '予約ページ',
+          },
+        ]),
+        line,
+        r2,
+      ),
+    ).rejects.toThrowError(/「予約ページ」: URLの形が正しくありません/);
+    expect(line.calls).toEqual([]);
+  });
+
+  it('計測リンクを選んだ面は、生成済みURLなので手入力URIの検査を飛ばす', async () => {
+    const line = makeMockLineClient();
+    const result = await publishRichMenuGroup(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'uri',
+          actionData: {},
+          intent: 'url',
+          trackedLinkUrl: 'https://l.example.com/r/abc',
+          label: '予約ページ',
+        },
+      ]),
+      line,
+      r2,
+    );
+    expect(result.pages).toEqual([{ pageId: 'p1', newRichMenuId: 'lm-1' }]);
+    expect(line.calls[0]).toBe('create');
   });
 });
 

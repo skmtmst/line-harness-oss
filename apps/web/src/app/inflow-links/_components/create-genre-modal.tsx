@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { X } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
+import Notice from '@/components/shared/notice'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import type { EntryRouteGenre } from '@line-crm/shared'
 
 export default function GenreModal({
@@ -17,6 +19,9 @@ export default function GenreModal({
   const [name, setName] = useState(genre?.name ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const titleId = useId()
+  // 保存の途中でEscape・背景クリックに負けて窓だけ消えないようにする。
+  const panelRef = useOverlayFocus(true, onClose, submitting)
 
   const save = async () => {
     const normalized = name.trim()
@@ -42,21 +47,21 @@ export default function GenreModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-scrim p-4">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-card bg-canvas p-6 shadow-overlay">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-bold text-ink">
+          <h2 id={titleId} className="text-lg font-bold text-ink">
             {genre ? 'ジャンル名を編集' : '新しいジャンル'}
           </h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-ink-secondary">
           協力会社名や媒体グループなど、リンクをまとめる名前を入力してください。
         </p>
-        {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-        <label className="mt-5 block text-sm font-medium text-gray-700" htmlFor="new-referral-genre">
+        {error && <Notice tone="danger" message={error} className="mt-4" />}
+        <label className="mt-5 block text-sm font-medium text-ink" htmlFor="new-referral-genre">
           ジャンル名
         </label>
         <input
@@ -69,18 +74,18 @@ export default function GenreModal({
           }}
           maxLength={80}
           placeholder="例: A店"
-          className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+          className="mt-2 w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-success focus:outline-none focus:ring-2 focus:ring-success/25"
         />
         <div className="mt-6 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-gray-600">
+          <button onClick={onClose} className="rounded-control px-4 py-2 text-sm text-ink-secondary">
             キャンセル
           </button>
           <button
             onClick={save}
             disabled={!name.trim() || submitting}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+            className="rounded-control bg-success px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-90 disabled:opacity-40"
           >
-            {submitting ? '保存中…' : genre ? '変更を保存' : 'ジャンルを作成'}
+            {submitting ? '保存中…' : genre ? '保存する' : 'ジャンルを作る'}
           </button>
         </div>
       </div>

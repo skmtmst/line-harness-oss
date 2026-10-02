@@ -41,7 +41,7 @@ describe('新規プール窓の送信 (#1058)', () => {
   it('APIの返事(success:false)と画面の失敗表示を従来どおり分ける', () => {
     const body = fnBody(PAGE, 'const onSubmit = async ()')
     expect(body).toContain('if (res.success) onCreated()')
-    expect(body).toContain("else setError(res.error ?? '作成に失敗しました')")
+    expect(body).toContain("else setError(res.error ?? '作成に失敗しました。通信を確かめて、もう一度お試しください。')")
   })
 })
 
@@ -72,6 +72,7 @@ describe('プール所属アカウントの読み込み・追加 (#1058)', () =>
   })
 
   it('選択からの呼び出しもPromiseを宙に浮かせない', () => {
-    expect(PAGE).toContain('void onAdd(e.target.value)')
+    // 選び欄は共通 Select。onChange は値そのものを受け取る。
+    expect(PAGE).toContain('void onAdd(value)')
   })
 })

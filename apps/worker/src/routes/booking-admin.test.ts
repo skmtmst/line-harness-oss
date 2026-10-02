@@ -41,7 +41,11 @@ vi.mock('../services/availability.js', async (importOriginal) => ({
 }));
 
 const notifierMocks = { sendBookingNotification: vi.fn() };
-vi.mock('../services/booking-notifier.js', () => notifierMocks);
+// 送る側だけ差し替える。文面の組み立て（時刻・残り時間）は本物を使う。
+vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+  ...notifierMocks,
+}));
 
 const accountAccessMocks = {
   canAccessAllLineAccounts: vi.fn(async () => true),
@@ -1293,8 +1297,11 @@ describe('staff breaks API (N-405 #655)', () => {
 });
 
 describe('GET /api/booking/admin/availability-check (IDEA-28)', () => {
-  // 2099-01-10 は土曜。シフトを置いて「はるか未来の空き枠」として使う。
-  const CHECK_DAY = '2099-01-10';
+  // R92: 店舗の受付期間（既定60日）・締切（既定24h）の内側の日を使う。
+  // 2099年では期間の外になり、お客さま向け判定が booking_window で塞がる。
+  // シフトの日付指定なので曜日は問わない。30日先なら締切・期間の内側。
+  const CHECK_DAY = new Date(Date.now() + 30 * 86_400_000 + 9 * 3_600_000)
+    .toISOString().slice(0, 10);
   function seedCheck(sqlite: Database.Database) {
     sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
     sqlite.exec(`
@@ -1352,12 +1359,12 @@ describe('GET /api/booking/admin/availability-check (IDEA-28)', () => {
     const sqlite = new Database(':memory:');
     try {
       seedCheck(sqlite);
-      // 11:00-12:00 JST = 02:00-03:00 UTC に別メニュー(m2)の予約を置く
+      // 11:00-12:30 JST = 02:00-03:30 UTC に別メニュー(m2)の予約を置く
       sqlite.exec(`
         INSERT INTO bookings (id, line_account_id, booking_customer_id, staff_id, menu_id,
           starts_at, ends_at, block_ends_at, status, price_at_booking, requested_at)
         VALUES ('b1','acc1','c1','s1','m2',
-          '2099-01-10T02:00:00Z','2099-01-10T03:30:00Z','2099-01-10T03:30:00Z',
+          '${CHECK_DAY}T02:00:00Z','${CHECK_DAY}T03:30:00Z','${CHECK_DAY}T03:30:00Z',
           'confirmed',8000,'2026-01-01T00:00:00Z');
       `);
       const { app, env } = makeApp(sqliteAsD1(sqlite));
@@ -1440,6 +1447,79 @@ describe('GET /api/booking/admin/availability-check (IDEA-28)', () => {
         `/api/booking/admin/availability-check?menu_id=m1&date=${CHECK_DAY}&time=11:00`, {}, env as never,
       );
       expect(noAccount.status).toBe(400);
+    } finally {
+      sqlite.close();
+    }
+  });
+});
+
+describe('GET /api/booking/admin/requests-summary のタブ件数', () => {
+  /*
+   * 表示タブ（今日・今週・今月）の数は、その期間の有効な予約の数。
+   * カレンダーと同じ基準（R86）で、取消・拒否・期限切れを除く。
+   * 従来の todayTotal / weekTotal / monthTotal（KPI・解約率用）は変えない。
+   */
+  function seedTabs(sqlite: Database.Database) {
+    sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
+    sqlite.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('acc1','channel-1','A店','token','secret');
+      INSERT INTO staff (id, line_account_id, name, display_name)
+      VALUES ('s1','acc1','担当A','担当A');
+      INSERT INTO menus (id, line_account_id, name, duration_minutes, buffer_after_minutes, base_price)
+      VALUES ('m1','acc1','カット',60,0,5000);
+      INSERT INTO booking_customers (id, line_account_id, display_name, phone_normalized_hash, phone_encrypted, phone_last4)
+      VALUES ('c1','acc1','客A','hash','enc','0000');
+      INSERT INTO bookings (id, line_account_id, booking_customer_id, staff_id, menu_id,
+        starts_at, ends_at, block_ends_at, status, price_at_booking, requested_at)
+      VALUES
+        ('b-conf-today','acc1','c1','s1','m1',
+          '2026-09-28T01:00:00Z','2026-09-28T01:30:00Z','2026-09-28T01:30:00Z',
+          'confirmed',5000,'2026-09-01T00:00:00Z'),
+        ('b-cancel-today','acc1','c1','s1','m1',
+          '2026-09-28T02:00:00Z','2026-09-28T02:30:00Z','2026-09-28T02:30:00Z',
+          'cancelled',5000,'2026-09-01T00:00:00Z'),
+        ('b-noshow-today','acc1','c1','s1','m1',
+          '2026-09-28T03:00:00Z','2026-09-28T03:30:00Z','2026-09-28T03:30:00Z',
+          'no_show',5000,'2026-09-01T00:00:00Z'),
+        ('b-req-week','acc1','c1','s1','m1',
+          '2026-09-30T01:00:00Z','2026-09-30T01:30:00Z','2026-09-30T01:30:00Z',
+          'requested',5000,'2026-09-01T00:00:00Z'),
+        ('b-reject-week','acc1','c1','s1','m1',
+          '2026-10-01T01:00:00Z','2026-10-01T01:30:00Z','2026-10-01T01:30:00Z',
+          'rejected',5000,'2026-09-01T00:00:00Z'),
+        ('b-conf-month','acc1','c1','s1','m1',
+          '2026-09-05T01:00:00Z','2026-09-05T01:30:00Z','2026-09-05T01:30:00Z',
+          'confirmed',5000,'2026-09-01T00:00:00Z'),
+        ('b-exp-month','acc1','c1','s1','m1',
+          '2026-09-10T01:00:00Z','2026-09-10T01:30:00Z','2026-09-10T01:30:00Z',
+          'expired',5000,'2026-09-01T00:00:00Z'),
+        ('b-conf-lastmonth','acc1','c1','s1','m1',
+          '2026-08-20T01:00:00Z','2026-08-20T01:30:00Z','2026-08-20T01:30:00Z',
+          'confirmed',5000,'2026-08-01T00:00:00Z');
+    `);
+  }
+
+  test('タブ用は取消・拒否・期限切れを除く（従来の集計は変えない）', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedTabs(sqlite);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const res = await app.request(
+        '/api/booking/admin/requests-summary?account_id=acc1&month=2026-09&last_month=2026-08&today=2026-09-28&week_to=2026-10-05',
+        {}, env as never,
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json() as Record<string, number>;
+      // 従来の集計（KPI・解約率用）は全部数える。
+      expect(body.todayTotal).toBe(3);
+      expect(body.weekTotal).toBe(5);
+      expect(body.monthTotal).toBe(6);
+      expect(body.lastMonthTotal).toBe(1);
+      // タブ用は有効な予約だけ。取消・拒否・期限切れを除く。
+      expect(body.todayTabTotal).toBe(2);
+      expect(body.weekTabTotal).toBe(3);
+      expect(body.monthTabTotal).toBe(4);
     } finally {
       sqlite.close();
     }

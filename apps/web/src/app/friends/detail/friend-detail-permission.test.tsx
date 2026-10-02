@@ -116,6 +116,24 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null }),
 }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の担当・対応状況の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return {
@@ -256,14 +274,14 @@ async function setSelectValue(select: HTMLSelectElement, value: string) {
 }
 
 describe('N-037 staffの情報欄は読み取り専用（403と画面を一致）', () => {
-  it('管理者には入力欄と「保存」「項目を追加」が出る', async () => {
+  it('管理者には入力欄と「保存」「項目を作る」が出る', async () => {
     setRole('admin')
     await render('info')
     const input = host.querySelector<HTMLInputElement>('input[type="text"]')
     expect(input).toBeTruthy()
     expect(input!.disabled).toBe(false)
-    expect(buttonsByText('保存')).toHaveLength(1)
-    expect(linksByText('項目を追加').length).toBeGreaterThan(0)
+    expect(buttonsByText('保存する')).toHaveLength(1)
+    expect(linksByText('項目を作る').length).toBeGreaterThan(0)
     expect(host.textContent).not.toContain('情報欄の値を保存できるのは')
   })
 
@@ -276,8 +294,8 @@ describe('N-037 staffの情報欄は読み取り専用（403と画面を一致�
     expect(input!.disabled).toBe(true)
     expect(input!.value).toBe('既存の値')
     // 押すと403になる口は出さない
-    expect(buttonsByText('保存')).toHaveLength(0)
-    expect(linksByText('項目を追加')).toHaveLength(0)
+    expect(buttonsByText('保存する')).toHaveLength(0)
+    expect(linksByText('項目を作る')).toHaveLength(0)
     expect(host.textContent).toContain('情報欄の値を保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。')
   })
 })
@@ -301,9 +319,9 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     // 個人情報の項目は編集できる
     expect(personal.disabled).toBe(false)
     expect(personal.value).toBe('090-0000-0000')
-    expect(buttonsByText('保存')).toHaveLength(1)
+    expect(buttonsByText('保存する')).toHaveLength(1)
     // 項目の定義を足す口はオーナー・管理者専用のまま
-    expect(linksByText('項目を追加')).toHaveLength(0)
+    expect(linksByText('項目を作る')).toHaveLength(0)
     expect(host.textContent).toContain('個人情報')
   })
 
@@ -317,7 +335,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
       personal.dispatchEvent(new Event('input', { bubbles: true }))
     })
     await act(async () => {
-      buttonsByText('保存')[0].click()
+      buttonsByText('保存する')[0].click()
     })
     await eventually(() => {
       const call = net.calls.find((c) => c.name === 'friendFields.saveForFriend')
@@ -335,8 +353,8 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     expect(personal.disabled).toBe(true)
     // 値は読める
     expect(personal.value).toBe('090-0000-0000')
-    expect(buttonsByText('保存')).toHaveLength(0)
-    expect(linksByText('項目を追加')).toHaveLength(0)
+    expect(buttonsByText('保存する')).toHaveLength(0)
+    expect(linksByText('項目を作る')).toHaveLength(0)
   })
 
   it('鍵の無い staff はサーバーが個人情報を返さない前提で、読み取り専用のまま', async () => {
@@ -348,7 +366,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     expect(inputs()).toHaveLength(1)
     expect(host.textContent).toContain('個人情報の項目が 1 件あります。')
     expect(host.textContent).toContain('表示には個人情報の閲覧権限が要ります。')
-    expect(buttonsByText('保存')).toHaveLength(0)
+    expect(buttonsByText('保存する')).toHaveLength(0)
   })
 })
 

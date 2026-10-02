@@ -98,13 +98,13 @@ export default function UsersPage() {
         // 失敗時に古い rows を残すと、新しいフィルタ条件で古いデータが見えて誤誘導するのでクリア。
         setRows([])
         setTotal(0)
-        setError('取得に失敗しました')
+        setError('取得に失敗しました。もう一度読み込んでください。')
       }
     } catch {
       if (seq !== requestSeqRef.current) return
       setRows([])
       setTotal(0)
-      setError('取得に失敗しました')
+      setError('取得に失敗しました。もう一度読み込んでください。')
     } finally {
       if (seq === requestSeqRef.current) {
         setLoading(false)
@@ -185,14 +185,13 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-4" data-users-design="v6" data-design-node="r7eSi">
-      <section className="rounded-card border border-hairline bg-canvas px-4 py-3 shadow-card">
-        <p className="text-sm font-bold text-ink">
-          複数の友だちを、1人の顧客として横断管理します。
-        </p>
-        <p className="mt-1 text-xs leading-5 text-ink-secondary">
-          元の友だちは残したまま、登録アカウント・最終接触・重複配信の確認ができます。同じ人か確認が必要なものは「要確認」と表示します。
-        </p>
-      </section>
+      {/*
+        使い方の説明は毎回読むものではないので、共通 Disclosure が無い
+        いまは1行の小さな説明文に留める（カードにしない）。
+      */}
+      <p className="text-xs leading-5 text-ink-secondary">
+        複数の友だちを、1人の顧客として横断管理します。同じ人か確認が必要なものは「要確認」と表示します。
+      </p>
 
       <SummaryBar rows={rows} />
 
@@ -204,18 +203,15 @@ export default function UsersPage() {
       */}
       <div className="flex flex-wrap items-center gap-2" data-users-actions="true">
         <Button href="/friends/identity-candidates" variant="primary">
-          ＋ 統合ユーザーを作成
+          ＋ 統合ユーザーを作る
         </Button>
-        <Button type="button" onClick={() => void exportCsv()} disabled={exporting} className="ml-auto">
-          {exporting ? '書き出し中…' : 'CSVで書き出す'}
+        <Button type="button" onClick={() => void exportCsv()} disabled={exporting} className="ml-auto" busy={exporting} busyLabel="書き出し中…">CSVで書き出す
         </Button>
         <Button
           type="button"
           onClick={() => setPendingForceRefresh(true)}
           disabled={refreshing}
-          title="最新の状態を取得して一覧を更新"
-        >
-          {refreshing ? '再計算中…' : '再計算'}
+          title="最新の状態を取得して一覧を更新" busy={refreshing} busyLabel="再計算中…">再計算
         </Button>
       </div>
       <div data-users-filters>
@@ -235,7 +231,7 @@ export default function UsersPage() {
       </div>
       <style>{`
         [data-users-filters] > div { flex-wrap: wrap; }
-        [data-users-filters] input[type="search"] { flex: 1 1 100%; }
+        [data-users-filters] [data-design-node="phlR1"] { flex: 1 1 100%; }
         /* U041: 7列の表は狭い幅で見出しが衝突する。列同士の比較が要る表なので、
            収まらない幅では枠の内側だけ横へ動かして見出しの形を保つ。 */
         [data-scroll-table] > div { overflow-x: auto; }

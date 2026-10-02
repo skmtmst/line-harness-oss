@@ -35,8 +35,41 @@ export interface KeywordRuleDraft {
   caseSensitive: boolean
 }
 
-export function emptyKeywordRule(): KeywordRuleDraft {
-  return { keyword: '', matchType: 'exact', minLength: '', caseSensitive: true }
+export function emptyKeywordRule(matchType: 'exact' | 'contains' = 'exact'): KeywordRuleDraft {
+  return { keyword: '', matchType, minLength: '', caseSensitive: true }
+}
+
+/**
+ * 開いたときに「効いている当て方」として出す値（R29）。
+ *
+ * 保存された複数行があればそれを見る（判定側が読むのは行のほう）。
+ * 行がそろっていればその当て方、ばらばらなら先頭の行（行自体は残す）。
+ * 行が無ければこれまでの1行（keyword / matchType）を見る。
+ */
+export function initialMatchType(draft: {
+  keyword: string
+  matchType: 'exact' | 'contains'
+  keywords?: unknown[] | null
+}): 'exact' | 'contains' {
+  const rules = readKeywordRules(draft)
+  const fromStored =
+    Array.isArray(draft.keywords) && draft.keywords.length > 0 && rules.length > 0
+  if (fromStored) return rules[0].matchType
+  return draft.matchType
+}
+
+/**
+ * 選んだ当て方を全行へ載せる（R29）。
+ *
+ * 「一致のしかた」の選択は行ごとのものとして1つに持つ。選ぶたびに
+ * 全行を書き換えるので、選んだのに行だけ古いまま、が起きない。
+ * 元の配列は壊さない。
+ */
+export function applyMatchType(
+  rules: KeywordRuleDraft[],
+  matchType: 'exact' | 'contains',
+): KeywordRuleDraft[] {
+  return rules.map((rule) => ({ ...rule, matchType }))
 }
 
 /**
@@ -77,6 +110,32 @@ export function readKeywordRules(draft: {
   ]
 }
 
+/**
+ * R257: 異なる文言の完全一致を「すべて必須」にすると不成立になる。
+ *
+ * 1つの受信文は2つの異なる文言と完全には一致しないので、判定は必ず
+ * false を返す（Worker の `keywordMatches` が正しくそう動く）。
+ * ここは保存を止めず、不成立の理由だけを返す。埋まっていない行は見ない。
+ *
+ * 大文字小文字を区別しない行が混ざると成立し得る組み合わせがあるため、
+ * 厳密な一致（`caseSensitive` が効く行）だけのときに知らせる。誤った
+ * 案内を出さないための絞り込みで、緩い方の組み合わせは対象外。
+ */
+export function exactAllMismatchNotice(
+  rules: KeywordRuleDraft[],
+  matchMode: 'any' | 'all',
+): string | null {
+  if (matchMode !== 'all') return null
+  const words = rules.map((rule) => rule.keyword.trim()).filter((word) => word !== '')
+  if (words.length < 2) return null
+  const strict = rules
+    .filter((rule) => rule.keyword.trim() !== '')
+    .every((rule) => rule.matchType === 'exact' && rule.caseSensitive !== false)
+  if (!strict) return null
+  if (new Set(words).size < 2) return null
+  return '異なる文言の完全一致をすべて必須にしています。1つの受信文は2つの異なる文言と完全には一致しないため、このままでは応答しません。部分一致にするか、「どれか1つ」にしてください。'
+}
+
 export function toKeywordPayload(rule: KeywordRuleDraft): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     keyword: rule.keyword,
@@ -96,6 +155,14 @@ export interface InlineAction {
   key: string
   actionType: ScenarioActionType
   config: unknown
+  /** 失敗したら止めるか続けるか。無指定は続ける（いまの動き）。 */
+  onFailure: 'stop' | 'continue'
+}
+
+function readOnFailure(raw: unknown): 'stop' | 'continue' {
+  if (!raw || typeof raw !== 'object') return 'continue'
+  const value = (raw as Record<string, unknown>).onFailure ?? (raw as Record<string, unknown>).on_failure
+  return value === 'stop' ? 'stop' : 'continue'
 }
 
 let actionKeySeq = 0
@@ -120,10 +187,10 @@ export function readInlineActions(stored: unknown[] | null | undefined): InlineA
         config = {}
       }
     }
-    return [{ key: newActionKey(), actionType: actionType as ScenarioActionType, config }]
+    return [{ key: newActionKey(), actionType: actionType as ScenarioActionType, config, onFailure: readOnFailure(r) }]
   })
 }
 
 export function toActionPayload(action: InlineAction): Record<string, unknown> {
-  return { actionType: action.actionType, config: action.config ?? {} }
+  return { actionType: action.actionType, config: action.config ?? {}, onFailure: action.onFailure }
 }

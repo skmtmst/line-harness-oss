@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const COMPONENT = readFileSync(join(HERE, 'tag-list-v2.tsx'), 'utf8')
-const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'tags-v2', 'page.tsx'), 'utf8')
+// 2026-09-25: 比較用の /tags-v2 を撤去。同じ表示層を使う visual-qa の画面で見張りを続ける。
+const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'visual-qa', 'friend-attributes-v2', 'page.tsx'), 'utf8')
 
 describe('友だち属性V2の移行契約', () => {
   it('現行の表示部品を読み込まず、独立した表示層を使う', () => {

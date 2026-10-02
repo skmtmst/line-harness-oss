@@ -54,9 +54,15 @@ describe('NEN column operations', () => {
       VALUES ('job-a', 'column', 'friend-a', 'account-a', 'column:column-a', '{}', '2099-01-01', 'pending', 0, '2026-01-01', '2026-01-01')`).run();
     await expect(sendPendingNenDeliveriesNow(testDb.db, { lineAccountId: 'account-a', expectedCount: 0 }))
       .rejects.toMatchObject({ code: 'pending_count_changed', status: 409 });
-    await expect(sendPendingNenDeliveriesNow(testDb.db, { lineAccountId: 'account-a', expectedCount: 1 }))
-      .resolves.toEqual({ queued: 1 });
+    await expect(sendPendingNenDeliveriesNow(testDb.db, {
+      lineAccountId: 'account-a', expectedCount: 1, now: new Date('2026-09-25T12:00:00+09:00'),
+    })).resolves.toEqual({ queued: 1, quietHours: { active: false, resumesAt: null } });
     await expect(sendPendingNenDeliveriesNow(testDb.db, { lineAccountId: 'account-a', expectedCount: Number.NaN }))
       .rejects.toMatchObject({ code: 'expected_count_invalid', status: 400 });
+    await expect(sendPendingNenDeliveriesNow(testDb.db, {
+      lineAccountId: 'account-a', expectedCount: 0, now: new Date('2026-09-25T23:00:00+09:00'),
+    })).resolves.toEqual({
+      queued: 0, quietHours: { active: true, resumesAt: '2026-09-26T08:00:00+09:00' },
+    });
   });
 });

@@ -168,6 +168,20 @@ export function validateSearchConditions(
           error: `条件「${String(c.kind)}」では使えない比較方法です（${c.op}）`,
         };
       }
+      /*
+       * R183: 開始日より後の終了日（逆転期間）は0人になる設定ミス。
+       * 0人のまま保存・再利用されると「本当に該当者なし」と区別が
+       * 付かないため、保存の時点で断る。片側だけの期間は許容する。
+       * 日付は YYYY-MM-DD のため文字列比較で前後が分かる。
+       */
+      if ((c.kind === 'created_at' || c.kind === 'last_activity') && c.op === 'between') {
+        const range = (c.value ?? {}) as { from?: unknown; to?: unknown };
+        const from = typeof range.from === 'string' ? range.from.trim() : '';
+        const to = typeof range.to === 'string' ? range.to.trim() : '';
+        if (from && to && from > to) {
+          return { ok: false, error: '期間の開始日が終了日より後になっています' };
+        }
+      }
       list.push(c as unknown as SearchCondition);
     }
     out[group] = list;
@@ -801,6 +815,21 @@ export async function deleteSavedSearch(
   id: string,
   access: SavedSearchAccess,
 ): Promise<boolean> {
+  /*
+   * R189: 一覧での呼び出し履歴（saved_search_usage_events）は閲覧の記録で、
+   * 生きている使用先ではない。RESTRICT の外部キーが残っていると、一度でも
+   * 一覧で開いた検索が「使用中」として消せなくなる。書き込むのは一覧表示
+   * だけなので（recordSavedSearchUsage の呼び出しは friends 一覧のみ）、
+   * 検索の削除に合わせて履歴も消す。配信・自動処理などの現用の参照は
+   * saved_search_references 側の検査が別に止める。
+   */
+  await db
+    .prepare(
+      `DELETE FROM saved_search_usage_events
+       WHERE saved_search_id = ? AND line_account_id = ?`,
+    )
+    .bind(id, access.lineAccountId)
+    .run();
   const result = await db
     .prepare(
       `DELETE FROM saved_searches

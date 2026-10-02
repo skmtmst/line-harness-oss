@@ -160,7 +160,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
         occurredAt: event.processed_at,
         friendId,
         eventData: { type: 'purchase', amount: obj.amount, stripeEventId: body.id },
-      }, undefined, friendAccount?.line_account_id);
+      }, undefined, friendAccount?.line_account_id, undefined, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
     }
 
     // サブスクリプションイベント処理

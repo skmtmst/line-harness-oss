@@ -4,6 +4,8 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import type { BookingRequest } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { formatDay, formatNumber, formatRange, formatTime } from '@/lib/format'
 
 // BOOKING-01: 9〜18時の固定10マスは「空き枠」ではなく、空き枠APIの実績が
 // まだ届いていないときの表示レンジ。実際に受け付けられる枠が届いたら、
@@ -56,23 +58,8 @@ export function startOfWeek(day: string): string {
   return moveDay(day, -offset)
 }
 
-function dateLabel(day: string, weekday = true): string {
-  return new Date(`${day}T00:00:00+09:00`).toLocaleDateString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    weekday: weekday ? 'short' : undefined,
-    timeZone: 'Asia/Tokyo',
-  })
-}
-
-function longDateLabel(day: string): string {
-  return new Date(`${day}T00:00:00+09:00`).toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-    timeZone: 'Asia/Tokyo',
-  })
+function dateLabel(day: string): string {
+  return formatDay(`${day}T00:00:00+09:00`)
 }
 
 const sep = '\u0000'
@@ -82,24 +69,44 @@ function bookingHour(booking: BookingRequest): number {
 }
 
 function bookingTime(booking: BookingRequest): string {
-  return new Date(booking.starts_at).toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatTime(booking.starts_at)
+}
+
+/**
+ * R88: 受付経路は `source` で分ける。担当者が既存の友だちを選んで
+ * 代理入力した予約（source=operator＋friend_idあり）を「LINEから」に
+ * 数えない。`source` の無い古い応答だけ `friend_id` で補う。
+ */
+export function isLineBooking(booking: BookingRequest): boolean {
+  if (booking.source) return booking.source === 'liff'
+  return Boolean(booking.friend_id)
 }
 
 function isPhoneBooking(booking: BookingRequest): boolean {
-  return !booking.friend_id
+  return !isLineBooking(booking)
+}
+
+/**
+ * R86: 件数・売上見込みから外す状態。取消・拒否・期限切れは履歴として
+ * 残すが、有効な予約として数えない。カードには状態を出す。
+ */
+const HISTORY_STATUSES = new Set(['cancelled', 'rejected', 'expired'])
+
+/** カードに添える状態の言葉。承認待ち・確定・完了は何も付けない。 */
+const CARD_STATUS_LABEL: Record<string, string> = {
+  cancelled: 'キャンセル',
+  rejected: '拒否',
+  expired: '期限切れ',
+  no_show: '来店なし',
 }
 
 function money(value: number): string {
-  return `¥${value.toLocaleString('ja-JP')}`
+  return `¥${formatNumber(value)}`
 }
 
 function Kpi({ title, value, detail }: { title: string; value: string; detail: string }) {
   return (
-    <div className="rounded-card border-hairline bg-canvas border px-4 py-3 shadow-sm">
+    <div className="rounded-card border-hairline bg-canvas border px-4 py-3 shadow-card">
       <p className="text-ink-secondary text-xs font-medium">{title}</p>
       <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{value}</p>
       <p className="text-ink-faint mt-1 text-xs">{detail}</p>
@@ -113,11 +120,12 @@ function BookingCard({ booking, compact = false, onOpen }: {
   onOpen: (id: string) => void
 }) {
   const phone = isPhoneBooking(booking)
+  const statusMark = CARD_STATUS_LABEL[booking.status]
   return (
     <button
       type="button"
       onClick={() => onOpen(booking.id)}
-      className={`w-full rounded-md border-l-4 px-2 py-1.5 text-left transition hover:brightness-95 ${
+      className={`w-full rounded-mini border-l-4 px-2 py-1.5 text-left transition hover:brightness-95 ${
         phone
           ? 'border-action bg-action-soft text-action'
           : 'border-success bg-success-bg text-success'
@@ -130,25 +138,45 @@ function BookingCard({ booking, compact = false, onOpen }: {
         {!compact && ` ／ ${phone ? '電話' : 'LINE'}`}
       </p>
       {compact && <p className="truncate text-xs opacity-80">{booking.staff_name}</p>}
+      {statusMark && <p className="truncate text-xs opacity-80">（{statusMark}）</p>}
     </button>
   )
 }
 
-function EmptyCell({ href }: { href?: string }) {
+/**
+ * R315: 空き枠の読み上げ名。「9月29日(火) 10:30 山田 空きあり」のように
+ * 日付・開始時刻・担当を名前に入れ、70本の入口を区別できるようにする。
+ * 70本すべて同じ名前だと、読み上げの一覧から目的の日時を選べない。
+ */
+/**
+ * R316: 日の見出し（9月30日(火)）。集計・注意の見出しで選んだ日を名指しする。
+ */
+export function slotDateLabel(day: string): string {
+  return formatDay(`${day}T00:00:00+09:00`)
+}
+
+export function slotAriaLabel(input: { day: string; time: string; staffName?: string }): string {
+  const day = slotDateLabel(input.day)
+  return input.staffName ? `${day} ${input.time} ${input.staffName} 空きあり` : `${day} ${input.time} 空きあり`
+}
+
+function EmptyCell({ href, label }: { href?: string; label?: string }) {
   // N-399: 空きセルが代理予約の入口になる。操作権限がない人・遷移先が
   // 組み立てられないセルは押せる形に見せない。
   // BOOKING-01: カレンダーのマスそのものは「空き枠」と呼ばない。実際に
   // 受け付けられる枠だけが入口になり、取れないマス（営業時間外・休み・
   // 満席・まだ読み込み中）は「—」で示す。
   if (!href) {
-    return <span className="text-ink-faint text-xs opacity-50" aria-label="受け付けていない時間">—</span>
+    // ★V7：受け付けていないマスは空のまま（読み上げだけ伝える）。全マスに「—」が並ぶと、表が記号で埋まって
+    // 「あき ＋」の入口が目立たなかった。
+    return <span className="sr-only">受け付けていない時間</span>
   }
   return (
     <Link
       href={href}
-      aria-label="この空き枠に予約を入れる"
-      title="この空き枠に予約を入れる"
-      className="text-ink-faint hover:bg-accent-soft hover:text-accent inline-block rounded-control px-2 py-0.5 text-xs opacity-60 transition hover:opacity-100"
+      aria-label={label ?? '空きあり'}
+      title={label ?? '空きあり'}
+      className="text-ink-faint hover:bg-accent-soft hover:text-action inline-block rounded-control px-2 py-0.5 text-xs opacity-60 transition hover:opacity-100"
     >
       あき ＋
     </Link>
@@ -186,13 +214,13 @@ function CalendarFrame({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-sm">
+    <section className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-card">
       <div className="border-hairline flex min-h-12 flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={onPrevious} aria-label="前の期間" className="h-8 w-8">‹</Button>
           <Button variant="secondary" onClick={onNext} aria-label="次の期間" className="h-8 w-8">›</Button>
           <p className="text-ink text-sm font-semibold">{title}</p>
-          <button type="button" onClick={onToday} className="rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent">今日</button>
+          <button type="button" onClick={onToday} className="rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep hover:brightness-95">今日</button>
         </div>
         <p className="text-ink-secondary text-xs tabular-nums">{meta}</p>
       </div>
@@ -240,11 +268,26 @@ function DayGrid({ items, staff, day, hours, bookable, canCreate, onOpen }: {
           {staff.map((name) => {
             const cell = cells.get(String(hour) + sep + name) ?? []
             const slot = bookable.get(String(hour) + sep + name)
+            // R87: 同じマスに予約があっても、重ならない空き枠の入口は残す。
+            // 空マスは従来どおり枠があれば入口にする。予約ありのマスだけ
+            // 時刻の重なりを確かめ、読めない・重なる枠は出さない。
+            const entryHref = canCreate && slot && (cell.length === 0 || !slotOverlapsBookings(slot, cell))
+              ? newBookingHref({ day, time: slot.start, staffName: name, menuId: slot.menuId })
+              : undefined
+            // R315: 読み上げで日時・担当を区別できるよう、枠ごとに固有の名前を付ける。
+            const entryLabel = entryHref && slot
+              ? slotAriaLabel({ day, time: slot.start, staffName: name })
+              : undefined
             return (
               <div key={name} className="border-hairline flex min-w-0 items-center border-l p-1">
                 {cell.length > 0
-                  ? <div className="w-full space-y-1">{cell.map((booking) => <BookingCard key={booking.id} booking={booking} onOpen={onOpen} />)}</div>
-                  : <div className="w-full text-center"><EmptyCell href={canCreate && slot ? newBookingHref({ day, time: slot.start, staffName: name, menuId: slot.menuId }) : undefined} /></div>}
+                  ? (
+                    <div className="w-full space-y-1">
+                      {cell.map((booking) => <BookingCard key={booking.id} booking={booking} onOpen={onOpen} />)}
+                      {entryHref ? <div className="w-full text-center"><EmptyCell href={entryHref} label={entryLabel} /></div> : null}
+                    </div>
+                    )
+                  : <div className="w-full text-center"><EmptyCell href={entryHref} label={entryLabel} /></div>}
               </div>
             )
           })}
@@ -275,16 +318,24 @@ function WeekGrid({ days, items, hours, bookable, canCreate, onOpen }: {
     }
     return map
   }, [items])
+  // R86: 週見出しの件数は有効な予約だけ。取消・拒否・期限切れは数えない。
   const dayCounts = useMemo(() => {
     const map = new Map<string, number>()
     for (const booking of items) {
+      if (HISTORY_STATUSES.has(booking.status)) continue
       const day = jstDay(booking.starts_at)
       map.set(day, (map.get(day) ?? 0) + 1)
     }
     return map
   }, [items])
+  // R85: 狭い画面で7日分を無理に押し込まず、横に流して見る。
+  // 日付が見出しの幅より狭くなると隣の列へ重なるため、1日あたり
+  // 70px（時刻列64px＋7日で554px→560px）を下限にしてスクロールさせる。
+  // 器に余裕があるときは広がり、スクロールは出ない。
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 overflow-x-auto">
+      {/* 560pxは任意値記法を避けるためstyleで直書き（affiliatesの表と同じ下限）。 */}
+      <div style={{ minWidth: 560 }}>
       <div className="border-hairline grid border-b bg-canvas-sunken" style={{ gridTemplateColumns: columns }}>
         <div />
         {days.map((day) => {
@@ -303,16 +354,32 @@ function WeekGrid({ days, items, hours, bookable, canCreate, onOpen }: {
           {days.map((day) => {
             const cell = cells.get(day + sep + String(hour)) ?? []
             const slot = bookable.get(day + sep + String(hour))
+            // R87: 同じマスに予約があっても、重ならない空き枠の入口は残す。
+            // 空マスは従来どおり枠があれば入口にする。予約ありのマスだけ
+            // 時刻の重なりを確かめ、読めない・重なる枠は出さない。
+            const entryHref = canCreate && slot && (cell.length === 0 || !slotOverlapsBookings(slot, cell))
+              ? newBookingHref({ day, time: slot.start, staffName: slot.staffName, menuId: slot.menuId })
+              : undefined
+            // R315: 読み上げで日時・担当を区別できるよう、枠ごとに固有の名前を付ける。
+            const entryLabel = entryHref && slot
+              ? slotAriaLabel({ day, time: slot.start, staffName: slot.staffName })
+              : undefined
             return (
               <div key={day} className="border-hairline flex min-w-0 items-center border-l p-1">
                 {cell.length > 0
-                  ? <div className="w-full space-y-1">{cell.map((booking) => <BookingCard key={booking.id} booking={booking} compact onOpen={onOpen} />)}</div>
-                  : <div className="w-full text-center"><EmptyCell href={canCreate && slot ? newBookingHref({ day, time: slot.start, staffName: slot.staffName, menuId: slot.menuId }) : undefined} /></div>}
+                  ? (
+                    <div className="w-full space-y-1">
+                      {cell.map((booking) => <BookingCard key={booking.id} booking={booking} compact onOpen={onOpen} />)}
+                      {entryHref ? <div className="w-full text-center"><EmptyCell href={entryHref} label={entryLabel} /></div> : null}
+                    </div>
+                    )
+                  : <div className="w-full text-center"><EmptyCell href={entryHref} label={entryLabel} /></div>}
               </div>
             )
           })}
         </div>
       ))}
+      </div>
     </div>
   )
 }
@@ -333,6 +400,22 @@ const OCCUPIED_STATUSES = new Set(['requested', 'confirmed', 'completed', 'no_sh
 function slotHour(slot: CalendarSlot): number | null {
   const hour = Number(slot.start.slice(0, 2))
   return Number.isFinite(hour) ? hour : null
+}
+
+/**
+ * R87: 枠の区間がそのマスの予約と重なるか。時刻が読めないときは
+ * 重なると見なして入口を出さない（取れない枠を踏ませない）。
+ */
+function slotOverlapsBookings(slot: CalendarSlot, bookings: BookingRequest[]): boolean {
+  const start = slot.startUtc ? Date.parse(slot.startUtc) : NaN
+  const end = slot.endUtc ? Date.parse(slot.endUtc) : NaN
+  if (!Number.isFinite(start) || !Number.isFinite(end) || !(start < end)) return true
+  return bookings.some((item) => {
+    const itemStart = Date.parse(item.starts_at)
+    const itemEnd = Date.parse(item.ends_at)
+    if (!Number.isFinite(itemStart) || !Number.isFinite(itemEnd) || !(itemStart < itemEnd)) return true
+    return start < itemEnd && itemStart < end
+  })
 }
 
 function intervalMs(start: string | null | undefined, end: string | null | undefined): [number, number] | null {
@@ -365,10 +448,15 @@ function hoursText(ms: number): string {
   return `${hours}時間`
 }
 
-export default function BookingCalendar({ mode, items, onOpen, staffNames, canCreate = false, anchorDay, onAnchorChange, availability }: {
+export default function BookingCalendar({ mode, items, onOpen, staffNames, canCreate = false, anchorDay, onAnchorChange, availability, onRetryAvailability, dataState = 'ready' }: {
   mode: 'day' | 'week'
   items: BookingRequest[]
   onOpen: (id: string) => void
+  /**
+   * ★V7：一覧の読み込み状態。取れていない間、カレンダー内の件数に 0 を
+   * 出さない。「—」と出し、読み込み中と失敗を言い分ける。
+   */
+  dataState?: 'loading' | 'error' | 'ready'
   /** 稼働中の担当者名。予約がまだ無い担当も列に出す（その空きへ予約を入れられる）。 */
   staffNames?: string[]
   /** N-399/N-401: 操作できる人だけ空きセルを代理予約の入口にする。 */
@@ -382,6 +470,11 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
    * 空きを推測しない。実績が無い・取れないなら「—」を出す。
    */
   availability: CalendarAvailability
+  /**
+   * #634: 空き枠（と、その元になる集計・メニュー・担当）の取り直し。
+   * 失敗の帯の中に置く。渡さないときは開き直しの案内だけを出す。
+   */
+  onRetryAvailability?: () => void
 }) {
   const weekStart = startOfWeek(anchorDay)
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => moveDay(weekStart, index)), [weekStart])
@@ -389,6 +482,12 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
   const dayItems = useMemo(() => items.filter((booking) => jstDay(booking.starts_at) === anchorDay), [anchorDay, items])
   const weekItems = useMemo(() => items.filter((booking) => days.includes(jstDay(booking.starts_at))), [days, items])
   const visible = mode === 'day' ? dayItems : weekItems
+  // R86: 有効な予約だけを数える・集計する。取消・拒否・期限切れは
+  // 履歴としてマスに残すが、件数・売上見込みから外す。
+  const activeItems = useMemo(
+    () => visible.filter((booking) => !HISTORY_STATUSES.has(booking.status)),
+    [visible],
+  )
   const staff = useMemo(() => {
     // まだ予約の入っていない担当も列に出す。空き列が代理予約の入口になる。
     const names = new Set(staffNames?.filter(Boolean) ?? [])
@@ -397,10 +496,10 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
     }
     return Array.from(names)
   }, [items, staffNames])
-  const phoneCount = visible.filter(isPhoneBooking).length
-  const lineCount = visible.length - phoneCount
-  const sales = visible.reduce((sum, booking) => sum + booking.price_at_booking, 0)
-  const requested = visible.filter((booking) => booking.status === 'requested').length
+  const phoneCount = activeItems.filter(isPhoneBooking).length
+  const lineCount = activeItems.length - phoneCount
+  const sales = activeItems.reduce((sum, booking) => sum + booking.price_at_booking, 0)
+  const requested = activeItems.filter((booking) => booking.status === 'requested').length
   const cancelled = visible.filter((booking) => ['cancelled', 'rejected', 'no_show'].includes(booking.status)).length
 
   /*
@@ -514,48 +613,80 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
         ? `受付${hoursText(capacity.acceptableMs)}のうち${hoursText(capacity.bookedMs)}を使用中`
         : '受付可能な時間がありません'
 
+  // ★V7：一覧が取れていない間、カレンダー内の件数に 0 を出さない。
+  const listMissing = dataState !== 'ready'
+  const listMissingDetail = dataState === 'error' ? '読み込めませんでした' : '読み込んでいます'
+  const countOrDash = (text: string) => (listMissing ? '—' : text)
+
+  /*
+   * R316: 集計・注意の見出しは、選んでいる日・週そのものを名指しする。
+   * 「今日」「今週」は、選んだ期間が今日・今週と重なるときだけ添える。
+   * 日を進めても見出しが「今日」のままだと、選択期間の情報を
+   * 今日の情報と読み違える。
+   */
+  const dayHead = slotDateLabel(anchorDay)
+  const weekHead = `${formatRange(`${days[0]}T00:00:00+09:00`, `${days[6]}T00:00:00+09:00`)} の週`
+  const isToday = anchorDay === todayKey()
+  const isThisWeek = days.includes(todayKey())
+  const periodHead = mode === 'day' ? dayHead : weekHead
+  const periodWithToday = mode === 'day'
+    ? (isToday ? `今日（${dayHead}）` : dayHead)
+    : (isThisWeek ? `今週（${weekHead}）` : weekHead)
+
   return (
     <div data-design-node={mode === 'day' ? 'TV2DI' : 'SbuUI'}>
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Kpi title={mode === 'day' ? '今日の予約' : '今週の予約'} value={`${visible.length}件`} detail={`LINEから ${lineCount}・電話 ${phoneCount}`} />
+        <Kpi title={`${periodWithToday}の予約`} value={countOrDash(`${activeItems.length}件`)} detail={listMissing ? listMissingDetail : `LINEから ${lineCount}・電話 ${phoneCount}`} />
         <Kpi
           title={mode === 'day' ? 'まだ空いている枠' : 'うまっている割合'}
-          value={mode === 'day' ? (availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—') : weekRateValue}
-          detail={mode === 'day' ? availabilityNote : weekRateDetail}
+          value={listMissing ? '—' : mode === 'day' ? (availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—') : weekRateValue}
+          detail={listMissing ? listMissingDetail : mode === 'day' ? availabilityNote : weekRateDetail}
         />
         <Kpi
           title={mode === 'day' ? '未承認・要対応' : 'あいている枠'}
-          value={mode === 'day' ? `${requested}件` : availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—'}
-          detail={mode === 'day' ? (requested > 0 ? '確認が必要です' : '現在、確認待ちはありません') : availabilityNote}
+          value={listMissing ? '—' : mode === 'day' ? `${requested}件` : availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—'}
+          detail={listMissing ? listMissingDetail : mode === 'day' ? (requested > 0 ? '確認が必要です' : '現在、確認待ちはありません') : availabilityNote}
         />
-        <Kpi title="キャンセル" value={`${cancelled}件`} detail={mode === 'day' ? '選んだ日' : 'この1週間'} />
+        <Kpi title="キャンセル" value={countOrDash(`${cancelled}件`)} detail={listMissing ? listMissingDetail : mode === 'day' ? '選んだ日' : 'この1週間'} />
       </div>
 
-      <div className="bg-action-soft text-action mb-4 rounded-control px-4 py-3 text-xs font-semibold">
-        {mode === 'day'
-          ? '今日の予約を、時間と担当で並べた台帳です。LINEからの予約（緑）と電話の予約（青）を同じところに並べます。'
-          : '今週の予約を曜日ごとに並べています。空いているところと詰まっているところが1目で分かります。'}
-      </div>
+      {/* ★V7：常に出ていた説明の帯は、色の見方だけを小さな凡例にした。 */}
+      <p className="text-ink-secondary mb-3 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs">
+        <span><span aria-hidden="true" className="text-accent-deep">●</span> LINEからの予約</span>
+        <span><span aria-hidden="true" className="text-action">●</span> 電話の予約</span>
+        <span className="text-ink-faint">「あき ＋」から予約を入れられます</span>
+      </p>
 
       {/* BOOKING-01: 未設定・取得不能・空き0を区別して知らせる。
           未設定・取得不能のときの「—」は空き0とは別の意味なので理由を出す。 */}
       {availability.status === 'unconfigured' ? (
-        <div className="bg-warning-bg text-warning mb-4 rounded-control px-4 py-3 text-xs font-semibold">
-          担当者または予約メニューがまだ設定されていません。受け付けられる枠がないため、空きは「—」で表示しています。予約設定で登録すると空き枠が出ます。
-        </div>
+        <Notice tone="warn" message="担当者または予約メニューがまだ設定されていません。受け付けられる枠がないため、空きは「—」で表示しています。予約設定で登録すると空き枠が出ます。" className="mb-4" />
       ) : null}
+      {/*
+        ★V7：空き枠だけ取れないときは、その場所に小さく1行だけ。
+        黄色の帯にしない。文言と読み直す口は契約試験が守る。
+      */}
       {availability.status === 'error' ? (
-        <div className="bg-warning-bg text-warning mb-4 rounded-control px-4 py-3 text-xs font-semibold">
-          空き枠を読み込めませんでした。予約の記録だけを表示しています。時間をおいて開き直してください。
-        </div>
+        <p className="text-ink-secondary mb-4 text-xs" role="status">
+          空き枠を読み込めませんでした。予約の記録だけを表示しています。
+          {/*
+            * #634: 失敗の知らせの中に読み直す口を出す。無いとページ全体を
+            * 開き直す以外に直す道がない（集計側の帯と同じ導線）。
+            */}
+          {onRetryAvailability ? (
+            <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={onRetryAvailability}>もう一度読み込む</button>
+          ) : (
+            <span> 時間をおいて開き直してください。</span>
+          )}
+        </p>
       ) : null}
 
       <div className="flex min-w-0 flex-col gap-4 xl:flex-row">
         <div className="min-w-0 flex-1">
           {mode === 'day' ? (
             <CalendarFrame
-              title={longDateLabel(anchorDay)}
-              meta={`${visible.length}件 ／ 売上見込み ${money(sales)}`}
+              title={dateLabel(anchorDay)}
+              meta={listMissing ? '—' : `${activeItems.length}件 ／ 売上見込み ${money(sales)}`}
               onPrevious={() => onAnchorChange(moveDay(anchorDay, -1))}
               onNext={() => onAnchorChange(moveDay(anchorDay, 1))}
               onToday={() => onAnchorChange(todayKey())}
@@ -564,8 +695,8 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
             </CalendarFrame>
           ) : (
             <CalendarFrame
-              title={`${dateLabel(days[0], false)}〜${dateLabel(days[6])}`}
-              meta={`${visible.length}件 ／ 売上見込み ${money(sales)}`}
+              title={`${formatRange(`${days[0]}T00:00:00+09:00`, `${days[6]}T00:00:00+09:00`)}`}
+              meta={listMissing ? '—' : `${activeItems.length}件 ／ 売上見込み ${money(sales)}`}
               onPrevious={() => onAnchorChange(moveDay(anchorDay, -7))}
               onNext={() => onAnchorChange(moveDay(anchorDay, 7))}
               onToday={() => onAnchorChange(todayKey())}
@@ -576,16 +707,22 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
         </div>
 
         <aside className="w-full shrink-0 space-y-3 xl:w-72">
-          <SidePanel title={mode === 'day' ? '今日 気をつけること' : '今週 気をつけること'} tone={requested > 0 || phoneCount > 0 ? 'warning' : 'plain'}>
-            {requested > 0 && <p>● 未承認の予約が {requested}件あります。内容を確認してください。</p>}
-            {phoneCount > 0 && <p>● 電話予約が {phoneCount}件あります。LINE未連携の方には当日の連絡ができません。</p>}
-            {requested === 0 && phoneCount === 0 && <p>いま確認が必要な予約はありません。</p>}
-          </SidePanel>
-          <SidePanel title={mode === 'day' ? '今日の流れ' : '今週の内訳'}>
-            <p className="flex justify-between"><span>予約</span><strong>{visible.length}件</strong></p>
-            <p className="flex justify-between"><span>うちLINEから</span><strong className="text-success">{lineCount}件</strong></p>
-            <p className="flex justify-between"><span>うち電話</span><strong className="text-action">{phoneCount}件</strong></p>
-            <p className="flex justify-between"><span>売上見込み</span><strong>{money(sales)}</strong></p>
+          {/*
+            ★V7：注意の有無は数えてから言う。取れていない間は出さない。
+          */}
+          {!listMissing ? (
+            <SidePanel title={`${periodWithToday} 気をつけること`} tone={requested > 0 || phoneCount > 0 ? 'warning' : 'plain'}>
+              {requested > 0 && <p>● 未承認の予約が {requested}件あります。内容を確認してください。</p>}
+              {phoneCount > 0 && <p>● 電話予約が {phoneCount}件あります。LINE未連携の方には当日の連絡ができません。</p>}
+              {requested === 0 && phoneCount === 0 && <p>いま確認が必要な予約はありません。</p>}
+            </SidePanel>
+          ) : null}
+          {/* R316: 日の内訳も週と同じ「内訳」にそろえ、選んだ期間を名指しする。 */}
+          <SidePanel title={`${periodHead}の内訳`}>
+            <p className="flex justify-between"><span>予約</span><strong>{listMissing ? '—' : `${activeItems.length}件`}</strong></p>
+            <p className="flex justify-between"><span>うちLINEから</span><strong className="text-success">{listMissing ? '—' : `${lineCount}件`}</strong></p>
+            <p className="flex justify-between"><span>うち電話</span><strong className="text-action">{listMissing ? '—' : `${phoneCount}件`}</strong></p>
+            <p className="flex justify-between"><span>売上見込み</span><strong>{listMissing ? '—' : money(sales)}</strong></p>
           </SidePanel>
           <SidePanel title="つながる先">
             <p>→ 予約設定　メニューと受付枠</p>

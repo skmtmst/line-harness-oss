@@ -66,7 +66,7 @@ function PreviewImage({ block }: { block: FormBlock & { kind: 'image' } }) {
         <button
           type="button"
           onClick={() => setStatus('loading')}
-          className="text-accent mt-1 underline"
+          className="text-action mt-1 underline"
         >
           再試行
         </button>
@@ -173,7 +173,7 @@ function PreviewBlock({ block, theme }: { block: FormBlock; theme: FormTheme }) 
               >
                 <span
                   className={`border-hairline inline-block h-3 w-3 border ${
-                    block.type === 'radio' ? 'rounded-pill' : 'rounded-[3px]'
+                    block.type === 'radio' ? 'rounded-pill' : 'rounded-mini'
                   } ${selected ? '' : 'bg-canvas'}`}
                   style={selected ? { backgroundColor: theme.main, borderColor: theme.main } : undefined}
                 />
@@ -208,6 +208,13 @@ export default function FormPreview({
   const options = layout.options ?? {}
   const theme = normalizeFormTheme(options.theme)
   const isLast = sectionIndex >= layout.sections.length - 1
+  /*
+   * ボタン箱がある面では、下の固定の送信口を出さない。
+   * 箱と固定口の両方に「送信する」が並ぶ重複になる。
+   * 箱は利用者が置いた中身なので、消すのは固定口の方。
+   */
+  const shownBlocks = [...layout.header, ...(section?.blocks ?? [])]
+  const hasButtonBlock = shownBlocks.some((block) => block.kind === 'button')
 
   return (
     <div
@@ -259,19 +266,23 @@ export default function FormPreview({
           </p>
         )}
 
-        <div className="flex gap-2 pt-2">
-          {multi && sectionIndex > 0 && (
-            <div className="border-hairline text-ink-secondary rounded-control flex-1 border py-2 text-center text-sm">
-              {options.prevLabel || '前へ'}
-            </div>
-          )}
-          <div
-            className="flex-1 py-2 text-center text-sm font-medium"
-            style={{ backgroundColor: theme.main, color: formThemeButtonText(theme), borderRadius: radiusOf(theme) }}
-          >
-            {isLast ? options.submitLabel || '送信' : options.nextLabel || '次へ'}
+        {hasButtonBlock && !(multi && sectionIndex > 0) ? null : (
+          <div className="flex gap-2 pt-2">
+            {multi && sectionIndex > 0 && (
+              <div className="border-hairline text-ink-secondary rounded-control flex-1 border py-2 text-center text-sm">
+                {options.prevLabel || '前へ'}
+              </div>
+            )}
+            {hasButtonBlock ? null : (
+              <div
+                className="flex-1 py-2 text-center text-sm font-medium"
+                style={{ backgroundColor: theme.main, color: formThemeButtonText(theme), borderRadius: radiusOf(theme) }}
+              >
+                {isLast ? options.submitLabel || '送信する' : options.nextLabel || '次へ'}
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

@@ -54,7 +54,7 @@ export default function ReorderGrip({
       onKeyDown={handleKeyDown}
       aria-label={`${label}を並び替え。上下キーで移動`}
       title="ドラッグまたは上下キーで並び替え"
-      className="inline-flex cursor-grab items-center justify-center rounded-control p-0.5 outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      className="inline-flex cursor-grab items-center justify-center rounded-control p-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
     >
       {children ?? <GripVertical size={16} aria-hidden="true" />}
     </button>

@@ -30,7 +30,10 @@ describe('V6 7-1-H リマインダ実行結果', () => {
     expect(LIST_PAGE).toContain("label: '実行履歴を見る'")
     expect(LIST_PAGE).toContain('<ActionMenu')
     expect(LIST_PAGE).toContain('<MoreHorizontal />')
-    expect(LIST_PAGE).toContain('<Trash2 />')
+    // 削除は行に直に置かず、メニューの中の危ない操作にする。
+    expect(LIST_PAGE).not.toContain('<Trash2 />')
+    expect(LIST_PAGE).toContain("label: '削除する'")
+    expect(LIST_PAGE).toContain("tone: 'danger'")
     expect(PAGE).toContain("const isPlannedView = searchParams.get('status') === 'planned'")
     expect(PAGE).toContain("setStatus(isPlannedView ? 'planned' : '')")
     expect(PAGE).toContain('status: status || undefined')
@@ -53,7 +56,7 @@ describe('V6 7-1-H リマインダ実行結果', () => {
     expect(API).toMatch(/runs:\s*\(\s*\n?\s*reminderId: string,/)
     expect(PAGE).not.toContain('1,284')
     expect(PAGE).not.toContain('360人')
-    expect(PAGE).toContain("value={data ? `${data.summary.sent.toLocaleString('ja-JP')}通` : '—'}")
+    expect(PAGE).toContain("value={data ? `${formatNumber(data.summary.sent)}通` : '—'}")
     expect(PAGE).not.toContain('data?.summary.sent ?? 0')
   })
 
@@ -77,12 +80,14 @@ describe('V6 7-1-H リマインダ実行結果', () => {
 
   it('読込・失敗・空を区別し、失敗した1通だけ再試行できる', () => {
     expect(PAGE).toContain('<ListState kind="loading"')
-    expect(PAGE).toContain('<ListState kind="error"')
+    // 対象の取得失敗は ★V7 TargetMissing の error（取り直し口つき）。
+    expect(PAGE).toContain('kind="error"')
+    expect(PAGE).toContain('onRetry={() => void load()}')
+    expect(PAGE).toContain('を読み込めませんでした')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain("crypto.randomUUID()")
     expect(PAGE).toContain('api.reminders.retryRun(runId')
     expect(PAGE).toContain('const canRetry = item.canRetry')
-    expect(PAGE).toContain('通知実績を表示できませんでした')
     expect(PAGE).toContain('送る内容を表示できませんでした')
     expect(PAGE).toContain('setData(null)')
   })

@@ -151,7 +151,7 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
       nameInput.dispatchEvent(new Event('input', { bubbles: true }))
       await settle()
     })
-    await act(async () => { buttonByText('テンプレートを保存').click(); await settle() })
+    await act(async () => { buttonByText('テンプレートを保存する').click(); await settle() })
     expect(fixture.createCalls).toHaveLength(1)
     expect(fixture.createCalls[0].payload).toMatchObject({
       imageUrl: 'https://cdn.example.test/campaign.png',
@@ -202,7 +202,7 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
       host.querySelector<HTMLInputElement>('input[placeholder="画像URL"]')!.dispatchEvent(new Event('input', { bubbles: true }))
       await settle()
     })
-    await act(async () => { buttonByText('テンプレートを保存').click(); await settle() })
+    await act(async () => { buttonByText('テンプレートを保存する').click(); await settle() })
     expect(fixture.createCalls).toHaveLength(1)
     expect(fixture.createCalls[0].lineAccountId).toBe('account-b')
     expect(fixture.createCalls[0].payload.imageMediaId).toBeNull()

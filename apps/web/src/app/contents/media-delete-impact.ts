@@ -1,5 +1,6 @@
 import type { MediaDeleteImpact, MediaDeleteImpactReference } from '@line-crm/shared'
 import { mediaUsageKindText } from './media-usage-display'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 /**
  * メディアを消したときの影響（設計 `YfTfJ` 15-1-C／契約 #610）。
@@ -47,15 +48,29 @@ export function dialogTitle(impact: MediaDeleteImpact | null, filename: string):
   return impact.canDelete ? `「${filename}」を削除しますか？` : `「${filename}」は削除できません`
 }
 
-/** 使用中の言い方。**0件は「どこでも使っていません」**で、未取得と混ぜない。 */
+/**
+ * 使用中の言い方。**0件は「どこでも使っていません」**で、未取得と混ぜない。
+ *
+ * R34: 未確認（verified false）の0件は「使っていない」ではなく
+ * 「確かめられなかった」。見つかった使用先は実在するので数えるが、
+ * ほかに未確認がある旨を添える。
+ */
 export function usageText(impact: MediaDeleteImpact): string {
+  if (impact.verified === false) {
+    return impact.usageCount === 0
+      ? '使われている場所を確かめられませんでした。'
+      : `いま ${formatNumber(impact.usageCount)}か所で使われています（ほかに確認できていない場所があります）。`
+  }
   if (impact.usageCount === 0) return 'どこでも使っていません。'
-  return `いま ${impact.usageCount.toLocaleString('ja-JP')}か所で使われています。`
+  return `いま ${formatNumber(impact.usageCount)}か所で使われています。`
 }
 
 /** 消せない理由。設計の「そこから外すか、別の画像に差し替えてください」。 */
 export function blockedReason(impact: MediaDeleteImpact): string | null {
   if (impact.canDelete) return null
+  if (impact.verified === false) {
+    return '使われている場所を確かめられないため、削除できません。読み直してから、もう一度お試しください。'
+  }
   return '使われているあいだは削除できません。使用先から外してから、もう一度お試しください。'
 }
 
@@ -63,10 +78,7 @@ export function blockedReason(impact: MediaDeleteImpact): string | null {
 export function checkedAtText(checkedAt: string): string {
   const date = new Date(checkedAt)
   if (Number.isNaN(date.getTime())) return NOT_AVAILABLE
-  return new Intl.DateTimeFormat('ja-JP', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo',
-  }).format(date)
+  return formatDateTime(date)
 }
 
 /**
@@ -74,12 +86,14 @@ export function checkedAtText(checkedAt: string): string {
  *
  * **`canDelete` と `usageCount` の両方を見る。** どちらか一方だけだと、
  * 片方が更新されたときに押せてしまう組み合わせが残る。
+ * R34: 未確認（verified false）は確かめられないので消させない。
  */
 export function canDelete(input: {
   impact: MediaDeleteImpact | null
   busy: boolean
 }): boolean {
   if (!input.impact || input.busy) return false
+  if (input.impact.verified === false) return false
   return input.impact.canDelete && input.impact.usageCount === 0
 }
 

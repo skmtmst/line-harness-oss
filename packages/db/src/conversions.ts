@@ -1,6 +1,10 @@
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { boundedListLimit, jstNow, nonNegativeListOffset, toJstString } from './utils.js';
-import { resolveAffiliateAttribution } from './affiliate-attribution.js';
+import {
+  explainAffiliateAttribution,
+  recordAttributionDecision,
+} from './affiliate-attribution.js';
+import { isFriendExcludedByConversion, readConversionExclusion } from './conversion-exclusions.js';
 // =============================================================================
 // Conversion Points & Events — CV Tracking
 // =============================================================================
@@ -39,6 +43,11 @@ export interface ConversionPoint {
   created_at: string;
   /** 金額の決め方(N-252)。source のときは起点イベントの申告値を写す。 */
   value_mode?: 'source' | 'fixed' | 'none' | null;
+  /**
+   * 友だちと結び付かない成果を匿名の合計として数えるか(#819)。
+   * 0=数えない(既定)。1=conversion_anonymous_days へ日別の件数だけ残す。
+   */
+  count_anonymous?: number;
 }
 
 export interface ConversionEvent {
@@ -260,11 +269,58 @@ export async function updateConversionPoint(
 }
 
 /**
+ * ページ到達の照合用にURLを同じ形へ直す（R282）。
+ *
+ * - `?` 以降（パラメータ）と `#` 以降（ページ内位置）を外す。
+ *   画面の説明どおり「パラメータは無視」する。保存した側に残っている
+ *   パラメータも同じく外すので、保存時と受信時で解釈がずれない。
+ * - ホストは小文字へ揃える（大文字・小文字の違いは同じ場所とみなす）。
+ * - パスは文字どおりに残す（大文字・小文字は別の場所、`_` や `%` も
+ *   別の文字へ広げない）。
+ *
+ * http(s) でない・壊れた形は null を返す。
+ */
+export function normalizeUrlReachUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  const host = parsed.hostname.toLowerCase();
+  if (!host) return null;
+  const port = parsed.port ? `:${parsed.port}` : '';
+  return `${parsed.protocol}//${host}${port}${parsed.pathname || '/'}`;
+}
+
+/**
+ * 保存した対象URLが受信URLに当てはまるか（R282）。
+ *
+ * 両方を normalizeUrlReachUrl で同じ形へ直してから、文字どおりの
+ * 前方一致で見る。SQL の LIKE に任せない（`_`・`%` が別の文字へ
+ * 広がり、パスが大文字・小文字を区別しなくなるため）。
+ */
+export function matchesUrlReachTarget(targetUrl: unknown, url: string): boolean {
+  const target = normalizeUrlReachUrl(targetUrl);
+  const incoming = normalizeUrlReachUrl(url);
+  return target !== null && incoming !== null && incoming.startsWith(target);
+}
+
+/**
  * このURLに到達したときに数える成果地点を探す。
  *
  * target_url の前方一致で見る。完全一致にすると、クエリ文字列
  * （?utm_source=... など）が付いた瞬間に数えられなくなる。
  * 逆に部分一致にすると、URLの途中にたまたま含まれるだけで数えてしまう。
+ *
+ * R282: 照合は matchesUrlReachTarget（文字どおりの前方一致）で行う。
+ * 保存済みの設定を SQL で正規化し直すのはやめ、候補を絞ったあと
+ * JS で1件ずつ見る。既存の設定（パラメータ付きの保存など）も
+ * 作り直さずに正しく当てはまる。
  *
  * lineAccountId は「絞っていない地点（NULL）」と「このアカウントの地点」
  * の両方を拾う。
@@ -274,6 +330,7 @@ export async function getUrlReachConversionPoints(
   url: string,
   lineAccountId: string | null,
 ): Promise<ConversionPoint[]> {
+  if (normalizeUrlReachUrl(url) === null) return [];
   // N-263: 統括も一致条件にする。アカウントを絞っていない地点でも
   // tenant_id を持つので、リンクのアカウントの統括と同じ地点だけを返せば、
   // 「全アカウント対象の地点が別の統括のリンクで反応する」ことがない。
@@ -285,14 +342,13 @@ export async function getUrlReachConversionPoints(
           AND status = 'active'
           AND target_url IS NOT NULL
           AND target_url != ''
-          AND ? LIKE target_url || '%'
           AND (line_account_id IS NULL OR line_account_id = ?)
           AND COALESCE(tenant_id, ?) = COALESCE(
             (SELECT tenant_id FROM line_accounts WHERE id = ?), ?)`,
     )
-    .bind(url, lineAccountId, DEFAULT_TENANT_ID, lineAccountId, DEFAULT_TENANT_ID)
+    .bind(lineAccountId, DEFAULT_TENANT_ID, lineAccountId, DEFAULT_TENANT_ID)
     .all<ConversionPoint>();
-  return result.results;
+  return result.results.filter((point) => matchesUrlReachTarget(point.target_url, url));
 }
 
 /**
@@ -472,18 +528,28 @@ async function findBlockingEvent(
 }
 
 /**
- * 計測したときの金額の控え（N-252）。**必ず数値を返す。NULL を返さない。**
+ * 固定金額の控え（N-252）。**必ず数値を返す。NULL を返さない。**
  *
- * `point.value` をそのまま控えると、`value_mode` が `none` / `source` の地点では
- * NULL が入る（`createConversionDefinition` は fixed 以外で value を NULL にする）。
- * NULL の行は `affiliate-settlements.ts` の `value_snapshot ?? point_value` で
- * **そのときの地点の値**へ落ちるため、承認前に地点を編集すると過去の成果の
- * 報酬額が後から動く。控えに数値を必ず1つ置いて、後から変わる値を参照させない。
- *
- * 「いま NULL の行を見つけられなかった」ではなく、**NULL の行が生まれない形**にする。
+ * fixed の地点では `point.value` に決まった額が入るので、そのまま写すと
+ * 後から地点を編集しても過去の成果の控えは動かない。`?? 0` は fixed で
+ * value が空のまま残った行の転び止め。source/none の地点には使わない
+ * (R42)。source は起点の申告(`asSourceValue`)、none は金額なし(NULL)を
+ * 残し、0円と区別する。source 地点の `point.value` は NULL のため、
+ * 報酬計算の `value_snapshot ?? point_value` は NULL のまま 0 扱いになり、
+ * 編集で過去の報酬が動くことはない。
  */
 function measuredValue(point: { value: number | null }): number {
   return Number(point.value ?? 0);
+}
+
+/**
+ * 起点が申告した1件あたりの金額(R42)。0以上の有限数だけを受け付け、
+ * 無い・不正なときは NULL(金額なし)を返す。0 へ倒さない。
+ */
+function asSourceValue(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : null;
 }
 
 export async function trackConversion(
@@ -526,6 +592,29 @@ export async function trackConversion(
   )) {
     throw new Error('conversion_account_mismatch');
   }
+  // R40: 「数えない条件」に当てはまる友だちは記録しない。外部受信・
+  // 手動記録・起点の自動計測のすべてがこの関数を通るので、ここ1か所で
+  // 効く。壊れた条件は保存口で弾くが、直書きされた行に備えてここでは
+  // 例外にせず条件なしとして数え続け、記録を止めない。
+  {
+    const configRow = await db.prepare(
+      `SELECT source_config_json FROM conversion_points WHERE id = ?`,
+    ).bind(input.conversionPointId).first<{ source_config_json: string | null }>();
+    let parsed: unknown = null;
+    try {
+      parsed = configRow?.source_config_json ? JSON.parse(configRow.source_config_json) : null;
+    } catch {
+      parsed = null;
+    }
+    const exclusion = readConversionExclusion(parsed);
+    if (exclusion.invalid) {
+      console.error('conversion exclusion unreadable:', {
+        conversionPointId: input.conversionPointId,
+      });
+    } else if (await isFriendExcludedByConversion(db, input.friendId, exclusion.condition)) {
+      throw new Error('conversion_excluded');
+    }
+  }
 
   if (input.idempotencyKey) {
     const existing = await findEventByIdempotencyKey(db, input.conversionPointId, input.idempotencyKey);
@@ -539,21 +628,28 @@ export async function trackConversion(
   const policy = resolveDedupPolicy(point);
 
   /*
-   * N-270: 金額のスナップショット。
-   * source の地点は起点の申告値を採る(不正値は 0 へ倒す)。fixed/none では
-   * 地点の設定だけを写し、呼び出し側の申告で固定金額を上書きさせない。
+   * N-270/R42: 金額のスナップショット。
+   * source の地点は起点の申告値を採る。申告が無い・不正なときは 0 へ
+   * 倒さず NULL(金額なし)で残す。0円と金額なしを混ぜると、注文金額を
+   * 使う設定なのに成果が 0円に見える(R42)。fixed では地点の設定だけを
+   * 写し、呼び出し側の申告で固定金額を上書きさせない。none は金額を
+   * 集計しないので常に NULL。集計側は COALESCE(value_snapshot, 0) で
+   * 合計し、表示側は NULL を「金額なし」として 0円と区別する。
    */
   const snapshotValue = point.value_mode === 'source'
-    && typeof input.value === 'number' && Number.isFinite(input.value) && input.value >= 0
-    ? input.value
-    : measuredValue(point);
+    ? asSourceValue(input.value)
+    : point.value_mode === 'fixed'
+      ? measuredValue(point)
+      : null;
 
-  // Resolve last-touch affiliate attribution before inserting the event.
-  // 地点ごとに期間を狭めたい場合があるので attribution_days を渡す
-  // （NULL なら全体の既定 90 日）。
-  const attr = await resolveAffiliateAttribution(db, input.friendId, undefined, {
+  // 付け方の判断(#823)。候補を新しい順に並べ、決まりをすべて満たす
+  // 最初の紹介に付ける。地点ごとに期間を狭めたい場合は attribution_days を渡す。
+  // 付けなかった理由も残し、成果の詳細で1件ずつ説明できるようにする。
+  const explanation = await explainAffiliateAttribution(db, input.friendId, now, {
     windowDays: point.attribution_days ?? undefined,
+    lineAccountId: friend.line_account_id ?? null,
   });
+  const attr = explanation.decision;
 
   // Affiliate-attributed CVs enter the approval queue as 'pending'; non-attributed
   // CVs leave approval_status NULL (the approval flow only applies to attributed rows).
@@ -727,6 +823,16 @@ export async function trackConversion(
     .bind(id)
     .first<ConversionEvent>();
   if (!created) throw new Error('conversion_event_insert_failed');
+  // 付け方の判断を成果に結びつけて残す。同じ成果の再送は最初の記録を保つ。
+  // 記録に失敗しても成果自体は失わない(成果の取りこぼしより記録の欠落を選ぶ)。
+  try {
+    await recordAttributionDecision(db, id, input.friendId, input.conversionPointId, explanation);
+  } catch (err) {
+    console.error('attribution decision unreadable:', {
+      conversionEventId: id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
   return created;
 }
 

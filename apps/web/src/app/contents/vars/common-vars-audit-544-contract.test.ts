@@ -60,7 +60,10 @@ describe('#544 N2 一覧の件数上限と絞り込み誘導', () => {
 
 describe('#544 N4 編集画面の値欄に入力上限を付ける', () => {
   it('値欄は200文字までで、数値種別は登録画面と同じ扱いにする', () => {
-    expect(EDIT_PAGE).toMatch(/id="cv-value"[\s\S]{0,300}?maxLength=\{item\.type === 'number' \? undefined : 200\}/)
+    // 日付・日時種別は★V7の選択部品（文字数制限の概念がない）で、文章・数値種別だけが入力欄のまま。
+    expect(EDIT_PAGE).toContain('<DateField id="cv-value"')
+    expect(EDIT_PAGE).toContain('<DateTimeField id="cv-value"')
+    expect(EDIT_PAGE).toMatch(/maxLength=\{item\.type === 'number' \? undefined : 200\}/)
   })
 })
 

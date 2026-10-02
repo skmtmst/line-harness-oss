@@ -52,6 +52,24 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
 }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の共通情報の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 import NewCommonVarPage from './page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -64,7 +82,7 @@ async function render() {
 }
 
 function byId(id: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
-  const el = host.querySelector(`#${id}`)
+  const el = document.querySelector(`#${id}`)
   if (!el) throw new Error(`見つかりません: #${id}`)
   return el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 }
@@ -72,7 +90,7 @@ function byId(id: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectEl
 /** 「登録」の完全一致だけを拾う。部分一致だと秘密値警告側の
  *  「内容を確認して登録する」まで一緒に拾ってしまう。 */
 function byExactText(tag: string, text: string): HTMLElement {
-  const found = Array.from(host.querySelectorAll(tag)).find((el) => el.textContent?.trim() === text)
+  const found = Array.from(document.querySelectorAll(tag)).find((el) => el.textContent?.trim() === text)
   if (!found) throw new Error(`見つかりません: <${tag}> "${text}"`)
   return found as HTMLElement
 }
@@ -100,6 +118,63 @@ async function click(element: HTMLElement) {
   await act(async () => { element.click() })
 }
 
+/** 暦で YYYY-MM-DD の日を選ぶ（日付・日時の選択の★V7）。 */
+async function pickCalendarDay(iso: string) {
+  const [y, mo, d] = iso.split('-').map(Number)
+  const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
+  for (let i = 0; i < 36; i += 1) {
+    const grid = document.querySelector('[role="grid"]')
+    const label = grid?.getAttribute('aria-label')
+    if (label === `${y}年${mo}月`) break
+    const target = y * 12 + mo
+    const currentLabel = /^(\d+)年(\d+)月$/.exec(label ?? '')
+    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : target
+    const nav = Array.from(document.querySelectorAll('button')).find(
+      (b) => b.getAttribute('aria-label') === (target > current ? '次の月' : '前の月'),
+    )!
+    await click(nav)
+  }
+  const day = Array.from(document.querySelectorAll('button')).find((b) =>
+    (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
+  )!
+  await click(day)
+}
+
+/** 日付の選択で YYYY-MM-DD を選ぶ。値は今までどおりの文字列。 */
+async function setDateValue(id: string, iso: string) {
+  await click(byId(id) as unknown as HTMLElement)
+  await pickCalendarDay(iso)
+  await closeDatePicker()
+}
+
+/** 開いている日時の選択箱を閉じる（次の欄の前に必ず呼ぶ）。日付の選択は選ぶと閉じる。 */
+async function closeDatePicker() {
+  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
+  if (!picker) return
+  const close = Array.from(picker.querySelectorAll('button')).find((b) => b.textContent?.trim() === '閉じる')!
+  await click(close)
+}
+
+/** 日時の選択で YYYY-MM-DDTHH:mm を選ぶ。値は今までどおり日本時間の文字列。 */
+async function setDateTimeValue(id: string, iso: string) {
+  const [date, time] = iso.split('T')
+  const [hour, minute] = time.split(':')
+  await click(byId(id) as unknown as HTMLElement)
+  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  await click(picker.querySelector('button[aria-label="日付"]') as HTMLElement)
+  await pickCalendarDay(date)
+  const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  await act(async () => {
+    const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
+    hourSelect.value = hour
+    hourSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    const minuteSelect = reopened.querySelector('select[aria-label="分"]') as HTMLSelectElement
+    minuteSelect.value = minute
+    minuteSelect.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await closeDatePicker()
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   fixture.accountId = 'account-1'
@@ -122,11 +197,11 @@ describe('共通情報の新規作成(実React)', () => {
     await setValue(byId('cv-name'), '期間限定案内')
     await setValue(byId('cv-key'), 'limited_notice')
     await setValue(byId('cv-value'), '受付中')
-    await setValue(byId('cv-valid-from'), '2026-09-16T10:00')
-    await setValue(byId('cv-valid-until'), '2026-09-16T12:00')
+    await setDateTimeValue('cv-valid-from', '2026-09-16T10:00')
+    await setDateTimeValue('cv-valid-until', '2026-09-16T12:00')
     await setValue(byId('cv-expiry-behavior'), 'fallback')
     await setValue(byId('cv-fallback-value'), '受付終了')
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({
       validFrom: '2026-09-16T10:00', validUntil: '2026-09-16T12:00',
@@ -138,29 +213,30 @@ describe('共通情報の新規作成(実React)', () => {
     await render()
     await setValue(byId('cv-name'), '不正期間')
     await setValue(byId('cv-key'), 'invalid_window')
-    await setValue(byId('cv-valid-from'), '2026-09-16T10:00')
-    await setValue(byId('cv-valid-until'), '2026-09-16T10:00')
-    await click(byExactText('button', '登録'))
+    await setDateTimeValue('cv-valid-from', '2026-09-16T10:00')
+    await setDateTimeValue('cv-valid-until', '2026-09-16T10:00')
+    await click(byExactText('button', '登録する'))
     expect(api.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('有効終了は有効開始より後にしてください')
   })
 
   it.each([
-    ['long_text', '案内'.repeat(5_000), 'TEXTAREA', null],
-    ['date', '2028-02-29', 'INPUT', 'date'],
-    ['datetime', '2028-02-29T23:59', 'INPUT', 'datetime-local'],
-    ['boolean', 'true', 'SELECT', null],
-  ])('%sを選ぶと適切な入力欄で保存payloadへ渡す', async (type, value, tagName, inputType) => {
+    ['long_text', '案内'.repeat(5_000), 'TEXTAREA'],
+    ['date', '2028-02-29', 'BUTTON'],
+    ['datetime', '2028-02-29T23:59', 'BUTTON'],
+    ['boolean', 'true', 'SELECT'],
+  ])('%sを選ぶと適切な入力欄で保存payloadへ渡す', async (type, value, tagName) => {
     await render()
     await setValue(byId('cv-name'), `${type}の項目`)
     await setValue(byId('cv-key'), `${type}_value`)
-    await click(host.querySelector(`input[name="cv-type"][value="${type}"]`) as HTMLInputElement)
+    await click(document.querySelector(`input[name="cv-type"][value="${type}"]`) as HTMLInputElement)
 
     const control = byId('cv-value')
     expect(control.tagName).toBe(tagName)
-    if (inputType) expect((control as HTMLInputElement).type).toBe(inputType)
-    await setValue(control, value)
-    await click(byExactText('button', '登録'))
+    if (type === 'date') await setDateValue('cv-value', value)
+    else if (type === 'datetime') await setDateTimeValue('cv-value', value)
+    else await setValue(control, value)
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ type, value }))
   })
@@ -170,18 +246,18 @@ describe('共通情報の新規作成(実React)', () => {
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-memo'), 'パスワード: hunter2')
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
 
-    expect(host.querySelector('[role="alertdialog"]')).not.toBeNull()
+    expect(document.querySelector('[role="alertdialog"]')).not.toBeNull()
     expect(host.textContent).toContain('社内メモ')
     expect(api.create).not.toHaveBeenCalled()
   })
 
-  it('入力中に一覧へのリンクを押すと確認を出し、「保存せずに移動」だけが遷移する（VAR-01 監査）', async () => {
+  it('入力中に一覧へのリンクを押すと確認を出し、「保存せずに移る」だけが遷移する（VAR-01 監査）', async () => {
     await render()
     await setValue(byId('cv-name'), '途中の下書き')
 
-    const backLink = Array.from(host.querySelectorAll('a')).find(
+    const backLink = Array.from(document.querySelectorAll('a')).find(
       (el) => el.textContent?.trim() === '共通情報一覧へ戻る',
     ) as HTMLAnchorElement
     expect(backLink).not.toBeUndefined()
@@ -198,9 +274,9 @@ describe('共通情報の新規作成(実React)', () => {
     expect((byId('cv-name') as HTMLInputElement).value).toBe('途中の下書き')
     expect(routerPush).not.toHaveBeenCalled()
 
-    // 「保存せずに移動」を選んだときだけ一覧へ進む。
+    // 「保存せずに移る」を選んだときだけ一覧へ進む。
     await click(backLink)
-    await click(byExactTextInBody('button', '保存せずに移動'))
+    await click(byExactTextInBody('button', '保存せずに移る'))
     expect(routerPush).toHaveBeenCalledWith('/contents/vars')
   })
 
@@ -209,15 +285,15 @@ describe('共通情報の新規作成(実React)', () => {
     await setValue(byId('cv-name'), 'account-1の下書き')
     await setValue(byId('cv-key'), 'draft_key')
     await setValue(byId('cv-memo'), 'password: hunter2')
-    await click(byExactText('button', '登録'))
-    expect(host.querySelector('[role="alertdialog"]')).not.toBeNull()
+    await click(byExactText('button', '登録する'))
+    expect(document.querySelector('[role="alertdialog"]')).not.toBeNull()
 
     // ヘッダーのアカウント選択(ページ遷移なし)で account-2 へ切り替える。
     fixture.accountId = 'account-2'
     await render()
 
     // 切替後は前アカウント向けの警告・入力を引き継がない。
-    expect(host.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
     expect((byId('cv-name') as HTMLInputElement).value).toBe('')
     expect((byId('cv-memo') as HTMLTextAreaElement).value).toBe('')
     expect(host.textContent).toContain('LINEアカウントが切り替わったため、入力をやり直してください')
@@ -225,7 +301,7 @@ describe('共通情報の新規作成(実React)', () => {
     // account-2 用に改めて入力し、account-2 として正しく登録できる。
     await setValue(byId('cv-name'), 'account-2の値')
     await setValue(byId('cv-key'), 'a2_key')
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).toHaveBeenCalledTimes(1)
     expect(api.create.mock.calls[0][0]).toMatchObject({ accountId: 'account-2', name: 'account-2の値' })
@@ -244,9 +320,9 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await render()
     await setValue(byId('cv-name'), '営業中フラグ')
     await setValue(byId('cv-key'), 'is_open')
-    await click(host.querySelector('input[name="cv-type"][value="boolean"]') as HTMLInputElement)
+    await click(document.querySelector('input[name="cv-type"][value="boolean"]') as HTMLInputElement)
     // 「選んでください」のまま登録する。
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('値を選んでください')
@@ -257,8 +333,8 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await render()
     await setValue(byId('cv-name'), '開店日')
     await setValue(byId('cv-key'), 'open_date')
-    await click(host.querySelector('input[name="cv-type"][value="date"]') as HTMLInputElement)
-    await click(byExactText('button', '登録'))
+    await click(document.querySelector('input[name="cv-type"][value="date"]') as HTMLInputElement)
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('値の日付を入力してください')
@@ -268,23 +344,50 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await render()
     await setValue(byId('cv-name'), 'ロゴ')
     await setValue(byId('cv-key'), 'logo_url')
-    await click(host.querySelector('input[name="cv-type"][value="image"]') as HTMLInputElement)
+    await click(document.querySelector('input[name="cv-type"][value="image"]') as HTMLInputElement)
     await setValue(byId('cv-value'), 'not-an-image')
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('https://')
+  })
+
+  it('URL型にURLでない文章を入れると止め、欄のすぐ下にも理由を出す(R36)', async () => {
+    await render()
+    await setValue(byId('cv-name'), '店舗リンク')
+    await setValue(byId('cv-key'), 'shop_link')
+    await click(host.querySelector('input[name="cv-type"][value="url"]') as HTMLInputElement)
+    await setValue(byId('cv-value'), 'これはURLではありません')
+    await click(byExactText('button', '登録する'))
+
+    expect(api.create).not.toHaveBeenCalled()
+    // 欄のすぐ下に出る。
+    const valueField = byId('cv-value').closest('div')
+    expect(valueField?.textContent).toContain('http://')
+    expect((document.activeElement as HTMLElement | null)?.id).toBe('cv-value')
+  })
+
+  it('URL型は http/https のURLなら通す(R36)', async () => {
+    await render()
+    await setValue(byId('cv-name'), '店舗リンク')
+    await setValue(byId('cv-key'), 'shop_link2')
+    await click(host.querySelector('input[name="cv-type"][value="url"]') as HTMLInputElement)
+    await setValue(byId('cv-value'), 'https://example.com/shop')
+    await click(byExactText('button', '登録する'))
+
+    expect(api.create).toHaveBeenCalledTimes(1)
+    expect(api.create.mock.calls[0][0]).toMatchObject({ type: 'url', value: 'https://example.com/shop' })
   })
 
   it('期間外の代替値が種別に合わないと止める', async () => {
     await render()
     await setValue(byId('cv-name'), 'ロゴ')
     await setValue(byId('cv-key'), 'logo_url2')
-    await click(host.querySelector('input[name="cv-type"][value="image"]') as HTMLInputElement)
+    await click(document.querySelector('input[name="cv-type"][value="image"]') as HTMLInputElement)
     await setValue(byId('cv-value'), 'https://cdn.example.com/logo.png')
     await setValue(byId('cv-expiry-behavior'), 'fallback')
     await setValue(byId('cv-fallback-value'), 'not-an-image')
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('代替値は https:// からはじまるURLで入力してください')
@@ -297,10 +400,10 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-value'), '10:00-18:00')
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
 
     expect(host.textContent).toContain('種別に合う値を入力してください')
-    expect(host.textContent).not.toContain('保存に失敗しました')
+    expect(host.textContent).not.toContain('保存に失敗しました。通信を確かめて、もう一度お試しください。')
   })
 
   it('重複(409)は従来の案内を出し、差し込み名の欄へ戻す', async () => {
@@ -309,7 +412,7 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-value'), '10:00-18:00')
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
 
     expect(host.textContent).toContain('その差し込み名は既に使われています')
     expect((document.activeElement as HTMLElement | null)?.id).toBe('cv-key')
@@ -321,7 +424,7 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-value'), '10:00-18:00')
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
 
     expect(host.textContent).toContain('通信が切れている可能性があります')
     // 入力は消さない。
@@ -351,9 +454,9 @@ describe('日本語の秘密値検知(限定語彙+区切り記号必須とい�
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-memo'), memo)
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
 
-    expect(host.querySelector('[role="alertdialog"]')).not.toBeNull()
+    expect(document.querySelector('[role="alertdialog"]')).not.toBeNull()
     expect(api.create).not.toHaveBeenCalled()
   })
 
@@ -370,10 +473,10 @@ describe('日本語の秘密値検知(限定語彙+区切り記号必須とい�
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours2')
     await setValue(byId('cv-memo'), memo)
-    await click(byExactText('button', '登録'))
+    await click(byExactText('button', '登録する'))
 
     // 誤検知していなければ、警告を出さずにそのまま送信まで進む。
-    expect(host.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
     expect(api.create).toHaveBeenCalledTimes(1)
     expect(api.create.mock.calls[0][0]).toMatchObject({ memo })
   })

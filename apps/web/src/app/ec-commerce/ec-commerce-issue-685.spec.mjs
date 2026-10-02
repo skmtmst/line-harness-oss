@@ -383,9 +383,14 @@ test('Aで再試行の応答を待つ間にBへ切り替えても、Bの一覧�
 
   await openEc(page)
   await expect(page.getByText('111件', { exact: true }).first()).toBeVisible()
-  await page.getByRole('button', { name: 'もう一度やる' }).click()
+  // #641: 「もう一度やる」は行の「・・・」メニューの中にある
+  await page.getByRole('button', { name: 'この行のその他操作' }).click()
+  await page.getByRole('menuitem', { name: 'もう一度やる' }).click()
   await expect.poll(() => retryRequested).toBe(true)
-  await expect(page.getByRole('button', { name: '戻しています…' })).toBeVisible()
+  /* 再試行中はメニューの文言が「戻しています…」に変わる */
+  await page.getByRole('button', { name: 'この行のその他操作' }).click()
+  await expect(page.getByRole('menuitem', { name: '戻しています…' })).toBeVisible()
+  await page.keyboard.press('Escape')
 
   /* Aの再試行応答(2秒後)が届く前にBへ切り替える。 */
   await switchAccount(page, ACCOUNT_B)

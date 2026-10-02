@@ -3,7 +3,7 @@ import Link from 'next/link'
 /**
  * 見本・比較画面の明示（UI監査 #975 U101）。
  *
- * /tags-v2 や /visual-qa/* は固定データを表示する検証用の画面だが、
+ * /visual-qa/* は固定データを表示する検証用の画面だが、
  * 見た目が通常の業務画面と同じなので、直リンクで開いた人が本物の
  * 一覧だと取り違える。画面の先頭へ常にこの帯を出し、通常画面への
  * 戻り口も置く。
@@ -34,7 +34,7 @@ export default function SampleScreenNotice({
       </p>
       <Link
         href={backHref}
-        className="border-warning text-status-warn-deep hover:bg-canvas rounded-control shrink-0 border px-3 py-1.5 text-xs font-bold"
+        className="border-warning text-status-warn-deep hover:bg-canvas rounded-control shrink-0 border px-3 py-1.5 text-xs font-medium"
       >
         {backLabel}
       </Link>

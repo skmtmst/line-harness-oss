@@ -4,10 +4,11 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { Folder, Tag } from '@line-crm/shared'
-import { AlertTriangle, ArrowRight, CheckCircle2, Eye, GripVertical, Paperclip, Plus, Save, Send, Trash2, Zap } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CheckCircle2, Eye, Plus, Save, Send, Trash2, Zap } from 'lucide-react'
 import {
   ApiError,
   api,
+  describeSaveFailure,
   type ApiBroadcast,
   type BroadcastBubble,
   type BroadcastBubbleType,
@@ -17,6 +18,7 @@ import {
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import StickyBar from '@/components/shared/sticky-bar'
+import LinePreview from '@/components/shared/line-preview'
 import {
   MAX_BUBBLES,
   MAX_TEXT_LENGTH,
@@ -24,10 +26,12 @@ import {
   messageLengthNotice,
 } from './message-limits'
 import {
+  assetBubbleError,
   bubbleLegacyMessage,
   bubblesForSave,
   contentTemplateToBubble,
   isContentTemplateType,
+  messageButtonsError,
   messageTemplateToBubble,
   type BroadcastTemplateOption,
 } from '@/lib/broadcast-template'
@@ -39,14 +43,17 @@ import {
   type TargetMode,
 } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
-import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
+import { carouselColumnsProblem, flexContentProblem } from '@/components/broadcasts/bubble-content-check'
+import { newBroadcastDraftSession, persistBroadcastDraft, type BroadcastDraftSession } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
+import DateField from '@/components/shared/date-field'
+import { TimeField } from '@/components/shared/date-time-field'
 import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
 import { audienceSummary } from '@/lib/broadcast-summary'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import MessageKindFields, {
   emptyMessageKindState,
-  serializeMessageKind,
+  messageKindProblem,
   type MessageKind,
   type MessageKindState,
 } from '@/components/scenarios/message-kind-fields'
@@ -55,16 +62,37 @@ import CarouselPicker, {
   filterSendableTemplates,
 } from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
+import Combobox from '@/components/shared/combobox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Checkbox from '@/components/shared/checkbox'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
+import Select from '@/components/shared/select'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { testSendFailure, testSendResult, type TestSendView } from './test-send-view'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import {
+  ApprovalRequestFields,
+  SingleOperatorFields,
+} from '@/components/broadcasts/broadcast-approval'
+import type { BroadcastApprovalCandidate } from '@/lib/api'
+import { formatDateTime, formatDay, formatNumber, formatRelative, formatTime } from '@/lib/format'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 interface BroadcastFormProps {
   tags: Tag[]
+  /**
+   * R581: タグ候補の取得状態。呼び側（作成ページ）が持つ。
+   * 取得失敗と真の0件を分け、同じ画面で再試行できるようにする。
+   * 未指定は取得ずみ扱い（一覧の埋め込みフォームは従来どおり）。
+   */
+  tagsStatus?: 'loading' | 'ready' | 'error'
+  /** R581: タグ候補の再取得。入力はフォームが持つので、再試行で消えない。 */
+  onRetryTags?: () => void
   /** 作成された実物。予約だけを完了画面へ送り、下書きと取り違えない。 */
   onSuccess: (broadcast: ApiBroadcast) => void
   /**
@@ -90,16 +118,10 @@ interface BroadcastFormProps {
 }
 
 /*
- * 右側のプレビューの枠は、**LINEのトーク画面を描いたもの**。
- * アプリのデザインの色ではないので、トークンにしない。
- * `bg-canvas` などに置き換えると、LINEに見えなくなって用をなさなくなる。
+ * 右側のプレビューの枠は、LINEのトーク画面に近い共通部品
+ * `LinePreview`（`components/shared/line-preview`）を使う。
+ * 画面ごとに枠の色を作らない（B-6）。
  */
-const LINE_MOCK = {
-  frame: 'border-[#1f2937]',   // 端末の外枠
-  bar: 'bg-[#1f2937]',         // 上のバー
-  wallpaper: 'bg-[#8faed2]',   // LINEの既定の壁紙
-  onDark: 'text-white',        // 上のバーと日付の文字
-} as const
 
 /**
  * 種類の名前。**内部の語をそのまま画面へ出さない。**
@@ -120,23 +142,23 @@ export function typeLabel(type: string): string {
 }
 
 /*
- * まだ送れない種別と、その理由。
+ * 直接は選べない種別と、その理由。
  *
  * ここに無い種別は、シナリオと同じ組み立て（`line-message.ts`）を通って
- * そのまま LINE へ渡る。ここに載っているものは `bubbleLegacyMessage` が
- * 「テキストに JSON を入れたもの」に落とすので、**中身の JSON がそのまま
- * 相手のトークに届く**。送って初めて分かる壊れ方なので、選ばせない。
+ * そのまま LINE へ渡る。ここに載っているものは手書きの中身が無いので、
+ * 種別の選択肢からは選ばせない。送って初めて分かる壊れ方にしない。
  *
- * リッチメッセージ・カードタイプ・クーポン・リサーチは、こちらで作った
- * 独自の型で、LINE に対応する種別が無い。Flex かカルーセルへ組み立て直す
- * 必要があるので、まだ蓋をしてある。
+ * リッチメッセージ・カードタイプ・クーポン・リサーチは、コンテンツの素材
+ * からのみ引用する。引用時は画面の保存と Worker の解析が同じ変換
+ *（`@line-crm/shared` の素材変換）で LINE の種別に直すので、中身の JSON が
+ * そのまま相手のトークに届かない（監査 R144）。
  */
 const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
-  rich_message: 'リッチメッセージは準備中です。いまは写真かFlexで作れます',
-  rich_video: 'リッチビデオは準備中です。いまは動画で送れます',
-  card_message: 'カードタイプは準備中です。いまはカルーセルで作れます',
-  coupon: 'クーポンは準備中です',
-  research: 'リサーチは準備中です',
+  rich_message: 'リッチメッセージには未対応です。いまは写真かFlexで作れます',
+  rich_video: 'リッチビデオには未対応です。いまは動画で送れます',
+  card_message: 'カードタイプには未対応です。いまはカルーセルで作れます',
+  coupon: 'クーポンには未対応です',
+  research: 'リサーチには未対応です',
 }
 
 /** メッセージ形式タブの並び。null は「紹介」（まだ作れない）。 */
@@ -155,6 +177,19 @@ const MESSAGE_TYPE_TABS = [
  * 書きかけの中身が移るたびに空へ戻ってしまう（切替は bubble の中身を
  * 作り直す）ので、フォーカスと選択は分ける。
  */
+/**
+ * R580: 保存の検査で止まった不備を直す欄がある段。
+ *
+ * 段の名前は `broadcast-steps.ts` の5段と同じにする。確認の段は入力を
+ * 持たないので、ここには出ない（不備は必ず基本・対象者・メッセージの
+ * どれかにある）。
+ */
+const VALIDATION_STEP_LABEL: Record<'basic' | 'audience' | 'message', string> = {
+  basic: '基本設定',
+  audience: '対象者',
+  message: 'メッセージ',
+}
+
 export function moveMessageTypeTabFocus(
   event: { key: string; currentTarget: HTMLElement; preventDefault: () => void },
   activeElement: Element | null,
@@ -173,9 +208,7 @@ export function moveMessageTypeTabFocus(
 const EMOJIS = ['😊', '✨', '🎉', '🐕', '🐈', '🌿', '❤️', '👍']
 
 function formatScheduleTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ja-JP', {
-    timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit',
-  })
+  return formatTime(iso)
 }
 
 /**
@@ -225,7 +258,7 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
       const res = await api.broadcastMessageAssets.upload(file)
       if (!res.success) { setError(res.error); return }
       onChange({ ...bubble.content, originalContentUrl: res.data.url, previewImageUrl: isVideo ? (bubble.content.previewImageUrl ?? '') : res.data.url })
-    } catch { setError('アップロードに失敗しました') } finally { setBusy(false) }
+    } catch { setError('アップロードに失敗しました。通信を確かめて、もう一度お試しください。') } finally { setBusy(false) }
   }
   return <div className="space-y-3">
     <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-card border-2 border-dashed border-hairline bg-canvas-sunken text-sm text-ink-faint hover:border-accent">
@@ -233,7 +266,7 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
       <span className="mt-1 text-xs">上限 {isVideo ? '200MB' : '10MB'}</span>
       <input type="file" className="hidden" disabled={busy} accept={isVideo ? 'video/mp4' : 'image/jpeg,image/png'} onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f) }} />
     </label>
-    {typeof bubble.content.originalContentUrl === 'string' && bubble.content.originalContentUrl && <p className="truncate text-xs text-accent">アップロード済み：{bubble.content.originalContentUrl}</p>}
+    {typeof bubble.content.originalContentUrl === 'string' && bubble.content.originalContentUrl && <p className="truncate text-xs text-accent-deep">アップロード済み：{bubble.content.originalContentUrl}</p>}
     {isVideo && <input value={String(bubble.content.previewImageUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, previewImageUrl: e.target.value })} placeholder="プレビュー画像URL（任意）" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
     {bubble.type === 'rich_video' && <input value={String(bubble.content.actionUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
     {error && <p className="text-xs text-danger">{error}</p>}
@@ -244,8 +277,8 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
   if (bubble.type === 'text') return <div className="max-w-[82%]">
-    <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-sm bg-canvas px-3 py-2 text-[13px] shadow-sm">{text || 'テキストを入力すると表示されます'}</div>
-    {buttons.map((button) => <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 truncate rounded-control px-3 py-2 text-center text-xs font-bold" title={button.value}>{button.label || 'ボタン'}</div>)}
+    <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-[13px] shadow-card">{text || 'テキストを入力すると表示されます'}</div>
+    {buttons.map((button) => <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 truncate rounded-control px-3 py-2 text-center text-xs font-medium" title={button.value}>{button.label || 'ボタン'}</div>)}
   </div>
   if (bubble.type === 'sticker') {
     const st = (bubble.content.state as MessageKindState | undefined)?.sticker
@@ -255,14 +288,14 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   }
   if (bubble.type === 'location') {
     const loc = (bubble.content.state as MessageKindState | undefined)?.location
-    return <div className="bg-canvas w-[82%] rounded-card p-3 text-[13px] shadow-sm">
+    return <div className="bg-canvas w-[82%] rounded-card p-3 text-[13px] shadow-card">
       <p className="text-ink font-bold">{loc?.title || '場所'}</p>
       <p className="text-ink-faint mt-0.5 text-[11px]">{loc?.address || '住所を入れると出ます'}</p>
     </div>
   }
   if (bubble.type === 'audio') {
     const au = (bubble.content.state as MessageKindState | undefined)?.audio
-    return <div className="bg-canvas flex w-[82%] items-center gap-2 rounded-card p-3 text-[13px] shadow-sm">
+    return <div className="bg-canvas flex w-[82%] items-center gap-2 rounded-card p-3 text-[13px] shadow-card">
       <span className="text-lg">▶</span>
       <span className="text-ink-faint text-[11px]">{au?.duration ? `${au.duration} 秒` : '音声'}</span>
     </div>
@@ -270,20 +303,20 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   if (bubble.type === 'carousel') {
     const name = String(bubble.content.templateName ?? '')
     return <div className="flex w-full gap-2 overflow-x-auto pb-1">
-      {[0, 1].map((i) => <div key={i} className="bg-canvas w-36 shrink-0 rounded-card p-2 shadow">
+      {[0, 1].map((i) => <div key={i} className="bg-canvas w-36 shrink-0 rounded-card p-2 shadow-card">
         <div className="bg-canvas-sunken h-20 rounded-control" />
-        <p className="text-ink mt-2 truncate text-xs font-bold">{i === 0 ? (name || 'カルーセル') : '…'}</p>
+        <p className="text-ink mt-2 truncate text-xs font-medium">{i === 0 ? (name || 'カルーセル') : '…'}</p>
       </div>)}
     </div>
   }
   if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
-  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-sm"><p className="text-xs font-bold text-info">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
+  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-card"><p className="text-xs font-medium text-info">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-bold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded bg-accent-deep py-1 text-[10px] text-on-accent">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow-card">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><Button variant="primary" className="mt-2 w-full rounded-mini px-0 py-1 text-[10px] border-0 h-auto whitespace-normal">{String(card.actionLabel ?? '詳しく見る')}</Button></div>)}</div>
   }
-  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-sm">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-bold">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
+  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-card">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-medium">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
 
 function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, onChange, onMove, onDelete }: {
@@ -297,22 +330,31 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
   const availableAssets = assets.filter((asset) => asset.kind === bubble.type)
   // 差し込みをカーソルの位置に入れるために、入力欄そのものを渡す。
   const textRef = useRef<HTMLTextAreaElement>(null)
-  return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
-    <div className="flex items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-deep text-xs font-bold text-on-accent">{index + 1}</span>
-      <select value={bubble.type} onChange={(e) => onChange(emptyBubble(e.target.value as BroadcastBubbleType))} className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-semibold">
-        {Object.entries(TYPE_LABELS).map(([value, label]) => {
+  return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
+    {/*
+      吹き出しの見出し行。狭い幅では2段に折る。折らないと、種類の選択肢と
+      移動・削除ボタンが横に並んだまま表示域をはみ出し、解除や並べ替えが
+      右側へ隠れる（監査 R149）。
+    */}
+    <div className="flex flex-wrap items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
+      <span className="flex h-7 w-7 items-center justify-center rounded-pill bg-accent-deep text-xs font-medium text-on-accent">{index + 1}</span>
+      <Select
+        aria-label={`吹き出し${index + 1}の種類`}
+        value={bubble.type}
+        onChange={(value) => onChange(emptyBubble(value as BroadcastBubbleType))}
+        options={Object.entries(TYPE_LABELS).map(([value, label]) => {
           const reason = UNSENDABLE_TYPES[value as BroadcastBubbleType]
-          return (
-            <option key={value} value={value} disabled={Boolean(reason)}>
-              {reason ? `${label}（準備中）` : label}
-            </option>
-          )
+          return {
+            value,
+            label: reason ? `${label}（未対応）` : label,
+            disabled: Boolean(reason),
+          }
         })}
-      </select>
+        className="min-w-0 flex-1"
+      />
       <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
       <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
-      <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除</button>
+      <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除する</button>
     </div>
     <div className="p-4">
       {bubble.type === 'text' && <div>
@@ -328,10 +370,10 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
           />
         </div>
         <textarea ref={textRef} rows={6} maxLength={MAX_TEXT_LENGTH} value={String(bubble.content.text ?? '')} onChange={(e) => onChange({ ...bubble, content: { text: e.target.value } })} placeholder="テキストを入力" className="border-hairline focus:border-accent rounded-card w-full resize-none border p-3 text-sm focus:outline-none" />
-        <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, MAX_TEXT_LENGTH) } })} className="rounded border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-ink-faint">{messageLengthLabel(String(bubble.content.text ?? '').length)}</span></div>
+        <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, MAX_TEXT_LENGTH) } })} className="rounded-mini border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-ink-faint">{messageLengthLabel(String(bubble.content.text ?? '').length)}</span></div>
       </div>}
       {bubble.type === 'flex' && <div>
-        <label className="mb-1 block text-xs font-bold text-ink-secondary">Flex JSON</label>
+        <label className="mb-1 block text-xs font-medium text-ink-secondary">Flex JSON</label>
         <textarea rows={8} value={String(bubble.content.flexJson ?? '')} onChange={(e) => onChange({ ...bubble, content: { ...bubble.content, flexJson: e.target.value, templateId: undefined, templateName: undefined } })} className="w-full resize-y rounded-card border border-hairline p-3 font-mono text-xs focus:border-accent focus:outline-none" />
       </div>}
       {/*
@@ -363,10 +405,16 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
       )}
       {['image','video','rich_video'].includes(bubble.type) && <MediaUpload bubble={bubble} onChange={(content) => onChange({ ...bubble, content })} />}
       {isContentTemplateType(bubble.type) && <div>
-        <label className="mb-1 block text-xs font-bold text-ink-secondary">コンテンツで作成したテンプレートから選択</label>
-        <select value={String(bubble.content.assetId ?? '')} onChange={(e) => { const asset = availableAssets.find((item) => item.id === e.target.value); onChange({ ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : { assetId: '', assetName: '' } }) }} className="w-full rounded-card border border-hairline px-3 py-2.5 text-sm">
-          <option value="">テンプレートを選択してください</option>{availableAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
-        </select>
+        <label className="mb-1 block text-xs font-medium text-ink-secondary">コンテンツで作成したテンプレートから選択</label>
+        <Combobox
+          aria-label="コンテンツで作成したテンプレートから選択"
+          placeholder="テンプレートを選択してください"
+          value={String(bubble.content.assetId ?? '')}
+          onChange={(next) => { const asset = availableAssets.find((item) => item.id === next); onChange({ ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : { assetId: '', assetName: '' } }) }}
+          options={availableAssets.map((asset) => ({ value: asset.id, label: asset.name }))}
+          loading={assetsStatus === 'loading'}
+          className="w-full"
+        />
         {assetsStatus === 'loading' && <p className="mt-2 text-xs text-ink-faint">テンプレートを読み込んでいます…</p>}
         {assetsStatus === 'error' && <p className="mt-2 text-xs text-warning">テンプレートを読み込めませんでした。開き直すと再取得します。</p>}
         {assetsStatus === 'ready' && availableAssets.length === 0 && <p className="mt-2 text-xs text-warning">先に「コンテンツ ＞ テンプレート」で作成してください。</p>}
@@ -375,23 +423,21 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
   </section>
 }
 
-function TextBubbleEditor({ bubble, index, trackLinks, buttons, embedded = false, visualReference = false, onTrackLinksChange, onButtonsChange, onChange }: {
+function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, visualReference = false, onTrackLinksChange, onChange, onMove, onDelete }: {
   bubble: BroadcastBubble
   index: number
+  total: number
   trackLinks: boolean
-  buttons: BroadcastMessageButton[]
   embedded?: boolean
   visualReference?: boolean
   onTrackLinksChange: (enabled: boolean) => void
-  onButtonsChange: (buttons: BroadcastMessageButton[]) => void
   onChange: (bubble: BroadcastBubble) => void
+  onMove: (direction: -1 | 1) => void
+  onDelete: () => void
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null)
   const text = String(bubble.content.text ?? '')
-  const urls = [...new Set([
-    ...(text.match(/https?:\/\/\S+/g) ?? []),
-    ...buttons.filter((button) => button.type === 'url' && button.value).map((button) => button.value),
-  ])]
+  const urls = [...new Set(text.match(/https?:\/\/\S+/g) ?? [])]
 
   return (
     <section className={embedded ? 'border-hairline border-t pt-4' : 'rounded-card border border-hairline bg-canvas p-4'}>
@@ -405,9 +451,15 @@ function TextBubbleEditor({ bubble, index, trackLinks, buttons, embedded = false
           />
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h4 className="text-sm font-bold text-ink">{index + 1}通目・テキスト</h4>
-        <Button type="button" onClick={() => onButtonsChange([...buttons, { label: '', type: 'url' as const, value: '' }].slice(0, 4))} disabled={buttons.length >= 4}><Paperclip size={15} aria-hidden /> URL・PDF</Button>
+      {/*
+        監査 R208: テキストも画像などと同じく削除・上下移動ができる。
+        以前はテキストに操作が無く、画像へ切り替えて消す裏技が要った。
+      */}
+      <div className="flex flex-wrap items-center gap-3">
+        <h4 className="min-w-0 flex-1 text-sm font-bold text-ink">{index + 1}通目・テキスト</h4>
+        <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
+        <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
+        <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除する</button>
       </div>
       {!embedded && <div className="mt-3 border-b border-hairline pb-3">
         <InsertToolbar
@@ -430,41 +482,60 @@ function TextBubbleEditor({ bubble, index, trackLinks, buttons, embedded = false
         <span className="font-semibold text-action">1通あたり5,000文字・最大5通まで。4,500文字を超えると自動で分割します。</span>
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <section className="rounded-control border border-hairline p-3">
-          <div className="flex items-start justify-between gap-2">
-            <div><h5 className="text-sm font-bold text-ink">ボタン</h5><p className="mt-1 text-xs text-ink-faint">メッセージの下に並びます。最大4つまで。</p></div>
-            <Button type="button" onClick={() => onButtonsChange([...buttons, { label: '', type: 'url' as const, value: '' }])} disabled={buttons.length >= 4}>＋ ボタンを追加</Button>
+      <section className="rounded-control mt-4 border border-hairline p-3">
+        <h5 className="text-sm font-bold text-ink">URLの扱い</h5>
+        <p className="mt-1 text-xs text-ink-faint">短縮すると、URLごとのクリック数を計測できます。</p>
+        <Checkbox checked={!trackLinks} onCheckedChange={(checked) => onTrackLinksChange(!checked)} className="mt-3">このメッセージではURLを短縮しない</Checkbox>
+        <div className="mt-3 overflow-hidden rounded-control border border-hairline text-xs">
+          <div className="broadcast-url-row bg-canvas-sunken px-3 py-2 font-bold text-ink-faint"><span>サイト名</span><span>URL</span><span>計測</span></div>
+          {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="font-semibold">キャンペーンLP</span><span className="truncate" title={url}>{url}</span><span>短縮して計測</span></div>) : (
+            <p className="border-t border-hairline px-3 py-3 text-ink-faint">本文にURLはありません。</p>
+          )}
+        </div>
+      </section>
+    </section>
+  )
+}
+
+/**
+ * 配信全体で1組のボタン（監査 R209）。
+ *
+ * 以前は各テキストの下に同じ編集欄が出て、2通目を直すと全通に反映された。
+ * ボタンの置き場は配信に1つ（1通目の下に付く）なので、編集欄も1つにして
+ * 適用範囲を文で明示する。
+ */
+function MessageButtonsSection({ buttons, error, onChange }: {
+  buttons: BroadcastMessageButton[]
+  error: string
+  onChange: (buttons: BroadcastMessageButton[]) => void
+}) {
+  return (
+    <section className="border-hairline mt-4 rounded-card border bg-canvas p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-bold text-ink">ボタン</h3>
+          <p className="mt-1 text-xs text-ink-faint">配信全体で1組です。1通目のメッセージの下に付きます。最大4つまで。</p>
+        </div>
+        <Button type="button" onClick={() => onChange([...buttons, { label: '', type: 'url' as const, value: '' }])} disabled={buttons.length >= 4}>＋ ボタンを追加する</Button>
+      </div>
+      <p className="mt-2 text-xs text-ink-faint">URL・PDFは https:// から始まるアドレスを入れてください。</p>
+      {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
+      <div className="mt-3 space-y-2">
+        {buttons.map((button, buttonIndex) => (
+          <div key={buttonIndex} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_2rem] items-center gap-2 rounded-control bg-canvas-sunken p-2">
+            <input aria-label={`ボタン${buttonIndex + 1}の名前`} value={button.label} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" />
+            {/*
+              共通の選び欄（幅176px）に合わせて種類の列を広げる。
+              開いた候補が切れないよう overflow-hidden は外す。
+            */}
+            <div className="grid min-w-0 grid-cols-[11rem_minmax(0,1fr)] rounded-control border border-hairline bg-canvas">
+              <Select aria-label={`ボタン${buttonIndex + 1}の種類`} value={button.type} onChange={(value) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, type: value as 'url' | 'pdf' } : item))} options={[{ value: 'url', label: 'URLを開く' }, { value: 'pdf', label: 'PDFを開く' }]} />
+              <input aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, value: event.target.value } : item))} placeholder="https://example.com" className="min-w-0 px-2 py-1.5 text-xs" />
+            </div>
+            <button type="button" aria-label={`ボタン${buttonIndex + 1}を削除`} onClick={() => onChange(buttons.filter((_, i) => i !== buttonIndex))} className="flex justify-center text-danger"><Trash2 size={16} aria-hidden /></button>
           </div>
-          <div className="mt-3 space-y-2">
-            {buttons.map((button, buttonIndex) => (
-              <div key={buttonIndex} className="grid grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.35fr)_2rem] items-center gap-2 rounded-control bg-canvas-sunken p-2">
-                <GripVertical size={16} className="text-ink-faint" aria-hidden />
-                <input aria-label={`ボタン${buttonIndex + 1}のラベル`} value={button.label} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" />
-                <div className="grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] overflow-hidden rounded-control border border-hairline bg-canvas">
-                  <select aria-label={`ボタン${buttonIndex + 1}の種類`} value={button.type} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, type: event.target.value as 'url' | 'pdf' } : item))} className="border-hairline border-r bg-canvas px-2 py-1.5 text-xs"><option value="url">URLを開く</option><option value="pdf">PDFを開く</option></select>
-                  <input aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, value: event.target.value } : item))} placeholder="https://example.com" className="min-w-0 px-2 py-1.5 text-xs" />
-                </div>
-                <button type="button" aria-label={`ボタン${buttonIndex + 1}を削除`} onClick={() => onButtonsChange(buttons.filter((_, i) => i !== buttonIndex))} className="flex justify-center text-danger"><Trash2 size={16} aria-hidden /></button>
-              </div>
-            ))}
-            {buttons.length === 0 && <p className="rounded-control bg-canvas-sunken p-3 text-xs text-ink-faint">ボタンはまだありません。</p>}
-          </div>
-        </section>
-        <section className="rounded-control border border-hairline p-3">
-          <h5 className="text-sm font-bold text-ink">URLの扱い</h5>
-          <p className="mt-1 text-xs text-ink-faint">短縮すると、URLごとのクリック数を計測できます。</p>
-          <label className="mt-3 flex items-center gap-2 text-xs text-ink-secondary">
-            <input type="checkbox" checked={!trackLinks} onChange={(event) => onTrackLinksChange(!event.target.checked)} />
-            このメッセージではURLを短縮しない
-          </label>
-          <div className="mt-3 overflow-hidden rounded-control border border-hairline text-xs">
-            <div className="broadcast-url-row bg-canvas-sunken px-3 py-2 font-bold text-ink-faint"><span>サイト名</span><span>URL</span><span>計測</span></div>
-            {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="font-semibold">キャンペーンLP</span><span className="truncate" title={url}>{url}</span><span>{'短縮して計測'}</span></div>) : (
-              <p className="border-t border-hairline px-3 py-3 text-ink-faint">本文にURLはありません。</p>
-            )}
-          </div>
-        </section>
+        ))}
+        {buttons.length === 0 && <p className="rounded-control bg-canvas-sunken p-3 text-xs text-ink-faint">ボタンはまだありません。</p>}
       </div>
     </section>
   )
@@ -487,23 +558,49 @@ function bubblesError(bubbles: BroadcastBubble[]): string {
     */
     if (KIND_FIELD_TYPES.has(bubble.type)) {
       const state = bubble.content.state as MessageKindState | undefined
-      if (!state || !serializeMessageKind(bubble.type as MessageKind, state)) {
-        return `吹き出し${index + 1}の${TYPE_LABELS[bubble.type]}を入力してください`
+      /*
+       * R234: 空だけでなく「入っているが送れない」（http の音声URL・
+       * 文字のスタンプ番号）も未完成にする。理由は入力欄の検査と同じ文にし、
+       * 5段の帯と保存の検査で食い違わせない。
+       * R210: 範囲外の緯度・経度も messageKindProblem が直し方まで言う
+       * （「未入力」とは言わない）。分岐を分けると文言がずれるので1本化する。
+       */
+      const problem = !state
+        ? `${TYPE_LABELS[bubble.type]}を入力してください`
+        : messageKindProblem(bubble.type as MessageKind, state)
+      if (problem) {
+        return `吹き出し${index + 1}の${problem}`
       }
     }
-    if (bubble.type === 'carousel' && !String(bubble.content.columnsJson ?? '').trim()) {
-      return `吹き出し${index + 1}のカルーセルを選択してください`
+    if (bubble.type === 'carousel') {
+      const columnsProblem = carouselColumnsProblem(bubble.content.columnsJson)
+      if (columnsProblem) {
+        return `吹き出し${index + 1}の${columnsProblem}`
+      }
     }
     if (bubble.type === 'flex') {
-      try { JSON.parse(String(bubble.content.flexJson ?? '')) } catch { return `吹き出し${index + 1}のFlex JSONを確認してください` }
+      const flexProblem = flexContentProblem(bubble.content.flexJson)
+      if (flexProblem) {
+        return `吹き出し${index + 1}の${flexProblem}`
+      }
     }
-    if (isContentTemplateType(bubble.type) && !bubble.content.assetId) return `吹き出し${index + 1}のテンプレートを選択してください`
+    /*
+     * 素材の引用は、選んでいないときも選んだ中身が送れる形に直せないときも
+     * ここで止める。保存の検査と Worker の解析が同じ変換を見るので、
+     * 画面では通るのに送信で断られる形にならない（監査 R144）。
+     */
+    if (isContentTemplateType(bubble.type)) {
+      const problem = assetBubbleError(bubble)
+      if (problem) return `吹き出し${index + 1}の${problem}`
+    }
   }
   return ''
 }
 
 export default function BroadcastForm({
   tags,
+  tagsStatus = 'ready',
+  onRetryTags,
   onSuccess,
   onDraftSaved,
   onCancel,
@@ -525,6 +622,17 @@ export default function BroadcastForm({
    * さらに別のレコードになる。アカウントを切り替えた場合だけ新しい下書きへ分ける。
    */
   const draftSession = useRef(newBroadcastDraftSession())
+  /*
+   * R625/R626/R627: 保存の直列化とアカウント別の世代管理。
+   * 同じアカウントの保存が重なったら後から来た方は先行を待ってから
+   * 最新の入力で送り直す（初回作成の二重POSTにしない）。
+   * 別アカウントの応答で今のアカウントの保存表示・版・下書きIDを
+   * 書き換えない。作りかけの冪等キーはアカウントごとに1つに保つ。
+   */
+  const saveInFlightRef = useRef<{ accountId: string | null; promise: Promise<ApiBroadcast | null> } | null>(null)
+  const draftSessionsByAccount = useRef(new Map<string | null, BroadcastDraftSession>())
+  const createKeyByAccount = useRef(new Map<string | null, string>())
+  const autosaveRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const appliedInitialTemplate = useRef(false)
   // 独立審査(指摘4): テンプレート読み込みの世代照合と選択中アカウントの記録。
   const templateLoadGenerationRef = useRef(createLoadGeneration())
@@ -647,7 +755,21 @@ export default function BroadcastForm({
   const [testHistory, setTestHistory] = useState<TestSendView[]>([])
   const [previewConfirmed, setPreviewConfirmed] = useState(visualQaAugustCampaign)
   const [error, setError] = useState('')
-  const [draftSaved, setDraftSaved] = useState(false)
+
+  /*
+   * 二者承認（m12a / 設計 A-1・A-4）。確認の窓を開いたときに境目と
+   * 運用者数を読み、人数で出し分ける。人数は配信前チェックの数だけを使う。
+   */
+  const [approvalConfig, setApprovalConfig] = useState<{
+    threshold: number
+    singleOperator: boolean
+  } | null>(null)
+  const [approvalConfigState, setApprovalConfigState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [approvalCandidates, setApprovalCandidates] = useState<BroadcastApprovalCandidate[]>([])
+  const [approvalCandidatesState, setApprovalCandidatesState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [approverId, setApproverId] = useState('')
+  const [approvalNote, setApprovalNote] = useState('')
+  const [approvalCountInput, setApprovalCountInput] = useState('')
 
   const stepTitle: Record<BroadcastStepKey, string> = {
     basic: '一斉配信を作成・基本設定',
@@ -664,9 +786,18 @@ export default function BroadcastForm({
         : stepTitle[currentStep ?? 'basic'],
   )
 
+  /*
+   * BC-02: `?templatePicker=1` で開いたとき、選択窓はメッセージの
+   * 段の中だけに出る。基本設定の段にいたままでは見出しだけ
+   * 「テンプレートを選ぶ」に変わって中身が出ないので、
+   * メッセージの段へも一緒に進める。
+   */
   useEffect(() => {
-    if (openTemplatePickerInitially) setShowTemplatePicker(true)
-  }, [openTemplatePickerInitially])
+    if (openTemplatePickerInitially) {
+      setShowTemplatePicker(true)
+      onStepChange?.('message')
+    }
+  }, [openTemplatePickerInitially]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /*
    * 送信済み詳細の「同じ設定で作り直す」から来たとき、元配信を種にする
@@ -803,7 +934,10 @@ export default function BroadcastForm({
         version: draft.version ?? 1,
         createKey: draftSession.current.createKey,
       }
+      draftSessionsByAccount.current.set(draftSession.current.accountId, draftSession.current)
       setEditingDraft(draft)
+      // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★V7 §5 未保存判定）。
+      cleanFingerprintRef.current = null
     }).catch(() => {
       setDraftError('下書きを読み込めませんでした。一覧から開き直してください。')
     })
@@ -1024,7 +1158,24 @@ export default function BroadcastForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bubbles, tagId, condition, scenarioId, targetMode, selectedAccountId, scheduledDate, scheduledTime, sendMode])
 
-  const updateBubble = (index: number, bubble: BroadcastBubble) => setBubbles((items) => items.map((item, i) => i === index ? { ...bubble, id: item.id } : item))
+  /*
+   * BC-01: 型を切り替えると `emptyBubble` で中身が空になるが、
+   * 書きかけの本文を黙って捨てない。型ごとの中身を吹き出し単位で
+   * 一時保管し、切り替えて戻したときに同じ内容を復元する。
+   * 保存するのは画面を開いている間だけ（下書きへの永続化はしない）。
+   */
+  const bubbleContentStash = useRef(new Map<string, Map<string, Record<string, unknown>>>())
+  const updateBubble = (index: number, bubble: BroadcastBubble) => setBubbles((items) => items.map((item, i) => {
+    if (i !== index) return item
+    if (item.type !== bubble.type) {
+      const stash = bubbleContentStash.current.get(item.id) ?? new Map<string, Record<string, unknown>>()
+      stash.set(item.type, item.content)
+      bubbleContentStash.current.set(item.id, stash)
+      const restored = stash.get(bubble.type)
+      return { ...bubble, id: item.id, content: restored ?? bubble.content }
+    }
+    return { ...bubble, id: item.id }
+  }))
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
 
   /*
@@ -1098,7 +1249,25 @@ export default function BroadcastForm({
     if (audienceProblem) return audienceProblem
     const bubbleProblem = bubblesError(bubbles)
     if (bubbleProblem) return bubbleProblem
+    // 監査 R206: ボタンの不備は「保存できませんでした」で済ませない。
+    // 何番の何が足りないかを言い、直したら保存できる。
+    const buttonProblem = messageButtonsError(messageButtons)
+    if (buttonProblem) return buttonProblem
     return ''
+  }
+  /**
+   * R580: いまの入力に対する検査結果が、どの段の不備か。
+   *
+   * `validate()` と同じ順序・同じ関数で判定する。別々に書くと、帯は
+   * 「対象者 済み」なのに保存で断られる、という一番困る形になる
+   * （段の帯と保存の検査を同じ関数に寄せる契約と同じ考え）。
+   * 送信設定の段は入力の不備を持たない（日時は保存の検査対象外）。
+   */
+  const validationStep = (): 'basic' | 'audience' | 'message' | null => {
+    if (!title.trim() || title.trim().length > TITLE_MAX) return 'basic'
+    if (audienceError(targetMode, { scenarioId, tagId, condition })) return 'audience'
+    if (bubblesError(bubbles) || messageButtonsError(messageButtons)) return 'message'
+    return null
   }
   /**
    * 配信前チェックへ渡す入力。
@@ -1179,7 +1348,7 @@ export default function BroadcastForm({
     return new Date(Date.UTC(y, mo - 1, d, h - 9, m)).toISOString()
   }
 
-  const draftPayload = (scheduledAt: string | null, saveAsDraft = false) => {
+  const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => {
     const first = bubbles[0]
     const legacy = bubbleLegacyMessage(first)
     return {
@@ -1190,6 +1359,8 @@ export default function BroadcastForm({
       ...targetPayload(),
       lineAccountId: selectedAccountId || null,
       scheduledAt,
+      // 1人運用のとき、送る人が確認で入れた人数。予約の口が突き合わせる。
+      ...(confirmedCount !== undefined ? { confirmedRecipientCount: confirmedCount } : {}),
       trackLinks,
       folderId: folderId || null,
       measureOpens,
@@ -1209,8 +1380,12 @@ export default function BroadcastForm({
    * #772: 更新は保持している版をその場で付けて送り、成功応答の版へ進める。
    * 版を閉じ込めた古い関数は作らない。409時は送り直さず、最新版を読み直して案内する。
    */
-  const persistDraft = async (scheduledAt: string | null, saveAsDraft = false): Promise<ApiBroadcast | null> => {
-    const accountId = selectedAccountId || null
+  const persistDraft = async (
+    scheduledAt: string | null,
+    saveAsDraft = false,
+    confirmedCount?: number,
+  ): Promise<ApiBroadcast | null> => {
+    const accountId = selectedAccountIdRef.current || null
     /*
      * 編集中にアカウントが切り替わったまま保存すると、下書きが別アカウントの
      * 新規配信として増える（セッションのアカウントと合わないため）。
@@ -1220,10 +1395,54 @@ export default function BroadcastForm({
       setError('別のLINEアカウントへ切り替わっています。元のアカウントへ戻してから保存してください。')
       return null
     }
-    const payload = draftPayload(scheduledAt, saveAsDraft)
+    /*
+     * R627: 同じアカウントの保存が重なったら最新の先行を待ち直す。
+     * 待たずに2つ投げると初回作成が2回・冪等キー2種になり、
+     * 下書きが2件・保持IDの競合になる。1つだけ待つと3つ目以降が
+     * 並ぶので、輪の中で読み直す。待った後は最新の入力で送り直すので、
+     * 段移動（draftStepの違い）も更新で追いつく。
+     */
+    for (;;) {
+      const latest = saveInFlightRef.current
+      if (!latest || latest.accountId !== accountId) break
+      try {
+        await latest.promise
+      } catch {
+        /* 先行の失敗はこの保存の判断に混ぜない。下で最新を送る。 */
+      }
+      if ((selectedAccountIdRef.current || null) !== accountId) return null
+    }
+    const payload = draftPayload(scheduledAt, saveAsDraft, confirmedCount)
+    /*
+     * R627: 作りかけの冪等キーはアカウントごとに1つ。
+     * 初期セッション（accountId=null）のまま毎回新しい鍵を作ると、
+     * 並んだ2つの初回作成が別物になる。ここで束ねて同じ鍵を使い回す。
+     */
+    const sessionForAccount = (() => {
+      const stored = draftSessionsByAccount.current.get(accountId)
+      if (stored) return stored
+      if (draftSession.current.accountId === accountId) {
+        draftSessionsByAccount.current.set(accountId, draftSession.current)
+        return draftSession.current
+      }
+      const stableKey = createKeyByAccount.current.get(accountId)
+        ?? (() => {
+          const next = crypto.randomUUID()
+          createKeyByAccount.current.set(accountId, next)
+          return next
+        })()
+      const fresh = newBroadcastDraftSession(accountId, stableKey)
+      draftSessionsByAccount.current.set(accountId, fresh)
+      return fresh
+    })()
+    let settleInFlight: (value: ApiBroadcast | null) => void = () => undefined
+    const ourPromise = new Promise<ApiBroadcast | null>((resolve) => {
+      settleInFlight = resolve
+    })
+    saveInFlightRef.current = { accountId, promise: ourPromise }
     try {
       const result = await persistBroadcastDraft(
-        draftSession.current,
+        sessionForAccount,
         accountId,
         payload,
         {
@@ -1232,36 +1451,212 @@ export default function BroadcastForm({
             api.broadcasts.update(id, { ...draftPayload, expectedVersion }),
         },
       )
-      draftSession.current = result.session
-      return result.broadcast
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 409 && draftSession.current.draftId) {
-        const current = await api.broadcasts.get(draftSession.current.draftId)
-        if (current.success) {
-          draftSession.current = { ...draftSession.current, version: current.data.version ?? null }
-        }
-        setError('別の画面で更新されたため読み直しました')
+      /*
+       * R626: 待っている間にアカウントが変わっていたら、今の画面の
+       * 保存表示・版・下書きIDへ混ぜない。古い方のセッションだけ残し、
+       * 今のアカウントは未保存のままにする。
+       */
+      draftSessionsByAccount.current.set(accountId, result.session)
+      if ((selectedAccountIdRef.current || null) !== accountId) {
+        settleInFlight(null)
         return null
       }
+      draftSession.current = result.session
+      settleInFlight(result.broadcast)
+      return result.broadcast
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && sessionForAccount.draftId) {
+        /*
+         * R626: 古いアカウントの409を今の画面の文言へ混ぜない。
+         * 取得も表示も今のアカウントのときだけにする。
+         */
+        if ((selectedAccountIdRef.current || null) !== accountId) {
+          settleInFlight(null)
+          return null
+        }
+        const current = await api.broadcasts.get(sessionForAccount.draftId)
+        if (current.success && (selectedAccountIdRef.current || null) === accountId) {
+          const refreshed = { ...sessionForAccount, version: current.data.version ?? null }
+          draftSessionsByAccount.current.set(accountId, refreshed)
+          draftSession.current = refreshed
+        }
+        if ((selectedAccountIdRef.current || null) !== accountId) {
+          settleInFlight(null)
+          return null
+        }
+        setError('別の画面で更新されたため読み直しました')
+        settleInFlight(null)
+        return null
+      }
+      settleInFlight(null)
       throw e
+    } finally {
+      if (saveInFlightRef.current?.promise === ourPromise) saveInFlightRef.current = null
     }
   }
 
-  const saveDraftNow = async () => {
-    setSaving(true)
-    setError('')
-    setDraftSaved(false)
+  /*
+   * ★V7 sTJsh §5: 書きかけを守る。
+   * 保存に送るのと同じ組み立て（draftPayload）を指紋にして、
+   * 「最後に保存した形」と違う間だけ未保存とする。開いた直後や
+   * 下書き読み込み直後は指紋が基準になるので、何もしていないのに
+   * 確認が出ることはない。lineAccountId は共通バーの選択が遅れて
+   * 届くと誤って未保存に見えるので指紋から外す（別アカウントへの
+   * 誤保存は persistDraft が別の口で止めている）。
+   */
+  const formFingerprint = JSON.stringify(
+    draftPayload(scheduledAtIso()),
+    (key, value) => (key === 'lineAccountId' ? undefined : value),
+  )
+  const cleanFingerprintRef = useRef<string | null>(null)
+  const formFingerprintRef = useRef(formFingerprint)
+  formFingerprintRef.current = formFingerprint
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
+  const [autosaving, setAutosaving] = useState(false)
+  const autosavingRef = useRef(false)
+  const [clockTick, setClockTick] = useState(() => Date.now())
+
+  // 最初の描画と、下書き適用で内容が入れ替わった直後に「保存ずみの形」を採る。
+  useEffect(() => {
+    if (cleanFingerprintRef.current === null) cleanFingerprintRef.current = formFingerprint
+  })
+  const dirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
+  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving })
+  const leaveTargetRef = useRef(leaveTarget)
+  leaveTargetRef.current = leaveTarget
+
+  /*
+   * 入力が2秒止まったら下書きへ静かに保存する。打つたびに送ると
+   * 通信だらけになるので指紋の変化から数える。通せない形（未入力など）、
+   * アカウントが決まっていない間、離脱の確認中は送らない。
+   */
+  const autosaveDraft = async () => {
+    if (autosavingRef.current || saving || testSending) return
+    if (!selectedAccountId || validate()) return
+    const requestAccountId = selectedAccountIdRef.current || null
+    autosavingRef.current = true
+    setAutosaving(true)
+    const fingerprintAtSave = formFingerprint
     try {
-      // #772: 409時は persistDraft が案内ずみで null を返すため、保存ずみにはしない。
       const saved = await persistDraft(scheduledAtIso(), true)
+      /*
+       * R626: 別アカウントへ移っていたら今の画面へ混ぜない。
+       * persistDraftがnullで返すのでここでも世代で守る。
+       */
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
       if (saved) {
-        setDraftSaved(true)
-        // BROADCAST-16: フォームは閉じない保存なので、背後の一覧と
-        // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
+        cleanFingerprintRef.current = fingerprintAtSave
+        setDraftSavedAt(Date.now())
+        // BROADCAST-16: 自動でも下書きが増えるので、一覧側へは同じ口で知らせる。
         onDraftSaved?.(saved)
       }
     } catch {
-      setError('下書きを保存できませんでした')
+      /* 静かに未保存のまま。次の変更・手動保存・「保存して移る」でやり直せる。 */
+    } finally {
+      autosavingRef.current = false
+      setAutosaving(false)
+      /*
+       * R625/R626: 保存中に追記されていたら置き去りにしない。
+       * 同じアカウントなら進んだ指紋を2秒後にもう一度静かに送る。
+       * 違うアカウントへ移っていたら、Aの応答でBを保存ずみにはしない
+       * まま、今のアカウントが未保存なら送り直す（Bの間合いが先行の
+       * 保存中に捨てられていても、autosavingの変化だけでは effect が
+       * 起きないため、ここで拾う）。
+       */
+      if (leaveTargetRef.current === null) {
+        const stillSameAccount = (selectedAccountIdRef.current || null) === requestAccountId
+        const pendingFingerprint = stillSameAccount
+          ? formFingerprintRef.current !== fingerprintAtSave
+          : cleanFingerprintRef.current !== null
+            && formFingerprintRef.current !== cleanFingerprintRef.current
+        if (pendingFingerprint) {
+          if (autosaveRetryTimer.current) clearTimeout(autosaveRetryTimer.current)
+          autosaveRetryTimer.current = setTimeout(() => autosaveDraftRef.current(), 2000)
+        }
+      }
+    }
+  }
+
+  /*
+   * R625: 置き去りの再送は最新の入力で送る。
+   * タイマーに閉じ込めた古い autosaveDraft を呼ぶと追記前の本文で
+   * 更新してしまう。毎描画で最新の関数へ付け替えて呼ぶ。
+   */
+  const autosaveDraftRef = useRef(() => {})
+  autosaveDraftRef.current = () => void autosaveDraft()
+
+  useEffect(() => {
+    if (!dirty || leaveTarget !== null) return
+    const timer = setTimeout(() => void autosaveDraft(), 2000)
+    return () => clearTimeout(timer)
+    // autosaveDraft は毎回作り直されるので依存に入れない。見たいのは中身の変化。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formFingerprint, dirty, selectedAccountId, saving, testSending, leaveTarget])
+
+  useEffect(() => () => {
+    if (autosaveRetryTimer.current) clearTimeout(autosaveRetryTimer.current)
+  }, [])
+
+  // 「下書き保存済み・◯秒前」の秒数だけ10秒ごとに進める。
+  useEffect(() => {
+    if (draftSavedAt === null) return
+    const timer = setInterval(() => setClockTick(Date.now()), 10_000)
+    return () => clearInterval(timer)
+  }, [draftSavedAt])
+
+  const draftSavedAgo = draftSavedAt === null
+    ? null
+    : Math.floor((clockTick - draftSavedAt) / 1000) < 60
+      ? `${Math.max(0, Math.floor((clockTick - draftSavedAt) / 1000))}秒前`
+      : formatRelative(draftSavedAt, clockTick)
+  const draftStatusLabel = autosaving
+    ? '下書きを保存しています…'
+    : dirty
+      ? '下書きはまだ保存していません'
+      : draftSavedAgo
+        ? `下書き保存済み・${draftSavedAgo}`
+        : null
+
+  const saveDraftNow = async (): Promise<boolean> => {
+    /*
+     * 監査 R206: 下書き保存も確認・テスト送信と同じ検査を通す。
+     * 通さないと、ボタンの不備が Worker で断られて「保存できませんでした」
+     * だけになり、どこを直すべきか分からない。
+     */
+    const validationError = validate()
+    if (validationError) {
+      setError(validationError)
+      return false
+    }
+    setSaving(true)
+    setError('')
+    const requestAccountId = selectedAccountIdRef.current || null
+    const fingerprintAtSave = formFingerprint
+    try {
+      // #772: 409時は persistDraft が案内ずみで null を返すため、保存ずみにはしない。
+      const saved = await persistDraft(scheduledAtIso(), true)
+      // R626: 待っている間にアカウントが変わっていたら今の画面へ混ぜない。
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
+      if (saved) {
+        cleanFingerprintRef.current = fingerprintAtSave
+        setDraftSavedAt(Date.now())
+        notifyToast('下書きを保存しました。')
+        // BROADCAST-16: フォームは閉じない保存なので、背後の一覧と
+        // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
+        onDraftSaved?.(saved)
+        return true
+      }
+      return false
+    } catch (error) {
+      /*
+       * R234: 保存側で弾いた理由（音声URL・スタンプ番号・Flexの形など）を
+       * そのまま出す。「保存できませんでした」だけだと、どこを直すか分からない。
+       * 400 の本文は運用者へ出してよい安全な文だけが来る（api.ts の約束）。
+       * R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
+       */
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
+      setError(describeSaveFailure(error))
+      return false
     } finally {
       setSaving(false)
     }
@@ -1282,7 +1677,7 @@ export default function BroadcastForm({
     setTestSending(true)
     setError('')
     setTestResult(null)
-    const at = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+    const at = formatTime(new Date())
     try {
       const draft = await persistDraft(null, true)
       if (!draft) return
@@ -1383,14 +1778,14 @@ export default function BroadcastForm({
     ? (() => {
         const ex = preflight.exclusions
         const parts = [
-          ex.blocked > 0 ? `ブロック ${ex.blocked.toLocaleString('ja-JP')}人` : null,
-          ex.hidden > 0 ? `非表示 ${ex.hidden.toLocaleString('ja-JP')}人` : null,
-          ex.missingDestination > 0 ? `宛先不明 ${ex.missingDestination.toLocaleString('ja-JP')}人` : null,
-          ex.duplicate > 0 ? `重複 ${ex.duplicate.toLocaleString('ja-JP')}人` : null,
+          ex.blocked > 0 ? `ブロック ${formatNumber(ex.blocked)}人` : null,
+          ex.hidden > 0 ? `非表示 ${formatNumber(ex.hidden)}人` : null,
+          ex.missingDestination > 0 ? `宛先不明 ${formatNumber(ex.missingDestination)}人` : null,
+          ex.duplicate > 0 ? `重複 ${formatNumber(ex.duplicate)}人` : null,
         ].filter((part): part is string => part !== null)
         return parts.length > 0 ? `${parts.join('・')}を除外` : '除外なし'
       })()
-    : preflight?.warnings.find((w) => w.message.includes('除いて'))?.message ?? null
+    : preflight?.warnings?.find((w) => w.message.includes('除いて'))?.message ?? null
   const quota = preflight?.quota ?? null
   const quotaAvailable = quota?.state === 'available'
   const quotaInsufficient = quota?.state === 'insufficient'
@@ -1403,13 +1798,11 @@ export default function BroadcastForm({
     : quota.state === 'unavailable'
       ? '確認できませんでした'
       : quota.state === 'insufficient'
-        ? `不足しています（残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'} / ${quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通）`
-        : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'} / ${quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通（この配信で ${quota.planned.toLocaleString('ja-JP')}通を使用）`
+        ? `不足しています（残り ${formatNumber(quota.remaining)} / ${formatNumber(quota.monthlyLimit)}通）`
+        : `残り ${formatNumber(quota.remaining)} / ${formatNumber(quota.monthlyLimit)}通（この配信で ${formatNumber(quota.planned)}通を使用）`
   /** 対象の人数を数えた時刻。応答の evaluatedAt をJSTで出す。 */
   const evaluatedAtLabel = preflight?.audience?.evaluatedAt
-    ? new Date(preflight.audience.evaluatedAt).toLocaleString('ja-JP', {
-        timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-      })
+    ? formatDateTime(preflight.audience.evaluatedAt)
     : null
   /** 把握できる重複配信。同じ時刻の前後1時間に入っている別の予約。 */
   const concurrentBroadcasts = preflight?.concurrentBroadcasts ?? []
@@ -1423,7 +1816,7 @@ export default function BroadcastForm({
    */
   const sendWhenLabel = scheduledLabel ?? (sendMode === 'now' ? '今すぐ（保存後に詳細画面で送信）' : null)
   const unconfirmedCount = preflight
-    ? preflight.warnings.filter((w) => w.level === 'warning').length
+    ? (preflight.warnings ?? []).filter((w) => w.level === 'warning').length
       + (testResult?.kind === 'success' ? 0 : 1)
       + (previewConfirmed ? 0 : 1)
     : null
@@ -1442,6 +1835,45 @@ export default function BroadcastForm({
   }
 
   /*
+   * 二者承認の境目と候補は、確認の窓を開いたときに読む。
+   * 入力を打つたびに読むと重く、開く前に読むと古くなる。
+   */
+  useEffect(() => {
+    if (!confirmOpen) return
+    setApproverId('')
+    setApprovalNote('')
+    setApprovalCountInput('')
+    const accountId = selectedAccountId
+    if (!accountId) {
+      setApprovalConfigState('error')
+      setApprovalCandidatesState('error')
+      return
+    }
+    let cancelled = false
+    setApprovalConfigState('loading')
+    setApprovalCandidatesState('loading')
+    api.broadcasts.approval.config(accountId).then((res) => {
+      if (cancelled) return
+      if (res.success) {
+        setApprovalConfig({ threshold: res.data.threshold, singleOperator: res.data.singleOperator })
+        setApprovalConfigState('ready')
+      } else {
+        setApprovalConfigState('error')
+      }
+    }).catch(() => { if (!cancelled) setApprovalConfigState('error') })
+    api.broadcasts.approval.candidates(accountId).then((res) => {
+      if (cancelled) return
+      if (res.success) {
+        setApprovalCandidates(res.data)
+        setApprovalCandidatesState('ready')
+      } else {
+        setApprovalCandidatesState('error')
+      }
+    }).catch(() => { if (!cancelled) setApprovalCandidatesState('error') })
+    return () => { cancelled = true }
+  }, [confirmOpen, selectedAccountId])
+
+  /*
     **人数が数えられていないなら送らせない。**
     `ConfirmDialog` は `onConfirm` を渡さないと確認のボタンごと出さないので、
     押せそうに見えるボタンが残らない。
@@ -1456,31 +1888,119 @@ export default function BroadcastForm({
   const progressSteps = broadcastSteps({
     basicDone: title.trim().length > 0 && title.trim().length <= TITLE_MAX,
     audienceDone: !audienceError(targetMode, { scenarioId, tagId, condition }),
-    messageDone: !bubblesError(bubbles),
+    messageDone: !bubblesError(bubbles) && !messageButtonsError(messageButtons),
     scheduleDone: sendMode === 'now' || (sendMode === 'scheduled' && Boolean(scheduledDate) && Boolean(scheduledTime)),
   })
   const stepOrder: BroadcastStepKey[] = ['basic', 'audience', 'message', 'schedule', 'confirm']
   const currentStepIndex = currentStep ? stepOrder.indexOf(currentStep) : -1
+  /*
+   * 設計 C：いまいる所（URL の ?step=）と入力済みを分ける。
+   * 以前は居場所より前の段を全部 done にしていたので、「次へ」で進んでも
+   * 空の段に ✓ が付いた。state は入力済みかだけを表し、居場所は currentKey で渡す。
+   * 確認の段にいるとき、まだ埋まっていない段は直すところ（△）として出す。
+   */
   const steps = currentStep
-    ? progressSteps.map((step, index) => ({
-        ...step,
-        state: index < currentStepIndex ? 'done' as const : index === currentStepIndex ? 'current' as const : 'todo' as const,
-      }))
+    ? progressSteps.map((step) => {
+        const filled = step.state === 'done'
+        const needsFix = !filled && currentStep === 'confirm'
+        return {
+          ...step,
+          state: (needsFix ? 'attention' : filled ? 'done' : 'todo') as 'done' | 'todo' | 'attention',
+          // 段ごとの画面にいるときは、済み・要修正の段を押すとその段へ移る。
+          onSelect: (filled || needsFix) && onStepChange ? () => goToStep(step.key) : undefined,
+        }
+      })
     : progressSteps
   const shows = (step: BroadcastStepKey) => currentStep === null || currentStep === step
   const goToStep = (step: BroadcastStepKey) => onStepChange?.(step)
+  /*
+   * R580: 保存を押した段で理由を示し、直す欄がある段へ移動できるようにする。
+   *
+   * 以前は失敗の文がメッセージの段の中にだけあり、対象者の段で保存を
+   * 押しても理由が見えなかった（非表示の段に隠れていた）。
+   *
+   * 導線は「いまの入力に対する検査結果」と画面の文が一致するときだけ出す。
+   * サーバー側で断られた文・直した後の古い文では、指す段がずれるので出さない。
+   */
+  const liveValidationProblem = validate()
+  const validationMoveStep: 'basic' | 'audience' | 'message' | null =
+    currentStep && error && error === liveValidationProblem ? validationStep() : null
+  /*
+   * 段を移動したあと、直す欄へ焦点を移す。押した位置（下部追従バー）に
+   * 取り残されると、キーボードだけの操作では修正欄へたどり着けない。
+   */
+  const pendingValidationFocus = useRef<BroadcastStepKey | null>(null)
+  const goToValidationStep = (step: 'basic' | 'audience' | 'message') => {
+    if (!onStepChange) {
+      pendingValidationFocus.current = null
+      return
+    }
+    pendingValidationFocus.current = step
+    goToStep(step)
+  }
+  useEffect(() => {
+    if (!pendingValidationFocus.current || pendingValidationFocus.current !== currentStep) return
+    pendingValidationFocus.current = null
+    const section = document.getElementById(`broadcast-step-${currentStep}`)
+    if (typeof section?.scrollIntoView === 'function') {
+      section.scrollIntoView({ block: 'start' })
+    }
+    section?.querySelector<HTMLElement>('input:not([type="hidden"]), textarea')?.focus()
+  }, [currentStep])
 
   const canConfirm = audienceCount !== null && audienceCount > 0
 
+  /*
+   * 二者承認の出し分け（設計 A-1・A-4）。人数は配信前チェックの数だけを使う。
+   * 境目が読めないときは承認なしの従来どおりに進める（送る直前に口が守る）。
+   */
+  const needsApproval = audienceCount !== null
+    && approvalConfig !== null
+    && audienceCount >= approvalConfig.threshold
+  const needsApprovalSingle = needsApproval && approvalConfig?.singleOperator === true
+  const approvalCountMatched = needsApprovalSingle
+    && approvalCountInput.trim() !== ''
+    && Number(approvalCountInput) === audienceCount
+
   const save = async () => {
     const validationError = validate(); if (validationError) { setError(validationError); return }
+    if (needsApproval && !needsApprovalSingle && approverId === '') {
+      setError('承認をお願いする人を選んでください')
+      return
+    }
+    if (needsApprovalSingle && !approvalCountMatched) {
+      setError('人数を入れて一致させてください')
+      return
+    }
     setSaving(true); setError('')
+    const requestAccountId = selectedAccountIdRef.current || null
     try {
-      const saved = await persistDraft(scheduledAtIso())
+      const saved = await persistDraft(
+        scheduledAtIso(),
+        false,
+        needsApprovalSingle ? Number(approvalCountInput) : undefined,
+      )
+      // R626: 待っている間にアカウントが変わっていたら今の画面へ混ぜない。
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
       if (!saved) return
+      // 承認が要るときは、保存のあと承認の依頼まで続ける。依頼までが1つの操作。
+      if (needsApproval && !needsApprovalSingle) {
+        const requested = await api.broadcasts.approval.request(saved.id, {
+          approverStaffId: approverId,
+          note: approvalNote.trim() || undefined,
+        })
+        if (!requested.success) {
+          setError(requested.error)
+          return
+        }
+      }
       setConfirmOpen(false)
       onSuccess(saved)
-    } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
+    } catch {
+      // R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
+      setError('下書きを保存できませんでした')
+    } finally { setSaving(false) }
   }
 
   /*
@@ -1496,7 +2016,7 @@ export default function BroadcastForm({
           <div className="rounded-card border border-hairline bg-canvas p-8 text-center">
             <p className="text-ink text-sm font-semibold">{draftError}</p>
             <div className="mt-4 flex items-center justify-center gap-3">
-              <Link href="/broadcasts" className="text-accent text-sm font-medium hover:underline">
+              <Link href="/broadcasts" className="text-action text-sm font-medium hover:underline">
                 一斉配信一覧へ戻る
               </Link>
             </div>
@@ -1526,41 +2046,63 @@ export default function BroadcastForm({
             送る相手・送る内容・送る時間を決めます。配信する前に、右側のチェックがすべて緑になっているか確認してください。
           </p>
         </div>
-        <button onClick={onCancel} className="border-hairline text-ink-secondary rounded-control border px-4 py-2 text-sm">
+        <Button variant="secondary" className="text-ink-secondary px-4 py-2 h-auto whitespace-normal" onClick={() => guarded(onCancel)}>
           一覧に戻る
-        </button>
+        </Button>
       </div>
     )}
-    <BroadcastStepRail steps={steps} />
+    <BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} />
+    {/*
+      R580: 保存を押した段で理由を示す。失敗の帯は1画面に1つまでなので、
+      段ごとに分かれているときはここだけに出し、メッセージの段の中の帯は
+      段分けなしの従来フォームのときだけ出す（下の `{!currentStep && ...}`）。
+    */}
+    {currentStep && error ? (
+      <Notice
+        tone="danger"
+        className="mt-3"
+        action={validationMoveStep && validationMoveStep !== currentStep ? (
+          <Button variant="secondary" size="compact" onClick={() => goToValidationStep(validationMoveStep)}>
+            {`${VALIDATION_STEP_LABEL[validationMoveStep]}へ移動`}
+          </Button>
+        ) : undefined}
+      >
+        {error}
+      </Notice>
+    ) : null}
     {editingDraft ? (
       <p className="border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs">
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
       </p>
     ) : null}
+    {/* ★V7 sTJsh §5: 下書きの状態を薄い字で常に示す（未保存→保存中→保存済み）。 */}
+    {draftStatusLabel ? (
+      <p className="text-ink-faint mt-1.5 text-xs" aria-live="polite">{draftStatusLabel}</p>
+    ) : null}
     <div className="mt-2.5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-      <div className={`space-y-5 ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
+      <div className={`min-w-0 space-y-5 ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-lg font-bold text-ink">配信内容</h3>
               <p className="mt-1 text-xs text-ink-faint">対象・日時・メッセージの最終確認です。</p>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-bold text-ink">{confirmAudienceLabel} {audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
-                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-bold text-ink">8/24 10:00</dd></div>
+                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-medium text-ink">{confirmAudienceLabel} {formatNumber(audienceCount)}人</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-medium text-ink">{sendWhenLabel ?? '未設定'}</dd></div>
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-lg font-bold text-ink">確認項目</h3>
               <p className="mt-1 text-xs text-ink-faint">警告が残っている場合は配信できません。</p>
               <dl className="mt-4 divide-y divide-hairline text-sm">
-                <div className="flex justify-between py-3"><dt className="font-bold text-ink">対象条件</dt><dd className="text-ink-secondary">除外{preflight?.exclusions?.total ?? 0}人を含めて確認済み</dd></div>
-                <div className="flex justify-between py-3"><dt className="font-bold text-ink">メッセージ表示</dt><dd className="text-ink-secondary">LINEプレビュー確認済み</dd></div>
-                <div className="flex justify-between py-3"><dt className="font-bold text-ink">送信枠</dt><dd className="text-ink-secondary">残り {quota?.remaining?.toLocaleString('ja-JP') ?? '—'} / {quota?.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</dd></div>
+                <div className="flex justify-between py-3"><dt className="font-medium text-ink">対象条件</dt><dd className="text-ink-secondary">除外{preflight?.exclusions?.total ?? 0}人を含めて確認済み</dd></div>
+                <div className="flex justify-between py-3"><dt className="font-medium text-ink">メッセージ表示</dt><dd className="text-ink-secondary">LINEプレビュー確認済み</dd></div>
+                <div className="flex justify-between py-3"><dt className="font-medium text-ink">送信枠</dt><dd className="text-ink-secondary">残り {formatNumber(quota?.remaining)} / {formatNumber(quota?.monthlyLimit)}通</dd></div>
               </dl>
             </section>
           </section>
         ) : null}
-        <section id="broadcast-step-basic" className={`${shows('basic') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-sm`}>
+        <section id="broadcast-step-basic" className={`${shows('basic') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-card`}>
           <div className="mb-4">
             <h3 className="text-lg font-bold text-ink">基本設定</h3>
             <p className="mt-1 text-sm text-ink-faint">管理名と保存先を設定します。</p>
@@ -1578,20 +2120,21 @@ export default function BroadcastForm({
             </label>
             <label className="block">
               <span className="text-ink block text-sm font-bold">フォルダ</span>
-              <select
+              <Select
                 aria-label="フォルダ"
                 value={folderId}
-                onChange={(e) => setFolderId(e.target.value)}
-                className="border-hairline rounded-control mt-2 w-full border px-3 py-2.5 text-sm"
-              >
-                <option value="">未分類</option>
-                {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
+                onChange={setFolderId}
+                options={[
+                  { value: '', label: '未分類' },
+                  ...folders.map((f) => ({ value: f.id, label: f.name })),
+                ]}
+                size="full"
+              />
             </label>
           </div>
           <label className="mt-4 block">
             <span className="flex items-center justify-between gap-2 text-sm font-bold text-ink">
-              <span>社内メモ <span className="ml-1 rounded bg-canvas-sunken px-1.5 py-0.5 text-xs font-normal text-ink-faint">任意</span></span>
+              <span>社内メモ <span className="ml-1 rounded-mini bg-canvas-sunken px-1.5 py-0.5 text-xs font-normal text-ink-faint">任意</span></span>
               <span className="text-xs font-normal text-ink-faint">友だちには表示されません</span>
             </span>
             <textarea
@@ -1606,7 +2149,7 @@ export default function BroadcastForm({
         </section>
         {shows('basic') && (
           <>
-            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
               <h3 className="text-lg font-bold text-ink">配信方法</h3>
               <p className="mt-1 text-xs text-ink-faint">新規作成・テンプレート・過去の配信の複製から選べます。</p>
               {/*
@@ -1644,7 +2187,7 @@ export default function BroadcastForm({
               </RadioCardGroup>
             </section>
 
-            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h3 className="text-lg font-bold text-ink">最近の配信</h3>
@@ -1655,9 +2198,9 @@ export default function BroadcastForm({
               <div className="mt-4 overflow-hidden rounded-control border border-hairline">
                 {recentBroadcasts.length ? recentBroadcasts.map((broadcast) => (
                   <div key={broadcast.id} className="broadcast-recent-row grid items-center gap-3 border-b border-hairline px-3 py-2.5 text-xs last:border-b-0">
-                    <div className="min-w-0"><p className="truncate font-bold text-action">{broadcast.title}</p><p className="truncate text-ink-faint">{typeLabel(broadcast.messageType)} 1通</p></div>
+                    <div className="min-w-0"><p className="truncate font-bold text-action" title={broadcast.title}>{broadcast.title}</p><p className="truncate text-ink-faint">{typeLabel(broadcast.messageType)} 1通</p></div>
                     <span className="text-ink-secondary">{broadcast.status === 'sent' ? '送信済み' : broadcast.status === 'scheduled' ? '予約済み' : '下書き'}</span>
-                    <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? new Date(broadcast.sentAt ?? broadcast.scheduledAt ?? '').toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '未設定'}</span>
+                    <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '未設定'}</span>
                     <button type="button" className="text-left font-semibold text-action hover:underline" onClick={() => duplicateRecent(broadcast)}>複製する</button>
                   </div>
                 )) : <p className="p-5 text-sm text-ink-faint">最近の配信はまだありません。</p>}
@@ -1665,7 +2208,7 @@ export default function BroadcastForm({
             </section>
           </>
         )}
-        <section id="broadcast-step-audience" className={`${shows('audience') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-sm`}>
+        <section id="broadcast-step-audience" className={`${shows('audience') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-card`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             {/*
               番号は上の段（STEP 1〜5）に合わせる。**本文だけ別の番号を振らない。**
@@ -1679,10 +2222,10 @@ export default function BroadcastForm({
               <p className="mt-1 text-sm text-ink-faint">全員または詳細条件から、実際に送れる友だちを確認します。</p>
             </div>
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
-              <p className="text-xs font-bold text-accent">送信対象</p>
-              <p className="text-2xl font-black text-accent">
-                {audienceDisplayCount?.toLocaleString('ja-JP') ?? '—'}
-                <span className="ml-1 text-sm">人</span>
+              <p className="text-xs font-medium text-accent-deep">送信対象</p>
+              <p className="text-hero text-accent-deep">
+                {formatNumber(audienceDisplayCount)}
+                <span className="ml-1 text-sm font-normal">人</span>
               </p>
             </div>
           </div>
@@ -1692,50 +2235,31 @@ export default function BroadcastForm({
             そろえて、それぞれに説明を付ける。
           */}
           {/* 4つある。3列だと3+1で折り返して最後の1つだけ浮くので、2列と4列で切り替える。 */}
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <RadioCardGroup legend="配信対象" className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {TARGET_MODES.map((mode) => (
-              <label
+              <RadioCard
                 key={mode.value}
-                className={`flex h-full cursor-pointer flex-col gap-1 rounded-card border p-3 transition-colors ${
-                  targetMode === mode.value
-                    ? 'border-accent bg-accent-soft'
-                    : 'border-hairline hover:bg-canvas-sunken'
-                }`}
-              >
-                <span className="flex items-start gap-2">
-                  {/*
-                    **読み上げ名を付ける。**
-                    `<label>` が丸ごと囲っているので目では押せるが、
-                    丸自体には名前が無く、読み上げでは「ラジオボタン」としか
-                    言われない。撮影ハーネスもこれを名前で探せず、
-                    設計 `cPk8A`（対象条件）が撮れていなかった。
-                  */}
-                  <input
-                    type="radio"
-                    name="broadcast-target-mode"
-                    aria-label={mode.label}
-                    checked={targetMode === mode.value}
-                    onChange={() => {
-                      if (mode.value === 'advanced') openConditionDialog()
-                      else setTargetMode(mode.value)
-                    }}
-                    className="mt-0.5"
-                  />
-                  <span className="text-ink text-sm font-semibold">{mode.label}</span>
-                </span>
-                <span className="text-ink-faint pl-6 text-xs leading-relaxed">{mode.description}</span>
-              </label>
+                name="broadcast-target-mode"
+                value={mode.value}
+                checked={targetMode === mode.value}
+                onChange={() => {
+                  if (mode.value === 'advanced') openConditionDialog()
+                  else setTargetMode(mode.value)
+                }}
+                title={mode.label}
+                note={mode.description}
+              />
             ))}
-          </div>
+          </RadioCardGroup>
           {audienceNotice && targetMode === 'advanced' && conditionHasAnalyticsAudience(condition) && (
             <div className="bg-accent-soft rounded-card mt-3 flex flex-wrap items-center justify-between gap-2 p-3">
               <p className="text-ink text-sm">
                 分析で作った対象者
                 {audienceNotice.label && <span className="ml-1 text-ink-secondary text-xs">{audienceNotice.label}</span>}
-                <span className="ml-2 font-bold">{audienceNotice.memberCount.toLocaleString('ja-JP')}人</span>
+                <span className="ml-2 font-bold">{formatNumber(audienceNotice.memberCount)}人</span>
               </p>
               <p className="text-ink-faint text-xs">
-                {new Date(audienceNotice.expiresAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}まで有効・送る直前にもう一度確かめます
+                {formatDateTime(audienceNotice.expiresAt)}まで有効・送る直前にもう一度確かめます
               </p>
             </div>
           )}
@@ -1743,12 +2267,9 @@ export default function BroadcastForm({
             {/* ブロック中の人は countRules の is_following=true で外れている。
                 外していることを書かないと、人数が合わないように見える。 */}
             <p className="text-ink-faint text-xs">ブロック中の友だちを自動で除外しています</p>
-            <Link
-              href="/friends"
-              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1 text-xs"
-            >
+            <Button variant="secondary" className="text-ink-secondary px-3 py-1 text-xs h-auto whitespace-normal" href="/friends">
               対象を一覧で見る
-            </Link>
+            </Button>
             <SegmentPresetControls
               accountId={selectedAccountId}
               value={targetMode === 'advanced' ? condition : null}
@@ -1763,14 +2284,15 @@ export default function BroadcastForm({
           </div>
           {targetMode === 'scenario' && <div className="mt-4 border-t pt-4">
             <label className="text-ink-secondary block text-xs font-semibold">どのシナリオ</label>
-            <select
+            <Combobox
+              aria-label="どのシナリオ"
+              placeholder="すべてのシナリオ（どれか1つでも購読中）"
               value={scenarioId}
-              onChange={(e) => setScenarioId(e.target.value)}
-              className="border-hairline mt-1 w-full rounded-control border px-3 py-2 text-sm sm:max-w-sm"
-            >
-              <option value="">すべてのシナリオ（どれか1つでも購読中）</option>
-              {scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.name}</option>)}
-            </select>
+              onChange={setScenarioId}
+              options={scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))}
+              loading={scenariosStatus === 'loading'}
+              className="mt-1 w-full sm:max-w-sm"
+            />
             {scenariosStatus === 'loading' && <p className="mt-1 text-xs text-ink-faint">シナリオを読み込んでいます…</p>}
             {scenariosStatus === 'error' && <p className="mt-1 text-xs text-warning">シナリオを読み込めませんでした。別の絞り方を選んで戻ると再取得します。</p>}
           </div>}
@@ -1780,10 +2302,41 @@ export default function BroadcastForm({
               「すべて」は置かない。タグを選ばないままだと絞り込みが消えて
               全員に届く。全員に送るなら上の「友だち全員に配信する」を選ぶ。
             */}
-            <select value={tagId} onChange={(e) => setTagId(e.target.value)} className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm sm:max-w-sm">
-              <option value="">タグを選んでください</option>
-              {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
-            </select>
+            <Combobox
+              aria-label="どのタグ"
+              placeholder="タグを選んでください"
+              value={tagId}
+              onChange={setTagId}
+              options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+              loading={tagsStatus === 'loading'}
+              /*
+               * R581: 候補が取れていない間は開かせない。空のまま開くと
+               * 「候補はありません」と出て、通信失敗が「タグが無い」と
+               * 誤って伝わる。読み込み中も同じ。
+               */
+              disabled={tagsStatus !== 'ready'}
+              className="mt-1 w-full sm:max-w-sm"
+            />
+            {/*
+              R581: 通信失敗と真の0件を分ける。失敗は赤を使わず注意色で出し、
+              同じ画面で再試行できるようにする（失敗・直し方は「？」に入れない）。
+              真の0件は作り先を案内する。入力はフォームが持つので、
+              再試行で書きかけは消えない。
+            */}
+            {tagsStatus === 'loading' && <p className="mt-1 text-xs text-ink-faint">タグを読み込んでいます…</p>}
+            {tagsStatus === 'error' && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p className="text-xs text-warning">タグを読み込めませんでした。通信を確かめて、もう一度お試しください。</p>
+                {onRetryTags && <Button variant="secondary" size="compact" onClick={onRetryTags}>もう一度読み込む</Button>}
+              </div>
+            )}
+            {tagsStatus === 'ready' && tags.length === 0 && (
+              <p className="mt-1 text-xs text-ink-faint">
+                タグはまだありません。先に
+                <Link href="/tags" className="font-semibold text-action hover:underline">友だち属性 ＞ タグ</Link>
+                で作成してください。
+              </p>
+            )}
           </div>}
           {targetMode === 'advanced' && <div className="border-hairline mt-4 border-t pt-4">
             {/*
@@ -1812,22 +2365,22 @@ export default function BroadcastForm({
                   ['除外', preflight.exclusions?.total ?? 0, 'text-warning'],
                 ].map(([label, value]) => (
                   <div key={String(label)} className="rounded-control border border-hairline bg-canvas-sunken p-3">
-                    <p className="text-xs font-bold text-ink-faint">{label}</p>
-                    <p className="text-ink mt-1 text-2xl font-black tabular-nums">{Number(value).toLocaleString('ja-JP')}人</p>
+                    <p className="text-xs font-medium text-ink-faint">{label}</p>
+                    <p className="text-ink mt-1 text-hero tabular-nums">{formatNumber(Number(value))}人</p>
                   </div>
                 ))}
               </div>
-              <p className="mt-3 rounded-control bg-info-bg p-3 text-xs text-info">重複アカウントは1人として数え、配信直前に再計算します。</p>
+              <Notice tone="info" className="mt-3">重複アカウントは1人として数え、配信直前に再計算します。</Notice>
               <section className="mt-4 border-t border-hairline pt-4">
                 <h4 className="text-sm font-bold text-ink">対象プレビュー</h4>
                 <p className="mt-1 text-xs text-ink-faint">代表的な友だちを確認できます。</p>
                 <div className="mt-2 divide-y divide-hairline">
                   {preflight.audience.representatives.map((friend) => (
                     <div key={friend.friendId} className="flex items-center gap-3 py-3">
-                      {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="size-8 rounded-full object-cover" /> : (
-                        <span className="flex size-8 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent">{friend.displayName?.slice(0, 1) ?? '—'}</span>
+                      {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="size-8 rounded-pill object-cover" /> : (
+                        <span className="flex size-8 items-center justify-center rounded-pill bg-accent-soft text-xs font-medium text-accent-deep">{friend.displayName?.slice(0, 1) ?? '—'}</span>
                       )}
-                      <div><p className="text-sm font-bold text-ink">{friend.displayName ?? '名前未登録'}</p><p className="text-xs text-ink-faint">{friend.summary}</p></div>
+                      <div><p className="text-sm font-semibold text-ink">{friend.displayName ?? '名前未登録'}</p><p className="text-xs text-ink-faint">{friend.summary}</p></div>
                     </div>
                   ))}
                   {preflight.audience.representatives.length === 0 && <p className="py-3 text-xs text-ink-faint">表示できる友だちはいません。</p>}
@@ -1852,7 +2405,7 @@ export default function BroadcastForm({
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className={`border-accent text-accent rounded-control border px-3 py-1 text-xs font-bold hover:bg-accent-soft ${currentStep === 'message' ? 'hidden' : ''}`}
+              className={`border-accent text-accent-deep rounded-control border px-3 py-1 text-xs font-medium hover:bg-accent-soft ${currentStep === 'message' ? 'hidden' : ''}`}
             >
               テンプレートから選ぶ
             </button>
@@ -1891,8 +2444,48 @@ export default function BroadcastForm({
               )
             })}
           </div>
+        {!showTemplatePicker && bubbles.map((bubble, index) => bubble.type === 'text' ? (
+          <TextBubbleEditor
+            key={bubble.id}
+            bubble={bubble}
+            index={index}
+            total={bubbles.length}
+            trackLinks={trackLinks}
+            embedded={currentStep === 'message'}
+            visualReference={visualQaAugustCampaign}
+            onTrackLinksChange={setTrackLinks}
+            onChange={(next) => updateBubble(index, next)}
+            onMove={(direction) => moveBubble(index, direction)}
+            onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))}
+          />
+        ) : (
+          <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} assetsStatus={templateCandidatesStatus} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
+        ))}
+        {/*
+          ボタンは配信全体で1組なので、編集欄はここに1つだけ置く。
+          各テキストの下に置いていた頃は、2通目を直すと全通に反映され、
+          個別設定に見えるのに共通設定だった（監査 R209）。
+        */}
+        {!showTemplatePicker && (
+          <MessageButtonsSection
+            buttons={messageButtons}
+            error={messageButtonsError(messageButtons)}
+            onChange={setMessageButtons}
+          />
+        )}
+        {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
+          <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加する</Button>
+          <Button type="button" onClick={() => setShowTemplatePicker(true)}>テンプレートから選ぶ</Button>
+          <Button type="button" disabled title="テンプレート保存の契約は未接続です"><Save size={15} aria-hidden /> 保存してテンプレート化する</Button>
+        </div>}
+        </section>
+        {/*
+          BC-02: 選択窓はエディタの節の**外側**に置く。内側にあった頃は
+          開くと親の節ごと hidden になり、どの入口からも一度も表示されなかった
+          （DOMには居るため既存テストは通っていた）。監査 #615。
+        */}
         {showTemplatePicker && (
-          <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+          <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-card">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-bold text-ink">テンプレート選択</h3>
@@ -1901,7 +2494,7 @@ export default function BroadcastForm({
               <button type="button" onClick={() => setShowTemplatePicker(false)} className="text-sm font-semibold text-action hover:underline">メッセージ編集へ戻る</button>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="block text-xs font-bold text-ink-secondary">名前・本文で検索
+              <label className="block text-xs font-medium text-ink-secondary">名前・本文で検索
                 <input
                   type="search"
                   aria-label="テンプレート名・本文で検索"
@@ -1911,17 +2504,18 @@ export default function BroadcastForm({
                   className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal"
                 />
               </label>
-              <label className="block text-xs font-bold text-ink-secondary">フォルダ
-                <select
+              <label className="block text-xs font-medium text-ink-secondary">フォルダ
+                <Select
                   aria-label="テンプレートのフォルダ"
                   value={templatePickerFolderId}
-                  onChange={(event) => setTemplatePickerFolderId(event.target.value)}
-                  className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal"
-                >
-                  <option value="">すべて</option>
-                  {templateFolders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
-                  <option value="__none__">未分類</option>
-                </select>
+                  onChange={setTemplatePickerFolderId}
+                  options={[
+                    { value: '', label: 'すべて' },
+                    ...templateFolders.map((folder) => ({ value: folder.id, label: folder.name })),
+                    { value: '__none__', label: '未分類' },
+                  ]}
+                  size="full"
+                />
               </label>
             </div>
             <div className="mt-4 space-y-3">
@@ -1957,44 +2551,26 @@ export default function BroadcastForm({
             </div>
           </section>
         )}
-        {!showTemplatePicker && bubbles.map((bubble, index) => bubble.type === 'text' ? (
-          <TextBubbleEditor
-            key={bubble.id}
-            bubble={bubble}
-            index={index}
-            trackLinks={trackLinks}
-            buttons={messageButtons}
-            embedded={currentStep === 'message'}
-            visualReference={visualQaAugustCampaign}
-            onTrackLinksChange={setTrackLinks}
-            onButtonsChange={setMessageButtons}
-            onChange={(next) => updateBubble(index, next)}
-          />
-        ) : (
-          <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} assetsStatus={templateCandidatesStatus} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
-        ))}
-        {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加</Button>
-          <Button type="button" onClick={() => setShowTemplatePicker(true)}>テンプレートから選ぶ</Button>
-          <Button type="button" disabled title="テンプレート保存の契約は未接続です"><Save size={15} aria-hidden /> 保存してテンプレート化</Button>
-        </div>}
-        </section>
         {!showTemplatePicker && <section className="rounded-card border border-hairline bg-canvas p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4>{currentStep !== 'message' && <p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p>}</div>
-            <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加</Link>
+            <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加する</Link>
           </div>
           {currentStep === 'message' ? (
             <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink-secondary">
-              <Zap size={17} className="text-accent" aria-hidden />
-              {publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'タグ「8月キャンペーン配信済み」を追加'}
+              <Zap size={17} className="text-ink-secondary" aria-hidden />
+              {publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'}
             </p>
-          ) : <label className="mt-3 block text-xs font-bold text-ink-secondary">実行する公開済みアクション
-            <select aria-label="配信後のアクション" value={afterActionVersionId} onChange={(event) => setAfterActionVersionId(event.target.value)} className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal text-ink">
-              <option value="">実行しない</option>
-              {publishedActions.map((action) => <option key={action.versionId} value={action.versionId}>{action.name}（第{action.version}版）</option>)}
-            </select>
-          </label>}
+          ) : <div className="mt-3 block text-xs font-medium text-ink-secondary">実行する公開済みアクション
+            <Combobox
+              aria-label="配信後のアクション"
+              placeholder="実行しない"
+              value={afterActionVersionId}
+              onChange={setAfterActionVersionId}
+              options={publishedActions.map((action) => ({ value: action.versionId, label: `${action.name}（第${action.version}版）` }))}
+              className="mt-2 w-full font-normal"
+            />
+          </div>}
           {currentStep !== 'message' && afterActionVersionId && <p className="mt-2 text-xs text-success">✓ 配信完了後に、選んだ公開版を実行します。</p>}
         </section>}
         {/*
@@ -2003,46 +2579,28 @@ export default function BroadcastForm({
           予約まで進んでから、配信の時刻に断られるのがいちばん困る。
         */}
         {bubbles.length > 1 && (
-          <p className="rounded-card bg-warning-bg text-warning p-3 text-sm leading-relaxed">
+          <Notice tone="warn">
             2通目以降はまだ配信できません。下書きとして残せますが、送信・予約はできません。
             いまは1通にまとめるか、配信を分けてください。
-          </p>
+          </Notice>
         )}
-        {error && <p className="rounded-card bg-danger-bg p-3 text-sm text-danger">{error}</p>}
+        {!currentStep && error && <Notice tone="danger" message={error} />}
         </div>
         <section id="broadcast-step-schedule" className={`${shows('schedule') ? '' : 'hidden'} border-hairline mb-3 rounded-card border bg-canvas p-5`}>
           <h3 className="text-lg font-bold text-ink">送信設定</h3>
           <p className="mb-4 mt-1 text-sm text-ink-faint">配信する日時と、LINEの集計方法を設定します。</p>
           <div className="grid gap-2 sm:grid-cols-3">
-            <button
-              type="button"
-              onClick={() => setSendMode('now')}
-              aria-pressed={sendMode === 'now'}
-              className={`rounded-card border p-3 text-left text-sm ${
+            <Button variant="secondary" className={(`rounded-card border p-3 text-left text-sm ${
                 sendMode === 'now' ? 'border-accent bg-accent-soft' : 'border-hairline'
-              }`}
-            >
+              }`) + ' h-auto whitespace-normal'} type="button" onClick={() => setSendMode('now')} aria-pressed={sendMode === 'now'}>
               今すぐ配信
-            </button>
-            <button
-              type="button"
-              onClick={() => setSendMode('scheduled')}
-              aria-pressed={sendMode === 'scheduled'}
-              className={`rounded-card border p-3 text-left text-sm ${
+            </Button>
+            <Button variant="secondary" className={(`rounded-card border p-3 text-left text-sm ${
                 sendMode === 'scheduled' ? 'border-accent bg-accent-soft' : 'border-hairline'
-              }`}
-            >
+              }`) + ' h-auto whitespace-normal'} type="button" onClick={() => setSendMode('scheduled')} aria-pressed={sendMode === 'scheduled'}>
               日時を指定して予約
-            </button>
-            {/* 1人ずつ最適な時刻を出す仕組みが無い。開封の時間帯を持っていない。 */}
-            <button
-              type="button"
-              disabled
-              title="友だちごとの最適な時間は準備中です"
-              className="border-hairline rounded-card text-ink-faint border p-3 text-left text-sm opacity-50"
-            >
-              友だちごとの最適な時間
-            </button>
+            </Button>
+            {/* 「友だちごとの最適な時間」は開封の時間帯を持っていないので押し口を出さない。 */}
           </div>
 
           {sendMode === 'scheduled' && (
@@ -2051,24 +2609,22 @@ export default function BroadcastForm({
                 <label htmlFor="bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
                   配信日（日本時間）
                 </label>
-                <input
+                <DateField
                   id="bc-date"
-                  type="date"
                   value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                  onChange={setScheduledDate}
+                  aria-label="配信日（日本時間）"
                 />
               </div>
               <div>
                 <label htmlFor="bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
                   時刻（日本時間）
                 </label>
-                <input
+                <TimeField
                   id="bc-time"
-                  type="time"
                   value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                  onChange={setScheduledTime}
+                  aria-label="時刻（日本時間）"
                 />
               </div>
               {/*
@@ -2081,15 +2637,15 @@ export default function BroadcastForm({
                 **送信枠には触れない。** 残り通数を読む口がこの画面には無く、
                 「送信枠も再確認します」と書くと出せない数を約束することになる。
               */}
-              <p className="bg-warning-bg text-warning rounded-control sm:col-span-2 p-3 text-xs leading-relaxed">
+              <Notice tone="warn" className="sm:col-span-2">
                 予約した時刻に、そのときの条件でもう一度対象を数え直してから送ります。
                 いま出ている人数から増減することがあります。
-              </p>
+              </Notice>
             </div>
           )}
 
           <div className="border-hairline mt-4 border-t pt-4">
-      <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-bold">
+      <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-medium">
         時間を分散して送る
         <span className="bg-success-bg text-success rounded-pill ml-2 px-2 py-0.5 text-[11px] font-normal">
           推奨
@@ -2116,7 +2672,7 @@ export default function BroadcastForm({
             <p className="text-sm font-bold text-ink">開封・クリックの集計</p>
             <p className="mt-1 text-xs text-ink-faint">
               {quota?.monthlyUsed !== null && quota?.monthlyUsed !== undefined && quota.monthlyLimit !== null
-                ? `LINEの月間送信枠を使います（今月 ${quota.monthlyUsed.toLocaleString('ja-JP')} / ${quota.monthlyLimit.toLocaleString('ja-JP')} 通）。`
+                ? `LINEの月間送信枠を使います（今月 ${formatNumber(quota.monthlyUsed)} / ${formatNumber(quota.monthlyLimit)} 通）。`
                 : 'LINEの月間送信枠を確認しています。'}
             </p>
           </div>
@@ -2128,9 +2684,9 @@ export default function BroadcastForm({
                 {[-1, 0, 1, 2].map((offset) => {
                   const base = scheduledDate ? new Date(`${scheduledDate}T00:00:00+09:00`) : null
                   if (base) base.setDate(base.getDate() + offset)
-                  const ymd = base ? base.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' }) : '日付未設定'
+                  const ymd = base ? formatDay(base) : '日付未設定'
                   const concurrent = offset === 0 ? concurrentBroadcasts : []
-                  return <div key={offset} className={`rounded-control border p-3 text-xs ${offset === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><p className="font-bold text-ink">{ymd}{offset === 0 ? ' 今回' : ''}</p>{concurrent.length ? concurrent.map((item) => <p key={item.id} className="mt-2 truncate text-ink-secondary" title={item.title}>{formatScheduleTime(item.scheduledAt)}　{item.title}</p>) : <p className="mt-2 text-ink-faint">予定なし</p>}</div>
+                  return <div key={offset} className={`rounded-control border p-3 text-xs ${offset === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><p className="font-semibold text-ink">{ymd}{offset === 0 ? ' 今回' : ''}</p>{concurrent.length ? concurrent.map((item) => <p key={item.id} className="mt-2 truncate text-ink-secondary" title={item.title}>{formatScheduleTime(item.scheduledAt)}　{item.title}</p>) : <p className="mt-2 text-ink-faint">予定なし</p>}</div>
                 })}
               </div>
               {concurrentBroadcasts.length > 0 && <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">同じ時刻の前後1時間に別の配信があります。対象が重なる場合は、間隔を空けてください。</p>}
@@ -2152,17 +2708,13 @@ export default function BroadcastForm({
           {/* 「今すぐ」は日時を持たないので未設定扱いしない。予約と混同しないよう別の文にする。 */}
           <li className="flex items-center gap-2"><span className={scheduledLabel || sendMode === 'now' ? 'text-success' : 'text-warning'}>{scheduledLabel || sendMode === 'now' ? '✓' : '!'}</span><span>{sendMode === 'now' ? '今すぐ配信を選んでいます' : '配信日時が設定されています'}</span></li>
           <li className="flex items-center gap-2"><span className={testResult?.kind === 'success' ? 'text-success' : testResult ? 'text-danger' : 'text-warning'}>{testResult?.kind === 'success' ? '✓' : '!'}</span><span>{testResult?.kind === 'success' ? 'テスト送信が完了しています' : testResult ? 'テスト送信で届かなかった宛先があります' : 'テスト送信がまだです'}</span></li>
-          <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{visualQaAugustCampaign ? '送信枠を超えていません' : quotaInsufficient ? `送信枠が${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通不足しています` : quotaAvailable ? `送信枠は残り${quota.remaining?.toLocaleString('ja-JP')}通です` : '送信枠を確認できません'}</span></li>
+          <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{visualQaAugustCampaign ? '送信枠を超えていません' : quotaInsufficient ? `送信枠が${formatNumber(Math.max(0, quota.planned - (quota.remaining ?? 0)))}通不足しています` : quotaAvailable ? `送信枠は残り${formatNumber(quota.remaining)}通です` : '送信枠を確認できません'}</span></li>
         </ul>
-        {!visualQaAugustCampaign && <label className="border-hairline mt-4 flex cursor-pointer items-center gap-3 border-t pt-4 text-sm font-semibold text-ink">
-          <input
-            type="checkbox"
-            checked={previewConfirmed}
-            onChange={(event) => setPreviewConfirmed(event.target.checked)}
-            className="size-4 accent-[var(--color-accent-deep)]"
-          />
-          <span>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</span>
-        </label>}
+        {!visualQaAugustCampaign && <Checkbox
+          checked={previewConfirmed}
+          onCheckedChange={setPreviewConfirmed}
+          className="border-hairline mt-4 border-t pt-4"
+        >{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox>}
       </section>
 
       {/*
@@ -2181,7 +2733,7 @@ export default function BroadcastForm({
         <dl className="mt-5 divide-y divide-hairline text-sm">
           {[
             ['管理名', title.trim() || '（未入力）'],
-            ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+            ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
             ['除外', visualQaAugustCampaign ? 'ブロック 12人を除外' : exclusionNote ?? '—'],
             ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
             ['送信枠', visualQaAugustCampaign ? '残り 8,700 / 10,000通' : quotaNote ?? '—'],
@@ -2197,18 +2749,18 @@ export default function BroadcastForm({
           ))}
         </dl>
         {concurrentBroadcasts.length > 0 && (
-          <div className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">
+          <Notice tone="warn" className="mt-3">
             <p className="font-semibold">同じ時刻の前後1時間に別の予約配信があります。対象が重なる場合は間隔を空けてください。</p>
             <ul className="mt-1 list-disc pl-4">
               {concurrentBroadcasts.map((item) => <li key={item.id}>{formatScheduleTime(item.scheduledAt)}　{item.title}</li>)}
             </ul>
-          </div>
+          </Notice>
         )}
-        <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">
+        <Notice tone="warn" className="mt-3">
           {sendMode === 'scheduled'
             ? '予約後も配信開始前までは編集・取消できます。'
             : '下書きとして保存します。送信は詳細画面で実行し、送信前にもう一度確認できます。'}
-        </p>
+        </Notice>
       </section>
     </div>
     {/*
@@ -2223,23 +2775,29 @@ export default function BroadcastForm({
       **こちらは常に出す。**
     */}
     {shows('message') && lengthNotice.tone === 'error' && (
-      <div className="border-danger-bg bg-danger-bg rounded-card mb-3 border p-3">
+      <Notice tone="danger" className="mb-3">
         <p className="text-danger text-sm font-bold">{lengthNotice.title}</p>
         <p className="text-danger mt-1 text-xs">{lengthNotice.description}</p>
-      </div>
+      </Notice>
     )}
-    {draftSaved && <p role="status" className="mb-3 rounded-control bg-success-bg p-3 text-sm text-success">下書きを保存しました。</p>}
       </div>
-      <aside className="xl:sticky xl:top-6 xl:h-fit">
+      {/*
+        xl で右列を追従させるとき、列の中身（LINEプレビュー + 操作）が
+        表示域より高いと、下端の「テスト送信」「配信イメージを見る」が
+        72px の下部追従バーに常時被って押せなくなる（#642）。列自体を
+        バーに届かない高さへ抑えて中をスクロール可能にし、下端の操作は
+        常にバーの上まで引き出せる形にする。
+      */}
+      <aside className="xl:sticky xl:top-6 xl:h-fit xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto">
         {showTemplatePicker ? (
           <div className="space-y-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-lg font-bold text-ink">設定サマリー</h3>
               <p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p>
               <dl className="mt-4 divide-y divide-hairline text-sm">
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">選択中</dt><dd className="font-bold text-ink">{selectedTemplate?.name ?? '未選択'}</dd></div>
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">更新日</dt><dd className="font-bold text-ink">{selectedTemplate?.updatedAt ? new Date(selectedTemplate.updatedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</dd></div>
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">使用回数</dt><dd className="font-bold text-ink">{selectedTemplate?.usageCount === undefined ? '—' : `${selectedTemplate.usageCount}回`}</dd></div>
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">選択中</dt><dd className="font-medium text-ink">{selectedTemplate?.name ?? '未選択'}</dd></div>
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">更新日</dt><dd className="font-medium text-ink">{selectedTemplate?.updatedAt ? formatDateTime(selectedTemplate.updatedAt) : '—'}</dd></div>
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">使用回数</dt><dd className="font-medium text-ink">{selectedTemplate?.usageCount === undefined ? '—' : `${selectedTemplate.usageCount}回`}</dd></div>
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
@@ -2258,32 +2816,39 @@ export default function BroadcastForm({
                   : 'テンプレートを選ぶと表示されます'}
               </div>
             </section>
-            <div className="grid grid-cols-2 gap-2"><Button type="button" onClick={() => void openTestDialog()}>テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
+            <div className="grid grid-cols-2 gap-2"><Button type="button" onClick={() => void openTestDialog()}>テストを送る</Button><Button type="button" disabled>配信イメージを見る</Button></div>
           </div>
         ) : preflightDialogOpen ? (
           <div className="space-y-3">
-            <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">設定サマリー</h3><p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p><dl className="mt-4 divide-y divide-hairline text-sm"><div className="flex justify-between py-2"><dt className="text-ink-faint">配信人数</dt><dd className="font-bold text-ink">{audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">送信枠</dt><dd className="font-bold text-danger">不足 {quota && quota.remaining !== null ? Math.max(0, quota.planned - quota.remaining).toLocaleString('ja-JP') : '—'}通</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">状態</dt><dd className="font-bold text-danger">要確認</dd></div></dl></section>
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-medium text-ink">設定サマリー</h3><p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p><dl className="mt-4 divide-y divide-hairline text-sm"><div className="flex justify-between py-2"><dt className="text-ink-faint">配信人数</dt><dd className="font-medium text-ink">{formatNumber(audienceCount)}人</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">送信枠</dt><dd className="font-medium text-danger">不足 {quota && quota.remaining !== null ? formatNumber(Math.max(0, quota.planned - quota.remaining)) : '—'}通</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">状態</dt><dd className="font-medium text-danger">要確認</dd></div></dl></section>
             <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">メッセージプレビュー</h3><p className="mt-1 text-xs text-ink-faint">実際のLINE表示に近い確認用プレビューです。</p><div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">8月限定キャンペーンのお知らせです。</div></section>
-            <div className="grid grid-cols-2 gap-2"><Button type="button">テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
+            <div className="grid grid-cols-2 gap-2"><Button type="button">テストを送る</Button><Button type="button" disabled>配信イメージを見る</Button></div>
           </div>
         ) : currentStep === 'confirm' ? (
           <div className="space-y-3">
-            <section className="broadcast-line-preview rounded-card p-5 text-on-accent">
-              <h3 className="text-center text-sm font-bold">LINEプレビュー</h3>
-              <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">2026/08/24 10:00 に届きます</p>
-              <div className="mt-4 flex flex-col gap-3 text-ink">
+            {/*
+              * BC-03: 実際に決めた値だけを出す。固定の日時・人数・
+              * タグ名を出すと、対象0人や未設定でも「実行される」
+              * ように見えてしまう。
+              */}
+            <LinePreview
+              caption={visualQaAugustCampaign ? '2026/08/24 10:00 に届きます'
+                : scheduledLabel ? `${scheduledLabel} に届きます`
+                : '保存後、詳細画面から送信します'}
+            >
+              <div className="flex flex-col gap-3 text-ink">
                 {bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}
               </div>
-            </section>
+            </LinePreview>
             <section className="rounded-card border border-hairline bg-canvas p-4">
               <h3 className="font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
                 {[
-                  ['配信対象', '条件指定 1,213人'],
-                  ['配信日時', '2026/08/24 10:00'],
-                  ['送信数', '1,213通'],
-                  ['配信後', 'タグ「配信済み」を追加'],
-                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-4"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-bold text-ink">{value}</dd></div>)}
+                  ['配信対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
+                  ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
+                  ['送信数', visualQaAugustCampaign ? '1,213通' : audienceCount === null ? '—' : `${formatNumber(audienceCount)}通`],
+                  ['配信後', visualQaAugustCampaign ? 'タグ「配信済み」を追加' : publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'],
+                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-4"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-medium text-ink">{value}</dd></div>)}
               </dl>
             </section>
           </div>
@@ -2292,9 +2857,9 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 space-y-3 text-sm">
-                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-bold text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${audienceDisplayCount.toLocaleString('ja-JP')}人`}</dd></div>
-                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-bold text-ink">未設定</dd></div>
-                <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-bold text-ink">{bubbles.length}通</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-medium text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${formatNumber(audienceDisplayCount)}人`}</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-medium text-ink">未設定</dd></div>
+                <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-medium text-ink">{bubbles.length}通</dd></div>
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
@@ -2311,19 +2876,19 @@ export default function BroadcastForm({
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
                 {[
-                  ['配信対象', `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+                  ['配信対象', `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
                   ['配信日時', scheduledLabel ?? '未設定'],
                   ['送信数', `${bubbles.length}通`],
                   ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
-                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-bold text-ink">{value}</dd></div>)}
+                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-medium text-ink">{value}</dd></div>)}
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">送信枠</h3>
               <p className="mt-1 text-xs text-ink-faint">現在の枠内で送信できるか確認します。</p>
-              {quota ? <><p className="mt-3 text-sm font-bold text-ink">使用予定　{quota.planned.toLocaleString('ja-JP')} / {quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</p><div className="mt-2 h-2 overflow-hidden rounded-full bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-bold ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通` : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
+              {quota ? <><p className="mt-3 text-sm font-semibold text-ink">使用予定　{formatNumber(quota.planned)} / {formatNumber(quota.monthlyLimit)}通</p><div className="mt-2 h-2 overflow-hidden rounded-pill bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-medium ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${formatNumber(Math.max(0, quota.planned - (quota.remaining ?? 0)))}通` : `残り ${formatNumber(quota.remaining)}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
             </section>
-            <section className="broadcast-line-preview rounded-card p-5 text-on-accent"><h3 className="text-center text-sm font-bold">LINEプレビュー</h3><div className="mt-4 rounded-control bg-canvas p-4 text-sm text-ink"><BubblePreview bubble={bubbles[0]} buttons={messageButtons} /></div></section>
+            <LinePreview><div className="rounded-control bg-canvas p-4 text-sm text-ink"><BubblePreview bubble={bubbles[0]} buttons={messageButtons} /></div></LinePreview>
           </div>
         ) : currentStep === 'basic' ? (
           <div className="space-y-3">
@@ -2331,44 +2896,41 @@ export default function BroadcastForm({
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
                 {[['配信対象', '未設定'], ['配信日時', '未設定'], ['送信数', '—'], ['配信後', '未設定']].map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="font-bold text-ink">{value}</dd></div>
+                  <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="font-medium text-ink">{value}</dd></div>
                 ))}
               </dl>
             </section>
-            <section className="broadcast-line-preview rounded-card p-5 text-on-accent">
-              <h3 className="text-center text-sm font-bold">LINEプレビュー</h3>
-              <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">配信日時は STEP 4 で設定します</p>
-              <div className="mt-4 rounded-control bg-canvas p-4 text-sm leading-relaxed text-ink">
+            <LinePreview caption="配信日時は STEP 4 で設定します">
+              <div className="rounded-control bg-canvas p-4 text-sm leading-relaxed text-ink">
                 メッセージは STEP 3 で作成します。テンプレートや過去の配信を選ぶと、ここに内容が入ります。
               </div>
-            </section>
+            </LinePreview>
             <div className="grid grid-cols-2 gap-2">
-              <Button type="button" disabled>テスト送信</Button>
+              <Button type="button" disabled>テストを送る</Button>
               <Button type="button" disabled>配信イメージを見る</Button>
             </div>
           </div>
         ) : currentStep === 'message' ? (
           <div className="space-y-3">
-            <section className="broadcast-line-preview rounded-card p-5 text-on-accent">
-              <h3 className="text-center text-sm font-bold">LINEプレビュー</h3>
-              <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">2026/08/24 10:00 に届きます</p>
-              <div className="mt-4 flex flex-col gap-3 text-ink">
+            <LinePreview
+              caption={visualQaAugustCampaign ? '2026/08/24 10:00 に届きます'
+                : scheduledLabel ? `${scheduledLabel} に届きます`
+                : '配信日時は STEP 4 で設定します'}
+            >
+              <div className="flex flex-col gap-3 text-ink">
                 {bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}
               </div>
-            </section>
+            </LinePreview>
             <div className="grid grid-cols-2 gap-2">
-              <Button type="button" onClick={() => void openTestDialog()}><Send size={15} aria-hidden /> テスト送信</Button>
+              <Button type="button" onClick={() => void openTestDialog()}><Send size={15} aria-hidden /> テストを送る</Button>
               <Button type="button" disabled><Eye size={15} aria-hidden /> 配信イメージを見る</Button>
             </div>
           </div>
         ) : (
           <>
-            <h3 className="mb-2 text-sm font-bold text-ink">LINEプレビュー</h3>
-            <p className="text-ink-faint mb-3 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
-            <div className={`overflow-hidden rounded-[28px] border-[8px] shadow-xl ${LINE_MOCK.frame} ${LINE_MOCK.wallpaper}`}>
-              <div className={`px-4 py-2 text-center text-xs font-bold ${LINE_MOCK.bar} ${LINE_MOCK.onDark}`}>プレビュー</div>
-              <div className="flex min-h-[600px] flex-col gap-3 p-4"><p className={`mb-3 text-center text-[11px] opacity-80 ${LINE_MOCK.onDark}`}>今日</p>{bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}</div>
-            </div>
+            <LinePreview note="実際のLINE表示に近い確認用プレビューです。">
+              <div className="flex flex-col gap-3 text-ink"><p className="text-center text-micro text-ink-faint">今日</p>{bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}</div>
+            </LinePreview>
           </>
         )}
         </>
@@ -2378,12 +2940,12 @@ export default function BroadcastForm({
 
     {currentStep === 'message' ? <div className="h-24" aria-hidden="true" /> : null}
     {currentStep === 'confirm' ? <div className="h-4" aria-hidden="true" /> : null}
-    <StickyBar className="broadcast-form-footer" actions={(
+    <StickyBar actions={(
       <>
       {currentStep ? (
         <>
           {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
-          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()}>{currentStep === 'message' && <Save size={15} aria-hidden />}{saving ? '保存中…' : '下書き保存'}</Button>
+          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
           {currentStep !== 'confirm' ? (
             <Button variant="primary" onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}>
               {currentStep === 'basic' ? '対象設定へ'
@@ -2392,24 +2954,38 @@ export default function BroadcastForm({
                     : '配信前チェックへ'}
             </Button>
           ) : (
-            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void save()}>
+            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void save()} busy={saving}>
               {/*
                 予約と下書きを混同しない（IDEA-06）。「今すぐ配信」はここでは
                 送らず、下書きを保存して詳細画面の送信ボタンで実行する。
               */}
-              {saving ? '保存中…' : sendMode === 'scheduled' ? 'この内容で予約' : '保存して送信画面へ'}
+              {sendMode === 'scheduled' ? 'この内容で予約' : '保存して送信画面へ'}
             </Button>
           )}
         </>
       ) : (
         <>
-          <button onClick={onCancel} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold">キャンセル</button>
-          {(shows('message') || shows('confirm')) && <button disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold disabled:opacity-50">{testSending ? '送信中…' : 'テスト送信'}</button>}
-          <button disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50">{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書き保存'}</button>
+          <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => guarded(onCancel)}>キャンセル</Button>
+          {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()}>{testSending ? '送信中…' : 'テストを送る'}</Button>}
+          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
         </>
       )}
       </>
     )} />
+
+    {/*
+      書きかけのまま離れようとしたときの確認（★V7 sTJsh §5）。
+      「保存して移る」は下書きへ保存できたらそのまま移動し、
+      保存できないときはこの画面へ戻って直す。
+    */}
+    <UnsavedLeaveDialog
+      open={leaveTarget !== null}
+      subject="配信の変更"
+      busy={saving}
+      onSave={saveDraftNow}
+      onConfirm={confirmLeave}
+      onCancel={cancelLeave}
+    />
 
     {/*
       最終確認（設計 `FpgxH` 6-1-H）。
@@ -2423,7 +2999,7 @@ export default function BroadcastForm({
       title="テンプレートを選択"
       description={selectedTemplate ? `「${selectedTemplate.name}」を一斉配信のメッセージに読み込みます。読み込み後も内容を編集できます。` : ''}
       confirmLabel="このテンプレートを使用"
-      cancelLabel="戻る"
+      cancelLabel="キャンセル"
       designNode="p97Tf"
       titleIcon={<CheckCircle2 size={22} />}
       onCancel={() => setSelectedTemplate(null)}
@@ -2460,11 +3036,11 @@ export default function BroadcastForm({
         </section>
         <section>
           <h3 className="text-sm font-bold text-ink">利用できる条件軸</h3>
-          <p className="mt-2 text-xs font-bold text-ink-secondary">標準互換（15軸）</p>
+          <p className="mt-2 text-xs font-medium text-ink-secondary">標準互換（15軸）</p>
           <div className="mt-2 flex flex-wrap gap-1.5">{STANDARD_CONDITION_AXES.map((axis) => <span key={axis} className="rounded-pill border border-hairline px-2 py-1 text-xs text-ink-secondary">{axis}</span>)}</div>
-          <p className="mt-3 text-xs font-bold text-ink-secondary">この画面だけの軸（6軸）</p>
+          <p className="mt-3 text-xs font-medium text-ink-secondary">この画面だけの軸（6軸）</p>
           <div className="mt-2 flex flex-wrap gap-1.5">{BROADCAST_ONLY_CONDITION_AXES.map((axis) => <span key={axis} className="rounded-pill border border-hairline px-2 py-1 text-xs text-ink-faint">{axis}</span>)}</div>
-          <p className="mt-3 rounded-control bg-info-bg p-3 text-xs text-info">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。未接続の軸は選択肢に出ません。</p>
+          <Notice tone="info" className="mt-3">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。未接続の軸は選択肢に出ません。</Notice>
         </section>
       </div>
     </ConfirmDialog>
@@ -2473,10 +3049,10 @@ export default function BroadcastForm({
       open={preflightDialogOpen}
       title={quotaInsufficient ? '配信枠が不足しています' : '配信前チェック'}
       description={quotaInsufficient
-        ? `現在の送信枠では${quota?.planned.toLocaleString('ja-JP')}通を送信できません。対象を絞るか、配信設定を確認してください。`
+        ? `現在の送信枠では${formatNumber(quota?.planned)}通を送信できません。対象を絞るか、配信設定を確認してください。`
         : '対象・メッセージ・日時・送信枠を確認しました。'}
       confirmLabel="対象を見直す"
-      cancelLabel="戻る"
+      cancelLabel="キャンセル"
       designNode="vW4Es"
       titleIcon={quotaInsufficient ? <AlertTriangle size={22} /> : <CheckCircle2 size={22} />}
       onCancel={() => setPreflightDialogOpen(false)}
@@ -2495,9 +3071,13 @@ export default function BroadcastForm({
     <div data-design-node="FpgxH">
       <ConfirmDialog
         open={confirmOpen}
-        title="この内容で予約しますか？"
-        description="送信対象・日時・内容を確認して予約します。予約後も配信開始前までは編集・取消できます。"
-        confirmLabel="この内容で予約"
+        title={needsApproval && !needsApprovalSingle ? 'この内容で送りますか？' : 'この内容で予約しますか？'}
+        description={
+          needsApproval && !needsApprovalSingle
+            ? '送る相手・日時・内容を確認し、承認をお願いする人を選んでください。承認されるまで送られません。'
+            : '送信対象・日時・内容を確認して予約します。予約後も配信開始前までは編集・取消できます。'
+        }
+        confirmLabel={needsApproval && !needsApprovalSingle ? '承認を依頼する' : 'この内容で予約'}
         cancelLabel="戻って修正"
         busy={saving}
         error={error || undefined}
@@ -2514,7 +3094,7 @@ export default function BroadcastForm({
             <dd className="text-ink text-right font-medium">
               {confirmAudienceLabel}
               <span className="ml-2 tabular-nums">
-                {audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}
+                {audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}
               </span>
             </dd>
           </div>
@@ -2568,14 +3148,14 @@ export default function BroadcastForm({
           読み合わせるときに見落とす。
         */}
         {concurrentBroadcasts.length > 0 && (
-          <div className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs leading-5">
+          <Notice tone="warn" className="mt-3">
             <p className="font-semibold">同じ時刻の前後1時間に別の予約配信があります</p>
             <ul className="mt-1 list-disc pl-4">
               {concurrentBroadcasts.map((item) => (
                 <li key={item.id}>{formatScheduleTime(item.scheduledAt)}　{item.title}</li>
               ))}
             </ul>
-          </div>
+          </Notice>
         )}
 
         {/*
@@ -2584,37 +3164,61 @@ export default function BroadcastForm({
           目に入っていないと、あとから気づけない。
         */}
         {unconfirmedCount !== null && unconfirmedCount > 0 ? (
-          <div className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs leading-5">
+          <Notice tone="warn" className="mt-3">
             <p className="font-semibold">配信前チェックに {unconfirmedCount}件 の未確認があります</p>
             <ul className="mt-1 list-disc pl-4">
-              {preflight?.warnings.filter((w) => w.level === 'warning').map((w) => (
+              {(preflight?.warnings ?? []).filter((w) => w.level === 'warning').map((w) => (
                 <li key={w.message}>{w.message}</li>
               ))}
               {testResult?.kind === 'success' ? null : testResult ? <li>テスト送信で届かなかった宛先があります</li> : <li>テスト送信がまだです</li>}
               {previewConfirmed ? null : <li>LINEプレビューが未確認です</li>}
             </ul>
-          </div>
+          </Notice>
+        ) : null}
+
+        {/*
+          二者承認（設計 A-1・A-4）。承認が要る人数のときだけ出す。
+          境目が読めているときだけ判定する（読めないときは従来どおり）。
+        */}
+        {needsApproval && !needsApprovalSingle && audienceCount !== null && approvalConfig !== null ? (
+          <ApprovalRequestFields
+            recipientCount={audienceCount}
+            threshold={approvalConfig.threshold}
+            candidates={approvalCandidates}
+            candidatesState={approvalCandidatesState}
+            approverId={approverId}
+            onApproverChange={setApproverId}
+            note={approvalNote}
+            onNoteChange={setApprovalNote}
+          />
+        ) : null}
+        {needsApprovalSingle && audienceCount !== null ? (
+          <SingleOperatorFields
+            recipientCount={audienceCount}
+            value={approvalCountInput}
+            onChange={setApprovalCountInput}
+          />
         ) : null}
 
         {/* 人数が無いなら送らせない。上で確認のボタン自体を出していない。 */}
         {audienceCount === null ? (
-          <p className="bg-danger-bg text-danger rounded-control mt-3 p-3 text-xs leading-5">
+          <Notice tone="danger" className="mt-3">
             対象の人数を数えられていないため、予約できません。
             宛先と本文を確かめてから、もう一度お試しください。
-          </p>
+          </Notice>
         ) : audienceCount === 0 ? (
-          <p className="bg-danger-bg text-danger rounded-control mt-3 p-3 text-xs leading-5">
+          <Notice tone="danger" className="mt-3">
             いま届く人が0人です。宛先の条件を見直してください。
-          </p>
+          </Notice>
         ) : null}
       </ConfirmDialog>
     </div>
 
     <ConfirmDialog
       open={testDialogOpen}
-      title="テスト送信"
+      title="テストを送る"
       description="登録済みのテスト送信先全員のLINEへ、表示確認用のメッセージを送ります。"
-      confirmLabel={testSending ? '送信中…' : 'テスト送信する'}
+      confirmLabel={testSending ? '送信中…' : 'テストを送る'}
       cancelLabel="キャンセル"
       busy={testSending}
       designNode="h0kahp"
@@ -2625,7 +3229,7 @@ export default function BroadcastForm({
     >
       <div className="space-y-3">
         {testRecipientState === 'loading' && <p className="text-sm text-ink-faint">読み込んでいます</p>}
-        {testRecipientState === 'error' && <p className="rounded-control bg-danger-bg p-3 text-sm text-danger">テスト送信先を読み込めませんでした。</p>}
+        {testRecipientState === 'error' && <Notice tone="danger">テスト送信先を読み込めませんでした。</Notice>}
         {testRecipientState === 'ready' && testRecipients.length === 0 && (
           <p className="rounded-control bg-canvas-sunken p-3 text-sm text-ink-faint">
             テスト送信先が登録されていません。アカウント設定で、LINE連携済みの担当者を登録してください。
@@ -2645,8 +3249,8 @@ export default function BroadcastForm({
             <ul className="space-y-2">
               {testRecipients.map((recipient) => (
                 <li key={recipient.id} className="flex items-center gap-3 rounded-control border border-hairline p-3">
-                  {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-full object-cover" /> : (
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-secondary text-sm font-bold text-on-accent">{recipient.displayName.slice(0, 1)}</span>
+                  {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-pill object-cover" /> : (
+                    <span className="flex h-9 w-9 items-center justify-center rounded-pill bg-ink-secondary text-sm font-bold text-on-accent">{recipient.displayName.slice(0, 1)}</span>
                   )}
                   <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{recipient.displayName}</span>
                 </li>
@@ -2656,9 +3260,9 @@ export default function BroadcastForm({
               テスト送信も通常の pushMessage を通すので、LINE公式アカウントの
               送信枠を使う。「消費しません」と書くと実装と食い違う。
             */}
-            <p className="rounded-control bg-info-bg p-3 text-xs font-semibold text-info">
-              テスト送信もLINE公式アカウントの送信枠を使用します（見込み {(testRecipients.length * bubbles.length).toLocaleString('ja-JP')}通）。
-            </p>
+            <Notice tone="info">
+              テスト送信もLINE公式アカウントの送信枠を使用します（見込み {formatNumber((testRecipients.length * bubbles.length))}通）。
+            </Notice>
           </>
         )}
         {testResult && (
@@ -2731,9 +3335,7 @@ export default function BroadcastForm({
       .broadcast-template-row strong,
       .broadcast-template-row small { display: block; }
       .broadcast-template-row small { margin-top: 3px; color: var(--color-ink-faint); }
-      .broadcast-line-preview { background: var(--color-line-preview); min-height: 428px; }
        .broadcast-url-row { display: grid; grid-template-columns: minmax(7rem, .7fr) minmax(0, 1.4fr) 7rem; }
-       .broadcast-form-footer { grid-template-columns: minmax(0, 1fr) auto 0; }
        .broadcast-preflight-page-open > :not(.broadcast-preflight-page) { display: none; }
       @media (min-width: 640px) {
         .broadcast-basic-fields { grid-template-columns: minmax(0, 1fr) 20rem; }

@@ -13,7 +13,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { executeIncomingWebhookActions } from './incoming-webhook-actions.js';
+import { executeIncomingWebhookActions, previewIncomingWebhook } from './incoming-webhook-actions.js';
 
 const ACCOUNT = 'account-1';
 const NOW = '2026-11-02T03:00:00.000Z';
@@ -69,7 +69,7 @@ async function resolveViaWebhook(
   kind: 'harness_friend_id' | 'external_customer_id' | 'verified_email' | 'verified_phone',
   path: string,
   payload: unknown,
-): Promise<{ matchedFriendId: string | null }> {
+): Promise<{ matchedFriendId: string | null; matchStatus: string }> {
   // actions は空でも「見つからなかったら箱へ置く」にすると照合が走る。
   return executeIncomingWebhookActions(db.db, {
     lineAccountId: ACCOUNT,
@@ -162,5 +162,94 @@ describe('N-377: 検証済みメアド・電話の照合には検証の裏付け
       testDb, 'external_customer_id', '$.customerId', { customerId: 'ec-123' },
     );
     expect(result.matchedFriendId).toBe('friend-1');
+  });
+});
+
+/*
+ * S (#939 機能26): 同じ値の友だちが2人以上いたら自動では動かさない。
+ * 先頭だけ選んで実行すると別人へ処理が届くため、箱へ保留して人が選ぶ。
+ */
+describe('S: 複数一致は自動実行せず箱へ保留する', () => {
+  let testDb: SqliteD1;
+
+  beforeEach(() => {
+    testDb = createTestD1();
+    seed(testDb);
+  });
+
+  it('同じ検証済みメアドの友だちが2人いると実行せず ambiguous で箱へ置く', async () => {
+    addUser(testDb, 'user-1', { email: 'owner@example.com' });
+    addUser(testDb, 'user-2', { email: 'owner@example.com' });
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: ACCOUNT, user_id: 'user-1' });
+    insertFriend(testDb.raw, 'friend-2', { line_account_id: ACCOUNT, user_id: 'user-2' });
+    addProfileValue(testDb, {
+      userId: 'user-1', fieldKey: 'email', value: 'owner@example.com', verifiedAt: NOW,
+    });
+    addProfileValue(testDb, {
+      userId: 'user-2', fieldKey: 'email', value: 'owner@example.com', verifiedAt: NOW,
+    });
+
+    const result = await executeIncomingWebhookActions(testDb.db, {
+      lineAccountId: ACCOUNT,
+      webhookId: 'iwh-1',
+      sourceEventId: crypto.randomUUID(),
+      payload: { email: 'owner@example.com' },
+      identityMatching: {
+        methods: [{ kind: 'verified_email', path: '$.email' }],
+        // 「何もしない」を選んでいても、複数一致は必ず保留する(0件扱いではない)。
+        onNotFound: 'do_nothing',
+      },
+      actions: [{ refKind: 'tag', refId: 'tag-1', refVersionId: null }],
+    });
+    expect(result.matchStatus).toBe('ambiguous');
+    expect(result.matchedFriendId).toBeNull();
+    expect(result.executed).toBe(0);
+
+    const row = testDb.raw.prepare(
+      `SELECT kind, candidate_friend_ids_json FROM incoming_webhook_unmatched_events`,
+    ).get() as { kind: string; candidate_friend_ids_json: string };
+    expect(row.kind).toBe('ambiguous');
+    expect(JSON.parse(row.candidate_friend_ids_json).sort()).toEqual(['friend-1', 'friend-2']);
+  });
+
+  it('同じ外部IDの友だちが2人いると ambiguous になる', async () => {
+    addUser(testDb, 'user-1', { externalId: 'ec-123' });
+    addUser(testDb, 'user-2', { externalId: 'ec-123' });
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: ACCOUNT, user_id: 'user-1' });
+    insertFriend(testDb.raw, 'friend-2', { line_account_id: ACCOUNT, user_id: 'user-2' });
+
+    const result = await resolveViaWebhook(
+      testDb, 'external_customer_id', '$.customerId', { customerId: 'ec-123' },
+    );
+    expect(result.matchedFriendId).toBeNull();
+    expect(result.matchStatus).toBe('ambiguous');
+  });
+
+  it('受け取りの試しは照合と組み立てだけで箱にも実行履歴にも残さない', async () => {
+    addUser(testDb, 'user-1', { externalId: 'ec-123' });
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: ACCOUNT, user_id: 'user-1' });
+    testDb.raw.prepare(
+      `INSERT INTO tags (id, line_account_id, name, created_at, updated_at)
+       VALUES ('tag-1', '${ACCOUNT}', '購入者', '${NOW}', '${NOW}')`,
+    ).run();
+
+    const preview = await previewIncomingWebhook(testDb.db, {
+      lineAccountId: ACCOUNT,
+      payload: { customerId: 'ec-123' },
+      identityMatching: {
+        methods: [{ kind: 'external_customer_id', path: '$.customerId' }],
+        onNotFound: 'unmatched_box',
+      },
+      actions: [{ refKind: 'tag', refId: 'tag-1', refVersionId: null }],
+    });
+    expect(preview.match).toEqual({ status: 'matched', friendId: 'friend-1' });
+    expect(preview.actions[0]).toMatchObject({ ok: true, plan: [{ type: 'add_tag' }] });
+    // 試しは副作用を持たない。箱にも友だちのタグにも何も書かない。
+    expect(
+      testDb.raw.prepare(`SELECT COUNT(*) AS n FROM incoming_webhook_unmatched_events`).get(),
+    ).toEqual({ n: 0 });
+    expect(
+      testDb.raw.prepare(`SELECT COUNT(*) AS n FROM friend_tags`).get(),
+    ).toEqual({ n: 0 });
   });
 });

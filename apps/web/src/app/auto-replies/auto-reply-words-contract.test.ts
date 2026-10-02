@@ -120,7 +120,7 @@ describe('自動応答の一覧に出す言葉（内部語の置き換え表）'
     expect(word.linked).toBe(false)
     expect(word.label).toBe('テンプレートを確認できません')
     expect(word.note).toContain('再読み込み')
-    expect(word.note).not.toContain('削除')
+    expect(word.note).not.toContain('削除する')
     expect(word.note).not.toContain('権限')
   })
 
@@ -158,10 +158,33 @@ describe('自動応答の一覧に出す言葉（内部語の置き換え表）'
   })
 
   it('知らないアクションでも、保存してある値をそのまま出さない', () => {
-    expect(actionWord('tag')).toBe('タグ')
-    expect(actionWord('common_var')).toBe('共通情報')
+    expect(actionWord('tag')).toBe('タグ操作')
+    expect(actionWord('common_var')).toBe('共通情報操作')
     expect(actionWord('rich_menu_switch')).toBe('その他の処理')
     expectNoInternalWord(actionWord('rich_menu_switch'))
+  })
+
+  /**
+   * R256: 送信・リマインダ・イベントの4種を「その他の処理」にまとめない。
+   * 対応済み9種は編集画面（`ACTION_KINDS` の label）と同じ名称にする。
+   * 変えたのは言い換えの表だけで、知らない値は出さない意図は変えない。
+   */
+  it('R256 対応済み9種は編集と同じ名称で判別できる', () => {
+    expect(actionWord('tag')).toBe('タグ操作')
+    expect(actionWord('friend_field')).toBe('友だち情報操作')
+    expect(actionWord('support_mark')).toBe('対応マーク操作')
+    expect(actionWord('scenario')).toBe('シナリオ操作')
+    expect(actionWord('common_var')).toBe('共通情報操作')
+    expect(actionWord('send_message')).toBe('テキスト送信')
+    expect(actionWord('send_template')).toBe('テンプレート送信')
+    expect(actionWord('reminder')).toBe('リマインダ操作')
+    expect(actionWord('event_booking')).toBe('イベント予約操作')
+    for (const type of [
+      'tag', 'friend_field', 'support_mark', 'scenario', 'common_var',
+      'send_message', 'send_template', 'reminder', 'event_booking',
+    ]) {
+      expectNoInternalWord(actionWord(type))
+    }
   })
 
   /**
@@ -249,16 +272,16 @@ describe('一覧の画面が置き換え表を通す', () => {
     expect(PAGE).toContain('LOAD_STATE_WORDS[visibleLoadState]')
     expect(PAGE).toContain('再読み込み')
     expect(PAGE).toContain("reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error'")
-    expect(PAGE).not.toContain('読み込みに失敗しました')
+    expect(PAGE).not.toContain('読み込みに失敗しました。もう一度読み込んでください。')
     expect(PAGE).not.toContain('読み込み中...')
     expect(PAGE).not.toContain('自動返信ルールがありません')
   })
 
   it('4指標を実APIから数え、未取得を 0 と出さない', () => {
-    // #721: 指標1は visualTotal 経由で読む。visualTotal は読み込んだ一覧の
-    // 件数そのもの（到達不能なキャスト分岐を消したため1行になった）。
+    // #721: 指標1は visualActive（有効なルール）経由で読む。総数は
+    // 「すべて」の行とページ送りだけにし、KPIでは重ねて出さない（R12）。
     // 2文で「呼ぶ側」と「数える元」の両方を固定する。
-    expect(PAGE).toContain('metricWord(visibleLoadState, visualTotal)')
+    expect(PAGE).toContain('metricWord(visibleLoadState, visualActive)')
     expect(PAGE).toContain('const visualTotal = items.length')
     expect(PAGE).toContain('metricWord(visibleLoadState, visualMonthly)')
     expect(PAGE).toContain('const visualMonthly = monthlyHits')
@@ -277,11 +300,19 @@ describe('一覧の画面が置き換え表を通す', () => {
   it('開く先が無いテンプレートをリンクにしない', () => {
     expect(PAGE).toContain('if (!word.linked)')
   })
+
+  it('R11: テンプレート名から別画面へ飛ばさない（名前は黒文字）', () => {
+    expect(PAGE).not.toContain('href="/templates"')
+    expect(PAGE).not.toContain('text-blue-600')
+  })
 })
 
 describe('削除確認 Gy9OK の絵と、押せる形', () => {
   it('見出しの左に警告22px、削除ボタンの中にごみ箱16pxを置く', () => {
-    expect(PAGE).toContain("import { Trash2, TriangleAlert } from 'lucide-react'")
+    // R28 で順番入れ替えの上下アイコン（ChevronUp/ChevronDown）を足したため、
+    // import 行の完全一致では見ない。使う図形と大きさが残っていることを見る。
+    expect(PAGE).toContain('TriangleAlert')
+    expect(PAGE).toContain('Trash2')
     expect(PAGE).toContain('titleIcon={<TriangleAlert size={22} />}')
     expect(PAGE).toContain('confirmIcon={<Trash2 size={16} />}')
   })

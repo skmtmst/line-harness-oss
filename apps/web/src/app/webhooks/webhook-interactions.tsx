@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/shared'
 
@@ -9,18 +9,22 @@ import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { ActionCell, DataTable, Td, Tr } from '@/components/shared/table'
 
 import styles from './webhook-interactions.module.css'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type Direction = 'all' | 'outgoing' | 'incoming'
 type Status = 'all' | 'succeeded' | 'failed'
@@ -30,7 +34,10 @@ const EMPTY: WebhookInteractionList = {
   total: 0,
   page: 1,
   limit: 20,
-  summary: { total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0, resultUnknown: 0, averageDurationMs: null },
+  summary: {
+    total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0,
+    resultUnknown: 0, outgoingFailed: 0, retryable: 0, averageDurationMs: null,
+  },
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -46,6 +53,8 @@ const EVENT_LABELS: Record<string, string> = {
 }
 
 function eventLabel(item: WebhookInteraction): string {
+  // d23d R407: 試しは受け取りではないので、実処理と別の文言にする。
+  if (item.eventType === 'incoming_webhook.test') return `${item.webhookName}の受け取りを試したとき`
   if (item.direction === 'incoming') return `${item.webhookName}から受け取ったとき`
   return EVENT_LABELS[item.eventType] ?? '外部サービスへ送る条件に合ったとき'
 }
@@ -53,11 +62,7 @@ function eventLabel(item: WebhookInteraction): string {
 function formatJst(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function directionLabel(direction: WebhookInteraction['direction']): string {
@@ -65,26 +70,40 @@ function directionLabel(direction: WebhookInteraction['direction']): string {
 }
 
 /*
- * IDEA-26: 失敗カードの補足。「届いたか分からない」ものは無条件に
- * 再送できないので、まとめてやり直せる数とは分けて件数を示す。
+ * 失敗カードの補足(IDEA-26 / d23b R408)。
+ * 「送った失敗」と「受け取りの失敗」を分け、ここから送り直せる件数と
+ * 対象外の件数を書く。届いたか分からないものは無条件に再送しない。
  */
 function failureDetail(
   items: WebhookInteraction[],
-  failed: number,
-  resultUnknown: number,
+  summary: WebhookInteractionList['summary'],
 ): string {
-  if (failed === 0) return '失敗はありません'
-  const reviewNote = resultUnknown > 0
-    ? `うち${resultUnknown}件は届いたか分からないため、相手先で確かめてからやり直します`
-    : ''
-  const visibleFailures = items.filter((item) => item.status === 'failed')
-  if (visibleFailures.length === 0) return `送り直せます${reviewNote ? `。${reviewNote}` : ''}`
-
-  const firstDestination = visibleFailures[0]?.webhookName.split('／')[0]?.trim()
-  const sameDestination = firstDestination
-    && visibleFailures.every((item) => item.webhookName.startsWith(firstDestination))
-  const retryNote = sameDestination ? `すべて${firstDestination}。送り直せます` : '送り直せます'
-  return reviewNote ? `${retryNote}。${reviewNote}` : retryNote
+  if (summary.failed === 0) return '失敗はありません'
+  const parts: string[] = []
+  const incomingFailed = Math.max(0, summary.failed - summary.outgoingFailed)
+  if (summary.retryable > 0) {
+    const visibleFailures = items.filter((item) => item.status === 'failed' && item.direction === 'outgoing')
+    const firstDestination = visibleFailures[0]?.webhookName.split('／')[0]?.trim()
+    const sameDestination = firstDestination
+      && visibleFailures.length > 0
+      && visibleFailures.every((item) => item.webhookName.startsWith(firstDestination))
+    parts.push(sameDestination
+      ? `すべて${firstDestination}へ。うち${summary.retryable}件はここから送り直せます`
+      : `うち${summary.retryable}件はここから送り直せます`)
+  } else if (summary.outgoingFailed > 0) {
+    parts.push('ここからまとめて送り直せる失敗はありません。行ごとの理由を確かめてください')
+  }
+  const excluded = summary.outgoingFailed - summary.retryable
+  if (excluded > 0) {
+    parts.push(`${excluded}件は送り先の停止・削除・自動の送り直し中などで対象外です`)
+  }
+  if (summary.resultUnknown > 0) {
+    parts.push(`うち${summary.resultUnknown}件は届いたか分からないため、相手先で確かめてからやり直します`)
+  }
+  if (incomingFailed > 0) {
+    parts.push(`受け取りの失敗${incomingFailed}件は相手側で送り直してもらってください`)
+  }
+  return parts.join('。') || '失敗はありません'
 }
 
 /**
@@ -108,16 +127,38 @@ function durationDetail(
  * （ボタンが無いだけでは、対象の消えた失敗と条件違いが区別できない）。
  */
 function retryabilityText(item: WebhookInteraction, allowed: boolean): string {
+  // d23d R407: 試しは届いた記録ではない。「届いたので送り直す必要なし」とは案内しない。
+  if (item.eventType === 'incoming_webhook.test') {
+    return '受け取りの試しの記録です。実際の受け取りと処理の実行はしていないため、送り直す対象ではありません。'
+  }
   if (item.status === 'succeeded') return '届いた記録なので、送り直す必要はありません。'
   if (item.status === 'pending') return 'いま処理の途中です。終わってから結果を確かめてください。'
   if (item.status === 'retried') return 'すでに送り直した記録です。あとから追加された新しい記録の結果を確かめてください。'
   if (item.direction === 'incoming') {
     return '受け取った記録なので、こちらからは送り直せません。相手側でもう一度送ってもらってください。'
   }
+  // d23b R414: 送り直せない理由を、送り先の現状に合わせて分ける。
+  if (item.retryBlockReason === 'webhook_deleted') {
+    return '送り先は削除されました。ここからは送り直せません。必要なら連携を作り直してください。'
+  }
+  if (item.retryBlockReason === 'webhook_inactive') {
+    return '送り先が止められています。送信の一覧で動かしてから「やり直す」を押してください。'
+  }
+  if (item.retryBlockReason === 'auto_retry_scheduled') {
+    return `自動での送り直しが予定されています${item.autoRetryNextAt ? `（${formatJst(item.autoRetryNextAt)}頃）` : ''}。しばらく待って届かない場合は、連携先の状態を確かめてください。`
+  }
+  if (item.retryBlockReason === 'already_delivered') {
+    return '自動の送り直しで届いています。ここから送り直す必要はありません。'
+  }
   if (!item.canRetry) {
     return 'つなぎ先の設定が消えたか、送った内容が残っていないため、ここからは送り直せません。'
   }
   if (!allowed) return '送り直せるのは管理者です。'
+  // d23b R415: こちら側の署名の準備ができなかった失敗。相手へ届いていない
+  // ので、設定を直してからそのままやり直せる。
+  if (item.failureReasonCode === 'secret_unavailable') {
+    return '署名に使う合言葉をこちらで確認できませんでした。相手には一度も送っていません。連携の設定を保存し直してから「やり直す」を押してください。'
+  }
   if (item.failureReasonCode === 'unknown') {
     return '相手先に届いたか分かっていません。相手先の記録で同じ処理がないか確かめてから「やり直す」を押してください。'
   }
@@ -142,7 +183,7 @@ export default function WebhookInteractions() {
   const [selected, setSelected] = useState<WebhookInteraction | null>(null)
   const [retrying, setRetrying] = useState<string | null>(null)
   const [bulkRetrying, setBulkRetrying] = useState(false)
-  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
+  const [notice, setNotice] = useState<{ tone: 'danger'; message: string } | null>(null)
   const [canRetry, setCanRetry] = useState(false)
   /*
    * 「届いたか分からない」失敗の送り直し確認(IDEA-26)。
@@ -177,7 +218,8 @@ export default function WebhookInteractions() {
     setData(EMPTY)
     setLoadedAccountId(null)
     setSelected(null)
-    setNotice(null)
+    // d23b R406: 「結果を確かめてください」の案内は読み直しでは消さない。
+    // 届いた・消えたは呼び出し側が新しい文へ置き換える。
     setRetrying(null)
     setBulkRetrying(false)
     setConfirmingRetry(null)
@@ -230,11 +272,8 @@ export default function WebhookInteractions() {
     ? Math.round((data.summary.succeeded / data.summary.total) * 1000) / 10
     : 0
   const pageCount = Math.max(1, Math.ceil(data.total / data.limit))
-  const range = useMemo(() => {
-    if (data.total === 0) return '0件'
-    const first = (data.page - 1) * data.limit + 1
-    return `${first}〜${Math.min(data.total, first + data.items.length - 1)}件 / 全${data.total}件`
-  }, [data])
+  const rangeFirst = data.total === 0 ? 0 : (data.page - 1) * data.limit + 1
+  const rangeLast = data.total === 0 ? 0 : Math.min(data.total, rangeFirst + data.items.length - 1)
 
   const retry = async (item: WebhookInteraction, confirmed = false) => {
     const requestAccountId = selectedAccountId
@@ -246,12 +285,11 @@ export default function WebhookInteractions() {
       const response = await api.webhooks.interactions.retry(item.id, requestAccountId, { confirmed })
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (!response.success) throw new Error(response.error)
-      setNotice({
-        tone: response.data.status === 'succeeded' ? 'success' : 'error',
-        message: response.data.status === 'succeeded'
-          ? `「${item.webhookName}」へもう一度送り、届いたことを確認しました。`
-          : `「${item.webhookName}」へ送り直しましたが、まだ届きませんでした。`,
-      })
+      if (response.data.status === 'succeeded') {
+        notifyToast(`「${item.webhookName}」へもう一度送り、届いたことを確認しました。`)
+      } else {
+        setNotice({ tone: 'danger', message: `「${item.webhookName}」へ送り直しましたが、まだ届きませんでした。` })
+      }
       await load()
     } catch (error) {
       if (selectedAccountIdRef.current !== requestAccountId) return
@@ -262,8 +300,23 @@ export default function WebhookInteractions() {
       */
       if (error instanceof ApiError && error.code === 'result_unknown_needs_check') {
         setConfirmingRetry(item)
+      } else if (error instanceof ApiError && error.code === 'webhook_not_found') {
+        // d23b R414: 操作の間に送り先が消えた。案内を残して一覧を読み直す。
+        setNotice({ tone: 'danger', message: '送り先は削除されています。一覧の表示を最新にしました。' })
+        void load()
+      } else if (error instanceof ApiError && error.code === 'auto_retry_scheduled') {
+        // d23b R412: 同じ通知の自動送り直しが動いている。重ねて送らない。
+        setNotice({ tone: 'danger', message: 'この通知は自動での送り直しが予定されています。しばらく待っても届かない場合は、連携先の設定を確かめてください。' })
+      } else if (error instanceof ApiError && error.code === 'already_delivered') {
+        setNotice({ tone: 'danger', message: 'この通知は自動の送り直しで届いています。一覧の表示を最新にしました。' })
+        void load()
+      } else if (error instanceof ApiError && error.code === 'webhook_inactive') {
+        setNotice({ tone: 'danger', message: '送り先が止められています。送信の一覧で動かしてからやり直してください。' })
+      } else if (error instanceof ApiError && error.status === 503) {
+        // d23b R415: こちら側の署名の準備ができない。送ってはいない。
+        setNotice({ tone: 'danger', message: '署名に使う合言葉を確認できないため、まだ送っていません。連携の設定を保存し直してからやり直してください。' })
       } else {
-        setNotice({ tone: 'error', message: '送り直しを受け付けられませんでした。状態を読み直してからお試しください。' })
+        setNotice({ tone: 'danger', message: '送り直しを受け付けられませんでした。状態を読み直してからお試しください。' })
       }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setRetrying(null)
@@ -289,14 +342,21 @@ export default function WebhookInteractions() {
       const reviewNote = response.data.needsReview > 0
         ? `届いたか分からないものが${response.data.needsReview}件あります。相手先の記録で同じ処理がないか確かめてから、一覧で1件ずつやり直してください。`
         : ''
-      setNotice({
-        tone: response.data.failed > 0 || response.data.skipped > 0 || response.data.remaining > 0 || response.data.needsReview > 0 ? 'error' : 'success',
-        message: `${response.data.requested}件を確認し、${response.data.succeeded}件が届きました。届かなかったもの ${response.data.failed}件、対象外 ${response.data.skipped}件です。${remainingNote}${reviewNote}`,
-      })
+      // d23b R408: 最初から対象外だった件数（消えた・止まった送り先、
+      // 自動の送り直しが動いている記録など）も黙って残さない。
+      const excludedNote = response.data.excluded > 0
+        ? `送り先が消えた・止まっている・自動の送り直し中などで、対象外のものが${response.data.excluded}件あります。`
+        : ''
+      const bulkMessage = `${response.data.requested}件を確認し、${response.data.succeeded}件が届きました。届かなかったもの ${response.data.failed}件、対象外 ${response.data.skipped}件です。${remainingNote}${reviewNote}${excludedNote}`
+      if (response.data.failed > 0 || response.data.skipped > 0 || response.data.remaining > 0 || response.data.needsReview > 0 || response.data.excluded > 0) {
+        setNotice({ tone: 'danger', message: bulkMessage })
+      } else {
+        notifyToast(bulkMessage)
+      }
       await load()
     } catch {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setNotice({ tone: 'error', message: 'まとめて送り直せませんでした。状態を読み直してからお試しください。' })
+      setNotice({ tone: 'danger', message: 'まとめて送り直せませんでした。状態を読み直してからお試しください。' })
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setBulkRetrying(false)
     }
@@ -315,15 +375,13 @@ export default function WebhookInteractions() {
       {canRetry ? <div className={styles.topActions}>
         <Button
           onClick={() => void retryFailed()}
-          disabled={loading || bulkRetrying || data.summary.failed === 0}
-          title={data.summary.failed === 0 ? '送り直す失敗はありません' : undefined}
-        >
-          <RefreshCw size={16} aria-hidden="true" />
-          {bulkRetrying ? '失敗したものを確認中' : '失敗したものをまとめてやり直す'}
+          disabled={loading || bulkRetrying || data.summary.retryable === 0}
+          title={data.summary.retryable === 0 ? '今ここから送り直せる失敗はありません' : undefined} busy={bulkRetrying} busyLabel="失敗したものを確認中">
+          <RefreshCw size={16} aria-hidden="true" />失敗したものをまとめてやり直す
         </Button>
       </div> : null}
 
-      {notice ? <Notice tone={notice.tone} message={notice.message} onClose={() => setNotice(null)} /> : null}
+      {notice ? <Notice tone="danger" message={notice.message} onClose={() => setNotice(null)} /> : null}
 
       {loading && data.items.length === 0 ? (
         <ListState kind="loading" title="やり取りの記録を読み込んでいます" />
@@ -337,10 +395,10 @@ export default function WebhookInteractions() {
       ) : (
         <>
           <div className={styles.cards}>
-            <SummaryCard variant="v6" title={`この${periodDays}日`} value={data.summary.total} unit="回" detail={`送った ${data.summary.outgoing.toLocaleString('ja-JP')}・受け取った ${data.summary.incoming.toLocaleString('ja-JP')}`} />
-            <SummaryCard variant="v6" title="成功" value={data.summary.succeeded} unit="回" detail={`この${periodDays}日で ${successRate.toLocaleString('ja-JP')}%`} />
-            <SummaryCard variant="v6" title="失敗" value={data.summary.failed} unit="回" detail={failureDetail(data.items, data.summary.failed, data.summary.resultUnknown)} badge={data.summary.failed > 0 ? 'やり直す' : undefined} badgeTone="danger" />
-            <SummaryCard variant="v6" title="返事までの時間" value={data.summary.averageDurationMs == null ? null : Math.round(data.summary.averageDurationMs / 100) / 10} unit="秒" detail={durationDetail(data.items, data.summary.averageDurationMs, periodDays)} />
+            <KpiCard variant="v6" title={`この${periodDays}日`} value={data.summary.total} unit="回" detail={`送った ${formatNumber(data.summary.outgoing)}・受け取った ${formatNumber(data.summary.incoming)}`} />
+            <KpiCard variant="v6" title="成功" value={data.summary.succeeded} unit="回" detail={`この${periodDays}日で ${formatNumber(successRate)}%`} />
+            <KpiCard variant="v6" title="失敗" value={data.summary.failed} unit="回" detail={failureDetail(data.items, data.summary)} badge={data.summary.failed > 0 ? 'やり直す' : undefined} badgeTone="danger" />
+            <KpiCard variant="v6" title="返事までの時間" value={data.summary.averageDurationMs == null ? null : Math.round(data.summary.averageDurationMs / 100) / 10} unit="秒" detail={durationDetail(data.items, data.summary.averageDurationMs, periodDays)} />
           </div>
 
           <NoteBar>送った・受け取ったやり取りの記録です。失敗したものはここからやり直せます。</NoteBar>
@@ -361,10 +419,10 @@ export default function WebhookInteractions() {
           </div>
 
           <div className={styles.filters} aria-label="やり取りの絞り込み">
-            <button type="button" className={`${styles.filter} ${direction === 'all' && status === 'all' ? styles.filterActive : ''}`} onClick={() => { setDirection('all'); setStatus('all'); setPage(1) }}>すべて {data.summary.total.toLocaleString('ja-JP')}</button>
-            <button type="button" className={`${styles.filter} ${direction === 'outgoing' ? styles.filterActive : ''}`} onClick={() => { setDirection('outgoing'); setStatus('all'); setPage(1) }}>送った {data.summary.outgoing.toLocaleString('ja-JP')}</button>
-            <button type="button" className={`${styles.filter} ${direction === 'incoming' ? styles.filterActive : ''}`} onClick={() => { setDirection('incoming'); setStatus('all'); setPage(1) }}>受け取った {data.summary.incoming.toLocaleString('ja-JP')}</button>
-            <button type="button" className={`${styles.filter} ${status === 'failed' ? styles.filterDanger : ''}`} onClick={() => { setDirection('all'); setStatus('failed'); setPage(1) }}>失敗 {data.summary.failed.toLocaleString('ja-JP')}</button>
+            <FilterChip selected={direction === 'all' && status === 'all'} onChange={() => { setDirection('all'); setStatus('all'); setPage(1) }} count={formatNumber(data.summary.total)}>すべて</FilterChip>
+            <FilterChip selected={direction === 'outgoing'} onChange={() => { setDirection('outgoing'); setStatus('all'); setPage(1) }} count={formatNumber(data.summary.outgoing)}>送った</FilterChip>
+            <FilterChip selected={direction === 'incoming'} onChange={() => { setDirection('incoming'); setStatus('all'); setPage(1) }} count={formatNumber(data.summary.incoming)}>受け取った</FilterChip>
+            <FilterChip selected={status === 'failed'} onChange={() => { setDirection('all'); setStatus('failed'); setPage(1) }} count={formatNumber(data.summary.failed)}>失敗</FilterChip>
           </div>
 
           {data.items.length === 0 ? (
@@ -389,9 +447,9 @@ export default function WebhookInteractions() {
                       {item.retryOfId ? <div className={styles.secondary}>前の失敗をやり直した記録</div> : null}
                     </Td>
                     <Td><div className={styles.primary} title={item.triggerSummary}>{item.triggerSummary}</div><div className={styles.secondary}>安全のため本文と接続情報は一覧に表示しません</div></Td>
-                    <Td><StatusBadge tone={item.status === 'succeeded' ? 'success' : item.status === 'failed' ? 'danger' : 'info'}>{item.responseLabel}</StatusBadge></Td>
+                    <Td><StatusBadge tone={item.eventType === 'incoming_webhook.test' ? 'info' : item.status === 'succeeded' ? 'success' : item.status === 'failed' ? 'danger' : 'info'}>{item.responseLabel}</StatusBadge></Td>
                     <Td>{item.durationMs == null ? '—' : `${Math.round(item.durationMs / 100) / 10}秒`}</Td>
-                    <ActionCell><div className={styles.rowActions}><Button onClick={() => setSelected(item)}>中身を見る</Button>{canRetry && item.canRetry ? <Button onClick={() => item.failureReasonCode === 'unknown' ? setConfirmingRetry(item) : void retry(item)} disabled={retrying === item.id}>{retrying === item.id ? 'やり直し中' : 'やり直す'}</Button> : null}</div></ActionCell>
+                    <ActionCell><div className={styles.rowActions}><Button onClick={() => setSelected(item)}>中身を見る</Button>{canRetry && item.canRetry ? <Button onClick={() => item.failureReasonCode === 'unknown' ? setConfirmingRetry(item) : void retry(item)} disabled={retrying === item.id} busy={retrying === item.id} busyLabel="やり直し中">やり直す</Button> : null}</div></ActionCell>
                   </Tr>
                 ))}
               </tbody>
@@ -399,7 +457,7 @@ export default function WebhookInteractions() {
           )}
 
           <div className={styles.pagination}>
-            <span className={styles.count}>やり取り {range}</span>
+            <ListRange label="やり取り" total={data.total} first={rangeFirst} last={rangeLast} />
             <Pagination page={data.page} pageCount={pageCount} onPageChange={setPage} disabled={loading} />
           </div>
         </>

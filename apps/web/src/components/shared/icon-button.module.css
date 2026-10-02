@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 .button {
   display: inline-flex;
   width: 32px;
@@ -10,11 +12,31 @@
   background: transparent;
   color: var(--color-ink-faint);
   cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    scale var(--motion-instant) var(--motion-ease-out);
+}
+
+/* 押したら少し沈む（★V7 修正方針 §4）。動きを減らす設定では変えない。 */
+@media (prefers-reduced-motion: no-preference) {
+  .button:active:not(:disabled) {
+    scale: 0.96;
+  }
 }
 
 .button:hover {
   background: var(--color-surface-pearl);
   color: var(--color-ink);
+}
+
+/* #639 タッチ端末では行内操作と同じく44pxを確保する（PCは32pxのまま）。 */
+@media (pointer: coarse) {
+  .button {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+  }
 }
 
 .button:focus-visible {
@@ -29,4 +51,23 @@
 .button > :is(svg, img) {
   width: 18px;
   height: 18px;
+}
+
+/*
+ * ★V8「アイコンボタン」（KspUx）：36×36・白地・細い枠・角丸 control。
+ * v7 の透明な32pxから、操作だと分かる小さな箱へ変える。
+ */
+[data-theme='v8'] .button {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+}
+
+[data-theme='v8'] .button:hover {
+  background: var(--color-canvas-sunken);
+}
 }

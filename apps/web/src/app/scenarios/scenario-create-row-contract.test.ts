@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /*
- * 「＋ シナリオを作成」で空の行を作らない（#949 N-055）。
+ * 「＋ シナリオを作る」で空の行を作らない（#949 N-055）。
  *
  * 以前は押した時点で POST /api/scenarios を打ち、配信方式や1通目の設定を
  * 放り出されると、名前も通も無い空の行が一覧に残った。一覧のボタンは

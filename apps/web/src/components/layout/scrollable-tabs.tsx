@@ -21,9 +21,12 @@ import { Tabs, type TabItem } from '../shared/tabs'
 export default function ScrollableTabs({
   items,
   actions,
+  label,
 }: {
   items: TabItem[]
   actions?: ReactNode
+  /** タブの並び全体を読み上げる名前（Issue #708）。 */
+  label?: string
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const [canLeft, setCanLeft] = useState(false)
@@ -53,7 +56,11 @@ export default function ScrollableTabs({
    */
   useEffect(() => {
     const el = scrollerRef.current
-    const current = el?.querySelector<HTMLElement>('[aria-current="page"]')
+    /*
+     * ★V7: 開いているタブの印が2種類ある。リンク移動のタブは
+     * aria-current="page"、ボタン切り替えのタブは aria-selected="true"。
+     */
+    const current = el?.querySelector<HTMLElement>('[aria-current="page"], [aria-selected="true"]')
     if (!el || !current) return
     const target = current.offsetLeft - 16
     el.scrollTo({ left: Math.max(0, target) })
@@ -79,7 +86,7 @@ export default function ScrollableTabs({
    * className」を増やさない）。外の余白は使う側の枠が持つ。
    */
   return (
-    <div className="flex min-w-0 items-stretch" data-scrollable-tabs>
+    <div className="flex min-w-0 flex-wrap items-stretch" data-scrollable-tabs>
       {canLeft ? (
         <span className="flex shrink-0 items-center border-b border-hairline px-1">
           <Button
@@ -91,19 +98,42 @@ export default function ScrollableTabs({
           </Button>
         </span>
       ) : null}
-      <div
-        ref={scrollerRef}
-        className="min-w-0 flex-1 overflow-x-auto"
-        onScroll={updateEdges}
-        onFocus={keepFocusVisible}
-      >
-        {/*
-          中のタブ行（shared Tabs の nav）を中身の幅まで広げる。
-          これが無いと nav は容器の幅のままでタブ列が見えないまま
-          はみ出し、スクロールしても右のタブへ届かない。
-          中身が収まるときは min-w-full で従来どおり全幅に敷く。
-        */}
-        <Tabs items={items} className="w-max min-w-full" />
+      {/*
+        #707: 390pxで4つ目以降のタブが隠れても手がかりが薄い。
+        隠れている側の端に薄い影を置き、続きがあることを見せる
+        （送りボタンと連動し、収まるときは何も出さない）。
+      */}
+      <div className="relative min-w-0 flex-1">
+        <div
+          ref={scrollerRef}
+          className="overflow-x-auto"
+          onScroll={updateEdges}
+          onFocus={keepFocusVisible}
+        >
+          {/*
+            中のタブ行（shared Tabs の nav）を中身の幅まで広げる。
+            これが無いと nav は容器の幅のままでタブ列が見えないまま
+            はみ出し、スクロールしても右のタブへ届かない。
+            中身が収まるときは min-w-full で従来どおり全幅に敷く。
+          */}
+          <Tabs items={items} className="w-max min-w-full" label={label} />
+        </div>
+        {canLeft ? (
+          <span
+            aria-hidden="true"
+            data-scroll-hint="left"
+            className="pointer-events-none absolute inset-y-0 left-0 w-6"
+            style={{ background: 'linear-gradient(to right, var(--color-canvas), transparent)' }}
+          />
+        ) : null}
+        {canRight ? (
+          <span
+            aria-hidden="true"
+            data-scroll-hint="right"
+            className="pointer-events-none absolute inset-y-0 right-0 w-6"
+            style={{ background: 'linear-gradient(to left, var(--color-canvas), transparent)' }}
+          />
+        ) : null}
       </div>
       {/*
         右端の操作はスクロール領域へ入れない。入れると「人を追加する」の
@@ -111,7 +141,7 @@ export default function ScrollableTabs({
         見た目は shared/tabs の `.actions` と同じ帯に揃える。
       */}
       {actions ? (
-        <span className="flex shrink-0 items-center gap-2 border-b border-hairline pb-1 pl-3">{actions}</span>
+        <span className="flex shrink-0 items-center gap-2 border-b border-hairline pb-1 pl-3 max-sm:order-last max-sm:basis-full max-sm:justify-end max-sm:border-b-0 max-sm:pl-0 max-sm:pt-2">{actions}</span>
       ) : null}
       {canRight ? (
         <span className="flex shrink-0 items-center border-b border-hairline px-1">

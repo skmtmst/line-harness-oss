@@ -1,5 +1,8 @@
 'use client'
 
+import Avatar from '@/components/shared/avatar'
+import Checkbox from '@/components/shared/checkbox'
+import { ArrowLeft, CircleDot, Copy, List, ListPlus, PencilLine, Send, Star } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -7,6 +10,7 @@ import type { ApiResponse, Chat, Folder, FriendField, Scenario } from '@line-crm
 import {
   api,
   ApiError,
+  describeSaveFailure,
   fetchApi,
   type FriendDetail,
   type FriendFormSubmission,
@@ -17,13 +21,19 @@ import {
 import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import { loadOperators } from '@/lib/operators-cache'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
-import SelectField from '@/components/shared/select-field'
+import Notice from '@/components/shared/notice'
+import TargetMissing from '@/components/shared/target-missing'
+import Select from '@/components/shared/select'
+import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { loadFailureKind } from './load-failure-kind'
+import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 
 /**
  * 友だち詳細。
@@ -235,7 +245,13 @@ function responseIsStale(
 }
 
 /** 履歴1行の表の並び。概要タブ・履歴タブで同じ形にする。 */
-const TIMELINE_ROW_COLUMNS = '140px 140px 1fr 110px 64px'
+/*
+ * #773: 右ペインのカードは lg 帯で 500px 台前半までしか広がらず、
+ * 固定列 140+140+110+64+gap+padding がほぼ全域を食い、「内容」の 1fr が
+ * 実測 3px に潰れて1文字縦積みになっていた。minmax で各列に下限を持たせ、
+ * カード幅が足りないときは下の @lg: 系コンテナクエリで折り返しへ逃がす。
+ */
+const TIMELINE_ROW_COLUMNS = 'minmax(7.5rem,140px) minmax(4.5rem,140px) minmax(6rem,1fr) minmax(4rem,110px) 3rem'
 
 /**
  * 履歴1行。日時・種別・内容・状態・アカウント・元情報リンクを出す。
@@ -246,14 +262,14 @@ function FriendTimelineRow({ item, friendId, last = false }: { item: FriendTimel
   const source = timelineSourceHref(item, friendId)
   return (
     <div
-      className={`text-ink-secondary flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline px-4 py-3 text-xs md:grid md:border-b-0 ${last ? 'last:border-b-0' : ''}`}
+      className={`text-ink-secondary flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline px-4 py-3 text-xs @lg:grid @lg:border-b-0 ${last ? 'last:border-b-0' : ''}`}
       style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}
     >
-      <span>{new Date(item.occurredAt).toLocaleString('ja-JP')}</span>
+      <span>{formatDateTime(item.occurredAt)}</span>
       <span>{timelineTypeLabel(item.type)}</span>
-      <span className="min-w-0 flex-1 basis-full md:basis-auto">
+      <span className="min-w-0 flex-1 basis-full @lg:basis-auto">
         {statusLabel ? (
-          <span className="border-hairline bg-canvas-sunken text-ink-faint mr-1.5 inline-block rounded-full border px-1.5 py-px font-semibold leading-4">
+          <span className="border-hairline bg-canvas-sunken text-ink-faint mr-1.5 inline-block rounded-pill border px-1.5 py-px font-semibold leading-4">
             {statusLabel}
           </span>
         ) : null}
@@ -263,11 +279,11 @@ function FriendTimelineRow({ item, friendId, last = false }: { item: FriendTimel
       <span>
         {source ? (
           source.external ? (
-            <a href={source.href} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+            <a href={source.href} target="_blank" rel="noreferrer" className="text-action hover:underline">
               開く
             </a>
           ) : (
-            <Link href={source.href} className="text-accent hover:underline">
+            <Link href={source.href} className="text-action hover:underline">
               開く
             </Link>
           )
@@ -328,13 +344,13 @@ function FieldInput({
   }
   if (field.type === 'select') {
     return (
-      <SelectField
+      <Select
         id={id}
         value={value}
         disabled={readOnly}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(value) => onChange(value)}
         aria-label={`${field.name}の値`}
-        className={base}
+        size="full"
         options={[
           { value: '', label: '— 未設定 —' },
           ...(field.options ?? []).map((option) => ({ value: option, label: option })),
@@ -344,17 +360,13 @@ function FieldInput({
   }
   if (field.type === 'checkbox') {
     return (
-      <label className="flex cursor-pointer items-center gap-2">
-        <input
-          id={id}
-          type="checkbox"
-          checked={value === '1'}
-          disabled={readOnly}
-          onChange={(e) => onChange(e.target.checked ? '1' : '')}
-          className="rounded border-gray-300"
-        />
-        <span className="text-ink-secondary text-sm">はい</span>
-      </label>
+      <Checkbox
+        id={id}
+        checked={value === '1'}
+        disabled={readOnly}
+        onCheckedChange={(checked) => onChange(checked ? '1' : '')}
+        aria-label={`${field.name}：はい`}
+      >はい</Checkbox>
     )
   }
   const inputType =
@@ -398,7 +410,7 @@ function SectionHead({
   return (
     <div className="mb-1.5 flex items-baseline justify-between gap-2">
       <p className="text-ink-faint text-xs font-semibold">{label}</p>
-      <Link href={href} className="text-accent shrink-0 text-xs hover:underline">
+      <Link href={href} className="text-action shrink-0 text-xs hover:underline">
         {actionLabel}
       </Link>
     </div>
@@ -437,6 +449,10 @@ function FriendDetailInner() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [friendMissing, setFriendMissing] = useState(false)
+  /** M012：読み込み 403（権限不足）。汎用の失敗面とは分け、再試行口は出さない。 */
+  const [loadForbidden, setLoadForbidden] = useState(false)
   const [notice, setNotice] = useState('')
   const [warnings, setWarnings] = useState<string[]>([])
   /*
@@ -457,6 +473,13 @@ function FriendDetailInner() {
     保存後の再取得で上書きしないために保持する。保存成功の確認まで残す。
   */
   const saveSnapshotRef = useRef<Record<string, string> | null>(null)
+  /*
+    #773: タブ帯はV7の方針で「折らずに横へ流す」が、macOSではスクロールバーが
+    出ないため、端で切れたタブ（リマインダ等）が壊れて見え、続きの存在にも
+    気づけない。はみ出している時だけ右端にフェードを出して続きを示す。
+  */
+  const tabsRowRef = useRef<HTMLDivElement>(null)
+  const [tabsOverflowing, setTabsOverflowing] = useState(false)
   const [mileage, setMileage] = useState<MileageSummary | null>(null)
   const [mileageInsights, setMileageInsights] = useState<MileageSelfInsights | null>(null)
   const [mileageConnections, setMileageConnections] = useState<MileageConnectedAccount[]>([])
@@ -541,7 +564,7 @@ function FriendDetailInner() {
   const scenarioReqRef = useRef(0)
   const group = params.get('group') ?? BASIC_GROUP
   // 情報欄タブは friend_fields の画面。オフのaccountではタブごと出さない。
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
   const fieldsEnabled = useFeatureVisibility(selectedAccountId).enabled('friend_fields')
   const visibleTabs = fieldsEnabled ? TABS : TABS.filter((t) => t.key !== 'info')
   /*
@@ -570,6 +593,8 @@ function FriendDetailInner() {
     const requestedAccountId = selectedAccountId
     setLoading(true)
     setError('')
+    setFriendMissing(false)
+    setLoadForbidden(false)
     try {
       // PERF-13: 回答本文は初期応答に載せない。総数だけ返るので
       // サイドの「フォーム回答 N件」とタブの案内は変わらない。
@@ -580,9 +605,16 @@ function FriendDetailInner() {
     } catch (err) {
       if (isStaleResponse(generation, requestedAccountId)) return
       setFriend(null)
-      setError(err instanceof ApiError && err.status === 404
-        ? '友だちが見つかりませんでした'
-        : '読み込みに失敗しました')
+      if (err instanceof ApiError && err.status === 404) {
+        setFriendMissing(true)
+        setError('')
+      } else if (loadFailureKind(err) === 'forbidden') {
+        // M012：403 は権限不足。汎用の失敗文ではなく権限の面へ分ける。
+        setLoadForbidden(true)
+        setError('')
+      } else {
+        setError('読み込みに失敗しました。もう一度読み込んでください。')
+      }
     } finally {
       if (!isStaleResponse(generation, requestedAccountId)) setLoading(false)
     }
@@ -881,6 +913,17 @@ function FriendDetailInner() {
     }
   }, [tab, historyStatus, loadHistory])
 
+  // #773: タブ帯がはみ出しているかを実測する。はみ出し中だけ右端フェードを出す。
+  useEffect(() => {
+    const el = tabsRowRef.current
+    if (!el) return
+    const check = () => setTabsOverflowing(el.scrollWidth > el.clientWidth + 1)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [visibleTabs.length])
+
   // PERF-13: フォーム回答も「回答フォーム」タブを開いたときにだけ取る。
   useEffect(() => {
     if (tab === 'forms' && submissionsStatus === 'idle') {
@@ -902,7 +945,8 @@ function FriendDetailInner() {
     try {
       const [chatRes, operatorRes] = await Promise.all([
         api.chats.get(friendId),
-        api.operators.list(),
+        // 友だち一覧の絞り込みと同じ名簿を共有する。保存の可否はサーバ側。
+        loadOperators(),
       ])
       if (chatRes.success) {
         setSupportStatus(chatRes.data.status)
@@ -944,7 +988,8 @@ function FriendDetailInner() {
         setSupportEditing(false)
         void loadFriend()
       } else {
-        setSupportError(err instanceof ApiError ? err.message : '保存に失敗しました')
+        // M012：原文のまま出さず、共通の状態別案内（403は権限・500は読み直し）へ渡す。
+        setSupportError(describeSaveFailure(err))
       }
     } finally {
       setSupportBusy(false)
@@ -987,7 +1032,7 @@ function FriendDetailInner() {
       // 値の正本は情報欄の取得口。保存後はそこだけ取り直す。
       void loadFields()
     } catch {
-      setError('保存に失敗しました')
+      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -1041,7 +1086,8 @@ function FriendDetailInner() {
         setScenarioError(res.error)
       }
     } catch (err) {
-      setScenarioError(err instanceof ApiError ? err.message : '登録に失敗しました')
+      // M012：原文のまま出さず、共通の状態別案内へ渡す。
+      setScenarioError(describeSaveFailure(err))
     } finally {
       setScenarioBusy(false)
     }
@@ -1052,15 +1098,12 @@ function FriendDetailInner() {
    * 移動。どちらも選んだ先で操作・取消・完了まで辿れるものだけを並べる。
    */
   const primaryActions: ActionMenuItem[] = [
-    {
-      id: 'inbox',
-      label: '受信箱で開く',
-      onSelect: () => router.push(inboxHrefForFriend(friendId)),
-    },
+    // 「受信箱で開く」は画面右上のボタンにあるので、メニューには重ねない（★V7）。
     ...(canEditSupport
       ? [{
           id: 'support',
           label: '対応状況を編集',
+          icon: <CircleDot size={16} />,
           onSelect: () => void openSupportEditor(),
         }]
       : []),
@@ -1068,6 +1111,7 @@ function FriendDetailInner() {
       ? [{
           id: 'fields',
           label: '情報欄を編集',
+          icon: <PencilLine size={16} />,
           onSelect: () =>
             router.push(`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`),
         }]
@@ -1076,25 +1120,31 @@ function FriendDetailInner() {
     ...(canManageFieldDefs
       ? [{
           id: 'scenario-enroll',
-          label: 'シナリオに登録',
+          label: 'シナリオに登録する',
+          icon: <ListPlus size={16} />,
           onSelect: () => void openScenarioPicker(),
         }]
       : []),
     {
       id: 'send-template',
-      label: 'テンプレートを送る（受信箱で選択）',
+      label: 'テンプレートを送る',
+      icon: <Send size={16} />,
+      description: '受信箱で選んで送ります',
+      external: true,
       onSelect: () => router.push(inboxHrefForFriend(friendId)),
     },
   ]
+  // 別画面への移動には ↗ を付ける（★V7）。「戻る」は戻る操作なので付けない。
   const secondaryActions: ActionMenuItem[] = [
-    { id: 'templates', label: 'テンプレート一覧を見る', onSelect: () => router.push('/templates') },
-    { id: 'scenarios', label: 'シナリオ一覧を見る', onSelect: () => router.push('/scenarios') },
-    { id: 'reminders', label: 'リマインダ一覧を見る', onSelect: () => router.push('/reminders') },
-    { id: 'mileage', label: 'マイルを確認', onSelect: () => router.push('/mileage') },
-    { id: 'duplicates', label: '重複候補を確認', onSelect: () => router.push('/duplicates') },
+    { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/templates') },
+    { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/scenarios') },
+    { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/reminders') },
+    { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: true, onSelect: () => router.push('/mileage') },
+    { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: true, onSelect: () => router.push('/duplicates') },
     {
       id: 'back-to-list',
       label: '友だち一覧へ戻る',
+      icon: <ArrowLeft size={16} />,
       dividerBefore: true,
       onSelect: () => router.push('/friends'),
     },
@@ -1110,7 +1160,7 @@ function FriendDetailInner() {
       <>
         {canManageFieldDefs ? (
           <Button type="button" variant="primary" onClick={() => void openScenarioPicker()}>
-            この友だちをシナリオに登録
+            この友だちをシナリオに登録する
           </Button>
         ) : null}
         <Button href="/scenarios">シナリオ一覧を見る</Button>
@@ -1133,14 +1183,13 @@ function FriendDetailInner() {
 
   if (!friendId) {
     return (
-      <div>
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          友だちが指定されていません。
-          <Link href="/friends" className="text-accent ml-1 hover:underline">
-            友だち一覧へ戻る
-          </Link>
-        </p>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="見る友だちが指定されていません"
+        description="友だちの一覧から、見たい人を選び直してください。"
+        backHref="/friends"
+        backLabel="友だち一覧へ戻る"
+      />
     )
   }
 
@@ -1201,9 +1250,51 @@ function FriendDetailInner() {
   /** 設計の「本名」。友だち情報欄に同じ名前の項目があればそれを使う。 */
   const realName = fields.find((f) => f.name === '本名')?.value ?? ''
 
+  /*
+   * M012：読み込み 403（権限不足）は見つからない案内より先に分ける。
+   * 403 のとき error は空文字なので、後の `!error && !friend` の受け皿に
+   * 先に捕まると権限の面が出ない（監査 228-003 の再発）。順番で守る。
+   * 再試行口は出さない（押し直しても直らないため）。誰に確認するかを添える。
+   */
+  if (!loading && loadForbidden) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="この友だちを見る権限がありません"
+        description="見るには権限が要ります。オーナーか管理者の方に確認してください。"
+      />
+    )
+  }
+
+  if (!loading && (friendMissing || (!error && !friend))) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この友だちは見つかりません"
+        description="削除されたか、別の LINE アカウントの人です。一覧から選び直してください。"
+        accountName={selectedAccount?.name}
+        backHref="/friends"
+        backLabel="友だち一覧へ戻る"
+      />
+    )
+  }
+
+  // 保存の失敗は error のまま帯で出す（下の `{error && friend && ...}`）。
+  // ここは本体が無いときだけ。友だちがあるのに error があるのは保存の失敗。
+  if (!loading && !friend) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="友だちを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void loadFriend()}
+      />
+    )
+  }
+
   return (
-    <div data-friends-detail-design="v4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <div data-friends-detail-design="v4" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" data-design="Crumb">
           <Link href="/friends" className="hover:underline">
             友だち
@@ -1212,12 +1303,9 @@ function FriendDetailInner() {
           <span>{friend?.displayName ?? '詳細'}</span>
         </nav>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href={inboxHrefForFriend(friendId)}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors"
-          >
+          <Button href={inboxHrefForFriend(friendId)} variant="primary">
             受信箱で開く
-          </Link>
+          </Button>
           {/*
             NEXT-08: 押しても何も起きないボタンを共通メニューへ接続する。
             「個別操作」はこの友だちへの操作、「…」は関連する画面への移動。
@@ -1266,28 +1354,16 @@ function FriendDetailInner() {
 
       {/* 本体が取れている途中の失敗（保存など）は帯で出す。本体の失敗は下のカードが出す。 */}
       {error && friend && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {/*
         NEXT-11: 読み込み中・取得失敗は「本体」だけを見る。マイルなどの
         補助パネルの遅延・失敗ではここに入らない。
       */}
-      {loading ? (
+      {loading || !friend ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
-        </div>
-      ) : !friend ? (
-        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          <p className="text-ink-secondary">{error || '友だちを表示できませんでした'}</p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <Button type="button" onClick={() => void loadFriend()}>
-              もう一度読み込む
-            </Button>
-            <Button href="/friends">友だち一覧へ戻る</Button>
-          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[23.5rem_1fr]">
@@ -1306,18 +1382,17 @@ function FriendDetailInner() {
           `}</style>
           <aside data-design="Left" data-friend-profile-panel className="bg-canvas rounded-card border-hairline overflow-hidden border">
             <div className="border-hairline border-b px-5 py-3.5">
-              <div className="flex items-center justify-between"><h2 className="text-ink text-sm font-semibold">顧客情報</h2><Link href="/friends" className="text-ink-faint text-lg">×</Link></div>
+              <div className="flex items-center justify-between"><h2 className="text-ink text-sm font-semibold">顧客情報</h2><Link href="/friends" aria-label="友だち一覧へ戻る" title="友だち一覧へ戻る" className="text-ink-faint text-lg">×</Link></div>
             </div>
 
             <div className="border-hairline flex flex-col items-center border-b px-5 py-5 text-center">
-              {friend?.pictureUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- LINE CDNの利用者画像。
-                <img src={friend.pictureUrl} alt="" className="h-16 w-16 rounded-full object-cover" />
-              ) : <div className="bg-action flex h-16 w-16 items-center justify-center rounded-full text-xl font-bold text-on-action">{friend?.displayName?.charAt(0) ?? '?'}</div>}
+              {/* ★V7 友だちの顔：名前が無い時は「?」ではなく人の印。 */}
+              <Avatar name={friend?.displayName} src={friend?.pictureUrl} size={56} />
               <h2 className="text-ink mt-3 text-sm font-bold">{friend?.displayName ?? '名前未登録'}</h2>
               <p className="text-ink-faint mt-1 text-xs">LINE表示名</p>
-              <div className="mt-3 flex flex-wrap justify-center gap-1.5"><SupportMarkBadge status={friend?.support?.status} /><span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-micro">{friend?.support?.operatorName ?? '未割り当て'}</span><span className="bg-accent-soft text-accent rounded-pill px-2 py-0.5 text-micro">表示中</span></div>
-              <Button href={`/friends/detail?id=${friendId}&tab=info`} className="mt-3">♙ 友だち詳細</Button>
+              <div className="mt-3 flex flex-wrap justify-center gap-1.5"><SupportMarkBadge status={friend?.support?.status} /><span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-micro">{friend?.support?.operatorName ?? '未割り当て'}</span><span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-0.5 text-micro">表示中</span></div>
+              {/* 同じ画面の「情報欄」タブへ移る。今いる画面と同じ名前・チェスの駒の記号は紛らわしかった（★V7）。 */}
+              <Button href={`/friends/detail?id=${friendId}&tab=info`} className="mt-3">情報欄を見る</Button>
             </div>
 
             {/* FRIEND-31: lg未満ではここから下（マイル以降の補助プロフィール）を畳む。 */}
@@ -1325,7 +1400,7 @@ function FriendDetailInner() {
               type="button"
               onClick={() => setProfileExpanded((v) => !v)}
               aria-expanded={profileExpanded}
-              className="text-accent w-full px-5 py-2.5 text-center text-xs font-semibold hover:bg-canvas-sunken lg:hidden"
+              className="text-action w-full px-5 py-2.5 text-center text-xs font-semibold hover:bg-canvas-sunken lg:hidden"
             >
               {profileExpanded ? '顧客情報を閉じる' : '顧客情報をすべて表示'}
             </button>
@@ -1337,19 +1412,19 @@ function FriendDetailInner() {
               取り損ねは「取得できませんでした」＋再試行で「—」と区別する。
             */}
             <div className="border-hairline border-b bg-canvas px-5 py-4">
-              <div className="flex items-center justify-between"><p className="text-ink text-xs font-bold">マイル</p><Link href="/mileage" className="text-action text-xs">詳細を見る</Link></div>
+              <div className="flex items-center justify-between"><p className="text-ink text-xs font-medium">マイル</p><Link href="/mileage" className="text-action text-xs">詳細を見る →</Link></div>
               <div className="bg-canvas-sunken mt-2 flex items-center justify-between rounded-control px-3 py-3">
                 <span className="text-ink-faint text-xs">
                   利用可能
                   {mileage && mileage.pending > 0
-                    ? ` ・ 確定待ち ${mileage.pending.toLocaleString('ja-JP')}`
+                    ? ` ・ 確定待ち ${formatNumber(mileage.pending)}`
                     : ''}
                 </span>
                 <strong className="text-ink text-base font-bold tabular-nums">
                   {mileageStatus === 'loading'
                     ? '…'
                     : mileage
-                      ? mileage.available.toLocaleString('ja-JP')
+                      ? formatNumber(mileage.available)
                       : '—'}
                   <span className="ml-1 text-xs font-semibold">mile</span>
                 </strong>
@@ -1360,7 +1435,7 @@ function FriendDetailInner() {
                   <button
                     type="button"
                     onClick={() => void loadMileage()}
-                    className="text-accent shrink-0 hover:underline"
+                    className="text-action shrink-0 hover:underline"
                   >
                     再試行
                   </button>
@@ -1383,12 +1458,12 @@ function FriendDetailInner() {
                       type="button"
                       onClick={() => (supportEditing ? setSupportEditing(false) : void openSupportEditor())}
                       aria-expanded={supportEditing}
-                      className="text-accent shrink-0 text-xs hover:underline"
+                      className="text-action shrink-0 text-xs hover:underline"
                     >
-                      {supportEditing ? 'やめる' : '編集'}
+                      {supportEditing ? 'キャンセル' : '編集'}
                     </button>
                   ) : (
-                    <Link href={inboxHrefForFriend(friendId)} className="text-accent shrink-0 text-xs hover:underline">
+                    <Link href={inboxHrefForFriend(friendId)} className="text-action shrink-0 text-xs hover:underline">
                       編集
                     </Link>
                   )}
@@ -1411,12 +1486,12 @@ function FriendDetailInner() {
                   <div className="border-hairline bg-canvas-sunken rounded-control mt-2 space-y-2 border p-3" data-support-editor>
                     <label className="text-ink-faint block text-xs">
                       対応状況
-                      <SelectField
+                      <Select size="full"
                         value={supportStatus}
                         disabled={supportBusy}
-                        onChange={(e) => setSupportStatus(e.target.value as Chat['status'])}
+                        onChange={(value) => setSupportStatus(value as Chat['status'])}
                         aria-label="対応状況を変える"
-                        className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-2 py-1.5 text-xs"
+                        className="mt-1"
                         options={[
                           { value: 'unread', label: '未対応' },
                           { value: 'in_progress', label: '対応中' },
@@ -1427,12 +1502,12 @@ function FriendDetailInner() {
                     </label>
                     <label className="text-ink-faint block text-xs">
                       担当者
-                      <SelectField
+                      <Select size="full"
                         value={supportOperatorId}
                         disabled={supportBusy}
-                        onChange={(e) => setSupportOperatorId(e.target.value)}
+                        onChange={(value) => setSupportOperatorId(value)}
                         aria-label="担当者を変える"
-                        className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-2 py-1.5 text-xs"
+                        className="mt-1"
                         options={[
                           { value: '', label: '未割り当て' },
                           ...supportOperators.map((operator) => ({ value: operator.id, label: operator.name })),
@@ -1445,9 +1520,7 @@ function FriendDetailInner() {
                         type="button"
                         variant="primary"
                         onClick={() => void saveSupport()}
-                        disabled={supportBusy}
-                      >
-                        {supportBusy ? '処理中…' : '保存する'}
+                        disabled={supportBusy} busy={supportBusy} busyLabel="処理中…">保存する
                       </Button>
                       <Button
                         type="button"
@@ -1498,12 +1571,9 @@ function FriendDetailInner() {
                   ) : (
                     <span className="text-ink-faint text-xs">タグはありません</span>
                   )}
-                  <Link
-                    href={inboxHrefForFriend(friendId)}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-pill border px-2 py-0.5 text-[11px]"
-                  >
+                  <Button variant="secondary" className="text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] h-auto whitespace-normal" href={inboxHrefForFriend(friendId)}>
                     ＋ 追加
-                  </Link>
+                  </Button>
                 </div>
               </div>
 
@@ -1539,7 +1609,7 @@ function FriendDetailInner() {
                     <button
                       type="button"
                       onClick={() => void loadFields()}
-                      className="text-accent ml-1 hover:underline"
+                      className="text-action ml-1 hover:underline"
                     >
                       再試行
                     </button>
@@ -1570,7 +1640,7 @@ function FriendDetailInner() {
                     <button
                       type="button"
                       onClick={() => void loadRichMenu()}
-                      className="text-accent hover:underline"
+                      className="text-action hover:underline"
                     >
                       再試行
                     </button>
@@ -1586,7 +1656,7 @@ function FriendDetailInner() {
                     <dt className="text-ink-faint">追加日</dt>
                     <dd className="text-ink-secondary">
                       {friend?.createdAt
-                        ? new Date(friend.createdAt).toLocaleDateString('ja-JP')
+                        ? formatDay(friend.createdAt)
                         : '—'}
                     </dd>
                   </div>
@@ -1621,23 +1691,43 @@ function FriendDetailInner() {
           </aside>
 
           {/* 右：タブ */}
-          <div data-design="Right">
-            <div className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
-              {visibleTabs.map((t) => (
-                <Link
-                  key={t.key}
-                  href={`/friends/detail?id=${friendId}&tab=${t.key}${
-                    group === BASIC_GROUP ? '' : `&group=${group}`
-                  }`}
-                  className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-                    tab === t.key
-                      ? 'border-accent text-accent'
-                      : 'text-ink-secondary hover:text-ink border-transparent'
-                  }`}
-                >
-                  {t.label}
-                </Link>
-              ))}
+          {/*
+            ★V7差し戻し: 折らないタブ帯がグリッドの右列を押し広げ、右端が
+            画面からはみ出していた。grid の子に min-w-0 を付け、幅の決定を
+            グリッドに任せてタブ帯だけ中で横に流す。
+          */}
+          <div data-design="Right" className="flex min-w-0 flex-col gap-4">
+            {/*
+              ★V7: 10個のタブが 1440px で2段に折れていた。折らずに1段にし、
+              入り切らない分は横に送る。リンクで移動するタブなので
+              aria-current="page" で現在地を示す（role="tab" は付けない）。
+            */}
+            <div className="relative">
+              <div ref={tabsRowRef} className="border-hairline flex gap-1 overflow-x-auto border-b">
+                {visibleTabs.map((t) => (
+                  <Link
+                    key={t.key}
+                    href={`/friends/detail?id=${friendId}&tab=${t.key}${
+                      group === BASIC_GROUP ? '' : `&group=${group}`
+                    }`}
+                    aria-current={tab === t.key ? 'page' : undefined}
+                    className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                      tab === t.key
+                        ? 'border-accent text-accent-deep'
+                        : 'text-ink-secondary hover:text-ink border-transparent'
+                    }`}
+                  >
+                    {t.label}
+                  </Link>
+                ))}
+              </div>
+              {/* #773: はみ出し中だけ右端にフェードを出し、続きがあることを示す。 */}
+              {tabsOverflowing ? (
+                <div
+                  aria-hidden="true"
+                  className="from-canvas-sunken pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l to-transparent"
+                />
+              ) : null}
             </div>
 
             {tab === 'timeline' && (
@@ -1646,7 +1736,7 @@ function FriendDetailInner() {
                   <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
                     <h2 className="text-ink text-sm font-bold">進行中の配信・自動処理</h2>
                     <dl className="text-ink-secondary mt-3 space-y-2 text-xs"><div className="flex gap-5"><dt className="font-semibold">シナリオ</dt><dd>取得元を接続後に表示</dd></div><div className="flex gap-5"><dt className="font-semibold">リマインド</dt><dd>取得元を接続後に表示</dd></div><div className="flex gap-5"><dt className="font-semibold">対象ルール</dt><dd>—</dd></div></dl>
-                    <Button type="button" disabled className="mt-3">配信状態を確認</Button>
+                    {/* ★V7：押せないまま置かれていた「配信状態を確認」は外した。 */}
                   </section>
                   <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
                     <h2 className="text-ink text-sm font-bold">同じ人としてつながる情報</h2>
@@ -1663,7 +1753,7 @@ function FriendDetailInner() {
                         <button
                           type="button"
                           onClick={() => void loadMileage()}
-                          className="text-accent ml-1 hover:underline"
+                          className="text-action ml-1 hover:underline"
                         >
                           再試行
                         </button>
@@ -1697,14 +1787,15 @@ function FriendDetailInner() {
                   フォーム回答・名寄せ）を時系列で取ったものを出す。
                   0件・取得失敗・読み込み中はそれぞれ区別して表示する。
                 */}
-                <section className="bg-canvas rounded-card border-hairline overflow-hidden border shadow-card">
-                  <div className="flex items-center justify-between px-4 py-3"><h2 className="text-ink text-sm font-bold">最近の履歴</h2><Link href={`/friends/detail?id=${friendId}&tab=history`} className="text-accent text-xs font-semibold">すべてを見る →</Link></div>
+                {/* #773: 行の表組みは「カードの幅」で切り替える（画面幅ではない）。 */}
+                <section className="@container bg-canvas rounded-card border-hairline overflow-hidden border shadow-card">
+                  <div className="flex items-center justify-between px-4 py-3"><h2 className="text-ink text-sm font-bold">最近の履歴</h2><Link href={`/friends/detail?id=${friendId}&tab=history`} className="text-action text-xs font-semibold">すべてを見る →</Link></div>
                   {/*
                     #985 CHK-04: 140+160+140pxの固定列は狭い幅で
                     親の overflow-hidden に欠ける。md 未満では見出しを
                     畳み、各行は折り返すカードにする。
                   */}
-                  <div className="bg-canvas-sunken border-hairline hidden border-y px-4 py-3 text-xs font-semibold text-ink-faint md:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>日時</span><span>種別</span><span>内容</span><span>アカウント</span><span>元</span></div>
+                  <div className="bg-canvas-sunken border-hairline hidden border-y px-4 py-3 text-xs font-semibold text-ink-faint @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>日時</span><span>種別</span><span>内容</span><span>アカウント</span><span>元</span></div>
                   {historyStatus === 'loading' ? (
                     <p className="text-ink-faint px-4 py-5 text-xs">履歴を読み込んでいます…</p>
                   ) : historyStatus === 'error' ? (
@@ -1713,7 +1804,7 @@ function FriendDetailInner() {
                       <button
                         type="button"
                         onClick={() => void loadHistory()}
-                        className="text-accent ml-1 hover:underline"
+                        className="text-action ml-1 hover:underline"
                       >
                         再試行
                       </button>
@@ -1727,7 +1818,7 @@ function FriendDetailInner() {
                         友だち追加の記録は本体の作成日時から出す実データ。
                         活動履歴が0件のときは、この記録だけが履歴になる。
                       */}
-                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs md:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span className="min-w-0 flex-1 basis-full md:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span><span /></div>
+                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>{friend.createdAt ? formatDay(friend.createdAt) : '—'}</span><span>友だち追加</span><span className="min-w-0 flex-1 basis-full @lg:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span><span /></div>
                       {historyStatus === 'ready' && historyItems.length === 0 ? (
                         <p className="text-ink-faint px-4 pb-4 text-xs">
                           上の「友だち追加の記録」以外の活動履歴はまだありません。
@@ -1738,13 +1829,13 @@ function FriendDetailInner() {
                 </section>
                 {/*
                   NEXT-09: 対象者を引き継ぐ操作と、汎用一覧への移動を分ける。
-                  「シナリオに登録」はこの友だちを対象に選んで実行できる。
+                  「シナリオに登録する」はこの友だちを対象に選んで実行できる。
                   一覧へ行くだけのものは名前を「一覧を見る」に変えて混同させない。
                 */}
                 <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
                   <h2 className="text-ink text-sm font-bold">この友だちに行う操作</h2>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button href={inboxHrefForFriend(friendId)} variant="primary" aria-label="個別トークを開く">受信箱で開く</Button>
+                    {/* 「受信箱で開く」は画面右上にもあるので、ここでは重ねない（★V7）。 */}
                     {canManageFieldDefs ? (
                       <Button
                         type="button"
@@ -1753,12 +1844,10 @@ function FriendDetailInner() {
                         }
                         aria-expanded={scenarioPickerOpen}
                       >
-                        シナリオに登録
+                        シナリオに登録する
                       </Button>
                     ) : null}
-                    <Button href="/templates">テンプレート一覧を見る</Button>
-                    <Button href="/scenarios">シナリオ一覧を見る</Button>
-                    <Button href="/reminders">リマインダ一覧を見る</Button>
+                    {/* ★V7：この友だちに関係の無い「〜一覧を見る」は外した（左のメニューから行ける）。 */}
                   </div>
                   <p className="text-ink-faint mt-2 text-xs">
                     この友だちへテンプレートを送るときは、受信箱でテンプレートを選んで送信します。
@@ -1776,7 +1865,7 @@ function FriendDetailInner() {
                           <button
                             type="button"
                             onClick={() => void openScenarioPicker()}
-                            className="text-accent ml-1 hover:underline"
+                            className="text-action ml-1 hover:underline"
                           >
                             再試行
                           </button>
@@ -1785,19 +1874,7 @@ function FriendDetailInner() {
                         <p className="text-ink-faint text-xs">登録できるシナリオがありません。</p>
                       ) : (
                         <>
-                          <SelectField
-                            value={scenarioPick}
-                            disabled={scenarioBusy}
-                            onChange={(e) => setScenarioPick(e.target.value)}
-                            aria-label="登録するシナリオを選ぶ"
-                            className="border-hairline rounded-control bg-canvas text-ink w-full border px-2 py-1.5 text-xs"
-                            options={[
-                              { value: '', label: '— シナリオを選ぶ —' },
-                              ...scenarioOptions
-                                .filter((s) => s.isActive)
-                                .map((s) => ({ value: s.id, label: s.name })),
-                            ]}
-                          />
+                          <Select size="full" value={scenarioPick} disabled={scenarioBusy} onChange={(value) => setScenarioPick(value)} aria-label="登録するシナリオを選ぶ" options={[ { value: '', label: '— シナリオを選ぶ —' }, ...scenarioOptions .filter((s) => s.isActive) .map((s) => ({ value: s.id, label: s.name })), ]} />
                           {scenarioPick ? (
                             <p className="text-ink-secondary text-xs">
                               「{scenarioOptions.find((s) => s.id === scenarioPick)?.name}」に
@@ -1814,16 +1891,14 @@ function FriendDetailInner() {
                           type="button"
                           variant="primary"
                           onClick={() => void enrollScenario()}
-                          disabled={scenarioBusy || !scenarioPick || scenarioListStatus !== 'ready'}
-                        >
-                          {scenarioBusy ? '登録中…' : 'このシナリオに登録する'}
+                          disabled={scenarioBusy || !scenarioPick || scenarioListStatus !== 'ready'} busy={scenarioBusy} busyLabel="登録中…">このシナリオに登録する
                         </Button>
                         <Button
                           type="button"
                           onClick={() => setScenarioPickerOpen(false)}
                           disabled={scenarioBusy}
                         >
-                          やめる
+                          キャンセル
                         </Button>
                       </div>
                     </div>
@@ -1840,9 +1915,9 @@ function FriendDetailInner() {
               0件・取得失敗・読み込み中を分け、続きは「さらに読み込む」。
             */}
             {tab === 'history' && (
-              <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-                {/* #985 CHK-04: 概要タブと同じく、狭い幅では見出しを畳みカードにする。 */}
-                <div className="bg-canvas-sunken border-hairline hidden border-b px-4 py-3 text-xs font-semibold text-ink-faint md:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
+              <div className="@container bg-canvas rounded-card border-hairline overflow-hidden border">
+                {/* #985 CHK-04 / #773: 見出しの表組みはカード幅(@lg)で切り替える。 */}
+                <div className="bg-canvas-sunken border-hairline hidden border-b px-4 py-3 text-xs font-semibold text-ink-faint @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
                   <span>日時</span><span>種別</span><span>内容</span><span>アカウント</span><span>元</span>
                 </div>
                 {historyStatus === 'loading' ? (
@@ -1861,10 +1936,10 @@ function FriendDetailInner() {
                     ))}
                     {/* 最後まで取れたときだけ、いちばん古い記録として友だち追加を末尾に出す。 */}
                     {!historyNextCursor ? (
-                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs md:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
-                        <span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span>
+                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
+                        <span>{friend.createdAt ? formatDay(friend.createdAt) : '—'}</span>
                         <span>友だち追加</span>
-                        <span className="min-w-0 flex-1 basis-full md:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span>
+                        <span className="min-w-0 flex-1 basis-full @lg:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span>
                         <span>システム</span>
                         <span />
                       </div>
@@ -1889,9 +1964,8 @@ function FriendDetailInner() {
                         <Button
                           type="button"
                           onClick={() => void loadHistory(historyNextCursor)}
-                          disabled={historyLoadingMore}
-                        >
-                          {historyLoadingMore ? '読み込み中…' : historyMoreError ? 'もう一度試す' : 'さらに読み込む'}
+                          disabled={historyLoadingMore} busy={historyLoadingMore} busyLabel="読み込み中…">
+                          {historyMoreError ? 'もう一度試す' : 'さらに読み込む'}
                         </Button>
                       </div>
                     ) : null}
@@ -1951,19 +2025,14 @@ function FriendDetailInner() {
                           chip.id === BASIC_GROUP ? '' : `&group=${encodeURIComponent(chip.id)}`
                         }`
                         return (
-                          <Link
-                            key={chip.id}
-                            href={href}
-                            aria-current={active ? 'true' : undefined}
-                            className={`rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          <Button variant="secondary" className={(`rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors ${
                               active
-                                ? 'border-accent bg-accent-soft text-accent'
+                                ? 'border-accent bg-accent-soft text-accent-deep'
                                 : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-                            }`}
-                          >
+                            }`) + ' h-auto whitespace-normal'} key={chip.id} href={href} aria-current={active ? 'true' : undefined}>
                             {chip.label}
                             <span className="ml-1 text-ink-faint">{chip.count}</span>
-                          </Link>
+                          </Button>
                         )
                       })}
                     </div>
@@ -1976,7 +2045,7 @@ function FriendDetailInner() {
                     この分類は削除されたか、見つかりません。
                     <Link
                       href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}
-                      className="text-accent ml-1 hover:underline"
+                      className="text-action ml-1 hover:underline"
                     >
                       基本の項目を見る
                     </Link>
@@ -2005,9 +2074,9 @@ function FriendDetailInner() {
                       {canManageFieldDefs && hiddenPersonalCount === 0 ? (
                         <Link
                           href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
-                          className="text-accent ml-1 hover:underline"
+                          className="text-action ml-1 hover:underline"
                         >
-                          項目を追加
+                          項目を作る
                         </Link>
                       ) : null}
                     </p>
@@ -2056,7 +2125,7 @@ function FriendDetailInner() {
                     )}
 
                     {warnings.length > 0 && (
-                      <ul className="bg-warning-bg text-warning mb-3 space-y-1 rounded-lg p-3 text-xs">
+                      <ul className="bg-warning-bg text-warning mb-3 space-y-1 rounded-control p-3 text-xs">
                         {warnings.map((w) => (
                           <li key={w}>{w}</li>
                         ))}
@@ -2072,20 +2141,13 @@ function FriendDetailInner() {
                     */}
                     {canSaveFields ? (
                       <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={save}
-                          disabled={saving}
-                          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-                        >
-                          {saving ? '保存中...' : '保存'}
-                        </button>
+                        <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={save} disabled={saving}>
+                          {saving ? '保存中...' : '保存する'}
+                        </Button>
                         {canManageFieldDefs && (
-                          <Link
-                            href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
-                            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
-                          >
-                            項目を追加
-                          </Link>
+                          <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}>
+                            項目を作る
+                          </Button>
                         )}
                       </div>
                     ) : (
@@ -2118,8 +2180,8 @@ function FriendDetailInner() {
                 ) : (
                   <>
                   {typeof submissionsTotal === 'number' && submissionsTotal > submissions.length && (
-                    <p className="text-ink-faint mb-2 text-xs">
-                      全{submissionsTotal}件中{submissions.length}件を表示しています。
+                    <p className="mb-2">
+                      <ListRange total={submissionsTotal} first={1} last={submissions.length} />
                     </p>
                   )}
                   <ul className="divide-hairline divide-y">
@@ -2145,9 +2207,9 @@ function FriendDetailInner() {
                       return (
                       <li key={s.id} className="py-3 first:pt-0 last:pb-0">
                         <div className="flex items-baseline justify-between gap-2">
-                          <p className="text-ink text-sm font-medium">{s.formName}</p>
+                          <p className="text-ink text-sm font-semibold">{s.formName}</p>
                           <p className="text-ink-faint text-xs">
-                            {new Date(s.createdAt).toLocaleString('ja-JP')}
+                            {formatDateTime(s.createdAt)}
                           </p>
                         </div>
                         <dl className="mt-1.5 space-y-0.5">
@@ -2180,9 +2242,7 @@ function FriendDetailInner() {
                         type="button"
                         variant="secondary"
                         disabled={submissionsLoadingMore}
-                        onClick={() => void loadSubmissions(submissionsNextCursor)}
-                      >
-                        {submissionsLoadingMore ? '読み込んでいます…' : 'さらに読み込む'}
+                        onClick={() => void loadSubmissions(submissionsNextCursor)} busy={submissionsLoadingMore} busyLabel="読み込んでいます…">さらに読み込む
                       </Button>
                     </div>
                   ) : null}

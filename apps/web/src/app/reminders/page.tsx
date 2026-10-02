@@ -3,7 +3,7 @@
 import { useCallback, useDeferredValue, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CalendarClock, History, MoreHorizontal, Trash2 } from 'lucide-react'
+import { CalendarClock, History, MoreHorizontal } from 'lucide-react'
 import type { ApiResponse, Folder, ReminderTriggerType } from '@line-crm/shared'
 import { api, fetchApi } from '@/lib/api'
 import { useOffsetServerList, type ServerListResponse } from '@/lib/use-server-list'
@@ -14,17 +14,22 @@ import { PRESETS as LIST_STATE_PRESETS } from '@/components/shared/list-state'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
+import { RefreshCover } from '@/components/shared/refresh-cover'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import SelectField from '@/components/shared/select-field'
-import { TextInput } from '@/components/shared/form-controls'
+import SortSelect from '@/components/ui/sort-select'
+import PageSizeSelect from '@/components/ui/page-size-select'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { TableStateRow } from '@/components/shared/table'
 import FilterChip from '@/components/shared/filter-chip'
+import ListToolbar from '@/components/shared/list-toolbar'
 import ActionMenu from '@/components/shared/action-menu'
 import IconButton from '@/components/shared/icon-button'
 import { Pill } from '@/components/reminders/reminder-v6-ui'
 import { deleteReminderSelection } from './delete-reminder-selection'
 import { formatTriggerOffset } from './reminder-timing'
+import { formatDateTime } from '@/lib/format'
 
 interface Reminder {
   id: string; name: string; description: string | null; isActive: boolean
@@ -41,19 +46,18 @@ interface Reminder {
 const UNFILED = '__unfiled__'
 const PER_PAGE_OPTIONS = [20, 50, 100]
 const SORT_OPTIONS = [
-  { value: 'order', label: '並び替え順' },
+  { value: 'order', label: '自分で並べた順' },
   { value: 'next', label: '次の送信が近い順' },
   { value: 'created', label: '作成日が新しい順' },
   { value: 'updated', label: '更新が新しい順' },
   { value: 'name', label: '名前順' },
 ]
 /** 行ごとに作ると件数分だけ重いため、外で1回作って使い回す (#489-19)。 */
-const lastSentFormat = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 function rowView(reminder: Reminder) {
   const timing = formatTriggerOffset(reminder.triggerOffsetMinutes)
   const status = reminder.lifecycleStatus === 'draft' ? '下書き' as const : reminder.lifecycleStatus === 'stopped' || !reminder.isActive ? '停止中' as const : '有効' as const
   const date = reminder.lastSentAt ? new Date(reminder.lastSentAt) : null
-  const last = date && !Number.isNaN(date.getTime()) ? lastSentFormat.format(date) : '—'
+  const last = date && !Number.isNaN(date.getTime()) ? formatDateTime(date) : '—'
   return { subtitle: reminder.timingSummary ?? `${timing}${reminder.sendAtTime ? ` ${reminder.sendAtTime}` : ''} ／ テキスト ${reminder.stepCount ?? 0}通`, status, base: reminder.baseDateSummary ?? (reminder.triggerType === 'booking' ? '予約日時' : reminder.triggerType === 'event' ? 'イベント開催日' : reminder.triggerType === 'friend_field' ? '友だち情報欄の日付' : '指定日時'), planned: reminder.plannedDeliveries == null ? '—' : `${reminder.plannedDeliveries}通`, last }
 }
 
@@ -162,13 +166,15 @@ export default function RemindersPage() {
       const reminderStats = stats.reminders as typeof stats.reminders & { failed?: number }
       return [{ title: 'リマインダ数', value: reminderStats.total, unit: '件', detail: `有効 ${reminderStats.active}件` }, { title: '送信予定', value: reminderStats.waiting, unit: '通', detail: '今後7日' }, { title: '今月の送信', value: reminderStats.sentThisMonth, unit: '通', detail: '正常送信' }, { title: '失敗', value: reminderStats.failed ?? null, unit: '通', detail: '要確認' }]
     }} /></div>
-    <div className="mb-3 flex gap-2"><Button href="/reminders/new" variant="primary">リマインダを作成</Button></div>
-    {error ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{LIST_STATE_PRESETS.error.title}。{LIST_STATE_PRESETS.error.description}</div> : null}
-    {moveError ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{moveError}</div> : null}
+    <div className="mb-3 flex gap-2"><Button href="/reminders/new" variant="primary">＋ リマインダを作る</Button></div>
+    {/*
+      ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。表の中の
+      TableStateRow error（読み直す口つき）だけにまとめる。
+    */}
+    {moveError ? <Notice tone="danger" message={moveError} className="mb-3" /> : null}
     <div data-design="Body" style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
-      {foldersError ? <div className="bg-danger-bg text-danger rounded-lg p-3 text-sm lg:col-span-2">フォルダを読み込めませんでした。<Button className="ml-2" onClick={() => void loadFolders()}>フォルダを再読み込み</Button></div> : null}
       <FolderPanel
-        total={loading || error ? '—' : `${listTotal}件`}
+        /* R12: 総数は「すべて」の行と同じ数なので見出しには出さない。 */
         activeId={folderFilter}
         onSelect={setFolderFilter}
         onAddFolder={() => setFolderDialogOpen(true)}
@@ -184,18 +190,59 @@ export default function RemindersPage() {
           })),
           { id: UNFILED, label: '未分類', count: unfiledCount },
         ]}
-      />
+      >
+        {/*
+          ★V7 `x63W5x`：補助のデータ（フォルダ）だけ取れないときは、
+          その場所に小さく1行だけ。赤字にしない。一覧は普通に出す。
+          一覧本体も失敗しているとき（一覧の失敗の1枚が出ているとき）は
+          そちらへまとめ、ここは出さない。
+        */}
+        {foldersError && (reminders.length > 0 || !error) ? (
+          <p role="alert" className="text-ink-secondary text-xs">
+            フォルダを読み込めませんでした。
+            <button type="button" onClick={() => void loadFolders()} className="text-action ml-2 font-semibold hover:underline">
+              もう一度
+            </button>
+          </p>
+        ) : null}
+      </FolderPanel>
       <div className="min-w-0">
-        <div className="bg-canvas rounded-card border-hairline mb-3 border p-3">
-          <div className="flex items-center gap-2"><TextInput type="search" placeholder="名前・内容で検索" aria-label="名前・内容で検索" value={nameQuery} onChange={(event) => setNameQuery(event.target.value)} className="min-w-0 flex-1 text-xs" /><SelectField aria-label="表示件数" className="text-xs" value={String(perPage)} onChange={(event) => setPerPage(Number(event.target.value))} options={PER_PAGE_OPTIONS.map((n) => ({ value: String(n), label: `${n}件表示` }))} /></div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">{['有効','下書き','停止中'].map((status) => <FilterChip key={status} selected={statusFilter === status} onChange={() => setStatusFilter(statusFilter === status ? '' : status)}>{status}</FilterChip>)}<FilterChip selected={statusFilter === '失敗あり'} onChange={() => setStatusFilter(statusFilter === '失敗あり' ? '' : '失敗あり')}>失敗あり</FilterChip><span className="ml-auto w-44"><SelectField aria-label="並び順" className="text-micro" value={sort} onChange={(event) => setSort(event.target.value)} options={SORT_OPTIONS} /></span></div>
-        </div>
+        {/*
+          ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+          右端に並び順と表示件数。#668 の並びの意図はそのまま。
+        */}
+        <ListToolbar
+          search={{ placeholder: '名前・内容で検索', value: nameQuery, onChange: setNameQuery }}
+          filters={
+            <>
+              <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+              {['有効','下書き','停止中'].map((status) => <FilterChip key={status} selected={statusFilter === status} onChange={() => setStatusFilter(statusFilter === status ? '' : status)}>{status}</FilterChip>)}
+              <FilterChip selected={statusFilter === '失敗あり'} onChange={() => setStatusFilter(statusFilter === '失敗あり' ? '' : '失敗あり')}>失敗あり</FilterChip>
+            </>
+          }
+          trailing={
+            <>
+              <SortSelect value={sort} onChange={setSort} options={SORT_OPTIONS} />
+              <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} />
+            </>
+          }
+        />
+        {/*
+          前の一覧を残したまま読み直す（★V7 sTJsh §2）。行があるあいだは
+          薄め＋上の線で伝え、読み込みの1枚は行が無いときだけ出す。
+        */}
+        <RefreshCover refreshing={reminderList.refreshing}>
         <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-          <table className="w-full table-fixed text-left text-xs"><thead className="bg-canvas-sunken text-ink-faint"><TableHeadRow><Th className="w-[31%]">リマインダ名</Th><Th className="w-1/12">状態</Th><Th className="w-1/5">基準日</Th><Th className="w-1/12">予定</Th><Th className="w-1/6">最終送信</Th><Th className="w-1/12" align="center">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">
-            {loading ? <tr><td colSpan={6} className="px-4 py-14 text-center"><b className="block text-ink">読み込んでいます</b><span className="text-ink-faint mt-1 block">このまま少しお待ちください。</span></td></tr> : reminders.length === 0 ? <tr><td colSpan={6} className="px-4 py-14 text-center">{error ? <><b className="block text-ink">表示できませんでした</b><span className="text-ink-faint mt-1 block">再読み込みしても直らないときは、エラー報告へお知らせください。</span><Button className="mt-3" onClick={reminderList.retry}>もう一度読み込む</Button><span hidden>上の案内をご覧ください</span></> : nameQuery.trim() || folderFilter || statusFilter ? 'この条件に合うリマインダはありません。' : <><b className="block text-ink">まだリマインダがありません</b><span className="text-ink-faint mt-1 block">日付を決めておくと、その前と後に自動で送れます。上の「リマインダを作成」から始められます。</span><span hidden>リマインダがありません。「リマインダを作成」から作成してください。</span></>}</td></tr> : reminders.map((reminder) => { const view = rowView(reminder); return <tr key={reminder.id} className="hover:bg-canvas-sunken"><td className="px-3 py-3"><Link href={`/reminders/detail?id=${encodeURIComponent(reminder.id)}`} className="text-action block truncate font-bold" title={reminder.name}>{reminder.name}</Link><span className="text-ink-faint text-micro mt-1 block truncate" title={view.subtitle}>{view.subtitle}</span></td><td><Pill tone={view.status === '有効' ? 'success' : view.status === '下書き' ? 'warning' : 'neutral'}>{view.status}</Pill></td><td className="truncate pr-2" title={view.base}>{view.base}</td><td>{view.planned}</td><td>{view.last}</td><td className="text-center"><div className="relative inline-flex items-center justify-center"><IconButton aria-label={`${reminder.name}を削除`} title={`${reminder.name}を削除`} className="text-danger" onClick={() => { setSelected(new Set([reminder.id])); setDeleteError(''); setConfirmOpen(true) }}><Trash2 /></IconButton><IconButton aria-label={`${reminder.name}のその他操作`} title={`${reminder.name}のその他操作`} onClick={() => setOpenMenuId((currentId) => currentId === reminder.id ? null : reminder.id)}><MoreHorizontal /></IconButton><ActionMenu open={openMenuId === reminder.id} ariaLabel={`${reminder.name}の操作`} onClose={() => setOpenMenuId(null)} items={[{ id: 'registrants', label: '登録者を管理', icon: <CalendarClock />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`) }, { id: 'planned', label: '配信予定を確認', icon: <CalendarClock />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}&status=planned`) }, { id: 'history', label: '実行履歴を見る', icon: <History />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`) }]} /></div></td></tr> })}
+          {/* #641: 操作列が広くなった分は表だけが横に流れる */}
+          {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「最終送信」を畳む。 */}
+          <div className="overflow-x-auto @container">
+          <table className="w-full min-w-[684px] table-fixed text-left text-xs @[830px]:min-w-[820px]"><thead className="bg-canvas-sunken text-ink-faint"><TableHeadRow><Th className="w-[31%]">リマインダ名</Th><Th className="w-1/12">状態</Th><Th className="w-1/5">基準日</Th><Th className="w-1/12">予定</Th><Th className="cq-hide-below-830 w-1/6">最終送信</Th><Th className="bg-canvas-sunken sticky right-0 w-44" align="right">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">
+            {loading && reminders.length === 0 ? <TableStateRow colSpan={6} kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" /> : reminders.length === 0 ? (<>{error ? <TableStateRow colSpan={6} kind="error" title={LIST_STATE_PRESETS.error.title} description={LIST_STATE_PRESETS.error.description} onRetry={reminderList.retry} /> : nameQuery.trim() || folderFilter || statusFilter ? (<><TableStateRow colSpan={6} kind="empty" title="この条件に合うリマインダはありません。" description="検索語や絞り込みを変えてください。" /><tr><td colSpan={6} className="px-4 pb-10 text-center"><Button onClick={() => { setNameQuery(''); setFolderFilter(''); setStatusFilter('') }}>検索と絞り込みを解除</Button></td></tr></>) : <TableStateRow colSpan={6} kind="empty" title="まだリマインダがありません" description="日付を決めておくと、その前と後に自動で送れます。上の「＋ リマインダを作る」から始められます。" />}</>) : reminders.map((reminder) => { const view = rowView(reminder); return <tr key={reminder.id} className="group cursor-pointer hover:bg-canvas-sunken" tabIndex={0} onClick={() => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter') { event.preventDefault(); router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`) } }}><td className="px-3 py-3"><Link href={`/reminders/detail?id=${encodeURIComponent(reminder.id)}`} className="block truncate font-semibold text-ink hover:text-action hover:underline" title={reminder.name}>{reminder.name}</Link><span className="text-ink-faint text-micro mt-1 block truncate" title={view.subtitle}>{view.subtitle}</span></td><td><Pill tone={view.status === '有効' ? 'success' : view.status === '下書き' ? 'warning' : 'neutral'}>{view.status}</Pill></td><td className="truncate pr-2" title={view.base}>{view.base}</td><td>{view.planned}</td><td className="cq-hide-below-830">{view.last}</td><td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-3 text-right"><div className="relative flex w-full items-center justify-end gap-1">{/* 行クリックで詳細へ。「詳細」＋「…」メニューにまとめ、削除はメニュー内の危ない操作へ。 */}<Button href={`/reminders/detail?id=${encodeURIComponent(reminder.id)}`} variant="secondary" size="compact">詳細</Button><IconButton aria-label={`${reminder.name}のその他操作`} title={`${reminder.name}のその他操作`} onClick={(event) => { event.stopPropagation(); setOpenMenuId((currentId) => currentId === reminder.id ? null : reminder.id) }}><MoreHorizontal /></IconButton><ActionMenu open={openMenuId === reminder.id} ariaLabel={`${reminder.name}の操作`} onClose={() => setOpenMenuId(null)} items={[{ id: 'registrants', label: '登録者を管理', icon: <CalendarClock />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`) }, { id: 'planned', label: '配信予定を確認', icon: <CalendarClock />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}&status=planned`) }, { id: 'history', label: '実行履歴を見る', icon: <History />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`) }, { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => { setSelected(new Set([reminder.id])); setDeleteError(''); setConfirmOpen(true) } }]} /></div></td></tr> })}
           </tbody></table>
+          </div>
         </div>
         <div className="mt-3"><Pagination page={reminderList.page} pageCount={reminderList.pageCount} onPageChange={reminderList.setPage} disabled={loading} /></div>
+        </RefreshCover>
       </div>
     </div>
     <ConfirmDialog open={confirmOpen} title={`「${selectedName}」を削除しますか？`} description="削除すると未送信の通知予定はすべて取り消されます。送信済みの履歴は監査記録として残り、この操作は取り消せません。" confirmLabel="削除する" destructive busy={deleting} error={deleteError} onConfirm={() => void handleDeleteSelected()} onCancel={() => { if (!deleting) { setConfirmOpen(false); setDeleteError('') } }} />

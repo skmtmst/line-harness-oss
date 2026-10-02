@@ -202,14 +202,17 @@ async function countInboxSavedViewMatches(
     where.push(`(${clauses.join(' OR ')})`);
   }
   if (conditions.query) {
-    where.push(`(f.display_name LIKE ? OR EXISTS (
+    /*
+     * #625: LIKE ではなく instr() で部分一致する。
+     * D1 の LIKE/GLOB パターンは最大50バイトのため、長い検索語で500になっていた。
+     */
+    where.push(`(instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
       SELECT 1 FROM messages_log searched
        WHERE searched.friend_id = f.id
          AND (searched.delivery_type IS NULL OR searched.delivery_type != 'test')
-         AND searched.content LIKE ?
+         AND instr(lower(searched.content), lower(?)) > 0
     ))`);
-    const like = `%${conditions.query}%`;
-    bindings.push(like, like);
+    bindings.push(conditions.query, conditions.query);
   }
   if (conditions.unread === 'mine') {
     where.push(`EXISTS (
@@ -287,12 +290,15 @@ async function countInboxSavedViewMatches(
     emailWhere.push(`(${clauses.join(' OR ')})`);
   }
   if (conditions.query) {
-    emailWhere.push(`(t.customer_email LIKE ? OR t.customer_name LIKE ? OR t.subject LIKE ? OR EXISTS (
+    // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+    emailWhere.push(`(instr(lower(t.customer_email), lower(?)) > 0
+      OR instr(lower(t.customer_name), lower(?)) > 0
+      OR instr(lower(t.subject), lower(?)) > 0
+      OR EXISTS (
       SELECT 1 FROM support_email_messages searched
-       WHERE searched.thread_id = t.id AND searched.body_text LIKE ?
+       WHERE searched.thread_id = t.id AND instr(lower(searched.body_text), lower(?)) > 0
     ))`);
-    const like = `%${conditions.query}%`;
-    emailBindings.push(like, like, like, like);
+    emailBindings.push(conditions.query, conditions.query, conditions.query, conditions.query);
   }
   if (conditions.unread === 'mine') {
     emailWhere.push('(sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at)');
@@ -636,21 +642,21 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
         conditionBindings.push(lineAccountId);
       }
       if (query) {
+        // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
         conditions.push(`(
-          f.display_name LIKE ? OR EXISTS (
+          instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
             SELECT 1 FROM messages_log mq
             WHERE mq.friend_id = f.id
               AND (mq.delivery_type IS NULL OR mq.delivery_type != 'test')
-              AND mq.content LIKE ?
+              AND instr(lower(mq.content), lower(?)) > 0
           )
         )`);
-        const like = `%${query}%`;
-        conditionBindings.push(like, like);
+        conditionBindings.push(query, query);
       }
 
       const countsRow = await c.env.DB.prepare(`
         WITH last_any AS MATERIALIZED (
-          SELECT friend_id, MAX(created_at) AS last_message_at
+          SELECT friend_id, MAX(COALESCE(line_event_at, created_at)) AS last_message_at
           FROM messages_log
           WHERE (delivery_type IS NULL OR delivery_type != 'test')
             AND ${accountFilterSql}
@@ -668,7 +674,7 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
           SUM(CASE WHEN COALESCE(c.status, 'resolved') = 'unread' THEN 1 ELSE 0 END) AS reply_count,
           SUM(CASE WHEN COALESCE(c.status, 'resolved') = 'unread'
                 AND julianday(COALESCE((
-                  SELECT MAX(latest.created_at) FROM messages_log latest
+                  SELECT MAX(COALESCE(latest.line_event_at, latest.created_at)) FROM messages_log latest
                   WHERE latest.friend_id = f.id
                     AND (latest.delivery_type IS NULL OR latest.delivery_type != 'test')
                 ), d.last_message_at)) <= julianday(?)
@@ -695,9 +701,11 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
 
     /*
      * ── メール側。一覧（/api/support/inbox?channel=email）と同じ
-     * 表示条件（デフォルトテナントのみ・同じ検索・担当・未読）で数える。 ──
+     * 表示条件（デフォルトテナントのみ・同じ検索・担当・未読）で数える。
+     * メールは LINE アカウントに所属しないため、選択中のアカウントが
+     * あっても数える（一覧と同じ）。 ──
      */
-    if (channel !== 'line' && scope.canSeeUnassigned && !lineAccountId) {
+    if (channel !== 'line' && scope.canSeeUnassigned) {
       const statusSql = !status || status === 'all'
         ? '1=1'
         : status === 'resolved'
@@ -710,14 +718,17 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
       if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
       let searchSql = '';
       if (query) {
+        // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
         searchSql = `AND (
-          t.customer_email LIKE ? OR t.customer_name LIKE ? OR t.subject LIKE ? OR EXISTS (
+          instr(lower(t.customer_email), lower(?)) > 0
+          OR instr(lower(t.customer_name), lower(?)) > 0
+          OR instr(lower(t.subject), lower(?)) > 0
+          OR EXISTS (
             SELECT 1 FROM support_email_messages searched
-            WHERE searched.thread_id = t.id AND searched.body_text LIKE ?
+            WHERE searched.thread_id = t.id AND instr(lower(searched.body_text), lower(?)) > 0
           )
         )`;
-        const like = `%${query}%`;
-        bindings.push(like, like, like, like);
+        bindings.push(query, query, query, query);
       }
       if (assignee) {
         if (assignee === 'unassigned') searchSql += ' AND t.assigned_staff_id IS NULL';
@@ -884,7 +895,8 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     //   新実装は (a) ROW_NUMBER を argmax GROUP BY に置換 (SQLite の bare-column +
     //   単一 MAX() は max 行の値を返す documented 挙動)、(b) CTE を MATERIALIZED して
     //   二重評価を防止、(c) page CTE で先に対象 friend を limit 件に確定してから
-    //   preview を計算、(d) デフォルト LIMIT 200 (最終行は last_message_at DESC)。
+    //   preview を計算、(d) デフォルト LIMIT 200
+    //   (最終行は 未読 DESC, last_message_at DESC, friend_id DESC)。
     //   同条件の本番実測: 459ms / 165k rows_read (旧 LIMIT 300 時)。
     //   - content は text のみ先頭 200 文字まで切り詰めて返す (flex/image など raw JSON を
     //     返すと broadcast 後の rows で multi-MB レスポンスになる)。
@@ -911,11 +923,17 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     // 不正値や負値を SQLite の「LIMIT 無制限」に渡さず、未対応絞り込みも含めて
     // 1回の応答を最大200件に止める。未対応一覧は上の専用DBページングで扱う。
     const limit = listLimit(c.req.query('limit'), 200);
-    // カーソルページング: (last_message_at, friend_id) の複合カーソルより古い行を返す。
-    // offset 方式は「取得の合間に新着で行が押し下げられた分が欠落する」構造問題が
-    // あるため採用しない。friend_id は同時刻 (broadcast 一斉配信等) のタイブレーク。
+    // カーソルページング: (未読, last_message_at, friend_id) の複合カーソルより後の行を返す。
+    // 一覧は「未読が先 → 最新の受信・送信が新しい順」。offset 方式は「取得の合間に
+    // 新着で行が押し下げられた分が欠落する」構造問題があるため採用しない。
+    // friend_id は同時刻 (broadcast 一斉配信等) のタイブレーク。
+    // beforeUnread が無い古い渡し方は、時刻だけの従来条件に倒す。
     const beforeAt = c.req.query('beforeAt') || undefined;
     const beforeId = c.req.query('beforeId') || undefined;
+    const beforeUnreadRaw = c.req.query('beforeUnread');
+    const beforeUnread = beforeUnreadRaw === '1' || beforeUnreadRaw === 'true'
+      ? 1
+      : beforeUnreadRaw === '0' || beforeUnreadRaw === 'false' ? 0 : null;
     const useCursor = Boolean(beforeAt && beforeId);
 
     const conditions: string[] = [];
@@ -945,9 +963,12 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     if (quickFilter) {
       conditions.push(`COALESCE(c.status, 'resolved') = 'unread'`);
       if (quickFilter === 'overdue') {
-        // Keep the existing UI definition: one hour since the displayed latest message.
+        // R111: 一覧に表示する最新時刻と同じ定義（受信時刻 line_event_at があれば
+        // そちらを正とし、無ければ保存時刻。件数側の overdue_count と共通）。
+        // created_at だけを見ると、遅れて届いた受信の待ち時間を短く数え、
+        // 札の件数を押しても対象が一覧に出なくなる。
         conditions.push(`julianday(COALESCE((
-          SELECT MAX(latest.created_at) FROM messages_log latest
+          SELECT MAX(COALESCE(latest.line_event_at, latest.created_at)) FROM messages_log latest
           WHERE latest.friend_id = f.id
             AND (latest.delivery_type IS NULL OR latest.delivery_type != 'test')
         ), d.last_message_at)) <= julianday(?)`);
@@ -959,16 +980,16 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       conditionBindings.push(lineAccountId);
     }
     if (query) {
+      // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
       conditions.push(`(
-        f.display_name LIKE ? OR EXISTS (
+        instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
           SELECT 1 FROM messages_log mq
           WHERE mq.friend_id = f.id
             AND (mq.delivery_type IS NULL OR mq.delivery_type != 'test')
-            AND mq.content LIKE ?
+            AND instr(lower(mq.content), lower(?)) > 0
         )
       )`);
-      const like = `%${query}%`;
-      conditionBindings.push(like, like);
+      conditionBindings.push(query, query);
     }
     // status / operator filter は chats を参照するので、その時だけ page CTE 側でも
     // chats を lookup する (無条件時は 全friend × chats lookup を省く)。
@@ -984,9 +1005,20 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     // 値を返す」という SQLite の documented 挙動で argmax として使っている。
     // 集約は page 確定後の friend に絞って実行する (全 friend 分の content を
     // materialize しない)。last_any は並び順決定専用のスリムな全走査 1 回のみ。
+    // 一覧の並びは「未読が先 → 最新の受信・送信が新しい順」。
+    // 未読は担当者ごとの既読位置で決まる (最後の受信より既読が古い = 未読)。
+    // page 確定の前に要るので、受信の最新は last_any の集計から取る。
+    // 最終段の is_unread_for_staff と同じ定義 (受信なしは既読扱い)。
+    const unreadExpr = `CASE
+      WHEN la.last_incoming_at IS NOT NULL
+       AND (sr.last_read_at IS NULL OR la.last_incoming_at > sr.last_read_at)
+      THEN 1 ELSE 0
+    END`;
     const sql = `
       WITH last_any AS MATERIALIZED (
-        SELECT friend_id, MAX(created_at) AS last_message_at
+        SELECT friend_id,
+          MAX(COALESCE(line_event_at, created_at)) AS last_message_at,
+          MAX(CASE WHEN direction = 'incoming' THEN created_at END) AS last_incoming_at
         FROM messages_log
         WHERE (delivery_type IS NULL OR delivery_type != 'test')
           AND ${accountFilterSql}
@@ -1000,16 +1032,25 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         ) GROUP BY friend_id
       ),
       page AS MATERIALIZED (
-        SELECT d.friend_id, d.last_message_at
+        SELECT d.friend_id, d.last_message_at, ${unreadExpr} AS is_unread
         FROM deduped d
         INNER JOIN friends f ON f.id = d.friend_id
+        LEFT JOIN last_any la ON la.friend_id = d.friend_id
+        LEFT JOIN inbox_staff_reads sr
+          ON sr.channel = 'line'
+         AND sr.conversation_id = d.friend_id
+         AND sr.staff_id = ?
         ${pageNeedsChats ? `LEFT JOIN chats c ON c.id = (
           SELECT id FROM chats WHERE friend_id = f.id ORDER BY created_at DESC LIMIT 1
         )` : ''}
         WHERE 1=1
         ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
-        ${useCursor ? 'AND (d.last_message_at < ? OR (d.last_message_at = ? AND d.friend_id < ?))' : ''}
-        ORDER BY d.last_message_at DESC, d.friend_id DESC
+        ${useCursor
+          ? beforeUnread == null
+            ? 'AND (d.last_message_at < ? OR (d.last_message_at = ? AND d.friend_id < ?))'
+            : `AND (${unreadExpr} < ? OR (${unreadExpr} = ? AND (d.last_message_at < ? OR (d.last_message_at = ? AND d.friend_id < ?))))`
+          : ''}
+        ORDER BY is_unread DESC, d.last_message_at DESC, d.friend_id DESC
         LIMIT ?
       ),
       any_agg AS (
@@ -1086,16 +1127,22 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         ON sr.channel = 'line'
        AND sr.conversation_id = f.id
        AND sr.staff_id = ?
-      ORDER BY d.last_message_at DESC, d.friend_id DESC
+      ORDER BY is_unread_for_staff DESC, d.last_message_at DESC, d.friend_id DESC
     `;
 
     // placeholder 順 = SQL 出現順: last_any(account) → deduped 内 chats(account) →
-    // page 条件 → cursor (beforeAt ×2 + beforeId) → LIMIT。
+    // page の未読判定 (sr 用 staff) → page 条件 → cursor
+    // (beforeUnread あり: unread ×2 + beforeAt ×2 + beforeId / なし: beforeAt ×2 + beforeId) →
+    // LIMIT → 最終段の未読判定 (sr 用 staff)。
     // any_agg は page で friend が確定済みのため account filter 不要。
     const allBindings: unknown[] = [];
     allBindings.push(...accountFilterBindings, ...accountFilterBindings);
+    allBindings.push(staff.id);
     allBindings.push(...conditionBindings);
-    if (useCursor) allBindings.push(beforeAt, beforeAt, beforeId);
+    if (useCursor) {
+      if (beforeUnread == null) allBindings.push(beforeAt, beforeAt, beforeId);
+      else allBindings.push(beforeUnread, beforeUnread, beforeAt, beforeAt, beforeId);
+    }
     allBindings.push(limit, staff.id);
     const result = await c.env.DB.prepare(sql).bind(...allBindings).all();
 
@@ -1207,12 +1254,14 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
                 CASE WHEN q.unsent_at IS NOT NULL THEN '' ELSE q.content END AS quoted_content,
                 CASE WHEN q.unsent_at IS NOT NULL THEN 1 ELSE 0 END AS quoted_is_unsent,
                 q.created_at AS quoted_created_at,
-                messages_log.created_at
+                messages_log.created_at,
+                messages_log.line_event_at,
+                COALESCE(messages_log.line_event_at, messages_log.created_at) AS sort_at
          FROM messages_log
          LEFT JOIN messages_log q ON q.id = messages_log.quoted_message_id
          WHERE messages_log.friend_id = ? AND (messages_log.delivery_type IS NULL OR messages_log.delivery_type != 'test')
-         ${useMessageCursor ? 'AND (messages_log.created_at < ? OR (messages_log.created_at = ? AND messages_log.id < ?))' : ''}
-         ORDER BY messages_log.created_at DESC, messages_log.id DESC LIMIT ?`,
+         ${useMessageCursor ? 'AND (COALESCE(messages_log.line_event_at, messages_log.created_at) < ? OR (COALESCE(messages_log.line_event_at, messages_log.created_at) = ? AND messages_log.id < ?))' : ''}
+         ORDER BY sort_at DESC, messages_log.id DESC LIMIT ?`,
       )
       .bind(...messageBindings)
       .all();
@@ -1261,6 +1310,7 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
               }
             : null,
           createdAt: m.created_at,
+          eventAt: (m.line_event_at as string | null) ?? null,
         })),
       },
     });
@@ -2099,7 +2149,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
-    let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; revision?: number; quotedMessageId?: string };
+    let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; texts?: unknown; revision?: number; quotedMessageId?: string };
     try {
       body = await c.req.json();
     } catch {
@@ -2107,7 +2157,16 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     }
     const image = body.image ?? null;
     const text = typeof body.text === 'string' ? body.text : null;
-    if (!image && !text) return c.json({ success: false, error: 'content is required' }, 400);
+    // G-4: テンプレートパック。`texts` は `text` と並べて受け、
+    // 挿入順のまま1回のpushにまとめる。LINEのpush上限は1回5通。
+    const extraTexts = Array.isArray(body.texts)
+      ? body.texts.filter((t): t is string => typeof t === 'string' && t.length > 0)
+      : [];
+    const texts = [...(text ? [text] : []), ...extraTexts];
+    if (!image && texts.length === 0) return c.json({ success: false, error: 'content is required' }, 400);
+    if (texts.length + (image ? 1 : 0) > 5) {
+      return c.json({ success: false, error: 'まとめて送れるのは5通までです' }, 400);
+    }
     if (body.revision !== undefined && body.revision !== chat.revision) {
       return c.json({
         success: false,
@@ -2158,12 +2217,12 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         previewImageUrl: image.previewImageUrl,
       };
     }
-    let textPart: string | null = null;
-    if (text) {
+    const textParts: string[] = [];
+    for (const rawText of texts) {
       // N-026: 差し込みは単体送信口と同じ解決器・同じ拒否。片方だけ
       // 素通しだと、画像つき送信が `{{name}}` をそのまま相手へ出す。
       const renderedText = await renderChatMessageContent(
-        c.env.DB, friend, 'text', text, liffId,
+        c.env.DB, friend, 'text', rawText, liffId,
         { kind: 'chat', id: friend.id },
       );
       if (renderedText.unresolved.length > 0) {
@@ -2173,11 +2232,11 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       if (renderedText.content.length > 5000) {
         return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
       }
-      textPart = renderedText.content;
+      textParts.push(renderedText.content);
     }
     const messages: Message[] = [
       ...(imagePart ? [{ type: 'image', ...imagePart } as Message] : []),
-      ...(textPart !== null ? [{ type: 'text', text: textPart } as Message] : []),
+      ...textParts.map((part) => ({ type: 'text', text: part }) as Message),
     ];
     // 引用は先頭のメッセージに付ける(1送信要求につき1つの引用元)。
     if (quoted?.quote_token && messages.length > 0) {
@@ -2209,7 +2268,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         friendId: friend.id,
         combined: true,
         image: imagePart,
-        text: textPart,
+        texts: textParts,
         quotedMessageId: quoted?.id ?? null,
       }),
     );
@@ -2311,11 +2370,11 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         messageType: 'image',
         content: JSON.stringify(imagePart),
       }] : []),
-      ...(textPart !== null ? [{
-        id: `${logBaseId}:${imagePart ? 1 : 0}`,
+      ...textParts.map((part, index) => ({
+        id: `${logBaseId}:${index + (imagePart ? 1 : 0)}`,
         messageType: 'text',
-        content: textPart,
-      }] : []),
+        content: part,
+      })),
     ];
     try {
       await c.env.DB.batch([

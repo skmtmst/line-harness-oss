@@ -30,6 +30,7 @@ const BASE_DEFINITION: FriendAddRuleDefinition = {
 describe('IDEA-09 友だち追加時配信の流れ説明', () => {
   it('経路→初回案内→付く属性→次の配信の順で、実設定の値を出す', () => {
     const steps = friendAddFlowSteps({
+      friendKind: 'first_time',
       isFallback: false,
       routeNames: ['店頭QR', 'Instagram広告'],
       missingRouteCount: 0,
@@ -57,6 +58,7 @@ describe('IDEA-09 友だち追加時配信の流れ説明', () => {
 
   it('設定していない内容は例示で埋めず「ありません」と書く', () => {
     const steps = friendAddFlowSteps({
+      friendKind: 'first_time',
       isFallback: false,
       routeNames: ['店頭QR'],
       missingRouteCount: 0,
@@ -73,6 +75,7 @@ describe('IDEA-09 友だち追加時配信の流れ説明', () => {
 
   it('受け皿ルールは経路不明の人向けであることを示す', () => {
     const steps = friendAddFlowSteps({
+      friendKind: 'first_time',
       isFallback: true,
       routeNames: [],
       missingRouteCount: 0,
@@ -85,6 +88,7 @@ describe('IDEA-09 友だち追加時配信の流れ説明', () => {
 
   it('停止・削除済みの経路は件数を明示する', () => {
     const steps = friendAddFlowSteps({
+      friendKind: 'first_time',
       isFallback: false,
       routeNames: ['店頭QR'],
       missingRouteCount: 2,
@@ -96,12 +100,12 @@ describe('IDEA-09 友だち追加時配信の流れ説明', () => {
 
   it('シナリオ未選択・削除済みを区別して書く', () => {
     const unset = friendAddFlowSteps({
-      isFallback: false, routeNames: ['A'], missingRouteCount: 0,
+      friendKind: 'first_time', isFallback: false, routeNames: ['A'], missingRouteCount: 0,
       definition: { ...BASE_DEFINITION, scenarioId: null }, scenarioName: null,
     })
     expect(unset[3].detail).toContain('配信シナリオは未選択です')
     const deleted = friendAddFlowSteps({
-      isFallback: false, routeNames: ['A'], missingRouteCount: 0,
+      friendKind: 'first_time', isFallback: false, routeNames: ['A'], missingRouteCount: 0,
       definition: BASE_DEFINITION, scenarioName: null,
     })
     expect(deleted[3].detail).toContain('削除済みのシナリオを指しています')
@@ -109,6 +113,7 @@ describe('IDEA-09 友だち追加時配信の流れ説明', () => {
 
   it('初回の1通を送らない設定は登録だけ行うと書く', () => {
     const steps = friendAddFlowSteps({
+      friendKind: 'first_time',
       isFallback: false, routeNames: ['A'], missingRouteCount: 0,
       definition: {
         ...BASE_DEFINITION,
@@ -117,6 +122,63 @@ describe('IDEA-09 友だち追加時配信の流れ説明', () => {
       scenarioName: 'ウェルカムシナリオ',
     })
     expect(steps[1].detail).toBe('最初の1通は送らず、シナリオへの登録だけを行います。')
+  })
+
+  it('再追加で「何も配信しない」は案内も次の配信も届かないと書く（アクションは別）', () => {
+    const steps = friendAddFlowSteps({
+      friendKind: 'returning',
+      isFallback: false, routeNames: ['A'], missingRouteCount: 0,
+      definition: {
+        ...BASE_DEFINITION,
+        returningMode: 'none',
+        actions: [{ type: 'add_tag', label: 'タグ「再来」を付ける', targetId: 'tag-9' }],
+      },
+      scenarioName: 'ウェルカムシナリオ',
+    })
+    // 「届く」ように見せない。タグ追加などのアクション自体は動くので両方書く。
+    expect(steps[1].detail).toContain('届きません')
+    expect(steps[2].detail).toContain('タグ「再来」を付ける')
+    expect(steps[3].detail).toContain('最初の案内は届きません')
+    expect(steps[3].detail).not.toContain('動かしません')
+  })
+
+  it('再追加で「何も配信しない」＋シナリオ開始のアクションは矛盾なく両方書く（R261）', () => {
+    // 監査の指摘：『シナリオは動かしません』と『シナリオ「…」を開始する』が
+    // 並ぶと矛盾する。最初の案内は届けないことと、案内後のアクションとして
+    // シナリオを始めることを区別して書く。実行側（friend-add-routing）は
+    // none でも設定したアクションを実行する。
+    const steps = friendAddFlowSteps({
+      friendKind: 'returning',
+      isFallback: false, routeNames: ['店頭QRコード'], missingRouteCount: 0,
+      definition: {
+        ...BASE_DEFINITION,
+        returningMode: 'none',
+        actions: [
+          { type: 'add_tag', label: 'タグ「新規友だち」を付ける', targetId: 'tag-1' },
+          { type: 'start_scenario', label: 'シナリオ「新規登録7日間フォロー」を開始する', targetId: 'sc-2' },
+        ],
+      },
+      scenarioName: 'ウェルカムシナリオ',
+    })
+    expect(steps[1].detail).toContain('届きません')
+    expect(steps[2].detail).toContain('タグ「新規友だち」を付ける')
+    expect(steps[3].detail).toContain('最初の案内は届きません')
+    expect(steps[3].detail).toContain('シナリオ「新規登録7日間フォロー」を開始する')
+    expect(steps[3].detail).not.toContain('動かしません')
+  })
+
+  it('再追加で「何も配信しない」＋アクションなしは案内も動作もないと書く（R261）', () => {
+    const steps = friendAddFlowSteps({
+      friendKind: 'returning',
+      isFallback: false, routeNames: ['A'], missingRouteCount: 0,
+      definition: { ...BASE_DEFINITION, returningMode: 'none', actions: [] },
+      scenarioName: 'ウェルカムシナリオ',
+    })
+    expect(steps[1].detail).toContain('届きません')
+    expect(steps[2].detail).toBe('タグの追加・解除はありません。')
+    expect(steps[3].detail).toContain('最初の案内は届きません')
+    expect(steps[3].detail).not.toContain('動かしません')
+    expect(steps[3].detail).not.toContain('開始する')
   })
 })
 
@@ -131,7 +193,7 @@ describe('IDEA-09 再追加時に動く／動かない処理の説明', () => {
     expect(lines.join('')).toContain('24時間に1回')
   })
 
-  it('再追加「何も配信しない」は案内・シナリオを止め、アクションだけ実行されると書く', () => {
+  it('再追加「何も配信しない」は最初の案内を止め、アクションだけ実行されると書く', () => {
     const lines = friendAddReaddLines({
       friendKind: 'returning',
       status: 'published',
@@ -141,8 +203,38 @@ describe('IDEA-09 再追加時に動く／動かない処理の説明', () => {
         actions: [{ type: 'add_tag', label: 'タグ「再来」を付ける', targetId: 'tag-9' }],
       },
     })
-    expect(lines.join('')).toContain('初回案内とシナリオを動かしません')
+    expect(lines.join('')).toContain('最初の案内は届きません')
     expect(lines.join('')).toContain('設定したアクションは実行されます')
+    expect(lines.join('')).not.toContain('動かしません')
+  })
+
+  it('再追加「何も配信しない」＋シナリオ開始のアクションは否定せず実行されると書く（R261）', () => {
+    const lines = friendAddReaddLines({
+      friendKind: 'returning',
+      status: 'published',
+      definition: {
+        ...BASE_DEFINITION,
+        returningMode: 'none',
+        actions: [
+          { type: 'add_tag', label: 'タグ「新規友だち」を付ける', targetId: 'tag-1' },
+          { type: 'start_scenario', label: 'シナリオ「新規登録7日間フォロー」を開始する', targetId: 'sc-2' },
+        ],
+      },
+    })
+    expect(lines.join('')).toContain('最初の案内は届きません')
+    expect(lines.join('')).toContain('設定したアクションは実行されます')
+    expect(lines.join('')).not.toContain('動かしません')
+  })
+
+  it('再追加「何も配信しない」＋アクションなしは案内も動作もないと書く（R261）', () => {
+    const lines = friendAddReaddLines({
+      friendKind: 'returning',
+      status: 'published',
+      definition: { ...BASE_DEFINITION, returningMode: 'none', actions: [] },
+    })
+    expect(lines.join('')).toContain('最初の案内は届きません')
+    expect(lines.join('')).toContain('アクションも実行されません')
+    expect(lines.join('')).not.toContain('動かしません')
   })
 
   it('再追加「はじめてと同じ内容」「別のシナリオ・開始位置」を書き分ける', () => {

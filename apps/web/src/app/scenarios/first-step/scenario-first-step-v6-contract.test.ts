@@ -31,7 +31,7 @@ describe('V6 1通目設定の契約', () => {
     expect(PAGE).toContain("usePageTitle('1通目を設定')")
     expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
     expect(PAGE).not.toContain('<Header')
-    expect(PAGE).toContain('✕ キャンセル')
+    expect(PAGE).toContain('キャンセル')
   })
 
   it('設計Node IDを画面に残す', () => {
@@ -50,7 +50,13 @@ describe('V6 1通目設定の契約', () => {
     expect(PAGE).toContain('label="シナリオ情報" state="done"')
     expect(PAGE).toContain('label="配信方式" state="done"')
     expect(PAGE).toContain('label="1通目を設定" state="current"')
-    expect(PREVIEW).toContain('LINEプレビュー')
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(PREVIEW).toContain('<LinePreview')
+    // R213: 通番号は変数で出す（2通目以降の編集で正しい番号になる）。
+    // 新規1通目の既定は 1 のままなので、ここの見た目は変わらない。
+    // R235: 時刻未設定の分岐が入ったが、通番号は両方の枝で変数のまま。
+    expect(PREVIEW).toContain('${stepLabel}')
+    expect(PREVIEW).toContain('stepOrder = 1')
     expect(PREVIEW).toContain('設定サマリー')
   })
 
@@ -61,7 +67,7 @@ describe('V6 1通目設定の契約', () => {
   })
 
   it('下見の外枠は設計の幅500・角丸10', () => {
-    expect(PREVIEW_CSS).toMatch(/\.preview \{[^}]*max-width: 500px;[^}]*border-radius: 10px;/)
+    expect(PREVIEW_CSS).toMatch(/\.preview \{[^}]*max-width: 500px;[^}]*border-radius: var\(--radius-card\);/)
     expect(PREVIEW).toContain('styles.preview')
     expect(PAGE).toContain('xl:grid-cols-[minmax(0,1fr)_500px]')
   })
@@ -74,16 +80,16 @@ describe('V6 1通目設定の契約', () => {
   })
 
   it('吹き出しは左下だけ角を落とし、本文は13px', () => {
-    expect(PREVIEW_CSS).toMatch(/\.bubble \{[^}]*border-radius: 14px 14px 14px 4px;/)
+    expect(PREVIEW_CSS).toMatch(/\.bubble \{[^}]*border-radius: var\(--radius-card\) var\(--radius-card\) var\(--radius-card\) var\(--radius-mini\);/)
     expect(PREVIEW).toContain('styles.bubble')
     expect(PREVIEW).toContain('text-label leading-relaxed font-medium')
   })
 
   it('種別タブは外枠38・タブ30の帯にする', () => {
-    expect(TABS_CSS).toMatch(/\.rail \{[^}]*min-height: 38px;[^}]*border-radius: 8px;/)
-    expect(TABS_CSS).toMatch(/\.tab \{[^}]*height: 30px;[^}]*border-radius: 6px;/)
+    expect(TABS_CSS).toMatch(/\.rail \{[^}]*min-height: 38px;[^}]*border-radius: var\(--radius-control\);/)
+    expect(TABS_CSS).toMatch(/\.tab \{[^}]*height: 30px;[^}]*border-radius: var\(--radius-mini\);/)
     expect(TABS).toContain('styles.rail')
-    expect(TABS).toContain('${styles.tab} px-3 text-micro font-bold')
+    expect(TABS).toContain('${styles.tab} px-3 text-micro font-medium')
     expect(TABS).not.toContain('rounded-t-control')
   })
 
@@ -91,18 +97,21 @@ describe('V6 1通目設定の契約', () => {
     /*
      * SCENARIO-19: 入力・選択・ボタンは PC 40px・タッチ 44px。
      * 本文の作成欄は 160px を下限に内容に応じて伸び、上限を超えた分は
-     * 欄内スクロール。幅だけが設計固有の数（日数110・時刻130）。
+     * 欄内スクロール。幅だけが設計固有の数（日数110）。
+     * 時刻の入力は★V7の時刻の選択（高さ40・14px）へ寄せ、画面固有の
+     * 幅130の決めは消した。
      */
     expect(PAGE_CSS).toMatch(/\.smallField \{[^}]*height: 40px;[^}]*width: 110px;/)
-    expect(PAGE_CSS).toMatch(/\.timeField \{[^}]*height: 40px;[^}]*width: 130px;/)
     expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*min-height: 160px;/)
     expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*field-sizing: content;/)
     expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*max-height:/)
     expect(PAGE_CSS).toContain('@media (pointer: coarse)')
-    expect(PAGE_CSS).toMatch(/\.smallField,\s*\n\s*\.timeField \{[^}]*height: 44px;/)
+    expect(PAGE_CSS).toMatch(/\.smallField \{[^}]*height: 44px;/)
     expect(PAGE).toContain('styles.bodyField')
     expect(PAGE).toContain('styles.smallField')
-    expect(PAGE).toContain('styles.timeField')
+    expect(PAGE).toContain('<TimeField')
+    expect(PAGE).toContain('aria-label="配信する時刻"')
+    expect(PAGE).not.toContain('styles.timeField')
     expect(PAGE).not.toContain('w-20 border px-3 py-2 text-sm')
   })
 
@@ -134,7 +143,9 @@ describe('V6 1通目設定の契約', () => {
     expect(PAGE).toContain("setLoadState('ready')")
     expect(PAGE).toContain("setLoadState('error')")
     expect(PAGE).toContain('loadState !== \'ready\'')
-    expect(PAGE).toContain('再読み込み')
+    // 再読み込みは ★V7 TargetMissing の error（onRetry が番号を進めて取り直す）。
+    expect(PAGE).toContain('kind="error"')
+    expect(PAGE).toContain('onRetry={() => setReloadKey((k) => k + 1)}')
   })
 
   it('保存の失敗・切断で「保存中」のままにしない', () => {

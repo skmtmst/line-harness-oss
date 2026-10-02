@@ -167,7 +167,7 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
 
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalledWith('account-1'))
     await waitFor(() => expect(view.queryAllByText('一斉配信')).toHaveLength(0))
-    await waitFor(() => expect(view.getAllByText('もう一度読み込む')).not.toHaveLength(0))
+    await waitFor(() => expect(view.getAllByText('もう一度')).not.toHaveLength(0))
     expect(view.getAllByText('ダッシュボード')).not.toHaveLength(0)
   })
 
@@ -182,8 +182,8 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     // 初回の未確認状態も、失敗状態も必須ナビだけを残す。
     expect(view.queryAllByText('一斉配信')).toHaveLength(0)
     expect(view.getAllByText('ダッシュボード')).not.toHaveLength(0)
-    await waitFor(() => expect(view.getAllByText('もう一度読み込む')).not.toHaveLength(0))
-    await act(async () => { view.getAllByText('もう一度読み込む')[0]?.click() })
+    await waitFor(() => expect(view.getAllByText('もう一度')).not.toHaveLength(0))
+    await act(async () => { view.getAllByText('もう一度')[0]?.click() })
     await waitFor(() => expect(view.getAllByText('一斉配信')).not.toHaveLength(0))
 
     let resolveOld: ((value: unknown) => void) | undefined

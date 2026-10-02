@@ -1,9 +1,21 @@
 import { jstNow } from './utils.js';
+import { recordMenuVersion } from './menu-versions.js';
 
 export type BookingInterval = { start: string; end: string; capacity?: number };
 export type BookingExceptionKind = 'closed' | 'custom_hours' | 'open';
 export type BookingExceptionScope = 'store' | 'staff' | 'resource';
 export type BookingPriceMode = 'fixed' | 'free' | 'inquiry';
+
+/** LIFF 予約「日時を選ぶ」段の最初の形。'list' がいまの形（既定）。 */
+export type LiffDateView = 'list' | 'calendar';
+
+/**
+ * 読み出し用。migration 前の行（列が無い）や壊れた値は
+ * いまの形 'list' に倒す。保存時の拒否は Worker の検証が行う。
+ */
+export function normalizeLiffDateView(value: unknown): LiffDateView {
+  return value === 'calendar' ? 'calendar' : 'list';
+}
 
 export interface BookingAvailabilityExceptionRow {
   id: string;
@@ -50,6 +62,8 @@ export interface BookingAdminSettings {
   approvalMode: 'automatic' | 'manual';
   holdMinutes: number;
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
+  /** LIFF 予約「日時を選ぶ」段の最初の形。migration 前の行も 'list'。 */
+  liffDateView: LiffDateView;
   /** 前日お知らせの送信時刻（店舗タイムゾーンの壁時刻）。null は予約24時間前。 */
   reminderDayBeforeTime: string | null;
   /** 当日お知らせを開始の何時間前に送るか。未設定の店舗は既定値。 */
@@ -74,6 +88,11 @@ export interface BookingAdminSettingsInput {
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
   reminderDayBeforeTime: string | null;
   reminderHoursBefore: number | null;
+  /**
+   * LIFF 予約「日時を選ぶ」段の最初の形。省いたときは今の値を保つ
+   * （初回作成だけ 'list'）。営業時間の保存で黙って戻さないため。
+   */
+  liffDateView?: LiffDateView;
   businessHours?: Array<{ weekday: number; intervals: BookingInterval[] }>;
 }
 
@@ -169,6 +188,7 @@ export async function getBookingAdminSettings(
         slot_granularity_minutes: 5 | 10 | 15 | 30 | 60;
         reminder_day_before_time: string | null;
         reminder_hours_before: number | null;
+        liff_date_view?: string | null;
         business_hours_configured: number;
         version: number;
         updated_at: string;
@@ -222,6 +242,7 @@ export async function getBookingAdminSettings(
     reminderHoursBefore: Number(
       setting?.reminder_hours_before ?? DEFAULT_SETTINGS.reminderHoursBefore,
     ),
+    liffDateView: normalizeLiffDateView(setting?.liff_date_view),
     menuCount,
     activeMenuCount,
     inactiveMenuCount: Math.max(0, menuCount - activeMenuCount),
@@ -259,9 +280,10 @@ export async function saveBookingAdminSettings(
       (id, line_account_id, timezone, booking_window_days, cutoff_minutes_before,
        cancel_deadline_minutes_before, max_active_bookings_per_friend,
        approval_mode, hold_minutes, slot_granularity_minutes,
-       reminder_day_before_time, reminder_hours_before, business_hours_configured,
+       reminder_day_before_time, reminder_hours_before, liff_date_view,
+       business_hours_configured,
        created_at, updated_at)
-      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       FROM line_accounts
       WHERE id = ?
       ON CONFLICT(line_account_id) DO NOTHING`)
@@ -277,6 +299,7 @@ export async function saveBookingAdminSettings(
         input.slotGranularityMinutes,
         input.reminderDayBeforeTime,
         input.reminderHoursBefore,
+        input.liffDateView ?? 'list',
         input.businessHours === undefined ? 0 : 1,
         now,
         now,
@@ -326,6 +349,7 @@ export async function saveBookingAdminSettings(
           cancel_deadline_minutes_before = ?, max_active_bookings_per_friend = ?,
           approval_mode = ?, hold_minutes = ?, slot_granularity_minutes = ?,
           reminder_day_before_time = ?, reminder_hours_before = ?,
+          liff_date_view = COALESCE(?, liff_date_view),
           business_hours_configured = 1, version = version + 1, updated_at = ?
       WHERE line_account_id = ? AND version = ?`)
       .bind(
@@ -339,6 +363,7 @@ export async function saveBookingAdminSettings(
         input.slotGranularityMinutes,
         input.reminderDayBeforeTime,
         input.reminderHoursBefore,
+        input.liffDateView ?? null,
         now,
         input.lineAccountId,
         input.expectedVersion,
@@ -351,6 +376,7 @@ export async function saveBookingAdminSettings(
           cancel_deadline_minutes_before = ?, max_active_bookings_per_friend = ?,
           approval_mode = ?, hold_minutes = ?, slot_granularity_minutes = ?,
           reminder_day_before_time = ?, reminder_hours_before = ?,
+          liff_date_view = COALESCE(?, liff_date_view),
           version = version + 1, updated_at = ?
       WHERE line_account_id = ? AND version = ?`)
       .bind(
@@ -364,6 +390,7 @@ export async function saveBookingAdminSettings(
         input.slotGranularityMinutes,
         input.reminderDayBeforeTime,
         input.reminderHoursBefore,
+        input.liffDateView ?? null,
         now,
         input.lineAccountId,
         input.expectedVersion,
@@ -649,6 +676,8 @@ export async function updateBookingMenuSettings(
     cancelDeadlineHoursBefore?: number | null;
     /** 公開切替だけ変えるときに使う。送らなければ今のまま。 */
     isActive?: boolean;
+    /** 版に残す「誰が」。無ければ空で残す。 */
+    staffId?: string | null;
   },
 ): Promise<
   | { status: 'updated'; version: number }
@@ -683,6 +712,8 @@ export async function updateBookingMenuSettings(
     .bind(...values)
     .run();
   if ((result.meta.changes ?? 0) > 0) {
+    // 保存するたびに版を1つ足す（T）。前の版は変えない。
+    await recordMenuVersion(db, { menuId: input.id, staffId: input.staffId ?? null });
     return { status: 'updated', version: input.expectedVersion + 1 };
   }
   const current = await db.prepare(`SELECT version FROM menus

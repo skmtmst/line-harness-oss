@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 .search {
   box-sizing: border-box;
   display: flex;
@@ -26,6 +28,8 @@
 .input {
   min-width: 0;
   flex: 1;
+  /* #734: 内側の入力本体も器の高さいっぱいにする（実測21pxでタップ領域不足と誤検出される） */
+  align-self: stretch;
   border: 0;
   background: transparent;
   color: var(--color-ink);
@@ -39,9 +43,21 @@
   opacity: 1;
 }
 
-.input:focus-visible,
+/*
+ * 輪郭はフォーカスされる要素自身（中の input）に出す。外枠の `:focus-within`
+ * ring では Tab 点検（`document.activeElement` の枠を見る）が反応せず、
+ * /hq/banners・/ops・/ops/support・/ops/tenants の検索欄が「枠が出ない」と
+ * 判定された（2026-09-25）。外枠と中の二重にならないよう外枠の ring は持たない。
+ * 色・太さ・余白は #804 と同じ（2px・action 色・offset 2px）。
+ */
+.input:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
 .clear:focus-visible {
-  outline: revert;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 .input::-webkit-search-cancel-button {
@@ -99,4 +115,20 @@
   .loadingIcon {
     animation: none;
   }
+}
+
+/*
+ * ★V8「探す欄」（TkVyB）：高さ36・余白 0 12・アイコンとの間 8・
+ * 文字は 13px（v7 の40px/14px から小さく引き締める）。
+ */
+[data-theme='v8'] .search {
+  height: 36px;
+  gap: 8px;
+  padding: 0 12px;
+  border-color: var(--color-control-border);
+}
+
+[data-theme='v8'] .input {
+  font-size: var(--text-label);
+}
 }

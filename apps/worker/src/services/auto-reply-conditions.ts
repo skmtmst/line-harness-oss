@@ -1,6 +1,31 @@
-import { isJapaneseHoliday, toJstParts, type HolidayRule } from '@line-crm/shared';
+import { toJstParts, type HolidayRule } from '@line-crm/shared';
 import { hasAutoReplyHitForFriend } from '@line-crm/db';
+import { holidaysOfYear } from './jp-holidays.js';
 import { matchesCondition, parseCondition } from './segment-query.js';
+
+/**
+ * 祝日かどうか（R253）。
+ *
+ * 共有の祝日表（`packages/shared`・年ごとに手で足す形）は2026年までで、
+ * 2027年の元日を誤判定する。ここでは祝日法の規則を計算で再現する
+ * `jp-holidays.ts`（2000〜2099年・内閣府の公開表と照合済み）を使う。
+ * 年を手で足す運用をやめ、範囲の外は祝日ではない日として扱ったうえで
+ * 警告を出す（黙って誤判定しないための保険は残す）。
+ */
+const HOLIDAY_YEAR_MIN = 2000;
+const HOLIDAY_YEAR_MAX = 2099;
+
+function isHolidayOn(isoDate: string): boolean {
+  const year = Number(isoDate.slice(0, 4));
+  if (!Number.isInteger(year) || year < HOLIDAY_YEAR_MIN || year > HOLIDAY_YEAR_MAX) {
+    console.warn(
+      `[auto-reply] 祝日の計算に対応していない年です。祝日ではない日として扱いました。` +
+        `表の更新が必要です（対応: ${HOLIDAY_YEAR_MIN}〜${HOLIDAY_YEAR_MAX}年）。 date=${isoDate}`,
+    );
+    return false;
+  }
+  return holidaysOfYear(year).some((holiday) => holiday.date === isoDate);
+}
 
 /**
  * 自動応答を「返すかどうか」の判定。
@@ -103,7 +128,7 @@ export function isOnRespondingDay(
   const { date, weekday } = toJstParts(target);
   const weekdayOk = weekdays.length === 0 || weekdays.includes(weekday);
   if (holidayRule === 'ignore') return weekdayOk;
-  const holiday = isJapaneseHoliday(date);
+  const holiday = isHolidayOn(date);
   if (holidayRule === 'include') return weekdayOk || holiday;
   return weekdayOk && !holiday;
 }

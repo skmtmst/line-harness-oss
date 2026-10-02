@@ -7,16 +7,28 @@ import { ApiError } from '@/lib/api'
 /**
  * 運営コンソール（★V6 37）だけで使う小さな部品と表記の決まり。
  *
- * 札は共通の `Chip`、数値カードは共通の `SummaryCard`、表は共通の `DataTable`
+ * 札は共通の `Chip`、数値カードは共通の `KpiCard`、表は共通の `DataTable`
  * を使う。ここには「状態をどの札で出すか」と「日付・プランの表記」だけを置く。
  */
 
-export function tenantStatusChip(status: string, planStatus?: string): ReactNode {
-  if (status === 'suspended') return <Chip tone="danger">停止</Chip>
-  if (status === 'archived') return <Chip tone="neutral">解約</Chip>
-  if (planStatus === 'trialing') return <Chip tone="warn">トライアル</Chip>
-  if (planStatus === 'past_due') return <Chip tone="danger">決済失敗</Chip>
-  return <Chip tone="ok">契約中</Chip>
+/*
+ * 契約先は「アカウントの利用状態」（status）と「請求の状態」（plan_status）の
+ * 2軸で見る。1枚の札にまとめると、請求が解約済みでも一覧は「契約中」になり、
+ * 詳細の「契約の状況」と矛盾して件数も画面ごとにずれる（監査 R153）。
+ */
+export function tenantUseStatusChip(status: string): ReactNode {
+  if (status === 'suspended') return <Chip tone="danger">利用停止</Chip>
+  if (status === 'archived') return <Chip tone="neutral">解約済み</Chip>
+  return <Chip tone="ok">利用中</Chip>
+}
+
+export function planStatusChip(planStatus: string): ReactNode {
+  const tone: ChipTone =
+    planStatus === 'active' ? 'ok'
+    : planStatus === 'trialing' ? 'info'
+    : planStatus === 'past_due' ? 'danger'
+    : 'neutral'
+  return <Chip tone={tone}>{PLAN_STATUS_LABEL[planStatus] ?? planStatus}</Chip>
 }
 
 export const PLAN_LABEL: Record<string, string> = { light: 'ライト', standard: 'スタンダード', pro: 'プロ' }
@@ -31,17 +43,29 @@ export const PLAN_STATUS_LABEL: Record<string, string> = {
   trialing: 'トライアル中',
   active: '契約中',
   past_due: '決済失敗',
-  canceled: '解約',
+  canceled: '請求解約',
 }
 
 export const ROLE_LABEL: Record<string, string> = { owner: 'オーナー', admin: '管理者', staff: '担当者' }
 
+const JST_DATETIME = new Intl.DateTimeFormat('ja-JP', {
+  timeZone: 'Asia/Tokyo',
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+})
+
+/*
+ * 運営コンソールの日時はすべて日本時間で出す。端末のタイムゾーンに従うと、
+ * スタッフ画面（Asia/Tokyo 固定）や監査ログと同じ記録が別の時刻に見えて
+ * 照合を誤る（監査 R160）。
+ */
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—'
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return value
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const parts = JST_DATETIME.formatToParts(d)
+  const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${pick('year')}-${pick('month')}-${pick('day')} ${pick('hour')}:${pick('minute')}`
 }
 
 export function formatDate(value: string | null | undefined): string {
@@ -57,6 +81,7 @@ export const AUDIT_ACTION_LABEL: Record<string, { label: string; tone: ChipTone 
   'impersonation.end': { label: '代理ログインを終了', tone: 'neutral' },
   'pii.reveal': { label: '個人情報を表示', tone: 'danger' },
   'ticket.view': { label: 'チケットを閲覧', tone: 'neutral' },
+  'billing.sync': { label: 'Stripe請求書を同期', tone: 'info' },
   'member.invite': { label: '運営メンバーを追加', tone: 'info' },
   'member.deactivate': { label: '運営メンバーを停止', tone: 'warn' },
   'member.activate': { label: '運営メンバーを再開', tone: 'info' },
@@ -88,7 +113,7 @@ export function opsErrorMessage(error: ApiError): string {
   if (error.status === 403) return 'この操作をする権限がありません'
   if (error.status === 404) return '対象が見つかりません。画面を読み直してください'
   if (error.status >= 500) return 'サーバーでエラーが起きました。少し待ってからもう一度お試しください'
-  return '処理に失敗しました'
+  return '処理に失敗しました。通信を確かめて、もう一度お試しください。'
 }
 
 export async function opsCall<T>(call: Promise<T>): Promise<T | { success: false; error: string }> {
@@ -97,6 +122,6 @@ export async function opsCall<T>(call: Promise<T>): Promise<T | { success: false
   } catch (error) {
     if (error instanceof ApiError) return { success: false, error: opsErrorMessage(error) }
     if (error instanceof TypeError) return { success: false, error: '通信できませんでした。ネットワークを確認してもう一度お試しください' }
-    return { success: false, error: error instanceof Error && error.message ? error.message : '処理に失敗しました' }
+    return { success: false, error: error instanceof Error && error.message ? error.message : '処理に失敗しました。通信を確かめて、もう一度お試しください。' }
   }
 }

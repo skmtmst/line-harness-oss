@@ -1,3 +1,5 @@
+import { dbTableExists } from './utils.js';
+
 export type AffiliateLifecycle = 'active' | 'paused' | 'archived';
 
 export interface AffiliateArchiveImpact {
@@ -87,9 +89,27 @@ export async function ensureConversionRewardSnapshot(
   eventId: string,
   now = new Date().toISOString(),
 ): Promise<AffiliateRewardCalculation | null> {
+  // 付けた時点の版があれば、その版の決まりを優先する(#823)。
+  // 版の表が無い古いスキーマ（最小構成の単体試験など）では、
+  // 従来どおり今の案件の値を使う。
+  const hasVersionTables = (await dbTableExists(db, 'affiliate_offer_versions'))
+    && (await dbTableExists(db, 'affiliate_attribution_decisions'));
+  const fixedRewardSelect = hasVersionTables
+    ? 'COALESCE(ov.reward_amount, off.reward_amount) AS fixed_reward'
+    : 'off.reward_amount AS fixed_reward';
+  const versionJoins = hasVersionTables
+    ? `LEFT JOIN affiliate_attribution_decisions dad
+         ON dad.conversion_event_id = ce.id
+       LEFT JOIN affiliate_offer_versions ov ON ov.id = dad.offer_version_id`
+    : '';
   const row = await db.prepare(
     `SELECT ce.id AS conversion_event_id,
             ce.value_snapshot AS value_snapshot,
+            ce.approval_formula AS frozen_formula,
+            ce.approval_commission_rate AS frozen_rate,
+            ce.approval_base_amount AS frozen_base,
+            ce.approval_fixed_reward AS frozen_fixed,
+            ce.approval_amount_minor AS frozen_amount,
             a.id AS affiliate_id,
             a.name AS affiliate_name,
             a.code AS affiliate_code,
@@ -103,7 +123,7 @@ export async function ensureConversionRewardSnapshot(
             off.line_account_id AS offer_account_id,
             off.id AS offer_id,
             COALESCE(off.name, ce.point_name_snapshot, cp.name, '') AS offer_name,
-            off.reward_amount AS fixed_reward
+            ${fixedRewardSelect}
        FROM conversion_events ce
        JOIN affiliates a ON a.id = ce.affiliate_id
        JOIN friends f ON f.id = ce.friend_id
@@ -112,12 +132,18 @@ export async function ensureConversionRewardSnapshot(
          ON al.ref_code = ce.attributed_ref_code
         AND al.affiliate_id = a.id
        LEFT JOIN affiliate_offers off ON off.id = al.offer_id
+       ${versionJoins}
       WHERE ce.id = ?
         AND ce.affiliate_id IS NOT NULL
         AND COALESCE(ce.approval_status, 'pending') = 'approved'`,
   ).bind(eventId).first<{
     conversion_event_id: string;
     value_snapshot: number | null;
+    frozen_formula: string | null;
+    frozen_rate: number | null;
+    frozen_base: number | null;
+    frozen_fixed: number | null;
+    frozen_amount: number | null;
     affiliate_id: string;
     affiliate_name: string;
     affiliate_code: string;
@@ -179,10 +205,27 @@ export async function ensureConversionRewardSnapshot(
   ).bind(eventId).first<{ 1: number }>();
   if (settled) return null;
 
-  const rate = row.commission_rate === null ? 0 : Number(row.commission_rate);
-  const formula: AffiliateRewardFormula = rate > 0 ? 'rate' : 'fixed';
-  const baseAmount = formula === 'rate' ? Number(row.value_snapshot ?? row.point_value ?? 0) : null;
-  const fixedReward = formula === 'fixed' ? Math.round(Number(row.fixed_reward ?? 0)) : null;
+  // m22u R356・R357: 承認時に凍結した入力があれば、現在の設定ではなく
+  // 凍結値を優先する(承認後の設定変更で過去の承認額が動かない)。
+  const frozenFormula = row.frozen_formula === 'rate' || row.frozen_formula === 'fixed'
+    ? row.frozen_formula
+    : null;
+  const liveRate = row.commission_rate === null ? 0 : Number(row.commission_rate);
+  const liveFormula: AffiliateRewardFormula = liveRate > 0 ? 'rate' : 'fixed';
+  const formula: AffiliateRewardFormula = frozenFormula ?? liveFormula;
+  const rate = formula === 'rate'
+    ? (row.frozen_rate === null || row.frozen_rate === undefined ? liveRate : Number(row.frozen_rate))
+    : 0;
+  const baseAmount = formula === 'rate'
+    ? (row.frozen_base === null || row.frozen_base === undefined
+      ? Number(row.value_snapshot ?? row.point_value ?? 0)
+      : Number(row.frozen_base))
+    : null;
+  const fixedReward = formula === 'fixed'
+    ? (row.frozen_fixed === null || row.frozen_fixed === undefined
+      ? Math.round(Number(row.fixed_reward ?? 0))
+      : Math.round(Number(row.frozen_fixed)))
+    : null;
   const amount = formula === 'rate'
     ? Math.round(baseAmount! * rate / 100)
     : fixedReward!;
@@ -319,6 +362,47 @@ export async function reverseSettledRewardOnRejection(
   };
 }
 
+/**
+ * m22u R358：締め済みの成果を却下→再承認したときの復活。
+ *
+ * 締めは成果ごとに確定(credit)を1件しか持てない（UNIQUE のため再承認で
+ * 新しい確定は作れない）。そのため再承認では、却下で reversed にした確定を
+ * settled へ戻し、締めの記録（settlement-1 の明細）をそのまま生かす。
+ * 却下で起こした相殺(debit)は行として残すが、有効な確定が戻った分は
+ * 未適用の取り立てから外す（affiliate-payouts 側の判定で見る）。
+ *
+ * 書込みは fence 付き：いま承認中で、取り消し済みの確定と相殺の組がある
+ * ときだけ戻す。再送では確定が有効のため 0 行で終わる（調整は1回）。
+ */
+export async function restoreSettledRewardOnReapproval(
+  db: D1Database,
+  eventId: string,
+): Promise<string | null> {
+  const result = await db.prepare(
+    `UPDATE affiliate_reward_entries
+        SET status = 'settled'
+      WHERE conversion_event_id = ?
+        AND entry_type = 'credit'
+        AND status = 'reversed'
+        AND EXISTS (
+          SELECT 1 FROM affiliate_reward_entries d
+           WHERE d.conversion_event_id = affiliate_reward_entries.conversion_event_id
+             AND d.entry_type = 'debit'
+        )
+        AND EXISTS (
+          SELECT 1 FROM conversion_events ce
+           WHERE ce.id = affiliate_reward_entries.conversion_event_id
+             AND COALESCE(ce.approval_status, 'pending') = 'approved'
+        )`,
+  ).bind(eventId).run();
+  if ((result.meta?.changes ?? 0) === 0) return null;
+  const restored = await db.prepare(
+    `SELECT id FROM affiliate_reward_entries
+      WHERE conversion_event_id = ? AND entry_type = 'credit' AND status = 'settled'`,
+  ).bind(eventId).first<{ id: string }>();
+  return restored?.id ?? null;
+}
+
 interface SettlementPreviewInternal extends AffiliateSettlementPreview {
   entries: SettlementEntry[];
 }
@@ -358,6 +442,18 @@ export function settlementWriteStatements(
     settlementId: string;
     targets: SettlementWriteTarget[];
     now: string;
+    /**
+     * R288: 全体締めが同時に付ける取消(entry_id 参照)の消費行。
+     * 別締めに先取りされて1行でも欠けたら、報酬行もろとも巻き戻す。
+     * 個別締めは渡さない(従来どおり報酬行だけを見る)。
+     */
+    expectedDebitEntryIds?: string[];
+    /**
+     * R288: 取り込む取消行。巻き戻し文より先に積むため、ここで受け取る。
+     * amount は負数(差し引き)。書込みは条件付きで、別締めが先に同じ
+     * 取消を付けていたら0行になる(entry_id の UNIQUE との二重構え)。
+     */
+    debitLines?: Array<{ debitId: string; affiliateId: string; amount: number }>;
   },
 ): D1PreparedStatement[] {
   const entryKeyPrefix = `settlement:${input.settlementId}:`;
@@ -417,19 +513,43 @@ export function settlementWriteStatements(
     );
   }
 
+  // R288: 取消の消費行は報酬行の直後・巻き戻し文より先に積む。
+  // 順序が逆だと巻き戻しがまだ無い行を数えて締めごと消してしまう。
+  for (const line of input.debitLines ?? []) {
+    statements.push(db.prepare(
+      `INSERT INTO affiliate_settlement_lines
+         (id, settlement_id, affiliate_id, entry_id, amount_minor, status, created_at)
+       SELECT ?, ?, ?, ?, ?, 'included', ?
+        WHERE NOT EXISTS (
+          SELECT 1 FROM affiliate_settlement_lines slx WHERE slx.entry_id = ?
+        )`,
+    ).bind(crypto.randomUUID(), input.settlementId, line.affiliateId, line.debitId, line.amount, input.now, line.debitId));
+  }
+
   // 巻き戻しの3文。fenceを通らなかった対象が1件でもあれば、この確定で
   // 書いた明細行 → credit → header の順に消す(子から先に消してFKを壊さない)。
   // 述語はいずれも「自分が消す表」を数えないため、途中経過に左右されない。
+  // R288: 取消の消費行も数える。別締めに先取りされて欠けたら、
+  // 報酬行が全部書けていても締めごと消す(部分適用は残らない)。
   const writtenEntries =
     `(SELECT COUNT(*) FROM affiliate_reward_entries re
        WHERE substr(re.idempotency_key, 1, ?) = ?)`;
+  const debitIds = input.expectedDebitEntryIds ?? [];
+  const writtenDebits = debitIds.length > 0
+    ? ` OR (SELECT COUNT(*) FROM affiliate_settlement_lines sl2
+             WHERE sl2.settlement_id = ?
+               AND sl2.entry_id IN (${debitIds.map(() => '?').join(',')})) <> ?`
+    : '';
   const noLinesLeft =
     `NOT EXISTS (SELECT 1 FROM affiliate_settlement_lines sl WHERE sl.settlement_id = ?)`;
   statements.push(
     db.prepare(
       `DELETE FROM affiliate_settlement_lines
-        WHERE settlement_id = ? AND ${writtenEntries} <> ?`,
-    ).bind(input.settlementId, entryKeyPrefix.length, entryKeyPrefix, input.targets.length),
+        WHERE settlement_id = ? AND (${writtenEntries} <> ?${writtenDebits})`,
+    ).bind(
+      input.settlementId, entryKeyPrefix.length, entryKeyPrefix, input.targets.length,
+      ...(debitIds.length > 0 ? [input.settlementId, ...debitIds, debitIds.length] : []),
+    ),
     db.prepare(
       `DELETE FROM affiliate_reward_entries
         WHERE substr(idempotency_key, 1, ?) = ? AND ${noLinesLeft}`,

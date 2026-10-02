@@ -238,3 +238,60 @@ describe('V6 保存タブの定期レポート', () => {
     }
   })
 })
+
+const SAVED_ITEM_2 = {
+  ...SAVED_ITEM,
+  id: 'saved-2', name: '曜日別の推移', snapshotCount: 0, latestSnapshot: null,
+}
+
+/** 2件ある状態に差し替える。 */
+function twoItemsHandler(path: string, init?: RequestInit) {
+  if (path === '/api/staff/me') return Promise.resolve({ success: true, data: { role: fixture.role } })
+  if (path.startsWith('/api/analytics/saved/saved-1/snapshots')) return Promise.resolve({ success: true, data: [] })
+  if (path.startsWith('/api/analytics/saved/saved-2/snapshots')) return Promise.resolve({ success: true, data: [] })
+  if (path.startsWith('/api/analytics/saved')) return Promise.resolve({ success: true, data: [SAVED_ITEM, SAVED_ITEM_2] })
+  return defaultHandler(path, init)
+}
+
+async function typeSearch(text: string) {
+  const input = host.querySelector('#saved-analysis-search') as HTMLInputElement
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  await act(async () => {
+    setter.call(input, text)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+
+describe('監査 R226 保存済み分析の絞り込み', () => {
+  it('0件の検索は「条件に合う〜」を出し、見えない分析の履歴を引きずらない', async () => {
+    net.handler = twoItemsHandler
+    await render()
+    // 初期は先頭（流入別の成果）が選ばれ、履歴欄に名前が出る
+    expect(host.textContent).toContain('流入別の成果 ／ 定期レポート')
+
+    await typeSearch('存在しない言葉')
+    expect(host.textContent).toContain('条件に合う保存済み分析はありません')
+    // 一覧は空だが「まだありません」（保存ゼロ）にはならない
+    expect(host.textContent).not.toContain('保存した分析はまだありません')
+    // 条件に合わない分析の履歴は見せ続けない
+    expect(host.textContent).not.toContain('流入別の成果 ／ 定期レポート')
+    expect(host.textContent).toContain('一覧から分析を選んでください')
+
+    // 「キャンセル」で元の一覧へ戻り、先頭が選び直されて履歴も戻る
+    await act(async () => { button('キャンセル').click() })
+    expect(host.textContent).toContain('流入別の成果 ／ 定期レポート')
+    expect(host.textContent).toContain('曜日別の推移')
+  })
+
+  it('絞り込みで選んだ項目が見えなくなったら、見えている先頭へ選び直す', async () => {
+    net.handler = twoItemsHandler
+    await render()
+    expect(host.textContent).toContain('流入別の成果 ／ 定期レポート')
+
+    await typeSearch('曜日')
+    // 一覧から「流入別の成果」の行が消え、「曜日別の推移」だけ残る
+    expect(host.textContent).toContain('曜日別の推移')
+    expect(host.textContent).toContain('曜日別の推移 ／ 定期レポート')
+    expect(net.calls.some((call) => call.path.startsWith('/api/analytics/saved/saved-2/snapshots'))).toBe(true)
+  })
+})

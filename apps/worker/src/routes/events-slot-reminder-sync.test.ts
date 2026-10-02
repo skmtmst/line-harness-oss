@@ -101,7 +101,7 @@ async function putSlot(app: Hono<Env>, env: { DB: D1Database }) {
   return app.request('/api/events/admin/events/ev-1/slots/slot-1?account_id=account-1', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ starts_at: NEW_STARTS_AT, ends_at: NEW_ENDS_AT }),
+    body: JSON.stringify({ starts_at: NEW_STARTS_AT, ends_at: NEW_ENDS_AT, expected_version: 1 }),
   }, env);
 }
 

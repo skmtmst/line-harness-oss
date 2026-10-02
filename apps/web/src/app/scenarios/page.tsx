@@ -5,27 +5,38 @@ import { useRouter } from 'next/navigation'
 import type { Scenario } from '@line-crm/shared'
 import { api, type ScenarioRuns, type ScenarioSimulation } from '@/lib/api'
 import { useOffsetServerList } from '@/lib/use-server-list'
+import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 
 function scenarioCompletionDetail(active: number, completed: number): string {
   const enrolled = active + completed
   if (enrolled === 0) return '—'
   const rate = Math.round((completed / enrolled) * 100)
-  return `登録合計 ${enrolled.toLocaleString('ja-JP')}人のうち ${rate}%`
+  return `登録合計 ${formatNumber(enrolled)}人のうち ${rate}%`
 }
 import type { Folder } from '@line-crm/shared'
+import FilterChip from '@/components/shared/filter-chip'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
+import { RefreshCover } from '@/components/shared/refresh-cover'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
+import Notice from '@/components/shared/notice'
 import ScenarioList from '@/components/scenarios/scenario-list'
 import { ON_COMPLETE_LABEL, type OnCompleteMode } from '@/components/scenarios/scenario-dialogs'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import type { ScenarioTriggerItem } from '@/lib/api'
 import { startChecklist } from './start-checklist'
+import { formatNumber } from '@/lib/format'
 
 type ScenarioWithCount = Scenario & {
   stepCount?: number
@@ -62,6 +73,8 @@ function StartScenarioDialog({
 }) {
   const { selectedAccountId, accounts } = useAccount()
   const lineAccountId = scenario.lineAccountId ?? selectedAccountId
+  // 開始の実行中は×と同じくEscapeでも閉じない。
+  const panelRef = useOverlayFocus(true, onCancel, busy)
   const [simulation, setSimulation] = useState<ScenarioSimulation | null>(null)
   const [runs, setRuns] = useState<ScenarioRuns | null>(null)
   /*
@@ -199,7 +212,7 @@ function StartScenarioDialog({
           ? '送信数の上限はありません'
           : runs.quota.remaining === null
             ? runs.quota.reason ?? '送信枠を取得できませんでした'
-            : `残り${runs.quota.remaining.toLocaleString('ja-JP')}通です`,
+            : `残り${formatNumber(runs.quota.remaining)}通です`,
       }
     }
     return item
@@ -224,11 +237,16 @@ function StartScenarioDialog({
         : triggers
             .map((t) => describeStartTrigger(t, t.tagId ? tagNameById[t.tagId] ?? null : null))
             .join('、')
+  /*
+   * R250: 移動先が空の「次のシナリオへ移動」は保存できない設定。
+   * 取得の失敗と、選ばれていないこととを書き分ける。
+   */
+  const moveTargetSummary = !scenario.onCompleteScenarioId
+    ? '（移動先が選ばれていません）'
+    : `（${moveTargetName ?? (preflightLoading ? '確認中…' : '移動先を取得できませんでした')}）`
   const completeSummary =
     ON_COMPLETE_LABEL[completeMode] +
-    (completeMode === 'move'
-      ? `（${moveTargetName ?? (preflightLoading ? '確認中…' : '移動先を取得できませんでした')}）`
-      : '') +
+    (completeMode === 'move' ? moveTargetSummary : '') +
     (completeActionCount === null
       ? ''
       : completeActionCount > 0
@@ -237,7 +255,7 @@ function StartScenarioDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }} role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
-      <div className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-xl" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
+      <div ref={panelRef} className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-float" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
         <div className="border-hairline flex items-start justify-between gap-4 border-b px-6 py-5">
           <div>
             <h2 id="start-scenario-title" className="text-ink text-xl font-bold">
@@ -254,7 +272,7 @@ function StartScenarioDialog({
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between gap-4"><dt className="text-ink-faint">シナリオ</dt><dd className="text-ink text-right font-medium">{scenario.name}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">LINEアカウント</dt><dd className="text-ink text-right font-medium">{accountLabel}</dd></div>
-              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `予約中 ${formatNumber(simulation.audience.newStartPlanned)}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始のきっかけ</dt><dd className="text-ink text-right font-medium">{triggerSummary}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">配信ステップ</dt><dd className="text-ink text-right font-medium">{simulation ? `${simulation.steps.length}通` : scenario.stepCount === undefined ? '—通' : `${scenario.stepCount}通`}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">終了後</dt><dd className="text-ink text-right font-medium">{completeSummary}</dd></div>
@@ -279,7 +297,7 @@ function StartScenarioDialog({
               ) : null}
               {checks.map((item) => (
                 <li key={item.label} className="flex items-start gap-3">
-                  <span aria-hidden className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${item.state === 'ok' ? 'bg-success-bg text-success' : item.state === 'warn' ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>
+                  <span aria-hidden className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-pill text-xs font-medium ${item.state === 'ok' ? 'bg-success-bg text-success' : item.state === 'warn' ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>
                     {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
                   </span>
                   <span><span className="text-ink block font-medium">{item.label}</span><span className="text-ink-faint block text-xs">{item.detail}</span></span>
@@ -289,15 +307,15 @@ function StartScenarioDialog({
           </section>
         </div>
 
-        <div className="bg-warning-bg mx-6 mb-5 rounded-card px-5 py-4">
-          <p className="text-warning text-sm font-bold">開始後に起きること</p>
-          <ul className="text-ink-secondary mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・配信中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
-        </div>
-        <label className={`mx-6 mb-4 flex items-center gap-2 text-sm font-medium ${preflightLoading ? 'opacity-60' : ''}`}><input type="checkbox" checked={confirmed} disabled={preflightState !== 'ready'} onChange={(event) => setConfirmed(event.target.checked)} />対象人数・内容・送信枠を確認しました</label>
-        {error ? <p className="bg-danger-bg text-danger mx-6 mb-4 rounded-card px-4 py-3 text-sm">{error}</p> : null}
+        <Notice tone="warn" className="mx-6 mb-5">
+          <p className="text-sm font-bold">開始後に起きること</p>
+          <ul className="mt-2 space-y-1 text-xs"><li>・条件に一致した{formatNumber(simulation?.audience.newStartPlanned) ?? '—'}人が購読を開始します</li><li>・稼働中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
+        </Notice>
+        <Checkbox checked={confirmed} disabled={preflightState !== 'ready'} onCheckedChange={setConfirmed} className="mx-6 mb-4">対象人数・内容・送信枠を確認しました</Checkbox>
+        {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
         <div className="border-hairline mt-auto flex justify-end gap-3 border-t px-6 py-4">
           <span className="text-ink-faint mr-auto self-center text-xs">開始後も、一覧からいつでも停止できます。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>
-          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed || preflightState !== 'ready'}>{busy ? '開始中…' : '配信を開始'}</Button>
+          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed || preflightState !== 'ready'} busy={busy} busyLabel="開始中…">配信を開始</Button>
         </div>
       </div>
     </div>
@@ -331,11 +349,10 @@ export default function ScenariosPage() {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   /*
    * SCENARIO-16: 案内帯の「配信を始める方法」。リンク風の見た目だけの
-   * span だったので、押すとその場で手順が開くボタンにする。
+   * span だったので、共通の開閉欄（Disclosure）でその場に手順を出す。
    * 開始条件の設定は各シナリオの詳細画面にあるため、ここでは
    * 「どこへ行って何を設定するか」を案内する。
    */
-  const [startGuideOpen, setStartGuideOpen] = useState(false)
   const [toggleTarget, setToggleTarget] = useState<ScenarioWithCount | null>(null)
   const [toggleBusy, setToggleBusy] = useState(false)
   const [toggleError, setToggleError] = useState('')
@@ -371,11 +388,15 @@ export default function ScenariosPage() {
    * 数えていたため「KPI12件・すべて11・未分類12」が混在していた。
    */
   const loadFolders = useCallback(async () => {
-    const accountId = selectedAccountId
-    const res = await api.folders.list('scenario', accountId ?? undefined)
-    if (activeAccountRef.current !== accountId) return
-    if (res.success) setFolders(res.data)
-    setUnfiledCount(res.success ? res.unfiledCount ?? null : null)
+    try {
+      const accountId = selectedAccountId
+      const res = await api.folders.list('scenario', accountId ?? undefined)
+      if (activeAccountRef.current !== accountId) return
+      if (res.success) setFolders(res.data)
+      setUnfiledCount(res.success ? res.unfiledCount ?? null : null)
+    } catch {
+      // m23m: 置き場が取れなくても一覧は出す。取れない失敗で画面を落とさない。
+    }
   }, [selectedAccountId])
 
   useEffect(() => {
@@ -403,7 +424,9 @@ export default function ScenariosPage() {
   }, [loadOverallTotal])
 
   useEffect(() => {
-    const timer = setTimeout(() => setServerQuery(nameQuery.trim()), 300)
+    // #625: サーバーへ送る語はここでも上限へ切り詰める（入力欄でも切るが、
+    // 値が別経路で入っても同じ長さにそろえる）。
+    const timer = setTimeout(() => setServerQuery(clampSearchQuery(nameQuery.trim())), 300)
     return () => clearTimeout(timer)
   }, [nameQuery])
 
@@ -448,6 +471,19 @@ export default function ScenariosPage() {
   const handleCreate = () => {
     router.push('/scenarios/mode')
   }
+
+  /**
+   * R173: 絞り込み0件の1枚から条件を外す。検索語（送信用の確定値も
+   * 含む）と3つの絞り込み・フォルダをまとめて戻す。
+   */
+  const clearScenarioFilters = () => {
+    setNameQuery('')
+    setServerQuery('')
+    setStoppedOnly(false)
+    setCreatedThisMonthOnly(false)
+    setFolderFilter('')
+  }
+  const scenarioFilterActive = Boolean(serverQuery || stoppedOnly || createdThisMonthOnly || folderFilter)
 
   /**
    * 掴んで入れ替えた並びを保存する。
@@ -623,34 +659,27 @@ export default function ScenariosPage() {
   }
 
   return (
-    <div>
-      <section data-design="Head" className="bg-success-bg text-success mb-4 rounded-card px-4 py-3 text-sm">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span aria-hidden>ⓘ</span>
-          <strong>作成しただけでは配信されません。開始条件を設定すると配信が始まります。</strong>
-          {/*
-            SCENARIO-16: 下線だけの span は押せない。ボタンにして、
-            その場で始め方の手順を開閉できるようにする。
-          */}
-          <button
-            type="button"
-            className="font-semibold underline underline-offset-2"
-            aria-expanded={startGuideOpen}
-            aria-controls="scenario-start-guide"
-            onClick={() => setStartGuideOpen((current) => !current)}
-          >
-            配信を始める方法
-          </button>
-        </div>
-        {startGuideOpen ? (
-          <ol id="scenario-start-guide" className="mt-2 list-decimal space-y-1 pl-8 text-sm">
-            <li>一覧からシナリオを開き、「開始のきっかけ」（友だち追加時・タグが付いたときなど）を設定します。</li>
-            <li>詳細画面の「テスト送信」で、実際の届き方を確認します。</li>
-            <li>この一覧に戻り、行の「その他 → 再開する」から配信を開始します。</li>
-          </ol>
-        ) : null}
-      </section>
-
+    <div className="flex flex-col gap-4">
+      {/*
+        m21p: 一覧の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの
+        mb/mt は付けない（一斉配信の一覧と同じ値・同じ形）。
+      */}
+      <Notice tone="info" data-design="Head">
+        作成しただけでは配信されません。開始条件を設定すると配信が始まります。
+      </Notice>
+      {/*
+        SCENARIO-16: 下線だけの span は押せない。3手順の説明は
+        開閉欄へ移し、帯は1〜2文だけにする。
+        m21p: ★V7 の順は「説明の開閉 → 数のカード → ＋作る → 一覧」。
+        開閉欄はここの1つだけにする（数のカードの下の2つ目は置かない）。
+      */}
+      <Disclosure size="compact" title="配信を始める方法" hint="3手順">
+        <ol className="list-decimal space-y-1 pl-5 text-sm">
+          <li>一覧からシナリオを開き、「開始のきっかけ」（友だち追加時・タグが付いたときなど）を設定します。</li>
+          <li>詳細画面の「テスト送信」で、実際の届き方を確認します。</li>
+          <li>この一覧に戻り、行の「その他 → 再開する」から配信を開始します。</li>
+        </ol>
+      </Disclosure>
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
       <div data-design="KPIs">
       <ListKpis
@@ -673,7 +702,7 @@ export default function ScenariosPage() {
               unit: '件',
               detail: `稼働中 ${s.scenarios.active}${sharedScenarioCount > 0 ? `・共通 ${sharedScenarioCount}件を含む` : ''}`,
             },
-            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '現在配信中・重複を含む' },
+            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '現在稼働中・重複を含む' },
             {
               title: '読了済',
               value: s.scenarios.completed,
@@ -740,16 +769,21 @@ export default function ScenariosPage() {
         </div>
       ) : null}
 
+      {/*
+        m21p: 作成ボタンは一覧本体の外へ出す。ボタンと下のフォルダの枠の
+        間は親の gap-4 で空ける（一斉配信の Head と同じ形）。Body の中に
+        置くと親の余白が効かず、枠にくっついて見える。
+      */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="primary"
+          onClick={handleCreate}
+        >
+          ＋ シナリオを作る
+        </Button>
+      </div>
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
-          onClick={handleCreate}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-        >
-          ＋ シナリオを作成
-        </button>
-      </div>
       {/*
         設計はフォルダを左の縦パネルに置く。シナリオはフォルダを持って
         いないので（列が無い）、いまは「すべて」だけ。分類できるように
@@ -771,64 +805,54 @@ export default function ScenariosPage() {
         </details>
         <div className="hidden lg:block">{folderPanel}</div>
 
-        <div>
-      <ListToolbar
-        searchPlaceholder="シナリオ名で検索"
-        searchValue={nameQuery}
-        onSearchChange={setNameQuery}
-      />
-
+        {/*
+          m21p: 一覧列の縦の間隔も親の gap-4 にそろえる。行ごとの
+          mb/mt は付けない（一斉配信の一覧列と同じ形）。
+        */}
+        <div className="flex flex-col gap-4">
       {/*
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み。
         よく使う絞り込み。数え方が決まっているのは「停止中のみ」だけ。
         離脱の大きさと作成月は、比べる相手を決める前に押せるようにすると、
         押した人ごとに違うものを想像する。
       */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs">よく使う</span>
-        <button
-          onClick={() => setStoppedOnly((v) => !v)}
-          className={`rounded-pill px-3 py-1 text-xs transition-colors ${
-            stoppedOnly
-              ? 'bg-accent-soft text-accent'
-              : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
-          }`}
-        >
-          停止中のみ
-        </button>
-        {[
-          {
-            label: '離脱が大きい',
-            disabled: true,
-            active: false,
-            title: '離脱率の比較基準が決まっていないため、まだ数えられません',
-            onClick: undefined,
-          },
-          {
-            label: '今月作成',
-            disabled: false,
-            active: createdThisMonthOnly,
-            title: undefined,
-            onClick: () => setCreatedThisMonthOnly((current) => !current),
-          },
-        ].map((filter) => (
-          <button
-            key={filter.label}
-            disabled={filter.disabled}
-            title={filter.title}
-            onClick={filter.onClick}
-            aria-pressed={filter.disabled ? undefined : filter.active}
-            className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
-              filter.disabled
-                ? 'border-hairline text-ink-faint opacity-50'
-                : filter.active
-                  ? 'border-accent-soft bg-accent-soft text-accent'
-                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-            }`}
-          >
-            {filter.label}
-          </button>
-        ))}
-      </div>
+      <ListToolbar
+        search={{
+          placeholder: 'シナリオ名で検索',
+          value: nameQuery,
+          // #625: 長い検索語は上限へ切り詰める。共有部品(ListToolbar)は
+          // 変えず、受け取る値をここで制限する。
+          onChange: (value) => setNameQuery(clampSearchQuery(value)),
+        }}
+        filters={
+          <>
+            <span className="text-ink-faint text-xs">よく使う絞り込み</span>
+            <FilterChip selected={stoppedOnly} onChange={(next) => setStoppedOnly(next)}>
+              停止中のみ
+            </FilterChip>
+            {[
+              /* ★V7：押せないまま置かれていた「離脱が大きい」は外した（比較の基準が決まるまで出さない）。 */
+              {
+                label: '今月作成',
+                disabled: false,
+                active: createdThisMonthOnly,
+                title: undefined,
+                onClick: () => setCreatedThisMonthOnly((current) => !current),
+              },
+            ].map((filter) => (
+              <FilterChip
+                key={filter.label}
+                selected={filter.disabled ? false : filter.active}
+                onChange={() => {
+                  if (!filter.disabled) filter.onClick()
+                }}
+              >
+                {filter.label}
+              </FilterChip>
+            ))}
+          </>
+        }
+      />
 
 
       {/*
@@ -837,15 +861,13 @@ export default function ScenariosPage() {
         絞り込んでいないときは一致＝全体なので、この行は出さない。
       */}
       {(serverQuery || stoppedOnly || createdThisMonthOnly || folderFilter) && scenarioList.loaded && (
-        <p className="text-ink-faint mb-3 text-xs tabular-nums">
-          条件に一致したシナリオ：{scenarioList.total.toLocaleString('ja-JP')}件
+        <p className="text-ink-faint text-xs tabular-nums">
+          条件に一致したシナリオ：{formatNumber(scenarioList.total)}件
         </p>
       )}
 
       {actionError && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {actionError}
-        </div>
+        <Notice tone="danger" message={actionError} />
       )}
 
       {scenarioList.loading && scenarios.length === 0 ? (
@@ -854,12 +876,22 @@ export default function ScenariosPage() {
         <ListState
           kind="error"
           title="表示できませんでした"
-          description="登録したシナリオは消えていません。再読み込みしても直らないときは、エラー報告へお知らせください。"
+          // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+          // それ以外は「登録したものは消えていない」と言い続ける。
+          description={isForbiddenOrRateLimited(scenarioList.error) ? undefined : '登録したシナリオは消えていません。再読み込みしても直らないときは、エラー報告へお知らせください。'}
+          error={scenarioList.error ?? undefined}
           onRetry={() => void loadScenarios()}
         />
       ) : (
+        /*
+         * 前の一覧を残したまま読み直す（★V7 sTJsh §2）。読み直し中は
+         * 行を消さず、表を薄めて上に 2px の線の帯を出す。
+         */
+        <RefreshCover refreshing={scenarioList.refreshing}>
         <ScenarioList
           scenarios={scenarios}
+          isFiltered={scenarioFilterActive}
+          onClearFilter={clearScenarioFilters}
           onReorder={handleReorder}
           folders={folders}
           onMoveFolders={handleMoveFolders}
@@ -867,18 +899,18 @@ export default function ScenariosPage() {
           onDelete={handleDelete}
           onCreate={() => void handleCreate()}
         />
-      )}
       {scenarioList.pageCount > 1 ? (
-        <div className="mt-4 flex items-center justify-end gap-3 text-sm">
-          <Button disabled={scenarioList.page <= 1 || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page - 1)}>
-            前へ
-          </Button>
-          <span className="text-ink-secondary">{scenarioList.page} / {scenarioList.pageCount}ページ</span>
-          <Button disabled={scenarioList.page >= scenarioList.pageCount || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page + 1)}>
-            次へ
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <ListRange
+            total={scenarioList.total}
+            first={(scenarioList.page - 1) * scenarioList.limit + 1}
+            last={Math.min(scenarioList.page * scenarioList.limit, scenarioList.total)}
+          />
+          <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} />
         </div>
       ) : null}
+        </RefreshCover>
+      )}
         </div>
       </div>
       </div>

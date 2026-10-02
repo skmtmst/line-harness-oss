@@ -28,6 +28,8 @@ describe('CHK-03 一斉配信の予約完了画面', () => {
 
   it('完了後に予約内容へ戻れる', () => {
     expect(PAGE).toContain('予約内容を確認')
-    expect(PAGE).toContain('/broadcasts?id=${encodeURIComponent(broadcast.id)}')
+    // 旧詳細（`/broadcasts?id=`）ではなく新しい詳細へ連れていく。
+    expect(PAGE).toContain('/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}')
+    expect(PAGE).not.toContain('`/broadcasts?id=${encodeURIComponent(broadcast.id)}`')
   })
 })

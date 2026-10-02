@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { dbTableExists, jstNow } from './utils.js';
 // =============================================================================
 // Affiliate Attribution — last-touch resolution (ASP)
 // =============================================================================
@@ -67,4 +67,393 @@ export async function resolveAffiliateAttribution(
     .bind(friendId, now, now)
     .first<{ affiliate_id: string; ref_code: string }>();
   return row ? { affiliateId: row.affiliate_id, refCode: row.ref_code } : null;
+}
+
+// =============================================================================
+// Attribution explanation — 成果の付け方の記録 (#823)
+// =============================================================================
+//
+// 候補になった紹介を並べ、どの決まりで誰に付けたかを1件ずつ説明する。
+// 付けなかった紹介には、その理由を残す。同じ成果に2人分は付けない
+// (affiliate_attribution_decisions.conversion_event_id が一意)。
+// 付け直しはこの行を書き換えず、理由付きの調整で足す。
+
+import {
+  getCurrentOfferVersion,
+  getOfferCapStatus,
+  OFFER_ATTRIBUTION_WINDOW_DEFAULT,
+} from './affiliate-offers.js';
+
+export type AttributionReason =
+  | 'matched_last_touch'
+  | 'no_touch'
+  | 'out_of_window'
+  | 'self_referral'
+  | 'inactive_link'
+  | 'inactive_affiliate'
+  | 'other_account'
+  | 'reception_closed'
+  | 'capped_total'
+  | 'capped_monthly';
+
+export type AttributionSkipReason = Exclude<AttributionReason, 'matched_last_touch' | 'no_touch'>;
+
+export interface AttributionCandidate {
+  affiliateId: string;
+  refCode: string;
+  touchedAt: string;
+  offerId: string | null;
+  /** 付けた候補か。 */
+  chosen: boolean;
+  /** 付けなかった理由。付けた候補は null。 */
+  skipReason: AttributionSkipReason | null;
+  windowDays: number;
+}
+
+export interface AttributionExplanation {
+  decision: {
+    affiliateId: string;
+    refCode: string;
+    offerId: string | null;
+    offerVersionId: string | null;
+  } | null;
+  reason: AttributionReason;
+  windowDays: number;
+  candidates: AttributionCandidate[];
+}
+
+export interface ExplainAttributionOptions {
+  /**
+   * この成果地点だけ期間を変える場合の日数。省略時は案件の版か全体の既定。
+   * 0 以下や整数でない値は無視する。
+   */
+  windowDays?: number;
+  /**
+   * 成果の所属(LINEアカウント)。指定時は、別アカウントの紹介者を
+   * 候補から外し、理由に残す。
+   */
+  lineAccountId?: string | null;
+}
+
+function asValidWindowDays(v: unknown): number | null {
+  return typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : null;
+}
+
+interface TouchRow {
+  ref_code: string;
+  touched_at: string;
+  affiliate_id: string;
+  offer_id: string | null;
+  link_active: number;
+  link_account: string | null;
+  aff_active: number;
+  aff_friend_id: string | null;
+  aff_account: string | null;
+}
+
+async function loadTouches(
+  db: D1Database,
+  friendId: string,
+  now: string,
+  full: boolean,
+): Promise<TouchRow[]> {
+  // full では案件・所属も見る。列が無い古いスキーマ（最小構成の単体試験など）
+  // では従来の列だけに戻す。
+  const offerSelect = full ? 'al.offer_id AS offer_id' : 'NULL AS offer_id';
+  const linkAccountSelect = full ? 'al.line_account_id AS link_account' : 'NULL AS link_account';
+  const affAccountSelect = full ? 'a.line_account_id AS aff_account' : 'NULL AS aff_account';
+  const touches = await db
+    .prepare(
+      `SELECT rt.ref_code AS ref_code, rt.created_at AS touched_at,
+              al.affiliate_id AS affiliate_id, ${offerSelect},
+              al.is_active AS link_active, ${linkAccountSelect},
+              a.is_active AS aff_active, a.friend_id AS aff_friend_id,
+              ${affAccountSelect}
+         FROM ref_tracking rt
+         JOIN affiliate_links al ON al.ref_code = rt.ref_code
+         JOIN affiliates a ON a.id = al.affiliate_id
+        WHERE rt.friend_id = ?
+          AND julianday(rt.created_at) <= julianday(?)
+        ORDER BY julianday(rt.created_at) DESC
+        LIMIT 20`,
+    )
+    .bind(friendId, now)
+    .all<TouchRow>();
+  return touches.results;
+}
+
+/**
+ * 友だちの紹介候補を新しい順に並べ、決まりに沿って1件を選ぶ。
+ * 新しい順に、最初に決まりをすべて満たした紹介が勝つ(last-touch)。
+ */
+export async function explainAffiliateAttribution(
+  db: D1Database,
+  friendId: string,
+  at?: string,
+  opts?: ExplainAttributionOptions,
+): Promise<AttributionExplanation> {
+  const now = at ?? jstNow();
+  const pointWindow = asValidWindowDays(opts?.windowDays);
+  const lineAccountId = opts?.lineAccountId ?? null;
+  // 決まりの列が無い古いスキーマ（最小構成の単体試験など）では、
+  // 案件の期間・上限・受付を見ずに従来の付け方に落とす。
+  let touches: TouchRow[];
+  try {
+    touches = await loadTouches(db, friendId, now, true);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!/no such (column|table)/i.test(msg)) throw err;
+    touches = await loadTouches(db, friendId, now, false);
+  }
+  const candidates: AttributionCandidate[] = [];
+  let decision: AttributionExplanation['decision'] = null;
+  let reason: AttributionReason = 'no_touch';
+  // 案件の無い汎用リンクは、従来の 90 日を legacy として使う。
+  let usedWindow = ATTRIBUTION_WINDOW_DAYS;
+  const versionCache = new Map<string, Awaited<ReturnType<typeof getCurrentOfferVersion>>>();
+  for (const touch of touches) {
+    let version = null;
+    if (touch.offer_id) {
+      if (!versionCache.has(touch.offer_id)) {
+        versionCache.set(touch.offer_id, await getCurrentOfferVersion(db, touch.offer_id));
+      }
+      version = versionCache.get(touch.offer_id) ?? null;
+    }
+    const windowDays = pointWindow
+      ?? version?.window_days
+      ?? ATTRIBUTION_WINDOW_DAYS;
+    const base = {
+      affiliateId: touch.affiliate_id,
+      refCode: touch.ref_code,
+      touchedAt: touch.touched_at,
+      offerId: touch.offer_id,
+      windowDays,
+    };
+    const skip = (skipReason: AttributionSkipReason): AttributionCandidate => ({
+      ...base, chosen: false, skipReason,
+    });
+    // 別アカウントの紹介者は候補にしない。推測で付け替えない。
+    if (lineAccountId !== null
+      && ((touch.link_account !== null && touch.link_account !== lineAccountId)
+        || (touch.aff_account !== null && touch.aff_account !== lineAccountId))) {
+      candidates.push(skip('other_account'));
+      continue;
+    }
+    if (touch.link_active !== 1) {
+      candidates.push(skip('inactive_link'));
+      continue;
+    }
+    if (touch.aff_active !== 1) {
+      candidates.push(skip('inactive_affiliate'));
+      continue;
+    }
+    // 自分の紹介には付けない。
+    if (touch.aff_friend_id !== null && touch.aff_friend_id === friendId) {
+      candidates.push(skip('self_referral'));
+      continue;
+    }
+    const inWindow = await db
+      .prepare(`SELECT 1 AS ok WHERE julianday(?) >= julianday(?) - ?`)
+      .bind(touch.touched_at, now, windowDays)
+      .first<{ ok: number }>();
+    if (!inWindow) {
+      candidates.push(skip('out_of_window'));
+      continue;
+    }
+    if (version) {
+      // 受付の期間外の紹介には付けない。
+      if (version.reception_from !== null) {
+        const open = await db
+          .prepare(`SELECT 1 AS ok WHERE julianday(?) >= julianday(?)`)
+          .bind(now, version.reception_from)
+          .first<{ ok: number }>();
+        if (!open) {
+          candidates.push(skip('reception_closed'));
+          continue;
+        }
+      }
+      if (version.reception_to !== null) {
+        const open = await db
+          .prepare(`SELECT 1 AS ok WHERE julianday(?) <= julianday(?)`)
+          .bind(now, version.reception_to)
+          .first<{ ok: number }>();
+        if (!open) {
+          candidates.push(skip('reception_closed'));
+          continue;
+        }
+      }
+      // 上限に達したら受付を自動で止める。同時の2件が両方通ることがあるが、
+      // 記録の一意性で2人付けにはならない(件数の超過は次の判断で止まる)。
+      if (version.cap_total !== null || version.cap_monthly_per_affiliate !== null) {
+        const status = await getOfferCapStatus(
+          db, touch.offer_id!, { affiliateId: touch.affiliate_id, at: now },
+        );
+        if (status.totalRemaining !== null && status.totalRemaining <= 0) {
+          candidates.push(skip('capped_total'));
+          continue;
+        }
+        if (status.monthlyRemaining !== null && status.monthlyRemaining <= 0) {
+          candidates.push(skip('capped_monthly'));
+          continue;
+        }
+      }
+    }
+    // 新しい順の最初の適格が勝ち。それ以前の不適格の理由は残る。
+    decision = {
+      affiliateId: touch.affiliate_id,
+      refCode: touch.ref_code,
+      offerId: touch.offer_id,
+      offerVersionId: version?.id ?? null,
+    };
+    reason = 'matched_last_touch';
+    usedWindow = windowDays;
+    candidates.push({ ...base, chosen: true, skipReason: null });
+    break;
+  }
+  if (!decision && candidates.length > 0) {
+    reason = candidates[0]!.skipReason ?? 'no_touch';
+    usedWindow = candidates[0]!.windowDays;
+  }
+  return { decision, reason, windowDays: usedWindow, candidates };
+}
+
+export interface AttributionDecisionRow {
+  id: string;
+  conversion_event_id: string;
+  friend_id: string;
+  conversion_point_id: string;
+  affiliate_id: string | null;
+  ref_code: string | null;
+  offer_id: string | null;
+  offer_version_id: string | null;
+  reason: AttributionReason;
+  window_days: number;
+  candidates_json: string;
+  created_at: string;
+}
+
+/** 候補1件の写し。判断の時点で残し、後から書き換えない。 */
+export interface AttributionCandidateSnapshot {
+  affiliateId: string;
+  affiliateName: string;
+  refCode: string;
+  touchedAt: string;
+  offerId: string | null;
+  offerName: string | null;
+  chosen: boolean;
+  skipReason: AttributionSkipReason | null;
+  windowDays: number;
+}
+
+export interface AttributionDecisionView {
+  conversionEventId: string;
+  affiliateId: string | null;
+  refCode: string | null;
+  offerId: string | null;
+  offerVersionId: string | null;
+  reason: AttributionReason;
+  windowDays: number;
+  candidates: AttributionCandidateSnapshot[];
+  createdAt: string;
+}
+
+/**
+ * 付け方の判断を成果に結びつけて残す。同じ成果の再送は最初の記録を保つ
+ * (INSERT OR IGNORE)。後から決まりが変わっても、この記録は書き換えない。
+ */
+export async function recordAttributionDecision(
+  db: D1Database,
+  conversionEventId: string,
+  friendId: string,
+  conversionPointId: string,
+  explanation: AttributionExplanation,
+): Promise<void> {
+  // 記録の表が無い古いスキーマ（最小構成の単体試験など）では書かない。
+  // 成果自体は残し、記録の欠落を選ぶ（conversions.ts の方針と同じ）。
+  if (!(await dbTableExists(db, 'affiliate_attribution_decisions'))) return;
+  // 候補の名前は判断の時点で写す。後から紹介者名・案件名が変わっても、
+  // この記録の表示は動かない。
+  const snapshots: AttributionCandidateSnapshot[] = [];
+  for (const candidate of explanation.candidates) {
+    const names = await db
+      .prepare(
+        `SELECT a.name AS affiliate_name, off.name AS offer_name
+           FROM affiliates a
+           LEFT JOIN affiliate_offers off ON off.id = ?
+          WHERE a.id = ?`,
+      )
+      .bind(candidate.offerId, candidate.affiliateId)
+      .first<{ affiliate_name: string | null; offer_name: string | null }>();
+    snapshots.push({
+      affiliateId: candidate.affiliateId,
+      affiliateName: names?.affiliate_name ?? '',
+      refCode: candidate.refCode,
+      touchedAt: candidate.touchedAt,
+      offerId: candidate.offerId,
+      offerName: names?.offer_name ?? null,
+      chosen: candidate.chosen,
+      skipReason: candidate.skipReason,
+      windowDays: candidate.windowDays,
+    });
+  }
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO affiliate_attribution_decisions
+         (id, conversion_event_id, friend_id, conversion_point_id,
+          affiliate_id, ref_code, offer_id, offer_version_id, reason, window_days,
+          candidates_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      crypto.randomUUID(),
+      conversionEventId,
+      friendId,
+      conversionPointId,
+      explanation.decision?.affiliateId ?? null,
+      explanation.decision?.refCode ?? null,
+      explanation.decision?.offerId ?? null,
+      explanation.decision?.offerVersionId ?? null,
+      explanation.reason,
+      explanation.windowDays,
+      JSON.stringify(snapshots),
+      jstNow(),
+    )
+    .run();
+}
+
+/** 成果の付け方の記録を、画面に出す形で返す。無い成果は null。 */
+export async function getAttributionDecisionView(
+  db: D1Database,
+  conversionEventId: string,
+): Promise<AttributionDecisionView | null> {
+  const row = await getAttributionDecision(db, conversionEventId);
+  if (!row) return null;
+  let candidates: AttributionCandidateSnapshot[] = [];
+  try {
+    const parsed: unknown = JSON.parse(row.candidates_json);
+    if (Array.isArray(parsed)) candidates = parsed as AttributionCandidateSnapshot[];
+  } catch {
+    candidates = [];
+  }
+  return {
+    conversionEventId: row.conversion_event_id,
+    affiliateId: row.affiliate_id,
+    refCode: row.ref_code,
+    offerId: row.offer_id,
+    offerVersionId: row.offer_version_id,
+    reason: row.reason,
+    windowDays: row.window_days,
+    candidates,
+    createdAt: row.created_at,
+  };
+}
+
+export async function getAttributionDecision(
+  db: D1Database,
+  conversionEventId: string,
+): Promise<AttributionDecisionRow | null> {
+  return db
+    .prepare(`SELECT * FROM affiliate_attribution_decisions WHERE conversion_event_id = ?`)
+    .bind(conversionEventId)
+    .first<AttributionDecisionRow>();
 }

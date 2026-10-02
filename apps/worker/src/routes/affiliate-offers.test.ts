@@ -21,6 +21,10 @@ const dbMocks = {
   updateAffiliateOffer: vi.fn(),
   listAffiliateOffers: vi.fn(),
   getAffiliateOfferById: vi.fn(),
+  createOfferVersion: vi.fn(),
+  getCurrentOfferVersion: vi.fn(),
+  listOfferVersions: vi.fn(),
+  getOfferCapStatus: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -223,15 +227,28 @@ describe('PUT /api/affiliate-offers/:id', () => {
 
 describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => {
   // タグ・シナリオの存在確認だけ本物の振る舞いにし、他は既存モックを使う。
-  const visibleTags = new Map([['tag-1', 'account-1']]);
-  const visibleScenarios = new Map([['sc-1', 'account-1']]);
+  // R193: 保管済み・停止中も本物と同じく「見えるが選べない」行を返す。
+  const visibleTags = new Map([
+    ['tag-1', { accountId: 'account-1', status: 'active' }],
+    ['tag-archived', { accountId: 'account-1', status: 'archived' }],
+  ]);
+  const visibleScenarios = new Map([
+    ['sc-1', { accountId: 'account-1', isActive: 1 }],
+    ['sc-stopped', { accountId: 'account-1', isActive: 0 }],
+  ]);
   const fakeDb = {
     prepare: (sql: string) => ({
       bind: (...args: unknown[]) => ({
         first: async () => {
           const [id, lineAccountId] = args as [string, string];
-          const table = sql.includes('FROM tags') ? visibleTags : visibleScenarios;
-          return table.get(id) === lineAccountId ? { id } : null;
+          if (sql.includes('FROM tags')) {
+            const tag = visibleTags.get(id);
+            return tag && tag.accountId === lineAccountId ? { id, status: tag.status } : null;
+          }
+          const scenario = visibleScenarios.get(id);
+          return scenario && scenario.accountId === lineAccountId
+            ? { id, is_active: scenario.isActive }
+            : null;
         },
       }),
     }),
@@ -291,5 +308,39 @@ describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => 
     dbMocks.updateAffiliateOffer.mockResolvedValue({ ...OFFER_ROW, scenario_id: 'sc-1' });
     const res = await reqWithDb('PUT', '/api/affiliate-offers/off-1', { scenarioId: 'sc-1' });
     expect(res.status).toBe(200);
+  });
+
+  /*
+   * R193: 保管済みタグ・停止中シナリオは承認時点で実行できない。
+   * 「保存は通るが成果の時に動かない」を防ぐため、保存の時点で
+   * 具体的な理由つきで止める。
+   */
+  it('保管済みタグ付きの作成を具体的な理由つきで400で弾く', async () => {
+    const res = await reqWithDb('POST', '/api/affiliate-offers', {
+      name: 'キャンペーンA', tagId: 'tag-archived',
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('保管済み');
+    expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
+  });
+
+  it('停止中シナリオ付きの作成を具体的な理由つきで400で弾く', async () => {
+    const res = await reqWithDb('POST', '/api/affiliate-offers', {
+      name: 'キャンペーンA', scenarioId: 'sc-stopped',
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('停止中');
+    expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
+  });
+
+  it('更新で保管済みタグを400で弾く（古い参照の上書き保存も同じ）', async () => {
+    dbMocks.getAffiliateOfferById.mockResolvedValue({ ...OFFER_ROW, line_account_id: 'account-1' });
+    const res = await reqWithDb('PUT', '/api/affiliate-offers/off-1', { tagId: 'tag-archived' });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('保管済み');
+    expect(dbMocks.updateAffiliateOffer).not.toHaveBeenCalled();
   });
 });

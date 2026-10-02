@@ -3,6 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ReportNewPage from './reports/new/page'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 /**
  * 定期レポート作成/編集画面を本物のReactで動かす試験(#844 / N-277,N-278)。
@@ -123,7 +124,9 @@ afterEach(async () => {
 })
 
 async function render() {
-  await act(async () => { root.render(<ReportNewPage />) })
+  // 保存の知らせは Toast（右下・4秒）で出す。置き場所も一緒に描く。
+  clearToastsForTest()
+  await act(async () => { root.render(<><ReportNewPage /><ToastHost /></>) })
 }
 
 function button(label: string): HTMLButtonElement {
@@ -144,7 +147,7 @@ describe('定期レポートの編集画面(?id=)', () => {
     expect(nameInput).toBeTruthy()
     expect(host.textContent).toContain('「週次まとめ」を直しています')
     expect(host.textContent).toContain('変更を保存する')
-    expect(host.textContent).not.toContain('いますぐ1回だけ送ってみる')
+    expect(host.textContent).not.toContain('今すぐ1回だけ送る')
 
     await act(async () => { button('変更を保存する').click() })
     const putCall = net.calls.find((call) => call.path.startsWith('/api/analytics/report-schedules/report-1?') && call.method === 'PUT')
@@ -183,8 +186,9 @@ describe('定期レポートの編集画面(?id=)', () => {
     expect(host.textContent).toContain('定期レポートを表示できませんでした')
     expect(host.textContent).not.toContain('定期レポートが見つかりませんでした')
     // やり直しで読み直しが走る
+    // ★V7 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
     net.handler = defaultHandler
-    await act(async () => { button('再読み込み').click() })
+    await act(async () => { button('もう一度読み込む').click() })
     expect(net.calls.filter((call) => call.path.startsWith('/api/analytics/report-schedules') && call.method === 'GET').length).toBeGreaterThanOrEqual(2)
     expect(host.textContent).toContain('「週次まとめ」を直しています')
   })

@@ -90,24 +90,30 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
     const expected = expectedWebhookUrl(c.env.WORKER_URL ?? new URL(c.req.url).origin);
     const webhookChecks = await Promise.all(
       rows.map(async (row) => {
-        if (row.is_active !== 1) return { id: row.id, status: 'unknown' as const };
+        if (row.is_active !== 1) return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
         const hasSecret = Boolean(row.channel_secret || row.channel_secret_encrypted);
-        if (!hasSecret) return { id: row.id, status: 'unknown' as const };
+        if (!hasSecret) return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
         try {
           const token = await resolveLineCredential(
             row.channel_access_token_encrypted,
             row.channel_access_token,
             { lineAccountId: row.id, field: 'channel_access_token' },
           );
-          if (!token) return { id: row.id, status: 'unknown' as const };
+          if (!token) return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
           const check = await fetchWebhookEndpoint(token, expected);
-          return { id: row.id, status: check.status };
+          return { id: row.id, status: check.status, active: check.active };
         } catch {
-          return { id: row.id, status: 'unknown' as const };
+          return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
         }
       }),
     );
-    const usable = webhookChecks.filter((w) => w.status === 'matched').length;
+    /*
+      R74。URLが一致していても、LINE側でWebhookの利用がオフなら
+      受信は届かない。「終わり」に数えない。`active: null`（読めなかった）
+      は従来どおり「合っている側」に寄せず `unknown` のまま——
+      ここでは利用オフ（false）だけを除外する。
+    */
+    const usable = webhookChecks.filter((w) => w.status === 'matched' && w.active !== false).length;
 
     const tagCount = accountId ? await c.env.DB.prepare(
       `SELECT COUNT(*) AS c FROM tags
@@ -186,7 +192,7 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
     const steps = [
       {
         ...withAccess(staff, 'accounts', usable > 0 ? 'done' : rows.length > 0 ? 'stalled' : 'todo',
-          rows.length > 0 && usable === 0 ? 'Webhookまたはシークレットを確認してください' : null),
+          rows.length > 0 && usable === 0 ? 'LINE側のWebhook利用設定またはシークレットを確認してください' : null),
         /*
           **Webhook を確かめられなかったことを隠さない。** ここが空だと、
           段1が終わらない理由が運用者に分からない。
@@ -206,6 +212,16 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
       withAccess(staff, 'firstMessage', firstMessage ? 'done' : 'todo'),
     ];
 
+    /*
+      「閉じた」は本人単位の記憶。**完了判定には使わない**（要件 §15）。
+      帯を出すかは `dismissed` と `allDone` を画面が見て決める。
+    */
+    const dismissedRow = staff?.id
+      ? await c.env.DB.prepare(
+          `SELECT getting_started_dismissed_at AS dismissed_at FROM staff_members WHERE id = ?`,
+        ).bind(staff.id).first<{ dismissed_at: string | null }>()
+      : null;
+
     return c.json({
       success: true,
       data: {
@@ -215,10 +231,35 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
         total: steps.length,
         /** 全部終わったら、ダッシュボードの帯を出さない。 */
         allDone: steps.every((s) => s.state === 'done'),
+        dismissed: dismissedRow?.dismissed_at != null,
       },
     });
   } catch (err) {
     console.error('GET /api/getting-started error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 進捗帯を閉じる（本人単位）。要件 §12。
+ *
+ * **完了ではない。** 閉じた日時は帯を出さないためだけの記憶で、
+ * 段の判定には一切入れない（§15）。
+ */
+gettingStarted.post('/api/getting-started/dismiss', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const staff = c.get('staff');
+    if (!staff?.id) {
+      return c.json({ success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401);
+    }
+    await c.env.DB.prepare(
+      `UPDATE staff_members
+          SET getting_started_dismissed_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ?`,
+    ).bind(staff.id).run();
+    return c.json({ success: true, data: { dismissed: true } });
+  } catch (err) {
+    console.error('POST /api/getting-started/dismiss error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

@@ -110,7 +110,8 @@ describe('H3lAOB / xGLVe トーク見出しの操作', () => {
     // U008/U010(#969): 390px では2行目へ落として右に切らないため、
     // 折り返しは sm 未満だけ。sm 以上では従来どおり1行を保つ。
     expect(header).toContain('sm:flex-nowrap')
-    expect(header).toContain('className="inline-flex h-10 shrink-0')
+    // V8 移行 ①: 共通 Button の inline-flex は部品側が持つので高さだけを見る。
+    expect(header).toContain('className="h-10 shrink-0')
     expect(header).toContain('compact={showFriendInfo}')
     expect(INBOX_DROPDOWN).toContain('whitespace-nowrap border px-2.5 text-xs')
   })
@@ -139,7 +140,7 @@ describe('#455 受信箱の上端と入力欄', () => {
 })
 
 describe('B7CER8 内部メモ', () => {
-  const popover = region(PAGE, 'data-inbox-v6="internal-memo-popover"', '<div className="rounded-[10px] border border-[#D0D5DD]')
+  const popover = region(PAGE, 'data-inbox-v6="internal-memo-popover"', '<div className="rounded-card border border-hairline')
   const toggle = region(PAGE, 'data-inbox-v6="internal-memo-toggle"', '</button>')
 
   it('画面を覆う窓ではなく、送信欄の上に出る紙にする', () => {
@@ -154,7 +155,7 @@ describe('B7CER8 内部メモ', () => {
     expect(popover).toContain('対応方針や引き継ぎ内容を入力してください。顧客には表示・送信されません。')
     expect(popover).toContain('例：次回返信時に配送先住所を確認する')
     expect(popover).toContain('この内容は社内メンバーだけが確認できます')
-    expect(popover).toContain('メモを保存')
+    expect(popover).toContain('メモを保存する')
   })
 
   it('保存の口へつなぎ、書き換えていないうちは押せない', () => {
@@ -182,21 +183,20 @@ describe('Xi4x9 右パネルの表示項目', () => {
     expect(panel).toContain('moveGroupBefore')
   })
 
-  it('出し入れは素のチェックを土台にした入／切で読み上げにも伝わる', () => {
-    expect(panel).toContain('type="checkbox"')
-    expect(panel).toContain('role="switch"')
-    expect(panel).toContain('className="peer sr-only"')
-    expect(panel).toContain('peer-checked:bg-accent')
-    // 軌道と丸は input の兄弟でないと `peer-checked:` が効かない。
-    expect(panel).toContain('peer-checked:translate-x-4')
-    expect(panel).not.toContain('<span className="rounded-pill bg-step-idle peer-checked:bg-accent peer-focus-visible:ring-accent/40 flex')
+  it('出し入れは本物のチェックを土台にした入／切で読み上げにも伝わる', () => {
+    // m21u: 素の input＋自作スイッチを共通の Checkbox へ置き換えた。
+    // 本物の input を使う性質（読み上げで入／切が伝わる）は保つ。
+    expect(panel).toContain('共通の Checkbox（本物の input）')
+    expect(panel).toContain('aria-label={`${group.label}を表示`}')
+    expect(panel).not.toContain('type="checkbox"')
+    expect(panel).not.toContain('role="switch"')
   })
 
   it('全部隠しても戻せる道と、閉じる道を置く', () => {
     expect(panel).toContain('初期状態に戻す')
     expect(panel).toContain('setSectionOrder(DEFAULT_SECTION_ORDER)')
     expect(panel).toContain('setHiddenSections([])')
-    expect(panel).toContain('完了')
+    expect(panel).toContain('閉じる')
   })
 })
 
@@ -272,10 +272,10 @@ describe('LAY-03 右パネルの表示項目パネル', () => {
     expect(SIDEBAR).toContain('window.innerHeight - margin * 2')
     expect(panel).toContain('min-h-0 flex-1')
     expect(panel).toContain('overflow-y-auto')
-    // 見出しと「初期状態に戻す」「完了」はスクロール領域の外に固定する。
+    // 見出しと「初期状態に戻す」「閉じる」はスクロール領域の外に固定する。
     expect(panel.indexOf('overflow-y-auto')).toBeGreaterThan(panel.indexOf('右パネルの表示項目'))
     expect(panel.indexOf('初期状態に戻す')).toBeGreaterThan(panel.indexOf('overflow-y-auto'))
-    expect(panel.indexOf('完了')).toBeGreaterThan(panel.indexOf('overflow-y-auto'))
+    expect(panel.lastIndexOf('閉じる')).toBeGreaterThan(panel.indexOf('overflow-y-auto'))
   })
 
   it('開いているあいだは Escape と画面の変化に追従する', () => {

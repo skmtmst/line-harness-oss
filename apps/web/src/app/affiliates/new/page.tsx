@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Friend } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import CreatePage, {
   AsideCard,
   ChoiceCard,
@@ -11,7 +12,11 @@ import CreatePage, {
   FormSection,
 } from '@/components/shared/create-page'
 import { TextInput } from '@/components/shared/form-controls'
-import SelectField from '@/components/shared/select-field'
+import Checkbox from '@/components/shared/checkbox'
+import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
+import { formatNumber } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 /**
  * 入力欄の幅。
@@ -82,12 +87,16 @@ function Unavailable({ label, reason }: { label: string; reason: string }) {
 type PayoutKind = 'per_conversion' | 'rate' | 'none'
 
 const PAYOUT_KINDS: Array<{ value: PayoutKind; label: string; note: string }> = [
-  { value: 'per_conversion', label: '成果1件ごとに定額', note: '1件あたりの金額を決めます' },
+  /* m22d: 金額は案件側で決まる（下の「1件あたりの報酬」と同じ説明）。
+     「1件あたり」を注記にも書くと、同じ「1件」が3回出るので書かない。 */
+  { value: 'per_conversion', label: '成果1件ごとに定額', note: '金額は案件の「報酬額」で決めます' },
   { value: 'rate', label: '売上に対する割合', note: '注文金額の◯%を報酬にします' },
   { value: 'none', label: '報酬なし（計測のみ）', note: '成果の件数だけを記録します' },
 ]
 
 export default function NewAffiliatePage() {
+  /* ★V7: 画面名は共通トップバーにだけ置く。本文の重複見出しは出さない。 */
+  usePageTitle('アフィリエイターを登録する')
   const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -113,6 +122,12 @@ export default function NewAffiliatePage() {
   // 追加情報の保存だけをやり直す。
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [partialSave, setPartialSave] = useState(false)
+  /*
+   * R525残部: 登録で確定した稼働状態（保存済みの真実）と、やり直しで送る
+   * 指定（未保存の切り替え）は別に持つ。切り替えただけで知らせが
+   * 「まだ始まっていない」「既に始まっている」と嘘をつかないようにする。
+   */
+  const [savedIsActive, setSavedIsActive] = useState<boolean | null>(null)
   // 作成の再送で二重登録にしないための、この登録試行1回分の安定した操作
   // UUID（Issue #686）。押し直しても同じ値のままにするため onSave では
   // 作らず、ここと onReset だけで作り直す。
@@ -133,6 +148,7 @@ export default function NewAffiliatePage() {
     draftAccountRef.current = selectedAccountId
     setCreatedId(null)
     setPartialSave(false)
+    setSavedIsActive(null)
     setOperationId(crypto.randomUUID())
     setFriendId('')
     setSelectedFriend(null)
@@ -185,6 +201,7 @@ export default function NewAffiliatePage() {
       successHref={(id) => `${AFFILIATE_LIST_PATH}&highlight=${encodeURIComponent(String(id))}`}
       saveLabel={partialSave ? '追加情報の保存を再開する' : '登録して、紹介リンクを発行する'}
       statusLabel={partialSave ? '基本情報は保存済み・追加情報は未保存' : undefined}
+      showHeader={false}
       variant="v6"
       designNode="xqT1Z"
       validate={() => {
@@ -219,6 +236,7 @@ export default function NewAffiliatePage() {
         setCopied(false)
         setCreatedId(null)
         setPartialSave(false)
+        setSavedIsActive(null)
         setOperationId(crypto.randomUUID())
       }}
       onSave={async () => {
@@ -237,16 +255,28 @@ export default function NewAffiliatePage() {
               issueInitialLink: true,
               lineAccountId: selectedAccountId,
               operationId,
+              // R525: 計測オフの登録は最初の行から停止で作る。追加情報の
+              // 保存が失敗しても稼働では残らない。
+              isActive: startTracking,
             })
             if (!res.success) throw new Error('create_failed')
             affiliateId = res.data.id
             setCreatedId(affiliateId)
+            // 保存された行の稼働状態へ寄せる。応答消失後の再送が古い行を
+            // 回収したときも、画面の表示と再試行の送り先がずれない。
+            // 応答に稼働状態が無いときは送った指定のままにする。
+            const persistedIsActive =
+              typeof res.data.isActive === 'boolean' ? res.data.isActive : startTracking
+            setStartTracking(persistedIsActive)
+            setSavedIsActive(persistedIsActive)
           } catch {
             throw new Error('アフィリエイターを登録できませんでした。入力を確認して、もう一度お試しください。')
           }
         }
-        // 連絡先・保留期間・支払いサイクル・通知・計測の開始は作成のAPIが
-        // 受けないので、続けて更新する。1つの操作として見えるようにまとめる。
+        // 連絡先・保留期間・支払いサイクル・通知は作成のAPIが受けないので、
+        // 続けて更新する。1つの操作として見えるようにまとめる。
+        // 計測の開始だけは作成のAPIへ渡す（R525）。更新でのみ送ると、
+        // 更新の失敗時に稼働の行が残ってしまう。
         // 名前・報酬率も更新APIが受けるので、途中保存後にここを直して
         // 再開した分もまとめて送る（一部項目だけだと画面上の変更を失う、
         // Issue #686）。
@@ -272,15 +302,19 @@ export default function NewAffiliatePage() {
       aside={
         <>
           <AsideCard title="成果が出たときにすること">
-            <label className="border-hairline flex items-start gap-2 rounded-control border p-3 text-sm">
-              <input type="checkbox" className="mt-0.5" checked={notifyOnConversion} onChange={(e) => setNotifyOnConversion(e.target.checked)} />
-              <span><strong className="text-ink block">本人へメールで知らせる</strong><span className="text-ink-faint text-xs">報酬が確定したタイミングで届きます</span></span>
-            </label>
-            <label className="border-hairline mt-2 flex items-start gap-2 rounded-control border p-3 text-sm">
-              <input type="checkbox" className="mt-0.5" checked={startTracking} onChange={(e) => setStartTracking(e.target.checked)} />
-              <span><strong className="text-ink block">すぐに計測を始める</strong><span className="text-ink-faint text-xs">オフでもリンクは発行されます</span></span>
-            </label>
-            <Unavailable label="成果時の動き" reason="まだ繋がっていません。紹介者ごとの成果時の動きが接続されると表示されます。" />
+            <Checkbox
+              checked={notifyOnConversion}
+              onCheckedChange={setNotifyOnConversion}
+              description="報酬が確定したタイミングで届きます"
+              className="border-hairline rounded-control border p-3"
+            >本人へメールで知らせる</Checkbox>
+            <Checkbox
+              checked={startTracking}
+              onCheckedChange={setStartTracking}
+              description="オフでもリンクは発行されます"
+              className="border-hairline mt-2 rounded-control border p-3"
+            >すぐに計測を始める</Checkbox>
+            {/* ★V7: 未接続の断り書きは出さない。接続後に項目として出す。 */}
           </AsideCard>
 
           <AsideCard title="つながる先">
@@ -305,18 +339,47 @@ export default function NewAffiliatePage() {
     >
       <FormSection step={1} label="だれを登録するか">
         {partialSave && createdId ? (
-          <div role="alert" className="border-warning bg-warning-bg rounded-control border px-3 py-2 text-sm">
-            <p className="text-ink font-semibold">基本情報は保存済みです</p>
-            <p className="text-ink-secondary mt-1">
+          <Notice
+            tone="warn"
+            action={
+              <a href={`${AFFILIATE_LIST_PATH}&highlight=${encodeURIComponent(createdId)}`}>
+                未保存の追加情報を破棄して一覧へ戻る
+              </a>
+            }
+          >
+            <p className="font-semibold">基本情報は保存済みです</p>
+            <p className="mt-1">
               下の「追加情報の保存を再開する」で続けるか、未保存の追加情報を破棄して一覧へ戻れます。
             </p>
-            <a
-              href={`${AFFILIATE_LIST_PATH}&highlight=${encodeURIComponent(createdId)}`}
-              className="text-danger mt-2 inline-block font-semibold underline"
-            >
-              未保存の追加情報を破棄して一覧へ戻る
-            </a>
-          </div>
+            {/*
+              R525残部: 知らせの1文目は保存済みの真実（savedIsActive）だけを
+              言う。未保存の切り替え（startTracking）は2文目で「再開するとき
+              どう送るか」として別に言う。混ぜると、オン保存→オフ切替で
+              「まだ始まっていない」、オフ保存→オン切替で「既に始まっている」
+              と嘘をつく。失敗・警告の文なので ? には入れない。
+            */}
+            {savedIsActive === true ? (
+              <p className="mt-1">
+                基本情報の登録で計測は既に始まっています。
+                {startTracking
+                  ? 'このまま追加情報だけを保存します。'
+                  : '再開するときは計測をオフに切り替えて保存します。'}
+              </p>
+            ) : savedIsActive === false ? (
+              <p className="mt-1">
+                基本情報の登録は計測オフで済んでいるので、計測はまだ始まっていません。
+                {startTracking
+                  ? '再開するときは計測をオンに切り替えて保存します。'
+                  : 'このまま追加情報だけを保存します。'}
+              </p>
+            ) : (
+              <p className="mt-1">
+                {startTracking
+                  ? '「すぐに計測を始める」がオンなので、基本情報の登録で計測は既に始まっています。'
+                  : '「すぐに計測を始める」がオフなので、計測は始まらないまま追加情報だけを保存します。'}
+              </p>
+            )}
+          </Notice>
         ) : null}
         <div className="grid gap-3 lg:grid-cols-3">
         <Field label="名前・屋号" htmlFor="af-name" required>
@@ -388,21 +451,21 @@ export default function NewAffiliatePage() {
                 />
                 <button
                   type="submit"
-                  className="text-accent hover:bg-accent-soft rounded-control px-4 py-2 text-sm font-semibold"
+                  className="text-accent-deep hover:bg-accent-soft rounded-control px-4 py-2 text-sm font-semibold"
                 >
                   検索
                 </button>
               </form>
-              <SelectField
+              <Select
                 id="af-friend"
                 aria-label="LINEの友だちと結びつける"
                 value={friendId}
-                onChange={(event) => {
-                  const nextId = event.target.value
+                onChange={(nextId) => {
                   setFriendId(nextId)
                   setSelectedFriend(friendOptions.find((friend) => friend.id === nextId) ?? null)
                 }}
                 className="w-full max-w-lg"
+                size="full"
                 options={[
                   { value: '', label: friendLoading ? '読み込んでいます' : '結びつけない' },
                   ...friendOptions.map((friend) => ({ value: friend.id, label: friend.displayName })),
@@ -414,7 +477,7 @@ export default function NewAffiliatePage() {
                   <button
                     type="button"
                     onClick={() => setFriendReload((value) => value + 1)}
-                    className="text-accent hover:bg-accent-soft rounded-control px-3 py-1 font-semibold"
+                    className="text-accent-deep hover:bg-accent-soft rounded-control px-3 py-1 font-semibold"
                   >
                     もう一度読み込む
                   </button>
@@ -422,16 +485,17 @@ export default function NewAffiliatePage() {
               ) : (
                 <div className="mt-2 flex max-w-lg flex-wrap items-center justify-between gap-2">
                   <p className="text-ink-faint text-xs tabular-nums">
-                    {friendLoading ? '友だちを読み込んでいます' : `全${friendTotal.toLocaleString('ja-JP')}件`}
+                    {friendLoading ? '友だちを読み込んでいます' : `全${formatNumber(friendTotal)}件`}
                   </p>
                   {friendPageCount > 1 ? (
-                    <SelectField
+                    <Select
                       id="af-friend-page"
                       aria-label="友だち候補のページ"
                       value={String(friendPage)}
-                      onChange={(event) => setFriendPage(Number(event.target.value))}
+                      onChange={(value) => setFriendPage(Number(value))}
                       disabled={friendLoading}
                       className="w-40"
+                      size="standard"
                       options={Array.from({ length: friendPageCount }, (_, index) => ({
                         value: String(index + 1),
                         label: `${index + 1} / ${friendPageCount}ページ`,
@@ -488,7 +552,7 @@ export default function NewAffiliatePage() {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Unavailable label="成果として数えるもの" reason="案件ごとに決めます。" />
-          <Unavailable label="1件あたりの上限" reason="まだ繋がっていません。上限回数が接続されると表示されます。" />
+          {/* ★V7: 未接続の断り書きは出さない。接続後に項目として出す。 */}
         </div>
       </FormSection>
 
@@ -524,7 +588,7 @@ export default function NewAffiliatePage() {
               className={W_EMAIL}
             />
           </Field>
-          <Unavailable label="振込先の登録" reason="まだ繋がっていません。銀行・支店・種別・末尾4桁が接続されると表示されます。" />
+          {/* ★V7: 未接続の断り書きは出さない。接続後に項目として出す。 */}
           <div className="border-hairline rounded-control border px-3 py-2">
           <p className="text-ink-secondary text-xs font-semibold">この方に渡すURL</p>
           <div className="flex items-center gap-2">
@@ -532,18 +596,14 @@ export default function NewAffiliatePage() {
               {previewUrl ?? '—'}
             </code>
             {previewUrl && (
-              <button
-                type="button"
-                onClick={() => {
+              <Button variant="secondary" className="px-2 py-1 text-xs h-auto whitespace-normal" type="button" onClick={() => {
                   void navigator.clipboard?.writeText(previewUrl).then(
                     () => setCopied(true),
                     () => setCopied(false),
                   )
-                }}
-                className="border-hairline text-ink rounded-control hover:bg-canvas-sunken border px-2 py-1 text-xs font-semibold"
-              >
+                }}>
                 コピー
-              </button>
+              </Button>
             )}
           </div>
           <p className="text-ink-faint text-micro mt-1">

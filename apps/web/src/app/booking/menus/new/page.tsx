@@ -11,12 +11,18 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import { canEditFeature } from '@/lib/staff-capability'
+import { classifyApiFailure } from '@/components/shared/api-error-message'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { bookingMenuError } from '../menu-validation'
+import { formatNumber } from '@/lib/format'
 
 /**
  * メニューを追加する（設計 V6 28-1-B / node GhOb3）。
@@ -51,8 +57,21 @@ export default function NewBookingMenuPage() {
    * 取得が終わるまで作成できない（DEEP-17: 候補の無いIDを送らないため）。
    */
   const [staffLoadState, setStaffLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
+  /** R536: 担当候補の取得失敗。そのまま捨てず、再試行と権限案内に使う。 */
+  const [staffError, setStaffError] = useState<unknown>(null)
+  /**
+   * R535: この作成試行の一意キー。サーバーで保存された直後に応答だけを
+   * 失っても、同じキーでの再送は作り直さず作成済みIDを返す。アカウント
+   * 切替・入力の破棄では新しい試行になるので新しいキーに替える。
+   */
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
   const [storeSettings, setStoreSettings] = useState<BookingSettings | null>(null)
   const [bookingMileage, setBookingMileage] = useState<number | null>(null)
+  /**
+   * R306: マイル設定の取得状態。「未設定」と「取得失敗」を混ぜない。
+   * bookingMileage===null だけでは両方に見えるため、読み込みの成否を別に持つ。
+   */
+  const [mileageLoadState, setMileageLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   /**
    * 作成に成功したが担当設定が残っているメニュー（DEEP-16）。
    * ここにIDがある間は createMenu を二度と呼ばず、残りの担当設定だけを
@@ -73,10 +92,28 @@ export default function NewBookingMenuPage() {
 
   // 担当一覧と店舗設定は別々に取る。片方の失敗・遅延でもう片方を巻き込まない
   // （担当が読めているのに設定待ちで作れない、という止まり方をしない）。
+  // R536: 担当候補だけを取り直す再試行。入力は state に残るので、
+  // 通信復旧後に同じ画面から続けられる。初回取得は下の効果のまま。
+  async function reloadStaff(accountId: string) {
+    setStaffLoadState('loading')
+    setStaffError(null)
+    try {
+      const staffResult = await bookingApi.listStaff(accountId)
+      setStaff(staffResult.staff)
+      setStaffLoadState('ready')
+    } catch (e) {
+      // 取得失敗は「未登録」と混ぜない。登録作業へ誘導しない。
+      setStaff([])
+      setStaffError(e)
+      setStaffLoadState('error')
+    }
+  }
+
   useEffect(() => {
     setStaff([])
     setStoreSettings(null)
     setStaffLoadState('loading')
+    setStaffError(null)
     if (!selectedAccountId) return
     let alive = true
     bookingApi.listStaff(selectedAccountId)
@@ -85,10 +122,11 @@ export default function NewBookingMenuPage() {
         setStaff(staffResult.staff)
         setStaffLoadState('ready')
       })
-      .catch(() => {
+      .catch((e) => {
         // 取得失敗は「未登録」と混ぜない。登録作業へ誘導しない。
         if (alive) {
           setStaff([])
+          setStaffError(e)
           setStaffLoadState('error')
         }
       })
@@ -109,8 +147,9 @@ export default function NewBookingMenuPage() {
   useEffect(() => {
     let cancelled = false
     setTagLoadState('loading')
+    // R23横展開: 候補は今のアカウントだけ。切替で取り直す（選択のリセットは切替効果で済み）。
     api.tags
-      .list()
+      .list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
       .then((r) => {
         if (cancelled) return
         // 取得失敗はタグなし保存の妨げにしない。候補が出ないだけで残す。
@@ -127,7 +166,7 @@ export default function NewBookingMenuPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   // アカウントを変えたら前の選択を残さない。別アカウントのタグを
   // そのまま送ると Worker が tag_not_found で落とすうえ、意図しない結び付きになる。
@@ -140,18 +179,29 @@ export default function NewBookingMenuPage() {
     // ものではなくなるので一緒に閉じる。
     setAssigned(new Set())
     setCreatedMenuNeedingStaff(null)
+    // R535: アカウントが変わったら別の作成試行。古いキーを使い回すと、
+    // 別アカウントの再送が前の応答に結び付くので新しいキーに替える。
+    setIdempotencyKey(crypto.randomUUID())
   }, [selectedAccountId])
 
   useEffect(() => {
     let alive = true
     api.mileage.rules()
       .then((response) => {
-        if (!alive || !response.success) return
+        if (!alive) return
+        if (!response.success) {
+          setMileageLoadState('error')
+          return
+        }
         const rule = response.data.find((item) => item.eventType === 'booking_created' && item.isActive)
         setBookingMileage(rule?.amount ?? null)
+        setMileageLoadState('ready')
       })
       .catch(() => {
-        if (alive) setBookingMileage(null)
+        if (alive) {
+          setBookingMileage(null)
+          setMileageLoadState('error')
+        }
       })
     return () => { alive = false }
   }, [])
@@ -195,7 +245,21 @@ export default function NewBookingMenuPage() {
     ? 'お問い合わせ'
     : priceMode === 'free'
       ? '無料'
-      : `¥${Number(basePrice).toLocaleString()}`
+      : `¥${formatNumber(Number(basePrice))}`
+
+  /*
+   * 作成途中の離脱確認。名前・時間・料金・担当・タグのどれかに手を付けて
+   * いたら、キャンセルや左メニューで確認窓を出す。タグの検索欄は絞り込み
+   * のため数えない。作成が終わると一覧へ router.push するので、成功後に
+   * 警告は出ない。
+   */
+  const dirty = Boolean(
+    name || categoryLabel || description || durationMinutes !== '60' ||
+    bufferAfterMinutes !== '0' || basePrice || concurrentCapacity !== '1' ||
+    windowDays || cutoffHours || cancelDeadlineHours || intakeQuestion ||
+    !isActive || assigned.size > 0 || autoTagId
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   if (!canEditMenus) {
     return (
@@ -210,6 +274,7 @@ export default function NewBookingMenuPage() {
   }
 
   return (
+    <>
     <CreatePage
       designNode="GhOb3"
       title="予約メニューをつくる"
@@ -220,7 +285,7 @@ export default function NewBookingMenuPage() {
           ? '担当の設定をやり直す'
           : isActive
             ? 'つくって出す'
-            : '下書きに保存'
+            : '下書きを保存する'
       }
       showHeader={false}
       variant="v6"
@@ -239,7 +304,7 @@ export default function NewBookingMenuPage() {
           return '担当スタッフを読み込んでいます。読み込みが終わってから作成してください'
         }
         if (staffLoadState === 'error') {
-          return '担当スタッフを読み込めませんでした。開き直してから作成してください'
+          return '担当スタッフを読み込めませんでした。下の「担当をもう一度読み込む」で読み込んでから作成してください'
         }
         const validationError = bookingMenuError({
           name,
@@ -269,6 +334,9 @@ export default function NewBookingMenuPage() {
         setAutoTagId(null)
         setTagQuery('')
         setCreatedMenuNeedingStaff(null)
+        // R535: 入力を捨てて作り直すときは別の作成試行。古いキーを使い回すと、
+        // 前に作ったメニューの応答が返って新しいメニューが作られない。
+        setIdempotencyKey(crypto.randomUUID())
       }}
       onSave={async () => {
         // DEEP-16: メニューが作成済みなら createMenu は二度と呼ばない。
@@ -294,7 +362,8 @@ export default function NewBookingMenuPage() {
             intake_question: intakeQuestion.trim() || null,
             is_active: isActive ? 1 : 0,
             auto_tag_id: autoTagId,
-            })
+            // R535: 同じ試行の再送は同じキー。応答消失後の再操作で作り直さない。
+            }, idempotencyKey)
           } catch (e) {
             // 選んだ後にタグが消えた場合は Worker が tag_not_found で落とす。
             // 入力は残る(CreatePage が失敗時に初期化しない)ので選び直せる。
@@ -397,18 +466,18 @@ export default function NewBookingMenuPage() {
       }
     >
       {createdMenuNeedingStaff && (
-        <div className="border-warning bg-warning-bg text-warning rounded-control border p-3 text-sm">
-          <p>
-            メニューは作成済みです。もう一度押しても新しいメニューは増えません。
-            担当にチェックを付けたまま「担当の設定をやり直す」を押すと、
-            残りの担当設定だけをやり直します。
-          </p>
-          <div className="mt-2">
+        <Notice
+          tone="warn"
+          action={
             <Button href={`/booking/menus?tab=staff&menu=${encodeURIComponent(createdMenuNeedingStaff.menuId)}`}>
               担当スタッフを一覧で設定する
             </Button>
-          </div>
-        </div>
+          }
+        >
+          メニューは作成済みです。もう一度押しても新しいメニューは増えません。
+          担当にチェックを付けたまま「担当の設定をやり直す」を押すと、
+          残りの担当設定だけをやり直します。
+        </Notice>
       )}
       <FormSection step={1} label="お客様に見える情報">
         <Field label="メニュー名" htmlFor="bm-name" required>
@@ -439,7 +508,7 @@ export default function NewBookingMenuPage() {
               <span className="text-ink-faint whitespace-nowrap text-xs">分</span>
             </div>
           </Field>
-          <Field label="料金" htmlFor="bm-price" note="税込の金額。0円は「無料」、空けると「お問い合わせ」と出ます。">
+          <Field label="料金" htmlFor="bm-price" help="税込の金額です。0円は「無料」、空けると「お問い合わせ」と出ます。">
             <div className="flex items-center gap-1.5">
               <input
                 id="bm-price"
@@ -455,7 +524,7 @@ export default function NewBookingMenuPage() {
           </Field>
         </div>
 
-        <Field label="分類" htmlFor="bm-category" note="お客様の画面で見出しになります。">
+        <Field label="分類" htmlFor="bm-category" help="お客様の画面で見出しになります。">
           <input
             id="bm-category"
             type="text"
@@ -483,7 +552,7 @@ export default function NewBookingMenuPage() {
           <Field
             label="同時に受けられる件数"
             htmlFor="bm-capacity"
-            note="同じ時間帯に何組まで受けるかです。"
+            help="同じ時間帯に何組まで受けるかです。"
           >
             <div className="flex items-center gap-1.5">
               <input
@@ -556,7 +625,7 @@ export default function NewBookingMenuPage() {
         <Field
           label="後の空き時間"
           htmlFor="bm-buffer"
-          note="片づけや移動の時間です。次の予約はこのぶん後ろから入ります。"
+          help="片づけや移動の時間です。次の予約はこのぶん後ろから入ります。"
         >
           <div className="flex items-center gap-1.5">
             <input
@@ -575,16 +644,35 @@ export default function NewBookingMenuPage() {
       <FormSection
         step={3}
         label="このメニューを担当できる人"
-        note="チェックした人だけ、お客様が指名できます。"
+        help="チェックした人だけ、お客様が指名できます。"
       >
         {staffLoadState === 'loading' ? (
           <p className="text-ink-faint text-sm">
             担当を読み込んでいます…
           </p>
         ) : staffLoadState === 'error' ? (
-          <p className="text-ink-faint text-sm">
-            担当を読み込めませんでした。開き直してください。
-          </p>
+          <div className="space-y-2">
+            {/*
+             * R536: 403は権限不足で、押しても直らない再試行は出さない。
+             * それ以外は入力を保ったまま同じ画面から取り直せる。
+             * DEEP-17（#1043更新）: 取得失敗は「未登録」と混ぜず、入力保持と
+             * 取り直しの口を出す。空（0人）は下の別の言葉で登録へ誘導する。
+             */}
+            <p className="text-ink-faint text-sm">
+              {classifyApiFailure(staffError) === 'forbidden'
+                ? '担当スタッフを見る権限がありません。オーナーか管理者に追加を依頼してください。'
+                : '担当を読み込めませんでした。入力はそのまま残っています。'}
+            </p>
+            {classifyApiFailure(staffError) !== 'forbidden' && selectedAccountId && (
+              <Button
+                variant="secondary"
+                size="compact"
+                onClick={() => void reloadStaff(selectedAccountId)}
+              >
+                担当をもう一度読み込む
+              </Button>
+            )}
+          </div>
         ) : staff.length === 0 ? (
           <p className="text-ink-faint text-sm">
             まだスタッフが登録されていません。先に予約設定の「担当スタッフ」から登録してください。
@@ -593,13 +681,11 @@ export default function NewBookingMenuPage() {
           <ul className="space-y-1.5">
             {staff.map((s) => (
               <li key={s.id}>
-                <label className="border-hairline hover:bg-canvas-sunken flex cursor-pointer items-center gap-2 rounded-md border p-2.5">
-                  <input
-                    type="checkbox"
-                    checked={assigned.has(s.id)}
-                    onChange={() => toggle(s.id)}
-                    className="accent-accent"
-                  />
+                <Checkbox
+                  checked={assigned.has(s.id)}
+                  onCheckedChange={() => toggle(s.id)}
+                  className="border-hairline hover:bg-canvas-sunken rounded-mini border p-2.5"
+                >
                   <span className="text-ink text-sm">{s.display_name || s.name}</span>
                   {s.role && <span className="text-ink-faint text-xs">{s.role}</span>}
                   {s.is_designation_optional === 1 && (
@@ -607,7 +693,7 @@ export default function NewBookingMenuPage() {
                       指名なし（空いている人が担当します）
                     </span>
                   )}
-                </label>
+                </Checkbox>
               </li>
             ))}
           </ul>
@@ -630,17 +716,37 @@ export default function NewBookingMenuPage() {
             detail="確定した予約は、前日と設定時間前のリマインダへ登録されます。"
             status="自動"
           />
+          {/*
+           * R306: 行き先はマイルの付与ルール（たまる決めごと）。行動スコアの
+           * ルールではない。R306: 未設定と取得失敗は別の言葉で出す。
+           */}
           <ActionSummary
-            title={bookingMileage === null ? '予約時のマイル' : `マイルを ${bookingMileage.toLocaleString()} 付ける`}
-            detail={bookingMileage === null ? '「予約した」のマイル設定を取得できませんでした。' : 'たまる決めごと「予約してくれた」が適用されます。'}
-            status={bookingMileage === null ? '未取得' : `予約で ${bookingMileage.toLocaleString()}`}
-            href="/mileage/score-rules"
+            title={bookingMileage === null ? '予約時のマイル' : `マイルを ${formatNumber(bookingMileage)} 付ける`}
+            detail={
+              mileageLoadState === 'loading'
+                ? 'マイル設定を読み込んでいます…'
+                : mileageLoadState === 'error'
+                  ? '「予約した」のマイル設定を取得できませんでした。'
+                  : bookingMileage === null
+                    ? '予約イベントのマイル付与ルールは未設定です。'
+                    : 'たまる決めごと「予約してくれた」が適用されます。'
+            }
+            status={
+              mileageLoadState === 'loading'
+                ? '確認中'
+                : mileageLoadState === 'error'
+                  ? '未取得'
+                  : bookingMileage === null
+                    ? '未設定'
+                    : `予約で ${formatNumber(bookingMileage)}`
+            }
+            href="/mileage?tab=earning-rules"
           />
         </div>
         <Field
           label="予約後に付けるタグ"
           htmlFor="bm-auto-tag"
-          note="このメニューで予約が入ると、予約した人の友だちに自動で付きます。付けないときは「なし」のままにしてください。"
+          help="このメニューで予約が入ると、予約した人の友だちに自動で付きます。付けないときは「なし」のままにしてください。"
         >
           {tagLoadState === 'loading' ? (
             <p className="text-ink-faint text-sm">タグを読み込んでいます…</p>
@@ -662,14 +768,7 @@ export default function NewBookingMenuPage() {
                 maxLength={100}
                 aria-label="タグを検索"
               />
-              <SelectField
-                id="bm-auto-tag"
-                aria-label="予約後に付けるタグ"
-                value={autoTagId ?? ''}
-                onChange={(e) => setAutoTagId(e.target.value === '' ? null : e.target.value)}
-                options={[{ value: '', label: '— なし —' }, ...tagOptions.map((t) => ({ value: t.id, label: t.name }))]}
-                className="w-full"
-              />
+              <Select size="full" id="bm-auto-tag" aria-label="予約後に付けるタグ" value={autoTagId ?? ''} onChange={(value) => setAutoTagId(value === '' ? null : value)} options={[{ value: '', label: '— なし —' }, ...tagOptions.map((t) => ({ value: t.id, label: t.name }))]} />
               {trimmedQuery !== '' && visibleTagCandidates.length === 0 && (
                 <p className="text-ink-faint text-xs">
                   「{trimmedQuery}」に合うタグがありません。
@@ -683,7 +782,7 @@ export default function NewBookingMenuPage() {
       <FormSection
         step={5}
         label="予約時に質問を出す"
-        note="犬種・体重など、当日必要な情報を先に聞けます。"
+        help="犬種・体重など、当日必要な情報を先に聞けます。"
       >
         <Field label="質問文" htmlFor="bm-intake" note="空欄なら質問しません。">
           <input
@@ -697,22 +796,17 @@ export default function NewBookingMenuPage() {
           />
         </Field>
 
-        <label className="flex cursor-pointer items-start gap-2">
-          <input
-            type="checkbox"
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
-            className="accent-accent mt-0.5"
-          />
-          <span>
-            <span className="text-ink text-sm">追加したらすぐ予約を受ける</span>
-            <span className="text-ink-faint block text-xs">
-              オフにすると下書きとして保存され、予約画面に出ません。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={isActive}
+          onCheckedChange={setIsActive}
+          description="オフにすると下書きとして保存され、予約画面に出ません。"
+        >
+          <span className="text-ink text-sm">追加したらすぐ予約を受ける</span>
+        </Checkbox>
       </FormSection>
     </CreatePage>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したメニュー" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    </>
   )
 }
 
@@ -734,7 +828,12 @@ function ActionSummary({ title, detail, status, href }: {
   return (
     <div className="border-hairline flex items-center gap-3 rounded-control border p-3">
       {content}
-      {href && <Button href={href}>設定を見る</Button>}
+      {/*
+       * R307: 作成中の入力を失わせないよう、関連設定は新しいタブで開く。
+       * 同じタブで離れると入力が空に戻るため（離脱確認を挟む代わりに、
+       * この画面自体は残す向きにする）。
+       */}
+      {href && <Button href={href} target="_blank" rel="noreferrer">設定を見る</Button>}
     </div>
   )
 }

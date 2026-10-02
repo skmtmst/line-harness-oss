@@ -19,7 +19,20 @@ const accountAccess = {
     canSeeUnassigned: true,
   })),
 };
-vi.mock('@line-crm/db', () => dbMocks);
+vi.mock('@line-crm/db', async (importOriginal) => {
+  // segment-conditions は純粋関数。実体は packages/db にあり、
+  // services/segment-query.js から再公開される。ここで潰すと条件の
+  // 検証・評価が undefined になるため、5つだけ実物を使う。
+  const real = await importOriginal<typeof import('@line-crm/db')>();
+  return {
+    buildPublicSegmentQuery: real.buildPublicSegmentQuery,
+    buildSegmentQuery: real.buildSegmentQuery,
+    buildSegmentWhere: real.buildSegmentWhere,
+    matchesCondition: real.matchesCondition,
+    parseCondition: real.parseCondition,
+    ...dbMocks,
+  };
+});
 vi.mock('../services/account-access.js', () => accountAccess);
 
 const { broadcasts } = await import('./broadcasts.js');
@@ -124,12 +137,13 @@ describe('POST /api/broadcasts idempotency', () => {
   });
 
   test('rejects an unsupported bubble instead of storing content that cannot be sent', async () => {
+    // coupon は配信用素材として対応済みのため、未対応種別の検証には使わない。
     const response = await setupApp().request('/api/broadcasts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...requestBody,
-        messageBubbles: [{ id: 'coupon-1', type: 'coupon', content: { assetId: 'coupon-1' } }],
+        messageBubbles: [{ id: 'mystery-1', type: 'mystery', content: {} }],
       }),
     });
     expect(response.status).toBe(400);

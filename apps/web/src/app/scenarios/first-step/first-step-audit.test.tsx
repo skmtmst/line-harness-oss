@@ -151,7 +151,7 @@ describe('SCENARIO-01：分の端数を丸めない', () => {
     // 日・時間・分の3欄に分かれて戻る（0日・1時間・30分）
     const numbers = screen.getAllByRole('spinbutton').map((el) => (el as HTMLInputElement).value)
     expect(numbers).toEqual(['0', '1', '30'])
-    await click('作成して編集へ →')
+    await click('作って編集へ →')
     expect(m.updateStep).toHaveBeenCalledTimes(1)
     expect(m.updateStep.mock.calls[0][2].offsetMinutes).toBe(90)
   })
@@ -161,7 +161,7 @@ describe('SCENARIO-01：分の端数を丸めない', () => {
       ok(scenario({ steps: [step({ offsetDays: 0, offsetMinutes: mins })] })),
     )
     await mount(<FirstStep />)
-    await click('作成して編集へ →')
+    await click('作って編集へ →')
     expect(m.updateStep.mock.calls[0][2].offsetMinutes).toBe(mins)
   })
 
@@ -170,7 +170,7 @@ describe('SCENARIO-01：分の端数を丸めない', () => {
       ok(scenario({ deliveryMode: 'relative', steps: [step({ delayMinutes: 90, offsetMinutes: null })] })),
     )
     await mount(<FirstStep />)
-    await click('作成して編集へ →')
+    await click('作って編集へ →')
     expect(m.updateStep.mock.calls[0][2].delayMinutes).toBe(90)
   })
 })
@@ -186,7 +186,7 @@ describe('SCENARIO-02：既存の内容を入力欄へ復元する', () => {
     )
     await mount(<FirstStep />)
     expect(screen.getByTestId('image-value').textContent).toContain('https://example.test/a.jpg')
-    await click('作成して編集へ →')
+    await click('作って編集へ →')
     expect(m.updateStep).toHaveBeenCalledTimes(1)
     expect(m.updateStep.mock.calls[0][2].messageContent).toBe(content)
   })
@@ -197,7 +197,7 @@ describe('SCENARIO-02：既存の内容を入力欄へ復元する', () => {
     )
     await mount(<FirstStep />)
     expect(screen.getByText(/読み取れませんでした/)).toBeTruthy()
-    await click('作成して編集へ →')
+    await click('作って編集へ →')
     expect(m.updateStep.mock.calls[0][2].messageContent).toBe('not-json')
     expect(m.updateStep.mock.calls[0][2].messageType).toBe('image')
   })
@@ -211,7 +211,7 @@ describe('SCENARIO-03：詳細条件が未設定なら全員対象にしない',
     fireEvent.change(screen.getByPlaceholderText('はじめまして。友だち追加ありがとうございます。'), {
       target: { value: '本文' },
     })
-    await click('作成して編集へ →')
+    await click('作って編集へ →')
     expect(m.addStep).not.toHaveBeenCalled()
     expect(screen.getByText(/詳細条件がまだ設定されていません/)).toBeTruthy()
   })
@@ -223,10 +223,10 @@ describe('SCENARIO-03：詳細条件が未設定なら全員対象にしない',
     fireEvent.change(screen.getByPlaceholderText('はじめまして。友だち追加ありがとうございます。'), {
       target: { value: '本文' },
     })
-    await click('作成して編集へ →')
+    await click('作って編集へ →')
     expect(m.addStep).not.toHaveBeenCalled()
     fireEvent.click(screen.getByLabelText('シナリオ購読中の全員に配信する'))
-    await click('作成して編集へ →')
+    await click('作って編集へ →')
     expect(m.addStep).toHaveBeenCalledTimes(1)
     expect(m.addStep.mock.calls[0][1].targetCondition).toBeNull()
   })
@@ -237,22 +237,23 @@ describe('SCENARIO-04：シナリオが確定するまで保存しない', () =>
     const slow = defer<unknown>()
     m.get.mockReturnValue(slow.promise)
     await mount(<FirstStep />)
-    expect(screen.queryByRole('button', { name: '作成して編集へ →' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '作って編集へ →' })).toBeNull()
     expect(screen.getByText('シナリオを読み込んでいます…')).toBeTruthy()
     await act(async () => {
       slow.resolve(ok(scenario({ steps: [] })))
     })
-    expect(screen.getByRole('button', { name: '作成して編集へ →' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '作って編集へ →' })).toBeTruthy()
   })
 
   it('取得失敗では保存できず、再読み込みで取り直せる', async () => {
     m.get.mockResolvedValueOnce(fail).mockResolvedValue(ok(scenario({ steps: [] })))
     await mount(<FirstStep />)
-    expect(screen.queryByRole('button', { name: '作成して編集へ →' })).toBeNull()
-    expect(screen.getByText('検証用エラー')).toBeTruthy()
-    await click('再読み込み')
+    expect(screen.queryByRole('button', { name: '作って編集へ →' })).toBeNull()
+    // 取得の失敗は ★V7 TargetMissing の error で出す（生の応答文は出さない）。
+    expect(screen.getByText('シナリオを読み込めませんでした')).toBeTruthy()
+    await click('もう一度読み込む')
     expect(m.get).toHaveBeenCalledTimes(2)
-    expect(screen.getByRole('button', { name: '作成して編集へ →' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '作って編集へ →' })).toBeTruthy()
   })
 
   it('id 切替後に古い応答が上書きしない（SCENARIO-11の1通目側）', async () => {
@@ -285,7 +286,7 @@ describe('SCENARIO-04：シナリオが確定するまで保存しない', () =>
     expect(
       (screen.getByPlaceholderText('はじめまして。友だち追加ありがとうございます。') as HTMLTextAreaElement).value,
     ).toBe('B本文')
-    await click('作成して編集へ →')
+    await click('作って編集へ →')
     expect(m.updateStep.mock.calls[0].slice(0, 2)).toEqual(['sc-b', 'b-step'])
   })
 })
@@ -298,22 +299,22 @@ describe('SCENARIO-05：保存失敗で「保存中」のままにしない', ()
       'はじめまして。友だち追加ありがとうございます。',
     ) as HTMLTextAreaElement
     fireEvent.change(body, { target: { value: '書きかけの本文' } })
-    await click('作成して編集へ →')
+    await click('作って編集へ →')
     expect(screen.getByText(/保存できませんでした/)).toBeTruthy()
-    const again = screen.getByRole('button', { name: '作成して編集へ →' }) as HTMLButtonElement
+    const again = screen.getByRole('button', { name: '作って編集へ →' }) as HTMLButtonElement
     expect(again.disabled).toBe(false)
     expect(body.value).toBe('書きかけの本文')
-    await click('作成して編集へ →')
+    await click('作って編集へ →')
     expect(m.updateStep).toHaveBeenCalledTimes(2)
   })
 
   it('業務失敗（success:false）でも busy を戻して理由を出す', async () => {
     m.updateStep.mockResolvedValueOnce(fail)
     await mount(<FirstStep />)
-    await click('作成して編集へ →')
+    await click('作って編集へ →')
     expect(screen.getByText('検証用エラー')).toBeTruthy()
     expect(
-      (screen.getByRole('button', { name: '作成して編集へ →' }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: '作って編集へ →' }) as HTMLButtonElement).disabled,
     ).toBe(false)
   })
 })

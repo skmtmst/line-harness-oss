@@ -59,7 +59,10 @@ describe('getAffiliatePaymentSummaries', () => {
       CREATE TABLE conversion_events (
         id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL, friend_id TEXT NOT NULL,
         affiliate_id TEXT, affiliate_code TEXT, attributed_ref_code TEXT,
-        approval_status TEXT, approved_at TEXT, value_snapshot REAL, point_name_snapshot TEXT
+        approval_status TEXT, approved_at TEXT, value_snapshot REAL, point_name_snapshot TEXT,
+        approval_amount_minor INTEGER, approval_formula TEXT, approval_commission_rate REAL,
+        approval_base_amount REAL, approval_fixed_reward INTEGER, approval_reward_miles INTEGER,
+        approval_notified_generation TEXT
       );
       CREATE TABLE affiliate_reward_entries (
         id TEXT PRIMARY KEY, organization_id TEXT, conversion_event_id TEXT NOT NULL,
@@ -87,9 +90,9 @@ describe('getAffiliatePaymentSummaries', () => {
       INSERT INTO affiliate_offers VALUES ('offer-fixed', '定期便', 3000, 'account-1');
       INSERT INTO affiliate_links VALUES ('link-fixed', 'fixed', 'fixed-ref', 'account-1', 'offer-fixed');
       INSERT INTO conversion_events VALUES
-        ('rate-approved', 'purchase', 'friend-1', 'rate', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 10000, NULL),
-        ('rate-pending', 'purchase', 'friend-1', 'rate', NULL, NULL, 'pending', NULL, 10000, NULL),
-        ('fixed-approved', 'purchase', 'friend-1', 'fixed', NULL, 'fixed-ref', 'approved', '2026-09-01T00:00:00Z', 10000, NULL);
+        ('rate-approved', 'purchase', 'friend-1', 'rate', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 10000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+        ('rate-pending', 'purchase', 'friend-1', 'rate', NULL, NULL, 'pending', NULL, 10000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+        ('fixed-approved', 'purchase', 'friend-1', 'fixed', NULL, 'fixed-ref', 'approved', '2026-09-01T00:00:00Z', 10000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
     `);
     // 承認済みは承認時に版がある状態にする(集計は版正本)。
     await ensureConversionRewardSnapshot(db, 'rate-approved', '2026-09-01T00:00:00Z');
@@ -112,8 +115,8 @@ describe('getAffiliatePaymentSummaries', () => {
         ('mine', '自店', 'mine-code', 10, 'friend-1', 0, NULL, 'account-1', 'tenant-1'),
         ('other', '他店', 'other-code', 10, 'friend-2', 0, NULL, 'account-2', 'tenant-1');
       INSERT INTO conversion_events VALUES
-        ('mine-cv', 'purchase', 'friend-1', 'mine', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 1000, NULL),
-        ('other-cv', 'purchase', 'friend-2', 'other', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 50000, NULL);
+        ('mine-cv', 'purchase', 'friend-1', 'mine', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 1000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+        ('other-cv', 'purchase', 'friend-2', 'other', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 50000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
     `);
     await ensureConversionRewardSnapshot(db, 'mine-cv', '2026-09-01T00:00:00Z');
 
@@ -130,8 +133,8 @@ describe('getAffiliatePaymentSummaries', () => {
       INSERT INTO affiliate_offers VALUES ('offer-fixed', '定期便', 3000, 'account-1');
       INSERT INTO affiliate_links VALUES ('link-fixed', 'fixed', 'fixed-ref', 'account-1', 'offer-fixed');
       INSERT INTO conversion_events VALUES
-        ('rate-approved', 'purchase', 'friend-1', 'rate', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 10000, NULL),
-        ('fixed-approved', 'purchase', 'friend-1', 'fixed', NULL, 'fixed-ref', 'approved', '2026-09-01T00:00:00Z', 10000, NULL);
+        ('rate-approved', 'purchase', 'friend-1', 'rate', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 10000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+        ('fixed-approved', 'purchase', 'friend-1', 'fixed', NULL, 'fixed-ref', 'approved', '2026-09-01T00:00:00Z', 10000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
     `);
     await ensureConversionRewardSnapshot(db, 'rate-approved', '2026-09-01T00:00:00Z');
     await ensureConversionRewardSnapshot(db, 'fixed-approved', '2026-09-01T00:00:00Z');
@@ -154,9 +157,9 @@ describe('getAffiliatePaymentSummaries', () => {
         ('held', '保留あり', 'held-code', 10, 'friend-1', 7, '毎月末締め', 'account-1', 'tenant-1'),
         ('empty', '成果なし', 'empty-code', 0, 'friend-1', NULL, NULL, 'account-1', 'tenant-1');
       INSERT INTO conversion_events VALUES
-        ('recent', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', '2026-09-03T00:00:00Z', 10000, NULL),
-        ('old', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', '2026-08-01T00:00:00Z', 10000, NULL),
-        ('unknown', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', NULL, 10000, NULL);
+        ('recent', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', '2026-09-03T00:00:00Z', 10000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+        ('old', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', '2026-08-01T00:00:00Z', 10000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+        ('unknown', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', NULL, 10000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
     `);
     await ensureConversionRewardSnapshot(db, 'recent', '2026-09-03T00:00:00Z');
     await ensureConversionRewardSnapshot(db, 'old', '2026-08-01T00:00:00Z');
@@ -211,7 +214,10 @@ describe('紹介停止と支払い確定の追記台帳', () => {
       CREATE TABLE conversion_events (
         id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL, friend_id TEXT NOT NULL,
         affiliate_id TEXT, affiliate_code TEXT, attributed_ref_code TEXT,
-        approval_status TEXT, approved_at TEXT, value_snapshot REAL, point_name_snapshot TEXT
+        approval_status TEXT, approved_at TEXT, value_snapshot REAL, point_name_snapshot TEXT,
+        approval_amount_minor INTEGER, approval_formula TEXT, approval_commission_rate REAL,
+        approval_base_amount REAL, approval_fixed_reward INTEGER, approval_reward_miles INTEGER,
+        approval_notified_generation TEXT
       );
       INSERT INTO tenants VALUES ('tenant-1');
       INSERT INTO line_accounts VALUES ('account-1', 'tenant-1');
@@ -231,9 +237,9 @@ describe('紹介停止と支払い確定の追記台帳', () => {
       INSERT INTO affiliate_offers VALUES ('offer-1', '定期便', 5000, 'account-1');
       INSERT INTO affiliate_links VALUES ('link-1', 'affiliate-1', 'north', 'account-1', 'offer-1', 1);
       INSERT INTO conversion_events VALUES
-        ('cv-1', 'purchase', 'friend-1', 'affiliate-1', NULL, 'north', 'approved', '2026-08-01T00:00:00Z', 12000, '購入'),
-        ('cv-2', 'purchase', 'friend-1', 'affiliate-1', NULL, 'north', 'approved', '2026-08-02T00:00:00Z', 15000, '購入'),
-        ('cv-pending', 'purchase', 'friend-1', 'affiliate-1', NULL, 'north', 'pending', NULL, 15000, '購入');
+        ('cv-1', 'purchase', 'friend-1', 'affiliate-1', NULL, 'north', 'approved', '2026-08-01T00:00:00Z', 12000, '購入', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+        ('cv-2', 'purchase', 'friend-1', 'affiliate-1', NULL, 'north', 'approved', '2026-08-02T00:00:00Z', 15000, '購入', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+        ('cv-pending', 'purchase', 'friend-1', 'affiliate-1', NULL, 'north', 'pending', NULL, 15000, '購入', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
     `);
     db = asFullD1(sqlite);
     // 承認済みfixtureは承認時に版がある状態にする(締めは版だけを使う)。
@@ -332,7 +338,7 @@ describe('紹介停止と支払い確定の追記台帳', () => {
       INSERT INTO affiliate_links VALUES ('link-2', 'affiliate-2', 'other', 'account-2', 'offer-2', 1);
       INSERT INTO conversion_events VALUES
         ('cv-other', 'purchase-2', 'friend-2', 'affiliate-2', NULL, 'other',
-         'approved', '2026-08-03T00:00:00Z', 20000, '購入');
+         'approved', '2026-08-03T00:00:00Z', 20000, '購入', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
     `);
     await ensureConversionRewardSnapshot(db, 'cv-other', '2026-08-03T00:00:00Z');
     expect(await confirmAffiliateSettlement(db, {

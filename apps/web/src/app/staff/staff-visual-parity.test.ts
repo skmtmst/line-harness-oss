@@ -28,10 +28,10 @@ describe('V6 30 ログインユーザーの画面契約', () => {
 
   it('集計カードをPenの105px高と文字階層に固定する', () => {
     expect(staffSource).toContain('h-[105px]')
-    expect(staffSource).toContain('rounded-[18px]')
+    expect(staffSource).toContain('rounded-card')
     expect(staffSource).toContain('p-[15px]')
     expect(staffSource).toContain('gap-[5px]')
-    expect(staffSource).toContain('text-xl font-bold leading-[1.45]')
+    expect(staffSource).toContain('text-xl font-semibold leading-[1.45]')
     expect(staffSource).toContain('text-[11px] leading-[1.45]')
   })
 
@@ -59,9 +59,26 @@ describe('V6 30 ログインユーザーの画面契約', () => {
   })
 
   it('一覧は1440pxで横スクロールさせない7列の固定表にする', () => {
-    expect(staffSource).toContain('w-full table-fixed text-sm')
+    // 表は共通の DataTable（中で w-full table-fixed を持つ）。
+    expect(staffSource).toContain('<DataTable')
     expect(staffSource).toContain('colSpan={7}')
     expect(staffSource).not.toContain('min-w-[1180px]')
+  })
+
+  it('「最後に入った」が切れないよう固定幅を配分し、操作列は欠けさせない', () => {
+    // 「人」と「見せる範囲」の広すぎる取り分をやめ、空きを日時列へ回す
+    expect(staffSource).not.toContain('<Th className="w-1/4">人</Th>')
+    expect(staffSource).not.toContain('見せる範囲</Th><Th>最後に入った')
+    // 日時と下の1行が読める幅・ボタンが収まる幅・見出しが触れない幅・操作列の順
+    expect(staffSource).toContain('<Th className="w-44">最後に入った</Th>')
+    expect(staffSource).toContain('<Th className="w-36">2段階の確認</Th>')
+    expect(staffSource).toContain('<Th className="w-20">役わり</Th>')
+    expect(staffSource).toContain('<Th align="right" className="w-72">操作</Th>')
+  })
+
+  it('「最後に入った」の下の1行は省略しても全文をtitleで読める', () => {
+    expect(staffSource).toContain('truncate text-xs text-ink-faint')
+    expect(staffSource).toContain('title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}`')
   })
 
   it('入った記録は異変を拾える札と設計順の5列を持つ', () => {
@@ -85,7 +102,7 @@ describe('V6 30 ログインユーザーの画面契約', () => {
     expect(staffSource).toContain('かたまりから選ぶ')
     expect(staffSource).toContain('項目ごとに決める')
     expect(staffSource).toContain('この決め方で、この人にはこう見えます')
-    expect(staffSource).toContain('見せる範囲を保存')
+    expect(staffSource).toContain('見せる範囲を保存する')
     expect(staffSource).not.toContain('function RolePermissionMatrix')
   })
 })

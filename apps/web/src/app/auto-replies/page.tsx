@@ -1,20 +1,30 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Disclosure from '@/components/shared/disclosure'
+import FilterChip from '@/components/shared/filter-chip'
+import ListToolbar from '@/components/shared/list-toolbar'
+import SortSelect from '@/components/ui/sort-select'
+import PageSizeSelect from '@/components/ui/page-size-select'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Trash2, TriangleAlert } from 'lucide-react'
+import { ChevronDown, ChevronUp, MoreHorizontal, Trash2, TriangleAlert } from 'lucide-react'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { toDraft } from '@/components/auto-replies/edit-dialog'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import EditDialog, { type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
+import EditDialog, { type AutoReplyDraft, type AutoReplyOrderHint } from '@/components/auto-replies/edit-dialog'
+import { inEvaluationOrder, movePriorityUpdates } from './auto-reply-order'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { TableStateRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import {
   EFFECTIVE_LEGEND,
   LOAD_STATE_WORDS,
@@ -160,9 +170,20 @@ function ruleSubtitle(r: AutoReply, templateName: string | null): string {
   return `${trigger} / ${[response, ...actions].join('＋')}`
 }
 
+/**
+ * R527: 見るだけの担当者（staff）には作成・変更・停止・削除の入口を出さない。
+ * 口側は作成・更新・停止・削除を owner/admin だけに絞っている
+ * （`auto-replies.ts` の requireRole）ので、画面も同じ境目
+ * （`canManageRole`）で出し分ける。確認が終わるまで
+ * （staffRole === null）は今までどおり出す。
+ */
+const NO_MANAGE_NOTE = '自動応答の作成・変更・停止・削除はオーナーと管理者だけができます。必要なときはオーナーか管理者に頼んでください。'
+
 export default function AutoRepliesPage() {
   usePageTitle('自動応答')
   const { selectedAccountId, accounts } = useAccount()
+  const staffRole = useStaffRole()
+  const canManage = staffRole === null || canManageRole(staffRole)
   const [items, setItems] = useState<AutoReply[]>([])
   const [query, setQuery] = useState('')
   const [templates, setTemplates] = useState<TemplateLite[]>([])
@@ -173,6 +194,8 @@ export default function AutoRepliesPage() {
    * 混ぜない。** 混ぜると、登録したものが消えたように読める。
    */
   const [loadState, setLoadState] = useState<LoadState>('loading')
+  /** m23m: 捕まえた読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   // #721: 未分類の件数は GET /api/folders の unfiledCount をそのまま出す。
   // 来ないときは null（FolderPanel が「—」と出す）。
@@ -191,6 +214,11 @@ export default function AutoRepliesPage() {
   const [toggleReason, setToggleReason] = useState('')
   const [toggling, setToggling] = useState(false)
   const [toggleError, setToggleError] = useState('')
+  // 行の「その他」メニューの開き先（#641: 停止・再開はここへ集約）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /** 上下入れ替えの実行中は同じ行のボタンを押せないようにする。 */
+  const [reorderingId, setReorderingId] = useState<string | null>(null)
+  const [reorderError, setReorderError] = useState('')
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
   const loadGenerationRef = useRef(0)
@@ -200,11 +228,13 @@ export default function AutoRepliesPage() {
     const requestAccountId = selectedAccountId
     const requestGeneration = ++loadGenerationRef.current
     setLoadState('loading')
+    setLoadError(null)
     setConflictCount(null)
     try {
       const [arRes, tplRes, summaryRes] = await Promise.all([
         api.autoReplies.list({ accountId: selectedAccountId || undefined }),
-        api.templates.list(),
+        // R23横展開: 返す文の候補は今のアカウントだけ（別アカウント混入防止）。
+        api.templates.list(undefined, selectedAccountId || undefined),
         selectedAccountId
           ? api.autoReplies.summary(selectedAccountId).catch(() => null)
           : Promise.resolve(null),
@@ -243,15 +273,20 @@ export default function AutoRepliesPage() {
       )) return
       // 403 は通信の失敗ではない。読み直しても直らないので、そう書く。
       setLoadedAccountId(requestAccountId)
+      setLoadError(reason)
       setLoadState(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
   }, [selectedAccountId])
 
   const loadFolders = useCallback(async () => {
-    const res = await api.folders.list('auto_reply')
-    if (res.success) {
-      setFolders(res.data)
-      setUnfiledCount(res.unfiledCount ?? null)
+    try {
+      const res = await api.folders.list('auto_reply')
+      if (res.success) {
+        setFolders(res.data)
+        setUnfiledCount(res.unfiledCount ?? null)
+      }
+    } catch {
+      // m23m: 置き場が取れなくても一覧は出す。取れない失敗で画面を落とさない。
     }
   }, [])
 
@@ -289,10 +324,10 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex max-w-full items-center truncate px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
+                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-[10px] bg-canvas-sunken text-ink-faint line-through"
                 title={title}
               >
-                {label}
+                {word.mark} {label}
               </span>
             )
           }
@@ -300,7 +335,7 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-success-bg text-success font-medium"
+                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-[10px] bg-success-bg text-success font-medium"
                 title={title}
               >
                 {word.mark} {label}{ea.via === 'automation' && <span className="text-success">⚙</span>}
@@ -310,7 +345,7 @@ export default function AutoRepliesPage() {
           return (
             <span
               key={ea.accountId}
-              className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-warning-bg text-warning"
+              className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-[10px] bg-warning-bg text-warning"
               title={title}
             >
               {word.mark} {label}
@@ -330,10 +365,10 @@ export default function AutoRepliesPage() {
           r.responseType === 'silent'
             ? 'text-ink-faint text-xs'
             : r.responseType === 'flex'
-              ? 'px-1.5 py-0.5 rounded bg-chip-alt-soft text-chip-alt text-[10px] font-medium'
+              ? 'px-1.5 py-0.5 rounded-mini bg-chip-alt-soft text-chip-alt text-[10px] font-medium'
               : r.responseType === 'image'
-                ? 'px-1.5 py-0.5 rounded bg-info-bg text-info text-[10px] font-medium'
-                : 'px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-secondary text-[10px] font-medium'
+                ? 'px-1.5 py-0.5 rounded-mini bg-info-bg text-info text-[10px] font-medium'
+                : 'px-1.5 py-0.5 rounded-mini bg-canvas-sunken text-ink-secondary text-[10px] font-medium'
         }
         title={word.note}
       >
@@ -352,10 +387,11 @@ export default function AutoRepliesPage() {
     if (!word.linked) {
       return <span className="text-[11px] text-ink-faint" title={word.note}>{word.label}</span>
     }
+    // R11: テンプレートはこの行の物とは別物のため、別画面へ飛ばさない。名前は黒文字。
     return (
-      <a href="/templates" className="text-blue-600 hover:underline text-xs" title={word.note}>
+      <span className="text-ink text-xs" title={word.note}>
         {word.label}
-      </a>
+      </span>
     )
   }
 
@@ -441,6 +477,56 @@ export default function AutoRepliesPage() {
       setToggling(false)
     }
   }
+
+  /*
+   * R28: 順番は一覧で上下を入れ替えて決める。窓の中では数字を打たせない。
+   * 入れ替えは隣との数字の交換（同点だけ1ずらし）で、既存の更新口を使う。
+   * 新しい口は足さない。
+   */
+  const evaluationOrdered = useMemo(() => inEvaluationOrder(items), [items])
+
+  const handleMove = async (id: string, delta: -1 | 1, ordered: Array<{ id: string; priority: number; createdAt: string }>) => {
+    const updates = movePriorityUpdates(ordered, id, delta)
+    if (!updates || reorderingId) return
+    setReorderingId(id)
+    setReorderError('')
+    try {
+      for (const update of updates) {
+        const result = await api.autoReplies.update(update.id, { priority: update.priority })
+        if (!result.success) throw new Error('reorder_failed')
+      }
+      await load()
+    } catch {
+      setReorderError('順番を変えられませんでした。画面を読み直してからお試しください。')
+    } finally {
+      setReorderingId(null)
+    }
+  }
+
+  /** 編集中の窓へ渡す順番の手がかり。評価順での位置と先に見る名前だけ。 */
+  const editingOrderHint: AutoReplyOrderHint | null = useMemo(() => {
+    if (!editing) return null
+    if (!editing.id) {
+      return { position: null, total: evaluationOrdered.length, earlier: [], earlierTotal: 0 }
+    }
+    const index = evaluationOrdered.findIndex((item) => item.id === editing.id)
+    if (index < 0) return null
+    const earlier = evaluationOrdered.slice(0, index).map((item) => ({
+      id: item.id,
+      name: item.name || (item.respondToAll ? 'すべてのメッセージ' : item.keyword),
+    }))
+    return {
+      position: index + 1,
+      total: evaluationOrdered.length,
+      earlier: earlier.slice(-3),
+      earlierTotal: earlier.length,
+    }
+  }, [editing, evaluationOrdered])
+
+  /** 新しく作るルールは一覧のいちばん下へ。窓の中では順番を変えられない。 */
+  const nextPriority = items.length === 0
+    ? 0
+    : Math.min(9999, Math.max(...items.map((item) => item.priority)) + 1)
 
   /*
     ヒット数の合計（152）。KPI に出す。
@@ -532,18 +618,20 @@ export default function AutoRepliesPage() {
   const visualMonthly = monthlyHits
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">ルール数</p>
+          {/* R12: 総数は「すべて」の行とページ送りだけにし、KPIの主数値は有効にする。 */}
+          <p className="text-ink-faint text-xs">有効</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(visibleLoadState, visualTotal)}
+            {metricWord(visibleLoadState, visualActive)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
-              ? `有効 ${visualActive}件`
+              ? `動いていない ${visualTotal - visualActive}件`
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
@@ -585,99 +673,110 @@ export default function AutoRepliesPage() {
         </div>
       </KpiCollapse>
 
+      {/*
+        ★V7 `Xn1Mz`：上からの順は「数のカード → 説明の開閉 → ＋作る」。
+        複数当てはまったときの挙動と、「適用アカウント」欄の札の読み方。書いていないと必ず問い合わせになるが、
+        毎回2つの帯が一覧を押し下げていたので、閉じた欄にしまう（★V7：今は出さなくてよいもの）。
+      */}
+      <Disclosure size="compact" title="ルールの動き方と札の見方" hint="上から順に1つだけ動きます">
+        <div className="text-ink-secondary mb-3 text-xs leading-relaxed">
+          上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
+          時間帯や連投の設定で見送られたときは、その次のルールを見ます。
+          並び順は「評価順」のとおりで、小さいほど先に見ます。
+          順番を変えるときは「評価順」の並びで上下のボタンを使います。
+        </div>
+
+        {/* 「適用アカウント」欄の札の読み方。札の見た目と1対1で並べる。 */}
+        <div className="text-ink-secondary space-y-1 text-xs">
+          {EFFECTIVE_LEGEND.map((row) => (
+            <p key={row.status}>
+              <span
+                className={
+                  row.status === 'reply'
+                    ? 'inline-flex items-center gap-0.5 rounded-mini bg-success-bg px-1.5 py-0.5 text-[10px] font-medium text-success'
+                    : row.status === 'silent'
+                      ? 'inline-flex items-center gap-0.5 rounded-mini bg-warning-bg px-1.5 py-0.5 text-[10px] text-warning'
+                      : 'inline-flex items-center gap-0.5 rounded-mini bg-canvas-sunken px-1.5 py-0.5 text-[10px] text-ink-faint line-through'
+                }
+              >
+                {row.mark ? `${row.mark} ` : ''}アカウント名
+              </span>{' '}
+              {row.text}
+            </p>
+          ))}
+        </div>
+      </Disclosure>
+
       <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
-        <Button
-          variant="primary"
-          onClick={() => setEditing({
-            keyword: '',
-            matchType: 'exact',
-            responseType: 'text',
-            responseContent: '',
-            templateId: null,
-            lineAccountId: selectedAccountId,
-            // AUTOREPLY-08: 新しい応答は止まった状態で作る。動かすのは
-            // 一覧の「再開」や公開前の確認から、保存とは別の操作で。
-            isActive: false,
-          })}
-        >
-          ルールを作成
-        </Button>
-      </div>
-
-      {/* 複数当てはまったときの挙動。書いていないと必ず問い合わせになる。 */}
-      <div className="bg-info-bg text-info mb-4 rounded-lg p-3 text-xs leading-relaxed">
-        上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
-        時間帯や連投の設定で見送られたときは、その次のルールを見ます。
-        並び順は「評価順」の数字で決まり、小さいほど先に見ます。
-      </div>
-
-      {/* 「適用アカウント」欄の札の読み方。札の見た目と1対1で並べる。 */}
-      <div className="bg-info-bg border-hairline text-info mb-4 space-y-1 rounded-lg border p-3 text-xs">
-        {EFFECTIVE_LEGEND.map((row) => (
-          <p key={row.status}>
-            <span
-              className={
-                row.status === 'reply'
-                  ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700'
-                  : row.status === 'silent'
-                    ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700'
-                    : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
-              }
-            >
-              {row.mark ? `${row.mark} ` : ''}アカウント名
-            </span>{' '}
-            {row.text}
+        {canManage ? (
+          <Button
+            variant="primary"
+            onClick={() => setEditing({
+              keyword: '',
+              matchType: 'exact',
+              responseType: 'text',
+              responseContent: '',
+              templateId: null,
+              lineAccountId: selectedAccountId,
+              // AUTOREPLY-08: 新しい応答は止まった状態で作る。動かすのは
+              // 一覧の「再開」や公開前の確認から、保存とは別の操作で。
+              isActive: false,
+              // R28: 新しいルールは一覧のいちばん下へ。順番は窓の中では変えない。
+              priority: nextPriority,
+            })}
+          >
+            ＋ ルールを作る
+          </Button>
+        ) : (
+          <p className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs leading-relaxed">
+            {NO_MANAGE_NOTE}
           </p>
-        ))}
+        )}
       </div>
 
-      <div
-        data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
-      >
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="自動応答名で検索"
-          aria-label="自動応答名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "hits", label: "ヒット数が多い順" }, { value: "priority", label: "評価順" }, { value: "name", label: "名前順" }, { value: "created", label: "作った順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
-        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <SelectField
-          size="compact"
-          value={pageSize}
-          onChange={(e) => setPageSize(Number(e.target.value))}
-          aria-label="表示件数"
-          options={[{ value: '20', label: '20件' }, { value: '50', label: '50件' }, { value: '100', label: '100件' }]}
-        />
+      {/*
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+        右端に並び順と表示件数。#636/#668 の並びの意図はそのまま。
+        設計の Bar（検索行）・Saved（絞り込み行）は共通 ListToolbar の
+        1・2行目にいる。印だけここに残し、設計との突き合わせを保つ。
+      */}
+      <div data-design="Bar">
+      <div data-design="Saved">
+      <ListToolbar
+        search={{ placeholder: '自動応答名で検索', value: query, onChange: setQuery }}
+        filters={
+          <>
+            <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+            {SAVED_FILTERS.map((f) => {
+              const on = savedFilter === f.key
+              return (
+                <FilterChip
+                  key={f.key}
+                  selected={on}
+                  onChange={(next) => setSavedFilter(next ? f.key : '')}
+                  title={f.note}
+                >
+                  {f.label}
+                </FilterChip>
+              )
+            })}
+          </>
+        }
+        trailing={
+          <>
+            <SortSelect
+              value={sortKey}
+              onChange={(value) => setSortKey(value as SortKey)}
+              options={[{ value: 'hits', label: 'ヒット数が多い順' }, { value: 'priority', label: '評価順' }, { value: 'name', label: '名前順' }, { value: 'created', label: '作った順' }]}
+            />
+            <PageSizeSelect value={pageSize} onChange={setPageSize} />
+          </>
+        }
+      />
+      </div>
       </div>
 
-      <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
-        {SAVED_FILTERS.map((f) => {
-          const on = savedFilter === f.key
-          return (
-            <button
-              key={f.key}
-              onClick={() => setSavedFilter(on ? '' : f.key)}
-              aria-pressed={on}
-              title={f.note}
-              className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
-                on
-                  ? 'border-accent bg-accent-soft text-ink'
-                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-              }`}
-            >
-              {f.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {folderDialogOpen && (
+      {folderDialogOpen && canManage && (
         <FolderAddDialog
           kind="auto_reply"
           note="自動応答を分けてしまう箱です。消しても、入っていた応答は未分類として残ります。"
@@ -689,10 +788,10 @@ export default function AutoRepliesPage() {
 
       <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
-          total={ready ? `${visualTotal} 件` : '—'}
+          /* 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。 */
           activeId={folderFilter}
           onSelect={setFolderFilter}
-          onAddFolder={() => setFolderDialogOpen(true)}
+          onAddFolder={canManage ? () => setFolderDialogOpen(true) : undefined}
           rows={[
             { id: '', label: 'すべて', count: visualTotal },
             ...folders.map((f) => ({
@@ -717,50 +816,66 @@ export default function AutoRepliesPage() {
         </FolderPanel>
 
         <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          <table className="min-w-[100%] w-full table-fixed">
+          {/* #641: 枠つきボタンで広くなった操作列ぶん、表だけが横に流れるようにする */}
+          {/* @container: 列の出し分けを画面幅ではなく表の実際の幅で決める（谷間帯の列削減）。 */}
+          <div className="overflow-x-auto @container">
+          <table className="min-w-[784px] @[880px]:min-w-[880px] w-full table-fixed">
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
-                <th className="w-2/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
-                <th className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
-                <th className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">どんなときに動くか</th>
-                <th title="返信と実行するアクション" className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">何を返すか</th>
-                <th className="w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
-                <th className="w-28 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
-                <th className="hidden px-4 py-3">テンプレート</th>
-                <th className="hidden px-4 py-3">応答条件</th>
-                <th className="hidden px-4 py-3">適用アカウント</th>
-                <th className="hidden px-4 py-3">累計</th>
+                <Th className="px-4 py-3 text-xs whitespace-normal">ルール名</Th>
+                <Th className="w-20 px-4 py-3 text-xs whitespace-normal">状態</Th>
+                <Th className="w-1/6 px-4 py-3 text-xs" title="動く条件（キーワード・適用アカウント）">条件</Th>
+                <Th className="w-1/6 px-4 py-3 text-xs" title="返信と実行するアクション">返すもの</Th>
+                {/* 谷間帯の列削減: 回数は補助情報なので表の幅が足りない間だけ畳む。 */}
+                <Th className="cq-hide-below-880 w-24 px-4 py-3 text-xs whitespace-normal" title="今月動いた回数">今月の応答</Th>
+                {/*
+                  #774: 右端の操作列は sticky で留める。幅は中身（編集＋
+                  その他の 32px 級 2つ）に合わせた固定 144。
+                */}
+                <Th title="編集・停止または再開・削除" className={`bg-canvas-sunken sticky right-0 px-4 py-3 text-right text-xs font-semibold text-ink-faint whitespace-normal ${sortKey === 'priority' ? 'w-52' : 'w-36'}`}>操作</Th>
+                <Th hidden>テンプレート</Th>
+                <Th hidden>応答条件</Th>
+                <Th hidden>適用アカウント</Th>
+                <Th hidden>累計</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-divider-soft">
               {/*
                 読めていないときに「ありません」と言わない。消えたように読める。
                 読込中・読めなかった・権限が無い・本当に0件を言い分ける。
               */}
               {!ready ? (
-                <tr><td colSpan={6} className="px-4 py-8">
-                  <ListState
+                visibleLoadState === 'forbidden' ? (
+                  <tr><td colSpan={6} className="px-4 py-8">
+                    <ListState
+                      kind="forbidden"
+                      title={LOAD_STATE_WORDS.forbidden.label}
+                      description={LOAD_STATE_WORDS.forbidden.note}
+                    />
+                  </td></tr>
+                ) : (
+                  <TableStateRow
+                    colSpan={6}
                     kind={visibleLoadState}
                     title={LOAD_STATE_WORDS[visibleLoadState].label}
-                    description={LOAD_STATE_WORDS[visibleLoadState].note}
-                    action={
-                      visibleLoadState === 'error'
-                        ? <Button onClick={() => void load()}>再読み込み</Button>
-                        : undefined
-                    }
+                    // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+                    // それ以外は画面の文のまま。
+                    description={isForbiddenOrRateLimited(loadError) ? undefined : LOAD_STATE_WORDS[visibleLoadState].note}
+                    error={loadError ?? undefined}
+                    onRetry={visibleLoadState === 'error' ? () => void load() : undefined}
+                    retryLabel="再読み込み"
                   />
-                </td></tr>
+                )
               ) : shownInFolder.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8">
-                  <ListState
-                    kind="empty"
-                    title="自動応答は0件です"
-                    description="絞り込みを外すか、「自動応答を作成」から追加してください。"
-                  />
-                </td></tr>
+                <TableStateRow
+                  colSpan={6}
+                  kind="empty"
+                  title="自動応答は0件です"
+                  description="絞り込みを外すか、「自動応答を作成」から追加してください。"
+                />
               ) : (
-                shownInFolder.map((r) => (
-                  <tr key={r.id} className="hover:bg-canvas-sunken">
+                shownInFolder.map((r, viewIndex) => (
+                  <tr key={r.id} className="group hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm font-medium text-ink">
                       {/* 名前があればそれを出す。無ければキーワード。
                           一律で応答するルールはキーワードが無いので、名前を付けて
@@ -775,7 +890,7 @@ export default function AutoRepliesPage() {
                     <td className="px-3 py-3">
                       {/* E-01: 止めた記録があれば、いつ・誰が・なぜを title で読める */}
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-pill text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}
                         title={stopNote(r) ?? undefined}
                       >
                         {r.isActive ? '有効' : '停止中'}
@@ -815,61 +930,117 @@ export default function AutoRepliesPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td
+                      className="cq-hide-below-880 px-3 py-3 whitespace-nowrap"
+                      title={`今月 ${r.hits?.period ?? '—'}回 ／ 累計 ${r.hits?.total ?? '—'}回`}
+                    >
                       {/* **数えられていないものを 0 と書かない。** 0 は「当たらなかった」の意味。 */}
                       <span className="text-ink text-sm tabular-nums">{r.hits?.period ?? '—'}</span>
                       <span className="text-ink-faint text-xs">回</span>
-                      <span className="text-ink-faint mt-0.5 block text-[10px]">累計 {r.hits?.total ?? '—'}回</span>
+                      {/* 狭い列でも横に流さないよう、累計は1行で切る（全文は列の title） */}
+                      <span className="text-ink-faint mt-0.5 block max-w-full truncate text-[10px]">累計 {r.hits?.total ?? '—'}回</span>
                     </td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => setEditing(toDraft(r))}
-                        className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-info-bg rounded-md"
-                      >
-                        編集
-                      </button>
-                      {/* N-086: 行から止められる。下書き（未公開）は公開の前段なので、
-                          動かす口は出さず、公開の流れに任せる。 */}
-                      {r.isActive ? (
-                        <button
-                          aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を停止`}
-                          onClick={() => {
-                            setToggleError('')
-                            setToggleReason('')
-                            setPendingToggle({ item: r, kind: 'stop', accountId: selectedAccountId })
-                          }}
-                          className="ml-1 px-2.5 py-1 text-xs font-medium text-ink-secondary hover:bg-canvas-sunken rounded-md"
+                    {/* 狭い列でボタンが切れても、重ねるだけで操作の全部が
+                        読めるように title を付ける（第5パス D-3）。 */}
+                    <td
+                      className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-3 py-3 text-right whitespace-nowrap"
+                      title={canManage
+                        ? ['編集', r.isActive ? '停止' : r.lifecycleStatus !== 'draft' ? '再開' : null, '削除'].filter(Boolean).join('・')
+                        : NO_MANAGE_NOTE}
+                    >
+                      {/* 行の操作は「主な1つ＋…メニュー」。削除は行に直に置かず、
+                          メニューの中の危ない操作へ。
+                          N-086: 行から止められる。下書き（未公開）は公開の前段なので、
+                          動かす口は出さず、公開の流れに任せる。
+                          R527: 見るだけには行の操作を出さず「—」にする。 */}
+                      {canManage ? (
+                      <div className="relative inline-flex items-center justify-end gap-1.5">
+                        {/*
+                          R28: 順番は「評価順」の並びで上下を入れ替えて決める。
+                          ほかの並びでは順番と関係ないので出さない。
+                        */}
+                        {sortKey === 'priority' && (
+                          <>
+                            <IconButton
+                              aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を1つ上へ`}
+                              disabled={viewIndex === 0 || reorderingId !== null}
+                              onClick={() => void handleMove(r.id, -1, sortedItems)}
+                            >
+                              <ChevronUp aria-hidden />
+                            </IconButton>
+                            <IconButton
+                              aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を1つ下へ`}
+                              disabled={viewIndex === sortedItems.length - 1 || reorderingId !== null}
+                              onClick={() => void handleMove(r.id, 1, sortedItems)}
+                            >
+                              <ChevronDown aria-hidden />
+                            </IconButton>
+                          </>
+                        )}
+                        <Button
+                          variant="secondary"
+                          size="compact"
+                          onClick={() => setEditing(toDraft(r))}
                         >
-                          停止
-                        </button>
-                      ) : r.lifecycleStatus !== 'draft' ? (
-                        <button
-                          aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を再開`}
-                          onClick={() => {
-                            setToggleError('')
-                            setPendingToggle({ item: r, kind: 'resume', accountId: selectedAccountId })
-                          }}
-                          className="ml-1 px-2.5 py-1 text-xs font-medium text-ink-secondary hover:bg-canvas-sunken rounded-md"
+                          編集
+                        </Button>
+                        <IconButton
+                          aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」のその他操作`}
+                          aria-expanded={openMenuId === r.id}
+                          onClick={() =>
+                            setOpenMenuId((current) => (current === r.id ? null : r.id))
+                          }
                         >
-                          再開
-                        </button>
-                      ) : null}
-                      <button
-                        aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を削除`}
-                        onClick={() => {
-                          setDeleteError('')
-                          setPendingDelete({ item: r, accountId: selectedAccountId })
-                        }}
-                        className="ml-1 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-danger-bg rounded-md"
-                      >
-                        削除
-                      </button>
+                          <MoreHorizontal aria-hidden />
+                        </IconButton>
+                        <ActionMenu
+                          open={openMenuId === r.id}
+                          ariaLabel={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」の操作`}
+                          onClose={() => setOpenMenuId(null)}
+                          items={[
+                            ...((r.isActive || r.lifecycleStatus !== 'draft')
+                              ? [r.isActive
+                                ? {
+                                    id: 'stop',
+                                    label: '停止する',
+                                    onSelect: () => {
+                                      setToggleError('')
+                                      setToggleReason('')
+                                      setPendingToggle({ item: r, kind: 'stop', accountId: selectedAccountId })
+                                    },
+                                  }
+                                : {
+                                    id: 'resume',
+                                    label: '再開する',
+                                    onSelect: () => {
+                                      setToggleError('')
+                                      setPendingToggle({ item: r, kind: 'resume', accountId: selectedAccountId })
+                                    },
+                                  }]
+                              : []),
+                            {
+                              id: 'delete',
+                              label: '削除する',
+                              tone: 'danger',
+                              dividerBefore: r.isActive || r.lifecycleStatus !== 'draft',
+                              onSelect: () => {
+                                setDeleteError('')
+                                setPendingDelete({ item: r, accountId: selectedAccountId })
+                              },
+                            },
+                          ]}
+                        />
+                      </div>
+                      ) : (
+                        <span className="text-ink-faint text-xs">—</span>
+                      )}
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -879,13 +1050,20 @@ export default function AutoRepliesPage() {
         </p>
       )}
 
-      {editing && (
+      {editing && canManage && (
         <EditDialog
           draft={editing}
           templates={templates}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load() }}
+          orderHint={editingOrderHint}
         />
+      )}
+
+      {reorderError && (
+        <p role="alert" className="text-danger text-center text-xs">
+          {reorderError}
+        </p>
       )}
 
       {/*
@@ -946,7 +1124,7 @@ export default function AutoRepliesPage() {
           open={pendingDelete !== null}
           title={`自動応答「${pendingDelete?.item.name || pendingDelete?.item.keyword || 'すべてのメッセージ'}」を削除しますか？`}
           description="新しく届くメッセージへの自動返信と、タグ付けなどの後続処理が止まります。過去の実行履歴は削除されません。この操作は元に戻せません。"
-          confirmLabel="自動応答を削除"
+          confirmLabel="自動応答を削除する"
           destructive
           busy={deleting}
           error={deleteError}

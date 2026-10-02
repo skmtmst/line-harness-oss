@@ -7,8 +7,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // without a real D1 binding.
 const dbMocks = {
   // eager module-load deps (mirror affiliate-links-redirect.test.ts)
-  getLineAccounts: vi.fn().mockResolvedValue([
-    { id: 'account-main', login_channel_id: '2000000000' },
+  listLineAccountsWithTenantStatus: vi.fn().mockResolvedValue([
+    { id: 'account-main', login_channel_id: '2000000000', tenant_status: 'active' },
   ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
@@ -203,8 +203,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
   imagesGet.mockReset();
-  dbMocks.getLineAccounts.mockResolvedValue([
-    { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID },
+  dbMocks.listLineAccountsWithTenantStatus.mockResolvedValue([
+    { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID, tenant_status: 'active' },
   ]);
   // No offers by default → serializeLink emits offerId/offerName = null.
   dbMocks.listAffiliateOffers.mockResolvedValue([]);
@@ -574,8 +574,12 @@ describe('LINE token verification', () => {
     // Env default channel does NOT match; a DB line_account's login_channel_id
     // does. Mirrors liff.ts allowing multi-account login channels.
     installLineFetchMock('3000000000');
-    dbMocks.getLineAccounts.mockResolvedValue([
-      { id: 'account-main', login_channel_id: '3000000000' } as unknown as never,
+    dbMocks.listLineAccountsWithTenantStatus.mockResolvedValue([
+      {
+        id: 'account-main',
+        login_channel_id: '3000000000',
+        tenant_status: 'active',
+      } as unknown as never,
     ]);
 
     const reg = await call('/api/liff/affiliate/register', {
@@ -584,6 +588,27 @@ describe('LINE token verification', () => {
       body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
     });
     expect(reg.status).toBe(200);
+  });
+
+  it('(d4) rejects a verified token for a suspended tenant before any write', async () => {
+    dbMocks.listLineAccountsWithTenantStatus.mockResolvedValue([
+      {
+        id: 'account-main',
+        login_channel_id: LOGIN_CHANNEL_ID,
+        tenant_status: 'suspended',
+      } as unknown as never,
+    ]);
+
+    const reg = await call('/api/liff/affiliate/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+
+    expect(reg.status).toBe(503);
+    await expect(reg.json()).resolves.toMatchObject({ code: 'TENANT_SUSPENDED' });
+    expect(dbMocks.getFriendByLineUserIdForAccount).not.toHaveBeenCalled();
+    expect(dbMocks.createAffiliate).not.toHaveBeenCalled();
   });
 });
 

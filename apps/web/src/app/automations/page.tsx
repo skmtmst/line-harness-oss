@@ -1,25 +1,37 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
+import ListToolbar from '@/components/shared/list-toolbar'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { MoreHorizontal } from 'lucide-react'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AutomationTemplateGallery from '@/components/automations/automation-template-gallery'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
+import Chip from '@/components/shared/chip'
+import Disclosure from '@/components/shared/disclosure'
+import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import FilterChip from '@/components/shared/filter-chip'
+import { useManualHref } from '@/lib/use-manual-href'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import MetricValue from '@/components/ui/metric-value'
 import {
   automationActionLabel,
   automationTriggerLabel,
   type Automation as SharedAutomation,
   type AutomationEventType,
 } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -39,7 +51,7 @@ interface Automation extends SharedAutomation {
 }
 
 const eventTypeBadgeColor: Record<AutomationEventType, string> = {
-  friend_add: 'bg-success-bg text-green-700',
+  friend_add: 'bg-success-bg text-success',
   tag_change: 'bg-blue-100 text-blue-700',
   score_threshold: 'bg-warning-bg text-yellow-700',
   cv_fire: 'bg-red-100 text-danger',
@@ -48,10 +60,10 @@ const eventTypeBadgeColor: Record<AutomationEventType, string> = {
   calendar_booked: 'bg-indigo-100 text-indigo-700',
   form_submitted: 'bg-violet-100 text-violet-700',
   link_clicked: 'bg-fuchsia-100 text-fuchsia-700',
-  datetime: 'bg-lime-100 text-lime-700',
+  datetime: 'bg-lime-100 text-success',
   daily: 'bg-amber-100 text-amber-700',
   weekly: 'bg-sky-100 text-sky-700',
-  'ec.order.confirmed': 'bg-emerald-100 text-emerald-700',
+  'ec.order.confirmed': 'bg-emerald-100 text-success',
   'ec.order.shipped': 'bg-cyan-100 text-cyan-700',
   'ec.subscription.upcoming': 'bg-teal-100 text-teal-700',
   'ec.subscription.payment_failed': 'bg-orange-100 text-orange-700',
@@ -162,6 +174,7 @@ function AutomationRowActions({
   onEdit,
   onDuplicate,
   onArchive,
+  onViewRuns,
 }: {
   automation: Automation
   canManage: boolean | null
@@ -170,22 +183,69 @@ function AutomationRowActions({
   onEdit: () => void
   onDuplicate: () => void
   onArchive: () => void
+  onViewRuns: () => void
 }) {
+  // #641: 「編集」＋「その他（…）」の形にそろえ、複製・止める・保管はメニューへ集約。
+  const [menuOpen, setMenuOpen] = useState(false)
+  /*
+   * #670 25: 「編集する」「動いた記録を見る」の2ボタンが折返しで縦に積まれ、
+   * 行の高さを押し上げていた。記録はメニュー先頭へ移し、行の操作は1行に収める。
+   * 閲覧のみには記録ボタンを残す(#677 N-352の見るだけ導線)。
+   */
+  const runsHref = `/automations/runs?search=${encodeURIComponent(automation.name)}`
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      <Button href={`/automations/runs?search=${encodeURIComponent(automation.name)}`} className="whitespace-nowrap">動いた記録を見る</Button>
+    <div className="relative flex flex-wrap items-center justify-end gap-1.5">
       {canManage ? (
         <>
           {/* #942 N-352: 編集・複製・保管を行から直接開けるようにする。 */}
-          <Button onClick={onEdit} disabled={busy} className="whitespace-nowrap">編集する</Button>
-          <Button onClick={onDuplicate} disabled={busy} className="whitespace-nowrap">複製する</Button>
-          {automation.status === 'draft' ? null : (
-            <Button onClick={onToggle} disabled={busy} className="whitespace-nowrap">止める・動かす</Button>
-          )}
-          <Button onClick={onArchive} disabled={busy} className="whitespace-nowrap">保管する</Button>
+          <Button onClick={onEdit} disabled={busy} variant="secondary" size="compact" className="whitespace-nowrap">編集する</Button>
+          <IconButton
+            aria-label={`${automation.name}のその他操作`}
+            aria-expanded={menuOpen}
+            disabled={busy}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <MoreHorizontal aria-hidden />
+          </IconButton>
+          <ActionMenu
+            open={menuOpen}
+            ariaLabel={`${automation.name}の操作`}
+            onClose={() => setMenuOpen(false)}
+            items={[
+              {
+                id: 'runs',
+                label: '動いた記録を見る',
+                disabled: busy,
+                onSelect: onViewRuns,
+              },
+              {
+                id: 'duplicate',
+                label: '複製する',
+                disabled: busy,
+                onSelect: onDuplicate,
+              },
+              ...(automation.status === 'draft'
+                ? []
+                : [{
+                    id: 'toggle',
+                    label: '止める・動かす',
+                    disabled: busy,
+                    onSelect: onToggle,
+                  }]),
+              {
+                id: 'archive',
+                label: '保管する',
+                disabled: busy,
+                onSelect: onArchive,
+              },
+            ]}
+          />
         </>
       ) : canManage === false ? (
-        <span className="text-xs text-ink-faint">操作する権限がありません</span>
+        <>
+          <Button href={runsHref} variant="secondary" className="whitespace-nowrap">動いた記録を見る</Button>
+          <span className="text-xs text-ink-faint">操作する権限がありません</span>
+        </>
       ) : null}
     </div>
   )
@@ -220,6 +280,8 @@ export default function AutomationsPage() {
   const tab = useMergedTab(MERGED_TABS)
   usePageTitle(tab === 'templates' ? '見本から作る' : 'オートメーション')
   const canManageAutomations = useCanManageAutomations()
+  /* 監査 R128: 正本表に登録があるときだけ出す。無ければボタン自体を出さない。 */
+  const manualHref = useManualHref('/automations')
   /*
    * 閲覧のみの利用者（N-361、要件 §4-1・§4-9）。
    *
@@ -229,6 +291,8 @@ export default function AutomationsPage() {
   const viewerOnly = canManageAutomations === false
   const [automations, setAutomations] = useState<Automation[]>([])
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  /** m23m: 捕まえた読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [error, setError] = useState('')
   /*
    * **ブラウザの `confirm()` を使わない。**
@@ -249,7 +313,6 @@ export default function AutomationsPage() {
   const [templateCount, setTemplateCount] = useState<number | null>(null)
   const [commonActionCount, setCommonActionCount] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'stopped'>('all')
   const [sortOrder, setSortOrder] = useState<'runs' | 'priority' | 'name'>('runs')
   const [page, setPage] = useState(1)
   /** 押したあとにアカウントが変わったか。変わっていたら実行させない。 */
@@ -267,6 +330,7 @@ export default function AutomationsPage() {
   const loadAutomations = useCallback(async () => {
     const requestId = ++loadRequestRef.current
     setLoadStatus('loading')
+    setLoadError(null)
     setError('')
     try {
       const [res, templatesResponse, commonActionsResponse] = await Promise.all([
@@ -295,9 +359,10 @@ export default function AutomationsPage() {
       }
       setTemplateCount(templatesResponse?.success ? templatesResponse.data.length : null)
       setCommonActionCount(commonActionsResponse?.success ? commonActionsResponse.data.length : null)
-    } catch {
+    } catch (caught) {
       if (requestId !== loadRequestRef.current) return
       setAutomations([])
+      setLoadError(caught)
       setLoadStatus('error')
       setAutomaticRuns(null)
       setFailedRuns(null)
@@ -465,14 +530,12 @@ export default function AutomationsPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 見本</p>
           {/* 作成は owner/admin だけ（N-361）。見本の閲覧と「これで作る」の出し分けは画廊側で行う。 */}
-          {canManageAutomations ? <Button href="/automations/new">ルールを作成</Button> : null}
+          {canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : null}
         </div>
         <div className="mb-4">
           <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
         </div>
-        <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info">
-          見本を選ぶと、そのまま「つくる」画面が開きます。中身は自由に直せます。よく使われている順に並べています。
-        </div>
+        <Notice tone="info" message="見本を選ぶと、そのまま「つくる」画面が開きます。中身は自由に直せます。よく使われている順に並べています。" className="mb-4" />
         <AutomationTemplateGallery accountId={selectedAccountId} canManage={canManageAutomations} />
         <style jsx global>{`
           [data-design-node="WjYAC"] [aria-label="きっかけで絞り込む"] { display: none; }
@@ -512,10 +575,11 @@ export default function AutomationsPage() {
             : item.label,
   }))
   const visibleAutomations = (() => {
-    const requestedStatus = tab === 'stopped' ? 'stopped' : statusFilter
+    // #734: 状態はタブが持つ。「動いているもの」タブは動いているものだけを出す。
+    const requestedStatus = tab === 'stopped' ? 'stopped' : 'active'
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase('ja')
     return automations
-      .filter((item) => requestedStatus === 'all' || (requestedStatus === 'active' ? item.isActive : !item.isActive))
+      .filter((item) => (requestedStatus === 'active' ? item.isActive : !item.isActive))
       .filter((item) => {
         if (!normalizedQuery) return true
         const actions = item.actions.map((action) => automationActionLabel(action.type)).join(' ')
@@ -539,109 +603,107 @@ export default function AutomationsPage() {
   )
 
   return (
-    <div>
-      <div className="mb-4">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div>
         <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
       </div>
-      <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      {/*
+        作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。
+        見出しの行の右端には、たまに使う「共通アクションを見る」
+        「マニュアル」だけを残す。
+      */}
+      <div data-design="Head" className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-faint">自動化 ＞ オートメーション</p>
         <div className="flex flex-wrap gap-2">
           <Button href="/common-actions">共通アクションを見る</Button>
-          <Button href="/automations?tab=templates">見本から作る</Button>
           {/* 作成は owner/admin だけ。閲覧のみには出さず、下で理由を出す（N-361）。 */}
-          {canManageAutomations ? <Button href="/automations/new" variant="primary">ルールを作成</Button> : null}
-          <Button href="/support">マニュアル</Button>
+          {manualHref ? <Button href={manualHref}>マニュアル</Button> : null}
         </div>
       </div>
       {viewerOnly ? (
-        <p className="mb-4 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm text-ink-secondary" role="note">
-          閲覧のみのため、ルールの作成・変更はできません。操作する権限がありません。
-        </p>
-      ) : null}
-
-      <p className="mb-4 text-sm text-ink-faint">「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。</p>
+        <Notice tone="warn" message="閲覧のみのため、ルールの作成・変更はできません。操作する権限がありません。" className="mb-4" />
+      ) : (
+        <Notice tone="info" message="「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。" className="mb-4" />
+      )}
       <p className="sr-only">共通アクションは友だち一覧からの手動実行にも使えます。</p>
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">動いているもの</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {activeCount ?? '—'}
-            {activeCount !== null ? <span className="text-ink-faint ml-0.5 text-xs font-normal">本</span> : null}
+          <p className="text-ink mt-1 text-2xl font-bold">
+            {/* 監査6 #674: 数字の見せ方は MetricValue に寄せる */}
+            <MetricValue value={activeCount} unit="本" />
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">稼働中 {activeCount ?? '—'}本・止めているもの {stoppedCount ?? '—'}本</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月の実行（この30日）</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{automaticRuns?.toLocaleString('ja-JP') ?? '—'}{automaticRuns !== null ? '回' : ''}</p>
+          <p className="text-ink mt-1 text-2xl font-bold"><MetricValue value={automaticRuns ?? null} unit="回" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">分析の「使われ方」と同じ集計</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">失敗した</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{failedRuns?.toLocaleString('ja-JP') ?? '—'}{failedRuns !== null ? '回' : ''}</p>
+          <p className="text-ink mt-1 text-2xl font-bold"><MetricValue value={failedRuns ?? null} unit="回" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">部分成功を含む・この30日</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">減らせた手作業</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{estimatedHoursSaved !== null ? `およそ ${estimatedHoursSaved.toLocaleString('ja-JP')}時間` : '—'}</p>
+          <p className="text-ink mt-1 text-2xl font-bold"><MetricValue value={estimatedHoursSaved} prefix="およそ" unit="時間" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">1回30秒として計算しています</p>
         </div>
       </KpiCollapse>
 
-      <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info">
-        上から順に見て、当てはまったものが動きます。同じきっかけで2本が当てはまると両方が動くため、片方だけにしたいときは条件をずらしてください。
+      <Disclosure size="compact" title="動く順番の見方" hint="上から順に確認">
+        <p>上から順に見て、当てはまったものが動きます。同じきっかけで2本が当てはまると両方が動くため、片方だけにしたいときは条件をずらしてください。</p>
+      </Disclosure>
+
+      {/*
+        作る操作は数字のカードの下・一覧のすぐ上の左。
+        「見本から作る」も作る操作なので同じ並びの副ボタンへ。
+      */}
+      <div className="flex flex-wrap items-center gap-2">
+        {canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : null}
+        <Button href="/automations?tab=templates">見本から作る</Button>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(event) => { setSearchQuery(event.target.value); setPage(1) }}
-          placeholder="ルール名・きっかけ・することで検索"
-          className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-info"
-        />
-        <div className="flex items-center gap-2">
-          <p className="text-sm text-ink-secondary">この30日</p>
-          <SelectField
-            aria-label="並び順"
-            value={sortOrder}
-            onChange={(event) => { setSortOrder(event.target.value as 'runs' | 'priority' | 'name'); setPage(1) }}
-            options={[
-              { value: 'runs', label: '動いた回数が多い順' },
-              { value: 'priority', label: '動く順' },
-              { value: 'name', label: '名前順' },
-            ]}
-            className="h-10 min-w-36"
-          />
-        </div>
-      </div>
+      {/*
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目の右端に並び順。
+        状態の切替はタブが持つ（#734）。
+      */}
+      <ListToolbar
+        search={{
+          placeholder: 'ルール名・きっかけ・することで検索',
+          value: searchQuery,
+          onChange: (value) => { setSearchQuery(value); setPage(1) },
+        }}
+        trailing={
+          <>
+            <p className="text-sm text-ink-secondary">この30日</p>
+            <Select
+              aria-label="並び順"
+              value={sortOrder}
+              onChange={(value) => { setSortOrder(value as 'runs' | 'priority' | 'name'); setPage(1) }}
+              options={[
+                { value: 'runs', label: '動いた回数が多い順' },
+                { value: 'priority', label: '動く順' },
+                { value: 'name', label: '名前順' },
+              ]}
+            />
+          </>
+        }
+      />
 
-      {tab !== 'stopped' ? (
-        <div className="mb-3 flex flex-wrap gap-2" aria-label="状態で絞り込む">
-          {([
-            ['all', `すべて ${automations.length}`],
-            ['active', `動いている ${activeCount ?? '—'}`],
-            ['stopped', `止めている ${stoppedCount ?? '—'}`],
-          ] as const).map(([value, label]) => (
-            <FilterChip
-              key={value}
-              selected={statusFilter === value}
-              onChange={() => { setStatusFilter(value); setPage(1) }}
-            >
-              {label}
-            </FilterChip>
-          ))}
-          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint">失敗あり {automations.filter((item) => item.failureCount30d > 0).length}</span>
-          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint">30日 動いていない {automations.filter((item) => item.executionCount30d === 0).length}</span>
-        </div>
-      ) : null}
+      {/*
+        #734: 状態の切替はタブ（動いているもの／止めているもの）の1機構に揃える。
+        同じ意味の札（すべて／動いている／止めている）を下にも並べると、
+        どちらが効いているか分からなくなる。失敗・未稼働の数は上のKPI札が持つ。
+      */}
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {loadStatus === 'loading' ? (
@@ -650,20 +712,25 @@ export default function AutomationsPage() {
         <ListState
           kind="error"
           title="オートメーションを表示できませんでした"
-          description="登録したルールは消えていません。再読み込みしても直らない場合はエラー報告へ。"
-          action={<Button variant="secondary" onClick={() => void loadAutomations()}>オートメーションを再読み込み</Button>}
+          // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+          // それ以外は画面の文のまま。403は押しても直らないので再試行の口も出さない。
+          description={isForbiddenOrRateLimited(loadError) ? undefined : '登録したルールは消えていません。再読み込みしても直らない場合はエラー報告へ。'}
+          error={loadError ?? undefined}
+          action={isForbiddenOrRateLimited(loadError) ? undefined : <Button variant="secondary" onClick={() => void loadAutomations()}>オートメーションを再読み込み</Button>}
         />
       ) : visibleAutomations.length === 0 ? (
-        <ListState
-          kind="empty"
-          title={automations.length === 0
-            ? (tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。')
-            : '条件に合うオートメーションはありません。'}
-          description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。' : '検索語や絞り込みを変えてください。'}
-          action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">ルールを作成</Button> : undefined}
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title={automations.length === 0
+              ? (tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。')
+              : '条件に合うオートメーションはありません。'}
+            description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。' : '検索語や絞り込みを変えてください。'}
+            action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : undefined}
+          />
+        </div>
       ) : (
-        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
           <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
             <span>きっかけ</span><span>だれに（条件）</span><span>すること</span><span>この30日</span><span>状態</span><span aria-hidden />
           </div>
@@ -676,10 +743,11 @@ export default function AutomationsPage() {
               <p className="truncate text-ink-secondary" title={conditionLabel(automation.conditions)}>{conditionLabel(automation.conditions)}</p>
               <p className="truncate text-ink-secondary" title={automation.actions.map((action) => automationActionLabel(action.type)).join('、')}>{automation.actions.map((action) => automationActionLabel(action.type)).join('、') || '処理なし'}</p>
               <div>
-                <span className="text-ink tabular-nums">{automation.executionCount30d.toLocaleString('ja-JP')}回</span>
+                <span className="text-ink tabular-nums">{formatNumber(automation.executionCount30d)}回</span>
                 {automation.failureCount30d > 0 ? <span className="text-danger block text-[11px]">失敗が{automation.failureCount30d}回</span> : null}
               </div>
-              <span className={automation.isActive ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{automation.isActive ? '動いています' : '止めています'}</span>
+              {/* #670 25: 状態は他画面と同じ札(Chip)で出す。素テキストだと列の中で浮く。 */}
+              <span><Chip tone={automation.isActive ? 'ok' : 'neutral'}>{automation.isActive ? '動いています' : '止めています'}</Chip></span>
               {/* 見るだけの導線は閲覧のみにも出す。検索語にこの行の名前を載せて実対象を引き継ぐ（#677で承認されたN-352の導線部分）。 */}
               <AutomationRowActions
                 automation={automation}
@@ -689,18 +757,15 @@ export default function AutomationsPage() {
                 onEdit={() => void handleEdit(automation)}
                 onDuplicate={() => void handleDuplicate(automation)}
                 onArchive={() => handleArchive(automation)}
+                onViewRuns={() => router.push(`/automations/runs?search=${encodeURIComponent(automation.name)}`)}
               />
             </div>
           ))}
           <div className="flex items-center justify-between border-t border-hairline px-4 py-3 text-xs text-ink-faint">
-            <span>オートメーション {visibleAutomations.length}本中 {(currentPage - 1) * AUTOMATION_PAGE_SIZE + 1}〜{Math.min(currentPage * AUTOMATION_PAGE_SIZE, visibleAutomations.length)}本を表示</span>
-            <div className="flex items-center gap-3" aria-label="ページ送り">
-              <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="text-action disabled:text-ink-faint">前へ</button>
-              {Array.from({ length: listPageCount }, (_, index) => index + 1).map((pageNumber) => (
-                <button key={pageNumber} type="button" aria-current={pageNumber === currentPage ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={pageNumber === currentPage ? 'text-action font-bold' : ''}>{pageNumber}</button>
-              ))}
-              <button type="button" disabled={currentPage >= listPageCount} onClick={() => setPage(currentPage + 1)} className="text-action disabled:text-ink-faint">次へ</button>
-            </div>
+            {/* 件数の数え方は共通の ListRange（助数は「件」にそろえる）。 */}
+            <ListRange label="オートメーション" total={visibleAutomations.length} first={(currentPage - 1) * AUTOMATION_PAGE_SIZE + 1} last={Math.min(currentPage * AUTOMATION_PAGE_SIZE, visibleAutomations.length)} />
+            {/* #670 9: 送る先が1ページだけならページ送りは出さない。押せない口が並ぶと「まだ何かある」と読める。 */}
+            <Pagination page={currentPage} pageCount={listPageCount} onPageChange={setPage} />
           </div>
         </div>
       )}

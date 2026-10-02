@@ -27,6 +27,7 @@ const fixture = vi.hoisted(() => ({
   selectedAccountId: 'account-a' as string | null,
   tagsList: null as null | (() => Promise<unknown>),
   createMenu: null as null | ((...args: unknown[]) => Promise<unknown>),
+  mileageRules: null as null | (() => Promise<unknown>),
 }))
 
 /**
@@ -77,7 +78,25 @@ vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => undefined,
 }))
 
-vi.mock('@/lib/api', () => {
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後のメニュー登録の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
   class ApiError extends Error {
     status: number
     code: string | undefined
@@ -89,10 +108,11 @@ vi.mock('@/lib/api', () => {
     }
   }
   return {
+    ...actual,
     ApiError,
     api: {
       tags: { list: (...args: unknown[]) => fixture.tagsList!(...(args as [])) },
-      mileage: { rules: async () => ({ success: true, data: [] }) },
+      mileage: { rules: (...args: unknown[]) => fixture.mileageRules!(...(args as [])) },
     },
     bookingApi: {
       createMenu: (...args: unknown[]) => fixture.createMenu!(...args),
@@ -137,6 +157,7 @@ beforeEach(() => {
   fixture.selectedAccountId = 'account-a'
   fixture.tagsList = async () => ({ success: true, data: TAGS })
   fixture.createMenu = vi.fn(async () => ({ id: 'menu-new', version: 1 }))
+  fixture.mileageRules = async () => ({ success: true, data: [] })
 })
 
 afterEach(() => {
@@ -250,6 +271,8 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     expect(fixture.createMenu).toHaveBeenCalledWith(
       'account-b',
       expect.objectContaining({ auto_tag_id: null }),
+      // R535: 作成試行の一意キーも一緒に送る。
+      expect.any(String),
     )
   })
 
@@ -267,6 +290,8 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     expect(fixture.createMenu).toHaveBeenCalledWith(
       'account-a',
       expect.objectContaining({ auto_tag_id: 'tag-active' }),
+      // R535: 作成試行の一意キーも一緒に送る。
+      expect.any(String),
     )
   })
 
@@ -291,5 +316,53 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     const again = screen.getByLabelText('予約後に付けるタグ') as HTMLSelectElement
     fireEvent.change(again, { target: { value: 'tag-active-2' } })
     expect(again.value).toBe('tag-active-2')
+  })
+})
+
+describe('R306/R307 予約時マイルの設定リンク', () => {
+  async function renderNew() {
+    render(<NewBookingMenuPage />)
+    // タグ欄が出れば画面の読み込みは終わっている。
+    await screen.findByLabelText('予約後に付けるタグ')
+  }
+
+  function settingsLink(): HTMLAnchorElement {
+    return screen.getByRole('link', { name: '設定を見る' }) as HTMLAnchorElement
+  }
+
+  test('行き先はマイルの付与ルールで、行動スコアのルールではない', async () => {
+    await renderNew()
+    const link = settingsLink()
+    expect(link.getAttribute('href')).toBe('/mileage?tab=earning-rules')
+  })
+
+  test('R307: 新しいタブで開くので、作成中の入力は残る', async () => {
+    await renderNew()
+    const link = settingsLink()
+    expect(link.getAttribute('target')).toBe('_blank')
+    // 同じタブで離れない（rel も付けて参照元を渡さない）。
+    expect(link.getAttribute('rel')).toContain('noreferrer')
+  })
+
+  test('付与ルールが無いときは「未設定」と出し、取得失敗と区別する', async () => {
+    await renderNew()
+    await waitFor(() => expect(screen.getByText('未設定')).toBeTruthy())
+    expect(screen.getByText('予約イベントのマイル付与ルールは未設定です。')).toBeTruthy()
+  })
+
+  test('取得に失敗したときは「未取得」と出し、未設定と区別する', async () => {
+    fixture.mileageRules = async () => { throw new Error('network down') }
+    await renderNew()
+    await waitFor(() => expect(screen.getByText('未取得')).toBeTruthy())
+    expect(screen.getByText('「予約した」のマイル設定を取得できませんでした。')).toBeTruthy()
+  })
+
+  test('有効な予約イベントのルールがあるときは付ける量を出す', async () => {
+    fixture.mileageRules = async () => ({
+      success: true,
+      data: [{ eventType: 'booking_created', isActive: true, amount: 50 }],
+    })
+    await renderNew()
+    await waitFor(() => expect(screen.getByText('マイルを 50 付ける')).toBeTruthy())
   })
 })

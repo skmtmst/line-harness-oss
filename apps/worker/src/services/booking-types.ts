@@ -113,6 +113,13 @@ export const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
 };
 
 export const SLOT_GRANULARITY_MINUTES = 30;
+
+/** 予約枠の間隔の候補（分）。店舗設定・DB CHECK と同じ顔ぶれ。 */
+export const SLOT_GRANULARITY_CHOICES = [5, 10, 15, 30, 60] as const;
 export const REQUEST_TTL_HOURS = 24;
 export const IDEMPOTENCY_TTL_MINUTES = 5;
+/** R535: メニュー作成の応答再送の窓。作成画面を開き直すまでの再試行に備えて24時間。 */
+export const MENU_IDEMPOTENCY_TTL_MINUTES = 60 * 24;
+/** R559: 電話客の台帳作成の応答再送の窓。予約の確定操作中の再送に備えて24時間。 */
+export const BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES = 60 * 24;
 export const REMINDER_MAX_RETRY = 3;

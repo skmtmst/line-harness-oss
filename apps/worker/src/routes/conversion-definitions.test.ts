@@ -28,6 +28,11 @@ const dbMocks = vi.hoisted(() => ({
   listConversionDefinitionsForExport: vi.fn(),
   listConversionDefinitionEvents: vi.fn(),
   listConversionIngestionEvents: vi.fn(),
+  getReversedEventIds: vi.fn(),
+  listConversionReversals: vi.fn(),
+  isConversionEventReversed: vi.fn(),
+  appendConversionReversal: vi.fn(),
+  isExclusionSavable: vi.fn(() => true),
 }));
 const contractMocks = vi.hoisted(() => ({
   ConversionDefinitionError: class ConversionDefinitionError extends Error {
@@ -99,6 +104,9 @@ beforeEach(() => {
   accountMocks.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-a'], canSeeUnassigned: false,
   });
+  dbMocks.getReversedEventIds.mockResolvedValue(new Set());
+  dbMocks.listConversionReversals.mockResolvedValue([]);
+  dbMocks.isConversionEventReversed.mockResolvedValue(false);
   dbMocks.listConversionDefinitions.mockResolvedValue(LIST_RESULT);
   dbMocks.getConversionDefinitionDetail.mockResolvedValue(null);
   dbMocks.getConversionDefinitionReport.mockResolvedValue({
@@ -236,6 +244,26 @@ describe('conversion definition V6 routes', () => {
     );
   });
 
+  it('R285: レポートは選んだアカウントの範囲をDBへ渡し、担当外は入れない', async () => {
+    dbMocks.getConversionDefinitionReport.mockClear();
+    const report = await app('staff').request('/api/conversions/report?from=2026-09-01&to=2026-09-07&lineAccountId=account-a');
+    expect(report.status).toBe(200);
+    expect(dbMocks.getConversionDefinitionReport).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        lineAccountId: 'account-a',
+        scope: { allowedAccountIds: ['account-a'], includeUnassigned: false },
+      }),
+    );
+
+    // 担当外のアカウントを指定したら403で、集計自体を呼ばない。
+    dbMocks.getConversionDefinitionReport.mockClear();
+    accountMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const hidden = await app('staff').request('/api/conversions/report?from=2026-09-01&to=2026-09-07&lineAccountId=account-b');
+    expect(hidden.status).toBe(403);
+    expect(dbMocks.getConversionDefinitionReport).not.toHaveBeenCalled();
+  });
+
   it('CSVは専用権限と一覧同条件を使い、空でも定義ヘッダーを返す', async () => {
     expect((await app('staff').request('/api/conversions/export')).status).toBe(403);
     const response = await app('staff', ['/conversions', 'conversion.report.export']).request(
@@ -279,6 +307,22 @@ describe('conversion definition V6 routes', () => {
 
     accountMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
     expect((await app().request('/api/conversions/definitions/preview', json({ ...body, lineAccountId: 'account-b' }))).status).toBe(404);
+  });
+
+  it('R40: 数えない条件が壊れている作成・試算は400で、保存も試算も実行しない', async () => {
+    const body = {
+      name: '壊れた条件', sourceType: 'ec_order_confirmed',
+      sourceConfig: { exclusion: { operator: 'AND' } }, lineAccountId: 'account-a',
+      deduplicationMode: 'once_per_friend', valueMode: 'source', reversalPolicy: 'manual',
+      usages: [],
+    };
+    dbMocks.isExclusionSavable.mockReturnValueOnce(false);
+    expect((await app().request('/api/conversions/definitions', json(body))).status).toBe(400);
+    expect(dbMocks.createConversionDefinition).not.toHaveBeenCalled();
+
+    dbMocks.isExclusionSavable.mockReturnValueOnce(false);
+    expect((await app().request('/api/conversions/definitions/preview', json(body))).status).toBe(400);
+    expect(dbMocks.previewConversionDefinition).not.toHaveBeenCalled();
   });
 
   it('削除影響、停止、差し替え、未使用削除を版付きで呼ぶ', async () => {

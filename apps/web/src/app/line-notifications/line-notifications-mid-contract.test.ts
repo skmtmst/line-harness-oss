@@ -26,7 +26,8 @@ describe('点検・中: LINE通知の画面契約', () => {
 
   it('中5: 押せないページ送りの飾りを置かない', () => {
     expect(OPERATOR_RULES).not.toContain('1　2　3')
-    expect(OPERATOR_RULES).toContain('件中')
+    // 件数は共通部品 ListRange が「N件中 X〜Y件を表示」の形で出す(#667)。
+    expect(OPERATOR_RULES).toContain('ListRange')
   })
 
   it('中6: 新規作成は保存し直せて、公開前に最新を保存する', () => {

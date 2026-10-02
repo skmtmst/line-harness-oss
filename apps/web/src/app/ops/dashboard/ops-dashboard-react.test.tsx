@@ -4,17 +4,17 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsDashboardPage from './page'
-import { deltaLabel, minutesLabel } from './format'
-import { formatBytes, formatYenShort, niceCeiling } from '@/components/ops/ops-charts'
+import { contractDetail, deltaLabel, minutesLabel, revenueDetail, revenueSourceLabel } from './format'
+import { formatBytes, formatYen, formatYenShort, niceCeiling } from '@/components/ops/ops-charts'
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 
 /** ★V6 37-2 運営ダッシュボード。API の形どおりに数値カード・グラフ・要対応・使用量が出ること。 */
 
 const payload = {
-  period: 'month', periodLabel: '今月', pricing: 'list_price',
+  period: 'month', periodLabel: '今月', pricing: 'stripe_actual', lastSyncedAt: '2026-09-25T03:00:00.000+09:00',
   plans: [{ key: 'light', label: 'ライト', monthlyYen: 9800 }],
-  kpis: { mrr: 398_000, mrrDelta: 59_600, active: 12, byPlan: { light: 4, standard: 6, pro: 2 }, trialing: 3, newInPeriod: 2, newTrialsInPeriod: 2, churnInPeriod: 0, churnRate: 0 },
+  kpis: { revenueThisMonth: 398_000, revenueDelta: 59_600, refundsThisMonth: 0, contractMonthlyTotal: 412_300, filledByListPriceCount: 1, active: 12, byPlan: { light: 4, standard: 6, pro: 2 }, trialing: 3, newInPeriod: 2, newTrialsInPeriod: 2, churnInPeriod: 0, churnRate: 0 },
   revenueByMonth: [4, 5, 6, 7, 8, 9].map((m, i) => ({ month: `2026-0${m}`, label: `${m}月`, yen: 3_000_000 + i * 200_000, current: i === 5 })),
   planShare: { total: 15, rows: [
     { key: 'light', label: 'ライト', count: 4, percent: 27 }, { key: 'standard', label: 'スタンダード', count: 6, percent: 40 },
@@ -32,16 +32,23 @@ const payload = {
 let host: HTMLDivElement
 let root: Root
 let urls: string[]
+let requests: Array<{ url: string; init?: RequestInit }>
 
 beforeEach(() => {
   urls = []
+  requests = []
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
-  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     urls.push(url)
-    const body = url.includes('line-unregistered')
-      ? { success: true, data: { registered: 21, total: 24, people: [{ staffId: 's1', name: '木下 花', tenantName: 'カフェ ムスビ', hasEmail: true }] } }
-      : { success: true, data: { ...payload, periodLabel: url.includes('prev_month') ? '先月' : '今月' } }
+    requests.push({ url, init })
+    const body = url.endsWith('/api/ops/me')
+      ? { success: true, data: { id: 'staff-1', name: '運営', email: 'ops@example.test', readOnly: false, totpEnabled: true, lineLinked: true, legacy: false, impersonation: null } }
+      : url.endsWith('/api/ops/billing/sync')
+        ? { success: true, data: { tenants: 2, imported: 7, failed: 1, completed: false, since: '2025-09-27T00:00:00.000Z', syncedAt: null } }
+        : url.includes('line-unregistered')
+          ? { success: true, data: { registered: 21, total: 24, people: [{ staffId: 's1', name: '木下 花', tenantName: 'カフェ ムスビ', hasEmail: true }] } }
+          : { success: true, data: { ...payload, periodLabel: url.includes('prev_month') ? '先月' : '今月' } }
     return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }))
   host = document.createElement('div')
@@ -64,9 +71,17 @@ describe('表記の決まり', () => {
     expect(deltaLabel(59_600)).toBe('前月比 ＋¥59,600')
     expect(deltaLabel(-9_800)).toBe('前月比 −¥9,800')
     expect(deltaLabel(0)).toBe('前月比 ±¥0')
+    expect(revenueDetail(59_600, 0)).toBe('前月比 ＋¥59,600・返金 ¥0')
+    expect(contractDetail(12, { light: 4, standard: 6, pro: 2 }, 1)).toBe('12件（ライト4・スタンダード6・プロ2）・定価で補い 1件')
+    expect(revenueSourceLabel('list_price', null)).toBe('定価で数えています')
     expect(minutesLabel(84)).toBe('1時間24分')
     expect(formatYenShort(4_500_000)).toBe('¥450万')
     expect(formatYenShort(0)).toBe('¥0')
+    // 数字でない値が来ても「¥NaN」を出さず「—」にする（金額は formatYen の1か所で守る）。
+    expect(formatYen(398_000)).toBe('¥398,000')
+    expect(formatYen(Number.NaN)).toBe('—')
+    expect(formatYen(undefined as unknown as number)).toBe('—')
+    expect(formatYenShort(Number.NaN)).toBe('—')
     expect(niceCeiling(3_980_000)).toBe(4_000_000)
     expect(niceCeiling(0)).toBe(100_000)
     expect(formatBytes(1.8 * 1024 ** 3)).toBe('1.8GB')
@@ -81,11 +96,16 @@ describe('画面', () => {
     expect(text).toContain('今月のようす')
     expect(text).toContain('¥398,000')
     expect(text).toContain('前月比 ＋¥59,600')
-    expect(text).toContain('ライト4・スタンダード6・プロ2')
+    expect(text).toContain('返金 ¥0')
+    expect(text).toContain('¥412,300')
+    expect(text).toContain('12件（ライト4・スタンダード6・プロ2）・定価で補い 1件')
     expect(text).toContain('解約率 0.0%')
     expect(text).toContain('月ごとの売上')
     expect(host.querySelectorAll('svg rect').length).toBeGreaterThanOrEqual(6)
-    expect(text).toContain('4件 ・ 27%')
+    // m22d: プラン別の行は割合だけにする。件数は「契約中の月額合計」の
+    // カードに集約する（同じ「1件」「2件」が4回出るため）。
+    expect(text).toContain('27%')
+    expect(text).not.toContain('4件 ・ 27%')
     expect(text).toContain('トライアルは契約前です')
     expect(text).toContain('決済が失敗している契約先')
     expect(text).toContain('LINEのトークン期限が近い店舗')
@@ -95,8 +115,91 @@ describe('画面', () => {
     expect(text).toContain('4,820 / 5,000')
     expect(text).toContain('1.8GB / 5.0GB')
     expect(text).toContain('96%')
-    expect(text).toContain('定価で数えています')
+    expect(text).toContain('Stripe の入金実績（最終同期 9月25日（金）3:00）')
+    expect(text.toLowerCase()).not.toContain(['m', 'r', 'r'].join(''))
     expect(host.querySelector('[data-design-node="Xvofy"]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="s7wSj"]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="fyib5"]')).not.toBeNull()
+  })
+
+  it('書き込み権限がある運営マスターには Stripe 同期ボタンを出す', async () => {
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    const button = Array.from(host.querySelectorAll('button')).find((item) => item.textContent?.includes('Stripe と同期'))
+    expect(button).toBeTruthy()
+    expect(button?.getAttribute('data-design-node')).toBe('Fo4yb')
+  })
+
+  it('閲覧のみの運営メンバーには Stripe 同期ボタンを出さない', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      const body = url.endsWith('/api/ops/me')
+        ? { success: true, data: { id: 'staff-2', name: '閲覧担当', email: null, readOnly: true, totpEnabled: true, lineLinked: false, legacy: false, impersonation: null } }
+        : { success: true, data: payload }
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }))
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    expect(Array.from(host.querySelectorAll('button')).some((item) => item.textContent?.includes('Stripe と同期'))).toBe(false)
+  })
+
+  it('同期中はボタンを無効にし、12か月同期の完了後に結果を出してダッシュボードを読み直す', async () => {
+    let finishSync: ((response: Response) => void) | undefined
+    const deferredSync = new Promise<Response>((resolve) => { finishSync = resolve })
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      requests.push({ url, init })
+      if (url.endsWith('/api/ops/me')) {
+        return new Response(JSON.stringify({ success: true, data: { id: 'staff-1', name: '運営', email: null, readOnly: false, totpEnabled: true, lineLinked: false, legacy: false, impersonation: null } }), { status: 200 })
+      }
+      if (url.endsWith('/api/ops/billing/sync')) return deferredSync
+      return new Response(JSON.stringify({ success: true, data: payload }), { status: 200 })
+    }))
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    const dashboardCallsBefore = requests.filter((item) => item.url.includes('/api/ops/dashboard') && !item.url.includes('line-unregistered')).length
+    const button = Array.from(host.querySelectorAll('button')).find((item) => item.textContent?.includes('Stripe と同期')) as HTMLButtonElement
+    await act(async () => { button.click(); await Promise.resolve() })
+    expect(button.disabled).toBe(true)
+    const syncRequest = requests.find((item) => item.url.endsWith('/api/ops/billing/sync'))
+    expect(syncRequest?.init?.method).toBe('POST')
+    expect(syncRequest?.init?.body).toBe(JSON.stringify({ months: 12 }))
+    finishSync!(new Response(JSON.stringify({ success: true, data: { tenants: 2, imported: 7, failed: 1, completed: false, since: '2025-09-27T00:00:00.000Z', syncedAt: null } }), { status: 200 }))
+    await flush()
+    expect(button.disabled).toBe(false)
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('Stripe から 7 件取り込みました（失敗 1 件）')
+    const dashboardCallsAfter = requests.filter((item) => item.url.includes('/api/ops/dashboard') && !item.url.includes('line-unregistered')).length
+    expect(dashboardCallsAfter).toBeGreaterThan(dashboardCallsBefore)
+  })
+
+  it('同期に失敗したら理由を alert で出す', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/ops/me')) {
+        return new Response(JSON.stringify({ success: true, data: { id: 'staff-1', name: '運営', email: null, readOnly: false, totpEnabled: true, lineLinked: false, legacy: false, impersonation: null } }), { status: 200 })
+      }
+      if (url.endsWith('/api/ops/billing/sync')) {
+        return new Response(JSON.stringify({ success: false, error: 'Stripe の接続設定がまだありません' }), { status: 503 })
+      }
+      return new Response(JSON.stringify({ success: true, data: payload }), { status: 200 })
+    }))
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    const button = Array.from(host.querySelectorAll('button')).find((item) => item.textContent?.includes('Stripe と同期')) as HTMLButtonElement
+    await act(async () => { button.click() })
+    await flush()
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('Stripe の接続設定がまだありません')
+    expect(button.disabled).toBe(false)
+  })
+
+  it('Stripe未設定時は定価の注記を同じ場所に出す', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: { ...payload, pricing: 'list_price', lastSyncedAt: null },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    expect(host.querySelector('[data-design-node="xaUOz"]')?.textContent).toBe('定価で数えています')
   })
 
   it('期間を先月に切り替えると period 付きで読み直す。未登録の人の一覧は名前と契約先を出す', async () => {
@@ -130,7 +233,7 @@ describe('画面', () => {
     expect(host.textContent).toContain('ダッシュボードを表示できませんでした')
     // 再読み込みで復帰する。
     fail = false
-    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('再読み込み'))
+    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
     expect(retry).toBeTruthy()
     await act(async () => { retry!.click() })
     await flush()
@@ -157,7 +260,7 @@ describe('画面', () => {
     await flush()
     // ダイアログは「読み込んでいます」のままにせず、エラーと再読み込みを出す。
     expect(document.body.textContent).toContain('未登録の人を表示できませんでした')
-    const retry = Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.includes('再読み込み'))
+    const retry = Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
     expect(retry).toBeTruthy()
     fail = false
     await act(async () => { retry!.click() })

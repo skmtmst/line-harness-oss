@@ -9,9 +9,13 @@ import type {
   EventBookingNotificationSender,
   EventNotificationKind,
 } from './event-booking-notifier.js';
-import { resolveLineCredential } from '@line-crm/db';
+import {
+  activeTenantLineAccountSql,
+  isOperationCapabilityStopped,
+  resolveLineCredential,
+} from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { featureJobCanRun } from './feature-enforcement.js';
-import { isOperationCapabilityStopped } from '@line-crm/db';
 
 export interface ComputedReminder {
   kind: EventReminderKind;
@@ -139,6 +143,17 @@ export async function processDueEventReminders(
   db: D1Database,
   params: ProcessDueEventRemindersParams,
 ): Promise<{ sent: number; failed: number }> {
+  await db.prepare(
+    `UPDATE event_booking_reminders
+        SET status = 'cancelled', last_error = 'tenant_suspended'
+      WHERE status IN ('pending','failed')
+        AND scheduled_at <= ?
+        AND EXISTS (
+          SELECT 1 FROM event_bookings stopped_booking
+           WHERE stopped_booking.id = event_booking_reminders.booking_id
+             AND ${stoppedTenantLineAccountSql('stopped_booking.line_account_id')}
+        )`,
+  ).bind(params.now.toISOString()).run();
   // status: 'pending' or 'failed' (retryable). 'sent' / 'failed_permanent'
   // / 'cancelled' are excluded. Booking must still be confirmed and slot
   // start in the future at processing time.
@@ -162,6 +177,7 @@ export async function processDueEventReminders(
           AND r.scheduled_at <= ?
           AND b.status = 'confirmed'
           AND s.starts_at > ?
+          AND ${activeTenantLineAccountSql('b.line_account_id')}
         LIMIT 100`,
     )
     .bind(params.now.toISOString(), params.now.toISOString())
@@ -214,7 +230,8 @@ export async function processDueEventReminders(
               AND EXISTS (
                 SELECT 1 FROM event_bookings b
                  WHERE b.id = event_booking_reminders.booking_id
-                   AND b.status = 'confirmed')`,
+                   AND b.status = 'confirmed'
+                   AND ${activeTenantLineAccountSql('b.line_account_id')})`,
         )
         .bind(row.id, priorRetry)
         .run();

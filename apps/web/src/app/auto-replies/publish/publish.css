@@ -14,7 +14,7 @@
   gap: 8px;
   color: var(--color-action);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .arp-backLink svg { width: 14px; height: 14px; }
@@ -49,7 +49,7 @@
 .arp-step > span:last-child { min-width: 0; }
 .arp-step small,
 .arp-step strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.arp-step small { color: var(--color-accent-deep); font-size: 10px; font-weight: 800; }
+.arp-step small { color: var(--color-accent-deep); font-size: 10px; font-weight: 500; }
 .arp-step strong { margin-top: 2px; font-size: var(--text-label); }
 
 .arp-stepDone,
@@ -65,7 +65,7 @@
   border-radius: var(--radius-pill);
   background: var(--color-shell);
   font-size: var(--text-caption);
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .arp-stepDone { background: var(--color-accent-deep); color: var(--color-on-accent); }
@@ -172,7 +172,7 @@
   background: var(--color-shell);
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  font-weight: 800;
+  font-weight: 600;
 }
 .arp-priorityList label { display: flex; min-width: 0; align-items: center; gap: 10px; cursor: pointer; }
 .arp-priorityList label input { accent-color: var(--color-accent-deep); }
@@ -180,7 +180,7 @@
 .arp-priorityList small { display: block; }
 .arp-priorityList strong { font-size: var(--text-label); }
 .arp-priorityList small { margin-top: 3px; color: var(--color-ink-faint); font-size: var(--text-caption); }
-.arp-priorityList em { color: var(--color-ink-secondary); font-size: var(--text-caption); font-style: normal; font-weight: 700; }
+.arp-priorityList em { color: var(--color-ink-secondary); font-size: var(--text-caption); font-style: normal; font-weight: 500; }
 .arp-priorityList .arp-priorityWinner { border-color: var(--color-accent); background: var(--color-accent-soft); }
 .arp-priorityList .arp-priorityWinner > span { background: var(--color-accent-deep); color: var(--color-on-accent); }
 .arp-conflictSettings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
@@ -200,7 +200,7 @@
 
 .arp-testFields { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 12px; }
 .arp-testFields label,
-.arp-selectField { display: grid; min-width: 0; gap: 7px; color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 700; }
+.arp-selectField { display: grid; min-width: 0; gap: 7px; color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 500; }
 .arp-testFields input { width: 100%; height: 42px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: 0 12px; color: var(--color-ink); font-size: var(--text-label); }
 .arp-senderTools { display: flex; gap: 8px; }
 .arp-senderTools input { min-width: 0; flex: 1; height: 38px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: 0 12px; color: var(--color-ink); font-size: var(--text-label); font-weight: 400; }
@@ -218,17 +218,6 @@
 .arp-evaluationList strong { color: var(--color-success); }
 .arp-evaluationList small { grid-column: 1 / -1; color: var(--color-ink-faint); }
 
-.arp-linePreview { min-height: 356px; border-radius: var(--radius-card); background: var(--color-line-preview); padding: 18px; }
-[data-design-node='U9hzqH'] .arp-linePreview { min-height: 322px; }
-.arp-confirmPreview { min-height: 410px; }
-.arp-donePreview { min-height: 280px; }
-.arp-linePreview > strong,
-.arp-linePreview > span { display: block; color: var(--color-on-accent); text-align: center; }
-.arp-linePreview > strong { font-size: var(--text-label); }
-.arp-linePreview > span { width: fit-content; margin: 14px auto 0; border-radius: var(--radius-pill); background: var(--color-line-preview-label); padding: 5px 12px; font-size: 10px; font-weight: 700; }
-.arp-linePreview > div { margin-top: 18px; border-radius: var(--radius-panel); background: var(--color-canvas); padding: 14px; font-size: var(--text-caption); font-weight: 650; line-height: 1.65; }
-.arp-linePreview > div p { white-space: pre-wrap; }
-.arp-linePreview > div span { display: block; margin-top: 10px; border-radius: var(--radius-control); background: var(--color-accent-deep); padding: 9px 12px; color: var(--color-on-accent); text-align: center; }
 .arp-previewActions { justify-content: flex-start; }
 .arp-previewActions svg,
 .arp-doneActions svg,
@@ -256,12 +245,12 @@
 .arp-nextActions > * { width: 100%; justify-content: flex-start; }
 .arp-monitorList { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .arp-monitorList li { display: flex; align-items: center; gap: 9px; font-size: var(--text-caption); font-weight: 650; }
-.arp-monitorList svg { width: 16px; height: 16px; color: var(--color-accent); }
+.arp-monitorList svg { width: 16px; height: 16px; color: var(--color-accent-deep); }
 
 .arp-overlay { position: fixed; z-index: 40; inset: 0; display: flex; align-items: flex-start; justify-content: center; background: color-mix(in srgb, var(--color-ink) 42%, transparent); padding: 280px 24px 24px; }
 .arp-dialog { width: min(600px, 100%); border: 1px solid var(--color-hairline); border-radius: var(--radius-panel); background: var(--color-canvas); box-shadow: var(--shadow-float); padding: 24px; }
 .arp-dialogTitle { display: flex; align-items: center; gap: 12px; }
-.arp-dialogTitle svg { width: 22px; height: 22px; color: var(--color-accent); }
+.arp-dialogTitle svg { width: 22px; height: 22px; color: var(--color-accent-deep); }
 .arp-dialogTitle h2 { font-size: var(--text-section); }
 .arp-dialog > p { margin-top: 16px; color: var(--color-ink-secondary); font-size: var(--text-label); }
 .arp-dialogActions { justify-content: flex-end; margin-top: 22px; }

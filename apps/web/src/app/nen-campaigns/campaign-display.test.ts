@@ -19,17 +19,29 @@ describe('NEN配信の表示', () => {
     })).toBe('予約した日時')
   })
 
-  it('購入後フォローは注文からの実際の段階を表示する', () => {
+  it('購入後フォローは設定の日数・時刻から表示する（監査 R64）', () => {
+    // 予約処理（scheduledAfter）と同じく「発送からN日後 HH:MM」で作る。
     expect(formatCampaignTiming({
       campaignKey: 'arrival_check',
       delayDays: 1,
       deliveryTime: '10:00',
-    })).toBe('到着の翌日 10:00')
+    })).toBe('発送から1日後 10:00')
     expect(formatCampaignTiming({
       campaignKey: 'review_request',
       delayDays: 7,
       deliveryTime: '20:00',
-    })).toBe('到着から7日後 20:00')
+    })).toBe('発送から7日後 20:00')
+    // 設定を変えたら表示も変わる（以前は固定文で変わらなかった）。
+    expect(formatCampaignTiming({
+      campaignKey: 'arrival_check',
+      delayDays: 20,
+      deliveryTime: '18:00',
+    })).toBe('発送から20日後 18:00')
+    expect(formatCampaignTiming({
+      campaignKey: 'cross_sell',
+      delayDays: 0,
+      deliveryTime: '10:00',
+    })).toBe('発送当日 10:00')
   })
 
   it('配信キーに対応する中身の種類を表示する', () => {
@@ -43,7 +55,7 @@ describe('NEN配信の表示', () => {
   })
 
   it('UTCの予定時刻を日本時間へ変換し、壊れた日時を生表示しない', () => {
-    expect(formatNenJobDateTime('2026-08-25T11:00:00.000Z')).toBe('2026/08/25 20:00')
+    expect(formatNenJobDateTime('2026-08-25T11:00:00.000Z')).toBe('8月25日（火）20:00')
     expect(formatNenJobDateTime('broken')).toBe('日時を確認できません')
   })
 })

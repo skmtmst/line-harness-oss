@@ -2,7 +2,7 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, expect, it, vi } from 'vitest'
-import OpsShell, { useOpsPageTitle } from './ops-shell'
+import OpsShell from './ops-shell'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 vi.mock('next/navigation', () => {
@@ -16,33 +16,31 @@ vi.mock('@/lib/admin-session', () => ({ adminSessionHeaders: () => ({}), capture
 
 afterEach(() => { vi.unstubAllGlobals(); document.body.style.overflow = '' })
 
-function SupportTitle({ draft }: { draft: boolean }) {
-  useOpsPageTitle(draft ? 'お問い合わせ ／ AIの下書き' : 'お問い合わせ')
-  return <p>架空の下書き</p>
-}
-
-it('AI下書きの状態に合わせてトップバーだけを更新する', async () => {
-  navigation.pathname = '/ops/support'
+/*
+ * ★V7: 外枠は全画面で同じ形。ナレッジ・お問い合わせだけの帯
+ * （運営 TopBar・data-knowledge-shell）は出さない。画面名は各画面の
+ * OpsPageHeader が出す。開閉メニューの振る舞いは変えない。
+ */
+it.each(['/ops/knowledge', '/ops/support', '/ops/tenants'])('%s はほかの画面と同じ外枠で、運営の帯を出さない', async pathname => {
+  navigation.pathname = pathname
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true, data: { platformAdmin: true } }) }))
   const host = document.createElement('div'); document.body.appendChild(host)
   const root = createRoot(host)
   try {
-    await act(async () => root.render(<OpsShell><SupportTitle draft /></OpsShell>))
-    expect(host.querySelectorAll('h1')).toHaveLength(1)
-    expect(host.querySelector('h1')?.textContent).toBe('お問い合わせ ／ AIの下書き')
-    await act(async () => root.render(<OpsShell><SupportTitle draft={false} /></OpsShell>))
-    expect(host.querySelector('h1')?.textContent).toBe('お問い合わせ')
+    await act(async () => { root.render(<OpsShell><p>本文</p></OpsShell>) })
+    expect(host.querySelector('[data-knowledge-shell]')).toBeNull()
+    // 帯ではなく各画面の見出しだけ。外枠自体は見出しを持たない。
+    expect(host.textContent).toContain('本文')
   } finally { act(() => root.unmount()); host.remove() }
 })
 
-it.each(['/ops/knowledge', '/ops/support'])('%s のV6レイアウトでもメニューを開き、Escapeで閉じられる', async pathname => {
+it.each(['/ops/knowledge', '/ops/support'])('%s でもメニューを開き、Escapeで閉じられる', async pathname => {
   navigation.pathname = pathname
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true, data: { platformAdmin: true } }) }))
   const host = document.createElement('div'); document.body.appendChild(host)
   const root = createRoot(host)
   try {
     await act(async () => { root.render(<OpsShell><p>ナレッジの本文</p></OpsShell>) })
-    expect(host.querySelector('[data-knowledge-shell] > main > header h1')?.textContent).toBe(pathname === '/ops/knowledge' ? 'ナレッジ' : 'お問い合わせ')
     const open = Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'メニュー')!
     expect(open).toBeDefined()
     expect(open.getAttribute('aria-expanded')).toBe('false')

@@ -2,19 +2,25 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import type { FriendField, FriendFieldType } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
-import SelectField from '@/components/shared/select-field'
+import TargetMissing from '@/components/shared/target-missing'
+import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { ApiError, api } from '@/lib/api'
+import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import type { FriendFieldMigrationPreview, FriendFieldMigrationRun } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
+import { formatDateTime } from '@/lib/format'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
 
@@ -33,14 +39,14 @@ const RUN_RUNNING = new Set<FriendFieldMigrationRun['status']>(['previewed', 'qu
 
 function FieldSummary({ title, field, kind }: { title: string; field: FriendField; kind: 'source' | 'target' }) {
   return (
-    <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+    <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
       <p className="text-xs font-semibold text-ink-faint">{title}</p>
       <div className="mt-3 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-ink">{field.name}</h2>
           <p className="mt-1 font-mono text-xs text-ink-faint">{`{{field.${field.fieldKey}}}`}</p>
         </div>
-        <span className={kind === 'source' ? 'rounded-full bg-surface-soft px-3 py-1 text-xs font-semibold text-ink-secondary' : 'rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent'}>
+        <span className={kind === 'source' ? 'rounded-pill bg-surface-soft px-3 py-1 text-xs font-semibold text-ink-secondary' : 'rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep'}>
           {FIELD_TYPE_LABELS[field.type]}
         </span>
       </div>
@@ -65,6 +71,13 @@ function MigrateFriendField() {
   /** 実行は確認と同じ証票で1回だけ。確認が成立した時点で発行する。 */
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null)
   const [run, setRun] = useState<FriendFieldMigrationRun | null>(null)
+  /*
+   * R548: 実行POSTを受け付けたrun。結果がまだ無くても「移行を実行する」
+   * には戻さない（同じ実行の再取得・再開で続ける）。
+   */
+  const [executedRunId, setExecutedRunId] = useState<string | null>(null)
+  /** 結果の取得に失敗・停滞したときの説明。再取得・再開の入口と一緒に出す。 */
+  const [pollProblem, setPollProblem] = useState('')
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
   const [executing, setExecuting] = useState(false)
@@ -75,6 +88,8 @@ function MigrateFriendField() {
     再試行できる失敗として出す。
   */
   const [loadError, setLoadError] = useState('')
+  /** 権限なしの失敗（見ること自体ができない）。通信の失敗とは分ける。 */
+  const [loadForbidden, setLoadForbidden] = useState(false)
 
   /*
     ATTR-10: 確認中に種類・名前・移行先を変えても、古い確認結果が
@@ -95,6 +110,7 @@ function MigrateFriendField() {
     let active = true
     setLoading(true)
     setLoadError('')
+    setLoadForbidden(false)
     void api.friendFields.list(selectedAccountId, { withUsage: true })
       .then((res) => {
         if (!active) return
@@ -109,7 +125,13 @@ function MigrateFriendField() {
       })
       .catch((reason) => {
         // ATTR-11: 失敗は loadError へ。項目未発見（!source）と混ぜない。
-        if (active) setLoadError(reason instanceof ApiError && reason.status === 403 ? '友だち情報欄を見る権限がありません。オーナーか管理者に確認してください。' : '項目を読み込めませんでした')
+        if (!active) return
+        if (reason instanceof ApiError && reason.status === 403) {
+          setLoadError('友だち情報欄を見る権限がありません。オーナーか管理者に確認してください。')
+          setLoadForbidden(true)
+        } else {
+          setLoadError('項目を読み込めませんでした')
+        }
       })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
@@ -120,12 +142,24 @@ function MigrateFriendField() {
     選択をすべて捨てる。前のアカウントの実行状況が残ると、いまの
     アカウントで起きていない移行が「完了」と見える。
   */
+  /*
+   * R519: 同じ移行先の作り直しは同じ要求キーで送る。入力を変えたら
+   * 新しいキーにする（同じキーに異なる内容はサーバが409で止める）。
+   */
+  const createKeyRef = useRef<string>(crypto.randomUUID())
+  useEffect(() => {
+    createKeyRef.current = crypto.randomUUID()
+  }, [targetName, targetKey, targetType])
+
   useEffect(() => {
     gateRef.current.invalidate()
     setPreview(null)
     setIdempotencyKey(null)
     setRun(null)
+    setExecutedRunId(null)
+    setPollProblem('')
     setCreatedTarget(null)
+    createKeyRef.current = crypto.randomUUID()
     /*
       TECH-07: 飛んでいる確認・実行を捨てたら、ボタンの「確認中…
       実行中…」も捨てる。世代を止めてもフラグが残ると、
@@ -149,27 +183,69 @@ function MigrateFriendField() {
     setPreview(null)
     setIdempotencyKey(null)
     setRun(null)
+    setExecutedRunId(null)
+    setPollProblem('')
+  }
+
+  /*
+   * R519: 移行先を作るか、作り済みを取り直す。
+   *
+   * 応答だけ失った再試行は同じ要求キーで送るため、サーバは保存済みを
+   * 返す。要求キーが変わった後の差し込み名の重複では、作成済みを
+   * 取り直して比べる。同一内容ならその移行先で事前確認を続け、
+   * 異なる内容なら衝突として説明する。
+   */
+  const createTargetOrRecover = async (account: string, token: number): Promise<FriendField | null> => {
+    if (!source) return null
+    const params = {
+      name: targetName.trim() || `${source.name}（新）`,
+      fieldKey: targetKey.trim() || `${source.fieldKey}_new`.slice(0, 32),
+      type: targetType,
+    }
+    try {
+      const created = await api.friendFields.create(account, params, createKeyRef.current)
+      if (!created.success) throw new Error(created.error)
+      if (!gateRef.current.current(token) || accountRef.current !== account) return null
+      setCreatedTarget(created.data)
+      setFields((current) => (current.some((item) => item.id === created.data.id) ? current : [...current, created.data]))
+      return created.data
+    } catch (reason) {
+      try {
+        const res = await api.friendFields.list(account)
+        if (res.success) {
+          const existing = res.data.find((item) => item.fieldKey === params.fieldKey) ?? null
+          if (existing && existing.name === params.name && existing.type === params.type) {
+            if (!gateRef.current.current(token) || accountRef.current !== account) return null
+            setCreatedTarget(existing)
+            setFields((current) => (current.some((item) => item.id === existing.id) ? current : [...current, existing]))
+            return existing
+          }
+        }
+      } catch { /* 取り直せないときは下の説明へ */ }
+      if (!gateRef.current.current(token) || accountRef.current !== account) return null
+      const status = (reason as { status?: number } | null)?.status
+      if (status === 409) {
+        setError(`同じ差し込み名「${params.fieldKey}」の別の項目があります。一覧を確認してください`)
+      } else {
+        setError(describeSaveFailure(reason))
+      }
+      return null
+    }
   }
 
   const runPreview = async () => {
     if (!source || !selectedAccountId || checking) return
     setChecking(true); setError(''); setPreview(null); setRun(null)
+    // 確認のやり直しは新しい出発にする。実行中の見守りは捨てる。
+    setExecutedRunId(null); setPollProblem('')
     const token = gateRef.current.begin()
     const account = selectedAccountId
     try {
       let targetField = target
       // 新規モードでは、実行できる確認（期限付き証票）に項目の実体が要るので先に作る。
       if (!targetField && targetMode === 'new') {
-        const created = await api.friendFields.create(account, {
-          name: targetName.trim() || `${source.name}（新）`,
-          fieldKey: targetKey.trim() || `${source.fieldKey}_new`.slice(0, 32),
-          type: targetType,
-        })
-        if (!created.success) throw new Error(created.error)
-        targetField = created.data
-        if (!gateRef.current.current(token) || accountRef.current !== account) return
-        setCreatedTarget(created.data)
-        setFields((current) => [...current, created.data])
+        targetField = await createTargetOrRecover(account, token)
+        if (!targetField) return
       }
       if (!targetField) {
         setError('移行先の項目を選んでください')
@@ -188,6 +264,11 @@ function MigrateFriendField() {
     }
   }
 
+  /*
+   * R548: 結果の取得失敗は黙殺しない。実行そのものは壊さないが、
+   * 失敗をはっきり出し、同じrunの再取得・再開へつなげる。
+   * R547: 上限で止まったまま「実行中」にしない。理由と入口を出す。
+   */
   const pollRun = (runId: string, account: string, token: number, attempt: number) => {
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
     pollTimerRef.current = setTimeout(() => {
@@ -196,28 +277,78 @@ function MigrateFriendField() {
           if (!gateRef.current.current(token) || accountRef.current !== account) return
           if (res.success) {
             setRun(res.data)
-            if (RUN_RUNNING.has(res.data.status) && attempt < 20) {
-              pollRun(runId, account, token, attempt + 1)
+            if (RUN_RUNNING.has(res.data.status)) {
+              if (attempt < 20) {
+                pollRun(runId, account, token, attempt + 1)
+              } else {
+                setPollProblem('まだ実行中です。結果の再取得か、止まっている場合の再開ができます。')
+              }
+            } else {
+              setPollProblem('')
             }
           }
         })
-        .catch(() => { /* 状況確認の失敗は実行そのものを壊さない */ })
+        .catch(() => {
+          if (!gateRef.current.current(token) || accountRef.current !== account) return
+          setPollProblem('移行の結果を確認できませんでした。通信を確かめて、結果を確認し直してください。')
+        })
     }, attempt === 0 ? 0 : 2000)
   }
 
   const execute = async () => {
     if (!source || !selectedAccountId || !preview?.previewToken || !idempotencyKey || executing) return
-    setExecuting(true); setError('')
+    setExecuting(true); setError(''); setPollProblem('')
     const token = gateRef.current.begin()
     const account = selectedAccountId
     try {
       const res = await api.friendFields.migrationExecute(source.id, account, preview.previewToken, idempotencyKey)
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       if (!res.success) throw new Error(res.error)
+      setExecutedRunId(res.data.runId)
       pollRun(res.data.runId, account, token, 0)
     } catch (reason) {
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       setError(reason instanceof ApiError ? reason.message : '移行を開始できませんでした。事前確認からやり直してください。')
+    } finally {
+      if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
+    }
+  }
+
+  /** R548: 同じrunの結果を取り直す。完了していれば結果へ戻れる。 */
+  const refetchRun = () => {
+    if (!selectedAccountId || !executedRunId || executing) return
+    setPollProblem('')
+    pollRun(executedRunId, selectedAccountId, gateRef.current.begin(), 0)
+  }
+
+  /*
+   * R547: 止まった実行を続きから再開する。新しい要求キーで送るため、
+   * サーバは受け付け済みの実行を再開する（D036）。終わっている実行の
+   * 再開は409になるので、そのときは結果を取り直して見せる。
+   */
+  const resume = async () => {
+    if (!source || !selectedAccountId || !preview?.previewToken || !executedRunId || executing) return
+    setExecuting(true); setError(''); setPollProblem('')
+    const token = gateRef.current.begin()
+    const account = selectedAccountId
+    try {
+      const res = await api.friendFields.migrationExecute(source.id, account, preview.previewToken, crypto.randomUUID())
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
+      if (!res.success) throw new Error(res.error)
+      setExecutedRunId(res.data.runId)
+      pollRun(res.data.runId, account, token, 0)
+    } catch (reason) {
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
+      try {
+        const current = await api.friendFields.migrationRun(executedRunId, account)
+        if (!gateRef.current.current(token) || accountRef.current !== account) return
+        if (current.success) {
+          setRun(current.data)
+          setPollProblem('')
+          return
+        }
+      } catch { /* 下の説明へ */ }
+      setError(reason instanceof ApiError ? reason.message : '移行を再開できませんでした。事前確認からやり直してください。')
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
     }
@@ -229,48 +360,80 @@ function MigrateFriendField() {
   /*
     U097: 「一覧から選び直してください」と言うだけの画面に、実際に
     戻れる操作を置く。直リンク・履歴なしでも画面内だけで復帰できる。
+    開き先がない3種は ★V7 TargetMissing（設計 `x5cgUH`）。
   */
+  if (!sourceId) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="移行する項目が指定されていません"
+        description="一覧から移行する項目を選び直してください。"
+        backHref="/tags?tab=fields"
+        backLabel="友だち情報欄の一覧へ戻る"
+      />
+    )
+  }
   if (!selectedAccountId) return (
-    <div data-design-node="KoT6c" role="alert" className="rounded-control border border-warning/30 bg-warning-bg p-4 text-sm text-warning">
+    <Notice tone="warn" data-design-node="KoT6c" action={<Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>}>
       LINE公式アカウントを選んでください。
-      <div className="mt-3"><Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button></div>
-    </div>
+    </Notice>
   )
   /*
     ATTR-11: 「読み込めなかった」と「移行元が無い」を分ける。
     通信失敗は再試行でき、項目が本当に無い（消された・URLが古い）
     ときだけ一覧へ戻す導線を出す。
   */
+  if (loadForbidden) {
+    return (
+      <ListState
+        kind="forbidden"
+        title="友だち情報欄を見る権限がありません"
+        description="オーナーか管理者に確認してください。"
+        action={<Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>}
+      />
+    )
+  }
   if (loadError) return (
-    <div data-design-node="KoT6c" role="alert" className="rounded-control border border-danger/20 bg-danger-bg p-4 text-sm text-danger">
-      {loadError}
-      <div className="mt-3 flex gap-2">
-        <Button type="button" onClick={() => setReloadTick((tick) => tick + 1)}>もう一度読み込む</Button>
-        <Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>
-      </div>
-    </div>
+    <TargetMissing
+      kind="error"
+      title="項目を読み込めませんでした"
+      description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+      onRetry={() => setReloadTick((tick) => tick + 1)}
+    />
   )
   if (!source) return (
-    <div data-design-node="KoT6c" role="alert" className="rounded-control border border-danger/20 bg-danger-bg p-4 text-sm text-danger">
-      移行元の項目が見つかりません。友だち情報欄の一覧から選び直してください。
-      <div className="mt-3"><Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button></div>
-    </div>
+    <TargetMissing
+      kind="not-found"
+      title="移行元の項目が見つかりません"
+      description="削除されたか、リンクが古くなっています。友だち情報欄の一覧から選び直してください。"
+      backHref="/tags?tab=fields"
+      backLabel="友だち情報欄の一覧へ戻る"
+    />
   )
 
   const confirmed = Boolean(preview?.previewToken)
   const running = executing || (run ? RUN_RUNNING.has(run.status) : false)
+  /*
+   * R547・R548: 取得の失敗・停滞で人の手が必要なときだけ、同じrunの
+   * 再取得・再開を出す。見守りの最中は何も出さない。
+   */
+  const needsPollAction = executedRunId !== null && !executing && pollProblem !== ''
+    && (!run || RUN_RUNNING.has(run.status))
+  const pollAttention = pollProblem !== '' && (!run || RUN_RUNNING.has(run.status))
 
   return (
-    <div data-design-node="KoT6c">
-      <div className="mb-4 flex items-center justify-between gap-4">
+    <div data-design-node="KoT6c" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      {/* m22c: 見出し行の戻りは共通の行き先リンク（カード見出しと同じ13px/600青文字）。 */}
+      <div className="flex items-center justify-between gap-4">
         <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: '項目を移行' }]} />
-        <Button href="/tags?tab=fields">友だち情報欄へ</Button>
+        <Link href="/tags?tab=fields" className="text-status-info shrink-0 text-label font-semibold hover:underline">友だち情報欄へ</Link>
       </div>
 
-      <div className="mb-4 rounded-control border border-info/25 bg-info-bg p-4 text-sm leading-6 text-info">
+      <Notice tone="info" className="mb-4">
         事前確認では値を1件も変更しません。移せる数と切り替わる使用先を確かめてから、「移行を実行する」を押した時だけ書き込みます。
-      </div>
-      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      </Notice>
+      {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
 
       {/*
         ATTR-25: 比較は「元 1fr ／ 矢印 44px ／ 先 1fr」。
@@ -283,8 +446,8 @@ function MigrateFriendField() {
           <span className="xl:hidden">↓</span>
           <span className="hidden xl:block">→</span>
         </div>
-        <section className="rounded-card border border-accent/30 bg-canvas p-5 shadow-sm">
-          <p className="text-xs font-semibold text-accent">移行先の項目</p>
+        <section className="rounded-card border border-accent/30 bg-canvas p-5 shadow-card">
+          <p className="text-xs font-semibold text-ink-secondary">移行先の項目</p>
           {target ? (
             <div className="mt-3">
               <h2 className="text-base font-bold text-ink">{target.name}</h2>
@@ -293,51 +456,42 @@ function MigrateFriendField() {
               <button
                 type="button"
                 onClick={() => { setCreatedTarget(null); setExistingTargetId(''); resetConfirmation() }}
-                className="mt-3 text-xs font-semibold text-accent hover:underline"
+                className="mt-3 text-xs font-semibold text-action hover:underline"
               >
                 別の項目を選び直す
               </button>
             </div>
           ) : (
             <div className="mt-3">
-              <fieldset>
-                <legend className="sr-only">移行先の決め方</legend>
-                <div className="flex flex-wrap gap-4 text-sm text-ink-secondary">
-                  <label className="flex items-center gap-2">
-                    <input type="radio" checked={targetMode === 'new'} onChange={() => { setTargetMode('new'); resetConfirmation() }} />
-                    新しい項目を作る
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="radio" checked={targetMode === 'existing'} onChange={() => { setTargetMode('existing'); resetConfirmation() }} />
-                    既存の項目を使う
-                  </label>
-                </div>
-              </fieldset>
+              <RadioCardGroup legend="移行先の決め方">
+                <RadioCard name="field-migrate-target" value="new" checked={targetMode === 'new'} onChange={() => { setTargetMode('new'); resetConfirmation() }} title="新しい項目を作る" />
+                <RadioCard name="field-migrate-target" value="existing" checked={targetMode === 'existing'} onChange={() => { setTargetMode('existing'); resetConfirmation() }} title="既存の項目を使う" />
+              </RadioCardGroup>
               {targetMode === 'new' ? (
                 <>
                   <label className="mt-3 block text-sm font-semibold text-ink">項目名
-                    <input value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal outline-none focus:border-accent" />
+                    <input value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal" />
                   </label>
                   <label className="mt-3 block text-sm font-semibold text-ink">差し込み名
-                    <input value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-mono font-normal outline-none focus:border-accent" />
+                    <input value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-mono font-normal" />
                   </label>
                   <label className="mt-3 block text-sm font-semibold text-ink">種類
-                    <SelectField
+                    <Select
                       value={targetType}
-                      onChange={(event) => { setTargetType(event.target.value as FriendFieldType); resetConfirmation() }}
+                      onChange={(value) => { setTargetType(value as FriendFieldType); resetConfirmation() }}
                       aria-label="移行後の友だち情報欄の種類"
-                      className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal"
+                      size="full"
                       options={TYPES.map((type) => ({ value: type, label: `${FIELD_TYPE_LABELS[type]} — ${FIELD_TYPE_HINTS[type]}` }))}
                     />
                   </label>
                 </>
               ) : (
                 <label className="mt-3 block text-sm font-semibold text-ink">移行先
-                  <SelectField
+                  <Select
                     value={existingTargetId}
-                    onChange={(event) => { setExistingTargetId(event.target.value); resetConfirmation() }}
+                    onChange={(value) => { setExistingTargetId(value); resetConfirmation() }}
                     aria-label="移行先の既存項目"
-                    className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal"
+                    size="full"
                     options={[
                       { value: '', label: '項目を選ぶ' },
                       ...fields
@@ -352,58 +506,70 @@ function MigrateFriendField() {
         </section>
       </div>
 
-      <section data-design="Preview" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+      <section data-design="Preview" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="text-base font-bold text-ink">値を変換できるか事前確認</h2><p className="mt-1 text-sm text-ink-secondary">登録済みの値を読み取り、移行できる数だけを確認します。</p></div>
-          <Button type="button" onClick={() => void runPreview()} disabled={checking || running || (!target && targetMode === 'existing' && !existingTargetId)}>
-            {checking ? '確認しています…' : targetMode === 'new' && !createdTarget ? '項目を作成して事前確認' : '事前確認する'}
+          <Button type="button" onClick={() => void runPreview()} disabled={checking || running || (executedRunId !== null && run === null) || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">
+            {targetMode === 'new' && !createdTarget ? '項目を作って事前確認' : '事前確認する'}
           </Button>
         </div>
         {preview ? (
           <div className="mt-5">
             <div className="grid gap-3 sm:grid-cols-4">
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">値がある友だち</p><p className="mt-1 text-xl font-bold text-ink">{preview.summary.total}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">そのまま移せる</p><p className="mt-1 text-xl font-bold text-accent">{preview.summary.convertible}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">人が確認する</p><p className="mt-1 text-xl font-bold text-warning">{preview.summary.review}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">空欄</p><p className="mt-1 text-xl font-bold text-danger">{preview.summary.invalid}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">値がある友だち</p><p className="mt-1 text-xl font-semibold text-ink">{preview.summary.total}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">そのまま移せる</p><p className="mt-1 text-xl font-semibold text-ink">{preview.summary.convertible}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">人が確認する</p><p className="mt-1 text-xl font-semibold text-warning">{preview.summary.review}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">空欄</p><p className="mt-1 text-xl font-semibold text-danger">{preview.summary.invalid}人</p></div>
             </div>
             {preview.rows.length ? (
               <DataTable className="mt-4">
                 <thead><TableHeadRow><Th>友だちID</Th><Th>いまの値</Th><Th>確認する理由</Th></TableHeadRow></thead>
                 <tbody>{preview.rows.map((row) => <Tr key={row.friendId}><Td className="truncate font-mono text-xs" title={row.friendId}>{row.friendId}</Td><Td className="truncate" title={row.sourceValue}>{row.sourceValue || '（空欄）'}</Td><Td>{row.reason ?? '確認してください'}</Td></Tr>)}</tbody>
               </DataTable>
-            ) : <p className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent">確認が必要な値はありません。</p>}
+            ) : <Notice tone="success" className="mt-4">確認が必要な値はありません。</Notice>}
           </div>
         ) : <p className="mt-4 text-sm text-ink-faint">まだ事前確認していません。未取得を0人として表示しません。</p>}
       </section>
 
-      <section data-design="Usage" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+      <section data-design="Usage" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
         <h2 className="text-base font-bold text-ink">切り替わる使用先</h2>
         {preview ? preview.usageTargets.length > 0 ? (
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
             {preview.usageTargets.map((usage) => <p key={`${usage.kind}:${usage.id}`} className="rounded-control bg-surface-soft p-3"><span className="block truncate font-semibold text-ink" title={usage.name}>{usage.name}</span><span className="mt-1 block text-xs text-ink-faint">{usage.kind} ／ {usage.switchable ? '移行時に切り替え' : '手動確認が必要'}</span></p>)}
           </div>
-        ) : <p className="mt-3 rounded-control bg-accent-soft p-3 text-sm text-accent">切り替えが必要な使用先はありません。</p>
+        ) : <Notice tone="success" className="mt-3">切り替えが必要な使用先はありません。</Notice>
           : <p className="mt-3 text-sm text-ink-faint">事前確認すると、回答フォームや自動処理などの使用先を表示します。</p>}
-        {preview?.runId && preview.previewExpiresAt ? <p className="mt-2 text-xs text-ink-faint">確認番号：{preview.runId} ／ 有効期限：{new Date(preview.previewExpiresAt).toLocaleString('ja-JP')}</p> : null}
+        {preview?.runId && preview.previewExpiresAt ? <p className="mt-2 text-xs text-ink-faint">確認番号：{preview.runId} ／ 有効期限：{formatDateTime(preview.previewExpiresAt)}</p> : null}
       </section>
 
+      {/*
+        R548: 実行を受け付けたのに結果がまだ無い間は、黙らせずに
+        「未確認」と出し、同じrunの再取得・再開へつなげる。
+        「移行を実行する」には戻さない。
+      */}
+      {!run && executedRunId ? (
+        <section data-design="Result" className="rounded-card border border-hairline bg-canvas p-5" aria-live="polite">
+          <h2 className="text-base font-bold text-ink">移行の結果</h2>
+          <p className="mt-2 text-sm text-ink">{pollProblem || '実行を受け付けました。結果を確認しています…'}</p>
+        </section>
+      ) : null}
+
       {run ? (
-        <section data-design="Result" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-live="polite">
+        <section data-design="Result" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-live="polite">
           <h2 className="text-base font-bold text-ink">移行の結果</h2>
           <p className="mt-2 text-sm font-semibold text-ink">{RUN_STATUS_LABELS[run.status]}</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できた</p><p className="mt-1 text-xl font-bold text-accent">{run.summary.succeeded}人</p></div>
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できなかった</p><p className="mt-1 text-xl font-bold text-danger">{run.summary.failed}人</p></div>
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">確認が必要なまま</p><p className="mt-1 text-xl font-bold text-warning">{run.summary.review + run.summary.invalid}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できた</p><p className="mt-1 text-xl font-semibold text-accent-deep">{run.summary.succeeded}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できなかった</p><p className="mt-1 text-xl font-semibold text-danger">{run.summary.failed}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">確認が必要なまま</p><p className="mt-1 text-xl font-semibold text-warning">{run.summary.review + run.summary.invalid}人</p></div>
           </div>
           {run.rows.filter((row) => row.status === 'failed').length ? (
             <DataTable className="mt-4">
               <thead><TableHeadRow><Th>友だちID</Th><Th>いまの値</Th><Th>失敗の理由</Th></TableHeadRow></thead>
-              <tbody>{run.rows.filter((row) => row.status === 'failed').map((row) => <Tr key={row.friendId}><Td className="truncate font-mono text-xs" title={row.friendId}>{row.friendId}</Td><Td className="truncate" title={row.sourceValue}>{row.sourceValue || '（空欄）'}</Td><Td>{row.reason ?? '失敗しました'}</Td></Tr>)}</tbody>
+              <tbody>{run.rows.filter((row) => row.status === 'failed').map((row) => <Tr key={row.friendId}><Td className="truncate font-mono text-xs" title={row.friendId}>{row.friendId}</Td><Td className="truncate" title={row.sourceValue}>{row.sourceValue || '（空欄）'}</Td><Td>{row.reason ?? '失敗しました。通信を確かめて、もう一度お試しください。'}</Td></Tr>)}</tbody>
             </DataTable>
           ) : null}
-          {run.error ? <p role="alert" className="mt-3 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{run.error}</p> : null}
+          {run.error ? <Notice tone="danger" message={run.error} className="mt-3" /> : null}
           {/*
             復旧可否を正直に伝える。元の項目の値は期限まで残るが、
             自動で元に戻す操作はまだ無い。戻す必要が出たときの行き先を
@@ -411,27 +577,34 @@ function MigrateFriendField() {
           */}
           {run.rollbackDeadline ? (
             <p className="mt-3 text-xs leading-5 text-ink-faint">
-              元の項目の値は {new Date(run.rollbackDeadline).toLocaleString('ja-JP')} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。
+              元の項目の値は {formatDateTime(run.rollbackDeadline)} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。
             </p>
           ) : null}
         </section>
       ) : null}
 
       <StickyBar
-        status={run ? RUN_STATUS_LABELS[run.status] : confirmed ? `事前確認済み：${preview?.summary.total ?? 0}人` : 'まだ事前確認していません'}
+        status={pollAttention ? pollProblem : run ? RUN_STATUS_LABELS[run.status] : executedRunId ? '実行を受け付けました。結果を確認しています' : confirmed ? `事前確認済み：${preview?.summary.total ?? 0}人` : 'まだ事前確認していません'}
         actions={<>
-          <Button href="/tags?tab=fields">移行をやめる</Button>
-          {confirmed && !run ? (
+          <Button href="/tags?tab=fields">キャンセル</Button>
+          {confirmed && !executedRunId ? (
             <Button type="button" onClick={() => void runPreview()} disabled={checking || running}>確認をやり直す</Button>
           ) : null}
-          {confirmed && !run ? (
-            <Button variant="primary" type="button" onClick={() => void execute()} disabled={executing || running}>
-              {running ? '実行中…' : '移行を実行する'}
+          {confirmed && !executedRunId ? (
+            <Button variant="primary" type="button" onClick={() => void execute()} disabled={executing || running} busy={running} busyLabel="実行中…">移行を実行する
+            </Button>
+          ) : null}
+          {needsPollAction ? (
+            <Button type="button" onClick={() => void refetchRun()} disabled={executing}>結果を確認する</Button>
+          ) : null}
+          {needsPollAction ? (
+            <Button variant="primary" type="button" onClick={() => void resume()} disabled={executing}>
+              {executing ? '再開中…' : '続きから再開する'}
             </Button>
           ) : null}
           {!confirmed ? (
-            <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)}>
-              {checking ? '確認しています…' : targetMode === 'new' && !createdTarget ? '項目を作成して事前確認' : '事前確認する'}
+            <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">
+              {targetMode === 'new' && !createdTarget ? '項目を作って事前確認' : '事前確認する'}
             </Button>
           ) : null}
         </>}

@@ -34,8 +34,12 @@ import {
   getSavedAnalyticsSnapshots,
   ANALYTICS_REPORT_SECTIONS,
   createAnalyticsReportSchedule,
+  getAnalyticsReportRuns,
   getAnalyticsReportSchedule,
+  getRecentOneTimeAnalyticsReportRuns,
+  getAnalyticsReportScheduleIncludingArchived,
   getAnalyticsReportSchedules,
+  requeueOneTimeAnalyticsReportSchedule,
   setAnalyticsReportScheduleStatus,
   updateAnalyticsReportSchedule,
   getStaffMembers,
@@ -54,6 +58,8 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
+import { zonedWallTime } from '../services/zoned-time.js';
 
 /**
  * 集計。
@@ -172,8 +178,9 @@ function nextReportRun(input: {
   cadence: 'weekly' | 'monthly'; weekday: number | null; monthDay: number | null;
   sendTime: string; timeZone: string; now: Date;
 }): string {
+  // R458: 0時のUTC換算＋時分の加算は夏時間の切替日に1時間ずれる。
+  // その日のその時刻を壁時計として解き直す（services/zoned-time.ts）。
   const currentDate = dateInZone(input.now, input.timeZone);
-  const [hour, minute] = input.sendTime.split(':').map(Number);
   const candidateDate = new Date(`${currentDate}T00:00:00.000Z`);
   if (input.cadence === 'weekly') {
     const currentWeekday = new Date(`${currentDate}T12:00:00.000Z`).getUTCDay();
@@ -182,14 +189,16 @@ function nextReportRun(input: {
     candidateDate.setUTCDate(input.monthDay!);
     if (candidateDate.toISOString().slice(0, 10) < currentDate) candidateDate.setUTCMonth(candidateDate.getUTCMonth() + 1);
   }
-  const asDate = candidateDate.toISOString().slice(0, 10);
-  let instant = Date.parse(zonedDateStart(asDate, input.timeZone)) + hour * 3_600_000 + minute * 60_000;
+  const resolve = (date: Date) =>
+    Date.parse(zonedWallTime(date.toISOString().slice(0, 10), input.sendTime, input.timeZone));
+  let instant = resolve(candidateDate);
   if (instant <= input.now.getTime()) {
-    if (input.cadence === 'weekly') instant += 7 * 86_400_000;
-    else {
+    if (input.cadence === 'weekly') {
+      candidateDate.setUTCDate(candidateDate.getUTCDate() + 7);
+      instant = resolve(candidateDate);
+    } else {
       candidateDate.setUTCMonth(candidateDate.getUTCMonth() + 1);
-      instant = Date.parse(zonedDateStart(candidateDate.toISOString().slice(0, 10), input.timeZone))
-        + hour * 3_600_000 + minute * 60_000;
+      instant = resolve(candidateDate);
     }
   }
   return new Date(instant).toISOString();
@@ -236,14 +245,27 @@ function parseReportBody(raw: unknown): { ok: true; value: {
     : [];
   if (!channels.length) return { ok: false, error: '通知方法を選んでください' };
   const recipients: AnalyticsReportRecipient[] = [];
+  // R228: 形が合わない宛先を黙って外さない。正しい宛先と混ざっていても、
+  // 不備のある行を示して止める（送ったつもりが届いていないを防ぐ）。
   for (const item of Array.isArray(body.recipients) ? body.recipients : []) {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return { ok: false, error: '宛先に読み取れない行があります' };
+    }
     const value = item as Record<string, unknown>;
     const label = typeof value.label === 'string' ? value.label.trim().slice(0, 120) : '';
-    if (value.kind === 'staff' && typeof value.staffId === 'string' && value.staffId.trim()) {
+    if (value.kind === 'staff') {
+      if (typeof value.staffId !== 'string' || !value.staffId.trim()) {
+        return { ok: false, error: '宛先のログインユーザーを読み取れませんでした' };
+      }
       recipients.push({ kind: 'staff', staffId: value.staffId.trim(), label: label || 'ログインユーザー' });
-    } else if (value.kind === 'email' && typeof value.email === 'string' && isEmail(value.email.trim())) {
-      recipients.push({ kind: 'email', email: value.email.trim().toLowerCase(), label: label || value.email.trim() });
+    } else if (value.kind === 'email') {
+      const email = typeof value.email === 'string' ? value.email.trim() : '';
+      if (!isEmail(email)) {
+        return { ok: false, error: `宛先のメールアドレス「${email || '(空)'}」は形が正しくありません` };
+      }
+      recipients.push({ kind: 'email', email: email.toLowerCase(), label: label || email });
+    } else {
+      return { ok: false, error: '宛先に読み取れない行があります' };
     }
   }
   if (!recipients.length) return { ok: false, error: '受け取る人を選んでください' };
@@ -391,9 +413,12 @@ analytics.get('/api/analytics/url-clicks', async (c) => {
     if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
       return c.json({ success: false, error: '表示件数は1〜200で指定してください' }, 400);
     }
+    // 監査 R72: 検索語はSQL側で絞る。取得済みの上位200件の中だけを探していた時期は、
+    // それより先のURLに辿り着けなかった。
+    const query = (c.req.query('query') ?? '').trim().slice(0, 200) || undefined;
     return c.json({
       success: true,
-      data: await getAnalyticsUrlClicksOverview(c.env.DB, context.value, limit),
+      data: await getAnalyticsUrlClicksOverview(c.env.DB, context.value, limit, query),
     });
   } catch (error) {
     console.error('GET /api/analytics/url-clicks error:', error);
@@ -613,15 +638,19 @@ analytics.get('/api/analytics/report-schedules', async (c) => {
     if (!account.ok) return account.response;
     const selected = await getLineAccountById(c.env.DB, account.accountId);
     if (!selected) return c.json({ success: false, error: 'Not found' }, 404);
-    const [items, savedAnalyses, recipients] = await Promise.all([
+    const [items, savedAnalyses, recipients, recentOneTime] = await Promise.all([
       getAnalyticsReportSchedules(c.env.DB, account.accountId),
       getSavedAnalytics(c.env.DB, account.accountId),
       reportRecipientOptions(c, account.accountId),
+      // R454: しまった1回送信の直近分も返す。一覧から消えても
+      // 失敗に気づき、依頼IDの結果へ進めるようにする。
+      getRecentOneTimeAnalyticsReportRuns(c.env.DB, account.accountId),
     ]);
     return c.json({
       success: true,
       data: {
         items,
+        recentOneTime,
         options: {
           timeZone: selected.timezone || 'Asia/Tokyo',
           savedAnalyses: savedAnalyses.map((item) => ({ id: item.id, name: item.name, kind: item.kind })),
@@ -674,6 +703,50 @@ function expectedUpdatedAtOf(rawBody: unknown): string | null {
 const REPORT_SCHEDULE_CONFLICT =
   'この定期レポートは別の画面で先に更新されました。最新の内容を読み込み直してください';
 
+/*
+ * R526: 同じ要求キーで同じ内容なら、既にある予約を返す。
+ *
+ * 作成の直後に応答だけ失われると、画面は失敗表示のまま「つくって動かす」を
+ * もう一度押せる。要求キーなしでは2件目の有効な予約ができ、同じ内容が重複
+ * して届く。次回予定（nextRunAt）と作った人は要求のたびに変わるので比べない。
+ */
+function sameReportCreateRequest(
+  existing: {
+    name: string; sections: unknown; savedAnalysisIds: unknown; cadence: string;
+    weekday: number | null; monthDay: number | null; sendTime: string; timeZone: string;
+    periodDays: number; recipients: unknown; channels: unknown; alertRules: unknown;
+    isOneTime: boolean;
+  },
+  value: {
+    name: string; sections: unknown; savedAnalysisIds: unknown; cadence: string;
+    weekday: number | null; monthDay: number | null; sendTime: string; timeZone: string;
+    periodDays: number; recipients: unknown; channels: unknown; alertRules: unknown;
+  },
+  sendOnce: boolean,
+): boolean {
+  return existing.isOneTime === sendOnce
+    && existing.name === value.name
+    && JSON.stringify(existing.sections) === JSON.stringify(value.sections)
+    && JSON.stringify(existing.savedAnalysisIds) === JSON.stringify(value.savedAnalysisIds)
+    && existing.cadence === value.cadence
+    && existing.weekday === value.weekday
+    && existing.monthDay === value.monthDay
+    && existing.sendTime === value.sendTime
+    && existing.timeZone === value.timeZone
+    && existing.periodDays === value.periodDays
+    && JSON.stringify(existing.recipients) === JSON.stringify(value.recipients)
+    && JSON.stringify(existing.channels) === JSON.stringify(value.channels)
+    && JSON.stringify(existing.alertRules) === JSON.stringify(value.alertRules);
+}
+
+function reportScheduleIdConflict(existingId: string) {
+  return {
+    success: false,
+    error: '同じ操作で内容の違う予約が既にあります。一覧で既にある予約を確認してください',
+    data: { existingId },
+  };
+}
+
 analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'), async (c) => {
   try {
     const account = await resolveAccount(c);
@@ -688,10 +761,28 @@ analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'),
     }
     const validationError = await validateReportPayload(c, account.accountId, parsed.value);
     if (validationError) return c.json({ success: false, error: validationError }, 422);
+    // R526: 要求キー（UUID）を付けた作成は、応答消失後の再送でも
+    // 同じ予約へ戻す。キーが無い従来の呼び出しはそのまま通す。
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
+    if (idempotencyKey && !isValidIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: 'Idempotency-Key はUUIDで送ってください' }, 400);
+    }
     const now = new Date();
     const sendOnce = Boolean(rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
       && (rawBody as Record<string, unknown>).sendOnce === true);
-    const item = await createAnalyticsReportSchedule(c.env.DB, {
+    if (idempotencyKey) {
+      const existing = await getAnalyticsReportScheduleIncludingArchived(
+        c.env.DB, idempotencyKey, account.accountId,
+      );
+      if (existing) {
+        if (!sameReportCreateRequest(existing, parsed.value, sendOnce)) {
+          return c.json(reportScheduleIdConflict(existing.id), 409);
+        }
+        c.header('Idempotency-Replayed', 'true');
+        return c.json({ success: true, data: existing, replayed: true }, 200);
+      }
+    }
+    const payload = {
       lineAccountId: account.accountId,
       ...parsed.value,
       nextRunAt: sendOnce ? now.toISOString() : nextReportRun({
@@ -702,8 +793,29 @@ analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'),
       createdBy: c.get('staff').id,
       now: now.toISOString(),
       isOneTime: sendOnce,
-    });
-    return c.json({ success: true, data: item }, 201);
+    };
+    try {
+      const item = await createAnalyticsReportSchedule(c.env.DB, {
+        ...payload,
+        // 要求キーをそのまま行の主キーにする。同時に届いた再送は
+        // 主キーの一意性で1本だけ通り、負けた側は下で回収する。
+        ...(idempotencyKey ? { id: idempotencyKey } : {}),
+      });
+      return c.json({ success: true, data: item }, 201);
+    } catch (createError) {
+      // 同時実行の競合で負けた側。勝った行を読み直し、同じ内容なら
+      // その予約を返す。内容が違うキー使い回しは409で止める。
+      if (!idempotencyKey) throw createError;
+      const raced = await getAnalyticsReportScheduleIncludingArchived(
+        c.env.DB, idempotencyKey, account.accountId,
+      );
+      if (!raced) throw createError;
+      if (!sameReportCreateRequest(raced, parsed.value, sendOnce)) {
+        return c.json(reportScheduleIdConflict(raced.id), 409);
+      }
+      c.header('Idempotency-Replayed', 'true');
+      return c.json({ success: true, data: raced, replayed: true }, 200);
+    }
   } catch (error) {
     console.error('POST /api/analytics/report-schedules error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -796,6 +908,66 @@ analytics.put('/api/analytics/report-schedules/:id/status', requireRole('owner',
     return c.json({ success: true, data: item });
   } catch (error) {
     console.error('PUT /api/analytics/report-schedules/:id/status error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// R454: 1回送信の依頼は送信後に一覧から消える（archived のため）。
+// 依頼IDから失敗理由・宛先別結果へ到達できるよう、履歴を返す。
+// しまったものも含めて引くが、別アカウントのIDは Not found にする。
+analytics.get('/api/analytics/report-schedules/:id/runs', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const schedule = await getAnalyticsReportScheduleIncludingArchived(
+      c.env.DB, c.req.param('id'), account.accountId,
+    );
+    if (!schedule) return c.json({ success: false, error: 'Not found' }, 404);
+    const runs = await getAnalyticsReportRuns(c.env.DB, {
+      scheduleId: schedule.id, lineAccountId: account.accountId,
+    });
+    return c.json({ success: true, data: { schedule, runs } });
+  } catch (error) {
+    console.error('GET /api/analytics/report-schedules/:id/runs error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// R454: 確定失敗の1回送信だけ送り直せる入口。一部でも届いたものは
+// 送り直さない（重複を防ぐ）。届いていないことの確認は最新履歴の
+// 宛先別結果で行い、送り直しは新しい実行記録として残す。
+analytics.post('/api/analytics/report-schedules/:id/retry', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const schedule = await getAnalyticsReportScheduleIncludingArchived(
+      c.env.DB, c.req.param('id'), account.accountId,
+    );
+    if (!schedule || !schedule.isOneTime || schedule.status !== 'archived') {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const runs = await getAnalyticsReportRuns(c.env.DB, {
+      scheduleId: schedule.id, lineAccountId: account.accountId, limit: 1,
+    });
+    const latest = runs[0] ?? null;
+    if (!latest || latest.state === 'running') {
+      return c.json({ success: false, error: '送信結果がまだ確定していません' }, 422);
+    }
+    const sent = latest.deliveryResults.some(
+      (item) => Boolean(item) && typeof item === 'object'
+        && (item as { status?: unknown }).status === 'sent',
+    );
+    if (sent) {
+      return c.json({ success: false, error: '一部は届いているため送り直せません' }, 422);
+    }
+    const outcome = await requeueOneTimeAnalyticsReportSchedule(c.env.DB, {
+      id: schedule.id, lineAccountId: account.accountId, now: new Date().toISOString(),
+    });
+    if (outcome === 'missing') return c.json({ success: false, error: 'Not found' }, 404);
+    const item = await getAnalyticsReportSchedule(c.env.DB, schedule.id, account.accountId);
+    return c.json({ success: true, data: item });
+  } catch (error) {
+    console.error('POST /api/analytics/report-schedules/:id/retry error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

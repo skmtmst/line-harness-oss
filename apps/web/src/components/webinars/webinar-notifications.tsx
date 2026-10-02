@@ -8,9 +8,14 @@ import {
   type WebinarNotificationSettingsInput,
 } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import { audienceText } from '@/app/webinars/overview-view'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
+import { formatNumber } from '@/lib/format'
 
 /**
  * ウェビナーの通知・リマインド（設計 `Ho8z4` 10-1-D）。
@@ -26,7 +31,7 @@ import { audienceText } from '@/app/webinars/overview-view'
 /** 数を出してよいのは読めたときだけ。**読めていないものを 0 と書かない。** */
 function countText(value: number | undefined, available: boolean): string {
   return available && typeof value === 'number' && Number.isFinite(value)
-    ? value.toLocaleString('ja-JP')
+    ? formatNumber(value)
     : '—'
 }
 
@@ -42,8 +47,13 @@ const HOUR_OPTIONS = [15, 30, 60, 120].map((m) => ({
 const SETTINGS_KEYS = [
   'registrationEnabled', 'dayBeforeEnabled', 'dayBeforeTime',
   'hourBeforeEnabled', 'hourBeforeMinutes', 'startEnabled',
-  'missedEnabled', 'missedTime', 'completedEnabled',
+  'missedEnabled', 'missedTime', 'missedWindowDays', 'completedEnabled',
 ] as const
+
+const MISSED_WINDOW_OPTIONS = Array.from({ length: 30 }, (_, index) => ({
+  value: String(index + 1),
+  label: `${index + 1}日`,
+}))
 
 /**
  * まだ保存されていないウェビナーの編集開始値（WEBINAR-09）。
@@ -63,6 +73,7 @@ const emptySettings = (webinarId: string): WebinarNotificationSettings => ({
   startEnabled: false,
   missedEnabled: false,
   missedTime: '20:00',
+  missedWindowDays: 7,
   completedEnabled: false,
   updatedAt: '',
 })
@@ -85,7 +96,6 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
   const [overview, setOverview] = useState<WebinarNotificationOverview | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
@@ -129,7 +139,6 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
   const save = async (): Promise<boolean> => {
     if (!settings || saving) return false
     setSaving(true)
-    setNotice('')
     setError('')
     try {
       const input: WebinarNotificationSettingsInput = {
@@ -141,6 +150,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         startEnabled: settings.startEnabled,
         missedEnabled: settings.missedEnabled,
         missedTime: settings.missedTime,
+        missedWindowDays: settings.missedWindowDays ?? 7,
         completedEnabled: settings.completedEnabled,
       }
       const res = await webinarApi.saveNotifications(webinarId, input)
@@ -148,7 +158,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       setBaseline(res.data.settings)
       /* **何が起きたかを数で言う。** 「保存しました」だけでは、予定が
          積まれたのか取り消されたのか分からない。 */
-      setNotice(`保存しました。${res.data.queued}件を予定に入れ、${res.data.cancelled}件を取り消しました。`)
+      notifyToast(`保存しました。${res.data.queued}件を予定に入れ、${res.data.cancelled}件を取り消しました。`)
       await load()
       return true
     } catch {
@@ -199,7 +209,6 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
               const initial = emptySettings(webinarId)
               setSettings(initial)
               setBaseline(initial)
-              setNotice('')
               setError('')
             }}
           >
@@ -225,15 +234,14 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       on: settings.dayBeforeEnabled,
       toggle: () => patch({ dayBeforeEnabled: !settings.dayBeforeEnabled }),
       extra: (
-        <label className="text-ink-secondary flex items-center gap-2 text-xs">
+        <span className="text-ink-secondary flex items-center gap-2 text-xs">
           送る時刻
-          <input
-            type="time"
+          <TimeField
             value={settings.dayBeforeTime}
-            onChange={(e) => patch({ dayBeforeTime: e.target.value })}
-            className="border-hairline rounded-control border px-2 py-1 text-sm"
+            onChange={(v) => patch({ dayBeforeTime: v })}
+            aria-label="前日のご案内を送る時刻"
           />
-        </label>
+        </span>
       ),
     },
     {
@@ -261,19 +269,25 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
     {
       key: 'missed',
       label: '見逃した人への案内',
-      note: '申し込んだのに見なかった人へ届きます。',
+      note: '申し込んだのに見なかった人へ届きます。期限を過ぎたら送りません。',
       on: settings.missedEnabled,
       toggle: () => patch({ missedEnabled: !settings.missedEnabled }),
       extra: (
-        <label className="text-ink-secondary flex items-center gap-2 text-xs">
+        <span className="text-ink-secondary flex flex-wrap items-center gap-2 text-xs">
           送る時刻
-          <input
-            type="time"
+          <TimeField
             value={settings.missedTime}
-            onChange={(e) => patch({ missedTime: e.target.value })}
-            className="border-hairline rounded-control border px-2 py-1 text-sm"
+            onChange={(v) => patch({ missedTime: v })}
+            aria-label="見逃した人への案内を送る時刻"
           />
-        </label>
+          期限
+          <Select
+            aria-label="見逃した人への案内の期限（開催からの日数）"
+            value={String(settings.missedWindowDays ?? 7)}
+            onChange={(value) => patch({ missedWindowDays: Number(value) })}
+            options={MISSED_WINDOW_OPTIONS}
+          />
+        </span>
       ),
     },
     {
@@ -302,7 +316,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         待ち・送信済み・失敗・見送り・取消を分けて出す。
         読めていないときは `—`——「失敗 0 件」と「まだ数えていない」を混ぜない。
       */}
-      <dl className="border-hairline grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-hairline sm:grid-cols-3">
+      <dl className="border-hairline grid grid-cols-2 gap-px overflow-hidden rounded-card border bg-hairline sm:grid-cols-3">
         {[
           ['予定', overview?.pending],
           ['送信済み', overview?.sent],
@@ -327,13 +341,13 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         0 件のときは出さない——常に空の枠があると、誰も見なくなる。
       */}
       {available && (overview?.skippedReasons?.length ?? 0) > 0 && (
-        <div className="border-hairline rounded-xl border p-4" data-testid="webinar-skip-reasons">
-          <p className="text-ink text-xs font-bold">見送りの内訳</p>
+        <div className="border-hairline rounded-card border p-4" data-testid="webinar-skip-reasons">
+          <p className="text-ink text-xs font-medium">見送りの内訳</p>
           <ul className="mt-2 space-y-1">
             {overview!.skippedReasons.map((reason) => (
               <li key={reason.code ?? 'unknown'} className="text-ink-secondary flex justify-between gap-4 text-xs">
                 <span>{reason.label}</span>
-                <span className="text-ink font-bold tabular-nums">{reason.count.toLocaleString('ja-JP')}件</span>
+                <span className="text-ink font-bold tabular-nums">{formatNumber(reason.count)}件</span>
               </li>
             ))}
           </ul>
@@ -351,34 +365,26 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         <p className="text-ink-faint mt-1 text-xs">{audience.note}</p>
       </div>
 
-      <ul className="border-hairline divide-hairline divide-y overflow-hidden rounded-xl border">
+      <ul className="border-hairline divide-hairline divide-y overflow-hidden rounded-card border">
         {rows.map((row) => (
           <li key={row.key} className="bg-canvas flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-            <label className="flex min-w-0 flex-1 items-start gap-3">
-              <input
-                type="checkbox"
-                checked={row.on}
-                onChange={row.toggle}
-                aria-label={`${row.label}を送る`}
-                className="accent-accent mt-0.5"
-              />
-              <span className="min-w-0">
-                <span className="text-ink block text-sm font-semibold">{row.label}</span>
-                <span className="text-ink-faint block text-xs">{row.note}</span>
-              </span>
-            </label>
+            <Checkbox
+              checked={row.on}
+              onCheckedChange={row.toggle}
+              aria-label={`${row.label}を送る`}
+              description={row.note}
+              className="min-w-0 flex-1"
+            >{row.label}</Checkbox>
             {/* 切っているものの細かい設定は出さない。押しても効かない欄を並べない。 */}
             {row.on && row.extra ? <div className="shrink-0">{row.extra}</div> : null}
           </li>
         ))}
       </ul>
 
-      {notice && <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">{notice}</p>}
-      {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
+      {error && <Notice tone="danger">{error}</Notice>}
 
       <div className="flex justify-end">
-        <Button variant="primary" onClick={() => void save()} disabled={saving}>
-          {saving ? '保存中…' : '通知の設定を保存'}
+        <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving}>通知の設定を保存する
         </Button>
       </div>
     </section>

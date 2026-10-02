@@ -12,12 +12,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, type RichMenuPublishRun } from '@/lib/api'
 import Button from '@/components/shared/button'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { formatDateTime } from '@/lib/format'
 
 type PublishRun = RichMenuPublishRun
 
-type ReconcileDiff = { kind: string; detail: string; pageId?: string; richMenuId?: string }
+type ReconcileDiff = {
+  kind: string; detail: string; pageId?: string; richMenuId?: string;
+  /** K-2: ずれの種類ごとの直し方（1つ）。古い応答には無いので任意。 */
+  fix?: { label: string; action: string };
+}
 
 const STATUS_LABEL: Record<PublishRun['status'], string> = {
   running: '実行中',
@@ -32,7 +38,7 @@ const STATUS_TONE: Record<PublishRun['status'], StatusBadgeTone> = {
 }
 
 function formatAt(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+  return formatDateTime(iso)
 }
 
 /** その版が誰に出る版か。スナップショットに情報が無い版は「分からない」と濁す。 */
@@ -64,6 +70,9 @@ export function PublishHistorySection({
   const [reconciling, setReconciling] = useState(false)
   const [reconcileConfirm, setReconcileConfirm] = useState(false)
   const [reconcileError, setReconcileError] = useState('')
+  /** K-2: 画面を開いた時の照合。見つかったずれだけ並べ、直すかは運用者が決める。 */
+  const [autoDiffs, setAutoDiffs] = useState<ReconcileDiff[] | null>(null)
+  const [unappliedNote, setUnappliedNote] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -95,6 +104,25 @@ export function PublishHistorySection({
   useEffect(() => {
     void load()
   }, [load])
+
+  // K-2: 画面を開いた時に照合する。読むだけ（dryRun）で、直さない。
+  useEffect(() => {
+    let cancelled = false
+    async function checkOnOpen() {
+      try {
+        const res = await api.richMenuGroups.reconcile(groupId, true)
+        if (!res.success || cancelled) return
+        setAutoDiffs(res.data.diffs)
+      } catch {
+        // 開いた時の照合が読めなくても、履歴は見せる。飾りの失敗は出さない。
+        if (!cancelled) setAutoDiffs(null)
+      }
+    }
+    void checkOnOpen()
+    return () => {
+      cancelled = true
+    }
+  }, [groupId])
 
   async function retry(run: PublishRun) {
     if (retryingId) return
@@ -152,12 +180,21 @@ export function PublishHistorySection({
     if (reconciling) return
     setReconciling(true)
     setReconcileError('')
+    setUnappliedNote('')
     try {
       const res = await api.richMenuGroups.reconcile(groupId, false)
       if (!res.success) throw new Error(res.error)
       setReconcileConfirm(false)
       setDiffs(null)
+      setAutoDiffs(null)
       setNotice(`ずれを ${res.data.applied ?? 0} 件修復しました。`)
+      // K-2: 自動で直さない分（取り込み候補）は、行き先と一緒に残す。
+      const unapplied = res.data.unapplied ?? []
+      if (unapplied.length > 0) {
+        setUnappliedNote(
+          `取り込みが必要なずれが ${unapplied.length} 件あります。「LINEにだけあるメニュー」は「外部メニューの取り込み」画面で取り込んでください。`,
+        )
+      }
       onChanged?.()
     } catch {
       setReconcileError('修復できませんでした。ずれの内容を確認して、もう一度お試しください。')
@@ -167,22 +204,75 @@ export function PublishHistorySection({
     }
   }
 
+  /** K-2: 見つかったずれと直し方の一覧。★V7の表部品で、短い文は折らず1行省略。 */
+  function diffTable(rows: ReconcileDiff[]) {
+    return (
+      <div className="mt-3">
+        <DataTable>
+          <colgroup>
+            <col style={{ width: '62%' }} />
+            <col style={{ width: '38%' }} />
+          </colgroup>
+          <thead>
+            <TableHeadRow>
+              <Th>見つかったずれ</Th>
+              <Th>どうするか</Th>
+            </TableHeadRow>
+          </thead>
+          <tbody>
+            {rows.map((diff, index) => (
+              <Tr key={index}>
+                <Td title={diff.detail}>
+                  <span className="block truncate">{diff.detail}</span>
+                </Td>
+                <Td title={diff.fix?.label ?? '内容を確認して直します'}>
+                  <span className="block truncate">{diff.fix?.label ?? '内容を確認して直します'}</span>
+                </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </DataTable>
+      </div>
+    )
+  }
+
   return (
     <section aria-label="公開履歴と照合" className="border-hairline bg-canvas rounded-card mt-5 border p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-ink text-sm font-bold">公開の履歴とLINEとの照合</h2>
-        <Button type="button" onClick={() => void checkReconcile()} disabled={reconciling}>
-          {reconciling ? '確認中…' : 'LINEとのずれを確認'}
+        <Button type="button" onClick={() => void checkReconcile()} disabled={reconciling} busy={reconciling} busyLabel="確認中…">LINEとのずれを確認
         </Button>
       </div>
 
       {notice ? <p role="status" className="text-success mt-3 text-xs">{notice}</p> : null}
+      {unappliedNote ? <p role="status" className="text-ink-secondary mt-3 text-xs">{unappliedNote}</p> : null}
       {actionError ? <p role="alert" className="text-danger mt-3 text-xs">{actionError}</p> : null}
       {reconcileError ? <p role="alert" className="text-danger mt-3 text-xs">{reconcileError}</p> : null}
 
+      {/* K-2: 開いた時に見つかったずれ。直すかは運用者が決める。 */}
+      {autoDiffs !== null && autoDiffs.length > 0 ? (
+        <div className="mt-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-ink text-xs font-semibold">LINEとのずれが {autoDiffs.length} 件あります</p>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => {
+                setDiffs(autoDiffs)
+                setReconcileConfirm(true)
+              }}
+              disabled={reconciling}
+            >
+              {autoDiffs.length}件を直す
+            </Button>
+          </div>
+          {diffTable(autoDiffs)}
+        </div>
+      ) : null}
+
       {/* 公開版と編集中の版を混ぜないための明示。 */}
       {!loadError && runs !== null ? (
-        <div className="border-hairline bg-canvas-sunken mt-3 rounded border px-3 py-2 text-xs leading-5">
+        <div className="border-hairline bg-canvas-sunken mt-3 rounded-mini border px-3 py-2 text-xs leading-5">
           {published ? (
             <p className="text-ink">
               いま対象に出ている版: 「{published.version.name ?? '（名前なし）'}」
@@ -211,7 +301,7 @@ export function PublishHistorySection({
       ) : (
         <ul className="mt-3 space-y-2">
           {runs.map((run) => (
-            <li key={run.id} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2 text-xs">
+            <li key={run.id} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded-mini border px-3 py-2 text-xs">
               <span className="text-ink">
                 <StatusBadge tone={STATUS_TONE[run.status]} size="compact" className="mr-2">
                   {STATUS_LABEL[run.status]}
@@ -226,8 +316,7 @@ export function PublishHistorySection({
               </span>
               {/* 失敗したものだけ再試行できる。成功済みはLINE操作をやり直さない。 */}
               {run.status === 'failed' ? (
-                <Button type="button" onClick={() => setRetryTarget(run)} disabled={retryingId !== null}>
-                  {retryingId === run.id ? '再試行中…' : '失敗分を再試行'}
+                <Button type="button" onClick={() => setRetryTarget(run)} disabled={retryingId !== null} busy={retryingId === run.id} busyLabel="再試行中…">失敗分を再試行
                 </Button>
               ) : null}
             </li>
@@ -276,7 +365,7 @@ export function PublishHistorySection({
       >
         <ul className="text-ink-secondary space-y-1 text-xs leading-5">
           {(diffs ?? []).map((diff, index) => (
-            <li key={index}>・{diff.detail}</li>
+            <li key={index}>・{diff.detail}{diff.fix?.label ? `（${diff.fix.label}）` : ''}</li>
           ))}
         </ul>
       </ConfirmDialog>

@@ -105,7 +105,7 @@ describe('コンバージョン起点の実イベント接続', () => {
         friendId: 'friend-1',
         sourceEventId: `src-${sourceType}`,
       });
-      expect(result).toEqual({ matched: 1, recorded: 1, failed: 0, skipped: null });
+      expect(result).toEqual({ matched: 1, recorded: 1, failed: 0, excluded: 0, skipped: null });
       expect(eventsFor(`point-${sourceType}`)).toBe(1);
     }
   });
@@ -246,7 +246,7 @@ describe('コンバージョン起点の実イベント接続', () => {
       sourceEventId: 'tag-9',
     });
 
-    expect(result).toEqual({ matched: 0, recorded: 0, failed: 0, skipped: null });
+    expect(result).toEqual({ matched: 0, recorded: 0, failed: 0, excluded: 0, skipped: null });
     expect(eventsFor('point-mine')).toBe(0);
   });
 });

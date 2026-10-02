@@ -1,6 +1,7 @@
 import {
-  getAccountSetting,
+  getAccountSettings,
   getTenantBilling,
+  getTenantBillingByLineAccount,
   getVersionedAccountSetting,
   recordAuditEvent,
 } from '@line-crm/db';
@@ -64,6 +65,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: { mode: 'exempt', reason: '受信箱の基本動作で、機能カタログの個別スイッチに属さない' },
   },
   {
+    name: 'manual link weekly check',
+    classification: { kind: 'core', reason: '画面横断のマニュアル導線の健全性点検' },
+    enforcement: { mode: 'exempt', reason: '機能別スイッチに属さない共通ヘルプ導線の週次確認で、off対象の機能がない' },
+  },
+  {
     name: 'mileage reward delivery retry',
     classification: { kind: 'feature', featureId: 'mileage' },
     enforcement: {
@@ -109,6 +115,22 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: {
       mode: 'exempt',
       reason: '送信可否はアカウント自身の広告設定だけで決まり、機能設定に属さない',
+    },
+  },
+  {
+    name: 'ad cost import',
+    classification: { kind: 'core', reason: '広告費の日次取込' },
+    enforcement: {
+      mode: 'exempt',
+      reason: '取込の可否はアカウント自身の広告設定(連携のis_active)だけで決まり、機能設定に属さない',
+    },
+  },
+  {
+    name: 'ec event retry',
+    classification: { kind: 'core', reason: 'ECイベント通知の再試行' },
+    enforcement: {
+      mode: 'exempt',
+      reason: '再試行の可否はアカウント自身のEC連携の取り込み停止だけで決まり、機能設定に属さない',
     },
   },
   {
@@ -165,6 +187,16 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    // K(#822): 公開中のリッチメニューを1日1回だけ見て、ずれを台帳に残す。
+    name: 'rich menu daily reconcile',
+    classification: { kind: 'feature', featureId: 'rich_menus' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/rich-menu-daily-reconcile.ts'],
+      markers: ["job: 'rich menu daily reconcile'"],
+    },
+  },
+  {
     name: 'support email sync',
     classification: { kind: 'core', reason: '運用問い合わせ受信' },
     enforcement: { mode: 'exempt', reason: '運用の問い合わせ受信で、アカウント機能に属さない' },
@@ -178,6 +210,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     name: 'platform knowledge',
     classification: { kind: 'core', reason: '運営専用の解決済み問い合わせナレッジ' },
     enforcement: { mode: 'exempt', reason: '運営専用でアカウント機能に属さない' },
+  },
+  {
+    name: 'billing invoice sync',
+    classification: { kind: 'core', reason: '運営ダッシュボードのStripe入金実績' },
+    enforcement: { mode: 'exempt', reason: '契約先の課金台帳同期で、アカウント機能に属さない' },
   },
   {
     name: 'friend field reminders',
@@ -222,9 +259,41 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'automation retention purge',
+    classification: { kind: 'feature', featureId: 'automations' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['packages/db/src/automation-retention.ts'],
+      markers: ['accountFeatureOffExclusionSql(', "`${alias}.line_account_id`, 'automations'"],
+    },
+  },
+  {
     name: 'friend snapshot',
     classification: { kind: 'core', reason: '友だち基礎集計' },
     enforcement: { mode: 'exempt', reason: '友だちの基礎集計で、外部呼び出しも機能の状態更新もしない' },
+  },
+  {
+    name: 'scheduled exports',
+    classification: { kind: 'core', reason: '友だちCSVの定期書き出し' },
+    enforcement: { mode: 'exempt', reason: '既存の書き出し台帳へ行を足すだけで、外部呼び出しも機能の状態更新もしない' },
+  },
+  {
+    name: 'google sheets sync',
+    classification: { kind: 'feature', featureId: 'external_integrations' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/google-sheets.ts'],
+      markers: ["'external_integrations', 'google sheets sync'"],
+    },
+  },
+  {
+    name: 'tiktok pnl sync',
+    classification: { kind: 'feature', featureId: 'external_integrations' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/tiktok-pnl.ts'],
+      markers: ["'external_integrations', 'tiktok pnl sync'"],
+    },
   },
   {
     name: 'media usage scan',
@@ -234,6 +303,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       sources: ['apps/worker/src/services/media-usage-scan.ts'],
       markers: ["'media', 'media usage scan'"],
     },
+  },
+  {
+    name: 'file scan retry',
+    classification: { kind: 'core', reason: '危険なファイルの検査の再試行（メディア・写真・添付を横断）' },
+    enforcement: { mode: 'exempt', reason: '安全の後始末で、止めると検査待ちが詰まる。単一機能に属さない' },
   },
   {
     name: 'following mileage',
@@ -269,6 +343,24 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       mode: 'gated',
       sources: ['apps/worker/src/services/restaurant-email-intake.ts'],
       markers: ["accountFeatureOffExclusionSql('st.line_account_id', 'restaurant_test')"],
+    },
+  },
+  {
+    name: 'google business resync',
+    classification: { kind: 'feature', featureId: 'restaurant_test' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/google-business-resync.ts'],
+      markers: ["'restaurant_test', 'google business resync'"],
+    },
+  },
+  {
+    name: 'google business metrics',
+    classification: { kind: 'feature', featureId: 'restaurant_test' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/google-business-resync.ts'],
+      markers: ["'restaurant_test', 'google business metrics'"],
     },
   },
   {
@@ -365,6 +457,15 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'common var expiry notices',
+    classification: { kind: 'feature', featureId: 'common_vars' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/common-var-expiry-sweep.ts'],
+      markers: ['isCommonVarsEnabled(db, candidate.line_account_id)'],
+    },
+  },
+  {
     name: 'scenario deliveries',
     dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'scenarios' },
@@ -432,11 +533,19 @@ async function accountCompanyFeatureSettings(
     accountId,
     FEATURE_SETTINGS_BUNDLE_KEY,
   );
-  const entries = await Promise.all(featureIds.map(async (featureId) => {
+  // 一括設定に無い分だけ旧 `feature.<キー>` を読む。機能ごとの往復にせず
+  // 1往復でまとめて取る(#633)。
+  const missing = featureIds.filter(
+    (featureId) => typeof bundle?.data.features?.[featureId] !== 'boolean',
+  );
+  const legacyValues = missing.length > 0
+    ? await getAccountSettings(db, accountId, missing.map((featureId) => `feature.${featureId}`))
+    : {};
+  const entries = featureIds.map((featureId) => {
     const bundled = bundle?.data.features?.[featureId];
     if (typeof bundled === 'boolean') return [featureId, bundled] as const;
 
-    const legacy = await getAccountSetting(db, accountId, `feature.${featureId}`);
+    const legacy = legacyValues[`feature.${featureId}`];
     if (legacy) {
       try {
         const parsed = JSON.parse(legacy) as boolean | { enabled?: boolean };
@@ -447,7 +556,7 @@ async function accountCompanyFeatureSettings(
       }
     }
     return [featureId, featureCatalogEntry(featureId).defaultEnabled] as const;
-  }));
+  });
   return Object.fromEntries(entries) as Partial<Record<FeatureId, boolean>>;
 }
 
@@ -512,14 +621,20 @@ async function contractAvailability(
   }
   // 古い試験・移行行のようにアカウント所有者を解決できない場合は、従来どおり
   // 契約で止めない。実アカウントは tenant_id から必ず料金状態を読む。
-  const tenantKnown = context?.tenantIdsByAccount.has(accountId) ?? false;
-  const tenantId = tenantKnown
-    ? context!.tenantIdsByAccount.get(accountId) ?? null
-    : (await db.prepare('SELECT tenant_id FROM line_accounts WHERE id = ?')
-      .bind(accountId).first<{ tenant_id: string | null }>())?.tenant_id ?? null;
-  const entitlements = tenantId
-    ? await tenantEntitlements(db, tenantId, context)
-    : resolveEntitlements(null);
+  if (context?.tenantIdsByAccount.has(accountId)) {
+    const tenantId = context.tenantIdsByAccount.get(accountId) ?? null;
+    const entitlements = tenantId
+      ? await tenantEntitlements(db, tenantId, context)
+      : resolveEntitlements(null);
+    return Object.fromEntries(FEATURE_CATALOG.map((entry) => [
+      entry.featureId,
+      featureContractIsAvailable(entitlements, entry.entitlementKey),
+    ])) as Record<FeatureId, boolean>;
+  }
+  // tenant_id 読取 + tenants 読取の2往復を1往復の結合読取へ(#633)。
+  const entitlements = resolveEntitlements(
+    await getTenantBillingByLineAccount(db, accountId),
+  );
   return Object.fromEntries(FEATURE_CATALOG.map((entry) => [
     entry.featureId,
     featureContractIsAvailable(entitlements, entry.entitlementKey),

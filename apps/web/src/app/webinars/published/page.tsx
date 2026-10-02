@@ -4,14 +4,16 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle2 } from 'lucide-react'
 import type { Webinar, WebinarEditor } from '@/lib/api'
-import { webinarApi } from '@/lib/api'
+import { webinarApi, ApiError } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
 import { useAccount } from '@/contexts/account-context'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 
 type PublishedWebinar = Webinar & {
   publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
@@ -35,8 +37,18 @@ function PublishedWebinarContent() {
   const [editor, setEditor] = useState<WebinarEditor | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  /*
+   * D001: 一時停止・通知テスト・複製の口は owner/admin だけ（Worker の
+   * requireRole とそろえる）。閲覧だけの担当者には押せる口を出さず、
+   * 理由を添える（テンプレート詳細 N-144 と同じ出し分け）。
+   * 読み取り（GET）は staff も通るので、編集画面への行き来は残す。
+   */
+  const [canMutateWebinars] = useState(() =>
+    typeof window === 'undefined' ? true : isOwnerOrAdmin())
 
   const load = useCallback(async () => {
     if (!id) {
@@ -46,13 +58,19 @@ function PublishedWebinarContent() {
     }
     setLoading(true)
     setError('')
+    setMissing(false)
     try {
       const [response, editorResponse] = await Promise.all([webinarApi.get(id), webinarApi.editor(id)])
       setWebinar(response.data)
       setEditor(editorResponse.data)
-    } catch {
+    } catch (caught) {
       setWebinar(null)
-      setError('公開結果を表示できませんでした。通信を確認して、もう一度お試しください。')
+      if (caught instanceof ApiError && caught.status === 404) {
+        setMissing(true)
+        setError('')
+      } else {
+        setError('公開結果を表示できませんでした。通信を確認して、もう一度お試しください。')
+      }
     } finally {
       setLoading(false)
     }
@@ -72,27 +90,35 @@ function PublishedWebinarContent() {
   */
   if (!id) {
     return (
-      <ListState
-        kind="empty"
+      <TargetMissing
+        kind="unspecified"
         title="確認するウェビナーが指定されていません"
         description="一覧から公開したウェビナーを選び直してください。"
-        action={<Button href="/webinars">ウェビナー一覧へ戻る</Button>}
+        backHref="/webinars"
+        backLabel="ウェビナー一覧へ戻る"
+      />
+    )
+  }
+
+  if (missing || (!error && (!webinar || !editor))) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このウェビナーは見つかりません"
+        description="公開したウェビナーが見つかりませんでした。削除されたか、一覧から選び直してください。"
+        backHref="/webinars"
+        backLabel="ウェビナー一覧へ戻る"
       />
     )
   }
 
   if (error || !webinar || !editor) {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
         title="公開結果を表示できませんでした"
-        description={error || '公開したウェビナーが見つかりませんでした。'}
-        action={
-          <>
-            <Button onClick={() => void load()}>もう一度読み込む</Button>
-            <Button href="/webinars">ウェビナー一覧へ戻る</Button>
-          </>
-        }
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
       />
     )
   }
@@ -137,20 +163,20 @@ function PublishedWebinarContent() {
   }
 
   return (
-    <main data-design-node="TimXl" className="mx-auto max-w-[1600px] space-y-4 px-6 pb-12 pt-4">
+    <div data-design-node="TimXl" className="mx-auto max-w-[1600px] space-y-4 px-6 pb-12 pt-4">
       <div className="flex flex-wrap items-center justify-between gap-3"><a href="/webinars" className="text-action text-sm font-semibold">← ウェビナー一覧</a><Button href="/webinars">ウェビナー一覧へ</Button></div>
-      <ol className="grid grid-cols-2 gap-2 py-2 sm:grid-cols-5">{['基本設定', '動画', 'CTA・フォーム', '通知', '確認'].map((label, index) => <li key={label} className="text-ink flex items-center gap-2 px-3 py-2 text-xs font-semibold"><span className="bg-accent-deep text-on-accent flex h-7 w-7 items-center justify-center rounded-full">✓</span><span><span className="text-accent block text-[10px]">STEP {index + 1}</span>{label}</span></li>)}</ol>
+      <ol className="grid grid-cols-2 gap-2 py-2 sm:grid-cols-5">{['基本設定', '動画', 'CTA・フォーム', '通知', '確認'].map((label, index) => <li key={label} className="text-ink flex items-center gap-2 px-3 py-2 text-xs font-semibold"><span className="bg-accent-deep text-on-accent flex h-7 w-7 items-center justify-center rounded-pill">✓</span><span><span className="text-accent-deep block text-[10px]">STEP {index + 1}</span>{label}</span></li>)}</ol>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
         <section className="border-hairline bg-canvas min-h-[720px] rounded-card border p-8 shadow-card">
-          <div className="text-center"><CheckCircle2 className="mx-auto text-accent" size={48} aria-hidden="true" /><h2 className="text-ink mt-5 text-2xl font-bold">公開しました</h2><p className="text-ink-secondary mt-3 text-sm">申込・配信条件に合う友だちが、このウェビナーを視聴できます。</p></div>
+          <div className="text-center"><CheckCircle2 className="mx-auto text-accent-deep" size={48} aria-hidden="true" /><h2 className="text-ink mt-5 text-2xl font-bold">公開しました</h2><p className="text-ink-secondary mt-3 text-sm">申込・配信条件に合う友だちが、このウェビナーを視聴できます。</p></div>
           <dl className="border-hairline divide-hairline mx-auto mt-6 max-w-3xl divide-y rounded-control border">{[
             ['ウェビナー名', webinar.title], ['動画・公開', editor.viewingCondition.label], ['対象', publicPeriod], ['公開URL', publicUrl ?? '—（LIFF ID未設定）'], ['状態', '稼働中'],
-          ].map(([label, value]) => <div key={label} className="flex flex-wrap items-baseline justify-between gap-3 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">{label}</dt><dd className="text-ink max-w-[70%] truncate text-sm font-bold" title={value}>{value}</dd></div>)}</dl>
+          ].map(([label, value]) => <div key={label} className="flex flex-wrap items-baseline justify-between gap-3 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">{label}</dt><dd className="text-ink max-w-[70%] truncate text-sm font-semibold" title={value}>{value}</dd></div>)}</dl>
           <div className="mx-auto mt-4 max-w-3xl space-y-3"><NoteBar>申込通知・動画配信・リマインド・相談予約の失敗は、運用者通知と要対応で確認できます。</NoteBar>{!publicUrl ? <NoteBar>{editor.publicPage.unavailableReason ?? publicPageUnavailable}</NoteBar> : null}{notice ? <NoteBar>{notice}</NoteBar> : null}</div>
           <div className="mt-5 flex flex-wrap justify-center gap-3"><Button href="/webinars">ウェビナー一覧へ</Button><Button variant="primary" href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=participants`}>参加状況を確認</Button>{publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : null}</div>
         </section>
         <aside className="space-y-4">
-          <section className="border-hairline bg-canvas rounded-card border p-5 shadow-card"><h2 className="text-ink font-bold">次にできること</h2><p className="text-ink-faint mt-1 text-xs">公開中でも下書き版を作り、安全に内容を変更できます。</p><div className="mt-4 grid gap-2"><Button disabled={busy} onClick={() => void run('pause')}>公開を一時停止</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーを編集</Button><Button disabled={busy} onClick={() => void run('test')}>通知をテスト</Button><Button disabled={busy} onClick={() => void run('duplicate')}>ウェビナーを複製して作成</Button></div></section>
+          <section className="border-hairline bg-canvas rounded-card border p-5 shadow-card"><h2 className="text-ink font-bold">次にできること</h2><p className="text-ink-faint mt-1 text-xs">公開中でも下書き版を作り、安全に内容を変更できます。</p><div className="mt-4 grid gap-2">{canMutateWebinars ? <Button disabled={busy} onClick={() => void run('pause')}>公開を一時停止</Button> : null}<Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーを編集</Button>{canMutateWebinars ? <Button disabled={busy} onClick={() => void run('test')}>通知をテスト</Button> : null}{canMutateWebinars ? <Button disabled={busy} onClick={() => void run('duplicate')}>ウェビナーを複製して作る</Button> : null}{canMutateWebinars ? null : <p className="text-ink-secondary text-xs">公開の変更（停止・通知テスト・複製）はオーナーか管理者が行います。必要なときは依頼してください。</p>}</div></section>
           <section className="border-hairline bg-canvas rounded-card border p-5 shadow-card"><h2 className="text-ink font-bold">監視中</h2><p className="text-ink-faint mt-1 text-xs">問題が起きた場合だけ表示します。</p><div className="mt-4 space-y-3">{[
             ['通知失敗', editor.monitoring.notificationFailures],
             ['申込重複', editor.monitoring.duplicateRegistrations],
@@ -159,7 +185,7 @@ function PublishedWebinarContent() {
           ].map(([label, count]) => <div key={String(label)} className="text-ink-secondary flex justify-between text-sm"><span>{label}</span><span className={Number(count) > 0 ? 'text-danger font-semibold' : 'text-success'}>{Number(count)}件</span></div>)}</div></section>
         </aside>
       </div>
-    </main>
+    </div>
   )
 }
 

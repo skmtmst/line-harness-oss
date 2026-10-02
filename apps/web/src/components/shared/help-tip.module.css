@@ -1,0 +1,149 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * 見出し・ラベル横の「？」（共通ルール 2-1b・★V7 `LYs5d`「？ 補足の印」）。
+ *
+ * 印は 18px の正円（枠 1px `ink-faint`・地 `canvas`）の
+ * 中に「?」11px 太字 `ink-secondary`。角丸の正方形・楕円・枠なしは使わない。
+ * 押せる範囲は 28px（指では 44px）。吹き出しは最大幅 300px。
+ * 色は `var()` だけを使う。
+ */
+
+.wrap {
+  position: relative; /* position: relative */
+  display: inline-flex; /* display: inline-flex */
+  align-items: center; /* alignItems: center */
+  flex-shrink: 0; /* 狭い行で押し潰されない */
+  vertical-align: middle;
+}
+
+/*
+ * 見た目の箱は 18px の正円に固定し、題の行の高さに入れない。
+ * globals の button{min-height:32px}・表の中の button の決まりに負けない
+ * よう、幅・高さ・最小・最大をすべて 18px にし、aspect-ratio: 1 で
+ * 縦横を同じに保つ。押せる範囲は位置を持たない ::before で広げる
+ * （28px・指では 44px）。狭い行（表見出し・札の横）で潰れないよう
+ * 縮小を止める。
+ */
+.button {
+  position: relative; /* ::before の当たりをここ基準に */
+  display: inline-flex; /* display: inline-flex */
+  align-items: center; /* alignItems: center */
+  justify-content: center; /* justifyContent: center */
+  flex: none; /* 押し潰されて楕円・縦長にならない */
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 0; /* globals の 32px を上書き。題の行を伸ばさない */
+  max-width: 18px;
+  max-height: 18px;
+  aspect-ratio: 1 / 1; /* 縦横は必ず同じ */
+  padding: 0;
+  border: 1px solid var(--color-ink-faint); /* border: $ink-faint */
+  border-radius: var(--radius-pill); /* ★V7 `LYs5d` 18px 正円 */
+  background: var(--color-canvas); /* fill: $canvas */
+  color: var(--color-ink-secondary); /* color: $ink-secondary */
+  cursor: pointer;
+}
+
+/* 当たりだけを広げる。absolute のため行の高さ・幅に影響しない。 */
+.button::before {
+  content: "";
+  position: absolute;
+  inset: -5px; /* 18 + 10 = 28px の当たり */
+}
+
+/* 指では 44px の当たりを確保する。見た目と行の高さは変わらない。 */
+@media (pointer: coarse) {
+  .button::before {
+    inset: -13px; /* 18 + 26 = 44px の当たり */
+  }
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-status-info); /* keyboard focus */
+  outline-offset: 1px;
+}
+
+/* 箱の中の「?」。★V7 `LYs5d`：11px 太字 `ink-secondary`。 */
+.mark {
+  font-size: var(--text-micro); /* fontSize: 11 */
+  font-weight: 500;
+  line-height: 1;
+}
+
+.tip {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
+  width: max-content;
+  max-width: 300px; /* maxWidth: 300 */
+  padding: 8px 10px; /* padding: [8, 10] */
+  border: 1px solid var(--color-hairline); /* border: $hairline */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-control */
+  background: var(--color-canvas); /* fill: $canvas */
+  box-shadow: var(--shadow-card);
+  color: var(--color-ink-secondary); /* color: $ink-secondary */
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+  line-height: 1.6;
+  white-space: normal;
+}
+
+/* 吹き出しの中の「くわしく」。長い説明のある場所へ逃がす。 */
+.tip a {
+  display: inline-block;
+  margin-left: 8px;
+  color: var(--color-action);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.tip a:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 1px;
+}
+
+/*
+ * ★V8 `f6zwfs`：ふきだしは黒（ink）の地に白い字。印の18px正円は変えない。
+ */
+[data-theme='v8'] .tip {
+  border-color: transparent;
+  background: var(--color-ink);
+  box-shadow: var(--shadow-float);
+  color: var(--color-canvas);
+}
+
+[data-theme='v8'] .tip a {
+  color: var(--color-canvas);
+}
+
+/*
+ * ★V8 `KjC1z`：印は 16px の正円（枠 1.2px）・「?」10px/600。
+ * v7 は 18px・11px/500・枠 1px のまま。当たりも印に合わせて
+ * 28px（-6px）・指では 44px（-14px）に変わる。
+ */
+[data-theme='v8'] .button {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  max-width: 16px;
+  max-height: 16px;
+  border-width: 1.2px;
+}
+
+[data-theme='v8'] .button::before {
+  inset: -6px; /* 16 + 12 = 28px の当たり */
+}
+
+@media (pointer: coarse) {
+  [data-theme='v8'] .button::before {
+    inset: -14px; /* 16 + 28 = 44px の当たり */
+  }
+}
+
+[data-theme='v8'] .mark {
+  font-size: var(--text-nano);
+  font-weight: 600;
+}
+}

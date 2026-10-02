@@ -11,7 +11,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   emptyMessageKindState,
+  messageKindProblem,
   serializeMessageKind,
+  locationRangeError,
   parseMessageKind,
   type MessageKindState,
 } from './message-kind-fields'
@@ -50,6 +52,44 @@ describe('位置情報', () => {
     expect(
       serializeMessageKind('location', withLocation({ latitude: 'あ', longitude: '139' })),
     ).toBeNull()
+  })
+
+  /*
+   * 範囲外の緯度・経度（監査 R210）。
+   *
+   * 地図上に無い数字を「入力済み」にすると、配信前チェックまで進んで
+   * 下書きに残る。範囲内の値への直し方も返す。
+   */
+  it('範囲外の緯度・経度は書き出さない', () => {
+    expect(
+      serializeMessageKind('location', withLocation({ latitude: '91', longitude: '139.701' })),
+    ).toBeNull()
+    expect(
+      serializeMessageKind('location', withLocation({ latitude: '35.658', longitude: '181' })),
+    ).toBeNull()
+    expect(
+      serializeMessageKind('location', withLocation({ latitude: '-91', longitude: '-181' })),
+    ).toBeNull()
+  })
+
+  it('境界値は書き出す', () => {
+    expect(
+      serializeMessageKind('location', withLocation({ latitude: '90', longitude: '180' })),
+    ).not.toBeNull()
+    expect(
+      serializeMessageKind('location', withLocation({ latitude: '-90', longitude: '-180' })),
+    ).not.toBeNull()
+  })
+
+  it('範囲外は直し方を返す（空欄・範囲内は空文字）', () => {
+    expect(locationRangeError(withLocation({ latitude: '91', longitude: '139' }).location)).toBe(
+      '緯度は-90〜90で入力してください',
+    )
+    expect(locationRangeError(withLocation({ latitude: '35', longitude: '181' }).location)).toBe(
+      '経度は-180〜180で入力してください',
+    )
+    expect(locationRangeError(withLocation({ latitude: '35', longitude: '139' }).location)).toBe('')
+    expect(locationRangeError(withLocation({}).location)).toBe('')
   })
 
   it('書いた値が編集で戻る', () => {
@@ -105,6 +145,26 @@ describe('音声', () => {
     const json = serializeMessageKind('audio', s)!
     expect(parseMessageKind('audio', json).audio.duration).toBe('30')
   })
+
+  /*
+   * R234: URL が https でない音声は、書けていても送れない。
+   * 空と同じく書き出さず、理由も返す（未完成表示と保存の検査が同じ理由を見る）。
+   */
+  it('https でないURLは書き出さない（R234）', () => {
+    const s = emptyMessageKindState()
+    for (const url of ['not-a-url', 'http://e.com/a.m4a', 'ftp://e.com/a.m4a']) {
+      s.audio = { originalContentUrl: url, duration: '1' }
+      expect(serializeMessageKind('audio', s)).toBeNull()
+      expect(messageKindProblem('audio', s)).toContain('https://')
+    }
+  })
+
+  it('https の音声は 1 秒でも書き出す（短さでは止めない）', () => {
+    const s = emptyMessageKindState()
+    s.audio = { originalContentUrl: 'https://e.com/a.m4a', duration: '1' }
+    expect(messageKindProblem('audio', s)).toBeNull()
+    expect(JSON.parse(serializeMessageKind('audio', s)!).duration).toBe(1000)
+  })
 })
 
 describe('スタンプ', () => {
@@ -124,6 +184,16 @@ describe('スタンプ', () => {
     s.sticker = { packageId: '789', stickerId: '10855' }
     const json = serializeMessageKind('sticker', s)!
     expect(parseMessageKind('sticker', json).sticker).toEqual(s.sticker)
+  })
+
+  /*
+   * R234: 数字でない番号は、2つそろっていても送れない。書き出さず理由も返す。
+   */
+  it('数字でない番号は書き出さない（R234）', () => {
+    const s = emptyMessageKindState()
+    s.sticker = { packageId: 'not-a-package', stickerId: 'not-a-sticker' }
+    expect(serializeMessageKind('sticker', s)).toBeNull()
+    expect(messageKindProblem('sticker', s)).toContain('番号')
   })
 })
 

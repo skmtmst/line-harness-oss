@@ -84,3 +84,123 @@
     padding: 14px 40px 32px;
   }
 }
+
+/*
+ * 谷間帯（1280〜1439px）: サイドバーが出て本文が狭くなるので、
+ * 左右の余白を24pxに譲って表の幅を稼ぐ。1440px以上では40pxに戻る。
+ */
+@media (min-width: 1280px) and (max-width: 1439.98px) {
+  .content {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+
+  .contentFull {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+}
+
+/*
+ * 本文へ移動（★V7 修正方針 §2 `sM9FE`）。焦点が来るまで画面の外に置く。
+ * `display:none` にすると Tab で選べなくなるので、位置だけずらす。
+ */
+.skipLink {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  padding: 8px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-ink);
+  color: var(--color-on-accent);
+  font-size: var(--text-body);
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+
+.skipLink:focus-visible {
+  transform: none;
+}
+
+/* 本文へ移動で焦点を受ける。枠は出さない（焦点は本文の最初の操作へ Tab で進む）。 */
+.main:focus {
+  outline: none;
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8 外側（移行③・Pencil `zUg8S` / lh-pro-ui §1）
+ *
+ * 地は全体が shell の灰。左メニューと上の帯は地の上に直接置き、
+ * 中身だけを白い板1枚に載せる（板の外に中身を置かない）。
+ * PC 幅（1024px 以上）だけの見た目で、モバイルの引き出しは v7 のまま。
+ * ------------------------------------------------------------------- */
+@media (min-width: 1024px) {
+  [data-theme="v8"] .main {
+    margin: 0 12px 12px 0;
+    border: 1px solid var(--color-board-line);
+    border-radius: var(--radius-panel);
+    background: var(--color-canvas);
+    box-shadow: var(--shadow-board);
+  }
+
+  /* 板の中の余白は板が持つ。内容の左右は 24px。 */
+  [data-theme="v8"] .content,
+  [data-theme="v8"] .contentFull {
+    padding: 20px 24px 28px;
+  }
+}
+
+/* v8 の帯は 1280px 未満でも出す（畳んだ左メニューと組む）。モバイルの
+   固定ヘッダー分の上余白は 1024px から要らない。 */
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  [data-theme="v8"] .side {
+    padding-top: 0;
+  }
+
+  [data-theme="v8"] .workspace > .main {
+    padding-top: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8（夕41）：設定の画面は白い板の中の左に「設定の中のメニュー」
+ * （幅208）を付ける。板の左端からメニューが始まるので、この画面では
+ * .content の余白を取り、中身の欄が従来どおりの余白を持つ。
+ * 1280px 未満では中のメニューは上の帯（1024〜1279）か畳み（1024 未満）
+ * になるので、板の中は上下に積む（MIGRATION-RISKS §4）。
+ * ------------------------------------------------------------------- */
+[data-theme="v8"] .contentSettings {
+  padding: 0;
+}
+
+[data-theme="v8"] .settingsBody {
+  min-width: 0;
+  padding: 24px 16px;
+}
+
+@media (min-width: 640px) {
+  [data-theme="v8"] .settingsBody {
+    padding-inline: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-theme="v8"] .settingsBody {
+    padding: 20px 24px 28px; /* .content の v8 の余白と同じ */
+  }
+}
+
+@media (min-width: 1280px) {
+  [data-theme="v8"] .settingsSplit {
+    display: flex;
+    align-items: stretch;
+    /* 上の帯 60 + 板の下余白 12 + 板の枠 2。中身が短い画面でも
+       左の線が板の下端まで届くようにする。 */
+    min-height: calc(100dvh - 74px);
+  }
+
+  [data-theme="v8"] .settingsBody {
+    flex: 1;
+  }
+}

@@ -3,15 +3,21 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import QuestionEditor, {
   emptyQuestion,
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import Button from '@/components/shared/button'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import LinePreview from '@/components/shared/line-preview'
+import Notice from '@/components/shared/notice'
+import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListState from '@/components/shared/list-state'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import type { Folder } from '@line-crm/shared'
@@ -43,6 +49,10 @@ function isEditableQuestion(value: unknown): value is ScenarioQuestion {
     && typeof (choice as Record<string, unknown>).label === 'string')
 }
 
+function snapshotOf(value: { name: string; category: string; folderId: string | null; question: ScenarioQuestion }): string {
+  return JSON.stringify(value)
+}
+
 function questionSummary(question: ScenarioQuestion): string[] {
   const tags = question.choices.reduce((count, choice) => count + (choice.addTagIds?.length ?? 0), 0)
   const fields = question.choices.filter((choice) => choice.field?.fieldId).length
@@ -65,7 +75,9 @@ function QuestionTemplatePageInner() {
   const [folders, setFolders] = useState<Folder[]>([])
   // 編集時はテンプレートが属するアカウント。選択中と食い違うことがある（N-147）。
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
-  const [question, setQuestion] = useState<ScenarioQuestion>(() => emptyQuestion())
+  /* 作りたての姿を「保存済み」とする。emptyQuestion() は呼ぶたびに違う鍵を振るため、別々に呼ぶと作りたてなのに未保存になる。 */
+  const [initialQuestion] = useState<ScenarioQuestion>(() => emptyQuestion())
+  const [question, setQuestion] = useState<ScenarioQuestion>(initialQuestion)
   const [usageCount, setUsageCount] = useState(0)
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
@@ -83,10 +95,11 @@ function QuestionTemplatePageInner() {
     setFolders([])
     if (!folderAccountId) return
     let cancelled = false
+    // m23m: 置き場が取れなくても質問は作れる。取れない失敗で画面を落とさない。
     void api.folders.list('template', folderAccountId).then((res) => {
       if (cancelled || !res.success) return
       setFolders(res.data)
-    })
+    }).catch(() => {})
     return () => { cancelled = true }
   }, [folderAccountId])
 
@@ -111,10 +124,22 @@ function QuestionTemplatePageInner() {
           return
         }
         setQuestion(template.data.question)
+        // R136 監査：読み込んだ直後の姿を「保存済み」とし、変えた分だけ
+        // 未保存にする。読み直すたびに確認が出ることはない。
+        setSavedSnapshot(snapshotOf({
+          name: template.data.name,
+          category: template.data.category || '未分類',
+          folderId: template.data.folderId ?? null,
+          question: template.data.question,
+        }))
         setUsageCount(Object.values(template.data.usedBy).reduce((total, items) => total + items.length, 0))
       })
-      .catch(() => {
-        if (!cancelled) setError('質問テンプレートを読み込めませんでした。')
+      // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+      // それ以外は画面の文のまま。生の `API error: NNN` は出さない。
+      .catch((caught: unknown) => {
+        if (!cancelled) {
+          setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, '質問テンプレート') : '質問テンプレートを読み込めませんでした。')
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -123,6 +148,21 @@ function QuestionTemplatePageInner() {
   }, [id, selectedAccountId])
 
   const summaries = useMemo(() => questionSummary(question), [question])
+
+  /*
+   * R136 監査：質問文を変えたまま「シナリオで使う」へ移ると、確認なく
+   * 入力が消える。保存済み（読み込んだ直後・作りたて）の姿との差を
+   * 未保存とし、離れる操作では確認を出す。保存は別画面へ送るため、
+   * 保存の成功後に確認が出ることはない。
+   */
+  const [savedSnapshot, setSavedSnapshot] = useState<string>(() => snapshotOf({
+    name: '',
+    category: '未分類',
+    folderId: null as string | null,
+    question: initialQuestion,
+  }))
+  const dirty = snapshotOf({ name, category, folderId, question }) !== savedSnapshot
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const save = async (questionStatus: 'draft' | 'published') => {
     if (!selectedAccountId) {
@@ -162,8 +202,13 @@ function QuestionTemplatePageInner() {
         return
       }
       router.push('/templates')
-    } catch {
-      setError('保存できませんでした。通信状態を確認してもう一度お試しください。')
+    } catch (caught) {
+      // 実行時のAPI失敗（500を含む）は原因どおりの文で出す。実送はしない。
+      if (caught instanceof ApiError && caught.status === 500) {
+        setError(`${describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' })}`)
+      } else {
+        setError(describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' }))
+      }
     } finally {
       setSaving(false)
     }
@@ -175,13 +220,13 @@ function QuestionTemplatePageInner() {
     return (
       <div className="pb-24">
         <nav className="text-ink-faint mb-4 text-xs" aria-label="現在地">
-          <Link href="/templates" className="text-accent hover:underline">テンプレート</Link>
+          <Link href="/templates" className="text-action underline">テンプレート</Link>
           <span className="mx-2">›</span>
-          <span className="text-accent">質問</span>
+          <span className="text-ink">質問</span>
         </nav>
         <div role="alert" className="bg-canvas rounded-card border-hairline border p-8 text-sm">
           <p className="font-bold text-ink">質問テンプレートの作成・変更はオーナーと管理者だけができます</p>
-          <Link href="/templates" className="text-accent hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
+          <Link href="/templates" className="text-action underline mt-3 inline-block text-sm">一覧へ戻る</Link>
         </div>
       </div>
     )
@@ -190,21 +235,19 @@ function QuestionTemplatePageInner() {
   return (
     <div data-design-node="NNDMR" className="pb-24">
       <nav className="text-ink-faint mb-4 text-xs" aria-label="現在地">
-        <Link href="/templates" className="text-accent hover:underline">テンプレート</Link>
+        <Link href="/templates" className="text-action underline">テンプレート</Link>
         <span className="mx-2">›</span>
-        <span className="text-accent">質問</span>
+        <span className="text-ink">質問</span>
         <span className="mx-2">›</span>
         <span>{id ? '編集' : '新しく作る'}</span>
       </nav>
 
       {error && (
-        <div role="alert" className="bg-danger-bg text-danger rounded-control text-label mb-4 px-4 py-3">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} className="mb-4" />
       )}
 
       <div className="grid min-w-0 gap-4 2xl:grid-cols-4">
-        <main className="min-w-0 space-y-4 2xl:col-span-3">
+        <div className="min-w-0 space-y-4 2xl:col-span-3">
           <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 lg:grid-cols-3">
             {/* 入力欄は共通部品。#976 U086: 必須の印は Field の required（
                 「必須」札）にそろえ、独自の赤字テキストは置かない。 */}
@@ -226,12 +269,12 @@ function QuestionTemplatePageInner() {
               選んだ置き場の名前をそのまま入れて、ずれないようにする。
             */}
             <Field label="置き場" htmlFor="tq-folder">
-              <SelectField
+              <Select
                 id="tq-folder"
                 aria-label="置き場"
                 value={folderId ?? ''}
-                onChange={(event) => {
-                  const next = event.target.value || null
+                onChange={(value) => {
+                  const next = value || null
                   setFolderId(next)
                   setCategory(folders.find((folder) => folder.id === next)?.name ?? '未分類')
                 }}
@@ -243,15 +286,11 @@ function QuestionTemplatePageInner() {
           <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
             <QuestionEditor value={question} onChange={setQuestion} choiceColumns />
           </section>
-        </main>
+        </div>
 
         <aside className="min-w-0 space-y-3 2xl:sticky 2xl:top-4 2xl:self-start">
-          <section className="rounded-card overflow-hidden bg-line-preview p-4 text-label text-on-accent">
-            <h2 className="text-center font-bold">LINEプレビュー</h2>
-            <p className="mx-auto mt-3 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">
-              質問の見え方（山田 太郎さんの場合）
-            </p>
-            <div className="rounded-card mt-4 overflow-hidden bg-canvas text-ink">
+          <LinePreview note="質問の見え方（山田 太郎さんの場合）">
+            <div className="rounded-card overflow-hidden bg-canvas text-ink">
               {question.intro?.trim() && (
                 <p className="border-hairline border-b px-4 py-3 leading-relaxed">
                   {displayText(question.intro)}
@@ -266,7 +305,7 @@ function QuestionTemplatePageInner() {
                 </div>
               ))}
             </div>
-          </section>
+          </LinePreview>
 
           <section className="rounded-card bg-line-answer-bg p-4 text-label text-line-answer">
             <h2 className="font-bold">答えをどこに残すか</h2>
@@ -284,7 +323,7 @@ function QuestionTemplatePageInner() {
             <p className="text-ink-secondary text-label mt-2">
               {id ? `使用先 ${usageCount}か所` : '保存後にシナリオから選べます'}
             </p>
-            <Link href="/scenarios" className="text-accent mt-3 inline-block font-semibold hover:underline">
+            <Link href="/scenarios" className="text-action mt-3 inline-block font-semibold underline">
               シナリオで使う
             </Link>
           </section>
@@ -299,14 +338,15 @@ function QuestionTemplatePageInner() {
               キャンセル
             </Button>
             <Button type="button" variant="secondary" disabled={saving} onClick={() => void save('draft')}>
-              下書きに保存
+              下書きを保存する
             </Button>
-            <Button type="button" variant="primary" disabled={saving} onClick={() => void save('published')}>
-              {saving ? '保存中…' : 'テンプレートを保存'}
+            <Button type="button" variant="primary" disabled={saving} onClick={() => void save('published')} busy={saving}>テンプレートを保存する
             </Button>
           </>
         )}
       />
+      {/* R136 監査：質問文などの書きかけがある間の離脱確認。 */}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="質問への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

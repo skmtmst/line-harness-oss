@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 /*
  * 入力欄。Pencil V5 の `ytG7l`「共通 入力欄」（102回）と
  * `keKe3`「共通 入力欄（複数行）」（22回）。
@@ -34,7 +36,7 @@
 }
 
 .field:focus-visible {
-  outline: 2px solid var(--color-status-info);
+  outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }
 
@@ -69,4 +71,14 @@
   .single {
     height: 44px;
   }
+}
+
+/* ★V8「枠線の色」：操作する欄の枠は control-border。誤りの赤は変えない。 */
+[data-theme='v8'] .field {
+  border-color: var(--color-control-border);
+}
+
+[data-theme='v8'] .invalid {
+  border-color: var(--color-status-danger);
+}
 }

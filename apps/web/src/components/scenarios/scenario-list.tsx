@@ -1,13 +1,20 @@
+import Checkbox from '@/components/shared/checkbox'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ListPlus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import BulkBar from '@/components/shared/bulk-bar'
+import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { MoveReferrersNotice } from './scenario-dialogs'
+import StatusChip from '@/components/shared/status-chip'
+import ListState from '@/components/shared/list-state'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import { formatNumber } from '@/lib/format'
 
 type ScenarioRow = Scenario & {
   stepCount?: number
@@ -53,6 +60,14 @@ interface ScenarioListProps {
   onReorder?: (ids: string[]) => void
   loading?: boolean
   onCreate?: () => void
+  /**
+   * R173: 検索・絞り込みの結果が0件のとき真にする。元データ0件の
+   * 「まだありません」と分け、「条件に合うものがありません」と
+   * 条件を外す口を出す（共通 ListState の `filtered`）。
+   */
+  isFiltered?: boolean
+  /** 絞り込みを外す。`isFiltered` のときだけ使う。 */
+  onClearFilter?: () => void
 }
 
 /**
@@ -82,7 +97,10 @@ export default function ScenarioList({
   onReorder,
   loading,
   onCreate,
+  isFiltered = false,
+  onClearFilter,
 }: ScenarioListProps) {
+  const router = useRouter()
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
 
@@ -305,8 +323,10 @@ export default function ScenarioList({
     >
       {deleteTarget && (
         <div className="text-ink-secondary space-y-2 text-sm">
+          {/* R250: 終了後の移動先にされていると、削除で参照元の設定が変わる。件数が取れたときだけ出す。 */}
+          <MoveReferrersNotice scenarioId={deleteTarget.id} />
           <p>
-            購読中 {(deleteTarget.subscriberCount ?? 0).toLocaleString('ja-JP')}人 ／ 通数{' '}
+            購読中 {formatNumber((deleteTarget.subscriberCount ?? 0))}人 ／ 通数{' '}
             {deleteTarget.stepCount === undefined
               ? '— 読み込めませんでした'
               : `${deleteTarget.stepCount}通`}
@@ -356,40 +376,53 @@ export default function ScenarioList({
     >
       <label className="block">
         <span className="text-ink-secondary mb-1 block text-xs font-medium">移動先のフォルダ</span>
-        <select
+        <Select
+          aria-label="移動先のフォルダ"
+          size="full"
           value={moveDraft}
-          onChange={(event) => setMoveDraft(event.target.value)}
+          onChange={(value) => setMoveDraft(value)}
           disabled={moving}
-          className="v6-select h-9 w-full rounded-control border border-hairline bg-canvas pl-3 text-sm font-semibold text-ink"
-        >
-          <option value="">未分類</option>
-          {folders.map((folder) => (
-            <option key={folder.id} value={folder.id}>
-              {folder.name}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: '', label: '未分類' },
+            ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+          ]}
+        />
       </label>
     </ConfirmDialog>
   )
 
   if (scenarios.length === 0) {
+    // R173: 絞り込みの結果0件は、元データ0件と分ける。作る口ではなく
+    // 条件を外す口を出す（保存済みが消えたと誤読されるため）。
+    if (isFiltered) {
+      return (
+        <>
+          <ListState
+            kind="empty"
+            emptyPreset="filtered"
+            action={onClearFilter ? (
+              <Button variant="secondary" onClick={onClearFilter}>
+                条件をクリア
+              </Button>
+            ) : undefined}
+          />
+          {moveDialog}
+          {confirmDialog}
+        </>
+      )
+    }
     return (
       <>
-        <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-          <ListPlus aria-hidden className="text-ink-faint mx-auto" size={24} />
-          <p className="text-ink mt-3 text-sm font-bold">まだシナリオがありません</p>
-          <p className="text-ink-faint mt-1 text-xs">1つ作ると、順番に届く配信をここで管理できます。</p>
-          {onCreate ? (
-            <Button
-              variant="primary"
-              onClick={onCreate}
-              className="mt-3"
-            >
+        <ListState
+          kind="empty"
+          title="まだシナリオがありません"
+          description="1つ作ると、順番に届く配信をここで管理できます。"
+          action={onCreate ? (
+            <Button variant="primary" onClick={onCreate}>
               ＋ シナリオを作る
             </Button>
-          ) : null}
-        </div>
+          ) : undefined}
+        />
         {moveDialog}
         {confirmDialog}
       </>
@@ -403,30 +436,9 @@ export default function ScenarioList({
         {moveNotice}
       </span>
       {/*
-        複数選択の一括操作は、選んでいる間だけ表の上に出す帯。
+        複数選択の一括操作は、選んでいる間だけ表の下に出す帯（★V7 仕上げ §2）。
         フォルダ移動の受け口はここと行の「その他」だけに絞る（NEXT-25）。
       */}
-      {canMove && selectedCount > 0 && (
-        <div className="border-hairline bg-accent-soft flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2">
-          <span className="text-ink text-sm font-medium tabular-nums">
-            {selectedCount}件を選択中
-          </span>
-          <button
-            type="button"
-            onClick={() => openMove([...selectedIds])}
-            className="text-accent text-sm font-medium hover:underline"
-          >
-            フォルダを移動
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedIds(new Set())}
-            className="text-ink-faint text-xs hover:underline"
-          >
-            選択を解除
-          </button>
-        </div>
-      )}
       <div className="overflow-x-auto">
         {/*
           名前だけが残り幅を受け取り、ほかの列は内容に合わせて固定する。
@@ -442,21 +454,19 @@ export default function ScenarioList({
             <col />
             <col className="w-28" />
             <col className="w-24" />
-            <col className="w-28" />
+            {/* 枠つき「編集」＋「…」がはみ出さない幅（#641） */}
+            <col className="w-36" />
           </colgroup>
           <thead>
             <TableHeadRow>
               {canMove && (
                 <Th className="w-10 px-2" aria-label="選択">
-                  <input
-                    type="checkbox"
+                  {/* ★V7 共通 チェックボックス（押せる範囲 24px・一部選択は「―」）。 */}
+                  <Checkbox
                     checked={allOnPageSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = !allOnPageSelected && selectedCount > 0
-                    }}
-                    onChange={toggleAllOnPage}
+                    indeterminate={!allOnPageSelected && selectedCount > 0}
+                    onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのシナリオをすべて選択"
-                    className="h-4 w-4 align-middle"
                   />
                 </Th>
               )}
@@ -489,15 +499,29 @@ export default function ScenarioList({
                 ...(showFolder ? [folderName] : []),
               ].join('・')
               return (
-              <tr key={s.id} className="hover:bg-canvas-sunken">
+              <tr
+                key={s.id}
+                className="cursor-pointer hover:bg-canvas-sunken"
+                tabIndex={0}
+                onClick={() => router.push(`/scenarios/detail?id=${s.id}`)}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    router.push(`/scenarios/detail?id=${s.id}`)
+                  }
+                }}
+              >
+                {/*
+                  行を押したら詳細へ（一覧の決まり）。名前は黒文字の太字。
+                  選択・並び替え・操作のセルは行の移動を起こさない。
+                */}
                 {canMove && (
-                  <td className="w-10 px-2 py-3 text-center align-top">
-                    <input
-                      type="checkbox"
+                  <td className="w-10 px-2 py-3 text-center align-top" onClick={(event) => event.stopPropagation()}>
+                    <Checkbox
                       checked={selectedIds.has(s.id)}
-                      onChange={() => toggleOne(s.id)}
+                      onCheckedChange={() => toggleOne(s.id)}
                       aria-label={`${s.name}を選択`}
-                      className="mt-0.5 h-4 w-4"
                     />
                   </td>
                 )}
@@ -509,6 +533,7 @@ export default function ScenarioList({
                 */}
                 <td
                   className="text-ink-faint w-10 cursor-grab px-2 py-3 text-center align-top select-none active:cursor-grabbing"
+                  onClick={(event) => event.stopPropagation()}
                   draggable={Boolean(onReorder)}
                   onDragStart={() => setDragId(s.id)}
                   onDragOver={(e) => e.preventDefault()}
@@ -536,7 +561,7 @@ export default function ScenarioList({
                       <Link
                         href={`/scenarios/detail?id=${s.id}`}
                         title={s.name}
-                        className="text-info min-w-0 truncate text-sm font-medium hover:underline"
+                        className="text-ink min-w-0 truncate text-sm font-bold hover:text-action hover:underline"
                       >
                         {s.name}
                       </Link>
@@ -566,37 +591,38 @@ export default function ScenarioList({
                   購読中と読了済は1列にまとめる（NEXT-25）。
                   1行目が「いま流れている人」、2行目が「最後まで届いた人」。
                 */}
-                <td className="px-4 py-3 whitespace-nowrap">
+                <td
+                  className="px-4 py-3 whitespace-nowrap"
+                  title={`購読 ${s.subscriberCount === undefined ? '—' : formatNumber(s.subscriberCount)}人 ／ 読了 ${formatNumber((s.completedCount ?? 0))}人`}
+                >
                   <div className="text-ink text-sm tabular-nums">
-                    {s.subscriberCount === undefined ? '—' : s.subscriberCount.toLocaleString('ja-JP')}
+                    {s.subscriberCount === undefined ? '—' : formatNumber(s.subscriberCount)}
                     <span className="text-ink-faint ml-0.5 text-xs">人</span>
                   </div>
                   <div className="text-ink-faint text-xs tabular-nums">
-                    読了 {(s.completedCount ?? 0).toLocaleString('ja-JP')}人
+                    読了 {formatNumber((s.completedCount ?? 0))}人
                   </div>
                   {/*
                     0人のとき、作っただけでは配信されないことに気づけない。
                     始め方への導線をその場に出す。
+                    m21p: 「購読 / 読了」列は w-28（112px）で、7文字の
+                    「配信を始める方法」は「配信を始め…」と途中で切れていた。
+                    全文は title で読めるようにし、見える文字は6文字の
+                    「配信の始め方」にして省略自体を出さない。
                   */}
                   {s.subscriberCount === 0 && (
                     <Link
                       href={`/scenarios/detail?id=${s.id}`}
-                      className="text-info mt-0.5 block text-xs font-normal hover:underline"
+                      title="配信を始める方法"
+                      className="text-info mt-0.5 block truncate text-xs font-normal whitespace-nowrap hover:underline"
                     >
-                      配信を始める方法
+                      配信の始め方
                     </Link>
                   )}
                 </td>
-                {/* 列が狭いと「配信可」が「配信 / 可」の2行になる。
-                    札の中で折り返させない。 */}
+                {/* 状態の札は共通の StatusChip（設計 B）。札の中で折り返させない。 */}
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <span
-                    className={`rounded-pill inline-block px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${
-                      s.isActive ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'
-                    }`}
-                  >
-                    {s.isActive ? '配信可' : '停止中'}
-                  </span>
+                  <StatusChip status={s.isActive ? 'running' : 'paused'} />
                 </td>
                 {/*
                   操作は「編集」＋「その他（…）」の2口だけ（NEXT-25）。
@@ -604,13 +630,11 @@ export default function ScenarioList({
                   右端の列を狭く保つ。
                 */}
                 <td className="px-4 py-3 text-right whitespace-nowrap">
-                  <div className="relative inline-flex items-center justify-end gap-1">
-                    <Link
-                      href={`/scenarios/detail?id=${s.id}`}
-                      className="text-accent px-2.5 py-1 text-xs font-medium hover:underline"
-                    >
+                  <div className="relative inline-flex items-center justify-end gap-1.5" onClick={(event) => event.stopPropagation()}>
+                    {/* #641: 編集も「その他」と同じ枠つきボタンにそろえる（友だち追加時配信と同じ形） */}
+                    <Button href={`/scenarios/detail?id=${s.id}`} variant="secondary">
                       編集
-                    </Link>
+                    </Button>
                     {/*
                       **撮影の入口。**文言（「停止」「再開」）で探すと、言葉を
                       変えたときに撮影が黙って空振りする。Node ID を付ける。
@@ -640,6 +664,21 @@ export default function ScenarioList({
           </tbody>
         </table>
       </div>
+
+      {/*
+        一括バーは表のすぐ下（下端から8px上がって出る）。選択が0件に
+        戻ると下がって消える。操作は白地ボタン＋取り消す「選択を解除」。
+      */}
+      {canMove ? (
+        <BulkBar count={selectedCount} className="mx-3 mb-3">
+          <Button variant="secondary" size="compact" onClick={() => openMove([...selectedIds])}>
+            フォルダを移動
+          </Button>
+          <Button variant="secondary" size="compact" onClick={() => setSelectedIds(new Set())}>
+            選択を解除
+          </Button>
+        </BulkBar>
+      ) : null}
 
       {confirmDialog}
       {moveDialog}

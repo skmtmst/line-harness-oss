@@ -18,7 +18,7 @@ import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createTestD1, type SqliteD1 } from './test-utils/d1-sqlite.js';
 
@@ -52,10 +52,17 @@ const NOW = new Date('2026-11-02T03:00:00.000Z');
 
 function seed(db: SqliteD1): void {
   db.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
+  // 有効期限・看板の同期時刻を入れておく。空だと delivery レーンの scheduled が
+  // 実ネットワーク(LINE API)へ取りに行き、CI で 5 秒制限に当たることがある。
+  // 回収の見張りには無関係なので、ここでは外す。
+  const freshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60_000).toISOString();
+  const justSyncedAt = new Date().toISOString();
   db.raw.prepare(`
     INSERT INTO line_accounts
-      (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
-    VALUES ('${ACCOUNT}', 'channel-1', '店舗1', 'token-1', 'secret-1', 1, 'tenant-1')
+      (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id,
+       token_expires_at, line_profile_synced_at)
+    VALUES ('${ACCOUNT}', 'channel-1', '店舗1', 'token-1', 'secret-1', 1, 'tenant-1',
+            '${freshExpiresAt}', '${justSyncedAt}')
   `).run();
   db.raw.prepare(`
     INSERT INTO staff_members
@@ -135,6 +142,33 @@ function workerEnv(db: SqliteD1) {
 describe('N-327 #663 cron からの運用者通知の回収', () => {
   let testDb: SqliteD1;
 
+  /**
+   * CI でたまに落ちていた2つの崩れ方の止め方（2026-09-27 の CI 記録より）。
+   *
+   * 1. 最初の1回だけ delivery レーン全体の読み込み（約40口の動的 import）に
+   *    時間がかかり、混んだ CI では 5000ms の制限を超えることがあった
+   *    （CI で 5169ms、手元では 400ms）。下の beforeAll で空のDBに
+   *    1回だけ回しておき、この重さを時間制限のある試験の外へ出す。
+   *    hook の制限は 10 秒なので、同じ混み具合でも収まる。
+   * 2. 制限を超えた1件目の scheduled が止まらず裏で走り続け、送った記録が
+   *    次の試験の時間帯に届いて「触っていないのに呼ばれた」になっていた
+   *    （2件目の記録にあろうはずのない `key-delivery-1` が残っていた）。
+   *    送った記録の数え方は自分の行の冪等キーだけに絞り、使い終わったDBは
+   *    毎回閉じる。閉じたDBに裏の実行が触ると止まって送らない。
+   */
+  beforeAll(async () => {
+    pushMessageWithRequestId.mockResolvedValue({ data: {}, requestId: 'line-request-1' });
+    sendOperationEmail.mockResolvedValue(undefined);
+    processOperationNotificationOutbox.mockResolvedValue(undefined);
+    processOperationAlertNotificationOutbox.mockResolvedValue(undefined);
+    const warmup = createTestD1();
+    seed(warmup);
+    await worker.scheduled!(
+      scheduledEvent(SCHEDULED_CRONS.delivery), workerEnv(warmup), execCtx(),
+    );
+    warmup.raw.close();
+  });
+
   beforeEach(() => {
     pushMessageWithRequestId.mockReset();
     pushMessageWithRequestId.mockResolvedValue({ data: {}, requestId: 'line-request-1' });
@@ -148,6 +182,15 @@ describe('N-327 #663 cron からの運用者通知の回収', () => {
     seed(testDb);
   });
 
+  afterEach(() => {
+    testDb.raw.close();
+  });
+
+  /** この試験の行の送信だけ数える。裏で走り続けた別試験の分は入れない。 */
+  function pushCallsFor(key: string): unknown[][] {
+    return pushMessageWithRequestId.mock.calls.filter((call) => call[2] === key);
+  }
+
   it('配信レーンの cron を回すと、期限の来た retry_wait が実際に捌ける', async () => {
     seedStuckDelivery(testDb, 'delivery-1', {
       nextRetryAt: '2026-11-02T02:55:00.000Z', // NOW より前 = 期限到来
@@ -157,7 +200,7 @@ describe('N-327 #663 cron からの運用者通知の回収', () => {
 
     await worker.scheduled!(scheduledEvent(SCHEDULED_CRONS.delivery), workerEnv(testDb), execCtx());
 
-    expect(pushMessageWithRequestId).toHaveBeenCalledTimes(1);
+    expect(pushCallsFor('key-delivery-1')).toHaveLength(1);
     const row = deliveryRow(testDb, 'delivery-1');
     expect(row.status).toBe('provider_accepted');
     expect(row.provider_request_id).toBe('line-request-1');
@@ -171,12 +214,14 @@ describe('N-327 #663 cron からの運用者通知の回収', () => {
 
     await worker.scheduled!(scheduledEvent(SCHEDULED_CRONS.delivery), workerEnv(testDb), execCtx());
 
-    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+    expect(pushCallsFor('key-delivery-future')).toHaveLength(0);
     expect(deliveryRow(testDb, 'delivery-future').status).toBe('retry_wait');
   });
 
   it('重い処理のレーンでは回収しない（配信レーンに載せている）', async () => {
-    seedStuckDelivery(testDb, 'delivery-1', {
+    // 1件目と同じ id にすると、裏で走り続けた1件目の送信と見分けが
+    // 付かない。重いレーンが触ったかどうかだけを見るため別の id にする。
+    seedStuckDelivery(testDb, 'delivery-heavy', {
       nextRetryAt: '2026-11-02T02:55:00.000Z',
       queuedAt: '2026-11-02T02:50:00.000Z',
     });
@@ -185,8 +230,8 @@ describe('N-327 #663 cron からの運用者通知の回収', () => {
       scheduledEvent(SCHEDULED_CRONS.sixHourlyHeavy), workerEnv(testDb), execCtx(),
     );
 
-    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
-    expect(deliveryRow(testDb, 'delivery-1').status).toBe('retry_wait');
+    expect(pushCallsFor('key-delivery-heavy')).toHaveLength(0);
+    expect(deliveryRow(testDb, 'delivery-heavy').status).toBe('retry_wait');
   });
 
   it('1回の取り分は上限までで、古い行から先に捌く（先入れ先出し）', async () => {
@@ -207,7 +252,14 @@ describe('N-327 #663 cron からの運用者通知の回収', () => {
     // 上限を小さくしたり渡し忘れたりすると、ここが落ちる。
     await worker.scheduled!(scheduledEvent(SCHEDULED_CRONS.delivery), workerEnv(testDb), execCtx());
 
-    expect(pushMessageWithRequestId).toHaveBeenCalledTimes(OPERATOR_NOTIFICATION_SWEEP_LIMIT);
+    // 積んだ行のキーだけ数える（3桁そろえなので1件目の `key-delivery-1`
+    // とは重ならない）。同じ行を2回送っていたら重複で落ちる。
+    const ownKeys = new Set(
+      Array.from({ length: total }, (_, index) => `key-delivery-${String(total - index).padStart(3, '0')}`),
+    );
+    const ownCalls = pushMessageWithRequestId.mock.calls.filter((call) => ownKeys.has(call[2]));
+    expect(ownCalls).toHaveLength(OPERATOR_NOTIFICATION_SWEEP_LIMIT);
+    expect(new Set(ownCalls.map((call) => call[2])).size).toBe(OPERATOR_NOTIFICATION_SWEEP_LIMIT);
     // あふれた1件は落ちていない。**残るのは一番新しい行**でなければならない。
     // 件数だけを数えると、新しい順に捌いて古い行を置き去りにしても緑になる。
     const leftover = testDb.raw.prepare(
@@ -238,7 +290,9 @@ describe('N-327 #663 回収が同時に2回走っても二重に送らない', (
     file = join(dir, 'sweep.sqlite');
     owner = createTestD1({ file });
     seed(owner);
-    seedStuckDelivery(owner, 'delivery-1', {
+    // 前のまとまりの `delivery-1` とキーが重ならないよう別の id にする。
+    // 裏で走り続けた前の実行の送信が紛れても、数え方に混ざらない。
+    seedStuckDelivery(owner, 'delivery-race', {
       nextRetryAt: '2026-11-02T02:55:00.000Z',
       queuedAt: '2026-11-02T02:50:00.000Z',
     });
@@ -261,14 +315,19 @@ describe('N-327 #663 回収が同時に2回走っても二重に送らない', (
 
     // 勝った側だけが1件掴み、負けた側は0件。
     expect([resultA.swept, resultB.swept].sort()).toEqual([0, 1]);
-    expect(pushMessageWithRequestId).toHaveBeenCalledTimes(1);
-    const row = deliveryRow(owner, 'delivery-1');
+    expect(
+      pushMessageWithRequestId.mock.calls.filter((call) => call[2] === 'key-delivery-race'),
+    ).toHaveLength(1);
+    const row = deliveryRow(owner, 'delivery-race');
     expect(row.status).toBe('provider_accepted');
     // 試行回数も1つしか進んでいない（2回送って2回数えていない）。
     expect(row.attempts).toBe(2);
     const attempts = owner.raw.prepare(
-      `SELECT COUNT(*) AS n FROM notification_delivery_attempts WHERE delivery_id = 'delivery-1'`,
+      `SELECT COUNT(*) AS n FROM notification_delivery_attempts WHERE delivery_id = 'delivery-race'`,
     ).get() as { n: number };
     expect(attempts.n).toBe(1);
+    runnerA.raw.close();
+    runnerB.raw.close();
+    owner.raw.close();
   });
 });

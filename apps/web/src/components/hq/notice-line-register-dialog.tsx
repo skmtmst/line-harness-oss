@@ -63,7 +63,7 @@ export default function NoticeLineRegisterDialog({ open, onClose, quietWhenUnava
             <img src={qr} alt={`${info.accountName} の友だち追加 QR コード`} className="h-44 w-44 rounded-control border border-hairline" />
           ) : null}
           <div className="grid min-w-0 flex-1 gap-2 text-caption text-ink">
-            <p className="text-label font-bold">{info.accountName}{info.basicId ? `（${info.basicId}）` : ''}</p>
+            <p className="text-label font-medium">{info.accountName}{info.basicId ? `（${info.basicId}）` : ''}</p>
             <ol className="grid list-decimal gap-1 pl-5">
               <li>スマートフォンの LINE でこの QR を読み取るか、下のボタンから友だち追加します。</li>
               <li>追加できたら、LINE のトーク画面で次の 6 桁を送ってください（あなたの管理画面と紐づきます）。</li>
@@ -74,7 +74,7 @@ export default function NoticeLineRegisterDialog({ open, onClose, quietWhenUnava
               <p className="text-body font-bold tracking-widest text-ink" aria-label="確認コード">{info.code}</p>
             ) : null}
             {info.addFriendUrl ? (
-              <a href={info.addFriendUrl} target="_blank" rel="noreferrer" className="text-accent-deep underline-offset-2 hover:underline">スマートフォンで開く（友だち追加）</a>
+              <a href={info.addFriendUrl} target="_blank" rel="noreferrer" className="text-action underline-offset-2 hover:underline">スマートフォンで開く（友だち追加）</a>
             ) : null}
             <p className="text-micro text-ink-faint">確認コードは 24 時間有効です。管理画面の「お問い合わせ」からも、いつでもこの案内を開けます。</p>
           </div>

@@ -37,4 +37,4 @@ export const cellInput =
 
 /** 押せる小さなボタン（追加・複製など）。 */
 export const miniButton =
-  'text-accent hover:bg-accent-soft rounded-control px-2 py-1 text-xs font-medium transition-colors'
+  'text-accent-deep hover:bg-accent-soft rounded-control px-2 py-1 text-xs font-medium transition-colors'

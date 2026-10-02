@@ -3,13 +3,16 @@
 import { useRef, useState } from 'react'
 import {
   FORM_THEME_DEFAULT,
+  formThemeContrastError,
+  normalizeFormTheme,
   type FormCornerRadius,
   type FormFontFamily,
   type FormTheme,
 } from '@line-crm/shared'
+import HelpTip from '@/components/shared/help-tip'
 import type { MediaItem } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { useRouter } from 'next/navigation'
@@ -58,6 +61,11 @@ export default function FormDesignSettings({
 }) {
   const router = useRouter()
   const theme = value ?? FORM_THEME_DEFAULT
+  /*
+   * P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
+   * 直し方（失敗そのもの）は赤字で欄の下に出し、決まりの意味だけを「？」に入れる。
+   */
+  const contrastError = formThemeContrastError(normalizeFormTheme(theme))
   /** FORM-18: カードの画像URLの入力時検査。空は「使わない」なので通す。 */
   const ogImageError = ogImageUrlError(ogImageUrl)
   /** メディア選択窓を開いている対象。null なら閉じている（N-193）。 */
@@ -167,7 +175,7 @@ export default function FormDesignSettings({
       aria-modal="true"
       aria-label="デザイン設定"
     >
-      <section data-design-node="ava2n" className="w-full overflow-hidden rounded-panel shadow-lg" style={{ marginBlock: 94, maxWidth: 820, background: 'var(--color-canvas)' }}>
+      <section data-design-node="ava2n" className="w-full overflow-hidden rounded-panel shadow-float" style={{ marginBlock: 94, maxWidth: 820, background: 'var(--color-canvas)' }}>
         <header className="border-hairline flex items-start justify-between border-b px-6 py-4">
           <div>
             <h2 className="text-ink text-lg font-bold">デザイン設定</h2>
@@ -186,11 +194,22 @@ export default function FormDesignSettings({
           CSS編集を実装するときは、そのときタブへ戻す。
         */}
         <div>
-          <h3 className="text-ink text-sm font-medium">色</h3>
+          <h3 className="text-ink text-sm font-semibold">
+            色
+            {' '}
+            <HelpTip label="文字と背景の色の決まりの説明">
+              お客さま画面は文字を背景の上に置きます。この2色の差は4.5:1以上が必要です。足りない組み合わせは保存できません。
+            </HelpTip>
+          </h3>
           <div className="mt-3 flex items-center justify-between gap-3">
             <p className="text-ink text-sm font-semibold">色は5つの役割にだけ割り当てます</p>
             <Button onClick={resetColors} title="5つの色だけを初期の組合せにします。書体・角の丸み・背景画像は変わりません。">おまかせで組む</Button>
           </div>
+          {contrastError ? (
+            <p role="alert" className="text-danger mt-2 text-xs leading-5">
+              {contrastError}
+            </p>
+          ) : null}
           <div className="mt-2 space-y-2">
             {COLOR_ROLES.map((role) => {
               const errorId = `form-theme-${role.key}-error`
@@ -203,7 +222,7 @@ export default function FormDesignSettings({
                     clearColorInput(role.key)
                     patch(role.key, event.target.value)
                   }}
-                  className="h-10 w-10 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+                  className="h-10 w-10 shrink-0 cursor-pointer rounded-mini border-0 bg-transparent p-0"
                   aria-label={`${role.label}の色`}
                 />
                 <span className="min-w-0 flex-1">
@@ -243,13 +262,14 @@ export default function FormDesignSettings({
         </div>
 
         <div className="border-hairline mt-5 border-t pt-5">
-          <h3 className="text-ink text-sm font-medium">文字と角の丸み</h3>
+          <h3 className="text-ink text-sm font-semibold">文字と角の丸み</h3>
           <div className="mt-3 grid gap-4 sm:grid-cols-3">
           <Field label="文字の書体" htmlFor="form-theme-font">
-            <SelectField
+            <Select
+              aria-label="文字の書体"
               id="form-theme-font"
               value={theme.fontFamily}
-              onChange={(event) => patch('fontFamily', event.target.value as FormFontFamily)}
+              onChange={(value) => patch('fontFamily', value as FormFontFamily)}
               options={[
                 { value: 'sans', label: 'ゴシック体' },
                 { value: 'serif', label: '明朝体' },
@@ -257,10 +277,11 @@ export default function FormDesignSettings({
             />
           </Field>
           <Field label="角の丸み" htmlFor="form-theme-radius">
-            <SelectField
+            <Select
+              aria-label="角の丸み"
               id="form-theme-radius"
               value={theme.cornerRadius}
-              onChange={(event) => patch('cornerRadius', event.target.value as FormCornerRadius)}
+              onChange={(value) => patch('cornerRadius', value as FormCornerRadius)}
               options={[
                 { value: 'none', label: 'なし' },
                 { value: 'medium', label: 'ふつう' },
@@ -277,7 +298,7 @@ export default function FormDesignSettings({
           が背景として描き、`normalizeFormTheme` が https のURLだけ通す。
         */}
         <div className="border-hairline mt-5 border-t pt-5">
-          <h3 className="text-ink text-sm font-medium">背景</h3>
+          <h3 className="text-ink text-sm font-semibold">背景</h3>
           <div className="mt-3 flex items-center justify-between gap-3">
             <p className="text-ink text-sm font-semibold">
               {theme.backgroundImageUrl ? '登録メディアの画像を使っています' : '背景画像は使っていません'}
@@ -297,7 +318,7 @@ export default function FormDesignSettings({
         </div>
 
         <div className="border-hairline mt-5 border-t pt-5">
-          <h3 className="text-ink text-sm font-medium">リンクの見え方</h3>
+          <h3 className="text-ink text-sm font-semibold">リンクの見え方</h3>
           <p className="text-ink-faint mt-0.5 text-xs">LINEやSNSにこのフォームのURLを貼ったときに出るカードです。空のままなら自動で作ります。</p>
           <div className="mt-3 space-y-4">
             <Field label="カードの見出し" htmlFor="form-og-title">
@@ -351,7 +372,7 @@ export default function FormDesignSettings({
               type="button"
               onClick={revertToInitial}
               title="この窓を開いた時点の設定へ戻します"
-              className="text-accent text-sm font-medium"
+              className="text-action text-sm font-medium"
             >
               元に戻す
             </button>

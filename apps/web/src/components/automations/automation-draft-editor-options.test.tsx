@@ -114,14 +114,15 @@ function openSelect(el: HTMLDivElement, buttonId: string): HTMLLIElement[] {
   const button = el.querySelector(`#${buttonId}`)
   if (!button) throw new Error(`#${buttonId} が見つかりません`)
   act(() => { (button as HTMLButtonElement).click() })
-  const options = Array.from(el.querySelectorAll('li[role="option"]')) as HTMLLIElement[]
+  // 選択肢は最上層（MenuPortal→document.body）に出る。器の中にはいない。
+  const options = Array.from(document.querySelectorAll('li[role="option"]')) as HTMLLIElement[]
   if (options.length === 0) throw new Error('選択肢が出ませんでした')
   return options
 }
 
 function saveButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存')
-  if (!button) throw new Error('「下書きを保存」ボタンが見つかりません')
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存する')
+  if (!button) throw new Error('「下書きを保存する」ボタンが見つかりません')
   return button as HTMLButtonElement
 }
 

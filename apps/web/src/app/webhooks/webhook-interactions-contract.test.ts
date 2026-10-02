@@ -42,7 +42,7 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
   it('遅れと成功率に対象期間を書く(IDEA-26)', () => {
     // 「いつからの数字か」が分からないと遅い・悪いの判断が付かない。
     // 成功・返事までの時間・未取得の各補足に選択中の期間を入れる。
-    expect(PAGE).toContain('この${periodDays}日で ${successRate.toLocaleString')
+    expect(PAGE).toContain('この${periodDays}日で ${formatNumber(successRate)}')
     expect(PAGE).toContain('この${periodDays}日でいちばん遅くて')
     expect(PAGE).toContain('この${periodDays}日は未取得')
     expect(PAGE).toContain('この${periodDays}日の送受信の処理時間')
@@ -65,7 +65,11 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
     expect(PAGE).toContain('前の失敗をやり直した記録')
     expect(PAGE).toContain('送り直せるのは管理者です')
     expect(PAGE).toContain('相手側でもう一度送ってもらってください')
-    expect(PAGE).toContain('data.summary.resultUnknown')
+    // d23b R408: 件数は「送り直せる数」と「対象外の数」に分けて出す。
+    // 結果不明の件数も引き続き案内へ出す。
+    expect(PAGE).toContain('summary.resultUnknown')
+    expect(PAGE).toContain('summary.retryable')
+    expect(PAGE).toContain('summary.outgoingFailed')
   })
 
   it('技術的な記録は必要なときだけ開き、秘密情報はそこにも出さない(IDEA-26)', () => {
@@ -105,5 +109,13 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
   it('本文に画面タイトルや説明を重ねない', () => {
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).not.toContain('<h1')
+  })
+
+  // d23d R407: 受け取りの「試し」は実際の受信ではない。
+  // 「届いた記録」「受け取ったとき」の案内を試しには出さない。
+  it('受け取りの試しの記録は実処理と別の案内にする(R407)', () => {
+    expect(PAGE).toContain("item.eventType === 'incoming_webhook.test'")
+    expect(PAGE).toContain('の受け取りを試したとき')
+    expect(PAGE).toContain('受け取りの試しの記録です。実際の受け取りと処理の実行はしていないため')
   })
 })

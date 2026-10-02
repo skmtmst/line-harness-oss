@@ -7,22 +7,29 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
+import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import Pagination from '@/components/shared/pagination'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 // #740: 一覧の Kpi と一字一句同じだったため、機能内共有の1部品へ統合した。
 import EventKpi from '@/components/events/event-kpi'
+import { parseEventQuestions } from '@/components/events/event-questions-editor'
 import {
   api,
   eventsApi,
   type EventBookingItem,
   type EventBookingSummary,
   type EventDetail,
+  type EventOccurrenceApplicant,
   type EventOccurrenceApplicants,
   type EventSlot,
 } from '@/lib/api'
 import { describeBookingCapacity } from '../event-attention'
+import { formatDateTime } from '@/lib/format'
 
 const PAGE_SIZE = 20
 
@@ -37,15 +44,20 @@ const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: 'all', label: '全件' },
 ]
 
-const statusBadge: Record<string, string> = {
-  requested: 'bg-warning-bg text-warning',
-  confirmed: 'bg-success-bg text-success',
-  rejected: 'bg-canvas-sunken text-ink-secondary',
-  cancelled: 'bg-canvas-sunken text-ink-secondary',
-  expired: 'bg-canvas-sunken text-ink-faint',
-  attended: 'bg-accent-soft text-accent',
-  no_show: 'bg-danger-bg text-danger',
-  waitlist: 'bg-warning-bg text-warning',
+/** 予約・申込の状態の見え方。**色だけに頼らず、必ず文字で言う。** */
+const statusTone: Record<string, StatusBadgeTone> = {
+  requested: 'warning',
+  confirmed: 'success',
+  rejected: 'neutral',
+  cancelled: 'neutral',
+  expired: 'neutral',
+  attended: 'success',
+  no_show: 'danger',
+  waitlist: 'warning',
+  waiting: 'warning',
+  offered: 'info',
+  accepted: 'success',
+  converted: 'success',
 }
 
 const STATUS_LABELS = new Map([
@@ -90,14 +102,7 @@ function formatJp(iso: string | null | undefined, fallback: string): string {
   if (!iso) return fallback
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return fallback
-  return date.toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(date)
 }
 
 /**
@@ -124,6 +129,9 @@ function OccurrenceApplicantsPanel({
   onPromote,
   onExportCsv,
   csvBusy,
+  onMoveWaiting,
+  onSkipWaiting,
+  waitlistBusy,
 }: {
   data: EventOccurrenceApplicants
   promoting: boolean
@@ -135,6 +143,10 @@ function OccurrenceApplicantsPanel({
    */
   onExportCsv: () => void
   csvBusy: boolean
+  /** U: 待ち順の手動変更・飛ばし。理由は呼び出し側の確認窓で聞く。 */
+  onMoveWaiting: (id: string, direction: -1 | 1) => void
+  onSkipWaiting: (applicant: EventOccurrenceApplicant) => void
+  waitlistBusy: boolean
 }) {
   const waitlistRows = data.applicants.filter((applicant) => applicant.source === 'waitlist')
   const waitingRows = waitlistRows.filter((applicant) => applicant.status === 'waiting')
@@ -179,16 +191,14 @@ function OccurrenceApplicantsPanel({
             type="button"
             onClick={onExportCsv}
             disabled={csvBusy}
-            className="text-accent text-xs font-medium hover:underline disabled:opacity-50"
+            className="text-action text-xs font-medium hover:underline disabled:opacity-50"
           >
             {csvBusy ? '書き出しています…' : 'CSVを書き出す'}
           </button>
           <Button
             onClick={onPromote}
             disabled={promoting || waitingCount === 0}
-            data-occurrence-action="promote-waitlist"
-          >
-            {promoting ? '案内を送信中…' : '次の方へ案内'}
+            data-occurrence-action="promote-waitlist" busy={promoting} busyLabel="案内を送信中…">次の方へ案内
           </Button>
         </div>
       </div>
@@ -216,7 +226,9 @@ function OccurrenceApplicantsPanel({
                         : '申込'}
                     </Td>
                     <Td>
-                      {STATUS_LABELS.get(applicant.status) ?? applicant.status}
+                      <StatusBadge tone={statusTone[applicant.status] ?? 'neutral'} size="compact">
+                        {STATUS_LABELS.get(applicant.status) ?? applicant.status}
+                      </StatusBadge>
                     </Td>
                     <Td className="text-xs">
                       {applicant.offerExpiresAt
@@ -224,12 +236,40 @@ function OccurrenceApplicantsPanel({
                         : applicant.status === 'waiting' ? '案内前' : '—'}
                     </Td>
                     <ActionCell>
-                      <Link
+                      {/* #641: 行操作は枠つきボタンにそろえる */}
+                      {applicant.source === 'waitlist' && applicant.status === 'waiting' && (
+                        <span className="mr-2 inline-flex items-center gap-1">
+                          <Button
+                            variant="secondary"
+                            onClick={() => onMoveWaiting(applicant.id, -1)}
+                            disabled={waitlistBusy || waitlistRank <= 1}
+                            aria-label={`${applicant.displayName ?? '待機中の方'}を1つ上へ`}
+                          >
+                            上へ
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onClick={() => onMoveWaiting(applicant.id, 1)}
+                            disabled={waitlistBusy || waitlistRank >= waitingRows.length}
+                            aria-label={`${applicant.displayName ?? '待機中の方'}を1つ下へ`}
+                          >
+                            下へ
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onClick={() => onSkipWaiting(applicant)}
+                            disabled={waitlistBusy}
+                          >
+                            見送る
+                          </Button>
+                        </span>
+                      )}
+                      <Button
                         href={`/chats?friend=${encodeURIComponent(applicant.friendId)}`}
-                        className="text-accent text-xs font-medium hover:underline"
+                        variant="secondary"
                       >
                         個別トーク
-                      </Link>
+                      </Button>
                     </ActionCell>
                   </Tr>
                 )
@@ -243,7 +283,7 @@ function OccurrenceApplicantsPanel({
         人は下の行で追う。記録の操作自体は下の予約一覧の既存ボタンで行う。
       */}
       <div className="border-hairline mt-4 border-t pt-3" data-idea29="attendance">
-        <h4 className="text-ink text-sm font-medium">当日の受付</h4>
+        <h4 className="text-ink text-sm font-semibold">当日の受付</h4>
         {attendance === null ? (
           <p className="text-ink-faint mt-1 text-xs">受付の記録はまだ取得できていません。</p>
         ) : (
@@ -263,7 +303,7 @@ function OccurrenceApplicantsPanel({
                     {attendance.entries.map((entry) => (
                       <Tr key={entry.id}>
                         <NameCell name={entry.displayName ?? '友だちは未取得'} sub={`${entry.partySize}人`} />
-                        <Td>{STATUS_LABELS.get(entry.status) ?? entry.status}</Td>
+                        <Td><StatusBadge tone={statusTone[entry.status] ?? 'neutral'} size="compact">{STATUS_LABELS.get(entry.status) ?? entry.status}</StatusBadge></Td>
                         <Td className="text-xs">{formatJp(entry.markedAt, '記録日時は未取得')}</Td>
                       </Tr>
                     ))}
@@ -280,7 +320,7 @@ function OccurrenceApplicantsPanel({
         案内中・待機中は上の一覧にいるので、ここでは結果が出た分を追う。
       */}
       <div className="border-hairline mt-4 border-t pt-3" data-idea29="waitlist-history">
-        <h4 className="text-ink text-sm font-medium">繰上げ・案内の履歴</h4>
+        <h4 className="text-ink text-sm font-semibold">繰上げ・案内の履歴</h4>
         {data.waitlistHistory === undefined ? (
           <p className="text-ink-faint mt-1 text-xs">履歴はまだ取得できていません。</p>
         ) : waitlistHistory.length === 0 ? (
@@ -297,7 +337,7 @@ function OccurrenceApplicantsPanel({
                 {waitlistHistory.map((entry) => (
                   <Tr key={entry.id}>
                     <NameCell name={entry.displayName ?? '友だちは未取得'} sub={`${entry.partySize}人`} />
-                    <Td>{WAITLIST_HISTORY_LABELS[entry.status] ?? STATUS_LABELS.get(entry.status) ?? entry.status}</Td>
+                    <Td><StatusBadge tone={statusTone[entry.status] ?? 'neutral'} size="compact">{WAITLIST_HISTORY_LABELS[entry.status] ?? STATUS_LABELS.get(entry.status) ?? entry.status}</StatusBadge></Td>
                     <Td className="text-xs">{formatJp(entry.createdAt, '—')}</Td>
                     <Td className="text-xs">
                       {entry.offeredAt ? formatJp(entry.offeredAt, '案内日時は未取得') : '案内なし'}
@@ -319,6 +359,9 @@ function BookingsInner() {
   const eventId = params.get('id')
   const { selectedAccountId, accounts } = useAccount()
   const [event, setEvent] = useState<EventDetail | null>(null)
+  // #841: 回答に質問文を付けるための定義。Workerは questions_json の
+  // 文字列で返すのでここでほぐす。未取得なら回答はid表記になる。
+  const eventQuestions = parseEventQuestions(event?.questions_json)
   const [items, setItems] = useState<EventBookingItem[]>([])
   const [bookingsTotal, setBookingsTotal] = useState(0)
   const [summary, setSummary] = useState<EventBookingSummary | null>(null)
@@ -328,10 +371,22 @@ function BookingsInner() {
   const [occurrenceStatus, setOccurrenceStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [promotingWaitlist, setPromotingWaitlist] = useState(false)
   const [occurrenceActionError, setOccurrenceActionError] = useState('')
+  /*
+   * U: 待ちの手動操作（繰上げ・順番の変更・飛ばし）の確認窓。
+   * 描画中の切替判定より前で持つ（後だと触る前に読んで落ちる）。
+   */
+  const [waitlistDialog, setWaitlistDialog] = useState<
+    | { kind: 'promote' }
+    | { kind: 'reorder'; orderedIds: string[]; description: string }
+    | { kind: 'skip'; waitlistId: string; name: string }
+    | null
+  >(null)
+  const [waitlistReason, setWaitlistReason] = useState('')
+  const [waitlistOpError, setWaitlistOpError] = useState('')
   /* TECH-03: 申込者CSVの書出し中。失敗は occurrenceActionError へ出す。 */
   const [csvBusy, setCsvBusy] = useState(false)
   const [broadcastMessage, setBroadcastMessage] = useState('')
-  const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number; scope: string } | null>(null)
+  const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number; scope: string; occurrenceId: string } | null>(null)
   const [broadcastBusy, setBroadcastBusy] = useState(false)
   const [broadcastConfirmOpen, setBroadcastConfirmOpen] = useState(false)
   const [broadcastError, setBroadcastError] = useState('')
@@ -375,6 +430,21 @@ function BookingsInner() {
   const occurrenceSlotsRequestRef = useRef(0)
   const occurrenceApplicantsRequestRef = useRef(0)
   const broadcastPreviewKeyRef = useRef<string | null>(null)
+  /*
+   * 対象確定の要求番号。押すたびに上げ、古い要求の成功・失敗・
+   * 後片付けには何も書かせない。開催回を戻すと scope と開催回IDが
+   * 同値に戻るため、この番号だけが新旧を見分ける。
+   */
+  const broadcastPreviewRequestRef = useRef(0)
+  /*
+   * 今選んでいる開催回。申込プレビューの遅い応答が、切り替え前の
+   * 開催回のものかを見分ける。描画のたびに写す（state は非同期の
+   *  closures では古いままになるため）。
+   */
+  const selectedOccurrenceIdRef = useRef(selectedOccurrenceId)
+  if (selectedOccurrenceIdRef.current !== selectedOccurrenceId) {
+    selectedOccurrenceIdRef.current = selectedOccurrenceId
+  }
 
   /*
    * **アカウント・イベントを切り替えたら、進行中の記録を失効させる。**
@@ -406,12 +476,32 @@ function BookingsInner() {
   if (occurrenceOperationScope !== scope) {
     setOccurrenceOperationScope(scope)
     setPromotingWaitlist(false)
+    setWaitlistDialog(null)
+    setWaitlistReason('')
+    setWaitlistOpError('')
     setOccurrenceActionError('')
     setBroadcastBusy(false)
     setBroadcastConfirmOpen(false)
     setBroadcastPreview(null)
     broadcastPreviewKeyRef.current = null
     setBroadcastMessage('')
+    setBroadcastError('')
+  }
+  /*
+   * **開催回を切り替えたら、前の開催回の下書きは捨てる。**
+   *
+   * 開催回1の対象確定を押したまま開催回2へ切り替えると、1の応答が
+   * 2の申込者の読み込みより後に返り、**2の画面に1の対象人数と確認
+   * ボタンが復活した。** そのまま進むと別日の申込者へ送りかねない。
+   * 描画のうちに捨てる（文面は残し、対象・確認・使い回し鍵だけ捨てる）。
+   */
+  const [broadcastOccurrenceScope, setBroadcastOccurrenceScope] = useState(selectedOccurrenceId)
+  if (broadcastOccurrenceScope !== selectedOccurrenceId) {
+    setBroadcastOccurrenceScope(selectedOccurrenceId)
+    setBroadcastBusy(false)
+    setBroadcastConfirmOpen(false)
+    setBroadcastPreview(null)
+    broadcastPreviewKeyRef.current = null
     setBroadcastError('')
   }
   /*
@@ -623,11 +713,13 @@ function BookingsInner() {
   if (!eventId) {
     /* #975 U070: イベント未指定は行き止まりにしない。一覧へ戻る入口を出す。 */
     return (
-      <div className="rounded-card border border-hairline bg-canvas p-5">
-        <p className="text-sm font-semibold text-ink">どのイベントの申込かが決まっていません</p>
-        <p className="mt-1 text-xs text-ink-faint">イベントの一覧から選び直してください。</p>
-        <Button href="/events" className="mt-3">イベント一覧へ戻る</Button>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="どのイベントの申込かが決まっていません"
+        description="イベントの一覧から選び直してください。"
+        backHref="/events"
+        backLabel="イベント一覧へ戻る"
+      />
     )
   }
 
@@ -780,23 +872,77 @@ function BookingsInner() {
     }
   }
 
-  async function promoteWaitlist() {
+  /*
+   * U: 待ちの手動操作（繰上げ・順番の変更・飛ばし）は理由が必須。
+   * 理由は変更の記録に残る。確認窓で聞いてから1回だけ送る。
+   */
+  function openWaitlistDialog(operation: NonNullable<typeof waitlistDialog>) {
+    setWaitlistReason('')
+    setWaitlistOpError('')
+    setWaitlistDialog(operation)
+  }
+
+  function moveWaiting(id: string, direction: -1 | 1) {
+    const applicants = occurrenceApplicants
+    if (!applicants || promotingWaitlist) return
+    const waiting = applicants.applicants.filter(
+      (applicant) => applicant.source === 'waitlist' && applicant.status === 'waiting',
+    )
+    const index = waiting.findIndex((applicant) => applicant.id === id)
+    const other = waiting[index + direction]
+    const current = waiting[index]
+    if (!current || !other) return
+    const orderedIds = waiting.map((applicant) => applicant.id)
+    const [moved] = orderedIds.splice(index, 1)
+    orderedIds.splice(index + direction, 0, moved as string)
+    const first = direction === -1 ? current : other
+    const second = direction === -1 ? other : current
+    openWaitlistDialog({
+      kind: 'reorder',
+      orderedIds,
+      description: `「${first.displayName ?? '待機中の方'}」と「${second.displayName ?? '待機中の方'}」の順番を入れ替えます。`,
+    })
+  }
+
+  async function runWaitlistOperation() {
     const accountId = selectedAccountId
     const occurrence = occurrenceApplicants?.occurrence
-    if (!accountId || !occurrence || promotingWaitlist) return
+    const operation = waitlistDialog
+    if (!accountId || !occurrence || !operation || promotingWaitlist) return
+    const trimmed = waitlistReason.trim()
+    if (trimmed === '') return
     const startedScope = scope
     setPromotingWaitlist(true)
+    setWaitlistOpError('')
     setOccurrenceActionError('')
     try {
-      await eventsApi.promoteOccurrenceWaitlist(accountId, occurrence.id, occurrence.version)
+      if (operation.kind === 'promote') {
+        await eventsApi.promoteOccurrenceWaitlist(accountId, occurrence.id, occurrence.version, trimmed)
+      } else if (operation.kind === 'reorder') {
+        await eventsApi.reorderOccurrenceWaitlist(accountId, occurrence.id, {
+          ordered_ids: operation.orderedIds,
+          expectedVersion: occurrence.version,
+          reason: trimmed,
+        })
+      } else {
+        await eventsApi.skipOccurrenceWaitlist(accountId, occurrence.id, {
+          waitlist_id: operation.waitlistId,
+          expectedVersion: occurrence.version,
+          reason: trimmed,
+        })
+      }
       if (scopeRef.current !== startedScope) return
       await refreshOccurrenceApplicants()
+      if (scopeRef.current === startedScope) {
+        setWaitlistDialog(null)
+        setWaitlistReason('')
+      }
     } catch {
       if (scopeRef.current !== startedScope) return
       /* 409を含め、再読込して最新の順位・期限を先に見せる。 */
       await refreshOccurrenceApplicants()
       if (scopeRef.current === startedScope) {
-        setOccurrenceActionError('案内を更新できませんでした。ほかの操作で順番や空席が変わった可能性があります。最新の状態を読み直してから、もう一度お試しください。')
+        setWaitlistOpError('変えられませんでした。ほかの操作で順番や空席が変わった可能性があります。最新の状態を確かめてから、もう一度お試しください。')
       }
     } finally {
       if (scopeRef.current === startedScope) setPromotingWaitlist(false)
@@ -809,6 +955,9 @@ function BookingsInner() {
     const message = broadcastMessage.trim()
     if (!accountId || !occurrence || !message || broadcastBusy) return
     const startedScope = scope
+    const startedOccurrenceId = occurrence.id
+    const startedRequest = broadcastPreviewRequestRef.current + 1
+    broadcastPreviewRequestRef.current = startedRequest
     setBroadcastBusy(true)
     setBroadcastError('')
     try {
@@ -820,17 +969,26 @@ function BookingsInner() {
         snapshotId: occurrenceApplicants.snapshotId,
       }, idempotencyKey)
       if (scopeRef.current !== startedScope) return
-      setBroadcastPreview({ ...result, scope: startedScope })
+      /* 古い要求の成功は書かせない。戻って同値でも番号で見分ける。 */
+      if (broadcastPreviewRequestRef.current !== startedRequest) return
+      /* 開催回が切り替わっていたら、前の開催回の下書きは捨てる。 */
+      if (selectedOccurrenceIdRef.current !== startedOccurrenceId) return
+      setBroadcastPreview({ ...result, scope: startedScope, occurrenceId: startedOccurrenceId })
     } catch {
       if (scopeRef.current !== startedScope) return
+      if (broadcastPreviewRequestRef.current !== startedRequest) return
+      if (selectedOccurrenceIdRef.current !== startedOccurrenceId) return
       setBroadcastError('対象を確定できませんでした。内容を確認して、もう一度お試しください。')
     } finally {
-      if (scopeRef.current === startedScope) setBroadcastBusy(false)
+      if (scopeRef.current !== startedScope) return
+      /* 古い要求の後片付けで、新しい要求の操作中表示を消さない。 */
+      if (broadcastPreviewRequestRef.current !== startedRequest) return
+      setBroadcastBusy(false)
     }
   }
 
   async function sendOccurrenceBroadcast() {
-    if (!broadcastPreview || broadcastPreview.scope !== scope || broadcastBusy) return
+    if (!broadcastPreview || broadcastPreview.scope !== scope || broadcastPreview.occurrenceId !== selectedOccurrenceId || broadcastBusy) return
     const startedScope = scope
     setBroadcastBusy(true)
     setBroadcastError('')
@@ -871,11 +1029,14 @@ function BookingsInner() {
   const currentPage = Math.min(page, pageCount)
   const selectedAccountRole = accounts.find((account) => account.id === selectedAccountId)?.role
   const canManageApplicantBroadcast = selectedAccountRole === 'owner' || selectedAccountRole === 'admin'
-  const activeBroadcastPreview = broadcastPreview?.scope === scope ? broadcastPreview : null
+  const activeBroadcastPreview = broadcastPreview?.scope === scope && broadcastPreview.occurrenceId === selectedOccurrenceId
+    ? broadcastPreview
+    : null
 
   return (
-    <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav data-design="Crumb" className="text-ink-faint text-xs">
         <Link href="/events" className="hover:underline">
           イベント予約
         </Link>
@@ -887,7 +1048,7 @@ function BookingsInner() {
         <span>予約者</span>
       </nav>
 
-      <div data-design="Head" className="mb-4">
+      <div data-design="Head">
         <h2 className="text-ink text-lg font-semibold">イベントの予約者</h2>
         <p className="text-ink-faint mt-1 text-sm">
           申込の確認・承認・キャンセルを行います。承認制のイベントは、承認するまで確定しません。
@@ -895,7 +1056,7 @@ function BookingsInner() {
         </p>
       </div>
 
-      <div data-design="Sel" className="bg-canvas rounded-card border-hairline mb-4 border p-3">
+      <div data-design="Sel" className="bg-canvas rounded-card border-hairline border p-3">
         <span className="text-ink-faint mr-2 text-xs">イベント</span>
         {/*
           **読めなかったのを「読み込み中」と言わない。** いつまでも
@@ -904,7 +1065,7 @@ function BookingsInner() {
         <span className="text-ink text-sm font-medium">
           {event?.name ?? (loadStatus === 'error' ? 'イベント名を取得できませんでした' : '読み込み中…')}
         </span>
-        <Link href="/events" className="text-accent ml-3 text-xs hover:underline">
+        <Link href="/events" className="text-action ml-3 text-xs hover:underline">
           ほかのイベントを選ぶ
         </Link>
       </div>
@@ -914,11 +1075,11 @@ function BookingsInner() {
         「対応するものが無い」と読める。取れていないだけなら、
         待たせている人を見落とす。
       */}
-      <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <EventKpi
           title="申込"
-          value={dataReady ? String(applied) : '—'}
-          unit={dataReady ? '人' : ''}
+          value={dataReady ? applied : null}
+          unit="人"
           detail={!dataReady
             ? '取得できませんでした'
             : /*
@@ -935,8 +1096,8 @@ function BookingsInner() {
         */}
         <EventKpi
           title="承認待ち"
-          value={dataReady ? String(pending) : '—'}
-          unit={dataReady ? '件' : ''}
+          value={dataReady ? pending : null}
+          unit="件"
           detail={dataReady
             ? pending > 0 ? `対応が必要：${pending}件を確認してください` : '確認待ちはありません'
             : '取得できませんでした'}
@@ -945,8 +1106,8 @@ function BookingsInner() {
             行が無いときは設定だけを示し、人数を推測しない。 */}
         <EventKpi
           title="キャンセル待ち"
-          value={dataReady ? String(waitlistPeople) : '—'}
-          unit={dataReady ? '人' : ''}
+          value={dataReady ? waitlistPeople : null}
+          unit="人"
           /*
             **読めていない設定を言い切らない。** `event` が取れていないと
             `waitlist_enabled` は undefined で、前は必ず「受け付けない設定です」
@@ -963,15 +1124,15 @@ function BookingsInner() {
         />
         <EventKpi
           title="キャンセル"
-          value={dataReady ? String(cancelled) : '—'}
-          unit={dataReady ? '件' : ''}
+          value={dataReady ? cancelled : null}
+          unit="件"
           detail={dataReady
             ? cancelled > 0 ? '空いた枠を確認してください' : 'キャンセルはありません'
             : '取得できませんでした'}
         />
       </div>
 
-      <section className="bg-canvas rounded-card border-hairline mb-4 border p-4" aria-labelledby="occurrence-applicants-title">
+      <section className="bg-canvas rounded-card border-hairline border p-4" aria-labelledby="occurrence-applicants-title">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h3 id="occurrence-applicants-title" className="text-ink font-semibold">開催回ごとの申込者とキャンセル待ち</h3>
@@ -980,10 +1141,10 @@ function BookingsInner() {
           {occurrenceSlots.length > 0 && (
             <label className="text-ink-secondary grid gap-1 text-xs font-medium">
               開催回
-              <SelectField
+              <Select
                 aria-label="開催回を選ぶ"
                 value={selectedOccurrenceId}
-                onChange={(event) => setSelectedOccurrenceId(event.target.value)}
+                onChange={(value) => setSelectedOccurrenceId(value)}
                 options={occurrenceSlots.map((slot) => ({ value: slot.id, label: formatJp(slot.starts_at, '日時未取得') }))}
               />
             </label>
@@ -1006,14 +1167,21 @@ function BookingsInner() {
               data={occurrenceApplicants}
               promoting={promotingWaitlist}
               error={occurrenceActionError}
-              onPromote={() => void promoteWaitlist()}
+              onPromote={() => openWaitlistDialog({ kind: 'promote' })}
               onExportCsv={() => void exportApplicantsCsv()}
               csvBusy={csvBusy}
+              onMoveWaiting={moveWaiting}
+              onSkipWaiting={(applicant) => openWaitlistDialog({
+                kind: 'skip',
+                waitlistId: applicant.id,
+                name: applicant.displayName ?? '待機中の方',
+              })}
+              waitlistBusy={promotingWaitlist}
             />
             {canManageApplicantBroadcast && (
               <>
                 <div className="border-hairline mt-4 border-t pt-4">
-                  <h4 className="text-ink font-medium">この開催回の申込者へ一斉送信</h4>
+                  <h4 className="text-ink font-semibold">この開催回の申込者へ一斉送信</h4>
                   <p className="text-ink-faint mt-1 text-xs">対象はこの確認時点の申込者で固定します。確認後の申込・取消・タグ変更では宛先を入れ替えません。</p>
                   <textarea
                     value={broadcastMessage}
@@ -1030,8 +1198,7 @@ function BookingsInner() {
                     className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm"
                   />
                   <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''}>
-                      {broadcastBusy ? '対象を確定中…' : '対象と内容を確認'}
+                    <Button onClick={() => void previewOccurrenceBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="対象を確定中…">対象と内容を確認
                     </Button>
                     {activeBroadcastPreview && <span className="text-ink-secondary text-sm">送信対象 {activeBroadcastPreview.recipientCount}人</span>}
                     {activeBroadcastPreview && <Button onClick={() => setBroadcastConfirmOpen(true)} disabled={broadcastBusy}>送信前の最終確認へ</Button>}
@@ -1042,8 +1209,8 @@ function BookingsInner() {
                   open={broadcastConfirmOpen && activeBroadcastPreview !== null}
                   title="この申込者へ送信を開始しますか？"
                   description={`確認済みの ${activeBroadcastPreview?.recipientCount ?? 0} 人へ送信します。送信開始後は取り消せません。`}
-                  confirmLabel="送信を開始"
-                  cancelLabel="戻る"
+                  confirmLabel="送る"
+                  cancelLabel="キャンセル"
                   busy={broadcastBusy}
                   error={broadcastError}
                   onConfirm={() => void sendOccurrenceBroadcast()}
@@ -1061,28 +1228,22 @@ function BookingsInner() {
           どの予約に対して失敗したのかが分からなくなる。
         */}
         {actionError && (
-          <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-3 text-sm">
-            {actionError}
-          </div>
+          <Notice tone="danger" message={actionError} onClose={() => setActionError(null)} className="mb-4" />
         )}
 
         <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-          <div className="border-hairline flex overflow-x-auto border-b">
+          <div className="border-hairline flex flex-wrap gap-2 border-b px-4 py-3">
             {STATUS_TABS.map((t) => (
-              <button
+              <FilterChip
                 key={t.key}
-                onClick={() => {
+                selected={tab === t.key}
+                onChange={() => {
                   setPage(1)
                   setTab(t.key)
                 }}
-                className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                  tab === t.key
-                    ? 'border-accent text-accent bg-accent-soft'
-                    : 'text-ink-secondary hover:bg-canvas-sunken border-transparent'
-                }`}
               >
                 {t.label}
-              </button>
+              </FilterChip>
             ))}
           </div>
 
@@ -1113,7 +1274,7 @@ function BookingsInner() {
                     <th className="px-4 py-2 text-left font-medium">予約枠</th>
                     <th className="px-4 py-2 text-left font-medium">連れてくるペット</th>
                     <th className="px-4 py-2 text-left font-medium">この方について</th>
-                    <th className="px-4 py-2 text-right font-medium">状態と操作</th>
+                    <th className="px-4 py-2 font-medium text-right">状態と操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1135,6 +1296,34 @@ function BookingsInner() {
                       <td className="text-ink px-4 py-3">
                         <span className="block font-medium">{friendName ?? '友だちは未取得'}</span>
                         <span className="text-ink-faint mt-0.5 block text-xs">{accountLabel}</span>
+                        {/* #841: 申込時の質問への回答。質問文はイベントの
+                            定義から引き、消えた質問はidのまま出す。 */}
+                        {(() => {
+                          const raw = b.answer_snapshot_json
+                          if (!raw) return null
+                          let map: Record<string, unknown>
+                          try { map = JSON.parse(raw) } catch { return null }
+                          const entries = Object.entries(map)
+                          if (entries.length === 0) return null
+                          const labelOf = new Map(
+                            (eventQuestions ?? []).map((q) => [q.id, q.label]),
+                          )
+                          return (
+                            <dl className="text-ink-faint mt-1 space-y-0.5 text-xs">
+                              {entries.map(([qid, ans]) => (
+                                <div key={qid}>
+                                  <dt className="inline font-medium">{labelOf.get(qid) ?? qid}：</dt>
+                                  <dd className="inline">
+                                    {Array.isArray(ans) ? ans.join('、') : String(ans)}
+                                  </dd>
+                                </div>
+                              ))}
+                            </dl>
+                          )
+                        })()}
+                        {b.customer_note ? (
+                          <p className="text-ink-faint mt-1 text-xs">備考：{b.customer_note}</p>
+                        ) : null}
                       </td>
                       <td className="text-ink-secondary px-4 py-3 text-xs">
                         {formatJp(b.requested_at ?? b.created_at, '受付日時は未取得')}
@@ -1167,19 +1356,19 @@ function BookingsInner() {
                           : b.is_first_time === 1 ? 'はじめての方です' : '来店履歴があります'}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className={`rounded-pill px-2 py-0.5 text-xs font-medium ${statusBadge[b.status] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                        <StatusBadge tone={statusTone[b.status] ?? 'neutral'}>
                           {STATUS_LABELS.get(b.status) ?? '状態は未取得'}
-                        </span>
+                        </StatusBadge>
                         {b.status === 'requested' && (
-                          <div className="ml-2 inline-flex gap-1.5">
-                            <button
+                          <div className="ml-2 inline-flex items-center gap-1.5">
+                            <Button
                               onClick={() => decide(b.id, 'confirm')}
                               disabled={busy}
-                              className="bg-success text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
                               承認
-                            </button>
+                            </Button>
                             <button
+                              type="button"
                               data-qa-open="i5SN2j-reject"
                               onClick={() => {
                                 setRejectReason('')
@@ -1187,7 +1376,7 @@ function BookingsInner() {
                                 setRejectTarget(b)
                               }}
                               disabled={busy}
-                              className="bg-ink-secondary text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
+                              className="rounded-control px-2 py-1 text-xs font-semibold text-danger hover:underline disabled:opacity-50"
                             >
                               拒否
                             </button>
@@ -1195,36 +1384,19 @@ function BookingsInner() {
                         )}
                         {b.status === 'confirmed' && (
                           <div className="ml-2 inline-flex gap-1.5">
-                            <button
-                              data-booking-id={b.id}
-                              data-booking-action="attended"
-                              onClick={() => markStatus(b.id, 'attended')}
-                              disabled={busy || marking}
-                              className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
-                            >
+                            <Button variant="primary" className="px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50 border-0 h-auto whitespace-normal" data-booking-id={b.id} data-booking-action="attended" onClick={() => markStatus(b.id, 'attended')} disabled={busy || marking}>
                               {marking ? '記録中…' : '参加済'}
-                            </button>
-                            <button
-                              data-booking-id={b.id}
-                              data-booking-action="no_show"
-                              onClick={() => markStatus(b.id, 'no_show')}
-                              disabled={busy || marking}
-                              className="bg-danger text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
-                            >
+                            </Button>
+                            <Button variant="danger" className="px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50 border-0 h-auto whitespace-normal" data-booking-id={b.id} data-booking-action="no_show" onClick={() => markStatus(b.id, 'no_show')} disabled={busy || marking}>
                               {marking ? '記録中…' : '無断'}
-                            </button>
-                            <button
-                              data-qa-open="i5SN2j-cancel"
-                              onClick={() => {
+                            </Button>
+                            <Button variant="secondary" className="hover:bg-canvas px-3 py-1 text-xs font-medium disabled:opacity-50 h-auto whitespace-normal" data-qa-open="i5SN2j-cancel" onClick={() => {
                                 if (!selectedAccountId) return
                                 setCancelError('')
                                 setCancelTarget({ booking: b, accountId: selectedAccountId })
-                              }}
-                              disabled={busy}
-                              className="border-hairline rounded-control hover:bg-canvas border px-3 py-1 text-xs font-medium disabled:opacity-50"
-                            >
+                              }} disabled={busy}>
                               キャンセル
-                            </button>
+                            </Button>
                             {markErrors[actionKey] && (
                               <span className="text-danger block max-w-64 text-left text-xs" role="alert">
                                 {markErrors[actionKey]}
@@ -1254,7 +1426,7 @@ function BookingsInner() {
         title="この予約を運営側でキャンセルしますか？"
         description="予約は「キャンセル」になり、枠が空きます。友だちにはLINEでキャンセルのお知らせが届きます。送ったお知らせは取り消せません。この画面から元の「確定」に戻すことはできません。"
         confirmLabel="キャンセルにする"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         /* 通知が飛び、この画面からは戻せない。だから赤にする。 */
         destructive
         busy={cancelling}
@@ -1286,11 +1458,66 @@ function BookingsInner() {
       </ConfirmDialog>
 
       <ConfirmDialog
+        open={waitlistDialog !== null}
+        title={
+          waitlistDialog?.kind === 'promote'
+            ? '次の方へ案内しますか？'
+            : waitlistDialog?.kind === 'reorder'
+              ? '待ち順を変えますか？'
+              : '今回は見送りますか？'
+        }
+        description={
+          waitlistDialog?.kind === 'promote'
+            ? '先頭の方へ期限付きの案内を送ります。期限までに返事がなければ次の方へ進みます。'
+            : waitlistDialog?.kind === 'reorder'
+              ? waitlistDialog.description
+              : `「${waitlistDialog?.kind === 'skip' ? waitlistDialog.name : ''}」を最後尾へ回します。行は消さず、次回の案内では後回しになります。`
+        }
+        confirmLabel={
+          waitlistDialog?.kind === 'promote'
+            ? '案内する'
+            : waitlistDialog?.kind === 'reorder'
+              ? '順番を変える'
+              : '見送る'
+        }
+        cancelLabel="キャンセル"
+        busy={promotingWaitlist}
+        error={waitlistOpError}
+        /* 理由が必須。空のまま送らせない（確認ボタンを出さない）。 */
+        onConfirm={waitlistReason.trim() === '' ? undefined : () => void runWaitlistOperation()}
+        onCancel={() => {
+          if (promotingWaitlist) return
+          setWaitlistDialog(null)
+          setWaitlistReason('')
+          setWaitlistOpError('')
+        }}
+      >
+        {waitlistDialog && (
+          <div className="text-ink-secondary space-y-2 text-sm">
+            <label className="block">
+              <span className="text-ink-faint text-xs">理由（必須）</span>
+              <textarea
+                value={waitlistReason}
+                onChange={(event) => setWaitlistReason(event.target.value)}
+                rows={2}
+                placeholder="例：空きが出たため順番どおり案内します"
+                aria-label="操作の理由"
+                className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
+              />
+            </label>
+            <p className="text-ink-faint text-xs">
+              この理由は変更の記録に残ります。友だちには送りません。
+            </p>
+          </div>
+        )}
+      </ConfirmDialog>
+
+      <ConfirmDialog
         open={rejectTarget !== null}
         title="この申し込みを断りますか？"
         description="予約は「拒否」になり、枠が空きます。友だちにはLINEで断りのお知らせが届きます。送ったお知らせは取り消せません。"
         confirmLabel="申し込みを断る"
-        cancelLabel="やめる"
+        cancelLabel="キャンセル"
         /* 通知が飛び、この画面からは戻せない。だから赤にする。 */
         destructive
         busy={busy}

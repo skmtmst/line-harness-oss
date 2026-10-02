@@ -110,8 +110,8 @@ function createDb(data: Fixture): unknown {
   const run = (sql: string, binds: unknown[]): Row[] => {
     const text = sql.replace(/\s+/g, ' ').trim()
     if (text.includes('FROM line_accounts')) return data.lineAccounts
-    if (text.includes('FROM staff_members WHERE id = ?')) {
-      return data.staffMembers.filter((row) => row.id === binds[0])
+    if (text.includes('FROM staff_members sm') && text.includes('WHERE sm.id = ?')) {
+      return data.staffMembers.filter((row) => row.id === binds.at(-1))
     }
     if (text.includes('FROM staff_account_scopes')) {
       return data.staffAccountScopes.filter((row) => row.staff_id === binds[0])

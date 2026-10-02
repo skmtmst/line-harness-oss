@@ -6,6 +6,9 @@ import type { ReminderDraftSettings, ReminderDraftStep, ReminderDraftVersion, Re
 import { ApiError, api } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
+import TargetMissing from '@/components/shared/target-missing'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
@@ -21,18 +24,18 @@ import {
   SummaryCard,
 } from '@/components/reminders/reminder-v6-ui'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { firstReminderStepMessage, reminderPlaceholders } from '@/components/reminders/reminder-labels'
+import InsertToolbar from '@/components/scenarios/insert-toolbar'
+import { firstReminderStepMessage, reminderPlaceholders, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import { useReminderTestSend } from '@/components/reminders/use-reminder-test-send'
 import { TestRecipientGuidance, testRecipientDestinationLabel, testRecipientNote, testSendConfirmDescription } from '@/components/reminders/test-recipient-guidance'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 function formatTestedAt(value: string | null): string {
   if (!value) return 'テスト記録なし'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return 'テスト記録なし'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  }).format(date)
+  return formatDateTime(date)
 }
 
 /** カードに出す「いつ届くか」。保存済みの offsetDays/sendAtTime から組み立てる。 */
@@ -54,11 +57,23 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
   const [settings, setSettings] = useState<ReminderDraftSettings | null>(null)
   const [savedSettings, setSavedSettings] = useState<ReminderDraftSettings | null>(null)
   const [versionId, setVersionId] = useState<string | null>(null)
+  /*
+   * R148 監査：開いたときの版時刻。通常保存は版IDを付け替えないため、
+   * 版IDだけでは別の画面の先勝ちを見逃す。保存のたびに変わるこの時刻も
+   * 送り、ずれていれば 409 で止める。
+   */
+  const [versionUpdatedAt, setVersionUpdatedAt] = useState<string | null>(null)
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null)
+  // 差し込みをカーソルの位置に入れるために、本文の入力欄そのものを渡す。
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
   const [validation, setValidation] = useState<ReminderValidationResult | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // 捕まえた取得失敗そのもの。TargetMissingのerrorへ渡す（403は再試行なし）。
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [conflict, setConflict] = useState(false)
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [draftMissing, setDraftMissing] = useState(false)
   /*
    * 読み込み・保存の応答は順不同で返る。世代番号で最新の要求だけを
    * 状態へ反映し、遅れた応答が新しい編集を上書きしないようにする。
@@ -71,6 +86,10 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
 
   const loadDraft = useCallback(async () => {
     const seq = ++requestSeq.current
+    setDraftMissing(false)
+    // 再試行・成功で古い失敗文を残さない（staleな赤字の消し忘れ防止）。
+    setError('')
+    setLoadError(null)
     try {
       const response = await api.reminders.getDraft(reminderId)
       if (seq !== requestSeq.current) return
@@ -78,13 +97,23 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
       setSettings(response.data.settings)
       setSavedSettings(response.data.settings)
       setVersionId(response.data.versionId)
+      setVersionUpdatedAt(response.data.updatedAt)
       setConflict(false)
       setSelectedStepId((current) => current
         && response.data.settings.steps.some((step) => step.stableStepId === current)
         ? current
         : response.data.settings.steps[0]?.stableStepId ?? null)
-    } catch {
-      if (seq === requestSeq.current) setError('リマインダを読み込めませんでした。')
+      // 成功したら失敗文は消す（直前の失敗が残らないように）。
+      setError('')
+      setLoadError(null)
+    } catch (caught) {
+      if (seq !== requestSeq.current) return
+      if (caught instanceof ApiError && caught.status === 404) {
+        setDraftMissing(true)
+      } else {
+        setLoadError(caught)
+        setError('リマインダを読み込めませんでした。')
+      }
     }
   }, [reminderId])
 
@@ -139,7 +168,35 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
     })
   }, [])
 
-  if (!settings) return <p className={error ? 'text-danger p-6 text-sm' : 'text-ink-faint p-6 text-sm'}>{error || '読み込んでいます'}</p>
+  if (!settings && (draftMissing || !error)) {
+    if (!error && !draftMissing) return <p className="text-ink-faint p-6 text-sm">読み込んでいます</p>
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このリマインダは見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/reminders"
+        backLabel="リマインダ一覧へ戻る"
+      />
+    )
+  }
+  /*
+   * D015: 403・429だけ共通文へ切り替える（権限・混雑の案内。再試行の
+   * 有無は `loadFailureCopy` が決める）。それ以外は画面の文のまま。
+   */
+  const reminderFailure = loadError ? loadFailureCopy(loadError, 'リマインダ') : null
+  const useCommonCopy = loadError ? isForbiddenOrRateLimited(loadError) : false
+  if (!settings) {
+    return (
+      <TargetMissing
+        kind="error"
+        title={useCommonCopy && reminderFailure ? reminderFailure.title : 'リマインダを読み込めませんでした'}
+        description={useCommonCopy && reminderFailure ? reminderFailure.description : '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
+        error={loadError ?? undefined}
+        onRetry={() => void loadDraft()}
+      />
+    )
+  }
 
   const selectedIndex = settings.steps.findIndex((step) => step.stableStepId === selectedStepId)
   /*
@@ -160,7 +217,9 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
       const response = await api.reminders.saveDraft(
         reminderId,
         settings,
-        versionId ? { expectedVersionId: versionId } : {},
+        // R148 監査：版IDに加え、開いたときの版時刻も送る。別の画面が先に
+        // 保存していたら 409 になり、古い内容で上書きしない。
+        versionId ? { expectedVersionId: versionId, ...(versionUpdatedAt ? { expectedUpdatedAt: versionUpdatedAt } : {}) } : {},
       )
       if (seq !== requestSeq.current) return
       if (!response.success) throw new Error(response.error)
@@ -168,6 +227,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
       setSettings(response.data.settings)
       setSavedSettings(response.data.settings)
       setVersionId(response.data.versionId)
+      setVersionUpdatedAt(response.data.updatedAt)
       router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=preview`)
     } catch (saveError) {
       if (seq !== requestSeq.current) return
@@ -185,17 +245,17 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
   return <div data-design-node="J64xI" className="grid gap-3">
     <ReminderWizard current={3} />
     <ReminderWorkspace aside={<div data-issue546-aside className="grid gap-3">
-      <SummaryCard rows={[["対象者", validation?.audience.matched == null ? '検査後に表示' : `${validation.audience.matched.toLocaleString('ja-JP')}人`], ['基準日', '予約日時（Google Meet相談）'], ['通知ステップ', `${settings.steps.length}件`], ['状態', dirty ? '未保存の変更あり' : '下書き']]} />
-      <LinePreview caption={selectedStep ? `表示例：${stepTimingLabel(selectedStep, settings.deliveryMode)} に届きます` : '通知はまだありません'} empty={!selectedStep}>{selectedStep ? selectedStep.messageContent || '本文を入力すると、ここに表示例が出ます。' : '「通知を追加」で1通目を作成してください。'}</LinePreview>
+      <SummaryCard rows={[["対象者", validation?.audience.matched == null ? '検査後に表示' : `${formatNumber(validation.audience.matched)}人`], ['基準日', '予約日時（Google Meet相談）'], ['通知ステップ', `${settings.steps.length}件`], ['状態', dirty ? '未保存の変更あり' : '下書き']]} />
+      <LinePreview caption={selectedStep ? `表示例：${stepTimingLabel(selectedStep, settings.deliveryMode)} に届きます` : '通知はまだありません'} empty={!selectedStep}>{selectedStep ? selectedStep.messageContent ? renderReminderBodySample(selectedStep.messageContent) : '本文を入力すると、ここに表示例が出ます。' : '「通知を追加」で1通目を作成してください。'}</LinePreview>
     </div>}>
       <ReminderPanel title="通知ステップ" note="基準日を軸に、何回・いつ送るかを並べます。上から順に届きます。">
-        {settings.steps.length === 0 ? <p className="text-ink-faint rounded-lg border border-hairline p-3 text-xs">通知はまだありません。「通知を追加」で1通目を作成してください。本文が入るまで次へは進めません。</p> : null}
+        {settings.steps.length === 0 ? <p className="text-ink-faint rounded-control border border-hairline p-3 text-xs">通知はまだありません。「通知を追加」で1通目を作成してください。本文が入るまで次へは進めません。</p> : null}
         <div className="grid min-h-28 gap-2 md:grid-cols-3">{settings.steps.map((step, index) => <ReminderStepCard key={step.stableStepId} selected={step.stableStepId === selectedStep?.stableStepId} number={index + 1} timing={stepTimingLabel(step, settings.deliveryMode)} title={`${index + 1}通目のお知らせ`} note={step.messageContent} onClick={() => setSelectedStepId(step.stableStepId)} />)}</div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Button onClick={addStep} disabled={settings.steps.length >= 50}>通知を追加</Button>
+          <Button onClick={addStep} disabled={settings.steps.length >= 50}>通知を追加する</Button>
           <Button onClick={() => { if (selectedStep) moveStep(selectedStep.stableStepId, -1) }} disabled={!selectedStep || selectedIndex <= 0}>前へ移動</Button>
           <Button onClick={() => { if (selectedStep) moveStep(selectedStep.stableStepId, 1) }} disabled={!selectedStep || selectedIndex < 0 || selectedIndex >= settings.steps.length - 1}>後ろへ移動</Button>
-          <Button onClick={() => { if (selectedStep) removeStep(selectedStep.stableStepId) }} disabled={settings.steps.length <= 1}>この通知を削除</Button>
+          <Button onClick={() => { if (selectedStep) removeStep(selectedStep.stableStepId) }} disabled={settings.steps.length <= 1}>この通知を削除する</Button>
         </div>
       </ReminderPanel>
       {selectedStep ? <ReminderPanel title={`${selectedIndex + 1 || 1}通目のお知らせ`} note="送るタイミングと文面を決めます。">
@@ -212,21 +272,35 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
                 const daysBefore = Number(event.target.value)
                 if (Number.isInteger(daysBefore)) updateStep(selectedStep.stableStepId, { offsetDays: -daysBefore })
               }} /></Field>
-              <Field label="送信時刻"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.sendAtTime ?? ''} placeholder="HH:MM" onChange={(event) => updateStep(selectedStep.stableStepId, { sendAtTime: event.target.value || null })} /></Field>
+              <Field label="送信時刻"><TextInput className="border-hairline rounded-control focus:ring-accent min-w-24 border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.sendAtTime ?? ''} placeholder="HH:MM" onChange={(event) => updateStep(selectedStep.stableStepId, { sendAtTime: event.target.value || null })} /></Field>
             </>)}
           </div>
-          <div className="flex flex-wrap gap-2"><Pill tone="success">名前</Pill><Pill>友だち情報</Pill><Pill>共通情報</Pill><Pill>回答フォーム</Pill><Pill>配信日</Pill><Pill>その他</Pill></div>
-          <Field label="本文" required note={`${selectedStep.messageContent.length} / 5,000文字`}><TextArea rows={3} className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.messageContent} onChange={(event) => updateStep(selectedStep.stableStepId, { messageContent: event.target.value })} /></Field>
+          <InsertToolbar
+            targetRef={bodyRef}
+            value={selectedStep.messageContent}
+            onChange={(next) => updateStep(selectedStep.stableStepId, { messageContent: next.slice(0, 5000) })}
+          />
+          <Field label="本文" required note={`${selectedStep.messageContent.length} / 5,000文字`}><TextArea ref={bodyRef} rows={3} className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.messageContent} onChange={(event) => updateStep(selectedStep.stableStepId, { messageContent: event.target.value })} /></Field>
+          {/\{\{[^}]+\}\}/.test(selectedStep.messageContent)
+            ? <p className="text-ink-secondary text-xs">見本：{renderReminderBodySample(selectedStep.messageContent)}</p>
+            : null}
         </div>
       </ReminderPanel> : null}
-      <ReminderPanel title="URLの扱い" note="短縮するとクリック数を計測できます。Meetの参加URLは短縮しない設定です。"><div className="flex items-center justify-between rounded-lg border border-hairline p-3 text-xs"><span>Google Meet 参加URL　<Pill>参加URL（差し込み）</Pill></span><strong>短縮しない</strong></div></ReminderPanel>
+      <ReminderPanel title="URLの扱い" note="短縮するとクリック数を計測できます。Meetの参加URLは短縮しない設定です。"><div className="flex items-center justify-between rounded-control border border-hairline p-3 text-xs"><span>Google Meet 参加URL　<Pill>参加URL（差し込み）</Pill></span><strong>短縮しない</strong></div></ReminderPanel>
       {error ? <p className="text-danger text-xs">{error}{conflict ? <button type="button" className="ml-2 underline" onClick={() => void loadDraft()}>最新を読み込み直す</button> : null}</p> : null}
     </ReminderWorkspace>
     <div className="mt-16"><ReminderFooter primary={saving ? '保存中…' : '送信設定へ'} primaryDisabled={saving || !allStepsHaveContent} onPrimary={() => void save()} /></div>
-    <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、通知ステップへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    <UnsavedLeaveDialog open={leaveTarget !== null} subject="通知ステップへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     <style jsx global>{`
-      [data-design-node='J64xI'] > div:nth-of-type(2) {
-        grid-template-columns: minmax(0, 1fr) 390px;
+      /*
+       * R17: 右390px固定は広い幅だけ。中くらいの幅では LINE のプレビューを
+       * 下へ送り、入力欄を細くしない。共通ワークスペースの 1100px 切り替え
+       * (reminder-v6-ui.module.css) と同じ境目にする。
+       */
+      @media(min-width: 1101px) {
+        [data-design-node='J64xI'] > div:nth-of-type(2) {
+          grid-template-columns: minmax(0, 1fr) 390px;
+        }
       }
       [data-issue546-aside] > section:first-child {
         min-height: 299px;
@@ -316,7 +390,7 @@ export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }
     <ReminderWorkspace aside={<div className="grid gap-3">
       <SummaryCard rows={[["本番への影響", 'なし'], ['送信数', '1通'], ['送信先', recipient], ['送信方法', 'LINE公式']]} />
       <LinePreview caption="テスト送信される1通目の内容">{firstReminderStepMessage(subjectDraft.settings) || '本文がありません'}</LinePreview>
-      <div className="grid grid-cols-2 gap-2"><Button onClick={openConfirm} disabled={sendBusy}>テスト送信</Button></div>
+      <div className="grid grid-cols-2 gap-2"><Button onClick={openConfirm} disabled={sendBusy}>テストを送る</Button></div>
     </div>}>
       <ReminderPanel title="テスト対象" note={testRecipientNote(testRecipient.view, sentKind)}><dl className="grid min-h-24 grid-cols-2 gap-4 text-xs"><Metric label="送信先" value={recipient} /><Metric label="最終テスト日時" value={testedAt} /></dl><TestRecipientGuidance view={testRecipient.view} accountId={subjectDraft.settings.lineAccountId} onRecheck={() => void testRecipient.reload()} /></ReminderPanel>
       <ReminderPanel title="差し込み値の確認" note="本文に書いた差し込みだけを並べ、どこから取るかを確認します。">{reminderPlaceholders(subjectDraft.settings, sentTo).length === 0 ? <p className="text-ink-faint px-3 py-3 text-xs">本文に差し込み値はありません。</p> : <table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody className="border-hairline border-t">{reminderPlaceholders(subjectDraft.settings, sentTo).map((placeholder) => <tr key={placeholder.token} className="border-hairline border-t"><td className="px-3 py-3"><code>{placeholder.token}</code></td><td className="px-3 py-3">{placeholder.testValue}</td><td className="px-3 py-3">{placeholder.source}</td></tr>)}</tbody></table>}</ReminderPanel>
@@ -324,11 +398,11 @@ export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }
       {/* 送信の失敗・結果不明は一つの状態で持つ。窓が閉じているときだけ背面に出す。 */}
       {sendIssue && !confirmOpen ? <p className="text-danger text-xs">{sendIssue}</p> : null}
     </ReminderWorkspace>
-    <div className="mt-16"><ReminderFooter status={subjectDraft.lastTestStatus === 'succeeded' ? `テスト済み ${testedAt}` : '下書き保存'} secondary={{ label: 'テスト送信', onClick: openConfirm }} primary="最終確認へ" onPrimary={() => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=confirm`)} /></div>
-    <ConfirmDialog open={confirmOpen} title="テスト送信しますか？" description={testSend.phase.kind === 'unknown' ? '前回の送信結果を確認できていません。再試行しても二重には送られません。' : testSendConfirmDescription(testRecipient.view, sentTo, sentKind)} confirmLabel={sendIssue ? 'もう一度送信' : 'テスト送信'} cancelLabel="配信予定へ戻る" busy={sendBusy} error={sendIssue} onConfirm={() => void sendTest()} onCancel={() => setConfirmOpen(false)} />
+    <div className="mt-16"><ReminderFooter status={subjectDraft.lastTestStatus === 'succeeded' ? `テスト済み ${testedAt}` : '下書き保存'} secondary={{ label: 'テストを送る', onClick: openConfirm }} primary="最終確認へ" onPrimary={() => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=confirm`)} /></div>
+    <ConfirmDialog open={confirmOpen} title="テスト送信しますか？" description={testSend.phase.kind === 'unknown' ? '前回の送信結果を確認できていません。再試行しても二重には送られません。' : testSendConfirmDescription(testRecipient.view, sentTo, sentKind)} confirmLabel={sendIssue ? 'もう一度送る' : 'テストを送る'} cancelLabel="配信予定へ戻る" busy={sendBusy} error={sendIssue} onConfirm={() => void sendTest()} onCancel={() => setConfirmOpen(false)} />
   </div>
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="flex items-center justify-between gap-3 py-2"><dt className="text-ink-faint">{label}</dt><dd className="text-ink font-bold">{value}</dd></div>
+  return <div className="flex items-center justify-between gap-3 py-2"><dt className="text-ink-faint">{label}</dt><dd className="text-ink font-medium">{value}</dd></div>
 }

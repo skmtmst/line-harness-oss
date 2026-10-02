@@ -15,6 +15,9 @@ import {
   settleBroadcastRecipients,
   isBroadcastStopped,
   isOperationCapabilityStopped,
+  listLineAccountsWithTenantStatus,
+  recordBroadcastLifecycleEvent,
+  recordSkippedDelivery,
 } from '@line-crm/db';
 import type { Broadcast } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
@@ -27,11 +30,13 @@ import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js
 import { getFriendFieldMap } from '@line-crm/db';
 import { contentNeedsFriendFields } from './interpolation-context.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
+import { processBroadcastAfterActions } from './broadcast-after-actions.js';
 import { classifyDeliveryFailure, deliveryErrorCode } from './broadcast-delivery-outcome.js';
 import { evaluateQuota, fetchQuota, shortfallMessage } from './broadcast-quota-guard.js';
 import { getSendPermissionForAccount, type SendPermissionCache } from './send-entitlements.js';
 import { recordLineTokenDefaultFallback } from './line-token.js';
 import { featureJobCanRun } from './feature-enforcement.js';
+import { isStoppedTenantStatus } from './tenant-runtime-status.js';
 import { assertAnalyticsAudiencesUsable, BroadcastAudienceError } from './segment-audience-guard.js';
 import type { SegmentCondition } from './segment-query.js';
 import {
@@ -438,7 +443,7 @@ export async function processBroadcastSend(
             ...sendableIds,
             JSON.stringify(batchMessages),
           );
-          await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey);
+          const { requestId } = await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey);
           successCount += sendable.length;
 
           // Log only successfully sent messages (batch insert for performance)
@@ -457,6 +462,7 @@ export async function processBroadcastSend(
               broadcastId,
               friendIds: sendableIds,
               state: 'sent',
+              lineRequestId: requestId,
             }),
           ]);
           for (const id of sendableIds) blocked.add(id);
@@ -593,6 +599,15 @@ export async function processScheduledBroadcasts(
   workerUrl?: string,
 ): Promise<void> {
   const sendPermissions: SendPermissionCache = new Map();
+  const accountsWithStatus = await listLineAccountsWithTenantStatus(db);
+  const tenantStatusByAccount = new Map(
+    accountsWithStatus.map((account) => [account.id, account.tenant_status]),
+  );
+  // アカウントの稼働状態（X-1）。止めているアカウント宛の予約は
+  // 「送らなかった」記録にして下書きへ戻す。
+  const activeByAccount = new Map(
+    accountsWithStatus.map((account) => [account.id, Boolean(account.is_active)]),
+  );
   const allBroadcasts = await getBroadcasts(db);
 
   const nowMs = Date.now();
@@ -603,9 +618,49 @@ export async function processScheduledBroadcasts(
       new Date(b.scheduled_at).getTime() <= nowMs,
   );
 
+  /*
+   * 二者承認（m12a）。予約時刻を過ぎても承認されなかった依頼は、
+   * 先に期限切れにして送らない（依頼主に知らせる）。
+   */
+  try {
+    const { sweepBroadcastApprovalExpiry } = await import('./broadcast-approval.js');
+    await sweepBroadcastApprovalExpiry(db, nowMs);
+  } catch (sweepError) {
+    console.error('[broadcast] approval expiry sweep failed:', sweepError);
+  }
+
   for (const broadcast of scheduled) {
     try {
       const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
+      if (ownerAccountId && isStoppedTenantStatus(tenantStatusByAccount.get(ownerAccountId))) {
+        // Keep the content but remove the expired automatic schedule. Restoring
+        // the tenant must never send a message whose due time passed while stopped.
+        await db.prepare(
+          `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'scheduled'`,
+        ).bind(broadcast.id).run();
+        continue;
+      }
+      /*
+       * アカウント停止中（X-1、v6-33 §10-1）。予約 job は消さず、
+       * 「止めていたので送らなかった」として一覧に残し、内容は下書きへ
+       * 戻す。再開しても自動では送り直さない。
+       */
+      if (ownerAccountId && activeByAccount.get(ownerAccountId) === false) {
+        try {
+          await recordSkippedDelivery(db, {
+            lineAccountId: ownerAccountId,
+            kind: 'broadcast',
+            refId: broadcast.id,
+            title: broadcast.title ?? null,
+          });
+        } catch (skipError) {
+          console.error(`[broadcast] skipped ledger write failed for ${broadcast.id}:`, skipError);
+        }
+        await db.prepare(
+          `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'scheduled'`,
+        ).bind(broadcast.id).run();
+        continue;
+      }
       // 機能オフ中はclaimせず予約のまま残す。再オンで再開する。
       if (ownerAccountId && !await featureJobCanRun(db, { accountId: ownerAccountId, featureId: 'broadcasts', job: 'broadcast deliveries' })) {
         continue;
@@ -616,12 +671,35 @@ export async function processScheduledBroadcasts(
       if (await isOperationCapabilityStopped(db, ownerAccountId, 'broadcast_dispatch')) {
         continue;
       }
+      /*
+       * 二者承認（m12a）。承認が要る人数なのに承認済みでなければ送らない。
+       * 期限切れの走査は上で済ませてある。数えられないときは送らず残す。
+       */
+      try {
+        const { checkScheduledBroadcastApproval } = await import('./broadcast-approval.js');
+        const approvalCheck = await checkScheduledBroadcastApproval(db, broadcast);
+        if (!approvalCheck.sendable) continue;
+      } catch (approvalError) {
+        console.error(`[broadcast] scheduled broadcast ${broadcast.id} held: approval check failed:`, approvalError);
+        continue;
+      }
       // Optimistic lock: claim this broadcast (scheduled → sending)
       const lockResult = await db
         .prepare(`UPDATE broadcasts SET status = 'sending' WHERE id = ? AND status = 'scheduled'`)
         .bind(broadcast.id)
         .run();
       if (!lockResult.meta.changes || lockResult.meta.changes === 0) continue;
+      // 予約の自動送信も記録に残す（#816）。誰の操作でもないので担当者は空＝「自動」。
+      try {
+        await recordBroadcastLifecycleEvent(db, {
+          broadcastId: broadcast.id,
+          actorStaffId: null,
+          action: 'send_started',
+          detail: { fromStatus: 'scheduled', trigger: 'schedule' },
+        });
+      } catch (lifecycleError) {
+        console.error(`[broadcast-lifecycle] send_started record failed:`, lifecycleError);
+      }
 
       // Resolve correct lineClient for this broadcast's account
       let deliveryClient = lineClient;
@@ -738,9 +816,19 @@ export async function processQueuedBroadcasts(
 ): Promise<void> {
   const queued = await getQueuedBroadcasts(db);
   const sendPermissions: SendPermissionCache = new Map();
+  const tenantStatusByAccount = new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
   for (const broadcast of queued) {
     // 機能オフ中は送信中の続きも止める。行は残るため再オンで再開する。
     const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
+    if (ownerAccountId && isStoppedTenantStatus(tenantStatusByAccount.get(ownerAccountId))) {
+      await db.prepare(
+        `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL, batch_lock_at = NULL
+          WHERE id = ? AND status IN ('sending', 'scheduled')`,
+      ).bind(broadcast.id).run();
+      continue;
+    }
     if (ownerAccountId && !await featureJobCanRun(db, { accountId: ownerAccountId, featureId: 'broadcasts', job: 'broadcast deliveries' })) {
       continue;
     }
@@ -1068,7 +1156,7 @@ async function processQueuedBroadcastBatches(
             lineAccountId: accountId,
             friendIds: [friend.id],
           });
-          await lineClient.pushMessage(friend.line_user_id, personalizedMessages, retryKey, aggregationUnits(unit));
+          const { requestId: pushRequestId } = await lineClient.pushMessageWithRequestId(friend.line_user_id, personalizedMessages, retryKey, aggregationUnits(unit));
 
           await db.batch([
             ...renderedParts.map((part) => db.prepare(
@@ -1088,10 +1176,19 @@ async function processQueuedBroadcastBatches(
               broadcastId: broadcast.id,
               friendIds: [friend.id],
               state: 'sent',
+              lineRequestId: pushRequestId,
             }),
           ]);
           blocked.add(friend.id);
           currentOffset++;
+          // 送信後動作: LINEが受け付けたこの宛先にだけ固定版を実行する。
+          // 送達は確定済みなので、ここが落ちても送り直さない。取り残しは
+          // 定期回収が拾う。
+          try {
+            await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 5 });
+          } catch (afterError) {
+            console.error(`[broadcast] after-actions failed broadcast=${broadcast.id}`, afterError);
+          }
         } catch (err) {
           console.error(`Personalized broadcast recipient ${friend.id} failed:`, err);
           // 届いていないと断定できたものだけ再送の対象にする。分からない
@@ -1169,6 +1266,7 @@ async function processQueuedBroadcastBatches(
       lineAccountId: accountId,
       friendIds: sendableIds,
     });
+    let queuedRequestId: string | null = null;
     try {
       const retryKey = await createBroadcastRetryKey(
         broadcast.id,
@@ -1177,7 +1275,7 @@ async function processQueuedBroadcastBatches(
         ...sendableIds,
         JSON.stringify(batchMessages),
       );
-      await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey);
+      ({ requestId: queuedRequestId } = await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey));
     } catch (err) {
       console.error(`Queued broadcast batch ${batchIndex} send failed:`, err);
       const outcome = classifyDeliveryFailure(err);
@@ -1200,6 +1298,7 @@ async function processQueuedBroadcastBatches(
       broadcastId: broadcast.id,
       friendIds: sendableIds,
       state: 'sent',
+      lineRequestId: queuedRequestId,
     });
     try {
       const stmts = [
@@ -1226,6 +1325,13 @@ async function processQueuedBroadcastBatches(
       }
     }
     for (const friend of sendable) blocked.add(friend.id);
+    // 送信後動作: この束で受け付けられた宛先にだけ固定版を実行する。
+    // 失敗した束は上の catch で決着済みで、ここには来ない。
+    try {
+      await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 100 });
+    } catch (afterError) {
+      console.error(`[broadcast] after-actions failed broadcast=${broadcast.id}`, afterError);
+    }
 
     currentOffset += batch.length;
     // Update success_count but keep batch_offset=-1 (locked) during processing

@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 .card {
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card);
@@ -48,24 +50,32 @@
   overflow: hidden;
   color: var(--color-ink);
   font-size: var(--text-lead);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.43;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/*
+ * #669 行の補足（件数など）は緑にしない。緑は CTA と成功・有効だけの
+ * ものにし、押せない補助文字はニュートラル（ink-secondary）にする。
+ */
 .meta {
   flex: 0 0 auto;
-  color: var(--color-accent, currentColor);
+  color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 500;
 }
 
+/*
+ * #669 カード頭の操作（「すべて見る →」など）はテキストリンクなので
+ * リンク色（action）にする。緑だと主操作ボタンと見分けがつかない。
+ */
 .action {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  color: var(--color-accent);
+  color: var(--color-action);
   font-size: var(--text-label);
   font-weight: 600;
   white-space: nowrap;
@@ -77,4 +87,5 @@
 
 .action :is(a, button):focus-visible {
   outline: revert;
+}
 }

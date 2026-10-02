@@ -7,6 +7,9 @@ import { useRouter } from 'next/navigation'
 import { Circle, Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import type { FriendListColumn } from './friend-list-table'
+import Avatar from '@/components/shared/avatar'
+import Checkbox from '@/components/shared/checkbox'
+import { formatDay } from '@/lib/format'
 
 interface Props {
   friend: FriendListItem
@@ -14,7 +17,6 @@ interface Props {
   onToggleSelect?: () => void
   onToggleAttention?: () => void
   visibleColumns: Set<FriendListColumn>
-  gridTemplateColumns: string
 }
 
 function statusView(status: FriendListItem['chatStatus']) {
@@ -25,7 +27,21 @@ function statusView(status: FriendListItem['chatStatus']) {
   if (status === 'unread') return { label: '未対応', className: 'bg-status-danger-soft text-danger' }
   if (status === 'in_progress') return { label: '対応中', className: 'bg-status-warn-soft text-status-warn-deep' }
   if (status === 'on_hold') return { label: '保留', className: 'bg-action-soft text-action' }
-  return { label: '対応済み', className: 'bg-accent-soft text-accent-hover' }
+  return { label: '対応済み', className: 'bg-accent-soft text-accent-deep' }
+}
+
+/*
+ * R112: 最終接触は受信・送信の新しい方。表の行と狭い画面のカードで
+ * 別の式を使うと、同じ相手の日付が幅で変わって見える。
+ * どちらもこの1つを読む（FRIEND-07 の受信・送信比較を共通化）。
+ */
+export function selectLastContactAt(friend: FriendListItem): string {
+  const incomingAt = friend.latestIncomingMessage?.createdAt
+  const outgoingAt = friend.latestOutgoingAt
+  if (incomingAt && outgoingAt) {
+    return new Date(incomingAt).getTime() >= new Date(outgoingAt).getTime() ? incomingAt : outgoingAt
+  }
+  return incomingAt ?? outgoingAt ?? friend.createdAt
 }
 
 export default function FriendListRow({
@@ -34,98 +50,98 @@ export default function FriendListRow({
   onToggleSelect,
   onToggleAttention,
   visibleColumns,
-  gridTemplateColumns,
 }: Props) {
   const router = useRouter()
   const status = statusView(friend.chatStatus)
   const latest = friend.latestIncomingMessage
-  /*
-   * FRIEND-07: 最終接触は受信・送信の新しい方。受信があると送信日時を
-   * 比較していなかったため、直前に送った返信があっても古い受信日が残った。
-   */
-  const incomingAt = latest?.createdAt
-  const outgoingAt = friend.latestOutgoingAt
-  const lastContact = incomingAt && outgoingAt
-    ? (new Date(incomingAt).getTime() >= new Date(outgoingAt).getTime() ? incomingAt : outgoingAt)
-    : incomingAt ?? outgoingAt ?? friend.createdAt
+  const lastContact = selectLastContactAt(friend)
   const attention = String(friend.metadata?.__attention ?? '') === '1'
-  const avatarColor = avatarTone(friend.displayName)
 
-  const openChat = () => router.push(`/chats?friend=${friend.id}`)
+  /*
+   * 行を押した先は友だちの詳細。一覧の行として正しい行き先にする。
+   * 受信箱へは最新メッセージの列の明示のリンクからのみ行く。
+   */
+  const openDetail = () => router.push(`/friends/detail?id=${friend.id}`)
 
   return (
     <div
       role="link"
       tabIndex={0}
-      onClick={openChat}
+      aria-label={`${friend.displayName}の詳細を開く`}
+      onClick={openDetail}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return
-        if (event.key === 'Enter' || event.key === ' ') {
+        if (event.key === 'Enter') {
           event.preventDefault()
-          openChat()
+          openDetail()
         }
       }}
+      data-friend-cols
       className="grid h-19.5 min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none"
-      style={{ gridTemplateColumns }}
     >
       <div onClick={(event) => event.stopPropagation()}>
-        <input
-          type="checkbox"
+        {/* ★V7 共通 チェックボックス（gvjpx）。 */}
+        <Checkbox
           checked={selected ?? false}
-          onChange={() => onToggleSelect?.()}
+          onCheckedChange={() => onToggleSelect?.()}
           aria-label={`${friend.displayName}を選ぶ`}
-          className="h-4 w-4 cursor-pointer accent-accent"
         />
       </div>
 
       <button
         type="button"
+        data-part="attention-star"
         aria-pressed={attention}
         aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
         onClick={(event) => {
           event.stopPropagation()
           onToggleAttention?.()
         }}
-        className={`rounded p-1 ${attention ? 'text-status-warn-deep' : 'text-ink-faint'} hover:bg-status-warn-soft hover:text-status-warn-deep`}
+        className={`rounded-mini p-1 ${attention ? 'text-status-warn-deep' : 'text-ink-faint'} hover:bg-status-warn-soft hover:text-status-warn-deep`}
       >
         <Star aria-hidden="true" className={`h-4 w-4 ${attention ? 'fill-current' : ''}`} />
       </button>
 
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3 overflow-hidden">
         {/* アバターは設計 `PhxG6` の 40x40 / r=18。真円（r=20）にしない。 */}
-        {friend.pictureUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- LINE CDNの利用者画像。
-          <img src={friend.pictureUrl} alt="" className="h-10 w-10 shrink-0 rounded-large bg-avatar-bg object-cover" />
-        ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-large text-sm font-bold text-on-accent" style={{ backgroundColor: avatarColor }}>
-            {friend.displayName?.charAt(0) ?? '?'}
-          </div>
-        )}
-        <div className="min-w-0">
-          <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block truncate text-sm font-bold text-ink hover:text-action hover:underline">
+        <Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />
+        <div className="min-w-0 flex-1 overflow-hidden">
+          {/*
+            長い名前はこの列の中で1行省略＋titleで全文。列幅（minmax）を
+            超えて隣の列へはみ出さないよう、受け側も overflow-hidden で受ける。
+          */}
+          <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block max-w-full min-h-6 truncate text-sm font-bold text-ink hover:text-action hover:underline">
             {friend.displayName}
           </Link>
-          <p className="mt-1 truncate text-nano text-ink-faint">登録 {formatDate(friend.createdAt)}</p>
+          <p className="mt-1 max-w-full truncate text-micro text-ink-faint">登録 {formatDate(friend.createdAt)}</p>
         </div>
       </div>
 
       {visibleColumns.has('support') ? (
         <div className="min-w-0">
-          <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-nano font-bold ${status.className}`}>{status.label}</span>
-          <p className="mt-1 flex min-w-0 items-center gap-1 truncate text-nano font-semibold text-ink-secondary">
-            <Circle aria-hidden="true" className="h-2 w-2 shrink-0 fill-current" style={{ color: friend.supportMark?.color ?? 'var(--color-ink-disabled)' }} />
-            {friend.supportMark?.name ?? 'マークなし'}
+          {/*
+            ★V7：対応状況の札と、自分で付ける対応マークを1段に並べる。以前は札・マーク・担当の3段で、
+            「対応済み」の札と「●対応中」のマークが縦に並んで食い違って見えた。マークが無い時は何も出さない。
+          */}
+          <p className="flex min-w-0 items-center gap-2">
+            <span className={`inline-flex whitespace-nowrap rounded-pill px-2 py-0.5 text-micro font-medium ${status.className}`}>{status.label}</span>
+            {friend.supportMark ? (
+              <span className="flex min-w-0 items-center gap-1 truncate text-micro font-semibold text-ink-secondary" title={`対応マーク：${friend.supportMark.name}`}>
+                <Circle aria-hidden="true" className="h-2 w-2 shrink-0 fill-current" style={{ color: friend.supportMark.color ?? 'var(--color-ink-disabled)' }} />
+                {friend.supportMark.name}
+              </span>
+            ) : null}
           </p>
           {/*
             担当者は設計 `PhxG6` の丸アイコン付き（16x16 / r=8 / 頭文字 10px・800）。
             未割り当ては頭文字が無いので全角ハイフンを置く。空欄にすると
             「読み込み中で出ていない」と見分けが付かなくなる。
           */}
-          <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-nano text-ink-secondary">
+          <p className="mt-1 flex min-w-0 items-center gap-1.5 text-micro text-ink-secondary">
             <span
               aria-hidden="true"
               data-operator-avatar={friend.operator ? 'assigned' : 'unassigned'}
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-nano font-extrabold ${friend.operator ? 'text-on-accent' : 'bg-avatar-bg text-ink-faint'}`}
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-pill text-nano font-medium ${friend.operator ? 'text-on-accent' : 'bg-avatar-bg text-ink-faint'}`}
               style={friend.operator ? { backgroundColor: avatarTone(friend.operator.name) } : undefined}
             >
               {friend.operator ? (friend.operator.name.charAt(0) || '－') : '－'}
@@ -144,25 +160,40 @@ export default function FriendListRow({
       ) : null}
 
       {visibleColumns.has('latest') ? (
-        <div className="min-w-0">
+        <div className="min-w-0 overflow-hidden">
           {latest ? (
             <>
               <p className="truncate text-xs text-ink" title={latest.content}>
                 {latest.messageType === 'text' ? latest.content : messageTypeLabel(latest.messageType)}
               </p>
-              <p className="mt-1 text-nano text-ink-faint">{formatDateTime(latest.createdAt)}</p>
+              <p className="mt-1 flex min-w-0 items-center gap-2">
+                <span className="shrink-0 text-micro text-ink-faint">{formatDateTime(latest.createdAt)}</span>
+                {/*
+                  受信箱へ行く口はこの列の明示のリンクだけ。行全体は詳細へ行く。
+                  行の移動を起こさないよう、押下は行へ伝えない。
+                */}
+                <Link
+                  href={`/chats?friend=${friend.id}`}
+                  onClick={(event) => event.stopPropagation()}
+                  aria-label={`${friend.displayName}さんの会話を受信箱で開く`}
+                  title="受信箱で開く"
+                  className="truncate text-micro font-semibold text-action hover:underline"
+                >
+                  受信箱で開く
+                </Link>
+              </p>
             </>
-          ) : <><span className="text-xs text-ink-secondary">受信なし</span><p className="mt-1 text-nano text-ink-faint">—</p></>}
+          ) : <><span className="text-xs text-ink-secondary">受信なし</span><p className="mt-1 text-micro text-ink-faint">—</p></>}
         </div>
       ) : null}
 
       {visibleColumns.has('tags') ? (
         <div className="flex min-w-0 flex-wrap content-center gap-1">
           {friend.tags.slice(0, 2).map((tag, index) => (
-            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-nano font-semibold ${index === 0 ? 'bg-accent-soft text-accent-hover' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
+            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-micro font-semibold ${index === 0 ? 'bg-accent-soft text-accent-deep' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
           ))}
-          {friend.tags.length > 2 ? <span className="rounded-mini bg-avatar-bg px-2 py-1 text-nano text-ink-secondary">+{friend.tags.length - 2}</span> : null}
-          {!friend.tags.length ? <span className="text-nano text-ink-disabled">—</span> : null}
+          {friend.tags.length > 2 ? <span className="rounded-mini bg-avatar-bg px-2 py-1 text-micro text-ink-secondary">+{friend.tags.length - 2}</span> : null}
+          {!friend.tags.length ? <span className="text-micro text-ink-disabled">—</span> : null}
         </div>
       ) : null}
 
@@ -172,7 +203,7 @@ export default function FriendListRow({
         計測なしは空欄にせず「不明」と出す（詳細と同じ言葉）。
       */}
       {visibleColumns.has('source') ? (
-        <div className="min-w-0">
+        <div className="min-w-0" data-column="source">
           <p className={`truncate text-xs ${friend.firstTrackedLinkName ? 'text-ink-secondary' : 'text-ink-faint'}`} title={friend.firstTrackedLinkName || '不明'}>
             {friend.firstTrackedLinkName || '不明'}
           </p>
@@ -200,13 +231,12 @@ export function FriendListCard({
   onToggleSelect,
   onToggleAttention,
   visibleColumns,
-}: Omit<Props, 'gridTemplateColumns'>) {
+}: Props) {
   const router = useRouter()
   const status = statusView(friend.chatStatus)
   const latest = friend.latestIncomingMessage
-  const lastContact = latest?.createdAt ?? friend.latestOutgoingAt ?? friend.createdAt
+  const lastContact = selectLastContactAt(friend)
   const attention = String(friend.metadata?.__attention ?? '') === '1'
-  const avatarColor = avatarTone(friend.displayName)
 
   const openChat = () => router.push(`/chats?friend=${friend.id}`)
 
@@ -223,7 +253,7 @@ export function FriendListCard({
       key: 'latest',
       label: '最新メッセージ',
       node: latest
-        ? <span title={latest.content}>{latest.messageType === 'text' ? latest.content : messageTypeLabel(latest.messageType)}<span className="ml-2 text-nano text-ink-faint">{formatDateTime(latest.createdAt)}</span></span>
+        ? <span title={latest.content}>{latest.messageType === 'text' ? latest.content : messageTypeLabel(latest.messageType)}<span className="ml-2 text-micro text-ink-faint">{formatDateTime(latest.createdAt)}</span></span>
         : <span className="text-ink-secondary">受信なし</span>,
     })
   }
@@ -234,7 +264,7 @@ export function FriendListCard({
       node: friend.tags.length ? (
         <span className="flex flex-wrap gap-1">
           {friend.tags.map((tag, index) => (
-            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-nano font-semibold ${index === 0 ? 'bg-accent-soft text-accent-hover' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
+            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-micro font-semibold ${index === 0 ? 'bg-accent-soft text-accent-deep' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
           ))}
         </span>
       ) : <span className="text-ink-disabled">—</span>,
@@ -252,58 +282,53 @@ export function FriendListCard({
     <div className="border-b border-divider-soft px-3 py-3">
       <div className="flex items-start gap-3">
         <div className="pt-1" onClick={(event) => event.stopPropagation()}>
-          <input
-            type="checkbox"
+          {/* ★V7 共通 チェックボックス（gvjpx）。 */}
+          <Checkbox
             checked={selected ?? false}
-            onChange={() => onToggleSelect?.()}
+            onCheckedChange={() => onToggleSelect?.()}
             aria-label={`${friend.displayName}を選ぶ`}
-            className="h-4 w-4 cursor-pointer accent-accent"
           />
         </div>
         <button
           type="button"
+          data-part="attention-star"
           aria-pressed={attention}
           aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
           onClick={(event) => {
             event.stopPropagation()
             onToggleAttention?.()
           }}
-          className={`rounded p-1 pt-1.5 ${attention ? 'text-status-warn-deep' : 'text-ink-faint'} hover:bg-status-warn-soft hover:text-status-warn-deep`}
+          className={`rounded-mini p-1 pt-1.5 ${attention ? 'text-status-warn-deep' : 'text-ink-faint'} hover:bg-status-warn-soft hover:text-status-warn-deep`}
         >
           <Star aria-hidden="true" className={`h-4 w-4 ${attention ? 'fill-current' : ''}`} />
         </button>
-        {friend.pictureUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- LINE CDNの利用者画像。
-          <img src={friend.pictureUrl} alt="" className="h-10 w-10 shrink-0 rounded-large bg-avatar-bg object-cover" />
-        ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-large text-sm font-bold text-on-accent" style={{ backgroundColor: avatarColor }}>
-            {friend.displayName?.charAt(0) ?? '?'}
-          </div>
-        )}
+        <Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />
         <div className="min-w-0 flex-1">
-          <Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className="block truncate text-sm font-bold text-ink hover:text-action hover:underline">
+          <Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className="block min-h-6 truncate text-sm font-bold text-ink hover:text-action hover:underline">
             {friend.displayName}
           </Link>
-          <p className="mt-1 flex min-w-0 items-center gap-1 truncate text-nano font-semibold text-ink-secondary">
-            <Circle aria-hidden="true" className="h-2 w-2 shrink-0 fill-current" style={{ color: friend.supportMark?.color ?? 'var(--color-ink-disabled)' }} />
-            {friend.supportMark?.name ?? 'マークなし'}
-          </p>
-          <p className="mt-0.5 truncate text-nano text-ink-secondary">担当：{friend.operator?.name ?? '未割り当て'}</p>
+          {friend.supportMark ? (
+            <p className="mt-1 flex min-w-0 items-center gap-1 truncate text-micro font-semibold text-ink-secondary">
+              <Circle aria-hidden="true" className="h-2 w-2 shrink-0 fill-current" style={{ color: friend.supportMark.color ?? 'var(--color-ink-disabled)' }} />
+              {friend.supportMark.name}
+            </p>
+          ) : null}
+          <p className="mt-0.5 truncate text-micro text-ink-secondary">担当：{friend.operator?.name ?? '未割り当て'}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {/* statusView() の戻り値を className へ入れると静的に読めない。判定をここへ展開する。 */}
           <span
-            className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-nano font-bold ${
+            className={`inline-flex whitespace-nowrap rounded-pill px-2 py-1 text-micro font-medium ${
               friend.chatStatus === 'unread'
                 ? 'bg-status-danger-soft text-danger'
                 : friend.chatStatus === 'in_progress' || friend.chatStatus === 'on_hold'
                   ? 'bg-status-warn-soft text-status-warn-deep'
-                  : 'bg-accent-soft text-accent-hover'
+                  : 'bg-accent-soft text-accent-deep'
             }`}
           >
             {status.label}
           </span>
-          <span className="text-nano tabular-nums text-ink-faint" title={formatDateTime(lastContact)}>{formatDate(lastContact)}</span>
+          <span className="text-micro tabular-nums text-ink-faint" title={formatDateTime(lastContact)}>{formatDate(lastContact)}</span>
         </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-7">
@@ -348,8 +373,9 @@ function messageTypeLabel(messageType: string): string {
   } as Record<string, string>)[messageType] ?? 'メッセージ'
 }
 
+/** M月D日（曜）。年が違う記録は YYYY年M月D日（★V7：数字の斜線より読みやすい）。 */
 function formatDate(iso: string): string {
-  return iso.slice(0, 10).replace(/-/g, '/')
+  return formatDay(iso)
 }
 
 function avatarTone(name: string): string {

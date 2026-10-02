@@ -22,6 +22,8 @@ vi.mock('@line-crm/db', () => ({
     : null),
   getPlatformAdminRecord: vi.fn(async () => null),
   getStaffByApiKey: vi.fn(async (_db: unknown, token: string) => {
+    if (token === 'suspended-key') return { id: 'suspended-owner', name: 'Stopped Owner', role: 'owner', tenant_id: 'tenant-stopped', tenant_status: 'suspended' };
+    if (token === 'archived-key') return { id: 'archived-owner', name: 'Archived Owner', role: 'owner', tenant_id: 'tenant-archived', tenant_status: 'archived' };
     if (token === 'viewer-key') return { id: 'viewer-1', name: 'Viewer One', role: 'staff', access_level: 'read_only' };
     if (token === 'friends-key') return { id: 'friends-1', name: 'Friends Staff', role: 'staff', permission_keys: '["/friends"]' };
     if (token === 'chats-key') return { id: 'chats-1', name: 'Chats Staff', role: 'staff', permission_keys: '["/chats"]' };
@@ -71,6 +73,11 @@ vi.mock('@line-crm/db', () => ({
   deleteExpiredTwoFactorChallenges: vi.fn(async () => undefined),
   getTwoFactorChallenge: vi.fn(async () => null),
   getStaffById: vi.fn(async () => null),
+  // V: セッション行の再確認・見なれない判定。既定は「行なし・履歴なし」。
+  getAdminSessionByTokenHash: vi.fn(async () => null),
+  adminSessionFamiliarity: vi.fn(async () => ({
+    hasBaseline: false, deviceKnown: false, ipKnown: false,
+  })),
   incrementTwoFactorChallengeAttempts: vi.fn(async () => undefined),
   deleteTwoFactorChallenge: vi.fn(async () => undefined),
   claimStaffTotpStep: vi.fn(async () => true),
@@ -122,6 +129,13 @@ function app() {
   a.route('/', adminAuth);
   a.get('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
   a.post('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
+  a.get('/api/friends', (c) => c.json({ success: true }));
+  a.post('/api/broadcasts/:id/send', (c) => c.json({ success: true }));
+  a.post('/api/hq/support/requests', (c) => c.json({ success: true }));
+  a.get('/api/hq/support/requests', (c) => c.json({ success: true }));
+  a.get('/api/hq/notices', (c) => c.json({ success: true }));
+  a.post('/api/hq/notices/:id/read', (c) => c.json({ success: true }));
+  a.get('/api/tenants/me', (c) => c.json({ success: true }));
   a.get('/api/ops/me', requirePlatformAdmin(), (c) => c.json({ success: true, data: c.get('staff') }));
   a.get('/api/auto-reply-runs', (c) => c.json({ success: true }));
   a.get('/api/automation-runs', (c) => c.json({ success: true }));
@@ -1068,5 +1082,66 @@ describe('N-423 staff deny-by-default (#670)', () => {
     expect(isPublicApiBoundary('GET', '/api/public/brands')).toBe(false);
     expect(isPublicApiBoundary('GET', '/api/auth/session')).toBe(false);
     expect(isPublicApiBoundary('GET', '/api/staff')).toBe(false);
+  });
+
+  test.each(['suspended-key', 'archived-key'])(
+    '停止・保管中の契約先は通常APIと配信操作を403にする (%s)',
+    async (token) => {
+      for (const [method, path] of [
+        ['GET', '/api/friends'],
+        ['POST', '/api/broadcasts/b1/send'],
+      ] as const) {
+        const res = await app().request(path, { ...staffBearer(token), method }, crossSiteEnv());
+        expect(res.status).toBe(403);
+        expect(await res.json()).toMatchObject({
+          success: false,
+          code: 'TENANT_SUSPENDED',
+        });
+      }
+    },
+  );
+
+  test('停止中セッションはsession・logout・お問い合わせ・運営からのお知らせだけ利用できる', async () => {
+    const session = await app().request('/api/auth/session', staffBearer('suspended-key'), crossSiteEnv());
+    expect(session.status).toBe(200);
+    expect(await session.json()).toMatchObject({ success: true, data: { tenantStatus: 'suspended' } });
+
+    for (const [method, path] of [
+      ['POST', '/api/auth/logout'],
+      ['POST', '/api/hq/support/requests'],
+      ['GET', '/api/hq/support/requests'],
+      ['GET', '/api/hq/notices'],
+      ['POST', '/api/hq/notices/notice-1/read'],
+    ] as const) {
+      expect((await app().request(path, { ...staffBearer('suspended-key'), method }, crossSiteEnv())).status).toBe(200);
+    }
+
+    for (const [method, path] of [
+      ['GET', '/api/friends'],
+      ['POST', '/api/broadcasts/b1/send'],
+      ['GET', '/api/tenants/me'],
+      ['POST', '/api/hq/notices'],
+    ] as const) {
+      const res = await app().request(path, { ...staffBearer('suspended-key'), method }, crossSiteEnv());
+      expect(res.status).toBe(403);
+      expect(await res.json()).toMatchObject({ code: 'TENANT_SUSPENDED' });
+    }
+  });
+
+  test('運営マスターの有効な代理ログインは停止中契約先を閲覧できる', async () => {
+    const db = await import('@line-crm/db');
+    vi.mocked(db.getActiveImpersonation).mockResolvedValueOnce({
+      id: 'impersonation-1',
+      platform_admin_staff_id: 'ops-staff-1',
+      tenant_id: 'tenant-stopped',
+      mode: 'read',
+      pii_revealed: 0,
+      started_at: '2026-09-24T00:00:00.000Z',
+      expires_at: '2026-09-24T08:00:00.000Z',
+      ended_at: null,
+      reason: null,
+    } as never);
+    const res = await app().request('/api/friends', staffBearer('ops-staff-key'), crossSiteEnv());
+    expect(res.status).toBe(200);
   });
 });

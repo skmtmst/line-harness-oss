@@ -8,7 +8,8 @@ export type EventNotificationKind =
   | 'cancelled_by_admin'
   | 'waitlist_offer'
   | 'reminder_day_before'
-  | 'reminder_hours_before';
+  | 'reminder_hours_before'
+  | 'schedule_changed';
 
 export interface EventNotificationContext {
   eventName: string;
@@ -16,6 +17,8 @@ export interface EventNotificationContext {
   venueName?: string | null;
   venueUrl?: string | null;
   hoursBefore?: number;
+  /** 変更のお知らせ (schedule_changed) の新旧の要点。人の言葉で1行。 */
+  changeSummary?: string | null;
   // 確定系 (received_confirmed / confirmed) の末尾に追記。空 / null は何もしない。
   confirmationExtra?: string | null;
   // リマインド系 (reminder_day_before / reminder_hours_before) の末尾に追記。
@@ -71,6 +74,12 @@ export function renderEventNotificationText(
         `【リマインド】まもなくイベント開始です（あと ${hours} 時間）。${detail}`,
         ctx.reminderExtra,
       );
+    }
+    case 'schedule_changed': {
+      const summary = ctx.changeSummary?.trim()
+        ? `\n\n変更内容: ${ctx.changeSummary.trim()}`
+        : '';
+      return `イベントの内容が変更になりました。${detail}${summary}\n\n参加が難しい場合は予約履歴画面から変更・キャンセルをお願いします。`;
     }
   }
 }

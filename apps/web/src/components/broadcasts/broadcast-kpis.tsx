@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { api, type BroadcastListKpis, type BroadcastStats } from '@/lib/api'
 import { buildBroadcastKpiCards, countText } from './broadcast-kpi-values'
+import MetricValue from '@/components/ui/metric-value'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 
 /** 帯の副題に出す数。中身は `broadcast-kpi-values.ts`。 */
 export { countText }
@@ -22,10 +24,14 @@ export { countText }
  * 合わない4枚になる。取れないものは `—` のままにする。
  */
 export default function BroadcastKpis({
-  unavailable = false,
+  loading: parentLoading = false,
+  failed = false,
   listKpis,
 }: {
-  unavailable?: boolean
+  /** 一覧の読み込み中。数値は骨組み、副題は「読み込んでいます」。 */
+  loading?: boolean
+  /** 一覧の取得失敗。数値は「—」、副題は「読み込めませんでした」。0 とは書かない。 */
+  failed?: boolean
   listKpis?: BroadcastListKpis | null
 }) {
   const [fallbackStats, setFallbackStats] = useState<BroadcastStats | null>(null)
@@ -61,24 +67,25 @@ export default function BroadcastKpis({
         <div key={card.title} className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-secondary text-xs font-medium">{card.title}</p>
           <p className="mt-1 flex items-baseline gap-1">
-            {loading ? (
-              <span className="bg-canvas-sunken inline-block h-7 w-14 animate-pulse rounded" />
-            ) : (
-              <>
-                <span className="text-ink text-2xl font-bold tabular-nums">
-                  {typeof card.value === 'number' && Number.isFinite(card.value)
-                    ? card.value.toLocaleString('ja-JP')
-                    : '—'}
-                </span>
-                {/* **数が無いときは単位も出さない。** `—件` は数に見える。 */}
-                {typeof card.value === 'number' && Number.isFinite(card.value) && (
-                  <span className="text-ink-secondary text-xs">{card.unit}</span>
-                )}
-              </>
-            )}
+            <DelayedSkeleton
+              loading={loading}
+              skeleton={<Skeleton className="h-7 w-14" />}
+            >
+              {/* 監査6 #674: 数が無いときは「—」だけで単位を出さない（`—件` は数に見える） */}
+              <span className="text-ink text-2xl font-bold">
+                <MetricValue
+                  value={typeof card.value === 'number' && Number.isFinite(card.value) ? card.value : null}
+                  unit={card.unit}
+                />
+              </span>
+            </DelayedSkeleton>
           </p>
           <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">
-            {unavailable ? '読み込めていません' : card.detail}
+            {/*
+              ★V7 `x63W5x`：読み込み中は「読み込んでいます」、失敗は
+              「読み込めませんでした」と言い分ける（失敗の言葉で待たせない）。
+            */}
+            {parentLoading || loading ? '読み込んでいます' : failed ? '読み込めませんでした' : card.detail}
           </p>
         </div>
       ))}

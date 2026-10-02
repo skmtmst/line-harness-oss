@@ -4,6 +4,8 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
 import { ApiError, api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
 import Button from '@/components/shared/button'
+import DateField from '@/components/shared/date-field'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { formatMediaSize } from './media-usage-display'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
@@ -21,6 +23,7 @@ import {
   putMediaFile,
   validateMediaFile,
 } from './media-direct-upload'
+import { formatDateTime } from '@/lib/format'
 
 /** 版追加を止めた理由を、互換基準ごとに運用者へ説明する。 */
 function versionBlockerText(blockers: MediaVersionBlocker[]): string {
@@ -44,7 +47,7 @@ function versionBlockerText(blockers: MediaVersionBlocker[]): string {
 function formatDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—（未取得）'
-  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo' }).format(date)
+  return formatDateTime(date)
 }
 
 function mediaKind(item: MediaItem): string {
@@ -424,8 +427,7 @@ export default function MediaDetailDialog({
           <h2 className="text-ink mt-3 truncate text-xl font-bold" title={item.filename}>{item.filename}</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" onClick={() => void downloadItem()} disabled={downloading}>
-            {downloading ? '取得中…' : 'ダウンロード'}
+          <Button type="button" onClick={() => void downloadItem()} disabled={downloading} busy={downloading} busyLabel="取得中…">ダウンロード
           </Button>
           {downloadError ? <p className="text-danger text-xs" role="alert">{downloadError}</p> : null}
           {impact && impact.usageCount > 0 ? (
@@ -435,7 +437,7 @@ export default function MediaDetailDialog({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <main className="space-y-4 xl:col-span-2">
+        <div className="space-y-4 xl:col-span-2">
           <div className="bg-canvas-sunken rounded-card flex min-h-96 items-center justify-center overflow-hidden border border-hairline">
             {item.kind === 'image' ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -469,7 +471,7 @@ export default function MediaDetailDialog({
               <div>
                 <p className="text-sm font-bold">ここにファイルをドラッグ、または押して選ぶ</p>
                 <p className="text-ink-faint mt-1 text-xs">いまのメディアと同じ種類を選びます。</p>
-                {versionFile ? <p className="text-ink mt-2 text-xs font-bold">{versionFile.name}</p> : null}
+                {versionFile ? <p className="text-ink mt-2 text-xs font-medium">{versionFile.name}</p> : null}
               </div>
             </label>
             <input id={fileInputId} type="file" className="sr-only" accept={mediaAcceptForKind(item.kind)} onChange={(event) => chooseVersionFile(event.target.files?.[0] ?? null)} />
@@ -492,16 +494,15 @@ export default function MediaDetailDialog({
                 <input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" />
               </div>
             ) : null}
-            {versionError ? <p className="bg-danger-bg text-danger mt-3 rounded-control p-3 text-xs" role="alert">{versionError}</p> : null}
+            {versionError ? <Notice tone="danger" message={versionError} className="mt-3" /> : null}
             {impact && impact.usageCount > 0 ? (
-              <p className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs font-semibold leading-5">
+              <Notice tone="warn" className="mt-3">
                 新しい版を追加しても、現在このメディアを使っている{impact.usageCount}か所の固定版は変わりません。使う場所ごとに切り替えてください。
-              </p>
+              </Notice>
             ) : null}
             <div className="mt-4 flex justify-end">
               {versionPreview?.canReplace ? (
-                <Button type="button" variant="primary" onClick={() => void publishVersion()} disabled={!changeReason.trim() || versionPhase === 'publishing'}>
-                  {versionPhase === 'publishing' ? '追加しています…' : '新しい版を追加する'}
+                <Button type="button" variant="primary" onClick={() => void publishVersion()} disabled={!changeReason.trim() || versionPhase === 'publishing'} busy={versionPhase === 'publishing'} busyLabel="追加しています…">新しい版を追加する
                 </Button>
               ) : (
                 <Button type="button" variant="primary" onClick={() => void prepareVersion()} disabled={!versionFile || versionPhase === 'uploading'}>
@@ -510,7 +511,7 @@ export default function MediaDetailDialog({
               )}
             </div>
           </section>
-        </main>
+        </div>
 
         <aside className="space-y-4">
           <section className="border-hairline rounded-card border bg-canvas p-4">
@@ -521,7 +522,9 @@ export default function MediaDetailDialog({
                 ['大きさ', mediaDimensions(item)],
                 ['容量', formatMediaSize(item.sizeBytes)],
                 ['入れた日', formatDate(item.createdAt)],
-                ['入れた人', item.uploadedBy || '—（未取得）'],
+                // R35: 内部ID（UUID）ではなく担当者の表示名を出す。
+                // 退職・削除済みで引けないときは人に分かる言葉にし、IDは出さない。
+                ['入れた人', item.uploadedByName ?? (item.uploadedBy ? '削除された担当者' : '—（未取得）')],
                 ['LINEの上限', mediaLimit(item)],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-start justify-between gap-3">
@@ -563,12 +566,11 @@ export default function MediaDetailDialog({
               <div className="border-hairline mt-3 space-y-3 border-t pt-3">
                 <div>
                   <label htmlFor={`${fileInputId}-expires`} className="text-ink-secondary block text-xs font-semibold">利用期限（分かる場合だけ）</label>
-                  <input
+                  <DateField
                     id={`${fileInputId}-expires`}
-                    type="date"
                     value={termsExpiresAt}
-                    onChange={(event) => setTermsExpiresAt(event.target.value)}
-                    className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
+                    onChange={setTermsExpiresAt}
+                    className="mt-1"
                   />
                 </div>
                 <div>
@@ -583,11 +585,10 @@ export default function MediaDetailDialog({
                     placeholder="例：出演者の同意書を確認済み（2026-01-10）"
                   />
                 </div>
-                {termsError ? <p className="bg-danger-bg text-danger rounded-control p-3 text-xs" role="alert">{termsError}</p> : null}
+                {termsError ? <Notice tone="danger" message={termsError} /> : null}
                 <div className="flex justify-end gap-2">
                   <Button type="button" onClick={() => setTermsEditing(false)} disabled={termsBusy}>キャンセル</Button>
-                  <Button type="button" variant="primary" onClick={() => void saveTerms()} disabled={termsBusy}>
-                    {termsBusy ? '保存しています…' : '保存する'}
+                  <Button type="button" variant="primary" onClick={() => void saveTerms()} disabled={termsBusy} busy={termsBusy} busyLabel="保存しています…">保存する
                   </Button>
                 </div>
               </div>
@@ -597,7 +598,12 @@ export default function MediaDetailDialog({
           <section className="border-hairline rounded-card border bg-canvas p-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-ink text-sm font-bold">使われている場所</h3>
-              <span className="text-action text-xs font-bold">{impact ? `${impact.usageCount}か所` : '—'}</span>
+              {/* R34: 未確認の0件は「0か所」にしない。件数は「—」で出す。 */}
+              <span className="text-action text-xs font-medium">
+                {impact && (impact.verified !== false || impact.references.length > 0)
+                  ? `${impact.usageCount}か所`
+                  : '—'}
+              </span>
             </div>
             {phase === 'loading' ? (
               <p className="text-ink-faint mt-3 text-xs">使われている場所を確認しています…</p>
@@ -606,8 +612,25 @@ export default function MediaDetailDialog({
                 <p className="text-danger text-xs">使われている場所を確認できませんでした。</p>
                 <Button type="button" onClick={() => void loadImpact()}>読み直す</Button>
               </div>
-            ) : impact && impact.references.length > 0 ? (
-              <ul className="mt-3 space-y-2">
+            ) : impact ? (
+              <>
+                {/*
+                  R34: 未確認は「どこでも使っていない」と分けて出す。
+                  見つかった使用先は実在するので一覧は残し、読み残しがある
+                  旨と読み直しを添える。0件の未確認は未使用にしない。
+                */}
+                {impact.verified === false ? (
+                  <div className="mt-3 space-y-2" role="status">
+                    <p className="text-ink-secondary text-xs">
+                      {impact.references.length > 0
+                        ? 'ほかに確認できていない場所があります。'
+                        : '使われている場所を確かめられませんでした。'}
+                    </p>
+                    <Button type="button" onClick={() => void loadImpact()}>読み直す</Button>
+                  </div>
+                ) : null}
+                {impact.references.length > 0 ? (
+                  <ul className="mt-3 space-y-2">
                 {impact.references.map((reference: MediaDeleteImpactReference, index) => {
                   const usage = reference as MediaUsageReferenceItem
                   const selectValue = usageSelectValue(usage.reference)
@@ -647,13 +670,17 @@ export default function MediaDetailDialog({
                     </li>
                   )
                 })}
-              </ul>
-            ) : (
-              <p className="text-ink-faint mt-3 text-xs">どこでも使われていません。</p>
-            )}
+                  </ul>
+                ) : impact.verified === false ? null : (
+                  <p className="text-ink-faint mt-3 text-xs">どこでも使われていません。</p>
+                )}
+              </>
+            ) : null}
             {usageError ? <p className="text-danger mt-3 text-xs" role="alert">{usageError}</p> : null}
             {impact ? <p className="text-ink-faint mt-3 text-xs">{checkedAtText(impact.checkedAt)} 時点で確認</p> : null}
-            {impact && impact.usageCount > 0 ? (
+            {impact && impact.verified === false ? (
+              <p className="text-ink-secondary mt-3 text-xs leading-5">確かめられないため削除できません。読み直してから、もう一度お試しください。</p>
+            ) : impact && impact.usageCount > 0 ? (
               <p className="text-ink-faint mt-3 text-xs leading-5">使われているあいだは削除できません。先にこの{impact.usageCount}か所から外してください。</p>
             ) : null}
           </section>
@@ -682,9 +709,7 @@ export default function MediaDetailDialog({
                       <Button
                         type="button"
                         onClick={() => void downloadVersion(version.versionNo)}
-                        disabled={downloadingVersion !== null}
-                      >
-                        {downloadingVersion === version.versionNo ? '取得中…' : 'この版をダウンロード'}
+                        disabled={downloadingVersion !== null} busy={downloadingVersion === version.versionNo} busyLabel="取得中…">この版をダウンロード
                       </Button>
                     </div>
                   </li>

@@ -14,7 +14,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/db', () => ({
   getFriendByLineUserIdForAccount: vi.fn(),
+  // 重複と報酬の決まりは本物でなく通す（重複なし・5pt固定）。
+  // 本物は nen-photo-duplicate-reward-817.test.ts で見る。
+  findRewardedAdoptedDuplicate: vi.fn(async () => null),
+  getEffectivePhotoRewardPolicy: vi.fn(async () => ({ versionNumber: 1, policyKey: 'legacy-5', points: 5 })),
   jstNow: mocks.jstNow,
+  toJstString: (date: Date) => date.toISOString().replace('Z', '+09:00'),
   resolveLineCredential: mocks.resolveCredential,
   claimPhotoNotificationDelivery: mocks.claim,
   completePhotoNotificationDelivery: mocks.complete,
@@ -30,6 +35,9 @@ vi.mock('../services/nen-tag-sync.js', () => ({
   refreshAllNenTags: vi.fn(), syncNenHealthTags: vi.fn(),
   syncNenPetTags: vi.fn(), syncNenPhotoTags: mocks.syncTags,
 }));
+// 検査の門番は本物でなく通す。門番自体は file-scan-gate.test.ts で見る。
+vi.mock('../services/file-scan.js', () => ({ getFileScanBySubject: async () => ({ status: 'clean' }) }));
+vi.mock('./file-scan.js', () => ({ ensureFileScanForUpload: async () => ({ id: 'scan-test-1' }) }));
 
 const { nenMembers, loadPhotoReviewRecipient } = await import('./nen-members.js');
 
@@ -139,6 +147,9 @@ function harness(options: {
           return null;
         },
         async all() {
+          if (query.includes('ORDER BY ps.created_at')) {
+            return { results: [{ id: 'photo-1', pet_name: 'そら', pet_gender: 'male' }] };
+          }
           if (query.includes('FROM nen_photo_publications pub')) {
             return { results: [{ id: 'publication-1', photo_id: 'photo-1', view_count: null, version: 2 }] };
           }
@@ -153,7 +164,6 @@ function harness(options: {
           if (query.includes('FROM nen_photo_review_events')) {
             return { results: options.reviewHistory ?? [] };
           }
-          if (query.includes('ORDER BY ps.created_at')) return { results: [{ id: 'photo-1' }] };
           return { results: [] };
         },
         async run() {
@@ -237,7 +247,22 @@ describe('NEN photo review', () => {
     const list = statements.find((entry) => entry.query.includes('ORDER BY ps.created_at'));
     expect(list?.query).toContain('ps.line_account_id = ? AND f.line_account_id = ?');
     // 絞り込みの2値のあとは、続きを取るための枚数と開始位置（#666）。
-    expect(list?.bindings).toEqual(['account-a', 'account-a', 200, 0]);
+    // 先頭の1値はポイント手続きの「要対応」判定に使う24時間前の区切り（PHOTO-06）。
+    expect(list?.bindings).toEqual([expect.any(String), 'account-a', 'account-a', 200, 0]);
+  });
+
+  it('写真一覧へ共通規則で作ったペットの呼び名を追加する', async () => {
+    const { app, statements } = harness();
+    const response = await app.request('/api/nen-members/photos?accountId=account-a');
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: Array<Record<string, unknown>> };
+    expect(body.data[0]).toMatchObject({
+      pet_name: 'そら',
+      pet_gender: 'male',
+      pet_call_name: 'そらくん',
+    });
+    const list = statements.find((entry) => entry.query.includes('ORDER BY ps.created_at'));
+    expect(list?.query).toContain('p.gender AS pet_gender');
   });
 
   it('returns a review derivative and risks without an original object key', async () => {
@@ -480,10 +505,16 @@ describe('NEN photo review', () => {
     expect(await response.json()).toMatchObject({
       data: { awardedPoints: 5, pointBalance: null, pointSync: 'pending' },
     });
+    const submissionUpdate = batches[0].find((entry) => entry.query.includes('UPDATE nen_photo_submissions'));
+    expect(submissionUpdate?.query).toContain(
+      "public_image_url = CASE WHEN ? = 'adopted'",
+    );
+    expect(submissionUpdate?.bindings).toContain('adopted');
     const outbox = batches[0].find((entry) => entry.query.includes('INSERT INTO nen_photo_reward_outbox'));
+    // 版の鍵は SQL の文字から束縛へ移った (#817)。値は同じ legacy-5・5pt。
     expect(outbox?.bindings).toEqual([
       expect.any(String), 'photo-1', 'account-a', 'friend-1', 'customer-1',
-      'nen-photo:photo-1', 5,
+      'nen-photo:photo-1', 'legacy-5', 5,
       '2026-08-28 03:00:00', '2026-08-28 03:00:00', '2026-08-28 03:00:00',
     ]);
   });
@@ -791,7 +822,7 @@ describe('NEN photo review', () => {
     expect(list?.query).toContain("p.name LIKE ? ESCAPE '\\'");
     expect(list?.query).toContain("f.display_name LIKE ? ESCAPE '\\'");
     expect(list?.bindings).toEqual([
-      'account-a', 'account-a', '%50\\%\\_\\\\%', '%50\\%\\_\\\\%', '%50\\%\\_\\\\%', 200, 0,
+      expect.any(String), 'account-a', 'account-a', '%50\\%\\_\\\\%', '%50\\%\\_\\\\%', '%50\\%\\_\\\\%', 200, 0,
     ]);
   });
 
@@ -801,6 +832,6 @@ describe('NEN photo review', () => {
     expect(response.status).toBe(200);
     const list = statements.find((entry) => entry.query.includes('ORDER BY ps.created_at'));
     expect(list?.query).not.toContain('LIKE');
-    expect(list?.bindings).toEqual(['account-a', 'account-a', 200, 0]);
+    expect(list?.bindings).toEqual([expect.any(String), 'account-a', 'account-a', 200, 0]);
   });
 });

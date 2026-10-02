@@ -14,6 +14,11 @@ compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 account_id = "55f40f5577bd68828d67716f8d900642"
 
+# 他社向けサービス用の検証APIドメイン。既存の workers.dev URL も併存して使える。
+routes = [
+  { pattern = "stg-api.musubo.jp", custom_domain = true }
+]
+
 [assets]
 directory = "dist/client"
 binding = "ASSETS"
@@ -35,6 +40,12 @@ bucket_name = "musubo-raw-mail-stg"
 [ai]
 binding = "AI"
 
+# バナー生成の用途寸法への整形（Cloudflare Images・R120）。
+# R2 の `IMAGES` と名前が重なるため `CF_IMAGES` にしている。
+# 注意: Images の有効化が必要か・変換回ごとの料金を、配備の前にオーナーへ確認する。
+[images]
+binding = "CF_IMAGES"
+
 [[queues.producers]]
 binding = "CODEX_MENTION_QUEUE"
 queue = "nen-codex-mentions-stg"
@@ -47,18 +58,21 @@ max_retries = 5
 retry_delay = 60
 
 [vars]
+DEPLOY_ENV = "staging"
 RESTAURANT_TEST_ENABLED = "true"
+GOOGLE_BUSINESS_OAUTH_CLIENT_ID = "904803281314-ufqj5bmmhqnl9hv58uigo4ct6jvfmdkg.apps.googleusercontent.com"
+GOOGLE_BUSINESS_WRITE_ENABLED = "false"
 WORKER_NAME = "nen-line-stg"
 ADMIN_PAGES_PROJECT = "nen-line-stg-admin"
 LIFF_PAGES_PROJECT = ""
 D1_DATABASE_ID = "00bd7aca-950b-4d67-b865-fd7427b9c43f"
 MANIFEST_URL = "https://github.com/Shudesu/line-harness-oss/releases/latest/download/release-manifest.json"
-WORKER_PUBLIC_URL = "https://nen-line-stg.skmtmst.workers.dev"
-WORKER_URL = "https://nen-line-stg.skmtmst.workers.dev"
-ADMIN_PUBLIC_URL = "https://nen-line-stg-admin.pages.dev"
-ADMIN_ORIGIN = "https://nen-line-stg-admin.pages.dev"
+WORKER_PUBLIC_URL = "https://stg-api.musubo.jp"
+WORKER_URL = "https://stg-api.musubo.jp"
+ADMIN_PUBLIC_URL = "https://stg-admin.musubo.jp"
+ADMIN_ORIGIN = "https://stg-admin.musubo.jp,https://nen-line-stg-admin.pages.dev"
 ADMIN_ALLOW_CROSS_SITE = "true"
-LIFF_PUBLIC_URL = "https://nen-line-stg.skmtmst.workers.dev"
+LIFF_PUBLIC_URL = "https://stg-api.musubo.jp"
 CF_ACCOUNT_ID = "55f40f5577bd68828d67716f8d900642"
 MEDIA_R2_BUCKET_NAME = "nen-line-stg-images"
 NEN_EC_BASE_URL = "https://stg.nen-petfood.com"

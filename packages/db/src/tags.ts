@@ -1099,6 +1099,20 @@ export async function addTagToFriend(
   db: D1Database,
   friendId: string,
   tagId: string,
+  options?: {
+    /**
+     * R403: 連動処理の冪等キー。受信Webhookの再試行など、同じ出来事を
+     * 繰り返す呼び出し元が安定した値を渡す。同じ値の再実行は二重計上しない。
+     * 省略時は従来どおり付与時刻入りの値を使う（単発の手動付与用）。
+     */
+    sourceEventId?: string;
+    /**
+     * R403: true のとき連動処理の失敗を握りつぶさず投げる。
+     * 受信Webhookの受領は失敗状態で残り、同じ受信の再送で欠けた記録だけを
+     * 復旧できる。手動付与など単発の呼び出しは従来どおり false。
+     */
+    strictSideEffects?: boolean;
+  },
 ): Promise<boolean> {
   const now = jstNow();
   const result = await db
@@ -1109,12 +1123,15 @@ export async function addTagToFriend(
     .bind(friendId, tagId, now)
     .run();
   const added = (result.meta?.changes ?? 0) > 0;
-  if (added) {
+  const sideEffectKey = options?.sourceEventId ?? `${friendId}:${tagId}:${now}`;
+  // 安定キーがある再実行は、タグ行が既にあっても連動処理を試す
+  // （冪等キーで二重計上しない）。単発の付け直しは従来どおり何もしない。
+  if (added || options?.sourceEventId !== undefined) {
     try {
       await enqueueMileageEvent(db, {
         eventType: 'tag_added',
         source: 'tag',
-        sourceEventId: `${friendId}:${tagId}:${now}`,
+        sourceEventId: sideEffectKey,
         friendId,
         subjectKey: tagId,
         metadata: { tagId },
@@ -1122,6 +1139,7 @@ export async function addTagToFriend(
       });
     } catch (error) {
       console.error('tag mileage enqueue failed:', error);
+      if (options?.strictSideEffects) throw error;
     }
     // 「タグが付いた」を成果として数える(#648)。
     //
@@ -1132,23 +1150,33 @@ export async function addTagToFriend(
     // 画面の起点一覧は「タグが付いた」としか書いておらず、誰が付けたかで
     // 数えたり数えなかったりする境界は運用者に説明できない。
     //
-    // 冪等キーは付与時刻を含む。同じ(友だち,タグ)の2回目は上の
+    // 冪等キーは安定キー（受領起点）か付与時刻。単発の付け直しは上の
     // INSERT OR IGNORE が 0 行になり added=false なので、ここへ来ない。
-    // 失敗しても握って進む。タグ付与そのものを巻き添えにしない。
+    // 単発では失敗しても握って進む。タグ付与そのものを巻き添えにしない。
+    // R403: strict のときは失敗を残す。欠けた記録は同じ安定キーの再送で復旧する。
     try {
-      await recordConversionSourceEvent(db, {
+      const conversion = await recordConversionSourceEvent(db, {
         sourceType: 'tag_added',
         friendId,
-        sourceEventId: `${friendId}:${tagId}:${now}`,
+        sourceEventId: sideEffectKey,
         metadata: { tagId },
       });
+      if (options?.strictSideEffects && conversion.failed > 0) {
+        throw new Error(`tag conversion record failed: ${conversion.failed}`);
+      }
     } catch (error) {
       console.error('tag conversion record failed:', error);
+      if (options?.strictSideEffects) throw error;
     }
   }
   return added;
 }
 
+/**
+ * M955: `enqueueRetroactive` が真のとき、マイル設定の更新と遡及キューの
+ * 投入を同じD1バッチで確定する。投入だけ落ちたら設定の更新も巻き戻り、
+ * 「保存は確定・遡及は消失」にならない。戻り値の `queued` は積んだ件数。
+ */
 export async function updateTagMileageSettings(
   db: D1Database,
   tagId: string,
@@ -1158,37 +1186,48 @@ export async function updateTagMileageSettings(
     multiplierBps: number | null;
     multiplierPriority: number;
   },
-): Promise<Tag | null> {
-  await db
-    .prepare(
-      `UPDATE tags
-          SET mileage_reward = ?, referral_mileage_reward = ?,
-              mileage_multiplier_bps = ?, mileage_multiplier_priority = ?
-        WHERE id = ?`,
-    )
-    .bind(
-      input.rewardMiles,
-      input.referralRewardMiles,
-      input.multiplierBps,
-      input.multiplierPriority,
-      tagId,
-    )
-    .run();
-  return db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(tagId).first<Tag>();
+  options: { enqueueRetroactive?: boolean } = {},
+): Promise<{ tag: Tag | null; queued: number }> {
+  const statements: D1PreparedStatement[] = [
+    db
+      .prepare(
+        `UPDATE tags
+            SET mileage_reward = ?, referral_mileage_reward = ?,
+                mileage_multiplier_bps = ?, mileage_multiplier_priority = ?
+          WHERE id = ?`,
+      )
+      .bind(
+        input.rewardMiles,
+        input.referralRewardMiles,
+        input.multiplierBps,
+        input.multiplierPriority,
+        tagId,
+      ),
+  ];
+  const enqueueStart = statements.length;
+  if (options.enqueueRetroactive) {
+    statements.push(...tagRetroactiveEnqueueStatements(db, tagId, jstNow()));
+  }
+  const results = await db.batch(statements);
+  const changes = (index: number) =>
+    (results[index] as unknown as { meta?: { changes?: number } } | undefined)?.meta?.changes ?? 0;
+  const queued = options.enqueueRetroactive ? changes(enqueueStart + 1) + changes(enqueueStart + 2) : 0;
+  const tag = await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(tagId).first<Tag>();
+  return { tag, queued };
 }
 
 /**
- * When an administrator enables a reward on an existing tag, normalize its
- * historic assignments into the same queue. INSERT OR IGNORE plus ledger
- * idempotency makes repeated saves safe.
+ * 遡及キューの3文を組み立てる。M955: タグの保存と同じD1バッチへ積むことで、
+ * 投入だけ落ちても「保存は確定・遡及は消失」にならない（巻き戻る）。
+ * 単独で使うときは `enqueueHistoricTagMileage` を使う（中身は同じ）。
  */
-export async function enqueueHistoricTagMileage(
+export function tagRetroactiveEnqueueStatements(
   db: D1Database,
   tagId: string,
-): Promise<number> {
-  const now = jstNow();
-  await db
-    .prepare(
+  now: string,
+): D1PreparedStatement[] {
+  return [
+    db.prepare(
       `INSERT OR IGNORE INTO engagement_events
          (id, program_id, idempotency_key, event_type, source, source_event_id,
           actor_user_id, actor_friend_id, metadata, occurred_at, created_at)
@@ -1201,12 +1240,8 @@ export async function enqueueHistoricTagMileage(
          FROM friend_tags ft
          JOIN friends f ON f.id = ft.friend_id
         WHERE ft.tag_id = ?`,
-    )
-    .bind(now, tagId)
-    .run();
-
-  const inserted = await db
-    .prepare(
+    ).bind(now, tagId),
+    db.prepare(
       `INSERT OR IGNORE INTO mileage_event_queue
          (engagement_event_id, status, attempts, available_at,
           applied_published_snapshot, created_at, updated_at)
@@ -1221,12 +1256,8 @@ export async function enqueueHistoricTagMileage(
         WHERE ee.event_type = 'tag_added'
           AND ee.source = 'tag'
           AND json_extract(ee.metadata, '$.tagId') = ?`,
-    )
-    .bind(now, now, now, tagId)
-    .run();
-
-  const reset = await db
-    .prepare(
+    ).bind(now, now, now, tagId),
+    db.prepare(
       `UPDATE mileage_event_queue
           SET status = 'pending', attempts = 0, available_at = ?,
               processing_started_at = NULL, processed_at = NULL,
@@ -1251,10 +1282,24 @@ export async function enqueueHistoricTagMileage(
              )
         )
           AND status IN ('processed', 'failed')`,
-    )
-    .bind(now, now, tagId)
-    .run();
-  return (inserted.meta?.changes ?? 0) + (reset.meta?.changes ?? 0);
+    ).bind(now, now, tagId),
+  ];
+}
+
+/**
+ * When an administrator enables a reward on an existing tag, normalize its
+ * historic assignments into the same queue. INSERT OR IGNORE plus ledger
+ * idempotency makes repeated saves safe.
+ */
+export async function enqueueHistoricTagMileage(
+  db: D1Database,
+  tagId: string,
+): Promise<number> {
+  const now = jstNow();
+  const results = await db.batch(tagRetroactiveEnqueueStatements(db, tagId, now));
+  const changes = (index: number) =>
+    (results[index] as unknown as { meta?: { changes?: number } } | undefined)?.meta?.changes ?? 0;
+  return changes(1) + changes(2);
 }
 
 // ─── 既存友だちへの遡及マイル：実行前の事前計算 ──────────────────

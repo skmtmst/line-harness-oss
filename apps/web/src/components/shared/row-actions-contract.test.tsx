@@ -105,4 +105,43 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
     expect(css).toMatch(/\.rowActions\s*{[^}]*white-space:\s*nowrap/s)
     expect(css).toMatch(/\.rowActions\s*{[^}]*position:\s*relative/s)
   })
+
+  it('行の文字ボタンは32px級でアイコン操作と高さをそろえる（★V7行内32）', () => {
+    const src = read('row-actions.tsx')
+    expect(src).toContain('size="compact"')
+    const buttonCss = read('button.module.css')
+    expect(buttonCss).toMatch(/\.compact\s*{[^}]*height:\s*32px/s)
+  })
+
+  it('「⋯」が無い行でも同じ幅の場所を取り、主ボタンの位置を全行でそろえる', () => {
+    /*
+     * 一斉配信の送信済み行は「⋯」が無く、主ボタン「詳細」だけが
+     * 右へずれて行ごとにそろわなかった。メニュー無しでも「⋯」
+     * と同じ幅の場所取りを置き、詳細の位置をそろえる。
+     * （CSSは実ブラウザで効く。vitestはCSSを読まないため、
+     * 場所取りの有無は描画結果・大きさはCSS文面で見る。）
+     */
+    const without = renderToStaticMarkup(
+      <RowActions subjectName="送信済みの配信" detail={{ href: '/broadcasts/detail?id=s1' }} />,
+    )
+    const withMenu = renderToStaticMarkup(
+      <RowActions
+        subjectName="下書きの配信"
+        detail={{ href: '/broadcasts/detail?id=d1' }}
+        menuItems={[{ id: 'copy', label: '複製する', onSelect: vi.fn() }]}
+      />,
+    )
+    // メニュー無しでも場所取りがある（見せない・読ませない）。
+    expect(without).toContain('data-more-placeholder')
+    expect(without).toContain('aria-hidden="true"')
+    // 本物の「⋯」がある行には場所取りを置かない（二重に幅を取らない）。
+    expect(withMenu).toContain('その他操作')
+    expect(withMenu).not.toContain('data-more-placeholder')
+    // 場所取りは「⋯」ボタンと同じ大きさ（32px・指では44px）。
+    const css = read('row-actions.module.css')
+    expect(css).toMatch(/\.morePlaceholder\s*{[^}]*width:\s*32px/s)
+    expect(css).toMatch(/\.morePlaceholder\s*{[^}]*height:\s*32px/s)
+    expect(css).toMatch(/@media \(pointer: coarse\)\s*{[\s\S]*?\.morePlaceholder\s*{[^}]*width:\s*44px/s)
+    expect(css).toMatch(/@media \(pointer: coarse\)\s*{[\s\S]*?\.morePlaceholder\s*{[^}]*height:\s*44px/s)
+  })
 })

@@ -6,6 +6,11 @@ import { ApiError, type WebinarListItem, type WebinarListParams, type WebinarLis
 import WebinarsPage from './page'
 import { webinarLoadFailure } from './webinar-load-failure'
 
+/* 一覧の行操作（R94 参加者・分析・演出への移動）が使う router の撮影口。 */
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+}))
+
 const {
   WEBINAR_SEARCH_DEBOUNCE_MS,
   WebinarArchiveConfirm,
@@ -233,12 +238,45 @@ describe('ウェビナー一覧の表示状態と操作', () => {
       expect(html).not.toContain('min-h-[360px]')
       expect(html).not.toContain('bg-canvas')
     }
-    /* 行があるときは一覧の器で包む */
+    /*
+     * 行があるときは一覧の器で包む。器の高さは中身に任せる——
+     * 固定の最小高さがあると1行の一覧でも表の下に大きな空白ができ、
+     * 件数表示だけが枠の外に取り残されて見えた（監査 A8）。
+     */
     const withRows = renderToStaticMarkup(
       <WebinarListContent {...common} visibleItems={[webinar()]} panelGrand={1} />,
     )
-    expect(withRows).toContain('min-h-[360px]')
+    /*
+     * #670 10: 1行だけのときに約350pxの空領域が残るため、器に最低高さを
+     * 付けない。中身に吸着する。
+     */
+    expect(withRows).not.toContain('min-h-[')
     expect(withRows).toContain('入門ウェビナー')
+  })
+
+  it('件数は器の内側の脚注に出て、枠外に孤立しない(#670 10)', () => {
+    const common = {
+      accountLoading: false,
+      loading: false,
+      selectedAccountId: 'account-1',
+      accountsCount: 1,
+      loadFailure: null,
+      visibleItems: [webinar()],
+      panelGrand: 1,
+      refreshing: false,
+      onRetry: vi.fn(),
+      onArchive: vi.fn(),
+    }
+    const withFooter = renderToStaticMarkup(
+      <WebinarListContent {...common} footer={<p>1〜1件 / 全1件</p>} />,
+    )
+    const cardAt = withFooter.indexOf('rounded-card')
+    const footerAt = withFooter.indexOf('1〜1件 / 全1件')
+    /* 脚注は器の内側(rounded-card の開始より後ろ)に描く */
+    expect(cardAt).toBeGreaterThanOrEqual(0)
+    expect(footerAt).toBeGreaterThan(cardAt)
+    const withoutFooter = renderToStaticMarkup(<WebinarListContent {...common} />)
+    expect(withoutFooter).not.toContain('border-t border-hairline px-4 py-3')
   })
 
   it('新規作成の操作名は画面内で一致する(DETAIL-02)', () => {
@@ -256,8 +294,9 @@ describe('ウェビナー一覧の表示状態と操作', () => {
         onArchive={vi.fn()}
       />,
     )
-    expect(html).toContain('ウェビナーを作成')
-    expect(html).not.toContain('ウェビナーを作る')
+    expect(html).toContain('＋ ウェビナーを作る')
+    expect(html).not.toContain('ウェビナーを作成')
+    expect(html).not.toContain('ウェビナーをつくる')
   })
 
   it('再検索が失敗しても直前の行を残し、再読み込み操作を受け付ける', async () => {

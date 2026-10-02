@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChoiceCard } from '@/components/shared/create-page'
 import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import { ApiError, api } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 type Direction = 'increase' | 'decrease'
 
@@ -129,7 +131,7 @@ export default function ActionScoreAdjustmentDialog({
         <section className="rounded-control bg-canvas-sunken p-4">
           <p className="text-xs font-semibold text-ink-faint">だれの点数を動かしますか</p>
           <p className="mt-2 font-bold text-ink">{friendName}</p>
-          <p className="mt-1 text-sm text-ink-secondary">いまの点数 {currentScore.toLocaleString('ja-JP')} 点</p>
+          <p className="mt-1 text-sm text-ink-secondary">いまの点数 {formatNumber(currentScore)} 点</p>
         </section>
 
         {step === 'input' ? (
@@ -156,24 +158,24 @@ export default function ActionScoreAdjustmentDialog({
             <Field label="理由" htmlFor="score-adjustment-reason" required note="履歴に残り、あとから実行者と一緒に確認できます。">
               <TextArea id="score-adjustment-reason" rows={3} value={reason} onChange={(event) => setReason(event.target.value)} />
             </Field>
-            <p className="rounded-control bg-info-bg p-3 text-xs leading-5 text-ink-secondary">
+            <Notice tone="info">
               点数は、設定された帯の下限〜上限の範囲でしか動かせません。範囲をまたぐ変更は実行されません。
-            </p>
+            </Notice>
           </>
         ) : (
           <section aria-label="変更内容の確認" className="space-y-3">
             <h3 className="text-sm font-bold text-ink">この変更で起きること</h3>
             <dl className="overflow-hidden rounded-panel border border-hairline text-sm">
-              <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{currentScore.toLocaleString('ja-JP')} 点</dd></div>
-              <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{delta > 0 ? '+' : ''}{delta.toLocaleString('ja-JP')} 点</dd></div>
-              <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-bold text-ink">{scoreAfter.toLocaleString('ja-JP')} 点</dd></div>
+              <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{formatNumber(currentScore)} 点</dd></div>
+              <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-medium text-danger' : 'font-medium text-accent-deep'}>{delta > 0 ? '+' : ''}{formatNumber(delta)} 点</dd></div>
+              <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-medium text-ink">{formatNumber(scoreAfter)} 点</dd></div>
             </dl>
             <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
               <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">理由</dt><dd className="col-span-2 whitespace-pre-wrap text-ink">{reason.trim()}</dd></div>
             </dl>
-            <div className="rounded-control bg-warning-bg p-3 text-xs leading-5 text-warning">
+            <Notice tone="warn">
               既存の履歴は書き換えず、理由と実行者を持つ新しい調整行を追加します。同じ操作を再送しても二重反映しません。
-            </div>
+            </Notice>
           </section>
         )}
       </div>

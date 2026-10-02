@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import { ApiError, api, type SupportMarkAutomationEvent, type SupportMarkAutomationRule } from '@/lib/api'
@@ -82,6 +83,13 @@ export default function SupportMarkRulesPanel({
   */
   const requestRef = useRef<RequestAt>({ accountId: null, markId: null, generation: 0 })
 
+  /*
+    **新しいルール1件に要求キー1つ。** 二度押し・応答喪失の送り直しで
+    同じルールが2件できないよう、作る窓を開けるたびに取り直す。
+    保存に失敗した直しの再送は同じキーで送る。
+  */
+  const ruleKeyRef = useRef<string>(crypto.randomUUID())
+
   const load = useCallback(async () => {
     if (!accountId || !markId) return
     requestRef.current = {
@@ -158,6 +166,7 @@ export default function SupportMarkRulesPanel({
     setDraft(EMPTY_DRAFT)
     setFailure(null)
     setTouched(false)
+    ruleKeyRef.current = crypto.randomUUID()
   }
 
   const openEdit = (rule: SupportMarkAutomationRule) => {
@@ -177,7 +186,7 @@ export default function SupportMarkRulesPanel({
     try {
       const res = call.kind === 'update'
         ? await api.supportMarks.updateAutomationRule(call.ruleId, accountId, call.expectedVersion, body)
-        : await api.supportMarks.createAutomationRule(markId, accountId, body)
+        : await api.supportMarks.createAutomationRule(markId, accountId, body, ruleKeyRef.current)
       if (!res.success) throw new Error('failed')
       setEditingId(null)
       await load()
@@ -225,7 +234,7 @@ export default function SupportMarkRulesPanel({
           onClick={openNew}
           disabled={state === 'forbidden' || state === 'not-connected'}
         >
-          ルールを追加
+          ＋ ルールを作る
         </Button>
       </header>
 
@@ -299,7 +308,7 @@ export default function SupportMarkRulesPanel({
 
       {editingId !== null ? (
         <div className={styles.form}>
-          <h4 className={styles.formTitle}>{editingId === 'new' ? 'ルールを追加' : 'ルールを変更'}</h4>
+          <h4 className={styles.formTitle}>{editingId === 'new' ? 'ルールを作る' : 'ルールを変更'}</h4>
           <label className={styles.field}>
             <span className={styles.label}>ルールの名前</span>
             <input
@@ -366,14 +375,10 @@ export default function SupportMarkRulesPanel({
             </label>
           </div>
 
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={draft.isActive}
-              onChange={(e) => setDraft((d) => ({ ...d, isActive: e.target.checked }))}
-            />
-            このルールを動かす
-          </label>
+          <Checkbox
+            checked={draft.isActive}
+            onCheckedChange={(checked) => setDraft((d) => ({ ...d, isActive: checked }))}
+          >このルールを動かす</Checkbox>
 
           <div className={styles.formActions}>
             <Button onClick={() => { setEditingId(null); setFailure(null) }} disabled={saving}>
@@ -385,9 +390,7 @@ export default function SupportMarkRulesPanel({
               data-qa-open="GMvBd-save"
               onMouseDown={() => setTouched(true)}
               onClick={() => void save()}
-              disabled={saving || errors.length > 0}
-            >
-              {saving ? '保存中…' : '保存'}
+              disabled={saving || errors.length > 0} busy={saving}>保存する
             </Button>
           </div>
         </div>

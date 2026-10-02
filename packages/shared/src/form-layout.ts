@@ -260,7 +260,7 @@ export const FORM_OPTIONS_DEFAULT: FormOptions = {
   thanksText: "ご回答ありがとうございました。",
   restorePrevious: false,
   pageTitle: null,
-  submitLabel: "送信",
+  submitLabel: "送信する",
   prevLabel: "前へ",
   nextLabel: "次へ",
   sectionHeader: "pageNumber",
@@ -627,6 +627,23 @@ export function normalizeFormTheme(input: unknown): FormTheme {
   };
 }
 
+/** 文字と背景の組み合わせに求めるコントラスト比（WCAG AA と同じ 4.5:1）。 */
+export const FORM_THEME_MIN_CONTRAST = 4.5;
+
+/**
+ * テーマの文字色と背景色の組み合わせが読めるか。
+ *
+ * P（回答フォームの読みにくい色）：お客さま画面は文字（text）を背景（sub）
+ * の上に置く（`apps/liff/src/pages/Form.tsx`・`form-preview.tsx`）。この2色の
+ * 差が 4.5:1 未満なら保存できない。測った比を文に入れて返す。問題なければ null。
+ */
+export function formThemeContrastError(theme: FormTheme): string | null {
+  const ratio = contrastRatio(theme.text, theme.sub);
+  if (ratio >= FORM_THEME_MIN_CONTRAST) return null;
+  const shown = Math.floor(ratio * 10) / 10;
+  return `文字と背景の色の組み合わせが読みにくいため保存できません（いま ${shown}:1、4.5:1以上が必要です）。文字か背景の色を変えてください`;
+}
+
 /** 主ボタンの背景に対して、4.5:1以上を優先して読みやすい文字色を返す。 */
 export function formThemeButtonText(theme: FormTheme): string {
   const white = contrastRatio(theme.main, "#ffffff");
@@ -892,7 +909,26 @@ export function validateFormDefinition(layout: FormLayout): string | null {
   ];
 
   for (const group of groups) {
+    let imageCount = 0;
     for (const block of group.blocks) {
+      /*
+       * R197: 画像のURLと、押したときに開くURLもボタンのリンク先と
+       * 同じ決めごとで見る。空は「未指定」（下書きでは許す）とし、
+       * 入っているのにURLの形でないものだけ止める。
+       */
+      if (block.kind === "image") {
+        imageCount += 1;
+        const at = `「${group.where}」の${imageCount}枚目の画像`;
+        const mediaUrl = (block.mediaUrl ?? "").trim();
+        if (mediaUrl !== "" && !isHttpUrl(mediaUrl)) {
+          return `${at}のURLがURLの形ではありません`;
+        }
+        const linkUrl = (block.linkUrl ?? "").trim();
+        if (linkUrl !== "" && !isHttpUrl(linkUrl)) {
+          return `${at}を押したときに開くURLがURLの形ではありません`;
+        }
+        continue;
+      }
       if (block.kind === "input") {
         const title = block.label.trim() || block.name;
         const at = `「${group.where}」の「${title}」`;
@@ -1134,16 +1170,50 @@ function validateFormBranchGraph(layout: FormLayout): string | null {
 }
 
 /**
+ * 初期値が、その欄の回答の決まりに合っているか。
+ *
+ * R196: 空の初期値は「未設定」で許す。入っているのに型・選択肢・
+ * 入力制限に合わないものは、公開の直前で止める。そのまま公開すると
+ * 管理者が入れた初期値のせいで回答者が送信できなくなるため。
+ * 判定は回答検証 `validateAnswer` と同じものを使う（必須だけ外す。
+ * 初期値が空でも回答者が入れればよい）。
+ */
+function validateFormDefaultValues(layout: FormLayout): string | null {
+  const groups: { where: string; blocks: FormBlock[] }[] = [
+    { where: "共通ヘッダ", blocks: layout.header },
+    ...layout.sections.map((section, index) => ({
+      where: section.name || `セクション${index + 1}`,
+      blocks: section.blocks,
+    })),
+  ];
+
+  for (const group of groups) {
+    for (const block of group.blocks) {
+      if (block.kind !== "input") continue;
+      if (block.defaultValue === undefined || block.defaultValue === "") continue;
+      const title = block.label.trim() || block.name;
+      const at = `「${group.where}」の「${title}」`;
+      const error = validateAnswer({ ...block, required: false }, block.defaultValue);
+      if (error) return `${at}の初期値：${error}`;
+    }
+  }
+  return null;
+}
+
+/**
  * 公開できる状態か。返すのは画面に出す文言で、問題なければ null。
  *
  * 保存時の定義検証に加えて、下書きでは許すが公開では止めるものを見る:
- * 分岐の循環・消えた行き先・共通ヘッダの分岐・選ぶ先が空の動作。
+ * 分岐の循環・消えた行き先・共通ヘッダの分岐・選ぶ先が空の動作・
+ * 回答の決まりに合わない初期値。
  * 管理画面の「公開して保存」と公開APIの両方から呼ぶ。
  */
 export function validateFormForPublish(layout: FormLayout): string | null {
   return (
     validateFormDefinition(layout) ??
     validateFormActionsReady(layout) ??
-    validateFormBranchGraph(layout)
+    validateFormBranchGraph(layout) ??
+    validateFormDefaultValues(layout) ??
+    formThemeContrastError(normalizeFormTheme(layout.options?.theme))
   );
 }

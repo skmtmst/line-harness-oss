@@ -6,6 +6,8 @@
  * テストしやすくしておく。
  */
 
+import { formatDateTime, formatRelative } from './format'
+
 export type BannerPresetGroup = 'line' | 'sns'
 
 export interface BannerPreset {
@@ -136,6 +138,23 @@ export interface BannerRunResult {
   generation: BannerGeneration
   image: BannerImage | null
   finished: boolean
+  /** 用途の指定寸法へ整形できたか。false のときは元の大きさのまま（検証環境で確認）。 */
+  resized?: boolean
+  targetWidth?: number
+  targetHeight?: number
+}
+
+/** 切り抜きの位置。用途寸法へ cover で整えるときに残す側（R120）。 */
+export type BannerCropPosition = 'center' | 'top' | 'bottom'
+
+export const CROP_POSITION_OPTIONS: Array<{ value: BannerCropPosition; label: string }> = [
+  { value: 'center', label: '中央' },
+  { value: 'top', label: '上' },
+  { value: 'bottom', label: '下' },
+]
+
+export function isBannerCropPosition(value: string): value is BannerCropPosition {
+  return value === 'center' || value === 'top' || value === 'bottom'
 }
 
 export interface BannerDeliveryResult {
@@ -147,6 +166,8 @@ export interface BannerDeliveryResult {
 export interface BannerGenerationInput {
   mode: BannerMode
   presetKey: string
+  /** 切り抜きの位置。run のときに送り、条件の登録ではサーバーが無視する。 */
+  cropPosition: BannerCropPosition
   textLines: string[]
   mainColor: string | null
   subColor: string | null
@@ -163,6 +184,7 @@ export interface BannerGenerationInput {
 export const EMPTY_GENERATION_INPUT: BannerGenerationInput = {
   mode: 'banner',
   presetKey: '',
+  cropPosition: 'center',
   textLines: [''],
   mainColor: null,
   subColor: null,
@@ -279,51 +301,28 @@ function gcd(a: number, b: number): number {
  * すでに時差（Z / +09:00）が付いているものはそのまま。
  */
 export function parseJstDateTime(value: string): Date {
+  // API の中身が欠けていても `undefined.replace` で落ちない。呼び出し側は NaN を「—」にする。
+  if (typeof value !== 'string' || value.trim() === '') return new Date(Number.NaN)
   const normalized = value.replace(' ', 'T')
   const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized)
   return new Date(hasOffset ? normalized : `${normalized}+09:00`)
 }
 
-/** 「9/12 21:40」。運用画面の基準は日本時間。 */
+/** 「9月12日（土）21:40」。運用画面の基準は日本時間（`@/lib/format`）。 */
 export function shortDateTime(iso: string, now = new Date()): string {
   const date = parseJstDateTime(iso)
   if (Number.isNaN(date.getTime())) return '—'
-  const fmt = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-  const parts = fmt.formatToParts(date)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
-  const sameYear =
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric' }).format(date) ===
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric' }).format(now)
-  const dayPart = `${get('month')}/${get('day')}`
-  const timePart = `${get('hour')}:${get('minute')}`
-  return sameYear ? `${dayPart} ${timePart}` : `${new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric' }).format(date)}/${dayPart} ${timePart}`
+  return formatDateTime(date, '—', now)
 }
 
 /**
- * 「3分前」「昨日」「9/5」。プロジェクトカードの「更新」に使う。
+ * 「3分前」「昨日 21:40」「9月5日（金）」。プロジェクトカードの「更新」に使う。
  * `docs/v6-common-rules.md` §2-7: 分の生表示は日で丸める。
  */
 export function relativeUpdated(iso: string, now = new Date()): string {
   const date = parseJstDateTime(iso)
   if (Number.isNaN(date.getTime())) return '—'
-  const diffMs = now.getTime() - date.getTime()
-  const minutes = Math.floor(diffMs / 60000)
-  if (minutes < 1) return 'たった今'
-  if (minutes < 60) return `${minutes}分前`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}時間前`
-  const days = Math.floor(hours / 24)
-  if (days === 1) return '昨日'
-  if (days < 7) return `${days}日前`
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')}`
+  return formatRelative(date, now)
 }
 
 /** 「412KB」「1.2MB」 */
@@ -416,6 +415,8 @@ export function inputFromGeneration(g: BannerGeneration): BannerGenerationInput 
   return {
     mode: g.mode,
     presetKey: g.presetKey,
+    // 切り抜き位置は保存していないので中央に戻す（R120・migration 不要のため）。
+    cropPosition: 'center',
     textLines: g.textLines.length > 0 ? [...g.textLines] : [''],
     mainColor: g.mainColor,
     subColor: g.subColor,

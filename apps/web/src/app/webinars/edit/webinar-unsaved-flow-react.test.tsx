@@ -91,13 +91,19 @@ vi.mock('@/components/shared/confirm-dialog', () => ({
     : null),
 }))
 
-vi.mock('@/components/shared/select-field', () => ({
-  default: ({ options, ...props }: React.ComponentProps<'select'> & { options: Array<{ value: string; label: string }> }) => (
-    <select {...props}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+vi.mock('@/components/shared/select', () => ({
+  default: ({ value, onChange, options, size: _size, ...props }: {
+    value: string
+    onChange?: (value: string) => void
+    options: Array<{ value: string; label: string }>
+    size?: string
+  } & React.ComponentProps<'select'>) => (
+    <select value={value} onChange={(event) => onChange?.(event.target.value)} {...props}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
   ),
 }))
 vi.mock('@/components/shared/sticky-bar', () => ({
-  default: ({ actions }: { actions: React.ReactNode }) => <div>{actions}</div>,
+  // 共通部品の契約どおり status も描く（status を落とすと未保存の印が見えなくなる）。
+  default: ({ actions, status }: { actions: React.ReactNode; status?: React.ReactNode }) => <div>{status}{actions}</div>,
 }))
 
 const webinar = {
@@ -282,14 +288,14 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
     expect(host.textContent).toContain('保存していない変更があります')
   })
 
-  it('「保存せずに移動」を選んだときだけ入力を捨てて一覧へ遷移する', async () => {
+  it('「保存せずに移る」を選んだときだけ入力を捨てて一覧へ遷移する', async () => {
     await openNotificationsPane()
     await act(async () => { buttonByText('通知を変更する').click() })
     await flush()
 
     await act(async () => { listLink().click() })
     await flush()
-    await act(async () => { buttonByText('保存せずに移動').click() })
+    await act(async () => { buttonByText('保存せずに移る').click() })
     await flush()
 
     expect(fixture.push).toHaveBeenCalledWith('/webinars')
@@ -301,7 +307,7 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
     await flush()
 
     /* 固定バーの「下書き保存」は通知の保存を呼ぶ。成功で未保存の印が降りる。 */
-    await act(async () => { buttonByText('下書き保存').click() })
+    await act(async () => { buttonByText('下書きを保存する').click() })
     await flush()
     expect(host.textContent).not.toContain('保存していない変更があります')
 
@@ -404,7 +410,7 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
     await flush()
 
     /* 固定バーの「下書き保存」は飾りではない。押せて、実際に保存する。 */
-    expect(buttonByText('下書き保存').disabled).toBe(false)
+    expect(buttonByText('下書きを保存する').disabled).toBe(false)
 
     await act(async () => { buttonContaining('動画へ').click() })
     await flush()
@@ -443,7 +449,7 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
     await flush()
 
     await act(async () => { fireEvent.change(titleInput(), { target: { value: '下書きで保存する題名' } }) })
-    await act(async () => { buttonByText('下書き保存').click() })
+    await act(async () => { buttonByText('下書きを保存する').click() })
     await flush()
 
     expect(putCalls()).toHaveLength(1)
@@ -497,10 +503,12 @@ describe('DETAIL-05 無反応のボタンを残さない', () => {
     await render()
     await flush()
 
-    await act(async () => { buttonByText('テスト送信').click() })
+    await act(async () => { buttonByText('テストを送る').click() })
     await flush()
     /* 送信前に相手と文面を確認する。押した瞬間に送らない。 */
-    await act(async () => { buttonByText('テスト送信する').click() })
+    const confirm = Array.from(host.querySelectorAll('[role="dialog"] button')).find((b) => b.textContent?.trim() === 'テストを送る') as HTMLButtonElement | undefined
+    expect(confirm).toBeDefined()
+    await act(async () => { confirm!.click() })
     await flush()
 
     expect(net.calls.some((call) => call.method === 'POST' && call.path.endsWith('/notifications/test'))).toBe(true)

@@ -15,7 +15,7 @@ const dbMocks = {
   getStaffMembers: vi.fn(),
   getStaffById: vi.fn(),
   getStaffByInviteTokenHash: vi.fn(),
-  createStaffMember: vi.fn(),
+  createStaffMemberWithScopes: vi.fn(),
   updateStaffMember: vi.fn(),
   deleteStaffMember: vi.fn(),
   countLoginAudit: vi.fn(),
@@ -107,7 +107,7 @@ describe('スタッフの店舗権限範囲', () => {
     dbMocks.getStaffByApiKey.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a' }));
     dbMocks.getLineAccounts.mockResolvedValue(accounts);
     dbMocks.getStaffMembers.mockResolvedValue([]);
-    dbMocks.createStaffMember.mockResolvedValue(row({ id: 'new-staff', role: 'staff', is_active: 0, tenant_id: 'tenant-a', account_scope: 'all' }));
+    dbMocks.createStaffMemberWithScopes.mockResolvedValue(row({ id: 'new-staff', role: 'staff', is_active: 0, tenant_id: 'tenant-a', account_scope: 'all' }));
   });
 
   const invitation = (scope: 'all' | 'accounts', ids: string[]) => ({
@@ -124,19 +124,24 @@ describe('スタッフの店舗権限範囲', () => {
   it('全店舗では紐付けを空にして保存する', async () => {
     const res = await send('/api/staff', 'POST', invitation('all', ['line-1']));
     expect(res.status).toBe(201);
-    expect(dbMocks.replaceStaffAccountScopes).toHaveBeenCalledWith(env.DB, 'new-staff', []);
+    // M957: 本人と担当範囲は同じ取引で書く。範囲は作成の第2引数で渡す。
+    expect(dbMocks.createStaffMemberWithScopes).toHaveBeenCalledWith(
+      env.DB, expect.objectContaining({ account_scope: 'all' }), [],
+    );
   });
 
   it('指定店舗を2つ保存する', async () => {
     const res = await send('/api/staff', 'POST', invitation('accounts', ['line-1', 'line-2']));
     expect(res.status).toBe(201);
-    expect(dbMocks.replaceStaffAccountScopes).toHaveBeenCalledWith(env.DB, 'new-staff', ['line-1', 'line-2']);
+    expect(dbMocks.createStaffMemberWithScopes).toHaveBeenCalledWith(
+      env.DB, expect.objectContaining({ account_scope: 'accounts' }), ['line-1', 'line-2'],
+    );
   });
 
   it('呼び出した人の範囲外の店舗を拒否する', async () => {
     const res = await send('/api/staff', 'POST', invitation('accounts', ['line-other']));
     expect(res.status).toBe(403);
-    expect(dbMocks.createStaffMember).not.toHaveBeenCalled();
+    expect(dbMocks.createStaffMemberWithScopes).not.toHaveBeenCalled();
   });
 
   it('指定店舗が空なら拒否する', async () => {
@@ -167,7 +172,7 @@ describe('スタッフの店舗権限範囲', () => {
     dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
     const res = await send('/api/staff', 'POST', invitation('all', []));
     expect(res.status).toBe(403);
-    expect(dbMocks.createStaffMember).not.toHaveBeenCalled();
+    expect(dbMocks.createStaffMemberWithScopes).not.toHaveBeenCalled();
   });
 
   it('限定された管理者は自分自身を全店舗の範囲に変更できない', async () => {
@@ -222,7 +227,7 @@ describe('スタッフ招待の統括', () => {
       tenant_id: 'tenant-inviter',
     }]);
     dbMocks.getStaffMembers.mockResolvedValue([]);
-    dbMocks.createStaffMember.mockResolvedValue(row({
+    dbMocks.createStaffMemberWithScopes.mockResolvedValue(row({
       id: 'invited',
       role: 'staff',
       is_active: 0,
@@ -237,9 +242,10 @@ describe('スタッフ招待の統括', () => {
     }, 'inviter-key');
 
     expect(res.status).toBe(201);
-    expect(dbMocks.createStaffMember).toHaveBeenCalledWith(
+    expect(dbMocks.createStaffMemberWithScopes).toHaveBeenCalledWith(
       env.DB,
       expect.objectContaining({ tenant_id: 'tenant-inviter' }),
+      [],
     );
   });
 
@@ -249,7 +255,7 @@ describe('スタッフ招待の統括', () => {
       id: 'line-b', parent_line_account_id: null, is_active: 1, tenant_id: 'tenant-b',
     }]);
     dbMocks.getStaffMembers.mockResolvedValue([]);
-    dbMocks.createStaffMember.mockResolvedValue(row({ id: 'new-b', role: 'staff', is_active: 0, tenant_id: 'tenant-b' }));
+    dbMocks.createStaffMemberWithScopes.mockResolvedValue(row({ id: 'new-b', role: 'staff', is_active: 0, tenant_id: 'tenant-b' }));
 
     const res = await send('/api/staff', 'POST', {
       name: '統括Bの担当者', email: 'shared@example.test', role: 'staff', assignedLineAccountId: 'line-b', accountScope: 'all', scopedLineAccountIds: [],
@@ -361,8 +367,10 @@ describe('最後の管理者を締め出さない', () => {
     const res = await send('/api/staff/admin-a', 'PATCH', { isActive: false });
 
     expect(res.status).toBe(200);
+    // R501: 管理者を外す書き込みは「ほかに有効な管理者が残る」を同じ条件にする。
     expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(
       env.DB, 'admin-a', expect.objectContaining({ is_active: 0 }),
+      expect.objectContaining({ requireRemainingAdmin: expect.objectContaining({ tenantId: expect.any(String) }) }),
     );
   });
 

@@ -50,6 +50,10 @@ vi.mock('@line-crm/db', () => ({
   getFormsWithStats: mocks.getFormsWithStats,
   getFormById: mocks.getFormById,
   getFormAccountIds: mocks.getFormAccountIds,
+  listLineAccountsWithTenantStatus: vi.fn(async () => [
+    { id: 'account-a', tenant_status: 'active' },
+    { id: 'account-secret', tenant_status: 'active' },
+  ]),
   getFormDeleteImpact: mocks.getFormDeleteImpact,
   formBelongsToLineAccount: mocks.formBelongsToLineAccount,
   createForm: mocks.createForm,

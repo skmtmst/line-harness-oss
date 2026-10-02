@@ -49,6 +49,8 @@ describe('Cron Trigger設定', () => {
       'processPendingNenRichMenuJobs',
       'syncXServerSupportMailbox',
       'processFriendFieldReminders',
+      // Googleビジネス第4段: 口コミ・投稿の再同期（接続ごとの55分ゲートで実質1時間ごと）。
+      'processGoogleBusinessHourlyResync',
     ];
     const sixHourlyHeavyCalls = [
       'refreshAllNenTags',
@@ -58,7 +60,10 @@ describe('Cron Trigger設定', () => {
       'enqueueFollowingMileageMilestones',
       'runExpirer',
       'runEventBookingExpirer',
+      'syncBillingInvoicesDaily',
       'deleteExpiredRestaurantRawEmails',
+      // Googleビジネス第4段: パフォーマンス指標の取り込み（JST日付ゲートで1日1回）。
+      'processGoogleBusinessDailyMetrics',
     ];
     const deliveryCalls = [
       'processScheduledAutomationTriggers',

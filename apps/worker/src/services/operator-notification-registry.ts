@@ -67,6 +67,25 @@ export const OPERATOR_NOTIFICATION_EVENT_TYPES: OperatorEventTypeEntry[] = [
     },
     connected: true,
   },
+  {
+    eventType: 'manual_link_broken',
+    label: 'マニュアルリンクの切断',
+    producer: {
+      file: 'apps/worker/src/index.ts',
+      route: 'cron manual link weekly check',
+    },
+    connected: true,
+  },
+  {
+    // Q: 期限の14日前と3日前に知らせる。
+    eventType: 'common_var_expiry',
+    label: '共通情報の期限が近い',
+    producer: {
+      file: 'apps/worker/src/services/common-var-expiry-sweep.ts',
+      route: 'cron common var expiry notices',
+    },
+    connected: true,
+  },
 ];
 
 export function isKnownOperatorEventType(eventType: string): boolean {

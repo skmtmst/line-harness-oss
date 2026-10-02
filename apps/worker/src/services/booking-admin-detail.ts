@@ -22,6 +22,8 @@ interface BookingDetailRow {
   price_at_booking: number;
   requested_at: string;
   decided_at: string | null;
+  menu_version_number: number | null;
+  menu_snapshot_json: string | null;
   source: string;
   created_by_staff_id: string | null;
   external_event_id: string | null;
@@ -122,9 +124,74 @@ function mapHistory(row: HistoryRow) {
   };
 }
 
+interface CustomerHistoryFilter {
+  lineAccountId: string;
+  friendId: string | null;
+  bookingCustomerId: string | null;
+  excludeId?: string;
+}
+
+/**
+ * R320: 同じ顧客の予約が何件あるか（対象予約を除く）。
+ * 一覧は直近10件だけなので、総数で打ち切りを伝える。
+ */
+async function historyTotalForCustomer(
+  db: D1Database,
+  input: CustomerHistoryFilter,
+): Promise<number> {
+  if (!input.friendId && !input.bookingCustomerId) return 0;
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS total
+       FROM bookings b
+      WHERE b.line_account_id = ?
+        AND ((? IS NOT NULL AND b.friend_id = ?)
+          OR (? IS NOT NULL AND b.booking_customer_id = ?))
+        AND (? IS NULL OR b.id <> ?)`,
+  ).bind(
+    input.lineAccountId,
+    input.friendId, input.friendId,
+    input.bookingCustomerId, input.bookingCustomerId,
+    input.excludeId ?? null, input.excludeId ?? null,
+  ).first<{ total: number }>();
+  return Number(row?.total ?? 0);
+}
+
+/**
+ * R320: 「前回来店の申し送り」は過去の来店完了だけから選ぶ。
+ * 未来の予約・キャンセル・お断り・来店なしのメモは混ぜない。
+ * beforeStartsAt より前の completed で、店内メモのある最新の1件を返す。
+ */
+async function previousHandoverForCustomer(
+  db: D1Database,
+  input: CustomerHistoryFilter & { beforeStartsAt: string },
+): Promise<{ note: string; bookingId: string; startsAt: string; status: string } | null> {
+  if (!input.friendId && !input.bookingCustomerId) return null;
+  const row = await db.prepare(
+    `SELECT b.id, b.starts_at, b.status, b.internal_note
+       FROM bookings b
+      WHERE b.line_account_id = ?
+        AND ((? IS NOT NULL AND b.friend_id = ?)
+          OR (? IS NOT NULL AND b.booking_customer_id = ?))
+        AND (? IS NULL OR b.id <> ?)
+        AND b.status = 'completed'
+        AND b.starts_at < ?
+        AND b.internal_note IS NOT NULL
+        AND TRIM(b.internal_note) <> ''
+      ORDER BY b.starts_at DESC LIMIT 1`,
+  ).bind(
+    input.lineAccountId,
+    input.friendId, input.friendId,
+    input.bookingCustomerId, input.bookingCustomerId,
+    input.excludeId ?? null, input.excludeId ?? null,
+    input.beforeStartsAt,
+  ).first<{ id: string; starts_at: string; status: string; internal_note: string }>();
+  if (!row) return null;
+  return { note: row.internal_note, bookingId: row.id, startsAt: row.starts_at, status: row.status };
+}
+
 export async function getBookingCustomerContext(
   db: D1Database,
-  input: { lineAccountId: string; friendId?: string | null; bookingCustomerId?: string | null },
+  input: { lineAccountId: string; friendId?: string | null; bookingCustomerId?: string | null; beforeStartsAt?: string },
 ) {
   const friendId = input.friendId ?? null;
   const bookingCustomerId = input.bookingCustomerId ?? null;
@@ -143,11 +210,17 @@ export async function getBookingCustomerContext(
     ? identity.friend_id
     : null;
   const resolvedFriendId: string | null = friendId ?? linkedFriendId;
-  const [profile, history] = await Promise.all([
+  const [profile, history, handover] = await Promise.all([
     friendProfile(db, resolvedFriendId),
     historyForCustomer(db, { lineAccountId: input.lineAccountId, friendId: resolvedFriendId, bookingCustomerId }),
+    // R320: 新規受付の文脈では「今より前」の来店完了だけを前回とする。
+    previousHandoverForCustomer(db, {
+      lineAccountId: input.lineAccountId,
+      friendId: resolvedFriendId,
+      bookingCustomerId,
+      beforeStartsAt: input.beforeStartsAt ?? new Date().toISOString(),
+    }),
   ]);
-  const previousHandover = history.find((row) => row.internal_note?.trim())?.internal_note ?? null;
   return {
     id: identity.id,
     friendId: resolvedFriendId,
@@ -157,7 +230,10 @@ export async function getBookingCustomerContext(
     petName: 'pet_name' in identity ? identity.pet_name : profile.petName,
     tags: profile.tags,
     mileageBalance: profile.mileageBalance,
-    previousHandover,
+    previousHandover: handover?.note ?? null,
+    previousHandoverBooking: handover
+      ? { id: handover.bookingId, startsAt: handover.startsAt, status: handover.status }
+      : null,
     recentBookings: history.map(mapHistory),
   };
 }
@@ -171,6 +247,7 @@ export async function getBookingAdminDetail(
             b.staff_id, b.menu_id,
             b.starts_at, b.ends_at, b.status, b.customer_note, b.internal_note,
             b.price_at_booking, b.requested_at, b.decided_at, b.source,
+            b.menu_version_number, b.menu_snapshot_json,
             b.created_by_staff_id, b.external_event_id, b.lock_version,
             b.notification_policy_snapshot,
             m.name AS menu_name, s.display_name AS staff_name,
@@ -186,13 +263,28 @@ export async function getBookingAdminDetail(
       WHERE b.id = ? AND b.line_account_id = ?`,
   ).bind(input.id, input.lineAccountId).first<BookingDetailRow>();
   if (!row) return null;
-  const [profile, history, reminders, operations, auditLogs, auditTotalRow] = await Promise.all([
+  const [profile, history, historyTotal, handover, reminders, operations, auditLogs, auditTotalRow] = await Promise.all([
     friendProfile(db, row.friend_id),
     historyForCustomer(db, {
       lineAccountId: input.lineAccountId,
       friendId: row.friend_id,
       bookingCustomerId: row.booking_customer_id,
       excludeId: row.id,
+    }),
+    // R321: 一覧は直近10件だけなので総数を別途数える。
+    historyTotalForCustomer(db, {
+      lineAccountId: input.lineAccountId,
+      friendId: row.friend_id,
+      bookingCustomerId: row.booking_customer_id,
+      excludeId: row.id,
+    }),
+    // R320: この予約より前の来店完了だけを「前回」とする。
+    previousHandoverForCustomer(db, {
+      lineAccountId: input.lineAccountId,
+      friendId: row.friend_id,
+      bookingCustomerId: row.booking_customer_id,
+      excludeId: row.id,
+      beforeStartsAt: row.starts_at,
     }),
     db.prepare(
       `SELECT id, kind, scheduled_at, sent_at, status, retry_count
@@ -207,7 +299,6 @@ export async function getBookingAdminDetail(
         WHERE booking_id = ? AND line_account_id = ?`,
     ).bind(row.id, input.lineAccountId).first<{ total: number }>(),
   ]);
-  const previousHandover = history.find((item) => item.internal_note?.trim())?.internal_note ?? null;
   let notificationPolicy: Record<string, boolean> = {
     send_line_confirmation: true,
     day_before: true,
@@ -237,11 +328,38 @@ export async function getBookingAdminDetail(
       : row.external_event_id
         ? 'synced'
         : 'not_configured';
+  // 予約の写し（T）。無い予約（490 より前）は null。壊れた写しも null に倒す。
+  let menuSnapshot: {
+    version: number;
+    name: string;
+    durationMinutes: number;
+    bufferAfterMinutes: number;
+    basePrice: number;
+    priceMode: string;
+  } | null = null;
+  if (row.menu_snapshot_json) {
+    try {
+      const parsed = JSON.parse(row.menu_snapshot_json) as Record<string, unknown>;
+      if (typeof parsed.name === 'string' && parsed.version != null) {
+        menuSnapshot = {
+          version: Number(parsed.version),
+          name: parsed.name,
+          durationMinutes: Number(parsed.duration_minutes),
+          bufferAfterMinutes: Number(parsed.buffer_after_minutes),
+          basePrice: Number(parsed.base_price),
+          priceMode: typeof parsed.price_mode === 'string' ? parsed.price_mode : 'fixed',
+        };
+      }
+    } catch {
+      menuSnapshot = null;
+    }
+  }
   return {
     id: row.id,
     staffId: row.staff_id,
     menuId: row.menu_id,
     lockVersion: Number(row.lock_version),
+    menuSnapshot,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     status: row.status,
@@ -266,8 +384,13 @@ export async function getBookingAdminDetail(
       tags: profile.tags,
       mileageBalance: profile.mileageBalance,
     },
-    previousHandover,
+    previousHandover: handover?.note ?? null,
+    previousHandoverBooking: handover
+      ? { id: handover.bookingId, startsAt: handover.startsAt, status: handover.status }
+      : null,
     history: history.map(mapHistory),
+    /** 同じ顧客の予約総数（対象を除く）。history は直近10件だけ。 */
+    historyTotal,
     reminders: (reminders.results ?? []).map((item) => ({
       id: item.id,
       kind: item.kind,

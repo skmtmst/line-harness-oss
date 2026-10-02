@@ -13,6 +13,10 @@ export interface EntryRoute {
   intro_template_id: string | null;
   run_account_friend_add_scenarios: number;
   is_active: number;
+  /** 476: 受付を止めた時刻。受付中・止めた記録が無い古い行は null。 */
+  stopped_at: string | null;
+  /** 476: 止めた理由。受付中は null。 */
+  stopped_reason: string | null;
   tenant_id: string | null;
   /** migration 308 より前の互換行は未割当のため null。 */
   line_account_id?: string | null;
@@ -76,6 +80,11 @@ export interface CreateEntryRouteInput {
   runAccountFriendAddScenarios?: boolean;
   isActive?: boolean;
   tenantId?: string;
+  /**
+   * R39: 作成時に所属させるLINEアカウント。migration 308 の
+   * line_account_id 列へ保存する。未指定は未割当のまま残す。
+   */
+  lineAccountId?: string | null;
 }
 
 export interface EntryRouteFunnel {
@@ -83,6 +92,9 @@ export interface EntryRouteFunnel {
   friend_add_count: number;
   form_submission_count: number;
   cv_count: number;
+  remainingCount: number;
+  blockedCount: number;
+  conversionValueSum: number;
 }
 
 export async function getEntryRoutes(db: D1Database, tenantId: string): Promise<EntryRoute[]> {
@@ -137,8 +149,8 @@ export async function createEntryRoute(
       `INSERT INTO entry_routes
          (id, ref_code, genre, name, tag_id, scenario_id, redirect_url,
           pool_id, intro_template_id, run_account_friend_add_scenarios,
-          is_active, tenant_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          is_active, tenant_id, line_account_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -153,6 +165,7 @@ export async function createEntryRoute(
       runAccount,
       isActive,
       input.tenantId ?? DEFAULT_TENANT_ID,
+      input.lineAccountId ?? null,
       now,
       now,
     )
@@ -184,7 +197,7 @@ export async function createEntryRoute(
 export async function updateEntryRoute(
   db: D1Database,
   id: string,
-  input: Partial<CreateEntryRouteInput>,
+  input: Partial<CreateEntryRouteInput> & { stoppedReason?: string | null },
 ): Promise<EntryRoute | null> {
   const now = jstNow();
   const fields: string[] = ['updated_at = ?'];
@@ -204,7 +217,24 @@ export async function updateEntryRoute(
     fields.push('run_account_friend_add_scenarios = ?');
     values.push(input.runAccountFriendAddScenarios ? 1 : 0);
   }
-  if (input.isActive !== undefined) { fields.push('is_active = ?'); values.push(input.isActive ? 1 : 0); }
+  if (input.isActive !== undefined) {
+    fields.push('is_active = ?');
+    values.push(input.isActive ? 1 : 0);
+    if (!input.isActive) {
+      // 受付停止はいつ・なぜ止めたかを残す。QRダイアログの停止表示が読む。
+      fields.push('stopped_at = ?');
+      values.push(now);
+      const reason = input.stoppedReason?.trim() || null;
+      fields.push('stopped_reason = ?');
+      values.push(reason);
+    } else {
+      // 受付再開で停止の記録を消す。古い停止表示が残らないようにする。
+      fields.push('stopped_at = ?');
+      values.push(null);
+      fields.push('stopped_reason = ?');
+      values.push(null);
+    }
+  }
 
   values.push(id);
 
@@ -300,24 +330,29 @@ export async function getEntryRouteFunnel(
 ): Promise<EntryRouteFunnel> {
   const row = await db
     .prepare(
-      `WITH first_touch AS (
-         SELECT f.id AS friend_id
+      `WITH route AS (SELECT id, ref_code FROM entry_routes WHERE id = ?),
+       first_touch AS (
+         SELECT f.id AS friend_id, f.is_following
          FROM friends f
-         INNER JOIN entry_routes er ON er.ref_code = f.ref_code
-         WHERE er.id = ?1
+         INNER JOIN route er ON er.ref_code = f.ref_code
        )
        SELECT
-         (SELECT COUNT(*) FROM ref_tracking WHERE entry_route_id = ?1) AS click_count,
+         (SELECT COUNT(*) FROM ref_tracking WHERE entry_route_id IN (SELECT id FROM route)) AS click_count,
          (SELECT COUNT(*) FROM first_touch) AS friend_add_count,
          (SELECT COUNT(*) FROM form_submissions
             WHERE friend_id IN (SELECT friend_id FROM first_touch)) AS form_submission_count,
          (SELECT COUNT(*) FROM conversion_events
-            WHERE friend_id IN (SELECT friend_id FROM first_touch)) AS cv_count`,
+            WHERE friend_id IN (SELECT friend_id FROM first_touch)) AS cv_count,
+         (SELECT COUNT(*) FROM first_touch WHERE is_following = 1) AS remainingCount,
+         (SELECT COUNT(*) FROM first_touch WHERE is_following = 0) AS blockedCount,
+         (SELECT COALESCE(SUM(COALESCE(ce.value_snapshot, cp.value, 0)), 0) FROM conversion_events ce
+            JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+            WHERE ce.friend_id IN (SELECT friend_id FROM first_touch)) AS conversionValueSum`,
     )
     .bind(entryRouteId)
     .first<EntryRouteFunnel>();
   return (
-    row ?? { click_count: 0, friend_add_count: 0, form_submission_count: 0, cv_count: 0 }
+    row ?? { click_count: 0, friend_add_count: 0, form_submission_count: 0, cv_count: 0, remainingCount: 0, blockedCount: 0, conversionValueSum: 0 }
   );
 }
 

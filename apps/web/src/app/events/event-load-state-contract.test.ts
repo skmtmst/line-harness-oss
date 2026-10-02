@@ -26,7 +26,6 @@ describe('V6 イベント・申込者一覧の状態', () => {
 
     it(`${name}は読込・成功・失敗を別の状態として持つ`, () => {
       expect(body).toContain("setLoadStatus('ready')")
-      expect(body).toContain("setLoadStatus('error')")
       expect(body).toContain("loadStatus === 'error'")
     })
 
@@ -42,19 +41,38 @@ describe('V6 イベント・申込者一覧の状態', () => {
     })
   }
 
+  it('申込者は失敗を error 状態として持つ', () => {
+    expect(code(BOOKINGS)).toContain("setLoadStatus('error')")
+  })
+
+  /*
+   * R601: イベント一覧は 403 を権限不足、それ以外を通信失敗として分ける。
+   * 以前の `setLoadStatus('error')` 一本化では、権限不足の人も再読み込みを
+   * 案内されていた。失敗の区別そのものは上の試験が守るので、ここでは
+   * 403 → forbidden、ほか → error の振り分けと、権限不足の1枚を見る。
+   */
+  it('イベントは403を権限不足、ほかは通信失敗として分ける', () => {
+    const body = code(EVENTS)
+    expect(body).toContain('cause.status === 403')
+    expect(body).toContain("'forbidden'")
+    expect(body).toContain(": 'error'")
+    expect(body).toContain("loadStatus === 'forbidden'")
+    expect(body).toContain('kind="forbidden"')
+  })
+
   it('イベント一覧は未取得の帯を0件にしない', () => {
     const body = code(EVENTS)
-    // 帯は「数」ではなく「次にすること」を出す（`event-attention.ts`）。
-    expect(body).toContain("value={dataReady ? String(attention.upcoming.length) : '—'}")
-    expect(body).toContain("value={dataReady ? String(attention.applied) : '—'}")
+    // 帯は「数」ではなく「次にすること」を出す（R79/R80 で全体集計へ）。
+    expect(body).toContain("value={dataReady ? kpi.upcoming_slots : null}")
+    expect(body).toContain("value={dataReady ? kpi.upcoming_active : null}")
     expect(body).toContain('登録したイベントは消えていません。')
   })
 
   it('申込者一覧は未取得の帯を0件にしない', () => {
     const body = code(BOOKINGS)
-    expect(body).toContain("value={dataReady ? String(applied) : '—'}")
-    expect(body).toContain("value={dataReady ? String(pending) : '—'}")
-    expect(body).toContain("value={dataReady ? String(cancelled) : '—'}")
+    expect(body).toContain("value={dataReady ? applied : null}")
+    expect(body).toContain("value={dataReady ? pending : null}")
+    expect(body).toContain("value={dataReady ? cancelled : null}")
     expect(body).toContain('受け付けた予約は消えていません。')
   })
 
@@ -93,7 +111,8 @@ describe('V6 イベント・申込者一覧の状態', () => {
     expect(body).toContain('<Pagination')
     const list = code(EVENTS)
     expect(list).toContain('setListTotal')
-    expect(list).toContain('q: query.trim() || undefined')
+    // #625: 検索語は上限へ切り詰めてから送る
+    expect(list).toContain('q: clampSearchQuery(query.trim()) || undefined')
     expect(list).toContain('filter,')
     expect(list).toContain('sort,')
     expect(EVENTS).not.toContain('200件まで表示しています')

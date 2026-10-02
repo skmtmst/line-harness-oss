@@ -14,6 +14,11 @@ describe('V6 予約設定', () => {
     expect(CREATE).toContain('designNode="GhOb3"')
   })
 
+  it('R91: メニューがあるときも見出しに作成の入口を常設する', () => {
+    expect(LIST).toContain("tab === 'menus' && canEditMenus")
+    expect(LIST).toContain('href="/booking/menus/new"')
+  })
+
   it('本文に画面タイトルを重ねず、行き先が分かる操作名にする', () => {
     expect(LIST).not.toContain('<Header')
     expect(CREATE).toContain('showHeader={false}')
@@ -40,7 +45,7 @@ describe('V6 予約設定', () => {
     expect(CREATE).toContain('予約を受け付けたことを知らせる')
     expect(CREATE).toContain('前日・開始前に思い出してもらう')
     expect(CREATE).toContain("item.eventType === 'booking_created'")
-    expect(CREATE).toContain('マイルを ${bookingMileage.toLocaleString()} 付ける')
+    expect(CREATE).toContain('マイルを ${formatNumber(bookingMileage)} 付ける')
   })
 
   it('作成画面で価格種別と店舗共通ルールの継承を実契約へ送る', () => {
@@ -59,7 +64,7 @@ describe('V6 予約設定', () => {
     expect(LIST).not.toContain('準備中')
     expect(LIST).toContain('bookingApi.getSettings(accountId)')
     expect(LIST).toContain('<Pagination page={page} pageCount={pageCount}')
-    expect(LIST).toContain('止める・出す')
+    expect(LIST).toContain("label: m.is_active ? '止める' : '再開'")
     expect(LIST).toContain('bookingApi.patchMenu(selectedAccountId, menu.id, version')
     expect(LIST).toContain('error={visibilityError ?? undefined}')
     expect(LIST).not.toContain('メニュー名で検索')
@@ -90,10 +95,19 @@ describe('V6 予約設定', () => {
   it('担当の取得失敗・取得中を「未登録」と誤表示せず作成も止める (DEEP-17)', () => {
     expect(CREATE).toContain('staffLoadState')
     expect(CREATE).toContain('担当を読み込んでいます')
-    expect(CREATE).toContain('担当を読み込めませんでした。開き直してください')
+    // 取得失敗は「未登録」と混ぜない。入力を残したまま、その場で取り直せる。
+    expect(CREATE).toContain('担当を読み込めませんでした。入力はそのまま残っています。')
+    expect(CREATE).toContain('担当をもう一度読み込む')
+    expect(CREATE).toContain('reloadStaff')
+    // 権限不足の失敗に再試行は出さず、権限の案内だけ出す。
+    expect(CREATE).toContain('担当スタッフを見る権限がありません')
+    expect(CREATE).toContain("classifyApiFailure(staffError) !== 'forbidden'")
+    // 空（0人）は失敗と別の言葉で出し、登録へ誘導するのは空のときだけ。
     expect(CREATE).toContain('まだスタッフが登録されていません')
     // 候補が確定するまで保存しない。候補にいないIDは選択数に数えない。
     expect(CREATE).toContain("staffLoadState === 'loading'")
+    expect(CREATE).toContain("staffLoadState === 'error'")
+    expect(CREATE).toContain('担当スタッフを読み込めませんでした。下の「担当をもう一度読み込む」で読み込んでから作成してください')
     expect(CREATE).toContain('assignedIds')
   })
 

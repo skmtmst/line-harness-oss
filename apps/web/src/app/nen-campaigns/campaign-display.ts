@@ -1,4 +1,5 @@
 import type { NenCampaignSetting } from '@/lib/api'
+import { formatDateTime } from '@/lib/format'
 
 type TimingSetting = Pick<NenCampaignSetting, 'campaignKey' | 'delayDays' | 'deliveryTime'>
 type ContentSetting = Pick<NenCampaignSetting, 'campaignKey' | 'buttonLabel'>
@@ -10,11 +11,14 @@ type ContentSetting = Pick<NenCampaignSetting, 'campaignKey' | 'buttonLabel'>
  * worker 側の CAMPAIGN_KEYS から導けない。CAMPAIGN_KEYS はサーバ側正本で
  * 所有外のため触れず、shared への移動も範囲外。実キーが変わったら
  * ここも手で揃える。4者突合の試験が、実口・型・見本とのずれを捕まえる。
+ *
+ * 「予約した日時」「誕生日の3日前 10:00」だけが固定。発送を起点にする3キー
+ * （arrival_check / review_request / cross_sell）は、worker の予約処理
+ * （scheduledAfter）と同じく設定の delayDays・deliveryTime から説明を作る。
+ * 以前はここに固定の日数を書いていたため、設定を変えても一覧が変わらなかった
+ * （監査 R64）。
  */
-const timingByCampaign: Record<string, string> = {
-  arrival_check: '到着の翌日 10:00',
-  review_request: '到着から7日後 20:00',
-  cross_sell: '到着から30日後',
+const fixedTimingByCampaign: Record<string, string> = {
   column: '予約した日時',
   birthday_coupon: '誕生日の3日前 10:00',
 }
@@ -27,13 +31,12 @@ const contentByCampaign: Record<string, string> = {
   birthday_coupon: 'テキスト＋クーポン',
 }
 
-/** 配信の実際の起点を、発送後と誕生日で言い分ける。 */
+/** 配信の実際の起点を、発送後と誕生日で言い分ける。日数・時刻は設定値から作る。 */
 export function formatCampaignTiming(setting: TimingSetting): string {
-  const known = timingByCampaign[setting.campaignKey]
+  const known = fixedTimingByCampaign[setting.campaignKey]
   if (known) return known
-  return setting.delayDays === 0
-    ? 'イベント発生後すぐ'
-    : `発送完了から${setting.delayDays}日後 ${setting.deliveryTime}`
+  if (setting.delayDays === 0) return `発送当日 ${setting.deliveryTime}`
+  return `発送から${setting.delayDays}日後 ${setting.deliveryTime}`
 }
 
 /** 配信キーで中身の種類が決まるものは、リンク有無だけに丸めず運用名で示す。 */
@@ -45,15 +48,7 @@ export function formatCampaignContent(setting: ContentSetting): string {
 export function formatNenJobDateTime(value: string): string {
   const date = new Date(value)
   if (!Number.isFinite(date.getTime())) return '日時を確認できません'
-  return date.toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(date)
 }
 
 /*

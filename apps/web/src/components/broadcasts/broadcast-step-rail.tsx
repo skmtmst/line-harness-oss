@@ -1,14 +1,14 @@
 'use client'
 
 import Button from '@/components/shared/button'
-import StepRail from '@/components/shared/step-rail'
+import Stepper from '@/components/shared/stepper'
 
 import type { BroadcastStep } from './broadcast-steps'
 
 /**
  * 一斉配信の5段の進み表示。
  *
- * 描くところは `shared/step-rail.tsx` に出した。**設計は同じ帯を15枚に置いている**
+ * 描くところは共通の `shared/stepper.tsx` に出した。**設計は同じ帯を15枚に置いている**
  * ので、配信の下に置いたままだとほかの機能から使えない。
  * ここは配信の段（`BroadcastStep`）を共通部品へ渡すだけにする。
  *
@@ -16,8 +16,10 @@ import type { BroadcastStep } from './broadcast-steps'
  * 折り返し・省略で読めなくなる。狭い幅では「いま何段目か」「全部で
  * 何段か」「前後へ移動」だけに絞った表示へ切り替える。
  */
-export default function BroadcastStepRail({ steps }: { steps: BroadcastStep[] }) {
-  const currentIndex = steps.findIndex((step) => step.state === 'current')
+export default function BroadcastStepRail({ steps, currentKey }: { steps: BroadcastStep[]; currentKey?: string }) {
+  // いまいる所は currentKey（URL の ?step=）で決める。入力済みの数で決めない（設計 C）。
+  const keyedIndex = currentKey !== undefined ? steps.findIndex((step) => step.key === currentKey) : -1
+  const currentIndex = keyedIndex !== -1 ? keyedIndex : steps.findIndex((step) => step.state === 'current')
   // 全部 done のとき（送信直前）は最後の段を現在地として出す。
   const activeIndex = currentIndex === -1 ? Math.max(steps.length - 1, 0) : currentIndex
   const current = steps[activeIndex]
@@ -37,7 +39,7 @@ export default function BroadcastStepRail({ steps }: { steps: BroadcastStep[] })
         >
           <div className="flex min-w-0 items-center justify-between gap-3">
             <p className="min-w-0">
-              <span className="text-accent block text-xs font-bold tracking-wider">
+              <span className="text-accent-deep block text-xs font-medium tracking-wider">
                 STEP {current.order} / {steps.length}
               </span>
               <span className="text-ink block truncate text-sm font-bold" title={current.label}>
@@ -67,7 +69,7 @@ export default function BroadcastStepRail({ steps }: { steps: BroadcastStep[] })
       ) : null}
       {/* 広い幅ではこれまでどおり5段の帯を出す。 */}
       <div className="hidden sm:block">
-        <StepRail steps={steps} ariaLabel="配信作成の進み" />
+        <Stepper label="配信作成の進み" steps={steps} currentKey={currentKey} />
       </div>
     </>
   )

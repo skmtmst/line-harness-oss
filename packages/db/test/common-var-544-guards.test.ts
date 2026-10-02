@@ -46,9 +46,9 @@ describe('#544 N6 フォルダの存在と種別の検証', () => {
       lineAccountId: 'account-1', name: '営業時間', varKey: 'shop_hours', folderId: 'folder-ok',
     });
     expect(created.folder_id).toBe('folder-ok');
-    await expect(updateCommonVar(db, created.id, 'account-1', { folderId: 'folder-other' }))
+    await expect(updateCommonVar(db, created.id, 'account-1', { folderId: 'folder-other', changeReason: '整理' }))
       .rejects.toBeInstanceOf(CommonVarFolderError);
-    const ungrouped = await updateCommonVar(db, created.id, 'account-1', { folderId: null });
+    const ungrouped = await updateCommonVar(db, created.id, 'account-1', { folderId: null, changeReason: '整理' });
     expect(ungrouped?.folder_id).toBeNull();
     expect((await getCommonVarById(db, created.id, 'account-1'))?.folder_id).toBeNull();
   });

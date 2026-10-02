@@ -5,7 +5,7 @@ import { ApiError, api, type ManualLink } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -188,20 +188,20 @@ export default function ManualLinksPage() {
       </div>
 
       <ListToolbar
-        searchPlaceholder="画面ID・画面名で検索"
-        searchValue={query}
-        onSearchChange={setQuery}
-      >
-        <SelectField
-          aria-label="リンクの状態"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value as StatusFilter)}
-          options={STATUS_FILTERS.map((f) => ({ value: f.value, label: `状態：${f.label}` }))}
-        />
-        <Button disabled={checking} onClick={() => void checkAll()}>
-          {checking ? '確かめています…' : 'いま全部を確かめる'}
-        </Button>
-      </ListToolbar>
+        search={{ placeholder: '画面ID・画面名で検索', value: query, onChange: setQuery }}
+        filters={
+          <Select
+            aria-label="リンクの状態"
+            value={filter}
+            onChange={(value) => setFilter(value as StatusFilter)}
+            options={STATUS_FILTERS.map((f) => ({ value: f.value, label: `状態：${f.label}` }))}
+          />
+        }
+        trailing={
+          <Button disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…">いま全部を確かめる
+          </Button>
+        }
+      />
 
       {actionError && (
         <p role="alert" className={styles.actionError}>
@@ -237,7 +237,8 @@ export default function ManualLinksPage() {
               <Th>公式記事のURL</Th>
               <Th>最後に確かめた日</Th>
               <Th>リンクの状態</Th>
-              <Th>操作</Th>
+              {/* 操作は右へ寄せ、右端の余白を左端とそろえる。 */}
+              <Th align="right">操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
@@ -271,11 +272,11 @@ export default function ManualLinksPage() {
                     {LINK_STATUS_LABEL[row.status]}
                   </StatusBadge>
                 </Td>
-                <Td>
+                <Td align="right">
                   {editing ? (
                     <>
-                      <Button disabled={saving} onClick={() => void saveEdit()}>保存</Button>
-                      <Button disabled={saving} onClick={() => setEditingKey(null)}>やめる</Button>
+                      <Button disabled={saving} onClick={() => setEditingKey(null)}>キャンセル</Button>
+                      <Button disabled={saving} onClick={() => void saveEdit()}>保存する</Button>
                     </>
                   ) : (
                     <Button onClick={() => startEdit(key)}>直す</Button>

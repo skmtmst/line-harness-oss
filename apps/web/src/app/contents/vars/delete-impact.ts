@@ -1,4 +1,5 @@
 import type { CommonVarDeleteImpact, CommonVarDeleteImpactItem } from '@line-crm/shared'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 /**
  * 共通情報を消したときの影響（設計 `yPkWe` 14-1-C／契約 #611）。
@@ -31,7 +32,7 @@ export function placeholderText(varKey: string): string {
  */
 export function usageText(impact: CommonVarDeleteImpact): string {
   if (impact.total === 0) return 'どこにも差し込まれていません。'
-  return `${placeholderText(impact.variable.varKey)} は ${impact.total.toLocaleString('ja-JP')}か所で差し込まれています。`
+  return `${placeholderText(impact.variable.varKey)} は ${formatNumber(impact.total)}か所で差し込まれています。`
 }
 
 /**
@@ -42,7 +43,7 @@ export function usageText(impact: CommonVarDeleteImpact): string {
  */
 export function consequenceText(impact: CommonVarDeleteImpact): string | null {
   if (impact.total === 0) return null
-  return `削除すると、その${impact.total.toLocaleString('ja-JP')}か所の `
+  return `削除すると、その${formatNumber(impact.total)}か所の `
     + `${placeholderText(impact.variable.varKey)} は空欄のまま送られます。`
 }
 
@@ -67,7 +68,7 @@ export function splitItems(items: CommonVarDeleteImpactItem[]): {
 export function unavailableText(impact: CommonVarDeleteImpact): string | null {
   if (impact.unavailableReferences.length === 0) return null
   return impact.unavailableReferences
-    .map((ref) => `${ref.kindLabel}${ref.count.toLocaleString('ja-JP')}件（${ref.reason}）`)
+    .map((ref) => `${ref.kindLabel}${formatNumber(ref.count)}件（${ref.reason}）`)
     .join('／')
 }
 
@@ -81,11 +82,13 @@ export function unavailableText(impact: CommonVarDeleteImpact): string | null {
 export function canDelete(input: {
   impact: CommonVarDeleteImpact | null
   typedKey: string
+  reason: string
   busy: boolean
 }): boolean {
   const impact = input.impact
   if (!impact || input.busy) return false
   if (!impact.canDelete) return false
+  if (!input.reason.trim()) return false
   return input.typedKey.trim() === placeholderText(impact.variable.varKey)
 }
 
@@ -93,13 +96,15 @@ export function canDelete(input: {
 export function blockedReason(input: {
   impact: CommonVarDeleteImpact | null
   typedKey: string
+  reason: string
 }): string | null {
   const impact = input.impact
   if (!impact) return '使用先をまだ読み込めていません。'
   if (!impact.canDelete) {
-    return `${impact.blockingTotal.toLocaleString('ja-JP')}か所で使われているあいだは削除できません。`
+    return `${formatNumber(impact.blockingTotal)}か所で使われているあいだは削除できません。`
       + '使用先から外してから、もう一度お試しください。'
   }
+  if (!input.reason.trim()) return '消した理由を入力してください。'
   if (input.typedKey.trim() !== placeholderText(impact.variable.varKey)) {
     return `確認のため ${placeholderText(impact.variable.varKey)} を入力してください。`
   }
@@ -110,8 +115,5 @@ export function blockedReason(input: {
 export function checkedAtText(checkedAt: string): string {
   const date = new Date(checkedAt)
   if (Number.isNaN(date.getTime())) return NOT_AVAILABLE
-  return new Intl.DateTimeFormat('ja-JP', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo',
-  }).format(date)
+  return formatDateTime(date)
 }

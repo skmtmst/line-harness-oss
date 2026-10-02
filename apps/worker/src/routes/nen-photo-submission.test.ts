@@ -168,9 +168,10 @@ describe('POST /api/liff/nen/photos のメタデータ除去と寸法検査(#931
     const bindings = insert!.bindings;
     expect(bindings[9]).toBe('account-a'); // line_account_id
     expect(bindings[10]).toMatch(/^https:\/\/worker\.example\.test\/images\/nen-photo-review\//); // review_image_url
-    expect(bindings[11]).toBe(640); // image_width
-    expect(bindings[12]).toBe(480); // image_height
-    expect(bindings[13]).toBe(original.byteLength); // image_byte_size
+    expect(bindings[11]).toBe(bindings[10]); // public_image_url（メタデータ除去済み派生を再利用）
+    expect(bindings[12]).toBe(640); // image_width
+    expect(bindings[13]).toBe(480); // image_height
+    expect(bindings[14]).toBe(original.byteLength); // image_byte_size
 
     // 公開されるURLは審査用派生を指す。原本キーは返さない。
     const body = await res.json() as { data: { imageUrl: string } };

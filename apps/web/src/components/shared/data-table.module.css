@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 /* ---------------------------------------------------------------------
  * 一覧表の外枠と行。Pencil V5 の `RwC76`「共通 標準一覧表」。★V5 で60回。
  *
@@ -16,13 +18,36 @@
 }
 
 .frame {
-  overflow: hidden; /* clip: true */
+  /* #707: 390pxで列幅の合計が容器を超えるとき、外枠で切り落とさず
+   * 横スクロールで届ける（PC幅では収まるので見た目は変わらない）。
+   * 角丸の切り抜きは overflow-x:auto でも保たれる。 */
+  overflow-x: auto; /* clip: true → 390pxでは送って見せる */
+  overflow-y: hidden;
   border: 1px solid var(--color-hairline); /* stroke: $hairline */
   border-radius: var(--radius-card); /* cornerRadius: $radius-md */
 }
 
 .row {
   height: 58px; /* 行 height: 58 */
+}
+
+/* ★V7のゆったりした行（高さ64px）。付けないときは58pxのまま。 */
+.rowComfortable {
+  height: 64px;
+}
+
+/* ★V7：選んでいる行は薄い緑の地。色だけでなく aria-selected でも伝える。 */
+.rowSelected {
+  background: var(--color-accent-soft);
+}
+
+/* ★V7：押せる行・選べる行だけ、指を乗せたときに一段沈んだ地を敷く。 */
+.rowInteractive:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.rowInteractive.rowSelected:hover {
+  background: var(--color-accent-soft);
 }
 
 .row + .row .bodyCell {
@@ -38,7 +63,7 @@
 
 /* 名前のセル。名前・副題・注記の3段。副題と注記は無くてよい。 */
 .name {
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 .sub {
@@ -68,4 +93,42 @@
   padding: 0 12px;
   vertical-align: middle;
   white-space: nowrap;
+  text-align: right; /* 中身を右端にそろえ、右の余白を左（12px）と同じにする。 */
+}
+
+/*
+ * ★V8「表の行」（JpOg0）：行は高さ52前後・左右20・下に divider の
+ * 細い線だけ。名前は 13px/500、補足は 12px ink-faint。外側のカード枠は
+ * やめ、白い板の中に直接置く（箱の中に箱を作らない）。
+ */
+[data-theme='v8'] .frame {
+  border: 0;
+  border-radius: 0;
+}
+
+[data-theme='v8'] .row {
+  height: 52px;
+}
+
+[data-theme='v8'] .rowComfortable {
+  height: 56px;
+}
+
+[data-theme='v8'] .row + .row .bodyCell {
+  border-top: 1px solid var(--color-divider);
+}
+
+[data-theme='v8'] .bodyCell {
+  padding: 9px 20px;
+}
+
+[data-theme='v8'] .name {
+  font-size: var(--text-label);
+  font-weight: 500;
+}
+
+[data-theme='v8'] .sub {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
 }

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import StaffDetail from './staff-detail'
+import LiffDateTimePreview, { type LiffPreviewStatus } from './liff-preview'
 import {
   ApiError,
   bookingApi,
@@ -13,20 +14,26 @@ import {
   type BookingMenu,
   type BookingResource,
   type BookingSettings,
-  type BookingSlotBlockReason,
   type BookingSlotCheckResult,
   type BookingStaff,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import DateField from '@/components/shared/date-field'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
+import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
-import SelectField from '@/components/shared/select-field'
-import { shortDate } from '../../lib/format-time'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import Select from '@/components/shared/select'
+import { formatDay, formatRange } from '@/lib/format'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
-type PreviewMark = '○' | '×' | '休'
 
 const DAYS = [
   { weekday: 1, label: '月曜日' },
@@ -91,7 +98,13 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
   const [draft, setDraft] = useState(() => initialBusinessHours(settings))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
+  /*
+   * R161 監査：曜日・時間を変えたまま別画面へ移ると、確認なく入力が
+   * 消える。保存済みの設定との差を未保存とし、離れる操作では確認を出す。
+   * 保存の成功後は設定が届き直して draft が戻るため、確認は出ない。
+   */
+  const businessHoursDirty = JSON.stringify(draft) !== JSON.stringify(initialBusinessHours(settings))
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: businessHoursDirty, busy: saving })
   const activeRef = useRef(true)
   const inFlightRef = useRef(false)
 
@@ -104,7 +117,6 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
     setDraft((current) => current.map((day) => day.weekday === weekday
       ? { ...day, intervals: update(day.intervals) }
       : day))
-    setSaved(false)
     setSaveError(null)
   }
 
@@ -130,7 +142,6 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
     inFlightRef.current = true
     setSaving(true)
     setSaveError(null)
-    setSaved(false)
     try {
       const response = await bookingApi.saveSettings(accountId, {
         expectedVersion: settings.version,
@@ -149,7 +160,7 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
       })
       if (!activeRef.current) return
       if (!response.success) throw new Error('booking_business_hours_save_failed')
-      setSaved(true)
+      notifyToast('営業時間を保存しました。')
       onSaved(response.data)
     } catch (error) {
       if (activeRef.current) setSaveError(businessHoursSaveError(error))
@@ -165,9 +176,7 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
         <h2 className="text-ink font-semibold">開ける時間</h2>
         <p className="text-ink-faint mt-1 text-xs">曜日ごとの受付時間と休けいを決めます。同時受付数は「1時間に受けられる数」ではなく、同じ時間に重ねられる予約数です。閉めた曜日は、お客様の画面に出ません。</p>
         {!settings.businessHoursConfigured ? (
-          <p className="bg-warning-bg text-warning mt-3 rounded-control px-3 py-2 text-xs" role="note">
-            まだ週全体の営業時間を保存していません。入力済みの時間帯は適用されていますが、時間帯がない曜日は現在は担当者の勤務時間どおりに受け付けます。保存すると、その曜日は休業になります。
-          </p>
+          <Notice tone="warn" message="まだ週全体の営業時間を保存していません。入力済みの時間帯は適用されていますが、時間帯がない曜日は現在は担当者の勤務時間どおりに受け付けます。保存すると、その曜日は休業になります。" className="mt-3" />
         ) : null}
       </div>
       <fieldset disabled={!canEdit} className="contents">
@@ -177,39 +186,36 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
           const accepts = intervals.length > 0
           return (
             <div className="grid gap-3 px-4 py-3 text-sm lg:grid-cols-6" key={day.weekday}>
-              <label className="flex items-center gap-2 font-semibold whitespace-nowrap lg:col-span-1">
-                <input
-                  aria-label={`${day.label}を受け付ける`}
-                  type="checkbox"
-                  checked={accepts}
-                  onChange={(event) => setAccepts(day.weekday, event.target.checked)}
-                />
-                {day.label}
-              </label>
+              <Checkbox
+                checked={accepts}
+                onCheckedChange={(checked) => setAccepts(day.weekday, checked)}
+                aria-label={`${day.label}を受け付ける`}
+                className="font-semibold whitespace-nowrap lg:col-span-1"
+              >{day.label}</Checkbox>
               {!accepts ? (
                 <p className="text-ink-faint lg:col-span-5">{settings.businessHoursConfigured ? '休み（定休日）' : '未設定（現在は担当者の勤務時間どおり）'}</p>
               ) : (
                 <div className="space-y-2 lg:col-span-5">
                   {intervals.map((interval, index) => (
                     <div className="flex flex-wrap items-end gap-2" key={`${day.weekday}-${index}`}>
-                      <label className="text-ink-secondary text-xs">
+                      <span className="text-ink-secondary text-xs">
                         開始
-                        <input aria-label={`${day.label} ${index + 1}件目の開始`} type="time" value={interval.start} onChange={(event) => updateInterval(day.weekday, index, { start: event.target.value })} className="border-hairline rounded-control mt-1 block border bg-canvas px-2 py-1.5 text-sm tabular-nums" />
-                      </label>
+                        <TimeField aria-label={`${day.label} ${index + 1}件目の開始`} value={interval.start} onChange={(v) => updateInterval(day.weekday, index, { start: v })} className="mt-1" />
+                      </span>
                       <span className="pb-2 text-xs">〜</span>
-                      <label className="text-ink-secondary text-xs">
+                      <span className="text-ink-secondary text-xs">
                         終了
-                        <input aria-label={`${day.label} ${index + 1}件目の終了`} type="time" value={interval.end} onChange={(event) => updateInterval(day.weekday, index, { end: event.target.value })} className="border-hairline rounded-control mt-1 block border bg-canvas px-2 py-1.5 text-sm tabular-nums" />
-                      </label>
+                        <TimeField aria-label={`${day.label} ${index + 1}件目の終了`} value={interval.end} onChange={(v) => updateInterval(day.weekday, index, { end: v })} className="mt-1" />
+                      </span>
                       <label className="text-ink-secondary text-xs">
                         同時受付数
-                        <input aria-label={`${day.label} ${index + 1}件目の同時受付数`} type="number" min={1} max={1000} value={interval.capacity ?? 1} onChange={(event) => updateInterval(day.weekday, index, { capacity: Number(event.target.value) })} className="border-hairline rounded-control mt-1 block w-24 border bg-canvas px-2 py-1.5 text-sm tabular-nums" />
+                        <input aria-label={`${day.label} ${index + 1}件目の同時受付数`} type="number" min={1} max={1000} value={interval.capacity ?? 1} onChange={(event) => updateInterval(day.weekday, index, { capacity: Number(event.target.value) })} className="border-hairline rounded-control mt-1 block w-24 border bg-canvas px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
                       </label>
-                      <button type="button" className="text-danger mb-1.5 px-2 py-1 text-xs underline" onClick={() => updateDay(day.weekday, (current) => current.filter((_, currentIndex) => currentIndex !== index))}>この時間を削除</button>
+                      <button type="button" className="text-danger mb-1.5 px-2 py-1 text-xs underline" onClick={() => updateDay(day.weekday, (current) => current.filter((_, currentIndex) => currentIndex !== index))}>この時間を削除する</button>
                     </div>
                   ))}
                   {intervals.length < 8 ? (
-                    <button type="button" className="text-accent text-xs font-semibold underline" onClick={() => updateDay(day.weekday, (current) => [...current, { start: '09:00', end: '18:00', capacity: 1 }])}>時間帯を追加</button>
+                    <button type="button" className="text-action text-xs font-semibold underline" onClick={() => updateDay(day.weekday, (current) => [...current, { start: '09:00', end: '18:00', capacity: 1 }])}>時間帯を追加する</button>
                   ) : null}
                 </div>
               )}
@@ -220,35 +226,36 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
       <div className="border-hairline border-t px-4 py-4">
         <p className="text-ink-faint text-xs">日をまたぐ営業は、日ごとに分けて入力してください。終了時刻に24:00は使えません。</p>
         {saveError ? (
-          <div className="bg-danger-bg text-danger mt-3 rounded-control p-3 text-sm" role="alert">
-            <p>{saveError}</p>
-            {saveError.includes('先に保存') ? <button type="button" onClick={onReload} className="mt-2 font-semibold underline">最新の内容を読み直す</button> : null}
-          </div>
+          <Notice
+            tone="danger"
+            message={saveError}
+            onClose={() => setSaveError(null)}
+            className="mt-3"
+            action={saveError.includes('先に保存') ? <button type="button" onClick={onReload} className="font-semibold underline">最新の内容を読み直す</button> : undefined}
+          />
         ) : null}
-        {saved ? <p className="text-success mt-3 text-sm font-semibold" role="status">営業時間を保存しました。</p> : null}
         {canEdit ? (
           <div className="mt-3 flex justify-end">
-            <Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? '保存中…' : '営業時間を保存'}</Button>
+            <Button variant="primary" onClick={() => void submit()} disabled={saving} busy={saving}>営業時間を保存する</Button>
           </div>
         ) : <p className="text-ink-faint mt-3 text-xs">閲覧のみです。変更には予約設定の権限が必要です。</p>}
       </div>
       </fieldset>
+      {/* R161 監査：営業時間の書きかけがある間の離脱確認。 */}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="営業時間への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </section>
   )
 }
 
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10)
-}
+const JST_OFFSET_MS = 9 * 3600_000
 
-function previewDates(): Array<{ date: string; day: number }> {
-  const now = new Date()
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-  return Array.from({ length: 14 }, (_, index) => {
-    const date = new Date(start)
-    date.setUTCDate(start.getUTCDate() + index)
-    return { date: isoDate(date), day: date.getUTCDate() }
-  })
+// LIFF の日時選択（apps/liff/src/components/DateTimePicker.tsx）と同じく、
+// JST の今日から14日分を空き枠の取得期間にする（liff 側の jstToday/addDays と同じ計算）。
+function previewRange(): { from: string; to: string } {
+  const from = new Date(Date.now() + JST_OFFSET_MS).toISOString().slice(0, 10)
+  const end = new Date(`${from}T00:00:00Z`)
+  end.setUTCDate(end.getUTCDate() + 13)
+  return { from, to: end.toISOString().slice(0, 10) }
 }
 
 export default function StaffShiftsPage() {
@@ -275,24 +282,43 @@ function StaffShiftsPageContent() {
 // 自分に紐づく予約スタッフを /staff/me で解決し、自分の勤務画面へ送る。
 // 紐づけが無い場合: 店舗の受付枠を見られる権限があれば従来どおり店舗ビュー、
 // なければ「紐づけ待ち」の案内を出す（真っ白な403画面にしない）。
+// R579: 2経路とも通信失敗したら「紐づけ無し」と断定しない。同画面での
+// 再試行の口を出し、復旧後は本人勤務へ進める。
 function OwnShiftEntry() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
-  const [resolved, setResolved] = useState<'loading' | 'store' | 'missing'>('loading')
+  const [resolved, setResolved] = useState<'loading' | 'store' | 'missing' | 'error'>('loading')
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
       // 選択中アカウント優先。見つからなければ紐づく全件の先頭を使う。
+      // どちらか一方が成功すれば「取得できた」扱い。両方失敗のときだけ
+      // 通信失敗として、空（紐づけ無し）とは別の案内にする。
+      let firstError: unknown = null
       const scoped = selectedAccountId
-        ? await bookingApi.listMyStaff(selectedAccountId).catch(() => null)
+        ? await bookingApi.listMyStaff(selectedAccountId).catch((error: unknown) => {
+          firstError = error
+          return null
+        })
         : null
       const rows = scoped?.staff?.length
         ? scoped.staff
-        : (await bookingApi.listMyStaff().catch(() => null))?.staff ?? []
+        : await bookingApi.listMyStaff().catch((error: unknown) => {
+          // 選択中の取得が成功済み（空）なら、全体の失敗は通信失敗にしない。
+          if (!scoped) firstError = error
+          return null
+        }).then((res) => res?.staff ?? [])
       if (cancelled) return
       if (rows.length > 0) {
         router.replace(`/booking/staff/shifts?staff_id=${rows[0].id}`)
+        return
+      }
+      if (firstError !== null) {
+        setLoadError(firstError)
+        setResolved('error')
         return
       }
       const canSeeStore = canViewFeature('/booking/bookings')
@@ -301,9 +327,30 @@ function OwnShiftEntry() {
       setResolved(canSeeStore ? 'store' : 'missing')
     })()
     return () => { cancelled = true }
-  }, [router, selectedAccountId])
+  }, [router, selectedAccountId, attempt])
+
+  function retry() {
+    setLoadError(null)
+    setResolved('loading')
+    setAttempt((value) => value + 1)
+  }
 
   if (resolved === 'store') return <StoreShiftsView />
+  if (resolved === 'error') {
+    return (
+      <div className="space-y-4 pb-8">
+        <ListState
+          kind="error"
+          title="自分の勤務を読み込めませんでした"
+          // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+          // それ以外は画面の文のまま。紐づけが無いとは限らないので断定しない。
+          description={isForbiddenOrRateLimited(loadError) ? undefined : '通信の不具合などで担当者の情報を読み込めませんでした。紐づけが無いとは限りません。「もう一度読み込む」を押してください。'}
+          error={loadError ?? undefined}
+          onRetry={retry}
+        />
+      </div>
+    )
+  }
   if (resolved === 'missing') {
     return (
       <div className="space-y-4 pb-8">
@@ -339,12 +386,27 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
   const [type, setType] = useState(resource.type)
   const [capacity, setCapacity] = useState(String(resource.capacity))
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  /* R313: 削除は確認窓を挟む。確定するまで送らない。 */
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  /*
+   * R312: 停止・再開で書きかけがあるときの破棄確認。
+   * 保存後は版が上がって窓が作り直され、下書きは消える。黙って消さず、
+   * 破棄するか編集に戻るかを利用者に選ばせる。
+   */
+  const [confirmStop, setConfirmStop] = useState(false)
+  /*
+   * R161 監査：設備名などを変えたまま別画面へ移ると、確認なく入力が
+   * 消える。読み込んだ設備との差を未保存とし、離れる操作では確認を出す。
+   */
+  const resourceDirty = name !== resource.name || type !== resource.type || capacity !== String(resource.capacity)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: resourceDirty, busy: saving })
   const [error, setError] = useState<string | null>(null)
   const activeRef = useRef(true)
   const inFlightRef = useRef(false)
   useEffect(() => () => { activeRef.current = false }, [])
 
-  async function update(nextActive = resource.isActive) {
+  async function update() {
     if (inFlightRef.current) return
     const parsedCapacity = Number(capacity)
     if (!name.trim() || name.trim().length > 100 || !type.trim() || type.trim().length > 50
@@ -361,6 +423,30 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
         name: name.trim(),
         type: type.trim(),
         capacity: parsedCapacity,
+        isActive: resource.isActive,
+      })
+      if (activeRef.current) onSaved(response.data)
+    } catch (cause) {
+      if (activeRef.current) setError(resourceSaveError(cause))
+    } finally {
+      inFlightRef.current = false
+      if (activeRef.current) setSaving(false)
+    }
+  }
+
+  /*
+   * R312: 受付の停止・再開は状態だけ変える。編集中の名前・種類・上限は
+   * 送らない（Worker が保存済みの値で補う部分更新）。下書きが不正でも
+   * 停止は進み、入力はそのまま残す。
+   */
+  async function setActive(nextActive: boolean) {
+    if (inFlightRef.current) return
+    inFlightRef.current = true
+    setSaving(true)
+    setError(null)
+    try {
+      const response = await bookingApi.updateResource(accountId, resource.id, {
+        expectedVersion: resource.version,
         isActive: nextActive,
       })
       if (activeRef.current) onSaved(response.data)
@@ -375,16 +461,19 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
   async function remove() {
     if (inFlightRef.current) return
     inFlightRef.current = true
-    setSaving(true)
+    setDeleting(true)
     setError(null)
     try {
       await bookingApi.deleteResource(accountId, resource.id, resource.version)
-      if (activeRef.current) onDeleted(resource.id)
+      if (activeRef.current) {
+        setConfirmDelete(false)
+        onDeleted(resource.id)
+      }
     } catch (cause) {
       if (activeRef.current) setError(resourceSaveError(cause))
     } finally {
       inFlightRef.current = false
-      if (activeRef.current) setSaving(false)
+      if (activeRef.current) setDeleting(false)
     }
   }
 
@@ -392,26 +481,57 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
     <div className="border-hairline rounded-control border p-3">
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="text-ink-secondary text-xs">設備名
-          <input aria-label={`${resource.name}の設備名`} value={name} onChange={(event) => setName(event.target.value)} disabled={!canManage || saving} maxLength={100} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60" />
+          <input aria-label={`${resource.name}の設備名`} value={name} onChange={(event) => setName(event.target.value)} disabled={!canManage || saving} maxLength={100} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
         </label>
         <label className="text-ink-secondary text-xs">種類
-          <input aria-label={`${resource.name}の種類`} value={type} onChange={(event) => setType(event.target.value)} disabled={!canManage || saving} maxLength={50} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60" />
+          <input aria-label={`${resource.name}の種類`} value={type} onChange={(event) => setType(event.target.value)} disabled={!canManage || saving} maxLength={50} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
         </label>
         <label className="text-ink-secondary text-xs">受付上限
-          <input aria-label={`${resource.name}の受付上限`} type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={!canManage || saving} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60" />
+          <input aria-label={`${resource.name}の受付上限`} type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={!canManage || saving} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
         </label>
       </div>
       <p className="text-ink-faint mt-2 text-xs">
-        メニュー {resource.usage.menuCount}件 ／ 予約 {resource.usage.bookingCount}件 ／ 例外日 {resource.usage.exceptionCount}件
+        メニュー {resource.usage?.menuCount ?? '—'}件 ／ 予約 {resource.usage?.bookingCount ?? '—'}件 ／ 例外日 {resource.usage?.exceptionCount ?? '—'}件
       </p>
       {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
       {canManage ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="primary" onClick={() => void update()} disabled={saving}>{saving ? '保存中…' : '設備を保存'}</Button>
-          <Button onClick={() => void update(!resource.isActive)} disabled={saving}>{resource.isActive ? '受付を停止' : '受付を再開'}</Button>
-          {!resource.usage.referenced ? <Button onClick={() => void remove()} disabled={saving}>設備を削除</Button> : null}
+          <Button variant="primary" onClick={() => void update()} disabled={saving || deleting} busy={saving}>設備を保存する</Button>
+          <Button onClick={() => {
+            if (resourceDirty) { setError(null); setConfirmStop(true); return }
+            void setActive(!resource.isActive)
+          }} disabled={saving || deleting} busy={saving}>{resource.isActive ? '受付を停止' : '受付を再開'}</Button>
+          {!resource.usage?.referenced ? <Button onClick={() => { setError(null); setConfirmDelete(true) }} disabled={saving || deleting}>設備を削除する</Button> : null}
         </div>
       ) : <p className="text-ink-faint mt-2 text-xs">閲覧のみです。変更はオーナーまたは管理者が行えます。</p>}
+      <ConfirmDialog
+        open={confirmStop}
+        title={`編集中の変更を破棄して${resource.isActive ? '停止' : '再開'}しますか？`}
+        description="名前・種類・上限の編集中の内容は保存されません。受付の状態だけ変わります。"
+        confirmLabel={resource.isActive ? '破棄して停止' : '破棄して再開'}
+        cancelLabel="編集に戻る"
+        primaryAction="cancel"
+        busy={saving}
+        onCancel={() => { if (!saving) setConfirmStop(false) }}
+        onConfirm={() => { setConfirmStop(false); void setActive(!resource.isActive) }}
+      />
+      {/* R161 監査：設備の書きかけがある間の離脱確認。 */}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="設備への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      {/*
+       * R313: 削除は共通の確認窓を挟む。消さずに受付だけ止める道も添える。
+       * 休業日の削除（#953 E-09）と同じ形。
+       */}
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`「${resource.name}」を削除しますか？`}
+        description="削除すると元に戻せません。受付だけ止めたいときは「受付を停止」を使ってください。"
+        confirmLabel="削除する"
+        cancelLabel="キャンセル"
+        destructive
+        busy={deleting}
+        onCancel={() => { if (!deleting) setConfirmDelete(false) }}
+        onConfirm={() => void remove()}
+      />
     </div>
   )
 }
@@ -425,6 +545,10 @@ function NewResourceEditor({ accountId, onCreated }: {
   const [capacity, setCapacity] = useState('1')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // R161 監査：設備の追加欄に入力が残ったまま別画面へ移ると、確認なく
+  // 消える。何か入っている間は未保存とし、離れる操作では確認を出す。
+  const newResourceDirty = name !== '' || type !== '' || capacity !== '1'
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: newResourceDirty, busy: saving })
   const activeRef = useRef(true)
   const inFlightRef = useRef(false)
   useEffect(() => () => { activeRef.current = false }, [])
@@ -461,46 +585,25 @@ function NewResourceEditor({ accountId, onCreated }: {
     <div className="border-hairline bg-canvas-sunken rounded-control border p-3">
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="text-ink-secondary text-xs">設備名
-          <input aria-label="新しい設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
+          <input aria-label="新しい設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
         </label>
         <label className="text-ink-secondary text-xs">種類
-          <input aria-label="新しい設備の種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例: 部屋・席・機器" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
+          <input aria-label="新しい設備の種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例: 部屋・席・機器" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
         </label>
         <label className="text-ink-secondary text-xs">受付上限
-          <input aria-label="新しい設備の受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
+          <input aria-label="新しい設備の受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
         </label>
       </div>
       {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
-      <Button className="mt-3" variant="primary" onClick={() => void create()} disabled={saving}>{saving ? '追加中…' : '設備を追加'}</Button>
+      <Button className="mt-3" variant="primary" onClick={() => void create()} disabled={saving} busy={saving} busyLabel="追加中…">設備を追加する</Button>
+      {/* R161 監査：追加欄の書きかけがある間の離脱確認。 */}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した設備" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
 
-/** IDEA-28: 予約できない理由コードを運用者向けの文へ。予定の件名や相手など詳細は API から返らない。 */
-const SLOT_REASON_LABELS: Record<BookingSlotBlockReason, string> = {
-  menu_inactive: 'このメニューは受付を止めているか、削除されています',
-  staff_not_offered: 'このメニューを担当できるスタッフがいません',
-  invalid_resource: 'このメニューが必要とする設備の設定に問題があります',
-  booking_window: '受付期間（何日先まで取れるか）の外です',
-  past_cutoff: '受付の締め切り（何時間前まで取れるか）を過ぎています',
-  invalid_time: 'その時刻は存在しません',
-  not_on_grid: '開始時刻が受付の刻み（30分）に合っていません',
-  exception_closed: '休業日・例外日で閉めています',
-  exception_invalid: '例外日の時間設定が壊れているため、安全のため閉めています',
-  outside_working: '勤務・営業時間の外です',
-  duration_overrun: '勤務・営業の終わりまでに所要時間が収まりません',
-  other_booking: 'ほかの予約と重なっています',
-  google_busy: '外部カレンダーの予定と重なっています',
-  capacity_full: '担当の同時受付数がいっぱいです',
-  store_full: '店舗全体の同時受付枠がいっぱいです',
-  resource_shortage: '必要な設備がその時間に足りません',
-  calendar_unavailable: '外部カレンダーを読めないため、安全のため閉めています',
-  unavailable: 'この日時は受け付けられません',
-}
-
-function slotReasonLabel(reason: BookingSlotBlockReason): string {
-  return SLOT_REASON_LABELS[reason] ?? 'この日時は受け付けられません'
-}
+/* 理由文は別ファイル（ページは default 以外を export できない）。 */
+import { slotReasonLabel } from './slot-reason'
 
 // IDEA-28: 日時を指定して、予約できるか・だめならどの条件で閉まっているかを確かめる。
 // 読み取りだけで予約は作らない。判定はお客様の予約画面と同じ条件。
@@ -569,33 +672,33 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="text-ink-secondary text-xs">
           メニュー
-          <SelectField
+          <Select size="full"
             aria-label="確認するメニュー"
             value={menuId}
-            onChange={(event) => { setMenuId(event.target.value); setResult(null) }}
-            className="mt-1 w-full"
+            onChange={(value) => { setMenuId(value); setResult(null) }}
+            className="mt-1"
             options={[
               ...(activeMenus.length === 0 ? [{ value: '', label: '受付中のメニューがありません' }] : []),
               ...activeMenus.map((menu) => ({ value: menu.id, label: menu.name })),
             ]}
           />
         </label>
-        <label className="text-ink-secondary text-xs">
+        <span className="text-ink-secondary text-xs">
           日付
-          <input aria-label="確認する日付" type="date" value={date} onChange={(event) => { setDate(event.target.value); setResult(null) }} className="border-hairline rounded-control mt-1 block w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
-        </label>
-        <label className="text-ink-secondary text-xs">
+          <DateField aria-label="確認する日付" value={date} onChange={(v) => { setDate(v); setResult(null) }} className="mt-1" />
+        </span>
+        <span className="text-ink-secondary text-xs">
           開始時刻
-          <input aria-label="確認する開始時刻" type="time" value={time} onChange={(event) => { setTime(event.target.value); setResult(null) }} className="border-hairline rounded-control mt-1 block w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
-        </label>
+          <TimeField aria-label="確認する開始時刻" value={time} onChange={(v) => { setTime(v); setResult(null) }} className="mt-1" />
+        </span>
         {staffOptions.length > 0 ? (
           <label className="text-ink-secondary text-xs">
             担当
-            <SelectField
+            <Select size="full"
               aria-label="確認する担当"
               value={staffId}
-              onChange={(event) => { setStaffId(event.target.value); setResult(null) }}
-              className="mt-1 w-full"
+              onChange={(value) => { setStaffId(value); setResult(null) }}
+              className="mt-1"
               options={[
                 { value: '', label: '指定しない（誰かが取れれば可）' },
                 ...staffOptions.map((staff) => ({ value: staff.id, label: staff.display_name })),
@@ -605,24 +708,24 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
         ) : null}
       </div>
       <div className="mt-3 flex justify-end">
-        <Button variant="primary" onClick={() => void run()} disabled={!canRun}>{checking ? '確認中…' : 'この日時を確かめる'}</Button>
+        <Button onClick={() => void run()} disabled={!canRun} busy={checking} busyLabel="確認中…">この日時を確かめる</Button>
       </div>
       {checkError ? <p className="text-danger mt-3 text-sm" role="alert">{checkError}</p> : null}
       {result ? (
         result.bookable ? (
-          <div className="bg-success-bg text-success mt-3 rounded-control p-3 text-sm" role="status">
+          <Notice tone="success" className="mt-3">
             <p className="font-semibold">この日時は予約を受けられます。</p>
             <ul className="mt-1 space-y-0.5 text-xs">
               {result.per_staff.filter((staff) => staff.bookable).map((staff) => (
                 <li key={staff.staff_id}>{staff.display_name}: 残り {staff.remaining}/{staff.capacity}</li>
               ))}
             </ul>
-          </div>
+          </Notice>
         ) : (
-          <div className="bg-warning-bg text-warning mt-3 rounded-control p-3 text-sm" role="status">
+          <Notice tone="warn" className="mt-3">
             <p className="font-semibold">この日時は予約できません。</p>
             <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
-              {result.reasons.map((reason) => <li key={reason}>{slotReasonLabel(reason)}</li>)}
+              {result.reasons.map((reason) => <li key={reason}>{slotReasonLabel(reason, result.slotGranularityMinutes)}</li>)}
             </ul>
             {result.per_staff.length > 1 ? (
               <ul className="mt-2 space-y-0.5 border-t border-current/20 pt-2 text-xs">
@@ -630,12 +733,12 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
                   <li key={staff.staff_id}>
                     {staff.display_name}: {staff.bookable
                       ? '予約できます'
-                      : staff.reasons.map(slotReasonLabel).join('、')}
+                      : staff.reasons.map((reason) => slotReasonLabel(reason, result.slotGranularityMinutes)).join('、')}
                   </li>
                 ))}
               </ul>
             ) : null}
-          </div>
+          </Notice>
         )
       ) : null}
     </section>
@@ -648,9 +751,15 @@ function StoreShiftsView() {
   const [settings, setSettings] = useState<BookingSettings | null>(null)
   const [menus, setMenus] = useState<BookingMenu[]>([])
   const [resources, setResources] = useState<BookingResource[]>([])
-  const [slots, setSlots] = useState<BookingAvailabilitySlot[]>([])
+  // プレビューは実LIFF（DateTimePicker）と同じ取得物を使う:
+  // 先頭の有効メニューについて、担当一覧の先頭（by_staff[0]）の空き枠。
+  const [preview, setPreview] = useState<{
+    status: LiffPreviewStatus
+    staffName: string | null
+    slots: BookingAvailabilitySlot[]
+    closedDates: string[]
+  }>({ status: 'loading', staffName: null, slots: [], closedDates: [] })
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
-  const [previewError, setPreviewError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [addingClosed, setAddingClosed] = useState(false)
   const [closedFrom, setClosedFrom] = useState('')
@@ -680,7 +789,15 @@ function StoreShiftsView() {
   const previewUrl = selectedAccount?.liffId
     ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
     : null
-  const dates = useMemo(previewDates, [])
+  const range = useMemo(previewRange, [])
+  /*
+   * R161 監査：休業日の追加・修正欄に書きかけがあるまま別画面へ移ると、
+   * 確認なく入力が消える。欄が出ていて何か入っている間は未保存とし、
+   * 離れる操作では確認を出す。保存の成功後は欄が閉じるため確認は出ない。
+   */
+  const exceptionFormDirty = (addingClosed && (closedFrom !== '' || closedTo !== '' || closedReason !== ''))
+    || editingExceptionId !== null
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: exceptionFormDirty, busy: savingClosed || exceptionBusy })
 
   useEffect(() => {
     const canEdit = canEditFeature('booking.settings')
@@ -695,12 +812,12 @@ function StoreShiftsView() {
       setSettings(null)
       setMenus([])
       setResources([])
-      setSlots([])
+      setPreview({ status: 'ready', staffName: null, slots: [], closedDates: [] })
       setLoadStatus('ready')
       return
     }
     if (loadedAccountRef.current !== selectedAccountId) setLoadStatus('loading')
-    setPreviewError(false)
+    setPreview({ status: 'loading', staffName: null, slots: [], closedDates: [] })
     setSaveError(null)
 
     void Promise.all([
@@ -719,54 +836,52 @@ function StoreShiftsView() {
 
       const menu = menuResult.menus.find((item) => item.is_active)
       if (!menu) {
-        setSlots([])
+        setPreview({ status: 'ready', staffName: null, slots: [], closedDates: [] })
         return
       }
       try {
+        // (b): 見本はお客様と同じ店舗ルールで判定する。付けないと締切前の
+        // 枠まで出て、空き確認の判定と食い違う。
         const availability = await bookingApi.getAvailability(selectedAccountId, {
           menuId: menu.id,
-          from: dates[0].date,
-          to: dates[dates.length - 1].date,
+          from: range.from,
+          to: range.to,
+          applyStoreRules: true,
         })
         if (requestId !== requestRef.current) return
-        setSlots(availability.by_staff.flatMap((item) => item.slots))
+        // LIFF は by_staff[0]（担当一覧の先頭）の枠だけを画面に出す。
+        // 全担当を合算すると実際の画面に無い時刻が混ざるので、先頭だけ使う。
+        const first = availability.by_staff[0]
+        setPreview({
+          status: 'ready',
+          staffName: first?.display_name ?? null,
+          slots: first?.slots ?? [],
+          closedDates: availability.closed_dates ?? [],
+        })
       } catch {
         if (requestId !== requestRef.current) return
-        setSlots([])
-        setPreviewError(true)
+        setPreview({ status: 'error', staffName: null, slots: [], closedDates: [] })
       }
     }).catch(() => {
       if (requestId !== requestRef.current) return
       setSettings(null)
       setMenus([])
       setResources([])
-      setSlots([])
+      setPreview({ status: 'ready', staffName: null, slots: [], closedDates: [] })
       setLoadStatus('error')
     })
 
     return () => {
       requestRef.current += 1
     }
-  }, [dates, reloadKey, selectedAccountId])
+  }, [range, reloadKey, selectedAccountId])
 
   const storeExceptions = useMemo(
     () => (settings?.exceptions ?? []).filter((item) => !item.scopeKind || item.scopeKind === 'store'),
     [settings],
   )
-  const slotDates = useMemo(() => new Set(slots.map((slot) => slot.date)), [slots])
-  const preview = useMemo(() => dates.map((item) => {
-    const weekday = new Date(`${item.date}T00:00:00.000Z`).getUTCDay()
-    const exception = storeExceptions.find((candidate) => {
-      const from = candidate.dateFrom || candidate.date || ''
-      const to = candidate.dateTo || candidate.date || ''
-      return from <= item.date && item.date <= to
-    })
-    const hours = settings?.businessHours.find((entry) => entry.weekday === weekday)?.intervals ?? []
-    let mark: PreviewMark = slotDates.has(item.date) ? '○' : '×'
-    if (exception?.kind === 'closed'
-      || (!exception && settings?.businessHoursConfigured && hours.length === 0)) mark = '休'
-    return { ...item, mark }
-  }), [dates, settings, slotDates, storeExceptions])
+  // プレビューに出すメニューは空き枠取得と同じ「先頭の有効メニュー」。
+  const previewMenuName = menus.find((item) => item.is_active)?.name ?? null
 
   const closedWeekdays = settings?.businessHoursConfigured ? DAYS.filter((day) => (
     settings?.businessHours.find((entry) => entry.weekday === day.weekday)?.intervals.length === 0
@@ -872,9 +987,9 @@ function StoreShiftsView() {
     <div data-design-node="tksPc" className="space-y-4 pb-8">
       <div data-design="Head" className="flex flex-wrap items-center gap-3">
         <nav aria-label="現在位置" className="text-ink-faint text-xs">
-          <Link href="/booking/bookings" className="text-accent hover:underline">予約</Link>
+          <Link href="/booking/bookings" className="text-action hover:underline">予約</Link>
           <span className="mx-2">›</span>
-          <Link href="/booking/menus" className="text-accent hover:underline">予約設定</Link>
+          <Link href="/booking/menus" className="text-action hover:underline">予約設定</Link>
           <span className="mx-2">›</span>
           <span>受付枠</span>
         </nav>
@@ -882,15 +997,13 @@ function StoreShiftsView() {
       </div>
 
       <div data-design="Tabs" className="border-hairline flex flex-wrap gap-1 border-b">
-        <Link href="/booking/menus" className="text-ink-faint rounded-t-md px-4 py-2 text-sm hover:text-ink-secondary">メニュー {settings?.menuCount ?? '—'}</Link>
-        <span className="border-accent text-ink rounded-t-md border-b-2 px-4 py-2 text-sm font-medium">受付枠</span>
-        <a href="#special" className="text-ink-faint rounded-t-md px-4 py-2 text-sm hover:text-ink-secondary">休業日</a>
-        <a href="#rules" className="text-ink-faint rounded-t-md px-4 py-2 text-sm hover:text-ink-secondary">予約のルール</a>
+        <Link href="/booking/menus" className="text-ink-faint rounded-t-mini px-4 py-2 text-sm hover:text-ink-secondary">メニュー {settings?.menuCount ?? '—'}</Link>
+        <span className="border-accent text-ink rounded-t-mini border-b-2 px-4 py-2 text-sm font-medium">受付枠</span>
+        <a href="#special" className="text-ink-faint rounded-t-mini px-4 py-2 text-sm hover:text-ink-secondary">休業日</a>
+        <a href="#rules" className="text-ink-faint rounded-t-mini px-4 py-2 text-sm hover:text-ink-secondary">予約のルール</a>
       </div>
 
-      <div data-design="Info" className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
-        何時から何時まで、どの曜日を受けるかです。右に、お客様のLINEに出るカレンダーがそのまま出ます。
-      </div>
+      <Notice data-design="Info" tone="info" message="何時から何時まで、どの曜日を受けるかです。右に、お客様のLINEに出る日時の選び方がそのまま出ます。" />
 
       {!selectedAccountId ? (
         <ListState kind="empty" title="LINEアカウントを選んでください" description="受付枠を確認するアカウントを選びます。" />
@@ -930,20 +1043,20 @@ function StoreShiftsView() {
               </div>
               {addingClosed ? (
                 <div className="border-hairline bg-canvas-sunken mt-4 grid gap-3 rounded-control border p-3 sm:grid-cols-3">
-                  <label className="text-ink-secondary text-xs">
+                  <span className="text-ink-secondary text-xs">
                     開始日
-                    <input aria-label="休業の開始日" type="date" value={closedFrom} onChange={(event) => setClosedFrom(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
-                  </label>
-                  <label className="text-ink-secondary text-xs">
+                    <DateField aria-label="休業の開始日" value={closedFrom} onChange={setClosedFrom} className="mt-1" />
+                  </span>
+                  <span className="text-ink-secondary text-xs">
                     終了日
-                    <input aria-label="休業の終了日" type="date" value={closedTo} onChange={(event) => setClosedTo(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
-                  </label>
+                    <DateField aria-label="休業の終了日" value={closedTo} onChange={setClosedTo} className="mt-1" />
+                  </span>
                   <label className="text-ink-secondary text-xs">
                     理由
-                    <input aria-label="休業の理由" value={closedReason} onChange={(event) => setClosedReason(event.target.value)} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
+                    <input aria-label="休業の理由" value={closedReason} onChange={(event) => setClosedReason(event.target.value)} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
                   </label>
                   {saveError ? <p className="text-danger text-xs sm:col-span-2">{saveError}</p> : <span className="sm:col-span-2" />}
-                  <Button variant="primary" onClick={() => void saveClosedDay()} disabled={savingClosed}>{savingClosed ? '保存中…' : '休業日を保存'}</Button>
+                  <Button variant="primary" onClick={() => void saveClosedDay()} disabled={savingClosed} busy={savingClosed}>休業日を保存する</Button>
                 </div>
               ) : null}
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -956,31 +1069,31 @@ function StoreShiftsView() {
                     <div key={item.id || `${from}-${to}`} className="border-hairline rounded-control border p-3">
                       {editingExceptionId === item.id ? (
                         <div className="space-y-2">
-                          <label className="text-ink-secondary block text-xs">
+                          <span className="text-ink-secondary block text-xs">
                             開始日
-                            <input aria-label="休業日の開始日" type="date" value={editFrom} onChange={(event) => setEditFrom(event.target.value)} disabled={exceptionBusy} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
-                          </label>
-                          <label className="text-ink-secondary block text-xs">
+                            <DateField aria-label="休業日の開始日" value={editFrom} onChange={setEditFrom} disabled={exceptionBusy} className="mt-1" />
+                          </span>
+                          <span className="text-ink-secondary block text-xs">
                             終了日
-                            <input aria-label="休業日の終了日" type="date" value={editTo} onChange={(event) => setEditTo(event.target.value)} disabled={exceptionBusy} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
-                          </label>
+                            <DateField aria-label="休業日の終了日" value={editTo} onChange={setEditTo} disabled={exceptionBusy} className="mt-1" />
+                          </span>
                           <label className="text-ink-secondary block text-xs">
                             理由
-                            <input aria-label="休業日の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={exceptionBusy} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
+                            <input aria-label="休業日の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={exceptionBusy} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
                           </label>
                           {exceptionError ? <p className="text-danger text-xs" role="alert">{exceptionError}</p> : null}
                           <div className="flex flex-wrap gap-2">
-                            <Button variant="primary" onClick={() => void saveExceptionEdit(item)} disabled={exceptionBusy}>{exceptionBusy ? '保存中…' : '休業日を保存'}</Button>
-                            <Button onClick={() => { setEditingExceptionId(null); setExceptionError(null) }} disabled={exceptionBusy}>やめる</Button>
+                            <Button variant="primary" onClick={() => void saveExceptionEdit(item)} disabled={exceptionBusy} busy={exceptionBusy}>休業日を保存する</Button>
+                            <Button onClick={() => { setEditingExceptionId(null); setExceptionError(null) }} disabled={exceptionBusy}>キャンセル</Button>
                           </div>
                         </div>
                       ) : (
                         <>
-                          <p className="text-ink font-semibold tabular-nums">{shortDate(from)}{from !== to ? `〜${shortDate(to)}` : ''}</p>
+                          <p className="text-ink font-semibold tabular-nums">{from !== to ? formatRange(from, to) : formatDay(from)}</p>
                           <p className="text-ink-secondary mt-1 text-sm">{item.reason || item.note || '休業日'}</p>
                           {canEditSettings ? (
                             <div className="mt-2 flex gap-3 text-xs">
-                              <button type="button" className="text-accent font-semibold underline" onClick={() => startEditException(item)}>修正する</button>
+                              <button type="button" className="text-action font-semibold underline" onClick={() => startEditException(item)}>修正する</button>
                               <button type="button" className="text-danger font-semibold underline" onClick={() => { setDeleteTarget(item); setExceptionError(null) }}>削除する</button>
                             </div>
                           ) : null}
@@ -1014,40 +1127,18 @@ function StoreShiftsView() {
 
           <aside className="space-y-3 xl:w-96 xl:flex-none">
             <section data-design="Preview" className="bg-canvas border-hairline rounded-card border p-4">
-              <h2 className="text-ink-secondary text-sm font-semibold">お客様のLINEではこう見えます</h2>
-              <div className="bg-info mt-3 rounded-card p-3">
-                <div className="bg-canvas rounded-control p-4">
-                  <p className="text-ink text-sm font-semibold">ご希望の日をえらんでください</p>
-                  <div className="text-ink-faint mt-3 grid grid-cols-7 gap-1 text-center text-xs">
-                    {['月', '火', '水', '木', '金', '土', '日'].map((day) => <span key={day} className="font-medium">{day}</span>)}
-                    {preview.map((item) => (
-                      <span key={item.date} className="bg-canvas-sunken rounded-control py-1" title={item.date}>
-                        <span className="block tabular-nums">{item.day}</span>
-                        <span className={item.mark === '○' ? 'text-success' : item.mark === '休' ? 'text-ink-faint' : 'text-danger'}>{item.mark}</span>
-                      </span>
-                    ))}
-                  </div>
-                  {previewError ? <p className="text-danger mt-3 text-xs">空き状況だけ読み込めませんでした。</p> : null}
-                  <dl className="text-ink-secondary mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                    <div className="flex gap-2"><dt className="text-success font-semibold">○</dt><dd>あいています</dd></div>
-                    <div className="flex gap-2"><dt className="text-danger font-semibold">×</dt><dd>満席です</dd></div>
-                    <div className="flex gap-2"><dt className="font-semibold">休</dt><dd>お休み</dd></div>
-                  </dl>
-                  <p className="text-ink-faint mt-3 text-xs">○・×は受付上限に対する残数を反映しています。</p>
-                  {slots.length > 0 ? (
-                    <details className="mt-3 text-xs">
-                      <summary className="text-accent cursor-pointer">空き枠の内訳を見る</summary>
-                      <div className="mt-2 space-y-1">
-                        {slots.slice(0, 6).map((slot) => <div key={`${slot.date}-${slot.start}`} className="flex justify-between"><span>{shortDate(slot.date)} {slot.start}</span><span>残り{slot.remaining}/{slot.capacity}</span></div>)}
-                      </div>
-                    </details>
-                  ) : null}
-                </div>
-              </div>
+              <LiffDateTimePreview
+                status={preview.status}
+                slots={preview.slots}
+                menuName={previewMenuName}
+                staffName={preview.staffName}
+                initialView={settings.liffDateView ?? 'list'}
+                closedDates={preview.closedDates}
+              />
             </section>
 
             <details className="bg-canvas border-hairline rounded-card border p-3">
-              <summary className="text-accent cursor-pointer text-sm font-semibold">設備ごとの受付上限を管理</summary>
+              <summary className="text-action cursor-pointer text-sm font-semibold">設備ごとの受付上限を管理</summary>
               <div className="mt-3 space-y-3 text-sm">
                 {canManageResources ? <NewResourceEditor key={`new:${selectedAccountId}`} accountId={selectedAccountId} onCreated={(created) => {
                   if (activeAccountRef.current === selectedAccountId) setResources((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name, 'ja')))
@@ -1088,10 +1179,11 @@ function StoreShiftsView() {
             <section data-design="Links" className="bg-canvas border-hairline rounded-card border p-4">
               <h2 className="text-ink font-semibold">つながる先</h2>
               <div className="mt-3 space-y-3 text-sm">
-                <Link href="/booking/bookings" className="text-accent flex justify-between gap-3"><span>→ 予約管理</span><span className="text-ink-faint text-xs">入った予約の台帳</span></Link>
-                <Link href="/rich-menus" className="text-accent flex justify-between gap-3"><span>→ リッチメニュー</span><span className="text-ink-faint text-xs">予約ボタンの飛び先</span></Link>
-                <Link href="/reminders" className="text-accent flex justify-between gap-3"><span>→ リマインダ</span><span className="text-ink-faint text-xs">前日・当日のお知らせ</span></Link>
-                <Link href="/users" className="text-accent flex justify-between gap-3"><span>→ ログインユーザー</span><span className="text-ink-faint text-xs">担当できる人</span></Link>
+                <Link href="/booking/bookings" className="text-action flex justify-between gap-3"><span>→ 予約管理</span><span className="text-ink-faint text-xs">入った予約の台帳</span></Link>
+                <Link href="/rich-menus" className="text-action flex justify-between gap-3"><span>→ リッチメニュー</span><span className="text-ink-faint text-xs">予約ボタンの飛び先</span></Link>
+                <Link href="/reminders" className="text-action flex justify-between gap-3"><span>→ リマインダ</span><span className="text-ink-faint text-xs">前日・当日のお知らせ</span></Link>
+                <Link href="/booking/staff" className="text-action flex justify-between gap-3"><span>→ 予約の担当者</span><span className="text-ink-faint text-xs">担当できる人の追加と削除</span></Link>
+                <Link href="/staff" className="text-action flex justify-between gap-3"><span>→ ログインユーザー</span><span className="text-ink-faint text-xs">ログイン権限の管理</span></Link>
               </div>
             </section>
           </aside>
@@ -1102,7 +1194,7 @@ function StoreShiftsView() {
         open={deleteTarget !== null}
         title="この休業日を消しますか？"
         description="消すと、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
-        confirmLabel="休業日を消す"
+        confirmLabel="休業日を削除する"
         destructive
         busy={exceptionBusy}
         error={exceptionError ?? undefined}
@@ -1113,6 +1205,8 @@ function StoreShiftsView() {
         }}
         onConfirm={() => void removeException()}
       />
+      {/* R161 監査：休業日の書きかけがある間の離脱確認。 */}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="休業日への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

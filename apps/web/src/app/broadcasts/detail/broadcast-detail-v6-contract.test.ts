@@ -6,20 +6,38 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
 describe('V6 一斉配信詳細の契約', () => {
-  it('概要から配信内容まで、同じ結果画面のタブとして示す', () => {
-    expect(PAGE).toContain("['概要', 'クリック', '友だち', 'エラー', '配信内容']")
+  it('概要・宛先・記録を押せるタブとして示す', () => {
+    // #816（★V7 C-2）。押せない5連の飾り（概要・クリック・友だち・エラー・
+    // 配信内容）は、押せる3つのタブ（概要・宛先・記録）へ置き換えた。
+    // 押せない飾りは出さない（★V7の決まり）。
+    expect(PAGE).toContain('<DetailTabs')
+    expect(PAGE).not.toContain("['概要', 'クリック', '友だち', 'エラー', '配信内容']")
     expect(PAGE).toContain('id="broadcast-content"')
     expect(PAGE).not.toContain('配信内容の別画面は準備中です')
   })
 
-  it('配信が読めるまでは内容への操作を押せない', () => {
-    expect(PAGE).toContain('disabled={!broadcast}')
+  it('書き出しはタブの中に置き、下の追従バーは出さない', () => {
+    // #816 C。書き出しは宛先のタブの中の1つと概要のタブの中の1つだけ。
+    // 画面の一番下の箱（StickyBar）は消す。二重になるとどちらを押せば
+    // よいか分からなくなる。
+    expect(PAGE).not.toContain('StickyBar')
+    expect(PAGE).toContain('CSVで書き出す')
+  })
+
+  it('承認が絡む配信は段に承認待ちを出す', () => {
+    // 記録に「承認を依頼した」「承認した」がある配信は、
+    // 送り終わっても段に承認待ちを出す。承認の要らない配信は出さない。
+    // 配信本体が古い応答のときは承認の今の状態で補う。
+    expect(PAGE).toContain('isApprovalInvolved(broadcast.approvalStatus, approval)')
+    expect(PAGE).toContain('approval={approvalState}')
   })
 
   it('取得失敗を配信なしと混ぜず、同じ画面で再読込できる', () => {
     expect(PAGE).toContain("setLoadState(error instanceof ApiError && error.status === 404 ? 'not-found' : 'error')")
     expect(PAGE).toContain('配信を読み込めませんでした')
-    expect(PAGE).toContain('配信を再読み込み')
+    // 再読み込みは TargetMissing の error（onRetry が同じ画面の取り直し）。
+    expect(PAGE).toContain('kind="error"')
+    expect(PAGE).toContain('onRetry={() => setReloadToken((value) => value + 1)}')
   })
 
   it('期間集計ではなく配信自身の保存済みインサイトを読む', () => {
@@ -73,5 +91,38 @@ describe('V6 一斉配信詳細の、取れない数の断り', () => {
     expect(PAGE).toContain('/broadcasts/new?duplicateFrom=')
     expect(PAGE).toContain('同じ設定で作り直す')
     expect(PAGE).not.toContain('種にして作り直す口がまだないため押せません')
+  })
+})
+
+describe('V6 一斉配信詳細の、送信前の進み具合', () => {
+  it('Progress は送信中だけに出す（下書き・予約では棒も回る印も出さない）', () => {
+    // 予約しただけの配信に preparing の棒を出すと、送り始めているように見える。
+    expect(PAGE).toContain('state="active"')
+    expect(PAGE).not.toContain('state="preparing"')
+    expect(PAGE).not.toContain('state="done"')
+    expect(PAGE).not.toContain('state="partial"')
+    expect(PAGE).not.toContain('state={')
+  })
+
+  it('下書き・予約は1行の文だけにし、0/0 の件数行を出さない', () => {
+    expect(PAGE).toContain('に送り始めます')
+    expect(PAGE).toContain('まだ送っていません')
+  })
+
+  it('sent は SentResult の分かれ道へ行くので、完了の分岐をここに置かない', () => {
+    expect(PAGE).toContain('<SentResult')
+    expect(PAGE).not.toContain('送信が完了しました')
+    expect(PAGE).not.toContain('一部届きませんでした')
+  })
+
+  it('計測リンクのある配信だけ「押していない人へ追送」を出す', () => {
+    // 追いかけ配信（G-3）。母集団は「届いた人」なので、計測リンクが無い
+    // 配信に出すと全員が対象になってしまう。links がある時だけ出す。
+    expect(PAGE).toContain('リンクを押していない人へ追送')
+    expect(PAGE).toContain('insight?.links?.length ? (')
+    expect(PAGE).toContain("type: 'broadcast_link_clicked'")
+    expect(PAGE).toContain('clicked: false')
+    // 文面は元配信を種にする（宛先だけ差し替える）。
+    expect(PAGE).toContain('duplicateFrom=')
   })
 })

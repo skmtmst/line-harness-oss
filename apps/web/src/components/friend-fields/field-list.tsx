@@ -11,9 +11,11 @@ import { createResponseGate } from '@/lib/latest-request'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
+import Notice from '@/components/shared/notice'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { Th } from '@/components/shared/table'
+import Select from '@/components/shared/select'
 
 export const FIELD_TYPE_HINTS: Record<FriendFieldType, string> = {
   text: '短いテキスト', textarea: '長い文章', number: '体重など', date: '誕生日など', datetime: '予約日時など',
@@ -29,7 +31,7 @@ export const FIELD_TYPE_LABELS: Record<FriendFieldType, string> = {
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-function destinationLabel(field: FriendField): string {
+export function destinationLabel(field: FriendField): string {
   if (field.displayTargets?.length) return field.displayTargets.join('・')
   const places = ['友だち詳細', 'テンプレート差し込み']
   if (field.isStarred) places.push('友だち一覧')
@@ -37,13 +39,13 @@ function destinationLabel(field: FriendField): string {
   return places.join('・')
 }
 
-function knownUsageCount(field: FriendField): number | null {
+export function knownUsageCount(field: FriendField): number | null {
   return typeof field.usageCount === 'number' && Number.isFinite(field.usageCount) && field.usageCount >= 0
     ? field.usageCount
     : null
 }
 
-function fieldDeletionBlockedReason(field: FriendField): string | null {
+export function fieldDeletionBlockedReason(field: FriendField): string | null {
   const usageCount = knownUsageCount(field)
   if (usageCount === null) return '使用人数を確認できないため削除できません。再読み込みしてください。'
   if (usageCount > 0) return '値が入っているため、先に項目を移行してください'
@@ -268,26 +270,30 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
 
   return (
     <div data-design-node="HBTk0">
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map((card) => <SummaryCard key={card.title} {...card} loading={statsStatus === 'loading'} variant="v6" />)}</div>
+      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map((card) => <KpiCard key={card.title} {...card} loading={statsStatus === 'loading'} variant="v6" />)}</div>
       <NoteBar className="mb-4">既定値は友だち情報が空欄のときの送信値です。種類は新規登録後に変更せず、回答フォーム・友だち詳細・変数挿入で同じ定義を使います。</NoteBar>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="項目名で検索" aria-label="項目名で検索" className="h-9 w-[150px] rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent" />
-        <select value={type} onChange={(event) => setType(event.target.value as typeof type)} className="v6-select h-9 w-[150px] rounded-control border border-hairline bg-canvas px-3 text-label font-semibold text-ink" aria-label="項目の種類">
-          <option value="all">種類：すべて</option>
-          {Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="項目名で検索" aria-label="項目名で検索" className="h-9 w-[150px] rounded-control border border-hairline bg-canvas px-3 text-label" />
+        <Select
+          label="種類"
+          aria-label="項目の種類"
+          value={type}
+          onChange={(value) => setType(value as typeof type)}
+          options={[{ value: 'all', label: 'すべて' }, ...Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => ({ value, label }))]}
+        />
         <span className="flex-1" />
         {/* 追加ボタンはタブの右に1個だけ（#1014 ATTR-22）。一覧の中には置かない。 */}
       </div>
 
       {status === 'ready' && actionError ? (
-        <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">
-          {actionError}
-          {retryOrder ? (
+        <Notice
+          tone="danger"
+          className="mb-4"
+          action={retryOrder ? (
             <button
               type="button"
-              className="ml-2 font-semibold underline underline-offset-2"
+              className="font-semibold underline underline-offset-2"
               onClick={() => {
                 const next = retryOrder
                 setRetryOrder(null)
@@ -296,11 +302,13 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
             >
               再試行
             </button>
-          ) : null}
-        </p>
+          ) : undefined}
+        >
+          {actionError}
+        </Notice>
       ) : null}
 
-      <div className="overflow-hidden rounded-card border border-hairline bg-canvas [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+      <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
         {/* 960px以上は表。それ未満は縦に重ねたカード（#1014 ATTR-14）。 */}
         <table className="hidden w-full table-fixed text-sm md:table">
           <thead className="border-b border-hairline bg-canvas-sunken text-caption text-ink-faint"><tr>
@@ -319,13 +327,13 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
                     行操作は移行/削除しかなく、名前・既定値・保護設定を
                     変える入口がなかった。種類と差し込み名は編集画面でも固定。
                   */}
-                  <td className="px-3 py-3"><Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className="block truncate font-semibold text-accent hover:underline" title={`${field.name}を編集`}>{field.name}</Link><p className="truncate font-mono text-caption text-ink-faint" title={`{{field.${field.fieldKey}}}`}>{`{{field.${field.fieldKey}}}`}</p></td>
+                  <td className="px-3 py-3"><Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className="block truncate font-semibold text-action hover:underline" title={`${field.name}を編集`}>{field.name}</Link><p className="truncate font-mono text-caption text-ink-faint" title={`{{field.${field.fieldKey}}}`}>{`{{field.${field.fieldKey}}}`}</p></td>
                   <td className="px-3 py-3 text-ink">{FIELD_TYPE_LABELS[field.type] ?? field.type}</td>
                   <td className="px-3 py-3 tabular-nums text-ink">{knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}</td>
                   <td className="px-3 py-3 text-ink-faint" title={field.formUsageCount === undefined ? '回答フォームの使用数を取得できません' : undefined}>{field.formUsageCount === undefined ? '—' : `回答フォーム ${field.formUsageCount}個`}</td>
                   <td className="truncate px-3 py-3 text-ink" title={destinationLabel(field)}>{destinationLabel(field)}</td>
                   <td className="px-3 py-3 text-center"><div className="flex items-center justify-center gap-2">
-                    {(knownUsageCount(field) ?? 0) > 0 ? <Link href={`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`} className="text-caption font-semibold text-accent hover:underline">移行</Link> : null}
+                    {(knownUsageCount(field) ?? 0) > 0 ? <Link href={`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`} className="text-caption font-semibold text-action hover:underline">移行</Link> : null}
                     {field.isInherited ? <span title="共通項目は直接削除できません" className="text-ink-faint"><LockKeyhole size={18} aria-label="共通項目のため削除できません" /></span> : <button type="button" disabled={fieldDeletionBlockedReason(field) !== null} onClick={() => setPendingDelete(field)} aria-label={`${field.name}を削除`} title={fieldDeletionBlockedReason(field) ?? '項目を削除'} className="text-danger hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-30"><Trash2 size={18} /></button>}
                   </div></td>
                 </tr>)}
@@ -354,7 +362,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
                     <ReorderGrip label={field.name} disabled={field.isInherited} disabledReason="共通項目は移行後に並び替えできます" onMove={(direction) => void keyboardMove(field.id, direction)} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className="block truncate font-semibold text-accent hover:underline" title={`${field.name}を編集`}>{field.name}</Link>
+                    <Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className="block truncate font-semibold text-action hover:underline" title={`${field.name}を編集`}>{field.name}</Link>
                     <p className="truncate font-mono text-caption text-ink-faint">{`{{field.${field.fieldKey}}}`}</p>
                     <p className="mt-1 text-xs text-ink-secondary">
                       {FIELD_TYPE_LABELS[field.type] ?? field.type}・使用中 {knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}
@@ -364,7 +372,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 pt-1">
-                    {(knownUsageCount(field) ?? 0) > 0 ? <Link href={`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`} className="text-caption font-semibold text-accent hover:underline">移行</Link> : null}
+                    {(knownUsageCount(field) ?? 0) > 0 ? <Link href={`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`} className="text-caption font-semibold text-action hover:underline">移行</Link> : null}
                     {field.isInherited ? <span title="共通項目は直接削除できません" className="text-ink-faint"><LockKeyhole size={18} aria-label="共通項目のため削除できません" /></span> : <button type="button" disabled={fieldDeletionBlockedReason(field) !== null} onClick={() => setPendingDelete(field)} aria-label={`${field.name}を削除`} title={fieldDeletionBlockedReason(field) ?? '項目を削除'} className="text-danger hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-30"><Trash2 size={18} /></button>}
                   </div>
                 </div>
@@ -374,7 +382,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
         ) : null}
       </div>
 
-      <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]"><h2 className="text-sm font-bold text-ink">既定値・種類・削除の安全確認</h2><p className="mt-1 text-xs leading-relaxed text-ink-faint">既定値は空欄送信事故を防ぎます。種類は新規登録後に変更不可とし、値が入っている項目は削除せず新しい項目へ移行します。</p></section>
+      <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 shadow-card"><h2 className="text-sm font-bold text-ink">既定値・種類・削除の安全確認</h2><p className="mt-1 text-xs leading-relaxed text-ink-faint">既定値は空欄送信事故を防ぎます。種類は新規登録後に変更不可とし、値が入っている項目は削除せず新しい項目へ移行します。</p></section>
       <ConfirmDialog open={pendingDelete !== null} title={`項目「${pendingDelete?.name ?? ''}」を削除しますか？`} description="値が入っていない項目だけ削除できます。この操作は元に戻せません。" confirmLabel="削除する" destructive onCancel={() => setPendingDelete(null)} onConfirm={() => { const target = pendingDelete; setPendingDelete(null); if (target) void remove(target) }} />
     </div>
   )

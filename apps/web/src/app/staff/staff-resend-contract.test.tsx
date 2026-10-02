@@ -99,14 +99,21 @@ vi.mock('@/lib/api', () => {
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: StaffPage } = await import('./page')
+const { default: ToastHost, clearToastsForTest } = await import('@/components/shared/toast')
 
 async function mount() {
-  await act(async () => { render(<StaffPage />) })
+  // 保存の知らせは Toast（右下・4秒）で出す。置き場所も一緒に描く。
+  await act(async () => { render(<><StaffPage /><ToastHost /></>) })
   await waitFor(() => expect(screen.getByText('招待された人')).toBeTruthy())
 }
 
 function resendButtons() {
-  return screen.queryAllByRole('button', { name: /もう一度送る|送信中/ })
+  return screen.queryAllByRole('menuitem', { name: /もう一度送る|送信中/ })
+}
+
+/* 再送は行の「…」の中。開いてから項目を押す。 */
+async function openRowMenu() {
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '招待された人のその他操作' })) })
 }
 
 beforeEach(() => {
@@ -115,6 +122,7 @@ beforeEach(() => {
   fixture.fetchApi.mockReset()
   state.members = [member({})]
   state.users = [accessUser({})]
+  clearToastsForTest()
 })
 afterEach(() => { cleanup() })
 
@@ -126,6 +134,7 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
     })
     await mount()
 
+    await openRowMenu()
     await act(async () => { fireEvent.click(resendButtons()[0]) })
 
     expect(fixture.fetchApi).toHaveBeenCalledTimes(1)
@@ -135,7 +144,7 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
     const notice = await screen.findByRole('status')
     expect(notice.textContent).toContain('送り直しました')
     /* 新しい期限が JST で出る。日付が読めないと「いつまでに受けてもらうか」が伝わらない。 */
-    expect(notice.textContent).toContain('3/4')
+    expect(notice.textContent).toContain('3月4日')
     expect(notice.textContent).toContain('期限内に受諾がなければ')
     expect(screen.queryByRole('alert')).toBeNull()
   })
@@ -147,7 +156,10 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
     }))
     await mount()
 
+    await openRowMenu()
     await act(async () => { fireEvent.click(resendButtons()[0]) })
+    /* 項目を押すとメニューは閉じる。開き直すと送信中の表示になる。 */
+    await openRowMenu()
     expect(resendButtons()[0].textContent).toContain('送信中')
     expect((resendButtons()[0] as HTMLButtonElement).disabled).toBe(true)
 
@@ -161,6 +173,7 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
   it('素早い二度押しでも1回しか叩かない(同じ描画の中で2回届く場合)', async () => {
     fixture.fetchApi.mockImplementation(() => new Promise(() => {}))
     await mount()
+    await openRowMenu()
     /* 見た目の disabled が効く前に2回届く。2回叩くと1通目のリンクが死ぬ。 */
     const button = resendButtons()[0]
     await act(async () => {
@@ -174,12 +187,14 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
     fixture.fetchApi.mockRejectedValue(new Error('このユーザーはすでに利用を開始しています'))
     await mount()
 
+    await openRowMenu()
     await act(async () => { fireEvent.click(resendButtons()[0]) })
 
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('すでに利用を開始しています')
     expect(screen.queryByRole('status')).toBeNull()
     /* 失敗しても押し直せる。押せないまま詰むのがこの票のもとの不具合。 */
+    await openRowMenu()
     expect((resendButtons()[0] as HTMLButtonElement).disabled).toBe(false)
   })
 

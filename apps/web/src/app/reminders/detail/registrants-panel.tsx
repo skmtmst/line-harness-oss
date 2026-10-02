@@ -7,8 +7,9 @@ import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import { TextInput } from '@/components/shared/form-controls'
+import DateTimeField from '@/components/shared/date-time-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatDateTime } from '@/lib/format'
 
 
 const JST_PARTS = new Intl.DateTimeFormat('en-CA', {
@@ -43,9 +44,7 @@ export function dateTimeLocalJstToUtcIso(value: string): string | null {
 function formatDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 export function ReminderRegistrantsPanel({ reminderId }: { reminderId: string }) {
@@ -136,11 +135,11 @@ export function ReminderRegistrantsPanel({ reminderId }: { reminderId: string })
       <DataTable><thead><TableHeadRow><Th>友だち</Th><Th>基準日</Th><Th>状態</Th><Th>登録</Th><Th align="right">操作</Th></TableHeadRow></thead><tbody>
         {items.map((item) => <Tr key={item.id}>
           <Td>{item.friendName || '名前未設定'}</Td>
-          <Td><TextInput aria-label={`${item.friendName || '登録者'}の基準日`} type="datetime-local" value={draftDates[item.id] ?? ''} disabled={item.status !== 'active' || actioningId === item.id} onChange={(event) => setDraftDates((current) => ({ ...current, [item.id]: event.target.value }))} /></Td>
+          <Td><DateTimeField aria-label={`${item.friendName || '登録者'}の基準日`} value={draftDates[item.id] ?? ''} disabled={item.status !== 'active' || actioningId === item.id} onChange={(v) => setDraftDates((current) => ({ ...current, [item.id]: v }))} /></Td>
           <Td>{item.status === 'active' ? '有効' : item.status === 'cancelled' ? '取消済み' : item.status}</Td>
           <Td>{formatDate(item.createdAt)}</Td>
           <Td align="right"><div className="flex flex-wrap justify-end gap-2">
-            {item.status === 'active' ? <><Button size="field" disabled={actioningId === item.id} onClick={() => void saveDate(item)}>基準日を保存</Button><Button size="field" variant="secondary" disabled={actioningId === item.id} onClick={() => void changeStatus(item, 'cancel')}>取消</Button></> : null}
+            {item.status === 'active' ? <><Button size="field" disabled={actioningId === item.id} onClick={() => void saveDate(item)}>基準日を保存する</Button><Button size="field" variant="secondary" disabled={actioningId === item.id} onClick={() => void changeStatus(item, 'cancel')}>取消</Button></> : null}
             {item.status === 'cancelled' ? <Button size="field" disabled={actioningId === item.id} onClick={() => void changeStatus(item, 'resume')}>再開</Button> : null}
           </div></Td>
         </Tr>)}

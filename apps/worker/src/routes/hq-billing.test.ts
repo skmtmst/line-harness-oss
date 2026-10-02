@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
@@ -11,6 +11,7 @@ const stripe = vi.hoisted(() => ({
   createPortalSession: vi.fn(),
   retrievePrice: vi.fn(),
   retrieveSubscription: vi.fn(),
+  retrievePaymentIntent: vi.fn(),
   listInvoices: vi.fn(),
 }));
 vi.mock('../services/stripe-api.js', async (importOriginal) => {
@@ -98,6 +99,10 @@ beforeEach(() => {
   testDb.raw.prepare(
     `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id) VALUES ('staff-1', '山田 太郎', 'masato@example.com', 'admin', 'key-1', ?)`,
   ).run(DEFAULT_TENANT_ID);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('契約状況（summary）', () => {
@@ -348,6 +353,130 @@ describe('課金 Webhook', () => {
     expect(tenantRow().plan_status).toBe('canceled');
     const summary = (await (await call('GET', '/api/hq/billing/summary')).json<{ data: { canSend: boolean; state: string } }>()).data;
     expect(summary).toMatchObject({ state: 'canceled', canSend: false });
+  });
+
+  it('入金済み請求書の金額・入金日・年払いを保存し、同じイベントは増やさない', async () => {
+    setTenant({ stripe_customer_id: 'cus_1', plan_status: 'past_due' });
+    const paid = {
+      id: 'evt_invoice_paid',
+      type: 'invoice.paid',
+      data: { object: {
+        id: 'in_paid', customer: 'cus_1', subscription: 'sub_1', status: 'paid',
+        amount_paid: 99_000, amount_due: 99_000, amount_remaining: 0, currency: 'jpy',
+        created: 1_760_000_000, period_start: 1_760_000_000, period_end: 1_791_536_000,
+        status_transitions: { paid_at: 1_760_000_100 }, hosted_invoice_url: 'https://invoice.example.test/in_paid',
+        lines: { data: [{ description: 'ライト年払い', price: { recurring: { interval: 'year' } } }] },
+      } },
+    };
+    expect((await webhook(paid)).status).toBe(200);
+    expect((await webhook(paid)).status).toBe(200);
+    const rows = testDb.raw.prepare(`SELECT * FROM billing_invoices WHERE id = 'in_paid'`).all() as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      tenant_id: DEFAULT_TENANT_ID,
+      status: 'paid',
+      amount_paid: 99_000,
+      amount_due: 99_000,
+      interval: 'year',
+      stripe_customer_id: 'cus_1',
+      subscription_id: 'sub_1',
+    });
+    expect(String(rows[0]?.paid_at)).toMatch(/\+09:00$/);
+    expect(tenantRow().plan_status).toBe('active');
+  });
+
+  it('支払い失敗・無効化・返金を請求書へ反映する', async () => {
+    setTenant({ stripe_customer_id: 'cus_1', plan_status: 'active' });
+    const invoice = {
+      id: 'in_status', customer: 'cus_1', subscription: 'sub_1', amount_paid: 29_800,
+      amount_due: 29_800, amount_remaining: 29_800, currency: 'jpy', created: 1_760_000_000,
+      period_start: 1_760_000_000, period_end: 1_762_592_000, hosted_invoice_url: null, lines: { data: [] },
+    };
+    await webhook({ id: 'evt_failed', type: 'invoice.payment_failed', data: { object: invoice } });
+    expect(testDb.raw.prepare(`SELECT status, amount_due FROM billing_invoices WHERE id = 'in_status'`).get()).toMatchObject({ status: 'open', amount_due: 29_800 });
+    await webhook({ id: 'evt_void', type: 'invoice.voided', data: { object: invoice } });
+    expect(testDb.raw.prepare(`SELECT status FROM billing_invoices WHERE id = 'in_status'`).get()).toMatchObject({ status: 'void' });
+    await webhook({ id: 'evt_paid_again', type: 'invoice.paid', data: { object: { ...invoice, status: 'paid', status_transitions: { paid_at: 1_760_000_100 } } } });
+    await webhook({ id: 'evt_refund', type: 'charge.refunded', data: { object: { id: 'ch_1', customer: 'cus_1', invoice: 'in_status', amount_refunded: 4_000 } } });
+    expect(testDb.raw.prepare(`SELECT status, amount_refunded FROM billing_invoices WHERE id = 'in_status'`).get()).toMatchObject({ status: 'paid', amount_refunded: 4_000 });
+  });
+
+  it('請求書のないEC-CUBE返金は対象外として記録し、請求書を変更しない', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const res = await webhook({
+      id: 'evt_ec_refund',
+      type: 'charge.refunded',
+      data: { object: { id: 'ch_ec', customer: 'cus_ec', invoice: null, amount_refunded: 2_530 } },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json<{ data: { matched: boolean } }>()).toMatchObject({ data: { matched: false } });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM billing_invoices').get()).toMatchObject({ n: 0 });
+    expect(info).toHaveBeenCalledWith(JSON.stringify({
+      message: 'billing webhook: charge.refunded 対象外',
+      eventId: 'evt_ec_refund',
+      reason: 'Stripe Billing請求書でない',
+    }));
+  });
+
+  it('invoiceが無くpayment_intentのみのEC-CUBE返金でも、Billing請求書のPaymentIntentならStripeに問い合わせて反映する', async () => {
+    setTenant({ stripe_customer_id: 'cus_1' });
+    testDb.raw.prepare(
+      `INSERT INTO billing_invoices (id, tenant_id, status, amount_paid, amount_due, amount_refunded, currency, synced_at, created_at)
+       VALUES ('in_pi_test', ?, 'paid', 4_000, 4_000, 0, 'jpy', '2026-09-27T00:00:00+09:00', '2026-09-27T00:00:00+09:00')`,
+    ).run(DEFAULT_TENANT_ID);
+    stripe.retrievePaymentIntent.mockResolvedValue({ id: 'pi_test', invoice: 'in_pi_test' });
+
+    const res = await webhook({
+      id: 'evt_pi_refund',
+      type: 'charge.refunded',
+      data: { object: { id: 'ch_pi', customer: 'cus_1', invoice: null, payment_intent: 'pi_test', amount_refunded: 4_000 } },
+    });
+
+    expect(res.status).toBe(200);
+    expect(stripe.retrievePaymentIntent).toHaveBeenCalledWith(expect.anything(), 'pi_test');
+    expect(testDb.raw.prepare(`SELECT amount_refunded FROM billing_invoices WHERE id = 'in_pi_test'`).get()).toMatchObject({ amount_refunded: 4_000 });
+  });
+
+  it('payment_intentがあっても請求書に紐付かなければ対象外として記録する（Stripe未設定時は問い合わせない）', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const res = await webhook({
+      id: 'evt_pi_no_invoice',
+      type: 'charge.refunded',
+      data: { object: { id: 'ch_ec2', customer: 'cus_ec2', invoice: null, payment_intent: 'pi_ec', amount_refunded: 1_200 } },
+    }, { env: { STRIPE_SECRET_KEY: undefined } });
+
+    expect(res.status).toBe(200);
+    expect(stripe.retrievePaymentIntent).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledWith(JSON.stringify({
+      message: 'billing webhook: charge.refunded 対象外',
+      eventId: 'evt_pi_no_invoice',
+      reason: 'Stripe Billing請求書でない',
+    }));
+  });
+
+  it('請求書IDがあっても更新対象がなければ警告する', async () => {
+    setTenant({ stripe_customer_id: 'cus_1' });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const res = await webhook({
+      id: 'evt_missing_invoice_refund',
+      type: 'charge.refunded',
+      data: { object: { id: 'ch_missing', customer: 'cus_1', invoice: 'in_missing', amount_refunded: 1_000 } },
+    });
+
+    expect(res.status).toBe(200);
+    expect(warn).toHaveBeenCalledWith(JSON.stringify({
+      message: 'billing webhook: charge.refunded 更新対象なし',
+      eventId: 'evt_missing_invoice_refund',
+      invoiceId: 'in_missing',
+      reason: 'billing_invoice_not_found',
+    }));
+  });
+
+  it('知らない顧客の請求書はイベントだけ記録し、請求書行は作らない', async () => {
+    const res = await webhook({ id: 'evt_unknown_invoice', type: 'invoice.paid', data: { object: { id: 'in_unknown', customer: 'cus_unknown', amount_paid: 9_800, amount_due: 9_800, currency: 'jpy' } } });
+    expect((await res.json<{ data: { matched: boolean } }>()).data.matched).toBe(false);
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS n FROM billing_invoices WHERE id = 'in_unknown'`).get()).toMatchObject({ n: 0 });
   });
 
   it('知らない顧客のイベントは受け取るだけで何も変えない', async () => {

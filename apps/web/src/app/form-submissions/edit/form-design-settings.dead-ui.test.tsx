@@ -145,8 +145,9 @@ describe('デザイン設定に無反応な操作面を残さない(#725)', () =
     expect(spans).not.toContain('CSSで細かく')
     expect(host.textContent).not.toContain('CSSで細かく')
     // 区分そのものは見出しとして残っていて、中身は同時に見える。
-    const headings = Array.from(host.querySelectorAll('h3')).map((h) => h.textContent?.trim())
-    expect(headings).toContain('色')
+    // 「色」の見出しには決まりの「？」が付くため、前方一致で見る。
+    const headings = Array.from(host.querySelectorAll('h3')).map((h) => h.textContent?.trim() ?? '')
+    expect(headings.some((heading) => heading.startsWith('色'))).toBe(true)
     expect(headings).toContain('文字と角の丸み')
     expect(headings).toContain('リンクの見え方')
   })

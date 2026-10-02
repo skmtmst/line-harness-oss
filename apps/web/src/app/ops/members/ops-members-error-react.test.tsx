@@ -87,7 +87,7 @@ describe('運営メンバーの読み込み失敗', () => {
     await flush()
 
     failMembers = false
-    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('再読み込み'))
+    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
     expect(retry).toBeTruthy()
     await act(async () => { retry!.click() })
     await flush()

@@ -8,7 +8,10 @@ import NotificationRunList from '@/components/line-notifications/notification-ru
 import OperatorNotificationRules from './operator-notification-rules'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
+import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import {
   ApiError,
@@ -18,15 +21,23 @@ import {
   type EcNotificationSetting,
   type LineNotificationDefinition,
   type LineNotificationMetric,
+  type LineNotificationSendCounts,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import {
   canOpenCustomerNotificationKpi,
   customerNotificationKpis,
+  type CustomerNotificationKpi,
   type LineNotificationQuota,
 } from './customer-kpis'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import {
+  isForbidden,
+  isForbiddenOrRateLimited,
+  loadFailureNotice,
+} from '@/components/shared/api-error-message'
 import styles from './customer-notifications.module.css'
+import { formatDateTime } from '@/lib/format'
 
 const customerFilters = [
   ['all', 'すべて'],
@@ -62,9 +73,7 @@ function formatUpdatedAt(iso: string | null | undefined): string {
   if (!iso) return '最終更新 —'
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '最終更新 —'
-  return `最終更新 ${date.toLocaleString('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-  })}`
+  return `最終更新 ${formatDateTime(date)}`
 }
 
 function isIncomplete(setting: EcNotificationSetting): boolean {
@@ -124,6 +133,23 @@ function sortCustomerSettingsBySentCount(
   countOf: (eventType: string) => number | null,
 ): EcNotificationSetting[] {
   return [...settings].sort((a, b) => (countOf(b.eventType) ?? -1) - (countOf(a.eventType) ?? -1))
+}
+
+/**
+ * send-counts の形の見張り。偽APIや段階配備中の旧Workerが想定外の形
+ * （配列・byEventTypeなし）を返しても `.map` で落ちないようにする。
+ * 形が違うときは「読み込めなかった」として null 扱いにする。
+ */
+function isSendCountsData(value: unknown): value is LineNotificationSendCounts {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const data = value as Record<string, unknown>
+  if (typeof data.sentToday !== 'number' || typeof data.sentLast30d !== 'number') return false
+  if (!Array.isArray(data.byEventType)) return false
+  return (data.byEventType as unknown[]).every((item) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) return false
+    const row = item as Record<string, unknown>
+    return typeof row.eventType === 'string' && typeof row.today === 'number' && typeof row.last30d === 'number'
+  })
 }
 
 /** N-340: 編集中の下書きは入力欄の6項目だけを残す。出・止めの切替は即保存なので入れない。 */
@@ -214,6 +240,8 @@ type OperatorTabState = 'loading' | 'ready' | 'error' | 'forbidden'
 function operatorTabCountLabel(state: OperatorTabState, count: number | null): string {
   if (state === 'ready' && count !== null) return `${count}`
   if (state === 'loading') return '—'
+  // M031: 403は取れなかったのではなく権限が無い。「取得失敗」と混ぜない。
+  if (state === 'forbidden') return '権限なし'
   return '取得失敗'
 }
 
@@ -479,13 +507,13 @@ const TABS = [
 
 function Toggle({ setting, busy, onToggle }: { setting: EcNotificationSetting; busy: boolean; onToggle: () => void }) {
   return <button type="button" role="switch" aria-checked={setting.isEnabled} aria-label={`${setting.label}のお知らせを出す・止める`} disabled={busy} onClick={onToggle}
-    className={`inline-flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors disabled:opacity-50 ${setting.isEnabled ? 'bg-accent' : 'bg-hairline'}`}>
-    <span className={`h-5 w-5 rounded-full bg-canvas shadow-sm transition-transform ${setting.isEnabled ? 'translate-x-5' : ''}`} />
+    className={`inline-flex h-7 w-12 shrink-0 items-center rounded-pill p-1 transition-colors disabled:opacity-50 ${setting.isEnabled ? 'bg-accent' : 'bg-hairline'}`}>
+    <span className={`h-5 w-5 rounded-pill bg-canvas shadow-card transition-transform ${setting.isEnabled ? 'translate-x-5' : ''}`} />
   </button>
 }
 
 function CardPreview({ setting }: { setting: EcNotificationSetting }) {
-  return <div className="border-nen-border bg-nen-ivory overflow-hidden rounded-[24px] border shadow-lg">
+  return <div className="border-nen-border bg-nen-ivory overflow-hidden rounded-card border shadow-float">
     {setting.imageUrl && <img src={setting.imageUrl} alt="" className="aspect-[20/9] w-full object-cover" />}
     <div className="p-5">
       <div className="border-nen-gold-soft flex items-center gap-2 border-b pb-3">
@@ -502,7 +530,7 @@ function CardPreview({ setting }: { setting: EcNotificationSetting }) {
         </div>)}
       </div>
       {setting.outroText && <p className="text-nen-muted mt-4 whitespace-pre-wrap text-xs leading-5">{setting.outroText}</p>}
-      {setting.buttonLabel && <div className="bg-nen-green text-on-accent mt-5 rounded-xl px-4 py-3 text-center text-sm font-semibold">{setting.buttonLabel}</div>}
+      {setting.buttonLabel && <div className="bg-nen-green text-on-accent mt-5 rounded-card px-4 py-3 text-center text-sm font-semibold">{setting.buttonLabel}</div>}
     </div>
   </div>
 }
@@ -530,17 +558,17 @@ function CustomerNotificationEditor({
   notice: { tone: 'success' | 'error'; text: string } | null
   hasUnsaved: boolean
 }) {
-  return <main data-design-node="Q55bb" className="min-w-0 space-y-4 pb-48 sm:pb-24">
+  return <div data-design-node="Q55bb" className="min-w-0 space-y-4 pb-48 sm:pb-24">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p className="text-xs font-semibold text-accent">LINE通知　›　お知らせの種類</p>
+        <p className="text-xs font-semibold text-ink-faint">LINE通知　›　お知らせの種類</p>
         <p className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</p>
         <p className="mt-1 text-xs text-ink-faint">{definition ? `公開版 ${definition.currentVersionNumber ? `v${definition.currentVersionNumber}` : 'なし'} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
         {hasUnsaved ? <p className="mt-1 text-xs font-semibold text-warning">未保存の変更があります</p> : null}
       </div>
-      <Button onClick={onTestSend} disabled={busy}>テスト受信者に送信</Button>
+      <Button onClick={onTestSend} disabled={busy}>テスト受信者に送る</Button>
     </div>
-    {notice && <div role={notice.tone === 'success' ? 'status' : 'alert'} aria-live={notice.tone === 'success' ? 'polite' : 'assertive'} className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
+    {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
     {/* N-337: 狭い幅では見本を下に回す。390pxを無条件に横置きしない。 */}
     <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
@@ -557,23 +585,23 @@ function CustomerNotificationEditor({
         <section className="rounded-card border border-hairline bg-canvas p-4">
           <h2 className="font-bold text-ink">送るもの</h2>
           <div className="mt-3 space-y-4">
-            <label className="block text-sm font-semibold text-ink-secondary">通知の見出し<input value={setting.title ?? ''} maxLength={80} onChange={(event) => onChange({ title: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-white px-3 py-2.5 font-normal text-ink" /></label>
-            <label className="block text-sm font-semibold text-ink-secondary">ご案内文<textarea value={setting.introText} maxLength={800} rows={5} onChange={(event) => onChange({ introText: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-white px-3 py-2.5 font-normal leading-6 text-ink" /></label>
+            <label className="block text-sm font-semibold text-ink-secondary">通知の見出し<input value={setting.title ?? ''} maxLength={80} onChange={(event) => onChange({ title: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 font-normal text-ink" /></label>
+            <label className="block text-sm font-semibold text-ink-secondary">ご案内文<textarea value={setting.introText} maxLength={800} rows={5} onChange={(event) => onChange({ introText: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 font-normal leading-6 text-ink" /></label>
             <div className="rounded-control border border-nen-border bg-nen-ivory p-4">
               <p className="text-sm font-bold text-nen-green">このお知らせで差し込める項目（EC連携から来ます）</p>
               <div className="mt-2 flex flex-wrap gap-2">{setting.fixedFields.map((field) => <span key={field} className="rounded-pill bg-canvas px-2.5 py-1 text-xs text-nen-chip ring-1 ring-nen-gold-soft">{field}</span>)}</div>
             </div>
-            <label className="block text-sm font-semibold text-ink-secondary">結びの文章<textarea value={setting.outroText} maxLength={800} rows={3} onChange={(event) => onChange({ outroText: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-white px-3 py-2.5 font-normal leading-6 text-ink" /></label>
+            <label className="block text-sm font-semibold text-ink-secondary">結びの文章<textarea value={setting.outroText} maxLength={800} rows={3} onChange={(event) => onChange({ outroText: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 font-normal leading-6 text-ink" /></label>
           </div>
         </section>
 
         <section className="rounded-card border border-hairline bg-canvas p-4">
           <h2 className="font-bold text-ink">ボタン</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-semibold text-ink-secondary">ボタンの文字<input value={setting.buttonLabel} maxLength={20} onChange={(event) => onChange({ buttonLabel: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-white px-3 py-2.5 font-normal" /></label>
-            <label className="block text-sm font-semibold text-ink-secondary">押したときに開く先<input value={setting.buttonUrl} placeholder="注文情報のURLを使う場合は空欄" onChange={(event) => onChange({ buttonUrl: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-white px-3 py-2.5 font-normal" /></label>
+            <label className="block text-sm font-semibold text-ink-secondary">ボタンの文字<input value={setting.buttonLabel} maxLength={20} onChange={(event) => onChange({ buttonLabel: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 font-normal" /></label>
+            <label className="block text-sm font-semibold text-ink-secondary">押したときに開く先<input value={setting.buttonUrl} placeholder="注文情報のURLを使う場合は空欄" onChange={(event) => onChange({ buttonUrl: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 font-normal" /></label>
           </div>
-          <label className="mt-3 block text-sm font-semibold text-ink-secondary">カード画像URL<input value={setting.imageUrl} placeholder="未設定の場合はロゴ中心のカード" onChange={(event) => onChange({ imageUrl: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-white px-3 py-2.5 font-normal" /></label>
+          <label className="mt-3 block text-sm font-semibold text-ink-secondary">カード画像URL<input value={setting.imageUrl} placeholder="未設定の場合はロゴ中心のカード" onChange={(event) => onChange({ imageUrl: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 font-normal" /></label>
         </section>
 
         <section className="rounded-card border border-hairline bg-canvas p-4">
@@ -589,10 +617,10 @@ function CustomerNotificationEditor({
           <p className="mb-2 text-xs font-semibold text-ink-faint">架空の注文による表示例</p>
           <CardPreview setting={setting} />
         </section>
-        <section className="rounded-card border border-warning bg-warning-bg p-4 text-sm text-warning">
-          <h2 className="font-bold">これは「お知らせ」です</h2>
-          <ul className="mt-2 space-y-2 leading-5"><li>配信を止めている人にも届きます</li><li>売り込みの文章は入れないでください</li><li>遅れると問い合わせが増えます</li></ul>
-        </section>
+        <Notice tone="warn">
+          <h2 className="text-sm font-bold">これは「お知らせ」です</h2>
+          <ul className="mt-2 space-y-2 text-sm leading-5"><li>配信を止めている人にも届きます</li><li>売り込みの文章は入れないでください</li><li>遅れると問い合わせが増えます</li></ul>
+        </Notice>
         <section className="rounded-card border border-hairline bg-canvas p-4 text-sm">
           <h2 className="font-bold text-ink">つながる先</h2>
           {/* #988 LAY-10拡張: リンク色だけの p をやめ、実際に移動できる Link にする。 */}
@@ -612,13 +640,13 @@ function CustomerNotificationEditor({
       * 375px級では並びを折り返さないと横にはみ出す。入れ物を `min-w-0` にし、
       * 操作列を `flex-wrap` で複数行に落とす。左右の余白も狭幅では詰める。
       */}
-    <div data-design="editor-footer" className="fixed bottom-0 left-0 right-0 z-20 min-w-0 border-t border-hairline bg-canvas px-4 py-3 shadow-lg sm:px-6">
+    <div data-design="editor-footer" className="fixed bottom-0 left-0 right-0 z-20 min-w-0 border-t border-hairline bg-canvas px-4 py-3 shadow-float sm:px-6">
       <div className="ml-auto flex min-w-0 flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1584 }}>
         <p className="min-w-0 text-xs text-ink-faint">{definition ? '下書きの保存だけでは公開中の内容は変わりません。確認後に公開してください。' : '出しています。保存すると、次のお知らせから新しい文面が使われます。'}</p>
-        <div data-design="editor-footer-actions" className="flex min-w-0 flex-wrap justify-end gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>テスト受信者に送信</Button><Button onClick={onSave} disabled={busy}>{definition ? '下書きを保存' : 'お知らせを保存'}</Button>{definition ? <Button variant="primary" onClick={onPublish} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>
+        <div data-design="editor-footer-actions" className="flex min-w-0 flex-wrap justify-end gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>テスト受信者に送る</Button><Button onClick={onSave} disabled={busy}>{definition ? '下書きを保存する' : 'お知らせを保存する'}</Button>{definition ? <Button variant="primary" onClick={onPublish} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>
       </div>
     </div>
-  </main>
+  </div>
 }
 
 function LineNotificationsPage() {
@@ -640,12 +668,16 @@ function LineNotificationsPage() {
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
   const [definitions, setDefinitions] = useState<LineNotificationDefinition[]>([])
   const [metrics, setMetrics] = useState<LineNotificationMetric[]>([])
+  const [sendCounts, setSendCounts] = useState<LineNotificationSendCounts | null>(null)
+  // send-countsだけ取れなかった・形が違ったときの印。一覧全体は表示を続ける。
+  const [sendCountsFailed, setSendCountsFailed] = useState(false)
   const [quota, setQuota] = useState<LineNotificationQuota | null>(null)
   const [filter, setFilter] = useState<CustomerFilter>('all')
   const [customerPage, setCustomerPage] = useState(1)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loadState, setLoadState] = useState<CustomerLoadState>('loading')
   const [busy, setBusy] = useState<string | null>(null)
+  const [pendingToggle, setPendingToggle] = useState<EcNotificationSetting | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   /*
@@ -662,6 +694,10 @@ function LineNotificationsPage() {
   // N-341: 運用者タブの件数は実データで出す。子部品とは別に親で取る。
   const [operatorCount, setOperatorCount] = useState<number | null>(null)
   const [operatorState, setOperatorState] = useState<OperatorTabState>('loading')
+  // M031: 捕まえた件数取得の失敗。403・429の言い分けと再試行の有無に使う。
+  const [operatorCountError, setOperatorCountError] = useState<unknown>(null)
+  // M031: 顧客タブの読み込み失敗。ListState の error へ渡す。
+  const [customerLoadError, setCustomerLoadError] = useState<unknown>(null)
   // N-340: 保存していない編集のあるお知らせ。離脱警告と復元の目印。
   const [dirtyEvents, setDirtyEvents] = useState<readonly string[]>([])
   // N-340: 保存済みの姿。編集中に戻るときの戻し先。
@@ -680,6 +716,8 @@ function LineNotificationsPage() {
     setOverview(null)
     setDefinitions([])
     setMetrics([])
+    setSendCounts(null)
+    setSendCountsFailed(false)
     setQuota(null)
     setNotice(null)
     setCloseConfirmOpen(false)
@@ -688,6 +726,8 @@ function LineNotificationsPage() {
     testRecipientGeneration.current += 1
     setOperatorCount(null)
     setOperatorState('loading')
+    setOperatorCountError(null)
+    setCustomerLoadError(null)
     setDirtyEvents([])
     setBusy(null)
     lastSavedRef.current = new Map()
@@ -712,16 +752,18 @@ function LineNotificationsPage() {
       if (!operatorRes.success) throw new Error('operator count failed')
       setOperatorCount(operatorRes.data.summary.total)
       setOperatorState('ready')
+      setOperatorCountError(null)
     } catch (error) {
       if (stale()) return
       setOperatorCount(null)
       setOperatorState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
+      setOperatorCountError(error)
     }
     // 顧客タブだけが定義・集計を読む。運用者・記録タブは子部品が自前で取る（#509 軽1）。
     // 設定口は列車側で店別になったため、持ち回しはしない。
     const needCustomer = tab === 'customer'
     try {
-      const [settingRes, overviewRes, definitionRes, metricRes, quotaRes] = await Promise.all([
+      const [settingRes, overviewRes, definitionRes, metricRes, sendCountsRes, quotaRes] = await Promise.all([
         api.ecCommerce.settings(selectedAccountId), api.ecCommerce.overview(selectedAccountId),
         needCustomer
           ? api.lineNotifications.definitions(selectedAccountId).catch((error: unknown) => {
@@ -731,6 +773,12 @@ function LineNotificationsPage() {
           : Promise.resolve(null),
         needCustomer
           ? api.lineNotifications.metrics(selectedAccountId).catch((error: unknown) => {
+              if (error instanceof ApiError && error.status === 403) throw error
+              return null
+            })
+          : Promise.resolve(null),
+        needCustomer
+          ? api.lineNotifications.sendCounts(selectedAccountId).catch((error: unknown) => {
               if (error instanceof ApiError && error.status === 403) throw error
               return null
             })
@@ -799,6 +847,18 @@ function LineNotificationsPage() {
       setOverview(overviewRes.data)
       setDefinitions(loadedDefinitions)
       setMetrics(metricRes?.success ? metricRes.data.items : [])
+      if (sendCountsRes?.success && isSendCountsData(sendCountsRes.data)) {
+        setSendCounts(sendCountsRes.data)
+        setSendCountsFailed(false)
+      } else if (needCustomer) {
+        // 顧客タブで読もうとして取れなかった・形が違ったときだけ「読み込めなかった」にする。
+        // 運用者・記録タブでは読んでいないので失敗扱いにしない。
+        setSendCounts(null)
+        setSendCountsFailed(true)
+      } else {
+        setSendCounts(null)
+        setSendCountsFailed(false)
+      }
       setQuota(quotaRes?.success ? quotaRes.data.quota : null)
       setExpanded((current) => withDrafts.some((setting) => setting.eventType === current) ? current : null)
       if (restoredEvents.length > 0) {
@@ -806,18 +866,37 @@ function LineNotificationsPage() {
         setNotice({ tone: 'success', text: `未保存の編集を${restoredEvents.length}件復元しました。確認して保存してください。` })
       }
       setLoadState('ready')
+      setCustomerLoadError(null)
     } catch (error) {
       if (!stale()) {
+        // ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。
+        // 一覧の場所の ListState error だけにまとめる。
         setLoadState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
-        setNotice({ tone: 'error', text: 'LINE通知の設定を読み込めませんでした。' })
+        // M031: 捕まえた失敗を ListState へ渡す。403は再試行なし、429は待ち案内になる。
+        setCustomerLoadError(error)
       }
     }
   }, [selectedAccountId, tab])
   useEffect(() => { void load() }, [load])
 
+  /*
+   * 行の「今日」「この30日」は実際の送信履歴（send-counts）で数える。
+   * ECの取り込み件数（overview.byType）やLINE集計の全期間合計（metrics）は
+   * 混ぜない。口がまだ返っていないときだけ null（「—」表示）にする。
+   */
+  const sendCountMaps = useMemo(() => {
+    // 形が違う値が混ざっても落ちないよう、配列のときだけ数える。
+    const rows = Array.isArray(sendCounts?.byEventType) ? sendCounts.byEventType : []
+    return {
+      today: new Map(rows.map((item) => [item.eventType, item.today])),
+      last30d: new Map(rows.map((item) => [item.eventType, item.last30d])),
+    }
+  }, [sendCounts])
   // N-338: 行の「今日」列と同じ数で多い順に並べ、説明文と一致させる。
   const sentCountOf = useCallback((eventType: string): number | null =>
-    overview?.byType.find((item) => item.eventType === eventType)?.count ?? null, [overview])
+    sendCounts ? (sendCountMaps.today.get(eventType) ?? 0) : null, [sendCounts, sendCountMaps])
+  const sent30dOf = useCallback((eventType: string): number | null =>
+    sendCounts ? (sendCountMaps.last30d.get(eventType) ?? 0) : null, [sendCounts, sendCountMaps])
   const visible = useMemo(() => sortCustomerSettingsBySentCount(settings.filter((setting) => {
     if (filter === 'enabled') return setting.isEnabled
     if (filter === 'stopped') return !setting.isEnabled
@@ -841,16 +920,39 @@ function LineNotificationsPage() {
     if (value === 'incomplete') return settings.filter(isIncomplete).length
     return settings.length
   }
-  const sentBreakdown = overview?.byType.slice(0, 3).map((item) => `${item.label} ${item.count}`).join('・') ?? ''
+  const sentBreakdown = useMemo(() => {
+    if (!sendCounts || !Array.isArray(sendCounts.byEventType)) return ''
+    const labelOf = new Map(settings.map((setting) => [setting.eventType, setting.label]))
+    const ranked = [...sendCounts.byEventType]
+      .filter((item) => item.today > 0)
+      .sort((a, b) => b.today - a.today)
+      .slice(0, 3)
+    return ranked.map((item) => `${labelOf.get(item.eventType) ?? item.eventType} ${item.today}`).join('・')
+  }, [sendCounts, settings])
+  /*
+   * R611: 一覧の取得に失敗したときは、上部の件数・送信枠も「取得中」の
+   * ままにしない。値は「—」のまま、注記を失敗の言葉へ変える。
+   * 権限不足も同じく、取れていないのに「取得中」とは出さない。
+   */
+  const customerLoadFailed = loadState === 'error' || loadState === 'forbidden'
   const kpis = customerNotificationKpis({
     ready: loadState === 'ready' && overview !== null,
     settingsCount: settings.length,
     enabledCount: settings.filter((setting) => setting.isEnabled).length,
-    sentToday: overview?.last24h ?? null,
+    sentToday: typeof sendCounts?.sentToday === 'number' ? sendCounts.sentToday : null,
     sentBreakdown,
     failed: overview?.failed ?? null,
     quota,
+    loadFailed: customerLoadFailed,
   })
+  /*
+   * send-countsだけ取れなかったときは、そのカードだけ「取得できませんでした」にする。
+   * 一覧全体は ListState error にしない（設定・定義は表示を続ける）。
+   * 見た目は共通の失敗の1枚と同じ中立（赤を使わない。★V7 `x63W5x`）。
+   */
+  const kpisWithSendCountsState = sendCountsFailed
+    ? kpis.map((kpi) => kpi.label === '今日 送った' ? { ...kpi, note: '送信件数を取得できませんでした' } : kpi)
+    : kpis
   const tabsWithCounts = TABS.map((item) => {
     if (item.key === 'customer') return { ...item, label: `${item.label} ${loadState === 'ready' ? settings.length : '—'}` }
     // N-341: 運用者タブの件数は実データ。取れなかったときは「取得失敗」と区別する。
@@ -859,6 +961,21 @@ function LineNotificationsPage() {
     return item
   })
   const update = (eventType: string, patch: Partial<EcNotificationSetting>) => setSettings((current) => current.map((setting) => setting.eventType === eventType ? { ...setting, ...patch } : setting))
+  const renderKpiCard = (kpi: CustomerNotificationKpi) => {
+    const { label, value, unit, note, href } = kpi
+    return <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
+      <p className="text-ink-faint text-xs">{label}</p>
+      <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+        {value === null ? '—' : value}
+        {value === null || unit === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>}
+      </p>
+      <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
+      {/* 0件のときは押し口を出さない。押しても何も無い。 */}
+      {canOpenCustomerNotificationKpi(kpi) && href
+        ? <Button onClick={() => router.replace(href)} className="mt-2">送れなかったものを見る</Button>
+        : null}
+    </div>
+  }
   // N-340: 入力のたびに端末へ下書きを置き、未保存の印を付ける。
   const edit = (eventType: string, patch: Partial<EcNotificationSetting>) => {
     const current = settings.find((setting) => setting.eventType === eventType)
@@ -1021,8 +1138,29 @@ function LineNotificationsPage() {
     setBusy(null)
   }
 
-  return <>
+  return <div className="flex flex-col gap-4">
     {expandedSetting === null ? <MergedTabs basePath="/line-notifications" tabs={tabsWithCounts} active={tab} defaultKey="customer" /> : null}
+    {/*
+      * #634: 運用者タブの件数だけが取れなかったとき、タブの「取得失敗」の
+      * 隣に直す道を出す。出さないと、ページ全体を開き直す以外に
+      * 読み直す手段がない。押すと load() が件数の取得からやり直す。
+      */}
+    {/*
+      ★V7 `x63W5x`：補助のデータ（運用者タブの件数）だけ取れないときは、
+      その場所に小さく1行だけ。黄色の帯にしない。
+    */}
+    {expandedSetting === null && (operatorState === 'error' || operatorState === 'forbidden') ? (
+      <p role="alert" className="text-ink-secondary text-xs">
+        {isForbiddenOrRateLimited(operatorCountError)
+          // M031: 403・429は共通の言い方（権限の案内・待ち案内）へ切り替える。
+          ? loadFailureNotice(operatorCountError, '運用者へのお知らせ')
+          : '運用者へのお知らせの件数を読み込めませんでした。'}
+        {/* M031: 403は押しても直らないので再試行の口は出さない。 */}
+        {isForbidden(operatorCountError) ? null : (
+          <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => void load()}>もう一度</button>
+        )}
+      </p>
+    ) : null}
     {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
     {tab === 'operator' ? <OperatorNotificationRules lineAccountId={selectedAccountId} /> : null}
@@ -1084,35 +1222,56 @@ function LineNotificationsPage() {
         </dl>
       </ConfirmDialog>
     </> : null}
-    {tab === 'customer' && !expandedSetting ? <main
+    {/*
+      * #734: 通知の出す・止めるはお客さまへのLINEに直結するので、
+      * 1クリックの即時切替ではなく確認窓を1回挟む（誤タップ防止）。
+      * 一覧（expandedSetting が無い状態）から開くので、編集画面の条件の
+      * 中には置かない。
+      */}
+    <ConfirmDialog
+      open={pendingToggle !== null}
+      title={pendingToggle?.isEnabled ? `「${pendingToggle.label}」のお知らせを止めますか？` : `「${pendingToggle?.label ?? ''}」のお知らせを出しますか？`}
+      description={pendingToggle?.isEnabled ? '止めると、この出来事が起きてもお客さまへLINEが送られなくなります。あとからまた出せます。' : '出すと、この出来事が起きたお客さまへLINEが送られ始めます。'}
+      confirmLabel={pendingToggle?.isEnabled ? 'お知らせを止める' : 'お知らせを出す'}
+      onConfirm={pendingToggle ? () => { const s = pendingToggle; setPendingToggle(null); void save(s, !s.isEnabled) } : undefined}
+      onCancel={() => setPendingToggle(null)}
+    />
+    {tab === 'customer' && !expandedSetting ? <div
       data-design-node="festr"
       data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
       className={styles.root}
     >
     {/* #975 U060: 7指標を390pxで積まない。先頭2件を出し、残りは「集計を見る」で開く。 */}
+    {/*
+      帯は「お知らせの数」と「月の送信枠」の2まとまり。7枚を4列に流すと
+      2段目が3枚だけ伸びる非対称グリッドになっていた（監査 A13）。
+      送信枠の3枚は全幅のまとまりとして2段目へ置き、中で3列に並べる。
+      KpiCollapseの中に入れるのは、狭い幅で畳む対象から外さないため。
+    */}
     <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {kpis.map((kpi) => {
-        const { label, value, unit, note, href } = kpi
-        const body = <>
-          <p className="text-ink-faint text-xs">{label}</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {value === null ? '—' : value}
-            {value === null || unit === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>}
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
-        </>
-        return <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
-          {body}
-          {/* 0件のときは押し口を出さない。押しても何も無い。 */}
-          {canOpenCustomerNotificationKpi(kpi) && href
-            ? <Button onClick={() => router.replace(href)} className="mt-2">送れなかったものを見る</Button>
-            : null}
+      {kpisWithSendCountsState.filter((kpi) => kpi.group === 'notice').map(renderKpiCard)}
+      <section className="sm:col-span-2 xl:col-span-4" aria-label="今月の送信枠">
+        <p className="text-ink-faint mb-2 text-xs font-semibold">今月の送信枠（LINE公式アカウントの月間上限）</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {kpisWithSendCountsState.filter((kpi) => kpi.group === 'quota').map(renderKpiCard)}
         </div>
-      })}
+      </section>
     </KpiCollapse>
-    <div className="border-info bg-info-bg text-info rounded-control border px-4 py-3 text-sm leading-6">
-      これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。
-    </div>
+    {/*
+      R611: 一覧の取得に失敗したときは、上部の件数も取れていないことを添え、
+      下の一覧の再読み込みへ案内する。読み直しの口は一覧の ListState が持つ
+      ので、ここにはボタンも帯も置かない。赤も使わない（★V7 `x63W5x`）。
+    */}
+    {loadState === 'error' ? <p className="text-xs text-ink-secondary">お知らせの件数は取得失敗です。下の一覧の「もう一度読み込む」から読み直してください。</p> : null}
+    <div><NoteBar help="お知らせは売り込みではなく取引に必要な連絡です" helpLabel="お知らせの意味">これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。</NoteBar></div>
+    {/*
+      send-countsだけ読み込めなかったときの部分表示。一覧全体は残す。
+      共通ボタン（副・小）で読み直せる。赤は使わない（★V7 `x63W5x`）。
+    */}
+    {sendCountsFailed && loadState === 'ready' ? <div className="flex flex-wrap items-center gap-2">
+      <p className="text-xs text-ink-faint">送信件数を読み込めませんでした。時間をおいて、もう一度お試しください。</p>
+      <Button variant="secondary" size="compact" onClick={() => void load()}>もう一度読み込む</Button>
+    </div> : null}
 
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="grid w-full max-w-[48rem] grid-cols-2 gap-2 lg:grid-cols-4" aria-label="お知らせの絞り込み">
@@ -1121,17 +1280,17 @@ function LineNotificationsPage() {
       <p className="text-xs text-ink-faint">送った数が多い順</p>
     </div>
 
-    {notice && <div role={notice.tone === 'success' ? 'status' : 'alert'} aria-live={notice.tone === 'success' ? 'polite' : 'assertive'} className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
+    {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
     <section className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas">
       {loadState === 'loading' ? <ListState kind="loading" title="顧客へのお知らせを読み込んでいます" />
         : loadState === 'forbidden' ? <ListState kind="forbidden" />
-        : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" onRetry={() => void load()} />
+        : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" error={customerLoadError ?? undefined} onRetry={() => void load()} />
         : settings.length === 0 ? <ListState kind="empty" title="顧客へのお知らせはまだありません" description="EC連携の取引イベントを接続すると、ここで種類ごとに管理できます。" />
         : visible.length === 0 ? <ListState kind="empty" title="条件に合うお知らせはありません" description="絞り込みを変えてください。" />
         : <>
         <div className="line-notification-v6-header">
-          <span>お知らせ</span><span>いつ送るか</span><span>今日</span><span>この30日</span><span>LINE上で表示</span><span>操作</span>
+          <span>お知らせ</span><span>いつ送るか</span><span className="inline-flex items-center gap-1">今日<HelpTip label="今日の件数の説明">今日の0時からいままでに送った数です</HelpTip></span><span className="inline-flex items-center gap-1">この30日<HelpTip label="この30日の件数の説明">今日を含む30日間に送った数です</HelpTip></span><span>LINE上で表示</span><span>操作</span>
         </div>
         {visiblePage.map((setting) => <article key={setting.eventType} className="border-b border-hairline last:border-b-0">
           <div className="line-notification-v6-row">
@@ -1141,14 +1300,14 @@ function LineNotificationsPage() {
               <p className="mt-0.5 truncate text-xs text-ink-faint">{formatUpdatedAt(setting.updatedAt)}</p>
             </div>
             <span className="text-sm text-ink-secondary">{timingLabel(setting)}</span>
-            <span className="text-sm tabular-nums text-ink-secondary">{overview?.byType.find((item) => item.eventType === setting.eventType)?.count ?? '—'}通</span>
-            <span className="text-sm tabular-nums text-ink-secondary">{metricByEvent.get(setting.eventType)?.accepted.value ?? '—'}通</span>
+            <span className="text-sm tabular-nums text-ink-secondary">{sendCountsFailed ? '取得失敗' : `${sentCountOf(setting.eventType) ?? '—'}通`}</span>
+            <span className="text-sm tabular-nums text-ink-secondary">{sendCountsFailed ? '取得失敗' : `${sent30dOf(setting.eventType) ?? '—'}通`}</span>
             <span className="text-sm text-ink-faint">{(() => {
               const displayed = metricByEvent.get(setting.eventType)?.displayed
               if (!displayed || displayed.value === null) return displayed?.state === 'pending' ? '集計待ち' : '— 未取得'
               return `${displayed.value}人`
             })()}</span>
-            <div className="flex items-center justify-end gap-2"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => void save(setting, !setting.isEnabled)} /><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : '止めている'}</span><button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className="line-notification-v6-row-action">{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button></div>
+            <div className="flex items-center justify-end gap-2"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : '止めている'}</span><button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className="line-notification-v6-row-action">{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button></div>
           </div>
         </article>)}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-4 py-3">
@@ -1157,8 +1316,8 @@ function LineNotificationsPage() {
         </div>
         </>}
     </section>
-    </main> : null}
-  </>
+    </div> : null}
+  </div>
 }
 
 /*

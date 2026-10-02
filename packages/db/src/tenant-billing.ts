@@ -26,6 +26,31 @@ export async function getTenantBilling(db: D1Database, tenantId: string): Promis
   return db.prepare(`SELECT ${COLUMNS} FROM tenants WHERE id = ?`).bind(tenantId).first<TenantBilling>();
 }
 
+/**
+ * LINEアカウントの所属統括の課金行を1往復で読む(#633)。
+ *
+ * 「アカウントの tenant_id を読んでから tenants を読む」と2往復になるため、
+ * 機能可否判定のように両方を連続で使う呼び出しではこの結合読取を使う。
+ * tenant 未割当・tenant 行なし・アカウント行なしは全部 null。
+ */
+export async function getTenantBillingByLineAccount(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<TenantBilling | null> {
+  const row = await db
+    .prepare(
+      `SELECT t.id, t.name, t.plan_key, t.plan_status, t.trial_ends_at,
+              t.stripe_customer_id, t.stripe_subscription_id,
+              t.current_period_ends_at, t.plan_updated_at
+         FROM line_accounts la
+         LEFT JOIN tenants t ON t.id = la.tenant_id
+        WHERE la.id = ?`,
+    )
+    .bind(lineAccountId)
+    .first<TenantBilling>();
+  return row?.id ? row : null;
+}
+
 export async function getTenantBillingByStripeCustomer(
   db: D1Database,
   stripeCustomerId: string,

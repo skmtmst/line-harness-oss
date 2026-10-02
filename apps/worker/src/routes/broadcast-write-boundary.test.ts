@@ -31,6 +31,16 @@ const owner: AuthenticatedStaff = {
 };
 const keyStaff: AuthenticatedStaff = {
   id: 'staff-key', name: '配信権あり', role: 'staff', readOnly: false, tenantId: 'tenant-1',
+  // v6-06 §6：範囲の鍵に加え、操作ごとの個別キーも要る。
+  permissionKeys: [
+    '/broadcasts',
+    'broadcast.definition.edit',
+    'broadcast.definition.publish',
+  ],
+};
+// 範囲の鍵はあるが操作キーがない担当。作成・更新・送信はできない。
+const noOperationKeyStaff: AuthenticatedStaff = {
+  id: 'staff-noop', name: '操作権なし', role: 'staff', readOnly: false, tenantId: 'tenant-1',
   permissionKeys: ['/broadcasts'],
 };
 const noKeyStaff: AuthenticatedStaff = {
@@ -156,6 +166,15 @@ describe('配信の共通境界(N-061)', () => {
     expect(crossTenant.status).toBe(403);
   });
 
+  test('作成・更新・送信は操作キーがないと403', async () => {
+    seedBroadcast('bc-1', 'acc-1');
+    expect((await postCreate(CREATE_BODY, noOperationKeyStaff)).status).toBe(403);
+    expect((await putUpdate('bc-1', { title: '書き換え', expectedVersion: 1 }, noOperationKeyStaff)).status)
+      .toBe(403);
+    expect((await postSend('bc-1', noOperationKeyStaff)).status).toBe(403);
+    expect(statusOf('bc-1')).not.toBe('sending');
+  });
+
   test('更新は/broadcasts持ちstaffが自accountの行を変えられる', async () => {
     seedBroadcast('bc-1', 'acc-1');
     const res = await putUpdate('bc-1', { title: '新しい題名', expectedVersion: 1 }, keyStaff);
@@ -193,5 +212,24 @@ describe('配信の共通境界(N-061)', () => {
     expect((await postCreate(CREATE_BODY, owner)).status).toBe(201);
     expect((await putUpdate('bc-1', { title: '題名', expectedVersion: 1 }, owner)).status).toBe(200);
     expect((await postSend('bc-1', owner)).status).toBe(200);
+  });
+
+  test('ボタンの不備は番号と項目を日本語で断る（監査 R206）', async () => {
+    // 空の名前・空のURL・https でないURLを区別する。理由のない失敗にしない。
+    const button = (over: Record<string, unknown>) => ({
+      label: '資料を見る', type: 'url', value: 'https://example.com/guide', ...over,
+    });
+    const emptyLabel = await postCreate({ ...CREATE_BODY, messageOptions: { buttons: [button({ label: '' })] } });
+    expect(emptyLabel.status).toBe(400);
+    await expect(emptyLabel.json()).resolves.toMatchObject({ error: 'ボタン1の名前を入力してください' });
+    const emptyUrl = await postCreate({ ...CREATE_BODY, messageOptions: { buttons: [button({ value: '' })] } });
+    expect(emptyUrl.status).toBe(400);
+    await expect(emptyUrl.json()).resolves.toMatchObject({ error: 'ボタン1のURLを入力してください' });
+    const badUrl = await postCreate({ ...CREATE_BODY, messageOptions: { buttons: [button({ value: 'not-a-url' })] } });
+    expect(badUrl.status).toBe(400);
+    await expect(badUrl.json()).resolves.toMatchObject({ error: 'ボタン1のURLは https:// から始めてください' });
+    // 直したら通る。
+    const fixed = await postCreate({ ...CREATE_BODY, messageOptions: { buttons: [button({})] } });
+    expect(fixed.status).toBe(201);
   });
 });

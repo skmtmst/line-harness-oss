@@ -12,11 +12,21 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { api, ApiError } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './auto-reply-runs.module.css'
+import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
 const PAGE_SIZE = 20
+
+/**
+ * R530: 再実行・一時停止は owner/admin だけ（再実行POST・更新PUT の
+ * requireRole と同じ境目）。見るだけにはボタンを出さず、理由を1つの帯で出す。
+ * 403 で断られたときは読み直しではなく権限の説明を出す。
+ */
+const NO_MANAGE_NOTE = '実行結果の再実行・一時停止はオーナーと管理者だけができます。必要なときはオーナーか管理者に頼んでください。'
+const NO_RETRY_PERMISSION = '再実行する権限がありません。オーナーか管理者に頼んでください。'
 
 const STATUS: Record<ExecutionRunStatus, { label: string; tone: StatusBadgeTone }> = {
   succeeded: { label: '成功', tone: 'success' },
@@ -38,32 +48,7 @@ function statusView(status: string): { label: string; tone: StatusBadgeTone } {
     ?? { label: '確認中', tone: 'neutral' }
 }
 
-function formatTime(value: string | null): string {
-  if (!value) return '—'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(parsed)
-}
 
-function formatDateTime(value: string | null): string {
-  if (!value) return '—'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(parsed)
-}
 
 function actionLabel(run: AutoReplyRun): string {
   const summary = run.actionSummary
@@ -98,6 +83,8 @@ function csvFor(items: AutoReplyRun[]): string {
 function AutoReplyRunsInner() {
   const searchParams = useSearchParams()
   const requestedRuleId = searchParams.get('id') ?? ''
+  const staffRole = useStaffRole()
+  const canManage = staffRole === null || canManageRole(staffRole)
   const [data, setData] = useState<AutoReplyRunsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -107,10 +94,25 @@ function AutoReplyRunsInner() {
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const exportCancelledRef = useRef(false)
+  /*
+   * R529: 対象IDが変わったら古いルールの表示と操作を残さない。
+   * 読み取りに世代番号を持たせ、遅れて届いた古い応答は捨てる。
+   * IDが変わった瞬間に古い表示も消す（失敗時は古い操作が出ない）。
+   */
+  const loadSeqRef = useRef(0)
 
   usePageTitle(data ? `${data.rule.name}・実行結果` : '自動応答・実行結果')
 
+  // IDが変わったらページを先頭に戻し、古いルールの表示と操作を消す。
+  useEffect(() => {
+    setPage(1)
+    setData(null)
+    setActionMessage('')
+  }, [requestedRuleId])
+
   const load = useCallback(async () => {
+    const seq = loadSeqRef.current + 1
+    loadSeqRef.current = seq
     setLoading(true)
     setError('')
     try {
@@ -119,6 +121,8 @@ function AutoReplyRunsInner() {
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
       })
+      // 古い世代の応答は捨てる。遅いAの応答でBの表示へ戻さない。
+      if (loadSeqRef.current !== seq) return
       if (!response.success) throw new Error(response.error)
       /*
         **形が違う返事を、そのまま画面へ流さない。**
@@ -129,11 +133,18 @@ function AutoReplyRunsInner() {
       if (!response.data?.rule || !Array.isArray(response.data.items)) {
         throw new Error('runs_shape')
       }
+      // 対象IDを指定しているとき、応答の対象が今見ているIDと違うなら
+      // 捨てる（Bを見ているのにAが出ない）。ID無しの一覧はそのまま受ける。
+      if (requestedRuleId && (response.data.rule.id || '') !== requestedRuleId) return
       setData(response.data)
     } catch {
+      if (loadSeqRef.current !== seq) return
+      // Bの取得失敗でAの集計・操作を残さない。ID切替時は上で消しているが、
+      // 同じIDの再読み込み失敗でも古い表示に操作が残るため、失敗時は消す。
+      setData(null)
       setError('実行結果を読み込めませんでした。時間を置いてもう一度お試しください。')
     } finally {
-      setLoading(false)
+      if (loadSeqRef.current === seq) setLoading(false)
     }
   }, [page, requestedRuleId])
 
@@ -171,6 +182,9 @@ function AutoReplyRunsInner() {
       if (e instanceof ApiError && e.status === 409) {
         setActionMessage('すでに処理中または完了しています。最新の状態を読み直しました。')
         await load()
+      } else if (e instanceof ApiError && e.status === 403) {
+        // 権限で断られたときは読み直しても直らない。読み直せとは書かない。
+        setActionMessage(NO_RETRY_PERMISSION)
       } else {
         setActionMessage('失敗した処理をもう一度実行できませんでした。時間を置いてお試しください。')
       }
@@ -198,7 +212,7 @@ function AutoReplyRunsInner() {
         items.push(...response.data.items.slice(0, room))
         offset += response.data.items.length
         if (items.length % 1000 === 0 && items.length > 0) {
-          setActionMessage(`${items.length.toLocaleString('ja-JP')}件読み込み中…`)
+          setActionMessage(`${formatNumber(items.length)}件読み込み中…`)
         }
         if (items.length >= MAX_CSV_ROWS) {
           capped = offset < response.data.pagination.total || response.data.items.length > room
@@ -214,8 +228,8 @@ function AutoReplyRunsInner() {
       URL.revokeObjectURL(url)
       setActionMessage(
         capped
-          ? `直近${MAX_CSV_ROWS.toLocaleString('ja-JP')}件まで書き出しました。全部要るときは期間を絞って分けてください。`
-          : `${items.length.toLocaleString('ja-JP')}件を書き出しました。`,
+          ? `直近${formatNumber(MAX_CSV_ROWS)}件まで書き出しました。全部要るときは期間を絞って分けてください。`
+          : `${formatNumber(items.length)}件を書き出しました。`,
       )
     } catch (e) {
       if (e instanceof Error && e.message === 'csv_cancelled') {
@@ -233,10 +247,15 @@ function AutoReplyRunsInner() {
 
   return (
     <div className={styles.page} data-design-node="t7UtYQ">
+      {!canManage && (
+        <p className="bg-info-bg text-ink-secondary rounded-control mb-4 px-4 py-3 text-xs leading-relaxed">
+          {NO_MANAGE_NOTE}実行結果の確認と書き出しはこのまま使えます。
+        </p>
+      )}
       <div className={styles.topActions}>
         <Link href="/auto-replies" className={styles.back}><ArrowLeft size={16} />自動応答一覧</Link>
-        <Button onClick={() => void exportCsv()} disabled={!data?.rule.id || exporting}>
-          <Download size={16} />{exporting ? '書き出しています' : '実行結果をCSVで書き出す'}
+        <Button onClick={() => void exportCsv()} disabled={!data?.rule.id || exporting} busy={exporting} busyLabel="書き出しています">
+          <Download size={16} />実行結果をCSVで書き出す
         </Button>
         {exporting ? (
           <Button variant="secondary" onClick={() => { exportCancelledRef.current = true }}>
@@ -246,12 +265,12 @@ function AutoReplyRunsInner() {
       </div>
 
       <div className={styles.columns}>
-        <main className={styles.main}>
+        <div className={styles.main}>
           <section className={styles.summary} aria-label="実行結果のまとめ">
-            <SummaryCard variant="v6" title="今月ヒット" value={data?.summary.monthHits ?? null} unit="回" detail="今月、条件に合った回数" loading={loading} />
-            <SummaryCard variant="v6" title="累計ヒット" value={data?.summary.totalHits ?? null} unit="回" detail="記録を開始してからの合計" loading={loading} />
-            <SummaryCard variant="v6" title="引継ぎ" value={data?.summary.handovers ?? null} unit="件" detail="担当者へ渡した件数" loading={loading} />
-            <SummaryCard variant="v6" title="エラー" value={data?.summary.errors ?? null} unit="件" detail="失敗した実行を確認" badgeTone="danger" loading={loading} />
+            <KpiCard variant="v6" title="今月ヒット" value={data?.summary.monthHits ?? null} unit="回" detail="" help="今月、条件に合った回数です" loading={loading} />
+            <KpiCard variant="v6" title="累計ヒット" value={data?.summary.totalHits ?? null} unit="回" detail="" help="記録を開始してからの合計です" loading={loading} />
+            <KpiCard variant="v6" title="引継ぎ" value={data?.summary.handovers ?? null} unit="件" detail="" help="担当者へ渡した件数です" loading={loading} />
+            <KpiCard variant="v6" title="エラー" value={data?.summary.errors ?? null} unit="件" detail="失敗した実行を確認" badgeTone="danger" loading={loading} />
           </section>
 
           <Card className={styles.runCard} id="recent-runs">
@@ -273,19 +292,25 @@ function AutoReplyRunsInner() {
                           <strong title={item.friendName ?? undefined}>{item.friendName ?? '削除済みの友だち'}</strong>
                           <span title={item.inputPreview ?? undefined}>入力：{item.inputPreview ?? '—'}</span>
                         </div>
-                        <span className={styles.actionLabel} title={actionLabel(item)}>{actionLabel(item)}</span>
+                        {/*
+                          m22d: 失敗した行は理由を出す。「失敗1件」では何が
+                          起きたか分からず、同じ「1件」が3回出る。CSVの
+                          処理内容（actionLabel）は変えない。
+                        */}
+                        {(() => {
+                          const label = item.status === 'failed' && item.detail ? item.detail : actionLabel(item)
+                          return <span className={styles.actionLabel} title={label}>{label}</span>
+                        })()}
                         <StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge>
                         <time className={styles.time} dateTime={item.occurredAt}>{formatTime(item.occurredAt)}</time>
-                        {item.canRetry ? (
+                        {item.canRetry && canManage ? (
                           <div data-retry-row>
                             <Button
                               variant="secondary"
                               size="field"
                               onClick={() => void retryRun(item)}
-                              disabled={retryingId !== null}
-                            >
-                              <RotateCcw size={14} />
-                              {retryingId === item.id ? '実行しています' : 'もう一度実行'}
+                              disabled={retryingId !== null} busy={retryingId === item.id} busyLabel="実行しています">
+                              <RotateCcw size={14} />もう一度実行
                             </Button>
                           </div>
                         ) : null}
@@ -314,14 +339,14 @@ function AutoReplyRunsInner() {
                 {data!.triggerBreakdown.map((item) => (
                   <div className={styles.breakdownRow} key={item.trigger}>
                     <strong>{item.trigger}</strong>
-                    <span>{item.count.toLocaleString('ja-JP')}回</span>
+                    <span>{formatNumber(item.count)}回</span>
                     <b>{item.share === null ? '—' : `${(item.share * 100).toFixed(1)}%`}</b>
                   </div>
                 ))}
               </div>
             )}
           </Card>
-        </main>
+        </div>
 
         <aside className={styles.side}>
           <Card>
@@ -342,7 +367,7 @@ function AutoReplyRunsInner() {
             ) : errors > 0 ? (
               <div className={styles.alert}>
                 <TriangleAlert size={18} aria-hidden="true" />
-                <div><strong>実行エラー {errors.toLocaleString('ja-JP')}件</strong><span>実行結果で理由を確認してください</span></div>
+                <div><strong>実行エラー {formatNumber(errors)}件</strong><span>実行結果で理由を確認してください</span></div>
                 <Button href="#recent-runs"><Eye size={16} />実行結果を確認</Button>
               </div>
             ) : <p className={styles.quiet}>確認が必要なエラーはありません。</p>}
@@ -366,9 +391,12 @@ function AutoReplyRunsInner() {
         status={data?.rule.isActive === false ? 'この自動応答は停止中です' : '変更は実行結果に影響しません'}
         actions={(
           <>
-            <Button onClick={() => void pause()} disabled={!data?.rule.id || data.rule.isActive !== true || pausing}>
-              <Pause size={16} />{pausing ? '停止しています' : '自動応答を一時停止'}
-            </Button>
+            {/* 一時停止は更新口（owner/admin）なので見るだけには出さない。設定の編集への移動は操作ではないので残す。 */}
+            {canManage && (
+              <Button onClick={() => void pause()} disabled={!data?.rule.id || data.rule.isActive !== true || pausing} busy={pausing} busyLabel="停止しています">
+                <Pause size={16} />自動応答を一時停止
+              </Button>
+            )}
             <Button variant="primary" href={data?.rule.id ? `/auto-replies/edit?id=${encodeURIComponent(data.rule.id)}` : '/auto-replies'}>
               <Pencil size={16} />自動応答の設定を編集
             </Button>

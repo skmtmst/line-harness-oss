@@ -37,6 +37,24 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
 }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の数え方の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 function installFetch() {
   vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : String(input)
@@ -346,7 +364,9 @@ describe('エラー面の読み直し(N-287)', () => {
     fixture.tab = 'saved'
     await render()
 
-    expect(host.textContent).toContain('接続できませんでした')
+    // ★V7 `x63W5x`：口の生文言は出さず、一覧の場所の失敗の1枚だけ出す。
+    expect(host.textContent).toContain('保存した分析を読み込めませんでした')
+    expect(host.textContent).not.toContain('接続できませんでした')
     expect(callsTo('/api/analytics/saved?')).toHaveLength(1)
 
     listOk = true
@@ -387,7 +407,9 @@ describe('棒グラフと期間切替の読み上げ(N-288)', () => {
     fixture.tab = 'friends'
     await render()
 
-    const dayBar = host.querySelector('button[aria-label="2026-09-09 増加5・減少2"]') as HTMLButtonElement | null
+    // ★V7 h99Gb：棒は列全体のボタンになり、読み上げ名は「9月9日（水） 増えた5人・減った2人」。
+    // 意図は同じ（日付と増減が読める・選んだ日が分かる）。
+    const dayBar = host.querySelector('button[aria-label="9月9日（水） 増えた5人・減った2人"]') as HTMLButtonElement | null
     expect(dayBar).not.toBeNull()
     expect(dayBar?.getAttribute('aria-pressed')).toBe('false')
 

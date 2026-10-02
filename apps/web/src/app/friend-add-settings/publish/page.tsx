@@ -9,7 +9,10 @@ import type {
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
+import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
+import Stepper from '@/components/shared/stepper'
+import TargetMissing from '@/components/shared/target-missing'
 import PageHeader from '@/components/shared/page-header'
 import { api, ApiError, type FriendAddRule } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -36,7 +39,7 @@ import styles from './publish.module.css'
  * 出せないときは4つに分ける。読込・空（下書きが無い）・失敗・権限不足。
  * 空を失敗にしない。失敗を0件にしない。
  */
-type Phase = 'loading' | 'ready' | 'empty' | 'error' | 'forbidden'
+type Phase = 'loading' | 'ready' | 'empty' | 'error' | 'forbidden' | 'missing'
 
 const STEPS = ['基本設定', '流入条件', '初回案内', 'アクション', '確認']
 type RuleDetail = {
@@ -75,28 +78,6 @@ function routingVersionOf(rule: FriendAddRule): FriendAddRoutingVersion {
  * **どこまで済んでいるかが読めないと、戻ってよいのか分からない。**
  * 共通の部品はこの枝に無いので、この画面のぶんだけ置く。
  */
-function StepTrail({ steps, current, complete = false }: { steps: string[]; current: number; complete?: boolean }) {
-  return (
-    <ol className={styles.steps} aria-label="設定の進み">
-      {steps.map((label, index) => {
-        const done = complete || index + 1 < current
-        const now = !complete && index + 1 === current
-        return (
-          <li key={label} className={styles.step} aria-current={now ? 'step' : undefined}>
-            <span className={`${styles.stepMark} ${done ? styles.stepDone : now ? styles.stepNow : ''}`}>
-              {done ? '✓' : index + 1}
-            </span>
-            <span className={styles.stepText}>
-              <span className={styles.stepNo}>STEP {index + 1}</span>
-              <span className={styles.stepLabel}>{label}</span>
-            </span>
-          </li>
-        )
-      })}
-    </ol>
-  )
-}
-
 function FriendAddPublishInner() {
   const searchParams = useSearchParams()
   const { selectedAccountId } = useAccount()
@@ -126,7 +107,7 @@ function FriendAddPublishInner() {
   useEffect(() => {
     if (!selectedAccountId) return
     if (!ruleId) {
-      setPhase('empty')
+      setPhase('missing')
       return
     }
     let alive = true
@@ -271,24 +252,44 @@ function FriendAddPublishInner() {
 
   if (phase === 'loading') return <ListState kind="loading" />
   if (phase === 'forbidden') {
-    return <ListState kind="forbidden" title={failure?.title} description={failure?.description} />
-  }
-  if (phase === 'empty') {
     return (
       <ListState
-        kind="empty"
+        kind="forbidden"
+        title={failure?.title}
+        description={failure?.description}
+        action={<Button href="/friend-add-settings">設定へ戻る</Button>}
+      />
+    )
+  }
+  if (phase === 'missing') {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="公開する下書きが指定されていません"
+        description="一覧から、公開する下書きを選び直してください。"
+        backHref="/friend-add-settings"
+        backLabel="設定へ戻る"
+      />
+    )
+  }
+  if (phase === 'empty') {
+    // 404 は「確認する下書きがない」。失敗と混ぜない。
+    return (
+      <TargetMissing
+        kind="not-found"
         title="確認する下書きがありません"
         description="友だち追加時の配信を作ってから、この画面で公開します。"
-        action={<Button href="/friend-add-settings">設定へ戻る</Button>}
+        backHref="/friend-add-settings"
+        backLabel="設定へ戻る"
       />
     )
   }
   if (phase === 'error' || !draft) {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
-        title={failure?.title}
-        description={failure?.description}
+        title={failure?.title ?? '下書きを読み込めませんでした'}
+        description={failure?.description ?? '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
         onRetry={() => setReloadKey((key) => key + 1)}
       />
     )
@@ -299,15 +300,20 @@ function FriendAddPublishInner() {
 
   const blocked = blockedReason(validation)
   const ready = canPublish({ validation, busy })
+  // 「何も配信しない」ではメッセージもシナリオも送らない（R261）。
+  const noneMode = ruleDetail?.rule.friendKind === 'returning'
+    && ruleDetail?.rule.definition.returningMode === 'none'
 
   return (
     <div className={styles.screen} data-design-node="ec9vg">
       <PageHeader
         breadcrumb={[{ label: '友だち追加時の配信', href: '/friend-add-settings' }, { label: '最終確認' }]}
         title="友だち追加時・最終確認"
-        description="有効化すると、新しく追加された友だちへ初回案内を送ります。"
+        description={noneMode
+          ? '有効化すると、再追加した人へアクションだけを実行します。'
+          : '有効化すると、新しく追加された友だちへ初回案内を送ります。'}
       />
-      <StepTrail steps={STEPS} current={5} />
+      <Stepper label="設定の進み" steps={STEPS.map((label, index) => ({ label, state: index + 1 < 5 ? 'done' as const : 'current' as const }))} />
 
       <div className={styles.split}>
         <div className={styles.main}>
@@ -340,20 +346,23 @@ function FriendAddPublishInner() {
           </Card>
 
           <Card layout="vertical" className={styles.section} data-friend-add-part="summary">
-            <CardHeader title="最終確認" meta="有効化すると新しく追加された友だちへ初回案内を送ります。" />
+            <CardHeader title="最終確認" meta={noneMode ? '有効化すると、再追加した人に対してアクションだけを実行します。' : '有効化すると新しく追加された友だちへ初回案内を送ります。'} />
             <div className={styles.rows}>
               <Row label="設定名" value={ruleDetail?.rule.name ?? `第${draft.versionNumber}版の下書き`} />
               <Row label="流入条件" value={ruleDetail?.rule.isFallback ? '経路が分からなかった人' : ruleDetail?.rule.routeNames.join('、') || NOT_AVAILABLE} />
-              <Row label="送信タイミング" value={(ruleDetail?.rule.definition.timing ?? draft.routing.firstTime.timing) === 'immediate' ? '登録直後から5分以内' : 'シナリオの時刻に従う'} />
+              <Row label="送信タイミング" value={noneMode ? '適用外（配信しません）' : (ruleDetail?.rule.definition.timing ?? draft.routing.firstTime.timing) === 'immediate' ? '登録直後から5分以内' : 'シナリオの時刻に従う'} />
               <Row label="対象" value={ruleDetail?.rule.friendKind === 'returning' ? '以前からの友だち・ブロック解除' : '初回登録・既存友だち除外'} />
-              <Row label="初回案内" value={ruleDetail?.rule.scenarioName ?? (draft.routing.firstTime.scenarioId ? '選択済みのシナリオ' : NOT_AVAILABLE)} />
+              <Row label="初回案内" value={noneMode ? 'なし（アクションのみ実行）' : ruleDetail?.rule.scenarioName ?? (draft.routing.firstTime.scenarioId ? '選択済みのシナリオ' : NOT_AVAILABLE)} />
               <Row label="アクション" value={ruleDetail ? ruleActionSummary(ruleDetail.rule) : actionSummary(draft)} />
             </div>
             {/*
              * 再追加時の制限は設定値をそのまま出す。固定で「24時間に1回」と
              * 書くと、制限しない・7日に1回の設定と食い違う(#946 N-109 同类)。
+             * 「何も配信しない」はそもそも送らないので、再送の説明は出さない。
              */}
-            <p className={styles.note}>{suppressionNote(ruleDetail?.rule.definition.resendSuppressionHours)}</p>
+            <p className={styles.note}>{noneMode
+              ? '再追加ではメッセージもシナリオも動かしません。案内後のアクションだけを実行します。'
+              : suppressionNote(ruleDetail?.rule.definition.resendSuppressionHours)}</p>
           </Card>
 
           <Card layout="vertical" className={styles.section} data-friend-add-part="test">
@@ -382,20 +391,21 @@ function FriendAddPublishInner() {
         </div>
 
         <aside className={styles.side}>
-          <Card layout="vertical" className={styles.section} data-friend-add-part="preview">
-            <CardHeader title="LINEプレビュー" />
-            <p className="text-center text-xs text-ink-secondary">
-              {draft.routing.firstTime.timing === 'immediate'
+          {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。白い箱はやめる。 */}
+          <LinePreview
+            caption={noneMode
+              ? '再追加では配信しません'
+              : draft.routing.firstTime.timing === 'immediate'
                 ? '登録直後から5分以内に届きます'
                 : '設定したシナリオの時刻に届きます'}
-            </p>
-            <div className="mx-auto w-full max-w-xs overflow-hidden rounded-card border border-hairline bg-line-preview">
-              <div className="border-b border-hairline bg-canvas px-3 py-2.5 text-center text-xs font-bold text-ink">LINE公式アカウント</div>
-              <div className="m-3 my-7 w-4/5 rounded-card bg-canvas p-3 text-xs leading-6 text-ink-secondary">
-                {ruleDetail?.rule.definition.messageText || `シナリオ「${ruleDetail?.rule.scenarioName ?? '選択中'}」を開始します。`}
-              </div>
+            accountName="LINE公式アカウント"
+          >
+            <div className="rounded-card bg-canvas p-3 text-xs leading-6 text-ink-secondary">
+              {noneMode
+                ? 'メッセージは届きません。アクションだけを実行します。'
+                : ruleDetail?.rule.definition.messageText || `シナリオ「${ruleDetail?.rule.scenarioName ?? '選択中'}」を開始します。`}
             </div>
-          </Card>
+          </LinePreview>
           <Card layout="vertical" className={styles.section} data-friend-add-part="side">
             <CardHeader title="設定サマリー" meta="有効化する内容です。" />
             <div className={styles.rows}>
@@ -432,9 +442,7 @@ function FriendAddPublishInner() {
             variant="primary"
             data-qa-open="ec9vg"
             disabled={!ready}
-            onClick={publish}
-          >
-            {busy ? '処理中…' : '友だち追加時の配信を有効化'}
+            onClick={publish} busy={busy} busyLabel="処理中…">友だち追加時の配信を有効化
           </Button>
         </div>
       </div>
@@ -467,7 +475,7 @@ function PublishedView({ result, detail, accountId }: { result: FriendAddRouting
         title="友だち追加時・有効化完了"
         description="新しく追加された友だちへ、流入経路に合った初回案内を自動で送ります。"
       />
-      <StepTrail steps={STEPS} current={5} complete />
+      <Stepper label="設定の進み" steps={STEPS.map((label) => ({ label, state: 'done' as const }))} />
 
       <div className={styles.split}>
         <Card layout="vertical" className={styles.section} data-friend-add-part="done">
@@ -505,9 +513,9 @@ function PublishedView({ result, detail, accountId }: { result: FriendAddRouting
             <CardHeader title="次にできること" />
             <p className="text-xs leading-5 text-ink-secondary">配信中でも下書きを作って安全に変更できます。</p>
             <div className="grid gap-2">
-              <Button type="button" disabled={!detail || stopping} onClick={() => void stop()}>{stopping ? '停止中…' : '配信を一時停止'}</Button>
+              <Button type="button" disabled={!detail || stopping} onClick={() => void stop()} busy={stopping} busyLabel="停止中…">配信を一時停止</Button>
               <Button href={detail ? `/friend-add-settings?view=edit&id=${encodeURIComponent(detail.rule.id)}&step=basic` : '/friend-add-settings'}>内容を編集する</Button>
-              <Button href={detail ? `/friend-add-settings?view=edit&id=${encodeURIComponent(detail.rule.id)}&step=preview` : '/friend-add-settings'}>テストを再送信</Button>
+              <Button href={detail ? `/friend-add-settings?view=edit&id=${encodeURIComponent(detail.rule.id)}&step=preview` : '/friend-add-settings'}>テストをもう一度送る</Button>
               <Button type="button" disabled title="複製の操作はまだ接続されていません">別の経路用に複製</Button>
               {stopMessage && <p className="text-xs text-ink-secondary" role="status">{stopMessage}</p>}
             </div>

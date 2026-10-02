@@ -3,8 +3,11 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import RadioCard from '@/components/shared/radio-card'
 import { ApiError, api } from '@/lib/api'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings'
+import { loadFeatureSettings } from '@/lib/feature-settings-cache'
 import {
   FEATURE_PRESETS,
   FEATURE_SET_LABELS,
@@ -49,7 +52,8 @@ export function FeatureSetCard({ accountId }: { accountId: string | null }) {
     setState({ kind: 'loading' })
     setApplyError('')
     try {
-      const res = await api.featureSettings.get(accountId)
+      // サイドバー・機能設定画面と同じ答えを共有する。保存の合図で捨てられる。
+      const res = await loadFeatureSettings(accountId)
       if (generationRef.current !== generation) return
       if (!res.success) {
         setState({ kind: 'error' })
@@ -153,7 +157,7 @@ export function FeatureSetCard({ accountId }: { accountId: string | null }) {
           <button
             type="button"
             onClick={() => void load()}
-            className="text-accent-deep ml-2 cursor-pointer font-bold underline hover:no-underline"
+            className="text-action ml-2 cursor-pointer font-bold underline hover:no-underline"
           >
             {FEATURE_SET_LABELS.retry}
           </button>
@@ -167,7 +171,7 @@ export function FeatureSetCard({ accountId }: { accountId: string | null }) {
       {state.kind === 'configured' && (
         <p className="text-sm leading-relaxed text-ink-secondary">
           {FEATURE_SET_LABELS.configured}{' '}
-          <Link href="/settings" className="text-accent-deep font-bold underline">
+          <Link href="/settings" className="text-action font-bold underline">
             {FEATURE_SET_LABELS.openSettings}
           </Link>
         </p>
@@ -176,7 +180,7 @@ export function FeatureSetCard({ accountId }: { accountId: string | null }) {
       {state.kind === 'applied' && (
         <p role="status" className="text-sm leading-relaxed text-ink-secondary">
           {FEATURE_SET_LABELS.applied(state.label)}{' '}
-          <Link href="/settings" className="text-accent-deep font-bold underline">
+          <Link href="/settings" className="text-action font-bold underline">
             {FEATURE_SET_LABELS.openSettings}
           </Link>
         </p>
@@ -215,27 +219,15 @@ function Picker({ currentFeatures, selectedId, busy, applyError, onSelect, onApp
           業種・担当業務に近いものを1つ選んでください
         </legend>
         {FEATURE_PRESETS.map((preset) => (
-          <label
+          <RadioCard
             key={preset.id}
-            className={`rounded-control flex cursor-pointer items-start gap-2.5 border p-3 ${
-              preset.id === selectedId
-                ? 'border-accent-deep bg-accent-soft'
-                : 'border-hairline bg-canvas'
-            }`}
-          >
-            <input
-              type="radio"
-              name="feature-preset"
-              value={preset.id}
-              checked={preset.id === selectedId}
-              onChange={() => onSelect(preset.id)}
-              className="accent-accent-deep mt-0.5"
-            />
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="text-sm font-bold text-ink">{preset.label}</span>
-              <span className="text-xs leading-relaxed text-ink-secondary">{preset.audience}</span>
-            </span>
-          </label>
+            name="feature-preset"
+            value={preset.id}
+            checked={preset.id === selectedId}
+            onChange={() => onSelect(preset.id)}
+            title={preset.label}
+            note={preset.audience}
+          />
         ))}
       </fieldset>
 
@@ -257,14 +249,15 @@ function Picker({ currentFeatures, selectedId, busy, applyError, onSelect, onApp
       </ul>
 
       {applyError && (
-        <p role="alert" className="rounded-control border-danger bg-danger-bg text-danger border p-3 text-sm leading-relaxed">
-          {applyError}{' '}
-          {applyError === FEATURE_SET_LABELS.impactBlocked && (
-            <Link href="/settings" className="font-bold underline">
+        <Notice
+          tone="danger"
+          message={applyError}
+          action={applyError === FEATURE_SET_LABELS.impactBlocked ? (
+            <Link href="/settings">
               {FEATURE_SET_LABELS.openSettings}
             </Link>
-          )}
-        </p>
+          ) : undefined}
+        />
       )}
 
       <div className="flex justify-end">

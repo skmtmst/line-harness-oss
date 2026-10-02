@@ -61,13 +61,18 @@ describe('テンプレートの使用先', () => {
         first: async () => ({ total: 1 }),
         all: async () => {
           if (sql.includes('references_by_kind')) {
-            return { results: [
-              { template_id: 'tpl-1', acct: 'account-1' },
-              { template_id: 'tpl-1', acct: 'account-1' },
-              { template_id: 'tpl-1', acct: 'account-1' },
-              { template_id: 'tpl-1', acct: 'account-1' },
-              { template_id: 'tpl-1', acct: 'account-1' },
-            ] };
+            // D1 上限(5項)回避で2本に分けている。前半3分岐・後半3分岐で計5件。
+            const rows = sql.includes('friend_reminders')
+              ? [
+                { template_id: 'tpl-1', acct: 'account-1' },
+                { template_id: 'tpl-1', acct: 'account-1' },
+              ]
+              : [
+                { template_id: 'tpl-1', acct: 'account-1' },
+                { template_id: 'tpl-1', acct: 'account-1' },
+                { template_id: 'tpl-1', acct: 'account-1' },
+              ];
+            return { results: rows };
           }
           if (sql.includes('FROM automations')) {
             return { results: [{ actions: '[{"params":{"template_id":"tpl-1"}}]', line_account_id: 'account-1' }] };

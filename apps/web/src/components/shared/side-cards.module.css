@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 /*
  * 右カラム（幅390px）に置く2枚のカード。
  *
@@ -24,7 +26,7 @@
 .title {
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-label); /* fontSize: $size-label */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 /* --- つながる先 ------------------------------------------------------- */
@@ -42,7 +44,7 @@
   gap: 6px; /* gap: 6 */
   color: var(--color-status-info); /* fill: $status-info */
   font-size: var(--text-caption); /* fontSize: $size-caption */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 .linkName:hover {
@@ -101,11 +103,12 @@
 .careHead {
   color: var(--color-status-warn-deep);
   font-size: var(--text-caption); /* fontSize: $size-caption */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .careNote {
   color: var(--color-status-warn-deep);
   font-size: var(--text-micro); /* fontSize: $size-micro */
   font-weight: 500;
+}
 }

@@ -6,14 +6,16 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import MobileTableCards from '@/components/shared/mobile-table-cards'
 import { TextField } from '@/components/shared/text-field'
 import { ApiError } from '@/lib/api'
 import {
-  nenPetsApi, petAnimalTypeLabel, type NenHealthChangeFilter, type NenHealthKpis, type NenHealthLastFilter, type NenHealthListData, type NenHealthRow, type NenHealthSort,
+  headCountLabel, nenPetsApi, petAnimalTypeLabel, type NenHealthChangeFilter, type NenHealthKpis, type NenHealthLastFilter, type NenHealthListData, type NenHealthRow, type NenHealthSort,
 } from '@/lib/nen-pets-api'
+import { formatNumber } from '@/lib/format'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -66,10 +68,10 @@ export default function HealthTab({
   return (
     <>
       <KpiCollapse data-design="KPIs" data-design-node="health-kpis" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="今週の記録" value={ready ? kpis!.recordsThisWeek : null} unit="件" detail="直近7日にお客様が付けた記録" loading={!ready && status === 'loading'} />
-        <SummaryCard variant="v6" title="記録しているペット" value={ready ? kpis!.petsWithRecords : null} unit="頭" detail={ready ? `登録 ${kpis!.petsTotal.toLocaleString('ja-JP')}頭のうち` : '—'} loading={!ready && status === 'loading'} />
-        <SummaryCard variant="v6" title="気になる変化" value={ready ? kpis!.concerning : null} unit="頭" detail="体重 ±10%・便の異常や食いつき不良が3回続く" loading={!ready && status === 'loading'} />
-        <SummaryCard variant="v6" title="30日以上 記録なし" value={ready ? kpis!.silent30 : null} unit="頭" detail="続けるきっかけを配信できる" loading={!ready && status === 'loading'} />
+        <KpiCard variant="v6" title="今週の記録" value={ready ? kpis!.recordsThisWeek : null} unit="件" detail="" help="直近7日にお客様が付けた記録です" loading={!ready && status === 'loading'} />
+        <KpiCard variant="v6" title="記録しているペット" value={ready ? kpis!.petsWithRecords : null} unit="頭" detail={ready ? `登録 ${formatNumber(kpis!.petsTotal)}頭のうち` : '—'} loading={!ready && status === 'loading'} />
+        <KpiCard variant="v6" title="気になる変化" value={ready ? kpis!.concerning : null} unit="頭" detail="" help="体重の±10%の変化・便の異常・食いつき不良が3回続いたペットです" loading={!ready && status === 'loading'} />
+        <KpiCard variant="v6" title="30日以上 記録なし" value={ready ? kpis!.silent30 : null} unit="頭" detail="続けるきっかけを配信できる" loading={!ready && status === 'loading'} />
       </KpiCollapse>
 
       <div data-design="Note" data-design-node="health-note">
@@ -125,7 +127,7 @@ export default function HealthTab({
           ]}
         />
         <span className="ml-auto text-caption font-semibold text-ink-faint">
-          {data ? `${data.total.toLocaleString('ja-JP')}頭中 ${data.total === 0 ? 0 : (data.page - 1) * data.pageSize + 1}〜${Math.min(data.total, data.page * data.pageSize)}頭` : '—'}
+          {data ? headCountLabel(data.total, data.page, data.pageSize) : '—'}
         </span>
       </div>
 
@@ -144,6 +146,36 @@ export default function HealthTab({
           )
         ) : data ? (
           <>
+            {/*
+              ★V7 監査の直し：390pxで8列（約981px）が横にはみ出すので、
+              767px 以下は日付・ペット・状態・主な記録に絞った共通カードにし、
+              表は768px 以上だけ出す。体重の推移グラフは表側に残す。
+            */}
+            <MobileTableCards
+              items={data.items.map((row) => {
+                const petName = row.pet.callName || row.pet.name || '（名前なし）'
+                const kindAge = row.pet.ageLabel === '—'
+                  ? petAnimalTypeLabel(row.pet.animalType)
+                  : `${petAnimalTypeLabel(row.pet.animalType)}・${row.pet.ageLabel}`
+                return {
+                  id: row.pet.id,
+                  name: petName,
+                  status: row.changes.length === 0 ? undefined : (
+                    <span className="flex max-w-40 flex-wrap justify-end gap-1">
+                      {row.changes.map((c) => <Chip key={c.key} tone={c.tone === 'warn' ? 'warn' : 'neutral'}>{c.label}</Chip>)}
+                    </span>
+                  ),
+                  summary: `${kindAge}・最終記録 ${row.lastLoggedLabel}・${row.owner.name || '（名前なし）'}`,
+                  metric: `30日 ${row.count30d}件${row.latestStool && row.latestAppetite ? `・${row.latestStool}・${row.latestAppetite}` : ''}`,
+                  primaryAction: (
+                    <button type="button" onClick={() => onOpenSummary(row.pet.id)} className="text-label font-semibold text-action">
+                      30日のまとめ
+                    </button>
+                  ),
+                }
+              })}
+            />
+            <div className="hidden md:block">
             <DataTable>
               <thead>
                 <TableHeadRow>
@@ -161,6 +193,7 @@ export default function HealthTab({
                 {data.items.map((row) => <HealthRow key={row.pet.id} row={row} onOpenSummary={onOpenSummary} />)}
               </tbody>
             </DataTable>
+            </div>
             {pageCount > 1 ? <Pagination page={data.page} pageCount={pageCount} onPageChange={setPage} /> : null}
           </>
         ) : null}
@@ -169,8 +202,11 @@ export default function HealthTab({
   )
 }
 
-/** 8週の週平均体重を小さな棒で。最小〜最大の幅で高さを決め、記録の無い週は薄い線。 */
-function WeightBars({ series, warn }: { series: Array<number | null>; warn: boolean }) {
+/**
+ * 8週の週平均体重を小さな棒で。最小〜最大の幅で高さを決め、記録の無い週は薄い線。
+ * 棒の上は丸めない。8px 幅に丸みを付けると縦長の点に見える。
+ */
+export function WeightBars({ series, warn }: { series: Array<number | null>; warn: boolean }) {
   const known = series.filter((v): v is number => v != null)
   const min = known.length ? Math.min(...known) : 0
   const max = known.length ? Math.max(...known) : 0
@@ -180,9 +216,9 @@ function WeightBars({ series, warn }: { series: Array<number | null>; warn: bool
       {series.map((value, index) => value == null ? (
         <span key={index} className="h-0.5 w-2 rounded-pill bg-hairline" />
       ) : warn ? (
-        <span key={index} className="w-2 rounded-t-sm bg-status-warn" style={{ height: `${max === min ? 60 : 30 + Math.round(((value - min) / (max - min)) * 70)}%` }} />
+        <span key={index} className="w-2 bg-status-warn" style={{ height: `${max === min ? 60 : 30 + Math.round(((value - min) / (max - min)) * 70)}%` }} />
       ) : (
-        <span key={index} className="w-2 rounded-t-sm bg-accent" style={{ height: `${max === min ? 60 : 30 + Math.round(((value - min) / (max - min)) * 70)}%` }} />
+        <span key={index} className="w-2 bg-accent" style={{ height: `${max === min ? 60 : 30 + Math.round(((value - min) / (max - min)) * 70)}%` }} />
       ))}
     </span>
   )
@@ -201,7 +237,7 @@ function HealthRow({ row, onOpenSummary }: { row: NenHealthRow; onOpenSummary: (
             // eslint-disable-next-line @next/next/no-img-element -- お客様がマイページで登録した写真
             <img src={row.pet.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-pill object-cover" />
           ) : (
-            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep">{initial}</span>
+            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep">{initial}</span>
           )}
           <span className="min-w-0">
             <span className="block truncate text-label font-semibold text-ink" title={row.pet.callName}>{row.pet.callName || row.pet.name || '（名前なし）'}</span>
@@ -224,7 +260,7 @@ function HealthRow({ row, onOpenSummary }: { row: NenHealthRow; onOpenSummary: (
         )}
       </Td>
       <Td align="right">
-        <button type="button" onClick={() => onOpenSummary(row.pet.id)} className="text-label font-semibold text-accent-deep">30日のまとめ</button>
+        <button type="button" onClick={() => onOpenSummary(row.pet.id)} className="text-label font-semibold text-action">30日のまとめ</button>
       </Td>
     </Tr>
   )

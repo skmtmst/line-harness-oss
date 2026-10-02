@@ -35,6 +35,7 @@ export default function MergedTabs({
   variant = 'underline',
   actions,
   disabledKeys = [],
+  label,
 }: {
   basePath: string
   /** クエリの名前。受信箱だけ channel を使う。 */
@@ -53,6 +54,8 @@ export default function MergedTabs({
   /** タブ行の右端に置くもの。underline のときだけ効く。 */
   actions?: ReactNode
   disabledKeys?: readonly string[]
+  /** タブの並び全体を読み上げる名前（Issue #708）。underline のときだけ効く。 */
+  label?: string
 }) {
   const router = useRouter()
   const home = defaultKey ?? tabs[0].key
@@ -72,6 +75,7 @@ export default function MergedTabs({
       <div className={styles.shared}>
       <ScrollableTabs
         actions={actions}
+        label={label}
         items={tabs.map((tab) => ({
           label: tab.label,
           current: active === tab.key,
@@ -110,13 +114,20 @@ export default function MergedTabs({
   )
 }
 
-/** クエリから今のタブを読む。知らない値は既定（省略時は先頭）のタブに寄せる。 */
+/**
+ * クエリから今のタブを読む。知らない値は既定（省略時は先頭）のタブに寄せる。
+ *
+ * `aliases` は改名前に配ったURL（ブックマーク・社内Wiki）を受けるための
+ * 互換表。`{ clicks: 'url-clicks' }` のように旧キー→現行キーを書く。
+ */
 export function useMergedTab(
   tabs: readonly MergedTab[],
   paramName = 'tab',
   defaultKey?: string,
+  aliases?: Readonly<Record<string, string>>,
 ): string {
   const params = useSearchParams()
   const raw = params.get(paramName)
-  return tabs.find((t) => t.key === raw)?.key ?? defaultKey ?? tabs[0].key
+  const key = (raw && aliases?.[raw]) || raw
+  return tabs.find((t) => t.key === key)?.key ?? defaultKey ?? tabs[0].key
 }

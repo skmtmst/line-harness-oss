@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import TemplatePicker from '@/components/chats/template-picker'
+import ListState from '@/components/shared/list-state'
 import { describeSendFailure } from '@/app/chats/send-failure'
+import { formatDay, formatTime } from '@/lib/format'
+import Button from '@/components/shared/button'
 
 /**
  * 友だち詳細のタイムライン（設計 V2 2-2-1 の右カラム）。
@@ -25,10 +28,9 @@ interface MessageLog {
   createdAt: string
 }
 
-/** 絞り込み。★は印の仕組みがまだ無いので押せない形で置く。 */
+/** 絞り込み。「出す＝使える」の決まりで、押せないものは並べない。 */
 const FILTERS = [
   { key: 'all', label: '全件' },
-  { key: 'starred', label: '★のみ', disabled: true },
   { key: 'incoming', label: '受信' },
   { key: 'outgoing', label: '送信' },
   { key: 'system', label: 'システム通知' },
@@ -49,11 +51,11 @@ function dayLabel(iso: string): string {
     d.getMonth() === today.getMonth() &&
     d.getDate() === today.getDate()
   if (same) return '今日'
-  return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
+  return formatDay(d)
 }
 
 function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+  return formatTime(iso)
 }
 
 /** 本文。テキスト以外は種類だけ出す。中身の描き分けは受信箱側が持っている。 */
@@ -156,15 +158,11 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
           <button
             key={f.key}
             type="button"
-            disabled={'disabled' in f && f.disabled}
-            title={'disabled' in f && f.disabled ? '印を付ける仕組みは準備中です' : undefined}
             onClick={() => setFilter(f.key)}
             className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
-              'disabled' in f && f.disabled
-                ? 'text-ink-faint opacity-50'
-                : filter === f.key
-                  ? 'bg-accent-soft text-accent'
-                  : 'text-ink-secondary hover:bg-canvas-sunken'
+              filter === f.key
+                ? 'bg-accent-soft text-accent-deep'
+                : 'text-ink-secondary hover:bg-canvas-sunken'
             }`}
           >
             {f.label}
@@ -175,11 +173,13 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
       {/* 本体 */}
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {loading ? (
-          <p className="text-ink-faint text-center text-sm">読み込み中...</p>
+          <ListState kind="loading" title="やり取りを読み込んでいます" />
         ) : shown.length === 0 ? (
-          <p className="text-ink-faint text-center text-sm">
-            {messages.length === 0 ? 'やり取りはまだありません' : 'この絞り込みに当てはまるものはありません'}
-          </p>
+          <ListState
+            kind="empty"
+            title={messages.length === 0 ? 'やり取りはまだありません' : 'この絞り込みに当てはまるものはありません'}
+            description={messages.length === 0 ? 'メッセージを送ると、ここに並びます。' : '絞り込みを変えてください。'}
+          />
         ) : (
           shown.map((msg) => {
             const day = dayLabel(msg.createdAt)
@@ -235,7 +235,7 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
           <button
             type="button"
             onClick={() => setShowTemplates(true)}
-            className="text-accent text-xs hover:underline"
+            className="text-action text-xs hover:underline"
           >
             テンプレートを選択
           </button>
@@ -265,14 +265,9 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
         {error && <p className="text-danger mt-1 text-xs">{error}</p>}
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className="text-ink-faint text-xs">画像は JPEG / PNG、1枚 10MB まで</span>
-          <button
-            type="button"
-            onClick={() => void send()}
-            disabled={sending || !text.trim()}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium disabled:opacity-40"
-          >
+          <Button variant="primary" className="px-5 py-2 font-medium border-0 h-auto whitespace-normal" type="button" onClick={() => void send()} disabled={sending || !text.trim()}>
             {sending ? '送信中...' : '送信'}
-          </button>
+          </Button>
         </div>
       </div>
 

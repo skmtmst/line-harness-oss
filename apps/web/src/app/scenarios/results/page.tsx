@@ -4,21 +4,27 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type React
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'
-import { api, type ScenarioRuns } from '@/lib/api'
+import { api, ApiError, type ScenarioRuns } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { MoreHorizontal } from 'lucide-react'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import styles from './scenario-results.module.css'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
+import { shortDateTime } from '@/lib/hq-banners'
+import { formatNumber } from '@/lib/format'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -95,6 +101,8 @@ function ResultsInner() {
   const [subscriptionStatus, setSubscriptionStatus] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [resultsMissing, setResultsMissing] = useState(false)
   /*
    * 友だち単位の操作（#949 N-054）。止める・再開・失敗を再送・移す。
    * busy は「購読ID:操作」で持ち、押した行だけを止める。
@@ -115,6 +123,8 @@ function ResultsInner() {
    */
   const [planOpen, setPlanOpen] = useState(false)
   const [planFriend, setPlanFriend] = useState<{ id: string; name: string } | null>(null)
+  // 行の「その他」メニューの開き先（#641）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const opKeys = useRef(new IdempotencyKeyStore())
 
   usePageTitle(scenario ? `シナリオ結果：${scenario.name}` : null)
@@ -130,11 +140,13 @@ function ResultsInner() {
   const loadMain = useCallback(async (seq: number) => {
     if (!id) {
       setLoading(false)
-      setError('配信結果を確認するシナリオが指定されていません。')
+      setError('')
+      setResultsMissing(false)
       return
     }
     setLoading(true)
     setError('')
+    setResultsMissing(false)
     try {
       const [scenarioResponse, statsResponse] = await Promise.all([
         scenarioReferenceData.scenario(id),
@@ -144,9 +156,13 @@ function ResultsInner() {
       if (!scenarioResponse.success || !statsResponse.success) throw new Error('load failed')
       setScenario(scenarioResponse.data)
       setStats(statsResponse.data)
-    } catch {
+    } catch (caught) {
       if (seq !== loadSeqRef.current) return
-      setError('配信結果を読み込めませんでした。時間を置いてもう一度お試しください。')
+      if (caught instanceof ApiError && caught.status === 404) {
+        setResultsMissing(true)
+      } else {
+        setError('配信結果を読み込めませんでした。時間を置いてもう一度お試しください。')
+      }
     } finally {
       if (seq === loadSeqRef.current) setLoading(false)
     }
@@ -357,6 +373,45 @@ function ResultsInner() {
 
   const moveChoices = (moveOptions ?? []).filter((item) => item.id !== id && item.isActive)
 
+  /*
+    対象が無いときは、上の操作列（シナリオ編集へ戻る・CSVで書き出す）も
+    出さない。戻り先は TargetMissing のボタンが持つ（設計 `x5cgUH`）。
+  */
+  if (!id) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="配信結果を見るシナリオが指定されていません"
+        description="一覧から、結果を見たいシナリオを選び直してください。"
+        backHref="/scenarios"
+        backLabel="シナリオ一覧へ戻る"
+      />
+    )
+  }
+
+  if (!loading && (resultsMissing || (!error && !scenario))) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このシナリオは見つかりません"
+        description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
+        backHref="/scenarios"
+        backLabel="シナリオ一覧へ戻る"
+      />
+    )
+  }
+
+  if (!loading && error) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="配信結果を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void loadMain(loadSeqRef.current)}
+      />
+    )
+  }
+
   return (
     <div className={styles.page} data-design-node="M2b2B">
       <div className={styles.actions}>
@@ -374,15 +429,14 @@ function ResultsInner() {
       </div>
 
       {loading ? <ListState kind="loading" title="配信結果を読み込んでいます" /> : null}
-      {!loading && error ? <ListState kind="error" description={error} onRetry={() => void loadMain(loadSeqRef.current)} /> : null}
 
       {!loading && !error && scenario && stats ? (
         <div className={styles.columns}>
-          <main className={styles.main}>
+          <div className={styles.main}>
             <Panel title="配信結果" lead="開始・完了・どの通まで届いたかを確認します。">
               <div className={styles.resultSummary}>
-                <SummaryCard variant="v6" title="開始" value={stats.enrolledTotal} unit="人" detail="このシナリオに参加した人数" />
-                <SummaryCard variant="v6" title="完了" value={stats.completed} unit="人" detail={percentLabel(stats.completed, stats.enrolledTotal)} />
+                <KpiCard variant="v6" title="開始" value={stats.enrolledTotal} unit="人" detail="" help="このシナリオに参加した人数です" />
+                <KpiCard variant="v6" title="完了" value={stats.completed} unit="人" detail={percentLabel(stats.completed, stats.enrolledTotal)} />
               </div>
             </Panel>
 
@@ -399,7 +453,7 @@ function ResultsInner() {
                       <li key={step.id} className={styles.step}>
                         <div className={styles.stepTitle}>
                           <span>ステップ{step.stepOrder}：{scheduleLabel(step)}</span>
-                          <span className={styles.reached}>{(run?.delivered ?? result?.reachedCount)?.toLocaleString('ja-JP') ?? '—'}人到達</span>
+                          <span className={styles.reached}>{formatNumber((run?.delivered ?? result?.reachedCount))}人到達</span>
                         </div>
                         <p>
                           到達率 {run ? percentLabel(run.delivered, stats.enrolledTotal) : result ? percentLabel(result.reachedCount, stats.enrolledTotal) : '—'}
@@ -436,10 +490,10 @@ function ResultsInner() {
                 手元の表示中ページだけを絞ると、総件数と食い違う。
               */}
               <div className="mb-3 flex flex-wrap items-center gap-3">
-                <SelectField
-                  size="compact"
+                <Select
+                  size="page-size"
                   value={subscriptionStatus}
-                  onChange={(event) => setSubscriptionStatus(event.target.value)}
+                  onChange={(value) => setSubscriptionStatus(value)}
                   aria-label="購読の状態で絞り込む"
                   options={[
                     { value: '', label: 'すべての状態' },
@@ -451,7 +505,7 @@ function ResultsInner() {
                 />
                 {runs ? (
                   <span className="text-ink-faint text-xs tabular-nums">
-                    {runs.subscriptions.length.toLocaleString('ja-JP')} / {runs.pagination.total.toLocaleString('ja-JP')}人
+                    {formatNumber(runs.subscriptions.length)} / {formatNumber(runs.pagination.total)}人
                   </span>
                 ) : null}
               </div>
@@ -518,61 +572,71 @@ function ResultsInner() {
                           <Td className="whitespace-nowrap">
                             {sub.status === 'completed'
                               ? '—'
-                              : sub.nextDeliveryAt ?? '—'}
+                              : sub.nextDeliveryAt ? shortDateTime(sub.nextDeliveryAt) : '—'}
                           </Td>
                           <ActionCell>
-                            <div className="flex flex-wrap items-center justify-end gap-3">
-                              <button
-                                type="button"
-                                className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
+                            {/* #641: 主操作は枠つき「予定を見る」、購読操作は「その他（…）」へ集約。 */}
+                            <div className="relative inline-flex items-center justify-end gap-1.5">
+                              <Button
+                                variant="secondary"
                                 onClick={() => {
                                   setPlanFriend({ id: sub.friendId, name: sub.friendName })
                                   setPlanOpen(true)
                                 }}
                               >
                                 予定を見る
-                              </button>
-                              {sub.status === 'active' ? (
-                                <button
-                                  type="button"
-                                  className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
-                                  disabled={opBusy !== null}
-                                  onClick={() => void runSubscriptionOp(sub, 'pause')}
-                                >
-                                  {opBusy === `${sub.id}:pause` ? '停止中…' : '止める'}
-                                </button>
-                              ) : null}
-                              {sub.status === 'paused' ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
-                                    disabled={opBusy !== null}
-                                    onClick={() => void runSubscriptionOp(sub, 'resume')}
-                                  >
-                                    {opBusy === `${sub.id}:resume` ? '再開中…' : '再開'}
-                                  </button>
-                                  {pausedByFailure ? (
-                                    <button
-                                      type="button"
-                                      className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
-                                      disabled={opBusy !== null}
-                                      onClick={() => void runSubscriptionOp(sub, 'retry')}
-                                    >
-                                      {opBusy === `${sub.id}:retry` ? '再送中…' : '失敗を再送'}
-                                    </button>
-                                  ) : null}
-                                </>
-                              ) : null}
+                              </Button>
                               {sub.status === 'active' || sub.status === 'paused' ? (
-                                <button
-                                  type="button"
-                                  className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
-                                  disabled={opBusy !== null}
-                                  onClick={() => void openMoveDialog(sub)}
-                                >
-                                  別のシナリオへ移す
-                                </button>
+                                <>
+                                  <IconButton
+                                    aria-label={`${sub.friendName}のその他操作`}
+                                    aria-expanded={openMenuId === sub.id}
+                                    onClick={() =>
+                                      setOpenMenuId((current) => (current === sub.id ? null : sub.id))
+                                    }
+                                  >
+                                    <MoreHorizontal aria-hidden />
+                                  </IconButton>
+                                  <ActionMenu
+                                    open={openMenuId === sub.id}
+                                    ariaLabel={`${sub.friendName}の操作`}
+                                    onClose={() => setOpenMenuId(null)}
+                                    items={(() => {
+                                      const items: ActionMenuItem[] = []
+                                      if (sub.status === 'active') {
+                                        items.push({
+                                          id: 'pause',
+                                          label: opBusy === `${sub.id}:pause` ? '停止中…' : '止める',
+                                          disabled: opBusy !== null,
+                                          onSelect: () => void runSubscriptionOp(sub, 'pause'),
+                                        })
+                                      }
+                                      if (sub.status === 'paused') {
+                                        items.push({
+                                          id: 'resume',
+                                          label: opBusy === `${sub.id}:resume` ? '再開中…' : '再開',
+                                          disabled: opBusy !== null,
+                                          onSelect: () => void runSubscriptionOp(sub, 'resume'),
+                                        })
+                                        if (pausedByFailure) {
+                                          items.push({
+                                            id: 'retry',
+                                            label: opBusy === `${sub.id}:retry` ? '再送中…' : '失敗を再送',
+                                            disabled: opBusy !== null,
+                                            onSelect: () => void runSubscriptionOp(sub, 'retry'),
+                                          })
+                                        }
+                                      }
+                                      items.push({
+                                        id: 'move',
+                                        label: '別のシナリオへ移す',
+                                        disabled: opBusy !== null,
+                                        onSelect: () => void openMoveDialog(sub),
+                                      })
+                                      return items
+                                    })()}
+                                  />
+                                </>
                               ) : null}
                             </div>
                           </ActionCell>
@@ -600,22 +664,21 @@ function ResultsInner() {
                 ) : null}
                 {runs.pagination.nextCursor ? (
                   <div className="mt-3 flex justify-center">
-                    <Button onClick={loadMoreRuns} disabled={runsLoadingMore}>
-                      {runsLoadingMore ? '読み込んでいます…' : 'さらに読み込む'}
+                    <Button onClick={loadMoreRuns} disabled={runsLoadingMore} busy={runsLoadingMore} busyLabel="読み込んでいます…">さらに読み込む
                     </Button>
                   </div>
                 ) : null}
               </>
               )}
             </Panel>
-          </main>
+          </div>
 
           <aside className={styles.side}>
             <Panel title="設定サマリー" lead="現在の参加状況です。">
               <dl className={styles.summaryList}>
-                <div><dt>参加中</dt><dd>{(runs ? runs.summary.active + runs.summary.delivering : stats.activeNow).toLocaleString('ja-JP')}人</dd></div>
-                <div><dt>完了</dt><dd>{(runs?.summary.completed ?? stats.completed).toLocaleString('ja-JP')}人</dd></div>
-                <div><dt>一時停止</dt><dd>{(runs?.summary.paused ?? stats.paused).toLocaleString('ja-JP')}人</dd></div>
+                <div><dt>参加中</dt><dd>{formatNumber((runs ? runs.summary.active + runs.summary.delivering : stats.activeNow))}人</dd></div>
+                <div><dt>完了</dt><dd>{formatNumber((runs?.summary.completed ?? stats.completed))}人</dd></div>
+                <div><dt>一時停止</dt><dd>{formatNumber((runs?.summary.paused ?? stats.paused))}人</dd></div>
                 <div><dt>エラー</dt><dd>—</dd></div>
               </dl>
               <p className={styles.unavailable}>
@@ -669,9 +732,7 @@ function ResultsInner() {
               type="button"
               variant="primary"
               disabled={!moveScenarioId || opBusy !== null}
-              onClick={() => void confirmMove()}
-            >
-              {opBusy ? '移しています…' : 'このシナリオへ移す'}
+              onClick={() => void confirmMove()} busy={opBusy !== null} busyLabel="移しています…">このシナリオへ移す
             </Button>
           </div>
         )}
@@ -693,17 +754,12 @@ function ResultsInner() {
             </button>
           </p>
         ) : (
-          <SelectField
+          <Select
             value={moveScenarioId}
-            title={moveOptions === null
-              ? '読み込んでいます'
-              : moveChoices.length === 0
-                ? '移せるシナリオがありません'
-                : '移し先のシナリオを選んでください'}
             disabled={moveOptions === null || moveChoices.length === 0 || opBusy !== null}
-            onChange={(event) => setMoveScenarioId(event.target.value)}
+            onChange={(value) => setMoveScenarioId(value)}
             aria-label="移し先のシナリオ"
-            className="w-full"
+            size="full"
             options={[
               {
                 value: '',

@@ -1,39 +1,48 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { MoreHorizontal } from 'lucide-react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { isMileageFriendsV6Overview } from './friends-overview-guard'
 import MileageRewardsTab from './mileage-rewards-tab'
 import ActionMenu from '@/components/shared/action-menu'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
+  type MileageAdjustmentApprovalRequest,
   type MileageAdminHistory,
+  type MileageEarningRuleTestResult,
   type MileageEarningRuleV6,
   type MileageEarningRulesV6Overview,
+  type MileageFriendV6,
   type MileageFriendsV6Overview,
 } from '@/lib/api'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { csvCell } from '@/lib/presentation'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
-import { mileagePaginationTotal } from './mileage-response-state'
+import { describeMileageCsvExportFailure, mileagePaginationTotal } from './mileage-response-state'
 import { ruleEventLabel } from './earning-rule-view'
 import MileageHistoryTab from './mileage-history-tab'
 import ActionScoreTab from './action-score-tab'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { formatDay, formatNumber } from '@/lib/format'
 
 const PAGE_SIZE = 20
 const TABS = [
@@ -83,8 +92,12 @@ function dateOnlyDaysAgo(days: number) {
   return date.toISOString().slice(0, 10)
 }
 
+/*
+ * R53: 台帳の実額合計を使う。下書き金額を後から変えても、
+ * 過ぎた30日の額は変わらない（回数×今の下書き金額にしない）。
+ */
 function grantedMiles30d(rule: MileageEarningRuleV6) {
-  return rule.metrics30d.granted * rule.draft.amount
+  return rule.metrics30d.grantedMiles
 }
 
 type EarningRuleSummary = {
@@ -99,6 +112,19 @@ type EarningRuleSummary = {
   averageDenominator: number | null
 }
 
+/*
+ * R383: 「期限つきマイルがない（null）」と「期限つきはあるが30日以内は
+ * 0（次の失効はもっと先）」を区別する一覧表示。
+ */
+function expiringLabel(member: MileageFriendV6): string {
+  if (member.expiringMiles30d == null) return 'なし'
+  if (member.expiringMiles30d === 0 && member.nextExpiringAt) {
+    const date = formatDay(new Date(member.nextExpiringAt))
+    return `30日以内はなし（次は ${date}）`
+  }
+  return `${formatMileageNumber(member.expiringMiles30d)} マイル`
+}
+
 function rankLabel(rank: string | null) {
   if (rank === 'gold') return 'ゴールド'
   if (rank === 'silver') return 'シルバー'
@@ -106,20 +132,7 @@ function rankLabel(rank: string | null) {
   return null
 }
 
-function isMileageFriendsV6Overview(value: unknown): value is MileageFriendsV6Overview {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<MileageFriendsV6Overview>
-  return Array.isArray(candidate.items)
-    && !!candidate.summary
-    && typeof candidate.summary.totalMembers === 'number'
-    && typeof candidate.summary.withBalanceCount === 'number'
-    && typeof candidate.summary.available === 'number'
-    && typeof candidate.summary.pending === 'number'
-    && !!candidate.pagination
-    && typeof candidate.pagination.total === 'number'
-    && typeof candidate.pagination.limit === 'number'
-    && typeof candidate.pagination.offset === 'number'
-}
+/* D022: 友だち残高の応答検査は friends-overview-guard.ts にある。 */
 
 function isMileageEarningRulesV6Overview(value: unknown): value is MileageEarningRulesV6Overview {
   if (!value || typeof value !== 'object') return false
@@ -140,7 +153,7 @@ const RULE_FILTERS: Array<{ key: RuleFilter; label: string }> = [
 
 const RULE_SORTS: Array<{ value: RuleSort; label: string }> = [
   { value: 'order', label: '決めた並び順' },
-  { value: 'granted', label: '付いた回数が多い順' },
+  { value: 'granted', label: '付いたマイルが多い順' },
   { value: 'name', label: '名前順' },
   { value: 'amount', label: 'マイルが多い順' },
 ]
@@ -149,6 +162,7 @@ const RULE_PAGE_SIZE = 8
 
 
 function MileagePageInner() {
+  const router = useRouter()
   const tab = useMergedTab(TABS, 'tab', 'balances')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
@@ -174,6 +188,9 @@ function MileagePageInner() {
   const [ruleActionError, setRuleActionError] = useState('')
   const [publishTarget, setPublishTarget] = useState<MileageEarningRuleV6 | null>(null)
   const [publishError, setPublishError] = useState('')
+  /** R296: まだ公開していない決めごとだけ消せる。運用済みは停止して残す。 */
+  const [deleteTarget, setDeleteTarget] = useState<MileageEarningRuleV6 | null>(null)
+  const [deleteError, setDeleteError] = useState('')
   const [savingRuleOrder, setSavingRuleOrder] = useState(false)
   const [ruleOrder, setRuleOrder] = useState<string[]>([])
   const [ruleOrderDirty, setRuleOrderDirty] = useState(false)
@@ -182,6 +199,20 @@ function MileagePageInner() {
   const [rulePage, setRulePage] = useState(1)
   const [tabCounts, setTabCounts] = useState<{ balances: number | null; rules: number | null; rewards: number | null }>({ balances: null, rules: null, rewards: null })
   const [canAdjustMileage, setCanAdjustMileage] = useState(false)
+  const [isOwner, setIsOwner] = useState(false)
+  /** R: 高額調整の承認待ち。依頼した人とは別のオーナーが決める。 */
+  const [approvalRequests, setApprovalRequests] = useState<MileageAdjustmentApprovalRequest[] | null>(null)
+  // M502: 承認待ちの取得失敗は黙って消さない。0 件と失敗を区別して出す。
+  const [approvalFailed, setApprovalFailed] = useState(false)
+  const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<MileageAdjustmentApprovalRequest | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [approvalError, setApprovalError] = useState('')
+  /** R: 決めごとの事前テスト。付与もキューも動かさず見通しだけ返す。 */
+  const [ruleTestTarget, setRuleTestTarget] = useState<MileageEarningRuleV6 | null>(null)
+  const [ruleTestResult, setRuleTestResult] = useState<MileageEarningRuleTestResult | null>(null)
+  const [ruleTestBusy, setRuleTestBusy] = useState(false)
+  const [ruleTestError, setRuleTestError] = useState('')
   /*
    * 並び順の未保存変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
    * 左メニュー・画面内リンク・戻る操作・再読込を同じ確認対話へ寄せる。
@@ -336,11 +367,70 @@ function MileagePageInner() {
     void api.staff.me().then((response) => {
       if (!current || !response.success) return
       setCanAdjustMileage(response.data.role === 'owner' || response.data.role === 'admin')
+      setIsOwner(response.data.role === 'owner')
     }).catch(() => {
       if (current) setCanAdjustMileage(false)
     })
     return () => { current = false }
   }, [])
+
+  const loadApprovalRequests = useCallback(async () => {
+    if (!selectedAccountId) {
+      setApprovalRequests(null)
+      setApprovalFailed(false)
+      return
+    }
+    try {
+      const response = await api.mileage.adjustmentApprovals(selectedAccountId, 'pending')
+      // M502: 失敗応答も失敗として残す。依頼 0 件と区別する。
+      setApprovalRequests(response.success ? response.data : null)
+      setApprovalFailed(!response.success)
+    } catch {
+      setApprovalRequests(null)
+      setApprovalFailed(true)
+    }
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    void loadApprovalRequests()
+  }, [loadApprovalRequests])
+
+  const runRuleTest = async (rule: MileageEarningRuleV6) => {
+    if (!selectedAccountId || ruleTestBusy) return
+    setRuleTestTarget(rule)
+    setRuleTestResult(null)
+    setRuleTestError('')
+    setRuleTestBusy(true)
+    try {
+      const response = await api.mileage.testEarningRule(selectedAccountId, rule.draft)
+      if (!response.success) throw new Error(response.error)
+      setRuleTestResult(response.data)
+    } catch (caught) {
+      setRuleTestError(caught instanceof Error ? caught.message : 'テストできませんでした。もう一度お試しください。')
+    } finally {
+      setRuleTestBusy(false)
+    }
+  }
+
+  const decideApproval = async (requestId: string, action: 'approve' | 'reject', reason?: string) => {
+    if (!selectedAccountId || approvalBusyId) return
+    setApprovalBusyId(requestId)
+    setApprovalError('')
+    try {
+      const response = action === 'approve'
+        ? await api.mileage.approveAdjustment(requestId, selectedAccountId)
+        : await api.mileage.rejectAdjustment(requestId, selectedAccountId, reason)
+      if (!response.success) throw new Error(response.error)
+      setRejectTarget(null)
+      setRejectReason('')
+      await loadApprovalRequests()
+      await loadOverview()
+    } catch (caught) {
+      setApprovalError(caught instanceof Error ? caught.message : '処理できませんでした。もう一度お試しください。')
+    } finally {
+      setApprovalBusyId(null)
+    }
+  }
 
   const toggleRule = async (rule: MileageEarningRuleV6) => {
     setSavingRuleId(rule.id)
@@ -351,6 +441,28 @@ function MileagePageInner() {
       await loadRules()
     } catch {
       setRuleActionError('たまる決めごとを更新できませんでした。もう一度お試しください。')
+    } finally {
+      setSavingRuleId(null)
+    }
+  }
+
+  /*
+   * R296: まだ公開したことがない決めごとだけ消せる。付与履歴があるものは
+   * 口が 409 で断るので、その文を確認窓にそのまま出す（運用済みは停止）。
+   */
+  const deleteRule = async (rule: MileageEarningRuleV6) => {
+    if (savingRuleId !== null) return
+    setSavingRuleId(rule.id)
+    setDeleteError('')
+    try {
+      const res = await api.mileage.deleteRule(rule.id)
+      if (!res.success) throw new Error(res.error)
+      setDeleteTarget(null)
+      await loadRules()
+    } catch (caught) {
+      setDeleteError(caught instanceof Error && caught.message && !/^API error/.test(caught.message)
+        ? caught.message
+        : '削除できませんでした。もう一度お試しください。')
     } finally {
       setSavingRuleId(null)
     }
@@ -435,12 +547,17 @@ function MileagePageInner() {
     if (!selectedAccountId || exportingRules) return
     setExportingRules(true)
     setRuleActionError('')
+    // M503: 応答の状態を残す。通信断（fetch が投げる）は null のまま。
+    let exportStatus: number | null = null
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/mileage/rules/export?accountId=${encodeURIComponent(selectedAccountId)}`,
         { credentials: 'include', headers: adminSessionHeaders() },
       )
-      if (!res.ok) throw new Error('export_failed')
+      if (!res.ok) {
+        exportStatus = res.status
+        throw new Error('export_failed')
+      }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -449,13 +566,17 @@ function MileagePageInner() {
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      setRuleActionError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
+      setRuleActionError(describeMileageCsvExportFailure(exportStatus))
     } finally {
       setExportingRules(false)
     }
   }
 
   const summary = overview?.summary
+  /* R383: 期限つきマイルが30日より先だけにあるときに添える次の失効日。 */
+  const nextExpiringLabel = summary?.nextExpiringAt
+    ? formatDay(new Date(summary.nextExpiringAt))
+    : null
   const members = overview?.items ?? []
   const activeRules = rules.filter((rule) => rule.published.status === 'published')
   const topRule = [...rules].sort((a, b) => grantedMiles30d(b) - grantedMiles30d(a))[0] ?? null
@@ -489,9 +610,10 @@ function MileagePageInner() {
   }
 
   return (
-    <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : tab === 'earning-rules' ? 'N46cQ' : tab === 'rewards' ? 'qlVLJ' : tab === 'history' ? 'MvZm5' : 'z3PB2'}>
-      <Breadcrumb items={[{ label: '成果と分析' }, { label: 'マイル' }, ...(tab === 'balances' ? [] : [{ label: TABS.find((item) => item.key === tab)?.label ?? 'マイル' }])]} className="mb-3" />
-      <div data-design="Tabs" data-tabs-row>
+    <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : tab === 'earning-rules' ? 'N46cQ' : tab === 'rewards' ? 'qlVLJ' : tab === 'history' ? 'MvZm5' : 'z3PB2'} className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <Breadcrumb items={[{ label: '成果と分析' }, { label: 'マイル' }, ...(tab === 'balances' ? [] : [{ label: TABS.find((item) => item.key === tab)?.label ?? 'マイル' }])]} />
+      <div data-design="Tabs">
         <MergedTabs
           basePath="/mileage"
           tabs={displayTabs}
@@ -505,27 +627,24 @@ function MileagePageInner() {
         />
       </div>
       {/*
-        #972 U030: 390pxではタブの並びが右端の操作ボタンに重なっていた。
-        共通タブの形は変えず、この画面のタブ行だけ「収まらないとき折り返す」
-        にする。収まる幅では1行のままで見た目は変わらない。
-        U040 の表の側の印（data-mileage-table）もここでまとめて面倒を見る。
+        #972 U040: 決めごとの表は列が多い。狭い幅では見出しが潰れて列と
+        値の対応が読めなくなるので、枠の内側で横に動かせるようにする。
+        主タブは横スクロール＋共通の狭幅対応に任せる（折り返しの上書きを
+        付けるとスクロールと衝突して語の途中で割れる）。
       */}
       <style>{`
-        [data-tabs-row] nav:has(> span) { height: auto; flex-wrap: wrap; row-gap: 8px; }
-        [data-tabs-row] nav:has(> span) > span { flex-wrap: wrap; row-gap: 0; }
-        [data-tabs-row] nav:has(> span) > span + span { margin-left: auto; }
-        /* U040: 決めごとの表は列が多い。狭い幅では見出しが潰れて列と
-           値の対応が読めなくなるので、枠の内側で横に動かせるようにする。 */
         [data-mileage-table] { overflow-x: auto; }
         [data-mileage-table] > table { min-width: 920px; }
       `}</style>
 
       {!selectedAccountId && !accountLoading ? (
-        <ListState
-          kind="empty"
-          title="LINEアカウントを選択してください"
-          description="友だちの残高は、共通トップバーで選んだLINEアカウントごとに表示します。"
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="LINEアカウントを選択してください"
+            description="友だちの残高は、共通トップバーで選んだLINEアカウントごとに表示します。"
+          />
+        </div>
       ) : <>
 
       {tab === 'balances' && loading ? (
@@ -546,22 +665,91 @@ function MileagePageInner() {
       ) : null}
 
       {tab === 'balances' && !loading && !loadError && <>
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard variant="v6" title="マイルを持っている友だち" value={summary?.withBalanceCount ?? null} unit="人" detail={summary ? `選択中 ${summary.totalMembers.toLocaleString('ja-JP')}人のうち` : '選択中のLINEアカウント'} />
-        <SummaryCard variant="v6" title="たまっているマイル" value={summary?.available ?? null} unit=" マイル" detail={`確定待ち ${summary?.pending.toLocaleString('ja-JP') ?? '—'} マイル`} />
-        <SummaryCard variant="v6" title="今月の増減" value={summary?.monthChange ?? null} unit=" マイル" detail="選択中の友だち全体" />
-        <SummaryCard
+      {/*
+        R: 承認境界以上の手動調整はここに依頼として残る。依頼した人とは
+        別のオーナーだけが承認・差し戻しできる（依頼票の staff id と
+        画面の担当者をサーバが突き合わせる）。
+      */}
+      {approvalRequests && approvalRequests.length > 0 ? (
+        <section className="overflow-hidden rounded-card border border-hairline bg-canvas" aria-label="承認待ちのマイル変更">
+          <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
+            <h2 className="text-base font-bold text-ink">承認待ちのマイル変更</h2>
+            <span className="text-xs text-ink-faint">{approvalRequests.length}件</span>
+          </div>
+          {approvalError ? <Notice tone="warn">{approvalError}</Notice> : null}
+          <ul className="divide-y divide-hairline">
+            {approvalRequests.map((request) => (
+              <li key={request.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink">
+                    {request.friend_display_name ?? request.friend_id} に
+                    {request.direction === 'increase' ? ' +' : ' −'}
+                    {formatNumber(request.amount)} マイル
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-ink-secondary" title={request.reason}>
+                    {request.reason}
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink-faint">
+                    依頼：{request.requested_by_staff_name} ・ {formatMileageDate(request.created_at)}
+                  </p>
+                </div>
+                {isOwner ? (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="primary"
+                      disabled={approvalBusyId !== null}
+                      onClick={() => void decideApproval(request.id, 'approve')}
+                    >承認する</Button>
+                    <Button
+                      variant="secondary"
+                      disabled={approvalBusyId !== null}
+                      onClick={() => { setRejectTarget(request); setRejectReason(''); setApprovalError('') }}
+                    >差し戻す</Button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-ink-faint">オーナーが対応します</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : approvalFailed ? (
+        /*
+         * M502: 承認待ちの取得失敗はこの欄で理由と取り直しを出す。
+         * 依頼 0 件（欄なし）と区別する。赤は使わない。
+         */
+        <section className="overflow-hidden rounded-card border border-hairline bg-canvas" aria-label="承認待ちのマイル変更">
+          <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
+            <h2 className="text-base font-bold text-ink">承認待ちのマイル変更</h2>
+          </div>
+          <div className="px-4 py-3">
+            <p className="text-sm text-ink-secondary">承認待ちを読み込めませんでした。依頼があるか分からない状態です。</p>
+            <Button onClick={() => void loadApprovalRequests()} className="mt-2">もう一度読み込む</Button>
+          </div>
+        </section>
+      ) : null}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard variant="v6" title="マイルを持っている友だち" value={summary?.withBalanceCount ?? null} unit="人" detail={summary ? `選択中 ${formatNumber(summary.totalMembers)}人のうち` : '選択中のLINEアカウント'} />
+        <KpiCard variant="v6" title="たまっているマイル" value={summary?.available ?? null} unit=" マイル" detail={`確定待ち ${formatNumber(summary?.pending) ?? '—'} マイル`} />
+        <KpiCard variant="v6" title="今月の増減" value={summary?.monthChange ?? null} unit=" マイル" detail="" help="選択中の友だち全体の増減です" />
+        <KpiCard
           variant="v6"
           title="もうすぐ消えるマイル"
           value={summary?.expiringMiles30d ?? null}
           unit=" マイル"
-          detail={summary?.expiringMiles30d == null ? '期限付きの付与記録はありません' : '30日以内に期限を迎える分'}
+          detail={summary?.expiringMiles30d == null
+            ? '期限付きの付与記録はありません'
+            // R383: 期限つきが30日より先だけにあるときは 0 と次の失効日を出し、
+            // 「期限付きなし（null）」と区別する。
+            : summary.expiringMiles30d === 0 && summary.nextExpiringAt
+              ? `30日以内の失効はありません（次は ${nextExpiringLabel}）`
+              : '30日以内に期限を迎える分'}
         />
       </div>
-      <NoteBar className="mb-4">
+      <NoteBar>
         友だちごとにたまっているマイルです。どうやってたまるかは「たまる決めごと」、何と交換できるかは「使い道」で決めます。
       </NoteBar>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <SearchField
           aria-label="友だちの名前で検索"
           value={searchInput}
@@ -580,33 +768,40 @@ function MileagePageInner() {
         <Button onClick={() => void reloadAll()}>残高を再読み込み</Button>
         <Button onClick={exportBalancesCsv} disabled={members.length === 0} className="ml-auto">この頁の残高をCSVで書き出す</Button>
       </div>
-      <div className="mb-4 flex flex-wrap items-center gap-2" aria-label="残高の絞り込み状況">
-        <span className="rounded-full border border-accent bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-hover">
-          すべて {overviewTotal === null ? '—' : formatMileageNumber(overviewTotal)}
+      {/*
+        #668: ここは人数の内訳で、絞り込みの口ではない。ピルの形
+        （rounded-pill + 枠）だと押せるチップに見えるので、押せない
+        事実は字だけの行として出す。「残高が多い順」も選べないので
+        「並び順：」の前置きで固定値だと分かる形にする。
+      */}
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs" aria-label="ランク別の人数">
+        <span className="text-ink font-semibold tabular-nums">
+          すべて {overviewTotal === null ? '—' : `${formatMileageNumber(overviewTotal)}名`}
         </span>
         {(summary?.rankCounts ?? []).map((rank) => (
-          <span key={rank.rewardId} className="rounded-full border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary">
-            {rank.rankName} {formatMileageNumber(rank.friendCount)}人
+          <span key={rank.rewardId} className="text-ink-secondary tabular-nums">
+            {rank.rankName} {formatMileageNumber(rank.friendCount)}名
           </span>
         ))}
-        {summary && summary.rankCounts.length === 0 ? <span className="rounded-full border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-faint">公開中のランクなし</span> : null}
-        <span className="rounded-full border border-status-warn bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep">
+        {summary && summary.rankCounts.length === 0 ? <span className="text-ink-faint">公開中のランクなし</span> : null}
+        <span className="text-status-warn-deep tabular-nums">
           30日以内に消える {summary?.expiringMiles30d == null ? '0' : formatMileageNumber(summary.expiringMiles30d)} マイル
         </span>
-        <span className="ml-auto rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary">
-          残高が多い順
+        <span className="text-ink-faint ml-auto">
+          並び順：残高が多い順
         </span>
       </div>
       </>}
 
-      {tab === 'earning-rules' && <div className="mb-6">
+      {tab === 'earning-rules' && <div className="flex flex-col gap-4">
         {/* 設計 N46cQ に本文見出しは無い。画面名はタブが持っているので、
             ここで見出しをもう一度書かない。 */}
-        {!loading && !loadError ? <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <SummaryCard variant="v6" title="動いている決めごと" value={activeRules.length} unit="つ" detail={`止めているもの ${rules.length - activeRules.length}つ`} />
-          <SummaryCard variant="v6" title="この30日で付いたマイル" value={ruleSummary?.grantedMiles ?? null} unit="マイル" detail={`のべ ${formatMileageNumber(ruleSummary?.grantedCount ?? 0)}回`} />
-          <SummaryCard variant="v6" title="いちばん付いている" value={topRule ? grantedMiles30d(topRule) : null} unit="マイル" detail={topRule ? `${topRule.draft.name}・${formatMileageNumber(topRule.metrics30d.granted)}回` : 'まだ付与記録はありません'} />
-          <SummaryCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={ruleSummary?.averageDenominator ? `残高0の人は除き、持っている人 ${formatMileageNumber(ruleSummary.averageDenominator)}人で割った数` : '残高がある人がいないため計算していません'} />
+        {!loading && !loadError ? <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <KpiCard variant="v6" title="動いている決めごと" value={activeRules.length} unit="つ" detail={`止めているもの ${rules.length - activeRules.length}つ`} />
+          <KpiCard variant="v6" title="この30日で付いたマイル" value={ruleSummary?.grantedMiles ?? null} unit="マイル" detail={`のべ ${formatMileageNumber(ruleSummary?.grantedCount ?? 0)}回`} />
+          <KpiCard variant="v6" title="いちばん付いている" value={topRule ? grantedMiles30d(topRule) : null} unit="マイル" detail={topRule ? `${topRule.draft.name}・${formatMileageNumber(topRule.metrics30d.granted)}回` : 'まだ付与記録はありません'} />
+          {/* MILEAGE-05: 分母の人数は計算と同じ口の値を見せる。数字そのものなので「？」へ移さない。 */}
+          <KpiCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={ruleSummary?.averageDenominator ? `残高0の人は除き、持っている人 ${formatMileageNumber(ruleSummary.averageDenominator)}人で割った数` : '残高がある人がいないため計算していません'} />
         </div> : null}
         <NoteBar>
           どんなことをしたら何マイル付けるかを決めます。付与数を変えると、変更後に起きた行動から新しい値を使います。
@@ -626,16 +821,18 @@ function MileagePageInner() {
             onRetry={() => void reloadAll()}
           />
         ) : rules.length === 0 ? (
-          <ListState
-            kind="empty"
-            title="まだ決めごとがありません"
-            description="どんなことをしたら何マイル付けるかを決めます。"
-            action={<Button href="/mileage/earning-rules/new" variant="primary">決めごとを作る</Button>}
-          />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="まだ決めごとがありません"
+              description="どんなことをしたら何マイル付けるかを決めます。"
+              action={<Button href="/mileage/earning-rules/new" variant="primary">＋ 決めごとを作る</Button>}
+            />
+          </div>
         ) : (
         <>
         <div
-          className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+          className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3"
         >
           <Button href="/mileage/earning-rules/new" variant="primary">決めごとをつくる</Button>
           <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
@@ -650,9 +847,7 @@ function MileagePageInner() {
           />
           <Button
             onClick={() => void saveRuleOrder()}
-            disabled={savingRuleOrder || !ruleOrderDirty || ruleFilters.length > 0 || ruleSort !== 'order'}
-          >
-            {savingRuleOrder ? '保存しています' : '並び順を保存'}
+            disabled={savingRuleOrder || !ruleOrderDirty || ruleFilters.length > 0 || ruleSort !== 'order'} busy={savingRuleOrder} busyLabel="保存しています">並び順を保存する
           </Button>
           <Button onClick={exportRulesCsv} disabled={shownRules.length === 0} className="ml-auto">
             CSVで書き出す
@@ -660,12 +855,10 @@ function MileagePageInner() {
         </div>
 
         {ruleActionError ? (
-          <p role="alert" className="border-status-danger bg-status-danger-soft text-status-danger mb-3 rounded-control border px-3 py-2 text-sm">
-            {ruleActionError}
-          </p>
+          <Notice tone="danger" message={ruleActionError} className="mb-3" />
         ) : null}
 
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {RULE_FILTERS.map((f) => (
             <FilterChip
               key={f.key}
@@ -683,11 +876,13 @@ function MileagePageInner() {
         </div>
 
         {shownRules.length === 0 ? (
-          <ListState
-            kind="empty"
-            title="絞り込みに合う決めごとがありません"
-            description="絞り込みの札を外すと表示されます。"
-          />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="絞り込みに合う決めごとがありません"
+              description="絞り込みの札を外すと表示されます。"
+            />
+          </div>
         ) : (
         <div className="bg-canvas rounded-card border-hairline overflow-hidden border" data-mileage-table="earning-rules">
           <table className="w-full table-fixed">
@@ -718,11 +913,31 @@ function MileagePageInner() {
                           ? `利用対象：条件 ${rule.draft.targetConditions.rules.length + (rule.draft.targetConditions.groups?.reduce((sum, group) => sum + group.rules.length, 0) ?? 0)}件・下書き v${rule.draftVersion}`
                           : `利用対象：すべての友だち・下書き v${rule.draftVersion}`}
                       </span>
-                      <details className="relative shrink-0 text-ink-secondary">
-                        <summary className="cursor-pointer font-semibold text-accent">公開版の中身を見る</summary>
-                        <p className="absolute left-0 top-full z-10 mt-1 w-72 rounded-control border border-hairline bg-canvas p-2 shadow-card" title={`${rule.published.name} / ${ruleEventLabel(rule.published.eventType, EVENT_LABELS)} / ${formatMileageNumber(rule.published.amount)}マイル`}>
-                          {rule.published.name}・{ruleEventLabel(rule.published.eventType, EVENT_LABELS)}・{formatMileageNumber(rule.published.amount)}マイル
-                        </p>
+                      {/*
+                        表の枠は横に動かせる（`overflow-x: auto`）ので、絶対位置の
+                        吹き出しは枠に切られる。開いた分は行の中でそのまま伸ばす。
+                      */}
+                      <details className="min-w-0 shrink-0 text-ink-secondary">
+                        {/*
+                          R297: 未公開の決めごとに「公開版」があるように見せない。
+                          公開済みだけ版番号と反映日時つきで、下書きと比較できる。
+                        */}
+                        <summary className="cursor-pointer font-semibold text-action">
+                          {rule.publishedVersion == null ? '下書きの内容を見る' : '公開版の中身を見る'}
+                        </summary>
+                        {rule.publishedVersion == null ? (
+                          <p className="mt-1 rounded-control border border-hairline bg-canvas p-2 shadow-card">
+                            {rule.draft.name}・{ruleEventLabel(rule.draft.eventType, EVENT_LABELS)}・{formatMileageNumber(rule.draft.amount)}マイル
+                            <span className="mt-1 block text-ink-faint">
+                              下書き v{rule.draftVersion}・{formatMileageDate(rule.draftUpdatedAt)} に保存・まだ公開版はありません
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="mt-1 rounded-control border border-hairline bg-canvas p-2 shadow-card" title={`${rule.published.name} / ${ruleEventLabel(rule.published.eventType, EVENT_LABELS)} / ${formatMileageNumber(rule.published.amount)}マイル`}>
+                            公開版 v{rule.publishedVersion}・{rule.published.name}・{ruleEventLabel(rule.published.eventType, EVENT_LABELS)}・{formatMileageNumber(rule.published.amount)}マイル
+                            <span className="mt-1 block text-ink-faint">{formatMileageDate(rule.published.updatedAt)} に反映</span>
+                          </p>
+                        )}
                       </details>
                     </div>
                   </td>
@@ -770,6 +985,19 @@ function MileagePageInner() {
                         onClose={() => setRuleMenuId(null)}
                         items={[
                           {
+                            id: 'edit',
+                            label: '下書きを編集',
+                            external: true,
+                            onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
+                          },
+                          {
+                            id: 'test',
+                            label: 'この内容をテスト',
+                            disabled: ruleTestBusy,
+                            disabledReason: 'テストを実行しています',
+                            onSelect: () => void runRuleTest(rule),
+                          },
+                          {
                             id: 'toggle',
                             label: rule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開',
                             disabled: savingRuleId === rule.id,
@@ -783,6 +1011,19 @@ function MileagePageInner() {
                             disabledReason: '別の決めごとを反映しています',
                             onSelect: () => { setPublishError(''); setPublishTarget(rule) },
                           },
+                          /*
+                            R296: 消せるのは公開前の下書きだけ。履歴のある運用済みは
+                            口が 409 で断るので、そこへは「停止」を選ばせる。
+                          */
+                          ...(rule.publishedVersion == null ? [{
+                            id: 'delete',
+                            label: 'この決めごとを削除する',
+                            tone: 'danger' as const,
+                            dividerBefore: true,
+                            disabled: savingRuleId !== null,
+                            disabledReason: 'ほかの操作を反映しています',
+                            onSelect: () => { setDeleteError(''); setDeleteTarget(rule) },
+                          }] : []),
                         ]}
                       />
                     </div>
@@ -794,7 +1035,7 @@ function MileagePageInner() {
         </div>
         )}
 
-        <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-semibold tabular-nums text-ink-faint">
             {shownRules.length === rules.length
               ? `決めごと ${rules.length}件のうち ${Math.min((rulePage - 1) * RULE_PAGE_SIZE + 1, shownRules.length)}〜${Math.min(rulePage * RULE_PAGE_SIZE, shownRules.length)}件を表示`
@@ -821,16 +1062,77 @@ function MileagePageInner() {
       />
 
       <ConfirmDialog
+        open={deleteTarget !== null}
+        title={deleteTarget ? `「${deleteTarget.draft.name}」を削除しますか？` : '決めごとを削除しますか？'}
+        description="まだ公開していない決めごとの下書きごと消えます。取り消せません。すでに動いている決めごとは、削除ではなく停止を選んでください。"
+        confirmLabel="削除する"
+        destructive
+        busy={deleteTarget !== null && savingRuleId === deleteTarget.id}
+        error={deleteError || undefined}
+        onCancel={() => { if (savingRuleId === null) setDeleteTarget(null) }}
+        onConfirm={() => { if (deleteTarget) void deleteRule(deleteTarget) }}
+      />
+
+      <Dialog
+        open={ruleTestTarget !== null}
+        title={ruleTestTarget ? `「${ruleTestTarget.draft.name}」をテスト` : '決めごとをテスト'}
+        description="この30日の記録に当てはめて、何人に・合計いくら付きそうかを見ます。実際には付与されず、履歴も増えません。"
+        confirmLabel="閉じる"
+        onConfirm={() => setRuleTestTarget(null)}
+        onCancel={() => setRuleTestTarget(null)}
+        busy={ruleTestBusy}
+      >
+        {ruleTestError ? (
+          <Notice tone="danger" message={ruleTestError} />
+        ) : ruleTestResult ? (
+          <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
+            <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">条件に合う行動</dt><dd className="col-span-2 text-ink">{formatMileageNumber(ruleTestResult.matchedEvents)}回</dd></div>
+            <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">対象になる友だち</dt><dd className="col-span-2 text-ink">{formatMileageNumber(ruleTestResult.matchedFriends)}人</dd></div>
+            <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">付与見込みの合計</dt><dd className="col-span-2 font-semibold text-ink">{formatMileageNumber(ruleTestResult.estimatedTotalMiles)} マイル</dd></div>
+            <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">1人あたり最大</dt><dd className="col-span-2 text-ink">{formatMileageNumber(ruleTestResult.maxPerFriend)} マイル</dd></div>
+            <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">付いた直後の状態</dt><dd className="col-span-2 text-ink">{ruleTestResult.initialStatus === 'pending' ? '確定待ち' : 'すぐ使える'}</dd></div>
+            <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">失効の例</dt><dd className="col-span-2 text-ink">{ruleTestResult.expirationExampleAt ? formatMileageDate(ruleTestResult.expirationExampleAt) : '失効なし'}</dd></div>
+            {ruleTestResult.overlappingRuleNames.length > 0 ? (
+              <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">同じきっかけの決めごと</dt><dd className="col-span-2 text-ink">{ruleTestResult.overlappingRuleNames.join('、')}</dd></div>
+            ) : null}
+          </dl>
+        ) : (
+          <ListState kind="loading" title="テストしています" description="実際の付与は行いません。" />
+        )}
+      </Dialog>
+
+      <Dialog
+        open={rejectTarget !== null}
+        title="この変更依頼を差し戻しますか？"
+        description={rejectTarget ? `${rejectTarget.friend_display_name ?? rejectTarget.friend_id} への変更は行われず、台帳は変わりません。` : undefined}
+        tone="destructive"
+        confirmLabel="差し戻す"
+        cancelLabel="キャンセル"
+        busy={approvalBusyId !== null}
+        error={approvalError || undefined}
+        onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}
+        onConfirm={() => { if (rejectTarget) void decideApproval(rejectTarget.id, 'reject', rejectReason.trim() || undefined) }}
+      >
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-semibold text-ink">差し戻す理由</span>
+          <textarea
+            className="min-h-20 rounded-mini border border-hairline px-3 py-2 text-sm"
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            placeholder="例：調整の根拠となる資料を確認できませんでした"
+          />
+        </label>
+      </Dialog>
+
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、たまる決めごとの並び順への変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
+        subject="たまる決めごとの並び順への変更"
+        busy={savingRuleOrder}
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
 
-      {tab === 'history' && selectedAccountId ? <MileageHistoryTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
+      {tab === 'history' && selectedAccountId ? <MileageHistoryTab key={selectedAccountId} accountId={selectedAccountId} canOperate={canAdjustMileage} /> : null}
 
       {tab === 'rewards' ? <MileageRewardsTab key={selectedAccountId ?? 'none'} accountId={selectedAccountId} /> : null}
       {tab === 'score' && selectedAccountId ? <ActionScoreTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
@@ -860,14 +1162,14 @@ function MileagePageInner() {
                         <p className="mt-0.5 truncate text-xs text-ink-faint" title={member.lineAccount.name}>{member.lineAccount.name}</p>
                       </div>
                       <p className="shrink-0 text-right">
-                        <span className="block font-bold tabular-nums text-accent-hover">{formatMileageNumber(member.available)}<span className="text-xs font-normal text-ink-faint"> マイル</span></span>
-                        {member.pending > 0 && <span className="block text-[10px] text-warning">保留 {formatMileageNumber(member.pending)}</span>}
+                        <span className="block font-semibold tabular-nums text-ink">{formatMileageNumber(member.available)}<span className="text-xs font-normal text-ink-faint"> マイル</span></span>
+                        {member.pending > 0 && <span className="block text-micro text-status-warn-deep">保留 {formatMileageNumber(member.pending)}</span>}
                       </p>
                     </div>
                     <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-secondary">
                       <div><dt className="inline text-ink-faint">ランク：</dt><dd className="inline" title={member.rankReason}>{displayRank ?? '未設定'}</dd></div>
-                      <div><dt className="inline text-ink-faint">今月の増減：</dt><dd className={`inline font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-hover'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</dd></div>
-                      <div><dt className="inline text-ink-faint">消える予定：</dt><dd className="inline">{member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}</dd></div>
+                      <div><dt className="inline text-ink-faint">今月の増減：</dt><dd className={`inline font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-ink'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</dd></div>
+                      <div><dt className="inline text-ink-faint">消える予定：</dt><dd className="inline">{expiringLabel(member)}</dd></div>
                       <div><dt className="inline text-ink-faint">最終変動：</dt><dd className="inline">{formatMileageDate(member.lastChangedAt)}</dd></div>
                     </dl>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -886,27 +1188,27 @@ function MileagePageInner() {
                   <Th className="w-1/12">ランク</Th>
                   <Th className="w-1/12" align="right">いまの残高</Th>
                   <Th className="w-1/12" align="right">今月の増減</Th>
-                  <Th className="w-1/12">消える予定</Th>
+                  <Th className="w-1/6">消える予定（マイル）</Th>
                   <Th className="w-1/6">最終行動</Th>
                   <Th className="w-1/6" align="right">操作</Th>
                 </TableHeadRow>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-hairline divide-y">
                 {members.map((member) => {
                   const displayRank = rankLabel(member.rank)
                   return (
-                    <tr key={member.friendId} className="hover:bg-gray-50/70">
+                    <tr key={member.friendId} className="hover:bg-canvas-sunken">
                       <td className="px-4 py-3">
                         <p className="truncate text-sm font-semibold text-ink" title={member.displayName}>{member.displayName}</p>
                         <p className="mt-1 truncate text-xs text-ink-faint" title={member.lineAccount.name}>{member.lineAccount.name}</p>
                       </td>
                       <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={member.rankReason}>{displayRank ?? <><span>—</span><span className="ml-1 text-xs text-ink-faint">未設定</span></>}</p></td>
                       <td className="px-4 py-4 text-right">
-                        <p className="font-bold text-accent-hover">{formatMileageNumber(member.available)}</p>
-                        {member.pending > 0 && <p className="text-[10px] text-amber-600">保留 {formatMileageNumber(member.pending)}</p>}
+                        <p className="font-bold text-ink">{formatMileageNumber(member.available)}</p>
+                        {member.pending > 0 && <p className="text-micro text-status-warn-deep">保留 {formatMileageNumber(member.pending)}</p>}
                       </td>
-                      <td className={`px-4 py-4 text-right text-sm font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-hover'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</td>
-                      <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}>{member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}</p></td>
+                      <td className={`px-4 py-4 text-right text-sm font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-ink'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</td>
+                      <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={expiringLabel(member)}>{expiringLabel(member)}</p></td>
                       <td className="px-4 py-4 text-xs text-ink-secondary">{formatMileageDate(member.lastChangedAt)}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
@@ -924,8 +1226,8 @@ function MileagePageInner() {
         )}
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3">
-            <span className="text-xs text-gray-500">
+          <div className="flex items-center justify-between border-t border-hairline px-5 py-3">
+            <span className="text-xs text-ink-faint">
               {overviewTotal === null
                 ? '表示件数は未取得'
                 : `${formatMileageNumber(overviewTotal)}人中 ${formatMileageNumber(offset + 1)}〜${formatMileageNumber(Math.min(offset + members.length, overviewTotal))}人を表示`}

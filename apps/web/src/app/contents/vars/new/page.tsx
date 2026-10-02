@@ -1,17 +1,21 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
-import { useEffect, useRef, useState } from 'react'
+import DateField from '@/components/shared/date-field'
+import DateTimeField from '@/components/shared/date-time-field'
+import Select from '@/components/shared/select'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
-import { commonVarValueError, COMMON_VAR_VALUE_REQUIRED } from '@/lib/common-vars'
+import { commonVarValueError, COMMON_VAR_VALUE_REQUIRED, isSecretLikeVarValue } from '@/lib/common-vars'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import RadioCard from '@/components/shared/radio-card'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 
 /**
@@ -167,6 +171,9 @@ function NewCommonVarInner() {
   const [fallbackValue, setFallbackValue] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /** R36: 直し方は欄のすぐ下にも出す。全体の失敗文だけではどの欄か分からない。 */
+  const [valueFieldError, setValueFieldError] = useState('')
+  const [fallbackFieldError, setFallbackFieldError] = useState('')
   const [secretWarningFields, setSecretWarningFields] = useState<string[] | null>(null)
   const valueRef = useRef<HTMLInputElement>(null)
   const longValueRef = useRef<HTMLTextAreaElement>(null)
@@ -177,16 +184,30 @@ function NewCommonVarInner() {
   // 登録しないため）。
   const boundAccountRef = useRef(selectedAccountId)
 
-  useEffect(() => {
-    void api.folders
-      .list('common_var')
-      .then((res) => {
-        if (res.success) setFolders(res.data)
-      })
-      .catch(() => {
-        // フォルダが読めなくても登録はできる（未分類になる）。
-      })
+  /**
+   * R593: フォルダの一覧は独立した取得状態にする。失敗を黙って握りつぶすと
+   * 503でも正常な0件と同じ「未分類だけ」になり、失敗と気づけない。
+   * 失敗を明示して再試行を付け、未分類のまま登録できることを伝える。
+   */
+  const [foldersError, setFoldersError] = useState(false)
+  const loadFolders = useCallback(async () => {
+    try {
+      const res = await api.folders.list('common_var')
+      if (res.success) {
+        setFolders(res.data)
+        setFoldersError(false)
+      } else {
+        setFoldersError(true)
+      }
+    } catch {
+      // フォルダが読めなくても登録はできる（未分類になる）。
+      setFoldersError(true)
+    }
   }, [])
+
+  useEffect(() => {
+    void loadFolders()
+  }, [loadFolders])
 
   useEffect(() => {
     if (selectedAccountId === boundAccountRef.current) return
@@ -213,6 +234,27 @@ function NewCommonVarInner() {
     if (secretWarningFields) secretWarningRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [secretWarningFields])
 
+  /**
+   * R594: 値・代替値の入力エラーは、欄の下と画面下部の両方に出る。
+   * 直したら両方消す。欄の下だけ消すと、直ったのに画面下部で
+   * 怒られているように見える。画面下部の一文は、値の入力エラーと
+   * 同じ文のときだけ一緒に消す（別の失敗文は残す）。
+   */
+  const valueErrorMessageRef = useRef('')
+  const fallbackErrorMessageRef = useRef('')
+  useEffect(() => {
+    setValueFieldError('')
+    const message = valueErrorMessageRef.current
+    valueErrorMessageRef.current = ''
+    if (message) setError((current) => (current === message ? '' : current))
+  }, [value, type])
+  useEffect(() => {
+    setFallbackFieldError('')
+    const message = fallbackErrorMessageRef.current
+    fallbackErrorMessageRef.current = ''
+    if (message) setError((current) => (current === message ? '' : current))
+  }, [fallbackValue, type])
+
   /*
    * 入力中に画面の外へ出る操作を止める（VAR-01 監査）。リッチメニュー・
    * ウェビナーと同じ `useUnsavedGuard`＋確認ダイアログの形で、一覧リンク・
@@ -232,7 +274,7 @@ function NewCommonVarInner() {
   // 種別は内部stateからのみ選ぶが、見つからないときは先頭へ倒す（非null断言を使わない）。
   const spec = TYPES.find((t) => t.key === type) ?? TYPES[0]
 
-  const save = async (allowSensitive = false) => {
+  const save = async (allowSensitive = false, asDraft = false) => {
     if (saving) return
     if (!selectedAccountId) {
       setError('LINEアカウントを選択してください')
@@ -255,9 +297,13 @@ function NewCommonVarInner() {
     }
     // VAR-06: 空欄不可の種別（真偽・年月日・日時）や形式違いは、APIを呼ぶ
     // 前に理由を出して値の欄へ戻す。400を一律の失敗文へ置き換えない。
+    // 理由は欄のすぐ下にも出す（R36）。
     const valueError = commonVarValueError(type, value)
     if (valueError) {
       setError(valueError)
+      setValueFieldError(valueError)
+      // R594: 直したら画面下部の一文も一緒に消せるよう、文を覚える。
+      valueErrorMessageRef.current = valueError
       focusField('cv-value')
       return
     }
@@ -274,9 +320,31 @@ function NewCommonVarInner() {
       const fallbackError = commonVarValueError(type, fallbackValue, '代替値')
       if (fallbackError) {
         setError(fallbackError)
+        setFallbackFieldError(fallbackError)
+        fallbackErrorMessageRef.current = fallbackError
         focusField('cv-fallback-value')
         return
       }
+    }
+    // Q: 鍵の形・長い乱数はサーバでも422で止まる。確認を通しても保存できない
+    // ものはここで止め、理由を欄のすぐ下へ出す。
+    const secretField = isSecretLikeVarValue(value)
+      ? 'cv-value'
+      : expiryBehavior === 'fallback' && isSecretLikeVarValue(fallbackValue)
+        ? 'cv-fallback-value'
+        : null
+    if (secretField) {
+      const message = '鍵やトークンのような秘密の値は共通情報に保存できません。外部連携の設定へ登録してください'
+      setError(message)
+      if (secretField === 'cv-value') {
+        setValueFieldError(message)
+        valueErrorMessageRef.current = message
+      } else {
+        setFallbackFieldError(message)
+        fallbackErrorMessageRef.current = message
+      }
+      focusField(secretField)
+      return
     }
     const sensitiveFields = sensitiveFieldLabels(value, memo)
     if (sensitiveFields.length > 0 && !allowSensitive) {
@@ -300,11 +368,21 @@ function NewCommonVarInner() {
         validUntil: validUntil || null,
         expiryBehavior,
         fallbackValue: expiryBehavior === 'fallback' ? fallbackValue : null,
+        status: asDraft ? 'draft' as const : 'active' as const,
       }
       const res = await api.commonVars.create(payload)
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setError(res.error)
+        // 口で止まった理由も欄のすぐ下に映す（R36）。
+        const target = focusTargetForReason(res.error)
+        if (target === 'cv-value') {
+          setValueFieldError(res.error)
+          valueErrorMessageRef.current = res.error
+        } else if (target === 'cv-fallback-value') {
+          setFallbackFieldError(res.error)
+          fallbackErrorMessageRef.current = res.error
+        }
         return
       }
       router.push('/contents/vars')
@@ -319,6 +397,13 @@ function NewCommonVarInner() {
         if (e instanceof ApiError && (e.status === 400 || e.status === 422)) {
           const target = e.status === 422 ? 'cv-key' : focusTargetForReason(e.message)
           if (target) focusField(target)
+          if (target === 'cv-value') {
+            setValueFieldError(e.message)
+            valueErrorMessageRef.current = e.message
+          } else if (target === 'cv-fallback-value') {
+            setFallbackFieldError(e.message)
+            fallbackErrorMessageRef.current = e.message
+          }
         }
       }
     } finally {
@@ -327,29 +412,41 @@ function NewCommonVarInner() {
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {!accountLoading && !selectedAccountId && (
-        <div className="bg-warning-bg text-warning mb-4 max-w-3xl rounded-card p-4 text-sm">
-          共通情報を登録するLINEアカウントを選択してください。
-        </div>
+        <Notice tone="warn" message="共通情報を登録するLINEアカウントを選択してください。" className="mb-4" />
       )}
-      <nav className="text-ink-faint mb-3 text-xs">
-        <Link href="/contents/vars" className="text-info hover:underline">
+      <nav className="text-ink-faint text-xs">
+        <Link href="/contents/vars" className="text-info underline">
           共通情報一覧
         </Link>
         <span className="mx-1.5">›</span>
         <span>共通情報登録</span>
       </nav>
 
-      <div className="bg-canvas rounded-card border-hairline max-w-3xl space-y-6 border p-6">
-        <div className="bg-warning-bg text-warning rounded-control border border-current/20 p-4 text-sm" role="note">
+      {/* ★V7: ほかの新規画面と同じ「本体＋右の案内」の2列にする。右の文は画面内の既存の文だけを使う。注意は入力より先に読ませる（読み上げ順もこの順）。 */}
+      <div className="grid items-start gap-4 xl:grid-cols-3">
+      <aside className="space-y-4 xl:col-start-3 xl:row-start-1" aria-label="登録の案内">
+        <Notice tone="warn">
           <p className="font-semibold">秘密値は保存しないでください</p>
           <p className="mt-1 leading-relaxed">
             パスワード、APIトークン、秘密鍵などは共通情報に入力しないでください。
             配信文へ誤って差し込まれるおそれがあります。
           </p>
-        </div>
-
+        </Notice>
+        <section className="bg-canvas rounded-card border-hairline border p-4">
+          <h2 className="text-ink text-sm font-bold">差し込み名の決めかた</h2>
+          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+            半角の英小文字で始め、英小文字・数字・下線だけ、32文字まで。テンプレートには差し込み名で書きます。
+          </p>
+          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+            <strong>あとから変えられません。</strong>
+            変えるとテンプレートの差し込みが空になるためです。
+          </p>
+        </section>
+      </aside>
+      <div className="bg-canvas rounded-card border-hairline min-w-0 space-y-6 border p-6 xl:col-span-2 xl:col-start-1 xl:row-start-1">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="cv-name" className="text-ink-secondary mb-1 block text-sm font-medium">
@@ -365,7 +462,7 @@ function NewCommonVarInner() {
                 if (!keyTouched) setVarKey(suggestKey(e.target.value))
               }}
               placeholder="営業時間、予約受付人数、連絡先、店のオープン日"
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
             />
             <p className="text-ink-faint mt-1 text-right text-xs tabular-nums">
               {name.length}/{NAME_MAX}
@@ -376,12 +473,28 @@ function NewCommonVarInner() {
             <label htmlFor="cv-folder" className="text-ink-secondary mb-1 block text-sm font-medium">
               フォルダ
             </label>
-            <SelectField
+            <Select
+              aria-label="フォルダ"
               id="cv-folder"
               value={folderId}
-              onChange={(e) => setFolderId(e.target.value)}
+              onChange={(value) => setFolderId(value)}
               options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
             />
+            {/*
+              R593: 一覧が読めなくても「未分類だけ」とは言わない。失敗と
+              再試行を欄の下に出し、未分類のまま登録を続けられることと、
+              その影響（未分類で登録される）を伝える。赤は使わない。
+            */}
+            {foldersError ? (
+              <div className="mt-1 space-y-1" data-folders-state="error">
+                <p className="text-ink-secondary text-xs">
+                  フォルダの一覧を読み込めませんでした。未分類のまま登録できます。
+                </p>
+                <Button type="button" onClick={() => void loadFolders()}>
+                  再読み込み
+                </Button>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -391,37 +504,36 @@ function NewCommonVarInner() {
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="cv-valid-from" className="text-ink-secondary mb-1 block text-xs font-medium">有効開始</label>
-              <input id="cv-valid-from" type="datetime-local" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+              <DateTimeField id="cv-valid-from" value={validFrom} onChange={setValidFrom} />
             </div>
             <div>
               <label htmlFor="cv-valid-until" className="text-ink-secondary mb-1 block text-xs font-medium">有効終了</label>
-              <input id="cv-valid-until" type="datetime-local" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+              <DateTimeField id="cv-valid-until" value={validUntil} onChange={setValidUntil} />
             </div>
           </div>
           <div>
             <label htmlFor="cv-expiry-behavior" className="text-ink-secondary mb-1 block text-xs font-medium">期間外の動作</label>
-            <SelectField id="cv-expiry-behavior" value={expiryBehavior} onChange={(e) => setExpiryBehavior(e.target.value as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} className="w-full" />
+            <Select size="full" aria-label="期間外の動作" id="cv-expiry-behavior" value={expiryBehavior} onChange={(value) => setExpiryBehavior(value as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
           </div>
           {expiryBehavior === 'fallback' && (
             <div>
               <label htmlFor="cv-fallback-value" className="text-ink-secondary mb-1 block text-xs font-medium">代替値</label>
               {type === 'boolean' ? (
-                <SelectField
-                  id="cv-fallback-value"
-                  value={fallbackValue}
-                  onChange={(e) => setFallbackValue(e.target.value)}
-                  options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
-                  className="w-full"
-                />
+                <Select size="full" aria-label="代替値" id="cv-fallback-value" value={fallbackValue} onChange={(value) => setFallbackValue(value)} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
+              ) : type === 'date' ? (
+                <DateField id="cv-fallback-value" value={fallbackValue} onChange={setFallbackValue} />
+              ) : type === 'datetime' ? (
+                <DateTimeField id="cv-fallback-value" value={fallbackValue} onChange={setFallbackValue} />
               ) : (
                 <input
                   id="cv-fallback-value"
-                  type={type === 'number' ? 'number' : type === 'date' ? 'date' : type === 'datetime' ? 'datetime-local' : 'text'}
+                  type={type === 'number' ? 'number' : 'text'}
                   value={fallbackValue}
                   onChange={(e) => setFallbackValue(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
                 />
               )}
+              {fallbackFieldError ? <p className="text-danger mt-1 text-xs">{fallbackFieldError}</p> : null}
             </div>
           )}
         </fieldset>
@@ -439,7 +551,7 @@ function NewCommonVarInner() {
               setVarKey(e.target.value)
             }}
             placeholder="shop_hours"
-            className="border-hairline rounded-control focus:ring-accent w-full max-w-sm border px-3 py-2 font-mono text-sm focus:ring-2 focus:outline-none"
+            className="border-hairline rounded-control w-full max-w-sm border px-3 py-2 font-mono text-sm"
           />
           <p className="text-ink-faint mt-1 text-xs leading-relaxed">
             半角の英小文字で始め、英小文字・数字・下線だけ、32文字まで。
@@ -447,7 +559,7 @@ function NewCommonVarInner() {
               <>
                 <br />
                 テンプレートには{' '}
-                <code className="bg-canvas-sunken rounded px-1">{`{{var.${varKey}}}`}</code>{' '}
+                <code className="bg-canvas-sunken rounded-mini px-1">{`{{var.${varKey}}}`}</code>{' '}
                 と書きます。
               </>
             )}
@@ -464,36 +576,28 @@ function NewCommonVarInner() {
           </legend>
           <div className="max-w-xl space-y-2">
             {TYPES.map((t) => (
-              <label
+              <RadioCard
                 key={t.key}
-                className={`rounded-control flex cursor-pointer items-center gap-3 border p-3 transition-colors ${
-                  type === t.key
-                    ? 'border-accent bg-accent-soft'
-                    : 'border-hairline hover:bg-canvas-sunken'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="cv-type"
-                  value={t.key}
-                  checked={type === t.key}
-                  onChange={() => {
-                    setType(t.key)
-                    setValue('')
-                  }}
-                  className="accent-green-500"
-                />
-                <span
-                  className="bg-canvas border-hairline text-ink-secondary flex h-8 w-11 shrink-0 items-center justify-center rounded border text-xs"
-                  aria-hidden="true"
-                >
-                  {t.mark}
-                </span>
-                <span className="min-w-0">
-                  <span className="text-ink block text-sm font-medium">{t.label}</span>
-                  <span className="text-ink-faint block text-xs">{t.note}</span>
-                </span>
-              </label>
+                name="cv-type"
+                value={t.key}
+                checked={type === t.key}
+                onChange={() => {
+                  setType(t.key)
+                  setValue('')
+                }}
+                title={t.label}
+                note={
+                  <>
+                    <span
+                      className="bg-canvas border-hairline text-ink-secondary mr-2 inline-flex h-8 w-11 items-center justify-center rounded-mini border text-xs"
+                      aria-hidden="true"
+                    >
+                      {t.mark}
+                    </span>
+                    {t.note}
+                  </>
+                }
+              />
             ))}
           </div>
         </fieldset>
@@ -502,7 +606,7 @@ function NewCommonVarInner() {
           <label htmlFor="cv-value" className="text-ink-secondary mb-1 block text-sm font-medium">
             値 {COMMON_VAR_VALUE_REQUIRED.has(type) && <span className="text-danger">*</span>}
           </label>
-          {type === 'boolean' ? <SelectField id="cv-value" value={value} onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} className="w-full max-w-md" /> : type === 'long_text' ? <textarea
+          {type === 'boolean' ? <Select size="full" aria-label="値" id="cv-value" value={value} onChange={(value) => { setValue(value); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} className="max-w-md" /> : type === 'long_text' ? <textarea
             ref={longValueRef}
             id="cv-value"
             maxLength={10000}
@@ -512,17 +616,30 @@ function NewCommonVarInner() {
               setSecretWarningFields(null)
             }}
             placeholder={spec.placeholder}
-            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
-          /> : <input
+            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
+          /> : type === 'date' ? (
+            <DateField
+              id="cv-value"
+              value={value}
+              onChange={(v) => { setValue(v); setSecretWarningFields(null) }}
+            />
+          ) : type === 'datetime' ? (
+            <DateTimeField
+              id="cv-value"
+              value={value}
+              onChange={(v) => { setValue(v); setSecretWarningFields(null) }}
+            />
+          ) : <input
             ref={valueRef}
             id="cv-value"
-            type={type === 'number' ? 'number' : type === 'date' ? 'date' : type === 'datetime' ? 'datetime-local' : 'text'}
+            type={type === 'number' ? 'number' : 'text'}
             maxLength={type === 'number' ? undefined : VALUE_MAX}
             value={value}
             onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }}
             placeholder={spec.placeholder}
-            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
+            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
           />}
+          {valueFieldError ? <p className="text-danger mt-1 max-w-md text-xs">{valueFieldError}</p> : null}
           {type !== 'number' && type !== 'boolean' && (
             <p className="text-ink-faint mt-1 max-w-md text-right text-xs tabular-nums">
               {value.length}/{type === 'long_text' ? 10000 : VALUE_MAX}
@@ -593,27 +710,23 @@ function NewCommonVarInner() {
 
         {error && <p className="text-danger text-sm" role="alert">{error}</p>}
       </div>
+      </div>
 
       <StickyBar
         actions={(
           <>
             <Button href="/contents/vars">共通情報一覧へ戻る</Button>
-            <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>
-              {saving ? '登録中…' : '登録'}
+            {/* Q: まだ配信へ出したくないものは下書きで残せる。下書きは差し込みに使われない。 */}
+            <Button type="button" disabled={saving} onClick={() => void save(false, true)}>
+              下書きを保存する
+            </Button>
+            <Button type="button" variant="primary" disabled={saving} onClick={() => void save()} busy={saving} busyLabel="登録中…">登録する
             </Button>
           </>
         )}
       />
 
-      <ConfirmDialog
-        open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、入力した共通情報は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した共通情報" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Disclosure from '@/components/shared/disclosure'
+import Select from '@/components/shared/select'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   api,
@@ -12,6 +13,8 @@ import {
   type ConversionValueMode,
 } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
   CalendarCheck,
   ClipboardCheck,
@@ -29,8 +32,14 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import ConditionBuilder, { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder'
+import type { SegmentCondition } from '@/lib/segment-condition'
+import { originInfoOf } from '../origin-labels'
 import { useAccount } from '@/contexts/account-context'
 import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 成果地点を作る（設計 V6 19-1-B）。
@@ -66,6 +75,17 @@ const TRIGGER_CHOICES: TriggerChoice[] = [
   { value: 'video', label: '動画を見終えた', note: 'ウェビナー', eventType: 'webinar_completed', measureMethod: 'webhook', icon: Video, connected: true },
   { value: 'tag', label: 'タグが付いた', note: '友だち属性', eventType: 'tag_added', measureMethod: 'webhook', icon: Tag, connected: true },
 ]
+
+/**
+ * 金額の出し方の表示名。選択肢は対応表(origin-labels)の valueModes
+ * から作り、ここでは名前だけを持つ。起点に金額が無いものは 'source'
+ * を選択肢に出さない。
+ */
+const VALUE_MODE_LABELS: Record<ConversionValueMode, string> = {
+  source: '注文の金額をそのまま使う',
+  fixed: '決まった額を使う',
+  none: '金額を集計しない',
+}
 
 /**
  * 「使う場所」の種類(N-258)。
@@ -148,15 +168,26 @@ export default function NewConversionPointPage() {
   const [eventType, setEventType] = useState('ec_order_confirmed')
   const [value, setValue] = useState('')
   const [valueMode, setValueMode] = useState<ConversionValueMode>('source')
+  // 起点切替で金額の出し方を戻したときの知らせ。自分で選び直したら消える。
+  const [valueModeNotice, setValueModeNotice] = useState<string | null>(null)
   const [measureMethod, setMeasureMethod] = useState<'url_reach' | 'webhook'>('webhook')
   const [targetUrl, setTargetUrl] = useState('')
-  const [excludedCondition, setExcludedCondition] = useState('')
+  // R40: 自由文のメモと実効する除外条件を分ける。条件は共通の条件部品で
+  // 選び、試算・記録の両方に効く。メモは数え方に影響しない。
+  const [exclusion, setExclusion] = useState<SegmentCondition | null>(null)
+  const [exclusionMemo, setExclusionMemo] = useState('')
   const [deduplicationMode, setDeduplicationMode] = useState<ConversionDeduplicationMode>('once_per_friend')
   const [reversalPolicy, setReversalPolicy] = useState<ConversionReversalPolicy>('source_cancelled')
   const [attributionDays, setAttributionDays] = useState('')
   /** N-268: チェックすると下書きで保存し、公開するまで計測しない。 */
   const [saveAsDraft, setSaveAsDraft] = useState(false)
   const [points, setPoints] = useState<ConversionPoint[]>([])
+  /**
+   * R597: 同名判定のもと（`GET /api/conversions/points`）が読めないとき、
+   * 黙って空として扱うと同名警告が消え、未確認のまま作れてしまう。
+   * 失敗を残し、名前欄の下で失敗と再試行を出す。
+   */
+  const [pointsFailed, setPointsFailed] = useState(false)
   const [usageKinds, setUsageKinds] = useState<Record<UsageGroupKind, UsageKindResult>>(EMPTY_USAGE_KINDS)
   const [selectedUsageKeys, setSelectedUsageKeys] = useState<Set<string>>(new Set())
   const [preview, setPreview] = useState<ConversionDefinitionPreview | null>(null)
@@ -165,15 +196,22 @@ export default function NewConversionPointPage() {
   const previewRequests = useRef(createLatestPreviewRequestGate())
 
   // 右の「同種の成果地点」に要る。作る前に、似たものが既にあるか分かるように。
-  useEffect(() => {
-    let cancelled = false
+  // R597: 読めないときは握りつぶさず失敗を残す。再試行はこの関数を呼ぶ。
+  const requestPoints = useCallback(() => {
+    setPointsFailed(false)
     void api.conversions.points().then((response) => {
-      if (!cancelled && response.success) setPoints(response.data)
-    }).catch(() => undefined)
-    return () => {
-      cancelled = true
-    }
+      if (response.success) {
+        setPoints(response.data)
+        setPointsFailed(false)
+      } else {
+        setPointsFailed(true)
+      }
+    }).catch(() => setPointsFailed(true))
   }, [])
+
+  useEffect(() => {
+    requestPoints()
+  }, [requestPoints])
 
   /*
    * 集計対象アカウントは画面上部の選択に固定する(DETAIL-17)。
@@ -249,6 +287,8 @@ export default function NewConversionPointPage() {
   }, [name, points, lineAccountId])
 
   const yen = value ? Number(value) : null
+  // R41: 起点ごとの名前・対象・金額の説明は対応表から引く。
+  const origin = originInfoOf(eventType)
 
   useEffect(() => {
     if (!lineAccountId) return
@@ -259,7 +299,11 @@ export default function NewConversionPointPage() {
       setPreviewFailed(false)
       void api.conversions.previewDefinition({
         sourceType: eventType,
-        sourceConfig: { triggerKind, excludedCondition: excludedCondition.trim() || null },
+        sourceConfig: {
+          triggerKind,
+          exclusion: pruneCondition(exclusion),
+          exclusionMemo: exclusionMemo.trim() || null,
+        },
         targetUrl: measureMethod === 'url_reach' ? targetUrl.trim() : null,
         lineAccountId,
         deduplicationMode,
@@ -281,7 +325,7 @@ export default function NewConversionPointPage() {
       window.clearTimeout(timer)
       request?.abort()
     }
-  }, [deduplicationMode, eventType, excludedCondition, lineAccountId, measureMethod, reversalPolicy, targetUrl, triggerKind, valueMode, yen])
+  }, [deduplicationMode, eventType, exclusion, exclusionMemo, lineAccountId, measureMethod, reversalPolicy, targetUrl, triggerKind, valueMode, yen])
 
   const toggleUsage = (target: UsageTarget) => {
     setSelectedUsageKeys((current) => {
@@ -295,20 +339,46 @@ export default function NewConversionPointPage() {
 
   const selectTrigger = (choice: TriggerChoice) => {
     if (!choice.connected) return
+    // 起点に金額が無いもの(タグ・フォーム・予約・ページ・動画など)では
+    // 注文の金額を選べない。今の選択が合わなければ合う既定へ戻して知らせる。
+    const nextOrigin = originInfoOf(choice.eventType)
     setTriggerKind(choice.value)
     setEventType(choice.eventType)
     setMeasureMethod(choice.measureMethod)
     if (choice.measureMethod !== 'url_reach') setTargetUrl('')
+    if (!nextOrigin.valueModes.includes(valueMode)) {
+      setValueMode(nextOrigin.defaultValueMode)
+      setValueModeNotice(
+        `起点に注文の金額が無いため、金額の出し方を「${VALUE_MODE_LABELS[nextOrigin.defaultValueMode]}」に戻しました。`,
+      )
+    } else {
+      setValueModeNotice(null)
+    }
   }
+
+  /*
+   * 作成途中の離脱確認。名前・金額・対象URL・数えない条件・使う場所の
+   * どれかに手を付けていたら、キャンセルや左メニューで確認窓を出す。
+   * 作成が終わると一覧へ router.push するので、成功後に警告は出ない。
+   */
+  const dirty = Boolean(
+    name || value || targetUrl || exclusionMemo || attributionDays ||
+    triggerKind !== 'order' || eventType !== 'ec_order_confirmed' ||
+    valueMode !== 'source' || measureMethod !== 'webhook' ||
+    exclusion !== null || deduplicationMode !== 'once_per_friend' ||
+    reversalPolicy !== 'source_cancelled' || saveAsDraft ||
+    selectedUsageKeys.size > 0
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   return (
     <CreatePage
-      title="成果地点をつくる"
+      title="成果地点を作る"
       description="「申込」「購入」など、成果として数えたい行動を登録します。"
       showHeader={false}
       parent={['コンバージョン', '/conversions?tab=points']}
       successHref={(id) => `/conversions?tab=points${id ? `&highlight=${encodeURIComponent(id)}` : ''}`}
-      saveLabel={saveAsDraft ? '下書きとして保存する' : 'つくって数えはじめる'}
+      saveLabel={saveAsDraft ? '下書きを保存する' : 'つくって数えはじめる'}
       designNode="GtylA"
       variant="v6"
       validate={() => {
@@ -318,6 +388,18 @@ export default function NewConversionPointPage() {
           return '指定ページへの到達で数えるときは、対象のURLが要ります'
         }
         if (!lineAccountId) return '集計対象のLINEアカウントを選んでください（画面上部で選べます）'
+        if (exclusionMemo.trim().length > 500) return '数えない条件のメモは500文字以内で入力してください'
+        /*
+         * S4-OR: 空の「いずれか」のかたまり・未完成の行は、黙って
+         * 「除外なし」に落とさない。足すつもりの条件が無いまま数えると
+         * 広く数えすぎるので、保存を止めて直し方を案内する。
+         */
+        const exclusionIssue = findConditionDraftIssue(exclusion)
+        if (exclusionIssue) return exclusionIssue
+        // 起点に金額が無いのに注文の金額が残っていたら先に言う(通常は選べない)。
+        if (!origin.valueModes.includes(valueMode)) {
+          return 'この起点には注文の金額が無いため、金額の出し方は「決まった額を使う」か「金額を集計しない」を選んでください'
+        }
         // 保存側(400)と同じ条件を先に言う。素通りすると汎用失敗文になる(#513 L3)。
         if (valueMode === 'fixed' && (yen === null || !Number.isFinite(yen) || yen < 0)) {
           return '固定で付ける金額は0以上の数値で入力してください'
@@ -333,9 +415,12 @@ export default function NewConversionPointPage() {
       onReset={() => {
         setName('')
         setValue('')
-        setValueMode('source')
+        // 今の起点に合う既定へ戻す(タグ起点などで注文の金額に戻さない)。
+        setValueMode(originInfoOf(eventType).defaultValueMode)
+        setValueModeNotice(null)
         setTargetUrl('')
-        setExcludedCondition('')
+        setExclusion(null)
+        setExclusionMemo('')
         setDeduplicationMode('once_per_friend')
         setReversalPolicy('source_cancelled')
         setSelectedUsageKeys(new Set())
@@ -344,7 +429,11 @@ export default function NewConversionPointPage() {
         const res = await api.conversions.createDefinition({
           name: name.trim(),
           sourceType: eventType,
-          sourceConfig: { triggerKind, excludedCondition: excludedCondition.trim() || null },
+          sourceConfig: {
+            triggerKind,
+            exclusion: pruneCondition(exclusion),
+            exclusionMemo: exclusionMemo.trim() || null,
+          },
           targetUrl: measureMethod === 'url_reach' ? targetUrl.trim() : null,
           lineAccountId,
           deduplicationMode,
@@ -368,14 +457,14 @@ export default function NewConversionPointPage() {
             <h2 className="text-info text-sm font-bold">この決めごとをこの30日にあてはめると</h2>
             <div className="mt-3 flex items-end justify-between gap-4" aria-busy={previewLoading}>
               <div>
-                <p className="text-info text-2xl font-bold tabular-nums">{preview ? `${preview.estimatedCount.toLocaleString()}件` : '—'}</p>
-                <p className="text-info mt-1 text-xs tabular-nums">1日あたり {preview ? `${preview.dailyAverage.toLocaleString()}件` : '—'}</p>
+                <p className="text-info text-2xl font-bold tabular-nums">{preview ? `${formatNumber(preview.estimatedCount)}件` : '—'}</p>
+                <p className="text-info mt-1 text-xs tabular-nums">1日あたり {preview ? `${formatNumber(preview.dailyAverage)}件` : '—'}</p>
               </div>
               <div className="text-right">
-                <p className="text-info text-xl font-bold tabular-nums">{preview ? `¥${preview.estimatedValue.toLocaleString()}` : '—'}</p>
+                <p className="text-info text-xl font-bold tabular-nums">{preview ? `¥${formatNumber(preview.estimatedValue)}` : '—'}</p>
                 <p className="text-info mt-1 text-xs tabular-nums">
                   {preview && preview.estimatedCount > 0
-                    ? `1件あたり ¥${Math.round(preview.estimatedValue / preview.estimatedCount).toLocaleString()}`
+                    ? `1件あたり ¥${formatNumber(Math.round(preview.estimatedValue / preview.estimatedCount))}`
                     : '1件あたり —'}
                 </p>
               </div>
@@ -387,6 +476,14 @@ export default function NewConversionPointPage() {
                   ? `入力中の条件だけで試算しています。重複除外 ${preview.duplicateExcludedCount}件・取消 ${preview.cancellationCount}件。試算では成果を追加しません。`
                   : '入力中の条件を試算しています。'}
             </p>
+            {/* R40: 試算の注意(excludedReasons)は画面に出す。無いときは出さない。 */}
+            {preview && !previewFailed && preview.excludedReasons.length > 0 ? (
+              <ul className="text-ink-secondary mt-2 space-y-1 text-xs leading-relaxed">
+                {preview.excludedReasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            ) : null}
           </section>
 
           <AsideCard title="つながる先">
@@ -413,32 +510,24 @@ export default function NewConversionPointPage() {
     >
       <FormSection step={1} label="何が起きたら数えますか">
         {/* #975 U062: 390pxで6枚の大カードを積まない。短い選択群にし、説明は選択中の1種類だけ下へ出す。 */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="数えるきっかけ">
+        <RadioCardGroup legend="数えるきっかけ" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {TRIGGER_CHOICES.map((choice) => {
-            const Icon = choice.icon
             const selected = triggerKind === choice.value
             return (
-              <label
+              <RadioCard
                 key={choice.value}
-                className={`rounded-control flex min-h-11 min-w-0 items-center gap-2 border px-3 py-2 text-left transition-colors ${
-                  selected ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
-                } ${choice.connected ? 'cursor-pointer' : 'cursor-not-allowed opacity-55'}`}
-              >
-                <input
-                  type="radio"
-                  name="conversion-trigger"
-                  value={choice.value}
-                  checked={selected}
-                  disabled={!choice.connected}
-                  onChange={() => selectTrigger(choice)}
-                  className="sr-only"
-                />
-                <Icon className={`shrink-0 ${selected ? 'text-accent' : 'text-ink-faint'}`} size={16} aria-hidden />
-                <span className="text-ink truncate text-xs font-bold" title={choice.label}>{choice.label}</span>
-              </label>
+                name="conversion-trigger"
+                value={choice.value}
+                checked={selected}
+                disabled={!choice.connected}
+                disabledReason={choice.connected ? undefined : 'このきっかけはまだ使えません'}
+                onChange={() => selectTrigger(choice)}
+                title={choice.label}
+                note={choice.note}
+              />
             )
           })}
-        </div>
+        </RadioCardGroup>
         {(() => {
           const current = TRIGGER_CHOICES.find((choice) => choice.value === triggerKind)
           return current ? (
@@ -448,12 +537,12 @@ export default function NewConversionPointPage() {
           ) : null
         })()}
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2">
           <Field
             label="成果地点の名前"
             htmlFor="cv-name"
             required
-            note="一覧・案件・分析にこの名前で並びます。"
+            help="一覧・案件・分析にこの名前で並びます。"
           >
             <input
               id="cv-name"
@@ -468,6 +557,27 @@ export default function NewConversionPointPage() {
                 同じ名前の「{duplicateName.name}」があります。同じ意味の成果地点を2つ作らないでください。
               </p>
             )}
+            {/*
+              R597: 同名のもとが読めないときは、警告が出ないこと自体を伝える。
+              読み込めなかった時は赤を使わない（★V7）。再試行で直れば
+              同名警告が戻る。保存自体は止めない（保存時の重複拒否は
+              監査の範囲外のため、ここでは未確認のまま残す）。
+            */}
+            {pointsFailed && (
+              <div className="mt-1">
+                <p className="text-ink-secondary text-xs" role="alert">
+                  同じ名前があるか確認できませんでした。同じ意味の成果地点があるかもしれません。
+                </p>
+                <Button
+                  variant="secondary"
+                  size="field"
+                  className="mt-1.5"
+                  onClick={() => requestPoints()}
+                >
+                  同名の確認を再読み込み
+                </Button>
+              </div>
+            )}
           </Field>
 
           {measureMethod === 'url_reach' ? (
@@ -475,7 +585,7 @@ export default function NewConversionPointPage() {
               label="数えてよいページ"
               htmlFor="cv-url"
               required
-              note="前方一致で判定し、パラメータは無視します。"
+              help="「?」以降と「#」以降を除いて前方一致で判定します。"
             >
               <input
                 id="cv-url"
@@ -487,21 +597,43 @@ export default function NewConversionPointPage() {
               />
             </Field>
           ) : (
-            <Field label="どの注文を数えるか" note="すべての注文を対象に保存します。">
-              <SelectField value="all" disabled options={[{ value: 'all', label: 'すべての注文' }]} className="w-full" />
+            // R41: 起点ごとに対象を言う。タグ起点で「注文」と出さない。
+            <Field label={origin.targetLabel} help={origin.target}>
+              <p className="bg-canvas-sunken text-ink rounded-control px-3 py-2 text-sm">
+                {origin.target}
+              </p>
             </Field>
           )}
-
-          <Field label="数えない条件（任意）" htmlFor="cv-excluded-condition" note="空欄なら、除外せずに数えます。">
-            <input
-              id="cv-excluded-condition"
-              value={excludedCondition}
-              onChange={(event) => setExcludedCondition(event.target.value)}
-              placeholder="例：テスト用アカウントの注文をのぞく"
-              className={inputClass}
-            />
-          </Field>
         </div>
+
+        {/* R40: 数えない条件は共通の条件部品で選ぶ。自由文のメモとは分ける。 */}
+        <Field
+          label="数えない条件"
+          help="条件に当てはまる人は数えません。選ばないままなら、除外せずに数えます。試算の数字にも反映します。"
+          note="条件に当てはまる人は、保存後の記録から除きます。"
+        >
+          <ConditionBuilder
+            value={exclusion}
+            onChange={setExclusion}
+            label="数えない条件"
+            showCount={false}
+          />
+        </Field>
+        <Field
+          label="数えない条件のメモ（任意）"
+          htmlFor="cv-exclusion-memo"
+          note="運用の引き継ぎ用です。数え方には影響しません。"
+        >
+          <input
+            id="cv-exclusion-memo"
+            type="text"
+            value={exclusionMemo}
+            onChange={(event) => setExclusionMemo(event.target.value)}
+            placeholder="例：テスト用の注文は条件で除いています"
+            maxLength={500}
+            className={inputClass}
+          />
+        </Field>
       </FormSection>
 
       <FormSection
@@ -510,7 +642,8 @@ export default function NewConversionPointPage() {
         note="ここを間違えると、売上を重ねて数えることがあります。"
       >
         <div className="grid gap-2 sm:grid-cols-3">
-          <ChoiceCard selected={deduplicationMode === 'every'} title="何回でも数える" note="買うたびに1件。売上を追うときに使います" onClick={() => setDeduplicationMode('every')} />
+          {/* m22d: 「1件」は試算の「1件あたり」に集約し、ここでは書かない。 */}
+          <ChoiceCard selected={deduplicationMode === 'every'} title="何回でも数える" note="買うたびに数えます。売上を追うときに使います" onClick={() => setDeduplicationMode('every')} />
           <ChoiceCard selected={deduplicationMode === 'once_per_friend'} title="1人1回だけ" note="はじめての人だけを数えます" onClick={() => setDeduplicationMode('once_per_friend')} />
           <ChoiceCard selected={deduplicationMode === 'window'} title="30日に1回まで" note="短い間にくり返し起きるものに使います" onClick={() => setDeduplicationMode('window')} />
         </div>
@@ -518,20 +651,27 @@ export default function NewConversionPointPage() {
 
       <FormSection step={3} label="金額をどう出すか">
         <div className="grid gap-3 md:grid-cols-3">
-          <Field label="金額の出し方" htmlFor="cv-value-mode">
-            <SelectField
+          {/* 起点に金額が無いもの(タグ・フォーム・予約・ページ・動画など)では注文の金額を出さない。選択肢は対応表が持つ。 */}
+          <Field label="金額の出し方" htmlFor="cv-value-mode" help={origin.amount}>
+            <Select
+              size="full"
+              aria-label="金額の出し方"
               id="cv-value-mode"
               value={valueMode}
-              onChange={(event) => setValueMode(event.target.value as ConversionValueMode)}
-              options={[
-                { value: 'source', label: '注文の金額をそのまま使う' },
-                { value: 'fixed', label: '決まった額を使う' },
-                { value: 'none', label: '金額を集計しない' },
-              ]}
-              className="w-full"
+              onChange={(value) => {
+                setValueMode(value as ConversionValueMode)
+                setValueModeNotice(null)
+              }}
+              options={origin.valueModes.map((mode) => ({ value: mode, label: VALUE_MODE_LABELS[mode] }))}
             />
+            {valueModeNotice ? (
+              <p className="text-warning mt-1 text-xs" role="status">
+                {valueModeNotice}
+              </p>
+            ) : null}
           </Field>
-          <Field label="決まった金額（円）" htmlFor="cv-value" note="1件ごとの金額です。">
+          {/* m22d: 「1件」は試算の「1件あたり」に集約し、ここでは書かない。 */}
+          <Field label="決まった金額（円）" htmlFor="cv-value" help="成果ごとの金額です。">
             <input
               id="cv-value"
               type="number"
@@ -542,17 +682,8 @@ export default function NewConversionPointPage() {
               className={`${inputClass} tabular-nums disabled:bg-canvas-sunken`}
             />
           </Field>
-          <Field label="取り消しの扱い" note="元の成果は消さず、取消記録を追加します。">
-            <SelectField
-              value={reversalPolicy}
-              onChange={(event) => setReversalPolicy(event.target.value as ConversionReversalPolicy)}
-              options={[
-                { value: 'source_cancelled', label: '返品されたら取り消す' },
-                { value: 'manual', label: '担当者が取り消す' },
-                { value: 'none', label: '取り消しを数えない' },
-              ]}
-              className="w-full"
-            />
+          <Field label="取り消しの扱い" htmlFor="cv-reversal-policy" help="元の成果は消さず、取消記録を追加します。">
+            <Select size="full" aria-label="取り消しの扱い" id="cv-reversal-policy" value={reversalPolicy} onChange={(value) => setReversalPolicy(value as ConversionReversalPolicy)} options={[ { value: 'source_cancelled', label: '返品されたら取り消す' }, { value: 'manual', label: '担当者が取り消す' }, { value: 'none', label: '取り消しを数えない' }, ]} />
           </Field>
         </div>
       </FormSection>
@@ -597,15 +728,10 @@ export default function NewConversionPointPage() {
                   <ul className="mt-2 space-y-1.5">
                     {targets.map((target) => (
                       <li key={usageKey(target)}>
-                        <label className="flex cursor-pointer items-start gap-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedUsageKeys.has(usageKey(target))}
-                            onChange={() => toggleUsage(target)}
-                            className="mt-0.5"
-                          />
-                          <span className="text-ink text-xs">{target.label}</span>
-                        </label>
+                        <Checkbox
+                          checked={selectedUsageKeys.has(usageKey(target))}
+                          onCheckedChange={() => toggleUsage(target)}
+                        >{target.label}</Checkbox>
                       </li>
                     ))}
                   </ul>
@@ -614,23 +740,14 @@ export default function NewConversionPointPage() {
             )
           })}
         </div>
-        <label className="border-hairline rounded-control mt-3 flex cursor-pointer items-start gap-3 border p-3">
-          <input
-            type="checkbox"
-            checked={saveAsDraft}
-            onChange={(event) => setSaveAsDraft(event.target.checked)}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="text-ink block text-sm font-semibold">まだ計測せず、下書きとして保存する</span>
-            <span className="text-ink-faint mt-0.5 block text-xs">
-              一覧の「下書き」に入ります。数えはじめるには一覧から公開します。
-            </span>
-          </span>
-        </label>
-        <details className="border-hairline rounded-control border px-3 py-2">
-          <summary className="text-ink-secondary cursor-pointer text-xs font-semibold">詳細設定（帰属期間・集計対象）</summary>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <Checkbox
+          checked={saveAsDraft}
+          onCheckedChange={setSaveAsDraft}
+          description="一覧の「下書き」に入ります。数えはじめるには一覧から公開します。"
+          className="border-hairline rounded-control mt-3 border p-3"
+        >まだ計測せず、下書きとして保存する</Checkbox>
+        <Disclosure size="compact" title="詳細設定" hint="帰属期間・集計対象">
+          <div className="grid gap-3 md:grid-cols-2">
             <Field label="友だち追加からの計測期間" htmlFor="cv-days" note="空欄なら既定の90日です。">
               <div className="flex items-center gap-1.5">
                 <input id="cv-days" type="number" min={1} max={365} value={attributionDays} onChange={(e) => setAttributionDays(e.target.value)} placeholder="90" className={`${inputClass} w-24 tabular-nums`} />
@@ -647,8 +764,9 @@ export default function NewConversionPointPage() {
               </p>
             </Field>
           </div>
-        </details>
+        </Disclosure>
       </FormSection>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した成果地点" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
   )
 }

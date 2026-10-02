@@ -361,22 +361,33 @@ export async function saveActionScoreRuleDraft(
   }
 
   if (owner.current_draft_version_id) {
-    if (input.expectedDraftVersionId !== owner.current_draft_version_id) {
+    // R131: 同じ版IDのまま中身だけ書き換えると、古い版を持つ人の保存が
+    // 成功して先の変更を消してしまう。保存ごとに新しい版を作り、版IDが
+    // 進むことで古い版での保存を競合にできる（migrationなし）。
+    const expected = owner.current_draft_version_id;
+    if (input.expectedDraftVersionId !== expected) {
       throw new ActionScoreRuleValidationError('version_conflict', '編集中の版が変わりました。再読み込みしてください');
     }
+    const versionId = crypto.randomUUID();
     const results = await db.batch([
       db.prepare(
-        `UPDATE action_score_rule_versions
-            SET rules_json = ?, min_score = ?, max_score = ?, normal_min = ?, high_min = ?
-          WHERE id = ? AND rule_set_id = ? AND status = 'draft'`,
+        `INSERT INTO action_score_rule_versions
+           (id, rule_set_id, version_number, status, rules_json, min_score, max_score,
+            normal_min, high_min, created_by, created_at)
+         SELECT ?, id,
+                COALESCE((SELECT MAX(version_number) FROM action_score_rule_versions WHERE rule_set_id = ?), 0) + 1,
+                'draft', ?, ?, ?, ?, ?, ?, ?
+           FROM action_score_rule_sets
+          WHERE id = ? AND current_draft_version_id = ?`,
       ).bind(
-        JSON.stringify(bundle.rules), bundle.bands.min, bundle.bands.max,
-        bundle.bands.normalMin, bundle.bands.highMin, owner.current_draft_version_id, owner.id,
+        versionId, owner.id, JSON.stringify(bundle.rules), bundle.bands.min, bundle.bands.max,
+        bundle.bands.normalMin, bundle.bands.highMin, input.createdBy ?? null, now,
+        owner.id, expected,
       ),
       db.prepare(
-        `UPDATE action_score_rule_sets SET updated_at = ?
+        `UPDATE action_score_rule_sets SET current_draft_version_id = ?, updated_at = ?
           WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?`,
-      ).bind(now, owner.id, input.lineAccountId, owner.current_draft_version_id),
+      ).bind(versionId, now, owner.id, input.lineAccountId, expected),
     ]);
     if ((results[0].meta?.changes ?? 0) !== 1 || (results[1].meta?.changes ?? 0) !== 1) {
       throw new ActionScoreRuleValidationError('version_conflict', '編集中の版が変わりました。再読み込みしてください');
@@ -415,6 +426,35 @@ export async function saveActionScoreRuleDraft(
     throw new ActionScoreRuleValidationError('version_conflict', '別の人が新版を作りました。再読み込みしてください');
   }
   return getActionScoreRuleConfiguration(db, input.lineAccountId);
+}
+
+/**
+ * M505: 応答消失後の再送を、競合ではなく保存済みとして返すための照合。
+ *
+ * 保存は通ったのに応答だけ失われると、画面は古い版IDのまま送り直す。
+ * 最新の下書きの中身と送られた中身が同じなら、自分の保存が通ったものとして
+ * 現在の設定を返す（migrationなしで版の競合と再送を見分ける）。
+ * 中身が違う・下書きが無い・形が壊れているときは null を返し、
+ * 呼び出し側は409のままにする。
+ */
+export async function getActionScoreDraftReplayIfSameContent(
+  db: D1Database,
+  lineAccountId: string,
+  configuration: unknown,
+): Promise<ActionScoreRuleConfiguration | null> {
+  let wanted: ActionScoreRuleBundle;
+  try {
+    wanted = validateActionScoreRuleBundle(configuration);
+  } catch {
+    return null;
+  }
+  const owner = await getRuleSet(db, lineAccountId);
+  const current = await getVersion(db, owner?.current_draft_version_id ?? null);
+  if (!current) return null;
+  const same = JSON.stringify({ rules: wanted.rules, bands: wanted.bands })
+    === JSON.stringify({ rules: current.rules, bands: current.bands });
+  if (!same) return null;
+  return getActionScoreRuleConfiguration(db, lineAccountId);
 }
 
 export async function publishActionScoreRuleDraft(

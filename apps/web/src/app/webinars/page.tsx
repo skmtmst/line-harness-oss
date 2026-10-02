@@ -1,14 +1,23 @@
 'use client'
 
 import { X } from 'lucide-react'
-import SelectField from '@/components/shared/select-field'
+import SortSelect from '@/components/ui/sort-select'
+import PageSizeSelect from '@/components/ui/page-size-select'
+import ListRange from '@/components/ui/list-range'
+
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
+import LinePreview from '@/components/shared/line-preview'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { RowActions } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import FilterChip from '@/components/shared/filter-chip'
 import './webinars.css'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
@@ -27,15 +36,21 @@ import KpiCollapse from '@/components/ui/kpi-collapse'
 import KpiCard from '@/components/shared/kpi-card'
 import { overviewCards } from './overview-view'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 const STATUS_LABEL: Record<Webinar['status'], string> = {
   draft: '下書き', active: '公開中', archived: 'アーカイブ',
 }
 
+/*
+ * #702: 札は「薄い同系背景＋濃い同系文字」のトークン規則へ統一。
+ * 生の Tailwind 灰・緑・黄はやめ、AA(4.5:1)を満たす組み合わせだけ使う。
+ * draft 6.94:1 / active 5.11:1 / archived 4.72:1（いずれも 11px 太字）。
+ */
 const STATUS_BADGE: Record<Webinar['status'], string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  active: 'bg-green-100 text-green-700',
-  archived: 'bg-amber-100 text-amber-700',
+  draft: 'bg-shell text-ink-secondary',
+  active: 'bg-success-bg text-success',
+  archived: 'bg-warning-bg text-warning',
 }
 
 function scheduleSummary(w: Webinar): string {
@@ -62,7 +77,7 @@ function scheduleSummary(w: Webinar): string {
   }
   otherRules.forEach((rule) => {
     if (rule.type === 'weekly') parts.push(`毎週${(rule.days ?? []).map((day) => DAYS[day]).join('・')} ${rule.time}`)
-    if (rule.type === 'once') parts.push(rule.at ? new Date(rule.at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '単発・日時未設定')
+    if (rule.type === 'once') parts.push(rule.at ? formatDateTime(rule.at) : '単発・日時未設定')
   })
   return parts.join(' / ')
 }
@@ -86,10 +101,13 @@ function WebinarFolderDialog({
   onSave: (name: string) => void
 }) {
   const [name, setName] = useState(folder?.name ?? '')
+  // 保存中は×と同じくEscapeでも閉じない。共通の約束（初期フォーカス・
+  // Tabの循環・起点へのフォーカス復帰・背面スクロール停止）もそろえる。
+  const panelRef = useOverlayFocus(true, onCancel, busy)
 
   return (
     <div className="bg-ink/35 fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="webinar-folder-title">
-      <section className="bg-canvas rounded-card w-full max-w-md border border-hairline p-5 shadow-card">
+      <section ref={panelRef} className="bg-canvas rounded-card w-full max-w-md border border-hairline p-5 shadow-card">
         <div className="flex items-start justify-between gap-3">
           <h2 id="webinar-folder-title" className="text-ink text-lg font-bold">
             {folder ? 'フォルダ名を変更' : 'フォルダを追加'}
@@ -107,7 +125,6 @@ function WebinarFolderDialog({
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && name.trim() && !busy) onSave(name.trim())
-            if (event.key === 'Escape' && !busy) onCancel()
           }}
           className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
           placeholder="例: 商品説明"
@@ -115,8 +132,7 @@ function WebinarFolderDialog({
         {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
         <div className="mt-5 flex justify-end gap-2">
           <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
-          <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy}>
-            {busy ? '保存中…' : '保存する'}
+          <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy} busy={busy}>保存する
           </Button>
         </div>
       </section>
@@ -126,7 +142,7 @@ function WebinarFolderDialog({
 
 function measuredCount(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value)
-    ? `${value.toLocaleString('ja-JP')}人`
+    ? `${formatNumber(value)}人`
     : '—'
 }
 
@@ -264,7 +280,7 @@ function WebinarArchiveConfirm({
       onConfirm={copy.stopFirst ? undefined : onConfirm}
     >
       {copy.stopFirst ? (
-        <div className="rounded-control border border-amber-200 bg-amber-50 p-3 text-xs text-ink">
+        <div className="rounded-control border border-status-warn bg-status-warn-soft p-3 text-xs text-ink">
           <p>{copy.stopFirst}</p>
           <div className="mt-3">
             <Button href={`/webinars/edit?id=${target.id}`}>編集画面で公開を停止する</Button>
@@ -282,6 +298,7 @@ function WebinarListTable({
   items: WebinarListItem[]
   onArchive: (target: WebinarListItem) => void
 }) {
+  const router = useRouter()
   return (
     <>
       <div className="bg-canvas-sunken text-ink-faint hidden grid-cols-12 gap-3 px-4 py-3 text-xs font-semibold md:grid">
@@ -290,12 +307,27 @@ function WebinarListTable({
       <div className="divide-hairline divide-y">
         {items.map((w) => (
           <div key={w.id} className="grid gap-3 px-4 py-4 md:grid-cols-12 md:items-center">
-            <div className="min-w-0 md:col-span-4"><Link href={`/webinars/edit?id=${w.id}`} className="text-accent block truncate text-sm font-bold hover:underline" title={w.title}>{w.title}</Link><span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span></div>
+            <div className="min-w-0 md:col-span-4"><Link href={`/webinars/edit?id=${w.id}`} className="block truncate whitespace-nowrap text-sm font-semibold text-ink hover:underline" title={w.title}>{w.title}</Link><span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span></div>
             <div className="md:col-span-2"><span className={`rounded-pill inline-flex px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{displayStatus(w)}</span></div>
             <div className="text-ink-secondary text-sm tabular-nums" title={w.registrationCount == null ? '申込人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">申込 </span>{measuredCount(w.registrationCount)}</div>
             <div className="text-ink-secondary text-sm tabular-nums" title={w.viewerCount == null ? '視聴人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">視聴 </span>{measuredCount(w.viewerCount)}</div>
             <div className="text-ink-secondary truncate text-sm md:col-span-2" title={publicationSummary(w)}>{publicationSummary(w)}</div>
-            <div className="flex items-center gap-2 md:col-span-2"><Link href={`/webinars/edit?id=${w.id}`} className="text-accent text-xs font-semibold">編集</Link><button type="button" data-qa-open={w.id === 'webinar-5' ? 'LKuAQ' : undefined} onClick={() => onArchive(w)} className="text-danger text-xs font-semibold" aria-label={`${w.title}をアーカイブ`}>アーカイブ</button></div>
+            {/*
+              ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。アーカイブは
+              メニューの中へ。箱のアイコンだけのボタンは行に直に置かない。
+              撮影口（LKuAQ）は「…」ボタンへ移す（2段操作の1段目）。
+            */}
+            <div className="flex items-center gap-1.5 md:col-span-2"><RowActions
+              subjectName={w.title}
+              edit={{ href: `/webinars/edit?id=${w.id}` }}
+              menuItems={[
+                { id: 'participants', label: '参加者を見る', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=participants`) },
+                { id: 'analytics', label: '分析を見る', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=analytics`) },
+                { id: 'comments', label: 'コメント演出を開く', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=comments`) },
+                { id: 'archive', label: 'アーカイブする', onSelect: () => onArchive(w) },
+              ]}
+              menuButtonProps={{ 'data-qa-open': w.id === 'webinar-5' ? 'LKuAQ' : undefined }}
+            /></div>
           </div>
         ))}
       </div>
@@ -322,14 +354,24 @@ function WebinarListErrorNotice({
 }
 
 /*
-  一覧の器(白い面・最低360px)。**行があるときだけ包む。**
+  一覧の器(白い面)。**行があるときだけ包む。**
   読込・空・失敗の1枚は ListState が自分で面と高さを持つので、
   器に入れると白い余白と灰色の二重背景になる(監査 DETAIL-01)。
+  以前は最低360pxを付けていたが、1行だけのときに約350pxの
+  空領域が残るため外した(#670 10)。器は中身に吸着させる。
+  件数は器の内側の脚注へ入れ、枠外に孤立させない。
 */
-function WebinarListCard({ children }: { children: ReactNode }) {
+function WebinarListCard({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
+  /*
+    高さは中身に任せる。以前は固定の最小高さがあって、1行だけの一覧でも
+    表の下に大きな空白帯ができ、その外に件数表示が取り残されて見えた
+    （監査 A8）。読込・空・失敗は ListState が自分の面を持つので、
+    ここで高さを決める必要はない。件数は footer で器の内側に出す。
+  */
   return (
-    <div className="border-hairline bg-canvas min-h-[360px] overflow-hidden rounded-card border">
+    <div className="border-hairline bg-canvas overflow-hidden rounded-card border">
       {children}
+      {footer ? <div className="border-t border-hairline px-4 py-3">{footer}</div> : null}
     </div>
   )
 }
@@ -345,6 +387,7 @@ function WebinarListContent({
   refreshing,
   onRetry,
   onArchive,
+  footer,
 }: {
   accountLoading: boolean
   loading: boolean
@@ -356,6 +399,7 @@ function WebinarListContent({
   refreshing: boolean
   onRetry: () => void
   onArchive: (target: WebinarListItem) => void
+  footer?: ReactNode
 }) {
   if (accountLoading || loading) return <ListState kind="loading" />
   if (!selectedAccountId) {
@@ -369,7 +413,7 @@ function WebinarListContent({
   }
   if (loadFailure) {
     return visibleItems.length > 0 ? (
-      <WebinarListCard>
+      <WebinarListCard footer={footer}>
         <WebinarListErrorNotice failure={loadFailure} onRetry={onRetry} />
         <WebinarListTable items={visibleItems} onArchive={onArchive} />
       </WebinarListCard>
@@ -388,14 +432,14 @@ function WebinarListContent({
         kind="empty"
         title="まだウェビナーがありません"
         description="動画セミナーの申込と視聴を、ここで管理します。"
-        action={<Button variant="primary" href="/webinars/new">ウェビナーを作成</Button>}
+        action={<Button variant="primary" href="/webinars/new">＋ ウェビナーを作る</Button>}
       />
     ) : (
       <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索文字かよく使う絞り込みを変えてください。" />
     )
   }
   return (
-    <WebinarListCard>
+    <WebinarListCard footer={footer}>
       {refreshing ? <p role="status" className="text-ink-faint border-hairline border-b px-4 py-2 text-xs">検索中…</p> : null}
       <WebinarListTable items={visibleItems} onArchive={onArchive} />
     </WebinarListCard>
@@ -705,7 +749,7 @@ function WebinarsPage() {
   return (
     <>
       {visibleOverviewFailure ? (
-        <div className="mx-auto mb-4 max-w-[1600px] px-6 pt-4">
+        <div className="mb-4">
           <ListState
             kind={visibleOverviewFailure.kind}
             title={visibleOverviewFailure.title}
@@ -718,7 +762,7 @@ function WebinarsPage() {
           />
         </div>
       ) : (
-        <KpiCollapse data-design="KPIs" className="mx-auto mb-4 max-w-[1600px] px-6 pt-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {/*
             #1005: カードは共通KpiCardの3段（見出し・数値・短い状態）で出す。
             取得できない詳しい理由は description として説明アイコンの中へ渡し、
@@ -738,14 +782,16 @@ function WebinarsPage() {
           ))}
         </KpiCollapse>
       )}
-      <div data-design-node="ZC13r" className="mx-auto max-w-[1600px] px-6 pb-10">
-        <div data-design="Head" className="mb-4 flex flex-wrap gap-2">
-          <Button variant="primary" href="/webinars/new">ウェビナーを作成</Button>
+      {/* 外枠の余白は共通シェルが持つ。ここで px-6 を足すと左端がずれる。 */}
+      <div data-design-node="ZC13r" className="flex flex-col gap-4">
+        {/* 作る操作は一覧のすぐ上の左。右上には置かない。他の一覧と同じ置き場所。 */}
+        <div data-design="Head" className="flex flex-wrap justify-start gap-2">
+          <Button variant="primary" href="/webinars/new">＋ ウェビナーを作る</Button>
         </div>
 
         <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
           <FolderPanel
-            total={hasListData ? `${panelGrand}件` : '—'}
+            /* 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。 */
             activeId={selectedFolder}
             onSelect={setSelectedFolder}
             onAddFolder={() => { setFolderError(''); setFolderDialogOpen(true) }}
@@ -768,19 +814,36 @@ function WebinarsPage() {
           />
 
           <section className="min-w-0">
-            <div data-design="Bar" className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
-              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="名前・内容で検索" aria-label="ウェビナー名で検索" className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
-              <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-              <SelectField value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} aria-label="並び順" options={[{ value: 'updated', label: '更新が新しい順' }, { value: 'created', label: '作成が新しい順' }, { value: 'name', label: '名前順' }]} className="border-hairline rounded-control border px-2 py-2 text-sm" />
-              <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-              <SelectField size="compact" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} aria-label="表示件数" options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]} />
+            {/*
+              ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+              右端に並び順と表示件数。#636/#668 の並びの意図はそのまま。
+              設計の Bar（検索行）・Saved（絞り込み行）は共通 ListToolbar の
+              1・2行目にいる。印だけここに残し、設計との突き合わせを保つ。
+            */}
+            <div data-design="Bar">
+            <div data-design="Saved">
+            <ListToolbar
+              search={{ placeholder: '名前・内容で検索', label: 'ウェビナー名で検索', value: query, onChange: setQuery }}
+              filters={
+                <>
+                  <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+                  {([{ key: 'active', label: '公開中のみ' }, { key: 'draft', label: '下書きのみ' }] as const).map(({ key, label }) => (
+                    <FilterChip key={key} selected={savedFilter === key} onChange={(next) => setSavedFilter(next ? key : '')}>{label}</FilterChip>
+                  ))}
+                </>
+              }
+              trailing={
+                <>
+                  <SortSelect
+                    value={sortKey}
+                    onChange={(value) => setSortKey(value as SortKey)}
+                    options={[{ value: 'updated', label: '更新が新しい順' }, { value: 'created', label: '作成が新しい順' }, { value: 'name', label: '名前順' }]}
+                  />
+                  <PageSizeSelect value={pageSize} onChange={setPageSize} />
+                </>
+              }
+            />
             </div>
-
-            <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
-              {([{ key: 'active', label: '公開中のみ' }, { key: 'draft', label: '下書きのみ' }] as const).map(({ key, label }) => (
-                <button key={key} onClick={() => setSavedFilter(savedFilter === key ? '' : key)} aria-pressed={savedFilter === key} className={`rounded-pill border px-3 py-1 text-xs transition-colors ${savedFilter === key ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}>{label}</button>
-              ))}
             </div>
 
             <WebinarListContent
@@ -794,10 +857,11 @@ function WebinarsPage() {
               refreshing={refreshing}
               onRetry={() => void refresh()}
               onArchive={openArchive}
+              footer={hasListData && visibleTotal > 0 ? <ListRange total={visibleTotal} first={(currentPage - 1) * pageSize + 1} last={(currentPage - 1) * pageSize + visible.length} /> : undefined}
             />
 
             {hasListData && visibleTotal > 0 && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><p className="text-ink-faint text-xs tabular-nums">{(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length}件 / 全{visibleTotal}件</p><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-3"><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
             )}
           </section>
         </div>
@@ -853,24 +917,24 @@ function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
    */
   return (
     <div className="bg-canvas-sunken fixed inset-x-0 bottom-0 top-[var(--mobile-header-height)] z-10 overflow-y-auto px-4 py-5 sm:px-10 xl:left-64 xl:top-14" data-design-node="LKuAQ">
-      <div className="mx-auto max-w-screen-2xl">
-        <p className="text-accent text-xs font-bold">← ウェビナー一覧</p>
-        <div className="mt-5 grid gap-4 xl:grid-cols-4">
-          <main className="space-y-4 xl:col-span-3">
+      <div className="mx-auto flex max-w-screen-2xl flex-col gap-4">
+        <p className="text-ink-faint text-xs font-medium">← ウェビナー一覧</p>
+        <div className="grid gap-4 xl:grid-cols-4">
+          <div className="space-y-4 xl:col-span-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h2 className="text-base font-bold text-ink">アーカイブする対象</h2>
               <p className="mt-1 text-xs text-ink-secondary">アーカイブするウェビナーを確認します。</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2"><div><p className="text-xs font-bold text-ink-faint">ウェビナー</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{target.title}</p></div><div><p className="text-xs font-bold text-ink-faint">申込者</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{measuredCount(target.registrationCount)}</p></div></div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2"><div><p className="text-xs font-medium text-ink-faint">ウェビナー</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{target.title}</p></div><div><p className="text-xs font-medium text-ink-faint">申込者</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{measuredCount(target.registrationCount)}</p></div></div>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h2 className="text-base font-bold text-ink">アーカイブしたあと</h2>
               <p className="mt-1 text-xs text-ink-secondary">アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。</p>
               <div className="mt-4 space-y-3"><div className="rounded-control border border-hairline p-4"><strong className="text-sm text-ink">公開ページ</strong><p className="mt-1 text-xs text-ink-secondary">公開URLが無効になります</p></div><div className="rounded-control border border-hairline p-4"><strong className="text-sm text-ink">分析結果</strong><p className="mt-1 text-xs text-ink-secondary">視聴履歴とCTAの結果は消えません</p></div></div>
             </section>
-          </main>
+          </div>
           <aside className="space-y-4">
-            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">設定サマリー</h2><dl className="mt-4 divide-y divide-hairline text-xs"><div className="flex justify-between py-3"><dt className="text-ink-faint">状態</dt><dd className="font-semibold text-ink">{STATUS_LABEL[target.status]}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">申込</dt><dd className="font-semibold text-ink">{measuredCount(target.registrationCount)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">視聴</dt><dd className="font-semibold text-ink">{measuredCount(target.viewerCount)}</dd></div></dl></section>
-            <section className="min-h-96 rounded-card bg-line-preview p-5"><p className="text-center text-xs font-bold text-on-accent">LINEプレビュー</p><div className="mt-12 rounded-control bg-canvas p-4 text-xs text-ink">このウェビナーは{target.status === 'active' ? '公開中' : '非公開'}です。</div></section>
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-semibold text-ink">設定サマリー</h2><dl className="mt-4 divide-y divide-hairline text-xs"><div className="flex justify-between py-3"><dt className="text-ink-faint">状態</dt><dd className="font-semibold text-ink">{STATUS_LABEL[target.status]}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">申込</dt><dd className="font-semibold text-ink">{measuredCount(target.registrationCount)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">視聴</dt><dd className="font-semibold text-ink">{measuredCount(target.viewerCount)}</dd></div></dl></section>
+            <div className="min-h-96"><LinePreview><div className="rounded-control bg-canvas p-4 text-xs text-ink">このウェビナーは{target.status === 'active' ? '公開中' : '非公開'}です。</div></LinePreview></div>
           </aside>
         </div>
       </div>

@@ -14,7 +14,9 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
@@ -27,6 +29,7 @@ import {
   usageRefusal,
   usageStatusText,
   validateGenerationInput,
+  type BannerCropPosition,
   type BannerGeneration,
   type BannerGenerationInput,
   type BannerImage,
@@ -35,7 +38,7 @@ import {
   type BannerUsage,
 } from '@/lib/hq-banners'
 
-type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'notfound'
+type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'notfound' | 'missing'
 type Filter = 'all' | 'favorite' | 'delivered'
 
 /**
@@ -72,6 +75,8 @@ function ProjectInner() {
   const [filter, setFilter] = useState<Filter>('all')
   const [actionError, setActionError] = useState('')
   const [generationError, setGenerationError] = useState('')
+  // 用途寸法へ整形できなかった生成があった（binding の無い環境）。R120。
+  const [sizeNotice, setSizeNotice] = useState(false)
   const [running, setRunning] = useState<BannerGeneration | null>(null)
   const [cancelling, setCancelling] = useState(false)
   const [openImage, setOpenImage] = useState<BannerImage | null>(null)
@@ -100,7 +105,7 @@ function ProjectInner() {
 
   const load = useCallback(async () => {
     if (!projectId) {
-      setStatus('notfound')
+      setStatus('missing')
       return
     }
     setStatus('loading')
@@ -150,8 +155,11 @@ function ProjectInner() {
   /**
    * 1枚ずつ run を繰り返す。1回の呼び出しで1枚。
    * 失敗したらそこで止め、理由を出す。成功分はサーバーに残っている。
+   *
+   * 切り抜き位置は保存していないので、作り始めたときの値をそのまま使う。
+   * 画面を離れて戻った続きは中央になる（R120・migration 不要のため）。
    */
-  const runLoop = useCallback(async (generation: BannerGeneration) => {
+  const runLoop = useCallback(async (generation: BannerGeneration, crop: BannerCropPosition = 'center') => {
     if (loopRef.current === generation.id) return
     loopRef.current = generation.id
     cancelRef.current = false
@@ -161,10 +169,11 @@ function ProjectInner() {
     try {
       let current = generation
       while (!cancelRef.current) {
-        const res = await api.hqBanners.generations.run(current.id)
+        const res = await api.hqBanners.generations.run(current.id, { gravity: crop })
         if (!res.success) throw new Error(res.error)
         current = res.data.generation
         setRunning(current)
+        if (res.data.resized === false) setSizeNotice(true)
         if (res.data.image) {
           const image = res.data.image
           setImages((prev) => (prev.some((i) => i.id === image.id) ? prev : [image, ...prev]))
@@ -218,7 +227,7 @@ function ProjectInner() {
       })
       if (!res.success) throw new Error(res.error)
       setGenerations((prev) => [res.data, ...prev])
-      void runLoop(res.data)
+      void runLoop(res.data, input.cropPosition)
     } catch (caught) {
       setGenerationError(caught instanceof Error && caught.message ? caught.message : '生成を始められませんでした。')
       void loadUsage()
@@ -379,25 +388,43 @@ function ProjectInner() {
   if (status === 'loading') {
     return <ListState kind="loading" title="プロジェクトを読み込んでいます" />
   }
+  if (status === 'missing') {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="開くプロジェクトが指定されていません"
+        description="一覧から、開きたいプロジェクトを選び直してください。"
+        backHref="/hq/banners"
+        backLabel="プロジェクト一覧へ戻る"
+      />
+    )
+  }
   if (status === 'notfound') {
     return (
-      <ListState
-        kind="empty"
+      <TargetMissing
+        kind="not-found"
         title="プロジェクトが見つかりません"
-        description="アーカイブされたか、別の統括のものかもしれません。"
-        action={<Button href="/hq/banners">プロジェクト一覧へ</Button>}
+        description="アーカイブされたか、別の統括のものかもしれません。一覧から選び直してください。"
+        backHref="/hq/banners"
+        backLabel="プロジェクト一覧へ戻る"
       />
     )
   }
   if (status === 'forbidden') {
-    return <ListState kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
+    return (
+      <ListState
+        kind="forbidden"
+        description="バナー生成は統括の管理者・オーナーだけが使えます。"
+        action={<Button href="/hq/banners">プロジェクト一覧へ戻る</Button>}
+      />
+    )
   }
   if (status === 'error' || !project) {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
         title="プロジェクトを読み込めませんでした"
-        description="通信の状態を確認して、もう一度お試しください。"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => void load()}
       />
     )
@@ -446,7 +473,7 @@ function ProjectInner() {
         )}
       </div>
 
-      {actionError ? <p className="text-label text-status-danger" role="alert">{actionError}</p> : null}
+      {actionError ? <p className="text-label text-danger" role="alert">{actionError}</p> : null}
       {project.description ? <p className="text-caption text-ink-faint">{project.description}</p> : null}
 
       <div data-design-node="H2eb7f" className="flex flex-col gap-4 xl:flex-row xl:items-start">
@@ -455,7 +482,7 @@ function ProjectInner() {
             <h2 className="text-body font-bold text-ink">このプロジェクトの画像</h2>
             <span className="text-caption text-ink-faint">{images.length}枚</span>
             {running ? (
-              <span className="inline-flex h-5 items-center gap-1 rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info" role="status">
+              <span className="inline-flex h-5 items-center gap-1 rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info" role="status">
                 <LoaderCircle aria-hidden="true" className="h-3 w-3 animate-spin" />
                 {progressBadgeText(running)}
               </span>
@@ -467,9 +494,10 @@ function ProjectInner() {
           </div>
           <div className="border-t border-hairline" />
           {generationError ? (
-            <div className="mx-4 mt-4 rounded-card bg-status-danger-soft px-4 py-3 text-label text-status-danger" role="alert">
-              {generationError}
-            </div>
+            <Notice tone="danger" message={generationError} onClose={() => setGenerationError('')} className="mx-4 mt-4" />
+          ) : null}
+          {sizeNotice ? (
+            <Notice tone="info" message="大きさの調整は検証環境で確認してください。この画像は生成時の大きさのまま保存されています。" onClose={() => setSizeNotice(false)} className="mx-4 mt-4" />
           ) : null}
           <div data-design-node="TyPEb" className="p-4">
             {images.length === 0 && pendingCount === 0 ? (
@@ -534,8 +562,7 @@ function ProjectInner() {
           actions={
             running ? (
               <>
-                <Button onClick={() => void cancelGeneration()} disabled={cancelling}>
-                  {cancelling ? '止めています…' : '残りをやめる'}
+                <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">残りをやめる
                 </Button>
                 <Button variant="primary" disabled>
                   <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />

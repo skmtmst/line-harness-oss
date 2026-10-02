@@ -48,12 +48,16 @@ import {
   MEDIA_FOLDERS,
   MEDIA_ITEMS,
   MEDIA_QUOTA,
+  FILE_SCAN_ITEMS,
+  FILE_SCAN_CONFIG,
   FRIEND_ADD_RUNS,
   AUTO_REPLIES, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
   BROADCASTS, BROADCAST_FOLDERS, BROADCAST_INSIGHTS, BROADCAST_LIST_META,
   BROADCAST_NOTIFICATION_SETTINGS,
+  BROADCAST_APPROVAL_CONFIG, BROADCAST_APPROVAL_CANDIDATES, BROADCAST_APPROVAL_STATE,
+  BROADCAST_RECIPIENTS, BROADCAST_ACTIVITY,
   BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_FIELD_FOLDERS,
   FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW,
   INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
@@ -64,7 +68,7 @@ import {
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
-  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
+  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_AUDIENCE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
@@ -77,16 +81,18 @@ import {
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
+  OFFER_VERSIONS, OFFER_CAP_STATUS, ATTRIBUTION_DECISION,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
-  BOOKING_MENUS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
+  BOOKING_MENUS, BOOKING_MENU_VERSIONS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
   BOOKING_AVAILABILITY_RULES, BOOKING_BREAKS, BOOKING_BREAK_DATES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
-  EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_DELIVERIES,
-  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_DETAIL, EVENT_SLOTS, EVENT_WAITLIST, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
+  EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_SEND_COUNTS, LINE_NOTIFICATION_DELIVERIES,
+  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_DETAIL, EVENT_SLOTS, EVENT_WAITLIST, EVENT_BOOKINGS, EVENT_CHANGE_PREVIEW, EVENT_CHANGE_APPLY_RESULT, EVENT_LIFECYCLE_RESULT, EVENT_WAITLIST_REORDER_RESULT, EVENT_WAITLIST_SKIP_RESULT, EVENT_LIFF_CHANGE_RESULT, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
+  NEN_PHOTO_REWARD_POLICY_VERSIONS,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
   FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
@@ -96,10 +102,14 @@ import {
   CONVERSION_DEFINITION_PREVIEW, CONVERSION_DEFINITION_DELETE_IMPACT,
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_COMMENTS, WEBINAR_ANALYTICS,
-  WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS,
+  WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS, WEBINAR_VIDEO_ASSET,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
   ACCESS_USERS, ACCESS_ROLES, ACCESS_AUDIT_EVENTS,
   GETTING_STARTED, RECIPES, MANUAL_LINKS,
+  TEST_RECIPIENT_LOGIN_USERS,
+  HQ_BANNER_PRESETS, HQ_BANNER_USAGE, HQ_BANNER_STATS, HQ_BANNER_PROJECTS, HQ_BANNER_IMAGES,
+  NEN_RANK_SETTINGS, NEN_MEMBER_LIST, NEN_PET_LIST, NEN_HEALTH_LIST,
+  FRIEND_ADD_RUN_DETAIL, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -112,6 +122,17 @@ const HOST = '127.0.0.1'
 
 // 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
 let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
+
+// J-1・N 撮影用。動画の準備の段と開催回の定員を同じプロセス内で保存結果として返す。
+let mockVideoAsset = WEBINAR_VIDEO_ASSET ? { ...WEBINAR_VIDEO_ASSET } : null
+let mockSessionCapacity = 50
+
+// R25専用。回答フォームの箱も作る・直す・消すを見本で返す。
+let formFolders = FORM_FOLDERS.map((folder) => ({ ...folder }))
+// R37 撮影用。登録メディア・共通情報のフォルダ名変更・削除を同じ
+// プロセス内で保存結果として返す。
+let mediaFolders = MEDIA_FOLDERS.map((folder) => ({ ...folder }))
+let commonVarFolders = COMMON_VAR_FOLDERS.map((folder) => ({ ...folder }))
 
 // 機能15専用。版追加の撮影では、差し替え用セッションの確定が本番口と同じ
 // `verified` を返す必要がある。申告時に受けた targetMediaId を覚えておく。
@@ -162,6 +183,274 @@ const ACCOUNT = {
  * 落ちるため、混ぜられない）。
  */
 const EMPTY_PAGE = { items: [], total: 0, page: 1, limit: 20 }
+
+/**
+ * 運営コンソール（`/ops/*`）の見本データ。形は Worker の
+ * `apps/worker/src/routes/ops.ts`・`ops-dashboard.ts`・`ops-support.ts`・
+ * `ops-knowledge.ts`・`ops-announcements.ts` と `apps/web/src/lib/api.ts`
+ * の `Ops*` 型に合わせる。名前はすべて作り物で、実在の個人情報は入れない。
+ * 日時は固定（撮るたびに同じ絵になる）。
+ */
+const OPS_ME = {
+  id: 'visual-qa-ops',
+  name: '検証 太郎',
+  email: null,
+  readOnly: false,
+  totpEnabled: true,
+  lineLinked: false,
+  legacy: false,
+  impersonation: null,
+}
+const OPS_TENANTS = [
+  {
+    id: 'visual-tenant-1', name: '検証商事', status: 'active', featurePacks: [],
+    plan_key: 'standard', plan_status: 'active', trial_ends_at: null,
+    current_period_ends_at: '2026-10-01T00:00:00+09:00',
+    created_at: '2026-04-01T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
+    account_count: 2, staff_count: 5, last_login_at: '2026-09-07T08:00:00+09:00',
+  },
+  {
+    id: 'visual-tenant-2', name: '見本物産', status: 'active', featurePacks: [],
+    plan_key: null, plan_status: 'trialing', trial_ends_at: '2026-09-14T00:00:00+09:00',
+    current_period_ends_at: null,
+    created_at: '2026-08-20T10:00:00+09:00', updated_at: '2026-09-02T10:00:00+09:00',
+    account_count: 1, staff_count: 2, last_login_at: '2026-09-06T10:00:00+09:00',
+  },
+  {
+    id: 'visual-tenant-3', name: 'サンプル商店', status: 'suspended', featurePacks: [],
+    plan_key: 'light', plan_status: 'past_due', trial_ends_at: null,
+    current_period_ends_at: '2026-09-01T00:00:00+09:00',
+    created_at: '2026-02-01T10:00:00+09:00', updated_at: '2026-08-20T10:00:00+09:00',
+    account_count: 1, staff_count: 1, last_login_at: '2026-08-10T10:00:00+09:00',
+  },
+]
+const OPS_TENANT_SUMMARY = { active: 1, trialing: 1, suspended: 1, pastDue: 1 }
+const OPS_AUDIT = [
+  {
+    id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    tenant_id: 'visual-tenant-1', tenant_name: '検証商事',
+    action: 'tenant.status.change', reason: '検証用の記録', detail: '{"from":"suspended","to":"active"}',
+    ip: null, visible_to_tenant: 1, created_at: '2026-09-05T10:00:00+09:00',
+  },
+  {
+    id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    tenant_id: null, tenant_name: null,
+    action: 'ticket.view', reason: null, detail: '{"ticketNo":1}',
+    ip: null, visible_to_tenant: 0, created_at: '2026-09-06T10:00:00+09:00',
+  },
+]
+const OPS_MEMBERS = [
+  {
+    staffId: 'visual-qa-ops', name: '検証 太郎', email: null, isActive: true,
+    totpEnabled: true, lineLinked: false, inviteStatus: 'accepted', activationState: 'active',
+    invitedAt: '2026-04-01T10:00:00+09:00', approvedBy: null,
+    lastLoginAt: '2026-09-07T08:00:00+09:00', createdAt: '2026-04-01T10:00:00+09:00',
+  },
+  {
+    staffId: 'visual-ops-invited', name: '見本 花子', email: null, isActive: true,
+    totpEnabled: false, lineLinked: false, inviteStatus: 'sent', activationState: 'invited',
+    invitedAt: '2026-09-06T10:00:00+09:00', approvedBy: '検証 太郎',
+    lastLoginAt: null, createdAt: '2026-09-06T10:00:00+09:00',
+  },
+]
+const OPS_MEMBER_SUMMARY = {
+  members: 1, invited: 1, awaitingTotp: 0, totpEnabled: 1,
+  impersonationsThisMonth: 0, writeImpersonationsThisMonth: 0, piiRevealsThisMonth: 0,
+}
+const OPS_DASHBOARD = {
+  period: 'month',
+  periodLabel: '2026年9月',
+  pricing: 'list_price',
+  lastSyncedAt: null,
+  ai: { callsThisMonth: 12, draftsThisMonth: 9, articlesActive: 3 },
+  plans: [
+    { key: 'light', label: 'ライト', monthlyYen: 9800 },
+    { key: 'standard', label: 'スタンダード', monthlyYen: 29800 },
+    { key: 'pro', label: 'プロ', monthlyYen: 59800 },
+  ],
+  kpis: {
+    revenueThisMonth: 129200, revenueDelta: 9800, refundsThisMonth: 0,
+    contractMonthlyTotal: 129200, filledByListPriceCount: 2, active: 4,
+    byPlan: { light: 1, standard: 2, pro: 1 },
+    trialing: 2, newInPeriod: 1, newTrialsInPeriod: 1,
+    churnInPeriod: 0, churnRate: 0,
+  },
+  revenueByMonth: [
+    { month: '2026-04', label: '4月', yen: 99400, current: false },
+    { month: '2026-05', label: '5月', yen: 99400, current: false },
+    { month: '2026-06', label: '6月', yen: 109200, current: false },
+    { month: '2026-07', label: '7月', yen: 119400, current: false },
+    { month: '2026-08', label: '8月', yen: 119400, current: false },
+    { month: '2026-09', label: '9月', yen: 129200, current: true },
+  ],
+  planShare: {
+    total: 6,
+    rows: [
+      { key: 'light', label: 'ライト', count: 1, percent: 17 },
+      { key: 'standard', label: 'スタンダード', count: 2, percent: 33 },
+      { key: 'pro', label: 'プロ', count: 1, percent: 17 },
+      { key: 'trial', label: 'トライアル', count: 2, percent: 33 },
+    ],
+  },
+  alerts: { pastDue: 1, trialEndingSoon: 1, lineTokenExpiring: 0, unansweredTickets: 2 },
+  tickets: { newCount: 2, inProgressCount: 1, avgFirstReplyMinutes: 95, closedInPeriod: 5 },
+  lineRegistration: { registered: 8, total: 10, unregisteredCount: 2 },
+  usage: [
+    {
+      tenantId: 'visual-tenant-1', tenantName: '検証商事', planKey: 'standard', planLabel: 'スタンダード',
+      messages: 12000, bannerUnits: 3, mediaBytes: 800000000,
+      limits: { messages: 30000, images: 10, mediaBytes: 1000000000 }, usageRate: 80,
+    },
+    {
+      tenantId: 'visual-tenant-3', tenantName: 'サンプル商店', planKey: 'light', planLabel: 'ライト',
+      messages: 4500, bannerUnits: 0, mediaBytes: 100000000,
+      limits: { messages: 5000, images: 3, mediaBytes: 300000000 }, usageRate: 90,
+    },
+  ],
+  generatedAt: '2026-09-07T06:00:00+09:00',
+}
+const OPS_LINE_UNREGISTERED = {
+  registered: 8,
+  total: 10,
+  people: [
+    { staffId: 'visual-staff-1', name: '検証 一郎', tenantName: '検証商事', hasEmail: true },
+    { staffId: 'visual-staff-2', name: '見本 二郎', tenantName: '見本物産', hasEmail: false },
+  ],
+}
+const OPS_SUPPORT_SUMMARY = {
+  byStage: { all: 3, new: 1, in_progress: 1, waiting: 0, resolved: 1, closed: 0 },
+  kpis: {
+    untouched: 1, untouchedFromLine: 0,
+    avgFirstReplyMinutes: 95, prevAvgFirstReplyMinutes: 120,
+    resolutionRate: 80, prevResolutionRate: 75,
+    avgResolutionMinutes: 300, prevAvgResolutionMinutes: 360,
+  },
+}
+const OPS_SUPPORT_TICKETS = [
+  {
+    id: 'visual-ticket-1', ticketNo: 1, ticketLabel: 'No.1',
+    tenantId: 'visual-tenant-1', tenantName: '検証商事',
+    tenantPlanKey: 'standard', tenantPlanStatus: 'active', tenantStatus: 'active',
+    staffId: 'visual-staff-1', staffName: '検証 一郎', staffRole: 'owner', staffEmailRegistered: true,
+    kind: 'usage', kindLabel: '使い方',
+    subject: '検証用の問い合わせ', subjectAuto: false,
+    body: '画面確認用の問い合わせ本文。',
+    attachments: [],
+    stage: 'new', stageLabel: '新規', priority: 'high', priorityLabel: '高',
+    channel: 'admin', channelLabel: '管理画面',
+    assigneeStaffId: null, replyCount: 0, firstRepliedAt: null,
+    lastMessageAt: '2026-09-06T10:00:00+09:00', resolvedAt: null, closedAt: null,
+    createdAt: '2026-09-06T10:00:00+09:00', updatedAt: '2026-09-06T10:00:00+09:00',
+  },
+  {
+    id: 'visual-ticket-2', ticketNo: 2, ticketLabel: 'No.2',
+    tenantId: 'visual-tenant-2', tenantName: '見本物産',
+    tenantPlanKey: null, tenantPlanStatus: 'trialing', tenantStatus: 'active',
+    staffId: null, staffName: '—', staffRole: null, staffEmailRegistered: false,
+    kind: 'bug', kindLabel: '不具合',
+    subject: '検証用の対応中の問い合わせ', subjectAuto: true,
+    body: '画面確認用の対応中の問い合わせ本文。',
+    attachments: [],
+    stage: 'in_progress', stageLabel: '対応中', priority: 'medium', priorityLabel: '中',
+    channel: 'line', channelLabel: 'LINE',
+    assigneeStaffId: 'visual-qa-ops', replyCount: 1, firstRepliedAt: '2026-09-05T11:00:00+09:00',
+    lastMessageAt: '2026-09-05T12:00:00+09:00', resolvedAt: null, closedAt: null,
+    createdAt: '2026-09-05T10:00:00+09:00', updatedAt: '2026-09-05T12:00:00+09:00',
+  },
+]
+const OPS_SUPPORT_DETAIL = {
+  ticket: { ...OPS_SUPPORT_TICKETS[0], replyCount: 1 },
+  tenant: { accountCount: 2, staffCount: 5, staffWithLine: 3, pastTickets: 2, pastOpen: 1 },
+  messages: [
+    {
+      id: 'visual-msg-1', authorKind: 'tenant', authorName: '検証 一郎',
+      body: '画面確認用の問い合わせ本文。', attachments: [],
+      aiAssisted: false, deliveredVia: ['admin'],
+      createdAt: '2026-09-06T10:00:00+09:00',
+    },
+    {
+      id: 'visual-msg-2', authorKind: 'ops', authorName: '検証 太郎',
+      body: '画面確認用の返信文。', attachments: [],
+      aiAssisted: false, deliveredVia: ['admin'],
+      createdAt: '2026-09-06T11:00:00+09:00',
+    },
+  ],
+  draft: null,
+  ai: { available: false },
+  knowledge: { article: null, job: null },
+}
+/**
+ * 統括のお問い合わせの続き（`/hq/support/detail?id=…`）。
+ * `apps/web/src/lib/hq-support.ts` の `HqSupportDetail` と同じ器。
+ * 名前はすべて作り物で、日時は固定（撮るたびに同じ絵になる）。
+ */
+const HQ_SUPPORT_REQUESTS = [
+  {
+    id: 'visual-ticket-1', kind: 'usage', kindLabel: '使い方について',
+    subject: '画面確認用の問い合わせ', body: '画面確認用の問い合わせ本文。',
+    lineAccountId: 'visual-qa-account', attachments: [],
+    status: 'open', staffName: '検証 一郎', notified: true,
+    createdAt: '2026-09-06T10:00:00+09:00', ticketLabel: 'No.1',
+  },
+]
+const HQ_SUPPORT_DETAIL = {
+  ...HQ_SUPPORT_REQUESTS[0],
+  stageLabel: '受付済み',
+  /*
+   * 本物（`apps/worker/src/routes/hq-support.ts`）と同じく、最初の本文は
+   * `body` にだけ置き、`messages` には追記だけを入れる。本文を両方に
+   * 入れると画面で2回出る。運営の名は `musubo 運営 ／ 名前` の形。
+   */
+  messages: [
+    {
+      id: 'visual-support-msg-1', authorKind: 'ops', authorName: 'musubo 運営 ／ 検証 太郎',
+      body: '画面確認用の返信文。', attachments: [],
+      createdAt: '2026-09-06T11:00:00+09:00',
+    },
+  ],
+  canFollowUp: true,
+}
+const OPS_KNOWLEDGE = [
+  {
+    id: 'visual-article-1', version: 1,
+    title: '検証用の手順書', question: '画面確認用の質問文。', answer: '画面確認用の回答文。',
+    kind: 'usage', keywords: ['検証', '手順'],
+    sourceRequestId: 'visual-ticket-1', ticketNo: 1, sourceCurrent: true,
+    articleKind: 'verified',
+    reviewState: 'approved', status: 'active', reviewReason: '',
+    evidence: [], usedCount: 3, helpfulCount: 2, unhelpfulCount: 0,
+    updatedAt: '2026-09-05T10:00:00+09:00',
+  },
+  {
+    id: 'visual-article-2', version: 2,
+    title: '検証用の回答例', question: '画面確認用の質問文その2。', answer: '画面確認用の回答文その2。',
+    kind: 'bug', keywords: ['検証'],
+    sourceRequestId: 'visual-ticket-2', ticketNo: 2, sourceCurrent: false,
+    articleKind: 'answer_example',
+    reviewState: 'needs_review', status: 'active', reviewReason: '',
+    evidence: [], usedCount: 1, helpfulCount: 0, unhelpfulCount: 1,
+    updatedAt: '2026-09-04T10:00:00+09:00',
+  },
+]
+const OPS_ANNOUNCEMENTS = [
+  {
+    id: 'visual-announcement-1', subject: '検証用のお知らせ', body: '画面確認用のお知らせ本文。',
+    audienceKind: 'all', audiencePlans: [], audienceTenantIds: [], audienceLabel: 'すべて',
+    channels: ['screen'], channelLabels: ['画面'],
+    status: 'draft', statusLabel: '下書き',
+    publishAt: null, sentAt: null,
+    recipientsTotal: 10, lineSent: 0, lineFailed: 0, mailSent: 0, mailFailed: 0,
+    screenRead: 0, screenTotal: 10, lastError: null,
+    createdByName: '検証 太郎',
+    createdAt: '2026-09-06T10:00:00+09:00', updatedAt: '2026-09-06T10:00:00+09:00',
+  },
+]
+const OPS_NOTICE_LINE = {
+  currentId: 'visual-qa-account',
+  current: { id: 'visual-qa-account', name: '画面確認アカウント', basicId: null, addFriendUrl: null },
+  candidates: [{ id: 'visual-qa-account', name: '画面確認アカウント', basicId: null }],
+  linked: { linked: 8, total: 10 },
+}
 
 /** 機能9。設計の一覧・5段編集・削除確認を同じ1組の設定で撮る。 */
 const FRIEND_ADD_RULE = {
@@ -315,11 +604,53 @@ const DASHBOARD_PREFERENCES = {
     ],
     right: [
       ...['send-quota', 'operational-alerts', 'connection-status', 'support-mark-status',
-        'friend-status', 'upcoming', 'monthly-delivery', 'recent-results'].map((id) => ({ id, visible: true })),
+        'friend-status', 'upcoming', 'delivery-failures', 'monthly-delivery', 'recent-results'].map((id) => ({ id, visible: true })),
       ...['booking-status', 'inflow-top', 'funnel-alert', 'automation-failures'].map((id) => ({ id, visible: false })),
     ],
   },
 }
+
+/**
+ * M (今後の予定)の見本。型は `api.ts` の `DashboardUpcoming` どおり。
+ * 予約配信・リマインダー・予約を時刻順に並べた形。
+ */
+const DASHBOARD_UPCOMING = {
+  items: [
+    { kind: 'reminder', id: 'fr-1', title: '来店前日（あおい）', startsAt: `${FIXED_TO}T01:00:00.000Z`, href: '/reminders' },
+    { kind: 'broadcast', id: 'bc-1', title: '秋の案内', startsAt: `${FIXED_TO}T02:00:00.000Z`, href: '/broadcasts' },
+    { kind: 'booking', id: 'bk-1', title: '相談30分（あおい）', startsAt: `${FIXED_TO}T03:00:00.000Z`, href: '/booking/bookings?view=list' },
+  ],
+  asOf: `${FIXED_TO}T00:00:00.000Z`,
+  rangeDays: 7,
+}
+
+/**
+ * L (#824 数字の出どころ)の見本。型は `api.ts` の `DeliveryFailureOrigins` どおり。
+ * 同じ失敗は1件・送り直しは数えない形（合計3件）。
+ */
+const DASHBOARD_DELIVERY_FAILURE_ORIGINS = {
+  total: 3,
+  asOf: `${FIXED_TO}T11:50:00.000Z`,
+  origins: [
+    { source: 'broadcast.failed', failures: 2, latestFailedAt: `${FIXED_TO}T11:50:00.000Z`, sampleDeliveryIds: ['delivery-a', 'delivery-b'] },
+    { source: 'scenario.failed', failures: 1, latestFailedAt: `${FIXED_TO}T10:20:00.000Z`, sampleDeliveryIds: ['delivery-c'] },
+  ],
+}
+
+/** M (止めた経路のQR)の印刷用PDFの見本。A4・1枚の骨組みだけ。 */
+const QR_PRINT_PDF_SAMPLE = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] >>
+endobj
+trailer
+<< /Size 4 /Root 1 0 R >>
+%%EOF`
 
 const DASHBOARD_OVERVIEW = {
   period: 'today',
@@ -331,7 +662,11 @@ const DASHBOARD_OVERVIEW = {
   inbox: {
     unanswered: 5,
     inProgress: 0,
+    onHold: 0,
     resolved: 38,
+    // 受信箱の見本（summary total 5・line 1・email 4・emailUnread 4）と同じ内訳。
+    line: { unanswered: 1, inProgress: 0, onHold: 0, resolved: 34 },
+    email: { unanswered: 4, inProgress: 0, onHold: 0, resolved: 4 },
     // 設計の運用アラート「最も古い未対応：9,110分前」。
     oldestUnansweredMinutes: 9110,
     averageFirstReplyMinutes: null,
@@ -402,8 +737,11 @@ const DASHBOARD_OVERVIEW = {
     twoFactor: { enabled: 0, total: 6 },
     notificationUnreadCount: 3,
     shipmentStatus: '未処理なし',
-    // 設計の運用アラート見本は未対応360件。本番相当の inbox.unanswered=5 とは別物の見本値。
-    supportInbox: { unanswered: 360, resolved: 38 },
+    /*
+     * 対応状況の差し替えは置かない。本物の概要と同じ数（上の小カード5件と
+     * 右の未対応が同じ `overview.inbox`）にする。360件の見本を置いていた頃、
+     * 同じ画面で 5件と360件が並んで食い違いに見えた。
+     */
   },
 }
 
@@ -895,6 +1233,7 @@ const SHAPES = {
   */
   '/api/analytics/report-schedules': {
     items: [],
+    recentOneTime: [],
     options: {
       timeZone: 'Asia/Tokyo',
       savedAnalyses: [
@@ -923,6 +1262,9 @@ const SHAPES = {
     // 本物は版を返す。無いと画面の expectedVersion 付き保存の欠落に気づけない。
     version: 1,
   },
+  // 左メニューの出し分け。無いと汎用の空一覧が返り「機能設定を読み込めませんでした」になり、
+  // メニューが基本の9項目だけになる（2026-09-24 の点検で発覚）。
+  '/api/settings/features/visibility': { features: FEATURES },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
@@ -980,7 +1322,12 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
-  if (method === 'POST' && pathname === '/api/notifications/operator-rules/recipients-preview') {
+  if (method === 'POST' && (pathname === '/api/notifications/operator-rules/recipients-preview' || pathname === '/api/line-notifications/operator-rules/recipients-preview')) {
+    /*
+     * 本物は両方の名で同じ候補を返す（`notifications.ts`）。
+     * `line-notifications` 側が無いと、つくる画面の「受け取る人」が
+     * 「読み込めませんでした」になっていた。
+     */
     return OPERATOR_NOTIFICATION_RECIPIENTS
   }
   if (method === 'POST' && /^\/api\/notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
@@ -996,8 +1343,18 @@ function visualQaWriteBody(method, pathname) {
    * 読みの `/draft` と `/runs` は従来のGET側にある。ここは書き込み側で、
    * 本番と同じ器（`{success:true,data}`）で固定の返事を返す。
    */
-  if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) return REMINDER_DRAFT
+  /*
+   * 対象者ステップはどのIDで開いても描けるように、要求のIDをそのまま返す。
+   * 固定の `reminder-3` を返すと、別ID（例 `reminder-1`）では画面の
+   * 照合（`draft.reminderId === reminderId`）に落ち、いつまでも
+   * 「下書きを読み込んでいます」になる。F-1 の撮影は ID を変えて行う。
+   */
+  if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
+    const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
+    return { ...REMINDER_DRAFT, reminderId: draftId || REMINDER_DRAFT.reminderId }
+  }
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/validate$/.test(pathname)) return REMINDER_VALIDATE
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/audience$/.test(pathname)) return REMINDER_AUDIENCE
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/preview$/.test(pathname)) return REMINDER_PREVIEW
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/test-send$/.test(pathname)) return REMINDER_TEST_SEND
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/publish$/.test(pathname)) return REMINDER_PUBLISH
@@ -1096,6 +1453,29 @@ function visualQaWriteBody(method, pathname) {
   if (method === 'PUT' && pathname === '/api/broadcasts/notification-settings') {
     return BROADCAST_NOTIFICATION_SETTINGS
   }
+  /* 二者承認（m12a / 設計 A）。撮影で承認待ちの帯・承認する人の操作を出す。 */
+  if (method === 'PUT' && pathname === '/api/broadcasts/approval-threshold') {
+    return { success: true, data: { lineAccountId: query.get('lineAccountId') ?? 'visual-qa-account', threshold: 1000 } }
+  }
+  const broadcastApprovalAction = pathname.match(/^\/api\/broadcasts\/([^/]+)\/approval-(request|approve|reject|cancel|remind)$/)
+  if (method === 'POST' && broadcastApprovalAction) {
+    const action = broadcastApprovalAction[2]
+    if (action === 'remind') return { success: true, data: { reminded: true } }
+    const status = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : action === 'cancel' ? 'cancelled' : 'pending'
+    return {
+      success: true,
+      data: {
+        approval: {
+          ...BROADCAST_APPROVAL_STATE.approval,
+          status,
+          decidedByStaffId: status === 'pending' ? null : 'staff-approver',
+          decidedAt: status === 'pending' ? null : '2026-09-25T21:00:00+09:00',
+          rejectReason: status === 'rejected' ? '金額が古い' : null,
+        },
+        ...(action === 'approve' ? { needsSend: true } : {}),
+      },
+    }
+  }
   if (method === 'POST' && /^\/api\/tags\/[^/]+\/archive$/.test(pathname)) {
     return TAG_ARCHIVE_RESULT
   }
@@ -1122,6 +1502,25 @@ function visualQaWriteBody(method, pathname) {
   if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/slots$/.test(pathname)) {
     return { items: EVENT_SLOTS }
   }
+  /* U: 変更の確認・状態・待ちの手動操作・LIFF開催回変更の見本（実APIと同じ器）。 */
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/lifecycle$/.test(pathname)) {
+    return EVENT_LIFECYCLE_RESULT
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/change-review$/.test(pathname)) {
+    return EVENT_CHANGE_PREVIEW
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/change-review\/apply$/.test(pathname)) {
+    return EVENT_CHANGE_APPLY_RESULT
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/occurrences\/[^/]+\/waitlist\/reorder$/.test(pathname)) {
+    return EVENT_WAITLIST_REORDER_RESULT
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/occurrences\/[^/]+\/waitlist\/skip$/.test(pathname)) {
+    return EVENT_WAITLIST_SKIP_RESULT
+  }
+  if (method === 'POST' && /^\/api\/events\/liff\/bookings\/[^/]+\/change$/.test(pathname)) {
+    return EVENT_LIFF_CHANGE_RESULT
+  }
   if (method === 'PUT' && /^\/api\/events\/admin\/events\/[^/]+\/slots\/[^/]+$/.test(pathname)) {
     return EVENT_SLOTS[0]
   }
@@ -1135,7 +1534,7 @@ function visualQaWriteBody(method, pathname) {
 const RAW = {
   // `0.0.0-dev` のときはバナー自体を出さない。manifest も見に行かない。
   //（update-banner.tsx の DEV_VERSION と同じ値でないと効かない）
-  '/admin/version': { version: '2.6.4', worker_hash: '', admin_hash: '', liff_hash: '' },
+  '/admin/version': { version: '2.6.4', worker_hash: '', admin_hash: '', liff_hash: '', git_commit: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', deploy_env: 'staging', released_at: '2026-09-27T04:05:00.000Z' },
   '/admin/manifest': { releases: [], versions: [] },
 
   /*
@@ -1190,6 +1589,13 @@ const RAW = {
  */
 const RAW_PATTERNS = [
   [/^\/api\/booking\/admin\/bookings\/[^/]+$/, BOOKING_ADMIN_DETAIL],
+  [/^\/api\/booking\/admin\/menus\/[^/]+\/versions$/, { versions: BOOKING_MENU_VERSIONS }],
+  [/^\/api\/booking\/admin\/menus\/[^/]+\/versions\/\d+$/, (url) => {
+    const wanted = Number(url.pathname.split('/').pop())
+    const version = BOOKING_MENU_VERSIONS.find((item) => item.version_number === wanted)
+      ?? BOOKING_MENU_VERSIONS[0]
+    return { version }
+  }],
   [/^\/api\/booking\/admin\/staff\/[^/]+\/menus$/, (url) => ({
     matrix: BOOKING_STAFF_MENUS[url.pathname.split('/')[5]] ?? [],
   })],
@@ -1296,8 +1702,150 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/hq/billing/invoices') {
     return { success: true, data: [] }
   }
+  if (method === 'GET' && pathname === '/api/hq/support/context') {
+    /*
+     * 統括のお問い合わせ（`apps/worker/src/routes/hq-support.ts`）と同じ器。
+     * 無いと既定の `{items,total,page,limit}` が返り、画面の `kinds.map` で
+     * `/hq/support` が真っ白になった（2026-09-25）。
+     */
+    return {
+      success: true,
+      data: {
+        kinds: [
+          { key: 'usage', label: '使い方について' },
+          { key: 'bug', label: '不具合の報告' },
+          { key: 'billing', label: '料金・契約について' },
+          { key: 'feature', label: '要望・提案' },
+          { key: 'other', label: 'その他' },
+        ],
+        accounts: [{ id: 'visual-qa-account', name: '画面確認アカウント' }],
+        sender: {
+          tenantName: '画面確認統括',
+          name: '検証 一郎',
+          email: 'owner@example.com',
+          planLabel: 'スタンダード',
+        },
+      },
+    }
+  }
+  {
+    /*
+     * 統括のお問い合わせの続き（`HqSupportDetail`）。
+     * 無いと既定の `{items,total,page,limit}` が返り、日時の整形で落ちて
+     * `/hq/support/detail?id=visual-ticket-1` が開けなかった（2026-09-25）。
+     */
+    const hqSupportDetail = /^\/api\/hq\/support\/requests\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && hqSupportDetail) {
+      const id = decodeURIComponent(hqSupportDetail[1])
+      const found = HQ_SUPPORT_REQUESTS.find((row) => row.id === id) ?? HQ_SUPPORT_REQUESTS[0]
+      return { success: true, data: { ...HQ_SUPPORT_DETAIL, ...found, messages: HQ_SUPPORT_DETAIL.messages } }
+    }
+  }
   if (pathname === '/api/auth/session') {
-    return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
+    /*
+     * 運営コンソールの外枠（`OpsShell`）は `platformAdmin` を見る。
+     * 本物（`apps/worker/src/routes/admin-auth.ts`）と同じ器で、
+     * 運営メンバーとして返す。通常の `AuthGuard` は余分な鍵を無視するので、
+     * 他の画面は変わらない。
+     */
+    return {
+      success: true,
+      data: { ...STAFF, platformAdmin: true, platformAdminState: null, impersonation: null },
+      csrfToken: 'visual-qa-csrf',
+    }
+  }
+  /*
+   * 運営コンソール（`/ops/*`）。画面側は変えない。見本データは上の `OPS_*`。
+   * 更新系は従来どおり405で、撮影では読みの画面だけを見る。
+   */
+  if (method === 'GET' && pathname === '/api/ops/me') {
+    return { success: true, data: OPS_ME }
+  }
+  if (method === 'GET' && pathname === '/api/ops/impersonation/current') {
+    return { success: true, data: null }
+  }
+  if (method === 'GET' && pathname === '/api/ops/tenants') {
+    return { success: true, data: OPS_TENANTS, summary: OPS_TENANT_SUMMARY }
+  }
+  {
+    const tenantDetail = /^\/api\/ops\/tenants\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && tenantDetail) {
+      const id = decodeURIComponent(tenantDetail[1])
+      const tenant = OPS_TENANTS.find((row) => row.id === id) ?? OPS_TENANTS[0]
+      return {
+        success: true,
+        data: {
+          tenant: { ...tenant, id: tenant.id },
+          accounts: [
+            {
+              id: 'visual-qa-account', name: '画面確認アカウント', is_active: 1,
+              archived_at: null, updated_at: '2026-09-01T10:00:00+09:00', friend_count: 231,
+            },
+          ],
+          members: [
+            {
+              id: 'visual-staff-1', name: '検証 一郎', email: null, role: 'owner',
+              access_level: 'admin', is_active: 1, invite_status: 'accepted',
+              last_login_at: '2026-09-07T08:00:00+09:00',
+            },
+          ],
+          audit: OPS_AUDIT,
+        },
+      }
+    }
+  }
+  if (method === 'GET' && pathname === '/api/ops/dashboard') {
+    const period = query.get('period')
+    const selected = period === 'prev_month' || period === 'year' ? period : 'month'
+    return { success: true, data: { ...OPS_DASHBOARD, period: selected } }
+  }
+  if (method === 'GET' && pathname === '/api/ops/dashboard/line-unregistered') {
+    return { success: true, data: OPS_LINE_UNREGISTERED }
+  }
+  if (method === 'GET' && pathname === '/api/ops/support/summary') {
+    return { success: true, data: OPS_SUPPORT_SUMMARY }
+  }
+  if (method === 'GET' && pathname === '/api/ops/support/tickets') {
+    return { success: true, data: OPS_SUPPORT_TICKETS, total: OPS_SUPPORT_TICKETS.length }
+  }
+  {
+    const supportDetail = /^\/api\/ops\/support\/tickets\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && supportDetail) {
+      const id = decodeURIComponent(supportDetail[1])
+      const ticket = OPS_SUPPORT_TICKETS.find((row) => row.id === id) ?? OPS_SUPPORT_TICKETS[0]
+      return {
+        success: true,
+        data: { ...OPS_SUPPORT_DETAIL, ticket: { ...OPS_SUPPORT_DETAIL.ticket, ...ticket, replyCount: 1 } },
+      }
+    }
+  }
+  if (method === 'GET' && pathname === '/api/ops/knowledge') {
+    return { success: true, data: OPS_KNOWLEDGE, total: OPS_KNOWLEDGE.length }
+  }
+  {
+    const knowledgeDetail = /^\/api\/ops\/knowledge\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && knowledgeDetail) {
+      const id = decodeURIComponent(knowledgeDetail[1])
+      const article = OPS_KNOWLEDGE.find((row) => row.id === id) ?? OPS_KNOWLEDGE[0]
+      return { success: true, data: { ...article, sourceSubject: null } }
+    }
+  }
+  if (method === 'GET' && pathname === '/api/ops/announcements') {
+    return {
+      success: true,
+      data: OPS_ANNOUNCEMENTS,
+      linked: OPS_NOTICE_LINE.linked,
+      noticeLineConfigured: true,
+    }
+  }
+  if (method === 'GET' && pathname === '/api/ops/notice-line-account') {
+    return { success: true, data: OPS_NOTICE_LINE }
+  }
+  if (method === 'GET' && pathname === '/api/ops/audit') {
+    return { success: true, data: OPS_AUDIT, total: OPS_AUDIT.length }
+  }
+  if (method === 'GET' && pathname === '/api/ops/members') {
+    return { success: true, data: OPS_MEMBERS, summary: OPS_MEMBER_SUMMARY }
   }
   if (pathname === '/api/inbox/unanswered') {
     return {
@@ -1458,11 +2006,49 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/recipes') return { success: true, data: RECIPES }
   const recipeDetail = /^\/api\/recipes\/([^/]+)$/.exec(pathname)
   if (recipeDetail) {
-    return { success: true, data: RECIPES.find((recipe) => recipe.id === recipeDetail[1]) ?? null }
+    /*
+     * 未知IDは本物と同じく失敗にする。成功＋null だと
+     * 複製画面が `recipe.items.map` で落ちていた。
+     */
+    const found = RECIPES.find((recipe) => recipe.id === recipeDetail[1])
+    if (!found) return { success: false, error: 'レシピが見つかりません' }
+    return { success: true, data: found }
   }
   if (pathname === '/api/manual-links') return { success: true, data: MANUAL_LINKS }
   if (pathname === '/api/operations/control/preview') {
     return { success: true, data: OPERATION_CONTROL_PREVIEW }
+  }
+  if (pathname === '/api/operations/send-paths') {
+    /*
+     * 無いと既定の器が返り、`data.capabilities` が回せず
+     * 「画面を表示できませんでした」になっていた（`?tab=control`）。
+     * 本物は `{evaluatedAt,capabilities,problems,paths}`（`operations.ts`）。
+     */
+    return { success: true, data: OPERATION_SEND_PATHS }
+  }
+  if (pathname === '/api/hq/banners/presets') {
+    /*
+     * 無いと既定の器が返り、`stats.projects.active` で
+     * 「画面を表示できませんでした」になっていた。本物の形で置く。
+     */
+    return {
+      success: true,
+      data: { presets: HQ_BANNER_PRESETS, maxCount: 4, usage: HQ_BANNER_USAGE, engineReady: true },
+    }
+  }
+  if (pathname === '/api/hq/banners/stats') {
+    return { success: true, data: HQ_BANNER_STATS }
+  }
+  if (pathname === '/api/hq/banners/projects') {
+    const archived = query.get('archived') === '1'
+    const items = archived ? [] : HQ_BANNER_PROJECTS
+    return { success: true, data: items }
+  }
+  if (pathname === '/api/hq/banners/images') {
+    return { success: true, data: HQ_BANNER_IMAGES, nextBefore: null }
+  }
+  if (method === 'DELETE' && pathname === '/api/hq/templates/media') {
+    return { success: true, data: { deleted: true } }
   }
   if (pathname === '/api/operations/health') {
     return { success: true, data: OPERATION_HEALTH }
@@ -1499,6 +2085,34 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/analytics/saved') {
     return { success: true, data: ANALYTICS_SAVED }
+  }
+  /* R454: 1回送信の履歴と送り直し。型どおりの器で返す。 */
+  const reportRuns = /^\/api\/analytics\/report-schedules\/([^/]+)\/runs$/.exec(pathname)
+  if (method === 'GET' && reportRuns) {
+    return {
+      success: true,
+      data: {
+        schedule: {
+          id: reportRuns[1], lineAccountId: 'visual-qa-account', name: '1回送信の見本',
+          sections: ['friends'], savedAnalysisIds: [], cadence: 'weekly', weekday: 1,
+          monthDay: null, sendTime: '09:00', timeZone: 'Asia/Tokyo', periodDays: 7,
+          recipients: [{ kind: 'email', email: 'report@example.com', label: 'report@example.com' }],
+          channels: ['email'], alertRules: [], status: 'archived', isOneTime: true,
+          nextRunAt: '2026-09-07T00:00:00.000Z', createdBy: null,
+          createdAt: '2026-09-06T00:00:00.000Z', updatedAt: '2026-09-07T01:00:00.000Z',
+        },
+        runs: [{
+          id: 'visual-run-1', scheduleId: reportRuns[1], lineAccountId: 'visual-qa-account',
+          scheduledFor: '2026-09-07T00:00:00.000Z', periodFrom: '2026-08-31', periodTo: '2026-09-06',
+          timeZone: 'Asia/Tokyo', dataCutoffAt: '2026-09-07T00:00:00.000Z', state: 'failed',
+          result: {}, deliveryResults: [{ channel: 'email', recipient: 'report@example.com', status: 'failed', reason: '見本の失敗' }],
+          errorCode: 'synthetic_mail_failed', startedAt: '2026-09-07T00:00:00.000Z', completedAt: '2026-09-07T00:01:00.000Z',
+        }],
+      },
+    }
+  }
+  if (method === 'POST' && /^\/api\/analytics\/report-schedules\/[^/]+\/retry$/.test(pathname)) {
+    return { success: true, data: null }
   }
   const savedSnapshots = /^\/api\/analytics\/saved\/([^/]+)\/snapshots$/.exec(pathname)
   if (savedSnapshots) {
@@ -1687,6 +2301,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: DASHBOARD_PREFERENCES }
   }
+  // M (今後の予定)・L (#824 数字の出どころ)の見本。型どおりの名前で返す。
+  if (pathname === '/api/dashboard/upcoming') return { success: true, data: DASHBOARD_UPCOMING }
+  if (pathname === '/api/dashboard/delivery-failure-origins') {
+    return { success: true, data: DASHBOARD_DELIVERY_FAILURE_ORIGINS }
+  }
   // 設計と画像で比べるための中身。空の表しか描けないと、
   // 「空の状態」だけを見て一致したと言えてしまう。
   // 受信箱（設計 `xGLVe`）。空で返すと一覧も吹き出しも出ない。
@@ -1729,25 +2348,105 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     // 設計 `xGLVe` のトーク欄。載っていない友だちは空で返す（実際に空の人もいる）。
     return { success: true, data: FRIEND_MESSAGES[messages[1]] ?? [] }
   }
-  // テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
-  if (pathname === '/api/templates') return { success: true, data: TEMPLATES }
+  /*
+   * テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
+   *
+   * 実Workerは口を2つに分けている。`page` か `limit` が付くとページ区切りの
+   * `{ items, total, limit, sort }` を返し、無ければ配列のまま返す
+   * （`apps/worker/src/routes/templates.ts`）。受信箱のテンプレート選択は
+   * 区切り形だけを読むので、ここも同じ分け方にする。ずれていると
+   * `items` が undefined になって画面ごと落ちる。
+   */
+  if (pathname === '/api/templates') {
+    if (query.has('page') || query.has('limit')) {
+      const q = query.get('q')?.toLowerCase()
+      const folderId = query.get('folder_id')
+      const messageType = query.get('message_type')
+      const filtered = TEMPLATES.filter((item) =>
+        (messageType ? item.messageType === messageType : true)
+        && (folderId ? (folderId === '__none__' ? !item.folderId : item.folderId === folderId) : true)
+        && (q ? item.name.toLowerCase().includes(q) || item.messageContent.toLowerCase().includes(q) : true))
+      const limit = Math.max(1, Number(query.get('limit') ?? 100) || 100)
+      const page = Math.max(1, Number(query.get('page') ?? 1) || 1)
+      const items = filtered.slice((page - 1) * limit, page * limit)
+      const folderCounts = query.get('folder_counts') === '1'
+        ? filtered.reduce((acc, item) => {
+            const key = item.folderId ?? ''
+            acc[key] = (acc[key] ?? 0) + 1
+            return acc
+          }, {})
+        : undefined
+      return {
+        success: true,
+        data: {
+          items,
+          total: filtered.length,
+          limit,
+          sort: [{ field: 'created_at', direction: 'desc' }, { field: 'id', direction: 'asc' }],
+          ...(folderCounts ? { folderCounts } : {}),
+        },
+      }
+    }
+    return { success: true, data: TEMPLATES }
+  }
   const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
   if (templateDetail) {
     const template = TEMPLATES.find((item) => item.id === templateDetail[1])
     if (template) {
       const usedBy = template.id === 'template-9' ? {
-        scenarioSteps: [{ scenarioId: 'scenario-welcome', scenarioName: '新規登録7日間フォロー', stepId: 'step-1', stepOrder: 1 }],
-        autoReplies: [{ id: 'auto-reply-document', keyword: '資料請求', matchType: 'exact', lineAccountId: 'visual-qa-account' }],
+        scenarioSteps: [{ scenarioId: 'scenario-welcome', scenarioName: '新規登録7日間フォロー', stepId: 'step-1', stepOrder: 1, templateVersion: 3 }],
+        autoReplies: [{ id: 'auto-reply-document', keyword: '資料請求', matchType: 'exact', lineAccountId: 'visual-qa-account', templateVersion: 3 }],
         automations: [{ id: 'automation-inbox-favorite', name: '受信箱の「よく使う」（担当3人が登録）', eventType: 'inbox_favorite' }],
         reminderSteps: [], richMenuAreas: [], trackedLinks: [],
+        broadcasts: [
+          { broadcastId: 'broadcast-autumn', title: '秋の会員向け案内', status: 'scheduled', scheduledAt: '2026-10-01T10:00:00+09:00', templateVersionNumber: 3, referenceMode: 'fixed' },
+          { broadcastId: 'broadcast-august', title: '8月の案内', status: 'sent', scheduledAt: null, templateVersionNumber: 2, referenceMode: 'fixed' },
+        ],
       } : {
-        autoReplies: [], automations: [], scenarioSteps: [], reminderSteps: [], richMenuAreas: [], trackedLinks: [],
+        autoReplies: [], automations: [], scenarioSteps: [], reminderSteps: [], richMenuAreas: [], trackedLinks: [], broadcasts: [],
       }
-      return { success: true, data: { ...template, accountId: 'visual-qa-account', question: null, questionStatus: 'draft', usedBy } }
+      return {
+        success: true,
+        data: {
+          ...template,
+          accountId: 'visual-qa-account',
+          question: null,
+          questionStatus: 'draft',
+          usedBy,
+          hasDraft: false,
+          publishedVersion: 3,
+          publishedAt: '2026-09-10T11:02:00+09:00',
+          draftRevision: 0,
+        },
+      }
     }
+  }
+  // #820: 版の履歴。新しい版から返す。status は in_use / reserved / past。
+  const templateVersions = /^\/api\/templates\/(template-\d+)\/versions$/.exec(pathname)
+  if (templateVersions) {
+    return {
+      success: true,
+      data: [
+        { versionNumber: 3, status: 'in_use', messageType: 'text', messageContent: 'いまの本文です。内容をご確認ください。', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-09-10T11:02:00+09:00' },
+        { versionNumber: 2, status: 'past', messageType: 'text', messageContent: '前の本文です。内容をご確認ください。', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-08-01T10:00:00+09:00' },
+      ],
+    }
+  }
+  // #820: この版に戻す。過去の版は変えず、その中身で新しい版を作る。
+  const templateRevert = method === 'POST' && /^\/api\/templates\/(template-\d+)\/revert$/.exec(pathname)
+  if (templateRevert) {
+    return { success: true, data: { id: templateRevert[1], publishedVersion: 4, hasDraft: false } }
   }
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
+  }
+  if (pathname === '/api/account-settings/test-recipient-login-users') {
+    /*
+     * 無いと既定の器（`{items,total,page,limit}`）が返り、
+     * `loginUsers.filter` で「画面を表示できませんでした」になっていた。
+     * 本物は配列を返す（`account-settings.ts`）。
+     */
+    return { success: true, data: TEST_RECIPIENT_LOGIN_USERS }
   }
   // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
   if (method === 'POST' && pathname === '/api/forms/drafts') {
@@ -1772,6 +2471,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'DELETE' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
     return { success: true, data: null }
   }
+  // P: 公開前の試し合言葉の発行。生の値はこの応答でしか返らない。
+  const formTestToken = method === 'POST' && /^\/api\/forms\/([^/]+)\/test-token$/.exec(pathname)
+  if (formTestToken) {
+    return { success: true, data: { token: 'test-token-qa', expiresAt: '2026-09-28T15:00:00.000+09:00' } }
+  }
+  // R230: フォーム全体の複製。絵の検証用に新しい下書き（受付停止）を返す。
+  const formDuplicate = method === 'POST' && /^\/api\/forms\/([^/]+)\/duplicate$/.exec(pathname)
+  if (formDuplicate) {
+    return { success: true, data: { id: 'form-duplicate-qa', isActive: false } }
+  }
   if (pathname === '/api/forms') {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
   }
@@ -1794,7 +2503,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: { ...FORM_SUBMISSIONS, items: FORM_SUBMISSIONS.items.slice(start, start + safeLimit), page: safePage, limit: safeLimit } }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'form') {
-    return { success: true, data: FORM_FOLDERS }
+    // R25: 作った箱も同じプロセス内では返す（webinar と同じ流儀）。
+    return { success: true, data: formFolders }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
     return { success: true, data: TEMPLATE_FOLDERS }
@@ -1819,10 +2529,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: AUTO_REPLY_FOLDERS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'common_var') {
-    return { success: true, data: COMMON_VAR_FOLDERS }
+    return { success: true, data: commonVarFolders }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'media') {
-    return { success: true, data: MEDIA_FOLDERS }
+    return { success: true, data: mediaFolders }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'webinar') {
     const accountId = query.get('account_id')
@@ -1902,8 +2612,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  /*
+   * 対象者の画面が読む口（条件・人数・顔ぶれ・数え直し）の見本。
+   * 下書きは要求のIDをそのまま返す。固定IDだと別IDの撮影が
+   * 照合に落ち、F-1（条件を足す・変える・消す・人数がすぐ変わる・
+   * 顔ぶれを見る）を確かめられない。人数・顔ぶれ・数え直しは
+   * `REMINDER_VALIDATE` / `REMINDER_AUDIENCE` が固定で返す。
+   */
   if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
-    return { success: true, data: REMINDER_DRAFT }
+    const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
+    return { success: true, data: { ...REMINDER_DRAFT, reminderId: draftId || REMINDER_DRAFT.reminderId } }
   }
   const reminderOne = /^\/api\/reminders\/([^/]+)$/.exec(pathname)
   if (reminderOne) {
@@ -1926,6 +2644,14 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const reminder = REMINDERS.find((item) => item.id === reminderSteps[1])
     return { success: true, data: reminder ? reminderStepsOf(reminder) : [] }
   }
+  const reminderRegistrants = /^\/api\/reminders\/([^/]+)\/registrants$/.exec(pathname)
+  if (reminderRegistrants) {
+    /*
+     * 無いと既定の器が返り、登録者の欄が
+     * 「読み込めませんでした」になっていた。本物は配列（`reminders.ts`）。
+     */
+    return { success: true, data: REMINDER_REGISTRANTS }
+  }
   if (pathname === '/api/friend-add-runs') {
     const status = query.get('status')
     const ruleId = query.get('rule_id')
@@ -1942,6 +2668,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       .filter((item) => !attribution || item.attribution?.status === attribution)
       .slice(0, limit)
     return { success: true, data: { ...FRIEND_ADD_RUNS, items } }
+  }
+  const friendAddRunDetail = /^\/api\/friend-add-runs\/([^/]+)$/.exec(pathname)
+  if (friendAddRunDetail) {
+    /*
+     * 無いと既定の器が返り、`detail.actionRuns.filter` で
+     * 「画面を表示できませんでした」になっていた。
+     * 本物は `actionRuns` まで含めた1件（`friend-add-rules.ts`）。
+     * 未知IDは本物と同じく失敗にする。
+     */
+    if (friendAddRunDetail[1] !== FRIEND_ADD_RUN_DETAIL.id) return { success: false, error: '実行結果が見つかりません' }
+    return { success: true, data: FRIEND_ADD_RUN_DETAIL }
   }
   if (pathname === '/api/scenarios') {
     const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
@@ -1985,6 +2722,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         .sort((left, right) => left.sortOrder - right.sortOrder),
     }
   }
+  // R250: 終了後の移動先にしているシナリオの一覧。型どおり `{items,total}`。
+  const scenarioMoveReferrers = pathname.match(/^\/api\/scenarios\/([^/]+)\/move-referrers$/)
+  if (scenarioMoveReferrers) return { success: true, data: { items: [], total: 0 } }
   const scenario = pathname.match(/^\/api\/scenarios\/([^/]+)$/)
   if (scenario) {
     // 通を配列で返す。`{items,total}` のままだと `scenario.steps` で落ちる。
@@ -1997,9 +2737,79 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/broadcasts/notification-settings') {
     return { success: true, data: BROADCAST_NOTIFICATION_SETTINGS }
   }
+  /* 二者承認（m12a）。固定名の口は :id より先に置く（本番と同じ順番）。 */
+  if (pathname === '/api/broadcasts/approval-config') {
+    return {
+      success: true,
+      data: { ...BROADCAST_APPROVAL_CONFIG, lineAccountId: query.get('lineAccountId') ?? 'visual-qa-account' },
+    }
+  }
+  if (pathname === '/api/broadcasts/approvals/candidates') {
+    return { success: true, data: BROADCAST_APPROVAL_CANDIDATES }
+  }
+  if (pathname === '/api/broadcasts/approval-threshold') {
+    return { success: true, data: { lineAccountId: query.get('lineAccountId') ?? 'visual-qa-account', threshold: 1000 } }
+  }
+  const broadcastApproval = pathname.match(/^\/api\/broadcasts\/([^/]+)\/approval$/)
+  if (broadcastApproval) {
+    const approvalId = broadcastApproval[1]
+    // 記録の見本と合わせる。2行目は承認を通って送信済み。
+    // 承認の無い配信は 'none'（段に承認待ちを出さない）。
+    if (approvalId === 'broadcast-2') {
+      return {
+        success: true,
+        data: {
+          ...BROADCAST_APPROVAL_STATE,
+          approval: {
+            ...BROADCAST_APPROVAL_STATE.approval,
+            status: 'approved',
+            decidedByStaffId: 'staff-approver',
+            decidedAt: '2026-09-25T21:02:00+09:00',
+          },
+        },
+      }
+    }
+    if (approvalId !== 'broadcast-0' && approvalId !== 'broadcast-visual') {
+      return {
+        success: true,
+        data: {
+          ...BROADCAST_APPROVAL_STATE,
+          approval: {
+            ...BROADCAST_APPROVAL_STATE.approval,
+            status: 'none',
+            requestedByStaffId: null,
+            requestedAt: null,
+            approverStaffId: null,
+            note: null,
+          },
+          gate: { ...BROADCAST_APPROVAL_STATE.gate, required: false, recipientCount: 0 },
+        },
+      }
+    }
+    return { success: true, data: BROADCAST_APPROVAL_STATE }
+  }
   const broadcastInsight = pathname.match(/^\/api\/broadcasts\/([^/]+)\/insight$/)
   if (broadcastInsight) {
     return { success: true, data: BROADCAST_INSIGHTS[broadcastInsight[1]] ?? null }
+  }
+  const broadcastRecipients = pathname.match(/^\/api\/broadcasts\/([^/]+)\/recipients$/)
+  if (broadcastRecipients) {
+    const wanted = query.get('result') ?? 'all'
+    const groupFor = { delivered: 'delivered', temporary: 'failed_temporary', permanent: 'failed_permanent', unknown: 'unknown', inflight: 'inflight' }[wanted]
+    const rows = groupFor ? BROADCAST_RECIPIENTS.rows.filter((row) => row.group === groupFor) : BROADCAST_RECIPIENTS.rows
+    return {
+      success: true,
+      data: { rows, summary: BROADCAST_RECIPIENTS.summary, aggregateOnly: false, aggregateReason: null, legacySuccessCount: null },
+      pagination: { total: rows.length, limit: 50, cursor: 0, nextCursor: null },
+    }
+  }
+  const broadcastActivity = pathname.match(/^\/api\/broadcasts\/([^/]+)\/activity$/)
+  if (broadcastActivity) {
+    return {
+      success: true,
+      data: BROADCAST_ACTIVITY,
+      pagination: { limit: 50, cursor: 0, nextCursor: null },
+    }
   }
   const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
   if (broadcastOne) {
@@ -2009,6 +2819,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/broadcasts') {
     return { success: true, data: BROADCASTS, ...BROADCAST_LIST_META }
   }
+  /* 予約結果（`/broadcasts/reserved?id=`）は上の1件取得で足りる。 */
   if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
   if (pathname === '/api/friends/saved-views') {
     const id = query.get('id')
@@ -2150,9 +2961,52 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/site/pages') return { success: true, data: SITE_TRACKING_PAGES }
   if (pathname === '/api/site/tracking-key') {
     // アカウントごとに違う鍵を返す。乱数は使わない(毎回同じ絵にする)。
-    const accountId = query.get('accountId') ?? 'visual-qa-account'
+    // 画面は account_id で送る（旧 accountId も受ける）。
+    const accountId = query.get('account_id') ?? query.get('accountId') ?? 'visual-qa-account'
     const trackingKey = `hk_${createHash('sha256').update(`site-tracking:${accountId}`).digest('hex').slice(0, 32)}`
     return { success: true, data: { accountId, trackingKey } }
+  }
+  // Google Sheets 連携の見本。名前は packages/shared の型どおり（data 包み）。
+  if (pathname === '/api/integrations/google-sheets/connection') {
+    return {
+      success: true,
+      data: {
+        connection: {
+          status: 'connected',
+          googleAccountEmail: 'owner@example.com',
+          spreadsheetId: 'sheet-123',
+          spreadsheetTitle: 'LINE連携シート',
+          spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet-123',
+          lastSyncedAt: '2026-09-26T03:00:00.000Z',
+          lastSyncStatus: 'ok',
+          lastSyncError: null,
+          consecutiveFailures: 0,
+          connectedAt: '2026-09-20T00:00:00.000Z',
+        },
+        oauthConfigured: true,
+        syncRunning: false,
+        canManage: true,
+      },
+    }
+  }
+  if (pathname === '/api/integrations/google-sheets/runs') {
+    return {
+      success: true,
+      data: {
+        runs: [
+          {
+            id: 'run-1',
+            kind: 'scheduled',
+            dataType: 'friends',
+            status: 'ok',
+            rowsWritten: 120,
+            error: null,
+            startedAt: '2026-09-26T03:00:00.000Z',
+            finishedAt: '2026-09-26T03:01:00.000Z',
+          },
+        ],
+      },
+    }
   }
   if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
   if (pathname === '/api/ad-platforms/logs') {
@@ -2241,6 +3095,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  // 実物は { sessions: [...] }。既定の空ページ（items）で返すと、担当者一覧が丸ごと落ちる。
+  if (pathname === '/api/auth/sessions') return { success: true, data: { sessions: [
+    { id: 'sess-current', current: true, createdAt: '2026-08-25T00:00:00.000Z', expiresAt: '2026-09-24T00:00:00.000Z', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/128.0', ipPrefix: '203.0.113.*' },
+  ] } }
   if (pathname === '/api/staff') return { success: true, data: STAFF_MEMBERS }
   if (pathname === '/api/login-audit') return { success: true, data: LOGIN_AUDIT }
 
@@ -2253,6 +3111,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   */
   if (pathname === '/api/affiliates') return { success: true, data: AFFILIATES }
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
+  // #823 案件の決まりの版・上限の残り・成果の付け方の記録。
+  const offerVersions = /^\/api\/affiliate-offers\/([^/]+)\/versions$/.exec(pathname)
+  if (offerVersions) return { success: true, data: OFFER_VERSIONS }
+  const offerCapStatus = /^\/api\/affiliate-offers\/([^/]+)\/cap-status$/.exec(pathname)
+  if (offerCapStatus) return { success: true, data: OFFER_CAP_STATUS }
+  const conversionAttribution = /^\/api\/conversions\/events\/([^/]+)\/attribution$/.exec(pathname)
+  if (conversionAttribution) return { success: true, data: ATTRIBUTION_DECISION }
   if (pathname === '/api/common-actions') {
     const status = query.get('status')
     const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
@@ -2261,7 +3126,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         ? item.oldVersionBindingCount > 0
         : status === 'unused'
           ? item.status === 'published' && item.bindingCount === 0
-          : status ? item.status === status : true)
+          // 監査 R480: 通常一覧から保管済みを外す（本番口と同じ）。
+          : status ? item.status === status : item.status !== 'archived')
       .filter((item) => !search || `${item.name} ${item.description ?? ''}`.toLocaleLowerCase('ja').includes(search))
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
     const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
@@ -2294,9 +3160,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/automation-runs') {
     // #519 軽: 本番口と同じく search・status・limit で絞る（固定7件を返さない）。
+    // R24: offset にも連動させ、ページ送りの撮影ができるようにする。
     const runStatus = query.get('status')
     const runSearch = (query.get('search') ?? '').trim().toLocaleLowerCase('ja')
     const runLimit = Math.max(1, Number.parseInt(query.get('limit') ?? '', 10) || 20)
+    const runOffset = Math.max(0, Number.parseInt(query.get('offset') ?? '', 10) || 0)
     const statusDomains = runStatus === 'executed'
       ? ['success', 'partial', 'failed']
       : runStatus === 'problems'
@@ -2314,18 +3182,53 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       success: true,
       data: {
         ...AUTOMATION_RUNS,
-        items: runItems.slice(0, runLimit),
-        pagination: { total: runItems.length, limit: runLimit, offset: 0 },
+        items: runItems.slice(runOffset, runOffset + runLimit),
+        pagination: { total: runItems.length, limit: runLimit, offset: runOffset },
       },
     }
   }
   if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
+  {
+    const automationDraftDetail = /^\/api\/automation-drafts\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && automationDraftDetail) {
+      /*
+       * 一覧の「編集する」「複製する」の行き先。`<id>-draft` は一覧の見本
+       * から写す（保存はしない）。無いと編集画面が開けず、直前のPOST追加
+       * だけでは赤い帯が別の画面へ移るだけになる（1920px見直し③）。
+       */
+      const id = decodeURIComponent(automationDraftDetail[1])
+      const source = AUTOMATIONS.find((item) => `${item.id}-draft` === id || `${item.id}-copy-draft` === id)
+        ?? (id === 'automation-visual-draft' ? AUTOMATIONS[0] : null)
+      if (!source) return { success: false, error: '下書きが見つかりません' }
+      return {
+        success: true,
+        data: {
+          id,
+          draftVersionId: `${id}-version`,
+          name: source.name,
+          description: source.description ?? null,
+          eventType: source.eventType,
+          triggerConfig: source.triggerConfig ?? source.conditions ?? {},
+          conditions: source.conditions ?? {},
+          actions: (source.actions ?? []).map((action, index) => ({
+            id: `${id}-action-${index + 1}`,
+            type: action.type,
+            params: action.params ?? {},
+            onFailure: 'stop',
+          })),
+        },
+      }
+    }
+  }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
   if (pathname === '/api/line-notifications/customer-definitions') {
     return { success: true, data: LINE_NOTIFICATION_DEFINITIONS }
   }
   if (pathname === '/api/line-notifications/metrics') {
     return { success: true, data: LINE_NOTIFICATION_METRICS }
+  }
+  if (pathname === '/api/line-notifications/send-counts') {
+    return { success: true, data: LINE_NOTIFICATION_SEND_COUNTS }
   }
   if (pathname === '/api/line-notifications/deliveries') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
@@ -2341,8 +3244,40 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     ).map(toPublic)
     return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
   }
-  if (pathname === '/api/notifications/operator-rules') {
+  if (pathname === '/api/notifications/operator-rules' || pathname === '/api/line-notifications/operator-rules') {
+    /*
+     * 本物は両方の名で同じ一覧を返す（`notifications.ts`）。
+     * `line-notifications` 側が無いと、運用者タブの件数が
+     * 「読み込めませんでした」になっていた。
+     */
     return { success: true, data: { items: OPERATOR_NOTIFICATION_RULES, summary: { total: 11, published: 9, stopped: 2, missingRecipients: 1, recipients: 6, acceptedToday: 42, excludedToday: 1 } } }
+  }
+  const lineOperatorRuleDetail = /^\/api\/line-notifications\/operator-rules\/([^/]+)$/.exec(pathname)
+  if (lineOperatorRuleDetail && lineOperatorRuleDetail[1] !== 'recipients-preview') {
+    const rule = OPERATOR_NOTIFICATION_RULES.find((item) => item.id === lineOperatorRuleDetail[1])
+    if (!rule) return { success: false, error: 'ルールが見つかりません' }
+    return { success: true, data: rule }
+  }
+  if (pathname === '/api/nen/rank-settings') {
+    /*
+     * 無いと既定の器が返り、`settings.kpis.members` で
+     * 「画面を表示できませんでした」になっていた。
+     * 本物は `settingsResponse` の形（`nen-ranks.ts`）。
+     */
+    return { success: true, data: NEN_RANK_SETTINGS }
+  }
+  if (pathname === '/api/nen/members') {
+    return { success: true, data: NEN_MEMBER_LIST }
+  }
+  if (pathname === '/api/nen/pets') {
+    /*
+     * 無いと既定の器が返り、`kpis.total` が取れず
+     * 「ペットを読み込めませんでした」になっていた。
+     */
+    return { success: true, data: NEN_PET_LIST }
+  }
+  if (pathname === '/api/nen/health') {
+    return { success: true, data: NEN_HEALTH_LIST }
   }
   if (pathname === '/api/ec-commerce/notification-runs') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
@@ -2377,9 +3312,58 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: NEN_PHOTO_DERIVATIVES }
   }
   if (/^\/api\/nen-members\/photos\/[^/]+$/.test(pathname)) return { success: true, data: NEN_PHOTO_DETAIL }
+  // #817: 報酬の決まりの版。新しい版から返す。
+  if (pathname === '/api/nen-members/photo-reward-policy/versions') {
+    return { success: true, data: NEN_PHOTO_REWARD_POLICY_VERSIONS }
+  }
+  // #817: 新しい版を作る・この版に戻す。過去の版は変えず、新しい版を作る。
+  if (method === 'POST' && pathname === '/api/nen-members/photo-reward-policy/versions') {
+    return {
+      success: true,
+      data: {
+        created: true,
+        version: {
+          versionNumber: 5, policyKey: 'v5', points: 10,
+          summary: '報酬を5pt→10ptに', effectiveFrom: null,
+          createdAt: '2026-09-27T10:00:00+09:00',
+        },
+      },
+    }
+  }
+  if (method === 'POST' && pathname === '/api/nen-members/photo-reward-policy/revert') {
+    return {
+      success: true,
+      data: {
+        created: true,
+        version: {
+          versionNumber: 5, policyKey: 'v5', points: 5,
+          summary: '最初の報酬の決まり', effectiveFrom: null,
+          createdAt: '2026-09-27T10:00:00+09:00',
+        },
+      },
+    }
+  }
   if (pathname === '/api/ec-commerce/overview') return { success: true, data: EC_OVERVIEW }
-  /* 取り込みの記録。ページ送りの数を器の外に持つ口。 */
+  /* 取り込みの記録。`?view=actions` は処理1件ずつの形（`ec-commerce.ts`）。 */
   if (pathname === '/api/ec-commerce/events') {
+    if (query.get('view') === 'actions') {
+      /*
+       * 前は出来事の配列をそのまま返していて、画面の
+       * `data.items` が取れず「読み込めませんでした」になっていた。
+       * 本物と同じ処理1件ずつの器で返す。
+       */
+      const items = EC_ACTION_EXECUTIONS.items.map((execution) => ({
+        ...execution,
+        eventLabel: '',
+        friendId: null,
+        failureKind: null,
+        order: null,
+      }))
+      return {
+        success: true,
+        data: { items, total: items.length, summary: EC_ACTION_EXECUTIONS.summary },
+      }
+    }
     return { success: true, data: EC_EVENTS, pagination: { total: EC_EVENTS.length, limit: 20, offset: 0 } }
   }
   if (pathname === '/api/ec-commerce/subscriptions') {
@@ -2431,6 +3415,45 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
   if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
   if (/^\/api\/affiliates\/[^/]+\/links$/.test(pathname)) return { success: true, data: AFFILIATE_LINKS }
+  /*
+   * 要対応の交換の一覧。型どおりの名前（items/pagination）で返す。
+   * 失敗中と送ったか分からない配送中（照合待ち）を混ぜ、21件以上でも
+   * limit/offset で残りを出せる見本にする（R364・R365）。
+   */
+  if (pathname === '/api/mileage/redemptions') {
+    const limit = Math.min(100, Math.max(1, Number(query.get('limit') || 20)))
+    const offset = Math.max(0, Number(query.get('offset') || 0))
+    const items = [
+      {
+        id: 'mock-redemption-1', rewardName: '500円ぶんのクーポン', status: 'delivery_failed',
+        attemptCount: 2, failureCode: 'reward_delivery_failed',
+        failureMessage: '特典を渡せませんでした。時間をおいてもう一度お試しください。',
+        updatedAt: '2026-09-09T01:02:03.000Z',
+      },
+      {
+        id: 'mock-redemption-2', rewardName: '送料無料', status: 'delivering',
+        attemptCount: 1, failureCode: null, failureMessage: null,
+        updatedAt: '2026-09-09T02:03:04.000Z',
+      },
+    ]
+    return {
+      success: true,
+      data: {
+        items: items.slice(offset, offset + limit),
+        pagination: { total: items.length, limit, offset },
+      },
+    }
+  }
+  if (method === 'POST' && /^\/api\/mileage\/redemptions\/[^/]+\/retry-fulfillment$/.test(pathname)) {
+    return {
+      success: true,
+      data: {
+        status: 'succeeded', rewardName: '500円ぶんのクーポン', customerMessage: '交換できました',
+        rewardCode: null, retryAt: null, failurePolicy: 'retry', message: null,
+        redemption: { id: pathname.split('/')[4], status: 'succeeded' },
+      },
+    }
+  }
   if (pathname === '/api/mileage/overview') return { success: true, data: MILEAGE_OVERVIEW }
   if (pathname === '/api/mileage/friends') return { success: true, data: MILEAGE_FRIENDS }
   if (pathname === '/api/mileage/earning-rules') return { success: true, data: MILEAGE_EARNING_RULES }
@@ -2831,7 +3854,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         currentDraftVersionId: null,
         currentPublishedVersionId: 'cav-broadcast-delivered-tag-1',
         versions: [{
-          id: 'cav-broadcast-delivered-tag-1', versionNumber: 1, status: 'published',
+          id: 'cav-broadcast-delivered-tag-1', versionNumber: 1, status: 'published', draftRevision: 1,
           actions: [{ id: 'broadcast-delivered-tag-step', type: 'add_tag', params: { tagId: 'tag-broadcast-delivered' }, onFailure: 'stop' }],
           createdBy: 'Kenta Kawano', createdAt: '2026-08-20T00:00:00.000Z', publishedAt: '2026-08-20T00:00:00.000Z',
         }],
@@ -2840,6 +3863,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname.startsWith('/api/common-actions/') && !pathname.includes('/resources')) {
+    // 監査 R480: 保管・復元の見本（型どおりの名前で）。
+    if (pathname.endsWith('/archive') && method === 'POST') {
+      return { success: true, data: { archived: true } }
+    }
+    if (pathname.endsWith('/unarchive') && method === 'POST') {
+      return { success: true, data: { unarchived: true } }
+    }
     // `versions` `bindings` が入っていないと `.find` で落ちる。
     return { success: true, data: COMMON_ACTION_DETAIL }
   }
@@ -2920,6 +3950,24 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (/^\/api\/webinars\/[^/]+\/comments$/.test(pathname)) return { success: true, data: WEBINAR_COMMENTS }
   if (/^\/api\/webinars\/[^/]+\/user-comments$/.test(pathname)) return { success: true, data: [] }
   if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) return { success: true, data: WEBINAR_ANALYTICS }
+  if (/^\/api\/webinars\/[^/]+\/video-asset$/.test(pathname)) {
+    return { success: true, data: { asset: mockVideoAsset } }
+  }
+  if (/^\/api\/webinars\/[^/]+\/sessions\/[^/]+$/.test(pathname)) {
+    const startAt = Number(pathname.split('/').pop())
+    const capacity = mockSessionCapacity
+    const reservedCount = 3
+    return {
+      success: true,
+      data: {
+        session: {
+          sessionStartAt: startAt, capacity, reservedCount,
+          state: capacity !== null && reservedCount >= capacity ? 'full' : 'open',
+          remaining: capacity === null ? null : Math.max(0, capacity - reservedCount),
+        },
+      },
+    }
+  }
   if (/^\/api\/webinars\/[^/]+$/.test(pathname)) {
     /*
       ウェビナー1件。**器を通さない**（`fetchApi<{ data: Webinar }>`）。
@@ -3015,6 +4063,32 @@ const server = createServer((req, res) => {
     return
   }
 
+  if (method === 'GET' && url.pathname === '/api/file-scans') {
+    const status = url.searchParams.get('status')
+    const filtered = FILE_SCAN_ITEMS.filter((item) => !status || item.status === status)
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { items: filtered, total: filtered.length, limit: 50, offset: 0 } }))
+    return
+  }
+  if (method === 'GET' && url.pathname === '/api/file-scans/by-subject') {
+    const id = url.searchParams.get('id')
+    const scan = FILE_SCAN_ITEMS.find((item) => item.subjectId === id) ?? null
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { scan } }))
+    return
+  }
+  if (method === 'GET' && url.pathname === '/api/file-scans/for-media') {
+    const mediaId = url.searchParams.get('mediaId')
+    const scan = FILE_SCAN_ITEMS.find((item) => item.mediaId === mediaId) ?? null
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { scan } }))
+    return
+  }
+  if (method === 'GET' && url.pathname === '/api/file-scans/health') {
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { stopped: false, pendingCount: 1, oldestPendingAt: null } }))
+    return
+  }
+  if (method === 'GET' && url.pathname === '/api/file-scans/config') {
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { config: FILE_SCAN_CONFIG } }))
+    return
+  }
   if (method === 'GET' && url.pathname === '/api/media') {
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 20)))
     const offset = Math.max(0, Number(url.searchParams.get('offset') || 0))
@@ -3099,6 +4173,25 @@ const server = createServer((req, res) => {
   //
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
+  // M (止めた経路のQR): 印刷用PDFの見本。止めた経路は409で出さない。
+  const qrPdf = /^\/api\/entry-routes\/([^/]+)\/qr-pdf$/.exec(url.pathname)
+  if (method === 'POST' && qrPdf) {
+    const route = ENTRY_ROUTES.find((item) => item.id === qrPdf[1])
+    if (!route) {
+      res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+      return
+    }
+    if (!route.isActive) {
+      res.writeHead(409).end(JSON.stringify({ success: false, error: 'この経路は停止しています' }))
+      return
+    }
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="qr-${route.refCode}.pdf"`)
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(QR_PRINT_PDF_SAMPLE)
+    return
+  }
+
   if (method !== 'GET') {
     const formWriteRequest = (
       (method === 'POST' && (url.pathname === '/api/forms/drafts'
@@ -3108,6 +4201,51 @@ const server = createServer((req, res) => {
     )
     if (formWriteRequest) {
       res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
+      return
+    }
+    // J-1・N 撮影用。動画の準備の段と開催回の定員の保存を見本で返す。
+    if (
+      (method === 'POST' && /^\/api\/webinars\/[^/]+\/video-asset\/advance$/.test(url.pathname)) ||
+      (method === 'PUT' && /^\/api\/webinars\/[^/]+\/sessions\/[^/]+$/.test(url.pathname))
+    ) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        if (/video-asset\/advance$/.test(url.pathname)) {
+          const stage = typeof body.stage === 'string' ? body.stage : mockVideoAsset?.stage ?? 'uploaded'
+          const labels = {
+            uploaded: '受け付け', inspecting: '検査', converting: '変換',
+            packaging: '配信の形', thumbnail: '表紙', ready: '準備完了', failed: '失敗',
+          }
+          mockVideoAsset = mockVideoAsset
+            ? { ...mockVideoAsset, stage, stageLabel: labels[stage] ?? stage }
+            : {
+              id: 'video-asset-1', stage, stageLabel: labels[stage] ?? stage, provider: 'r2_hls',
+              durationSeconds: 0, errorCode: null, expiresAt: null, purgedAt: null,
+              createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+            }
+          res.writeHead(200).end(JSON.stringify({ success: true, data: { asset: mockVideoAsset } }))
+          return
+        }
+        const capacity = body.capacity === undefined || body.capacity === null
+          ? null
+          : Math.floor(Number(body.capacity))
+        mockSessionCapacity = Number.isInteger(capacity) && capacity >= 1 ? capacity : null
+        const startAt = Number(url.pathname.split('/').pop())
+        const reservedCount = 3
+        res.writeHead(200).end(JSON.stringify({
+          success: true,
+          data: {
+            session: {
+              sessionStartAt: startAt, capacity: mockSessionCapacity, reservedCount,
+              state: mockSessionCapacity !== null && reservedCount >= mockSessionCapacity ? 'full' : 'open',
+              remaining: mockSessionCapacity === null ? null : Math.max(0, mockSessionCapacity - reservedCount),
+            },
+          },
+        }))
+      })
       return
     }
     if (/^\/api\/(mileage\/(rules|rewards|adjustments)|action-scores\/rules)/.test(url.pathname)) {
@@ -3131,6 +4269,27 @@ const server = createServer((req, res) => {
       req.on('end', () => {
         let body = {}
         try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        // R25: 回答フォームの箱も見本で作れるようにする（本物と同じ器）。
+        if (body.kind === 'form') {
+          if (!body.accountId || !String(body.name ?? '').trim()) {
+            res.writeHead(400).end(JSON.stringify({ success: false, error: 'フォルダの内容を確認してください' }))
+            return
+          }
+          const folder = {
+            id: `form-folder-${formFolders.length + 1}`,
+            kind: 'form',
+            accountId: body.accountId,
+            name: String(body.name).trim(),
+            parentId: null,
+            displayOrder: formFolders.length,
+            color: body.color ?? null,
+            createdAt: '2026-09-27T00:00:00.000Z',
+            updatedAt: '2026-09-27T00:00:00.000Z',
+          }
+          formFolders = [...formFolders, folder]
+          res.writeHead(201).end(JSON.stringify({ success: true, data: folder }))
+          return
+        }
         if (body.kind !== 'webinar') {
           res.writeHead(405).end(JSON.stringify({ success: false, error: '画面確認用のため、更新はできません' }))
           return
@@ -3157,7 +4316,47 @@ const server = createServer((req, res) => {
       return
     }
     const webinarFolderPath = /^\/api\/folders\/([^/]+)$/.exec(url.pathname)
-    if (method === 'PATCH' && webinarFolderPath) {
+    // R25: webinar の箱と回答フォームの箱で見本を分ける。IDだけでは
+    // 種類が分からないため、先にどちら側の箱かを見てから振り分ける。
+    // R37 撮影用。登録メディア・共通情報のフォルダ名変更・削除もここで受け、
+    // 本番口と同じ形（PATCH は更新後、DELETE は data: null）で返す。
+    // ウェビナー・回答フォームの箱は後の口へ通す。
+    const webinarFolderId = webinarFolderPath ? decodeURIComponent(webinarFolderPath[1]) : null
+    const isWebinarFolder = webinarFolderId !== null && webinarFolders.some((folder) => folder.id === webinarFolderId)
+    // R25: 回答フォームの箱は後の口（formFolderPath）へ通す。
+    const isFormFolder = webinarFolderId !== null && formFolders.some((folder) => folder.id === webinarFolderId)
+    if ((method === 'PATCH' || method === 'DELETE') && webinarFolderPath && !isWebinarFolder && !isFormFolder) {
+      const mediaCommonId = decodeURIComponent(webinarFolderPath[1])
+      const target = mediaFolders.find((item) => item.id === mediaCommonId)
+        ?? commonVarFolders.find((item) => item.id === mediaCommonId)
+      if (!target) {
+        res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+        return
+      }
+      if (method === 'DELETE') {
+        mediaFolders = mediaFolders.filter((item) => item.id !== mediaCommonId)
+        commonVarFolders = commonVarFolders.filter((item) => item.id !== mediaCommonId)
+        res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+        return
+      }
+      let mediaCommonRaw = ''
+      req.on('data', (chunk) => { mediaCommonRaw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(mediaCommonRaw || '{}') } catch { body = {} }
+        const name = String(body.name ?? '').trim()
+        if (!name) {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: 'フォルダ名を入力してください' }))
+          return
+        }
+        target.name = name
+        target.updatedAt = '2026-09-27T10:00:00.000Z'
+        res.writeHead(200).end(JSON.stringify({ success: true, data: { ...target } }))
+      })
+      return
+    }
+    // R25: ウェビナーの箱だけここで直す。回答フォームの箱は後の口へ通す。
+    if (method === 'PATCH' && webinarFolderPath && isWebinarFolder) {
       let raw = ''
       req.on('data', (chunk) => { raw += chunk })
       req.on('end', () => {
@@ -3181,7 +4380,7 @@ const server = createServer((req, res) => {
       })
       return
     }
-    if (method === 'DELETE' && webinarFolderPath) {
+    if (method === 'DELETE' && webinarFolderPath && isWebinarFolder) {
       const id = decodeURIComponent(webinarFolderPath[1])
       const accountId = url.searchParams.get('account_id')
       const folder = webinarFolders.find((item) => item.id === id && item.accountId === accountId)
@@ -3191,6 +4390,48 @@ const server = createServer((req, res) => {
       }
       webinarFolders = webinarFolders.filter((item) => item.id !== id)
       res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+      return
+    }
+    // R25: 回答フォームの箱の直し・消し・並べ替えの見本（本物と同じ器）。
+    const formFolderPath = /^\/api\/folders\/([^/]+)(\/swap-order)?$/.exec(url.pathname)
+    if (method === 'PATCH' && formFolderPath && !formFolderPath[2]) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const id = decodeURIComponent(formFolderPath[1])
+        const index = formFolders.findIndex((folder) => folder.id === id)
+        if (index < 0) {
+          res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+          return
+        }
+        const folder = {
+          ...formFolders[index],
+          ...(typeof body.name === 'string' && body.name.trim() ? { name: body.name.trim() } : {}),
+          ...('color' in body ? { color: body.color ?? null } : {}),
+          updatedAt: '2026-09-27T00:01:00.000Z',
+        }
+        formFolders = formFolders.map((item, itemIndex) => itemIndex === index ? folder : item)
+        res.writeHead(200).end(JSON.stringify({ success: true, data: folder }))
+      })
+      return
+    }
+    if (method === 'DELETE' && formFolderPath && !formFolderPath[2]) {
+      const id = decodeURIComponent(formFolderPath[1])
+      // 中身（フォーム）は消さず、箱だけ消す。本物と同じく未分類に戻る。
+      formFolders = formFolders.filter((item) => item.id !== id)
+      res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+      return
+    }
+    if (method === 'POST' && formFolderPath && formFolderPath[2] === '/swap-order') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        res.writeHead(200).end(JSON.stringify({ success: true, data: { swapped: [decodeURIComponent(formFolderPath[1]), body.withId ?? null] } }))
+      })
       return
     }
     if (method === 'POST' && url.pathname === '/api/conversions/definitions/preview') {
@@ -3246,6 +4487,45 @@ const server = createServer((req, res) => {
         success: true,
         data: { id: 'automation-visual-draft', draftVersionId: 'automation-visual-version' },
       }))
+      return
+    }
+    /*
+     * 一覧の「編集する」「複製する」・稼働切替・保管（#942 N-352）。
+     * 本番（`apps/worker/src/routes/automations.ts`）と同じ器で返す。
+     * 無いと一覧で405になり、赤い帯「編集用の下書きを作れませんでした」
+     * が出ていた（1920px見直し③）。DBへは書かない。
+     */
+    if (method === 'POST' && /^\/api\/automations\/[^/]+\/draft$/.test(url.pathname)) {
+      const automationId = decodeURIComponent(url.pathname.split('/')[3] ?? '')
+      res.writeHead(201).end(JSON.stringify({
+        success: true,
+        data: { id: `${automationId}-draft`, draftVersionId: `${automationId}-draft-version` },
+      }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/automations\/[^/]+\/duplicate$/.test(url.pathname)) {
+      const automationId = decodeURIComponent(url.pathname.split('/')[3] ?? '')
+      res.writeHead(201).end(JSON.stringify({
+        success: true,
+        data: { id: `${automationId}-copy-draft`, draftVersionId: `${automationId}-copy-draft-version` },
+      }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/automations\/[^/]+\/status$/.test(url.pathname)) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let status = ''
+        try { status = JSON.parse(raw || '{}').status ?? '' } catch { status = '' }
+        if (status !== 'active' && status !== 'stopped' && status !== 'archived') {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: 'status は active / stopped / archived のどれかで送ってください' }))
+          return
+        }
+        res.writeHead(200).end(JSON.stringify({
+          success: true,
+          data: { id: decodeURIComponent(url.pathname.split('/')[3] ?? ''), status },
+        }))
+      })
       return
     }
     if (method === 'PUT' && url.pathname === '/api/automation-drafts/automation-visual-draft') {
@@ -3672,6 +4952,69 @@ const server = createServer((req, res) => {
         return
       }
       res.writeHead(200).end(JSON.stringify({ success: true }))
+      return
+    }
+    // K-1・O-1: 公開の進みと公開前の確認の見本（本物と同じ器）。
+    const richMenuProgress = /^\/api\/rich-menu-groups\/([^/]+)\/publish-progress$/.exec(url.pathname)
+    if (method === 'GET' && richMenuProgress) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        run: { id: 'visual-qa-run', mode: 'publish', status: 'failed', startedAt: '2026-09-27T10:00:00+09:00', completedAt: '2026-09-27T10:01:00+09:00' },
+        steps: [
+          { key: 'image', label: '画像をLINEに上げる', status: 'done' },
+          { key: 'menu', label: 'メニューを作る', status: 'done' },
+          { key: 'assign', label: '友だちに割り当てる', status: 'failed' },
+          { key: 'cleanup', label: '前のメニューを片付ける', status: 'pending' },
+        ],
+        message: '割り当てに失敗したので、作ったメニューをLINEから消し、前のメニューのままにしました。もう一度公開できます。',
+      } }))
+      return
+    }
+    const richMenuPrecheck = /^\/api\/rich-menu-groups\/([^/]+)\/prepublish-check$/.exec(url.pathname)
+    if (method === 'GET' && richMenuPrecheck) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        fingerprint: 'visual-qa-fp',
+        pageCount: 2,
+        maxPages: 10,
+        selfCheck: { ok: true, message: '自前の検査を通りました。' },
+        deviceConfirmed: false,
+        deviceConfirmedAt: null,
+        versionNumber: null,
+      } }))
+      return
+    }
+    const richMenuValidate = /^\/api\/rich-menu-groups\/([^/]+)\/validate$/.exec(url.pathname)
+    if (method === 'POST' && richMenuValidate) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        checks: [
+          { key: 'self', ok: true, message: '自前の検査を通りました。' },
+          { key: 'line', ok: true, message: 'LINEの検査を通りました。' },
+        ],
+      } }))
+      return
+    }
+    const richMenuDevice = /^\/api\/rich-menu-groups\/([^/]+)\/device-confirm$/.exec(url.pathname)
+    if (method === 'POST' && richMenuDevice) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        confirmedAt: '2026-09-27T10:00:00+09:00', fingerprint: 'visual-qa-fp',
+      } }))
+      return
+    }
+    // K-2: 照合の見本。ずれの種類ごとの直し方（fix）つき。
+    const richMenuReconcile = /^\/api\/rich-menu-groups\/([^/]+)\/reconcile$/.exec(url.pathname)
+    if (method === 'POST' && richMenuReconcile) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let dryRun = true
+        try { dryRun = JSON.parse(raw || '{}').dryRun !== false } catch { dryRun = true }
+        const diffs = [
+          { kind: 'external_only', detail: 'LINEにだけあるメニュー「別で作ったメニュー」（rm-external-1）があります', richMenuId: 'rm-external-1', fix: { label: 'こちらに取り込む', action: 'import-external' } },
+          { kind: 'default_mismatch', detail: 'LINEの全員既定がこのメニューを指していません（現在: rm-other-9）', richMenuId: 'rm-other-9', fix: { label: 'こちらに合わせる', action: 'relink-default' } },
+        ]
+        res.writeHead(200).end(JSON.stringify({ success: true, data: dryRun
+          ? { dryRun: true, diffs }
+          : { dryRun: false, diffs, applied: 1, failed: [], unapplied: [{ diff: diffs[0], reason: '取り込みは「外部メニューの取り込み」画面で運用者が行います' }], runId: 'visual-qa-reconcile-run' } }))
+      })
       return
     }
     const richMenuWriteAction = /^\/api\/rich-menu-groups\/([^/]+)\/(publish|unpublish|schedule|apply-to-tag)$/.exec(url.pathname)

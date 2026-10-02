@@ -27,7 +27,8 @@ describe('V6 イベント作成の最初の予約枠', () => {
   })
 
   it('入力と同じ内容をお客様向けプレビューに出す', () => {
-    expect(SOURCE).toContain('お客様のLINEではこう見えます')
+    // B-6: 題は共通部品の「LINEプレビュー」に寄せた。用語集の呼び名どおり。
+    expect(SOURCE).toContain('<LinePreview')
     expect(SOURCE).toContain("draft.name.trim() || 'イベント名'")
     expect(SOURCE).toContain('previewDate')
     expect(SOURCE).toContain('previewCapacity')

@@ -17,10 +17,9 @@ describe('友だち一覧のV6表示契約', () => {
   })
 
   it('表示件数メニューに安定した撮影の押し口がある', () => {
+    // #668: 件数の選び口は共通部品 PageSizeSelect。撮影の押し口は
+    // data-qa-open を select へ引き継いでいる。
+    expect(TABLE).toContain('PageSizeSelect')
     expect(TABLE).toContain('data-qa-open="LT8RS"')
-    for (const size of ['10', '20', '30', '40', '50']) {
-      expect(TABLE).toContain('pageSizeOptions.map')
-      expect(size).toMatch(/\d+/)
-    }
   })
 })

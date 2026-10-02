@@ -28,8 +28,15 @@ import type { Env } from '../index.js';
 
 const dispatchOperatorEvent = vi.hoisted(() => vi.fn());
 vi.mock('../services/operator-notification-dispatch.js', () => ({ dispatchOperatorEvent }));
+// R150: 送信Webhookへの発火だけ差し替える。他の公開口は本物。
+const fireOutgoingWebhooks = vi.hoisted(() => vi.fn());
+vi.mock('../services/event-bus.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  fireOutgoingWebhooks,
+}));
 // 送る側(顧客への LINE 通知)は対象外。予約の成否と運用者通知だけを見る。
-vi.mock('../services/booking-notifier.js', () => ({
+vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../services/account-access.js', () => ({
@@ -125,6 +132,8 @@ describe('N-327 #663 予約の受付から運用者通知を自動発火する',
     vi.setSystemTime(new Date('2026-10-20T03:00:00.000Z'));
     dispatchOperatorEvent.mockReset();
     dispatchOperatorEvent.mockResolvedValue(undefined);
+    fireOutgoingWebhooks.mockReset();
+    fireOutgoingWebhooks.mockResolvedValue(undefined);
 
     sqlite = new Database(':memory:');
     sqlite.pragma('foreign_keys = ON');
@@ -306,5 +315,80 @@ describe('N-327 #663 予約の受付から運用者通知を自動発火する',
     expect(response.status).toBe(401);
     expect(bookingRows()).toHaveLength(0);
     expect(dispatchOperatorEvent).not.toHaveBeenCalled();
+  });
+
+  /*
+   * R150: 予約の送信Webhook発火。運用者通知と同じ成否境界で、予約が
+   * 成立したときだけ booking_created を購読者へ届ける。発生元は予約ID
+   * で固定し、作成→承認の二重発火は配送台帳の冪等キーで吸収する。
+   */
+  describe('R150 予約の受付を送信Webhookへ発火する', () => {
+    test('成立した予約は予約IDを発生元に booking_created を1回発火する', async () => {
+      stubLineVerify('U-a-1');
+      const { ctx, settle } = collectingExecCtx();
+
+      const response = await liffBook(ctx, { key: 'key-wh-1' });
+      await settle();
+
+      expect(response.status).toBe(201);
+      const rows = bookingRows();
+      expect(rows).toHaveLength(1);
+      expect(fireOutgoingWebhooks).toHaveBeenCalledTimes(1);
+      const [db, eventType, payload, accountId] = fireOutgoingWebhooks.mock.calls[0] as [
+        unknown, string, Record<string, unknown>, string,
+      ];
+      expect(db).toBe(env.DB);
+      expect(eventType).toBe('booking_created');
+      expect(accountId).toBe(ACCOUNT);
+      expect(payload).toMatchObject({
+        sourceKind: 'booking',
+        sourceEventId: rows[0].id,
+        friendId: 'friend-a',
+      });
+      expect(payload.eventData).toMatchObject({
+        bookingId: rows[0].id,
+        menuId: 'menu-a',
+        staffId: 'staff-a',
+      });
+    });
+
+    test('同じ Idempotency-Key の再送では送信Webhookも増えない', async () => {
+      stubLineVerify('U-a-1');
+      const first = collectingExecCtx();
+      expect((await liffBook(first.ctx, { key: 'key-wh-same' })).status).toBe(201);
+      await first.settle();
+
+      const second = collectingExecCtx();
+      await liffBook(second.ctx, { key: 'key-wh-same' });
+      await second.settle();
+
+      expect(fireOutgoingWebhooks).toHaveBeenCalledTimes(1);
+    });
+
+    test('成立しなかった予約（枠の競合）は発火しない', async () => {
+      stubLineVerify('U-a-1');
+      const first = collectingExecCtx();
+      expect((await liffBook(first.ctx, { key: 'key-wh-a' })).status).toBe(201);
+      await first.settle();
+      fireOutgoingWebhooks.mockClear();
+
+      const second = collectingExecCtx();
+      expect((await liffBook(second.ctx, { key: 'key-wh-b' })).status).toBe(422);
+      await second.settle();
+      expect(fireOutgoingWebhooks).not.toHaveBeenCalled();
+    });
+
+    test('送信Webhookが落ちても予約は成立させ、拒否を外へ漏らさない', async () => {
+      stubLineVerify('U-a-1');
+      fireOutgoingWebhooks.mockRejectedValueOnce(new Error('webhook dispatch unavailable'));
+      const { ctx, settle } = collectingExecCtx();
+
+      const response = await liffBook(ctx, { key: 'key-wh-fail' });
+      const escaped = await settle();
+
+      expect(response.status).toBe(201);
+      expect(bookingRows()).toHaveLength(1);
+      expect(escaped).toEqual([]);
+    });
   });
 });

@@ -26,7 +26,7 @@ export default function Breadcrumb({ items, className }: { items: Crumb[]; class
                 {item.label}
               </Link>
             ) : (
-              <span className={styles.current} aria-current={last ? 'page' : undefined}>
+              <span className={styles.current} aria-current={last ? 'page' : undefined} title={item.label}>
                 {item.label}
               </span>
             )}

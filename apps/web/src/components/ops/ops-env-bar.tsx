@@ -20,14 +20,18 @@ export default function OpsEnvBar() {
     <div
       data-design-node="OGkIw"
       className={production
-        ? 'flex h-8 items-center justify-between bg-ink px-5 text-caption font-bold text-on-accent'
-        : 'flex h-8 items-center justify-between bg-status-warn-deep px-5 text-caption font-bold text-on-accent'}
+        ? 'flex h-8 items-center justify-between bg-ink px-5 text-caption font-medium text-on-accent'
+        : 'flex h-8 items-center justify-between bg-status-warn-deep px-5 text-caption font-medium text-on-accent'}
     >
       <span className="flex items-center gap-2">
         <ShieldCheck aria-hidden="true" className="h-4 w-4" />
         musubo 運営コンソール ／ {production ? '本番' : '検証環境'}
       </span>
-      <span className="text-nano font-normal text-on-accent opacity-80">契約先のデータを扱います。操作はすべて記録されます</span>
+      {/*
+       * 80% の白字だと検証帯 (#a15c00) の上で 3.93:1 しかない。
+       * 100% の白字なら 5.19:1。薄く見せるための opacity は付けない。
+       */}
+      <span className="text-nano font-normal text-on-accent">契約先のデータを扱います。操作はすべて記録されます</span>
     </div>
   )
 }

@@ -138,22 +138,23 @@ describe('UID移行のタブと段組み（#984 LAY-13/14）', () => {
     expect(TABS).toContain("'/accounts?tab=migration'")
   })
 
-  it('移行履歴は主タブと競合しない補助リンク', () => {
-    expect(PAGE).toContain('href="#migration-history"')
+  /*
+   * 右端の「移行履歴」は下の履歴節へ飛ぶだけの補助リンクで、同じ節が
+   * 画面内に常に見えるため置かない（重複を出さない・V7判断 2026-09-26）。
+   * 以前この補助リンクの存在を固定していたが、使いやすさの直しを優先し
+   * 存在固定をやめる。「CSVで書き出す・取り込む」は別画面への導線なので残す。
+   */
+  it('下の履歴節へ飛ぶだけの「移行履歴」ボタンは置かない', () => {
+    expect(PAGE).not.toContain('href="#migration-history"')
+    expect(PAGE).toContain('href="/friends/migrations"')
   })
 
-  it('プルダウンの全幅は画面側の属性スコープで広げる', () => {
-    /*
-     * shared/ は Claude 所有領域。U063 と同じく、共有部品を改変せず
-     * data-selects-wide の属性スコープで select だけを全幅にする。
-     * className="w-full" の上書きはモジュールCSSの .default に負けるため使わない。
-     */
-    expect(PAGE).toContain('data-selects-wide')
-    expect(PAGE).toContain('[data-selects-wide] select { width: 100%; }')
-    expect(PAGE).toContain('<SelectField aria-label="移行元アカウント"')
-    expect(PAGE).toContain('<SelectField aria-label="移行先アカウント"')
-    expect(PAGE).not.toContain('size="full"')
-    expect(PAGE.match(/<SelectField[^>]*w-full/g) ?? []).toHaveLength(0)
+  it('移行元・移行先の選び欄は欄いっぱいに広げる', () => {
+    // 選び欄は Select 1 本化済み。幅は部品の size="full" で持たせる。
+    expect(PAGE).toContain('<Select aria-label="移行元アカウント"')
+    expect(PAGE).toContain('<Select aria-label="移行先アカウント"')
+    expect(PAGE.match(/size="full"/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(PAGE).not.toContain('[data-selects-wide] select')
   })
 
   it('移行元と移行先は同幅の2欄、利用目的は全幅', () => {
@@ -191,5 +192,30 @@ describe('UID移行の5段階表示（#1015 CHK-06）', () => {
     expect(PAGE).toContain('すべて完了')
     // 済んだ段階だけ✓、現在は▶、先の段階は番号のまま。
     expect(PAGE).toContain("index < currentStep ? '✓' : index === currentStep ? '▶'")
+  })
+})
+
+/**
+ * カード同士の縦の間隔そろえ（★V7 16px・2026-09-26）。
+ * 親を縦並び＋gap-4 にし、子ごとの mb/mt で間隔を作らない。
+ * 空の案内も白地・枠・角丸のカードの中に出す（灰色の地だけにしない）。
+ */
+describe('UID移行のカード間隔（★V7 gap-4）', () => {
+  it('画面の親は縦並び＋gap-4 で、カード間の mb/mt を持たない', () => {
+    expect(PAGE).toContain('data-design-node="vtBCu" className="flex flex-col gap-4"')
+    // カードの断片（section・帯・履歴節）に個別の縦余白を付けない。
+    expect(PAGE).not.toMatch(/<(section|div)[^>]*className="[^"]*\bmb-[46]\b/)
+  })
+
+  it('空の案内は履歴と同じカード（白地・枠・角丸）の中に出す', () => {
+    expect(PAGE).toContain('テスト移行の結果')
+    expect(PAGE).toContain('テスト移行はまだありません')
+    // 灰色の ListState をカードの外に直接置かない。
+    expect(PAGE).not.toMatch(/\} : <ListState kind="empty"/)
+  })
+
+  it('対応表ありの中身も gap-4 でそろえ、mb-6（24px）を作らない', () => {
+    expect(PAGE).toContain('return (<div className="flex flex-col gap-4">')
+    expect(PAGE).not.toMatch(/className="[^"]*\bmb-6\b/)
   })
 })

@@ -70,7 +70,7 @@ CREATE TABLE account_handovers (
   resolved_at         TEXT,
   executed_at         TEXT,
   completed_at        TEXT
-);
+, declared_friend_total INTEGER, rolled_back_at TEXT, rolled_back_by TEXT, rollback_note TEXT);
 
 CREATE TABLE account_health_logs (
   id              TEXT PRIMARY KEY,
@@ -93,6 +93,16 @@ CREATE TABLE account_migrations (
   completed_at     TEXT
 );
 
+CREATE TABLE account_pool_switch_events (
+  id              TEXT PRIMARY KEY,
+  pool_id         TEXT NOT NULL REFERENCES traffic_pools(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  direction       TEXT NOT NULL CHECK (direction IN ('out', 'in')),
+  reason          TEXT NOT NULL,
+  actor           TEXT NOT NULL DEFAULT 'system',
+  created_at      TEXT NOT NULL
+);
+
 CREATE TABLE account_settings (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL,
@@ -101,6 +111,17 @@ CREATE TABLE account_settings (
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   UNIQUE(line_account_id, key)
+);
+
+CREATE TABLE account_skipped_deliveries (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  kind            TEXT NOT NULL,
+  ref_id          TEXT NOT NULL,
+  title           TEXT,
+  reason          TEXT NOT NULL DEFAULT 'account_inactive',
+  skipped_at      TEXT NOT NULL,
+  UNIQUE (kind, ref_id)
 );
 
 CREATE TABLE action_score_rule_sets (
@@ -177,6 +198,32 @@ CREATE TABLE ad_conversion_outbox (
   UNIQUE (ad_platform_id, friend_id, event_name, idempotency_key)
 );
 
+CREATE TABLE ad_cost_entries (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  ad_platform_id  TEXT REFERENCES ad_platforms(id) ON DELETE SET NULL,
+  entry_route_id  TEXT REFERENCES entry_routes(id) ON DELETE SET NULL,
+  source_label    TEXT NOT NULL,
+  day             TEXT NOT NULL,
+  amount_minor    INTEGER NOT NULL CHECK (amount_minor >= 0),
+  currency        TEXT NOT NULL DEFAULT 'JPY',
+  source          TEXT NOT NULL CHECK (source IN ('import', 'manual')),
+  imported_at     TEXT,
+  created_by      TEXT REFERENCES staff_members(id),
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+, cancelled_at TEXT, cancel_reason TEXT);
+
+CREATE TABLE ad_cost_import_runs (
+  id             TEXT PRIMARY KEY,
+  ad_platform_id TEXT NOT NULL REFERENCES ad_platforms(id) ON DELETE CASCADE,
+  day            TEXT NOT NULL,
+  status         TEXT NOT NULL CHECK (status IN ('success', 'failed')),
+  error_message  TEXT,
+  created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (ad_platform_id, day)
+);
+
 CREATE TABLE ad_platforms (
   id           TEXT PRIMARY KEY,
   name         TEXT NOT NULL,
@@ -185,14 +232,14 @@ CREATE TABLE ad_platforms (
   is_active    INTEGER DEFAULT 1,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, config_encrypted TEXT, verified_at TEXT);
 
 CREATE TABLE admin_sessions (
   token_hash TEXT PRIMARY KEY,
   staff_id   TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), selected_restaurant_store_id TEXT
-  REFERENCES rt_stores(id) ON DELETE SET NULL, user_agent TEXT, ip_prefix TEXT,
+  REFERENCES rt_stores(id) ON DELETE SET NULL, user_agent TEXT, ip_prefix TEXT, step_up_at TEXT, device_hash TEXT, unfamiliar_at TEXT,
   FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
 );
 
@@ -227,6 +274,38 @@ CREATE TABLE affiliate_adjustments (
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'applied')),
   idempotency_key TEXT NOT NULL UNIQUE,
   applied_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE affiliate_attribution_decisions (
+  id TEXT PRIMARY KEY,
+  conversion_event_id TEXT NOT NULL UNIQUE REFERENCES conversion_events(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL,
+  conversion_point_id TEXT NOT NULL,
+  -- 付けた先。付けなかったときは空。
+  affiliate_id TEXT REFERENCES affiliates(id),
+  ref_code TEXT,
+  offer_id TEXT REFERENCES affiliate_offers(id),
+  -- 判断に使った案件の版。版を変えてもこの記録は変わらない。
+  offer_version_id TEXT REFERENCES affiliate_offer_versions(id),
+  -- 判断の理由。画面には人の言葉で出す。
+  reason TEXT NOT NULL CHECK (reason IN (
+    'matched_last_touch',
+    'no_touch',
+    'out_of_window',
+    'self_referral',
+    'inactive_link',
+    'inactive_affiliate',
+    'other_account',
+    'reception_closed',
+    'capped_total',
+    'capped_monthly'
+  )),
+  -- 判断に使った数える期間(日)。案件の版があればその値、なければ全体の既定。
+  window_days INTEGER NOT NULL CHECK (window_days BETWEEN 1 AND 365),
+  -- 候補になった紹介の写し(JSON)。紹介者名・案件名・開いた時刻・結果を
+  -- 判断の時点で残す。後から名前が変わっても、この記録は書き換えない。
+  candidates_json TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -270,6 +349,30 @@ CREATE TABLE affiliate_links (
   created_at      TEXT NOT NULL,
   click_count     INTEGER NOT NULL DEFAULT 0
 , operation_id TEXT);
+
+CREATE TABLE affiliate_offer_versions (
+  id TEXT PRIMARY KEY,
+  offer_id TEXT NOT NULL REFERENCES affiliate_offers(id),
+  version_number INTEGER NOT NULL,
+  -- 1件あたりの報酬。固定額(円)とマイル。
+  reward_amount INTEGER NOT NULL DEFAULT 0 CHECK (reward_amount >= 0),
+  reward_miles INTEGER NOT NULL DEFAULT 0 CHECK (reward_miles >= 0),
+  -- リンクを開いてから数える期間(日)。既定 30。
+  window_days INTEGER NOT NULL DEFAULT 30 CHECK (window_days BETWEEN 1 AND 365),
+  -- 上限。空は「上限なし」。上限に達したら受付を自動で止める。
+  cap_total INTEGER CHECK (cap_total IS NULL OR cap_total > 0),
+  cap_monthly_per_affiliate INTEGER CHECK (cap_monthly_per_affiliate IS NULL OR cap_monthly_per_affiliate > 0),
+  -- 受付の期間。空の端は「区切りなし」。期間外の紹介には成果を付けない。
+  reception_from TEXT,
+  reception_to TEXT,
+  -- 使い始めの日時。空は「公開と同時」。未来の日時は「予約」の札で見せる。
+  effective_from TEXT,
+  created_by_staff_id TEXT,
+  -- 同じ確認キーの再送では版を増やさないための鍵。
+  idempotency_key TEXT UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (offer_id, version_number)
+);
 
 CREATE TABLE affiliate_offers (
   id              TEXT PRIMARY KEY,
@@ -515,6 +618,26 @@ CREATE TABLE analytics_events (
   idempotency_key   TEXT NOT NULL,
   created_at        TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (line_account_id, idempotency_key)
+);
+
+CREATE TABLE analytics_export_jobs (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  target TEXT NOT NULL
+    CHECK (target IN ('reactions', 'url-clicks', 'cross', 'funnel', 'saved')),
+  params_json TEXT NOT NULL CHECK (json_valid(params_json)),
+  status TEXT NOT NULL DEFAULT 'queued'
+    CHECK (status IN ('queued', 'running', 'completed', 'failed', 'expired')),
+  row_count INTEGER CHECK (row_count IS NULL OR row_count >= 0),
+  byte_size INTEGER CHECK (byte_size IS NULL OR byte_size >= 0),
+  csv_text TEXT,
+  created_by TEXT NOT NULL,
+  created_by_name TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  started_at TEXT,
+  finished_at TEXT,
+  expires_at TEXT NOT NULL,
+  failure_reason TEXT
 );
 
 CREATE TABLE analytics_funnel_run_members (
@@ -802,7 +925,7 @@ CREATE TABLE auth_step_up_grants (
   expires_at  TEXT NOT NULL,
   consumed_at TEXT,
   created_at  TEXT NOT NULL
-);
+, session_token_hash TEXT, issued_policy_version INTEGER);
 
 CREATE TABLE auth_throttles (
   key           TEXT PRIMARY KEY,
@@ -863,6 +986,19 @@ CREATE TABLE auto_reply_action_runs (
   created_at          TEXT NOT NULL,
   updated_at          TEXT NOT NULL,
   UNIQUE (evaluation_id, action_stable_id)
+);
+
+CREATE TABLE auto_reply_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT REFERENCES line_accounts(id),
+  operation         TEXT NOT NULL,
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  auto_reply_id     TEXT NOT NULL REFERENCES auto_replies(id) ON DELETE CASCADE,
+  version_id        TEXT REFERENCES auto_reply_versions(id) ON DELETE SET NULL,
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(idempotency_key)
 );
 
 CREATE TABLE auto_reply_evaluation_details (
@@ -959,6 +1095,18 @@ CREATE TABLE automation_logs (
   actions_result TEXT,
   status         TEXT NOT NULL DEFAULT 'success' CHECK (status IN ('success', 'partial', 'failed')),
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE automation_run_daily_counts (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  automation_id   TEXT NOT NULL,
+  day             TEXT NOT NULL,
+  status          TEXT NOT NULL,
+  run_count       INTEGER NOT NULL DEFAULT 0 CHECK (run_count >= 0),
+  step_count      INTEGER NOT NULL DEFAULT 0 CHECK (step_count >= 0),
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (line_account_id, automation_id, day, status)
 );
 
 CREATE TABLE automation_run_steps (
@@ -1124,6 +1272,26 @@ CREATE TABLE billing_events (
   received_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE billing_invoices (
+  id                  TEXT PRIMARY KEY,
+  tenant_id           TEXT NOT NULL,
+  stripe_customer_id  TEXT,
+  subscription_id     TEXT,
+  status              TEXT,
+  amount_paid         INTEGER NOT NULL DEFAULT 0,
+  amount_due          INTEGER NOT NULL DEFAULT 0,
+  amount_refunded     INTEGER NOT NULL DEFAULT 0,
+  currency            TEXT NOT NULL DEFAULT 'jpy',
+  interval            TEXT CHECK (interval IN ('month', 'year')),
+  period_start        TEXT,
+  period_end          TEXT,
+  paid_at             TEXT,
+  hosted_invoice_url  TEXT,
+  raw_updated_at      TEXT,
+  synced_at           TEXT NOT NULL,
+  created_at          TEXT NOT NULL
+);
+
 CREATE TABLE booking_audit_logs (
   id              TEXT PRIMARY KEY,
   booking_id      TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -1283,7 +1451,8 @@ CREATE TABLE booking_settings (
          OR (reminder_day_before_time GLOB '[0-2][0-9]:[0-5][0-9]'
              AND substr(reminder_day_before_time, 1, 2) <= '23')), reminder_hours_before INTEGER
   CHECK (reminder_hours_before IS NULL
-         OR reminder_hours_before BETWEEN 1 AND 72));
+         OR reminder_hours_before BETWEEN 1 AND 72), liff_date_view TEXT NOT NULL DEFAULT 'list'
+  CHECK (liff_date_view IN ('list', 'calendar')));
 
 CREATE TABLE "bookings" (
   id                           TEXT PRIMARY KEY,
@@ -1314,7 +1483,7 @@ CREATE TABLE "bookings" (
   cancelled_at                 TEXT,
   completed_at                 TEXT,
   created_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),
@@ -1322,6 +1491,31 @@ CREATE TABLE "bookings" (
   FOREIGN KEY (created_by_staff_id) REFERENCES staff(id),
   FOREIGN KEY (updated_by_staff_id) REFERENCES staff(id),
   CHECK (friend_id IS NOT NULL OR booking_customer_id IS NOT NULL)
+);
+
+CREATE TABLE broadcast_after_action_runs (
+  id                       TEXT PRIMARY KEY,
+  broadcast_id             TEXT NOT NULL REFERENCES broadcasts (id) ON DELETE CASCADE,
+  friend_id                TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
+  common_action_version_id TEXT NOT NULL,
+  action_id                TEXT NOT NULL,
+  status                   TEXT NOT NULL DEFAULT 'pending'
+                             CHECK (status IN ('pending', 'running', 'done', 'failed')),
+  attempt_count            INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  max_attempts             INTEGER NOT NULL DEFAULT 5 CHECK (max_attempts >= 1),
+  error_code               TEXT,
+  created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (broadcast_id, friend_id, action_id)
+);
+
+CREATE TABLE broadcast_approval_events (
+  id              TEXT PRIMARY KEY,
+  broadcast_id    TEXT NOT NULL REFERENCES broadcasts (id) ON DELETE CASCADE,
+  actor_staff_id  TEXT NOT NULL,
+  action          TEXT NOT NULL CHECK (action IN ('requested', 'approved', 'rejected', 'cancelled', 'expired', 'reminded')),
+  reason          TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE TABLE broadcast_insights (
@@ -1338,6 +1532,19 @@ CREATE TABLE broadcast_insights (
   retry_count         INTEGER NOT NULL DEFAULT 0,
   fetched_at          TEXT,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE broadcast_lifecycle_events (
+  id              TEXT PRIMARY KEY,
+  broadcast_id    TEXT NOT NULL REFERENCES broadcasts (id) ON DELETE CASCADE,
+  actor_staff_id  TEXT,
+  action          TEXT NOT NULL CHECK (action IN (
+    'created', 'updated', 'scheduled', 'send_started',
+    'stopped', 'resumed', 'retried', 'cancelled'
+  )),
+  reason          TEXT,
+  detail_json     TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE TABLE broadcast_message_assets (
@@ -1377,7 +1584,7 @@ CREATE TABLE broadcast_send_claims (
   settled_at      TEXT,
   error_code      TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), line_request_id TEXT,
   PRIMARY KEY (broadcast_id, friend_id)
 );
 
@@ -1422,7 +1629,7 @@ CREATE TABLE "broadcasts" (
   CHECK (message_options_json IS NULL OR json_valid(message_options_json)), after_action_version_id TEXT
   REFERENCES common_action_versions(id) ON DELETE RESTRICT, lock_version INTEGER NOT NULL DEFAULT 1
   CHECK (lock_version > 0), stopped_at TEXT, stopped_by TEXT, send_attempt_no INTEGER NOT NULL DEFAULT 1, common_var_snapshot TEXT
-  CHECK (common_var_snapshot IS NULL OR json_valid(common_var_snapshot)), common_var_snapshot_at TEXT);
+  CHECK (common_var_snapshot IS NULL OR json_valid(common_var_snapshot)), common_var_snapshot_at TEXT, approval_status TEXT NOT NULL DEFAULT 'none', approval_requested_by_staff_id TEXT, approval_requested_at TEXT, approval_approver_staff_id TEXT, approval_note TEXT, approval_decided_by_staff_id TEXT, approval_decided_at TEXT, approval_reject_reason TEXT, approval_confirmed_count INTEGER);
 
 CREATE TABLE calendar_bookings (
   id             TEXT PRIMARY KEY,
@@ -1529,7 +1736,7 @@ CREATE TABLE common_action_versions (
   action_config    TEXT NOT NULL DEFAULT '[]',
   created_by       TEXT,
   created_at       TEXT NOT NULL DEFAULT (datetime('now')),
-  published_at     TEXT,
+  published_at     TEXT, draft_revision INTEGER NOT NULL DEFAULT 1,
   UNIQUE (common_action_id, version_number)
 );
 
@@ -1548,7 +1755,7 @@ CREATE TABLE common_actions (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-);
+, client_request_key TEXT);
 
 CREATE TABLE common_var_export_jobs (
   id TEXT PRIMARY KEY,
@@ -1583,9 +1790,7 @@ CREATE TABLE "common_var_resolution_failures" (
   )),
   source_id       TEXT NOT NULL,
   var_key         TEXT NOT NULL,
-  reason          TEXT NOT NULL CHECK (reason IN ('missing', 'not_started', 'expired', 'fallback_missing', 'invalid_window')),
-  -- 1 = 共通情報を直せば同じ送信を重複なく再試行できる。0 = 再試行しても
-  -- 治らない失敗（今のところ解決失敗はすべて 1。将来の恒久的失敗用の印）。
+  reason          TEXT NOT NULL CHECK (reason IN ('missing', 'not_started', 'expired', 'fallback_missing', 'invalid_window', 'stopped', 'draft')),
   retryable       INTEGER NOT NULL DEFAULT 1 CHECK (retryable IN (0, 1)),
   execution_at    TEXT NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
@@ -1608,8 +1813,17 @@ CREATE TABLE "common_vars" (
   line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
   memo TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1,
   updated_by TEXT, archived_at TEXT, replacement_run_id TEXT, valid_from TEXT, valid_until TEXT, fallback_value TEXT, expiry_behavior TEXT NOT NULL DEFAULT 'stop'
-  CHECK (expiry_behavior IN ('stop', 'fallback')),
+  CHECK (expiry_behavior IN ('stop', 'fallback')), status TEXT NOT NULL DEFAULT 'active'
+  CHECK (status IN ('draft', 'active', 'stopped')), stopped_at TEXT, expiry_notice_14_at TEXT, expiry_notice_3_at TEXT,
   UNIQUE(line_account_id, var_key)
+);
+
+CREATE TABLE conversion_anonymous_days (
+  conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id) ON DELETE CASCADE,
+  day                 TEXT NOT NULL,
+  anonymous_count     INTEGER NOT NULL DEFAULT 0,
+  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  PRIMARY KEY (conversion_point_id, day)
 );
 
 CREATE TABLE conversion_definition_operations (
@@ -1666,6 +1880,16 @@ CREATE TABLE conversion_event_dedup_claims (
       OR (mode = 'window' AND window_days IS NOT NULL))
 );
 
+CREATE TABLE conversion_event_reversals (
+  id                  TEXT PRIMARY KEY,
+  conversion_event_id TEXT NOT NULL REFERENCES conversion_events(id) ON DELETE CASCADE,
+  kind                TEXT NOT NULL CHECK (kind IN ('reverse', 'restore')),
+  reason              TEXT NOT NULL,
+  actor_id            TEXT,
+  actor_name          TEXT,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
 CREATE TABLE conversion_events (
   id                   TEXT PRIMARY KEY,
   conversion_point_id  TEXT NOT NULL REFERENCES conversion_points (id) ON DELETE CASCADE,
@@ -1682,7 +1906,7 @@ CREATE TABLE conversion_events (
   value_snapshot       REAL,
   idempotency_key      TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, point_version_snapshot INTEGER, tenant_id TEXT REFERENCES tenants(id));
+, point_version_snapshot INTEGER, tenant_id TEXT REFERENCES tenants(id), approval_amount_minor INTEGER, approval_formula TEXT, approval_commission_rate REAL, approval_base_amount REAL, approval_fixed_reward INTEGER, approval_reward_miles INTEGER, approval_notified_generation TEXT);
 
 CREATE TABLE conversion_ingestion_events (
   id                  TEXT PRIMARY KEY,
@@ -1727,7 +1951,7 @@ CREATE TABLE "conversion_points" (
   tenant_id  TEXT REFERENCES tenants(id),
   ingest_secret_encrypted TEXT,
   ingest_disabled_at TEXT
-);
+, count_anonymous INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -1995,7 +2219,24 @@ CREATE TABLE entry_routes (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, stopped_at TEXT, stopped_reason TEXT);
+
+CREATE TABLE error_messages (
+  -- エラーコード。code が無い現行 route は error 文字列そのものを鍵にする（§9-1）。
+  code               TEXT PRIMARY KEY,
+  -- 運用者向け文面。{incidentId} {n} {max} などの差し込みは画面側で埋める。
+  message            TEXT NOT NULL,
+  -- 次の行動の種類。押せるものだけを出す。
+  next_action_kind   TEXT NOT NULL DEFAULT 'none'
+                       CHECK (next_action_kind IN ('navigate', 'retry', 'contact_admin', 'none')),
+  -- navigate の行き先（管理画面のパス）。navigate 以外は NULL。
+  next_action_target TEXT,
+  -- 出典（route または service）。追加するときは必ず埋める（§9-2）。
+  source             TEXT NOT NULL,
+  version            INTEGER NOT NULL DEFAULT 1,
+  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
 
 CREATE TABLE event_booking_idempotency_keys (
   key              TEXT PRIMARY KEY,
@@ -2043,6 +2284,35 @@ CREATE TABLE event_bookings (
   FOREIGN KEY (event_id) REFERENCES events(id),
   FOREIGN KEY (slot_id) REFERENCES event_slots(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id)
+);
+
+CREATE TABLE event_change_logs (
+  id                    TEXT PRIMARY KEY,
+  line_account_id       TEXT NOT NULL,
+  event_id              TEXT NOT NULL,
+  slot_id               TEXT,
+  actor_id              TEXT,
+  actor_role            TEXT,
+  action                TEXT NOT NULL
+    CHECK (action IN (
+      'lifecycle',
+      'change_review_apply',
+      'waitlist_promote',
+      'waitlist_reorder',
+      'waitlist_skip',
+      'booking_change'
+    )),
+  reason                TEXT,
+  before_json           TEXT,
+  after_json            TEXT,
+  affected_confirmed    INTEGER NOT NULL DEFAULT 0,
+  affected_waiting       INTEGER NOT NULL DEFAULT 0,
+  affected_reminders     INTEGER NOT NULL DEFAULT 0,
+  notify_planned         INTEGER NOT NULL DEFAULT 0,
+  notify_sent            INTEGER NOT NULL DEFAULT 0,
+  idempotency_key       TEXT,
+  created_at            TEXT NOT NULL,
+  FOREIGN KEY (event_id) REFERENCES events(id)
 );
 
 CREATE TABLE event_occurrence_applicant_snapshots (
@@ -2111,7 +2381,7 @@ CREATE TABLE "event_waitlist" (
   notified_at                    TEXT,
   version                        INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
   created_at                     TEXT NOT NULL,
-  updated_at                     TEXT NOT NULL, event_version_id TEXT REFERENCES event_versions(id), event_snapshot_json TEXT CHECK (event_snapshot_json IS NULL OR json_valid(event_snapshot_json)),
+  updated_at                     TEXT NOT NULL, event_version_id TEXT REFERENCES event_versions(id), event_snapshot_json TEXT CHECK (event_snapshot_json IS NULL OR json_valid(event_snapshot_json)), sort_order INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (event_id) REFERENCES events(id),
   FOREIGN KEY (slot_id) REFERENCES event_slots(id),
@@ -2161,7 +2431,10 @@ CREATE TABLE events (
   CHECK (account_ids IS NULL OR json_valid(account_ids)), dedup_priority TEXT
   CHECK (dedup_priority IS NULL OR json_valid(dedup_priority)), failed_account_ids TEXT
   CHECK (failed_account_ids IS NULL OR json_valid(failed_account_ids)), confirmation_message_extra TEXT, reminder_message_extra TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, visible_tag_id TEXT, waitlist_enabled INTEGER NOT NULL DEFAULT 0, entry_cutoff_hours_before INTEGER, version INTEGER NOT NULL DEFAULT 1, current_published_version_id TEXT, version_write_token TEXT, approval_deadline_hours INTEGER NOT NULL DEFAULT 24
-  CHECK (approval_deadline_hours IN (2, 24, 72)),
+  CHECK (approval_deadline_hours IN (2, 24, 72)), questions_json TEXT CHECK (
+    questions_json IS NULL OR json_valid(questions_json)
+  ), lifecycle_status TEXT NOT NULL DEFAULT 'draft'
+  CHECK (lifecycle_status IN ('draft', 'published', 'paused', 'ended', 'cancelled')), lifecycle_changed_at TEXT, lifecycle_change_reason TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 
@@ -2207,6 +2480,19 @@ CREATE TABLE field_migration_runs (
   updated_at            TEXT NOT NULL
 );
 
+CREATE TABLE file_scan_configs (
+  line_account_id      TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  external_provider    TEXT,
+  external_endpoint_url TEXT,
+  external_secret_ref  TEXT,
+  external_timeout_ms  INTEGER NOT NULL DEFAULT 10000 CHECK (external_timeout_ms > 0),
+  max_bytes_override   INTEGER CHECK (max_bytes_override IS NULL OR max_bytes_override > 0),
+  max_pixels_override  INTEGER CHECK (max_pixels_override IS NULL OR max_pixels_override > 0),
+  stopped_notified_at  TEXT,
+  updated_by           TEXT,
+  updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE "folders" (
   id            TEXT PRIMARY KEY,
   kind          TEXT NOT NULL CHECK (kind IN (
@@ -2242,7 +2528,8 @@ CREATE TABLE form_opens (
   friend_id TEXT,
   friend_name TEXT,
   opened_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, is_test INTEGER NOT NULL DEFAULT 0
+  CHECK (is_test IN (0, 1)));
 
 CREATE TABLE form_submissions (
   id TEXT PRIMARY KEY,
@@ -2251,7 +2538,8 @@ CREATE TABLE form_submissions (
   data TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , destination_write_status TEXT NOT NULL DEFAULT 'unknown'
-  CHECK (destination_write_status IN ('pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown')), destination_write_attempted INTEGER, destination_write_succeeded INTEGER, destination_write_failed INTEGER, destination_write_completed_at TEXT, form_version_id TEXT REFERENCES form_versions(id));
+  CHECK (destination_write_status IN ('pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown')), destination_write_attempted INTEGER, destination_write_succeeded INTEGER, destination_write_failed INTEGER, destination_write_completed_at TEXT, form_version_id TEXT REFERENCES form_versions(id), is_test INTEGER NOT NULL DEFAULT 0
+  CHECK (is_test IN (0, 1)));
 
 CREATE TABLE form_submit_claims (
   tenant_id TEXT NOT NULL DEFAULT '',
@@ -2289,6 +2577,15 @@ CREATE TABLE form_submit_outbox (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key, kind)
+);
+
+CREATE TABLE form_test_tokens (
+  id                  TEXT PRIMARY KEY,
+  form_id             TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+  token_hash          TEXT NOT NULL UNIQUE,
+  created_by_staff_id TEXT,
+  expires_at          TEXT NOT NULL,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
 );
 
 CREATE TABLE form_versions (
@@ -2561,6 +2858,17 @@ CREATE TABLE friend_export_jobs (
   failure_reason TEXT
 );
 
+CREATE TABLE friend_field_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT NOT NULL REFERENCES line_accounts(id),
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  field_id          TEXT NOT NULL REFERENCES friend_fields(id),
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(line_account_id, idempotency_key)
+);
+
 CREATE TABLE friend_field_reminder_scan_states (
   reminder_id TEXT PRIMARY KEY REFERENCES reminders(id) ON DELETE CASCADE,
   cursor      TEXT,
@@ -2670,7 +2978,7 @@ CREATE TABLE friend_reminders (
   status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, reminder_version_id TEXT REFERENCES reminder_versions(id), source_kind TEXT NOT NULL DEFAULT 'manual', source_id TEXT, source_event_id TEXT, timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', cancel_reason TEXT, completed_at TEXT, lock_version INTEGER NOT NULL DEFAULT 0);
+, reminder_version_id TEXT REFERENCES reminder_versions(id), source_kind TEXT NOT NULL DEFAULT 'manual', source_id TEXT, source_event_id TEXT, timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', cancel_reason TEXT, completed_at TEXT, lock_version INTEGER NOT NULL DEFAULT 0, template_version_snapshot TEXT);
 
 CREATE TABLE friend_scenario_op_keys (
   op_idempotency_key TEXT PRIMARY KEY,
@@ -2781,6 +3089,55 @@ CREATE TABLE google_calendar_connections (
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
+
+CREATE TABLE google_sheets_integrations (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL UNIQUE REFERENCES line_accounts(id) ON DELETE CASCADE,
+  tenant_id TEXT,
+  google_account_email TEXT,
+  refresh_token_enc TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending_target'
+    CHECK (status IN ('pending_target', 'connected', 'expired')),
+  spreadsheet_id TEXT,
+  spreadsheet_title TEXT,
+  -- データ種別ごとの再開点。{"friends": {"after": "...", "lastId": "..."}} の形。
+  -- 途中で止まった同期が前回の続きから書き直すためのもの。
+  sync_cursor_json TEXT NOT NULL DEFAULT '{}',
+  last_synced_at TEXT,
+  last_sync_status TEXT
+    CHECK (last_sync_status IN ('ok', 'partial', 'error') OR last_sync_status IS NULL),
+  last_sync_error TEXT,
+  consecutive_failures INTEGER NOT NULL DEFAULT 0,
+  connected_by_staff_id TEXT,
+  connected_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE google_sheets_oauth_states (
+  state TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  staff_id TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('connect', 'reconnect')),
+  code_verifier_enc TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE google_sheets_sync_runs (
+  id TEXT PRIMARY KEY,
+  integration_id TEXT NOT NULL REFERENCES google_sheets_integrations(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('manual', 'scheduled')),
+  data_type TEXT NOT NULL CHECK (data_type IN ('friends', 'form_answers')),
+  status TEXT NOT NULL CHECK (status IN ('running', 'ok', 'partial', 'error')),
+  rows_written INTEGER NOT NULL DEFAULT 0 CHECK (rows_written >= 0),
+  cursor_json TEXT,
+  error TEXT,
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+, run_date TEXT, spreadsheet_id TEXT);
 
 CREATE TABLE hq_support_messages (
   id               TEXT PRIMARY KEY,
@@ -3121,7 +3478,7 @@ CREATE TABLE incoming_webhook_receipts (
   attempt_count INTEGER NOT NULL DEFAULT 0,
   completed_at TEXT,
   last_error_code TEXT,
-  received_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  received_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), config_version INTEGER, identity_match_json TEXT, action_refs_json TEXT, body_hash TEXT,
   PRIMARY KEY (webhook_id, signature_hash)
 );
 
@@ -3133,17 +3490,19 @@ CREATE TABLE incoming_webhook_steps (
   PRIMARY KEY (source_event_id, step_key)
 );
 
-CREATE TABLE incoming_webhook_unmatched_events (
+CREATE TABLE "incoming_webhook_unmatched_events" (
   id                    TEXT PRIMARY KEY,
   webhook_id            TEXT NOT NULL REFERENCES incoming_webhooks(id),
   line_account_id       TEXT NOT NULL REFERENCES line_accounts(id),
   source_event_id       TEXT NOT NULL,
-  kind                  TEXT NOT NULL CHECK (kind IN ('unmatched', 'candidate')),
+  kind                  TEXT NOT NULL CHECK (kind IN ('unmatched', 'candidate', 'ambiguous')),
   status                TEXT NOT NULL DEFAULT 'pending'
                         CHECK (status IN ('pending', 'resolved', 'dismissed')),
   identity_attempts_json TEXT NOT NULL DEFAULT '[]'
                         CHECK (json_valid(identity_attempts_json)),
   masked_shape_json     TEXT CHECK (masked_shape_json IS NULL OR json_valid(masked_shape_json)),
+  -- kind='ambiguous' の届物だけが持つ、一致した友だちIDの並び。
+  candidate_friend_ids_json TEXT CHECK (candidate_friend_ids_json IS NULL OR json_valid(candidate_friend_ids_json)),
   resolved_friend_id    TEXT REFERENCES friends(id),
   resolved_by           TEXT,
   resolved_at           TEXT,
@@ -3164,7 +3523,7 @@ CREATE TABLE incoming_webhooks (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , version INTEGER NOT NULL DEFAULT 1
   CHECK (version > 0), identity_match_json TEXT NOT NULL DEFAULT
-  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
+  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT);
 
 CREATE TABLE integration_api_tokens (
   id              TEXT PRIMARY KEY,
@@ -3230,7 +3589,9 @@ CREATE TABLE line_accounts (
   official_profile_url   TEXT,
   created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id), timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', provider_id TEXT, revision INTEGER NOT NULL DEFAULT 1, line_display_name TEXT, line_picture_url TEXT, line_basic_id TEXT, line_profile_synced_at TEXT);
+, login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id), timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', provider_id TEXT, revision INTEGER NOT NULL DEFAULT 1, line_display_name TEXT, line_picture_url TEXT, line_basic_id TEXT, line_profile_synced_at TEXT, inactive_reason TEXT
+  CHECK (inactive_reason IS NULL OR inactive_reason IN ('manual', 'ban_detected', 'credential_invalid')), inactive_reason_detail TEXT, inactivated_at TEXT, login_channel_secret_encrypted TEXT, last_webhook_received_at TEXT, webhook_silence_exempt INTEGER NOT NULL DEFAULT 0
+  CHECK (webhook_silence_exempt IN (0, 1)));
 
 CREATE TABLE line_message_unsends (
   line_message_account_key TEXT NOT NULL,
@@ -3313,6 +3674,29 @@ CREATE TABLE manual_links (
 , version INTEGER NOT NULL DEFAULT 1
   CHECK (version > 0), last_http_status INTEGER);
 
+CREATE TABLE measurement_domain_rejections (
+  site_id        TEXT NOT NULL REFERENCES measurement_sites(id) ON DELETE CASCADE,
+  host           TEXT NOT NULL,
+  rejected_count INTEGER NOT NULL DEFAULT 0,
+  last_seen_at   TEXT NOT NULL,
+  PRIMARY KEY (site_id, host)
+);
+
+CREATE TABLE measurement_site_domains (
+  site_id    TEXT NOT NULL REFERENCES measurement_sites(id) ON DELETE CASCADE,
+  host       TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  PRIMARY KEY (site_id, host)
+);
+
+CREATE TABLE measurement_sites (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  label           TEXT NOT NULL,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  updated_at      TEXT
+, stopped_at TEXT, stopped_reason TEXT);
+
 CREATE TABLE media (
   id          TEXT PRIMARY KEY,
   folder_id   TEXT REFERENCES folders(id) ON DELETE SET NULL,
@@ -3328,6 +3712,34 @@ CREATE TABLE media (
   uploaded_by TEXT,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
 , line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, archived_at TEXT, archived_by TEXT, archive_reason TEXT, usage_expires_at TEXT, usage_consent_note TEXT);
+
+CREATE TABLE media_file_scans (
+  id               TEXT PRIMARY KEY,
+  -- 全体で使う素材（配信用画像など）はアカウントを持たないため NULL を許す。
+  line_account_id  TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
+  -- form_file / broadcast_asset / generic_image は R2 キーを subject_id に入れる。
+  subject_kind     TEXT NOT NULL CHECK (subject_kind IN (
+                     'media', 'media_version', 'upload_session', 'photo',
+                     'form_file', 'broadcast_asset', 'generic_image')),
+  subject_id       TEXT NOT NULL,
+  media_id         TEXT REFERENCES media(id) ON DELETE SET NULL,
+  filename         TEXT NOT NULL,
+  mime_type        TEXT NOT NULL,
+  size_bytes       INTEGER NOT NULL CHECK (size_bytes >= 0),
+  status           TEXT NOT NULL DEFAULT 'pending'
+                     CHECK (status IN ('pending', 'clean', 'rejected', 'quarantined')),
+  reason_code      TEXT,
+  reason_detail    TEXT,
+  attempts         INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  next_retry_at    TEXT,
+  scanned_at       TEXT,
+  quarantined_at   TEXT,
+  released_at      TEXT,
+  release_reason   TEXT,
+  released_by      TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
 
 CREATE TABLE media_storage_quotas (
   line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -3439,6 +3851,30 @@ CREATE TABLE meet_consultations (
   updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE menu_versions (
+  id TEXT PRIMARY KEY,
+  menu_id TEXT NOT NULL
+    REFERENCES menus(id) ON DELETE CASCADE,
+  version_number INTEGER NOT NULL CHECK (version_number > 0),
+  name TEXT NOT NULL,
+  category_label TEXT,
+  description TEXT,
+  duration_minutes INTEGER NOT NULL,
+  buffer_after_minutes INTEGER NOT NULL DEFAULT 0,
+  base_price INTEGER NOT NULL,
+  price_mode TEXT NOT NULL DEFAULT 'fixed'
+    CHECK (price_mode IN ('fixed', 'free', 'inquiry')),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  -- 受付条件の上書き（booking_window_days / cutoff_hours_before /
+  -- cancel_deadline_hours_before / intake_question / concurrent_capacity）。
+  -- 空は「店舗の決まりを使う」。
+  rules_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(rules_json)),
+  created_by_staff_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (menu_id, version_number)
+);
+
 CREATE TABLE menus (
   id                    TEXT PRIMARY KEY,
   line_account_id       TEXT NOT NULL,
@@ -3481,8 +3917,45 @@ CREATE TABLE messages_log (
   source           TEXT,
   line_account_id  TEXT,
   sent_by_staff_id TEXT,
+  line_event_at    TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT);
+
+CREATE TABLE mileage_adjustment_approval_events (
+  id              TEXT PRIMARY KEY,
+  request_id      TEXT NOT NULL REFERENCES mileage_adjustment_approval_requests (id) ON DELETE CASCADE,
+  actor_staff_id  TEXT NOT NULL,
+  action          TEXT NOT NULL CHECK (action IN ('requested', 'approved', 'rejected', 'cancelled')),
+  reason          TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE mileage_adjustment_approval_requests (
+  id                     TEXT PRIMARY KEY,
+  line_account_id        TEXT NOT NULL,
+  program_id             TEXT NOT NULL DEFAULT 'default',
+  friend_id              TEXT NOT NULL,
+  direction              TEXT NOT NULL CHECK (direction IN ('increase', 'decrease')),
+  amount                 INTEGER NOT NULL CHECK (amount > 0),
+  reason_category        TEXT NOT NULL,
+  reason                 TEXT NOT NULL,
+  source_reference_id    TEXT,
+  expires_at             TEXT,
+  notify_friend          INTEGER NOT NULL DEFAULT 0,
+  idempotency_key        TEXT NOT NULL,
+  status                 TEXT NOT NULL DEFAULT 'pending'
+                           CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+  requested_by_staff_id  TEXT NOT NULL,
+  requested_by_staff_name TEXT NOT NULL,
+  decided_by_staff_id    TEXT,
+  decided_by_staff_name  TEXT,
+  decided_at             TEXT,
+  decision_reason        TEXT,
+  ledger_entry_id        TEXT,
+  created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (line_account_id, idempotency_key)
+);
 
 CREATE TABLE mileage_adjustment_notifications (
   id                TEXT PRIMARY KEY,
@@ -3638,7 +4111,7 @@ CREATE TABLE mileage_redemptions (
   delivered_at             TEXT,
   refunded_at              TEXT,
   created_at               TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at               TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at               TEXT NOT NULL DEFAULT (datetime('now')), reward_name_snapshot TEXT, reward_kind_snapshot TEXT,
   UNIQUE (program_id, idempotency_key)
 );
 
@@ -3674,7 +4147,7 @@ CREATE TABLE mileage_reward_versions (
   customer_message         TEXT NOT NULL DEFAULT '',
   created_by               TEXT,
   created_at               TEXT NOT NULL DEFAULT (datetime('now')),
-  published_at             TEXT, target_conditions TEXT,
+  published_at             TEXT, target_conditions TEXT, revision INTEGER NOT NULL DEFAULT 1,
   UNIQUE (reward_id, version_number)
 );
 
@@ -3978,7 +4451,7 @@ CREATE TABLE nen_pet_profiles (
   birthday TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT);
+, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT, weight_updated_at TEXT);
 
 CREATE TABLE nen_photo_assessment_runs (
   id TEXT PRIMARY KEY,
@@ -4170,7 +4643,7 @@ CREATE TABLE nen_photo_submissions (
   CHECK (public_pet_name IN (0, 1)), review_reason_code TEXT
   CHECK (review_reason_code IS NULL OR review_reason_code IN ('quality', 'privacy', 'unrelated', 'duplicate', 'other')), review_reason_note TEXT, reviewed_by TEXT, reviewed_by_name TEXT, review_notification_status TEXT NOT NULL DEFAULT 'not_required'
   CHECK (review_notification_status IN ('not_required', 'pending', 'sent', 'failed')), review_image_url TEXT, public_image_url TEXT, image_width INTEGER CHECK (image_width IS NULL OR image_width > 0), image_height INTEGER CHECK (image_height IS NULL OR image_height > 0), image_byte_size INTEGER CHECK (image_byte_size IS NULL OR image_byte_size >= 0), captured_device TEXT, review_version INTEGER NOT NULL DEFAULT 1 CHECK (review_version > 0), display_rotation INTEGER NOT NULL DEFAULT 0
-  CHECK (display_rotation IN (0, 90, 180, 270)), rotation_idempotency_key TEXT, notification_retry_key TEXT);
+  CHECK (display_rotation IN (0, 90, 180, 270)), rotation_idempotency_key TEXT, notification_retry_key TEXT, content_hash TEXT);
 
 CREATE TABLE nen_point_ledger (
   id TEXT PRIMARY KEY,
@@ -4269,7 +4742,7 @@ CREATE TABLE notification_deliveries (
   execution_mode          TEXT NOT NULL DEFAULT 'automatic'
                           CHECK (execution_mode IN ('automatic', 'retry', 'resend', 'test')),
   version                 INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
-  updated_at              TEXT NOT NULL,
+  updated_at              TEXT NOT NULL, source TEXT,
   UNIQUE (line_account_id, idempotency_key)
 );
 
@@ -4373,12 +4846,13 @@ CREATE TABLE operation_alert_notification_outbox (
   UNIQUE (event_id, staff_id, channel)
 );
 
-CREATE TABLE operation_alerts (
+CREATE TABLE "operation_alerts" (
   id                   TEXT PRIMARY KEY,
   line_account_id      TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   check_key            TEXT NOT NULL CHECK (check_key IN (
     'line_connection', 'message_quota', 'external_integrations',
-    'webhook', 'dispatch_jobs', 'friend_change'
+    'webhook', 'dispatch_jobs', 'friend_change',
+    'monitoring_heartbeat', 'infra_canary', 'credential_expiry'
   )),
   status               TEXT NOT NULL CHECK (status IN ('open', 'acknowledged', 'resolved')),
   severity             TEXT NOT NULL CHECK (severity IN ('unknown', 'warning', 'danger')),
@@ -4455,12 +4929,13 @@ CREATE TABLE operation_dispatcher_heartbeats (
   updated_at       TEXT NOT NULL
 );
 
-CREATE TABLE operation_health_results (
+CREATE TABLE "operation_health_results" (
   id             TEXT PRIMARY KEY,
   run_id         TEXT NOT NULL REFERENCES operation_health_runs(id) ON DELETE CASCADE,
   check_key      TEXT NOT NULL CHECK (check_key IN (
     'line_connection', 'message_quota', 'external_integrations',
-    'webhook', 'dispatch_jobs', 'friend_change'
+    'webhook', 'dispatch_jobs', 'friend_change',
+    'monitoring_heartbeat', 'infra_canary', 'credential_expiry'
   )),
   status         TEXT NOT NULL CHECK (status IN ('normal', 'warning', 'danger', 'unknown')),
   summary        TEXT NOT NULL,
@@ -4508,6 +4983,13 @@ CREATE TABLE operation_incidents (
 , stopped_definitions_json TEXT
   CHECK (stopped_definitions_json IS NULL OR json_valid(stopped_definitions_json)), restore_report_json TEXT
   CHECK (restore_report_json IS NULL OR json_valid(restore_report_json)));
+
+CREATE TABLE operation_infra_probes (
+  id         TEXT PRIMARY KEY,
+  kind       TEXT NOT NULL CHECK (kind IN ('d1')),
+  payload    TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 
 CREATE TABLE operation_notification_outbox (
   id              TEXT PRIMARY KEY,
@@ -4611,6 +5093,24 @@ CREATE TABLE outgoing_webhooks (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, auto_stopped_at TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
+
+CREATE TABLE photo_reward_policies (
+  id TEXT PRIMARY KEY,
+  version_number INTEGER NOT NULL UNIQUE,
+  -- 付与の記録に写す鍵。第1版は既存の 'legacy-5' と同じ鍵にする。
+  -- 第2版からは 'v2' 'v3' …と付ける。
+  policy_key TEXT NOT NULL UNIQUE,
+  -- 採用1枚につき付けるポイント数。
+  points INTEGER NOT NULL CHECK (points > 0 AND points <= 100000),
+  -- 版の中身のひとこと。「報酬を5pt→10ptに」など。
+  summary TEXT NOT NULL DEFAULT '',
+  -- 使い始めの日時。空は「公開と同時」。未来の日時は「予約」の札で見せる。
+  effective_from TEXT,
+  created_by_staff_id TEXT,
+  -- 同じ確認キーの再送では版を増やさないための鍵。
+  idempotency_key TEXT UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 CREATE TABLE pii_reveal_logs (
   id                        TEXT PRIMARY KEY,
@@ -4734,7 +5234,8 @@ CREATE TABLE platform_knowledge_articles (
   helpful_count INTEGER NOT NULL DEFAULT 0,
   unhelpful_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL, article_kind TEXT NOT NULL DEFAULT 'verified'
+  CHECK (article_kind IN ('verified','answer_example')),
   UNIQUE(source_request_id, source_revision)
 );
 
@@ -4828,7 +5329,7 @@ CREATE TABLE recipes (
   display_order  INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, created_by_staff_id TEXT);
 
 CREATE TABLE ref_tracking (
   id              TEXT PRIMARY KEY,
@@ -4869,7 +5370,7 @@ CREATE TABLE reminder_delivery_runs (
   started_at                 TEXT,
   completed_at               TEXT,
   created_at                 TEXT NOT NULL,
-  updated_at                 TEXT NOT NULL,
+  updated_at                 TEXT NOT NULL, sent_message_type TEXT, sent_message_content TEXT, sent_template_id TEXT, sent_template_version INTEGER,
   UNIQUE (friend_reminder_id, reminder_step_id, scheduled_at)
 );
 
@@ -5010,6 +5511,17 @@ CREATE TABLE rich_menu_assignments (
   UNIQUE (line_account_id, friend_id)
 );
 
+CREATE TABLE rich_menu_device_confirmations (
+  id                     TEXT PRIMARY KEY,
+  group_id               TEXT NOT NULL REFERENCES rich_menu_groups(id) ON DELETE CASCADE,
+  -- 確認した時点の下書きの fingerprint。公開時は今の下書きと突き合わせる。
+  definition_fingerprint TEXT NOT NULL,
+  version_id             TEXT REFERENCES rich_menu_versions(id) ON DELETE SET NULL,
+  staff_id               TEXT NOT NULL,
+  confirmed_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
 CREATE TABLE rich_menu_duplicate_requests (
   id                TEXT PRIMARY KEY,
   account_id        TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -5042,7 +5554,7 @@ CREATE TABLE rich_menu_groups (
   display_order       INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, publishing_owner TEXT, publishing_expires_at TEXT, publishing_generation INTEGER NOT NULL DEFAULT 0);
+, publishing_owner TEXT, publishing_expires_at TEXT, publishing_generation INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE rich_menu_manual_publish_requests (
   id                    TEXT PRIMARY KEY,
@@ -5082,6 +5594,45 @@ CREATE TABLE rich_menu_pages (
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   UNIQUE (group_id, order_index)
+);
+
+CREATE TABLE rich_menu_publish_run_pages (
+  id                  TEXT PRIMARY KEY,
+  run_id              TEXT NOT NULL REFERENCES rich_menu_publish_runs(id) ON DELETE CASCADE,
+  page_id             TEXT NOT NULL,
+  order_index         INTEGER NOT NULL,
+  alias_id            TEXT NOT NULL,
+  old_line_richmenu_id TEXT,
+  new_line_richmenu_id TEXT,
+  create_status       TEXT NOT NULL DEFAULT 'pending'
+    CHECK (create_status IN ('pending', 'succeeded', 'failed')),
+  image_status        TEXT NOT NULL DEFAULT 'pending'
+    CHECK (image_status IN ('pending', 'succeeded', 'failed')),
+  alias_status        TEXT NOT NULL DEFAULT 'pending'
+    CHECK (alias_status IN ('pending', 'succeeded', 'failed')),
+  cleanup_status      TEXT NOT NULL DEFAULT 'pending'
+    CHECK (cleanup_status IN ('pending', 'succeeded', 'failed', 'skipped')),
+  last_error_code     TEXT,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
+CREATE TABLE rich_menu_publish_runs (
+  id                    TEXT PRIMARY KEY,
+  group_id              TEXT NOT NULL REFERENCES rich_menu_groups(id) ON DELETE CASCADE,
+  version_id            TEXT REFERENCES rich_menu_versions(id) ON DELETE SET NULL,
+  idempotency_key       TEXT NOT NULL,
+  mode                  TEXT NOT NULL
+    CHECK (mode IN ('publish', 'unpublish', 'retry', 'reconcile', 'scheduled_reconcile')),
+  status                TEXT NOT NULL DEFAULT 'running'
+    CHECK (status IN ('running', 'succeeded', 'failed')),
+  requested_by_staff_id TEXT,
+  -- 照合のときだけ使う。見つかったずれの一覧（JSON配列）。
+  diffs_json            TEXT,
+  last_error_code       TEXT,
+  started_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  completed_at          TEXT,
+  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
 );
 
 CREATE TABLE rich_menu_schedule_publications (
@@ -5139,6 +5690,22 @@ CREATE TABLE rich_menu_test_applies (
   created_at            TEXT NOT NULL,
   updated_at            TEXT NOT NULL,
   UNIQUE (account_id, idempotency_key)
+);
+
+CREATE TABLE rich_menu_versions (
+  id                   TEXT PRIMARY KEY,
+  group_id             TEXT NOT NULL REFERENCES rich_menu_groups(id) ON DELETE CASCADE,
+  version_number       INTEGER NOT NULL CHECK (version_number >= 1),
+  -- 公開を実行した時点の下書きの中身（ページ・領域・割当条件の写し）。
+  definition_snapshot  TEXT NOT NULL,
+  -- 下書きの要約と公開版の照合に使う。下書きが変わると変わる。
+  definition_fingerprint TEXT NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'published', 'archived')),
+  created_by_staff_id  TEXT,
+  published_at         TEXT,
+  created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
 );
 
 CREATE TABLE rt_approval_requests (
@@ -5209,6 +5776,206 @@ CREATE TABLE rt_gbp_reviews (
   UNIQUE(store_id, external_review_id)
 );
 
+CREATE TABLE rt_google_changes (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('special_hours', 'regular_hours', 'profile', 'photo')),
+  source TEXT NOT NULL CHECK (source IN ('shortcut', 'text', 'calendar', 'weekly', 'profile_edit', 'photo')),
+  summary TEXT NOT NULL,
+  target_json TEXT NOT NULL,
+  before_json TEXT,
+  after_json TEXT NOT NULL,
+  input_text TEXT,
+  reservation_impact_count INTEGER NOT NULL DEFAULT 0,
+  base_fingerprint TEXT,
+  status TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'pending_confirm', 'accepted', 'applied', 'failed', 'conflict', 'cancelled')),
+  staff_id TEXT,
+  staff_name TEXT,
+  request_id TEXT,
+  error TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  sent_at TEXT,
+  applied_at TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE rt_google_connections (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL UNIQUE REFERENCES rt_stores(id) ON DELETE CASCADE,
+  line_account_id TEXT REFERENCES line_accounts(id),
+  google_account_email TEXT,
+  location_name TEXT,
+  location_title TEXT,
+  location_maps_url TEXT,
+  refresh_token_enc TEXT,
+  access_token_enc TEXT,
+  access_token_expires_at TEXT,
+  status TEXT NOT NULL DEFAULT 'disconnected'
+    CHECK (status IN ('pending_location', 'connected', 'expired', 'no_permission', 'disconnected')),
+  connected_by_staff_id TEXT,
+  connected_at TEXT,
+  disconnected_at TEXT,
+  last_synced_at TEXT,
+  last_sync_error TEXT,
+  average_rating REAL,
+  total_review_count INTEGER,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+, last_posts_synced_at TEXT, last_metrics_synced_at TEXT);
+
+CREATE TABLE rt_google_location_candidates (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  location_name TEXT NOT NULL,
+  location_title TEXT NOT NULL,
+  address_text TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(store_id, location_name)
+);
+
+CREATE TABLE rt_google_metrics_daily (
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  date TEXT NOT NULL,                       -- YYYY-MM-DD（店舗所在地の暦日。Googleの日次区切りに従う）
+
+  -- プロフィール表示（Business Impressions）の内訳
+  impressions_desktop_maps INTEGER,
+  impressions_desktop_search INTEGER,
+  impressions_mobile_maps INTEGER,
+  impressions_mobile_search INTEGER,
+
+  -- 行動（クリック等）
+  direction_requests INTEGER,               -- ルート検索
+  call_clicks INTEGER,                      -- 電話ボタンのクリック（通話成立数ではない）
+  website_clicks INTEGER,                   -- サイトへのクリック
+
+  -- 飲食店向け
+  menu_clicks INTEGER,                      -- メニュー閲覧
+  bookings INTEGER,                         -- Google経由の予約（連携サービス未対応の店舗は NULL）
+  food_orders INTEGER,                      -- 料理の注文（同上）
+
+  fetched_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (store_id, date)
+);
+
+CREATE TABLE rt_google_oauth_states (
+  state TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  line_account_id TEXT,
+  staff_id TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('connect', 'reconnect')),
+  code_verifier_enc TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE rt_google_posts (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('standard', 'event', 'offer', 'alert')),
+  origin TEXT NOT NULL DEFAULT 'admin' CHECK (origin IN ('admin', 'google')),
+
+  -- 本文・タイトル（イベント／特典はタイトル必須。最新情報は空文字のまま使わない）
+  summary TEXT NOT NULL DEFAULT '',
+  title TEXT,
+
+  -- イベント／特典の期間。Google の TimeInterval は日付と時刻が別項目なので分けて持つ。
+  -- タイムゾーンは店舗の所在地に合わせてGoogle側が解釈する（既定Asia/Tokyo）。
+  event_start_date TEXT,
+  event_start_time TEXT,
+  event_end_date TEXT,
+  event_end_time TEXT,
+
+  -- ボタン。特典（offer）ではGoogleが無視するため送らない（画面にも出さない）。
+  cta_type TEXT CHECK (cta_type IN ('none', 'book', 'order', 'shop', 'learn_more', 'sign_up', 'call')),
+  cta_url TEXT,
+
+  -- 特典だけの項目（いずれも任意）
+  coupon_code TEXT,
+  redeem_online_url TEXT,
+  terms_conditions TEXT,
+
+  -- 画像。[{ mediaId, filename, sourceUrl }] のJSON配列。第3段は社内の登録メディアから1枚まで。
+  -- Local Posts の media は sourceUrl のみ対応のため、登録メディアの公開URLをそのまま入れる。
+  media_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(media_json)),
+
+  publish_mode TEXT NOT NULL DEFAULT 'now' CHECK (publish_mode IN ('now', 'scheduled')),
+  publish_at TEXT,
+
+  status TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'scheduled', 'pending_confirm', 'accepted', 'published',
+                      'rejected', 'failed', 'cancelled', 'deleted')),
+
+  -- Google 側の識別子。accounts/{account}/locations/{location}/localPosts/{id} の形。
+  google_post_name TEXT,
+  google_state TEXT,
+  search_url TEXT,
+  google_create_time TEXT,
+  google_update_time TEXT,
+
+  -- 送信内容の指紋（SHA-256先頭32文字）。送信結果が不明なとき、Googleの一覧から
+  -- 自分が出した投稿を見つけて二重投稿を避けるための照合キー。
+  content_fingerprint TEXT,
+  request_id TEXT,
+
+  staff_id TEXT,
+  staff_name TEXT,
+  error TEXT,
+
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  sent_at TEXT,
+  published_at TEXT,
+  checked_at TEXT,
+  deleted_at TEXT,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE rt_google_profiles (
+  store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,
+  location_name TEXT NOT NULL,
+  profile_json TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  fetched_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE rt_google_reviews (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  review_name TEXT NOT NULL,
+  reviewer_display_name TEXT,
+  star_rating INTEGER NOT NULL CHECK (star_rating BETWEEN 1 AND 5),
+  comment TEXT,
+  create_time TEXT NOT NULL,
+  update_time TEXT,
+  needs_attention INTEGER NOT NULL DEFAULT 0,
+  reply_status TEXT NOT NULL DEFAULT 'unreplied'
+    CHECK (reply_status IN ('unreplied', 'draft', 'pending_confirm', 'replied', 'published')),
+  reply_draft TEXT,
+  reply_draft_ai_generated INTEGER NOT NULL DEFAULT 0,
+  reply_draft_generated_at TEXT,
+  reply_comment TEXT,
+  reply_update_time TEXT,
+  first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(store_id, review_name)
+);
+
+CREATE TABLE rt_google_write_log (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('review_reply', 'connect', 'reconnect', 'disconnect')),
+  target_name TEXT,
+  staff_id TEXT,
+  before_text TEXT,
+  after_text TEXT,
+  request_id TEXT,
+  result TEXT NOT NULL CHECK (result IN ('accepted', 'failed', 'unknown')),
+  error TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE rt_inbound_emails (
   id TEXT PRIMARY KEY,
   message_id TEXT NOT NULL UNIQUE,
@@ -5219,7 +5986,7 @@ CREATE TABLE rt_inbound_emails (
     CHECK (status IN ('storing', 'stored', 'received', 'quarantined', 'storage_failed', 'raw_deleted')),
   size_bytes INTEGER NOT NULL DEFAULT 0 CHECK (size_bytes >= 0),
   quarantine_reason TEXT
-);
+, media_id TEXT REFERENCES rt_media(id));
 
 CREATE TABLE rt_intake_addresses (
   id TEXT PRIMARY KEY,
@@ -5258,9 +6025,9 @@ CREATE TABLE rt_line_flows (
   UNIQUE(organization_id, store_id, flow_type)
 );
 
-CREATE TABLE rt_media (
+CREATE TABLE "rt_media" (
   id TEXT PRIMARY KEY,
-  code TEXT NOT NULL UNIQUE CHECK (code IN ('retty', 'gurunavi', 'tabelog', 'hotpepper')),
+  code TEXT NOT NULL UNIQUE CHECK (code IN ('retty', 'gurunavi', 'tabelog', 'hotpepper', 'google_reservation', 'ikyu', 'tablecheck')),
   name TEXT NOT NULL,
   sender_addresses TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(sender_addresses)),
   parser_key TEXT NOT NULL UNIQUE,
@@ -5602,6 +6369,15 @@ CREATE TABLE scoring_rules (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE site_consent_days (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  day             TEXT NOT NULL,
+  suppressed      INTEGER NOT NULL DEFAULT 0,
+  granted         INTEGER NOT NULL DEFAULT 0,
+  declined        INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (line_account_id, day)
+);
+
 CREATE TABLE site_events (
   id          TEXT PRIMARY KEY,
   visitor_id  TEXT NOT NULL REFERENCES site_visitors(id) ON DELETE CASCADE,
@@ -5629,7 +6405,7 @@ CREATE TABLE site_visitors (
   last_seen_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   linked_at     TEXT,
   linked_by     TEXT CHECK (linked_by IS NULL OR linked_by IN ('entry_route','liff','form','manual'))
-, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, consent_state TEXT CHECK (consent_state IS NULL OR consent_state IN ('granted', 'declined')), consent_at TEXT);
 
 CREATE TABLE staff (
   id                       TEXT PRIMARY KEY,
@@ -5722,7 +6498,7 @@ CREATE TABLE staff_members (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), account_scope TEXT NOT NULL DEFAULT 'all'
-  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT, email_change_new TEXT, email_change_token_hash TEXT, email_change_expires_at TEXT);
+  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT, email_change_new TEXT, email_change_token_hash TEXT, email_change_expires_at TEXT, getting_started_dismissed_at TEXT);
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -5740,6 +6516,16 @@ CREATE TABLE staff_notification_reads (
   staff_id        TEXT NOT NULL,
   read_at         TEXT NOT NULL,
   PRIMARY KEY (notification_id, staff_id)
+);
+
+CREATE TABLE staff_permission_receipts (
+  idempotency_key TEXT NOT NULL,
+  staff_id        TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  request_hash    TEXT NOT NULL,
+  policy_version  INTEGER NOT NULL,
+  result          TEXT NOT NULL,
+  created_at      TEXT NOT NULL,
+  PRIMARY KEY (idempotency_key, staff_id)
 );
 
 CREATE TABLE staff_shifts (
@@ -5831,6 +6617,29 @@ CREATE TABLE support_mark_archive_requests (
   UNIQUE(line_account_id, idempotency_key)
 );
 
+CREATE TABLE support_mark_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT NOT NULL REFERENCES line_accounts(id),
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  mark_id           TEXT NOT NULL REFERENCES support_marks(id),
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(line_account_id, idempotency_key)
+);
+
+CREATE TABLE support_mark_rule_create_requests (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT NOT NULL REFERENCES line_accounts(id),
+  mark_id           TEXT NOT NULL REFERENCES support_marks(id),
+  idempotency_key   TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  rule_id           TEXT NOT NULL REFERENCES automation_definitions(id),
+  response_json     TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at        TEXT NOT NULL,
+  UNIQUE(line_account_id, idempotency_key)
+);
+
 CREATE TABLE support_mark_scopes (
   mark_id         TEXT PRIMARY KEY REFERENCES support_marks(id),
   tenant_id       TEXT NOT NULL REFERENCES tenants(id),
@@ -5856,6 +6665,17 @@ CREATE TABLE tag_groups (
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
+);
+
+CREATE TABLE tag_update_requests (
+  id                  TEXT PRIMARY KEY,
+  tag_id              TEXT NOT NULL REFERENCES tags(id),
+  idempotency_key     TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  resulting_version   INTEGER NOT NULL,
+  response_json       TEXT NOT NULL CHECK (json_valid(response_json)),
+  created_at          TEXT NOT NULL,
+  UNIQUE(tag_id, idempotency_key)
 );
 
 CREATE TABLE "tags" (
@@ -5885,6 +6705,41 @@ CREATE TABLE template_publish_keys (
   message_type TEXT,
   message_content TEXT,
   PRIMARY KEY (template_id, idempotency_key)
+);
+
+CREATE TABLE template_references (
+  id TEXT PRIMARY KEY,
+  template_id TEXT NOT NULL
+    REFERENCES templates(id) ON DELETE CASCADE,
+  -- 使っている版 (templates.published_version と同じ番号)。版履歴より前の
+  -- 参照は空のままにし、画面では「—」と出す（無い版番号をでっち上げない）。
+  template_version_number INTEGER,
+  consumer_kind TEXT NOT NULL
+    CHECK (consumer_kind IN ('broadcast', 'scenario', 'auto_reply')),
+  consumer_id TEXT NOT NULL,
+  reference_mode TEXT NOT NULL DEFAULT 'fixed'
+    CHECK (reference_mode IN ('fixed', 'latest')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (template_id, consumer_kind, consumer_id)
+);
+
+CREATE TABLE template_versions (
+  id TEXT PRIMARY KEY,
+  template_id TEXT NOT NULL
+    REFERENCES templates(id) ON DELETE CASCADE,
+  version_number INTEGER NOT NULL,
+  message_type TEXT NOT NULL,
+  message_content TEXT NOT NULL,
+  carousel_actions_json TEXT,
+  carousel_tap_limit_mode TEXT,
+  carousel_tap_limit_text TEXT,
+  question_json TEXT,
+  question_status TEXT,
+  -- 使い始めの日時。空は「公開と同時」。未来の日時は「予約」の札で見せる。
+  effective_from TEXT,
+  created_by_staff_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (template_id, version_number)
 );
 
 CREATE TABLE templates (
@@ -5917,6 +6772,65 @@ CREATE TABLE tenants (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , feature_packs TEXT NOT NULL DEFAULT '[]', plan_key TEXT, plan_status TEXT NOT NULL DEFAULT 'exempt'
   CHECK (plan_status IN ('exempt', 'trialing', 'active', 'past_due', 'canceled')), trial_ends_at TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT, current_period_ends_at TEXT, plan_updated_at TEXT, signup_device_marker TEXT);
+
+CREATE TABLE tiktok_pnl_order_lines (
+  -- `<TikTok注文ID>:<行番号>`。シートのキー列（A列）にもこの値を使う。
+  -- 主キーは line_account_id と組にする。TikTok注文IDはアカウントをまたいで
+  -- 重複し得るため、単独キーにすると先に取り込んだアカウントが行を占有し、
+  -- 別アカウントの同一注文IDが混入・欠落する。
+  line_key TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  tiktok_order_id TEXT NOT NULL,
+  line_index INTEGER NOT NULL,
+  -- 集計の基準日（JST）。支払日、なければ注文日から求める。YYYY-MM-DD。
+  order_date_jst TEXT NOT NULL,
+  paid_at TEXT,
+  -- EC側から届いた生のステータス。表示用の日本語化は書き出し時に行う。
+  order_status TEXT,
+  sku TEXT,
+  product_name TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  unit_price_yen INTEGER,
+  line_amount_yen INTEGER,
+  -- 同日・同一購入者を1発送と数えるための識別子（EC側で正規化済み）。
+  buyer_key TEXT,
+  source_updated_at TEXT,
+  fetched_at TEXT NOT NULL,
+  -- 1 = シートへ未反映（新規または内容が変わった）。書き出し成功で 0 に戻す。
+  sheet_dirty INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (line_account_id, line_key)
+);
+
+CREATE TABLE tiktok_pnl_settings (
+  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  -- 1 = このアカウントで利益計算シートを使う。既定は 0。
+  -- cron は 1 のアカウントだけ処理する。Google Sheets連携が繋がっているだけで
+  -- 勝手にスプレッドシートを作らないための明示的な有効化。
+  -- 管理画面の手動同期が押された時に 1 へ上げる。
+  enabled INTEGER NOT NULL DEFAULT 0,
+  spreadsheet_id TEXT,
+  spreadsheet_url TEXT,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'ready', 'error')),
+  -- 同期中の目印（開始時刻）。手動同期と定期実行が重なると同じ明細を
+  -- 二重に追記してしまうため、アカウント単位の排他に使う。
+  -- 途中で落ちた場合も古い値は期限切れとして無視する。
+  sync_started_at TEXT,
+  -- 雛形（見出し・数式・マスタ）を書き込み終えた時刻。
+  -- 作成と書き込みを分けたので、ここが空なら次tickで書き込みだけやり直す。
+  -- 2つ目のスプレッドシートを作らないための目印。
+  template_filled_at TEXT,
+  -- EC側取り込みの再開点（source_updated_at ベース）。
+  import_cursor TEXT,
+  last_import_at TEXT,
+  last_sheet_sync_at TEXT,
+  last_error TEXT,
+  consecutive_failures INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 CREATE TABLE tracked_links (
   id TEXT PRIMARY KEY,
@@ -6064,7 +6978,7 @@ CREATE TABLE users (
 , tenant_id TEXT REFERENCES tenants(id) ON DELETE RESTRICT, status TEXT NOT NULL DEFAULT 'active'
   CHECK (status IN ('active', 'review', 'archived')), primary_display_name TEXT, revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1), created_by TEXT, archived_at TEXT);
 
-CREATE TABLE webhook_interaction_logs (
+CREATE TABLE "webhook_interaction_logs" (
   id                 TEXT PRIMARY KEY,
   line_account_id    TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   direction          TEXT NOT NULL CHECK (direction IN ('outgoing', 'incoming')),
@@ -6080,7 +6994,7 @@ CREATE TABLE webhook_interaction_logs (
   failure_reason     TEXT CHECK (
     failure_reason IS NULL OR failure_reason IN (
       'connection_failed', 'response_4xx', 'response_429',
-      'response_5xx', 'processing_failed', 'unknown'
+      'response_5xx', 'processing_failed', 'unknown', 'secret_unavailable'
     )
   ),
   idempotency_key    TEXT NOT NULL,
@@ -6206,6 +7120,16 @@ CREATE TABLE webinar_funnel_events (
   created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE webinar_heartbeat_rejects (
+  id TEXT PRIMARY KEY,
+  webinar_id TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  session_start_at INTEGER NOT NULL,
+  reason TEXT NOT NULL CHECK (reason IN ('position_jump', 'negative_gap', 'invalid_rate')),
+  position_seconds INTEGER NOT NULL,
+  received_at TEXT NOT NULL
+);
+
 CREATE TABLE webinar_journey_followups (
   id          TEXT PRIMARY KEY,
   webinar_id  TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
@@ -6269,7 +7193,8 @@ CREATE TABLE webinar_notification_settings (
   missed_time_minutes         INTEGER NOT NULL DEFAULT 600,
   completed_enabled           INTEGER NOT NULL DEFAULT 1,
   created_at                  TEXT NOT NULL,
-  updated_at                  TEXT NOT NULL,
+  updated_at                  TEXT NOT NULL, missed_window_days INTEGER NOT NULL DEFAULT 7
+  CHECK (missed_window_days BETWEEN 1 AND 30),
   CHECK (day_before_time_minutes BETWEEN 0 AND 1439),
   CHECK (hour_before_minutes BETWEEN 1 AND 10080),
   CHECK (missed_time_minutes BETWEEN 0 AND 1439)
@@ -6294,6 +7219,19 @@ CREATE TABLE webinar_registrations (
   UNIQUE (webinar_id, friend_id, session_start_at)
 );
 
+CREATE TABLE webinar_sessions (
+  id TEXT PRIMARY KEY,
+  webinar_id TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
+  session_start_at INTEGER NOT NULL,
+  capacity INTEGER CHECK (capacity IS NULL OR capacity > 0),
+  reserved_count INTEGER NOT NULL DEFAULT 0 CHECK (reserved_count >= 0),
+  state TEXT NOT NULL DEFAULT 'open'
+    CHECK (state IN ('open', 'full', 'closed')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (webinar_id, session_start_at)
+);
+
 CREATE TABLE webinar_user_comments (
   id TEXT PRIMARY KEY,
   webinar_id TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
@@ -6316,6 +7254,24 @@ CREATE TABLE webinar_versions (
   UNIQUE (webinar_id, version)
 );
 
+CREATE TABLE webinar_video_assets (
+  id TEXT PRIMARY KEY,
+  webinar_id TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
+  stage TEXT NOT NULL DEFAULT 'uploaded'
+    CHECK (stage IN (
+      'uploaded', 'inspecting', 'converting', 'packaging',
+      'thumbnail', 'ready', 'failed'
+    )),
+  provider TEXT NOT NULL DEFAULT 'r2_hls',
+  duration_seconds INTEGER NOT NULL DEFAULT 0 CHECK (duration_seconds >= 0),
+  checksum TEXT,
+  error_code TEXT,
+  expires_at TEXT,
+  purged_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE webinar_view_segments (
   id               TEXT PRIMARY KEY,
   webinar_id       TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
@@ -6325,7 +7281,8 @@ CREATE TABLE webinar_view_segments (
   end_seconds      INTEGER NOT NULL CHECK (end_seconds > start_seconds),
   received_at      TEXT NOT NULL,
   idempotency_key  TEXT NOT NULL UNIQUE
-);
+, playback_rate REAL NOT NULL DEFAULT 1
+  CHECK (playback_rate > 0 AND playback_rate <= 4), client_at_ms INTEGER);
 
 CREATE TABLE webinar_viewers (
   id TEXT PRIMARY KEY,
@@ -6334,7 +7291,7 @@ CREATE TABLE webinar_viewers (
   session_start_at INTEGER NOT NULL,
   joined_at TEXT NOT NULL,
   last_position_seconds INTEGER NOT NULL DEFAULT 0,
-  cta_clicked_at TEXT,
+  cta_clicked_at TEXT, last_heartbeat_at INTEGER,
   UNIQUE (webinar_id, friend_id, session_start_at)
 );
 
@@ -6352,11 +7309,17 @@ CREATE TABLE webinars (
   tag_on_cta_click TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL);
 
 CREATE INDEX idx_account_handovers_from ON account_handovers (from_account_id);
 
 CREATE INDEX idx_account_handovers_status ON account_handovers (status);
+
+CREATE INDEX idx_account_pool_switch_events_account
+  ON account_pool_switch_events(line_account_id, created_at DESC);
+
+CREATE INDEX idx_account_skipped_deliveries_account
+  ON account_skipped_deliveries(line_account_id, skipped_at DESC);
 
 CREATE INDEX idx_action_score_rule_sets_account_status
   ON action_score_rule_sets(line_account_id, status);
@@ -6387,6 +7350,19 @@ CREATE INDEX idx_ad_conversion_outbox_friend
 CREATE INDEX idx_ad_conversion_outbox_retryable_due
   ON ad_conversion_outbox(is_retryable, status, next_attempt_at);
 
+CREATE INDEX idx_ad_cost_entries_account_day ON ad_cost_entries(line_account_id, day);
+
+CREATE INDEX idx_ad_cost_entries_route ON ad_cost_entries(entry_route_id, day);
+
+CREATE UNIQUE INDEX idx_ad_cost_entries_unique_day
+  ON ad_cost_entries(
+    line_account_id,
+    COALESCE(ad_platform_id, ''),
+    COALESCE(entry_route_id, ''),
+    source_label,
+    day
+  );
+
 CREATE INDEX idx_ad_platforms_account ON ad_platforms(line_account_id);
 
 CREATE UNIQUE INDEX idx_ad_platforms_account_name
@@ -6398,13 +7374,25 @@ CREATE INDEX idx_admin_sessions_restaurant_store
   ON admin_sessions(selected_restaurant_store_id)
   WHERE selected_restaurant_store_id IS NOT NULL;
 
+CREATE INDEX idx_admin_sessions_staff_device
+  ON admin_sessions(staff_id, device_hash);
+
 CREATE INDEX idx_admin_sessions_staff_id ON admin_sessions(staff_id);
+
+CREATE INDEX idx_admin_sessions_staff_ip_prefix
+  ON admin_sessions(staff_id, ip_prefix);
 
 CREATE INDEX idx_admin_two_factor_challenges_expires
   ON admin_two_factor_challenges(expires_at);
 
 CREATE INDEX idx_admin_two_factor_challenges_staff
   ON admin_two_factor_challenges(staff_id);
+
+CREATE INDEX idx_affiliate_attribution_decisions_friend
+  ON affiliate_attribution_decisions (friend_id, created_at DESC);
+
+CREATE INDEX idx_affiliate_attribution_decisions_offer
+  ON affiliate_attribution_decisions (offer_id, created_at DESC);
 
 CREATE INDEX idx_affiliate_bank_profiles_scope
   ON affiliate_bank_profiles(organization_id, line_account_id, affiliate_id);
@@ -6418,6 +7406,9 @@ CREATE INDEX idx_affiliate_links_offer ON affiliate_links (offer_id);
 CREATE UNIQUE INDEX idx_affiliate_links_operation_id
   ON affiliate_links(affiliate_id, operation_id)
   WHERE operation_id IS NOT NULL;
+
+CREATE INDEX idx_affiliate_offer_versions_offer
+  ON affiliate_offer_versions (offer_id, version_number DESC);
 
 CREATE UNIQUE INDEX idx_affiliate_offers_operation_id
   ON affiliate_offers(line_account_id, operation_id)
@@ -6476,6 +7467,9 @@ CREATE INDEX idx_analytics_events_account_type_time
 CREATE INDEX idx_analytics_events_friend_time
   ON analytics_events(line_account_id, friend_id, occurred_at, id)
   WHERE friend_id IS NOT NULL;
+
+CREATE INDEX idx_analytics_export_jobs_account
+  ON analytics_export_jobs(line_account_id, created_at DESC);
 
 CREATE INDEX idx_analytics_funnel_members_selection
   ON analytics_funnel_run_members(run_id, group_key, highest_step_order, state, friend_id);
@@ -6544,6 +7538,9 @@ CREATE INDEX idx_auto_replies_template_id ON auto_replies(template_id);
 CREATE INDEX idx_auto_reply_action_runs_evaluation
   ON auto_reply_action_runs (evaluation_id, status);
 
+CREATE INDEX idx_auto_reply_create_requests_rule
+  ON auto_reply_create_requests(auto_reply_id, created_at DESC);
+
 CREATE INDEX idx_auto_reply_evaluation_details_evaluation
   ON auto_reply_evaluation_details (evaluation_id, evaluation_order);
 
@@ -6574,6 +7571,9 @@ CREATE INDEX idx_automation_definitions_account_status
   ON automation_definitions(line_account_id, status, priority DESC);
 
 CREATE INDEX idx_automation_logs_automation ON automation_logs (automation_id);
+
+CREATE INDEX idx_automation_run_daily_counts_day
+  ON automation_run_daily_counts(day);
 
 CREATE INDEX idx_automation_run_steps_common_action_metrics
   ON automation_run_steps(common_action_version_id, automation_run_id, status, step_key)
@@ -6640,6 +7640,12 @@ CREATE INDEX idx_banner_usage_tenant_created
 CREATE INDEX idx_billing_events_tenant
   ON billing_events(tenant_id, received_at DESC);
 
+CREATE INDEX idx_billing_invoices_paid
+  ON billing_invoices(paid_at);
+
+CREATE INDEX idx_billing_invoices_tenant_paid
+  ON billing_invoices(tenant_id, paid_at);
+
 CREATE INDEX idx_booking_audit_logs_booking
   ON booking_audit_logs(line_account_id, booking_id, occurred_at);
 
@@ -6673,6 +7679,9 @@ CREATE INDEX idx_booking_resource_consumptions_resource
 CREATE INDEX idx_booking_resources_account_active
   ON booking_resources(line_account_id, is_active, id);
 
+CREATE INDEX idx_bookings_menu_version
+  ON bookings (menu_id, menu_version_number);
+
 CREATE INDEX idx_bookings_v298_account_status_starts
   ON bookings(line_account_id, status, starts_at);
 
@@ -6685,9 +7694,18 @@ CREATE INDEX idx_bookings_v298_friend_starts
 CREATE INDEX idx_bookings_v298_staff_overlap
   ON bookings(staff_id, status, starts_at, block_ends_at);
 
+CREATE INDEX idx_broadcast_after_action_runs_due
+  ON broadcast_after_action_runs (status, updated_at);
+
+CREATE INDEX idx_broadcast_approval_events_broadcast
+  ON broadcast_approval_events (broadcast_id, created_at DESC);
+
 CREATE INDEX idx_broadcast_insights_broadcast_id ON broadcast_insights(broadcast_id);
 
 CREATE INDEX idx_broadcast_insights_status ON broadcast_insights(status);
+
+CREATE INDEX idx_broadcast_lifecycle_events_broadcast
+  ON broadcast_lifecycle_events (broadcast_id, created_at DESC);
 
 CREATE INDEX idx_broadcast_message_assets_account_kind
   ON broadcast_message_assets(line_account_id, kind, updated_at DESC);
@@ -6700,6 +7718,10 @@ CREATE INDEX idx_broadcast_send_claims_state
 
 CREATE INDEX idx_broadcast_tracked_links_link
   ON broadcast_tracked_links(tracked_link_id, broadcast_id);
+
+CREATE INDEX idx_broadcasts_approval_approver ON broadcasts (approval_approver_staff_id);
+
+CREATE INDEX idx_broadcasts_approval_status ON broadcasts (approval_status);
 
 CREATE INDEX idx_broadcasts_status_lookup ON broadcasts (status);
 
@@ -6747,12 +7769,15 @@ CREATE INDEX idx_common_action_versions_action_status
 CREATE INDEX idx_common_actions_account_status
   ON common_actions(line_account_id, status, updated_at DESC);
 
+CREATE UNIQUE INDEX idx_common_actions_request_key
+  ON common_actions(line_account_id, client_request_key);
+
 CREATE INDEX idx_common_var_export_jobs_account
   ON common_var_export_jobs(line_account_id, created_at DESC);
 
 CREATE INDEX idx_common_var_replacement_runs_v403_source ON common_var_replacement_runs(source_common_var_id, created_at DESC);
 
-CREATE INDEX idx_common_var_resolution_failures_source_v423
+CREATE INDEX idx_common_var_resolution_failures_source_v485
   ON common_var_resolution_failures(source_kind, source_id, created_at DESC);
 
 CREATE INDEX idx_common_var_schedules_v403_pending ON common_var_schedules(var_id, effective_from) WHERE applied_at IS NULL;
@@ -6786,6 +7811,9 @@ CREATE UNIQUE INDEX idx_conversion_definition_usages_reference
 
 CREATE INDEX idx_conversion_event_dedup_claims_event
   ON conversion_event_dedup_claims(last_event_id);
+
+CREATE INDEX idx_conversion_event_reversals_event
+  ON conversion_event_reversals(conversion_event_id, created_at DESC);
 
 CREATE INDEX idx_conversion_events_affiliate ON conversion_events (affiliate_code);
 
@@ -6872,6 +7900,9 @@ CREATE INDEX idx_engagement_events_source
 CREATE INDEX idx_entry_route_genres_created
   ON entry_route_genres (created_at ASC);
 
+CREATE INDEX idx_entry_routes_account_active
+  ON entry_routes(line_account_id, is_active);
+
 CREATE INDEX idx_entry_routes_genre
   ON entry_routes (genre, created_at DESC);
 
@@ -6901,6 +7932,13 @@ CREATE INDEX idx_event_bookings_requested_expiry
 
 CREATE INDEX idx_event_bookings_slot_status ON event_bookings (slot_id, status);
 
+CREATE INDEX idx_event_change_logs_event
+  ON event_change_logs (event_id, created_at);
+
+CREATE UNIQUE INDEX idx_event_change_logs_idem
+  ON event_change_logs (line_account_id, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+
 CREATE INDEX idx_event_occurrence_applicant_snapshots_expiry
   ON event_occurrence_applicant_snapshots(expires_at);
 
@@ -6929,7 +7967,13 @@ CREATE UNIQUE INDEX idx_event_waitlist_slot_identity
   ON event_waitlist(slot_id, identity_key)
   WHERE status IN ('waiting', 'offered', 'accepted');
 
+CREATE INDEX idx_event_waitlist_slot_order
+  ON event_waitlist (slot_id, status, sort_order, created_at);
+
 CREATE INDEX idx_events_account_published_sort ON events (line_account_id, is_published, sort_order);
+
+CREATE INDEX idx_events_lifecycle
+  ON events (line_account_id, lifecycle_status);
 
 CREATE INDEX idx_ffv_field ON friend_field_values(field_id, value);
 
@@ -6959,6 +8003,9 @@ CREATE INDEX idx_form_capacity_claims_submission
 
 CREATE INDEX idx_form_opens_form ON form_opens (form_id, opened_at);
 
+CREATE INDEX idx_form_opens_test_month
+  ON form_opens(form_id, is_test, opened_at);
+
 CREATE INDEX idx_form_submissions_form ON form_submissions (form_id);
 
 CREATE INDEX idx_form_submissions_form_friend
@@ -6969,6 +8016,9 @@ CREATE INDEX idx_form_submissions_form_write_status
 
 CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
 
+CREATE INDEX idx_form_submissions_test_month
+  ON form_submissions(form_id, is_test, created_at);
+
 CREATE INDEX idx_form_submissions_version
   ON form_submissions(form_version_id)
   WHERE form_version_id IS NOT NULL;
@@ -6978,6 +8028,9 @@ CREATE INDEX idx_form_submit_claims_submission
 
 CREATE INDEX idx_form_submit_claims_updated
   ON form_submit_claims (updated_at);
+
+CREATE INDEX idx_form_test_tokens_form
+  ON form_test_tokens(form_id, expires_at);
 
 CREATE INDEX idx_form_versions_form_number
   ON form_versions(form_id, version_number DESC);
@@ -7064,6 +8117,9 @@ CREATE INDEX idx_friend_daily_snapshots_date
 CREATE INDEX idx_friend_export_jobs_account
   ON friend_export_jobs(line_account_id, created_at DESC);
 
+CREATE INDEX idx_friend_field_create_requests_field
+  ON friend_field_create_requests(line_account_id, field_id, created_at DESC);
+
 CREATE INDEX idx_friend_field_scopes_account
   ON friend_field_scopes(tenant_id, line_account_id);
 
@@ -7141,6 +8197,16 @@ CREATE INDEX idx_funnels_line_account_created
 
 CREATE INDEX idx_google_calendar_connections_staff
   ON google_calendar_connections (line_account_id, staff_id, is_active);
+
+CREATE INDEX idx_google_sheets_oauth_states_expires
+  ON google_sheets_oauth_states(expires_at);
+
+CREATE INDEX idx_google_sheets_sync_runs_integration
+  ON google_sheets_sync_runs(integration_id, started_at DESC);
+
+CREATE INDEX idx_google_sheets_sync_runs_running
+  ON google_sheets_sync_runs(integration_id, status)
+  WHERE status = 'running';
 
 CREATE INDEX idx_handover_decisions_handover
   ON account_handover_decisions (handover_id);
@@ -7220,6 +8286,9 @@ CREATE INDEX idx_inbox_reply_leases_expiry ON inbox_reply_leases (expires_at);
 CREATE INDEX idx_inbox_staff_reads_conversation
   ON inbox_staff_reads (channel, conversation_id, staff_id);
 
+CREATE UNIQUE INDEX idx_incoming_webhook_receipts_body
+  ON incoming_webhook_receipts (webhook_id, body_hash);
+
 CREATE INDEX idx_incoming_webhook_receipts_received
   ON incoming_webhook_receipts (received_at);
 
@@ -7242,6 +8311,12 @@ CREATE INDEX idx_line_accounts_archived
 
 CREATE INDEX idx_line_accounts_display_order
   ON line_accounts (display_order, created_at);
+
+CREATE UNIQUE INDEX idx_line_accounts_liff_id_unique
+  ON line_accounts(liff_id);
+
+CREATE UNIQUE INDEX idx_line_accounts_login_channel_id_unique
+  ON line_accounts(login_channel_id);
 
 CREATE UNIQUE INDEX idx_line_accounts_one_default_per_tenant
   ON line_accounts (COALESCE(tenant_id, '00000000-0000-4000-8000-000000000001'))
@@ -7270,11 +8345,25 @@ CREATE INDEX idx_manual_link_check_history_v316_key_time
 
 CREATE INDEX idx_manual_links_status ON manual_links (status);
 
+CREATE INDEX idx_measurement_sites_account ON measurement_sites(line_account_id);
+
 CREATE INDEX idx_media_account_archived_v424
   ON media(line_account_id, archived_at);
 
 CREATE INDEX idx_media_account_created
   ON media(line_account_id, created_at DESC, id);
+
+CREATE INDEX idx_media_file_scans_account_status
+  ON media_file_scans(line_account_id, status, updated_at DESC);
+
+CREATE INDEX idx_media_file_scans_media
+  ON media_file_scans(media_id, status) WHERE media_id IS NOT NULL;
+
+CREATE INDEX idx_media_file_scans_retry
+  ON media_file_scans(status, next_retry_at) WHERE status = 'pending';
+
+CREATE INDEX idx_media_file_scans_subject
+  ON media_file_scans(subject_kind, subject_id);
 
 CREATE INDEX idx_media_kind ON media(kind, created_at DESC);
 
@@ -7300,6 +8389,9 @@ CREATE INDEX idx_meet_consultations_friend ON meet_consultations (friend_id);
 
 CREATE INDEX idx_meet_consultations_start ON meet_consultations (status, starts_at);
 
+CREATE INDEX idx_menu_versions_menu
+  ON menu_versions (menu_id, version_number DESC);
+
 CREATE INDEX idx_menus_account_sort ON menus (line_account_id, sort_order);
 
 CREATE INDEX idx_messages_account_direction_created ON messages_log(line_account_id, direction, created_at);
@@ -7320,6 +8412,8 @@ CREATE INDEX idx_messages_log_friend_id ON messages_log (friend_id);
 
 CREATE INDEX idx_messages_log_friend_source ON messages_log (friend_id, source);
 
+CREATE INDEX idx_messages_log_line_event_at ON messages_log (line_event_at);
+
 CREATE UNIQUE INDEX idx_messages_log_line_message_scope
   ON messages_log (line_message_account_key, line_message_id)
   WHERE line_message_id IS NOT NULL AND line_message_account_key IS NOT NULL;
@@ -7333,6 +8427,15 @@ CREATE INDEX idx_messages_log_quoted
 CREATE INDEX idx_messages_log_version_step
   ON messages_log (friend_id, scenario_version_step_id)
   WHERE scenario_version_step_id IS NOT NULL;
+
+CREATE INDEX idx_mileage_adj_approval_account
+  ON mileage_adjustment_approval_requests (line_account_id, status, created_at DESC);
+
+CREATE INDEX idx_mileage_adj_approval_events_request
+  ON mileage_adjustment_approval_events (request_id, created_at DESC);
+
+CREATE INDEX idx_mileage_adj_approval_friend
+  ON mileage_adjustment_approval_requests (friend_id, created_at DESC);
 
 CREATE INDEX idx_mileage_adjustment_notifications_retry
   ON mileage_adjustment_notifications(status, updated_at)
@@ -7522,6 +8625,9 @@ CREATE INDEX idx_nen_rich_menu_jobs_status
 CREATE INDEX idx_notification_deliveries_account_status
   ON notification_deliveries(line_account_id, status, queued_at DESC, id DESC);
 
+CREATE INDEX idx_notification_deliveries_origin
+  ON notification_deliveries(line_account_id, status, source, failed_at DESC);
+
 CREATE INDEX idx_notification_deliveries_retry
   ON notification_deliveries(status, retryable, next_retry_at);
 
@@ -7545,7 +8651,7 @@ CREATE INDEX idx_operation_alert_events_alert_created
 CREATE INDEX idx_operation_alert_notification_due
   ON operation_alert_notification_outbox(status, next_attempt_at);
 
-CREATE INDEX idx_operation_alerts_account_status
+CREATE INDEX idx_operation_alerts_account_status_v496
   ON operation_alerts(line_account_id, status, updated_at DESC);
 
 CREATE INDEX idx_operation_audit_kind_date
@@ -7554,7 +8660,7 @@ CREATE INDEX idx_operation_audit_kind_date
 CREATE INDEX idx_operation_deployment_events_occurred
   ON operation_deployment_events(occurred_at DESC, id DESC);
 
-CREATE INDEX idx_operation_health_results_run
+CREATE INDEX idx_operation_health_results_run_v496
   ON operation_health_results(run_id, check_key);
 
 CREATE INDEX idx_operation_health_runs_scope_started
@@ -7597,6 +8703,12 @@ CREATE INDEX idx_outgoing_webhook_deliveries_webhook
 CREATE INDEX idx_outgoing_webhooks_line_account
   ON outgoing_webhooks(line_account_id, is_active, updated_at DESC);
 
+CREATE INDEX idx_photo_reward_policies_version
+  ON photo_reward_policies (version_number DESC);
+
+CREATE INDEX idx_photo_submissions_content_hash
+  ON nen_photo_submissions (line_account_id, content_hash);
+
 CREATE INDEX idx_pii_reveal_logs_tenant
   ON pii_reveal_logs(tenant_id, created_at DESC);
 
@@ -7619,6 +8731,9 @@ CREATE INDEX idx_platform_audit_logs_created
 CREATE INDEX idx_platform_audit_logs_tenant
   ON platform_audit_logs(tenant_id, created_at DESC);
 
+CREATE INDEX idx_platform_knowledge_articles_kind_review
+  ON platform_knowledge_articles(article_kind, review_state, status, kind);
+
 CREATE INDEX idx_platform_knowledge_articles_review ON platform_knowledge_articles(review_state, status, kind);
 
 CREATE INDEX idx_platform_knowledge_jobs_pending ON platform_knowledge_jobs(status, lease_until);
@@ -7631,6 +8746,8 @@ CREATE INDEX idx_recipe_clone_runs_v316_account
 
 CREATE INDEX idx_recipe_clone_runs_v316_recipe
   ON recipe_clone_runs(recipe_id, created_at DESC);
+
+CREATE INDEX idx_recipes_v464_account ON recipes(line_account_id);
 
 CREATE INDEX idx_ref_tracking_ad_click_scope
   ON ref_tracking(friend_id, line_account_id, created_at DESC);
@@ -7692,6 +8809,12 @@ CREATE INDEX idx_rich_menu_assignment_runs_monthly
 CREATE INDEX idx_rich_menu_assignments_group
   ON rich_menu_assignments (line_account_id, group_id);
 
+CREATE INDEX idx_rich_menu_device_confirmations_group
+  ON rich_menu_device_confirmations(group_id, confirmed_at DESC);
+
+CREATE UNIQUE INDEX idx_rich_menu_device_confirmations_group_fp_staff
+  ON rich_menu_device_confirmations(group_id, definition_fingerprint, staff_id);
+
 CREATE INDEX idx_rich_menu_duplicate_requests_source
   ON rich_menu_duplicate_requests(source_group_id);
 
@@ -7701,6 +8824,18 @@ CREATE INDEX idx_rich_menu_manual_publish_requests_group
   ON rich_menu_manual_publish_requests (group_id, created_at DESC);
 
 CREATE INDEX idx_rich_menu_pages_group    ON rich_menu_pages(group_id, order_index);
+
+CREATE INDEX idx_rich_menu_publish_run_pages_run
+  ON rich_menu_publish_run_pages(run_id, order_index);
+
+CREATE UNIQUE INDEX idx_rich_menu_publish_run_pages_run_page
+  ON rich_menu_publish_run_pages(run_id, page_id);
+
+CREATE INDEX idx_rich_menu_publish_runs_group
+  ON rich_menu_publish_runs(group_id, started_at DESC);
+
+CREATE UNIQUE INDEX idx_rich_menu_publish_runs_idem
+  ON rich_menu_publish_runs(group_id, idempotency_key);
 
 CREATE INDEX idx_rich_menu_schedules_due
   ON rich_menu_schedules (status, starts_at, ends_at);
@@ -7717,12 +8852,42 @@ CREATE INDEX idx_rich_menu_schedules_retry
 CREATE INDEX idx_rich_menu_test_applies_group
   ON rich_menu_test_applies(group_id, staff_id, status);
 
+CREATE UNIQUE INDEX idx_rich_menu_versions_group_number
+  ON rich_menu_versions(group_id, version_number);
+
+CREATE INDEX idx_rich_menu_versions_group_status
+  ON rich_menu_versions(group_id, status);
+
 CREATE INDEX idx_rt_approvals_queue ON rt_approval_requests(organization_id, status, created_at DESC);
 
 CREATE INDEX idx_rt_email_digests_store_date
   ON rt_email_digests (store_id, target_date, media_id);
 
 CREATE INDEX idx_rt_gbp_reviews_store ON rt_gbp_reviews(store_id, reply_status, reviewed_at DESC);
+
+CREATE INDEX idx_rt_google_changes_status ON rt_google_changes(store_id, status);
+
+CREATE INDEX idx_rt_google_changes_store ON rt_google_changes(store_id, created_at DESC);
+
+CREATE INDEX idx_rt_google_metrics_daily_store_date
+  ON rt_google_metrics_daily(store_id, date DESC);
+
+CREATE INDEX idx_rt_google_oauth_states_expires ON rt_google_oauth_states(expires_at);
+
+CREATE INDEX idx_rt_google_posts_fingerprint
+  ON rt_google_posts(store_id, content_fingerprint) WHERE content_fingerprint IS NOT NULL;
+
+CREATE UNIQUE INDEX idx_rt_google_posts_google_name
+  ON rt_google_posts(store_id, google_post_name) WHERE google_post_name IS NOT NULL;
+
+CREATE INDEX idx_rt_google_posts_status ON rt_google_posts(store_id, status);
+
+CREATE INDEX idx_rt_google_posts_store ON rt_google_posts(store_id, created_at DESC);
+
+CREATE INDEX idx_rt_google_reviews_store
+  ON rt_google_reviews(store_id, reply_status, create_time DESC);
+
+CREATE INDEX idx_rt_google_write_log_store ON rt_google_write_log(store_id, created_at DESC);
 
 CREATE INDEX idx_rt_inbound_emails_retention
   ON rt_inbound_emails (received_at, status);
@@ -7734,6 +8899,8 @@ CREATE INDEX idx_rt_intake_addresses_store
   ON rt_intake_addresses (store_id, status);
 
 CREATE INDEX idx_rt_inventory_store_time ON rt_inventory_slots(store_id, starts_at);
+
+CREATE UNIQUE INDEX idx_rt_manual_email_import ON rt_reservations(inbound_email_id) WHERE parser_key = 'manual_import';
 
 CREATE INDEX idx_rt_memberships_org ON rt_memberships(organization_id, store_id, role);
 
@@ -7878,8 +9045,14 @@ CREATE INDEX idx_staff_members_role ON staff_members(role);
 CREATE INDEX idx_staff_members_tenant
   ON staff_members(tenant_id);
 
+CREATE UNIQUE INDEX idx_staff_members_tenant_email_unique
+  ON staff_members(COALESCE(tenant_id, ''), lower(email)) WHERE email IS NOT NULL;
+
 CREATE INDEX idx_staff_notification_reads_staff
   ON staff_notification_reads(staff_id, read_at DESC);
+
+CREATE INDEX idx_staff_permission_receipts_staff_v527
+  ON staff_permission_receipts (staff_id, created_at DESC);
 
 CREATE UNIQUE INDEX idx_stop_suppressions_dedup
   ON entry_route_stop_suppressions (line_account_id, line_user_id, ref_code);
@@ -7906,6 +9079,12 @@ CREATE INDEX idx_support_email_threads_status_last
 CREATE INDEX idx_support_mark_archive_requests_mark
   ON support_mark_archive_requests(line_account_id, mark_id, created_at DESC);
 
+CREATE INDEX idx_support_mark_create_requests_mark
+  ON support_mark_create_requests(line_account_id, mark_id, created_at DESC);
+
+CREATE INDEX idx_support_mark_rule_create_requests_rule
+  ON support_mark_rule_create_requests(line_account_id, rule_id, created_at DESC);
+
 CREATE INDEX idx_support_mark_scopes_account
   ON support_mark_scopes(tenant_id, line_account_id);
 
@@ -7913,6 +9092,9 @@ CREATE INDEX idx_support_marks_active
   ON support_marks(archived_at, display_order, created_at);
 
 CREATE INDEX idx_tag_groups_sort ON tag_groups(sort_order, id);
+
+CREATE INDEX idx_tag_update_requests_tag
+  ON tag_update_requests(tag_id, created_at DESC);
 
 CREATE UNIQUE INDEX idx_tags_account_exact_name
   ON tags(line_account_id, name) WHERE line_account_id IS NOT NULL;
@@ -7937,6 +9119,15 @@ CREATE INDEX idx_tags_line_account
 
 CREATE INDEX idx_tags_order ON tags (folder_id, display_order);
 
+CREATE INDEX idx_template_references_consumer
+  ON template_references (consumer_kind, consumer_id);
+
+CREATE INDEX idx_template_references_template
+  ON template_references (template_id);
+
+CREATE INDEX idx_template_versions_template
+  ON template_versions (template_id, version_number DESC);
+
 CREATE INDEX idx_templates_category ON templates (category);
 
 CREATE INDEX idx_templates_line_account
@@ -7949,6 +9140,12 @@ CREATE INDEX idx_tenants_signup_device_marker
 
 CREATE UNIQUE INDEX idx_tenants_stripe_customer
   ON tenants(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
+
+CREATE INDEX idx_tiktok_pnl_lines_account_date
+  ON tiktok_pnl_order_lines(line_account_id, order_date_jst);
+
+CREATE INDEX idx_tiktok_pnl_lines_dirty
+  ON tiktok_pnl_order_lines(line_account_id, sheet_dirty);
 
 CREATE UNIQUE INDEX idx_tracked_links_dedup_key
   ON tracked_links (dedup_key) WHERE dedup_key IS NOT NULL;
@@ -7999,16 +9196,16 @@ CREATE INDEX idx_users_phone ON users (phone);
 CREATE INDEX idx_users_tenant_status
   ON users(tenant_id, status, updated_at DESC);
 
-CREATE INDEX idx_webhook_interactions_account_created
+CREATE INDEX idx_webhook_interactions_account_created_v532
   ON webhook_interaction_logs (line_account_id, created_at DESC);
 
-CREATE INDEX idx_webhook_interactions_account_status
+CREATE INDEX idx_webhook_interactions_account_status_v532
   ON webhook_interaction_logs (line_account_id, status, created_at DESC);
 
-CREATE INDEX idx_webhook_interactions_connection_period
+CREATE INDEX idx_webhook_interactions_connection_period_v532
   ON webhook_interaction_logs(line_account_id, webhook_id, created_at DESC, status);
 
-CREATE INDEX idx_webhook_interactions_webhook
+CREATE INDEX idx_webhook_interactions_webhook_v532
   ON webhook_interaction_logs (line_account_id, webhook_id, created_at DESC);
 
 CREATE INDEX idx_webinar_action_executions_status
@@ -8037,6 +9234,9 @@ CREATE UNIQUE INDEX idx_webinar_funnel_events_unique
 CREATE INDEX idx_webinar_funnel_events_webinar_created
   ON webinar_funnel_events (webinar_id, created_at);
 
+CREATE INDEX idx_webinar_heartbeat_rejects_webinar
+  ON webinar_heartbeat_rejects (webinar_id, received_at);
+
 CREATE INDEX idx_webinar_journey_followups_status
   ON webinar_journey_followups (status, updated_at);
 
@@ -8058,14 +9258,23 @@ CREATE INDEX idx_webinar_regs_due
 CREATE INDEX idx_webinar_regs_friend
   ON webinar_registrations (webinar_id, friend_id);
 
+CREATE INDEX idx_webinar_sessions_webinar
+  ON webinar_sessions (webinar_id, session_start_at);
+
 CREATE INDEX idx_webinar_user_comments_webinar
   ON webinar_user_comments (webinar_id, created_at);
 
 CREATE INDEX idx_webinar_versions_state
   ON webinar_versions (webinar_id, state, version DESC);
 
+CREATE INDEX idx_webinar_video_assets_webinar
+  ON webinar_video_assets (webinar_id, stage);
+
 CREATE INDEX idx_webinar_view_segments_coverage
   ON webinar_view_segments (webinar_id, start_seconds, end_seconds);
+
+CREATE INDEX idx_webinar_view_segments_rate
+  ON webinar_view_segments (webinar_id, playback_rate);
 
 CREATE INDEX idx_webinar_viewers_webinar
   ON webinar_viewers (webinar_id, session_start_at);
@@ -8334,14 +9543,6 @@ CREATE TRIGGER trg_automation_published_version_no_delete
 BEFORE DELETE ON automation_versions
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published automation version cannot be deleted'); END;
-
-CREATE TRIGGER trg_automation_run_steps_no_delete
-BEFORE DELETE ON automation_run_steps
-BEGIN SELECT RAISE(ABORT, 'automation step history cannot be deleted'); END;
-
-CREATE TRIGGER trg_automation_runs_no_delete
-BEFORE DELETE ON automation_runs
-BEGIN SELECT RAISE(ABORT, 'automation run history cannot be deleted'); END;
 
 CREATE TRIGGER trg_common_action_binding_migrations_no_delete
 BEFORE DELETE ON common_action_binding_migration_events

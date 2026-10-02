@@ -43,6 +43,7 @@ describe('未取得・未計測を0にしない', () => {
   it('グラフが描けない間は選択日の内訳を出さない', () => {
     // 「増加0人・減少0人・施策なし」は未取得の0を確定値に見せる。
     expect(PAGE).toContain('{daysShown && selectedDay && (')
-    expect(PAGE).toContain('{daysShown && (')
+    // ★V7 h99Gb：凡例は部品へ移り、施策名だけが残った。daysShown の門は残す。
+    expect(PAGE).toContain('{daysShown && overview.campaigns.length > 0 && (')
   })
 })

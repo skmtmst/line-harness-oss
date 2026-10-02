@@ -24,10 +24,26 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 const fireEvent = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<void>>(async () => undefined));
 vi.mock('../services/event-bus.js', () => ({ fireEvent }));
 const delivery = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<{ ok: boolean; attempts: number; lastStatus: number }>>());
-vi.mock('../services/outgoing-webhook-delivery.js', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../services/outgoing-webhook-delivery.js')>(),
-  deliverWebhook: delivery,
-}));
+vi.mock('../services/outgoing-webhook-delivery.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../services/outgoing-webhook-delivery.js')>();
+  return {
+    ...actual,
+    deliverWebhook: delivery,
+    /*
+      d23b R419: event bus の初回配送と sweep はどちらも1回固定経路
+      (deliverOnce)を呼ぶ。event bus 側(送信手段を渡さない)は記録用の
+      モックへ、sweep 側(fetchImpl を渡す)は実物の配送へ流して、
+      同じ冪等キーで実際に署名して送る姿を確かめられるようにする。
+    */
+    deliverOnce: vi.fn(
+      (
+        wh: Parameters<typeof actual.deliverOnce>[0],
+        body: string,
+        opts: Parameters<typeof actual.deliverOnce>[2],
+      ) => (opts?.fetchImpl ? actual.deliverOnce(wh, body, opts) : delivery(wh, body, opts)),
+    ),
+  };
+});
 
 const { app } = await import('../index.js');
 
@@ -307,7 +323,9 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
   it.each([
     ['INSERT OR IGNORE INTO incoming_webhook_receipts', null],
     ["SET status='processing',lease_owner=", 'accepted'],
-    ['SELECT source_event_id,status,received_at', 'processing'],
+    // R425: 本文照合を予約より先に行うため、この文の障害では行が残らない。
+    // 受信自体は失わず、正規再送で回復する（下の 200・completed で確かめる）。
+    ['SELECT source_event_id,status,received_at', null],
   ])('受付途中のDB障害でも受信を失わない: %s', async (fragment, expectedStatus) => {
     const prepare = db.db.prepare.bind(db.db);
     let fail = true;
@@ -323,10 +341,6 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     expect(fireEvent).not.toHaveBeenCalled();
     const row = db.raw.prepare('SELECT status FROM incoming_webhook_receipts').get() as { status: string } | undefined;
     expect(row?.status ?? null).toBe(expectedStatus);
-    if (expectedStatus === 'processing') {
-      expect((await receive(body)).status).toBe(503);
-      db.raw.prepare('UPDATE incoming_webhook_receipts SET lease_expires_at=0').run();
-    }
     expect((await receive(body)).status).toBe(200);
     expect(fireEvent).toHaveBeenCalledTimes(1);
     expect(db.raw.prepare('SELECT status FROM incoming_webhook_receipts').get()).toEqual({ status: 'completed' });

@@ -38,12 +38,18 @@ function harness() {
                   channel_access_token_encrypted: null,
                 };
               }
-              if (query.includes('SELECT id FROM nen_photo_submissions')) return { id: 'photo-1' };
+              if (query.includes('SELECT id, status FROM nen_photo_submissions')) {
+                return { id: 'photo-1', status: 'pending' };
+              }
               return null;
             },
             async all() {
-              if (query.includes("ps.status = 'adopted'")) {
-                return { results: [{ id: 'photo-1', public_pet_name: 0 }] };
+              if (query.includes('WHERE ps.friend_id = ?')) {
+                return { results: [
+                  { id: 'photo-pending', status: 'pending', public_pet_name: 0 },
+                  { id: 'photo-adopted', status: 'adopted', public_pet_name: 0 },
+                  { id: 'photo-rejected', status: 'rejected', public_pet_name: 0 },
+                ] };
               }
               return { results: [] };
             },
@@ -66,14 +72,18 @@ beforeEach(() => {
 });
 
 describe('NEN photo privacy boundaries', () => {
-  it('returns only the current friend photos in the LIFF member response', async () => {
+  it('returns all three review states only for the current friend in the LIFF member response', async () => {
     const { app, statements } = harness();
-    expect((await app.request('/api/liff/nen/member', {
+    const response = await app.request('/api/liff/nen/member', {
       headers: { Authorization: 'Bearer liff-token' },
-    })).status).toBe(200);
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { photos: Array<{ status: string }> } };
+    expect(body.data.photos.map((photo) => photo.status)).toEqual(['pending', 'adopted', 'rejected']);
 
-    const photoQuery = statements.find((entry) => entry.query.includes("ps.status = 'adopted'"));
+    const photoQuery = statements.find((entry) => entry.query.includes('WHERE ps.friend_id = ?'));
     expect(photoQuery?.query).toContain('ps.friend_id = ?');
+    expect(photoQuery?.query).not.toContain("ps.status = 'adopted'");
     expect(photoQuery?.bindings).toEqual(['friend-1']);
   });
 
@@ -101,7 +111,7 @@ describe('NEN photo privacy boundaries', () => {
       body: JSON.stringify({ consent: true, consentVersion: 'photo-public-v1', showPetName: false }),
     });
     expect(consent.status).toBe(200);
-    expect(statements.find((entry) => entry.query.includes('SELECT id FROM nen_photo_submissions'))?.bindings)
+    expect(statements.find((entry) => entry.query.includes('SELECT id, status FROM nen_photo_submissions'))?.bindings)
       .toEqual(['photo-1', 'friend-1', 'account-a']);
     expect(statements.find((entry) => entry.query.includes('publication_consent_version = ?'))?.bindings)
       .toEqual(['photo-public-v1', '2026-08-28 02:00:00', 0, '2026-08-28 02:00:00', 'photo-1', 'friend-1', 'account-a']);

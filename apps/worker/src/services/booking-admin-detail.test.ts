@@ -50,6 +50,116 @@ describe('予約の顧客カルテ・通知実績', () => {
     });
   });
 
+  it('R320: 前回来店の申し送りは過去の完了だけから選ぶ', async () => {
+    const testDb = createTestD1();
+    testDb.raw.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('account-1', 'channel-1', '本店', '', '');
+      INSERT INTO staff (id, line_account_id, name, display_name)
+      VALUES ('staff-1', 'account-1', '担当', '担当');
+      INSERT INTO menus (id, line_account_id, name, duration_minutes, buffer_after_minutes, base_price)
+      VALUES ('menu-1', 'account-1', '相談', 60, 0, 5000);
+      INSERT INTO friends (id, line_user_id, display_name, line_account_id, created_at, updated_at)
+      VALUES ('friend-1', 'U1', '山田', 'account-1', '2026-01-01', '2026-01-01');
+      INSERT INTO bookings (
+        id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at,
+        block_ends_at, status, customer_note, internal_note, price_at_booking,
+        requested_at, decided_at, source
+      ) VALUES
+      ('booking-past', 'account-1', 'friend-1', 'staff-1', 'menu-1',
+       '2026-09-01T01:00:00.000Z', '2026-09-01T02:00:00.000Z', '2026-09-01T02:00:00.000Z',
+       'completed', NULL, '来店時のメモ', 5000, '2026-08-31T01:00:00.000Z', '2026-08-31T02:00:00.000Z', 'liff'),
+      ('booking-target', 'account-1', 'friend-1', 'staff-1', 'menu-1',
+       '2026-10-01T01:00:00.000Z', '2026-10-01T02:00:00.000Z', '2026-10-01T02:00:00.000Z',
+       'confirmed', NULL, NULL, 5000, '2026-09-07T01:00:00.000Z', '2026-09-07T02:00:00.000Z', 'operator'),
+      ('booking-future-cancelled', 'account-1', 'friend-1', 'staff-1', 'menu-1',
+       '2026-10-10T01:00:00.000Z', '2026-10-10T02:00:00.000Z', '2026-10-10T02:00:00.000Z',
+       'cancelled', NULL, '未来の取消メモ', 5000, '2026-09-07T01:00:00.000Z', '2026-09-07T02:00:00.000Z', 'operator'),
+      ('booking-past-noshow', 'account-1', 'friend-1', 'staff-1', 'menu-1',
+       '2026-09-20T01:00:00.000Z', '2026-09-20T02:00:00.000Z', '2026-09-20T02:00:00.000Z',
+       'no_show', NULL, '来店なしメモ', 5000, '2026-09-19T01:00:00.000Z', '2026-09-19T02:00:00.000Z', 'operator');
+    `);
+    const detail = await getBookingAdminDetail(testDb.db, {
+      id: 'booking-target', lineAccountId: 'account-1',
+    });
+    // 未来の取消・来店なしではなく、過去の完了のメモだけを前回とする。
+    expect(detail?.previousHandover).toBe('来店時のメモ');
+    expect(detail?.previousHandoverBooking).toMatchObject({
+      id: 'booking-past', startsAt: '2026-09-01T01:00:00.000Z', status: 'completed',
+    });
+  });
+
+  it('R320: 該当する来店完了がなければ前回申し送りはなしと区別する', async () => {
+    const testDb = createTestD1();
+    testDb.raw.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('account-1', 'channel-1', '本店', '', '');
+      INSERT INTO staff (id, line_account_id, name, display_name)
+      VALUES ('staff-1', 'account-1', '担当', '担当');
+      INSERT INTO menus (id, line_account_id, name, duration_minutes, buffer_after_minutes, base_price)
+      VALUES ('menu-1', 'account-1', '相談', 60, 0, 5000);
+      INSERT INTO friends (id, line_user_id, display_name, line_account_id, created_at, updated_at)
+      VALUES ('friend-1', 'U1', '山田', 'account-1', '2026-01-01', '2026-01-01');
+      INSERT INTO bookings (
+        id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at,
+        block_ends_at, status, customer_note, internal_note, price_at_booking,
+        requested_at, decided_at, source
+      ) VALUES
+      ('booking-target', 'account-1', 'friend-1', 'staff-1', 'menu-1',
+       '2026-10-01T01:00:00.000Z', '2026-10-01T02:00:00.000Z', '2026-10-01T02:00:00.000Z',
+       'confirmed', NULL, NULL, 5000, '2026-09-07T01:00:00.000Z', '2026-09-07T02:00:00.000Z', 'operator'),
+      ('booking-future-cancelled', 'account-1', 'friend-1', 'staff-1', 'menu-1',
+       '2026-10-10T01:00:00.000Z', '2026-10-10T02:00:00.000Z', '2026-10-10T02:00:00.000Z',
+       'cancelled', NULL, '未来の取消メモ', 5000, '2026-09-07T01:00:00.000Z', '2026-09-07T02:00:00.000Z', 'operator');
+    `);
+    const detail = await getBookingAdminDetail(testDb.db, {
+      id: 'booking-target', lineAccountId: 'account-1',
+    });
+    expect(detail?.previousHandover).toBeNull();
+    expect(detail?.previousHandoverBooking).toBeNull();
+  });
+
+  it('R321: 履歴は直近10件だけ返し、総数を別途返す', async () => {
+    const testDb = createTestD1();
+    testDb.raw.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('account-1', 'channel-1', '本店', '', '');
+      INSERT INTO staff (id, line_account_id, name, display_name)
+      VALUES ('staff-1', 'account-1', '担当', '担当');
+      INSERT INTO menus (id, line_account_id, name, duration_minutes, buffer_after_minutes, base_price)
+      VALUES ('menu-1', 'account-1', '相談', 60, 0, 5000);
+      INSERT INTO friends (id, line_user_id, display_name, line_account_id, created_at, updated_at)
+      VALUES ('friend-1', 'U1', '山田', 'account-1', '2026-01-01', '2026-01-01');
+      INSERT INTO bookings (
+        id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at,
+        block_ends_at, status, customer_note, internal_note, price_at_booking,
+        requested_at, decided_at, source
+      ) VALUES (
+        'booking-target', 'account-1', 'friend-1', 'staff-1', 'menu-1',
+        '2026-10-01T01:00:00.000Z', '2026-10-01T02:00:00.000Z', '2026-10-01T02:00:00.000Z',
+        'confirmed', NULL, NULL, 5000, '2026-09-07T01:00:00.000Z', '2026-09-07T02:00:00.000Z', 'operator');
+    `);
+    for (let i = 1; i <= 12; i += 1) {
+      const day = String(i).padStart(2, '0');
+      testDb.raw.exec(`
+        INSERT INTO bookings (
+          id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at,
+          block_ends_at, status, customer_note, internal_note, price_at_booking,
+          requested_at, decided_at, source
+        ) VALUES (
+          'booking-past-${day}', 'account-1', 'friend-1', 'staff-1', 'menu-1',
+          '2026-08-${day}T01:00:00.000Z', '2026-08-${day}T02:00:00.000Z', '2026-08-${day}T02:00:00.000Z',
+          'completed', NULL, NULL, 5000, '2026-08-01T01:00:00.000Z', '2026-08-01T02:00:00.000Z', 'operator')`);
+    }
+    const detail = await getBookingAdminDetail(testDb.db, {
+      id: 'booking-target', lineAccountId: 'account-1',
+    });
+    // 12件あっても一覧は直近10件。総数12件で打ち切りを伝える。
+    expect(detail?.history).toHaveLength(10);
+    expect(detail?.historyTotal).toBe(12);
+    expect(detail?.history[0]?.id).toBe('booking-past-12');
+  });
+
   it('IDEA-27: 変更履歴は要点分だけ同梱し、総数を別途返す', async () => {
     const testDb = createTestD1();
     testDb.raw.exec(`

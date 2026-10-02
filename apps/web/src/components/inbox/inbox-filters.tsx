@@ -1,5 +1,8 @@
 'use client'
 
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+
 interface AccountOption {
   id: string
   name: string
@@ -21,34 +24,27 @@ export default function InboxFilters({
   onChange,
 }: Props) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200">
+    <div className="flex flex-wrap items-center gap-3 rounded-control bg-canvas p-4 shadow-card ring-1 ring-hairline">
       <input
         type="search"
         value={q}
         onChange={(e) => onChange({ q: e.target.value })}
         placeholder="名前で検索"
-        className="min-w-[240px] flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+        className="min-w-[240px] flex-1 rounded-mini border border-hairline px-3 py-2 text-sm"
       />
-      <label className="flex items-center gap-2 text-sm text-gray-700">
-        <input
-          type="checkbox"
-          checked={overdueOnly}
-          onChange={(e) => onChange({ overdueOnly: e.target.checked })}
-        />
-        1時間以上のみ
-      </label>
-      <select
+      <Checkbox
+        checked={overdueOnly}
+        onCheckedChange={(checked) => onChange({ overdueOnly: checked })}
+      >1時間以上のみ</Checkbox>
+      <Select
         value={account}
-        onChange={(e) => onChange({ account: e.target.value })}
-        className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-      >
-        <option value="">全アカウント</option>
-        {accountOptions.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name}
-          </option>
-        ))}
-      </select>
+        onChange={(value) => onChange({ account: value })}
+        aria-label="アカウント"
+        options={[
+          { value: '', label: '全アカウント' },
+          ...accountOptions.map((a) => ({ value: a.id, label: a.name })),
+        ]}
+      />
     </div>
   )
 }

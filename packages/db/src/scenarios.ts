@@ -1,4 +1,5 @@
 import { accountFeatureOffExclusionSql } from './account-settings.js';
+import { refreshScenarioReferences, removeConsumerReferences } from './template-versions.js';
 import { jstNow } from './utils.js';
 import { computeNextDeliveryAt } from './scenario-schedule.js';
 import { resolveStepContent } from './scenario-resolve.js';
@@ -354,12 +355,27 @@ export async function updateScenario(
  * - 参照解除（entry_routes / tracked_links / forms の送信後シナリオ・
  *   他シナリオ完了時の遷移先）も同じ batch に入れる。FK OFF の環境では
  *   CASCADE も SET NULL も走らないので、明示で NULL に寄せる。
+ * - 他シナリオ完了時の遷移先（R250）は、移動先だけを NULL にしない。
+ *   mode='move' のまま target だけ空になると、通常の保存では作れない
+ *   「移動先のない移動」が残り、運用者は気づけない。削除と同時に
+ *   mode='pause'（何もしない）へ戻し、整合した設定にする。削除の確認窓で
+ *   参照元の名前を見せてから消す（窓側の役目）。
  */
 export async function deleteScenario(db: D1Database, id: string): Promise<void> {
   const dependent = await db.prepare(
     `SELECT id FROM affiliate_offers WHERE scenario_id = ? LIMIT 1`,
   ).bind(id).first<{ id: string }>();
   if (dependent) throw new Error('SCENARIO_HAS_DEPENDENTS');
+
+  /*
+   * R250: 参照元は消す前に押さえる。外部キーが有効な環境では親 DELETE の
+   * 時点で SET NULL が走り、あとの `WHERE on_complete_scenario_id = ?` が
+   * 誰にも当たらなくなる。ID 指定ならどちらの環境でも同じ終状態になる。
+   */
+  const referrers = await db.prepare(
+    `SELECT id FROM scenarios WHERE on_complete_scenario_id = ?`,
+  ).bind(id).all<{ id: string }>();
+  const referrerIds = referrers.results.map((row) => row.id);
 
   await db.batch([
     db.prepare(`DELETE FROM scenarios WHERE id = ?`).bind(id),
@@ -382,8 +398,46 @@ export async function deleteScenario(db: D1Database, id: string): Promise<void> 
     db.prepare(`UPDATE entry_routes SET scenario_id = NULL WHERE scenario_id = ?`).bind(id),
     db.prepare(`UPDATE tracked_links SET scenario_id = NULL WHERE scenario_id = ?`).bind(id),
     db.prepare(`UPDATE forms SET on_submit_scenario_id = NULL WHERE on_submit_scenario_id = ?`).bind(id),
-    db.prepare(`UPDATE scenarios SET on_complete_scenario_id = NULL WHERE on_complete_scenario_id = ?`).bind(id),
+    ...(referrerIds.length > 0
+      ? [
+        db.prepare(
+          `UPDATE scenarios SET on_complete_mode = 'pause', on_complete_scenario_id = NULL WHERE id IN (${referrerIds.map(() => '?').join(',')})`,
+        ).bind(...referrerIds),
+      ]
+      : []),
   ]);
+  // 467: 消えたシナリオの参照を消す。残すと削除の止めが誤作動する。
+  await removeConsumerReferences(db, 'scenario', id);
+}
+
+/**
+ * 終了後の移動先として `id` を指しているシナリオの一覧（R250）。
+ *
+ * 削除の確認窓で「どのシナリオの終了後の処理が変わるか」を見せるための
+ * 読み取り。消す側の権限ではなく、見える範囲の名前だけ返す。
+ */
+export interface MoveReferrer {
+  id: string;
+  name: string;
+  /** null = 全アカウント共通。窓側で権限の絞り込みに使う。 */
+  lineAccountId: string | null;
+}
+
+export async function listMoveReferrers(
+  db: D1Database,
+  id: string,
+): Promise<MoveReferrer[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, name, line_account_id FROM scenarios WHERE on_complete_scenario_id = ? ORDER BY name`,
+    )
+    .bind(id)
+    .all<{ id: string; name: string; line_account_id: string | null }>();
+  return result.results.map((row) => ({
+    id: row.id,
+    name: row.name,
+    lineAccountId: row.line_account_id ?? null,
+  }));
 }
 
 // ============================================================
@@ -455,10 +509,13 @@ export async function createScenarioStep(
     )
     .run();
 
-  return (await db
+  const created = (await db
     .prepare(`SELECT * FROM scenario_steps WHERE id = ?`)
     .bind(id)
     .first<ScenarioStep>())!;
+  // 467: 手順の保存で参照表を書き換える。どの版を使っているかの正本。
+  await refreshScenarioReferences(db, created.scenario_id);
+  return created;
 }
 
 export type UpdateScenarioStepInput = Partial<
@@ -569,14 +626,23 @@ export async function updateScenarioStep(
       .run();
   }
 
-  return db
+  const updated = await db
     .prepare(`SELECT * FROM scenario_steps WHERE id = ?`)
     .bind(id)
     .first<ScenarioStep>();
+  // 467: 手順の保存で参照表を書き換える。消えた手順の参照はここで消える。
+  if (updated) await refreshScenarioReferences(db, updated.scenario_id);
+  return updated;
 }
 
 export async function deleteScenarioStep(db: D1Database, id: string): Promise<void> {
+  const target = await db
+    .prepare(`SELECT scenario_id FROM scenario_steps WHERE id = ?`)
+    .bind(id)
+    .first<{ scenario_id: string }>();
   await db.prepare(`DELETE FROM scenario_steps WHERE id = ?`).bind(id).run();
+  // 467: 消えた手順の参照を数え直す。
+  if (target) await refreshScenarioReferences(db, target.scenario_id);
 }
 
 export async function getScenarioSteps(
@@ -1341,6 +1407,98 @@ function classifyPublishBatchError(error: unknown): 'version-number' | 'idempote
 }
 
 /**
+ * 分岐ジャンプで回る輪を見つける。通は step_order の昇順に進み、
+ * 条件分岐 (next_step_on_false) で飛べる。飛び先・次の通の両辺で
+ * 閉路があれば、その輪を step_order の列で返す。無ければ null。
+ */
+export function findBranchCycle(
+  steps: Array<{ step_order: number; next_step_on_false: number | null }>,
+): number[] | null {
+  const orders = [...new Set(steps.map((step) => step.step_order))].sort((a, b) => a - b);
+  const existing = new Set(orders);
+  const edges = new Map<number, number[]>();
+  for (let index = 0; index < orders.length; index += 1) {
+    const from = orders[index]!;
+    const next: number[] = [];
+    if (index + 1 < orders.length) next.push(orders[index + 1]!);
+    const jump = steps.find((step) => step.step_order === from)?.next_step_on_false;
+    if (jump != null && existing.has(jump) && !next.includes(jump)) next.push(jump);
+    edges.set(from, next);
+  }
+  // 深さ優先で「いま辿っている道」に戻る辺を探す。通は多くて数十件のため再帰で足りる。
+  const state = new Map<number, number>();
+  const stack: number[] = [];
+  let found: number[] | null = null;
+  const visit = (node: number): boolean => {
+    state.set(node, 1);
+    stack.push(node);
+    for (const to of edges.get(node) ?? []) {
+      const target = state.get(to) ?? 0;
+      if (target === 1) {
+        found = [...stack.slice(stack.indexOf(to)), to];
+        return true;
+      }
+      if (target === 0 && visit(to)) return true;
+    }
+    stack.pop();
+    state.set(node, 2);
+    return false;
+  };
+  for (const node of orders) {
+    if ((state.get(node) ?? 0) === 0 && visit(node)) break;
+  }
+  return found;
+}
+
+/**
+ * 公開を止める循環の理由。`message` は SCENARIO_PUBLISH_CYCLE 固定で、
+ * 画面へ出す理由文は `userMessage` に入れる（保存は止めない・公開だけ止める）。
+ */
+export class ScenarioPublishCycleError extends Error {
+  readonly cycleKind: 'branch' | 'cross_scenario';
+  readonly userMessage: string;
+  constructor(cycleKind: 'branch' | 'cross_scenario', userMessage: string) {
+    super('SCENARIO_PUBLISH_CYCLE');
+    this.cycleKind = cycleKind;
+    this.userMessage = userMessage;
+  }
+}
+
+/**
+ * 完了後の移動 (on_complete_mode='move') を辿り、輪になっていれば
+ * シナリオ名の列で返す。移動先が無い・移動でない・消えている所で止まる
+ * （それらは循環ではなく別の検査の仕事）。
+ */
+export async function findCrossScenarioCycle(
+  db: D1Database,
+  scenarioId: string,
+): Promise<string[] | null> {
+  const chain: string[] = [scenarioId];
+  const names = new Map<string, string>();
+  let current: string | null = scenarioId;
+  for (let hops = 0; hops < 50 && current; hops += 1) {
+    const row: {
+      id: string; name: string; on_complete_mode: string | null; on_complete_scenario_id: string | null;
+    } | null = await db.prepare(
+      `SELECT id, name, on_complete_mode, on_complete_scenario_id FROM scenarios WHERE id = ?`,
+    ).bind(current).first<{
+      id: string; name: string; on_complete_mode: string | null; on_complete_scenario_id: string | null;
+    }>();
+    if (!row) return null;
+    names.set(row.id, row.name);
+    if (row.on_complete_mode !== 'move' || !row.on_complete_scenario_id) return null;
+    const target: string = row.on_complete_scenario_id;
+    const revisit = chain.indexOf(target);
+    if (revisit >= 0) {
+      return [...chain.slice(revisit).map((id) => names.get(id) ?? id), names.get(target) ?? target];
+    }
+    chain.push(target);
+    current = target;
+  }
+  return null;
+}
+
+/**
  * いまの下書きを公開版として固定する。単一原子 protocol。
  *
  * - 書き込み前の判定では何も書かない。同キーの再実行は同版を返し、
@@ -1367,6 +1525,24 @@ export async function publishScenarioVersion(
   const draftSteps = await buildVersionSnapshotSteps(db, '', steps, scenario.line_account_id ?? null);
   const draftActions = await buildVersionSnapshotActions(db, '', scenarioId, steps);
   const draftPayload = canonicalPublishPayload(scenario, draftSteps, draftActions);
+
+  // 循環したまま公開すると購読した友だちに同じ通が回り続ける。下書きの
+  // 保存は止めないが、公開だけは止めてどこが回っているかを理由に返す。
+  const branchLoop = findBranchCycle(steps);
+  if (branchLoop) {
+    const trail = branchLoop.map((order) => `${order + 1}通目`).join(' → ');
+    throw new ScenarioPublishCycleError(
+      'branch',
+      `分岐が循環しているため公開できません（${trail}）。分岐先を見直してください`,
+    );
+  }
+  const crossNames = await findCrossScenarioCycle(db, scenarioId);
+  if (crossNames) {
+    throw new ScenarioPublishCycleError(
+      'cross_scenario',
+      `完了後の移動が循環しているため公開できません（${crossNames.join(' → ')}）。移動先を見直してください`,
+    );
+  }
 
   // 同じキーの再実行・使い回しの判定。ここでは何も書かないので、409 の
   // 経路で公開側の状態は変わらない。

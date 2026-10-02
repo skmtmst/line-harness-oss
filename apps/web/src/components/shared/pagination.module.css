@@ -1,5 +1,8 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 .pagination {
   display: flex;
+  flex-wrap: wrap; /* 幅320で「次へ」が右に切れていた（★V7 修正方針 §3） */
   align-items: center;
   gap: 8px;
 }
@@ -52,5 +55,74 @@ button.item:disabled {
   border-color: var(--color-accent-deep);
   background: var(--color-accent-deep);
   color: var(--color-on-accent);
-  font-weight: 700;
+  font-weight: 500;
+}
+
+/*
+ * #639 タッチ端末では指の当たりとして44pxを確保する（PCは38pxのまま）。
+ * 表記・構成の統一は #667 の範囲のため、ここでは高さだけを扱う。
+ */
+@media (pointer: coarse) {
+  .item {
+    min-height: 44px;
+  }
+}
+
+/*
+ * 帯の左端に出す件数の文（例「40件中 1〜20件を表示」）。v7 は帯の外に
+ * 従来の件数表示があるので、ここは v8 のときだけ出す。
+ */
+.summary {
+  display: none;
+}
+
+/*
+ * ★V8「ページ送り」（jX2Uw）：帯の余白は上下10・左右20、間は 6。
+ * 各ボタンは 32×32・角丸 control・文字は 13px/1.5。前・次は「‹」「›」の
+ * 印だけの正方形にする。いまのページの緑は変えない。
+ */
+[data-theme='v8'] .pagination {
+  gap: 6px;
+  padding: 10px 20px;
+}
+
+[data-theme='v8'] .summary {
+  display: inline-flex;
+  align-items: center;
+  margin-right: auto;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* 中身は bare の ListRange（文字指定を持たない）を想定し、帯側が決める */
+
+[data-theme='v8'] .item {
+  height: 32px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+[data-theme='v8'] .page {
+  width: 32px;
+}
+
+[data-theme='v8'] .control {
+  width: 32px;
+  padding: 0;
+}
+
+.controlGlyph {
+  display: none;
+}
+
+[data-theme='v8'] .controlLabel {
+  display: none;
+}
+
+[data-theme='v8'] .controlGlyph {
+  display: inline;
+}
 }

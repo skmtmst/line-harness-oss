@@ -1,4 +1,10 @@
-import { processAutomationRun, startAutomationRun, type RunStatus } from './automation-engine.js';
+import {
+  processAutomationRun,
+  resolveCommonActionVersion,
+  startAutomationRun,
+  type ActionDefinition,
+  type RunStatus,
+} from './automation-engine.js';
 import {
   automationRevisionToken,
   parseAutomationRevision,
@@ -236,6 +242,97 @@ async function requireCurrentVersion(
   return version;
 }
 
+/**
+ * 確認画面で見せた共通アクションの版の一式を、実行前のいま解決される版と
+ * 照合する（監査 R487）。
+ *
+ * - 下書きに共通アクションが無いときは `null`（照合なし）。
+ * - 共通アクションがあるのに照合用の一式が来ていない・形が違うときは、
+ *   確認していない版を送る恐れがあるので 409 で止める。
+ * - 1件でも解決版と食い違えば同じく 409。送る前なので副作用はない。
+ */
+async function checkExpectedCommonActions(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    automationId: string;
+    actionConfig: string;
+    expected: unknown;
+  },
+): Promise<Map<string, string> | null> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(input.actionConfig);
+  } catch {
+    parsed = null;
+  }
+  const steps = Array.isArray(parsed)
+    ? parsed.filter((step): step is ActionDefinition =>
+        typeof step === 'object' && step !== null
+        && (step as { type?: unknown }).type === 'common_action')
+    : [];
+  if (steps.length === 0) return null;
+  const expectedByStep = new Map<string, { commonActionId: string; versionId: string }>();
+  if (Array.isArray(input.expected)) {
+    for (const entry of input.expected) {
+      if (typeof entry !== 'object' || entry === null) continue;
+      const { stepId, commonActionId, versionId } = entry as Record<string, unknown>;
+      if (typeof stepId === 'string' && typeof commonActionId === 'string'
+        && typeof versionId === 'string' && stepId && commonActionId && versionId) {
+        expectedByStep.set(stepId, { commonActionId, versionId });
+      }
+    }
+  }
+  const resolvedByStep = new Map<string, string>();
+  for (const step of steps) {
+    const expectedForStep = expectedByStep.get(step.id);
+    const resolved = await resolveCommonActionVersion(db, {
+      lineAccountId: input.lineAccountId,
+      automationId: input.automationId,
+      action: step,
+    });
+    const stepCommonActionId = typeof step.params.commonActionId === 'string'
+      ? step.params.commonActionId
+      : '';
+    if (!expectedForStep || !resolved
+      || expectedForStep.commonActionId !== stepCommonActionId
+      || expectedForStep.versionId !== resolved) {
+      throw new AutomationDefinitionError(
+        'version_conflict',
+        '確認したあとに共通アクションの版が変わりました。送っていません。もう一度、送る内容を確認してください',
+        'versionId',
+      );
+    }
+    resolvedByStep.set(step.id, resolved);
+  }
+  return resolvedByStep;
+}
+
+/**
+ * 実行計画に焼き付いた共通アクション版（`common_action_marker` 段の
+ * `common_action_version_id`）が、確認時と同じかを見る。照合のあと・
+ * 焼き付けの前に束が切り替わった最後の隙間をここで閉じる。
+ * 版の中身に入れ子で書き込まれた呼び出しは、版ごと不変なので対象外
+ * （step_key に `/` が入る段はスキップ）。
+ */
+async function runStepsMatchExpectedCommonActions(
+  db: D1Database,
+  runId: string,
+  expected: Map<string, string> | null,
+): Promise<boolean> {
+  if (!expected) return true;
+  const markers = await db.prepare(
+    `SELECT step_key, common_action_version_id
+       FROM automation_run_steps
+      WHERE automation_run_id = ? AND action_type = 'common_action_marker'`,
+  ).bind(runId).all<{ step_key: string; common_action_version_id: string | null }>();
+  for (const marker of markers.results ?? []) {
+    if (marker.step_key.includes('/')) continue;
+    if (expected.get(marker.step_key) !== marker.common_action_version_id) return false;
+  }
+  return true;
+}
+
 /** 版の中身が、読んだときのままかを見る。1文字でも違えば当たらない。 */
 async function versionContentUnchanged(
   db: D1Database,
@@ -319,6 +416,21 @@ export async function runAutomationTest(
     friendId: unknown;
     lineAccountId: string;
     credentialEncryptionKey?: string;
+    /**
+     * 同じ確認画面の操作を識別する鍵（R484）。確認を開くたびに画面が振る。
+     * 応答が失われたあとの再試行は同じ鍵で来るので、2件目の実行を作らず
+     * 初回の実行を返す。鍵が無い・形が違う呼び出しは古い画面と見て、
+     * 従来どおり新しい実行を作る。
+     */
+    operationKey?: unknown;
+    /**
+     * 監査 R487: 確認画面で出した「この共通アクションはこの版を使う」の一式。
+     * 下書きの版と指紋は束の切り替えを検知できないため、確認後に別担当が
+     * 利用版を切り替えると、確認していない新版が送られてしまう。
+     * 下書きに共通アクションを含むときは必須とし、1件でも解決版と
+     * 食い違えば 409 で送らない。
+     */
+    expectedCommonActions?: unknown;
   },
 ): Promise<{ runId: string; versionId: string; status: RunStatus | 'busy' }> {
   /*
@@ -345,6 +457,17 @@ export async function runAutomationTest(
    * `cancelAutomationRunBeforeSend` の注釈）。
    */
   const version = await requireCurrentVersion(db, input, { requireFingerprint: true });
+  /*
+   * R487: 確認時に見せた共通アクションの版が、いま解決される版と同じか。
+   * 束の切り替えは下書きの版・指紋を変えないので、ここで別に照合する。
+   * 「確認した版と違う」「照合用の一式が来ていない」ときは送らない。
+   */
+  const expectedCommonActions = await checkExpectedCommonActions(db, {
+    lineAccountId: input.lineAccountId,
+    automationId: input.automationId,
+    actionConfig: version.action_config,
+    expected: input.expectedCommonActions,
+  });
   if (typeof input.friendId !== 'string' || !input.friendId.trim()) {
     throw new AutomationDefinitionError('required', 'テストする友だちを選んでください', 'friendId');
   }
@@ -359,13 +482,40 @@ export async function runAutomationTest(
     `SELECT 1 AS ok FROM friends f
       WHERE f.id = ? AND f.line_account_id = ? AND (${where.sql}) LIMIT 1`,
   ).bind(friendId, input.lineAccountId, ...where.bindings).first<{ ok: number }>();
-  const requestId = crypto.randomUUID();
+  /*
+   * R484: 同じ確認の再試行は同じ鍵で来る。先に初回の実行を探し、
+   * あれば作らずにそれを返す（副作用は1件のまま）。
+   * 応答が届く前に止まった再試行（まだ queued/waiting）もここで拾うので、
+   * 作り直して二重に送ることはない。
+   */
+  const operationKey = typeof input.operationKey === 'string' ? input.operationKey.trim() : '';
+  const idempotencyKey = /^[A-Za-z0-9._-]{8,128}$/.test(operationKey)
+    ? `manual-test:${operationKey}`
+    : `manual-test:${crypto.randomUUID()}`;
+  const previous = await db.prepare(
+    `SELECT id, status, automation_version_id
+       FROM automation_runs
+      WHERE line_account_id = ? AND automation_id = ? AND idempotency_key = ?`,
+  ).bind(input.lineAccountId, input.automationId, idempotencyKey).first<{
+    id: string;
+    status: RunStatus;
+    automation_version_id: string;
+  }>();
+  if (previous) {
+    // 同じ鍵で版が違う＝確認したときと中身が違う。送らずに競合で返す。
+    if (previous.automation_version_id !== version.version_id) {
+      throw new AutomationDefinitionError(
+        'version_conflict', '確認したあとに下書きが変わりました。送っていません。もう一度、送る内容を確認してください',
+      );
+    }
+    return { runId: previous.id, versionId: previous.automation_version_id, status: previous.status };
+  }
   const started = await startAutomationRun(db, {
     lineAccountId: input.lineAccountId,
     automationId: input.automationId,
     automationVersionId: version.version_id,
-    sourceEventId: `manual-test:${requestId}`,
-    idempotencyKey: `manual-test:${requestId}`,
+    sourceEventId: idempotencyKey,
+    idempotencyKey,
     friendId,
     inputEvent: { type: 'manual_test' },
     conditionMatched: !!match,
@@ -376,7 +526,8 @@ export async function runAutomationTest(
   }
   // 焼き付けたあと・送る前の最後の見張り（上の 2）。
   if (started.automationVersionId !== version.version_id
-    || !await versionContentUnchanged(db, version)) {
+    || !await versionContentUnchanged(db, version)
+    || !await runStepsMatchExpectedCommonActions(db, started.runId, expectedCommonActions)) {
     await cancelAutomationRunBeforeSend(db, started.runId);
     throw new AutomationDefinitionError(
       'version_conflict', '確認したあとに下書きが変わりました。送っていません。もう一度、送る内容を確認してください',

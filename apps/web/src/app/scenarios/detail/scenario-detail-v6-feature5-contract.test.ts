@@ -89,12 +89,12 @@ describe('bV5Vs シナリオ編集', () => {
     expect(header).not.toContain('シナリオ編集')
     expect(header).not.toContain('配信のタイミングと内容を並べます。')
     /*
-     * 操作は残す。配信結果・一括プレビュー・一括テスト送信・保存の
+     * 操作は残す。配信結果・一括プレビュー・一括でテストを送る・保存の
      * 各ボタンは Header の action に渡し続ける。
      */
     expect(header).toContain('action=')
     expect(detail).toContain('配信結果を見る')
-    expect(detail).toContain('一括テスト送信')
+    expect(detail).toContain('一括でテストを送る')
   })
 
   it('「作成しただけでは配信されません」を見出しの説明から外し、帯へ移す', () => {
@@ -141,28 +141,25 @@ describe('bV5Vs シナリオ編集', () => {
     expect(table).not.toMatch(/min-w-\[\d+px\]/)
     expect(table).toContain('<table className="w-full">')
     /*
-     * 操作は6つある。1行へ押さえる（whitespace-nowrap だけの列）と
-     * 表の幅がそのぶん広がるので、狭い幅では折り返す。
+     * ★V7: 操作6つを並べて折り返すのはやめ、「編集＋…」の1行に収める。
+     * 残り5つは「…」のメニュー項目として出す。
      */
     const actions = slice(detail, 'text-right align-top', '</td>')
-    expect(actions).toContain('flex-wrap')
+    expect(actions).not.toContain('flex-wrap')
+    expect(actions).toContain('<ActionMenu')
+    for (const id of ['preview', 'test', 'action', 'duplicate', 'delete']) {
+      expect(actions).toContain(`id: '${id}'`)
+    }
   })
 
   it('SCENARIO-23: 操作名は単語の途中で折らず、操作列の必要幅を確保する', () => {
     /*
-     * PC1440/1920 でも操作列が 36px まで潰れ、「編集」「プレビュー」等が
-     * 1文字ずつ縦に折れて行の高さが 349px になっていた。短い操作名は
-     * 各ボタンの whitespace-nowrap で1行を保ち、収まらない幅では
-     * ボタン単位で折り返す（上の N-058 と同じ方針）。見出しの w-80 が
-     * 「内容」列へ余白を渡す前の操作列の取り分になる。
+     * ★V7: 「編集＋…」の1行に収めるため、操作列の取り分は w-40 で足りる。
+     * 6つの操作名はメニュー項目として単語を折らずに出す（共通 ActionMenu）。
      */
     const actions = slice(detail, 'text-right align-top', '</td>')
-    const buttons = actions.match(/<button[\s\S]*?<\/button>/g) ?? []
-    expect(buttons.length).toBe(6)
-    for (const button of buttons) {
-      expect(button, '操作ボタンが単語の途中で折れる組み方です').toContain('whitespace-nowrap')
-    }
-    expect(thead).toContain('className="w-80" aria-label="操作"')
+    expect(actions).toContain('whitespace-nowrap')
+    expect(thead).toContain('className="w-40" aria-label="操作"')
   })
 })
 
@@ -189,10 +186,11 @@ describe('SCENARIO-15 開始前試算の取り直し', () => {
   })
 
   it('取り直し中は古い人数ではなく計算中と出す', () => {
-    expect(detail).toContain('新規開始予定を計算しています…')
+    // 設計 B：試算の人数は「予約中」にそろえる（旧「新規開始予定」）。
+    expect(detail).toContain('予約中の人数を計算しています…')
     const banner = slice(detail, 'data-design-node="NrBkW"', '</div>')
     expect(banner).toContain('simulationRefreshing')
-    expect(banner).toContain('開始予定の人数を計算しています…')
+    expect(banner).toContain('予約中の人数を計算しています…')
   })
 })
 
@@ -253,7 +251,12 @@ describe('配信対象の言い表し方', () => {
   it('送ったあと次へ進むのは決まっている値。—にしない', () => {
     expect(describeAfterSend('continue')).toEqual({ label: '次へ進む', paused: false })
     expect(describeAfterSend(undefined)).toEqual({ label: '次へ進む', paused: false })
-    expect(describeAfterSend('pause')).toEqual({ label: '返信まで一時停止', paused: true })
+    /*
+     * R236: pause は人が再開するまで止まるだけ。返信で自動再開しないのに
+     * 「返信まで」と書くと、返信を待てば続くと誤解される。編集欄の
+     * 「送信後：ここで一時停止する」と同じ意味の文言にそろえる。
+     */
+    expect(describeAfterSend('pause')).toEqual({ label: '送信後に一時停止', paused: true })
   })
 })
 
@@ -317,12 +320,12 @@ describe('EvVO5 開始条件', () => {
     expect(triggerEditor).toContain('await api.scenarios.simulate(scenarioId, lineAccountId)')
     expect(matchBlock).toContain('一致')
     expect(matchBlock).toContain('すでに購読中')
-    expect(matchBlock).toContain('新規開始予定')
+    expect(matchBlock).toContain('予約中')
     expect(matchBlock).toContain('対象を再計算')
   })
 
-  it('新規開始予定を引き算で作らない', () => {
-    const planned = slice(matchBlock, '<dt className="text-ink-faint text-xs">新規開始予定</dt>', '</dd>')
+  it('予約中の人数を引き算で作らない', () => {
+    const planned = slice(matchBlock, '<dt className="text-ink-faint text-xs">予約中</dt>', '</dd>')
     expect(planned).toContain('match.newStartPlanned')
     expect(planned).not.toMatch(/activeNow|match\.matched\s*-/)
     expect(triggerEditor).toContain('試算では配信も購読も始まりません。')
@@ -340,7 +343,7 @@ describe('EvVO5 開始条件', () => {
   })
 })
 
-describe('g2UNV 一括テスト送信', () => {
+describe('g2UNV 一括でテストを送る', () => {
   it('本番へ何が起きないのかを断る', () => {
     expect(testSendBody).toContain('本番の登録は増えません。配信予定も作りません。')
   })
@@ -365,7 +368,7 @@ describe('g2UNV 一括テスト送信', () => {
     expect(testSendBody).toContain('const [confirming, setConfirming] = useState(false)')
     expect(testSendBody).toContain('内容を確認')
     expect(testSendBody).toContain('selectedFriend?.displayName')
-    expect(testSendBody).toContain('テスト送信を開始')
+    expect(testSendBody).toContain('テストを送る')
   })
 
   it('詳細画面から、送る通を渡す', () => {

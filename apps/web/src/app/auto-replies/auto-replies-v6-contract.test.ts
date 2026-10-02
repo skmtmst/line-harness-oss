@@ -25,13 +25,34 @@ describe('V6 自動応答一覧の契約', () => {
     expect(EDITOR).toContain('folderId: folderId || null')
   })
 
-  it('優先順位の候補外の保存値は「1」へ化けず、そのまま見せる（AUTOREPLY-07）', () => {
-    // option の無い value を持つ select はブラウザが先頭候補を表示する。
-    // 保存値 30 が「1（高いほど先に判定）」に見えていたので、候補外のときは
-    // 値そのものの option を足す。値は書き換えない。
-    expect(EDITOR).toContain('PRIORITY_CANDIDATES')
-    expect(EDITOR).toContain('!PRIORITY_CANDIDATES.includes(Number(priority))')
-    expect(EDITOR).toContain('（現在の保存値・候補外）')
+  it('窓の中では順番の数字を打たせず位置と先に当たるルールだけ出す（R28）', () => {
+    // R28（2026-09-27 監査）：「高いほど先に判定」と「小さいほど先」が
+    // 同じ窓に混在し、実際の判定（小さいほど先）と食い違っていた。
+    // 順番は一覧の上下入れ替えで決め、窓の中では数字の入力・選択を置かない。
+    expect(EDITOR).not.toContain('PRIORITY_CANDIDATES')
+    expect(EDITOR).not.toContain('高いほど先に判定')
+    expect(EDITOR).not.toContain('id="ar-priority"')
+    expect(EDITOR).toContain('orderHint')
+    expect(EDITOR).toContain('一覧の上から順に1つだけ動きます')
+    expect(EDITOR).toContain('このルールより先に当たるかもしれないルール')
+  })
+
+  it('順番は一覧の「評価順」で上下を入れ替えて決める（R28）', () => {
+    // 新しい口は足さず、既存の更新口で隣と数字を交換する。
+    expect(LIST).toContain('movePriorityUpdates')
+    expect(LIST).toContain('1つ上へ')
+    expect(LIST).toContain('1つ下へ')
+    expect(LIST).toContain("sortKey === 'priority'")
+  })
+
+  it('一致方法の選択は送る行にも載る（R29）', () => {
+    // R29（2026-09-27 監査）：部分一致を選んでも行だけ完全一致のまま
+    // 保存され、判定側（行を優先）が拾わなかった。選び直したら全行へ載せ、
+    // 足した行はいまの選択を引き継ぎ、空行は落として送る。
+    expect(EDITOR).toContain('applyMatchType')
+    expect(EDITOR).toContain('initialMatchType')
+    expect(EDITOR).toContain('emptyKeywordRule(matchType)')
+    expect(EDITOR).toContain('effectiveRules')
   })
 
   it('フォルダの未取得を0件に見せず、同じ編集画面で再取得できる', () => {
@@ -65,8 +86,9 @@ describe('V6 自動応答一覧の契約', () => {
   })
 
   it('一覧を設計の6列に収め、ルール名の下に一致方法と返信の要約を出す', () => {
-    for (const heading of ['ルール名', '状態', 'どんなときに動くか', '何を返すか', '今月の応答', '操作']) {
-      expect(LIST).toContain(`>${heading}</th>`)
+    // ★V7（2026-09-24）：「どんなときに動くか」「何を返すか」は2行に折れていたので短い見出しへ。
+    for (const heading of ['ルール名', '状態', '条件', '返すもの', '今月の応答', '操作']) {
+      expect(LIST).toContain(`>${heading}</Th>`)
     }
     expect(LIST).toContain('ruleSubtitle(r,')
     expect(LIST).toContain('table-fixed')
@@ -76,9 +98,13 @@ describe('V6 自動応答一覧の契約', () => {
   it('URL編集は5段と設定内容・LINEプレビューを持つページ表示にする', () => {
     expect(EDIT_PAGE).toContain('<EditDialog')
     expect(EDIT_PAGE).toContain('page')
-    for (const word of ['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認', 'LINEプレビュー']) {
+    // R28・監査の直し：窓の中の順番は「優先順位」ではなく「動く順番」（一覧の上下で決める）。
+    for (const word of ['基本設定', 'どんなときに動くか', '何を返すか', '動く順番', '確認']) {
       expect(EDITOR).toContain(word)
     }
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(EDITOR).toContain("@/components/shared/line-preview'")
+    expect(EDITOR).toContain('<LinePreview')
     expect(EDITOR).not.toContain('Flex（JSONを直接書く）')
     expect(EDITOR).not.toContain('画像（JSONを直接書く）')
   })
@@ -113,7 +139,8 @@ describe('V6 自動応答一覧の契約', () => {
       expect(PUBLISH).toContain(word)
     }
     expect(PUBLISH).toContain('conflicts.map((conflict, index)')
-    expect(PUBLISH).toContain('LINEプレビュー')
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(PUBLISH).toContain('<AutoReplyPreview')
   })
 
   it('試験結果は候補の優先順位・動かない理由・解除条件と対応中の抑止を説明する', () => {
@@ -136,7 +163,8 @@ describe('V6 自動応答一覧の契約', () => {
     expect(EDITOR).toContain('対応中が解除されるとあらためて動きます')
     expect(EDITOR).toContain('予約・支払いなどの自動通知は別の送信経路なので止まりません')
     // ページ表示（5段の編集画面）でも抑止設定を変えられる。
-    expect(EDITOR).toContain('setSkipWhenOperatorActive(event.target.checked)')
+    // m20j: 共通 Checkbox（onCheckedChange）へ寄せたため、素の event 式ではなく setter の配線を見る。
+    expect(EDITOR).toContain('setSkipWhenOperatorActive')
   })
 
   it('有効化完了の一時停止と複製を実口へ接続する（NEXT-20）', () => {

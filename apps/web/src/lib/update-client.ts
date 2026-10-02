@@ -46,14 +46,10 @@ function adminKey(): string {
 }
 
 export async function getCurrentVersion(): Promise<CurrentVersion> {
-  const r = await fetch(`${API_URL}/admin/version`)
-  if (!r.ok) throw new Error(`version fetch failed ${r.status}`)
-  const j = (await r.json()) as {
-    version: string
-    worker_hash: string
-    admin_hash: string
-    liff_hash: string
-  }
+  // 共通メニューのいちばん上と同じ版番号を共有する（2回取らない）。
+  const { loadAdminVersionDetail } = await import('./admin-version-cache')
+  const j = await loadAdminVersionDetail()
+  if (!j.version) throw new Error('version fetch failed')
   return {
     version: j.version,
     worker_hash: j.worker_hash,

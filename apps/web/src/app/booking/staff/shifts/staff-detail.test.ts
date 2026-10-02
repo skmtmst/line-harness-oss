@@ -49,17 +49,19 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
     }
   })
 
-  it('休憩は曜日ごとに複数持てて、保存前は枠に反映されないと明示する', () => {
+  it('休憩は曜日ごとに複数持てて、枠から除くことを明示する(R164)', () => {
+    // R164 で枠への反映を実装したため、未対応の断りは残さない。
     expect(DETAIL).toContain('bookingApi.getBreaks(selectedAccountId, staffId)')
     expect(DETAIL).toContain('bookingApi.putBreaks(')
     expect(DETAIL).toContain('setBreakError(staffErrorMessage(error,')
-    expect(DETAIL).toContain('保存はできますが、まだ予約枠には反映されません')
+    expect(DETAIL).toContain('休憩の時間は予約枠から除きます')
+    expect(DETAIL).not.toContain('まだ予約枠には反映されません')
     expect(DETAIL).not.toContain('availability.ts')
   })
 
   /*
-    曜日指定と日付指定の休憩は「同じ理由で同じく予約枠へ反映されない」。
-    片方にだけ注記があると、運用者は注記の無いほうを「反映される」と読む。
+    曜日指定と日付指定の休憩は「同じ理由で同じく予約枠から除く」。
+    片方にだけ注記があると、運用者は注記の無いほうを「除かない」と読む。
     見出しの直後の説明文だけを切り出して見るので、別の節に同じ文が
     あっても通らない。文言は2つの節で一字一句そろえる。
   */
@@ -73,15 +75,15 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
     return DETAIL.slice(DETAIL.indexOf('>', open) + 1, close)
   }
 
-  it('休憩は曜日指定も日付指定も、枠へ反映されないことを同じ文言で断る', () => {
-    const NOT_REFLECTED = '保存はできますが、まだ予約枠には反映されません。'
+  it('休憩は曜日指定も日付指定も、枠から除くことを同じ文言で言う', () => {
+    const EXCLUDED = '休憩の時間は予約枠から除きます。'
     const weekly = noteUnderHeading('>休憩</h2>')
     const byDate = noteUnderHeading('>この日だけの休憩</h3>')
-    expect(weekly).toContain(NOT_REFLECTED)
-    expect(byDate).toContain(NOT_REFLECTED)
+    expect(weekly).toContain(EXCLUDED)
+    expect(byDate).toContain(EXCLUDED)
     // 「別の話かもしれない」と読まれないよう、言い換えを許さない。
-    expect(weekly.slice(weekly.indexOf('保存はできますが')))
-      .toBe(byDate.slice(byDate.indexOf('保存はできますが')))
+    expect(weekly.slice(weekly.indexOf('休憩の時間は')))
+      .toBe(byDate.slice(byDate.indexOf('休憩の時間は')))
   })
 
   it('休憩は版付きで保存し、重なったら最新へ描き直す', () => {
@@ -128,6 +130,16 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
     expect(DETAIL).not.toContain('new Date(shift.work_date)')
   })
 
+  it('14日の予約枠は初日の曜日ぶん空けて月曜始まりの列へ置く(R163)', () => {
+    // 列見出しは月〜日で固定。今日から14日を余白なしで並べると、
+    // 日曜に開いたときに日付と曜日の列がずれる。
+    expect(DETAIL).toContain('previewLeadBlanks')
+    expect(DETAIL).toContain('(weekdayOf(previewDates[0]) + 6) % 7')
+    expect(DETAIL).toContain('aria-hidden="true"')
+    // 月またぎの位置が分かるよう、月の初めと先頭は「月/日」で出す。
+    expect(DETAIL).toContain('formatDay(item.date)')
+  })
+
   it('日別シフトがある日は優先、ない日はいつもの時間、外の予定は枠を閉じる', () => {
     expect(DETAIL).toContain('ある日は、いつもの勤務時間よりこちらが優先されます')
     expect(DETAIL).toContain('外の予定は枠を閉じます')
@@ -143,9 +155,12 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
     }
   })
 
-  it('キーボードで操作でき、日付と時刻は専用の入力を使う', () => {
-    expect(DETAIL).toContain('type="date"')
-    expect(DETAIL).toContain('type="time"')
+  it('キーボードで操作でき、日付と時刻は★V7の部品を使う', () => {
+    expect(DETAIL).toContain('DateField')
+    expect(DETAIL).toContain('TimeField')
+    expect(DETAIL).toContain('date-field')
+    expect(DETAIL).not.toContain('type="date"')
+    expect(DETAIL).not.toContain('type="time"')
     expect(DETAIL).toContain('aria-label=')
   })
 })

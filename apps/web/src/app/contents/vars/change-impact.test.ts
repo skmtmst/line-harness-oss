@@ -126,7 +126,7 @@ describe('保存が落ちた理由を、運用者の言葉で出す', () => {
   it('どの理由でも「保存に失敗しました」だけでは終わらせない', () => {
     const texts = [403, 404, 409, 500].map((s) => saveErrorText(new ApiError(s)))
     for (const text of texts) {
-      expect(text).not.toBe('保存に失敗しました')
+      expect(text).not.toBe('保存に失敗しました。通信を確かめて、もう一度お試しください。')
       expect(text.length).toBeGreaterThan(12)
     }
   })
@@ -264,7 +264,7 @@ describe('取れないものは、取れないと書く', () => {
 describe('共通情報編集（uNBlA）の画面', () => {
   it('保存の catch は一言で片付けず、理由を作る関数を通す', () => {
     expect(SAVE_FN).toContain('setError(saveErrorText(e))')
-    expect(SAVE_FN).not.toContain("setError('保存に失敗しました')")
+    expect(SAVE_FN).not.toContain("setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')")
   })
 
   it('予約の catch は生文言を出さず、予約用の変換を通す（#578 L7）', () => {
@@ -294,7 +294,7 @@ describe('共通情報編集（uNBlA）の画面', () => {
     expect(IMPACT_SECTION).toContain('changeSummaryText(impact)')
     expect(IMPACT_SECTION).toContain('historicalText(impact)')
     expect(IMPACT_SECTION).toContain('usageGroups.map')
-    expect(IMPACT_SECTION).toContain('group.count.toLocaleString')
+    expect(IMPACT_SECTION).toContain('formatNumber(group.count')
   })
 
   it('1件ずつ見る画面では、保存後の文を作れない行を空文字で埋めない', () => {

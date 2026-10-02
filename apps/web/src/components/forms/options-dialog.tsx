@@ -11,10 +11,14 @@
  */
 
 import type { FormAction, FormOptions } from '@line-crm/shared'
+import styles from './options-dialog.module.css'
 import ActionEditor from './action-editor'
 import { describeAction } from './form-update-summary'
 import { fieldInput, type FormRefs } from './form-refs'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import DateTimeField from '@/components/shared/date-time-field'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 /**
  * 期限を初めてONにしたときの初期値。日本時間で「7日後の23:59」。
@@ -40,6 +44,13 @@ export default function OptionsDialog({
   onSave: () => Promise<void>
 }) {
   const patch = (next: Partial<FormOptions>) => onChange({ ...value, ...next })
+  /*
+   * R198: 開いている間はTab/Shift+Tabを窓の中に閉じ込め、Escで閉じる。
+   * 呼び出し元（編集画面）は条件付きで描画しているので、描画中＝開いている。
+   * 閉じたあとのフォーカスは、開く前の場所（公開ボタンなど）へ戻す。
+   * 共通の窓制御と同じ作法にする（shared/overlay-utils）。
+   */
+  const panelRef = useOverlayFocus(true, onClose)
 
   return (
     <div
@@ -49,8 +60,16 @@ export default function OptionsDialog({
       aria-modal="true"
       aria-label="オプション設定"
     >
-      <div className="bg-canvas w-full overflow-hidden rounded-panel shadow-lg" style={{ marginBlock: 74, height: 900, maxWidth: 880 }}>
-        <div className="border-hairline flex items-center justify-between border-b px-5 py-3">
+      {/*
+        R26: 高さ900・幅880の固定をやめる。390pxの画面では窓が画面の外へ出て、
+        閉じる口まで届かなかった。縦は画面に収め、中身だけを中で流す。
+        寸法は options-dialog.module.css にだけ置く（任意値にしない）。
+      */}
+      <div
+        ref={panelRef}
+        className={`bg-canvas flex w-full flex-col overflow-hidden rounded-panel shadow-float ${styles.panel}`}
+      >
+        <div className="border-hairline flex shrink-0 items-center justify-between border-b px-5 py-3">
           <div>
             <h2 className="text-ink text-base font-bold">オプション設定</h2>
             <p className="mt-0.5 text-xs text-ink-faint">答え終わったあとの動きと、受付のきまり</p>
@@ -60,15 +79,19 @@ export default function OptionsDialog({
           </button>
         </div>
 
-        <div className="overflow-y-auto px-6 py-4" style={{ maxHeight: 760 }}>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
           <section>
             <h3 className="text-ink text-sm font-bold">答え終わったあと</h3>
             <div className="bg-canvas-sunken mt-3 rounded-control p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-ink text-xs font-bold">実行すること</p>
-                <details className="group">
-                  <summary className="border-accent text-accent rounded-control cursor-pointer list-none border px-3 py-2 text-xs font-medium">アクションを設定</summary>
-                  <div className="mt-3 p-3 shadow-lg" style={{ minWidth: 680, background: 'var(--color-canvas)' }}>
+              {/*
+                R26: 動作の欄の最小幅680をやめる。390pxの画面ではタグ選択と
+                削除が画面の外へ出ていた。幅いっぱいに広げ、中の行は折り返す。
+              */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <p className="text-ink text-xs font-medium">実行すること</p>
+                <details className="group min-w-0">
+                  <summary className="border-accent text-accent-deep rounded-control inline-block cursor-pointer list-none border px-3 py-2 text-xs font-medium">アクションを設定</summary>
+                  <div className="bg-canvas mt-3 min-w-0 p-3 shadow-float">
                     <ActionEditor value={value.afterActions ?? []} onChange={(afterActions: FormAction[]) => patch({ afterActions })} refs={refs} />
                   </div>
                 </details>
@@ -86,7 +109,7 @@ export default function OptionsDialog({
             </div>
           </section>
 
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FieldLine label="答えたあとに開くページ（任意）"><input type="url" value={value.thanksUrl ?? ''} onChange={(e) => patch({ thanksUrl: e.target.value || null })} placeholder="https://..." className={fieldInput} /></FieldLine>
             <FieldLine label="ページを使わないときに出す文"><input value={value.thanksText ?? ''} onChange={(e) => patch({ thanksText: e.target.value })} placeholder="ご回答ありがとうございました。" className={fieldInput} /></FieldLine>
           </div>
@@ -101,14 +124,14 @@ export default function OptionsDialog({
             </div>
           </section>
 
-          {value.deadline?.enabled && <div className="bg-accent-soft mt-2 grid grid-cols-2 gap-3 rounded-control p-3">
-            <FieldLine label="受付の期限"><input type="datetime-local" value={value.deadline.endsAt ?? ''} onChange={(e) => patch({ deadline: { ...value.deadline, enabled: true, endsAt: e.target.value } })} className={fieldInput} /></FieldLine>
+          {value.deadline?.enabled && <div className="bg-accent-soft mt-2 grid grid-cols-1 gap-3 rounded-control p-3 sm:grid-cols-2">
+            <FieldLine label="受付の期限"><DateTimeField aria-label="受付の期限" value={value.deadline.endsAt ?? ''} onChange={(v) => patch({ deadline: { ...value.deadline, enabled: true, endsAt: v } })} /></FieldLine>
             <FieldLine label="期限を過ぎた人に出す文"><input type="text" value={value.deadline.message ?? ''} onChange={(e) => patch({ deadline: { ...value.deadline, enabled: true, message: e.target.value } })} className={fieldInput} /></FieldLine>
           </div>}
 
           <section className="mt-4">
             <h3 className="text-ink text-sm font-bold">見た目の言葉</h3>
-            <div className="mt-2 grid grid-cols-3 gap-3"><FieldLine label="ページの題名">
+            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3"><FieldLine label="ページの題名">
             <input
               type="text"
               value={value.pageTitle ?? ''}
@@ -124,7 +147,7 @@ export default function OptionsDialog({
                 type="text"
                 value={value.submitLabel ?? ''}
                 onChange={(e) => patch({ submitLabel: e.target.value })}
-                placeholder="送信"
+                placeholder="送信する"
                 className={fieldInput}
                 style={{ maxWidth: '10rem' }}
                 aria-label="送信ボタンの文字"
@@ -135,7 +158,7 @@ export default function OptionsDialog({
           </section>
         </div>
 
-        <div className="border-hairline flex justify-end gap-2 border-t px-5 py-3">
+        <div className="border-hairline flex shrink-0 justify-end gap-2 border-t px-5 py-3">
           <Button variant="primary" onClick={() => void onSave()}>
             保存する
           </Button>
@@ -146,9 +169,9 @@ export default function OptionsDialog({
 }
 
 function OptionCard({ checked, onChange, label, note }: { checked: boolean; onChange: (next: boolean) => void; label: string; note: string }) {
-  return <label className={`rounded-control border p-3 ${checked ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><span className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />{label}</span><span className="text-ink-faint ml-6 mt-1 block text-xs">{note}</span></label>
+  return <Checkbox checked={checked} onCheckedChange={onChange} description={note} className="rounded-control border border-hairline p-3">{label}</Checkbox>
 }
 
 function FieldLine({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label><span className="text-accent mb-1 block text-xs font-medium">{label}</span>{children}</label>
+  return <label><span className="text-ink-secondary mb-1 block text-xs font-medium">{label}</span>{children}</label>
 }

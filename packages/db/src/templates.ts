@@ -466,10 +466,52 @@ interface TemplatePublishKeyRecord {
  * - 公開版の更新とキー記録は `db.batch` の単一原子操作で行う。
  *   途中障害・並行要求で版だけ進むことはない(独立審査P1)。
  */
+/**
+ * 466: 公開が決まった内容を版履歴へ1行足す。前の版は変えない。
+ * 公開の原子操作のあとに足す。ここで落ちたら公開ごと500にし、
+ * 版だけ進んだ公開を残さない（黙って履歴欠けにしない）。
+ */
+async function recordPublishedVersion(
+  db: D1Database,
+  row: TemplateRow,
+  versionNumber: number,
+  options: { effectiveFrom?: string; createdByStaffId?: string | null },
+  now: string,
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO template_versions
+       (id, template_id, version_number, message_type, message_content,
+        carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
+        question_json, question_status, effective_from, created_by_staff_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(),
+    row.id,
+    versionNumber,
+    row.message_type,
+    row.message_content,
+    row.carousel_actions_json,
+    row.carousel_tap_limit_mode,
+    row.carousel_tap_limit_text,
+    row.question_json,
+    row.question_status,
+    options.effectiveFrom ?? now,
+    options.createdByStaffId ?? null,
+    now,
+  ).run();
+}
+
 export async function publishTemplate(
   db: D1Database,
   id: string,
-  options: { expectedVersion?: number; expectedDraftRevision?: number; idempotencyKey?: string } = {},
+  options: {
+    expectedVersion?: number;
+    expectedDraftRevision?: number;
+    idempotencyKey?: string;
+    /** 使い始めの日時。空なら公開と同時。 */
+    effectiveFrom?: string;
+    createdByStaffId?: string | null;
+  } = {},
 ): Promise<TemplatePublishResult> {
   const current = await getTemplateById(db, id);
   if (!current) throw new Error('TEMPLATE_NOT_FOUND');
@@ -633,6 +675,8 @@ export async function publishTemplate(
   if (!next || Number(next.published_version) !== nextVersion) {
     throw new Error('TEMPLATE_VERSION_CONFLICT');
   }
+  // 466: 公開のたびに版を1行足す。前の版は変えない。
+  await recordPublishedVersion(db, next, nextVersion, options, now);
   return { row: next, published: true, replayed: false };
 }
 
@@ -947,7 +991,8 @@ export async function getTemplatesWithUsageCount(
   // （または未設定）の使用先だけを数える。詳細の getTemplateUsage と
   // 同じ粒度・同じ境界にしないと「一覧の数」と「詳細の件数」がずれる
   // （#891 N-135/142/143）。
-  const relationalRes = await db.prepare(
+  // D1 の compound SELECT 上限(5項)を超えないよう2本に分けて問い合わせる。
+  const relationalResA = await db.prepare(
     `SELECT template_id, acct FROM (
        SELECT template_id, line_account_id AS acct FROM auto_replies WHERE template_id IS NOT NULL AND deleted_at IS NULL
        UNION ALL
@@ -958,6 +1003,19 @@ export async function getTemplatesWithUsageCount(
        SELECT rs.template_id, r.line_account_id AS acct
          FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id
         WHERE rs.template_id IS NOT NULL
+     ) references_by_kind`,
+  ).all<{ template_id: string; acct: string | null }>();
+  const relationalResB = await db.prepare(
+    `SELECT template_id, acct FROM (
+       -- R347: 旧公開版に固定された送信待ち・取消ずみ（再開できる）の登録も
+       -- 1登録1件で数える。版を切り替えても使用先が0件に見えないようにする。
+       -- 手順単位ではなく登録単位にまとめる（使用先の件数とずらさない）。
+       SELECT rvs.template_id, r.line_account_id AS acct
+         FROM friend_reminders fr
+         JOIN reminders r ON r.id = fr.reminder_id
+         JOIN reminder_version_steps rvs ON rvs.reminder_version_id = fr.reminder_version_id
+        WHERE rvs.template_id IS NOT NULL AND fr.status IN ('active', 'cancelled')
+        GROUP BY rvs.template_id, fr.id
        UNION ALL
        SELECT a.template_id, g.account_id AS acct
          FROM rich_menu_areas a
@@ -968,6 +1026,7 @@ export async function getTemplatesWithUsageCount(
        SELECT template_id, line_account_id AS acct FROM tracked_links WHERE template_id IS NOT NULL
      ) references_by_kind`,
   ).all<{ template_id: string; acct: string | null }>();
+  const relationalRows = [...(relationalResA.results ?? []), ...(relationalResB.results ?? [])];
 
   // 使用先1件を (template_id, 使用先のアカウント) の行として集める。
   const usageRefs = new Map<string, Array<string | null>>();
@@ -976,7 +1035,7 @@ export async function getTemplatesWithUsageCount(
     if (list) list.push(acct);
     else usageRefs.set(templateId, [acct]);
   };
-  for (const r of relationalRes.results ?? []) addRef(r.template_id, r.acct);
+  for (const r of relationalRows) addRef(r.template_id, r.acct);
 
   // 3. automations の actions JSON を取って template_id を抽出。
   // 詳細側は「そのテンプレートを使うオートメーション」を1件として

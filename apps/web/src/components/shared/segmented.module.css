@@ -1,0 +1,68 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * 切り替え（3つ）（Pencil ★V8 `dtJVi`）。
+ *
+ *   器：track の地（#1d1d1f0a）・border-soft の枠・余白 2・間隔 2・
+ *     角丸 control（高さ 36。Pencil は余白 3→2 に更新済み）
+ *   つまみ（選択中）：canvas の白・角丸 8・薄い影・中の文字 13/600 ink
+ *   未選択：文字 13/500 ink-secondary（地は器の track が透ける）
+ *   つまみは前の位置から 120ms で滑って着く。
+ *   V8 で新たに生えた部品のため v7 側の規定は持たない。
+ */
+
+.root {
+  position: relative;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  /* 枠は高さ（36）を変えないよう内側の影で引く（border だと 38 になる）。 */
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-track);
+  box-shadow: var(--shadow-segment-ring);
+}
+
+/* 白いつまみ。選択項目の後ろへ位置・幅を JS で合わせる。 */
+.thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  border-radius: var(--radius-segment);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-segment-thumb);
+  transition: transform var(--motion-fast) ease-out, width var(--motion-fast) ease-out;
+  pointer-events: none;
+}
+
+.item {
+  position: relative;
+  z-index: 1;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: var(--radius-segment);
+  background: transparent;
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  transition: color var(--motion-fast) ease-out;
+}
+
+.item:hover {
+  color: var(--color-ink);
+}
+
+.selected,
+.selected:hover {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+}
