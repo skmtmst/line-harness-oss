@@ -94,6 +94,33 @@ const PATHS = {
     <path key="a" d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />,
     <path key="b" d="m2 2 20 20" />,
   ],
+  /** ★V8 読み込めなかった時の印 (通信が切れた電波) */
+  'wifi-off': [
+    <path key="a" d="M8.5 16.5a5 5 0 0 1 7 0" />,
+    <path key="b" d="M2 8.82a15 15 0 0 1 4.17-2.65" />,
+    <path key="c" d="M10.66 5c4.01-.36 8.14.9 11.34 3.76" />,
+    <path key="d" d="M16.85 11.25a10 10 0 0 1 2.22 1.68" />,
+    <path key="e" d="M5 13a10 10 0 0 1 5.24-2.76" />,
+    <path key="f" d="m2 2 20 20" />,
+    <path key="g" d="M12 20h.01" />,
+  ],
+  /** ★V8 上の帯の閉じる印 */
+  x: [<path key="a" d="M18 6 6 18" />, <path key="b" d="m6 6 12 12" />],
+  /** ★V8 上の帯のメニュー印 (…) */
+  ellipsis: [
+    <circle key="a" cx="12" cy="12" r="1" />,
+    <circle key="b" cx="19" cy="12" r="1" />,
+    <circle key="c" cx="5" cy="12" r="1" />,
+  ],
+  /** ★V8 その期間に空きが無い時の印 (暦＋×) */
+  'calendar-x': [
+    <path key="a" d="M8 2v4" />,
+    <path key="b" d="M16 2v4" />,
+    <rect key="r" width="18" height="18" x="3" y="4" rx="2" />,
+    <path key="c" d="M3 10h18" />,
+    <path key="d" d="m14 14-4 4" />,
+    <path key="e" d="m10 14 4 4" />,
+  ],
   /** お店への連絡の案内 */
   'message-circle': [<path key="a" d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />],
   /** 担当 (1人) */
