@@ -3882,6 +3882,10 @@ export type ReminderDeliveryRunsResponse = {
     errors: number
     targetCount: number
     nextScheduledAt: string | null
+    /** 日本時間の当月に送信済みの件数。 */
+    sentThisMonth: number
+    /** 今後7日以内（期限切れの未送分を含む）に送る予定の件数。 */
+    scheduledNext7Days: number
   }
   steps: Array<{
     id: string
