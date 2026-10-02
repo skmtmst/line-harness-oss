@@ -104,6 +104,7 @@ import { richMenus } from './routes/rich-menus.js';
 import { trackedLinks } from './routes/tracked-links.js';
 import { entryRoutes } from './routes/entry-routes.js';
 import { forms } from './routes/forms.js';
+import { postalCode } from './routes/postal-code.js';
 import { adPlatforms } from './routes/ad-platforms.js';
 import { adCosts } from './routes/ad-costs.js';
 import { webMeasurement } from './routes/web-measurement.js';
@@ -523,6 +524,7 @@ app.route('/', richMenus);
 app.route('/', trackedLinks);
 app.route('/', entryRoutes);
 app.route('/', forms);
+app.route('/', postalCode);
 app.route('/', adPlatforms);
 app.route('/', adCosts);
 // Web計測の公開口と計測サイトの管理(#819)。
