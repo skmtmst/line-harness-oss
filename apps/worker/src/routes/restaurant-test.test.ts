@@ -986,6 +986,20 @@ describe('飲食店向けテストAPI', () => {
     expect(conflict.status).toBe(409);
   });
 
+  it('卓の位置と結合を保存し、省略時は保持・nullで結合を解除する', async () => {
+    seedRestaurantFixture();
+    const path = '/api/restaurant-test/tables/table-ginza?account_id=account-1';
+    expect((await requestWithMethod(path, 'PATCH', { floorX: 0, floorY: 120, joinGroup: '組1' })).status).toBe(200);
+    expect((await requestWithMethod(path, 'PATCH', { label: '配置済み' })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT floor_x, floor_y, join_group FROM rt_tables WHERE id = ?').get('table-ginza'))
+      .toEqual({ floor_x: 0, floor_y: 120, join_group: '組1' });
+    expect((await requestWithMethod(path, 'PATCH', { joinGroup: null })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT join_group FROM rt_tables WHERE id = ?').get('table-ginza')).toEqual({ join_group: null });
+    for (const body of [{ floorX: 1.5 }, { floorY: null }, { joinGroup: 3 }]) {
+      expect((await requestWithMethod(path, 'PATCH', body)).status).toBe(400);
+    }
+  });
+
   it('R107: 卓を変更・停止・再開しても予約の参照を残し、別組織の卓は変更しない', async () => {
     seedRestaurantFixture();
     const path = '/api/restaurant-test/tables/table-ginza?account_id=account-1';
