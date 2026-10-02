@@ -587,7 +587,7 @@ restaurantTest.get('/api/restaurant-test/snapshot', requireRole('owner', 'admin'
     dbFor(c.env).prepare(`SELECT i.* FROM rt_inventory_slots i JOIN rt_stores s ON s.id = i.store_id
       WHERE s.organization_id = ? AND (? IS NULL OR s.id = ?)
       ORDER BY i.starts_at LIMIT 300`).bind(orgId, scopedStoreId, scopedStoreId).all(),
-    dbFor(c.env).prepare(`SELECT m.* FROM rt_menu_items m JOIN rt_stores s ON s.id = m.store_id
+    dbFor(c.env).prepare(`SELECT m.*, (SELECT after_price FROM rt_menu_change_requests r WHERE r.menu_id = m.id AND r.status = 'pending') AS pendingPrice FROM rt_menu_items m JOIN rt_stores s ON s.id = m.store_id
       WHERE s.organization_id = ? AND (? IS NULL OR s.id = ?)
       ORDER BY m.kind, m.name`).bind(orgId, scopedStoreId, scopedStoreId).all(),
     dbFor(c.env).prepare(`SELECT x.* FROM rt_connector_status x JOIN rt_stores s ON s.id = x.store_id
@@ -915,16 +915,22 @@ restaurantTest.patch('/api/restaurant-test/approvals/:id', requireRole('owner', 
   const body = await c.req.json<{ action?: string; comment?: string }>();
   const status = body.action === 'approve' ? 'approved' : body.action === 'return' ? 'returned' : null;
   if (!status) return c.json({ success: false, error: 'action は approve または return です' }, 400);
+  if (status === 'returned' && (typeof body.comment !== 'string' || !body.comment.trim())) {
+    return c.json({ success: false, error: '差し戻しの理由を入力してください' }, 400);
+  }
+  if (body.comment !== undefined && typeof body.comment !== 'string') return c.json({ success: false, error: 'コメントは文字列で入力してください' }, 400);
   const staff = c.get('staff');
   const result = await dbFor(c.env).prepare(`UPDATE rt_approval_requests
     SET status = ?, review_comment = ?, reviewed_by = ?, updated_at = datetime('now')
     WHERE id = ? AND organization_id = ? AND (? IS NULL OR store_id = ?)
-      AND status IN ('pending', 'returned')`).bind(
+      AND status = 'pending'`).bind(
       status, body.comment?.trim() || null, staff?.name || staff?.id || '管理者', c.req.param('id'), organization.id,
       organization.scopedStoreId, organization.scopedStoreId,
     ).run();
   if (!result.meta.changes) return c.json({ success: false, error: '対象が無いか、すでに処理済みです' }, 409);
-  return c.json({ success: true, data: { id: c.req.param('id'), status } });
+  const change = await dbFor(c.env).prepare('SELECT status, failure_reason FROM rt_menu_change_requests WHERE approval_id = ?')
+    .bind(c.req.param('id')).first<{ status: string; failure_reason: string | null }>();
+  return c.json({ success: true, data: { id: c.req.param('id'), status, menuChangeStatus: change?.status ?? null, failureReason: change?.failure_reason ?? null } });
 });
 
 async function acquireLock(db: D1Database, key: string, owner: string): Promise<boolean> {
@@ -1387,7 +1393,7 @@ restaurantTest.patch('/api/restaurant-test/memberships/:id', requireRole('owner'
   return c.json({ success: true, data: { id: c.req.param('id') } });
 });
 
-restaurantTest.patch('/api/restaurant-test/menu/:id', requireRole('owner', 'admin'), async (c) => {
+const updateRestaurantMenu = async (c: Context<Env>) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
@@ -1407,10 +1413,29 @@ restaurantTest.patch('/api/restaurant-test/menu/:id', requireRole('owner', 'admi
     || (body.servicePeriods !== undefined && (!Array.isArray(body.servicePeriods) || body.servicePeriods.some((item) => !['lunch', 'dinner'].includes(item))))) {
     return c.json({ success: false, error: 'メニューの入力内容が正しくありません' }, 400);
   }
-  await dbFor(c.env, current.store_id).prepare(`UPDATE rt_menu_items SET kind = ?, name = ?, price = ?, allergens_json = ?, service_periods_json = ?, status = ?, updated_at = datetime('now') WHERE id = ?`)
-    .bind(kind, name.trim(), price, body.allergens === undefined ? current.allergens_json : JSON.stringify(body.allergens), body.servicePeriods === undefined ? current.service_periods_json : JSON.stringify(body.servicePeriods), status, c.req.param('id')).run();
-  return c.json({ success: true, data: { id: c.req.param('id') } });
-});
+  const db = dbFor(c.env, current.store_id);
+  const approvalId = price !== current.price ? crypto.randomUUID() : null;
+  const requestId = approvalId ? crypto.randomUUID() : null;
+  const writes = [db.prepare(`UPDATE rt_menu_items SET kind = ?, name = ?, allergens_json = ?, service_periods_json = ?, status = ?, updated_at = datetime('now') WHERE id = ?`)
+    .bind(kind, name.trim(), body.allergens === undefined ? current.allergens_json : JSON.stringify(body.allergens), body.servicePeriods === undefined ? current.service_periods_json : JSON.stringify(body.servicePeriods), status, c.req.param('id'))];
+  if (approvalId) {
+    const requester = c.get('staff')?.id || '管理者';
+    writes.push(db.prepare(`INSERT INTO rt_approval_requests (id, organization_id, store_id, kind, title, status, payload_json, requested_by)
+      VALUES (?, ?, ?, 'menu_change', ?, 'pending', ?, ?)`).bind(approvalId, organization.id, current.store_id,
+      `${name.trim()}の価格変更`, JSON.stringify({ menuId: c.req.param('id'), beforePrice: current.price, afterPrice: price }), requester));
+    writes.push(db.prepare(`INSERT INTO rt_menu_change_requests (id, approval_id, menu_id, store_id, before_price, after_price, requested_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).bind(requestId, approvalId, c.req.param('id'), current.store_id, current.price, price, requester));
+  }
+  try {
+    await db.batch(writes);
+  } catch (error) {
+    if (/unique constraint/i.test(String(error))) return c.json({ success: false, error: 'このメニューの価格は申請中です。承認または差し戻しを待ってください' }, 409);
+    throw error;
+  }
+  return c.json({ success: true, data: { id: c.req.param('id'), approvalId, requestId, pendingPrice: approvalId ? price : null } });
+};
+restaurantTest.patch('/api/restaurant-test/menu/:id', requireRole('owner', 'admin'), updateRestaurantMenu);
+restaurantTest.patch('/api/restaurant-test/menus/:id', requireRole('owner', 'admin'), updateRestaurantMenu);
 
 restaurantTest.put('/api/restaurant-test/inventory/:id', requireRole('owner', 'admin'), async (c) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
@@ -1437,13 +1462,49 @@ restaurantTest.post('/api/restaurant-test/menu', requireRole('owner', 'admin'), 
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
-  const body = await c.req.json<{ storeId?: string; kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[] }>();
+  const body = await c.req.json<{ storeId?: string; kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[]; status?: string }>();
   if (!body.storeId || !await storeBelongsTo(c, organization.id, body.storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
   const price = Number(body.price);
   if (!['course', 'a_la_carte'].includes(body.kind || '') || !body.name?.trim() || !Number.isInteger(price) || price < 0) return c.json({ success: false, error: 'メニューの入力内容が正しくありません' }, 400);
+  const status = body.status ?? 'active';
+  if (!['draft', 'active'].includes(status)) return c.json({ success: false, error: '作成時の状態は下書きまたは公開です' }, 400);
   const id = crypto.randomUUID();
-  await dbFor(c.env, body.storeId).prepare('INSERT INTO rt_menu_items (id, store_id, kind, name, price, allergens_json, service_periods_json) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(id, body.storeId, body.kind, body.name.trim(), price, JSON.stringify(body.allergens || []), JSON.stringify(body.servicePeriods || ['dinner'])).run();
+  await dbFor(c.env, body.storeId).prepare('INSERT INTO rt_menu_items (id, store_id, kind, name, price, allergens_json, service_periods_json, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(id, body.storeId, body.kind, body.name.trim(), price, JSON.stringify(body.allergens || []), JSON.stringify(body.servicePeriods || ['dinner']), status).run();
   return c.json({ success: true, data: { id } }, 201);
+});
+
+restaurantTest.get('/api/restaurant-test/menus', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const storeId = c.req.query('storeId') || null;
+  if (storeId && !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  const rows = await dbFor(c.env, storeId).prepare(`SELECT m.*,
+    (SELECT after_price FROM rt_menu_change_requests r WHERE r.menu_id = m.id AND r.status = 'pending') AS pendingPrice
+    FROM rt_menu_items m JOIN rt_stores s ON s.id = m.store_id
+    WHERE s.organization_id = ? AND (? IS NULL OR m.store_id = ?) AND (? IS NULL OR m.store_id = ?)
+    ORDER BY m.kind, m.name`).bind(organization.id, organization.scopedStoreId, organization.scopedStoreId, storeId, storeId).all();
+  return c.json({ success: true, data: rows.results });
+});
+
+restaurantTest.delete('/api/restaurant-test/menus/:id', requireRole('owner', 'admin'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const db = dbFor(c.env);
+  const menu = await db.prepare(`SELECT m.id, m.status, m.published_once, m.publication_history_unknown FROM rt_menu_items m JOIN rt_stores s ON s.id = m.store_id
+    WHERE m.id = ? AND s.organization_id = ? AND (? IS NULL OR s.id = ?)`)
+    .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
+    .first<{ id: string; status: string; published_once: number; publication_history_unknown: number }>();
+  if (!menu) return c.json({ success: false, error: 'メニューが見つかりません' }, 404);
+  if (menu.publication_history_unknown) return c.json({ success: false, error: 'このメニューは過去の公開履歴を確認できません。削除せず停止してください' }, 409);
+  if (menu.status !== 'draft' || menu.published_once) return c.json({ success: false, error: '公開したメニューは削除できません。停止してください' }, 409);
+  const result = await db.prepare(`DELETE FROM rt_menu_items WHERE id = ? AND status = 'draft' AND published_once = 0 AND publication_history_unknown = 0
+    AND NOT EXISTS (SELECT 1 FROM rt_menu_change_requests WHERE menu_id = rt_menu_items.id)
+    AND NOT EXISTS (SELECT 1 FROM rt_reservations WHERE course_id = rt_menu_items.id)`)
+    .bind(menu.id).run();
+  if (!result.meta.changes) return c.json({ success: false, error: '申請や予約で使われているメニューは削除できません。停止してください' }, 409);
+  return c.json({ success: true, data: { id: menu.id } });
 });
 
 restaurantTest.post('/api/restaurant-test/gbp/posts', requireRole('owner', 'admin'), async (c) => {
