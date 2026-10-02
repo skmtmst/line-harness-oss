@@ -17,6 +17,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
+import { ApiError } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 
 const lineAccountsListApi = vi.hoisted(() => vi.fn())
@@ -281,5 +282,42 @@ describe('文言と実態の一致・書きかけの保護（実mount・#935）'
     const afterSave = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(afterSave)
     expect(afterSave.defaultPrevented).toBe(false)
+  })
+})
+
+describe('同時保存の競合（実mount・M507）', () => {
+  it('保存に開いたときの版を添える', async () => {
+    await mount()
+    await setBody('新しい本文')
+
+    await click(saveButton())
+    await settle()
+
+    expect(updateSettingApi).toHaveBeenCalledTimes(1)
+    expect(updateSettingApi.mock.calls[0][2]).toMatchObject({
+      bodyText: '新しい本文',
+      expectedUpdatedAt: '2026-01-01T00:00:00.000Z',
+    })
+  })
+
+  it('ほかの人が先に保存していたら黙って上書きせず、入力を残したまま理由を出す', async () => {
+    updateSettingApi.mockRejectedValueOnce(
+      new ApiError(409, 'ほかの人が先に設定を変えました。最新の内容を確認してから保存し直してください。', 'VERSION_CONFLICT', {
+        latest: { title: 'ほかの人の見出し', updatedAt: '2026-02-02T00:00:00.000Z' },
+      }),
+    )
+    await mount()
+    await setBody('自分の本文')
+
+    await click(saveButton())
+    await settle()
+
+    // 最新を読み直す（settings がもう一度呼ばれる）。
+    expect(settingsApi.mock.calls.length).toBeGreaterThan(1)
+    expect(container.textContent).toContain('ほかの人が先に保存しました')
+    // 入力は消えない。
+    expect(bodyTextarea().value).toBe('自分の本文')
+    // 保存は1回だけ（黙った上書きをしていない）。
+    expect(updateSettingApi).toHaveBeenCalledTimes(1)
   })
 })

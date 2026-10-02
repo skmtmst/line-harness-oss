@@ -45,10 +45,12 @@ export type LiffPreviewView = 'list' | 'calendar'
 /**
  * 予約設定の右パネルに出す、お客様のLINE画面のプレビュー。
  *
- * 構造・文言は `apps/liff/src/components/DateTimePicker.tsx`（★V7）にそろえる:
- * リストは「日時を選んでください」の下に日付の札が横に並び
+ * 構造・文言は `apps/liff/src/components/DateTimePicker.tsx`（★V8）にそろえる:
+ * 「日時を選んでください」の下に日付の札が並び
  * （枠の無い日は「満席」で押せない）、選んだ日の時刻ボタンが3列で並ぶ。
  * カレンダーは月の表（●空きあり／満／休＋印の見方）と選んだ日の時刻3列。
+ * 空きが無いときは実LIFF（★V8・ADutg）と同じく「この週は空きがありません」
+ * ＋次の手の案内を出す。
  * 読み込み中・失敗の見せ方も実LIFFの共通部品（`LoadingView`・
  * `LoadErrorView`・`apps/liff/src/lib/user-message.ts` の文言）と同じにする。
  * 失敗は題「読み込めませんでした」＋本文 LOAD_FAILED_MESSAGE
@@ -127,7 +129,13 @@ export default function LiffDateTimePreview({
               </p>
             </div>
           ) : available.length === 0 ? (
-            <p className="text-ink-faint mt-4 text-sm">この期間に空きはありません。</p>
+            <div className="mt-4 text-center">
+              {/* 実LIFF（★V8・ADutg）の空きなし：題＋次の手の案内。 */}
+              <p className="text-ink text-sm font-bold">この週は空きがありません</p>
+              <p className="text-ink-faint mt-1 text-xs leading-5">
+                次の週を見るか、担当を「指名なし」にすると見つかることがあります。
+              </p>
+            </div>
           ) : initialView === 'calendar' && selectedDay ? (
             <CalendarPreview
               month={selectedDay.slice(0, 7)}

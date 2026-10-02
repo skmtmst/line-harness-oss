@@ -780,6 +780,41 @@ const spec = {
         responses: { '200': { description: 'Tenant billing summary and plan entitlements' }, '404': { description: 'Tenant not found' } },
       },
     },
+    '/api/hq/billing/preview': {
+      get: {
+        tags: ['HQ Billing'], summary: 'プラン変更の参考額を取得（契約・DBは変更しない）',
+        parameters: [
+          { name: 'planKey', in: 'query', required: true, schema: { type: 'string', enum: ['light', 'standard', 'pro'] } },
+          { name: 'interval', in: 'query', required: true, schema: { type: 'string', enum: ['month', 'year'] } },
+        ],
+        responses: {
+          '200': {
+            description: '即時変更を仮定した参考額（Cache-Control: no-store）',
+            content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: {
+              type: 'object',
+              required: ['planKey', 'interval', 'afterAmountYen', 'amountDueYen', 'prorationDifferenceYen', 'nextBillingAt', 'estimatedAt', 'isEstimate', 'notice'],
+              properties: {
+                planKey: { type: 'string', enum: ['light', 'standard', 'pro'] },
+                interval: { type: 'string', enum: ['month', 'year'] },
+                afterAmountYen: { type: 'integer', description: '変更後の1回あたりの金額（単価×数量）' },
+                amountDueYen: { type: 'integer', description: '見積り請求書の請求予定額' },
+                prorationDifferenceYen: { type: 'integer', description: '日割りの差額' },
+                nextBillingAt: { type: ['string', 'null'], format: 'date-time' },
+                estimatedAt: { type: 'string', format: 'date-time' },
+                isEstimate: { type: 'boolean', const: true },
+                notice: { type: 'string' },
+              },
+            } } } } },
+          },
+          '400': { description: 'Invalid plan or interval' },
+          '403': { description: 'Owner role required' },
+          '404': { description: 'Tenant not found' },
+          '409': { description: 'No changeable subscription' },
+          '502': { description: 'Stripe price or preview unavailable' },
+          '503': { description: 'Stripe or price configuration unavailable' },
+        },
+      },
+    },
     '/api/hq/billing/checkout': {
       post: {
         tags: ['HQ Billing'], summary: 'Stripe Checkoutの申込URLを作成',
@@ -899,7 +934,7 @@ const spec = {
     },
     '/api/ops/announcements': {
       get: { tags: ['Ops Console'], summary: 'お知らせの一覧（下書き・予約・配信済み）', responses: { '200': { description: 'Announcements' } } },
-      post: { tags: ['Ops Console'], summary: 'お知らせを作る（下書き／予約／今すぐ送る）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['subject', 'body', 'channels'], properties: { subject: { type: 'string' }, body: { type: 'string' }, audienceKind: { type: 'string', enum: ['all', 'plan', 'tenants'] }, audiencePlans: { type: 'array', items: { type: 'string' } }, audienceTenantIds: { type: 'array', items: { type: 'string' } }, channels: { type: 'array', items: { type: 'string', enum: ['line', 'screen', 'email'] } }, publishAt: { type: 'string' }, mode: { type: 'string', enum: ['draft', 'schedule', 'send'] } } } } } }, responses: { '201': { description: 'Created' }, '400': { description: 'Validation error' }, '409': { description: 'Notice LINE account missing' } } },
+      post: { tags: ['Ops Console'], summary: 'お知らせを作る（下書き／予約／今すぐ送る）', parameters: [{ name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string' }, description: '二重押し止めの再実行キー（UUID）。同じキー・同じ内容の再送は保存済みを返し、別内容は409。' }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['subject', 'body', 'channels'], properties: { subject: { type: 'string' }, body: { type: 'string' }, audienceKind: { type: 'string', enum: ['all', 'plan', 'tenants'] }, audiencePlans: { type: 'array', items: { type: 'string' } }, audienceTenantIds: { type: 'array', items: { type: 'string' } }, channels: { type: 'array', items: { type: 'string', enum: ['line', 'screen', 'email'] } }, publishAt: { type: 'string' }, mode: { type: 'string', enum: ['draft', 'schedule', 'send'] } } } } } }, responses: { '200': { description: 'Idempotent replay of the saved announcement' }, '201': { description: 'Created' }, '400': { description: 'Validation error' }, '409': { description: 'Notice LINE account missing or idempotency-key reuse with different content' } } },
     },
     '/api/ops/knowledge': {
       get: { tags: ['Ops Console'], summary: '運営専用ナレッジ一覧（検索・種別・承認状態・ページ送り）', responses: { '200': { description: 'Articles and total' }, '403': { description: 'Platform admin required' } } },
@@ -929,7 +964,7 @@ const spec = {
       post: { tags: ['Ops Console'], summary: '宛先の見積もり（契約先数・権限者数・LINE登録済み数）', responses: { '200': { description: 'Audience preview' } } },
     },
     '/api/ops/announcements/{id}': {
-      put: { tags: ['Ops Console'], summary: '下書き・予約のお知らせを変える（今すぐ送るも可）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Updated' }, '404': { description: 'Not found' }, '409': { description: 'Already sent' } } },
+      put: { tags: ['Ops Console'], summary: '下書き・予約のお知らせを変える（今すぐ送るも可）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { expectedUpdatedAt: { type: 'string', description: '一覧で見た版。違う版からの保存は最新の内容つきで409。' } } } } } }, responses: { '200': { description: 'Updated' }, '404': { description: 'Not found' }, '409': { description: 'Already sent or version conflict with the latest content' } } },
       delete: { tags: ['Ops Console'], summary: '下書き・予約のお知らせを消す', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' }, '404': { description: 'Not found' }, '409': { description: 'Already sent' } } },
     },
     // ── Ops Console: ダッシュボード（★V6 37-2） ────────────────────────────
@@ -2416,6 +2451,38 @@ const spec = {
         },
       },
     },
+    '/api/friend-add-rules/reorder': {
+      patch: {
+        tags: ['Webhook'],
+        summary: '友だち追加時の配信の優先順位を一括更新（一覧のつまみ並び替え）',
+        description:
+          '動かせる行（受け皿以外）の新しい順を ids で受け取り、1回のバッチで書く。そのアカウント・区分の受け皿以外の全件をちょうど含む並びだけを受け付け、足りなければ 409 で読み直しを促す。',
+        parameters: [{ name: 'account_id', in: 'query', required: false, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['friendKind', 'ids'],
+                properties: {
+                  accountId: { type: 'string', description: '対象のLINEアカウント（query の account_id でも可）' },
+                  friendKind: { type: 'string', enum: ['first_time', 'returning'] },
+                  ids: { type: 'array', items: { type: 'string' }, maxItems: 500, description: '受け皿以外の全設定の新しい順' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Order updated' },
+          '400': { description: 'account_id / friendKind / ids missing or invalid' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Account not in visible scope' },
+          '409': { description: 'ORDER_CHANGED: list changed elsewhere; reload and retry' },
+        },
+      },
+    },
     '/api/mileage/rules': {
       get: {
         tags: ['Mileage'], summary: 'LINEアカウント範囲内のマイル付与ルールを取得',
@@ -3325,7 +3392,10 @@ const spec = {
         tags: ['NEN delivery'],
         summary: 'ペットの登録（管理画面）',
         description: '誕生日は YYYY-MM-DD か MM-DD（月日だけ）。生まれた年が分からない子も誕生日配信の対象にする。',
-        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string' }, description: '二重押し止めの再実行キー（UUID）。同じキー・同じ内容の再送は保存済みを返し、別内容は409。' },
+        ],
         requestBody: { required: true, content: { 'application/json': { schema: {
           type: 'object',
           required: ['friendId', 'name'],
@@ -3341,10 +3411,12 @@ const spec = {
           },
         } } } },
         responses: {
+          '200': { description: 'Idempotent replay of the saved pet' },
           '201': { description: 'Created' },
           '400': { description: 'Invalid input' },
           '403': { description: 'Owner or admin role required' },
           '404': { description: 'Friend not found in account scope' },
+          '409': { description: 'Idempotency-key reuse with different content' },
         },
       },
     },
@@ -3367,6 +3439,7 @@ const spec = {
             birthday: { type: 'string', description: 'YYYY-MM-DD または MM-DD' },
             breed: { type: 'string', maxLength: 80 },
             weightKg: { type: 'number', minimum: 0.1, maximum: 200, nullable: true },
+            expectedUpdatedAt: { type: 'string', description: '一覧で見た版。違う版からの保存は最新の内容つきで409。' },
           },
         } } } },
         responses: {
@@ -3374,6 +3447,7 @@ const spec = {
           '400': { description: 'Invalid input' },
           '403': { description: 'Owner or admin role required' },
           '404': { description: 'Pet not found in account scope' },
+          '409': { description: 'Version conflict with the latest content' },
         },
       },
     },
@@ -5645,6 +5719,87 @@ const spec = {
         },
       },
     },
+    // ── Booking channels (V8-B) ──────────────────────────────────────────────
+    '/api/booking/admin/channels': {
+      get: {
+        tags: ['Booking'],
+        summary: '予約の受付経路・担当カレンダー接続・自動割り当ての状態を取得',
+        description: '接続済みの担当カレンダーは今週分を読み、自社から書き出した予約を除いた外の予定件数と最終読込日時を返す（最終読込日時は保存する）。今日の件数は店舗の暦日、週は月曜開始。Cache-Control: no-store。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': {
+            description: '受付経路ごとの今日の件数と担当ごとのカレンダー状態',
+            content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: {
+              type: 'object',
+              required: ['timeZone', 'todayFrom', 'todayTo', 'weekFrom', 'weekTo', 'staff', 'autoAssign', 'channels'],
+              properties: {
+                timeZone: { type: 'string' },
+                todayFrom: { type: 'string', format: 'date-time' },
+                todayTo: { type: 'string', format: 'date-time' },
+                weekFrom: { type: 'string', format: 'date-time' },
+                weekTo: { type: 'string', format: 'date-time' },
+                autoAssign: { type: 'boolean' },
+                staff: { type: 'array', items: { type: 'object', required: ['staffId', 'displayName', 'status', 'externalEventsThisWeek', 'lastReadAt', 'readError'], properties: {
+                  staffId: { type: 'string' },
+                  displayName: { type: 'string' },
+                  status: { type: 'string', enum: ['connected', 'disconnected', 'expired'] },
+                  externalEventsThisWeek: { type: ['integer', 'null'] },
+                  lastReadAt: { type: ['string', 'null'] },
+                  readError: { type: ['string', 'null'], enum: ['calendar_auth_expired', 'calendar_read_unavailable', null] },
+                } } },
+                channels: { type: 'array', items: { type: 'object', required: ['key', 'status', 'todayCount'], properties: {
+                  key: { type: 'string', enum: ['line', 'manual', 'hot_pepper_beauty', 'google_reserve', 'epark'] },
+                  status: { type: 'string', enum: ['active', 'preparing'] },
+                  todayCount: { type: ['integer', 'null'] },
+                } } },
+              },
+            } } } } },
+          },
+          '400': { description: 'account_id 未指定' },
+        },
+      },
+    },
+    '/api/booking/admin/channels/settings': {
+      put: {
+        tags: ['Booking'],
+        summary: '指名なし予約の担当自動割り当てを切り替え',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['autoAssign'], properties: { autoAssign: { type: 'boolean' } } } } } },
+        responses: {
+          '200': { description: '保存した設定', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'object', required: ['autoAssign'], properties: { autoAssign: { type: 'boolean' } } } } } } } },
+          '400': { description: 'account_id 未指定または autoAssign が真偽値でない' },
+          '403': { description: '予約設定の権限がない' },
+        },
+      },
+    },
+    '/api/booking/admin/conflicts': {
+      get: {
+        tags: ['Booking'],
+        summary: '同じ担当で時間が重なっている予約の組を取得',
+        description: '受付中・確定の予約だけを対象に、同じ担当で時間が重なる2件の組を開始日時順に返す。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': {
+            description: '重なっている予約の組',
+            content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'object', required: ['conflicts'], properties: {
+              conflicts: { type: 'array', items: { type: 'object', required: ['staffId', 'staffName', 'bookingId', 'otherBookingId', 'startsAt', 'endsAt', 'otherStartsAt', 'otherEndsAt', 'version', 'otherVersion'], properties: {
+                staffId: { type: 'string' },
+                staffName: { type: 'string' },
+                bookingId: { type: 'string' },
+                otherBookingId: { type: 'string' },
+                startsAt: { type: 'string' },
+                endsAt: { type: 'string' },
+                otherStartsAt: { type: 'string' },
+                otherEndsAt: { type: 'string' },
+                version: { type: 'integer', minimum: 0 },
+                otherVersion: { type: 'integer', minimum: 0 },
+              } } },
+            } } } } } },
+          },
+          '400': { description: 'account_id 未指定' },
+        },
+      },
+    },
     // ── Booking settings (N-406 #754) ────────────────────────────────────────
     '/api/booking/admin/settings': {
       get: {
@@ -5998,6 +6153,30 @@ const spec = {
           '404': { description: '予約または担当が対象アカウントに存在しない' },
           '409': { description: '版競合・変更不可の状態・枠の衝突' },
           '422': { description: 'メニュー未提供・過去日時・料金不備・方針不備・未連携への送信指定' },
+        },
+      },
+    },
+    '/api/booking/admin/bookings/{id}/reassign': {
+      post: {
+        tags: ['Booking'], summary: '予約を別の担当へ移す',
+        description: '今の版で担当だけを変える。これからの予約で、今と違う担当のときだけ受け付け、必ず今の空き判定を通す。結果は PATCH /api/booking/admin/bookings/{id} と同じ形。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['staffId', 'notifyCustomer'],
+          properties: {
+            staffId: { type: 'string', minLength: 1, description: '移し先の担当ID' },
+            notifyCustomer: { type: 'boolean', description: 'false でお客さまへの変更案内を送らない' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '変更後の版・カレンダー同期・通知・リマインダの実績' },
+          '400': { description: 'account_id 未指定または staffId・notifyCustomer の不備' },
+          '404': { description: '予約または担当が対象アカウントに存在しない' },
+          '409': { description: '過去の予約・同じ担当・枠の衝突・版競合' },
+          '422': { description: 'メニュー未提供など変更できない内容' },
         },
       },
     },

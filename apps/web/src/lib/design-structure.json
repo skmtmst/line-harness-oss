@@ -618,8 +618,8 @@
       }
     },
     "/booking/menus": {
-      "node": "QSLEH",
-      "name": "V6 28-1 予約設定",
+      "node": "QSLEH owaS3 P6EdLW yRPxl KRgTQ x1OZS6 VLEaj xCoDe",
+      "name": "V8 予約設定（V6 28-1、v7 見た目併存）",
       "sections": [
         "Head",
         "Tabs",
@@ -627,7 +627,13 @@
         "Bar",
         "Table",
         "Crumb",
-        "Actions"
+        "Actions",
+        "Body",
+        "Side",
+        "Savebar",
+        "Week",
+        "Special",
+        "Rules"
       ],
       "parts": [
         "お客様に見える画面を確かめる",
@@ -647,14 +653,17 @@
       ]
     },
     "/booking/menus/new": {
-      "node": "GhOb3",
-      "name": "V6 28-1-B 予約メニューをつくる",
+      "node": "GhOb3 QqER7 v5L19Z",
+      "name": "V8 予約メニューをつくる（V6 28-1-B、v7 見た目併存）",
       "sections": [
         "Crumb",
         "Head",
         "Body",
         "Left",
-        "Right"
+        "Right",
+        "Bar",
+        "Side",
+        "Savebar"
       ],
       "parts": [
         "お客様が予約するときに選ぶ内容を登録します。",
@@ -691,14 +700,16 @@
       ]
     },
     "/booking/staff/new": {
-      "node": "bEL9g",
-      "name": "V2 8-2-2 予約スタッフを登録する",
+      "node": "bEL9g CcA4k",
+      "name": "★ V8 予約スタッフを登録（CcA4k）",
       "sections": [
         "Crumb",
         "Head",
         "Body",
         "Left",
-        "Right"
+        "Right",
+        "Actions",
+        "Side"
       ],
       "parts": [
         "お客様が予約するときに指名できる担当者を登録します。",
@@ -732,15 +743,20 @@
       ]
     },
     "/booking/menus/staff": {
-      "node": "QSLEH",
-      "name": "V6 28-1 予約設定（メニュー担当）",
+      "node": "QSLEH ooufy",
+      "name": "V8 担当メニューをまとめて決める（V6 28-1、v7 見た目併存）",
       "sections": [
         "Crumb",
         "Actions",
         "KPIs",
         "Warn",
         "Table",
-        "note"
+        "note",
+        "Head",
+        "Tabs",
+        "Body",
+        "Override",
+        "Savebar"
       ],
       "parts": [
         "担当スタッフ",
@@ -765,7 +781,19 @@
         "この画面でできること",
         "・上書きした料金・所要時間は、そのスタッフを選んだときだけ適用されます。空欄なら標準の設定を使います",
         "・担当が0人のメニューは、公開していても予約フォームに枠が出ません",
-        "・旧デザインでは「メニュー」と「スタッフ」が別ページで、割り当ての全体像が見えませんでした。ここでは1画面で見比べられます"
+        "・旧デザインでは「メニュー」と「スタッフ」が別ページで、割り当ての全体像が見えませんでした。ここでは1画面で見比べられます",
+        "担当メニューをまとめて決める",
+        "未保存の変更があります",
+        "だれがどのメニューを受けるか",
+        "担当が0人のメニューは、出していてもお客さまの画面に枠が出ません",
+        "升を押したとき",
+        "このスタッフの所要時間",
+        "このスタッフの料金",
+        "上書きを消す",
+        "上書きがある升にはこの印が付きます",
+        "は担当が0人です。出しても予約は入りません。",
+        "キャンセル",
+        "保存"
       ]
     },
     "/booking/staff": {
@@ -788,19 +816,21 @@
       ]
     },
     "/booking/staff/shifts": {
-      "node": "tksPc",
-      "name": "★ V6 28-1-A 受付枠と休業日",
+      "node": "tksPc d5fmnM E3YDK wvGke",
+      "name": "★ V8 勤務とシフト（d5fmnM・管理者）／自分の勤務（E3YDK・本人／wvGke・未ひも付け）",
       "sections": [
         "Head",
         "Tabs",
         "Info",
         "Body",
         "Week",
+        "Breaks",
         "Special",
         "Rules",
         "Preview",
         "Trouble",
-        "Links"
+        "Links",
+        "Side"
       ],
       "parts": [
         "何時から何時まで、どの曜日を受けるかです。",
@@ -3026,15 +3056,17 @@
       ]
     },
     "/friend-add-settings": {
-      "node": "u1P0gG",
-      "name": "V2 4-6 友だち追加時の配信",
+      "node": "u1P0gG MRhef",
+      "name": "V2 4-6 友だち追加時の配信（一覧は★V8 MRhef）",
       "sections": [
         "Head",
         "Alert",
         "FirstTime",
         "Returning",
         "Rule",
-        "Flow"
+        "Flow",
+        "KPIs",
+        "KindTabs"
       ],
       "parts": [
         "友だち追加時の配信",
@@ -3068,8 +3100,19 @@
       }
     },
     "/scenarios/mode": {
-      "node": "cCB7r",
-      "name": "V6 5 配信方式の選択",
+      "node": "dnzqC",
+      "name": "★V8 シナリオを作る①（シナリオ情報・配信方式）",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": [
+          "dnzqC"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "★V8（オーナー決定 2026-10-01、Pencil dnzqC）へ V8 版 mode-v8 を実装。節の印は v7 側（Crumb/Head/Notice/Name/Choices）と共用部品（Steps）の和集合。同条件の画像比較は未実施"
+      },
       "sections": [
         "Crumb",
         "Head",
@@ -3104,23 +3147,39 @@
       ]
     },
     "/scenarios/first-step": {
-      "node": "（絵なし・案Aとして起こした）",
-      "name": "V2 4-1-3 ステップの作成（案A → Lステップの項目に合わせて改訂）",
+      "node": "V6xAo",
+      "name": "★V8 シナリオを作る②（1通目を設定）",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": [
+          "V6xAo"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "★V8（オーナー決定 2026-10-01、Pencil V6xAo）へ V8 版 first-step-v8 を実装。左に段（誰に送るか・いつ・1通目の内容）、右の欄に本物のスマホ（StepPreview）。節の印は v7 側との和集合。同条件の画像比較は未実施"
+      },
       "sections": [
+        "Body",
         "Crumb",
+        "Form",
         "Head",
         "Notice",
-        "Form"
+        "Right",
+        "Steps"
       ],
       "parts": [
-        "ステップの作成",
+        "1通目を設定",
         "キャンセル",
-        "配信対象の絞り込み",
+        "この1通目を誰に送るか",
         "シナリオ購読中の全員に配信する",
         "タグで絞り込んで配信する",
         "詳細条件で絞り込んで配信する",
-        "1通目",
+        "いつ",
         "購読開始から",
+        "時刻を消す",
+        "1通目の内容",
         "この画面で作る",
         "テンプレートから選ぶ",
         "テキスト",

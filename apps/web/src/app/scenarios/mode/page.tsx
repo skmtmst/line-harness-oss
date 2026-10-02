@@ -14,6 +14,8 @@ import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ScenarioModeV8 from '../mode-v8'
 import './scenario-mode.css'
 
 /**
@@ -28,9 +30,10 @@ import './scenario-mode.css'
  * 入りきらず、どちらを選ぶと何が変わるのかを読まずに押していた。
  */
 export default function ScenarioModePage() {
+  const theme = useAdminTheme()
   return (
     <Suspense fallback={<div className="text-ink-faint py-12 text-center text-sm">読み込み中…</div>}>
-      <ScenarioModeContent />
+      {theme === 'v8' ? <ScenarioModeV8 /> : <ScenarioModeContent />}
     </Suspense>
   )
 }

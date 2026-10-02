@@ -123,7 +123,19 @@ export interface StripeSubscription {
   current_period_end?: number;
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
-  items: { data: Array<{ price: { id: string }; current_period_end?: number }> };
+  items: { data: Array<{ id?: string; quantity?: number; price: { id: string }; current_period_end?: number }> };
+}
+
+export interface StripeInvoicePreview {
+  amount_due: number;
+  currency: string;
+  lines: { has_more: boolean; data: Array<{
+    amount: number;
+    proration: boolean;
+    type: string;
+    subscription_item: string | null;
+    period: { start: number; end: number };
+  }> };
 }
 
 export interface StripeInvoice {
@@ -161,6 +173,19 @@ export interface StripePaymentIntent {
 }
 
 export const stripeApi = {
+  createInvoicePreview: (
+    env: StripeEnv,
+    input: { subscriptionId: string; itemId: string; priceId: string; quantity: number; prorationDate: number },
+    fetchImpl?: typeof fetch,
+  ) => stripeRequest<StripeInvoicePreview>(env, 'POST', '/v1/invoices/create_preview', {
+    subscription: input.subscriptionId,
+    subscription_details: {
+      items: [{ id: input.itemId, price: input.priceId, quantity: input.quantity }],
+      proration_behavior: 'create_prorations',
+      proration_date: input.prorationDate,
+    },
+  }, { fetchImpl }),
+
   createCustomer: (env: StripeEnv, input: { name: string; email: string | null; tenantId: string }, fetchImpl?: typeof fetch) =>
     stripeRequest<StripeCustomer>(env, 'POST', '/v1/customers', {
       name: input.name,

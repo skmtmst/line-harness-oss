@@ -16,7 +16,7 @@ function section(source: string, start: string, end: string): string {
 }
 
 describe('機能16 V6の一覧', () => {
-  const affiliates = section(TABS, 'export function AffiliatorsTab(', '\nfunction formatDateTime')
+  const affiliates = section(TABS, 'export function AffiliatorsTab(', '\nexport function formatDateTime')
   const approvals = section(TABS, 'export function ApprovalQueue(', '\n// ── Offers list')
 
   it('紹介者一覧は実Node・帯・検索・絞り込み・CSV・ページ送りを持つ', () => {
