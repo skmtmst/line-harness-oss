@@ -93,4 +93,17 @@ describe('日本郵便の取込手順（外部通信なし・fixtureで検証）
     expect(inserts).toHaveLength(batches.length);
     expect((sql.match(/4520961/g) ?? []).length).toBe(60);
   });
+
+  it('取込SQLは無効化開始・取込中印・末尾確定の順で途中readyを作らない', () => {
+    const rows = [{ code: '1000001', prefecture: '東京都', city: '千代田区', town: '千代田' }];
+    const sql = buildImportSql({
+      rows, sourceUrl: 'src', inputSha256: 'sha', inputBytes: 1,
+      manifestId: 'jp-x', importedAt: 'at',
+    });
+    const lines = sql.split('\n').filter((line) => !line.startsWith('--') && line.trim() !== '');
+    expect(lines[0]).toBe('DELETE FROM postal_import_manifest;');
+    expect(lines[1]).toBe('DELETE FROM postal_codes;');
+    expect(sql).toContain('-1,');
+    expect(sql.trimEnd().endsWith(`UPDATE postal_import_manifest SET row_count = 1 WHERE id = 'jp-x';`)).toBe(true);
+  });
 });

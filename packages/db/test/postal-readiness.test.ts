@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { getPostalReadiness, searchPostalCodes } from '../src/postal-codes.js';
+import { buildImportSql } from '../../../scripts/fetch-jp-postal-data.mjs';
 
 function asD1(sqlite: Database.Database): D1Database {
   return {
@@ -114,5 +115,88 @@ describe('郵便番号検索は同じ番号の候補を欠落させない', () =
     expect(found.fromDb).toBe(false);
     expect(found.candidates).toHaveLength(2);
     expect(found.total).toBe(2);
+  });
+});
+
+describe('取込の途中は全国版と名乗らない（sentinel方式）', () => {
+  const OFFICIAL_NEW = OFFICIAL;
+  const OLD_ROWS = [
+    `('1000001','東京都','千代田区','千代田',NULL,NULL)`,
+    `('1000001','東京都','千代田区','皇居外苑',NULL,NULL)`,
+    `('5300001','大阪府','大阪市北区','梅田',NULL,NULL)`,
+  ];
+  // 同件数3件。B（梅田）が落ち、C（札幌）が入る。今回データだけが残る。
+  const NEW_ROWS = [
+    { code: '1000001', prefecture: '東京都', city: '千代田区', town: '千代田' },
+    { code: '1000001', prefecture: '東京都', city: '千代田区', town: '皇居外苑' },
+    { code: '0600000', prefecture: '北海道', city: '札幌市中央区', town: '' },
+  ];
+
+  function splitStatements(sql: string): string[] {
+    return sql
+      .split(/;\n/)
+      .map((part) => part
+        .split('\n')
+        .filter((line) => !line.startsWith('--') && line.trim() !== '')
+        .join('\n')
+        .trim())
+      .filter(Boolean)
+      .map((stmt) => `${stmt};`);
+  }
+
+  function setupOldFull(sqlite: Database.Database) {
+    sqlite.exec(`
+      CREATE TABLE postal_codes (
+        postal_code TEXT NOT NULL, prefecture TEXT NOT NULL, city TEXT NOT NULL,
+        town TEXT NOT NULL DEFAULT '', source_name TEXT, imported_at TEXT,
+        PRIMARY KEY (postal_code, prefecture, city, town));
+      CREATE TABLE postal_import_manifest (
+        id TEXT PRIMARY KEY, source_url TEXT NOT NULL, input_sha256 TEXT NOT NULL,
+        input_bytes INTEGER NOT NULL, row_count INTEGER NOT NULL, imported_at TEXT NOT NULL);
+    `);
+    sqlite.prepare(
+      `INSERT INTO postal_import_manifest VALUES ('jp-old', ?, 'oldsha', 10, 3, '2026-10-01T00:00:00+09:00')`,
+    ).run(OFFICIAL_NEW);
+    sqlite.prepare(`INSERT INTO postal_codes VALUES ${OLD_ROWS.join(',')}`).run();
+  }
+
+  test('開始だけ・本体途中・同件数一致でもfalse、完了でtrue・旧コードは残らない', async () => {
+    const sqlite = new Database(':memory:');
+    setupOldFull(sqlite);
+    const db = asD1(sqlite);
+    const before = await getPostalReadiness(db);
+    expect(before).toMatchObject({ fullDataset: true, complete: true, rowCount: 3 });
+
+    const sql = buildImportSql({
+      rows: NEW_ROWS, sourceUrl: OFFICIAL_NEW, inputSha256: 'newsha',
+      inputBytes: 10, manifestId: 'jp-new', importedAt: '2026-10-02T00:00:00+09:00',
+    });
+    const stmts = splitStatements(sql);
+    // 開始3文＋本体1文＋末尾1文（3件は1chunk）。
+    expect(stmts.length).toBe(5);
+    expect(stmts[0]).toBe('DELETE FROM postal_import_manifest;');
+    expect(stmts[1]).toBe('DELETE FROM postal_codes;');
+
+    // 開始だけ: 旧全国版は消え、取込中の印だけ。false。
+    sqlite.exec(stmts[0]);
+    sqlite.exec(stmts[1]);
+    sqlite.exec(stmts[2]);
+    const started = await getPostalReadiness(db);
+    expect(started).toMatchObject({ fullDataset: false, complete: false, rowCount: 0, expectedRows: 0 });
+
+    // 本体途中: 件数は新旧どちらの3件とも一致するが、印が-1のためfalse。
+    sqlite.exec(stmts[3]);
+    const partial = await getPostalReadiness(db);
+    expect(partial.rowCount).toBe(3);
+    expect(partial).toMatchObject({ fullDataset: false, complete: false, expectedRows: 0 });
+
+    // 全部完了: true。旧コード（梅田）は残らず、今回データだけ。
+    sqlite.exec(stmts[4]);
+    const done = await getPostalReadiness(db);
+    expect(done).toMatchObject({
+      fullDataset: true, complete: true, rowCount: 3, expectedRows: 3, inputSha256: 'newsha',
+    });
+    const towns = sqlite.prepare('SELECT town FROM postal_codes ORDER BY town').all() as Array<{ town: string }>;
+    expect(towns.map((r) => r.town).sort()).toEqual(['', '千代田', '皇居外苑']);
   });
 });

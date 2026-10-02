@@ -77,6 +77,9 @@ export async function getPostalReadiness(db: D1Database): Promise<PostalReadines
   }
   if (!manifest) return { ...empty, rowCount: count };
   // 完了記録と件数が一致し、由来が公式配布のときだけ全国版と名乗る。
+  // 取込中は完了記録が row_count = -1（sentinel）で残る。件数とは一致させない。
+  // 旧全国版と同件数の新データでも、sentinelがある間は件数が一致しても
+  // 全国版と名乗らない。取込中の expectedRows は 0 と出す。
   const expected = Number(manifest.row_count);
   const complete = expected > 0 && count === expected;
   const limited = !manifest.source_url.startsWith('https://www.post.japanpost.jp');
@@ -85,7 +88,7 @@ export async function getPostalReadiness(db: D1Database): Promise<PostalReadines
     rowCount: count,
     importedAt: manifest.imported_at ?? null,
     source: manifest.source_url ?? null,
-    expectedRows: expected,
+    expectedRows: expected > 0 ? expected : 0,
     inputSha256: manifest.input_sha256 ?? null,
     complete,
     limited,

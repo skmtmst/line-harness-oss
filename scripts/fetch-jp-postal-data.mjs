@@ -26,10 +26,13 @@
  *   「Maximum SQL statement length 100,000 bytes」。1文のINSERTに
  *   全行を連結すると上限を超えるため、1文が80KBを超えないよう
  *   行数ではなくバイト数で区切って複文のINSERTにする。
- * - 先頭は完了記録（postal_import_manifest）の1文、続いて本体の複文。
- *   どれも INSERT OR REPLACE のため再適用は冪等。順に適用し、途中で
- *   失敗したら止める。件数が完了記録と合うまで readiness は false の
- *   まま（部分適用を全国版と名乗らない）。
+ * - (1) 開始3文で旧完了記録と旧本体を消し、新完了記録を row_count=-1
+ *   （取込中）で置く。(2) 本体の複文を順に入れる。(3) 末尾1文で完了記録を
+ *   全件数に更新。どれも INSERT OR REPLACE・DELETE のため再適用は冪等。
+ *   順に適用し、途中で失敗したら止める。
+ * - 途中（開始だけ・1文だけ・失敗）は完了記録が -1 のため readiness は
+ *   false のまま。旧全国版と同件数の新データでも、旧本体を先に消すため
+ *   途中一致で全国版と誤認しない。末尾まで来て初めて件数一致が全国版。
  * - 実D1への適用は番号ごとの明示承認後。勝手に適用しない。
  *
  * 注意:
@@ -161,20 +164,30 @@ export function splitImportBatches(rows, sourceUrl, importedAt, maxBytes = IMPOR
   return batches;
 }
 
+export const IMPORT_SENTINEL_ROW_COUNT = -1;
+
 export function buildImportSql({ rows, sourceUrl, inputSha256, inputBytes, manifestId, importedAt }) {
   const batches = splitImportBatches(rows, sourceUrl, importedAt);
   const lines = [
     `-- 日本郵便の公開郵便番号データの取り込み（生成物）。実DB適用は承認後。`,
     `-- 由来: ${sourceUrl} / 入力SHA256: ${inputSha256} / ${rows.length}件 / ${importedAt}`,
     `-- D1の1文上限100KBに合わせ、本体は${batches.length}文に分割（各80KB以内）。`,
-    `-- 適用順: 完了記録→本体の順。途中失敗で止め、件数一致まで全国版と名乗らない。`,
-    `INSERT OR REPLACE INTO postal_import_manifest (id, source_url, input_sha256, input_bytes, row_count, imported_at)`,
-    `  VALUES (${sqlQuote(manifestId)}, ${sqlQuote(sourceUrl)}, ${sqlQuote(inputSha256)}, ${inputBytes}, ${rows.length}, ${sqlQuote(importedAt)});`,
+    `-- 適用順と途中readyの防止:`,
+    `-- (1) 開始3文で旧完了記録と旧本体を消し、新完了記録を row_count=-1（取込中）で置く。`,
+    `--     旧全国版と同件数の新データでも、旧件数と新完了記録の一致で全国版と誤認しない。`,
+    `-- (2) 本体 ${batches.length} 文を順に入れる。どれも INSERT OR REPLACE のため再適用は冪等。`,
+    `-- (3) 末尾1文で完了記録を ${rows.length} に更新。ここまで来て初めて件数一致が全国版。`,
+    `--     途中（開始だけ・1文だけ・失敗）では row_count=-1 のため readiness は false のまま。`,
+    `DELETE FROM postal_import_manifest;`,
+    `DELETE FROM postal_codes;`,
+    `INSERT INTO postal_import_manifest (id, source_url, input_sha256, input_bytes, row_count, imported_at)`,
+    `  VALUES (${sqlQuote(manifestId)}, ${sqlQuote(sourceUrl)}, ${sqlQuote(inputSha256)}, ${inputBytes}, ${IMPORT_SENTINEL_ROW_COUNT}, ${sqlQuote(importedAt)});`,
   ];
   for (const batch of batches) {
     lines.push(`INSERT OR REPLACE INTO postal_codes (postal_code, prefecture, city, town, source_name, imported_at) VALUES`);
     lines.push(`${batch.map((b) => `  ${b.text}`).join(',\n')};`);
   }
+  lines.push(`UPDATE postal_import_manifest SET row_count = ${rows.length} WHERE id = ${sqlQuote(manifestId)};`);
   return `${lines.join('\n')}\n`;
 }
 
