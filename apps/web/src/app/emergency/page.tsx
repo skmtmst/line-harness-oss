@@ -1,5 +1,9 @@
 'use client'
 
+import '@/app/notifications/readonly-v8.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import { X } from 'lucide-react'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -663,7 +667,7 @@ function HealthPanel({
 
   return (
     <div className="space-y-4" data-design="V3 Health">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div data-ro-kpis="true" className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : refreshing ? '更新中' : isStale ? '期限切れ（再確認待ち）' : '最新結果'} />
         <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
         <SummaryCard label="緊急停止状態" value={controlSummary.value} note={controlSummary.note} />
@@ -1173,7 +1177,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
 
       <div className="border-hairline rounded-card sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border bg-canvas px-4 py-3 shadow-float">
         <p className="text-xs font-semibold text-ink-faint">4つのうち{selectedTargets.length}つを選択 ／ {accountName} ／ 理由「{reason}」</p>
-        <div className="flex items-center gap-2"><button type="button" onClick={() => { setTargets({ broadcasts: true, scenarios: true, reminders: true, automations: false }); setReason('障害対応'); setReasonDetail('') }} disabled={mutationLocked || isStopped} className="rounded-control min-h-10 px-4 text-xs font-semibold text-action hover:bg-action-soft disabled:opacity-50">キャンセル</button><Button variant="danger" className="min-h-10 px-4 text-xs hover:opacity-90 disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={openStopConfirm} disabled={mutationLocked || isStopped || impactFailed || !impact || !control || !canControl}>緊急停止する</Button></div>
+        <div className="flex items-center gap-2"><button type="button" onClick={() => { setTargets({ broadcasts: true, scenarios: true, reminders: true, automations: false }); setReason('障害対応'); setReasonDetail('') }} disabled={mutationLocked || isStopped} className="rounded-control min-h-10 px-4 text-xs font-semibold text-action hover:bg-action-soft disabled:opacity-50">キャンセル</button><Button variant="danger" className="v7:min-h-10 px-4 text-xs hover:opacity-90 disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={openStopConfirm} disabled={mutationLocked || isStopped || impactFailed || !impact || !control || !canControl}>緊急停止する</Button></div>
       </div>
 
       {confirmMode && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title">
@@ -1190,7 +1194,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
           </>}
             <div><label className="block text-sm font-medium text-ink-secondary" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="mt-2 min-h-11 rounded-control border border-hairline px-3 text-sm" style={{ width: 280 }} /><p className="mt-2 text-xs text-ink-faint">この操作は記録に残り、ログインユーザーへ通知されます。</p></div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4" style={{ minHeight: 84 }}><p className="max-w-sm text-xs text-ink-faint">止めたことは、ログインユーザー全員のLINEとメールへ知らせます。</p><div className="flex gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={mutationLocked} className="min-h-11 rounded-control px-4 text-sm font-semibold text-action hover:bg-action-soft">キャンセル</button><Button variant="danger" className={(`min-h-11 rounded-control px-4 text-sm font-semibold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`) + ' border-0 h-auto whitespace-normal'} onClick={() => { setStepUpMode(confirmMode); setConfirmMode(null); setStepUpCode('') }} disabled={mutationLocked || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')}>{confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</Button></div></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4" style={{ minHeight: 84 }}><p className="max-w-sm text-xs text-ink-faint">止めたことは、ログインユーザー全員のLINEとメールへ知らせます。</p><div className="flex gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={mutationLocked} className="min-h-11 rounded-control px-4 text-sm font-semibold text-action hover:bg-action-soft">キャンセル</button><Button variant="danger" className={(`v7:min-h-11 rounded-control px-4 text-sm font-semibold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`) + ' border-0 h-auto whitespace-normal'} onClick={() => { setStepUpMode(confirmMode); setConfirmMode(null); setStepUpCode('') }} disabled={mutationLocked || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')}>{confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</Button></div></div>
         </div>
       </div>}
       {stepUpMode && (
@@ -1239,7 +1243,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
             <div className="mt-6 flex justify-end gap-2">
               <button onClick={() => { setStepUpMode(null); setStepUpCode('') }} disabled={mutationLocked} className="rounded-control min-h-11 px-4 text-sm font-bold text-action">戻る</button>
               {stepUpMethod !== 'none' && (
-                <Button variant="danger" className={(`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${stepUpMode === 'stop' ? 'bg-danger hover:brightness-90' : 'bg-info hover:brightness-90'}`) + ' border-0 h-auto whitespace-normal'} onClick={() => void (stepUpMode === 'stop' ? runStop() : runRestore())} disabled={mutationLocked || !stepUpReady}>
+                <Button variant="danger" className={(`rounded-control v7:min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${stepUpMode === 'stop' ? 'bg-danger hover:brightness-90' : 'bg-info hover:brightness-90'}`) + ' border-0 h-auto whitespace-normal'} onClick={() => void (stepUpMode === 'stop' ? runStop() : runRestore())} disabled={mutationLocked || !stepUpReady}>
                   {running ? '確認中...' : stepUpMode === 'stop' ? '本人確認して停止' : '本人確認して復旧'}
                 </Button>
               )}
@@ -1345,7 +1349,7 @@ function HistoryPanel() {
         <button type="button" onClick={downloadCsv} className="rounded-control min-h-9 px-3 text-xs font-semibold text-action hover:bg-action-soft">CSVで書き出す</button>
       </div>
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse gridClassName="grid grid-cols-1 gap-3 md:grid-cols-4">
+      <KpiCollapse data-ro-kpis="true" gridClassName="grid grid-cols-1 gap-3 md:grid-cols-4">
         <SummaryCard label="止めた回数" value={state === 'ready' ? `${entries.length}回${truncated ? '以上' : ''}` : '—'} note={period === '30days' ? 'この30日' : 'この1年'} />
         <SummaryCard label="いちばん長かった停止" value={longestMinutes > 0 ? formatMinutesRough(longestMinutes) : '—'} note={truncated ? '直近の記録から' : period === '30days' ? 'この30日' : 'この1年'} />
         <SummaryCard label="管理画面の更新" value={`${updateCount}回`} note="この30日" />
@@ -1389,6 +1393,7 @@ function HistoryPanel() {
 }
 
 function EmergencyPageInner() {
+  const theme = useAdminTheme()
   const tab = useMergedTab(TABS)
   const { selectedAccountId } = useAccount()
   const [severity, setSeverity] = useState<OperationSeverity>('unknown')
@@ -1439,7 +1444,7 @@ function EmergencyPageInner() {
   const headerAction = tab === 'health'
     ? <Button variant="primary" className="min-h-9 px-3 text-xs hover:brightness-90 disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy}>{manualBusy ? '↻ 確認中…' : '↻ いますぐ確かめる'}</Button>
     : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
-  return <div className="flex flex-col gap-4"><OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-semibold text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-semibold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} onManualRunSettled={settleManualRun} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
+  return <div className={`flex flex-col gap-4 ${tab === 'control' ? '' : 'v8-ro-notifications-page'}`} data-design-node={theme === 'v8' && tab !== 'control' ? (tab === 'health' ? 'Y4LkX1' : 'I2V65v') : undefined}>{theme === 'v8' && tab !== 'control' && <ReadonlyHeaderV8 title="運用状態" description="自動確認の結果と、止めた・戻した記録、管理画面の更新を確認します。" />}<OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-semibold text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-semibold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} onManualRunSettled={settleManualRun} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }
 
 function EmergencyPage() {

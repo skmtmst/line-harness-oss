@@ -303,3 +303,19 @@ describe('注文の状況パネル', () => {
     expect(document.body.querySelector('[role="dialog"]')).toBeNull()
   })
 })
+
+
+describe('V8 注文の引き出し', () => {
+  it('同じ注文と外部リンクを表示し、Escapeで閉じる', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    const close = vi.fn()
+    try {
+      render({ onClose: close }); await settle()
+      expect(document.querySelector('[data-design-node="nAesv"] [role="dialog"]')).not.toBeNull()
+      expect(mockOrderDetail).toHaveBeenCalledWith('order-1', 'account-1')
+      expect(document.querySelector('footer a[href="https://ec.example/admin/order/9001"]')).not.toBeNull()
+      await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+      expect(close).toHaveBeenCalledOnce()
+    } finally { delete document.documentElement.dataset.theme }
+  })
+})

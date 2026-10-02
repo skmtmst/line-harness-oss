@@ -326,7 +326,7 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
             {!data.oauthConfigured ? <NoteBar tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</NoteBar> : null}
             {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
             <div>
-              <Button className="min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage || !data.oauthConfigured}><Link2 size={17} />Googleアカウントを接続</Button>
+              <Button className="v7:min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage || !data.oauthConfigured}><Link2 size={17} />Googleアカウントを接続</Button>
             </div>
             <div className="border-hairline border-t pt-5">
               <p className="text-ink-secondary text-label whitespace-pre-line leading-relaxed">初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。\n接続後は、このLINEアカウントの店舗だけを表示します。</p>
@@ -412,8 +412,8 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
           </dl>
           {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
           <div className="flex flex-wrap gap-3">
-            <Button className="min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage}><Link2 size={17} />Googleアカウントを再接続</Button>
-            <Button className="min-h-11" variant="danger" onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>接続を解除</Button>
+            <Button className="v7:min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage}><Link2 size={17} />Googleアカウントを再接続</Button>
+            <Button className="v7:min-h-11" variant="danger" onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>接続を解除</Button>
           </div>
           <div className="border-hairline border-t pt-5">
             <p className="text-ink-secondary text-label leading-relaxed">認可が切れた場合は、店舗を管理するGoogleアカウントで再接続してください。接続解除後は口コミの同期とGoogleへの返信を止めますが、取得済みの口コミと下書きは残ります。</p>
