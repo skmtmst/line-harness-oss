@@ -77,7 +77,6 @@ function render(friend: FriendListItem = BASE) {
       <FriendListRow
         friend={friend}
         visibleColumns={COLUMNS}
-        gridTemplateColumns="36px"
         onToggleSelect={() => {}}
         onToggleAttention={() => {}}
       />,

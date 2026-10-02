@@ -13,6 +13,7 @@ import ListRange from '@/components/ui/list-range'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FriendListRow, { FriendListCard } from './friend-list-row'
 import { formatNumber } from '@/lib/format'
+import './friend-list-table.css'
 
 export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
 
@@ -100,23 +101,36 @@ export default function FriendListTable({
     }
   }, [preferencesReady, visible])
 
-  const gridTemplateColumns = useMemo(() => [
-    '36px',
-    '36px',
-    'minmax(180px,1.3fr)',
-    visible.has('support') ? 'minmax(125px,.9fr)' : null,
-    visible.has('scenario') ? 'minmax(85px,.65fr)' : null,
-    visible.has('latest') ? 'minmax(150px,1.45fr)' : null,
-    visible.has('tags') ? 'minmax(150px,1.35fr)' : null,
-    visible.has('source') ? 'minmax(110px,.8fr)' : null,
-    visible.has('last') ? '90px' : null,
-  ].filter(Boolean).join(' '), [visible])
+  const columnTracks = useMemo(() => ([
+    { key: 'check', track: '36px' },
+    { key: 'star', track: '36px' },
+    { key: 'friend', track: 'minmax(180px,1.3fr)' },
+    { key: 'support', track: 'minmax(125px,.9fr)' },
+    { key: 'scenario', track: 'minmax(85px,.65fr)' },
+    { key: 'latest', track: 'minmax(150px,1.45fr)' },
+    { key: 'tags', track: 'minmax(150px,1.35fr)' },
+    { key: 'source', track: 'minmax(110px,.8fr)' },
+    { key: 'last', track: '90px' },
+  ].filter((column) => column.key === 'check' || column.key === 'star' || column.key === 'friend' || visible.has(column.key as FriendListColumn))), [visible])
+
+  const gridTemplateColumns = columnTracks.map((column) => column.track).join(' ')
+  /*
+   * ★V8（夕14・WIDTHS-20261001）：1280px 幅で右の列が板の外に切れる。
+   * AGENTS.md の順番（横送りより先に「大事でない列を隠す」）に従い、
+   * v8 の 1366px 未満では流入元列を隠す。流入元は追加時の計測値で、
+   * 詳細の「友だち情報」にあるので一覧から消しても辿れる。
+   */
+  const narrowGridTemplateColumns = columnTracks.filter((column) => column.key !== 'source').map((column) => column.track).join(' ')
 
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1
   const rangeEnd = Math.min(page * pageSize, total)
 
   return (
-    <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" data-design="V6FriendTable" data-design-node="k4Hz0X" aria-busy={status === 'loading' || undefined}>
+    <section
+      className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card"
+      style={{ '--friend-cols': gridTemplateColumns, '--friend-cols-narrow': narrowGridTemplateColumns } as React.CSSProperties}
+      data-design="V6FriendTable" data-design-node="k4Hz0X" aria-busy={status === 'loading' || undefined}
+    >
       {/*
         FRIEND-17: 狭い幅ではツールバーの右側（件数・表示項目）を折り返して
         隠さない。h-14 の固定高は lg 以上にだけ掛ける。
@@ -183,7 +197,7 @@ export default function FriendListTable({
       </div>
 
       {/* FRIEND-17: 列見出しは表と対になるため、カード表示の幅では出さない。 */}
-      <div className="hidden h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary lg:grid" style={{ gridTemplateColumns }}>
+      <div data-friend-cols className="hidden h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary lg:grid">
         <div>
           {/* ★V7 共通 チェックボックス（gvjpx）。一部だけ選んでいるときは「―」。 */}
           <Checkbox
@@ -262,7 +276,6 @@ export default function FriendListTable({
                 onToggleSelect={() => onToggleSelect?.(friend.id)}
                 onToggleAttention={() => onToggleAttention?.(friend)}
                 visibleColumns={visible}
-                gridTemplateColumns={gridTemplateColumns}
               />
             </div>
           </div>
