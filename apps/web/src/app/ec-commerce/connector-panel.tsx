@@ -155,7 +155,7 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
       <ListState
         kind={state}
         title={state === 'empty' ? accountId ? 'つなぎ先はまだありません' : 'LINEアカウントを選択してください' : undefined}
-        description={state === 'empty' ? accountId ? 'ネットショップの種類・アドレス・鍵を登録すると、注文を取り込めます。' : '左のメニュー上部で、設定するLINEアカウントを選びます。' : undefined}
+        description={state === 'empty' ? accountId ? 'ネットショップの種類・アドレス・鍵を登録すると、注文を取り込めます。' : 'LINEアカウントを選ぶ欄で、設定するアカウントを選びます。' : undefined}
         action={state === 'empty' && accountId ? <Button type="button" variant="primary" onClick={() => setState('ready')}>つなぎ先を設定</Button> : undefined}
         onRetry={state === 'error' ? () => void load() : undefined}
       />
