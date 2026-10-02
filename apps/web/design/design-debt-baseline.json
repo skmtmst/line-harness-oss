@@ -5,6 +5,10 @@
   "app/accounts/page.tsx": {
     "arbitrary-value": 1
   },
+  "app/accounts/uid-migration-v8.tsx": {
+    "unresolved-classname": 99,
+    "direct-th": 8
+  },
   "app/affiliate-offers/new/page.tsx": {
     "unresolved-classname": 4
   },
@@ -106,6 +110,10 @@
   "app/conversions/new/page.tsx": {
     "unresolved-classname": 5
   },
+  "app/duplicates/duplicates-v8.tsx": {
+    "unresolved-classname": 65,
+    "direct-th": 12
+  },
   "app/ec-commerce/connector-panel.tsx": {
     "unresolved-classname": 30
   },
@@ -148,8 +156,19 @@
     "unresolved-classname": 3,
     "arbitrary-value": 5
   },
+  "app/friends/friends-nav-v8.tsx": {
+    "unresolved-classname": 11
+  },
+  "app/friends/identity-candidates/identity-candidates-v8.tsx": {
+    "unresolved-classname": 18,
+    "direct-th": 4
+  },
   "app/friends/identity-candidates/page.tsx": {
     "unresolved-classname": 6
+  },
+  "app/friends/migrations/migrations-v8.tsx": {
+    "unresolved-classname": 62,
+    "direct-th": 5
   },
   "app/friends/page.tsx": {
     "unresolved-classname": 2
@@ -255,6 +274,9 @@
   "app/rich-menus/edit/page.tsx": {
     "arbitrary-value": 10
   },
+  "app/rich-menus/new/create-v8.tsx": {
+    "unresolved-classname": 186
+  },
   "app/rich-menus/external-import.tsx": {
     "arbitrary-value": 5,
     "direct-secondary-button": 1
@@ -297,12 +319,26 @@
   "app/search-console/page.tsx": {
     "arbitrary-value": 2
   },
+  "app/settings/feature-settings-v8.tsx": {
+    "unresolved-classname": 55
+  },
+  "app/settings/file-scan/file-scan-v8.tsx": {
+    "unresolved-classname": 29,
+    "direct-th": 4
+  },
+  "app/settings/manual-links/manual-links-v8.tsx": {
+    "unresolved-classname": 14,
+    "direct-th": 6
+  },
   "app/settings/manual-links/page.tsx": {
     "unresolved-classname": 4
   },
   "app/settings/page.tsx": {
     "unresolved-classname": 1,
     "arbitrary-value": 15
+  },
+  "app/settings/settings-nav-v8.tsx": {
+    "unresolved-classname": 9
   },
   "app/staff/new/page.tsx": {
     "direct-secondary-button": 1,
@@ -384,6 +420,10 @@
   },
   "app/templates/questions/question-v8.tsx": {
     "unresolved-classname": 17
+  },
+  "app/users/users-v8.tsx": {
+    "unresolved-classname": 55,
+    "direct-th": 5
   },
   "app/webhooks/edit/page.tsx": {
     "unresolved-classname": 4
@@ -585,6 +625,10 @@
   },
   "components/merged-person/merged-delivery-dialog.tsx": {
     "unresolved-classname": 11
+  },
+  "components/merged-person/merged-person-detail-v8.tsx": {
+    "unresolved-classname": 44,
+    "direct-th": 8
   },
   "components/merged-person/merged-person-detail.tsx": {
     "unresolved-classname": 15
