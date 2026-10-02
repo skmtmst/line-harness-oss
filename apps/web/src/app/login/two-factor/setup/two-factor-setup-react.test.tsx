@@ -24,6 +24,8 @@ const fixture = vi.hoisted(() => ({
   confirmResponse: { success: true, data: { sessionToken: 'sess-1' }, csrfToken: 'csrf-1' } as Record<string, unknown>,
   confirmStatus: 200,
   confirmReject: null as unknown,
+  setupStatus: 200,
+  setupReject: null as unknown,
   calls: [] as Array<{ url: string; body: Record<string, unknown> }>,
 }))
 
@@ -62,6 +64,8 @@ beforeEach(() => {
   fixture.confirmResponse = { success: true, data: { sessionToken: 'sess-1' }, csrfToken: 'csrf-1' }
   fixture.confirmStatus = 200
   fixture.confirmReject = null
+  fixture.setupStatus = 200
+  fixture.setupReject = null
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   window.sessionStorage.clear()
   window.localStorage?.clear?.()
@@ -73,7 +77,10 @@ beforeEach(() => {
       if (fixture.confirmReject) throw fixture.confirmReject
       return json(fixture.confirmResponse, fixture.confirmStatus)
     }
-    if (url.endsWith('/api/auth/two-factor/setup')) return json(fixture.setupResponse)
+    if (url.endsWith('/api/auth/two-factor/setup')) {
+      if (fixture.setupReject) throw fixture.setupReject
+      return json(fixture.setupResponse, fixture.setupStatus)
+    }
     if (url.endsWith('/api/auth/session')) return json({ success: true, data: { platformAdmin: true } })
     return json({ success: false, error: 'unexpected' }, 500)
   }))
@@ -226,5 +233,53 @@ describe('N-426: 初回設定画面', () => {
     expect(host.textContent).not.toContain('Failed to fetch')
     // 通信断では合言葉は生きているので、入力欄を残して再試行できる。
     expect(host.querySelector('form')).not.toBeNull()
+  })
+
+  it('M033: setup開始の失敗はその場で再試行できる（再ログイン不要）', async () => {
+    fixture.setupResponse = { success: false, error: '一時的に混み合っています' }
+    fixture.setupStatus = 500
+    await render()
+    expect(host.querySelector('form')).toBeNull()
+    const retry = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('もう一度読み込む'))
+    expect(retry).toBeTruthy()
+    fixture.setupResponse = {
+      success: true,
+      data: {
+        provisioningUri: 'otpauth://totp/Test?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=x',
+        manualKey: 'GEZD GNBV GY3T QOJQ GEZD GNBV GY3T QOJQ',
+      },
+    }
+    fixture.setupStatus = 200
+    await act(async () => { retry!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await flush()
+    expect(fixture.calls.filter((c) => c.url.endsWith('/api/auth/two-factor/setup')).length).toBe(2)
+    expect(host.querySelector('form')).not.toBeNull()
+    expect(host.textContent).toContain('GEZD GNBV GY3T QOJQ')
+  })
+
+  it('M033: setup開始の通信断もその場で再試行できる', async () => {
+    fixture.setupReject = new TypeError('Failed to fetch')
+    await render()
+    expect(host.textContent).not.toContain('Failed to fetch')
+    const retry = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('もう一度読み込む'))
+    expect(retry).toBeTruthy()
+  })
+
+  it('M033: setup開始の403は再試行を出さない', async () => {
+    fixture.setupResponse = { success: false, error: '権限がありません' }
+    fixture.setupStatus = 403
+    await render()
+    expect(host.textContent).toContain('権限がありません')
+    const retry = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('もう一度読み込む'))
+    expect(retry).toBeUndefined()
+  })
+
+  it('M033: setup開始の429は待ち案内と再試行を出す', async () => {
+    fixture.setupResponse = { success: false, error: '混み合っています' }
+    fixture.setupStatus = 429
+    await render()
+    expect(host.textContent).toContain('混み合っています')
+    const retry = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('もう一度読み込む'))
+    expect(retry).toBeTruthy()
   })
 })

@@ -35,6 +35,8 @@ export interface RichMenuGroup {
   folder_id: string | null;
   /** 160: 自分で決める並び順。小さいほど先。 */
   display_order: number;
+  /** M951: 下書き保存の版。保存のたびに +1。古い画面からの保存は 409 で止める。 */
+  version: number;
   created_at: string;
   updated_at: string;
 }
@@ -674,6 +676,17 @@ export async function updateRichMenuGroupMeta(
   id: string,
   patch: UpdateRichMenuGroupMetaInput,
 ): Promise<void> {
+  const built = buildMetaSets(patch);
+  if (!built) return;
+  const now = jstNow();
+  await db
+    .prepare(`UPDATE rich_menu_groups SET ${built.sets.join(', ')}, updated_at = ? WHERE id = ?`)
+    .bind(...built.vals, now, id)
+    .run();
+}
+
+/** meta の差分を SET 句へ写す。差分が無ければ null。 */
+function buildMetaSets(patch: UpdateRichMenuGroupMetaInput): { sets: string[]; vals: unknown[] } | null {
   const sets: string[] = [];
   const vals: unknown[] = [];
   if (patch.name !== undefined) {
@@ -708,14 +721,8 @@ export async function updateRichMenuGroupMeta(
     sets.push('display_order = ?');
     vals.push(patch.displayOrder);
   }
-  if (sets.length === 0) return;
-  sets.push('updated_at = ?');
-  vals.push(jstNow());
-  vals.push(id);
-  await db
-    .prepare(`UPDATE rich_menu_groups SET ${sets.join(', ')} WHERE id = ?`)
-    .bind(...vals)
-    .run();
+  if (sets.length === 0) return null;
+  return { sets, vals };
 }
 
 // pages 配列を「id 維持型」全置換する。
@@ -733,7 +740,33 @@ export async function replaceRichMenuPages(
   pages: RichMenuPageInput[],
 ): Promise<void> {
   const now = jstNow();
+  const keep = await loadPageKeepMeta(db, groupId);
+  const stmts = buildPageReplaceStatements(db, groupId, pages, keep, now);
+  await db.batch(stmts);
+}
 
+type PageKeepMeta = {
+  existingMap: Map<
+    string,
+    {
+      id: string;
+      image_r2_key: string | null;
+      image_content_type: string | null;
+      line_richmenu_id: string | null;
+      created_at: string;
+    }
+  >;
+  existingAreaIds: Set<string>;
+};
+
+/**
+ * ページ置換で引き継ぐ既存メタ (image / line_richmenu_id / created_at と
+ * area id) を読む。押された回数は area id を軸に数えるので、保存のたびに
+ * 振り直すと、同じボタンの記録がそこで途切れてしまう。
+ * 引き継ぐのは「この group に今ある id」だけ。別 group の id や消えた id を
+ * そのまま挿すと PK が衝突する (page 側と同じ考え方)。
+ */
+async function loadPageKeepMeta(db: D1Database, groupId: string): Promise<PageKeepMeta> {
   // 既存 page のメタ (image / line_richmenu_id / created_at) を保持するため事前取得。
   const existing = (
     (
@@ -754,10 +787,6 @@ export async function replaceRichMenuPages(
   );
   const existingMap = new Map(existing.map((p) => [p.id, p]));
 
-  // area の id も引き継ぐ。押された回数はこの id を軸に数えるので、保存のたびに
-  // 振り直すと、同じボタンの記録がそこで途切れてしまう。
-  // 引き継ぐのは「この group に今ある id」だけ。別 group の id や消えた id を
-  // そのまま挿すと PK が衝突する (page 側と同じ考え方)。
   const existingAreaIds = new Set(
     (
       (
@@ -773,6 +802,21 @@ export async function replaceRichMenuPages(
       ).results ?? []
     ).map((r) => r.id),
   );
+  return { existingMap, existingAreaIds };
+}
+
+/**
+ * ページ置換の書き込み文を作る (DELETE → 復元 INSERT)。
+ * 呼び出し側が 1 batch で流す。meta 更新と束ねるときは同じ batch へ足す。
+ */
+function buildPageReplaceStatements(
+  db: D1Database,
+  groupId: string,
+  pages: RichMenuPageInput[],
+  keep: PageKeepMeta,
+  now: string,
+): D1PreparedStatement[] {
+  const { existingMap, existingAreaIds } = keep;
   const claimedAreaIds = new Set<string>();
   const resolveAreaId = (a: RichMenuAreaInput): string => {
     if (a.id && existingAreaIds.has(a.id) && !claimedAreaIds.has(a.id)) {
@@ -853,7 +897,106 @@ export async function replaceRichMenuPages(
     );
   }
 
-  await db.batch(stmts);
+  return stmts;
+}
+
+export interface SaveRichMenuGroupDraftInput {
+  meta: UpdateRichMenuGroupMetaInput;
+  pages?: RichMenuPageInput[];
+  /**
+   * 保存元画面が読んだときの版 (M951・タグ編集と同じ約束)。
+   * 現在の版と違えば書かず version_conflict を返す。
+   */
+  expectedVersion: number;
+}
+
+export type SaveRichMenuGroupDraftResult =
+  | { ok: true; version: number }
+  | { ok: false; reason: 'version_conflict'; currentVersion: number | null };
+
+/**
+ * 版の番人が落ちたときの印。番人は SELECT 1 文で、版が合わない
+ * （行が無い場合も含む）ときだけ壊れた JSON を読んで batch 全体を
+ * 止める。batch 内の正規文は JSON.stringify 済みしか扱わないので、
+ * malformed JSON は番人以外から出ない。
+ */
+function isVersionGuardTrip(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /malformed JSON/i.test(message);
+}
+
+/**
+ * 下書き保存を1件の取引で確定する (M950/M951)。
+ *
+ * 版の検査・版上げ・書込をすべて 1 batch で流す。batch の先頭に版の
+ * 番人を置き、期待の版と違うときは番人で batch 全体を失敗させて
+ * 何も書かず version_conflict (route が 409 へ写す)。本番 D1 の batch は
+ * 原子（試験の createTestD1 も同じく取引で包む）なので、検査と書込の
+ * 間に別の保存が割り込めない。古い書込が最後に来ても黙って上書き
+ * しない。失敗時は版も進まないので、読み直さずに保存し直せる。
+ */
+export async function saveRichMenuGroupDraft(
+  db: D1Database,
+  groupId: string,
+  input: SaveRichMenuGroupDraftInput,
+): Promise<SaveRichMenuGroupDraftResult> {
+  const metaBuilt = buildMetaSets(input.meta);
+  // 書くものが無ければ読むだけ。版も進めない。
+  if (!metaBuilt && !input.pages) {
+    const current = await db
+      .prepare(`SELECT version FROM rich_menu_groups WHERE id = ?`)
+      .bind(groupId)
+      .first<{ version: number }>();
+    if (!current || current.version !== input.expectedVersion) {
+      return { ok: false, reason: 'version_conflict', currentVersion: current?.version ?? null };
+    }
+    return { ok: true, version: current.version };
+  }
+  const now = jstNow();
+  const keep = input.pages ? await loadPageKeepMeta(db, groupId) : null;
+  const stmts: D1PreparedStatement[] = [];
+  // 版の番人。期待の版と違う（行が無い場合も含む）ときだけ1行を作り、
+  // 壊れた JSON を読んで失敗し、batch 全体を戻す。合っているときは
+  // 何も作らず素通りする。SELECT なので副作用は無い。
+  stmts.push(
+    db
+      .prepare(
+        `SELECT json('__RICH_MENU_VERSION_GUARD_TRIPPED__')
+           WHERE (SELECT version FROM rich_menu_groups WHERE id = ?) IS DISTINCT FROM ?`,
+      )
+      .bind(groupId, input.expectedVersion),
+  );
+  if (metaBuilt) {
+    stmts.push(
+      db
+        .prepare(
+          `UPDATE rich_menu_groups SET ${metaBuilt.sets.join(', ')}, version = version + 1, updated_at = ? WHERE id = ?`,
+        )
+        .bind(...metaBuilt.vals, now, groupId),
+    );
+  } else {
+    stmts.push(
+      db
+        .prepare(`UPDATE rich_menu_groups SET version = version + 1, updated_at = ? WHERE id = ?`)
+        .bind(now, groupId),
+    );
+  }
+  if (input.pages && keep) {
+    stmts.push(...buildPageReplaceStatements(db, groupId, input.pages, keep, now));
+  }
+  try {
+    await db.batch(stmts);
+  } catch (error) {
+    if (isVersionGuardTrip(error)) {
+      const reread = await db
+        .prepare(`SELECT version FROM rich_menu_groups WHERE id = ?`)
+        .bind(groupId)
+        .first<{ version: number }>();
+      return { ok: false, reason: 'version_conflict', currentVersion: reread?.version ?? null };
+    }
+    throw error;
+  }
+  return { ok: true, version: input.expectedVersion + 1 };
 }
 
 export async function deleteRichMenuGroup(
