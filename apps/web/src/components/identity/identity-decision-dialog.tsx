@@ -41,12 +41,18 @@ export default function IdentityDecisionDialog({
   candidate,
   busy,
   error,
+  initialDecision = 'linked',
   onCancel,
   onSubmit,
 }: {
   open: boolean
   candidate: IdentityCandidateDetail | IdentityCandidateWithProfiles
   busy: boolean
+  /**
+   * ★V8 `fcg2D`：追従帯の「別の人だった」「あとで決める」「結び付ける」が
+   * この窓を開くときの初期選択。省略時は「同じ人として結び付ける」。
+   */
+  initialDecision?: IdentityCandidateDecision
   /** 版競合や権限不足の言い換え。候補の中身は入れない。 */
   error?: string
   onCancel: () => void
@@ -66,13 +72,13 @@ export default function IdentityDecisionDialog({
   // 別の候補を開いたら、前の候補の入力を持ち越さない。
   useEffect(() => {
     if (!open) return
-    setDecision('linked')
+    setDecision(initialDecision)
     setReason('')
     setMode('future_only')
     const profiles = 'profileCandidates' in candidate ? candidate.profileCandidates : []
     setProfileSelections(Object.fromEntries(profiles.flatMap((field) => field.options[0] ? [[field.fieldKey, field.options[0].sourceFriendId]] : [])))
     setConsents([false, false, false])
-  }, [open, candidate])
+  }, [open, candidate, initialDecision])
 
   const ec = candidate.kind === 'ec_member'
   const canReprocess = ec && decision === 'linked'

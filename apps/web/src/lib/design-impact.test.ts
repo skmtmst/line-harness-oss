@@ -50,13 +50,15 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする54ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする55ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
     expect(directImporters(files, pagination, importIndex).map((file) => relative(SRC, file))).toEqual([
       // m15c: 手書きのページ送りを共通 Pagination へ置き換えた10画面を足す。
       'app/accounts/migration.tsx',
+      // ★V8 LINEユーザーIDの移行（Z0jHp）。判断一覧は50件ずつのページ送り。
+      'app/accounts/uid-migration-v8.tsx',
       // 2026-09-02: 案件一覧が自前のページ送りを持たないまま全件を出していた。
       // 設計 `GH8VL` は表の下にページ送りがある。共通へ寄せた。
       'app/affiliates/tabs.tsx',
@@ -73,6 +75,8 @@ describe('共通部品の影響範囲', () => {
       'app/booking/bookings/page.tsx',
       // #370: 予約メニュー8件を設計どおり1ページ6件に区切る。
       'app/booking/menus/page.tsx',
+      // 予約設定V8（owaS3）のメニュー表も1ページ6件で区切る。
+      'app/booking/menus/settings-v8.tsx',
       // #1145(★V8): 一斉配信の一覧。20件ずつのページ送りを共通へ寄せた。
       'app/broadcasts/list-v8.tsx',
       'app/common-actions/page.tsx',
@@ -86,6 +90,8 @@ describe('共通部品の影響範囲', () => {
       'app/conversions/page.tsx',
       // #1011 FRIEND-11: 重複候補が50件を超えると後ろの候補へ辿れなかった。
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
+      // ★V8 重複しているかも（hn6Y8）。v7 と同じくサーバ総数でページ送り。
+      'app/duplicates/duplicates-v8.tsx',
       'app/duplicates/page.tsx',
       // #572: EC連携の取り込み記録が先頭20件しか出ず、21件目以降の失敗に
       // 届かなかった。状態絞りをサーバへ移し、共通へ寄せた。
@@ -103,6 +109,7 @@ describe('共通部品の影響範囲', () => {
       'app/form-submissions/page.tsx',
       // #543: 一覧の到達不能な回答表（M2削除）と共に共通Paginationの利用を外した。
       'app/form-submissions/responses/page.tsx',
+      'app/hq/account-browser-v8.tsx',
       // IDEA-18 (#1036): 経路別の注文明細が増えても画面を重くしないよう
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
       'app/inflow-links/_components/ref-orders.tsx',
@@ -126,6 +133,8 @@ describe('共通部品の影響範囲', () => {
       'app/ops/audit/page.tsx',
       // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
       'app/reminders/detail/page.tsx',
+      // ★V8 リマインダ一覧（apLqS）。表の下にページ送りを置く。
+      'app/reminders/list-v8.tsx',
       'app/reminders/page.tsx',
       // 2026-09-23: Googleビジネスの口コミ一覧（★V6 GB-2）。20件ずつのページ送り。
       'app/restaurant-test/google/google-business.tsx',
@@ -143,6 +152,8 @@ describe('共通部品の影響範囲', () => {
       'app/scenarios/page.tsx',
       // 監査 R132: ファイル検査の一覧が先頭50件固定で検索・ページ送りが
       // なかった。サーバが数えた総数でページ送りを出すため共通へ寄せた。
+      // ★V8 ファイルの検査（PfA4o）。表の下にページ送りを置く。
+      'app/settings/file-scan/file-scan-v8.tsx',
       'app/settings/file-scan/page.tsx',
       'app/staff/page.tsx',
       // 友だち属性V8の4タブ（タグ・情報欄・対応マーク・保存した検索）。
@@ -154,6 +165,8 @@ describe('共通部品の影響範囲', () => {
       // ★V8 テンプレート一覧（v19Ivv）。表の下にページ送りがあり、
       // 1ページごとの件数を選べる。
       'app/templates/list-v8.tsx',
+      // ★V8 統合ユーザーの一覧（ADjK8）。20件ずつのページ送り。
+      'app/users/users-v8.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
       'app/webinars/page.tsx',

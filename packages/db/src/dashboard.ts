@@ -1361,7 +1361,7 @@ export interface ListStats {
     /** 今週（過去7日）のシナリオ由来の送信。 */
     sentThisWeek: number;
   };
-  reminders: { total: number; active: number; waiting: number; sentThisMonth: number };
+  reminders: { total: number; active: number; waiting: number; sentThisMonth: number; failed: number };
   /**
    * ★V8 回答フォーム一覧（I3L41O）の数の帯。
    * 「公開中」は受付中（is_active）の数、下書きは受付中でない数。
@@ -1388,6 +1388,8 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
   const messageScope = accountScopeSql(scope, 'line_account_id');
   const scenarioScope = accountScopeSql(scope, 'line_account_id');
   const reminderScope = accountScopeSql(scope, 'line_account_id');
+  // reminder_delivery_runs にも line_account_id があるので、JOIN内では実施側の列で絞る。
+  const reminderRunScope = accountScopeSql(scope, 'rdr.line_account_id');
   const markScope = 'allTenants' in scope
     ? { sql: '1 = 1', binds: [] as string[] }
     : scope.allowedAccountIds.length > 0
@@ -1557,10 +1559,13 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
           `SELECT
              (SELECT COUNT(*) FROM reminders WHERE deleted_at IS NULL AND ${reminderScope.sql}) AS total,
              (SELECT COUNT(*) FROM reminders WHERE deleted_at IS NULL AND is_active = 1 AND ${reminderScope.sql}) AS active,
-             (SELECT COUNT(*) FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id WHERE fr.status = 'active' AND ${friendScope.sql}) AS waiting`,
+             (SELECT COUNT(*) FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id WHERE fr.status = 'active' AND ${friendScope.sql}) AS waiting,
+             (SELECT COUNT(*) FROM reminder_delivery_runs rdr
+               JOIN reminders rm ON rm.id = rdr.reminder_id
+              WHERE rdr.status IN ('retry_wait', 'permanent_failed') AND rm.deleted_at IS NULL AND ${reminderRunScope.sql}) AS failed`,
         )
-        .bind(...reminderScope.binds, ...reminderScope.binds, ...friendScope.binds)
-        .first<{ total: number; active: number; waiting: number }>();
+        .bind(...reminderScope.binds, ...reminderScope.binds, ...friendScope.binds, ...reminderRunScope.binds)
+        .first<{ total: number; active: number; waiting: number; failed: number }>();
       // リマインダ由来の送信。source は 028 で入っている。
       const sentThisMonth = await count(
         db,
@@ -1573,8 +1578,9 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
         active: row?.active ?? 0,
         waiting: row?.waiting ?? 0,
         sentThisMonth,
+        failed: row?.failed ?? 0,
       };
-    }, { total: 0, active: 0, waiting: 0, sentThisMonth: 0 }),
+    }, { total: 0, active: 0, waiting: 0, sentThisMonth: 0, failed: 0 }),
 
     safe(async () => {
       // フォームはアカウント直下ではなく form_accounts(M:N) で持つ。
