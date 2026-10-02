@@ -519,13 +519,6 @@
   --v8-bphone-screen-radius: 34px;   /* 画面の角丸 */
   /* 一覧の日付窓（list-v8.module.css の datePopover）が落とす影 */
   --v8-popover-shadow: 0 8px 24px rgb(15 23 32 / 0.12);
-=======
-  --color-status-warn-soft: #fdf3e1;
-  --color-track: #1d1d1f0a;
-  --color-border-soft: #1d1d1f14;
-  --shadow-segment-ring: inset 0 0 0 1px var(--color-border-soft);
-  --shadow-segment-thumb: 0 1px 2px #1d1d1f1a;
->>>>>>> origin/codex/development
 }
 
 /*
