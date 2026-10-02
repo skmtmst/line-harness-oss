@@ -30,6 +30,8 @@ import { csvExportLine } from './csv-export'
 import BulkRunDialog from '@/components/friends/bulk-run-dialog'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { FRIENDS_MERGED_TABS } from './friends-tabs'
+import { FriendsListHeadV8 } from './friends-nav-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
 import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
@@ -39,7 +41,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
   （共通Buttonは設計と一致済みで、こちらへ寄せると他画面が動く）。
   幅は設計の実寸：詳細条件110 / 保存した検索130 / 検索70。
 */
-const SEARCH_ROW_SECONDARY = 'inline-flex h-9.5 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas text-label font-semibold text-ink hover:bg-canvas-sunken'
+const SEARCH_ROW_SECONDARY = 'inline-flex v7:h-9.5 v8:h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas text-label font-semibold text-ink hover:bg-canvas-sunken'
 
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
@@ -571,7 +573,7 @@ function FriendsPageInner({
               保存した検索
             </button>
           ) : null}
-          <Button variant="primary" className="h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap text-label font-medium border-0" type="submit">検索</Button>
+          <Button variant="primary" className="v7:h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap text-label v7:font-medium border-0" type="submit">検索</Button>
         </form>
 
         {advanced?.summary.length ? (
@@ -853,12 +855,36 @@ function FriendsPageInner({
 
 function FriendsPageHost() {
   const tab = useMergedTab(MERGED_TABS)
+  const theme = useAdminTheme()
   const [notice, setNotice] = useState<Notice>(null)
   const [exportCurrentPage, setExportCurrentPage] = useState<(() => void) | null>(null)
   const registerExporter = useCallback(
     (exporter: (() => void) | null) => setExportCurrentPage(() => exporter),
     [],
   )
+
+  /*
+   * ★V8（specs/friends-data-menu.md・採用 D）：タブの段は出さず、低頻度の
+   * 管理画面は右上の「データ管理 ▾」へまとめる。道筋（URL）は変えない。
+   * 一覧タブは板の頭に「データ管理 ▾」（副）と「友だちを取り込む」（主）。
+   * 管理画面側（重複検出・統合ユーザー）は各 -v8 ファイルが
+   * 「← 友だち一覧 › データ管理 › 今の画面」の段を自分で出す。
+   */
+  if (theme === 'v8') {
+    return (
+      <div data-friends-page="v8" data-design-node="sdbsQ" className="flex flex-col gap-4">
+        {tab === 'list' ? (
+          <>
+            <FriendsListHeadV8 onExportCurrentPage={exportCurrentPage} />
+            <FriendsPageInner onNotice={setNotice} onExportReady={registerExporter} />
+          </>
+        ) : null}
+        {tab === 'duplicates' ? <EmbeddedPageProvider><DuplicatesPage /></EmbeddedPageProvider> : null}
+        {tab === 'merged' ? <EmbeddedPageProvider><MergedUsersPage /></EmbeddedPageProvider> : null}
+        {notice ? <NoticeDialog notice={notice} onClose={() => setNotice(null)} /> : null}
+      </div>
+    )
+  }
 
   return (
     <div data-friends-page="v6" data-design-node="PhxG6" className="flex flex-col gap-4">
@@ -875,7 +901,7 @@ function FriendsPageHost() {
           active={tab}
           actions={(
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {tab === 'list' ? <Button variant="secondary" className="h-9.5 px-4 text-ink-secondary disabled:text-ink-disabled whitespace-normal" type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage}>表示中をCSVで書き出す</Button> : null}
+              {tab === 'list' ? <Button variant="secondary" className="v7:h-9.5 v7:px-4 text-ink-secondary disabled:text-ink-disabled whitespace-normal" type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage}>表示中をCSVで書き出す</Button> : null}
             </div>
           )}
         />

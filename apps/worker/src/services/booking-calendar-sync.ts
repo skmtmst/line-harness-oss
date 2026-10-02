@@ -45,7 +45,7 @@ export async function getStaffCalendarConnection(
     .first<StaffCalendarConnection>();
 }
 
-async function clientForConnection(
+export async function clientForConnection(
   connection: StaffCalendarConnection,
   credentials: GoogleServiceAccountCredentials,
 ): Promise<GoogleCalendarClient> {

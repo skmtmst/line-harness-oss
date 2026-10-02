@@ -49,9 +49,9 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
     expect((FRIENDS_BODY.match(/size="full"/g) ?? []).length).toBeGreaterThanOrEqual(5)
   })
 
-  it('検索行の副操作を設計の高さ38pxと幅で置く', () => {
-    /* 共通Buttonは36px・角丸8pxで設計と一致済み。ここへ当てない。 */
-    expect(FRIENDS).toContain("const SEARCH_ROW_SECONDARY = 'inline-flex h-9.5")
+  it('検索行の副操作を設計の高さ（v7は38px・v8は36px）と幅で置く', () => {
+    /* 共通Buttonは36px・角丸8pxで設計と一致済み。ここへ当てない。v8は36pxにそろえる。 */
+    expect(FRIENDS).toContain("const SEARCH_ROW_SECONDARY = 'inline-flex v7:h-9.5 v8:h-9")
     expect(FRIENDS_BODY, '詳細条件が110pxでない').toContain('w-27.5')
     expect(FRIENDS_BODY, '保存した検索が130pxでない').toContain('w-32.5')
     expect(FRIENDS_BODY, '検索実行が70pxでない').toContain('w-17.5')

@@ -1,0 +1,261 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8「担当メニューをまとめて決める」（板 ooufy）の、升目表と升の編集段だけの
+ * 見た目。板の外枠・頭・帯は settings-v8.module.css（shell）を借りる。
+ * 値は全部トークン（直書きを数える試験がある）。
+ */
+
+/* ===== メニュー×スタッフの升目表 ===== */
+
+/* スタッフが多いときは表の中だけ横に送る（画面全体を横スクロールさせない）。 */
+.matrixWrap {
+  overflow-x: auto;
+}
+
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.matrix th,
+.matrix td {
+  padding: 14px 8px;
+  border-bottom: 1px solid var(--color-divider);
+  vertical-align: middle;
+}
+
+.matrix thead th {
+  padding-top: 0;
+  padding-bottom: 10px;
+}
+
+.matrix tbody tr:last-child th,
+.matrix tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.matrixMenuHead {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+}
+
+/* スタッフの列は中身に合わせた固定幅。名は1行のまま省略。 */
+.matrixStaffHead {
+  width: 120px;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.matrixStaffName {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matrixStaffOff {
+  display: block;
+  color: var(--color-ink-faint);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.matrixRowFocus {
+  background: var(--color-accent-soft);
+}
+
+/* 1列目（メニュー名）が伸び縮みする。名は左寄せ（th の既定は中央なので戻す）。 */
+.matrixMenuCell {
+  min-width: 0;
+  text-align: left;
+}
+
+.matrixMenuName {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 升：押すとその升が「升を押したとき」の段の対象になる。板は升自体に色を付けない。 */
+.matrixCell {
+  text-align: center;
+  cursor: pointer;
+}
+
+.cellBox {
+  position: relative;
+  display: inline-flex;
+}
+
+/* 上書きがある升の印（小さい黄の点）。 */
+.ovrDot {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--color-canvas);
+  border-radius: var(--radius-pill);
+  background: var(--color-warning);
+}
+
+/* ===== 升の中身を変える段（升目表の内側にある、枠付きの小段） ===== */
+
+.overrideCard {
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.overrideTitle {
+  margin: 0 0 12px;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.overrideFields {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.field {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.unitField {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-board);
+}
+
+.unitField:focus-within {
+  border-color: var(--color-accent);
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.unitField input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.unitField input:focus-visible {
+  outline: none;
+}
+
+.unitField input:disabled {
+  color: var(--color-ink-faint);
+}
+
+.unitSuffix {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.overrideClear {
+  flex-shrink: 0;
+}
+
+/* 段の下の説明行：升の印の見本。 */
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.legendCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: var(--radius-icon);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+}
+
+.legendName {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ovrBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ovrBadgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-warning);
+}
+
+.legendCaption {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+/* ===== 下の帯（保存）：板ではボタンが真ん中 ===== */
+
+.saveBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  box-shadow: var(--v8-savebar-shadow);
+}

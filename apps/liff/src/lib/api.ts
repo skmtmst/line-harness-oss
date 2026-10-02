@@ -13,6 +13,8 @@ export interface MenuItem {
   buffer_after_minutes: number;
   base_price: number;
   sort_order: number;
+  /** キャンセル期限 (開始の何時間前まで)。null は期限なし。 */
+  cancel_deadline_hours_before?: number | null;
 }
 
 export interface StaffItem {
@@ -240,6 +242,11 @@ export interface FormSubmitResponse {
 }
 
 export const api = {
+  /** 上の帯に出す店名など。liffId から店を決める公開口 (Worker は {success,data} で返す)。 */
+  liffConfig: () =>
+    get<{ success: boolean; data: { botBasicId: string; accountName: string; accountId: string } }>(
+      '/api/liff/config',
+    ),
   menus: () => get<{ menus: MenuItem[] }>('/api/liff/booking/menus'),
   staffOf: (menuId: string) =>
     get<{ staff: StaffItem[] }>(`/api/liff/booking/menus/${menuId}/staff`),
