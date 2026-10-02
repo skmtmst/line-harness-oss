@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 複数選択。Pencil ★V7 `WUVcz` §2。欄・候補の決まりは Combobox と同じ。
