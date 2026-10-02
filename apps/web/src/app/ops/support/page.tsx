@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Hourglass, Inbox, Paperclip, Plus, Sparkles, Timer } from 'lucide-react'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   api,
   type OpsSupportDetail,
@@ -21,6 +21,7 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
 import { formatDateTime, planLabel, PLAN_STATUS_LABEL, ROLE_LABEL, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
+import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -279,14 +280,17 @@ export default function OpsSupportPage() {
     await refreshAll()
   }
 
-  const create = async (event: FormEvent) => {
-    event.preventDefault()
+  const [createError, setCreateError] = useState('')
+
+  const create = async () => {
+    if (busy) return
     setBusy(true)
-    setError('')
+    setCreateError('')
     const res = await opsCall(api.ops.support.create({ tenantId: form.tenantId, subject: form.subject.trim(), body: form.body.trim(), kind: form.kind, priority: form.priority }))
     setBusy(false)
-    if (!res.success) { setError(res.error || '作れませんでした'); return }
+    if (!res.success) { setCreateError(res.error || '作れませんでした'); return }
     setCreating(false)
+    setCreateError('')
     setForm({ tenantId: '', subject: '', body: '', kind: 'other', priority: 'medium' })
     setNotice(`${res.data.ticketLabel} を作りました`)
     setStage('new')
@@ -345,41 +349,49 @@ export default function OpsSupportPage() {
 
       {/* 作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。 */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button variant="primary" onClick={() => setCreating((v) => !v)}>
+        <Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}>
           <Plus aria-hidden="true" className="h-4 w-4" />
-          チケットを作る
+          代わりに起票する
         </Button>
       </div>
 
-      {creating ? (
-        <form onSubmit={(event) => void create(event)} className="mb-4 grid gap-3 rounded-card border border-hairline bg-canvas px-4 py-4 md:grid-cols-2">
-          <label className="grid gap-1 text-caption text-ink-secondary">
-            契約先
+      <Dialog
+        open={creating}
+        title="チケットを作る"
+        confirmLabel="作る"
+        cancelLabel="キャンセル"
+        confirmIcon={<Plus size={16} aria-hidden="true" />}
+        busy={busy}
+        error={createError || undefined}
+        designNode="Izau1"
+        onConfirm={() => void create()}
+        onCancel={() => { if (!busy) setCreating(false) }}
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="block md:col-span-2">
+            <span className="mb-1.5 block text-caption font-medium text-ink">契約先</span>
             <Select size="full" aria-label="契約先" value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))}
               options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ value: t.id, label: t.name }))]} />
           </label>
-          <label className="grid gap-1 text-caption text-ink-secondary">
-            種類・優先度
-            <span className="flex gap-2">
-              <Select size="full" aria-label="種類" value={form.kind} onChange={(value) => setForm((f) => ({ ...f, kind: value }))} options={KIND_OPTIONS} />
-              <Select size="page-size" aria-label="優先度" value={form.priority} onChange={(value) => setForm((f) => ({ ...f, priority: value as OpsSupportPriority }))} options={PRIORITY_OPTIONS.slice(1)} />
-            </span>
+          <label className="block">
+            <span className="mb-1.5 block text-caption font-medium text-ink">種類</span>
+            <Select size="full" aria-label="種類" value={form.kind} onChange={(value) => setForm((f) => ({ ...f, kind: value }))} options={KIND_OPTIONS} />
           </label>
-          <label className="grid gap-1 text-caption text-ink-secondary md:col-span-2">
-            件名
-            <TextField value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：電話で受けた配信の相談" maxLength={120} required />
+          <label className="block">
+            <span className="mb-1.5 block text-caption font-medium text-ink">優先度</span>
+            <Select size="full" aria-label="優先度" value={form.priority} onChange={(value) => setForm((f) => ({ ...f, priority: value as OpsSupportPriority }))} options={PRIORITY_OPTIONS.slice(1)} />
           </label>
-          <label className="grid gap-1 text-caption text-ink-secondary md:col-span-2">
-            内容
-            <TextArea rows={4} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} required />
+          <label className="block md:col-span-2">
+            <span className="mb-1.5 block text-caption font-medium text-ink">件名</span>
+            <TextField value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：電話で受けた配信の相談" maxLength={120} aria-label="件名" />
           </label>
-          <div className="flex items-center gap-2 md:col-span-2">
-            <Button onClick={() => setCreating(false)}>キャンセル</Button>
-            <Button type="submit" variant="primary" disabled={busy}>作る</Button>
-            <span className="text-micro text-ink-faint">電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。</span>
-          </div>
-        </form>
-      ) : null}
+          <label className="block md:col-span-2">
+            <span className="mb-1.5 block text-caption font-medium text-ink">内容</span>
+            <TextArea rows={4} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} aria-label="内容" />
+          </label>
+          <p className="text-caption text-ink-secondary md:col-span-2">電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。</p>
+        </div>
+      </Dialog>
 
       {notice ? <p role="status" className="mb-3 text-caption text-accent-deep">{notice}</p> : null}
       {/*
