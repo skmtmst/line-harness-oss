@@ -77,7 +77,7 @@ import { formatDay, formatNumber } from '@/lib/format'
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface AffiliateItem {
+export interface AffiliateItem {
   id: string
   name: string
   code: string
@@ -105,7 +105,7 @@ interface AffiliateReportRow {
 }
 
 /** Merged for the list view */
-interface AffiliateListRow extends AffiliateItem {
+export interface AffiliateListRow extends AffiliateItem {
   totalClicks: number
   totalConversions: number
   totalRevenue: number
@@ -114,7 +114,7 @@ interface AffiliateListRow extends AffiliateItem {
   friendAdds: number
 }
 
-interface AffiliateLink {
+export interface AffiliateLink {
   id: string
   affiliate_id: string
   ref_code: string
@@ -127,7 +127,7 @@ interface AffiliateLink {
   offer_name: string | null
 }
 
-interface ReportV2 {
+export interface ReportV2 {
   affiliateId: string
   affiliateName: string
   code: string
@@ -165,7 +165,7 @@ interface ReportV2 {
   0件と「この期間に記録が無い」を混ぜないため、読めないときは `null` にして
   呼ぶ側で理由を出す。**0で埋めない。**
 */
-function asReportV2(raw: unknown): ReportV2 | null {
+export function asReportV2(raw: unknown): ReportV2 | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
   const value = raw as Partial<ReportV2>
   const numbers: Array<number | undefined> = [
@@ -179,7 +179,7 @@ function asReportV2(raw: unknown): ReportV2 | null {
 }
 
 
-interface JourneySummary {
+export interface JourneySummary {
   friendId: string
   displayName: string | null
   addedAt: string
@@ -213,7 +213,7 @@ function formatYen(n: number): string {
 */
 const WORKER_BASE = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
-function distributionUrl(refCode: string, customBase: string | null): string {
+export function distributionUrl(refCode: string, customBase: string | null): string {
   if (customBase) return `${customBase.replace(/\/$/, '')}/${refCode}`
   if (WORKER_BASE) return `${WORKER_BASE}/r/${encodeURIComponent(refCode)}`
   return ''
@@ -259,7 +259,7 @@ export function parseTab(raw: string | null): PageTab {
 const APPROVAL_PAGE_SIZE = 200
 const APPROVAL_MAX_PAGES = 25
 
-async function listAllConversionApprovals(
+export async function listAllConversionApprovals(
   status: 'pending' | 'approved' | 'rejected',
   startOffset = 0,
 ): Promise<{ items: ConversionApprovalItem[]; truncated: boolean }> {
@@ -1565,12 +1565,12 @@ export function CreateAffiliateModal({
 // Offers / approvals — moved from the former /affiliate-offers page
 // ─────────────────────────────────────────────────────────────────────────────
 
-function formatDateTime(iso: string | null): string {
+export function formatDateTime(iso: string | null): string {
   if (!iso) return '—'
   return formatDay(iso)
 }
 
-function formatYenNullable(n: number | null): string {
+export function formatYenNullable(n: number | null): string {
   if (n === null) return '—'
   return `¥${formatNumber(Math.round(n))}`
 }
@@ -1586,7 +1586,7 @@ interface OfferFormProps {
   onSaved: () => void
 }
 
-function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }: OfferFormProps) {
+export function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }: OfferFormProps) {
   const isEdit = Boolean(initial)
   // R286: 読み上げの項目名。見えている項目名と入力欄を htmlFor・id で結ぶ。
   const fieldId = useId()
@@ -3100,7 +3100,7 @@ export function OffersTab() {
  * 一覧の行を開いたところに置いている。別画面にすると、報酬の数字を見て
  * から条件を直す、という流れで毎回行き来することになる。
  */
-function SettlementEditor({
+export function SettlementEditor({
   affiliate,
   onSaved,
 }: {
