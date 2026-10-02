@@ -1,0 +1,376 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8-B 流入リンクを作る（板 `KMaMk`、競合 `vWJEm`）。
+ *
+ * v7 の作る画面（`new/page.tsx`）とは別の見せ方。入力の項目・順番・
+ * 保存の動きは v7 と同じ（REF の形・未入力の扱い・409 の重複の扱い）。
+ * 右の列（幅 380・薄い地・左に細い線）に「お客さまの進む順」と
+ * スマホの見本を固定する。下の帯は追従（sticky）。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.headBackWrap {
+  margin: 0;
+}
+
+.headBack {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.headBack:hover {
+  text-decoration: underline;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 競合の帯：板の頭の下（`vWJEm`）。 */
+.conflictBand {
+  margin: 0;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 0;
+  align-items: start;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 20px 24px;
+}
+
+.section {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.sectionNote {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.fieldGrid label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.urlPreview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+.urlPreviewCode {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-num);
+}
+
+.urlPreviewNote {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* 動きの行：スイッチ＋説明＋右に変えるボタン。 */
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.actionRowText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.actionRowTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.actionRowSub {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actionPicker {
+  margin-top: 8px;
+}
+
+/* 右の列：進む順＋スマホの見本。 */
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 20px 24px;
+  border-left: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  border-top-right-radius: var(--radius-card, 12px);
+  border-bottom-right-radius: var(--radius-card, 12px);
+}
+
+.railTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.flowList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  list-style: none;
+}
+
+.flowItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.flowItem + .flowItem {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.flowNum {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.flowNumLast {
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+}
+
+/* スマホの見本：角丸 38・黒い縁・LINE の青い地・白い吹き出し。 */
+.phone {
+  overflow: hidden;
+  border: 10px solid var(--color-ink);
+  border-radius: 38px;
+  background: var(--color-ink);
+}
+
+.phoneScreen {
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+  border-radius: 28px;
+  background: var(--color-canvas-sunken);
+}
+
+.phoneStatus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 4px;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.phoneAccount {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.phoneBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--v8-line-screen, var(--color-line-talk));
+}
+
+.phoneDay {
+  align-self: center;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-canvas) 60%, transparent);
+  color: var(--color-ink-secondary);
+  font-size: 10px;
+}
+
+.phoneRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.phoneAvatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.phoneBubble {
+  max-width: 75%;
+  padding: 8px 12px;
+  border-radius: 0 12px 12px 12px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.phoneMenu {
+  padding: 10px;
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* 下の帯：画面の下に追従（sticky）。 */
+.footerBar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+/* ===== 板が 1100px を切ったら右の列を下へ ===== */
+@container (max-width: 1099px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rail {
+    border-top: 1px solid var(--color-hairline);
+    border-left: 0;
+    border-top-right-radius: 0;
+    border-bottom-left-radius: var(--radius-card, 12px);
+  }
+
+  .fieldGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
