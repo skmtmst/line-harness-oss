@@ -27,7 +27,6 @@ export const FOLDER_KINDS = [
   'event',
   'entry_route',
   'broadcast',
-  'broadcast_message_asset',
   // 友だち情報欄の分類。友だち詳細の上に並ぶタブ（飼い主情報・ペット
   // プロフィールなど）がこれ。friend_fields.folder_id が指す先。
   'friend_field',
@@ -268,7 +267,6 @@ export const FOLDER_ITEM_COUNT_TABLES: Partial<Record<FolderKind, {
   // 一覧は deleted_at IS NULL で絞る(packages/db/src/auto-replies.ts:76)。
   auto_reply: { table: 'auto_replies', accountColumn: 'line_account_id', listFilter: 'deleted_at IS NULL' },
   broadcast: { table: 'broadcasts', accountColumn: 'line_account_id' },
-  broadcast_message_asset: { table: 'broadcast_message_assets', accountColumn: 'line_account_id' },
   // #730: media / common_var / rich_menu は一覧が単一アカウントに閉じて
   // いるため、単一アカウント方式で数える。common_var は一覧と同じく
   // archived（archived_at IS NOT NULL）を除く。media の kind 等の追加絞りは
