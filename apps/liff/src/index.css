@@ -39,6 +39,8 @@
   --color-liff-photo: #e9e2d4;
   --color-liff-photo-ink: #6b5b3e;
   --color-liff-note: #f2f6fe;
+  /* 必須の札の地 (B8rCt・g9osGN。文字は --color-liff-sun)。 */
+  --color-liff-required-bg: #fdecec;
   --color-liff-wait-bg: #fff6e5;
   --color-liff-wait-ink: #b26b00;
   --color-liff-ok-bg: #e8f8ee;
