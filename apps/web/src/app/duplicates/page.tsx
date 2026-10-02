@@ -408,7 +408,7 @@ export default function DuplicatesPage() {
                     <td className="py-3 pr-3 pl-5 font-semibold text-ink" title={`${candidate.left.label} ↔ ${candidate.right.label}`}><span className="block truncate">{candidate.left.label} ↔ {candidate.right.label}</span></td>
                     <td className="px-3 py-3 text-ink-secondary">{candidate.confidence.label === 'very_high' ? '最高' : candidate.confidence.label === 'high' ? '高' : candidate.confidence.label === 'medium' ? '中' : '低'}</td>
                     <td className="truncate px-3 py-3 text-ink-secondary" title={candidate.evidenceSummary.join('・')}>{candidate.evidenceSummary.join('・') || '根拠を確認'}</td>
-                    <td className="truncate px-3 py-3 text-ink-secondary">{[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ') || '—'}</td>
+                    <td className="truncate px-3 py-3 text-ink-secondary" title={[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ')}>{[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ') || '—'}</td>
                     <td className="px-3 py-3 text-ink-secondary">{formatDateTime(candidate.reviewedAt ?? candidate.detectedAt)}</td>
                     <td className="px-3 py-3 font-semibold text-ink">{candidate.status === 'pending' ? '未確認' : candidate.status === 'linked' ? '確認済み' : candidate.status === 'deferred' ? '保留' : '別人'}</td>
                     <td className="whitespace-nowrap py-2 pr-5 pl-3 text-right"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>重複候補を確認</Button></td>
