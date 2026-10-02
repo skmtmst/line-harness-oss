@@ -7,6 +7,8 @@ import { api, type ScenarioRuns, type ScenarioSimulation } from '@/lib/api'
 import { useOffsetServerList } from '@/lib/use-server-list'
 import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ScenariosListV8 from './list-v8'
 
 function scenarioCompletionDetail(active: number, completed: number): string {
   const enrolled = active + completed
@@ -332,7 +334,7 @@ function currentMonthStart(now = new Date()): string {
   return `${month.format(now)}-01T00:00:00+09:00`
 }
 
-export default function ScenariosPage() {
+function ScenariosPageV7() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const router = useRouter()
   // 名前の絞り込み（設計 `Body` の検索）。手元で絞る。
@@ -916,4 +918,15 @@ export default function ScenariosPage() {
       </div>
     </div>
   )
+}
+
+/**
+ * シナリオ配信の入口。
+ *
+ * 見た目テーマが v8 のときだけ新しい一覧（`list-v8.tsx`、Pencil `axFrW`）
+ * を出す。v7 では従来どおり上の ScenariosPageV7（見た目は1画素も変えない）。
+ */
+export default function ScenariosPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <ScenariosListV8 /> : <ScenariosPageV7 />
 }
