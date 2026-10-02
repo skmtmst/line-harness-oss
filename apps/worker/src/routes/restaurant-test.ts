@@ -1452,9 +1452,9 @@ restaurantTest.patch('/api/restaurant-test/tables/:id', requireRole('owner', 'ad
   const current = await dbFor(c.env).prepare(`SELECT t.* FROM rt_tables t JOIN rt_stores s ON s.id = t.store_id
     WHERE t.id = ? AND s.organization_id = ? AND (? IS NULL OR s.id = ?)`)
     .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
-    .first<{ store_id: string; code: string; label: string; seat_type: string; min_capacity: number; max_capacity: number; is_active: number }>();
+    .first<{ store_id: string; code: string; label: string; seat_type: string; min_capacity: number; max_capacity: number; is_active: number; floor_x: number; floor_y: number; join_group: string | null }>();
   if (!current) return c.json({ success: false, error: '卓が見つかりません' }, 404);
-  const body = await c.req.json<{ code?: string; label?: string; seatType?: string; minCapacity?: number; maxCapacity?: number; isActive?: boolean }>();
+  const body = await c.req.json<{ code?: string; label?: string; seatType?: string; minCapacity?: number; maxCapacity?: number; isActive?: boolean; floorX?: number; floorY?: number; joinGroup?: string | null }>();
   const code = body.code === undefined ? current.code : body.code;
   const label = body.label === undefined ? current.label : body.label;
   const seatType = body.seatType === undefined ? current.seat_type : body.seatType;
@@ -1463,11 +1463,14 @@ restaurantTest.patch('/api/restaurant-test/tables/:id', requireRole('owner', 'ad
   if (typeof code !== 'string' || !code.trim() || typeof label !== 'string' || !label.trim()
     || !['counter', 'table', 'private_room', 'terrace'].includes(seatType)
     || !Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max < min
-    || (body.isActive !== undefined && typeof body.isActive !== 'boolean')) {
+    || (body.isActive !== undefined && typeof body.isActive !== 'boolean')
+    || (body.floorX !== undefined && !Number.isSafeInteger(body.floorX))
+    || (body.floorY !== undefined && !Number.isSafeInteger(body.floorY))
+    || (body.joinGroup !== undefined && body.joinGroup !== null && (typeof body.joinGroup !== 'string' || body.joinGroup.length > 100))) {
     return c.json({ success: false, error: '卓の入力内容が正しくありません' }, 400);
   }
-  await dbFor(c.env, current.store_id).prepare(`UPDATE rt_tables SET code = ?, label = ?, seat_type = ?, min_capacity = ?, max_capacity = ?, is_active = ?, updated_at = datetime('now') WHERE id = ?`)
-    .bind(code.trim(), label.trim(), seatType, min, max, body.isActive === undefined ? current.is_active : Number(body.isActive), c.req.param('id')).run();
+  await dbFor(c.env, current.store_id).prepare(`UPDATE rt_tables SET code = ?, label = ?, seat_type = ?, min_capacity = ?, max_capacity = ?, is_active = ?, floor_x = ?, floor_y = ?, join_group = ?, updated_at = datetime('now') WHERE id = ?`)
+    .bind(code.trim(), label.trim(), seatType, min, max, body.isActive === undefined ? current.is_active : Number(body.isActive), body.floorX ?? current.floor_x, body.floorY ?? current.floor_y, body.joinGroup === undefined ? current.join_group : body.joinGroup?.trim() || null, c.req.param('id')).run();
   return c.json({ success: true, data: { id: c.req.param('id') } });
 });
 
