@@ -490,7 +490,8 @@
     "540_support_mark_rule_create_idempotency.sql",
     "541_tag_update_idempotency.sql",
     "542_line_account_login_liff_unique.sql",
-    "543_auto_reply_create_idempotency.sql"
+    "543_auto_reply_create_idempotency.sql",
+    "544_line_account_tags.sql"
   ],
-  "migrationCount": 491
+  "migrationCount": 492
 }
