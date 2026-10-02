@@ -51,6 +51,9 @@ const qaLiff = {
   openWindow(_options: { url: string; external?: boolean }): void {
     // 撮影モードでは外部ブラウザを開かない。
   },
+  closeWindow(): void {
+    // 撮影モードでは窓を閉じられない。押せることだけ担保する。
+  },
 };
 
 export default qaLiff;
