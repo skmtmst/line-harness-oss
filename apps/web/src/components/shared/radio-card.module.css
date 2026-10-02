@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * ラジオカード（監査 DEEP-02／共通仕様「入力欄と選択カード」§2）。

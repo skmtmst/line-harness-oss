@@ -26,11 +26,18 @@ export default function RecipesPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  /*
+   * D025/M043: 捕まえた取得失敗は共通部品へ渡す。403 は権限の案内に
+   * なり再試行口は出ない。429 は待ち秒数を添えた案内になる。
+   */
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (accountLoading) return
     let alive = true
     setStatus('loading')
+    setLoadError(null)
     void api.recipes
       .list(selectedAccountId ?? undefined)
       .then((res) => {
@@ -42,13 +49,15 @@ export default function RecipesPage() {
         setRecipes(res.data)
         setStatus('ready')
       })
-      .catch(() => {
-        if (alive) setStatus('error')
+      .catch((caught) => {
+        if (!alive) return
+        setLoadError(caught)
+        setStatus('error')
       })
     return () => {
       alive = false
     }
-  }, [accountLoading, selectedAccountId])
+  }, [accountLoading, selectedAccountId, reloadKey])
 
   return (
     <div className={styles.page}>
@@ -59,7 +68,11 @@ export default function RecipesPage() {
       />
 
       {status !== 'ready' ? (
-        <ListState kind={status === 'error' ? 'error' : 'loading'} />
+        <ListState
+          kind={status === 'error' ? 'error' : 'loading'}
+          error={loadError ?? undefined}
+          onRetry={status === 'error' ? () => setReloadKey((key) => key + 1) : undefined}
+        />
       ) : recipes.length === 0 ? (
         <ListState
           kind="empty"
