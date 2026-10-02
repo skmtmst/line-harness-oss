@@ -47,7 +47,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function AppTopBar() {
   const pathname = usePathname() ?? '/'
-  const { title, } = usePageChrome()
+  const { title, crumbs } = usePageChrome()
   const router = useRouter()
   const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId, loading, error, refreshing, refreshAccounts } = useAccount()
   const [staffName, setStaffName] = useState('')
@@ -162,6 +162,7 @@ export default function AppTopBar() {
       onLogout={logout}
       notificationUnreadCount={notificationUnread}
       v8Chrome
+      crumbs={crumbs}
     />
     </div>
     {accountsLoadFailed ? (
