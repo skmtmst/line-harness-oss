@@ -1,0 +1,716 @@
+@layer properties, theme, base, components, utilities;
+
+/* ★V8 シナリオ編集（Pencil `PMLkX` 稼働中・`nMSiE` 開始直後・`ARuZ4` 停止中）。
+   左に流れ（3箱・数の帯・メッセージ）、右の欄（380）に本物のスマホ。
+   白い板が 1100px を切ったら右の欄を下へ畳む。 */
+
+/* 白い板いっぱいのコンテナ。幅を測る土台。 */
+.page {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 左に流れ・右の欄（380）。1通の編集中は右の欄を出さず1段にする。 */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 20px;
+  align-items: start;
+}
+
+.splitEditing {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* ===== 見出し ===== */
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-action);
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.headRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.titleName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.renameButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: none;
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.renameButton:hover {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.meta {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink-faint);
+}
+
+.metaLink {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--color-info, var(--color-action));
+  cursor: pointer;
+}
+
+.metaLink:hover {
+  text-decoration: underline;
+}
+
+/* 1通を編集しているときの上の行 */
+.editHeadRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.editHeadGap {
+  flex: 1;
+}
+
+/* ===== nMSiE：始めた直後の知らせ ===== */
+
+.startedBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-success-bg);
+}
+
+.startedText {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+.startedLink {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-success);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ===== 3 つの箱（同じ高さ・ボタンは同じ位置） ===== */
+
+.boxGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.boxStep {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+}
+
+.boxTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.boxBody {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.boxNote {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink-faint);
+}
+
+/* ボタンは箱の下の縁にそろえる（3つの箱は同じ高さ・ボタンは同じ位置）。 */
+.boxAction,
+.box > :global(.btn),
+.box > :global(button) {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+.boxAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.boxAction:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.boxLink {
+  margin-top: 6px;
+  align-self: flex-start;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--color-info, var(--color-action));
+  cursor: pointer;
+}
+
+.boxLink:hover {
+  text-decoration: underline;
+}
+
+/* ===== 数の帯 4 つ ===== */
+
+.statBand {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.statCell {
+  min-width: 0;
+}
+
+.statLabel {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.statValue {
+  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.statDrop {
+  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-warning);
+}
+
+.statUnit {
+  margin-left: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-ink-faint);
+}
+
+.statNote {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-ink-faint);
+}
+
+/* ===== 最後の1通の後 ===== */
+
+.completeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.completeLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.completeValue {
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+.completeNote {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.completeAction {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--color-info, var(--color-action));
+  cursor: pointer;
+}
+
+.completeAction:hover {
+  text-decoration: underline;
+}
+
+/* ===== 段・板 ===== */
+
+.panel {
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.panelTitle {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+/* ===== メッセージの行 ===== */
+
+.stepList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.insertRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.insertLine {
+  flex: 1;
+  border-top: 1px dashed var(--color-hairline);
+}
+
+.insertButton {
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--color-action);
+  cursor: pointer;
+}
+
+.insertButton:hover {
+  text-decoration: underline;
+}
+
+.stepRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.stepRowSelected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.stepMain {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stepNo {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.stepTiming {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 160px;
+}
+
+.stepWhen {
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+.stepExample {
+  font-size: 12px;
+  color: var(--color-action);
+}
+
+.stepTitleCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.stepTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+.stepKind {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-canvas-sunken);
+  font-size: 11px;
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+}
+
+.stepOps {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.moveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.moveButton:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+}
+
+.moveButton:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.stepEditRow {
+  list-style: none;
+}
+
+.emptySteps {
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-ink-faint);
+}
+
+/* ===== 通ごとの数 ===== */
+
+.countPanel {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas-sunken);
+}
+
+.countTitle {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.countPanel ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.countRow {
+  display: grid;
+  grid-template-columns: 56px minmax(120px, 1fr) 160px minmax(140px, auto) minmax(120px, auto);
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.countRow:first-child {
+  border-top: none;
+}
+
+.countNo {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.countAudience {
+  font-size: 12px;
+  color: var(--color-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.countBar {
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-canvas);
+  overflow: hidden;
+}
+
+.countBar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+}
+
+.countReach {
+  font-size: 12px;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.countContinue {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+}
+
+.countStop {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-warning);
+  white-space: nowrap;
+}
+
+/* ===== 行の下の文字ボタン 3 つ ===== */
+
+.addRow {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+
+.addButton {
+  border: none;
+  background: none;
+  padding: 4px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-action);
+  cursor: pointer;
+}
+
+.addButton:hover {
+  text-decoration: underline;
+}
+
+/* ===== 右の欄（本物のスマホ） ===== */
+
+.side {
+  position: sticky;
+  top: 16px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.sideTitle {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.sideEmpty {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--color-ink-faint);
+}
+
+/* ===== 下の帯（削除＝左端・ほか＝真ん中） ===== */
+
+.deleteButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-danger);
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+}
+
+.deleteButton:hover {
+  filter: brightness(0.92);
+}
+
+.duplicateNote {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+/* ===== 板が 1100px を切ったら右の欄を下へ ===== */
+
+@container (max-width: 1099px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    position: static;
+  }
+
+  .boxGrid,
+  .statBand {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .countRow {
+    grid-template-columns: 56px minmax(0, 1fr) minmax(140px, auto);
+  }
+
+  .countBar,
+  .countContinue,
+  .countStop {
+    grid-column: 2 / -1;
+  }
+}

@@ -3,10 +3,13 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import TargetMissing from '@/components/shared/target-missing'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import ScenarioDetailClient from './scenario-detail-client'
+import ScenarioDetailV8 from './detail-v8'
 
 function ScenarioDetailPageContent() {
   const searchParams = useSearchParams()
+  const theme = useAdminTheme()
   const id = searchParams.get('id')
   const showStarted = searchParams.get('started') === '1'
   if (!id) {
@@ -20,7 +23,11 @@ function ScenarioDetailPageContent() {
       />
     )
   }
-  return <ScenarioDetailClient scenarioId={id} showStarted={showStarted} />
+  return theme === 'v8' ? (
+    <ScenarioDetailV8 scenarioId={id} showStarted={showStarted} />
+  ) : (
+    <ScenarioDetailClient scenarioId={id} showStarted={showStarted} />
+  )
 }
 
 // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。

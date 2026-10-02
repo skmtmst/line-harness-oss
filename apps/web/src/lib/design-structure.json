@@ -1718,8 +1718,21 @@
       ]
     },
     "/scenarios/detail": {
-      "node": "g6qn3",
-      "name": "V2 4-1-1 シナリオ編集",
+      "node": "PMLkX nMSiE ARuZ4",
+      "name": "★V8 シナリオ編集（稼働中・開始直後・停止中）",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": [
+          "PMLkX",
+          "nMSiE",
+          "ARuZ4"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "★V8（オーナー決定 2026-10-01、Pencil PMLkX/nMSiE/ARuZ4）へ V8 版 detail-v8 を実装。左に流れ（3箱・数の帯・メッセージ）、右の欄に本物のスマホ（StepPreview）、下の帯は削除＝左端・ほか＝真ん中。節の印は v7 側との和集合。同条件の画像比較は未実施"
+      },
       "sections": [
         "Crumb",
         "Head",
@@ -1769,7 +1782,17 @@
         "ここに挿入",
         "このシナリオを複製",
         "このシナリオを削除",
-        "配信後"
+        "配信後",
+        "← シナリオ配信へ",
+        "配信結果を見る",
+        "まとめて下見",
+        "まとめてテストを送る",
+        "このシナリオを削除する",
+        "メッセージ（",
+        "＋ ここに挿入",
+        "＋ メッセージを追加する",
+        "テンプレートを追加する",
+        "分岐を追加する"
       ]
     },
     "/reminders/new": {
