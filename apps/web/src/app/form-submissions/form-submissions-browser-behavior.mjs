@@ -59,6 +59,7 @@ const formMatchesListFilter = (f, filter) => {
   if (filter === 'published') return f.isActive
   if (filter === 'draft') return !f.isActive
   if (filter === 'stored') return hasStoredDestination(f.layout, f.onSubmitTagId)
+  if (filter === 'pending') return (f.pendingPostActionCount ?? 0) > 0
   return true
 }
 const formMatchesListQuery = (f, raw) => {
@@ -178,6 +179,7 @@ function form(index, overrides = {}) {
     monthlySubmitCount: index,
     monthlyOpenCount: index + 1,
     monthlyCompletionRate: 50,
+    pendingPostActionCount: 0,
     destinationSummary: { friendFieldCount: 0, tagCount: 0 },
     createdAt: `2025-01-${day}T00:00:00.000Z`,
     updatedAt: `2026-09-${day}T00:00:00.000Z`,
@@ -286,7 +288,7 @@ async function openHarness(browser, {
        */
       const rawFilter = url.searchParams.get('filter')
       const rawSort = url.searchParams.get('sort')
-      const filter = ['published', 'draft', 'stored'].includes(rawFilter) ? rawFilter : 'all'
+      const filter = ['published', 'draft', 'stored', 'pending'].includes(rawFilter) ? rawFilter : 'all'
       const sort = ['answers', 'updated', 'name'].includes(rawSort) ? rawSort : 'latest-answer'
       const search = url.searchParams.get('q') ?? ''
       let list = filter === 'all' ? all : all.filter((f) => formMatchesListFilter(f, filter))
