@@ -126,7 +126,7 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
         <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
           パネルを並べて作る画面が別にあります。そこで作ると、ここから選べるようになります。
         </p>
-        <Button variant="secondary" className="text-ink-secondary mt-3 h-10 items-center px-4 whitespace-normal" href="/templates/carousel">
+        <Button variant="secondary" className="text-ink-secondary mt-3 v7:h-10 items-center px-4 whitespace-normal" href="/templates/carousel">
           カルーセルを作りに行く
         </Button>
       </div>

@@ -57,14 +57,19 @@ const GUARDED = [
   'app/restaurant-test/google/google-profile.tsx',
   'app/restaurant-test/stores/new/page.tsx',
   'app/rich-menus/edit/page.tsx',
+  'app/rich-menus/new/create-v8.tsx',
   'app/rich-menus/new/page.tsx',
   'app/settings/page.tsx',
   'app/settings/file-scan/page.tsx',
   'app/staff/new/page.tsx',
+  'app/tags/field-editor-v8.tsx',
   'app/tags/fields/edit/page.tsx',
   'app/tags/fields/new/page.tsx',
+  'app/tags/mark-editor-v8.tsx',
+  'app/tags/search-editor-v8.tsx',
   'app/tags/searches/edit/page.tsx',
   'app/templates/carousel/page.tsx',
+  'app/templates/editor-v8.tsx',
   'app/templates/questions/new/page.tsx',
   'app/webhooks/new/page.tsx',
   'app/webinars/edit/page.tsx',
@@ -81,8 +86,16 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string> = {
+  'app/templates/edit-v8.tsx': 'app/templates/editor-v8.tsx',
+  'app/templates/asset-editor-v8.tsx': 'app/templates/editor-v8.tsx',
+  'app/templates/carousel/carousel-v8.tsx': 'app/templates/editor-v8.tsx',
+  'app/templates/questions/question-v8.tsx': 'app/templates/editor-v8.tsx',
   'components/webinars/webinar-form.tsx': 'app/webinars/edit/page.tsx',
   'components/webinars/webinar-notifications.tsx': 'app/webinars/edit/page.tsx',
+  // ★V8 版の描画。番兵（useUnsavedGuard）は同じ画面の page.tsx が
+  // 共有フック経由で持つ。どちらのテーマでも同じ番兵が効く。
+  'app/settings/feature-settings-v8.tsx': 'app/settings/page.tsx',
+  'app/settings/file-scan/file-scan-v8.tsx': 'app/settings/file-scan/page.tsx',
 }
 
 /*
@@ -134,6 +147,8 @@ const EXEMPTIONS: Record<string, string> = {
     '一覧と絞り込みが中心。作る操作は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
   'app/inflow-links/page.tsx':
     '一覧の一括操作（移動・再開）は押した直後に即時保存し、下書きを持たない',
+  'app/tags/field-migrate-v8.tsx':
+    '★V8 の項目移行画面（GobMd）。事前確認→明示実行の2段階で、途中離脱で失うのは確認状態だけ。離脱番兵の v7 同等画面（fields/migrate/page.tsx）と同じ扱い',
   'app/inflow-links/detail/page.tsx':
     '転送先の編集は保存ボタン確定式。下書き・dirty 管理がなく番兵の扱いは別途検討',
   'app/mileage/score-rules/page.tsx':
@@ -304,9 +319,21 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
     ).toEqual([])
   })
 
+  /*
+   * 画面の守りを共有フック（同じフォルダの use-*.ts）へ寄せた画面は、
+   * フックの中身も合わせて1つの画面として見る。
+   */
+  function screenSources(file: string): string {
+    const dir = dirname(join(SRC, file))
+    const hooks = readdirSync(dir)
+      .filter((name) => /^use-[^/]+\.ts$/.test(name) && !name.includes('.test.'))
+      .map((name) => readFileSync(join(dir, name), 'utf8'))
+    return [readFileSync(join(SRC, file), 'utf8'), ...hooks].join('\n')
+  }
+
   it('番兵を持つ画面は共通フックと離脱確認ダイアログを配線している', () => {
     for (const file of GUARDED) {
-      const source = readFileSync(join(SRC, file), 'utf8')
+      const source = screenSources(file)
       expect(source, file).toContain('useUnsavedGuard(')
       expect(source, `${file} の離脱確認`).toContain('leaveTarget !== null')
     }
@@ -314,7 +341,7 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
 
   it('親へ dirty を報告する画面の親は、共通フックで番兵を持っている', () => {
     for (const [file, parent] of Object.entries(COVERED_BY_PARENT)) {
-      const parentSource = readFileSync(join(SRC, parent), 'utf8')
+      const parentSource = screenSources(parent)
       expect(parentSource, `${file} の番兵を持つ親 ${parent}`).toContain('useUnsavedGuard(')
     }
   })

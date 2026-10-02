@@ -1,6 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import Select from '@/components/shared/select'
+
 import Link from 'next/link'
 import { MoreHorizontal } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -38,6 +41,10 @@ const STATUS_TONE: Record<EcSubscription['status'], string> = {
 const PAGE_SIZE = 100
 
 export default function SubscriptionsPanel({ accountId }: { accountId: string | null }) {
+  const theme = useAdminTheme()
+  const [v8PageSize, setV8PageSize] = useState(10)
+  const pageSize = theme === 'v8' ? v8PageSize : PAGE_SIZE
+  const loadGeneration = useRef(0)
   const [data, setData] = useState<EcSubscriptionList | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
   const [filter, setFilter] = useState<Filter>('all')
@@ -54,6 +61,7 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
    * ページの中だけで効く(サーバ側に検索が無いため。下の文言でそう伝える)。
    */
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current
     if (!accountId) {
       setData(null)
       setState('empty')
@@ -64,17 +72,19 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
       const response = await api.ecCommerce.subscriptions({
         lineAccountId: accountId,
         status: filter === 'all' ? undefined : filter,
-        limit: PAGE_SIZE,
-        offset: (page - 1) * PAGE_SIZE,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
       })
+      if (generation !== loadGeneration.current) return
       if (!response.success || !Array.isArray(response.data?.items)) throw new Error('invalid_subscription_response')
       setData(response.data)
       setTotal(response.pagination?.total ?? response.data.items.length)
       setState(response.data.items.length ? 'ready' : 'empty')
     } catch (error) {
+      if (generation !== loadGeneration.current) return
       setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId, filter, page])
+  }, [accountId, filter, page, pageSize])
 
   useEffect(() => { void load() }, [load])
   // 表示条件やアカウントを変えたら先頭のページへ戻す。
@@ -92,7 +102,7 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
       <ListState
         kind={state}
         title={state === 'empty' && !accountId ? 'LINEアカウントを選択してください' : state === 'empty' ? '定期便はまだありません' : undefined}
-        description={state === 'empty' && !accountId ? '左のメニュー上部で、確認するLINEアカウントを選びます。' : state === 'empty' ? 'ECから定期便が届くと、ここに並びます。' : undefined}
+        description={state === 'empty' && !accountId ? 'LINEアカウントを選ぶ欄で、確認するアカウントを選びます。' : state === 'empty' ? 'ECから定期便が届くと、ここに並びます。' : undefined}
         onRetry={state === 'error' ? () => void load() : undefined}
       />
     )
@@ -101,7 +111,7 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
   const summary = data?.summary
   return (
     <>
-      <div className={styles.kpis}>
+      <div className={styles.kpis} data-ro-kpis="true">
         <KpiCard variant="v6" title="続いている定期便" value={summary?.active ?? null} unit="件" detail={summary?.monthlyAmount === null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary?.monthlyAmount)}`} />
         <KpiCard variant="v6" title="今月 はじまった" value={summary?.startedThisMonth ?? null} unit="件" detail="" help="定期便の開始日から集計しています" badge={summary?.startedThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
         <KpiCard variant="v6" title="今月 止まった" value={summary?.cancelledThisMonth ?? null} unit="件" detail={summary?.cancellationTopReason ? `多い理由「${summary.cancellationTopReason}」` : '解約理由の記録なし'} badge={summary?.cancelledThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
@@ -183,16 +193,17 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
           : <ListRange
               label={filter === 'all' ? '定期便' : '表示条件に合う定期便'}
               total={total}
-              first={total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}
-              last={(page - 1) * PAGE_SIZE + shown.length}
+              first={total === 0 ? 0 : (page - 1) * pageSize + 1}
+              last={(page - 1) * pageSize + shown.length}
             />}
         {data && data.skipped.malformedSnapshots > 0
           ? `／ 形が読めなかったお客様のぶん ${formatNumber(data.skipped.malformedSnapshots)}件は数えていません`
           : ''}
       </p>
+      {theme === 'v8' && <div className="flex justify-end"><Select aria-label="定期便の表示件数" value={String(v8PageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}件` }))} onChange={(value) => { setV8PageSize(Number(value)); setPage(1) }} /></div>}
       <Pagination
         page={page}
-        pageCount={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+        pageCount={Math.max(1, Math.ceil(total / pageSize))}
         onPageChange={setPage}
         ariaLabel="定期便のページ送り"
       />

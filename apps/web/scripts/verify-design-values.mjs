@@ -369,6 +369,7 @@ const V8_MEASURE = [
   { id: 'RfHCo', file: 'shared/otp-input.module.css', cls: 'group', node: '桁の並び', skipText: true },
   { id: 'cfVyj', file: 'shared/line-preview.module.css', cls: 'phone', skipText: true },
   { id: 'clV5c', file: 'shared/tabs.module.css', cls: 'list', textCls: ['tab', 'current'] },
+  { id: 'KVkPg', file: 'shared/color-well.module.css', cls: 'well', skipText: true },
   { id: 'KjC1z', file: 'shared/help-tip.module.css', cls: 'button', textCls: 'mark' },
   { id: 'mpVfY', file: 'shared/status-badge.module.css', cls: 'badge' },
 ]

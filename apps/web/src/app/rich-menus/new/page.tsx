@@ -24,6 +24,8 @@ import { TEMPLATES } from '@/lib/rich-menu-templates'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { pruneCondition } from '@/lib/segment-condition'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import RichMenuCreateV8 from './create-v8'
 
 /**
  * N-161: 作成画面の「切替ボタン」は行き先を orderIndex の文字列で持つ
@@ -43,7 +45,16 @@ function areaDraftsWithSwitchTargets(areas: Area[]) {
   })
 }
 
+/*
+ * v7 の本体（NewRichMenuPageV7）は変えない。★V8 のときだけ
+ * 4手順の作る画面（JeINq/Z0uO6/OxEMM/F4gELj）へ切り替える。
+ */
 export default function NewRichMenuPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <RichMenuCreateV8 /> : <NewRichMenuPageV7 />
+}
+
+function NewRichMenuPageV7() {
   usePageTitle('リッチメニューを作る')
   const router = useRouter()
   const { selectedAccount } = useAccount()

@@ -10,6 +10,9 @@ const MESSAGE_TYPE = readFileSync(join(HERE, 'template-message-type.ts'), 'utf8'
 const EDIT_PAGE = readFileSync(join(HERE, 'edit/page.tsx'), 'utf8')
 const MESSAGE_EDITOR = readFileSync(join(HERE, '../../components/templates/message-template-editor.tsx'), 'utf8')
 const CAROUSEL_PAGE = readFileSync(join(HERE, 'carousel/page.tsx'), 'utf8')
+// 組み立て・保存の正本は core へ出した（page.tsx は自由な export を持てない）。
+// 契約は「画面が使う全体」を見るため、ページ＋共有モジュールをつなげて読む。
+const CAROUSEL_CORE = readFileSync(join(HERE, 'carousel/carousel-core.ts'), 'utf8')
 const ASSET_EDITOR = readFileSync(join(HERE, 'template-asset-editor.tsx'), 'utf8')
 
 /**
@@ -79,7 +82,7 @@ describe('V6の作成画面', () => {
   })
 
   it('カルーセルをパネルとして最大10枚まで扱う', () => {
-    expect(CAROUSEL_PAGE).toContain('const MAX_COLUMNS = 10')
+    expect(CAROUSEL_PAGE + CAROUSEL_CORE).toContain('const MAX_COLUMNS = 10')
     // 選択肢の上限は直書きせず MAX_ACTIONS。数は全部のパネルでそろえる決まりも添える。
     expect(CAROUSEL_PAGE).toContain('このパネルの選択肢（最大{MAX_ACTIONS}つ・数は全部のパネルでそろえてください）')
     expect(CAROUSEL_PAGE).toContain('画像は横1024 × 縦678pxを推奨')
