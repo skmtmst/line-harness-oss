@@ -108,7 +108,7 @@ export async function processOperationAlertNotificationOutbox(
         if (!row.email) throw new Error('alert_email_recipient_unavailable');
         await sendOperationEmail(env, {
           to: row.email,
-          subject: '【LINE Harness】運用状態の確認が必要です',
+          subject: '【musubo】運用状態の確認が必要です',
           body: text,
         });
       }

@@ -18,6 +18,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { requirePhotoPermission } from './nen-photo-operations.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
+import { classifyExternalDeliveryError } from '../services/external-delivery-retry.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import { imageDimensions, stripImageMetadata } from '../services/media-metadata.js';
 import {
@@ -406,7 +407,14 @@ export async function deliverPhotoReviewNotification(
     );
     relayed = true;
   } catch (error) {
-    sendError = error instanceof Error ? error.message : '審査結果をLINEで通知できませんでした';
+    /*
+     * ここだけ生のエラー本文を使っていたため、写真の一括審査の失敗一覧
+     * （管理画面）に `LINE Harness proxy error: 500 …` と LINE 側の応答本文が
+     * そのまま出ていた。他の送信失敗と同じ安全な理由へそろえる（2026-10-02）。
+     * 原因を追うための生の本文はログにだけ残す。
+     */
+    console.error('photo review notification failed', input.decisionId, error);
+    sendError = classifyExternalDeliveryError(error).message;
   }
   try {
     const completed = await completePhotoNotificationDelivery(db, {
