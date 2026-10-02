@@ -1,0 +1,232 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B ウェビナー①基本設定（作る）（板 `j7PP04`）。
+ * 5段の手順の帯・左の設定カード・右の見え方・下の帯。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.crumb {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.crumbLink {
+  color: var(--color-action);
+}
+
+.crumbLink:hover {
+  text-decoration: underline;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* 5段の手順の帯：済み＝緑のチェック、いま＝緑の枠、まだ＝灰。 */
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-ink-faint);
+}
+
+.step + .step::before {
+  content: "";
+  width: 24px;
+  height: 1px;
+  margin: 0 8px;
+  background: var(--color-hairline);
+}
+
+.stepNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 999px;
+  border: 1px solid var(--color-hairline);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stepDone {
+  color: var(--color-ink);
+}
+
+.stepDone .stepNum {
+  border-color: transparent;
+  background: var(--color-success);
+  color: #fff;
+}
+
+.stepCurrent {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.stepCurrent .stepNum {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 本体2列：左の設定・右の見え方（幅 340〜380・左に細い線）。 */
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 24px;
+  align-items: start;
+  min-width: 0;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 20px 24px;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cardNote {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: 10px;
+  padding: 0 12px;
+  height: 36px;
+  font-size: 13px;
+  color: var(--color-ink);
+  background: var(--color-canvas);
+}
+
+.input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.fieldHelp {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.radioRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.previewCol {
+  min-width: 0;
+  border-left: 1px solid var(--color-hairline);
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.previewTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.previewBubbleTitle {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.previewBubbleBody {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.testRow {
+  display: flex;
+  justify-content: center;
+}
+
+@container (max-width: 1100px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .previewCol {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--color-hairline);
+    padding-top: 16px;
+  }
+}
