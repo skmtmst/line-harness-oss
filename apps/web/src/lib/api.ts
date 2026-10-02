@@ -12606,6 +12606,8 @@ export const api = {
         targetingPriority: number;
         targetingEnabled: boolean;
         folderId: string | null;
+        /** M951: 保存時に送り返す版。古い版での保存は 409 で止まる。 */
+        version: number;
         createdAt: string;
         updatedAt: string;
         pages: Array<{
@@ -12697,6 +12699,8 @@ export const api = {
       }),
 
     update: (groupId: string, input: {
+      /** M951: 読んだときの版。必須。古ければ 409。 */
+      expectedVersion: number;
       name?: string;
       chatBarText?: string;
       isDefaultForAll?: boolean;
@@ -14151,9 +14155,16 @@ export const bookingApi = {
     if (query?.trim()) params.set('q', query.trim());
     return fetchApi<{ customers: BookingCustomerSummary[] }>(`/api/booking/admin/customers?${params}`);
   },
-  createCustomer: (accountId: string, body: { display_name: string; phone: string; pet_name?: string }) =>
+  createCustomer: (
+    accountId: string,
+    body: { display_name: string; phone: string; pet_name?: string },
+    idempotencyKey?: string,
+  ) =>
     fetchApi<{ customer: BookingCustomerSummary }>(withAccount('/api/booking/admin/customers', accountId), {
-      method: 'POST', body: JSON.stringify(body),
+      method: 'POST',
+      // R559: 確定操作ごとに1つのキーで送り、応答消失後の再送で台帳を二重作成しない。
+      ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+      body: JSON.stringify(body),
     }),
   getSettings: (accountId: string) =>
     fetchApi<ApiResponse<BookingSettings>>(withAccount('/api/booking/admin/settings', accountId)),

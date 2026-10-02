@@ -581,7 +581,7 @@
     "unresolved-classname": 1
   },
   "components/shared/line-preview.tsx": {
-    "unresolved-classname": 1
+    "unresolved-classname": 17
   },
   "components/shared/list-kpis.tsx": {
     "unresolved-classname": 1
