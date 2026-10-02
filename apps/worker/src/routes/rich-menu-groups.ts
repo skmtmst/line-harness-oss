@@ -5,8 +5,7 @@ import {
   getRichMenuGroupWithPages,
   getRichMenuDeleteImpact,
   createRichMenuGroup,
-  updateRichMenuGroupMeta,
-  replaceRichMenuPages,
+  saveRichMenuGroupDraft,
   deleteRichMenuGroup,
   setRichMenuPageImage,
   pageBelongsToGroup,
@@ -133,6 +132,8 @@ function serializeGroup(row: RichMenuGroup) {
     targetingEnabled: row.targeting_enabled === 1,
     folderId: row.folder_id,
     displayOrder: row.display_order,
+    // M951: 保存時に送り返す版。古い版での保存は 409 で止める。
+    version: row.version ?? 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -1662,7 +1663,17 @@ richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), asyn
       const ext = contentType === 'image/png' ? 'png' : 'jpg';
       const key = `rich-menus/${parsed.value.accountId}/${created.id}/${defaultPage.id}/${Date.now()}.${ext}`;
       await c.env.IMAGES.put(key, buf, { httpMetadata: { contentType } });
-      await setRichMenuPageImage(c.env.DB, defaultPage.id, key, contentType);
+      try {
+        await setRichMenuPageImage(c.env.DB, defaultPage.id, key, contentType);
+      } catch (dbError) {
+        // M954 と同じく、DB への記録に失敗したら上げた画像を片付ける。
+        try {
+          await c.env.IMAGES.delete(key);
+        } catch {
+          console.error('POST /api/rich-menu-groups image apply orphan cleanup failed:', key);
+        }
+        throw dbError;
+      }
       const refreshed = await getRichMenuGroupWithPages(c.env.DB, created.id);
       return c.json({ success: true, data: serializeGroupWithPages(refreshed ?? created) });
     } catch (error) {
@@ -1696,6 +1707,47 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
   const parsed = parsePatchBody(body);
   if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
 
+  // M951: 保存に版を付ける (タグ編集の expectedVersion と同じ約束)。
+  // 無し・不正は 400、古い版は 409。先に読んだ側の変更が黙って消えないようにする。
+  const rawVersion = isJsonRecord(body) ? body.expectedVersion : undefined;
+  if (rawVersion === undefined) {
+    return c.json(
+      {
+        success: false,
+        error: '保存の版情報がありません。画面を読み込み直して、もう一度保存してください。',
+      },
+      400,
+    );
+  }
+  const expectedVersion = Number(rawVersion);
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+    return c.json(
+      {
+        success: false,
+        error: '保存の版情報が正しくありません。画面を読み込み直して、もう一度保存してください。',
+      },
+      400,
+    );
+  }
+
+  // M952: 作成口と同じ検査を保存口にも入れる。「条件で出し分ける」のに
+  // 条件が無いメニューは誰にも出ない。片方だけの変更でも、残りと合わせた
+  // 形で見る。
+  const effectiveTargetingEnabled = parsed.value.meta.targetingEnabled
+    ?? (existing.targeting_enabled === 1);
+  const effectiveTargetingCondition = parsed.value.meta.targetingCondition !== undefined
+    ? parsed.value.meta.targetingCondition
+    : existing.targeting_condition;
+  if (effectiveTargetingEnabled && !effectiveTargetingCondition) {
+    return c.json(
+      {
+        success: false,
+        error: '「条件で出し分ける」を使うには、出し分けの条件が必要です。条件を設定するか、「条件で出し分ける」をオフにしてください。',
+      },
+      400,
+    );
+  }
+
   // #827 (N-158): 公開中の定義(LINEに出ている形)は直接上書きしない。ページ構成・
   // トークバー文言・全員既定の指定を変えるには、いったん取り下げて下書きへ戻すか、
   // 取り込み/新規作成で別IDの下書きを作る。名前・出し分け条件・フォルダ・並び順は
@@ -1715,9 +1767,31 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
     );
   }
 
-  await updateRichMenuGroupMeta(c.env.DB, groupId, parsed.value.meta);
-  if (parsed.value.pages) {
-    await replaceRichMenuPages(c.env.DB, groupId, parsed.value.pages);
+  // M950: meta と pages を同じ取引で確定する。pages が失敗したら meta も
+  // 戻る (saveRichMenuGroupDraft が 1 batch で流す)。古い版は書かず 409。
+  const saved = await saveRichMenuGroupDraft(c.env.DB, groupId, {
+    meta: parsed.value.meta,
+    pages: parsed.value.pages,
+    expectedVersion,
+  });
+  if (!saved.ok) {
+    // 保存の直前に消されていたら、不在として一覧へ戻す。
+    if (saved.currentVersion === null) {
+      return c.json(
+        {
+          success: false,
+          error: 'このリッチメニューは見つかりません。削除された可能性があります。一覧から選び直してください。',
+        },
+        404,
+      );
+    }
+    return c.json(
+      {
+        success: false,
+        error: 'ほかの人がこのメニューを先に保存しました。画面を読み込み直してから、もう一度保存してください。',
+      },
+      409,
+    );
   }
   const refreshed = await getRichMenuGroupWithPages(c.env.DB, groupId);
   if (!refreshed) return c.json({ success: false, error: 'group disappeared after update' }, 500);
@@ -1869,7 +1943,26 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
   const ext = contentType === 'image/png' ? 'png' : 'jpg';
   const key = `rich-menus/${group.account_id}/${groupId}/${pageId}/${Date.now()}.${ext}`;
   await c.env.IMAGES.put(key, buf, { httpMetadata: { contentType } });
-  await setRichMenuPageImage(c.env.DB, pageId, key, contentType);
+  try {
+    await setRichMenuPageImage(c.env.DB, pageId, key, contentType);
+  } catch (error) {
+    // M954: DB への記録に失敗したら、上げた画像を片付ける。
+    // 置きっぱなしにすると再試行のたびに孤児が溜まる。
+    try {
+      await c.env.IMAGES.delete(key);
+    } catch {
+      // 片付けの失敗は元の失敗に付けない。ログだけ残す。
+      console.error('POST /api/rich-menu-groups/:groupId/pages/:pageId/image orphan cleanup failed:', key);
+    }
+    console.error('POST /api/rich-menu-groups/:groupId/pages/:pageId/image db error:', error);
+    return c.json(
+      {
+        success: false,
+        error: '画像の保存に失敗しました。もう一度お試しください。',
+      },
+      500,
+    );
+  }
 
   return c.json({
     success: true,
