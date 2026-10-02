@@ -12,12 +12,42 @@
   "app/affiliate-offers/new/page.tsx": {
     "unresolved-classname": 4
   },
+  "app/affiliates/affiliates-v8.tsx": {
+    "unresolved-classname": 7
+  },
   "app/affiliates/new/page.tsx": {
     "unresolved-classname": 6
   },
   "app/affiliates/tabs.tsx": {
     "arbitrary-value": 12,
     "direct-th": 20
+  },
+  "app/affiliates/v8-affiliates-tab.tsx": {
+    "unresolved-classname": 25,
+    "direct-th": 7
+  },
+  "app/affiliates/v8-approvals-tab.tsx": {
+    "unresolved-classname": 33,
+    "direct-th": 8
+  },
+  "app/affiliates/v8-drawer.tsx": {
+    "unresolved-classname": 48,
+    "direct-th": 8
+  },
+  "app/affiliates/v8-offers-tab.tsx": {
+    "unresolved-classname": 33,
+    "direct-th": 6
+  },
+  "app/affiliates/v8-payment-tab.tsx": {
+    "unresolved-classname": 38,
+    "direct-th": 6
+  },
+  "app/affiliates/v8-report-tab.tsx": {
+    "unresolved-classname": 25,
+    "direct-th": 7
+  },
+  "app/affiliates/v8-shared.tsx": {
+    "unresolved-classname": 39
   },
   "app/analytics/page.tsx": {
     "arbitrary-value": 6
@@ -55,8 +85,7 @@
     "unresolved-classname": 75
   },
   "app/booking/menus/new/menu-form-v8.tsx": {
-    "unresolved-classname": 117,
-    "arbitrary-value": 1
+    "unresolved-classname": 115
   },
   "app/booking/menus/new/page.tsx": {
     "unresolved-classname": 11
@@ -201,9 +230,6 @@
   "app/health/page.tsx": {
     "unresolved-classname": 5
   },
-  "app/hq/billing/page.tsx": {
-    "unresolved-classname": 1
-  },
   "app/hq/templates/template-console.tsx": {
     "unresolved-classname": 82
   },
@@ -308,9 +334,6 @@
   "app/rich-menus/edit/page.tsx": {
     "arbitrary-value": 10
   },
-  "app/rich-menus/new/create-v8.tsx": {
-    "unresolved-classname": 186
-  },
   "app/rich-menus/external-import.tsx": {
     "arbitrary-value": 5,
     "direct-secondary-button": 1
@@ -319,6 +342,9 @@
     "unresolved-classname": 81,
     "direct-th": 6,
     "arbitrary-value": 1
+  },
+  "app/rich-menus/new/create-v8.tsx": {
+    "unresolved-classname": 184
   },
   "app/rich-menus/page.tsx": {
     "arbitrary-value": 5
@@ -400,7 +426,7 @@
     "unresolved-classname": 6
   },
   "app/tags/mark-editor-v8.tsx": {
-    "unresolved-classname": 52
+    "unresolved-classname": 48
   },
   "app/tags/marks-v8.tsx": {
     "unresolved-classname": 51
