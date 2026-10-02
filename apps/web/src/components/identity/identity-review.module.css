@@ -169,6 +169,14 @@
   line-height: 1.3;
 }
 
+/* ★V8（夕21・STATES-ALL）：長い名前が枠からはみ出すので1行で … に
+   （全文は title）。v7 は従来どおり折り返す。 */
+[data-theme='v8'] .subjectLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .subjectDetail {
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);

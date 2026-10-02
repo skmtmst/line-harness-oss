@@ -163,7 +163,7 @@ describe('差し替え候補の名前検索（N-205）', () => {
 
     // ページ送り（2ページ目）は offset 50 で読む。
     fixture.listQueue.push(ok([media('c-50', '候補50.png')], 51))
-    const next = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '次へ')!
+    const next = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label') === '次のページ')!
     await act(async () => { next.click(); await settle() })
     expect(fixture.listCalls.at(-1)?.params?.offset).toBe(50)
 

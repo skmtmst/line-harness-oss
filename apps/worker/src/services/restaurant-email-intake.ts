@@ -329,7 +329,7 @@ async function storeRestaurantReservationEmail(
   }
 
   await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails
-    SET r2_key = ?, status = 'stored' WHERE id = ?`).bind(objectKey, claim.id).run();
+    SET r2_key = ?, status = 'stored', media_id = ? WHERE id = ?`).bind(objectKey, media.id, claim.id).run();
 
   const eventId = crypto.randomUUID();
   const inserted = await dbFor(env, storeId).prepare(`INSERT INTO rt_sync_events
