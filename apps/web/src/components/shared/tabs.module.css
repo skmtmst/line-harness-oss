@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * ページ内タブ。Pencil V5 の `VPn1F`（選択中）と `ISA1Q`（通常）。

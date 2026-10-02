@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * パンくず。Pencil V6 の `R098Z`「共通 パンくず」。

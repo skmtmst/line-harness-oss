@@ -180,6 +180,11 @@ shared-button-importer app/tags/fields/migrate/page.tsx
 shared-button-importer app/tags/fields/new/page.tsx
 shared-button-importer app/tags/folders/new/page.tsx
 shared-button-importer app/tags/searches/edit/page.tsx
+shared-button-importer app/tags/list-v8.tsx
+shared-button-importer app/tags/tags-tab-v8.tsx
+shared-button-importer app/tags/fields-tab-v8.tsx
+shared-button-importer app/tags/marks-v8.tsx
+shared-button-importer app/tags/searches-v8.tsx
 shared-button-importer app/templates/carousel/page.tsx
 shared-button-importer app/templates/detail/page.tsx
 shared-button-importer app/templates/edit/page.tsx

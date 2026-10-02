@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 保存の知らせ（Toast）。★V7 共通部品その2 §2。
