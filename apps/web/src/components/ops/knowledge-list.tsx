@@ -4,6 +4,7 @@ import { Search } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeArticleKind, knowledgeDate, knowledgeState } from '@/components/ops/knowledge-format'
 import KnowledgeEditor from '@/components/ops/knowledge-editor'
 import Button from '@/components/shared/button'
@@ -17,6 +18,18 @@ import { TextField } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
 import styles from '@/components/ops/knowledge.module.css'
 
+/*
+ * 読み込み失敗の説明。403・429 は説明を渡さず、ListState が捕まえた失敗から
+ * 共通の1枚（権限の案内・待ち案内）を作る。それ以外は捕まえた言葉をそのまま
+ * 出す（通信断の「通信できませんでした」など）。
+ */
+function loadDescription(err: unknown): string | undefined {
+  if (isForbiddenOrRateLimited(err)) return undefined
+  if (err instanceof TypeError) return '通信できませんでした。ネットワークを確認してもう一度お試しください'
+  if (err instanceof Error && err.message && !/^API error: /.test(err.message)) return err.message
+  return undefined
+}
+
 /** Canonical V6 37-11 list, shared with the review/edit feature parts. */
 export default function KnowledgeList() {
   const [rows, setRows] = useState<OpsKnowledgeArticle[]>([])
@@ -27,19 +40,27 @@ export default function KnowledgeList() {
   const [state, setState] = useState('')
   const [offset, setOffset] = useState(0)
   const [loaded, setLoaded] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<unknown>(null)
   const [actionError, setActionError] = useState('')
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState<OpsKnowledgeArticle | null>(null)
   const request = useRef(0)
   const load = useCallback(async () => {
     const current = ++request.current
-    setLoaded(false); setError('')
-    const res = await opsCall(api.ops.knowledge.list({ q, kind, articleKind, state, offset }))
-    if (current !== request.current) return
-    setLoaded(true)
-    if (!res.success) { setError(res.error || '読み込めませんでした'); return }
-    setRows(res.data); setTotal(res.total)
+    setLoaded(false); setError(null)
+    try {
+      const res = await api.ops.knowledge.list({ q, kind, articleKind, state, offset })
+      if (current !== request.current) return
+      if (!res.success) { setLoaded(true); setError(new Error(res.error || '読み込めませんでした')); return }
+      setLoaded(true)
+      setRows(res.data); setTotal(res.total)
+    } catch (caught) {
+      // M040：捕まえた失敗をそのまま残す。ListState が 403 は権限の案内
+      // （再試行なし）・429 は待ち案内に切り替える。
+      if (current !== request.current) return
+      setLoaded(true)
+      setError(caught)
+    }
   }, [q, kind, articleKind, state, offset])
   useEffect(() => {
     const timer = setTimeout(() => void load(), 150)
@@ -76,7 +97,7 @@ export default function KnowledgeList() {
     {/* ★V7: 緑は「正常」だけ。説明の帯は枠なしの info の小さい帯にする。 */}
     <Notice tone="info">解決した問い合わせを自動確認し、根拠が揃ったものだけ下書きにします。AI の返信に使うのは承認済みの記事だけです。</Notice>
     {actionError && <p role="alert" className={styles.error}>{actionError}</p>}
-    {!loaded ? <ListState kind="loading" /> : error ? <ListState kind="error" description={error} onRetry={() => void load()} /> : rows.length === 0
+    {!loaded ? <ListState kind="loading" /> : error ? <ListState kind="error" description={loadDescription(error)} error={error ?? undefined} onRetry={() => void load()} /> : rows.length === 0
       ? <ListState kind="empty" emptyPreset="readonly" title="記事はありません" description="解決した問い合わせの確認結果がここに並びます。" />
       : <DataTable className={styles.table}>
         <colgroup><col /><col className={styles.kindColumn} /><col className={styles.articleKindColumn} /><col className={styles.stateColumn} /><col className={styles.numberColumn} /><col className={styles.helpfulColumn} /><col className={styles.dateColumn} /><col className={styles.actionsColumn} /></colgroup>

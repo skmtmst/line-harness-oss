@@ -141,3 +141,33 @@ describe('2要素認証の確認エラー', () => {
     expect(host.textContent).toContain('2要素認証を登録しました')
   })
 })
+
+describe('R615 QR準備の失敗はログイン切れにしない', () => {
+  it('setup が 500 でもログインへ送らず、理由と取り直しを出す', async () => {
+    const seen: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      seen.push(url)
+      if (url.includes('/api/auth/session')) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: { id: 's1', name: '運営 太郎', platformAdmin: true },
+          csrfToken: 'csrf-token',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ error: 'setup failed' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      })
+    }))
+    await act(async () => { root.render(<OpsTwoFactorPage />) })
+    await flush()
+
+    // 準備の口を叩いたうえで、ログイン中のまま失敗を出す。
+    expect(seen.some((url) => url.includes('/two-factor/setup'))).toBe(true)
+    expect(host.textContent).toContain('QRコードを用意できませんでした')
+    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
+    expect(retry).toBeTruthy()
+    // ログイン画面への送りは起きない（送られていたら失敗文は出ない）。
+    expect(window.location.pathname).not.toContain('/ops/login')
+  })
+})
