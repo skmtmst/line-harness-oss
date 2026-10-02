@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import EventBookings from './EventBookings.js';
 import type { EventBookingMine, EventSlot } from '../lib/api.js';
 
@@ -18,6 +19,7 @@ vi.mock('../lib/api.js', () => ({
     cancelMyEventBooking: vi.fn(),
     getEventSlots: vi.fn(),
     changeMyEventBooking: vi.fn(),
+    liffConfig: vi.fn().mockResolvedValue({ success: true, data: {} }),
   },
 }));
 
@@ -68,7 +70,12 @@ function setup(bookings: EventBookingMine[], slots: EventSlot[]) {
     tab === 'upcoming' ? { items: bookings } : { items: [] },
   );
   getEventSlots.mockResolvedValue({ items: slots });
-  render(<EventBookings />);
+  // 自分のイベントは › でイベント詳細へ戻れるため、ルーターの中で描く。
+  render(
+    <MemoryRouter initialEntries={['/events/me?liffId=test']}>
+      <EventBookings />
+    </MemoryRouter>,
+  );
 }
 
 beforeEach(() => {
