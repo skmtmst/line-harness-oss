@@ -260,6 +260,9 @@ const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'label' | 'icon' | '
   { id: 'monitoring', label: '見張り自体', icon: '◎', description: '5分ごとの確認が動いているか', threshold: '10分止まると「エラー」', href: '/emergency?tab=health' },
 ]
 
+/** 常時描画する確認項目の数。案内の文言はここから作り、数だけ書き換えない。 */
+const CHECK_COUNT = CHECK_DEFINITIONS.length
+
 const HEALTH_CHECK_ID: Record<OperationHealthCheckKey, HealthCheckId> = {
   line_connection: 'line',
   message_quota: 'quota',
@@ -605,7 +608,7 @@ function HealthPanel({
   const isNormal = displayedSeverity === 'normal'
   const resultTitle = isNormal ? '異常なし' : displayedSeverity === 'warning' ? '注意' : displayedSeverity === 'danger' ? 'エラー' : '確認できない項目があります'
   const resultDescription = isNormal
-    ? '6項目を確認し、現在、確認できる異常はありません。'
+    ? `${CHECK_COUNT}項目を確認し、現在、確認できる異常はありません。`
     : displayedSeverity === 'warning'
       ? '注意が必要な項目があります。チェック結果を確認してください。'
       : displayedSeverity === 'danger'
@@ -671,7 +674,7 @@ function HealthPanel({
       <div className="rounded-card border-hairline flex flex-wrap items-center gap-3 border bg-canvas px-4 py-3">
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-canvas text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
         <div className="min-w-0 flex-1">
-          <p className="text-base font-bold text-ink">{loading ? '確認しています…' : `${resultTitle}。${isNormal ? '6項目のすべてが正常です。' : ''}`}</p>
+          <p className="text-base font-bold text-ink">{loading ? '確認しています…' : `${resultTitle}。${isNormal ? `${CHECK_COUNT}項目のすべてが正常です。` : ''}`}</p>
           <p className="mt-0.5 text-xs text-ink-faint">
             {loading ? '最新の状態を読み込んでいます。' : `${resultDescription}${isStale ? '' : ` 次は${formatOperationDate(nextCheckedAt)}に自動で確かめます。`}`}
           </p>
@@ -681,7 +684,7 @@ function HealthPanel({
       {alertNotice && <div className={`rounded-control px-4 py-3 text-xs font-medium ${alertNotice.tone === 'success' ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'}`} role="status">{alertNotice.text}</div>}
       <OperationAlertsPanel alerts={alerts} failed={alertsFailed} busyId={alertBusyId} onAcknowledge={acknowledgeAlert} onRetry={retryAlertNotifications} />
       <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
-        <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-ink">チェック結果</h2><p className="mt-0.5 text-xs text-ink-faint">6項目を常に表示し、確認内容と最新結果を示します</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-xs font-bold">5分ごと</span></div>
+        <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-ink">チェック結果</h2><p className="mt-0.5 text-xs text-ink-faint">{`${CHECK_COUNT}項目を常に表示し、確認内容と最新結果を示します`}</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-xs font-bold">5分ごと</span></div>
         <div className="hidden grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint lg:grid">
           <span>確認する項目</span><span>結果</span><span>いまの数字</span><span>目安</span><span>最後の確認</span><span>操作</span>
         </div>
