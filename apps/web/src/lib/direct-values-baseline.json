@@ -44,6 +44,11 @@
     "radius": 0,
     "shadow": 1
   },
+  "app/rich-menus/new/create-v8.module.css": {
+    "color": 6,
+    "radius": 4,
+    "shadow": 1
+  },
   "app/staff/page.tsx": {
     "color": 2,
     "radius": 0,

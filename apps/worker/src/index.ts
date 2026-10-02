@@ -2384,7 +2384,7 @@ async function scheduled(
     const buildGroupInput = async (snapshot: unknown, fallbackGroupId: string) => {
       const record = snapshot as {
         id?: string; size?: 'large' | 'compact'; chatBarText?: string;
-        isDefaultForAll?: boolean; pages?: Array<{
+        isDefaultForAll?: boolean; defaultOpen?: boolean; pages?: Array<{
           id: string; orderIndex: number; name: string;
           imageR2Key: string | null; imageContentType: string | null;
           lineRichmenuId: string | null;
@@ -2420,6 +2420,7 @@ async function scheduled(
           size: record.size ?? 'large',
           chatBarText: record.chatBarText ?? '',
           isDefaultForAll: record.isDefaultForAll ?? false,
+          defaultOpen: record.defaultOpen === true,
           formBaseUrl,
           pages: (record.pages ?? []).map((page) => ({
             id: page.id,
@@ -2502,6 +2503,7 @@ async function scheduled(
           size: restoreGroup.size,
           chatBarText: restoreGroup.chat_bar_text,
           isDefaultForAll: restoreGroup.is_default_for_all === 1,
+          defaultOpen: restoreGroup.default_open === 1,
           formBaseUrl,
           pages: restoreGroup.pages.map((page) => ({
             id: page.id,
