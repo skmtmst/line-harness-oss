@@ -1270,7 +1270,7 @@ export default function FormSubmissionsListV8() {
           {reviewMode ? (
             <div className={styles.reviewNote}>
               <p><strong>管理者確認中のフォーム</strong> — 担当アカウントが決まっていない旧フォームだけを出しています。公開URLは生きているため回答は入り続けます。</p>
-              <p>担当の割り当ては後続の対応（#771）で行います。この画面では割り当て操作はできません。</p>
+              <p>担当の割り当ては後続の対応で行います。この画面では割り当て操作はできません。</p>
             </div>
           ) : null}
 
