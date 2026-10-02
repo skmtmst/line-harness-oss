@@ -50,6 +50,10 @@ const INPUT_TYPE_LABEL: Record<FormInputType, string> = {
   file: 'ファイル',
   date: '日付',
   prefecture: '都道府県',
+  // F11で shared の FormInputType に足された種類。名称は shared の型注釈に合わせる。
+  // 入力メニューへの追加・編集欄・見た目の変更は今回しない。
+  address: '住所',
+  rating: '5段階評価',
 }
 
 const FORMATS: { value: FormInputFormat; label: string }[] = [
