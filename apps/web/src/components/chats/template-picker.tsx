@@ -564,10 +564,10 @@ export default function TemplatePicker({
               : '入力後に文章を編集してから送信できます。'}
           </p>
           <div className="mt-3 flex flex-wrap justify-end gap-2">
-            <Button variant="secondary" className="min-h-11 whitespace-nowrap px-4 py-2 text-ink-faint h-auto" onClick={onClose}>
+            <Button variant="secondary" className="v7:min-h-11 whitespace-nowrap px-4 py-2 text-ink-faint h-auto" onClick={onClose}>
               キャンセル
             </Button>
-            <Button variant="primary" className="min-h-11 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 border-0 h-auto" disabled={packMode && onPickPack ? packItems.length === 0 : !selected} onClick={() => {
+            <Button variant="primary" className="v7:min-h-11 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 border-0 h-auto" disabled={packMode && onPickPack ? packItems.length === 0 : !selected} onClick={() => {
                 if (packMode && onPickPack) {
                   if (packItems.length === 0) return
                   onPickPack(packItems.map((item) => item.content))

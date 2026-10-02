@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const root = join(import.meta.dirname, '..', '..', '..', '..', '..')
-const banner = readFileSync(join(import.meta.dirname, 'update-banner.tsx'), 'utf8')
+// 告知の発射は use-update-status.ts に1本化（帯と左メニュー「Ver.」行で分かち合う・夕12）
+const banner = readFileSync(join(import.meta.dirname, 'use-update-status.ts'), 'utf8')
 const capture = readFileSync(join(root, 'scripts/visual-qa/capture-screens.mjs'), 'utf8')
 
 describe('更新告知と画面撮影', () => {

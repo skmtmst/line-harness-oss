@@ -1,0 +1,57 @@
+@layer properties, theme, base, components, utilities;
+
+[data-theme='v8'] .v8-ro-ops-page { min-width: 0; }
+[data-theme='v8'] .v8-ro-ops-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; }
+[data-theme='v8'] .v8-ro-ops-header h2 { font-size: 20px; font-weight: 600; }
+[data-theme='v8'] .v8-ro-ops-header p { margin-top: 4px; font-size: 13px; line-height: 1.6; color: var(--color-ink-secondary); }
+[data-theme='v8'] .v8-ro-ops-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+[data-theme='v8'] .v8-ro-ops-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 0; border-block: 1px solid var(--color-hairline); margin-inline: -24px; }
+[data-theme='v8'] .v8-ro-ops-metrics > div { border-right: 1px solid var(--color-hairline); min-width: 0; }
+[data-theme='v8'] .v8-ro-ops-metrics > div:last-child { border-right: 0; }
+[data-theme='v8'] .v8-ro-ops-metrics [data-design-version] { min-height: 108px; padding: 14px 16px; border: 0; border-radius: var(--radius-none); box-shadow: none; background: transparent; }
+[data-theme='v8'] .v8-ro-ops-page table { width: 100%; table-layout: fixed; }
+[data-theme='v8'] .v8-ro-ops-page th { width: auto; font-size: 12px; padding-inline: 8px; white-space: nowrap; }
+[data-theme='v8'] .v8-ro-ops-page td { padding-inline: 8px; font-size: 13px; }
+[data-theme='v8'] .v8-ro-ops-page td > a { color: var(--color-action); }
+[data-theme='v8'] .v8-ro-ops-tenants th:first-child { width: 23%; }
+[data-theme='v8'] .v8-ro-ops-tenants th:nth-child(3) { width: 16%; }
+[data-theme='v8'] .v8-ro-ops-tenants th:nth-child(6),
+[data-theme='v8'] .v8-ro-ops-tenants th:nth-child(7) { width: 5%; }
+[data-theme='v8'] .v8-ro-ops-tenants th:last-child { width: 13%; }
+[data-theme='v8'] .v8-ro-ops-audit th:nth-child(4) { width: 23%; }
+[data-theme='v8'] .v8-ro-ops-audit th:nth-child(5) { width: 23%; }
+[data-theme='v8'] .v8-ro-ops-audit td:nth-child(4) { white-space: normal; }
+[data-theme='v8'] .v8-ro-ops-audit th:last-child { width: 11%; }
+[data-theme='v8'] .v8-ro-ops-knowledge table col { width: auto; }
+[data-theme='v8'] .v8-ro-ops-knowledge table col:first-child { width: 24%; }
+[data-theme='v8'] .v8-ro-ops-knowledge table col:nth-child(3) { width: 13%; }
+[data-theme='v8'] .v8-ro-ops-knowledge table col:last-child { width: 18%; }
+[data-theme='v8'] .v8-ro-ops-knowledge table td { padding: 10px 8px; }
+[data-theme='v8'] .v8-ro-ops-knowledge table td:last-child > div { flex-wrap: wrap; gap: 8px; }
+[data-theme='v8'] .v8-ro-ops-knowledge [data-design-node='aeKindFilter'] { min-width: 0; }
+[data-theme='v8'] .v8-ro-ops-knowledge > div:has(input) { flex-wrap: wrap; }
+[data-theme='v8'] .v8-ro-ops-supportColumns { grid-template-columns: minmax(260px, 30fr) minmax(0, 70fr); }
+[data-theme='v8'] .v8-ro-ops-supportList { border-radius: var(--radius-control); }
+[data-theme='v8'] .v8-ro-ops-supportDetail { border-radius: var(--radius-control); }
+[data-theme='v8'] .v8-ro-ops-revenue rect:not([width='88']) { fill: var(--color-accent); stroke: none; }
+[data-theme='v8'] .v8-ro-ops-revenue g:last-child > rect:not([width='88']) { fill: var(--color-accent-deep); }
+@media (max-width: 1279px) {
+  [data-theme='v8'] .v8-ro-ops-page th, [data-theme='v8'] .v8-ro-ops-page td { padding-inline: 6px; font-size: 12px; }
+  [data-theme='v8'] .v8-ro-ops-supportColumns { grid-template-columns: minmax(220px, 30fr) minmax(0, 70fr); }
+}
+@media (max-width: 767px) {
+  [data-theme='v8'] .v8-ro-ops-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  [data-theme='v8'] .v8-ro-ops-supportColumns { grid-template-columns: minmax(0,1fr); }
+}
+[data-theme='v8'] .v8-ro-ops-dashboard { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+[data-theme='v8'] .v8-ro-ops-dashboard > * { grid-column: 1 / -1; }
+[data-theme='v8'] .v8-ro-ops-dashboardGroup { display: contents; }
+[data-theme='v8'] .v8-ro-ops-dashboardGroup > section { grid-column: auto; min-width: 0; }
+[data-theme='v8'] .v8-ro-ops-dashboardGroup > section[aria-label='要対応'] { order: 10; }
+[data-theme='v8'] .v8-ro-ops-dashboardGroup > section[aria-label='月ごとの売上'] { order: 11; }
+[data-theme='v8'] .v8-ro-ops-dashboard > section[aria-label='上限に近い契約先'] { grid-column: auto; order: 12; }
+[data-theme='v8'] .v8-ro-ops-dashboardGroup > section[aria-label='お問い合わせ（チケット）'] { order: 13; }
+[data-theme='v8'] .v8-ro-ops-dashboardGroup > section[aria-label='プラン別の契約'] { grid-column: 1 / -1; order: 14; }
+@media (max-width: 767px) { [data-theme='v8'] .v8-ro-ops-dashboard { grid-template-columns: minmax(0,1fr); } }
+[data-theme='v8'] .v8-ro-ops-metrics > div:not(:last-child) { border-right: 1px solid var(--color-hairline); }
+[data-theme='v8'] .v8-ro-ops-dashboard .v8-ro-ops-metrics > [data-design-node='BaoAQ'] { order: -1; }
