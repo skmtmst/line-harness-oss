@@ -16,6 +16,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import { Th } from '@/components/shared/table'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -75,6 +76,8 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
   onConfirm: () => void
 }) {
   const dialogRef = useOverlayFocus(true, onCancel, saving)
+  /* ★V8 では小窓の絵 `fy5dz` に合わせる（題・実行ボタンの色・案内の文）。v7 は従来どおり。 */
+  const v8 = useAdminTheme() === 'v8'
   /* R138横展開: 確認窓の名前として見出しを読ませる。 */
   const titleId = useId()
   const selected = impact?.replacementOptions.find((option) => option.id === replacementMarkId)
@@ -107,11 +110,13 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
   const canConfirm = !loading && !saving && Boolean(impact?.canArchive) && (!needsReplacement || Boolean(replacementMarkId))
   return (
     <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/45 p-4">
-      <section data-design-node="zGZMA" data-design-part="archive-position" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[680px] flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
+      <section data-design-node="zGZMA" data-design-part="archive-position" className={`flex max-h-[calc(100dvh-2rem)] w-full ${v8 ? 'max-w-xl' : 'max-w-[680px]'} flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay`} role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="flex items-start justify-between gap-3 p-4 pb-0">
           <div>
-            <h2 id={titleId} className="text-lg font-bold text-ink">対応マーク「{mark.name}」を保管しますか？</h2>
-            <p className="mt-2 text-xs leading-5 text-ink-secondary">保管後は新しく選べません。{needsReplacement ? 'いま付いている友だちは、選んだマークへ置き換えて履歴を残します。' : '使っている友だちはいないので、そのまま保管できます。'}</p>
+            <h2 id={titleId} className="text-lg font-bold text-ink">{v8 ? `「${mark.name}」を保管しますか` : `対応マーク「${mark.name}」を保管しますか？`}</h2>
+            <p className="mt-2 text-xs leading-5 text-ink-secondary">{v8
+              ? (needsReplacement ? `いま ${friendCount} 人に付いています。保管すると、この ${friendCount} 人は下で選んだマークへ置き換え、履歴に残します。` : '使っている友だちはいないので、そのまま保管できます。')
+              : <>保管後は新しく選べません。{needsReplacement ? 'いま付いている友だちは、選んだマークへ置き換えて履歴を残します。' : '使っている友だちはいないので、そのまま保管できます。'}</>}</p>
           </div>
           <button type="button" onClick={onCancel} disabled={saving} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
             <X aria-hidden="true" className="h-5 w-5" />
@@ -133,10 +138,11 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
               {selected ? <p className="mt-2 text-xs text-ink-faint">{impact.friendCount}人を「{selected.name}」へ置き換えます。</p> : null}
             </div>
           ) : null}
+          {v8 ? <p className="mt-4 text-xs leading-5 text-ink-faint">初期値のマーク・共有しているマーク・自動のきまりで使っているマークは保管できません。</p> : null}
           {blockReason ? <p className="mt-4 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">{blockReason}</p> : null}
           {error ? <Notice tone="danger" className="mt-4">{error}</Notice> : null}
         </div>
-        <div className="flex justify-end gap-2 border-t border-hairline p-4"><Button onClick={onCancel} disabled={saving}>キャンセル</Button><Button variant="danger" className="h-9 px-4 font-bold border-0 whitespace-normal" type="button" onClick={onConfirm} disabled={!canConfirm}>{saving ? '保管中…' : needsReplacement ? '置き換えて保管する' : '保管する'}</Button></div>
+        <div className="flex justify-end gap-2 border-t border-hairline p-4"><Button onClick={onCancel} disabled={saving}>キャンセル</Button><Button variant={v8 ? 'primary' : 'danger'} className="h-9 px-4 font-bold border-0 whitespace-normal" type="button" onClick={onConfirm} disabled={!canConfirm}>{saving ? '保管中…' : needsReplacement ? '置き換えて保管する' : '保管する'}</Button></div>
       </section>
     </div>
   )

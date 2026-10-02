@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const updateBanner = readFileSync(
-  resolve(root, 'apps/web/src/components/update/update-banner.tsx'),
+  resolve(root, 'apps/web/src/components/update/use-update-status.ts'),
   'utf8',
 );
 
@@ -15,5 +15,11 @@ describe('update banner deployment toggle', () => {
     expect(updateBanner).toContain('if (!updateBannerEnabled) return');
     expect(updateBanner).toContain('getCurrentVersion()');
     expect(updateBanner).toContain('detectFork(current, manifest)');
+    // 帯・版の行の両方がこの状態を使う（夕12）
+    const banner = readFileSync(
+      resolve(root, 'apps/web/src/components/update/update-banner.tsx'),
+      'utf8',
+    );
+    expect(banner).toContain('useUpdateStatus');
   });
 });

@@ -3,12 +3,15 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import SupportMarkEditor from '@/components/friend-fields/support-mark-editor'
+import MarkEditorV8 from '@/app/tags/mark-editor-v8'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import FeatureGate from '@/components/feature-gate'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 function EditSupportMarkPageInner() {
   const id = useSearchParams().get('id')
+  const theme = useAdminTheme()
   /*
     編集ルートで `?id=` が無いと、新規作成の器（/tags/marks/new と同じ）が
     黙って出る。一覧へ戻して編集対象を選び直させる。
@@ -23,6 +26,9 @@ function EditSupportMarkPageInner() {
         backLabel="対応マークの一覧へ戻る"
       />
     )
+  }
+  if (theme === 'v8') {
+    return <MarkEditorV8 markId={id} />
   }
   return <SupportMarkEditor markId={id} />
 }
