@@ -61,12 +61,8 @@ import {
   type DeleteImpactRequest,
 } from './delete-impact'
 import { moveTargetingGroup, orderTargetingGroups } from './targeting-order'
-import {
-  ExternalImportWorkspace,
-  richMenuError,
-  richMenuErrorAll,
-  type LineMenu,
-} from './page'
+import { ExternalImportWorkspace, type LineMenu } from './external-import'
+import { richMenuError, richMenuErrorAll } from './rich-menu-errors'
 import styles from './list-v8.module.css'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */

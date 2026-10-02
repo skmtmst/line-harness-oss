@@ -245,14 +245,17 @@
   "app/rich-menus/edit/page.tsx": {
     "arbitrary-value": 10
   },
+  "app/rich-menus/external-import.tsx": {
+    "arbitrary-value": 5,
+    "direct-secondary-button": 1
+  },
   "app/rich-menus/list-v8.tsx": {
     "unresolved-classname": 81,
     "direct-th": 6,
     "arbitrary-value": 1
   },
   "app/rich-menus/page.tsx": {
-    "arbitrary-value": 10,
-    "direct-secondary-button": 1
+    "arbitrary-value": 5
   },
   "app/scenarios/detail/detail-v8.tsx": {
     "arbitrary-value": 2,

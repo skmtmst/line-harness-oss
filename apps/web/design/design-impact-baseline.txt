@@ -164,6 +164,7 @@ shared-button-importer app/rich-menus/edit/prepublish-check-section.tsx
 shared-button-importer app/rich-menus/edit/publish-history.tsx
 shared-button-importer app/rich-menus/edit/publish-progress-section.tsx
 shared-button-importer app/rich-menus/edit/test-apply-section.tsx
+shared-button-importer app/rich-menus/external-import.tsx
 shared-button-importer app/rich-menus/list-v8.tsx
 shared-button-importer app/rich-menus/new/page.tsx
 shared-button-importer app/rich-menus/page.tsx
