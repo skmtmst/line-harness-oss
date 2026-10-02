@@ -1,5 +1,8 @@
 'use client'
 
+import OrderDrawerV8 from './order-drawer-v8'
+import ro from './order-drawer-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ecEventLabel } from '@line-crm/shared'
@@ -162,6 +165,8 @@ export default function OrderDetailDrawer({
   retryingId: string | null
 }) {
   const [state, setState] = useState<DetailState>('loading')
+  const theme = useAdminTheme()
+  const Frame = theme === 'v8' ? OrderDrawerV8 : Drawer
   const [detail, setDetail] = useState<EcOrderDetail | null>(null)
   const loadSeq = useRef(0)
 
@@ -196,14 +201,14 @@ export default function OrderDetailDrawer({
   const order = detail?.order ?? null
   const friendId = order?.friendId ?? null
   return (
-    <Drawer
+    <Frame
       open={orderId !== null}
       title={order ? `注文 ${order.orderNumber}` : '注文の状況'}
       description={order
         ? `${ORDER_STATUS_TEXT[order.status] ?? order.status} ／ ${dateTime(order.orderedAt)} に注文`
         : undefined}
       onClose={onClose}
-      footer={state === 'ready' ? (
+      footer={state === 'ready' ? theme === 'v8' ? <div><div className={ro.links}><Button href="/ec-commerce/identity-candidates">会員のつき合わせへ</Button>{order?.detailUrl && <Button href={order.detailUrl} target="_blank" rel="noreferrer">ECの管理画面で開く</Button>}</div><p className={ro.hint}>もう一度行う・再取込では、届き済みの通知や入った成果・マイルは重ねません。</p></div> : (
         <p className={styles.footer}>
           もう一度行う・再取込では、届き済みの通知や入った成果・マイルは重ねません。
         </p>
@@ -256,7 +261,7 @@ export default function OrderDetailDrawer({
             )}
           </section>
 
-          <section className={styles.detailSection}>
+          <section className={styles.detailSection} data-order-block="followup">
             <h3 className={styles.detailSectionTitle}>発送後に届く案内</h3>
             {detail.followUps.length === 0 ? (
               <p className={styles.cellSub}>予約されている案内はありません。</p>
@@ -286,7 +291,7 @@ export default function OrderDetailDrawer({
             )}
           </section>
 
-          <section className={styles.detailSection}>
+          <section className={styles.detailSection} data-order-block="outcomes">
             <h3 className={styles.detailSectionTitle}>成果・マイル・スコア</h3>
             {detail.outcomes.conversions.length === 0 && detail.outcomes.mileage.length === 0 && detail.outcomes.scores.length === 0 ? (
               <p className={styles.cellSub}>この注文に結びついた成果・マイル・スコアはありません。</p>
@@ -341,6 +346,6 @@ export default function OrderDetailDrawer({
           </section>
         </div>
       )}
-    </Drawer>
+    </Frame>
   )
 }
