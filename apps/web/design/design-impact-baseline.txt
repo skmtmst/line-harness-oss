@@ -10,6 +10,7 @@ shared-button-importer app/affiliates/payment-tab.tsx
 shared-button-importer app/affiliates/tabs.tsx
 shared-button-importer app/analytics/page.tsx
 shared-button-importer app/analytics/reports/new/page.tsx
+shared-button-importer app/auto-replies/edit/wizard-v8.tsx
 shared-button-importer app/auto-replies/list-v8.tsx
 shared-button-importer app/auto-replies/page.tsx
 shared-button-importer app/auto-replies/publish/page.tsx

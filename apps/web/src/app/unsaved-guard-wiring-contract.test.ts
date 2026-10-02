@@ -21,6 +21,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 const GUARDED = [
   'app/affiliate-offers/new/page.tsx',
   'app/analytics/reports/new/page.tsx',
+  'app/auto-replies/edit/wizard-v8.tsx',
   'app/booking/menus/new/page.tsx',
   'app/booking/menus/staff/page.tsx',
   'app/booking/staff/new/page.tsx',

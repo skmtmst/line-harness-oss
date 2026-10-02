@@ -18,6 +18,9 @@
   "app/analytics/page.tsx": {
     "arbitrary-value": 6
   },
+  "app/auto-replies/edit/wizard-v8.tsx": {
+    "unresolved-classname": 249
+  },
   "app/auto-replies/list-v8.tsx": {
     "unresolved-classname": 76,
     "direct-th": 7

@@ -543,6 +543,9 @@
   --v8-line-shell-radius: 52px;       /* 器の角丸 */
   --v8-line-screen-radius: 42px;      /* 画面の角丸 */
   --v8-line-homebar-radius: 3px;      /* ホームの線の角丸 */
+  /* トークの吹き出し。届いた側（左・白）は左上、返す側（右・緑）は右上を小さく。 */
+  --v8-line-bubble-in-radius: 4px 14px 14px 14px;
+  --v8-line-bubble-out-radius: 14px 4px 14px 14px;
 }
 
 /*
