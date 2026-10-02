@@ -36,7 +36,7 @@ const COLUMNS = new Set<FriendListColumn>(['support', 'scenario', 'latest', 'tag
 
 const render = (friend: FriendListItem) =>
   renderToStaticMarkup(
-    <FriendListRow friend={friend} visibleColumns={COLUMNS} gridTemplateColumns="36px" />,
+    <FriendListRow friend={friend} visibleColumns={COLUMNS} />,
   )
 
 describe('友だち行の担当者とアバター（描画）', () => {

@@ -10,6 +10,11 @@ export type PaginationProps = {
   ariaLabel?: string
   disabled?: boolean
   className?: string
+  /**
+   * ★V8（jX2Uw）：帯の左端に出す件数の文。v7 では帯の外に従来の件数
+   * 表示があるので、この中身は v8 のときだけ出る。
+   */
+  summary?: React.ReactNode
 }
 
 /** Pencil の5枠に収め、先頭・現在地・末尾を常に辿れる並びを返す。 */
@@ -67,6 +72,7 @@ export default function Pagination({
   ariaLabel = 'ページ送り',
   disabled = false,
   className,
+  summary,
 }: PaginationProps) {
   const total = safePage(pageCount, 1)
   const current = Math.min(total, safePage(page, 1))
@@ -77,6 +83,7 @@ export default function Pagination({
 
   return (
     <nav aria-label={ariaLabel} className={classes}>
+      {summary ? <span className={styles.summary}>{summary}</span> : null}
       <button
         type="button"
         className={[styles.item, styles.control].join(' ')}
@@ -84,7 +91,10 @@ export default function Pagination({
         disabled={disabled || current <= 1}
         aria-label="前のページ"
       >
-        前へ
+        <span className={styles.controlLabel}>前へ</span>
+        <span className={styles.controlGlyph} aria-hidden="true">
+          ‹
+        </span>
       </button>
       {paginationItems(current, total).map((item, index) =>
         item === 'ellipsis' ? (
@@ -112,7 +122,10 @@ export default function Pagination({
         disabled={disabled || current >= total}
         aria-label="次のページ"
       >
-        次へ
+        <span className={styles.controlLabel}>次へ</span>
+        <span className={styles.controlGlyph} aria-hidden="true">
+          ›
+        </span>
       </button>
     </nav>
   )

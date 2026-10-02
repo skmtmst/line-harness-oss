@@ -417,6 +417,17 @@ describe('画像ライブラリと店舗への受け渡し', () => {
     expect((await res.json<{ data: unknown[] }>()).data).toHaveLength(0);
   });
 
+  it('配布状態の絞り込みをページ切り前にかけ、同じ画像は1件で返す', async () => {
+    const { image } = await generatedImage();
+    expect((await call('GET', '/api/hq/banners/images?delivered=1')).status).toBe(200);
+    expect((await (await call('GET', '/api/hq/banners/images?delivered=1')).json<{ data: unknown[] }>()).data).toHaveLength(0);
+    expect((await (await call('GET', '/api/hq/banners/images?delivered=0')).json<{ data: unknown[] }>()).data).toHaveLength(1);
+    await call('POST', `/api/hq/banners/images/${image.id}/deliver`, { lineAccountIds: ['account-1', 'account-2'] });
+    expect((await (await call('GET', '/api/hq/banners/images?delivered=1&limit=1')).json<{ data: { id: string }[] }>()).data.map(x => x.id)).toEqual([image.id]);
+    expect((await (await call('GET', '/api/hq/banners/images?delivered=0')).json<{ data: unknown[] }>()).data).toHaveLength(0);
+    expect((await call('GET', '/api/hq/banners/images?delivered=yes')).status).toBe(400);
+  });
+
   it('形式の合わないファイルは取り込まない', async () => {
     const { project } = await generatedImage();
     const res = await call('POST', `/api/hq/banners/projects/${project.id}/uploads`, {
