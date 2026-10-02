@@ -60,6 +60,10 @@
   "app/booking/menus/settings-v8.tsx": {
     "unresolved-classname": 207
   },
+  "app/booking/menus/staff/assign-v8.tsx": {
+    "unresolved-classname": 63,
+    "direct-th": 3
+  },
   "app/booking/menus/staff/page.tsx": {
     "arbitrary-value": 6,
     "unresolved-classname": 1

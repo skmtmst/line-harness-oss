@@ -29,6 +29,7 @@ shared-button-importer app/booking/menus/new/menu-form-v8.tsx
 shared-button-importer app/booking/menus/new/page.tsx
 shared-button-importer app/booking/menus/page.tsx
 shared-button-importer app/booking/menus/settings-v8.tsx
+shared-button-importer app/booking/menus/staff/assign-v8.tsx
 shared-button-importer app/booking/menus/staff/page.tsx
 shared-button-importer app/booking/staff/page.tsx
 shared-button-importer app/booking/staff/shifts/liff-preview.tsx

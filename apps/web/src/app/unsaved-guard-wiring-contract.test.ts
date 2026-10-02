@@ -25,6 +25,7 @@ const GUARDED = [
   'app/booking/menus/new/menu-form-v8.tsx',
   'app/booking/menus/new/page.tsx',
   'app/booking/menus/settings-v8.tsx',
+  'app/booking/menus/staff/assign-v8.tsx',
   'app/booking/menus/staff/page.tsx',
   'app/booking/staff/new/page.tsx',
   'app/booking/staff/shifts/page.tsx',
