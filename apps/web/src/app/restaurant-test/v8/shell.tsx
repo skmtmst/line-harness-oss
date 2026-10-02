@@ -129,13 +129,15 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, query, children }: {
+export default function RestaurantShell({ boardId, title, description, query, allStores = false, children }: {
   /** Pencil の板 ID（例 `CHz31`）。外枠へ付ける。 */
   boardId: string
   title: string
   description: string
   /** 台帳系の画面が渡す絞り込み。ダッシュボードは「今日以降の有効予約」。 */
   query?: ReservationQuery
+  /** 店舗を選ぶ欄の先頭に「すべての店舗」を足す（承認ワークフローなど全店を見る画面）。 */
+  allStores?: boolean
   children: (ctx: RestaurantV8Context) => ReactNode
 }) {
   usePageTitle(title)
@@ -156,7 +158,7 @@ export default function RestaurantShell({ boardId, title, description, query, ch
       const res = await restaurantTestApi.snapshot(selectedAccountId, query)
       setSnapshot(res.data)
       setLoadError(null)
-      setSelectedStoreId((current) => res.data.stores.some((item) => item.id === current)
+      setSelectedStoreId((current) => (allStores && current === '') || res.data.stores.some((item) => item.id === current)
         ? current
         : res.data.stores[0]?.id || '')
     } catch (caught) {
@@ -164,7 +166,7 @@ export default function RestaurantShell({ boardId, title, description, query, ch
     } finally {
       setLoading(false)
     }
-  }, [selectedAccountId, query])
+  }, [selectedAccountId, query, allStores])
   useEffect(() => { void load() }, [load])
 
   const mutate = useCallback(async (action: () => Promise<unknown>, success: string) => {
@@ -203,7 +205,10 @@ export default function RestaurantShell({ boardId, title, description, query, ch
             className={styles.storePicker}
             value={selectedStoreId}
             onChange={setSelectedStoreId}
-            options={snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` }))}
+            options={[
+              ...(allStores ? [{ value: '', label: '店舗：すべての店舗' }] : []),
+              ...snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` })),
+            ]}
           />
         ) : null}
       </div>

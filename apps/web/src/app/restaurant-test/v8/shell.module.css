@@ -586,4 +586,234 @@
 .matrixNo {
   color: var(--color-ink-faint);
 }
+
+/* ===== t8WgD8 承認ワークフロー ===== */
+
+/* 閲覧のみの案内（板 n4DT7：薄い青の帯） */
+.readOnlyBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--color-info-border, var(--color-hairline));
+  border-radius: var(--radius-control);
+  background: var(--color-info-bg, var(--color-surface-pearl));
+  color: var(--color-info, var(--color-ink-secondary));
+  font-size: var(--text-caption);
+}
+
+/* 承認カードの縦積み */
+.approvalList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 承認カード（板：白地・radius12・枠1・padding20・gap10） */
+.approvalCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+/* 閲覧のみで承認待ちのカードは枠を緑にして目立たせる（板 n4DT7） */
+.approvalCardPending {
+  border-color: var(--color-accent);
+  outline: 1px solid var(--color-accent);
+}
+
+.approvalHead {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.approvalMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 種類の札（板：緑の地・11/700・pill） */
+.kindChip {
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-success-bg);
+  color: var(--color-accent-deep);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+
+.approvalStore {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.approvalSpacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.approvalActions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* 「差戻し」の文字だけ赤（板：ボタン/副の中で文字のみ #c0392b） */
+.returnBtn {
+  color: var(--color-danger);
+}
+
+.returnBtn svg {
+  color: var(--color-ink);
+}
+
+.approvalTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+}
+
+/* 変更内容の箱（板：#fafafc・radius8・枠1・padding14・gap6） */
+.approvalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+}
+
+.payloadLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+
+.payloadMeta {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.payloadTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.payloadBody {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.payloadDiff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-caption);
+}
+
+/* 差戻しのコメント（板：薄い金色の帯・12・#94600a） */
+.returnComment {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  font-size: var(--text-caption);
+}
+
+/* 「公開境界」の枠（板：題14/700＋本文12、頭の区切り線なし） */
+.boundaryPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.boundaryPanelTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+}
+
+/* ===== n4j0Rm 差し戻す理由の小窓 ===== */
+
+.returnDialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* 対象の要約（板：#fafafc・radius8・padding10 12） */
+.dialogSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+}
+
+.dialogSummaryMeta {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.dialogSummaryMain {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.dialogField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dialogFieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+/* 注意（板：#fafafc の帯・11） */
+.dialogNote {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 }
