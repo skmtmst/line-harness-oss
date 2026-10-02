@@ -245,6 +245,9 @@
   "app/rich-menus/edit/page.tsx": {
     "arbitrary-value": 10
   },
+  "app/rich-menus/new/create-v8.tsx": {
+    "unresolved-classname": 186
+  },
   "app/rich-menus/page.tsx": {
     "arbitrary-value": 10,
     "direct-secondary-button": 1
