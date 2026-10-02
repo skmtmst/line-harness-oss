@@ -483,12 +483,22 @@
  *   control-border  操作する部品の枠の色（入力・選ぶ・検索・チェック・
  *     ラジオ・トグルのオフ・OTP・色を選ぶ・カードの中の印）。カードや
  *     表・外側の板の枠は hairline のまま（#868e98、板「枠線の色」）
+ *   status-warn-soft  注意の薄い地は #fff7e6 → #fdf3e1（夕13・TOKENS）
+ *   track  #1d1d1f0a  進みの棒・切り替えの溝の地（夕13・TOKENS）
+ *   border-soft  #1d1d1f14  ダイアログ・ふきだしなど重なる物の縁（同上）
+ *   shadow-segment-ring / shadow-segment-thumb  切り替え（3つ）の
+ *     器の内側1pxの縁と、白いつまみの薄い影（同上）
  */
 [data-theme="v8"] {
   --radius-control: 10px;
   --radius-panel: 16px;
   --text-lh: 1.5;
   --color-control-border: #868e98;
+  --color-status-warn-soft: #fdf3e1;
+  --color-track: #1d1d1f0a;
+  --color-border-soft: #1d1d1f14;
+  --shadow-segment-ring: inset 0 0 0 1px var(--color-border-soft);
+  --shadow-segment-thumb: 0 1px 2px #1d1d1f1a;
 }
 
 /*
@@ -536,6 +546,29 @@ html:not([data-theme="v8"]) .v8-only {
 /* v8 の地は全体が shell の灰。板の白が浮くのはこの差で作る。 */
 [data-theme="v8"] body {
   background-color: var(--color-shell);
+}
+
+/*
+ * ★V8（夕21）：全列が要る表だけ横送りにする（列は消さない）。
+ * 中の表・グリッドは `--scroll-min` で表ごとの最小幅を渡す。
+ *
+ * 端の影は「送れる方向にまだ列がある」印：スクロール位置に固定された
+ * 影（scroll）を、中身と一緒に動く白い覆い（local）が端で隠す
+ * （Verou のスクロール影）。端まで送る・戻ると影は消える。
+ */
+@media (max-width: 1365px) {
+  [data-theme="v8"] [data-scroll-x] {
+    overflow-x: auto;
+    background:
+      linear-gradient(to right, var(--color-canvas) 30%, rgb(255 255 255 / 0)) 0 0 / 40px 100% no-repeat local,
+      linear-gradient(to left, var(--color-canvas) 30%, rgb(255 255 255 / 0)) 100% 0 / 40px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgb(29 29 31 / 0.18), rgb(29 29 31 / 0)) 0 0 / 12px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgb(29 29 31 / 0.18), rgb(29 29 31 / 0)) 100% 0 / 12px 100% no-repeat scroll;
+    background-color: var(--color-canvas);
+  }
+  [data-theme="v8"] [data-scroll-x] > * {
+    min-width: var(--scroll-min, 0px);
+  }
 }
 
 /* v8 では上の帯を 1024px から出す（v7 は 1280px から）。畳んだ左
@@ -602,6 +635,21 @@ html:not([data-theme="v8"]) .v8-only {
   [data-theme="v8"] [data-part="attention-star"][aria-pressed="true"] svg {
     animation: v8-star-pop var(--motion-base) var(--motion-ease-out);
   }
+}
+
+/*
+ * ★V8「ページ送り」（jX2Uw）：帯そのものが「件数＋ボタン」を持つ。
+ * 帯を包む行（data-pagebar）は高さ固定・余白をやめ、外に出していた
+ * 件数の文（data-pagebar-out）は帯の中の summary へ移すので隠す。
+ * v7 は今までどおり。
+ */
+[data-theme="v8"] [data-pagebar] {
+  height: auto;
+  padding: 0;
+}
+
+[data-theme="v8"] [data-pagebar-out] {
+  display: none;
 }
 
 @keyframes v8-star-pop {
