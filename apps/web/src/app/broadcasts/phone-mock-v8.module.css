@@ -3,22 +3,23 @@
  *
  * LINE のトーク画面に近い形で届く見本を出す。枠・時計の帯・部屋名・
  * 下のメニューまでをここで持つ（中身の吹き出しは BroadcastMessagePreview）。
+ * 値は globals.css の `--v8-bphone-*`（`[data-theme="v8"]`）に置く。
  */
 
 .phone {
   overflow: hidden;
-  border: 10px solid #171a1f;
-  border-radius: 44px;
-  background: #171a1f;
-  box-shadow: 0 12px 32px rgb(15 23 32 / 0.18);
+  border: 10px solid var(--v8-bphone-ink);
+  border-radius: var(--v8-bphone-shell-radius);
+  background: var(--v8-bphone-ink);
+  box-shadow: var(--v8-bphone-shadow);
 }
 
 .screen {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 34px;
-  background: #7f93c4;
+  border-radius: var(--v8-bphone-screen-radius);
+  background: var(--v8-bphone-talk);
   /* スマホの縦横比に寄せる。中身が少なくても形が保てるよう高さを持たせる。 */
   min-height: 480px;
 }
@@ -28,8 +29,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 22px 4px;
-  background: #ffffff;
-  color: #171a1f;
+  background: var(--v8-bphone-chrome);
+  color: var(--v8-bphone-ink);
   font-size: 12px;
   font-weight: 600;
 }
@@ -38,8 +39,8 @@
 .island {
   width: 84px;
   height: 22px;
-  border-radius: 999px;
-  background: #171a1f;
+  border-radius: var(--radius-pill);
+  background: var(--v8-bphone-ink);
 }
 
 .statusIcons {
@@ -53,9 +54,9 @@
   align-items: center;
   gap: 10px;
   padding: 6px 12px;
-  border-top: 1px solid rgb(15 23 32 / 0.06);
-  background: #ffffff;
-  color: #171a1f;
+  border-top: 1px solid var(--v8-bphone-hairline);
+  background: var(--v8-bphone-chrome);
+  color: var(--v8-bphone-ink);
 }
 
 .chatName {
@@ -71,7 +72,7 @@
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  color: #4a525e;
+  color: var(--v8-bphone-sub);
 }
 
 .chatBody {
@@ -86,9 +87,9 @@
 .dateChip {
   align-self: center;
   padding: 3px 10px;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.55);
-  color: #3c4450;
+  border-radius: var(--radius-pill);
+  background: var(--v8-bphone-chip);
+  color: var(--v8-bphone-chip-ink);
   font-size: 10px;
   font-weight: 600;
 }
@@ -107,16 +108,16 @@
   width: 26px;
   height: 26px;
   flex-shrink: 0;
-  border-radius: 999px;
-  background: #06c755;
-  color: #ffffff;
+  border-radius: var(--radius-pill);
+  background: var(--v8-bphone-send);
+  color: var(--v8-bphone-chrome);
   font-size: 11px;
   font-weight: 700;
 }
 
 .senderName {
   overflow: hidden;
-  color: #ffffff;
+  color: var(--v8-bphone-chrome);
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -137,14 +138,14 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px 14px;
-  background: #ffffff;
-  color: #4a525e;
+  background: var(--v8-bphone-chrome);
+  color: var(--v8-bphone-sub);
   font-size: 10px;
 }
 
 .homeIndicator {
   width: 120px;
   height: 4px;
-  border-radius: 999px;
-  background: #171a1f;
+  border-radius: var(--radius-pill);
+  background: var(--v8-bphone-ink);
 }

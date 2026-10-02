@@ -49,7 +49,7 @@
   align-items: center;
   gap: 6px;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
   font-size: 12px;
@@ -60,7 +60,7 @@
 .statusDot {
   width: 7px;
   height: 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: currentcolor;
 }
 
@@ -161,7 +161,7 @@
   width: 20px;
   height: 20px;
   border: 1.5px solid var(--color-hairline);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--color-ink-faint);
   font-size: 10px;
   font-weight: 600;
@@ -170,7 +170,7 @@
 .railDone .railMark {
   border-color: var(--color-accent-deep, var(--color-action));
   background: var(--color-accent-deep, var(--color-action));
-  color: #fff;
+  color: var(--color-on-accent);
 }
 
 .railDone .railLabel {
@@ -350,13 +350,13 @@
 .linkBarTrack {
   height: 4px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-canvas-sunken);
 }
 
 .linkBar {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-accent-deep, var(--color-action));
 }
 
@@ -423,7 +423,7 @@
   flex-shrink: 0;
   width: 40px;
   height: 40px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-accent-soft, var(--color-success-bg));
   color: var(--color-accent-deep, var(--color-action));
 }

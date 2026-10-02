@@ -73,7 +73,7 @@
     "unresolved-classname": 16
   },
   "app/broadcasts/reserved-v8.tsx": {
-    "unresolved-classname": 34
+    "unresolved-classname": 35
   },
   "app/chats/page.tsx": {
     "arbitrary-value": 37,

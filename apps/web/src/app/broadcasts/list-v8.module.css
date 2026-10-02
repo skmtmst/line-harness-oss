@@ -80,7 +80,7 @@
   height: 24px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-mini);
   background: transparent;
   color: var(--color-ink-faint);
   font-size: 14px;
@@ -218,7 +218,7 @@
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
-  box-shadow: 0 8px 24px rgb(15 23 32 / 0.12);
+  box-shadow: var(--v8-popover-shadow);
 }
 
 .datePopoverLabel {
@@ -275,7 +275,7 @@
   height: 30px;
   padding: 0 12px;
   border: 1px solid var(--color-hairline);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
   font-size: 12px;
@@ -294,7 +294,7 @@
 
 .chip[data-selected='true'] {
   border-color: transparent;
-  background: var(--color-ink, #2b343f);
+  background: var(--color-ink);
   color: var(--color-canvas);
 }
 
@@ -437,7 +437,7 @@
   align-items: center;
   gap: 6px;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -446,7 +446,7 @@
 .statusDot {
   width: 7px;
   height: 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: currentcolor;
 }
 
@@ -487,7 +487,7 @@
   width: 32px;
   height: 32px;
   border: 1px solid var(--color-hairline);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
   font-size: 14px;
@@ -525,14 +525,14 @@
   width: 24px;
   height: 24px;
   flex-shrink: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-canvas-sunken);
 }
 
 .skeletonBar {
   height: 12px;
   flex: 1;
-  border-radius: 6px;
+  border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
 }
 
@@ -570,7 +570,7 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
 }

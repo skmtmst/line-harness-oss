@@ -28,10 +28,13 @@ shared-button-importer app/booking/staff/page.tsx
 shared-button-importer app/booking/staff/shifts/liff-preview.tsx
 shared-button-importer app/booking/staff/shifts/page.tsx
 shared-button-importer app/booking/staff/shifts/staff-detail.tsx
+shared-button-importer app/broadcasts/detail-v8.tsx
 shared-button-importer app/broadcasts/detail/broadcast-recipients.tsx
 shared-button-importer app/broadcasts/detail/page.tsx
+shared-button-importer app/broadcasts/list-v8.tsx
 shared-button-importer app/broadcasts/new/page.tsx
 shared-button-importer app/broadcasts/page.tsx
+shared-button-importer app/broadcasts/reserved-v8.tsx
 shared-button-importer app/broadcasts/reserved/page.tsx
 shared-button-importer app/chats/page.tsx
 shared-button-importer app/common-actions/branch-editor.tsx
