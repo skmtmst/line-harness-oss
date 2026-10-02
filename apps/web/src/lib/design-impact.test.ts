@@ -134,6 +134,7 @@ describe('共通部品の影響範囲', () => {
       'app/nen/pets/pets-tab.tsx',
       'app/ops/audit/page.tsx',
       // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
+      'app/reminders/detail/detail-v8.tsx',
       'app/reminders/detail/page.tsx',
       // ★V8 リマインダ一覧（apLqS）。表の下にページ送りを置く。
       'app/reminders/list-v8.tsx',
