@@ -23,14 +23,14 @@ import {
 } from './saved-search-kpis'
 import { formatDateTime, formatNumber } from '@/lib/format'
 
-function isSavedSearchCondition(item: unknown): item is SavedSearchCondition {
+export function isSavedSearchCondition(item: unknown): item is SavedSearchCondition {
   if (!item || typeof item !== 'object') return false
   const value = item as Partial<SavedSearchCondition>
   return typeof value.kind === 'string' && typeof value.op === 'string'
 }
 
 /** 保存した条件の中身。all（かつ）と any（または）に分けて返す。 */
-function splitConditions(
+export function splitConditions(
   conditions: unknown,
   tags: Tag[],
   labels: SavedSearchConditionLabels,
@@ -50,7 +50,7 @@ function splitConditions(
   }
 }
 
-const USAGE_KIND_LABELS = {
+export const USAGE_KIND_LABELS = {
   broadcast: '一斉配信',
   automation: 'オートメーション',
   scenario: 'シナリオ',
