@@ -496,5 +496,5 @@
     "546_restaurant_menu_approval.sql",
     "548_friend_bulk_message_approval.sql"
   ],
-  "migrationCount": 494
+  "migrationCount": 495
 }
