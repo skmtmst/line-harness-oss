@@ -2,6 +2,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import type { FormLayout } from '@line-crm/shared';
 import Form from './Form.js';
 
 /**
@@ -35,7 +36,7 @@ const { api } = await import('../lib/api.js');
 const getForm = vi.mocked(api.getForm);
 const submitForm = vi.mocked(api.submitForm);
 
-function layout() {
+function layout(): FormLayout {
   return {
     version: 2,
     header: [],
@@ -119,9 +120,9 @@ describe('V8 の形', () => {
 describe('送ったら終わりの画面', () => {
   it('「送信しました」と LINEに戻るを出す', async () => {
     setup();
-    submitForm.mockResolvedValue({ status: 200, body: {} });
     fireEvent.click(await screen.findByRole('radio', { name: 'トリミング' }));
     fireEvent.click(screen.getByRole('button', { name: '次へ' }));
+    submitForm.mockResolvedValue({ status: 200, body: { success: true, data: {} } });
     fireEvent.click(await screen.findByRole('button', { name: '送信する' }));
     expect(await screen.findByText('送信しました')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'LINEに戻る' })).toBeTruthy();
