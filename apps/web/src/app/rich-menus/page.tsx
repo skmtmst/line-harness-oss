@@ -7,6 +7,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import RichMenusListV8 from './list-v8'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import type { RichMenuDeleteImpact, RichMenuTapStats } from '@/lib/api'
 import { RICH_MENU_DIMENSIONS, type Folder } from '@line-crm/shared'
@@ -50,10 +52,10 @@ type SortKey = 'taps' | 'updated' | 'name' | 'priority'
 type RichMenuAction = 'load' | 'reorder' | 'delete' | 'unpublish' | 'externalDelete' | 'import'
 
 /** APIや通信の内部表現を、運用者が次の行動を選べる文へ置き換える。 */
-type RichMenuActionAll = RichMenuAction | 'duplicate'
+export type RichMenuActionAll = RichMenuAction | 'duplicate'
 
 /** APIや通信の内部表現を、運用者が次の行動を選べる文へ置き換える。 */
-function richMenuErrorAll(error: unknown, action: RichMenuActionAll): string {
+export function richMenuErrorAll(error: unknown, action: RichMenuActionAll): string {
   if (action === 'duplicate') {
     if (error instanceof ApiError && error.status === 409) {
       return '複製がほかの操作と重なりました。一覧を読み直してから、もう一度お試しください。'
@@ -63,7 +65,7 @@ function richMenuErrorAll(error: unknown, action: RichMenuActionAll): string {
   return richMenuError(error, action)
 }
 
-function richMenuError(error: unknown, action: RichMenuAction): string {
+export function richMenuError(error: unknown, action: RichMenuAction): string {
   if (error instanceof ApiError) {
     if (error.status === 403) return 'このLINEアカウントのリッチメニューを操作する権限がありません。'
     if (error.status === 404) return '対象のリッチメニューが見つかりません。一覧を読み直してください。'
@@ -152,7 +154,7 @@ function MenuStatusBadge({ group }: { group: Pick<RichMenuGroupListItem, 'status
   )
 }
 
-type LineMenu = {
+export type LineMenu = {
   richMenuId: string
   name: string
   chatBarText: string
@@ -185,7 +187,7 @@ type DeleteTarget =
   | { kind: 'managed'; group: RichMenuGroupListItem }
   | { kind: 'external'; menu: LineMenu }
 
-export default function RichMenusListPage() {
+function RichMenusPageV7() {
   const router = useRouter()
   const { selectedAccount } = useAccount()
   const [showExternal, setShowExternal] = useState(false)
@@ -1220,7 +1222,7 @@ export default function RichMenusListPage() {
   )
 }
 
-function ExternalImportWorkspace({
+export function ExternalImportWorkspace({
   external,
   loading,
   error,
@@ -1350,4 +1352,13 @@ function externalActionText(action: NonNullable<LineMenu['areas']>[number]['acti
     return `別のメニューへ切り替える（${action.richMenuAliasId}）`
   }
   return `未対応の動き（${action.type || '種類不明'}）`
+}
+
+/*
+ * ★V8 切替（一覧 `rZEGN`）。v7 の見た目は data-theme="v8" が付くまで
+ * 1画素も変えないため、v7 本体（RichMenusPageV7）は無変更のまま残す。
+ */
+export default function RichMenusPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <RichMenusListV8 /> : <RichMenusPageV7 />
 }
