@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * Pencil `cBSCb`（V6s 共通トップバー）の実測値。
