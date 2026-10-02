@@ -6,6 +6,8 @@
  * 全量未取り込みの環境では `readiness` で未反映を名乗り、利用可能と偽らない。
  */
 
+import { normalizePostalCodeDigits } from '@line-crm/shared';
+
 export interface PostalCodeCandidate {
   postalCode: string;
   prefecture: string;
@@ -14,16 +16,22 @@ export interface PostalCodeCandidate {
 }
 
 export interface PostalReadiness {
+  /** 全国版として使える完成品か。部分・試し取り込みではfalse。 */
   fullDataset: boolean;
   rowCount: number;
   importedAt: string | null;
   source: string | null;
+  expectedRows: number | null;
+  inputSha256: string | null;
+  /** 取り込み表の件数が完了記録と一致するか。 */
+  complete: boolean;
+  /** 公式配布以外の由来（見本・fixture）のときtrue。 */
+  limited: boolean;
 }
 
+/** 共有の厳密規則にそろえる。前後空白・全角数字は可、無関係文字は不可。 */
 export function normalizePostalQuery(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const digits = value.replace(/[^0-9]/g, '');
-  return /^\d{7}$/.test(digits) ? digits : null;
+  return normalizePostalCodeDigits(value);
 }
 
 export function formatPostalHyphen(digits7: string): string {
@@ -31,20 +39,57 @@ export function formatPostalHyphen(digits7: string): string {
 }
 
 export async function getPostalReadiness(db: D1Database): Promise<PostalReadiness> {
+  const empty: PostalReadiness = {
+    fullDataset: false,
+    rowCount: 0,
+    importedAt: null,
+    source: null,
+    expectedRows: null,
+    inputSha256: null,
+    complete: false,
+    limited: false,
+  };
+  let manifest: {
+    source_url: string;
+    input_sha256: string;
+    row_count: number;
+    imported_at: string;
+  } | null = null;
   try {
-    const row = await db.prepare(
-      'SELECT COUNT(*) AS n, MAX(imported_at) AS imported_at, MAX(source_name) AS source_name FROM postal_codes',
-    ).first<{ n: number; imported_at: string | null; source_name: string | null }>();
-    const count = Number(row?.n ?? 0);
-    return {
-      fullDataset: count > 0,
-      rowCount: count,
-      importedAt: row?.imported_at ?? null,
-      source: row?.source_name ?? null,
-    };
+    manifest = await db.prepare(
+      `SELECT source_url, input_sha256, row_count, imported_at
+         FROM postal_import_manifest ORDER BY imported_at DESC LIMIT 1`,
+    ).first<{
+      source_url: string;
+      input_sha256: string;
+      row_count: number;
+      imported_at: string;
+    }>();
   } catch {
-    return { fullDataset: false, rowCount: 0, importedAt: null, source: null };
+    manifest = null;
   }
+  let count = 0;
+  try {
+    const row = await db.prepare('SELECT COUNT(*) AS n FROM postal_codes').first<{ n: number }>();
+    count = Number(row?.n ?? 0);
+  } catch {
+    count = 0;
+  }
+  if (!manifest) return { ...empty, rowCount: count };
+  // 完了記録と件数が一致し、由来が公式配布のときだけ全国版と名乗る。
+  const expected = Number(manifest.row_count);
+  const complete = expected > 0 && count === expected;
+  const limited = !manifest.source_url.startsWith('https://www.post.japanpost.jp');
+  return {
+    fullDataset: complete && !limited,
+    rowCount: count,
+    importedAt: manifest.imported_at ?? null,
+    source: manifest.source_url ?? null,
+    expectedRows: expected,
+    inputSha256: manifest.input_sha256 ?? null,
+    complete,
+    limited,
+  };
 }
 
 export async function searchPostalCodes(

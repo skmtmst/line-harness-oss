@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
+import { getBroadcastMessageAsset } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 vi.mock('../services/account-access.js', () => ({
@@ -45,10 +46,9 @@ beforeEach(() => {
   store.raw.exec(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
       VALUES ('account-1', 'channel-account-1', 'A1', 'token', 'secret', 1, 'tenant-1'),
              ('account-2', 'channel-account-2', 'A2', 'token', 'secret', 1, 'tenant-1');
-    INSERT INTO folders (id, kind, account_id, name, display_order, created_at, updated_at)
-      VALUES ('folder-1', 'broadcast_message_asset', 'account-1', '素材置き場', 0, '2026-10-02T00:00:00+09:00', '2026-10-02T00:00:00+09:00'),
-             ('folder-out', 'broadcast_message_asset', 'account-2', '別', 0, '2026-10-02T00:00:00+09:00', '2026-10-02T00:00:00+09:00'),
-             ('folder-tag', 'tag', 'account-1', '分類', 0, '2026-10-02T00:00:00+09:00', '2026-10-02T00:00:00+09:00');`);
+    INSERT INTO broadcast_asset_folders (id, line_account_id, name, display_order, created_at, updated_at)
+      VALUES ('folder-1', 'account-1', '素材置き場', 0, '2026-10-02T00:00:00+09:00', '2026-10-02T00:00:00+09:00'),
+             ('folder-out', 'account-2', '別', 0, '2026-10-02T00:00:00+09:00', '2026-10-02T00:00:00+09:00');`);
 });
 
 async function createAsset(body: Record<string, unknown>) {
@@ -139,19 +139,56 @@ describe('F4 素材の公開・下書き・版', () => {
     expect(body.data.map((v) => v.versionNumber)).toEqual([1]);
   });
 
-  it('外アカウント・外kind・消失folderを拒否する', async () => {
+  it('外アカウント・不明folderを拒否する', async () => {
     const badFolder = await createAsset({
       lineAccountId: 'account-1', kind: 'coupon', name: '素材', payload: COUPON, folderId: 'folder-out',
     });
     expect(badFolder.status).toBe(422);
-    const tagFolder = await createAsset({
-      lineAccountId: 'account-1', kind: 'coupon', name: '素材', payload: COUPON, folderId: 'folder-tag',
-    });
-    expect(tagFolder.status).toBe(422);
     const missing = await createAsset({
       lineAccountId: 'account-1', kind: 'coupon', name: '素材', payload: COUPON, folderId: 'no-such-folder',
     });
     expect(missing.status).toBe(422);
+  });
+
+  it('置き場の一覧と作成ができる', async () => {
+    const created = await app().request('/api/broadcast-message-assets/folders', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccountId: 'account-1', name: '新しい置き場' }),
+    }, bindings);
+    expect(created.status).toBe(201);
+    const list = await app().request('/api/broadcast-message-assets/folders?lineAccountId=account-1', {}, bindings);
+    expect(list.status).toBe(200);
+    const body = await list.json() as { data: Array<{ id: string; name: string; lineAccountId: string }> };
+    expect(body.data.map((f) => f.name)).toContain('新しい置き場');
+    expect(body.data.map((f) => f.name)).toContain('素材置き場');
+  });
+
+  it('PUTの古い期待版は409で、名前・置き場・本文すべて不変', async () => {
+    const created = await (await createAsset({
+      lineAccountId: 'account-1', kind: 'coupon', name: '素材', payload: COUPON, folderId: 'folder-1',
+    })).json() as { data: { id: string } };
+    const id = created.data.id;
+    const winner = await app().request(`/api/broadcast-message-assets/${id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: '勝者', payload: { ...COUPON, title: '勝者案' } }),
+    }, bindings);
+    expect(winner.status).toBe(200);
+    const stale = await app().request(`/api/broadcast-message-assets/${id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: '負け', payload: { ...COUPON, title: '負け案' }, folderId: null,
+        expectedVersion: 0, expectedDraftRevision: 1,
+      }),
+    }, bindings);
+    expect(stale.status).toBe(409);
+    const row = await getBroadcastMessageAsset(store.db, id);
+    expect(row!.name).toBe('勝者');
+    expect(row!.folder_id).toBe('folder-1');
+    expect(JSON.parse(row!.draft_payload_json!)).toEqual({ ...COUPON, title: '勝者案' });
+    expect(row!.payload_json).toContain('見本クーポン');
   });
 
   it('一覧とcountsは同じ絞り込み母集団になる', async () => {

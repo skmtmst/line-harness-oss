@@ -25,11 +25,23 @@ describe('F11 rating', () => {
   it('1〜5の整数だけ通す', () => {
     expect(validateAnswer(block(), 3)).toBeNull();
     expect(validateAnswer(block(), '5')).toBeNull();
+    expect(validateAnswer(block(), ' 3 ')).toBeNull();
     expect(validateAnswer(block(), 0)).toContain('1〜5');
     expect(validateAnswer(block(), 6)).toContain('1〜5');
     expect(validateAnswer(block(), 2.5)).toContain('1〜5');
     expect(validateAnswer(block(), 'good')).toContain('1〜5');
     expect(validateAnswer(block(), {})).toContain('1〜5');
+  });
+
+  it('保存・平均と一致させるため "3.0" "3e0" 真偽値は通さない', () => {
+    expect(validateAnswer(block(), '3.0')).toContain('1〜5');
+    expect(validateAnswer(block(), '3e0')).toContain('1〜5');
+    expect(validateAnswer(block(), true)).toContain('1〜5');
+    expect(validateAnswer(block(), false)).toContain('1〜5');
+    expect(normalizeRatingValue('3.0')).toBeNull();
+    expect(normalizeRatingValue('3e0')).toBeNull();
+    expect(normalizeRatingValue(true)).toBeNull();
+    expect(normalizeRatingValue('3')).toBe(3);
   });
 
   it('必須の空欄は必須文言、任意の空欄は通す', () => {
@@ -50,8 +62,25 @@ describe('F11 address', () => {
   it('先頭0を保ち、形違いを止める', () => {
     expect(normalizePostalCodeDigits('060-0000')).toBe('0600000');
     expect(normalizePostalCodeDigits('0600000')).toBe('0600000');
+    expect(normalizePostalCodeDigits(' 100-0001 ')).toBe('1000001');
+    expect(normalizePostalCodeDigits('１０００００１')).toBe('1000001');
     expect(normalizePostalCodeDigits('12345')).toBeNull();
+    expect(normalizePostalCodeDigits('abc1000001')).toBeNull();
+    expect(normalizePostalCodeDigits('060 0000')).toBeNull();
     expect(formatPostalCode('0600000')).toBe('060-0000');
+  });
+
+  it('指定済み欄の型違いを黙って空にしない', () => {
+    const addr = () => block({ type: 'address', name: 'address', label: '住所' });
+    expect(validateAnswer(addr(), { postalCode: 1000001 })).toContain('郵便番号');
+    expect(validateAnswer(addr(), { city: 123 })).toContain('文字');
+    expect(validateAnswer(addr(), { city: ['千代田区'] })).toContain('文字');
+    expect(validateAnswer(addr(), { addressLine1: {番地: 1} as unknown as string })).toContain('文字');
+    expect(validateAnswer(addr(), { prefecture: 13 as unknown as string })).toContain('都道府県');
+    expect(validateAnswer(addr(), { city: 'x'.repeat(256) })).toContain('長すぎ');
+    expect(validateAnswer(addr(), {
+      postalCode: '100-0001', prefecture: '東京都', city: '千代田区', addressLine1: '1-1',
+    })).toBeNull();
   });
 
   it('郵便番号の形違いと都道府県違いを止める', () => {

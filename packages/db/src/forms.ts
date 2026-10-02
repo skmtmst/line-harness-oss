@@ -1302,14 +1302,12 @@ export async function getFormSubmissionAnalytics(
   ).values()];
   const ratingFieldResults: FormRatingFieldAnalytics[] = [];
   for (const field of normalizedRatingFields) {
-    // 1〜5の整数だけを平均に入れる。不正な旧値（0・6・小数・文字）は
-    // CASTで0へ混ぜず、未回答として数えない。未回答の平均はnull。
+    // 受け入れ・保存・平均の型を一致させる。整数1〜5とちょうどの "1"〜"5" だけ。
+    // 真偽値（SQLiteで1に化ける）・小数・"3.0"・"3e0" は数えない。
+    // 不正な旧値は0へ混ぜず、未回答として数えない。未回答の平均はnull。
     const row = await db.prepare(
       `SELECT COUNT(*) AS answered,
-              AVG(CASE
-                WHEN TRIM(CAST(answer.value AS TEXT)) IN ('1', '2', '3', '4', '5') THEN CAST(answer.value AS REAL)
-                ELSE NULL
-              END) AS average
+              AVG(CAST(answer.value AS REAL)) AS average
          FROM form_submissions fs
          JOIN friends f ON f.id = fs.friend_id
          JOIN json_each(CASE WHEN json_valid(fs.data) THEN fs.data ELSE '{}' END) answer
@@ -1317,6 +1315,7 @@ export async function getFormSubmissionAnalytics(
           AND f.line_account_id = ?
           AND fs.is_test = 0
           AND answer.key = ?
+          AND answer.type IN ('integer', 'text')
           AND TRIM(CAST(answer.value AS TEXT)) IN ('1', '2', '3', '4', '5')`,
     ).bind(formId, lineAccountId, field.key).first<{
       answered: number;

@@ -778,11 +778,18 @@ export interface FormAddressValue {
   addressLine2?: string;
 }
 
-/** 郵便番号の数字だけ（ハイフンなし・7桁）。先頭0を保つ。 */
+/**
+ * 郵便番号の数字だけ（ハイフンなし・7桁）。先頭0を保つ。
+ *
+ * 許すのは「7桁」「3桁-4桁」と前後の空白・全角数字だけ。
+ * `abc1000001` のような無関係文字の除去で有効化しない。
+ */
 export function normalizePostalCodeDigits(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  const digits = value.replace(/[^0-9]/g, "");
-  return /^\d{7}$/.test(digits) ? digits : null;
+  const trimmed = value.replace(/^[\s\u3000]+|[\s\u3000]+$/g, "");
+  const half = trimmed.replace(/[０-９]/g, (ch) => String("０１２３４５６７８９".indexOf(ch)));
+  if (!/^[0-9]{3}-?[0-9]{4}$/.test(half)) return null;
+  return half.replace("-", "");
 }
 
 /** 7桁を 123-4567 の表示形にする。7桁でなければそのまま返す。 */
@@ -834,14 +841,19 @@ export function isAddressValueEmpty(value: unknown): boolean {
   return parts.every((part) => part === undefined || part === null || String(part).trim() === "");
 }
 
-/** 5段階評価の値か。1〜5の整数だけ。文字列の "3" も数として認める。 */
+/**
+ * 5段階評価の値か。1〜5の整数と、ちょうどの "1"〜"5" だけ。
+ *
+ * "3.0" や "3e0" は数としては3だが、保存・平均の数え方（文字列1〜5・
+ * SQLite整数）と合わせるため認めない。真偽値は数に混ぜない。
+ */
 export function normalizeRatingValue(value: unknown): number | null {
   if (typeof value === "number") {
     return Number.isInteger(value) && value >= 1 && value <= 5 ? value : null;
   }
-  if (typeof value === "string" && value.trim() !== "") {
-    const n = Number(value.trim());
-    return Number.isInteger(n) && n >= 1 && n <= 5 ? n : null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return /^(1|2|3|4|5)$/.test(trimmed) ? Number(trimmed) : null;
   }
   return null;
 }
@@ -873,14 +885,44 @@ export function validateAnswer(
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       return `${block.label} の住所を入力してください`;
     }
-    const v = value as Partial<FormAddressValue>;
-    const postal = typeof v.postalCode === "string" ? v.postalCode.trim() : "";
-    if (postal !== "" && normalizePostalCodeDigits(postal) === null) {
-      return `${block.label} の郵便番号は 123-4567 のように入力してください`;
+    // 指定済みの各欄は型と長さを検査する。数・配列・物を黙って空にしない。
+    // 未指定（null・なし・空文字）は任意欄として保持する。
+    const v = value as Record<string, unknown>;
+    const names: Record<keyof Omit<FormAddressValue, "postalCode" | "prefecture">, string> = {
+      city: "市区町村",
+      addressLine1: "番地",
+      addressLine2: "建物名",
+    };
+    const checkText = (key: string, label: string, max: number): string | null => {
+      const raw = v[key];
+      if (raw === undefined || raw === null || raw === "") return null;
+      if (typeof raw !== "string") return `${block.label} の${label}は文字で入力してください`;
+      if (raw.trim().length > max) return `${block.label} の${label}が長すぎます`;
+      return null;
+    };
+    const postalRaw = v.postalCode;
+    if (postalRaw !== undefined && postalRaw !== null && postalRaw !== "") {
+      if (typeof postalRaw !== "string") {
+        return `${block.label} の郵便番号は 123-4567 のように入力してください`;
+      }
+      const postal = postalRaw.trim();
+      if (postal.length > 8) return `${block.label} の郵便番号は 123-4567 のように入力してください`;
+      if (normalizePostalCodeDigits(postal) === null) {
+        return `${block.label} の郵便番号は 123-4567 のように入力してください`;
+      }
     }
-    const prefecture = typeof v.prefecture === "string" ? v.prefecture.trim() : "";
-    if (prefecture !== "" && !(PREFECTURES as readonly string[]).includes(prefecture)) {
-      return `${block.label} は都道府県から選んでください`;
+    const prefectureRaw = v.prefecture;
+    if (prefectureRaw !== undefined && prefectureRaw !== null && prefectureRaw !== "") {
+      if (typeof prefectureRaw !== "string") {
+        return `${block.label} は都道府県から選んでください`;
+      }
+      if (!(PREFECTURES as readonly string[]).includes(prefectureRaw.trim())) {
+        return `${block.label} は都道府県から選んでください`;
+      }
+    }
+    for (const [key, label] of Object.entries(names)) {
+      const problem = checkText(key, label, 255);
+      if (problem !== null) return problem;
     }
     return null;
   }

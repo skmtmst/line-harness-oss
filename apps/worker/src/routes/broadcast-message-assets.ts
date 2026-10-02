@@ -3,16 +3,17 @@ import {
   assetStatusOf,
   countBroadcastMessageAssetsByKind,
   createBroadcastMessageAsset,
+  createBroadcastAssetFolder,
   deleteBroadcastMessageAsset,
   draftPayloadOf,
+  getBroadcastAssetFolderById,
   getBroadcastMessageAsset,
-  getFolderById,
   hasAssetDraft,
+  listBroadcastAssetFolders,
   listBroadcastMessageAssetVersions,
   listBroadcastMessageAssets,
   publishBroadcastMessageAsset,
   saveBroadcastMessageAssetDraft,
-  updateBroadcastMessageAssetMeta,
   type BroadcastMessageAsset,
   type BroadcastMessageAssetKind,
   type BroadcastMessageAssetStatus,
@@ -136,6 +137,10 @@ function serialize(row: BroadcastMessageAsset) {
   };
 }
 
+/**
+ * 素材の置き場は独立表（broadcast_asset_folders）を見る。
+ * 既存foldersは触らない。未割当の置き場は見える人にだけ見える。
+ */
 async function readAssetFolderId(
   db: D1Database,
   body: Record<string, unknown>,
@@ -146,12 +151,9 @@ async function readAssetFolderId(
   const raw = body.folderId;
   if (raw === null || raw === '') return { ok: true, folderId: null };
   const id = String(raw);
-  const folder = await getFolderById(db, id);
+  const folder = await getBroadcastAssetFolderById(db, id);
   if (!folder) return { ok: false, error: 'そのフォルダはありません' };
-  if (folder.kind !== 'broadcast_message_asset') {
-    return { ok: false, error: '素材のフォルダではありません' };
-  }
-  if (folder.account_id !== accountId && (folder.account_id !== null || !canSeeUnassigned)) {
+  if (folder.line_account_id !== accountId && (folder.line_account_id !== null || !canSeeUnassigned)) {
     return { ok: false, error: 'そのフォルダはありません' };
   }
   return { ok: true, folderId: id };
@@ -240,6 +242,50 @@ broadcastMessageAssets.get('/api/broadcast-message-assets/counts', async (c) => 
   return c.json({ success: true, data: counts });
 });
 
+broadcastMessageAssets.get('/api/broadcast-message-assets/folders', async (c) => {
+  const lineAccountId = c.req.query('lineAccountId');
+  if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  let folders = await listBroadcastAssetFolders(c.env.DB, lineAccountId || undefined);
+  const { scope } = await adminAccountScope(c);
+  folders = folders.filter((folder) => folder.line_account_id === null
+    ? scope.canSeeUnassigned
+    : scope.allowedAccountIds.includes(folder.line_account_id));
+  return c.json({
+    success: true,
+    data: folders.map((folder) => ({
+      id: folder.id,
+      lineAccountId: folder.line_account_id,
+      name: folder.name,
+      createdAt: folder.created_at,
+      updatedAt: folder.updated_at,
+    })),
+  });
+});
+
+broadcastMessageAssets.post('/api/broadcast-message-assets/folders', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ lineAccountId?: string | null; name?: string }>();
+  if (!body.name?.trim()) return c.json({ success: false, error: 'name is required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId ?? null])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const folder = await createBroadcastAssetFolder(c.env.DB, {
+    lineAccountId: body.lineAccountId,
+    name: body.name.trim(),
+  });
+  return c.json({
+    success: true,
+    data: folder ? {
+      id: folder.id,
+      lineAccountId: folder.line_account_id,
+      name: folder.name,
+      createdAt: folder.created_at,
+      updatedAt: folder.updated_at,
+    } : null,
+  }, 201);
+});
+
 broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{ lineAccountId?: string | null; kind?: BroadcastMessageAssetKind; name?: string; payload?: unknown; folderId?: string | null }>();
   if (!body.kind || !ASSET_KINDS.has(body.kind) || !body.name?.trim()) {
@@ -266,27 +312,43 @@ broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner'
 broadcastMessageAssets.put('/api/broadcast-message-assets/:id', requireRole('owner', 'admin'), requireVisibleAsset, async (c) => {
   const existing = await getBroadcastMessageAsset(c.env.DB, c.req.param('id'));
   if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-  const body = await c.req.json<{ name?: string; payload?: unknown; folderId?: string | null }>();
+  const body = await c.req.json<{ name?: string; payload?: unknown; folderId?: string | null; expectedVersion?: unknown; expectedDraftRevision?: unknown }>();
   if (!body.name?.trim()) return c.json({ success: false, error: 'name is required' }, 400);
   const payloadError = validatePayload(existing.kind, body.payload);
   if (payloadError) return c.json({ success: false, error: payloadError }, 400);
+  // 呼び出し側の期待版。指定があれば古い期待を409で拒否する。
+  // 指定がなければ読直し時点の版でCASする（テンプレートPUTと同契約）。
+  let expectedVersion: number | undefined;
+  let expectedDraftRevision: number | undefined;
+  if (body.expectedVersion !== undefined && body.expectedVersion !== null) {
+    expectedVersion = Number(body.expectedVersion);
+    if (!Number.isInteger(expectedVersion)) {
+      return c.json({ success: false, error: '版の番号を確認してください' }, 400);
+    }
+  }
+  if (body.expectedDraftRevision !== undefined && body.expectedDraftRevision !== null) {
+    expectedDraftRevision = Number(body.expectedDraftRevision);
+    if (!Number.isInteger(expectedDraftRevision)) {
+      return c.json({ success: false, error: '下書きの版を確認してください' }, 400);
+    }
+  }
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const folder = await readAssetFolderId(c.env.DB, body as unknown as Record<string, unknown>, existing.line_account_id, scope.canSeeUnassigned);
     if (!folder.ok) return c.json({ success: false, error: folder.error }, 422);
-    if (folder.folderId !== undefined) {
-      await updateBroadcastMessageAssetMeta(c.env.DB, existing.id, {
-        name: body.name.trim(),
-        folderId: folder.folderId,
-      });
-    } else {
-      await updateBroadcastMessageAssetMeta(c.env.DB, existing.id, { name: body.name.trim() });
-    }
+    // 名前・置き場・下書き本文を1文で書く。CAS敗北時は全面不変。
     const row = await saveBroadcastMessageAssetDraft(c.env.DB, existing.id, {
+      name: body.name.trim(),
+      folderId: folder.folderId,
       payloadJson: JSON.stringify(body.payload),
+      expectedVersion,
+      expectedDraftRevision,
     });
     return c.json({ success: true, data: row ? serialize(row) : null });
   } catch (err) {
+    if (err instanceof Error && err.message === 'ASSET_VERSION_CONFLICT') {
+      return c.json({ success: false, error: 'ほかの人が先に公開しました。開き直して確認してください' }, 409);
+    }
     if (err instanceof Error && err.message === 'ASSET_DRAFT_CONFLICT') {
       return c.json({ success: false, error: '編集中に公開状態が変わりました。読み直してください' }, 409);
     }
@@ -328,22 +390,30 @@ broadcastMessageAssets.post('/api/broadcast-message-assets/:id/publish', require
       createdByStaffId: staff?.id ?? null,
     });
     const row = result.row;
+    // 同キー再送は当時の記録を返す。後の版が進んでも旧版・旧本文。
+    const recorded = result.recordedVersion !== undefined
+      ? {
+        publishedVersion: result.recordedVersion,
+        payload: JSON.parse(result.recordedPayloadJson ?? row.payload_json) as unknown,
+        publishedAt: result.recordedPublishedAt ?? row.published_at,
+      }
+      : null;
     return c.json({
       success: true,
       data: {
         id: row.id,
         kind: row.kind,
         name: row.name,
-        payload: JSON.parse(draftPayloadOf(row)) as unknown,
-        publishedPayload: JSON.parse(row.payload_json) as unknown,
+        payload: recorded?.payload ?? (JSON.parse(draftPayloadOf(row)) as unknown),
+        publishedPayload: recorded?.payload ?? (JSON.parse(row.payload_json) as unknown),
         folderId: row.folder_id ?? null,
-        status: assetStatusOf(row),
-        publishedVersion: Number(row.published_version),
-        publishedAt: row.published_at,
+        status: recorded ? 'published' : assetStatusOf(row),
+        publishedVersion: recorded?.publishedVersion ?? Number(row.published_version),
+        publishedAt: recorded?.publishedAt ?? row.published_at,
         published: result.published,
         replayed: result.replayed,
-        hasDraft: hasAssetDraft(row),
-        draftRevision: Number(row.draft_revision ?? 0),
+        hasDraft: recorded ? false : hasAssetDraft(row),
+        draftRevision: recorded ? 0 : Number(row.draft_revision ?? 0),
       },
     });
   } catch (err) {

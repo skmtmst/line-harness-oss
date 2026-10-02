@@ -56,7 +56,11 @@ describe('F11 rating平均', () => {
         ('bad6', 'form-1', 'friend-a2', '{"satisfaction":6}', '2026-09-05', 0),
         ('badtext', 'form-1', 'friend-a1', '{"satisfaction":"good"}', '2026-09-06', 0),
         ('testrow', 'form-1', 'friend-a1', '{"satisfaction":5}', '2026-09-07', 1),
-        ('other-account', 'form-1', 'friend-b1', '{"satisfaction":5}', '2026-09-08', 0);
+        ('other-account', 'form-1', 'friend-b1', '{"satisfaction":5}', '2026-09-08', 0),
+        ('introw', 'form-1', 'friend-a3', '{"satisfaction":3}', '2026-09-09', 0),
+        ('boolrow', 'form-1', 'friend-a1', '{"satisfaction":true}', '2026-09-10', 0),
+        ('dotrow', 'form-1', 'friend-a2', '{"satisfaction":"3.0"}', '2026-09-11', 0),
+        ('exprow', 'form-1', 'friend-a3', '{"satisfaction":"3e0"}', '2026-09-12', 0);
     `);
     db = asD1(sqlite);
   });
@@ -66,8 +70,16 @@ describe('F11 rating平均', () => {
       db, 'form-1', 'account-a', [], [{ key: 'satisfaction', label: '満足度' }],
     );
     expect(summary.ratingFields).toEqual([{
-      key: 'satisfaction', label: '満足度', answered: 2, average: 3,
+      key: 'satisfaction', label: '満足度', answered: 3, average: 3,
     }]);
+  });
+
+  test('真偽値・"3.0"・"3e0"は平均に入れない', async () => {
+    const summary = await getFormSubmissionAnalytics(
+      db, 'form-1', 'account-a', [], [{ key: 'satisfaction', label: '満足度' }],
+    );
+    // 5・1・整数3だけが有効。true・"3.0"・"3e0"・0・6・文字は除外。
+    expect(summary.ratingFields[0]).toMatchObject({ answered: 3, average: 3 });
   });
 
   test('未回答だけならaverageはnull', async () => {
