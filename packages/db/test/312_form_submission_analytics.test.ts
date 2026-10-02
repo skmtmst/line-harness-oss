@@ -109,6 +109,7 @@ describe('migration 312 form submission analytics', () => {
         minDate: '2026-09-20',
         maxDate: '2026-09-25',
       }],
+      ratingFields: [],
     });
   });
 
