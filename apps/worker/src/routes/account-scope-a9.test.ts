@@ -22,6 +22,22 @@ vi.mock('@line-crm/db', () => ({
   getBroadcastMessageAsset: mocks.getAsset,
   listBroadcastMessageAssets: mocks.listAssets,
   updateBroadcastMessageAsset: mocks.updateAsset,
+  assetStatusOf: (row: { published_version?: number; draft_payload_json?: string | null; draft_revision?: number }) =>
+    Number(row.published_version ?? 0) < 1
+      ? 'draft'
+      : (row.draft_payload_json != null || Number(row.draft_revision ?? 0) > 0 ? 'published_with_draft' : 'published'),
+  draftPayloadOf: (row: { draft_payload_json?: string | null; payload_json: string }) =>
+    row.draft_payload_json ?? row.payload_json,
+  hasAssetDraft: (row: { draft_payload_json?: string | null; draft_revision?: number } | null | undefined) =>
+    Boolean(row) && (row!.draft_payload_json != null || Number(row!.draft_revision ?? 0) > 0),
+  getFolderById: vi.fn(),
+  getBroadcastAssetFolderById: vi.fn().mockResolvedValue(null),
+  listBroadcastAssetFolders: vi.fn().mockResolvedValue([]),
+  createBroadcastAssetFolder: vi.fn(),
+  listBroadcastMessageAssetVersions: vi.fn().mockResolvedValue([]),
+  publishBroadcastMessageAsset: vi.fn(),
+  saveBroadcastMessageAssetDraft: vi.fn(),
+  updateBroadcastMessageAssetMeta: vi.fn(),
   createTrackedLink: mocks.createLink,
   deleteTrackedLink: mocks.deleteLink,
   getTrackedLinkById: mocks.getLink,
