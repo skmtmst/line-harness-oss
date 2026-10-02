@@ -1,7 +1,7 @@
 'use client'
 
-import ro from '@/app/notifications/readonly-v8.module.css'
-import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import '@/app/notifications/readonly-v8.css'
+import ReadonlyHeaderV8, { ReadonlyDesignNode } from '@/app/notifications/readonly-header-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
 import { useSearchParams } from 'next/navigation'
@@ -266,7 +266,7 @@ function AccountDetail() {
   const webhook = webhookLabel(account)
 
   return (
-    <div data-design-node={theme === 'v8' ? 'ihjfd' : 'T9rA9'} className={`flex flex-col gap-4 ${ro.page}`}>
+    <ReadonlyDesignNode node="ihjfd"><div data-design-node="T9rA9" className="flex flex-col gap-4 v8-ro-notifications-page">
       {theme === 'v8' && <ReadonlyHeaderV8 title={account.name} description="登録の内容・接続状態・送受信の記録を確認します。秘密値は表示しません。" />}
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Head">
@@ -640,7 +640,7 @@ function AccountDetail() {
         />
       )}
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-    </div>
+    </div></ReadonlyDesignNode>
   )
 }
 

@@ -4,8 +4,8 @@ import ActionMenu from '@/components/shared/action-menu'
 import IconButton from '@/components/shared/icon-button'
 import { MoreHorizontal } from 'lucide-react'
 
-import ro from '@/app/notifications/readonly-v8.module.css'
-import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import '@/app/notifications/readonly-v8.css'
+import { ReadonlyDesignNode } from '@/app/notifications/readonly-header-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
 import Link from 'next/link'
@@ -148,7 +148,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
 
   const listState = !lineAccountId ? 'account-required' : state === 'ready' && rules.length === 0 ? 'empty' : state === 'ready' && visible.length === 0 ? 'filtered-empty' : state
 
-  return <section data-design-node={theme === 'v8' ? 'u8xibp' : 'DpxOK'} data-list-state={listState} className="space-y-4">
+  return <ReadonlyDesignNode node="u8xibp"><section data-design-node="DpxOK" data-list-state={listState} className="space-y-4">
     <NoteBar>この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。</NoteBar>
     <div data-ro-kpis="true" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <KpiCard title="出しているお知らせ" value={state === 'ready' ? summary?.published ?? null : null} unit="件" detail={state === 'ready' ? `うち止めている ${summary?.stopped ?? '—'}` : undefined} variant="v6" />
@@ -190,5 +190,5 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       </Tr>)}</tbody></DataTable>}
     {state === 'ready' && rules.length > 0 ? <div className="flex items-center justify-between"><ListRange total={summary?.total ?? rules.length} first={1} last={rules.length} /></div> : null}
     {showExport ? <div role="dialog" aria-modal="true" aria-label="CSVを書き出す理由" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4"><div ref={exportPanelRef} className="w-full max-w-md rounded-card border border-hairline bg-canvas p-5 shadow-float"><div className="flex items-start justify-between gap-3"><h2 className="font-bold text-ink">CSVを書き出す理由</h2><button type="button" onClick={() => setShowExport(false)} disabled={busy === 'csv'} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div><p className="mt-2 text-sm text-ink-secondary">個人情報を含むため、確認した目的を記録します。</p><input autoFocus value={exportReason} onChange={(event) => setExportReason(event.target.value)} className="mt-4 w-full rounded-control border border-hairline px-3 py-2 text-sm" placeholder="例：月次の運用確認" /><div className="mt-4 flex justify-end gap-2"><Button onClick={() => setShowExport(false)}>キャンセル</Button><Button variant="primary" onClick={() => void exportCsv()} disabled={!exportReason.trim() || busy === 'csv'}>書き出す</Button></div></div></div> : null}
-  </section>
+  </section></ReadonlyDesignNode>
 }

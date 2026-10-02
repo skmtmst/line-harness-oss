@@ -1,7 +1,7 @@
 'use client'
 
 import OrderDrawerV8 from './order-drawer-v8'
-import ro from './order-drawer-v8.module.css'
+import './order-drawer-v8.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -208,7 +208,7 @@ export default function OrderDetailDrawer({
         ? `${ORDER_STATUS_TEXT[order.status] ?? order.status} ／ ${dateTime(order.orderedAt)} に注文`
         : undefined}
       onClose={onClose}
-      footer={state === 'ready' ? theme === 'v8' ? <div><div className={ro.links}><Button href="/ec-commerce/identity-candidates">会員のつき合わせへ</Button>{order?.detailUrl && <Button href={order.detailUrl} target="_blank" rel="noreferrer">ECの管理画面で開く</Button>}</div><p className={ro.hint}>もう一度行う・再取込では、届き済みの通知や入った成果・マイルは重ねません。</p></div> : (
+      footer={state === 'ready' ? theme === 'v8' ? <div><div className="v8-ro-order-links"><Button href="/ec-commerce/identity-candidates">会員のつき合わせへ</Button>{order?.detailUrl && <Button href={order.detailUrl} target="_blank" rel="noreferrer">ECの管理画面で開く</Button>}</div><p className="v8-ro-order-hint">もう一度行う・再取込では、届き済みの通知や入った成果・マイルは重ねません。</p></div> : (
         <p className={styles.footer}>
           もう一度行う・再取込では、届き済みの通知や入った成果・マイルは重ねません。
         </p>

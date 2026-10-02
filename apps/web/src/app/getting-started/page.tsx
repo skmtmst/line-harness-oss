@@ -1,6 +1,6 @@
 'use client'
 
-import ro from '@/app/notifications/readonly-v8.module.css'
+import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
@@ -71,7 +71,7 @@ export default function GettingStartedPage() {
   const currentKey = steps.find((step) => step.state !== 'done')?.key ?? null
 
   return (
-    <div className={`${styles.page} ${ro.page}`} data-design-node={theme === 'v8' ? 'xuJ7D' : undefined}>
+    <div className={`${styles.page} v8-ro-notifications-page`} data-design-node={theme === 'v8' ? 'xuJ7D' : undefined}>
       {theme === 'v8' && <ReadonlyHeaderV8 title="はじめの設定" description="いまの進み具合と、次に設定することを確認します。順路は実際の5段に合わせています。" />}
       {/*
         読込面（loading）では共通部品が onRetry を見ない。

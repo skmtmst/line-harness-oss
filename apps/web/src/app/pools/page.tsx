@@ -1,6 +1,6 @@
 'use client'
 
-import ro from '@/app/notifications/readonly-v8.module.css'
+import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
@@ -82,7 +82,7 @@ export default function PoolsPage() {
   const isEmpty = !loading && !error && sortedPools.length === 0
 
   return (
-    <div className={`flex flex-col gap-4 ${ro.page}`} data-design-node={theme === 'v8' ? 'u3iab3' : undefined}>
+    <div className="flex flex-col gap-4 v8-ro-notifications-page" data-design-node={theme === 'v8' ? 'u3iab3' : undefined}>
       {theme === 'v8' && <ReadonlyHeaderV8 title="プール管理" description="公開URLから追加された人を、稼働中の所属先からランダムに振り分けます。" />}
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {isEmpty ? (
@@ -117,7 +117,7 @@ export default function PoolsPage() {
               onRetry={() => { void load() }}
             />
           ) : (
-            <div className={`flex flex-col gap-4 ${ro.poolCards}`}>
+            <div className="flex flex-col gap-4 v8-ro-notifications-poolCards">
               {error ? (
                 <Notice
                   tone="danger"

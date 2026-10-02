@@ -1,6 +1,6 @@
 'use client'
 
-import ro from '@/app/notifications/readonly-v8.module.css'
+import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
@@ -553,7 +553,7 @@ function EcCommercePageInner() {
   const { selectedAccountId } = useAccount()
 
   return (
-    <div className={`${styles.root} ${tab === 'connector' ? '' : ro.page}`} data-design="Head" data-design-node={theme === 'v8' && tab !== 'connector' ? (tab === 'subscriptions' ? 'wqC8x' : 'GmVR5') : undefined}>
+    <div className={`${styles.root} ${tab === 'connector' ? '' : 'v8-ro-notifications-page'}`} data-design="Head" data-design-node={theme === 'v8' && tab !== 'connector' ? (tab === 'subscriptions' ? 'wqC8x' : 'GmVR5') : undefined}>
       {theme === 'v8' && tab !== 'connector' && <ReadonlyHeaderV8 title="EC連携" description="取り込みの記録・会員のつき合わせ・定期便の状況を確認できます。" />}
       {/* マニュアルは共通トップバーに置く。本文に「ECの注文・定期便を取り込み、LINEの配信や成果へつなげます。」という重複説明は置かない。 */}
       <PageHeaderH2

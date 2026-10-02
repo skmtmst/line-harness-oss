@@ -1,7 +1,7 @@
 'use client'
 
-import ro from '@/app/notifications/readonly-v8.module.css'
-import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import '@/app/notifications/readonly-v8.css'
+import ReadonlyHeaderV8, { ReadonlyDesignNode } from '@/app/notifications/readonly-header-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
 import { useSearchParams } from 'next/navigation'
@@ -93,7 +93,7 @@ export default function AccountsPage() {
   if (searchParams.get('tab') === 'migration') return <AccountMigration />
 
   return (
-    <div data-design-node={theme === 'v8' ? 'V7vn3' : 'QT91v'} className={`flex flex-col gap-4 ${ro.page}`}>
+    <ReadonlyDesignNode node="V7vn3"><div data-design-node="QT91v" className="flex flex-col gap-4 v8-ro-notifications-page">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         {/* ★V7：上の帯の画面名と同じ1段だけのパンくずは出さない。 */}
@@ -303,6 +303,6 @@ export default function AccountsPage() {
           合っていないと、友だちからのメッセージが届きません。アーカイブしたアカウントは記録が残り、送受信だけを止めます。
         </p>
       </div>
-    </div>
+    </div></ReadonlyDesignNode>
   )
 }

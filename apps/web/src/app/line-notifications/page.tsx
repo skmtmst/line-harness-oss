@@ -1,6 +1,6 @@
 'use client'
 
-import ro from '@/app/notifications/readonly-v8.module.css'
+import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
@@ -1143,7 +1143,7 @@ function LineNotificationsPage() {
     setBusy(null)
   }
 
-  return <div className={`flex flex-col gap-4 ${expandedSetting === null ? ro.page : ''}`} data-design-node={theme === 'v8' && expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}>
+  return <div className={`flex flex-col gap-4 ${expandedSetting === null ? 'v8-ro-notifications-page' : ''}`} data-design-node={theme === 'v8' && expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}>
     {theme === 'v8' && expandedSetting === null && <ReadonlyHeaderV8 title="LINE通知" description="注文・予約・運用の出来事を知らせます。顧客向けと運用者向けの記録を分けて確認できます。" />}
     {expandedSetting === null ? <MergedTabs basePath="/line-notifications" tabs={tabsWithCounts} active={tab} defaultKey="customer" /> : null}
     {/*
