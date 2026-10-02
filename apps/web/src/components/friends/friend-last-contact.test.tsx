@@ -82,7 +82,6 @@ describe('最終接触日は行とカードで同じ', () => {
           <FriendListRow
             friend={FRIEND}
             visibleColumns={new Set<FriendListColumn>(['last'])}
-            gridTemplateColumns="36px"
             onToggleSelect={() => {}}
             onToggleAttention={() => {}}
           />

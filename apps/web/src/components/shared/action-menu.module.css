@@ -184,4 +184,9 @@
   overflow: hidden;
   vertical-align: top;
 }
+
+/* ★V8（夕13）：重なる物の外縁は border-soft（TOKENS-20261001）。 */
+[data-theme="v8"] .menu {
+  border-color: var(--color-border-soft);
+}
 }
