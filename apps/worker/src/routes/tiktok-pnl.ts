@@ -2,7 +2,7 @@
  * TikTok利益計算の自動化: 状態確認と手動同期のAPI。
  *
  * - 認可は既存の google_sheets_integrations（#838）を使い回すため、
- *   ここに新しいOAuthは無い。連携が connected のアカウントだけ動く。
+ *   ここに新しいOAuthは無い。Googleの認可が生きているアカウントだけ動く。
  * - 変更系（手動同期）は owner / admin に限定する。
  */
 import { Hono } from 'hono';
@@ -14,6 +14,7 @@ import { dbFor } from '../services/db-router.js';
 import type { GoogleSheetsIntegrationRow } from '../services/google-sheets.js';
 import {
   syncTiktokPnlForAccount,
+  TIKTOK_PNL_USABLE_STATUS_SQL,
   type TiktokPnlSettingsRow,
 } from '../services/tiktok-pnl.js';
 
@@ -27,13 +28,21 @@ function fail(
   return c.json({ success: false, error }, status);
 }
 
+/**
+ * 利益計算に使えるGoogle連携を1件返す。
+ *
+ * #838 の書き出し先スプレッドシート未選択（`pending_target`）でも、
+ * Googleの認可と更新用トークンは保存されているので利益計算は動く。
+ * 利益計算は自分でスプレッドシートを作るため #838 の書き出し先に依存しない。
+ * 認可切れ（`expired`）と未接続（行なし）だけを未接続として扱う。
+ */
 async function connectedIntegration(
   c: Context<Env>,
   lineAccountId: string,
 ): Promise<GoogleSheetsIntegrationRow | null> {
   return dbFor(c.env).prepare(
     `SELECT * FROM google_sheets_integrations
-      WHERE line_account_id = ? AND status = 'connected'
+      WHERE line_account_id = ? AND status IN ${TIKTOK_PNL_USABLE_STATUS_SQL}
       LIMIT 1`,
   ).bind(lineAccountId).first<GoogleSheetsIntegrationRow>();
 }
