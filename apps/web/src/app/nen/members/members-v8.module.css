@@ -1,0 +1,394 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B 会員（一覧 AOWoJ・ランク設定 fb9NJ・競合 e5yBLx・ライフタイム zQ5vY・状態 dzx5D）。
+ * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+/* 見出しブロック：画面名＋一行の説明。右に「CSV で書き出す」。 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.csvWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.csvError {
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+/* 数の帯：1枚の白い板を区切り線で4つに分ける（離したカードにしない）。 */
+.kpiBand {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.kpiCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 18px;
+}
+
+.kpiCell + .kpiCell {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.kpiHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kpiIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--color-hairline);
+  color: var(--color-ink-faint);
+}
+
+.kpiLabel {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpiValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiSub {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 道具の段：検索・札3つ・右によく使う絞り込みと件数。 */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.searchWrap {
+  width: 260px;
+  min-width: 160px;
+}
+
+.toolbarRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* 表：平らな一覧（外側の枠は引かず、行の区切り線だけ）。 */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 720px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 件数とページ送りの段。 */
+.listFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+
+.listHint {
+  margin: 12px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* ランク設定：左に「ランクの決まり」とランクの表、右に「ECとの同期」。 */
+.rankGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.rankMain {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cardDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 「ランクの決まり」4つの値を2×2で。 */
+.ruleGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 4px 0 0;
+}
+
+.ruleBox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ruleLabel {
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ruleValue {
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.syncRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ライフタイムの見出し行：左に説明、右に合計。 */
+.lifetimeHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.lifetimeTotal {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: right;
+}
+
+.lifetimeTotalValue {
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 「＋足す」「行を外す」の文字ボタン。 */
+.addRow {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addRow:disabled {
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
+}
+
+.removeRow {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.notice {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.errorText {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.conflictActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 「違いを比べる」の2列。 */
+.diffGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.diffHead {
+  margin: 0 0 6px;
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.diffList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-ink);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+/* 板が狭いとき：KPI は2×2、ランク設定は1列に畳む。 */
+@container (max-width: 900px) {
+  .kpiBand {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpiCell + .kpiCell {
+    border-left: 0;
+  }
+
+  .kpiCell:nth-child(even) {
+    border-left: 1px solid var(--color-hairline);
+  }
+
+  .kpiCell:nth-child(n + 3) {
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .rankGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container (max-width: 560px) {
+  .kpiBand {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpiCell + .kpiCell,
+  .kpiCell:nth-child(even) {
+    border-left: 0;
+  }
+
+  .kpiCell:nth-child(n + 2) {
+    border-top: 1px solid var(--color-hairline);
+  }
+}

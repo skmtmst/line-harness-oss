@@ -47,6 +47,7 @@ const GUARDED = [
   'app/nen-campaigns/edit/page.tsx',
   'app/nen-campaigns/page.tsx',
   'app/nen/members/lifetime-tab.tsx',
+  'app/nen/members/members-v8.tsx',
   'app/nen/members/rank-settings-tab.tsx',
   'app/nen/pets/feeding-tab.tsx',
   'app/ops/announcements/page.tsx',
