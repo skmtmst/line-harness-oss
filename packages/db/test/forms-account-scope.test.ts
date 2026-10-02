@@ -33,6 +33,10 @@ function setup(): D1Database {
       id TEXT PRIMARY KEY, form_id TEXT NOT NULL, friend_id TEXT,
       opened_at TEXT NOT NULL, is_test INTEGER NOT NULL DEFAULT 0
     );
+    CREATE TABLE form_submit_claims (
+      form_id TEXT NOT NULL, submission_id TEXT,
+      status TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
 
     INSERT INTO line_accounts VALUES
       ('account-a', 'A店', 'JP', 1), ('account-b', 'B店', 'JP', 2);
