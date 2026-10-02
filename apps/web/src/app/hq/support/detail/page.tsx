@@ -1,5 +1,8 @@
 'use client'
 
+import ReadonlyHeader from '@/app/hq/readonly-header-v8'
+import ro from '@/app/hq/readonly-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { ChevronLeft, ImagePlus, Paperclip, Send, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -38,6 +41,7 @@ type Attachment = { name: string; mimeType: string; data: string; size: number; 
  * 静的書き出しのため動的セグメントは使わず `?id=` で受ける。
  */
 export default function HqSupportDetailPage() {
+  const theme = useAdminTheme()
   usePageTitle('お問い合わせ')
   const router = useRouter()
   const uid = useId()
@@ -162,7 +166,8 @@ export default function HqSupportDetailPage() {
   )
 
   return (
-    <div data-design-node="Nt0UH" className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' ? 'OhguS' : 'Nt0UH'} className="flex flex-col gap-4">
+      {theme === 'v8' && <ReadonlyHeader title="お問い合わせのやり取り" description="問い合わせの内容と運営からの返事を確認します。" />}
       <div data-design-node="kcTeV">
         <NoteBar tone="info">{supportReplyNote(hasSenderEmail)}</NoteBar>
       </div>
@@ -282,7 +287,7 @@ export default function HqSupportDetailPage() {
             <p className="text-micro text-ink-faint">{supportSenderNote(hasSenderEmail)}</p>
           </section>
 
-          <section data-design-node="jeBCt" className="flex flex-col rounded-card border border-hairline bg-canvas">
+          <section data-design-node="jeBCt" className={`${ro.history} flex flex-col rounded-card border border-hairline bg-canvas`}>
             <h2 className="px-4 py-3 text-body font-bold text-ink">これまでの問い合わせ</h2>
             <div className="border-t border-hairline" />
             {history === null ? (

@@ -1,5 +1,7 @@
 'use client'
 
+import ro from '@/app/hq/readonly-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -99,6 +101,7 @@ function TemplateRowMenu({ name, busy, onEdit, onDistribute, onRemove }: {
 }
 
 export default function TemplateConsole({ type, useCanonicalEditors = true }: { type: TemplateType; useCanonicalEditors?: boolean }) {
+  const theme = useAdminTheme()
   const [stage, setStage] = useState<Stage>('list')
   const [templates, setTemplates] = useState<HqTemplate[]>([])
   const [accounts, setAccounts] = useState<HqAccount[]>([])
@@ -363,7 +366,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     await save(false, next, nextName, nextDescription, andAnother)
   }
 
-  return <div className={styles.console} data-design-node={NODES[stage]} aria-busy={busy}>
+  return <div className={`${styles.console} ${theme === 'v8' && stage === 'list' ? ro.page : ''}`} data-design-node={theme === 'v8' && stage === 'list' ? 'LRc93' : NODES[stage]} aria-busy={busy}>
     {stage !== 'list' && <nav aria-label="配布の進捗"><ol className={styles.steps}>{STEPS.map((step, i) => <li key={step.stage} aria-current={step.stage === stage ? 'step' : undefined}>{i + 1} {step.label}</li>)}</ol></nav>}
     {stage === 'edit' && <p className={styles.breadcrumb}><button type="button" disabled={busy || createUncertain} onClick={toList}>ひな形一覧</button> / {detail ? '編集' : '新規作成'}</p>}
     <header className={styles.header}><div><h1>{title}</h1><p className={styles.muted}>{stage === 'list' ? LIST_DESCRIPTIONS[type] : stage === 'accounts' ? '1アカウントだけ、または複数アカウントを選択して一括配布できます' : stage === 'duplicates' ? '一括設定のあと、必要な項目だけ個別に変更できます' : stage === 'edit' ? `LINEアカウント内と同じ項目で${LABELS[type]}のひな形を作成します` : detail?.template.name}</p></div>

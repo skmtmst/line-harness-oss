@@ -1,5 +1,9 @@
 'use client'
 
+import ReadonlyHeader from '@/app/hq/readonly-header-v8'
+import ro from '@/app/hq/readonly-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import OperatorHistory from '@/components/hq/operator-history'
 import { Plus } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
@@ -47,6 +51,7 @@ export default function HqMembersPage() {
 }
 
 function MembersInner() {
+  const theme = useAdminTheme()
   usePageTitle('メンバー管理')
   const router = useRouter()
   const params = useSearchParams()
@@ -168,7 +173,8 @@ function MembersInner() {
   const changeTab = (next: Tab) => router.replace(next === 'tenant' ? '/hq/members?tab=tenant' : '/hq/members')
 
   return (
-    <div data-design-node="CRL4w" className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' ? tab === 'tenant' ? 'K7HYu' : 'r4ARpV' : 'CRL4w'} className={`${ro.page} flex flex-col gap-4`}>
+      {theme === 'v8' && <ReadonlyHeader title={tab === 'tenant' ? '統括の情報' : 'メンバー'} description={tab === 'tenant' ? '統括の名前と、運営による操作を確認します。' : '権限者の役割、担当範囲、招待とログインの状況を確認します。'} />}
       <div data-design="Tabs" data-design-node="oGWXI">
         {/* U091: 右にはみ出すタブへ届くよう、横スクロール＋端の送りボタン付き。 */}
         <ScrollableTabs
@@ -192,7 +198,7 @@ function MembersInner() {
       ) : (
         <>
           {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-          <KpiCollapse data-design="KPIs" data-design-node="kCaRU" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <KpiCollapse data-ro-kpis data-design="KPIs" data-design-node="kCaRU" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <KpiCard variant="v6" title="権限者" value={status === 'ready' ? kpis.total : null} unit="人" detail={status === 'ready' ? `有効 ${kpis.active}人` : '—'} loading={status === 'loading'} />
             <KpiCard variant="v6" title="招待中" value={status === 'ready' ? kpis.invited : null} unit="人" detail="" help="まだ承諾していない招待です" loading={status === 'loading'} />
             <KpiCard variant="v6" title="閲覧のみ" value={status === 'ready' ? kpis.viewers : null} unit="人" detail="" help="編集できない権限者です" loading={status === 'loading'} />
@@ -433,6 +439,7 @@ function MembersInner() {
 
 /** 「統括の情報」タブ。統括名の変更（旧 /hq/settings のフォーム）。 */
 function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
+  const theme = useAdminTheme()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -480,7 +487,7 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
   return (
     <>
       <NoteBar tone="info" help="統括名は統括コンソールとメールの差出人に使われます" helpLabel="統括名の意味">統括名は、統括コンソールとメールの差出人に使われます。アカウントの名前はそれぞれのアカウントの設定で変えます。</NoteBar>
-      <form onSubmit={save} className="flex max-w-2xl flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
+      {theme === 'v8' && !canEdit ? <section className="rounded-card border border-hairline p-5"><dl><dt className="text-caption text-ink-secondary">統括名</dt><dd className="mt-2 text-label text-ink">{loading ? '読み込んでいます…' : error ? '読み込めませんでした' : name || '—'}</dd></dl>{error && <p role="alert" className="mt-2 text-caption text-danger">{error}</p>}</section> : <form onSubmit={save} className="flex max-w-2xl flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="tenant-name" className="text-label font-medium text-ink">統括名</label>
           <p className="text-micro text-ink-faint">100文字以内で入力してください。</p>
@@ -495,7 +502,8 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
         </div>
         {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
         {saved ? <p className="text-label text-accent-deep" role="status">保存しました。</p> : null}
-      </form>
+      </form>}
+      {theme === 'v8' && <OperatorHistory />}
       <div className="sticky bottom-0 z-10">
         <StickyBar
           status={canEdit ? undefined : '統括名の変更は管理者だけができます'}

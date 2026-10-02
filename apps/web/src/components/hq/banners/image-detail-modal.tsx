@@ -1,5 +1,7 @@
 'use client'
 
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ro from '@/app/hq/readonly-v8.module.css'
 import { Download, ImagePlus, RefreshCw, Star, Store, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -54,6 +56,7 @@ export default function ImageDetailModal({
   /** 「参照画像にする」（★V6 35-2 の参照画像欄へ入れる）。ライブラリから開いたときは渡さない。 */
   onUseAsReference?: () => void
 }) {
+  const theme = useAdminTheme()
   const panelRef = useOverlayFocus(true, onClose, busy)
   const [mounted, setMounted] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
@@ -78,7 +81,7 @@ export default function ImageDetailModal({
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-scrim"
       role="presentation"
-      data-design-node="g4MyEA"
+      data-design-node={theme === 'v8' ? 'rI5uh' : 'g4MyEA'}
       onMouseDown={(event) => {
         if (!busy && event.target === event.currentTarget) onClose()
       }}
@@ -122,7 +125,7 @@ export default function ImageDetailModal({
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-center overflow-hidden rounded-card border border-hairline bg-shell">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image.media.url} alt="" className="max-h-130 w-full object-contain" />
+              <img src={image.media.url} alt="" className={`${ro.imagePreview} max-h-130 w-full object-contain`} />
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-caption text-ink-faint">

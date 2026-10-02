@@ -1,5 +1,8 @@
 'use client'
 
+import ReadonlyHeader from '@/app/hq/readonly-header-v8'
+import ro from '@/app/hq/readonly-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { CheckCircle2, ImagePlus, Send, X } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -39,6 +42,7 @@ type Attachment = { name: string; mimeType: string; data: string; size: number; 
  * 送るとこの統括の記録に残り、運営へメールで知らせ、送信者には控えが届く。
  */
 export default function HqSupportPage() {
+  const theme = useAdminTheme()
   usePageTitle('お問い合わせ')
   const tenantStatus = useTenantStatus()
   const tenantUnavailable = tenantStatus === 'suspended' || tenantStatus === 'archived'
@@ -170,7 +174,8 @@ export default function HqSupportPage() {
   }
 
   return (
-    <div data-design-node="X6LZP" className={`flex flex-col gap-4 ${tenantUnavailable ? 'min-h-full flex-1' : ''}`}>
+    <div data-design-node={theme === 'v8' ? 'b8xBtZ' : 'X6LZP'} className={`flex flex-col gap-4 ${tenantUnavailable ? 'min-h-full flex-1' : ''}`}>
+      {theme === 'v8' && <ReadonlyHeader title="お問い合わせ" description="問い合わせの履歴と対応の状況を確認します。" />}
       <div data-design-node="kcTeV">
         {tenantUnavailable ? (
           <NoteBar tone="success">使い方の質問、不具合、料金の相談はここから送れます。返信は登録メールアドレスに届きます（平日 2営業日以内）。</NoteBar>
@@ -326,7 +331,7 @@ export default function HqSupportPage() {
             </p>
           </section>
 
-          <section data-design-node="Srh5W" className="flex flex-col rounded-card border border-hairline bg-canvas">
+          <section data-design-node="Srh5W" className={`${ro.history} flex flex-col rounded-card border border-hairline bg-canvas`}>
             <h2 className="px-4 py-3 text-body font-bold text-ink">これまでの問い合わせ</h2>
             <div className="border-t border-hairline" />
             {history === null ? (

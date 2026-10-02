@@ -1,5 +1,8 @@
 'use client'
 
+import ReadonlyHeader from '@/app/hq/readonly-header-v8'
+import ro from '@/app/hq/readonly-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Check, CreditCard, Info } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState } from 'react'
@@ -44,6 +47,7 @@ export default function HqBillingPage() {
 }
 
 function BillingInner() {
+  const theme = useAdminTheme()
   usePageTitle('課金プラン')
   const params = useSearchParams()
   const checkoutResult = params.get('checkout')
@@ -147,7 +151,8 @@ function BillingInner() {
   const canChoose = isOwner && summary.state !== 'exempt' && summary.state !== 'active' && summary.state !== 'past_due'
 
   return (
-    <div data-design-node={interval === 'year' ? 'clQZw' : 'OjkqO'} className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' ? 'JB8V1' : interval === 'year' ? 'clQZw' : 'OjkqO'} className="flex flex-col gap-4">
+      {theme === 'v8' && <ReadonlyHeader title="請求" description="契約のプランと支払いの記録を確認します。" />}
       {checkoutResult === 'success' ? (
         <Notice tone="info" message="お申し込みを受け付けました。決済の確認が済むと「契約中」に変わります（数秒〜1分ほどかかります）。" />
       ) : null}
@@ -252,7 +257,7 @@ function BillingInner() {
             : `${billingPriceNote(summary.plans, interval)}決済は Stripe で行い、請求書と領収書は支払い方法の管理画面から取得できます。`}
       </p>
 
-      <section data-design="History" data-design-node={interval === 'year' ? 'N4u2jV' : 'x6Xjm'} className="flex flex-col rounded-card border border-hairline bg-canvas">
+      <section data-design="History" data-design-node={interval === 'year' ? 'N4u2jV' : 'x6Xjm'} className={`${ro.page} ${ro.history} flex flex-col rounded-card border border-hairline bg-canvas`}>
         <h2 className="px-4 py-3 text-body font-bold text-ink">支払い履歴</h2>
         <div className="border-t border-hairline" />
         {invoiceFailed ? (
