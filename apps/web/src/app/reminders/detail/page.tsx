@@ -10,6 +10,8 @@ import {
   type ReminderDeliveryRunStatus,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ReminderDetailV8Page from './detail-v8'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -471,7 +473,16 @@ export default function ReminderRunsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <ReminderRunsInner />
+      <ReminderDetailEntry />
     </Suspense>
   )
+}
+
+/**
+ * ★V8（rbAig・loVfW）は detail-v8.tsx へ。v7 の見た目は1画素も変えないため、
+ * テーマだけ見て実装を丸ごと切り替える。
+ */
+function ReminderDetailEntry() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <ReminderDetailV8Page /> : <ReminderRunsInner />
 }

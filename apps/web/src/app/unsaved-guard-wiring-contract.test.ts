@@ -22,10 +22,13 @@ const GUARDED = [
   'app/affiliate-offers/new/page.tsx',
   'app/analytics/reports/new/page.tsx',
   'app/auto-replies/edit/wizard-v8.tsx',
+  'app/booking/menus/new/menu-form-v8.tsx',
   'app/booking/menus/new/page.tsx',
   'app/booking/menus/settings-v8.tsx',
+  'app/booking/menus/staff/assign-v8.tsx',
   'app/booking/menus/staff/page.tsx',
   'app/booking/staff/new/page.tsx',
+  'app/booking/staff/new/staff-new-v8.tsx',
   'app/booking/staff/shifts/page.tsx',
   'app/contents/vars/edit/page.tsx',
   'app/contents/vars/new/page.tsx',
@@ -47,7 +50,9 @@ const GUARDED = [
   'app/nen/members/rank-settings-tab.tsx',
   'app/nen/pets/feeding-tab.tsx',
   'app/ops/announcements/page.tsx',
+  'app/reminders/edit/edit-v8.tsx',
   'app/reminders/edit/issue469-reminder-screens.tsx',
+  'app/reminders/new/new-v8.tsx',
   'app/reminders/new/page.tsx',
   'app/restaurant-test/google/google-business.tsx',
   'app/restaurant-test/google/google-posts.tsx',
@@ -116,6 +121,8 @@ const EXEMPTIONS: Record<string, string> = {
     '入力を端末の下書きへ随時保存し、閉じる確認はエディタ内で済ませる設計。画面離脱への警告は要検討',
   'app/nen-campaigns/nen-overview.tsx':
     '紹介文の下書きは大きな一覧コンポーネント内のローカル状態。親の番兵へ載せるには報告口が要るため別途検討',
+  'app/reminders/detail/detail-v8.tsx':
+    '登録者の基準日は行内の小さな編集で「基準日を保存」で確定する。detail/page.tsx の registrants-panel（番兵なし）と同じ画面の★V8版のため、同じ扱いでここに置く',
   'app/scenarios/detail/detail-v8.tsx':
     'scenario-detail-client.tsx（s1 手動保存で番兵なし）と同じ画面の★V8版。番兵の要否は元の画面と一緒に決めるため、同じ扱いでここに置く',
   'app/scenarios/mode/page.tsx':
@@ -166,6 +173,8 @@ const EXEMPTIONS: Record<string, string> = {
     '予約メニュー編集窓（Dialog）内の dirty。×・Esc・背景・キャンセルは窓内の破棄確認に集め、閉じると入力は戻る仕様で画面離脱ガードの対象外',
   'app/booking/menus/edit-menu-dialog.tsx':
     'app/booking/menus/page.tsx から切り出したメニュー編集窓。dirty は窓の中だけで、閉じると入力は戻る仕様で画面離脱ガードの対象外',
+  'app/booking/staff/shifts/staff-detail-v8.tsx':
+    '★V8 の勤務とシフト（d5fmnM・E3YDK・wvGke）。各段がそれぞれの「保存」「作る」「足す」でその場で確定し、画面に残る下書きを持たない。v7 の staff-detail.tsx と同じ構造（番兵は shifts/page.tsx 側の GUARDED 行が担保）',
   'components/inflow-links/site-script.tsx':
     'サイトの追加・編集・停止理由の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
 }

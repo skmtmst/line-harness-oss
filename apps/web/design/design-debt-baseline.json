@@ -54,11 +54,19 @@
   "app/booking/menus/liff-phone-v8.tsx": {
     "unresolved-classname": 75
   },
+  "app/booking/menus/new/menu-form-v8.tsx": {
+    "unresolved-classname": 117,
+    "arbitrary-value": 1
+  },
   "app/booking/menus/new/page.tsx": {
     "unresolved-classname": 11
   },
   "app/booking/menus/settings-v8.tsx": {
     "unresolved-classname": 207
+  },
+  "app/booking/menus/staff/assign-v8.tsx": {
+    "unresolved-classname": 61,
+    "direct-th": 3
   },
   "app/booking/menus/staff/page.tsx": {
     "arbitrary-value": 6,
@@ -68,10 +76,16 @@
     "arbitrary-value": 1,
     "unresolved-classname": 5
   },
+  "app/booking/staff/new/staff-new-v8.tsx": {
+    "unresolved-classname": 68
+  },
   "app/booking/staff/shifts/liff-preview.tsx": {
     "direct-primary-button": 2,
     "direct-secondary-button": 2,
     "arbitrary-value": 2
+  },
+  "app/booking/staff/shifts/staff-detail-v8.tsx": {
+    "unresolved-classname": 153
   },
   "app/booking/staff/staff-edit-dialog.tsx": {
     "arbitrary-value": 1
@@ -145,6 +159,10 @@
   },
   "app/form-submissions/page.tsx": {
     "arbitrary-value": 4
+  },
+  "app/friend-add-settings/list-v8.tsx": {
+    "unresolved-classname": 77,
+    "direct-th": 6
   },
   "app/friend-add-settings/page.tsx": {
     "arbitrary-value": 2
@@ -838,5 +856,22 @@
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 8,
     "arbitrary-value": 2
+  },
+  "app/reminders/basics-form-v8.tsx": {
+    "unresolved-classname": 39
+  },
+  "app/reminders/detail/detail-v8.tsx": {
+    "unresolved-classname": 69,
+    "direct-th": 23
+  },
+  "app/reminders/edit/edit-v8.tsx": {
+    "unresolved-classname": 168,
+    "direct-th": 4
+  },
+  "app/reminders/new/new-v8.tsx": {
+    "unresolved-classname": 6
+  },
+  "app/reminders/wizard-v8-ui.tsx": {
+    "unresolved-classname": 33
   }
 }
