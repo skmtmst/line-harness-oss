@@ -37,7 +37,7 @@ export default function V8PartsPage() {
       <section>
         <h2 className="text-sm font-bold text-ink">OTP入力（2段階認証の6桁）</h2>
         <div className="otp-part mt-3 w-fit">
-          <p className="mb-1.5 text-[13px] font-medium leading-[1.5]">認証コード（6桁）</p>
+          <p className="mb-1.5 text-label font-medium text-ink">認証コード（6桁）</p>
           <OtpInput value={code} onChange={setCode} label="認証コード" />
         </div>
         <div className="mt-6 grid grid-cols-2 gap-8">
