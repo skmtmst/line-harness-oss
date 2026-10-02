@@ -283,6 +283,9 @@
     "unresolved-classname": 13,
     "arbitrary-value": 1
   },
+  "app/nen/members/members-v8.tsx": {
+    "unresolved-classname": 61
+  },
   "app/page.tsx": {
     "arbitrary-value": 8,
     "unresolved-classname": 1

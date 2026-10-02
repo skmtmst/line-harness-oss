@@ -177,6 +177,11 @@ describe('listNenMembers / getNenMemberKpis', () => {
       balanceTotal: 3_960,
       usedThisMonth: 500,
       byRank: { platinum: 1, gold: 1 },
+      // ★V8 会員帯の3つ。両方ともEC連携済み・ペットあり。当月の注文は無い。
+      linkedMembers: 2,
+      petMembers: 2,
+      monthPurchaseYen: 0,
+      monthBuyers: 0,
     });
   });
 });
