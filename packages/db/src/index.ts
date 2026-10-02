@@ -153,3 +153,5 @@ export * from './nen-member-ranks';
 export * from './platform-knowledge.js';
 export * from './integration-api-tokens';
 export * from './web-measurement';
+
+export * from './line-account-tags';
