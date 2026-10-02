@@ -134,7 +134,7 @@
   flex-shrink: 0;
   border-radius: var(--radius-control, 8px);
   background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
 }
 
 .modeTitle {

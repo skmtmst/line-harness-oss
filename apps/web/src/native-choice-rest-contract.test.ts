@@ -7,6 +7,8 @@
  *
  * 例外: app/scenarios/mode/page.tsx の比較カード1件は、表入りの見比べを
  * 残すため素のまま（使いやすさ優先の判断。詳細は報告に書く）。
+ * app/scenarios/mode-v8.tsx は同じ画面の★V8版で、同じ見比べカードを
+ * 持つため同じ扱いにする。
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -14,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)))
-const EXCEPTIONS = new Set(['app/scenarios/mode/page.tsx'])
+const EXCEPTIONS = new Set(['app/scenarios/mode/page.tsx', 'app/scenarios/mode-v8.tsx'])
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
