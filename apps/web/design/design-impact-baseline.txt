@@ -162,7 +162,6 @@ shared-button-importer app/reminders/detail/page.tsx
 shared-button-importer app/reminders/detail/registrants-panel.tsx
 shared-button-importer app/reminders/list-v8.tsx
 shared-button-importer app/reminders/basics-form-v8.tsx
-shared-button-importer app/reminders/detail/page.tsx
 shared-button-importer app/reminders/detail/registrants-panel.tsx
 shared-button-importer app/reminders/edit/edit-v8.tsx
 shared-button-importer app/reminders/new/page.tsx
