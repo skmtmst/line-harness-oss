@@ -86,6 +86,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/entry-route-genres', 'inflow_tracking'),
   feature('/api/links', 'inflow_tracking'),
   feature('/api/forms', 'forms'),
+  feature('/api/postal-code', 'forms'),
   feature('/api/liff/webinars', 'webinars'),
   feature('/api/nen-members/photos', 'photo_review'),
   feature('/api/nen/photo', 'photo_review'),
