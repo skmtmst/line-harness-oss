@@ -5069,6 +5069,8 @@ export type NenPetProfile = {
   birthday: string | null
   ownerName: string | null
   lineUserId: string
+  /** M511: 更新の版照合に使う。 */
+  updatedAt: string
 }
 
 export type NenUnavailableMetric = {
@@ -8851,8 +8853,20 @@ export const api = {
       list: () => fetchApi<ApiResponse<OpsAnnouncement[]> & { linked: { linked: number; total: number }; noticeLineConfigured: boolean }>('/api/ops/announcements'),
       preview: (input: { audienceKind: OpsAnnouncementAudience; audiencePlans: string[]; audienceTenantIds: string[] }) =>
         fetchApi<ApiResponse<OpsAudiencePreview>>('/api/ops/announcements/preview', { method: 'POST', body: JSON.stringify(input) }),
-      create: (input: OpsAnnouncementInput) => fetchApi<ApiResponse<OpsAnnouncement>>('/api/ops/announcements', { method: 'POST', body: JSON.stringify(input) }),
-      update: (id: string, input: OpsAnnouncementInput) => fetchApi<ApiResponse<OpsAnnouncement>>(`/api/ops/announcements/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input) }),
+      /**
+       * M512: idempotencyKey（UUID）を渡すと二重押しでも1件だけ作り、再送は
+       * 保存済みを返す。省略時は従来どおり作る。
+       */
+      create: (input: OpsAnnouncementInput, idempotencyKey?: string) => fetchApi<ApiResponse<OpsAnnouncement>>('/api/ops/announcements', {
+        method: 'POST',
+        ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+        body: JSON.stringify(input),
+      }),
+      /** M513: expectedUpdatedAt を渡すと、古い画面からの保存は最新つきで409になる。省略時は従来どおり通す。 */
+      update: (id: string, input: OpsAnnouncementInput, expectedUpdatedAt?: string) => fetchApi<ApiResponse<OpsAnnouncement>>(`/api/ops/announcements/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify(expectedUpdatedAt === undefined ? input : { ...input, expectedUpdatedAt }),
+      }),
       remove: (id: string) => fetchApi<ApiResponse<null>>(`/api/ops/announcements/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     },
     noticeLineAccount: () => fetchApi<ApiResponse<OpsNoticeLineAccount>>('/api/ops/notice-line-account'),
@@ -11159,8 +11173,14 @@ export const api = {
       `/api/nen-campaigns/settings?lineAccountId=${encodeURIComponent(accountId)}`,
     ),
     updateSetting: (accountId: string, campaignKey: string, data: Pick<NenCampaignSetting,
-      'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl' | 'dedupWindowDays' | 'excludeFormRespondents' | 'afterActions'>) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
+      'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl' | 'dedupWindowDays' | 'excludeFormRespondents' | 'afterActions'> & {
+      /**
+       * M507: 開いたときに見た版。違う版からの保存は最新の内容つきで409に
+       * なる。省略時は従来どおり通す。
+       */
+      expectedUpdatedAt?: string
+    }) =>
+      fetchApi<{ success: boolean; data?: { updatedAt: string } }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify(data),
       }),
     /** 一覧の停止・再開だけを切り替える。本文の長さに関わらず必ず実行できる（#659）。 */
@@ -11232,19 +11252,29 @@ export const api = {
       fetchApi<ApiResponse<{ queued: number }>>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/deliver`, {
         method: 'POST', body: JSON.stringify(data),
       }),
-    updateColumnMessage: (accountId: string, id: string, introText: string) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/message?lineAccountId=${encodeURIComponent(accountId)}`, {
-        method: 'PUT', body: JSON.stringify({ introText }),
+    /** M507: expectedUpdatedAt を渡すと、古い画面からの保存は最新の紹介文つきで409になる。省略時は従来どおり通す。成功時は新しい版を返す。 */
+    updateColumnMessage: (accountId: string, id: string, introText: string, expectedUpdatedAt?: string) =>
+      fetchApi<{ success: boolean; data?: { updatedAt: string } }>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/message?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'PUT', body: JSON.stringify(expectedUpdatedAt === undefined ? { introText } : { introText, expectedUpdatedAt }),
       }),
     pets: (accountId: string, search?: string) => {
       const query = new URLSearchParams({ lineAccountId: accountId })
       if (search) query.set('search', search)
       return fetchApi<ApiResponse<NenPetProfile[]>>(`/api/nen-campaigns/pets?${query}`)
     },
-    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null }) =>
-      fetchApi<ApiResponse<{ id: string }>>(`/api/nen-campaigns/pets?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: JSON.stringify(data) }),
-    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null }) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    /**
+     * M510: idempotencyKey（UUID）を渡すと二重押しでも1頭だけ作り、再送は
+     * 保存済みを返す。省略時は従来どおり作る。
+     */
+    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null }, idempotencyKey?: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(`/api/nen-campaigns/pets?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'POST',
+        ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+        body: JSON.stringify(data),
+      }),
+    /** M511: expectedUpdatedAt を渡すと、古い画面からの保存は最新の内容つきで409になる。省略時は従来どおり通す。成功時は新しい版を返す。 */
+    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null; expectedUpdatedAt?: string }) =>
+      fetchApi<{ success: boolean; data?: { updatedAt: string } }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
     deletePet: (accountId: string, id: string) => fetchApi<{ success: boolean }>(
       `/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`,
       { method: 'DELETE' },
@@ -11259,7 +11289,8 @@ export const api = {
   nenMembers: {
     overview: () => fetchApi<ApiResponse<{ pets: number; healthLogs: number; activeCare: number; pendingPhotos: number; members: number; consultations: number }>>('/api/nen-members/overview'),
     careFlags: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/care-flags'),
-    updateCareFlag: (id: string, data: { status: 'active' | 'resolved'; adviceReady: boolean }) => fetchApi<{ success: boolean }>(`/api/nen-members/care-flags/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    /** M509: expectedUpdatedAt を渡すと、古い画面からの保存は最新の状態つきで409になる。省略時は従来どおり通す。 */
+    updateCareFlag: (id: string, data: { status: 'active' | 'resolved'; adviceReady: boolean; expectedUpdatedAt?: string }) => fetchApi<{ success: boolean }>(`/api/nen-members/care-flags/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
     photos: (accountId: string) => fetchApi<ApiResponse<Array<Record<string, unknown>>>>(`/api/nen-members/photos?accountId=${encodeURIComponent(accountId)}`),
     photoReviewMetrics: (accountId: string) => fetchApi<ApiResponse<PhotoReviewMetrics>>(
       `/api/nen-members/photos/review-metrics?accountId=${encodeURIComponent(accountId)}`,

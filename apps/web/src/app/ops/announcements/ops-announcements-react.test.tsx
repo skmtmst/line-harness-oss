@@ -44,21 +44,33 @@ const draft = { ...sent, id: 'a2', subject: '料金改定のご案内（下書�
 
 let host: HTMLDivElement
 let root: Root
-let calls: Array<{ url: string; method: string; body: unknown }>
+let calls: Array<{ url: string; method: string; body: unknown; headers: Record<string, string> }>
 let lineConfigured = true
 let announcements: unknown[] = []
+/** M513: PUT の応答を差し替えて競合を起こす（null のときは通常応答）。 */
+let putOverride: { status: number; payload: unknown } | null = null
 
 beforeEach(() => {
   calls = []
   lineConfigured = true
   announcements = [sent, draft]
+  putOverride = null
   navigation.push.mockClear()
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     const method = init?.method ?? 'GET'
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null
-    calls.push({ url, method, body })
+    const headers: Record<string, string> = {}
+    const rawHeaders = init?.headers
+    if (rawHeaders) {
+      const entries = rawHeaders instanceof Headers ? rawHeaders.entries() : Object.entries(rawHeaders)
+      for (const [key, value] of entries) headers[String(key).toLowerCase()] = String(value)
+    }
+    calls.push({ url, method, body, headers })
+    if (putOverride && method === 'PUT' && url.includes('/api/ops/announcements/')) {
+      return new Response(JSON.stringify(putOverride.payload), { status: putOverride.status, headers: { 'Content-Type': 'application/json' } })
+    }
     let payload: unknown
     if (url.endsWith('/api/ops/announcements/preview')) payload = { success: true, data: { tenants: 12, staff: 24, lineLinked: 21, withEmail: 24 } }
     else if (url.endsWith('/api/ops/announcements') && method === 'POST') payload = { success: true, data: { ...sent, id: 'a3', recipientsTotal: 24, lineSent: 21, mailSent: 24 } }
@@ -241,5 +253,53 @@ describe('画面', () => {
     await act(async () => { button('保存せずに移る')!.click() })
     await flush()
     expect(navigation.push).toHaveBeenCalledWith('/ops/knowledge')
+  })
+})
+
+describe('二重押しと同時保存（M512/M513）', () => {
+  it('M512: 作成に再実行キー（UUID）を添えて送る', async () => {
+    await act(async () => { root.render(<OpsAnnouncementsPage />) })
+    await flush()
+    await act(async () => {
+      setValue(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, 'メンテナンスのお知らせ')
+      setValue(document.querySelector<HTMLTextAreaElement>('textarea')!, '本文です')
+    })
+    await act(async () => { button('今すぐ送る')!.click() })
+    await flush()
+    await act(async () => { button('送る')!.click() })
+    await flush()
+    const post = calls.find((c) => c.url.endsWith('/api/ops/announcements') && c.method === 'POST')!
+    expect(post.headers['idempotency-key']).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+  })
+
+  it('M513: 直すときは開いたときの版を添え、競合時は入力を残したまま理由を出して読み直す', async () => {
+    await act(async () => { root.render(<OpsAnnouncementsPage />) })
+    await flush()
+    // 下書きの「直す」を押して編集に入る。
+    await act(async () => { button('直す')!.click() })
+    await flush()
+    expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!.value).toContain('料金改定のご案内')
+    await act(async () => {
+      setValue(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, '料金改定のご案内（修正）')
+    })
+    // ほかの人が先に保存した想定で409を返す。
+    putOverride = {
+      status: 409,
+      payload: {
+        success: false,
+        code: 'VERSION_CONFLICT',
+        error: 'ほかの人が先に保存しました。一覧を読み直してから、もう一度保存してください。',
+        data: { latest: { subject: 'ほかの人の件名', updatedAt: '2026-09-18T00:00:00.000+09:00' } },
+      },
+    }
+    await act(async () => { button('下書きを保存する')!.click() })
+    await flush()
+    const put = calls.find((c) => c.url.includes('/api/ops/announcements/a2') && c.method === 'PUT')!
+    expect(put.body).toMatchObject({ subject: '料金改定のご案内（修正）', expectedUpdatedAt: '2026-09-17T10:00:00.000+09:00' })
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('ほかの人が先に保存しました')
+    // 入力は消えない。
+    expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!.value).toBe('料金改定のご案内（修正）')
+    // 一覧を読み直す（GET がもう一度呼ばれる）。
+    expect(calls.filter((c) => c.url.endsWith('/api/ops/announcements') && c.method === 'GET')).toHaveLength(2)
   })
 })
