@@ -564,6 +564,30 @@
 }
 
 /*
+ * ★V8 LIFFプレビューのスマホ（予約設定 `owaS3` の右欄）：お客さまの
+ * LIFF 予約画面の写しの値。管理画面のテーマ色とは別物なので
+ * `--v8-liff-*` で分ける（LINEプレビューの `--v8-line-*` と同じ考え）。
+ * 値は Pencil の実寸の写しで、直値はここだけに置く。
+ */
+[data-theme="v8"] {
+  --v8-liff-line: #e6e9ed;            /* カード・帯の細い枠 */
+  --v8-liff-slot-line: #dfe3e8;       /* 時刻の枠の細い枠 */
+  --v8-liff-primary: #03873a;         /* 決めるボタン・選んだ印・値段 */
+  --v8-liff-primary-soft: #f0fbf4;    /* 選んだカード・日の地 */
+  --v8-liff-chip: #f1f3f5;            /* 分類の札・切り替えの溝 */
+  --v8-liff-off: #f7f8f9;             /* 休みの日・押せない枠 */
+  --v8-liff-idle: #b8bec6;            /* まだの段の字・押せない字 */
+  --v8-liff-sub: #5f6670;             /* 補足の字 */
+  --v8-liff-thumb: #e9e2d4;           /* 写真・顔の置き場の地 */
+  --v8-liff-thumb-ink: #6b5b3e;       /* 顔の置き場の字 */
+  --v8-liff-phone-radius: 40px;       /* スマホの器の角丸 */
+  --v8-liff-card-radius: 14px;        /* 選ぶカードの角丸 */
+  --v8-liff-step-radius: 2px;         /* 段の線の角丸 */
+  --v8-savebar-shadow: 0 -4px 12px #1d1d1f14; /* 板の下の帯が上へ落とす影 */
+  --color-v8-pill-off: #f1f2f4;       /* 「止めている」の札の地 */
+}
+
+/*
  * ★V8 移行③: 外側（灰色の地・白い板1枚・上の帯）。
  *
  * 構造は v7 と同じ HTML のまま、v8 のときだけ見た目を切り替える。

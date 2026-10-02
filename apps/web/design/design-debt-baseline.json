@@ -47,8 +47,14 @@
   "app/booking/bookings/page.tsx": {
     "unresolved-classname": 2
   },
+  "app/booking/menus/liff-phone-v8.tsx": {
+    "unresolved-classname": 75
+  },
   "app/booking/menus/new/page.tsx": {
     "unresolved-classname": 11
+  },
+  "app/booking/menus/settings-v8.tsx": {
+    "unresolved-classname": 207
   },
   "app/booking/menus/staff/page.tsx": {
     "arbitrary-value": 6,
@@ -58,13 +64,13 @@
     "arbitrary-value": 1,
     "unresolved-classname": 5
   },
-  "app/booking/staff/page.tsx": {
-    "arbitrary-value": 1
-  },
   "app/booking/staff/shifts/liff-preview.tsx": {
     "direct-primary-button": 2,
     "direct-secondary-button": 2,
     "arbitrary-value": 2
+  },
+  "app/booking/staff/staff-edit-dialog.tsx": {
+    "arbitrary-value": 1
   },
   "app/broadcasts/detail-v8.tsx": {
     "unresolved-classname": 75
@@ -225,6 +231,10 @@
   },
   "app/reminders/detail/page.tsx": {
     "unresolved-classname": 29
+  },
+  "app/reminders/list-v8.tsx": {
+    "unresolved-classname": 71,
+    "direct-th": 7
   },
   "app/reminders/new/page.tsx": {
     "unresolved-classname": 7

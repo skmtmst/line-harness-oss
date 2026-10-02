@@ -3787,7 +3787,7 @@ export type ListStats = {
     completed: number
     sentThisWeek: number
   }
-  reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
+  reminders: { total: number; active: number; waiting: number; sentThisMonth: number; failed: number }
 }
 
 /**
