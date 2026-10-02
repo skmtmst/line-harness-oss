@@ -1,0 +1,599 @@
+/*
+ * ★V8 友だち属性の一覧（Pencil `I1E7Bt`・`q5gbcM`・`vKDj5`・`IWnYX`、状態は `U0aKD`）。
+ *
+ * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
+ * 板が 1100px を切ったらフォルダの列を道具の段へ畳む
+ * （`docs/v8` RESPONSIVE の決まり。約 1352px 未満の画面幅に相当）。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+/* 見出しブロック：画面名＋一行の説明。右端はタブごとの作る口。 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.headAction {
+  flex-shrink: 0;
+}
+
+/* 数の帯：4つのマス。アイコンつき。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.kpiLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpiLabel svg {
+  color: var(--color-ink-faint);
+}
+
+.kpiValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.kpiDetail {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 本体：左にフォルダの列 200px、右に一覧。フォルダを持たないタブは1列。 */
+.split {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.folderCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* フォルダ列のいちばん上の作るボタンは幅いっぱい。 */
+.folderCol :global(.v8-folder-create) {
+  width: 100%;
+}
+
+.folderNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.listCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 道具の段：検索・選ぶ欄 2 つ・右に「よく使う絞り込み」。 */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 広い板では「作る」とフォルダ選びはフォルダの列にいる。道具の段には出さない。 */
+.toolbarCreate,
+.folderSelectWrap {
+  display: none;
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+.searchWrap {
+  width: 200px;
+  min-width: 160px;
+}
+
+.quickWrap {
+  width: 176px;
+  flex-shrink: 0;
+}
+
+/* 一覧の上の案内の帯（「種類を変える注意」など）。 */
+.noteBand {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 操作の失敗の帯。 */
+.errorBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.errorBand button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* 表。 */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: top;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.rowClick {
+  cursor: pointer;
+}
+
+.rowClick:hover td {
+  background: var(--color-canvas-sunken);
+}
+
+.gripCell {
+  width: 44px;
+  color: var(--color-hairline);
+  text-align: center;
+  cursor: grab;
+}
+
+.gripCell[data-fixed='true'] {
+  cursor: not-allowed;
+}
+
+.cellTitle {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellTitle:hover {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+.cellSub {
+  margin: 2px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.nameRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.folderDot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-faint);
+}
+
+.miniBadge {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.miniBadgeWarn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+/* 連動の札。 */
+.linkChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.linkChip {
+  padding: 2px 7px;
+  border-radius: var(--radius-mini);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.linkChipAccent {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+.linkChipWarn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.linkChipNeutral {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+/* 「一覧に出す」の星。 */
+.starButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-hairline);
+  cursor: pointer;
+}
+
+.starButton:hover {
+  color: var(--color-warning);
+}
+
+.starButton[data-on='true'] {
+  color: var(--color-warning);
+}
+
+/* 対応マークの印（色つきの丸薬）。 */
+.markPill {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.markPill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.countLink {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.countLink:hover {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+.cellText {
+  color: var(--color-ink);
+}
+
+.cellMuted {
+  color: var(--color-ink-faint);
+}
+
+.cellTruncate {
+  display: block;
+  overflow: hidden;
+  max-width: 200px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.menuCell {
+  width: 44px;
+  text-align: right;
+}
+
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.menuButton:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.menuButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 読み込み中の骨格の行。 */
+.skeletonRows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.skeletonRow:last-child {
+  border-bottom: 0;
+}
+
+.skeletonDot {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+
+.skeletonBar {
+  height: 12px;
+  flex: 1;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+}
+
+/* ページ送りの行。左に件数、右に表示件数とページ送り。 */
+.pagerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pagerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 空・失敗の1枚。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  text-align: center;
+}
+
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.stateIconError {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 表の下の段（安全確認の説明）。 */
+.safetyNote {
+  padding: 16px 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.safetyNoteTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.safetyNoteBody {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ===== 板が 1100px を切ったら（画面幅で約 1352px 未満） ===== */
+@container (max-width: 1099px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* フォルダの列は道具の段の選ぶ欄へ畳む。「作る」は道具の段の左端。 */
+  .folderCol {
+    display: none;
+  }
+
+  .toolbarCreate {
+    display: inline-flex;
+  }
+
+  .folderSelectWrap {
+    display: block;
+  }
+}
+
+/* さらに狭い板では数の帯も1列に。 */
+@container (max-width: 560px) {
+  .kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .searchWrap {
+    width: 100%;
+  }
+}
