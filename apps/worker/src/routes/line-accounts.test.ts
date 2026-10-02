@@ -10,6 +10,7 @@ const dbMocks = {
   getLineAccountScopeEntries: vi.fn(),
   getLineAccountsByIds: vi.fn(),
   getLineAccountListStats: vi.fn(),
+  getLineAccountTagsByAccountIds: vi.fn(async () => ({})),
   getLineAccountById: vi.fn(),
   getLineAccountCredentialHealth: vi.fn(),
   createLineAccount: vi.fn(),
