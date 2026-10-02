@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする54ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする55ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -73,6 +73,8 @@ describe('共通部品の影響範囲', () => {
       'app/booking/bookings/page.tsx',
       // #370: 予約メニュー8件を設計どおり1ページ6件に区切る。
       'app/booking/menus/page.tsx',
+      // 予約設定V8（owaS3）のメニュー表も1ページ6件で区切る。
+      'app/booking/menus/settings-v8.tsx',
       // #1145(★V8): 一斉配信の一覧。20件ずつのページ送りを共通へ寄せた。
       'app/broadcasts/list-v8.tsx',
       'app/common-actions/page.tsx',
@@ -101,6 +103,7 @@ describe('共通部品の影響範囲', () => {
       'app/form-submissions/page.tsx',
       // #543: 一覧の到達不能な回答表（M2削除）と共に共通Paginationの利用を外した。
       'app/form-submissions/responses/page.tsx',
+      'app/hq/account-browser-v8.tsx',
       // IDEA-18 (#1036): 経路別の注文明細が増えても画面を重くしないよう
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
       'app/inflow-links/_components/ref-orders.tsx',
@@ -124,6 +127,8 @@ describe('共通部品の影響範囲', () => {
       'app/ops/audit/page.tsx',
       // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
       'app/reminders/detail/page.tsx',
+      // ★V8 リマインダ一覧（apLqS）。表の下にページ送りを置く。
+      'app/reminders/list-v8.tsx',
       'app/reminders/page.tsx',
       // 2026-09-23: Googleビジネスの口コミ一覧（★V6 GB-2）。20件ずつのページ送り。
       'app/restaurant-test/google/google-business.tsx',
