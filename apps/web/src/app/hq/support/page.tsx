@@ -1,7 +1,7 @@
 'use client'
 
 import ReadonlyHeader from '@/app/hq/readonly-header-v8'
-import ro from '@/app/hq/readonly-v8.module.css'
+import '@/app/hq/readonly-v8.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { CheckCircle2, ImagePlus, Send, X } from 'lucide-react'
 import Link from 'next/link'
@@ -331,7 +331,7 @@ export default function HqSupportPage() {
             </p>
           </section>
 
-          <section data-design-node="Srh5W" className={`${ro.history} flex flex-col rounded-card border border-hairline bg-canvas`}>
+          <section data-design-node="Srh5W" className="v8-ro-hq-history flex flex-col rounded-card border border-hairline bg-canvas">
             <h2 className="px-4 py-3 text-body font-bold text-ink">これまでの問い合わせ</h2>
             <div className="border-t border-hairline" />
             {history === null ? (

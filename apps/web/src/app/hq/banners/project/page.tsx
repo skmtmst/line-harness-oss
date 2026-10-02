@@ -1,7 +1,7 @@
 'use client'
 
 import ReadonlyHeader from '@/app/hq/readonly-header-v8'
-import ro from '@/app/hq/readonly-v8.module.css'
+import '@/app/hq/readonly-v8.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Archive, ArchiveRestore, Copy, LoaderCircle, Pencil, Sparkles, Star } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -482,7 +482,7 @@ function ProjectInner() {
       {project.description ? <p className="text-caption text-ink-faint">{project.description}</p> : null}
 
       <div data-design-node="H2eb7f" className="flex flex-col gap-4 xl:flex-row xl:items-start">
-        <section data-design-node="ZwrHR" className={`${ro.generationGallery} flex min-w-0 flex-1 flex-col rounded-card border border-hairline bg-canvas`}>
+        <section data-design-node="ZwrHR" className="v8-ro-hq-generationGallery flex min-w-0 flex-1 flex-col rounded-card border border-hairline bg-canvas">
           <div className="flex flex-wrap items-center gap-2 px-4 py-3">
             <h2 className="text-body font-bold text-ink">このプロジェクトの画像</h2>
             <span className="text-caption text-ink-faint">{images.length}枚</span>

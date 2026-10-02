@@ -1,6 +1,6 @@
 'use client'
 
-import ro from '@/app/hq/readonly-v8.module.css'
+import '@/app/hq/readonly-v8.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Archive, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -257,7 +257,7 @@ export default function ProjectsSection({
               />
             </>
           ) : (
-            <div className={`${ro.projectGrid} grid gap-4 md:grid-cols-2 xl:grid-cols-3`}>
+            <div className="v8-ro-hq-projectGrid grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {visible.map((project) => (
                 <ProjectCard
                   key={project.id}

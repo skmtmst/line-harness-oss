@@ -1,7 +1,7 @@
 'use client'
 
 import ReadonlyHeader from '@/app/hq/readonly-header-v8'
-import ro from '@/app/hq/readonly-v8.module.css'
+import '@/app/hq/readonly-v8.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import OperatorHistory from '@/components/hq/operator-history'
 import { Plus } from 'lucide-react'
@@ -173,7 +173,7 @@ function MembersInner() {
   const changeTab = (next: Tab) => router.replace(next === 'tenant' ? '/hq/members?tab=tenant' : '/hq/members')
 
   return (
-    <div data-design-node={theme === 'v8' ? tab === 'tenant' ? 'K7HYu' : 'r4ARpV' : 'CRL4w'} className={`${ro.page} flex flex-col gap-4`}>
+    <div data-design-node={theme === 'v8' ? tab === 'tenant' ? 'K7HYu' : 'r4ARpV' : 'CRL4w'} className="v8-ro-hq-page flex flex-col gap-4">
       {theme === 'v8' && <ReadonlyHeader title={tab === 'tenant' ? '統括の情報' : 'メンバー'} description={tab === 'tenant' ? '統括の名前と、運営による操作を確認します。' : '権限者の役割、担当範囲、招待とログインの状況を確認します。'} />}
       <div data-design="Tabs" data-design-node="oGWXI">
         {/* U091: 右にはみ出すタブへ届くよう、横スクロール＋端の送りボタン付き。 */}

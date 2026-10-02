@@ -1,6 +1,9 @@
 'use client'
+
 import type { ReactNode } from 'react'
-import styles from './readonly-v8.module.css'
+import PageHeader from '@/components/shared/page-header'
+import './readonly-v8.css'
+
 export default function ReadonlyHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
-  return <header className={styles.header}><div><h1>{title}</h1>{description && <p>{description}</p>}</div>{actions && <div className={styles.actions}>{actions}</div>}</header>
+  return <PageHeader breadcrumb={[]} title={title} description={description ?? ""} actions={actions} className="v8-ro-hq-header" />
 }

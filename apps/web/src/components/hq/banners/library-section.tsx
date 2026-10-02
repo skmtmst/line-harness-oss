@@ -1,6 +1,6 @@
 'use client'
 
-import ro from '@/app/hq/readonly-v8.module.css'
+import '@/app/hq/readonly-v8.css'
 import Select from '@/components/shared/select'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useRouter } from 'next/navigation'
@@ -245,7 +245,7 @@ export default function LibrarySection({
           ) : visible.length === 0 ? (
             <ListState kind="empty" />
           ) : (
-            <div className={`${ro.bannerGrid} grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5`}>
+            <div className="v8-ro-hq-bannerGrid grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {visible.map((image) => (
                 <ImageTile
                   key={image.id}

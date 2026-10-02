@@ -1,7 +1,7 @@
 'use client'
 
 import ReadonlyHeader from '@/app/hq/readonly-header-v8'
-import ro from '@/app/hq/readonly-v8.module.css'
+import '@/app/hq/readonly-v8.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
@@ -76,7 +76,7 @@ function HqBannersInner() {
   }
 
   return (
-    <div data-design-node={theme === 'v8' ? tab === 'projects' ? 'B9ZAr' : 'W5Wxr' : tab === 'projects' ? 'aH6NX' : 'w3ZDsD'} className={`${ro.page} flex flex-col gap-4`}>
+    <div data-design-node={theme === 'v8' ? tab === 'projects' ? 'B9ZAr' : 'W5Wxr' : tab === 'projects' ? 'aH6NX' : 'w3ZDsD'} className="v8-ro-hq-page flex flex-col gap-4">
       {theme === 'v8' && <ReadonlyHeader title="バナー生成" description={tab === 'projects' ? 'プロジェクトの画像と、生成の利用状況を確認します。' : '作った画像を用途やプロジェクトから探します。'} />}
       <BannerTabs
         current={tab}

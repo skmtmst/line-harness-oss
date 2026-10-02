@@ -2,7 +2,7 @@
 
 import ReadonlyHeader from './readonly-header-v8'
 import AccountBrowser from './account-browser-v8'
-import ro from './readonly-v8.module.css'
+import './readonly-v8.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -114,7 +114,7 @@ export default function HqPage() {
   const month = new Date().getMonth() + 1
 
   return (
-    <div data-design-node={theme === 'v8' ? 'JKjsE' : 'MjMCg'} className={`${ro.page} flex flex-col gap-4`}>
+    <div data-design-node={theme === 'v8' ? 'JKjsE' : 'MjMCg'} className="v8-ro-hq-page flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {theme === 'v8' && <ReadonlyHeader title="統括のアカウント" description="各アカウントの接続状態、友だち、配信の状況を確認できます。" />}
       <PlatformNotices />

@@ -1,7 +1,7 @@
 'use client'
 
 import ListState from '@/components/shared/list-state'
-import ro from '@/app/hq/readonly-v8.module.css'
+import '@/app/hq/readonly-v8.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useEffect, useState } from 'react'
 import { api, type OperatorHistoryRow } from '@/lib/api'
@@ -44,7 +44,7 @@ export default function OperatorHistory() {
   if (theme !== 'v8' && rows.length === 0) return null
 
   return (
-    <section className={`${ro.history} mt-6 rounded-card border border-hairline bg-canvas px-5 py-4 shadow-card`} aria-labelledby="operator-history-title">
+    <section className="v8-ro-hq-history mt-6 rounded-card border border-hairline bg-canvas px-5 py-4 shadow-card" aria-labelledby="operator-history-title">
       <h2 id="operator-history-title" className="text-base font-bold text-ink">運営による操作</h2>
       <p className="mt-1 text-sm text-ink-secondary">musubo の運営が、この統括のデータを変更した記録です。閲覧だけの確認は含みません。</p>
       {theme === 'v8' && (!loaded ? <ListState kind="loading" title="操作の記録を読み込んでいます" /> : error ? <ListState kind="error" title="操作の記録を読み込めませんでした" onRetry={() => setReloadKey(key => key + 1)} /> : rows.length === 0 ? <p className="mt-3 text-caption text-ink-faint">運営による変更の記録はありません。</p> : null)}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import ro from '@/app/hq/readonly-v8.module.css'
+import '@/app/hq/readonly-v8.css'
 import { Download, ImagePlus, RefreshCw, Star, Store, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -125,7 +125,7 @@ export default function ImageDetailModal({
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-center overflow-hidden rounded-card border border-hairline bg-shell">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image.media.url} alt="" className={`${ro.imagePreview} max-h-130 w-full object-contain`} />
+              <img src={image.media.url} alt="" className="v8-ro-hq-imagePreview max-h-130 w-full object-contain" />
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-caption text-ink-faint">
