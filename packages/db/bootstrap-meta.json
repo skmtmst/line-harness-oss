@@ -497,7 +497,8 @@
     "547_restaurant_inventory_from_tables.sql",
     "548_friend_bulk_message_approval.sql",
     "549_broadcast_asset_publish_and_postal_lookup.sql",
-    "550_nen_member_rank_sync.sql"
+    "550_nen_member_rank_sync.sql",
+    "551_rich_menu_group_default_open.sql"
   ],
-  "migrationCount": 498
+  "migrationCount": 499
 }

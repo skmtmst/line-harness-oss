@@ -1,5 +1,8 @@
 'use client'
 
+import ReadonlyHeader from '@/app/hq/readonly-header-v8'
+import '@/app/hq/readonly-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Check, CreditCard, Info } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState } from 'react'
@@ -24,7 +27,7 @@ import {
   type BillingPlanView,
   type BillingSummary,
 } from '@/lib/hq-billing'
-import styles from './billing.module.css'
+import './billing.css'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -44,6 +47,7 @@ export default function HqBillingPage() {
 }
 
 function BillingInner() {
+  const theme = useAdminTheme()
   usePageTitle('課金プラン')
   const params = useSearchParams()
   const checkoutResult = params.get('checkout')
@@ -147,7 +151,8 @@ function BillingInner() {
   const canChoose = isOwner && summary.state !== 'exempt' && summary.state !== 'active' && summary.state !== 'past_due'
 
   return (
-    <div data-design-node={interval === 'year' ? 'clQZw' : 'OjkqO'} className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' ? 'JB8V1' : interval === 'year' ? 'clQZw' : 'OjkqO'} className="flex flex-col gap-4">
+      {theme === 'v8' && <ReadonlyHeader title="請求" description="契約のプランと支払いの記録を確認します。" />}
       {checkoutResult === 'success' ? (
         <Notice tone="info" message="お申し込みを受け付けました。決済の確認が済むと「契約中」に変わります（数秒〜1分ほどかかります）。" />
       ) : null}
@@ -173,7 +178,7 @@ function BillingInner() {
 
       <div data-design="Interval" data-design-node={interval === 'year' ? 'k8DFrR' : 'T4S2Qb'} className="flex flex-wrap items-center justify-end gap-3">
         <span className={interval === 'month' ? 'text-label font-medium text-ink' : 'text-label font-semibold text-ink-faint'}>月払い</span>
-        <Toggle label="年払い" checked={interval === 'year'} onChange={(yearly) => setInterval(yearly ? 'year' : 'month')} className={styles.intervalToggle} />
+        <Toggle label="年払い" checked={interval === 'year'} onChange={(yearly) => setInterval(yearly ? 'year' : 'month')} className="v8-hq-billing-intervalToggle" />
         <span className={interval === 'year' ? 'text-label font-medium text-ink' : 'text-label font-semibold text-ink-faint'}>年払い</span>
         <span className="text-nano text-ink-faint">年払いは約15% OFF</span>
       </div>
@@ -252,7 +257,7 @@ function BillingInner() {
             : `${billingPriceNote(summary.plans, interval)}決済は Stripe で行い、請求書と領収書は支払い方法の管理画面から取得できます。`}
       </p>
 
-      <section data-design="History" data-design-node={interval === 'year' ? 'N4u2jV' : 'x6Xjm'} className="flex flex-col rounded-card border border-hairline bg-canvas">
+      <section data-design="History" data-design-node={interval === 'year' ? 'N4u2jV' : 'x6Xjm'} className="v8-ro-hq-page v8-ro-hq-history flex flex-col rounded-card border border-hairline bg-canvas">
         <h2 className="px-4 py-3 text-body font-bold text-ink">支払い履歴</h2>
         <div className="border-t border-hairline" />
         {invoiceFailed ? (

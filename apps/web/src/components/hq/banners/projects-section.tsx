@@ -1,5 +1,7 @@
 'use client'
 
+import '@/app/hq/readonly-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Archive, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -43,6 +45,7 @@ export default function ProjectsSection({
   /** タブ行の右端に置く操作を、親へ渡す。 */
   headerActions: (actions: ReactNode) => void
 }) {
+  const theme = useAdminTheme()
   const router = useRouter()
   const [projects, setProjects] = useState<BannerProject[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, BannerImage[]>>({})
@@ -181,7 +184,7 @@ export default function ProjectsSection({
           />
         </div>
         <div className="flex flex-wrap items-center gap-2 p-4">
-          <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
+          <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>{theme === 'v8' ? '使用中' : 'すべて'}</FilterChip>
           <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り</FilterChip>
           <FilterChip selected={filter === 'running'} onChange={(on) => setFilter(on ? 'running' : 'all')}>生成中</FilterChip>
           <label className="flex items-center gap-2 text-caption text-ink-faint">
@@ -254,7 +257,7 @@ export default function ProjectsSection({
               />
             </>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="v8-ro-hq-projectGrid grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {visible.map((project) => (
                 <ProjectCard
                   key={project.id}

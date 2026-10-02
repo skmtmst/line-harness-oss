@@ -30,6 +30,12 @@ describe('外側の殻（V8 移行③）', () => {
     expect(globals).toContain('.v8-only')
   })
 
+  it('テーマのときだけ効くユーティリティ v7: / v8: がある（@custom-variant）', () => {
+    expect(globals).toContain('@custom-variant v7')
+    expect(globals).toContain('@custom-variant v8')
+    expect(globals).toContain(':root:not([data-theme="v8"])')
+  })
+
   it('中身は白い板1枚（radius 16・枠・薄い影・右下に 12px）で、v8 のときだけ', () => {
     const board = appShellCss.match(/\[data-theme="v8"\] \.main \{([\s\S]*?)\}/)
     expect(board, 'v8 の .main の板の規定が無い').not.toBeNull()

@@ -11,7 +11,11 @@ vi.hoisted(() => {
 import { parseUidCsv, splitUidCsvLine } from './migration'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'migration.tsx'), 'utf8')
+const PAGE = [
+  'migration.tsx',
+  'use-uid-migration.ts',
+  'uid-migration-v8.tsx',
+].map((name) => readFileSync(join(HERE, name), 'utf8')).join('\n')
 /* #984 LAY-14: 友だち配下の主タブの正本。 */
 const TABS = readFileSync(join(HERE, '..', 'friends', 'friends-tabs.ts'), 'utf8')
 
