@@ -118,6 +118,9 @@ function isNonNegativeInteger(value: unknown): value is number {
 type ReminderListRow = Awaited<ReturnType<typeof getReminders>>[number] & {
   step_count?: number | string | null;
   has_failure?: number | string | null;
+  planned_count?: number | string | null;
+  failed_count?: number | string | null;
+  next_scheduled_at?: string | null;
 };
 
 function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: boolean, timingSummary?: string | null) {
@@ -145,6 +148,15 @@ function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: b
      */
     timingSummary: timingSummary ?? null,
     hasFailure: hasFailure ?? Number(row.has_failure ?? 0) > 0,
+    /*
+     * ★V8 一覧（`apLqS`）の「これから送る」「次に送る」「失敗 N」。
+     * ページ切替の経路でだけ数える（旧配列応答は null のまま）。
+     * 数え方は「失敗あり」の絞り込みと同じ retry_wait/permanent_failed、
+     * 予定は queued/retry_wait の先に送るもの。
+     */
+    plannedDeliveries: row.planned_count == null ? null : Number(row.planned_count),
+    failedCount: row.failed_count == null ? null : Number(row.failed_count),
+    nextScheduledAt: row.next_scheduled_at ?? null,
     displayOrder: row.display_order ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -865,7 +877,13 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
         .prepare(`SELECT r.*,
             (SELECT COUNT(*) FROM reminder_steps steps WHERE steps.reminder_id = r.id) AS step_count,
             EXISTS (SELECT 1 FROM reminder_delivery_runs failed
-              WHERE failed.reminder_id = r.id AND failed.status IN ('retry_wait', 'permanent_failed')) AS has_failure
+              WHERE failed.reminder_id = r.id AND failed.status IN ('retry_wait', 'permanent_failed')) AS has_failure,
+            (SELECT COUNT(*) FROM reminder_delivery_runs upcoming
+              WHERE upcoming.reminder_id = r.id AND upcoming.status IN ('queued', 'retry_wait')) AS planned_count,
+            (SELECT MIN(upcoming.scheduled_at) FROM reminder_delivery_runs upcoming
+              WHERE upcoming.reminder_id = r.id AND upcoming.status IN ('queued', 'retry_wait')) AS next_scheduled_at,
+            (SELECT COUNT(*) FROM reminder_delivery_runs failed
+              WHERE failed.reminder_id = r.id AND failed.status IN ('retry_wait', 'permanent_failed')) AS failed_count
           FROM reminders r WHERE ${where}
           ORDER BY ${sortSpec.orderBy}
           LIMIT ? OFFSET ?`)

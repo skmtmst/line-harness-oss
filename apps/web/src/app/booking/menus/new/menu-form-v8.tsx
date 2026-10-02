@@ -19,6 +19,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
 import ListState from '@/components/shared/list-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -1060,37 +1062,39 @@ export default function MenuFormV8() {
             )}
           </section>
 
-          {/* ⑦ お支払い（準備中） */}
+          {/* ⑦ お支払い */}
           <section className={shell.section}>
             <div className={shell.sectionHead}>
-              <h2 className={shell.sectionTitle}>お支払い <span className="rounded-pill bg-canvas-sunken text-ink-faint ml-1 px-2 py-0.5 text-[10px] font-normal">準備中</span></h2>
+              <h2 className={shell.sectionTitle}>お支払い <StatusBadge tone="warning" size="compact" className="ml-1">お店で払うのみ</StatusBadge></h2>
               <span className={shell.sectionDesc}>決済サービスをつなぐと選べるようになります。いまは「お店で払う」だけです。</span>
             </div>
-            <div className={`${styles.payRow} mt-3`} role="radiogroup" aria-label="お支払い方法">
-              {[
-                { value: 'store', label: 'お店で払う', enabled: true },
-                { value: 'online', label: 'オンラインで先払い', enabled: false },
-                { value: 'either', label: 'どちらでも', enabled: false },
-              ].map((option) => (
-                <span
-                  key={option.value}
-                  className={`${styles.payCard} ${option.value === 'store' ? styles.payCardOn : styles.payCardOff}`}
-                >
-                  <input
-                    type="radio"
-                    name="menu-payment"
-                    value={option.value}
-                    checked={option.value === 'store'}
-                    disabled={!option.enabled}
-                    readOnly
-                    className="sr-only"
-                    aria-label={option.label}
-                  />
-                  <span className={styles.payDot} aria-hidden="true" />
-                  {option.label}
-                </span>
-              ))}
-            </div>
+            <RadioCardGroup legend="お支払い方法" className={`${styles.payRow} mt-3`}>
+              <RadioCard
+                name="menu-payment"
+                value="store"
+                checked
+                onChange={() => {}}
+                title="お店で払う"
+              />
+              <RadioCard
+                name="menu-payment"
+                value="online"
+                checked={false}
+                disabled
+                disabledReason="決済サービスをつなぐと選べます"
+                onChange={() => {}}
+                title="オンラインで先払い"
+              />
+              <RadioCard
+                name="menu-payment"
+                value="either"
+                checked={false}
+                disabled
+                disabledReason="決済サービスをつなぐと選べます"
+                onChange={() => {}}
+                title="どちらでも"
+              />
+            </RadioCardGroup>
           </section>
 
           {saveError && (
