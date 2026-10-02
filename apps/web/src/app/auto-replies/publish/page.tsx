@@ -36,6 +36,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError, api, type FriendListItem } from '@/lib/api'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { canPublish, conflictTone, publishGates, type PublishStage } from './publish-flow'
 import './publish.css'
 import { formatNumber } from '@/lib/format'
@@ -1061,7 +1062,28 @@ function AutoReplyPublishInner() {
 export default function AutoReplyPublishPage() {
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <AutoReplyPublishInner />
+      <AutoReplyPublishThemed />
     </Suspense>
   )
+}
+
+/*
+ * ★V8 では公開の確かめ（重なり・試し送り・有効化）は作る画面の手順4・5
+ * （Guoye・XJUqs）に畳み込んである。一覧や導線から `/auto-replies/publish`
+ * へ来た場合は編集画面の手順4へ送る。
+ */
+function AutoReplyPublishThemed() {
+  const theme = useAdminTheme()
+  const router = useRouter()
+  const params = useSearchParams()
+  useEffect(() => {
+    if (theme !== 'v8') return
+    const query = new URLSearchParams()
+    const id = params.get('id')
+    if (id) query.set('id', id)
+    query.set('step', 'priority')
+    router.replace(`/auto-replies/edit?${query.toString()}`)
+  }, [theme, router, params])
+  if (theme === 'v8') return <ListState kind="loading" />
+  return <AutoReplyPublishInner />
 }
