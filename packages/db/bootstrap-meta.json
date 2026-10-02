@@ -494,7 +494,8 @@
     "544_line_account_tags.sql",
     "545_restaurant_channels.sql",
     "546_restaurant_menu_approval.sql",
-    "547_restaurant_inventory_from_tables.sql"
+    "547_restaurant_inventory_from_tables.sql",
+    "550_nen_member_rank_sync.sql"
   ],
-  "migrationCount": 495
+  "migrationCount": 496
 }

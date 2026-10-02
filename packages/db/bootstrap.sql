@@ -4460,6 +4460,27 @@ CREATE TABLE nen_lifetime_milestones (
   updated_at      TEXT NOT NULL
 );
 
+CREATE TABLE nen_member_rank_sync (
+  id TEXT PRIMARY KEY,
+  operation_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  friend_id TEXT NOT NULL,
+  customer_id TEXT,
+  rank_key TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  expected_version INTEGER CHECK (expected_version IS NULL OR expected_version >= 0),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'failed', 'synced')),
+  error_code TEXT,
+  error_reason TEXT,
+  result_version INTEGER,
+  duplicate INTEGER NOT NULL DEFAULT 0,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (operation_id, friend_id)
+);
+
 CREATE TABLE nen_pet_profiles (
   id TEXT PRIMARY KEY,
   external_id TEXT UNIQUE,
@@ -8595,6 +8616,9 @@ CREATE INDEX idx_nen_lifetime_milestones_account
   ON nen_lifetime_milestones(line_account_id, threshold_yen);
 
 CREATE INDEX idx_nen_member_rank ON nen_ec_member_snapshots(member_rank, purchase_amount DESC);
+
+CREATE INDEX idx_nen_member_rank_sync_operation
+  ON nen_member_rank_sync(line_account_id, operation_id, status);
 
 CREATE INDEX idx_nen_pet_profiles_birthday
   ON nen_pet_profiles(substr(birthday, 6, 2), friend_id);

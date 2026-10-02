@@ -8,6 +8,7 @@
  * を固定する。外部（EC）へは送らない（fetch を mock）。
  */
 import type Database from 'better-sqlite3';
+import { createHmac, randomBytes } from 'node:crypto';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -28,6 +29,7 @@ const ACCOUNT = 'account-nen';
 let sql: Database.Database;
 let db: D1Database;
 let fetchMock: ReturnType<typeof vi.fn>;
+let ecSecret: string;
 
 function seed(raw: Database.Database): void {
   raw.exec(`
@@ -50,7 +52,7 @@ function harness(role: 'owner' | 'admin' | 'staff', env: Record<string, unknown>
   const app = new Hono<any>();
   app.use('*', async (c, next) => {
     c.set('staff', { id: 'staff-a', name: '担当者', role, readOnly: false, permissionKeys: [], accountScope: 'all', ...staff });
-    c.env = { DB: db, NEN_EC_BASE_URL: 'https://ec.test', ECCUBE_WEBHOOK_SECRET: 'x'.repeat(40), ...env };
+    c.env = { DB: db, NEN_EC_BASE_URL: 'https://ec.test', ECCUBE_WEBHOOK_SECRET: ecSecret, ...env };
     await next();
   });
   app.route('/', nenRanks);
@@ -71,6 +73,7 @@ beforeEach(() => {
   sql = created.raw;
   db = created.db;
   seed(sql);
+  ecSecret = randomBytes(32).toString('hex');
   fetchMock = vi.fn(async () => new Response('{"success":true}', { status: 200 }));
   vi.stubGlobal('fetch', fetchMock);
   tagSide.attach.mockClear();
@@ -79,6 +82,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  sql.close();
 });
 
 describe('GET /api/nen/rank-settings', () => {
@@ -205,7 +209,7 @@ describe('DELETE /api/nen/rank-settings/:id', () => {
     sql.prepare('INSERT INTO friend_tags (friend_id, tag_id) VALUES (?, ?)').run('friend-a', source.tagId);
     const result = await deletion(source.id, { accountId: ACCOUNT, replacementRankId: target.id, expectedVersion: data.rules.version });
     expect(result.status).toBe(200);
-    expect(result.body.data).toEqual({ id: source.id, replacementRankId: target.id, movedMembers: 1, version: 2, ecSync: 'pending', message: '次の同期で反映' });
+    expect(result.body.data).toMatchObject({ id: source.id, replacementRankId: target.id, movedMembers: 1, version: 2, ecSync: 'pending', message: '次の同期で反映' });
     expect(sql.prepare('SELECT member_rank_key, member_rank, mile_rate_percent FROM nen_ec_member_snapshots WHERE friend_id = ?').get('friend-a'))
       .toEqual({ member_rank_key: 'gold', member_rank: 'ゴールド', mile_rate_percent: 2 });
     expect(sql.prepare('SELECT tag_id FROM friend_tags WHERE friend_id = ?').all('friend-a')).toEqual([{ tag_id: target.tagId }]);
@@ -246,6 +250,7 @@ describe('DELETE /api/nen/rank-settings/:id', () => {
     const other = (await json(harness('owner'), 'GET', '/api/nen/rank-settings?accountId=account-other')).body.data.ranks[0];
     expect((await deletion(source.id, { accountId: ACCOUNT, replacementRankId: other.id, expectedVersion: 1 })).status).toBe(400);
     expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_rank_settings WHERE line_account_id = ?').get(ACCOUNT)).toEqual({ n: 4 });
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_member_rank_sync').get()).toEqual({ n: 0 });
   });
 
   it('版の未指定・型違い・古い版、権限不足、別アカウントの削除は拒否する', async () => {
@@ -301,6 +306,211 @@ describe('DELETE /api/nen/rank-settings/:id', () => {
     expect(sql.prepare('SELECT COUNT(*) AS n FROM friend_tags').get()).toEqual({ n: 0 });
     expect(sql.prepare('SELECT version, sync_error FROM nen_rank_rules WHERE line_account_id = ?').get(ACCOUNT)).toEqual({ version: 1, sync_error: null });
     expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_rank_settings WHERE line_account_id = ?').get(ACCOUNT)).toEqual({ n: 4 });
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_member_rank_sync').get()).toEqual({ n: 0 });
+  });
+});
+
+describe('ランク削除時の会員別EC送信とやり直し', () => {
+  const enabled = { NEN_EC_MEMBER_RANK_SYNC_ENABLED: 'true' };
+  const retryPath = (operationId: string) => `/api/nen/rank-settings/member-sync/${operationId}/retry`;
+  async function move(env: Record<string, unknown> = enabled) {
+    const app = harness('owner', env);
+    const data = (await json(app, 'GET', `/api/nen/rank-settings?accountId=${ACCOUNT}`)).body.data;
+    return json(app, 'DELETE', `/api/nen/rank-settings/${data.ranks.find((r: any) => r.key === 'platinum').id}`,
+      { accountId: ACCOUNT, replacementRankId: data.ranks.find((r: any) => r.key === 'gold').id, expectedVersion: 1 });
+  }
+  function respond(versions = 0, failedId?: number) {
+    fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+      const payload = JSON.parse(String(init.body));
+      const results = url.endsWith('/versions')
+        ? payload.customerIds.map((customerId: number) => ({ customerId, success: true, version: versions }))
+        : payload.members.map((m: any) => m.customerId === failedId
+          ? { customerId: m.customerId, success: false, code: 'save_failed', reason: '試験用の失敗' }
+          : { customerId: m.customerId, success: true, version: m.expectedVersion + 1, rankKey: m.rankKey, duplicate: false });
+      return Response.json({ success: true, results });
+    });
+  }
+  it('署名を生の本文から作り、会員別の版を保存して送る。自動送信に手動の印を付けない', async () => {
+    respond(7);
+    const result = await move();
+    expect(result.status).toBe(200);
+    expect(result.body.data.ecSyncResult).toMatchObject({ succeeded: 1, failed: 0, pending: 0, status: 'synced' });
+    expect(result.body.data.ecSync).toBe('synced');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [url, init] of fetchMock.mock.calls as unknown as Array<[string, RequestInit]>) {
+      expect(url).toMatch(/^https:\/\/ec\.test\/line-harness\/member-rank/);
+      const headers = init.headers as Record<string, string>;
+      expect(headers['X-Nen-Signature']).toBe(`sha256=${createHmac('sha256', ecSecret)
+        .update(`${headers['X-Nen-Timestamp']}.${init.body}`).digest('hex')}`);
+      expect(headers['X-Line-Harness-Source']).toBeUndefined();
+    }
+    expect(JSON.parse(String(fetchMock.mock.calls[1]![1].body))).toMatchObject({ actor: 'musubo:staff-a',
+      members: [{ customerId: 10231, rankKey: 'gold', expectedVersion: 7, reason: 'ランク削除による移し替え',
+        idempotencyKey: expect.stringMatching(/^rank-delete:[a-f0-9-]+:[a-f0-9]+$/) }] });
+    const again = await json(harness('admin', enabled), 'POST', retryPath(result.body.data.operationId), { accountId: ACCOUNT });
+    expect(again.body.data.succeeded).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+  it('設定なし・false・接続設定不足は送らず同期待ち。後で切り替えを有効にして送れる', async () => {
+    for (const env of [{}, { NEN_EC_MEMBER_RANK_SYNC_ENABLED: 'false' }, { ...enabled, NEN_EC_BASE_URL: '' },
+      { ...enabled, ECCUBE_WEBHOOK_SECRET: '' }]) {
+      const result = await move(env);
+      expect(result.body.data.ecSync).toBe('pending');
+      expect(result.body.data.ecSyncResult).toMatchObject({ pending: 1, succeeded: 0, failed: 0 });
+      expect(fetchMock).not.toHaveBeenCalled();
+      respond();
+      const resent = await json(harness('admin', enabled), 'POST', retryPath(result.body.data.operationId), { accountId: ACCOUNT });
+      expect(resent.body.data.status).toBe('synced');
+      // 次のケースは独立したDBで確認する。
+      const created = createTestD1(); sql.close(); sql = created.raw; db = created.db; seed(sql); fetchMock.mockReset();
+    }
+  });
+  it('変更がECへ届いた後に応答が失われても、同じ本文・担当者・鍵・版で送り直す', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ results: [{ customerId: 10231, success: true, version: 4 }] }))
+      .mockRejectedValueOnce(new Error(ecSecret));
+    const result = await move();
+    const firstBody = String(fetchMock.mock.calls[1]![1].body);
+    expect(result.body.data.ecSyncResult).toMatchObject({ failed: 1, succeeded: 0 });
+    expect(JSON.stringify(result.body)).not.toContain(ecSecret);
+    // 友だちの結び付けが変わっても、保存した元の会員IDを使う。
+    sql.prepare('UPDATE nen_ec_member_snapshots SET customer_id = ? WHERE friend_id = ?').run('99999', 'friend-a');
+    fetchMock.mockResolvedValueOnce(Response.json({ results: [{ customerId: 10231, success: true, version: 5, rankKey: 'gold', duplicate: true }] }));
+    const resent = await json(harness('admin', enabled, { id: 'staff-b' }), 'POST', retryPath(result.body.data.operationId), { accountId: ACCOUNT });
+    expect(resent.body.data).toMatchObject({ succeeded: 1, failed: 0, results: [{ duplicate: true, attempts: 2 }] });
+    expect(String(fetchMock.mock.calls[2]![1].body)).toBe(firstBody);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+  it('版違いは理由を残し、現在の版を取り直して上書きしない', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ results: [{ customerId: 10231, success: true, version: 2 }] }));
+    fetchMock.mockImplementation(async () => Response.json({ results: [{ customerId: 10231, success: false,
+      code: 'version_conflict', version: 9, reason: ecSecret }] }));
+    const result = await move();
+    expect(result.body.data.ecSyncResult.results[0]).toMatchObject({ code: 'version_conflict', status: 'failed' });
+    await json(harness('owner', enabled), 'POST', retryPath(result.body.data.operationId), { accountId: ACCOUNT });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[2]![1].body)).toBe(String(fetchMock.mock.calls[1]![1].body));
+    expect(sql.prepare('SELECT expected_version, error_reason FROM nen_member_rank_sync').get()).toMatchObject({ expected_version: 2,
+      error_reason: expect.stringContaining('新しい変更') });
+    expect(JSON.stringify(sql.prepare('SELECT * FROM nen_member_rank_sync').all())).not.toContain(ecSecret);
+  });
+  it('一部の会員だけ失敗したら、成功と失敗の件数を返し、失敗した会員だけ再送する', async () => {
+    sql.prepare("UPDATE nen_ec_member_snapshots SET member_rank_key = 'platinum' WHERE friend_id = 'friend-b'").run();
+    respond(3, 10877);
+    const result = await move();
+    expect(result.body.data.ecSyncResult).toMatchObject({ total: 2, succeeded: 1, failed: 1, pending: 0 });
+    respond();
+    const resent = await json(harness('owner', enabled), 'POST', retryPath(result.body.data.operationId), { accountId: ACCOUNT });
+    expect(resent.body.data).toMatchObject({ succeeded: 2, failed: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(String(fetchMock.mock.calls[2]![1].body)).members).toHaveLength(1);
+    expect(JSON.parse(String(fetchMock.mock.calls[2]![1].body)).members[0].customerId).toBe(10877);
+  });
+  it.each([401, 404, 409, 500])('HTTP %sを成功にせず、版の読み取り失敗を保存して後でやり直す', async (status) => {
+    fetchMock.mockResolvedValueOnce(new Response(ecSecret, { status }));
+    const result = await move();
+    expect(result.body.data.ecSyncResult.results[0]).toMatchObject({ status: 'failed', code: 'http_failed' });
+    expect(sql.prepare('SELECT expected_version FROM nen_member_rank_sync').get()).toEqual({ expected_version: null });
+    respond();
+    expect((await json(harness('owner', enabled), 'POST', retryPath(result.body.data.operationId), { accountId: ACCOUNT })).body.data.status).toBe('synced');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+  it.each([null, { results: [] }, { results: [{ customerId: 42, success: true, version: 1 }] },
+    { results: [{ customerId: 10231, success: true, version: '1' }] }])('壊れた結果 %j で変更を送らない', async (reply) => {
+    fetchMock.mockResolvedValueOnce(Response.json(reply));
+    const result = await move();
+    expect(result.body.data.ecSyncResult.results[0].code).toBe('invalid_response');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('会員IDが不正なら失敗理由を保存し、ECへは送らない', async () => {
+    sql.prepare('UPDATE nen_ec_member_snapshots SET customer_id = NULL WHERE friend_id = ?').run('friend-a');
+    const result = await move();
+    expect(result.body.data.ecSyncResult.results[0].code).toBe('invalid_input');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('存在しないEC会員の理由を保存し、変更の口へは送らない', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ results: [{ customerId: 10231, success: false,
+      code: 'member_not_found', reason: '会員が見つかりません' }] }));
+    const result = await move();
+    expect(result.body.data.ecSyncResult.results[0]).toMatchObject({ code: 'member_not_found', status: 'failed' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('変更の結果が不正なら成功にしない。再送でも期待する版を固定する', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ results: [{ customerId: 10231, success: true, version: 3 }] }))
+      .mockResolvedValueOnce(Response.json({ results: [{ customerId: 10231, success: true, version: 8, rankKey: 'gold', duplicate: false }] }));
+    const result = await move();
+    expect(result.body.data.ecSyncResult.results[0].code).toBe('invalid_response');
+    respond();
+    expect((await json(harness('owner', enabled), 'POST', retryPath(result.body.data.operationId), { accountId: ACCOUNT })).body.data.succeeded).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[2]![1].body)).toBe(String(fetchMock.mock.calls[1]![1].body));
+  });
+  it('送信待ちの保存が失敗したら移し替え・タグ・削除・版を戻し、外部へ送らない', async () => {
+    sql.exec("CREATE TRIGGER reject_sync BEFORE INSERT ON nen_member_rank_sync BEGIN SELECT RAISE(ABORT, '試験用の失敗'); END");
+    expect((await move()).status).toBe(500);
+    expect(sql.prepare("SELECT member_rank_key FROM nen_ec_member_snapshots WHERE friend_id = 'friend-a'").get()).toEqual({ member_rank_key: 'platinum' });
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM friend_tags').get()).toEqual({ n: 0 });
+    expect(sql.prepare('SELECT version FROM nen_rank_rules WHERE line_account_id = ?').get(ACCOUNT)).toEqual({ version: 1 });
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_rank_settings WHERE line_account_id = ?').get(ACCOUNT)).toEqual({ n: 4 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('同時の再送が先に保存した版を採用し、読み取った別の版で上書きしない', async () => {
+    const result = await move({});
+    fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/versions')) {
+        sql.prepare('UPDATE nen_member_rank_sync SET expected_version = 6').run();
+        return Response.json({ results: [{ customerId: 10231, success: true, version: 7 }] });
+      }
+      const m = JSON.parse(String(init.body)).members[0];
+      return Response.json({ results: [{ customerId: m.customerId, success: true, version: m.expectedVersion + 1, rankKey: m.rankKey, duplicate: true }] });
+    });
+    expect((await json(harness('owner', enabled), 'POST', retryPath(result.body.data.operationId), { accountId: ACCOUNT })).body.data.succeeded).toBe(1);
+    expect(JSON.parse(String(fetchMock.mock.calls[1]![1].body)).members[0].expectedVersion).toBe(6);
+  });
+  it('送信後に結果を保存できなくても削除成功と操作IDを返し、元の記録から再送できる', async () => {
+    respond();
+    sql.exec("CREATE TRIGGER reject_sync_result BEFORE UPDATE ON nen_member_rank_sync WHEN NEW.status <> 'pending' BEGIN SELECT RAISE(ABORT, '試験用の失敗'); END");
+    const result = await move();
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ success: true, data: { ecSync: 'pending', ecSyncResult: null,
+      operationId: expect.any(String), message: expect.stringContaining('移し替えは保存しました') } });
+    expect(sql.prepare('SELECT expected_version, status FROM nen_member_rank_sync').get()).toEqual({ expected_version: 0, status: 'pending' });
+    sql.exec('DROP TRIGGER reject_sync_result');
+    expect((await json(harness('owner', enabled), 'POST', retryPath(result.body.data.operationId), { accountId: ACCOUNT })).body.data.succeeded).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[2]![1].body)).toBe(String(fetchMock.mock.calls[1]![1].body));
+  });
+  it('101人を100人ずつ送り、結果も100人ずつ取得できる', async () => {
+    const moved = await move({});
+    const operation = moved.body.data.operationId;
+    const insert = sql.prepare(`INSERT INTO nen_member_rank_sync
+      (id, operation_id, line_account_id, friend_id, customer_id, rank_key, actor, reason, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'gold', 'musubo:staff-a', 'ランク削除による移し替え', '2026-10-02', '2026-10-02')`);
+    for (let n = 0; n < 100; n++) insert.run(`rank-delete:extra:${n}`, operation, ACCOUNT, `extra-${n}`, String(30000 + n));
+    respond();
+    const first = await json(harness('owner', enabled), 'POST', retryPath(operation), { accountId: ACCOUNT });
+    expect(first.body.data).toMatchObject({ total: 101, succeeded: 100, pending: 1, failed: 0, status: 'pending' });
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1].body)).customerIds).toHaveLength(100);
+    expect(JSON.parse(String(fetchMock.mock.calls[1]![1].body)).members).toHaveLength(100);
+    expect(first.body.data.results).toHaveLength(100);
+    const page = await json(harness('owner'), 'GET', `/api/nen/rank-settings/member-sync/${operation}?accountId=${ACCOUNT}&afterId=${encodeURIComponent(first.body.data.nextCursor)}`);
+    expect(page.body.data.results).toHaveLength(1);
+    expect(page.body.data.nextCursor).toBeNull();
+    const second = await json(harness('owner', enabled), 'POST', retryPath(operation), { accountId: ACCOUNT });
+    expect(second.body.data).toMatchObject({ succeeded: 101, pending: 0, status: 'synced' });
+    expect(JSON.parse(String(fetchMock.mock.calls[3]![1].body)).members).toHaveLength(1);
+  });
+  it('別アカウント・スタッフの再送と閲覧を拒否する', async () => {
+    const result = await move({});
+    const operation = result.body.data.operationId;
+    for (const method of ['GET', 'POST']) {
+      const path = method === 'GET' ? `/api/nen/rank-settings/member-sync/${operation}?accountId=account-other` : retryPath(operation);
+      expect((await json(harness('owner', enabled), method, path, method === 'POST' ? { accountId: 'account-other' } : undefined)).status).toBe(404);
+      expect((await json(harness('staff', enabled), method, path, method === 'POST' ? { accountId: ACCOUNT } : undefined)).status).toBe(403);
+      expect((await json(harness('admin', enabled, { tenantId: 'tenant-other' }), method, path, method === 'POST' ? { accountId: ACCOUNT } : undefined)).status).toBe(403);
+    }
+    const loaded = await json(harness('owner'), 'GET', `/api/nen/rank-settings/member-sync/${operation}?accountId=${ACCOUNT}`);
+    expect(loaded.body.data).toMatchObject({ total: 1, pending: 1 });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

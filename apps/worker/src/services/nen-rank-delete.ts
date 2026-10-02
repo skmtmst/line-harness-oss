@@ -17,10 +17,11 @@ export async function countRankMembers(db: D1Database, accountId: string, rankKe
   return Number(row?.n ?? 0);
 }
 
-/** 外部へ送らず、会員・タグ・設定の版を同じトランザクションで変更する。 */
+/** 会員・タグ・設定の版・ECへの送信待ちを同じトランザクションで変更する。 */
 export async function deleteNenRank(
   db: D1Database, accountId: string, rankId: string, replacementRankId: string | null, expectedVersion: number,
   prepareTags: (ranks: NenRankSetting[], now: string) => Promise<NenRankSetting[]>,
+  actor: string,
 ) {
   const [ranks, rules] = await Promise.all([getNenRankSettings(db, accountId), getNenRankRules(db, accountId)]);
   if (!rules || rules.version !== expectedVersion) throw new NenRankDeleteError('版が変わりました。読み直してから削除してください', 409);
@@ -52,6 +53,12 @@ export async function deleteNenRank(
   }
   const updateIndex = statements.length;
   if (target) {
+    statements.push(db.prepare(`INSERT INTO nen_member_rank_sync
+      (id, operation_id, line_account_id, friend_id, customer_id, rank_key, actor, reason, created_at, updated_at)
+      SELECT 'rank-delete:' || ? || ':' || lower(hex(randomblob(16))), ?, ?, s.friend_id, s.customer_id, ?, ?, ?, ?, ?
+      FROM nen_ec_member_snapshots s WHERE s.friend_id IN (${members}) AND ${gate}`)
+      .bind(operation, operation, accountId, target.rank_key, actor, 'ランク削除による移し替え', now, now,
+        accountId, source.rank_key, accountId, operation));
     statements.push(db.prepare(`UPDATE nen_ec_member_snapshots SET member_rank_key = ?, member_rank = ?, mile_rate_percent = ?
       WHERE friend_id IN (${members}) AND ${gate}`).bind(target.rank_key, target.name, target.mile_rate_percent, accountId, source.rank_key, accountId, operation));
   }
@@ -61,7 +68,8 @@ export async function deleteNenRank(
   if (Number(result[0]?.meta.changes) !== 1) throw new NenRankDeleteError('版または会員数が変わりました。読み直してから削除してください', 409);
   return {
     id: source.id, replacementRankId: target?.id ?? null,
-    movedMembers: target ? Number(result[updateIndex]?.meta.changes ?? 0) : 0,
+    movedMembers: target ? Number(result[updateIndex + 1]?.meta.changes ?? 0) : 0,
     version: expectedVersion + 1, ecSync: 'pending' as const, message: '次の同期で反映',
+    operationId: operation,
   };
 }

@@ -25,6 +25,7 @@ import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../service
 import { NenRankSyncError, buildNenRankSyncPayload, pushNenRankSettingsToEc } from '../services/nen-rank-sync.js';
 import { refreshAllNenTags } from '../services/nen-tag-sync.js';
 import { deleteNenRank, NenRankDeleteError } from '../services/nen-rank-delete.js';
+import { getMemberRankSync, syncMemberRanks } from '../services/nen-member-rank-sync.js';
 import {
   ENERGY_FACTORS,
   NenFeedingValidationError,
@@ -182,15 +183,53 @@ nenRanks.delete('/api/nen/rank-settings/:id', requireRole('owner', 'admin'), asy
   if (body.replacementRankId != null && (typeof body.replacementRankId !== 'string' || !body.replacementRankId.trim())) {
     return c.json({ success: false, error: '移す先のランクを選んでください' }, 400);
   }
+  const actor = `musubo:${c.get('staff').id}`;
+  if (actor.length > 128) return c.json({ success: false, error: '担当者IDが長すぎます' }, 400);
   try {
     const data = await deleteNenRank(c.env.DB, accountId, c.req.param('id'),
       typeof body.replacementRankId === 'string' ? body.replacementRankId : null, body.expectedVersion,
-      (ranks, now) => ensureRankTags(c.env.DB, ranks, now));
-    return c.json({ success: true, data });
+      (ranks, now) => ensureRankTags(c.env.DB, ranks, now), actor);
+    let ecSyncResult;
+    try {
+      ecSyncResult = await syncMemberRanks(c.env.DB, accountId, data.operationId, memberSyncConfig(c));
+    } catch {
+      // 削除は既に保存済み。結果の保存障害を削除失敗として返さない。
+      return c.json({ success: true, data: { ...data, ecSyncResult: null,
+        message: '移し替えは保存しました。ECの送信結果を確認できませんでした。操作IDで確認してやり直してください' } });
+    }
+    return c.json({ success: true, data: { ...data, ecSync: ecSyncResult.status, ecSyncResult,
+      message: ecSyncResult.status === 'synced' ? '会員のランクをECへ反映しました'
+        : ecSyncResult.status === 'failed' ? 'ECへの反映に失敗した会員がいます。結果を確認してやり直してください' : data.message } });
   } catch (error) {
     if (error instanceof NenRankDeleteError) return c.json({ success: false, error: error.message }, error.status);
     return c.json({ success: false, error: 'ランクを削除できませんでした。読み直してからもう一度お試しください' }, 500);
   }
+});
+
+function memberSyncConfig(c: Context<Env>) {
+  return { enabled: c.env.NEN_EC_MEMBER_RANK_SYNC_ENABLED, baseUrl: c.env.NEN_EC_BASE_URL,
+    secret: c.env.ECCUBE_WEBHOOK_SECRET };
+}
+
+nenRanks.get('/api/nen/rank-settings/member-sync/:operationId', requireRole('owner', 'admin'), async (c) => {
+  const accountId = accountIdFrom(c);
+  const denied = await requireAccount(c, accountId);
+  if (denied) return denied;
+  const data = await getMemberRankSync(c.env.DB, accountId, c.req.param('operationId'), c.req.query('afterId'));
+  if (!data.total) return c.json({ success: false, error: '会員の送信記録が見つかりません' }, 404);
+  return c.json({ success: true, data });
+});
+
+nenRanks.post('/api/nen/rank-settings/member-sync/:operationId/retry', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ accountId?: string }>().catch(() => null);
+  const accountId = accountIdFrom(c, body);
+  const denied = await requireAccount(c, accountId);
+  if (denied) return denied;
+  const operationId = c.req.param('operationId');
+  if (!(await getMemberRankSync(c.env.DB, accountId, operationId)).total) {
+    return c.json({ success: false, error: '会員の送信記録が見つかりません' }, 404);
+  }
+  return c.json({ success: true, data: await syncMemberRanks(c.env.DB, accountId, operationId, memberSyncConfig(c)) });
 });
 
 type RankBody = { accountId?: string; ranks?: Array<{ id?: string | null; name?: unknown; annualThresholdYen?: unknown; mileRatePercent?: unknown }> };
