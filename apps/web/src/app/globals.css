@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/*
+ * `v7:` / `v8:` バリアント（★V8 移行）。
+ *
+ * Tailwind ユーティリティは部品の CSS Module より後の層に出るため、
+ * 呼び出し側の `h-9.5` のような指定が v8 規定にも勝ってしまう。
+ * 「v7 の見た目を1画素も変えない」ために、テーマのときだけ効く
+ * ユーティリティを `v7:h-9.5` の形で書けるようにする。
+ * data-theme は `<html>` に常に v7 か v8 が付く（layout.tsx）。
+ */
+@custom-variant v7 (&:where(:root:not([data-theme="v8"]) *));
+@custom-variant v8 (&:where([data-theme="v8"] *));
+
 [data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
 [data-design-node="YfTfJ"] [data-design-part="dialog"] { width: min(680px, calc(100% - 32px)); }
 [data-design-node="N2J629"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
@@ -227,6 +239,9 @@
   /* ★V7 の 12px 段（カード・ダイアログ・知らせ）。card と同値なのは意図。 */
   --radius-panel: 12px;
   --radius-icon: 3px;
+  --radius-none: 0;
+  --radius-chart-dot: 2px;
+  --radius-chart-bar: 4px;
   /* Pencil `$radius-xs`(6px)。行の中の小さな札（フォルダ・連動）。 */
   --radius-mini: 6px;
   /* Pencil ★V8 印のタイル（C9CaMS・E7USZ9・A2mryd）。小22→7、中28・大32→9。 */
@@ -499,6 +514,26 @@
   --color-border-soft: #1d1d1f14;
   --shadow-segment-ring: inset 0 0 0 1px var(--color-border-soft);
   --shadow-segment-thumb: 0 1px 2px #1d1d1f1a;
+
+  /*
+   * 夕15 一斉配信の右欄のスマホ（app/broadcasts/phone-mock-v8.module.css）。
+   * 画面の中の飾りなので管理画面のテーマ色とは別物として `bphone` で分ける。
+   * 共有の LINE 見本（components/shared/line-preview）とは別の絵で、
+   * 角丸・地の色も違う。値は Pencil `F3X1Mo` / `cgiGB` / `cdZBf` の実測。
+   */
+  --v8-bphone-ink: #171a1f;          /* 器の地・島・帯の中の字・ホームの線 */
+  --v8-bphone-talk: #7f93c4;         /* トークの地 */
+  --v8-bphone-chrome: #ffffff;       /* 帯の地・緑の上の字 */
+  --v8-bphone-sub: #4a525e;          /* 帯の副の字 */
+  --v8-bphone-chip: rgb(255 255 255 / 0.55); /* トークの中の札の地 */
+  --v8-bphone-chip-ink: #3c4450;     /* 札の字 */
+  --v8-bphone-send: #06c755;         /* 送信ボタンの緑（LINE の緑） */
+  --v8-bphone-hairline: rgb(15 23 32 / 0.06); /* 帯の区切り線 */
+  --v8-bphone-shadow: 0 12px 32px rgb(15 23 32 / 0.18); /* 器が下へ落とす影 */
+  --v8-bphone-shell-radius: 44px;    /* 器の角丸 */
+  --v8-bphone-screen-radius: 34px;   /* 画面の角丸 */
+  /* 一覧の日付窓（list-v8.module.css の datePopover）が落とす影 */
+  --v8-popover-shadow: 0 8px 24px rgb(15 23 32 / 0.12);
 }
 
 /*
@@ -523,6 +558,33 @@
   --v8-line-shell-radius: 52px;       /* 器の角丸 */
   --v8-line-screen-radius: 42px;      /* 画面の角丸 */
   --v8-line-homebar-radius: 3px;      /* ホームの線の角丸 */
+  /* トークの吹き出し。届いた側（左・白）は左上、返す側（右・緑）は右上を小さく。 */
+  --v8-line-bubble-in-radius: 4px 14px 14px 14px;
+  --v8-line-bubble-out-radius: 14px 4px 14px 14px;
+}
+
+/*
+ * ★V8 LIFFプレビューのスマホ（予約設定 `owaS3` の右欄）：お客さまの
+ * LIFF 予約画面の写しの値。管理画面のテーマ色とは別物なので
+ * `--v8-liff-*` で分ける（LINEプレビューの `--v8-line-*` と同じ考え）。
+ * 値は Pencil の実寸の写しで、直値はここだけに置く。
+ */
+[data-theme="v8"] {
+  --v8-liff-line: #e6e9ed;            /* カード・帯の細い枠 */
+  --v8-liff-slot-line: #dfe3e8;       /* 時刻の枠の細い枠 */
+  --v8-liff-primary: #03873a;         /* 決めるボタン・選んだ印・値段 */
+  --v8-liff-primary-soft: #f0fbf4;    /* 選んだカード・日の地 */
+  --v8-liff-chip: #f1f3f5;            /* 分類の札・切り替えの溝 */
+  --v8-liff-off: #f7f8f9;             /* 休みの日・押せない枠 */
+  --v8-liff-idle: #b8bec6;            /* まだの段の字・押せない字 */
+  --v8-liff-sub: #5f6670;             /* 補足の字 */
+  --v8-liff-thumb: #e9e2d4;           /* 写真・顔の置き場の地 */
+  --v8-liff-thumb-ink: #6b5b3e;       /* 顔の置き場の字 */
+  --v8-liff-phone-radius: 40px;       /* スマホの器の角丸 */
+  --v8-liff-card-radius: 14px;        /* 選ぶカードの角丸 */
+  --v8-liff-step-radius: 2px;         /* 段の線の角丸 */
+  --v8-savebar-shadow: 0 -4px 12px #1d1d1f14; /* 板の下の帯が上へ落とす影 */
+  --color-v8-pill-off: #f1f2f4;       /* 「止めている」の札の地 */
 }
 
 /*

@@ -485,6 +485,10 @@ export default function PhotoReviewsPage() {
       if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
       reviewKeys.current.delete(id)
+      // M508フォロー：成功が確定した同generationで前の失敗案内を消す。
+      // review()のcatchが入れた案内が対象。入力チェックは reasonError・
+      // accountNotice、読み直しの失敗は setLoadError と別の置き場なので消えない。
+      setNotice('')
       const notification = response.data.notificationStatus === 'sent'
         ? '投稿者へLINEで通知しました。'
         : '審査結果は保存しましたが、LINE通知は送れませんでした。一覧から再送できます。'
@@ -516,6 +520,12 @@ export default function PhotoReviewsPage() {
     } catch (error) {
       if (generation === accountGeneration.current) {
         setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。'))
+        // M508: ほかの人が先に決めていたときは一覧を読み直し、最新の状態を
+        // 見せる。保存の失敗（500）は読み直さず、同じ内容で再試行できる。
+        if (error instanceof ApiError && error.status === 409) {
+          reviewKeys.current.delete(id)
+          await load()
+        }
       }
     }
     finally { setReviewing(null) }

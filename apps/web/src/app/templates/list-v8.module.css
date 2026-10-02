@@ -1,0 +1,647 @@
+/*
+ * ★V8 テンプレートの一覧（Pencil `v19Ivv`、状態は `susGP`、
+ * 作る種類を選ぶ窓は `R9XUMr`）。
+ *
+ * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
+ * 板が 1100px を切ったらフォルダの列を道具の段へ畳む
+ * （`docs/v8` RESPONSIVE の決まり。約 1352px 未満の画面幅に相当）。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+/* 見出しブロック：画面名＋一行の説明。 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 数の帯：4つのマス。アイコンつき。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.kpiLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpiLabel svg {
+  color: var(--color-ink-faint);
+}
+
+.kpiValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.kpiDetail {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 本体：左にフォルダの列 200px、右に一覧。 */
+.split {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.folderCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* フォルダ列のいちばん上の作るボタンは幅いっぱい。 */
+.folderCol :global(.v8-folder-create) {
+  width: 100%;
+}
+
+.folderNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.listCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 道具の段：検索・札・よく使う絞り込み・件数。 */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 広い板では「作る」とフォルダ選びはフォルダの列にいる。道具の段には出さない。 */
+.toolbarCreate,
+.folderSelectWrap {
+  display: none;
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+.searchWrap {
+  width: 260px;
+  min-width: 160px;
+}
+
+/* 表。 */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.table {
+  width: 100%;
+  min-width: 640px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: top;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.rowClick {
+  cursor: pointer;
+}
+
+.rowClick:hover td {
+  background: var(--color-canvas-sunken);
+}
+
+.selectCell {
+  width: 40px;
+  text-align: center;
+}
+
+.cellTitle {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 600;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellTitle:hover {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+.cellSub {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 種類の札。 */
+.kindBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 公開の札：公開中／未公開の変更／下書きだけ。 */
+.publishPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.publishPill::before {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  content: '';
+}
+
+.publishPillLive {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.publishPillDraftChanges {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.publishPillDraftOnly {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+/* 「使っている所」列。数は押せる字（詳細画面で中身を見る）。 */
+.usageLink {
+  display: inline-block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.usageLink:hover {
+  text-decoration: underline;
+}
+
+.usageNone {
+  color: var(--color-ink-faint);
+  font-size: 13px;
+}
+
+/* 「今月送った数」列。 */
+.countCell {
+  white-space: nowrap;
+}
+
+.countMain {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.countSub {
+  margin-top: 2px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dateCell {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.menuCell {
+  width: 44px;
+  text-align: right;
+}
+
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.menuButton:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.menuButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* まとめての帯（選ぶと表の下に出る）：フォルダへ移す・削除。 */
+.bulkRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+}
+
+.bulkCount {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 読み込み中の骨格の行。 */
+.skeletonRows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.skeletonRow:last-child {
+  border-bottom: 0;
+}
+
+.skeletonDot {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+
+.skeletonBar {
+  height: 12px;
+  flex: 1;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+}
+
+/* ページ送りの行。左に件数、右にページ送り。 */
+.pagerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 表の下の案内。 */
+.footNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* 空・失敗の1枚。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  text-align: center;
+}
+
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.stateIconError {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stateDesc {
+  margin: 0;
+  max-width: 420px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/*
+ * 種類を選ぶ窓（`R9XUMr`）：同じ高さの6枚のカード。
+ * カードの中は「できること1行・使いどき・できないこと（→向いている種類）」。
+ */
+.pickerGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kindCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  height: 100%;
+  padding: 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  text-align: left;
+  cursor: pointer;
+}
+
+.kindCard:hover {
+  border-color: var(--color-action);
+  background: var(--color-accent-soft);
+}
+
+.kindCard:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+.kindIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+.kindTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.kindDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.kindMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.kindMetaLine {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.pickerFooter {
+  display: flex;
+  justify-content: center;
+}
+
+/* 削除できない窓（`Z0g3si`）の使用先リスト。 */
+.usageList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.usageItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-control, 8px);
+  color: var(--color-action);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.usageItem:hover {
+  background: var(--color-canvas-sunken);
+  text-decoration: underline;
+}
+
+.usageItemStatic {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+/* フォルダへ移す窓の中身。 */
+.moveBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.moveLabel {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ===== 板が 1100px を切ったら（画面幅で約 1352px 未満） ===== */
+@container (max-width: 1099px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* フォルダの列は道具の段の選ぶ欄へ畳む。「作る」は道具の段の左端。 */
+  .folderCol {
+    display: none;
+  }
+
+  .toolbarCreate {
+    display: inline-flex;
+  }
+
+  .folderSelectWrap {
+    display: block;
+  }
+
+  .pickerGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* さらに狭い板では数の帯・種類カードも1〜2列に。 */
+@container (max-width: 560px) {
+  .kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .searchWrap {
+    width: 100%;
+  }
+
+  .pickerGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

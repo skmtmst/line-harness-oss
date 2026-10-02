@@ -271,7 +271,11 @@ describe('プロフィールの採用値を変える窓', () => {
 })
 
 describe('画面のつなぎ', () => {
-  const detail = read('components/merged-person/merged-person-detail.tsx')
+  const detail = [
+    'components/merged-person/merged-person-detail.tsx',
+    'components/merged-person/use-merged-person.ts',
+    'components/merged-person/merged-person-detail-v8.tsx',
+  ].map(read).join('\n')
   const row = read('components/users/user-row.tsx')
   const page = read('app/users/page.tsx')
 

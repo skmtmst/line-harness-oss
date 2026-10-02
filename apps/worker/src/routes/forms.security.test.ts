@@ -509,6 +509,7 @@ describe('submission pagination compatibility', () => {
       'form-1',
       'account-a',
       [{ key: 'next_visit', label: '次回来店日' }],
+      [],
     );
   });
 

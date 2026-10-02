@@ -113,7 +113,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
   }
 
   const menuButton = (key: string, label: string, token?: string) => (
-    <Button variant="secondary" className={(`border-hairline rounded-control h-8 border px-2.5 text-xs transition-colors ${
+    <Button variant="secondary" className={(`border-hairline rounded-control v7:h-8 border px-2.5 text-xs transition-colors ${
         open === key ? 'bg-accent-soft text-accent-deep border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
       }`) + ' whitespace-normal'} type="button" ref={(element) => {
         buttonRefs.current[key] = element
@@ -157,7 +157,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     <div className="relative flex flex-wrap items-center gap-1.5">
       <span className="text-ink-faint text-xs">差し込み</span>
 
-      <Button variant="secondary" className="text-ink-secondary h-8 px-2.5 text-xs whitespace-normal" type="button" onClick={() => insert('{{name}}')}>
+      <Button variant="secondary" className="text-ink-secondary v7:h-8 px-2.5 text-xs whitespace-normal" type="button" onClick={() => insert('{{name}}')}>
         名前
       </Button>
 
@@ -210,7 +210,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
                 aria-label="目標日"
                 className="min-w-0 flex-1"
               />
-              <Button variant="secondary" className="text-ink-secondary h-8 shrink-0 px-3 text-xs whitespace-normal" type="button" disabled={!targetDate} onClick={() => insert(`{{days_until:${targetDate}}}`)}>
+              <Button variant="secondary" className="text-ink-secondary v7:h-8 shrink-0 px-3 text-xs whitespace-normal" type="button" disabled={!targetDate} onClick={() => insert(`{{days_until:${targetDate}}}`)}>
                 入れる
               </Button>
             </div>
@@ -218,7 +218,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
             <p className="text-ink text-xs font-medium mt-3">配信日から何日後かの日付</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {[1, 3, 7, 14, 30].map((n) => (
-                <Button variant="secondary" className="text-ink-secondary h-8 px-2.5 text-xs whitespace-normal" key={n} type="button" onClick={() => insert(`{{date+${n}}}`)}>
+                <Button variant="secondary" className="text-ink-secondary v7:h-8 px-2.5 text-xs whitespace-normal" key={n} type="button" onClick={() => insert(`{{date+${n}}}`)}>
                   {n}日後
                 </Button>
               ))}

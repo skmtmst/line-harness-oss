@@ -1,0 +1,712 @@
+/*
+ * ★V8 自動応答の作成・編集・有効化（Pencil `K7HWG` `A0pDt` `rfhIf`
+ * `Guoye` `XJUqs`、完了 `V4LjH`）。
+ *
+ * 組版は「作る・確かめる板（左）」と「いまの状態・LINEの見え方（右）」の
+ * 2列。板が狭い画面では右の列を下へ畳む。
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  text-decoration: none;
+  width: fit-content;
+}
+.backLink:hover {
+  color: var(--color-ink);
+  text-decoration: underline;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 手順の下の一行。「いま何をしているか」を置く。 */
+.subline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+.sublineName {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.sublineBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.label {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.labelOptional {
+  color: var(--color-ink-faint);
+  font-weight: 400;
+}
+.hint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 14px;
+}
+.input:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+.textarea {
+  composes: input;
+  min-height: 120px;
+  resize: vertical;
+  line-height: 1.7;
+  font-family: inherit;
+}
+
+/* 「言葉で反応する／すべてのメッセージ」のような2枚の選択カード。 */
+.radioPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .radioPair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 反応する言葉の札（追加は入力欄＋Enter、消すは各札の ×）。 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+  font-size: 13px;
+}
+.chipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+.chipRemove:hover {
+  color: var(--color-danger);
+}
+.chipInput {
+  flex: 1;
+  min-width: 160px;
+  padding: 6px 10px;
+  border: 1px dashed var(--color-control-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+}
+.chipInput:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+  border-style: solid;
+}
+
+/* 反応するメッセージの種類の押せる札。選んだものは濃く。 */
+.pickChip {
+  padding: 7px 14px;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+.pickChip[aria-pressed='true'] {
+  border-color: var(--color-action);
+  background: var(--color-success-bg);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* 「部分一致／完全一致」などのつながった選択。 */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control, 8px);
+  overflow: hidden;
+}
+.segBtn {
+  padding: 8px 14px;
+  border: 0;
+  border-right: 1px solid var(--color-control-border);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.segBtn:last-child {
+  border-right: 0;
+}
+.segBtn[aria-pressed='true'] {
+  background: var(--color-success-bg);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* 曜日：つなげた7つ。 */
+.weekdays {
+  display: inline-flex;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control, 8px);
+  overflow: hidden;
+}
+.weekday {
+  min-width: 48px;
+  padding: 8px 0;
+  border: 0;
+  border-right: 1px solid var(--color-control-border);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.weekday:last-child {
+  border-right: 0;
+}
+.weekday[aria-pressed='true'] {
+  background: var(--color-success-bg);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.weekdayPresets {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+.weekdayPreset {
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+.weekdayPreset:hover {
+  text-decoration: underline;
+}
+.weekdayNow {
+  color: var(--color-ink-secondary);
+}
+
+/* ひな形：同じ高さの3枚。 */
+.tplGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .tplGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.tplCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  text-align: left;
+}
+.tplName {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+.tplDesc {
+  flex: 1;
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.tplFoot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 手順4「動く順番」の行。 */
+.orderList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.orderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+}
+.orderRowSelf {
+  border-color: var(--color-action);
+  background: var(--color-success-bg);
+}
+.orderRowConflict {
+  border-color: var(--color-warning);
+}
+.orderGrip {
+  color: var(--color-ink-faint);
+}
+.orderNum {
+  min-width: 24px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  text-align: right;
+}
+.orderBody {
+  flex: 1;
+  min-width: 0;
+}
+.orderName {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.orderSub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+.orderOverlap {
+  color: var(--color-warning);
+}
+.orderMove {
+  display: flex;
+  gap: 8px;
+}
+
+/* 手順4「試しに送ってみる」の結果帯。 */
+.testResult {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  font-size: 13px;
+}
+.testResultWin {
+  border: 1px solid var(--color-success);
+  background: var(--color-success-bg);
+}
+.testResultLose {
+  border: 1px solid var(--color-warning);
+  background: var(--color-warning-bg);
+}
+.testResultTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: 700;
+}
+.testResultNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  line-height: 1.6;
+}
+
+/* 重なりの確かめ行。 */
+.conflictRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.conflictRow:last-child {
+  border-bottom: 0;
+}
+.conflictBody {
+  flex: 1;
+  min-width: 0;
+}
+.conflictName {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.conflictNote {
+  margin: 2px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.conflictCertainty {
+  color: var(--color-warning);
+}
+
+/* 右の「設定内容」などの名前と値の行。 */
+.kvList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.kvRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.kvRow:last-child {
+  border-bottom: 0;
+}
+.kvKey {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+.kvVal {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* 手順5「有効にする前の確認」の行。 */
+.checkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.checkRow:last-child {
+  border-bottom: 0;
+}
+.checkIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  flex-shrink: 0;
+}
+.checkIconOk {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.checkIconWarn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+.checkBody {
+  flex: 1;
+  min-width: 0;
+}
+.checkTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.checkNote {
+  margin: 2px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 確認の「設定の確認」表。各行の右に「変える」。 */
+.summaryRow {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.summaryRow:last-child {
+  border-bottom: 0;
+}
+.summaryKey {
+  color: var(--color-ink-faint);
+  font-size: 13px;
+}
+.summaryVal {
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* LINE の中の吹き出し（返す側＝右の緑、届いた側＝左の白）。 */
+.bubbleReply {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 10px 12px;
+  border-radius: var(--v8-line-bubble-out-radius);
+  background: var(--color-action);
+  color: var(--color-canvas);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.bubbleIn {
+  align-self: flex-start;
+  max-width: 85%;
+  padding: 10px 12px;
+  border-radius: var(--v8-line-bubble-in-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.bubbleMeta {
+  align-self: flex-end;
+  color: var(--color-ink-faint);
+  font-size: 10px;
+}
+.talkStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.talkStack .bubbleReply,
+.talkStack .bubbleIn,
+.talkStack .bubbleMeta {
+  margin: 0;
+}
+
+/* 完了（V4LjH）：中央の板。 */
+.done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 640px;
+  margin: 32px auto 0;
+  padding: 32px 28px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  text-align: center;
+}
+.doneIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-pill);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.doneTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 18px;
+  font-weight: 700;
+}
+.doneNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.doneRows {
+  width: 100%;
+  border-top: 1px solid var(--color-hairline);
+}
+.doneActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* トグルの行（細かい決まり）。 */
+.toggleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.toggleRow:last-child {
+  border-bottom: 0;
+}
+.toggleText {
+  flex: 1;
+  min-width: 0;
+}
+.toggleTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.toggleNote {
+  margin: 2px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.toggleExtra {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toggleNum {
+  width: 72px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  text-align: right;
+}
+
+.insertChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.insertChip {
+  padding: 5px 12px;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+.insertChip:hover {
+  border-color: var(--color-action);
+}
+.counter {
+  margin-left: auto;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}

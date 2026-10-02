@@ -30,6 +30,7 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/platform-admin.js';
 import { clientIp } from '../services/admin-session.js';
 import { dbFor } from '../services/db-router.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { deliverAnnouncement, loadNoticeLineAccount, previewAudience } from '../services/platform-announcements.js';
 
 /** 運営からのお知らせ配信 ★V6 37-7 `q2CokV`。運営マスターだけが呼べる。 */
@@ -176,6 +177,23 @@ opsAnnouncements.post('/api/ops/announcements/preview', async (c) => {
   return c.json({ success: true, data: preview });
 });
 
+/*
+ * M512: 作成ボタンの二重押し・通信再送で同じお知らせが2件できないよう、
+ * Idempotency-Key を行IDにする（broadcasts と同じ決めごと）。キーが無い
+ * 従来の呼び出しはそのまま作る。同じキーで内容が違う再送は取り違えなので
+ * 409 で止める。再送の返しは送り直さず保存済みを返す。
+ */
+function sameAnnouncementRequest(existing: PlatformAnnouncement, input: AnnouncementInput, status: 'draft' | 'scheduled'): boolean {
+  return existing.subject === input.subject
+    && existing.body === input.body
+    && existing.audience_kind === input.audienceKind
+    && existing.status === status
+    && (existing.publish_at ?? null) === (input.publishAt ?? null)
+    && JSON.stringify(parseJsonArray(existing.audience_plans)) === JSON.stringify(input.audiencePlans)
+    && JSON.stringify(parseJsonArray(existing.audience_tenant_ids)) === JSON.stringify(input.audienceTenantIds)
+    && JSON.stringify(parseJsonArray(existing.channels)) === JSON.stringify(input.channels);
+}
+
 opsAnnouncements.post('/api/ops/announcements', requirePlatformAdminWrite(), async (c) => {
   const db = dbFor(c.env);
   const staff = c.get('staff');
@@ -188,7 +206,37 @@ opsAnnouncements.post('/api/ops/announcements', requirePlatformAdminWrite(), asy
   if (parsed.input.channels.includes('line') && mode !== 'draft' && !(await loadNoticeLineAccount(c.env))) {
     return c.json({ success: false, error: '契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください' }, 409);
   }
-  const created = await createPlatformAnnouncement(db, { ...parsed.input, status: mode === 'schedule' ? 'scheduled' : 'draft', createdByStaffId: staff.id, createdByName: staff.name });
+  const rawKey = c.req.header('Idempotency-Key')?.trim() || null;
+  if (rawKey !== null && !isValidIdempotencyKey(rawKey)) {
+    return c.json({ success: false, error: '再実行キーの形式が正しくありません' }, 400);
+  }
+  const status = mode === 'schedule' ? 'scheduled' : 'draft';
+  if (rawKey) {
+    const existing = await getPlatformAnnouncement(db, rawKey);
+    if (existing) {
+      if (!sameAnnouncementRequest(existing, parsed.input, status)) {
+        return c.json({ success: false, code: 'IDEMPOTENCY_CONFLICT', error: '同じ再実行キーが別の内容に使われています' }, 409);
+      }
+      c.header('Idempotency-Replayed', 'true');
+      return c.json({ success: true, duplicate: true, data: await serialize(db, existing) }, 200);
+    }
+  }
+  let created: PlatformAnnouncement;
+  try {
+    created = await createPlatformAnnouncement(db, {
+      ...parsed.input, status, createdByStaffId: staff.id, createdByName: staff.name,
+      ...(rawKey ? { id: rawKey } : {}),
+    });
+  } catch (error) {
+    // 並行した再送が先に作ったときだけ保存済みを返す。それ以外は投げ直す。
+    const existing = rawKey ? await getPlatformAnnouncement(db, rawKey) : null;
+    if (!existing) throw error;
+    if (!sameAnnouncementRequest(existing, parsed.input, status)) {
+      return c.json({ success: false, code: 'IDEMPOTENCY_CONFLICT', error: '同じ再実行キーが別の内容に使われています' }, 409);
+    }
+    c.header('Idempotency-Replayed', 'true');
+    return c.json({ success: true, duplicate: true, data: await serialize(db, existing) }, 200);
+  }
   await audit(c, 'announcement.create', { id: created.id, mode, channels: parsed.input.channels, audienceKind: parsed.input.audienceKind });
   if (mode === 'send') {
     if (!(await markAnnouncementSending(db, created.id))) return c.json({ success: false, error: '送信の準備に失敗しました' }, 409);
@@ -212,8 +260,32 @@ opsAnnouncements.put('/api/ops/announcements/:id', requirePlatformAdminWrite(), 
   if (parsed.input.channels.includes('line') && mode !== 'draft' && !(await loadNoticeLineAccount(c.env))) {
     return c.json({ success: false, error: '契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください' }, 409);
   }
-  const updated = await updatePlatformAnnouncement(db, existing.id, { ...parsed.input, status: mode === 'schedule' ? 'scheduled' : 'draft' });
-  if (!updated) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
+  /*
+   * M513: 古い画面からの保存は止めて最新を見せる。版（expectedUpdatedAt）が
+   * 送られてきたときだけ照合し、合わなければ最新の件名つきで409にする。
+   * 送られてこない従来の呼び出しはそのまま通す。
+   */
+  const expectedUpdatedAt = typeof body.expectedUpdatedAt === 'string' ? body.expectedUpdatedAt : null;
+  if (expectedUpdatedAt !== null && existing.updated_at !== expectedUpdatedAt) {
+    return c.json({
+      success: false, code: 'VERSION_CONFLICT',
+      error: 'ほかの人が先に保存しました。一覧を読み直してから、もう一度保存してください。',
+      data: { latest: await serialize(db, existing) },
+    }, 409);
+  }
+  const updated = await updatePlatformAnnouncement(db, existing.id, { ...parsed.input, status: mode === 'schedule' ? 'scheduled' : 'draft' }, expectedUpdatedAt);
+  if (!updated) {
+    const fresh = await getPlatformAnnouncement(db, existing.id);
+    if (!fresh) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
+    if (fresh.status !== 'draft' && fresh.status !== 'scheduled') {
+      return c.json({ success: false, error: '配信済みのお知らせは変えられません' }, 409);
+    }
+    return c.json({
+      success: false, code: 'VERSION_CONFLICT',
+      error: 'ほかの人が先に保存しました。一覧を読み直してから、もう一度保存してください。',
+      data: { latest: await serialize(db, fresh) },
+    }, 409);
+  }
   if (mode === 'send') {
     if (!(await markAnnouncementSending(db, updated.id))) return c.json({ success: false, error: '送信の準備に失敗しました' }, 409);
     const result = await deliverAnnouncement(c.env, (await getPlatformAnnouncement(db, updated.id))!);

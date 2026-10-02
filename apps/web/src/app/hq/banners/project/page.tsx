@@ -1,5 +1,8 @@
 'use client'
 
+import ReadonlyHeader from '@/app/hq/readonly-header-v8'
+import '@/app/hq/readonly-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Archive, ArchiveRestore, Copy, LoaderCircle, Pencil, Sparkles, Star } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -57,6 +60,7 @@ export default function HqBannerProjectPage() {
 }
 
 function ProjectInner() {
+  const theme = useAdminTheme()
   const router = useRouter()
   const params = useSearchParams()
   const projectId = params.get('id') ?? ''
@@ -433,7 +437,8 @@ function ProjectInner() {
   const busy = busyAction !== null
 
   return (
-    <div data-design-node={running ? 'QGiQI' : 'g1WVyR'} className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' && running ? 'p03ImY' : theme === 'v8' && usage && (usage.blocked || usage.paused || usage.month.remaining <= 0 || usage.today.remaining <= 0) ? 'zOpMG' : running ? 'QGiQI' : 'g1WVyR'} className="flex flex-col gap-4">
+      {theme === 'v8' && <ReadonlyHeader title={project.name} description={running ? `${running.requestedCount}枚中 ${running.doneCount}枚できました。生成の状況を確認できます。` : 'プロジェクトの画像と利用状況を確認します。'} />}
       <div data-design-node="G6NIIg" className="flex flex-wrap items-center gap-2">
         <Breadcrumb items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />
         <span className="flex-1" />
@@ -477,7 +482,7 @@ function ProjectInner() {
       {project.description ? <p className="text-caption text-ink-faint">{project.description}</p> : null}
 
       <div data-design-node="H2eb7f" className="flex flex-col gap-4 xl:flex-row xl:items-start">
-        <section data-design-node="ZwrHR" className="flex min-w-0 flex-1 flex-col rounded-card border border-hairline bg-canvas">
+        <section data-design-node="ZwrHR" className="v8-ro-hq-generationGallery flex min-w-0 flex-1 flex-col rounded-card border border-hairline bg-canvas">
           <div className="flex flex-wrap items-center gap-2 px-4 py-3">
             <h2 className="text-body font-bold text-ink">このプロジェクトの画像</h2>
             <span className="text-caption text-ink-faint">{images.length}枚</span>

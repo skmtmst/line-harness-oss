@@ -24,6 +24,7 @@ vi.mock('next/link', () => ({ default: () => null }))
 // N-264: 一覧は ?highlight= を読む。試験ではクエリ無しとして返す。
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),

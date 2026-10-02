@@ -11,6 +11,8 @@ import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import { isForbiddenOrRateLimited, loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
 import EditDialog, { toVersionDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import AutoReplyWizardV8 from './wizard-v8'
 import './issue481-height.css'
 
 /*
@@ -202,7 +204,18 @@ export default function AutoReplyEditPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <AutoReplyEditInner />
+      <AutoReplyEditThemed />
     </Suspense>
   )
+}
+
+/*
+ * ★V8（K7HWG〜XJUqs・完了 V4LjH）はテーマで切る。
+ * v7 は従来どおり EditDialog の3段ページ。v8 は5手順のウィザードで、
+ * 公開の確かめ（重なり・試し送り・有効化）も手順4・5に畳み込む。
+ */
+function AutoReplyEditThemed() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <AutoReplyWizardV8 />
+  return <AutoReplyEditInner />
 }

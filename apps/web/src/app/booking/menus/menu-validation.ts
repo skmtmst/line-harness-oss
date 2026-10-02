@@ -1,3 +1,5 @@
+import { ApiError } from '@/lib/api'
+
 export type BookingMenuBaseDraft = {
   name: unknown
   durationMinutes: unknown
@@ -31,4 +33,20 @@ export function bookingMenuError(draft: BookingMenuBaseDraft): string | null {
     return '担当できる人を1人以上選んでください。0人だと予約画面に枠が出ません'
   }
   return null
+}
+
+export function bookingErrorMessage(error: unknown, action: '読み込み' | '保存'): string {
+  if (error instanceof ApiError) {
+    if (error.status === 403) return `予約メニューを${action}する権限がありません。`
+    if (error.status === 409) return `ほかの変更と重なったため、予約メニューを${action}できませんでした。`
+  }
+  return `予約メニューを${action}できませんでした。通信状態を確認して、もう一度お試しください。`
+}
+
+export function bookingRulesErrorMessage(error: unknown, action: '読み込み' | '保存'): string {
+  if (error instanceof ApiError) {
+    if (error.status === 403) return `予約の基本ルールを${action}する権限がありません。`
+    if (error.status === 409) return 'ほかの担当者が先に保存しました。最新の内容を読み直してから、もう一度変更してください。'
+  }
+  return `予約の基本ルールを${action}できませんでした。通信状態を確認して、もう一度お試しください。`
 }

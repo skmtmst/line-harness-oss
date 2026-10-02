@@ -14,7 +14,15 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)))
-const EXCEPTIONS = new Set(['app/scenarios/mode/page.tsx'])
+const EXCEPTIONS = new Set([
+  'app/scenarios/mode/page.tsx',
+  /*
+   * リマインダV8の選ぶカード（ChoiceCardV8）は共通 RadioCard が持たない
+   * 「アイコン左上・丸右上」の形。丸は本物の input[type=radio] で、
+   * 意味は保ったまま。★V8板（YChR6等）の見た目を守るために残す。
+   */
+  'app/reminders/wizard-v8-ui.tsx',
+])
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {

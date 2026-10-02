@@ -37,6 +37,19 @@ const SHEET_BATCH_SIZE = 200;
 
 export const TIKTOK_PNL_SPREADSHEET_TITLE = 'TikTok利益計算（自動集計）';
 
+/**
+ * 利益計算が使える連携の状態（#838 の google_sheets_integrations.status）。
+ *
+ * `pending_target` は「Googleの認可は済んでいるが、#838 の書き出し先スプレッドシートを
+ * まだ選んでいない」状態で、更新用トークンは保存されている。利益計算は自分で
+ * スプレッドシートを作るので #838 の書き出し先を必要とせず、この状態でも動かせる。
+ * 除外するのは認可が切れた `expired` と、行自体が無い未接続だけ。
+ */
+export const TIKTOK_PNL_USABLE_INTEGRATION_STATUSES = ['connected', 'pending_target'] as const;
+
+/** 上の状態をSQLの IN 句に使う形（値はリテラルなのでbind不要）。 */
+export const TIKTOK_PNL_USABLE_STATUS_SQL = "('connected', 'pending_target')";
+
 // タブ名。数式からも参照するため定数で一元管理する。
 const TAB_GUIDE = '使い方';
 const TAB_PNL = '月次PnL';
@@ -876,7 +889,7 @@ export async function processTiktokPnlTick(
   const integrations = await db.prepare(
     `SELECT g.* FROM google_sheets_integrations g
        JOIN tiktok_pnl_settings s ON s.line_account_id = g.line_account_id
-      WHERE g.status = 'connected' AND s.enabled = 1
+      WHERE g.status IN ${TIKTOK_PNL_USABLE_STATUS_SQL} AND s.enabled = 1
       ORDER BY g.line_account_id`,
   ).all<GoogleSheetsIntegrationRow>();
 

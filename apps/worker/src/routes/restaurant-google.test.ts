@@ -248,6 +248,22 @@ describe('Googleビジネス：設定（接続）', () => {
     expect(row.code_verifier_enc.startsWith('v1.')).toBe(true);
   });
 
+  it('リダイレクトURIは呼び出し元ホストではなく WORKER_PUBLIC_URL に固定する（redirect_uri_mismatch 防止）', async () => {
+    seedStore();
+    // Workerは独自ドメインでも workers.dev でも開ける。どちらから呼ばれても
+    // Googleへ送るURIが1つでないと redirect_uri_mismatch になる。
+    env.WORKER_PUBLIC_URL = 'https://api.example.test/';
+    const response = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {} });
+    expect(response.status).toBe(200);
+    const url = new URL(((await response.json()) as { authorizeUrl: string }).authorizeUrl);
+    expect(url.searchParams.get('redirect_uri')).toBe('https://api.example.test/api/restaurant-test/google/oauth/callback');
+    // 未設定の環境ではこれまでどおりリクエストのoriginへ退避する。
+    delete env.WORKER_PUBLIC_URL;
+    const fallback = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {} });
+    const fallbackUrl = new URL(((await fallback.json()) as { authorizeUrl: string }).authorizeUrl);
+    expect(fallbackUrl.searchParams.get('redirect_uri')).toBe('http://localhost/api/restaurant-test/google/oauth/callback');
+  });
+
   async function startAndCallback(callbackQuery: (state: string) => string, cookie?: ((state: string) => string) | null) {
     const start = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {} });
     const state = new URL(((await start.json()) as { authorizeUrl: string }).authorizeUrl).searchParams.get('state')!;

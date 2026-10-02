@@ -5,8 +5,10 @@ import {
   createFriendAddRuleDraft,
   ensureFriendAddFallbackRules,
   getFriendAddRule,
+  listFriendAddRuleOrderIds,
   listFriendAddRules,
   listFriendAddRulesPage,
+  reorderFriendAddRulePriorities,
   publishFriendAddRule,
   recordFriendAddRuleTest,
   saveFriendAddRuleDraft,
@@ -1004,6 +1006,43 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
     }
     console.error('GET /api/friend-add-rules error:', error);
     return c.json({ success: false, error: '友だち追加時の配信を取得できませんでした' }, 500);
+  }
+});
+
+/*
+ * PATCH /api/friend-add-rules/reorder — 一覧のつまみで動かした順を
+ * 優先順位としてまとめて書く（★V8 MRhef）。
+ *
+ * priority は版ではなく行の値で、実行側がそのまま読むため下書きを経ず
+ * すぐ効く。受け皿（経路が分からなかった人）は常に最後なので対象外。
+ * 安全のため、そのアカウント・区分の受け皿以外の全件をちょうど含む
+ * 並びだけを受け付ける——絞り込み中の一部だけで上書きされると、
+ * 見えていない設定の順が壊れるため、足りなければ 409 で読み直しを促す。
+ */
+friendAddRules.patch('/api/friend-add-rules/reorder', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: string; friendKind?: FriendAddRuleKind; ids?: unknown }>();
+    const accountId = accountIdFrom(c, body);
+    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    const kind = body.friendKind;
+    if (!kind || !KINDS.has(kind)) return c.json({ success: false, error: 'friendKind が正しくありません' }, 400);
+    if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
+      return c.json({ success: false, error: 'ids must be an array of rule ids' }, 400);
+    }
+    const ids = body.ids as string[];
+    if (ids.length > 500 || new Set(ids).size !== ids.length) {
+      return c.json({ success: false, error: 'ids must be unique and at most 500' }, 400);
+    }
+    if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+    const current = await listFriendAddRuleOrderIds(c.env.DB, { lineAccountId: accountId, friendKind: kind });
+    if (current.length !== ids.length || !current.every((id) => ids.includes(id))) {
+      return c.json({ success: false, code: 'ORDER_CHANGED', error: 'ほかの画面で一覧が変わっています。読み直してから、もう一度お試しください' }, 409);
+    }
+    await reorderFriendAddRulePriorities(c.env.DB, { lineAccountId: accountId, friendKind: kind, ids });
+    return c.json({ success: true, data: { updated: ids.length } });
+  } catch (error) {
+    console.error('PATCH /api/friend-add-rules/reorder error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 

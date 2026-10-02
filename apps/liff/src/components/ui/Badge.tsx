@@ -1,5 +1,5 @@
 /**
- * ★V7 の札。状態は色だけにせず文字を出す。
+ * ★V8 の札。状態は色だけにせず文字を出す。
  * confirmed=確定 (緑)・pending=確認待ち (黄)・neutral=それ以外 (灰)。
  */
 export default function Badge({
@@ -11,13 +11,13 @@ export default function Badge({
 }) {
   const cls =
     tone === 'confirmed'
-      ? 'bg-ok-bg text-ok-ink'
+      ? 'bg-liff-ok-bg text-liff-ok-ink'
       : tone === 'pending'
-        ? 'bg-wait-bg text-wait-ink'
-        : 'bg-ground text-ink-secondary';
+        ? 'bg-liff-wait-bg text-liff-wait-ink'
+        : 'bg-liff-chip text-liff-sub';
   return (
     <span
-      className={`inline-block h-fit shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${cls}`}
+      className={`inline-block h-fit w-fit shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold whitespace-nowrap ${cls}`}
     >
       {children}
     </span>

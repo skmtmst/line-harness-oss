@@ -1,0 +1,11 @@
+{
+  "id": "jp-20261002",
+  "sourceUrl": "https://www.post.japanpost.jp/service/search/zipcode/download/utf/zip/utf_ken_all.zip",
+  "inputFile": "utf_ken_all.csv",
+  "inputSha256": "444881769a631d2c36c644fc041e5ce62fe65d204ff498a601641ba1e66b5955",
+  "inputBytes": 2135514,
+  "rowCount": 124525,
+  "skippedRows": 1,
+  "format": "jp-post-utf-15col",
+  "importedAt": "2026-10-02T19:00:54+09:00"
+}

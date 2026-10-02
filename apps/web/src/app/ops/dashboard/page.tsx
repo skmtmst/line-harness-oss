@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsDashboard, type OpsDashboardPeriod, type OpsLineUnregistered } from '@/lib/api'
-import OpsPageHeader from '@/components/ops/ops-page-header'
+import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
+import '@/app/ops/readonly-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { opsCall } from '@/components/ops/ops-ui'
 import { PlanDonut, RevenueBars, formatBytes, formatYen, shareColor } from '@/components/ops/ops-charts'
 import Button from '@/components/shared/button'
@@ -31,6 +33,7 @@ const PERIODS: Array<{ key: OpsDashboardPeriod; label: string }> = [
 ]
 
 export default function OpsDashboardPage() {
+  const theme = useAdminTheme()
   const [period, setPeriod] = useState<OpsDashboardPeriod>('month')
   const [data, setData] = useState<OpsDashboard | null>(null)
   const [error, setError] = useState('')
@@ -89,7 +92,7 @@ export default function OpsDashboardPage() {
   const loading = data === null && !error
 
   return (
-    <div data-design-node="Xvofy" className="flex flex-col gap-4">
+    <ReadonlyDesignNode node="CyW0E"><div data-design-node="Xvofy" className="v8-ro-ops-page v8-ro-ops-dashboard flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader title="ダッシュボード" />
 
@@ -113,16 +116,16 @@ export default function OpsDashboardPage() {
         </div>
       ) : (
       <>
-      <div data-design-node="s7wSj" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div data-design-node="s7wSj" className="v8-ro-ops-metrics grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <div data-design-node="nPbgn"><KpiCard variant="v6" title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={k ? revenueDetail(k.revenueDelta, k.refundsThisMonth) : '—'} loading={loading} /></div>
         <div data-design-node="BaoAQ"><KpiCard variant="v6" title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k ? contractDetail(k.active, k.byPlan, k.filledByListPriceCount) : '—'} loading={loading} /></div>
-        <KpiCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="" detail={k ? `${label}の新規 ${k.newInPeriod}` : '—'} loading={loading} />
-        <KpiCard variant="v6" title={`${label}の解約`} value={k ? k.churnInPeriod : null} unit="" detail={k ? `解約率 ${k.churnRate.toFixed(1)}%` : '—'} badge={k && k.churnInPeriod > 0 ? '確認' : undefined} badgeTone="danger" loading={loading} />
+        <KpiCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="" detail={k ? `${label}の新規 ${k.newInPeriod}${theme === 'v8' ? `・解約 ${k.churnInPeriod}（${k.churnRate.toFixed(1)}%）` : ''}` : '—'} loading={loading} />
+        {theme !== 'v8' && <KpiCard variant="v6" title={`${label}の解約`} value={k ? k.churnInPeriod : null} unit="" detail={k ? `解約率 ${k.churnRate.toFixed(1)}%` : '—'} badge={k && k.churnInPeriod > 0 ? '確認' : undefined} badgeTone="danger" loading={loading} />}
         <div data-design-node="G0vK7"><KpiCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="回" detail={data?.ai ? `返信の下書き${data.ai.draftsThisMonth}回・記事化${data.ai.callsThisMonth - data.ai.draftsThisMonth}回` : '—'} loading={loading} /></div>
       </div>
 
       {/* グラフ帯 */}
-      <div className="grid gap-4 xl:grid-cols-5">
+      <div className="v8-ro-ops-dashboardGroup grid gap-4 xl:grid-cols-5">
         <section data-design-node="fyib5" aria-label="月ごとの売上" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-3">
           <div data-design-node="MVufa" className="mb-2 flex items-center gap-2">
             <h3 className="text-label font-semibold text-ink">月ごとの売上</h3>
@@ -135,7 +138,7 @@ export default function OpsDashboardPage() {
           </div>
           {billingSyncNotice ? <p role="status" className="mb-2 text-caption text-accent-deep">{billingSyncNotice}</p> : null}
           {billingSyncError ? <p role="alert" className="mb-2 text-caption text-danger">{billingSyncError}</p> : null}
-          {data ? <RevenueBars rows={data.revenueByMonth} /> : <ListState kind="loading" title="読み込んでいます" />}
+          {data ? theme === 'v8' ? <div className="v8-ro-ops-revenue"><p className="text-micro text-ink-faint">金額（円）・{data.revenueByMonth.map(row => row.label).join('、')}</p><RevenueBars rows={data.revenueByMonth} /></div> : <RevenueBars rows={data.revenueByMonth} /> : <ListState kind="loading" title="読み込んでいます" />}
         </section>
         <section aria-label="プラン別の契約" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-2">
           <h3 className="mb-2 text-label font-semibold text-ink">プラン別の契約</h3>
@@ -163,7 +166,7 @@ export default function OpsDashboardPage() {
       </div>
 
       {/* 要対応帯 */}
-      <div className="grid gap-4 xl:grid-cols-5">
+      <div className="v8-ro-ops-dashboardGroup grid gap-4 xl:grid-cols-5">
         <section aria-label="要対応" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-3">
           <h3 className="mb-2 text-label font-semibold text-ink">要対応</h3>
           {data ? (
@@ -267,7 +270,7 @@ export default function OpsDashboardPage() {
           <ListState kind="error" title="未登録の人を表示できませんでした" description={unregisteredError} onRetry={() => void openUnregistered()} />
         ) : <ListState kind="loading" title="読み込んでいます" />}
       </Dialog>
-    </div>
+    </div></ReadonlyDesignNode>
   )
 }
 

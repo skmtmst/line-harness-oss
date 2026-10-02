@@ -1165,11 +1165,11 @@ export const NEN_COLUMNS = [
 ]
 
 export const NEN_PETS = [
-  { id: 'nen-pet-momo', friendId: 'friend-1', customerId: 'customer-1', name: 'ももちゃん', animalType: 'dog', gender: 'female', birthday: '2022-09-02', ownerName: '高橋 直人', lineUserId: 'Uvisualfriend000001' },
-  { id: 'nen-pet-sora', friendId: 'friend-2', customerId: 'customer-2', name: 'そらくん', animalType: 'cat', gender: 'male', birthday: '2024-08-28', ownerName: '前田 さくら', lineUserId: 'Uvisualfriend000002' },
-  { id: 'nen-pet-komugi', friendId: 'friend-3', customerId: 'customer-3', name: 'こむぎちゃん', animalType: 'dog', gender: 'female', birthday: '2018-11-14', ownerName: '木村 亮', lineUserId: 'Uvisualfriend000003' },
-  { id: 'nen-pet-leo', friendId: 'friend-4', customerId: 'customer-4', name: 'レオくん', animalType: 'dog', gender: 'male', birthday: null, ownerName: '大西 健一', lineUserId: 'Uvisualfriend000004' },
-  { id: 'nen-pet-purin', friendId: 'friend-5', customerId: 'customer-5', name: 'ぷりんちゃん', animalType: 'other', gender: 'female', birthday: '2022-10-05', ownerName: '中村 彩', lineUserId: 'Uvisualfriend000005' },
+  { id: 'nen-pet-momo', friendId: 'friend-1', customerId: 'customer-1', name: 'ももちゃん', animalType: 'dog', gender: 'female', birthday: '2022-09-02', ownerName: '高橋 直人', lineUserId: 'Uvisualfriend000001', updatedAt: '2026-09-10T10:00:00.000+09:00' },
+  { id: 'nen-pet-sora', friendId: 'friend-2', customerId: 'customer-2', name: 'そらくん', animalType: 'cat', gender: 'male', birthday: '2024-08-28', ownerName: '前田 さくら', lineUserId: 'Uvisualfriend000002', updatedAt: '2026-09-10T10:00:00.000+09:00' },
+  { id: 'nen-pet-komugi', friendId: 'friend-3', customerId: 'customer-3', name: 'こむぎちゃん', animalType: 'dog', gender: 'female', birthday: '2018-11-14', ownerName: '木村 亮', lineUserId: 'Uvisualfriend000003', updatedAt: '2026-09-10T10:00:00.000+09:00' },
+  { id: 'nen-pet-leo', friendId: 'friend-4', customerId: 'customer-4', name: 'レオくん', animalType: 'dog', gender: 'male', birthday: null, ownerName: '大西 健一', lineUserId: 'Uvisualfriend000004', updatedAt: '2026-09-10T10:00:00.000+09:00' },
+  { id: 'nen-pet-purin', friendId: 'friend-5', customerId: 'customer-5', name: 'ぷりんちゃん', animalType: 'other', gender: 'female', birthday: '2022-10-05', ownerName: '中村 彩', lineUserId: 'Uvisualfriend000005', updatedAt: '2026-09-10T10:00:00.000+09:00' },
 ]
 
 const nenJob = (id, campaignKey, label, friendName, scheduledAt, status, attempts, sentAt, triggerLabel, reactionLabel, lineAccountName = 'LINE 本店') => ({
@@ -2617,10 +2617,16 @@ const RUN_BASE = {
 }
 
 export const REMINDER_RUNS = {
-  reminder: { id: 'reminder-1', name: '予約前日のお知らせ', isActive: true },
+  reminder: {
+    id: 'reminder-1', name: '予約前日のお知らせ', isActive: true,
+    /** V8詳細（rbAig）はこの3つで「いまの状態」の札と操作を分ける。 */
+    lifecycleStatus: 'published', stopConditions: null, hasPublishedVersion: true,
+  },
   summary: {
     sent: 1126, scheduled: 398, stopped: 28, errors: 2,
     targetCount: 398, nextScheduledAt: '2026-08-24T09:00:00+09:00',
+    /* V8詳細の「いまの状態」。`getReminderDeliveryRunSummary` の追加列と同じ意味。 */
+    sentThisMonth: 386, scheduledNext7Days: 124,
   },
   steps: [
     {
@@ -3234,6 +3240,12 @@ export const BROADCAST_LIST_META = {
     openRate: 69.4,
   },
   pagination: { total: 24, limit: 20, cursor: 0, nextCursor: '20' },
+  /*
+   * 絞り込みの札の横の数（10の状態で数えたもの。V8 一覧が読む）。
+   * 合計は pagination.total と同じ24にそろえる——数が合わないと
+   * 絵の見比べで「札とページ送りで数が違う」に見える。
+   */
+  statusCounts: { all: 24, scheduled: 6, draft: 5, pending_approval: 2, sent: 9, partial_failed: 1, failed: 1 },
 }
 
 /** 機能6。予約完了画面に出すSlack通知設定。 */

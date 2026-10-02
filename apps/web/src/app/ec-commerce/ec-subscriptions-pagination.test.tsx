@@ -11,13 +11,16 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   subscriptions: vi.fn(),
   overview: vi.fn(),
   identities: vi.fn(),
+  theme: "v7" as "v7" | "v8",
 }))
+
+vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => fixture.theme }))
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error { status = 0 },
@@ -68,6 +71,7 @@ function page(offset: number, limit: number, total = 900) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  fixture.theme = "v7"
   fixture.subscriptions.mockImplementation(async (params: { offset?: number; limit?: number }) =>
     page(params.offset ?? 0, params.limit ?? 100))
   fixture.overview.mockResolvedValue({ success: true, data: { total: 12, subscriptions: 900 } })
@@ -131,5 +135,21 @@ describe('#731 定期便のページ送りとタブの件数', () => {
     const footer = await screen.findByText(/数えていません/)
     console.log('AUDIT-WEB 弾いた件数の知らせ =', footer.textContent)
     expect(footer.textContent).toContain('2件は数えていません')
+  })
+})
+
+
+describe('V8 定期便の表示件数', () => {
+  test('10件で開き、50件へ変えた後の次ページはoffset50を使う', async () => {
+    fixture.theme = 'v8'
+    render(<SubscriptionsPanel accountId="account-a" />)
+    await screen.findByText(/1〜10件を表示/)
+    expect(fixture.subscriptions.mock.calls[0][0]).toMatchObject({ limit: 10, offset: 0 })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '定期便の表示件数' })) })
+    await act(async () => { fireEvent.click(within(screen.getByRole('option', { name: '50件' })).getByRole('button')) })
+    await screen.findByText(/1〜50件を表示/)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '2ページ目へ' })) })
+    await screen.findByText(/51〜100件を表示/)
+    expect(fixture.subscriptions.mock.calls.at(-1)![0]).toMatchObject({ limit: 50, offset: 50 })
   })
 })
