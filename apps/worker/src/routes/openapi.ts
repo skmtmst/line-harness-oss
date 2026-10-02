@@ -1257,6 +1257,23 @@ const spec = {
     '/api/friends/count': {
       get: { tags: ['Friends'], summary: '友だち数取得', responses: { '200': { description: 'Count' } } },
     },
+    '/api/friends/bulk-runs/{id}/approve': {
+      post: {
+        tags: ['Friends'],
+        summary: '人数基準を超えた一括送信の実行承認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { confirmedRecipientCount: { anyOf: [{ type: 'integer' }, { type: 'string' }], description: '1人運用の人数確認（整数または空でない数値文字列。対象人数と一致する場合のみ）' } } } } } },
+        responses: {
+          '202': { description: '承認を受け付けた（approval を返す。送信の完了は実行の取得で確認）' },
+          '400': { description: '指定を読み取れません' },
+          '403': { description: '承認する権限がありません' },
+          '404': { description: '一括操作が見つかりません' },
+          '409': { description: '承認待ちなし・期限切れ・人数不一致・本人の承認' },
+          '413': { description: '一括操作の指定が大きすぎます' },
+          '500': { description: '一括操作を処理できませんでした' },
+        },
+      },
+    },
     '/api/friends/{id}': {
       get: {
         tags: ['Friends'],
