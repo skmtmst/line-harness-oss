@@ -575,6 +575,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/booking/admin/conflicts',
   'POST /api/analytics/exports',
   'GET /api/booking/admin/staff/me',
+  'GET /api/hq/billing/preview',
   'PUT /api/booking/admin/staff-menus',
   'PUT /api/booking/admin/staff/{id}/break-dates',
   'PUT /api/booking/admin/staff/{id}/breaks',
