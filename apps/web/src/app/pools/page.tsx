@@ -1,5 +1,9 @@
 'use client'
 
+import ro from '@/app/notifications/readonly-v8.module.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import { X } from 'lucide-react'
 import Select from '@/components/shared/select'
 import { useEffect, useState } from 'react'
@@ -17,6 +21,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 
 export default function PoolsPage() {
+  const theme = useAdminTheme()
   usePageTitle('プール管理')
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [accounts, setAccounts] = useState<LineAccount[]>([])
@@ -77,7 +82,8 @@ export default function PoolsPage() {
   const isEmpty = !loading && !error && sortedPools.length === 0
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col gap-4 ${ro.page}`} data-design-node={theme === 'v8' ? 'u3iab3' : undefined}>
+      {theme === 'v8' && <ReadonlyHeaderV8 title="プール管理" description="公開URLから追加された人を、稼働中の所属先からランダムに振り分けます。" />}
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {isEmpty ? (
         <section className="bg-canvas rounded-card border-hairline border">
@@ -111,7 +117,7 @@ export default function PoolsPage() {
               onRetry={() => { void load() }}
             />
           ) : (
-            <div className="flex flex-col gap-4">
+            <div className={`flex flex-col gap-4 ${ro.poolCards}`}>
               {error ? (
                 <Notice
                   tone="danger"

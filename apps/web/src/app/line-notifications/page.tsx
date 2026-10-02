@@ -1,5 +1,9 @@
 'use client'
 
+import ro from '@/app/notifications/readonly-v8.module.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -650,6 +654,7 @@ function CustomerNotificationEditor({
 }
 
 function LineNotificationsPage() {
+  const theme = useAdminTheme()
   const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
   /*
@@ -1138,7 +1143,8 @@ function LineNotificationsPage() {
     setBusy(null)
   }
 
-  return <div className="flex flex-col gap-4">
+  return <div className={`flex flex-col gap-4 ${expandedSetting === null ? ro.page : ''}`} data-design-node={theme === 'v8' && expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}>
+    {theme === 'v8' && expandedSetting === null && <ReadonlyHeaderV8 title="LINE通知" description="注文・予約・運用の出来事を知らせます。顧客向けと運用者向けの記録を分けて確認できます。" />}
     {expandedSetting === null ? <MergedTabs basePath="/line-notifications" tabs={tabsWithCounts} active={tab} defaultKey="customer" /> : null}
     {/*
       * #634: 運用者タブの件数だけが取れなかったとき、タブの「取得失敗」の
@@ -1248,7 +1254,7 @@ function LineNotificationsPage() {
       送信枠の3枚は全幅のまとまりとして2段目へ置き、中で3列に並べる。
       KpiCollapseの中に入れるのは、狭い幅で畳む対象から外さないため。
     */}
-    <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <KpiCollapse data-design="KPIs" data-ro-kpis="true" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {kpisWithSendCountsState.filter((kpi) => kpi.group === 'notice').map(renderKpiCard)}
       <section className="sm:col-span-2 xl:col-span-4" aria-label="今月の送信枠">
         <p className="text-ink-faint mb-2 text-xs font-semibold">今月の送信枠（LINE公式アカウントの月間上限）</p>

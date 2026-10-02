@@ -1,5 +1,9 @@
 'use client'
 
+import ro from '@/app/notifications/readonly-v8.module.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState } from 'react'
@@ -36,6 +40,7 @@ type AccountDetailView = LineAccount & {
 
 /** 設計 ★V6 33-3（`T9rA9`）。概要 / 接続の確認 / 資格情報 / 乗り換え の 4 タブ。 */
 function AccountDetail() {
+  const theme = useAdminTheme()
   /*
     **`[id]` は使えない。** この管理画面は静的書き出し（`output: 'export'`）
     なので、ビルド時に全IDが分からない動的セグメントは書き出せない
@@ -261,7 +266,8 @@ function AccountDetail() {
   const webhook = webhookLabel(account)
 
   return (
-    <div data-design-node="T9rA9" className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' ? 'ihjfd' : 'T9rA9'} className={`flex flex-col gap-4 ${ro.page}`}>
+      {theme === 'v8' && <ReadonlyHeaderV8 title={account.name} description="登録の内容・接続状態・送受信の記録を確認します。秘密値は表示しません。" />}
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Head">
         <Breadcrumb items={[{ label: 'LINEアカウント', href: '/accounts' }, { label: account.name }]} />

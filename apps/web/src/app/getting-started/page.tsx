@@ -1,5 +1,9 @@
 'use client'
 
+import ro from '@/app/notifications/readonly-v8.module.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
@@ -31,6 +35,7 @@ const STATE_TONE: Record<StepState, 'success' | 'warning' | 'neutral' | 'danger'
 
 /** 設計 ★V6 34-1（`RAW35`）。順路 4 段と最終確認。 */
 export default function GettingStartedPage() {
+  const theme = useAdminTheme()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [steps, setSteps] = useState<StepResult[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -66,7 +71,8 @@ export default function GettingStartedPage() {
   const currentKey = steps.find((step) => step.state !== 'done')?.key ?? null
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${ro.page}`} data-design-node={theme === 'v8' ? 'xuJ7D' : undefined}>
+      {theme === 'v8' && <ReadonlyHeaderV8 title="はじめの設定" description="いまの進み具合と、次に設定することを確認します。順路は実際の5段に合わせています。" />}
       {/*
         読込面（loading）では共通部品が onRetry を見ない。
         失敗面にだけ再試行口が出る。

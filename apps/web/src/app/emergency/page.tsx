@@ -1,5 +1,9 @@
 'use client'
 
+import ro from '@/app/notifications/readonly-v8.module.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import { X } from 'lucide-react'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -663,7 +667,7 @@ function HealthPanel({
 
   return (
     <div className="space-y-4" data-design="V3 Health">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div data-ro-kpis="true" className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : refreshing ? '更新中' : isStale ? '期限切れ（再確認待ち）' : '最新結果'} />
         <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
         <SummaryCard label="緊急停止状態" value={controlSummary.value} note={controlSummary.note} />
@@ -1345,7 +1349,7 @@ function HistoryPanel() {
         <button type="button" onClick={downloadCsv} className="rounded-control min-h-9 px-3 text-xs font-semibold text-action hover:bg-action-soft">CSVで書き出す</button>
       </div>
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse gridClassName="grid grid-cols-1 gap-3 md:grid-cols-4">
+      <KpiCollapse data-ro-kpis="true" gridClassName="grid grid-cols-1 gap-3 md:grid-cols-4">
         <SummaryCard label="止めた回数" value={state === 'ready' ? `${entries.length}回${truncated ? '以上' : ''}` : '—'} note={period === '30days' ? 'この30日' : 'この1年'} />
         <SummaryCard label="いちばん長かった停止" value={longestMinutes > 0 ? formatMinutesRough(longestMinutes) : '—'} note={truncated ? '直近の記録から' : period === '30days' ? 'この30日' : 'この1年'} />
         <SummaryCard label="管理画面の更新" value={`${updateCount}回`} note="この30日" />
@@ -1389,6 +1393,7 @@ function HistoryPanel() {
 }
 
 function EmergencyPageInner() {
+  const theme = useAdminTheme()
   const tab = useMergedTab(TABS)
   const { selectedAccountId } = useAccount()
   const [severity, setSeverity] = useState<OperationSeverity>('unknown')
@@ -1439,7 +1444,7 @@ function EmergencyPageInner() {
   const headerAction = tab === 'health'
     ? <Button variant="primary" className="min-h-9 px-3 text-xs hover:brightness-90 disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy}>{manualBusy ? '↻ 確認中…' : '↻ いますぐ確かめる'}</Button>
     : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
-  return <div className="flex flex-col gap-4"><OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-semibold text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-semibold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} onManualRunSettled={settleManualRun} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
+  return <div className={`flex flex-col gap-4 ${tab === 'control' ? '' : ro.page}`} data-design-node={theme === 'v8' && tab !== 'control' ? (tab === 'health' ? 'Y4LkX1' : 'I2V65v') : undefined}>{theme === 'v8' && tab !== 'control' && <ReadonlyHeaderV8 title="運用状態" description="自動確認の結果と、止めた・戻した記録、管理画面の更新を確認します。" />}<OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-semibold text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-semibold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} onManualRunSettled={settleManualRun} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }
 
 function EmergencyPage() {
