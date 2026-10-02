@@ -1610,6 +1610,8 @@ const RAW_PATTERNS = [
   })],
   /* メニューに就ける担当。器は `{staff}`。包むと選ぶ口が0件になる。 */
   [/^\/api\/booking\/admin\/menus\/[^/]+\/staff$/, { staff: BOOKING_MENU_STAFF }],
+  /* スタッフロール本人の予約スタッフ（本人勤務 E3YDK）。器は `{staff}`。包むと `.find` で落ちる。 */
+  [/^\/api\/booking\/admin\/staff\/me$/, { staff: [BOOKING_STAFF[0]] }],
   /* `tksPc` の通常・読込中・失敗を分けるため、通常だけ本番と同じ器で返す。 */
   [/^\/api\/booking\/admin\/staff\/[^/]+\/shifts$/, { shifts: BOOKING_STAFF_SHIFTS }],
   [/^\/api\/booking\/admin\/staff\/[^/]+\/availability-rules$/, { rules: BOOKING_AVAILABILITY_RULES }],

@@ -54,14 +54,14 @@ import {
   type BookingStaff,
   type StaffMenuMatrix,
 } from '@/lib/api'
-import type { StaffMember, Tag } from '@line-crm/shared'
+import type { StaffMember } from '@line-crm/shared'
 import { formatHoursBeforeHint, formatMinutesLengthHint } from '@/lib/format-duration'
 import { bookingWindowEnd, minutesBeforeLabel } from '../lib/format-time'
 import { menuPriceLabel } from '../lib/menu-price'
 import { fetchAllPages } from '../bookings/fetch-all-pages'
 import { slotReasonLabel } from '../staff/shifts/slot-reason'
 import { bookingErrorMessage, bookingRulesErrorMessage } from './menu-validation'
-import { EditMenuModal } from './edit-menu-dialog'
+
 import MenuVersionHistory from './menu-version-history'
 import { EMPTY_STAFF, StaffEditModal } from '../staff/staff-edit-dialog'
 import { LiffPhoneDatetimeStep, LiffPhoneMenuStep, LiffPhoneStaffStep } from './liff-phone-v8'
@@ -304,7 +304,6 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
   const [resources, setResources] = useState<BookingResource[] | null>(null)
   const [resourcesStatus, setResourcesStatus] = useState<LoadStatus>('loading')
   const [resourcesError, setResourcesError] = useState<string | null>(null)
-  const [tags, setTags] = useState<Tag[]>([])
   const [preview, setPreview] = useState<{
     status: LoadStatus
     slots: BookingAvailabilitySlot[]
@@ -372,18 +371,6 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
   useEffect(() => {
     void loadCore()
   }, [loadCore])
-
-  /* タグ（メニュー編集の候補）。失敗しても編集自体は続けられる。 */
-  useEffect(() => {
-    let cancelled = false
-    api.tags
-      .list(accountId ? { accountId } : undefined)
-      .then((res) => {
-        if (!cancelled && res.success) setTags(res.data)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [accountId])
 
   /* ---- 右の写し（LIFF）用の空き枠。日時に関係するタブでのみ取る。 ---- */
   const firstActiveMenu = sortedMenus(menus).find((menu) => menu.is_active) ?? null
@@ -626,7 +613,6 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
                 status={menusStatus}
                 error={menusError}
                 menuCount={settings?.menuCount}
-                tags={tags}
                 canEdit={canEditMenus}
                 onReload={() => void loadCore()}
               />
@@ -753,19 +739,18 @@ function AccountIcon() {
 
 /* ==================== ① メニュー（owaS3） ==================== */
 
-function MenusTabV8({ accountId, menus, status, error, menuCount, tags, canEdit, onReload }: {
+function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onReload }: {
   accountId: string
   menus: BookingMenu[]
   status: LoadStatus
   error: string | null
   menuCount: number | undefined
-  tags: Tag[]
   canEdit: boolean
   onReload: () => void
 }) {
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
-  const [editing, setEditing] = useState<BookingMenu | null>(null)
   const [historyTarget, setHistoryTarget] = useState<BookingMenu | null>(null)
   const [visibilityTarget, setVisibilityTarget] = useState<BookingMenu | null>(null)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
@@ -785,15 +770,9 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, tags, canEdit,
   const safePage = Math.min(page, pageCount)
   const visible = shown.slice((safePage - 1) * MENU_PAGE_SIZE, safePage * MENU_PAGE_SIZE)
 
-  async function saveMenu(menu: BookingMenu) {
-    const version = menu.version
-    if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
-      onReload()
-      throw new ApiError(409, 'version_conflict', 'version_conflict')
-    }
-    await bookingApi.updateMenu(accountId, menu.id, version, menu)
-    setEditing(null)
-    onReload()
+  /* 中身の直しはメニュー作成ページ（?menu=<id>、node QqER7）に集約する。 */
+  function openMenuForm(menu: BookingMenu) {
+    router.push(`/booking/menus/new?menu=${menu.id}`)
   }
 
   /* 「…」の上へ・下へ。2件の sort_order を版つき updateMenu で交換する（v7 と同じ）。 */
@@ -958,7 +937,7 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, tags, canEdit,
                     <button
                       type="button"
                       className={styles.menuName}
-                      onClick={() => setEditing(menu)}
+                      onClick={() => openMenuForm(menu)}
                     >
                       {menu.name}
                     </button>
@@ -1001,7 +980,7 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, tags, canEdit,
                     ariaLabel={`「${menu.name}」の操作`}
                     onClose={() => setOpenMenuId(null)}
                     items={[
-                      { id: 'edit', label: '中身を編集', onSelect: () => setEditing(menu) },
+                      { id: 'edit', label: '中身を編集', onSelect: () => openMenuForm(menu) },
                       ...menuItems,
                     ]}
                   />
@@ -1020,23 +999,6 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, tags, canEdit,
           </div>
         </section>
       )}
-
-      {editing ? (
-        <EditMenuModal
-          menu={editing}
-          tags={tags}
-          accountId={accountId}
-          canManageResources={canEditFeature('booking.settings')}
-          canEdit={canEdit}
-          onSave={saveMenu}
-          onReloadLatest={async () => { onReload(); setEditing(null) }}
-          onResourcesSaved={() => {
-            // 設備割当の保存後は一覧を読み直す（件数・版のずれを残さない）。
-            onReload()
-          }}
-          onClose={() => setEditing(null)}
-        />
-      ) : null}
 
       {historyTarget ? (
         <MenuVersionHistory
