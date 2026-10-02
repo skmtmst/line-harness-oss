@@ -1,30 +1,57 @@
 'use client'
 
 /*
- * ★V8 友だち情報欄を作る・編集（Pencil `EhEXu`）。
+ * ★V8 友だち情報欄を作る・編集（Pencil `w9zY5`）。
  *
  * v7（app/tags/fields/new・edit の page.tsx）と動きは同じで、
- * 置き場だけを V8 の絵へ合わせる。左に「基本」「種類」「値の扱い」の段、
- * 右の欄に「出す場所」「使っている所」（編集）・「作成後に変更できないもの」。
+ * 置き場だけを V8 の絵へ合わせる。左に「基本」「種類」（よく使う 6 つを選ぶカード）、
+ * 右の欄に「種類（つづき）」の札・「値の扱い」（選択肢・既定値）・「オプション」3つ・
+ * 「出す場所」、（編集のみ）「いまの使用状況」。
  * 追従バーはキャンセル・保存＝真ん中（オーナー決定 2026-10-01）。
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FriendField, FriendFieldType, Folder } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import DefaultValueInput from '@/components/friend-fields/default-value-input'
 import { sameLabels, storedDefaultLabels } from './fields/default-labels'
 import styles from './field-editor-v8.module.css'
 
-const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
+/* 板 `w9zY5`：よく使う 6 つは左に選ぶカード、残りは右の欄の札。 */
+const PRIMARY_TYPES: FriendFieldType[] = ['text', 'textarea', 'select', 'multi_select', 'date', 'number']
+const SECONDARY_TYPES: FriendFieldType[] = ['datetime', 'checkbox', 'url', 'tel', 'email', 'image', 'pdf']
+const V8_TYPE_LABELS: Record<FriendFieldType, string> = {
+  text: '1行テキスト',
+  textarea: '文章',
+  select: '1つ選ぶ',
+  multi_select: 'いくつでも選ぶ',
+  date: '日付',
+  number: '数',
+  datetime: '日時',
+  checkbox: 'はい／いいえ',
+  url: 'リンク',
+  tel: '電話番号',
+  email: 'メール',
+  image: '画像',
+  pdf: 'PDF',
+}
+const V8_TYPE_HINTS: Partial<Record<FriendFieldType, string>> = {
+  text: '名前・番号など',
+  textarea: '長い文',
+  select: '都道府県など',
+  multi_select: '興味のあることなど',
+  date: '生年月日など',
+  number: '回数・金額など',
+}
+const TYPE_COUNT = PRIMARY_TYPES.length + SECONDARY_TYPES.length
 const NEEDS_OPTIONS = new Set<FriendFieldType>(['select', 'multi_select'])
 const FILE_TYPES = new Set<FriendFieldType>(['image', 'pdf'])
 
@@ -47,25 +74,34 @@ export interface FieldEditorValues {
   ecFieldPath: string
 }
 
-function Toggle({ checked, onChange, label, hint, disabled }: { checked: boolean; onChange: (next: boolean) => void; label: string; hint: string; disabled?: boolean }) {
+function TypeCard({ type: item, selected, disabled, onSelect }: { type: FriendFieldType; selected: boolean; disabled: boolean; onSelect: (next: FriendFieldType) => void }) {
   return (
-    <div className={styles.toggleRow}>
-      <div className="min-w-0">
-        <span className={styles.toggleLabel}>{label}</span>
-        <p className={styles.toggleHint}>{hint}</p>
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={`${styles.toggle} ${checked ? styles.toggleOn : ''}`}
-      >
-        <span className={styles.toggleKnob} />
-      </button>
-    </div>
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      disabled={disabled}
+      onClick={() => onSelect(item)}
+      className={`${styles.typeCard} ${selected ? styles.typeCardOn : ''}`}
+    >
+      <span className={styles.typeCardLabel}>{V8_TYPE_LABELS[item]}</span>
+      <span className={styles.typeCardHint}>{V8_TYPE_HINTS[item]}</span>
+    </button>
+  )
+}
+
+function TypeChip({ type: item, selected, disabled, onSelect }: { type: FriendFieldType; selected: boolean; disabled: boolean; onSelect: (next: FriendFieldType) => void }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      disabled={disabled}
+      onClick={() => onSelect(item)}
+      className={`${styles.typeChip} ${selected ? styles.typeChipOn : ''}`}
+    >
+      {V8_TYPE_LABELS[item]}
+    </button>
   )
 }
 
@@ -110,7 +146,8 @@ export default function FieldEditorV8({
   const [fieldKey, setFieldKey] = useState('')
   const [keyTouched, setKeyTouched] = useState(false)
   const [type, setType] = useState<FriendFieldType>(field?.type ?? 'text')
-  const [options, setOptions] = useState((field?.options ?? []).join('\n'))
+  /* 板 `w9zY5` の「値の扱い」は選択肢を1行1入力で並べ、「選択肢を足す」で増やす。 */
+  const [options, setOptions] = useState<string[]>(field?.options ?? [])
   const [defaultValue, setDefaultValue] = useState(stored.single)
   const [defaultOptions, setDefaultOptions] = useState<string[]>(stored.multi)
   const [isPersonal, setIsPersonal] = useState(field?.isPersonal ?? false)
@@ -120,7 +157,7 @@ export default function FieldEditorV8({
   const [folderId, setFolderId] = useState(field?.folderId ?? '')
   const [validationError, setValidationError] = useState('')
 
-  const optionList = useMemo(() => options.split('\n').map((value) => value.trim()).filter(Boolean), [options])
+  const optionList = useMemo(() => options.map((value) => value.trim()).filter(Boolean), [options])
   const nameDuplicates = useMemo(
     () => findDuplicateNames(siblings, name, field?.id ?? null),
     [siblings, name, field?.id],
@@ -136,11 +173,11 @@ export default function FieldEditorV8({
    * 編集画面は読み込んだ項目との差があれば未保存。
    */
   const dirty = mode === 'create'
-    ? Boolean(name || fieldKey || keyTouched || type !== 'text' || options || defaultValue || defaultOptions.length > 0
+    ? Boolean(name || fieldKey || keyTouched || type !== 'text' || optionList.length > 0 || defaultValue || defaultOptions.length > 0
       || isPersonal || !isStarred || ecIsMaster || ecFieldPath || folderId)
     : field !== null && !locked && (
       name !== field.name
-      || options !== (field.options ?? []).join('\n')
+      || options.join('\n') !== (field.options ?? []).join('\n')
       || defaultValue !== stored.single
       || !sameLabels(defaultOptions, stored.multi)
       || isPersonal !== field.isPersonal
@@ -159,6 +196,13 @@ export default function FieldEditorV8({
 
   const effectiveType = mode === 'edit' && field ? field.type : type
   const destination = folders.find((folder) => folder.id === folderId)?.name ?? '未分類'
+
+  const selectType = (next: FriendFieldType) => {
+    setType(next)
+    /* ATTR-07・R139: 種類を変えたら既定値は捨てる（見えない古い値が422で弾かれる）。 */
+    setDefaultValue('')
+    setDefaultOptions([])
+  }
 
   const submit = () => {
     if (saving) return
@@ -284,61 +328,77 @@ export default function FieldEditorV8({
             </div>
           </section>
 
-          {/* 段：種類（作る画面は選ぶカード、編集は読み取り専用） */}
+          {/* 段：種類（よく使う 6 つは選ぶカード。残りは右の欄の札。編集では両方押せない） */}
           <section className={styles.section}>
             <div className={styles.sectionHead}>
               <div>
                 <h2 className={styles.sectionTitle}>種類</h2>
-                {mode === 'edit' ? <p className={styles.sectionDesc}>種類は変えられません。別の種類にしたいときは一覧の「移行」から新しい項目へ移してください。</p> : null}
+                <p className={styles.sectionDesc}>
+                  {mode === 'edit' ? '種類は変えられません。別の種類にしたいときは一覧の「移行」から新しい項目へ移してください。' : '作ったあとは「移行」でだけ変えられます。'}
+                </p>
               </div>
             </div>
             <div className={styles.sectionBody}>
-              {mode === 'create' ? (
-                <div className={styles.typeGrid} role="radiogroup" aria-label="項目の種類">
-                  {TYPES.map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      role="radio"
-                      aria-checked={type === item}
-                      disabled={locked}
-                      onClick={() => {
-                        setType(item)
-                        /* ATTR-07・R139: 種類を変えたら既定値は捨てる（見えない古い値が422で弾かれる）。 */
-                        setDefaultValue('')
-                        setDefaultOptions([])
-                      }}
-                      className={`${styles.typeCard} ${type === item ? styles.typeCardOn : ''}`}
-                    >
-                      <span className={styles.typeCardLabel}>{FIELD_TYPE_LABELS[item]}</span>
-                      <span className={styles.typeCardHint}>{FIELD_TYPE_HINTS[item]}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className={styles.readonlyValue}>{FIELD_TYPE_LABELS[effectiveType] ?? effectiveType}</p>
-              )}
-              {NEEDS_OPTIONS.has(effectiveType) ? (
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel}>選択肢（1行に1つ）</span>
-                  <textarea
-                    className={styles.textarea}
-                    rows={5}
-                    value={options}
-                    disabled={locked}
-                    onChange={(event) => setOptions(event.target.value)}
-                  />
-                </div>
-              ) : null}
+              <div className={styles.typeGrid} role="radiogroup" aria-label="項目の種類（よく使う）">
+                {PRIMARY_TYPES.map((item) => (
+                  <TypeCard key={item} type={item} selected={effectiveType === item} disabled={mode === 'edit' || locked} onSelect={selectType} />
+                ))}
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* 右の欄（板 `w9zY5`：種類のつづき → 値の扱い → オプション → 出す場所） */}
+        <div className={styles.side} data-design="Right">
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>種類（つづき：全{TYPE_COUNT}種）</h2>
+            <div className={styles.sectionBody}>
+              <div className={styles.typeChipRow} role="radiogroup" aria-label="項目の種類（つづき）">
+                {SECONDARY_TYPES.map((item) => (
+                  <TypeChip key={item} type={item} selected={effectiveType === item} disabled={mode === 'edit' || locked} onSelect={selectType} />
+                ))}
+              </div>
             </div>
           </section>
 
-          {/* 段：値の扱い */}
+          {/* 値の扱い：選択肢は1行1入力で並べて足す。既定値は空欄のときに送る値。 */}
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>値の扱い</h2>
             <div className={styles.sectionBody}>
+              <p className={styles.fieldHint}>「{V8_TYPE_LABELS.select}」「{V8_TYPE_LABELS.multi_select}」のときは選択肢を並べます。</p>
+              {NEEDS_OPTIONS.has(effectiveType) ? (
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>選択肢（任意）</span>
+                  <div className={styles.optionList}>
+                    {options.map((value, index) => (
+                      <div key={index} className={styles.optionRow}>
+                        <input
+                          className={styles.input}
+                          value={value}
+                          disabled={locked}
+                          aria-label={`選択肢 ${index + 1}`}
+                          placeholder={index === 0 ? '例：柴' : undefined}
+                          onChange={(event) => setOptions(options.map((item, i) => (i === index ? event.target.value : item)))}
+                        />
+                        <button
+                          type="button"
+                          className={styles.optionRemove}
+                          disabled={locked}
+                          aria-label={`選択肢 ${index + 1} を外す`}
+                          onClick={() => setOptions(options.filter((_, i) => i !== index))}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <Button variant="secondary" disabled={locked} onClick={() => setOptions([...options, ''])}>選択肢を足す</Button>
+                  </div>
+                </div>
+              ) : null}
               <div className={styles.field}>
-                <span className={styles.fieldLabel}>既定値</span>
+                <span className={styles.fieldLabel}>既定値（任意）</span>
                 {/* R139: 複数選択は登録済みの選択肢から複数選ぶ。単一選択は一覧から1つ選ぶ。 */}
                 <DefaultValueInput
                   mode={FILE_TYPES.has(effectiveType) ? 'file' : effectiveType === 'multi_select' ? 'multi' : effectiveType === 'select' ? 'single' : effectiveType === 'textarea' ? 'longtext' : 'text'}
@@ -356,11 +416,22 @@ export default function FieldEditorV8({
                   {FILE_TYPES.has(effectiveType) ? '画像・PDFはファイルとして保存し、本文へ文字として差し込みません。' : '友だち情報が空欄のとき、この値が代わりに送信されます。'}
                 </span>
               </div>
-              <div>
-                <Toggle checked={isStarred} onChange={setIsStarred} disabled={locked} label="友だち一覧に表示" hint="よく見る項目だけを列に追加" />
-                <Toggle checked={isPersonal} onChange={setIsPersonal} disabled={locked} label="個人情報として保護" hint="権限制限と閲覧履歴を有効化" />
-                <Toggle checked={ecIsMaster} onChange={setEcIsMaster} disabled={locked} label="EC側を正とする" hint="管理画面からの上書きを防ぐ" />
-              </div>
+            </div>
+          </section>
+
+          {/* オプション：板はチェック3つ（保護・一覧の列・EC側が正）。 */}
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>オプション</h2>
+            <div className={styles.sectionBody}>
+              <Checkbox checked={isPersonal} onCheckedChange={setIsPersonal} disabled={locked}>
+                個人情報として保護する<span className={styles.optionNote}>（画面で伏せ、書き出しに権限が要る）</span>
+              </Checkbox>
+              <Checkbox checked={isStarred} onCheckedChange={setIsStarred} disabled={locked}>
+                友だち一覧の列に出す
+              </Checkbox>
+              <Checkbox checked={ecIsMaster} onCheckedChange={setEcIsMaster} disabled={locked}>
+                EC側の値を正とする<span className={styles.optionNote}>（EC連携で上書き）</span>
+              </Checkbox>
               {ecIsMaster ? (
                 <div className={styles.field}>
                   <span className={styles.fieldLabel}>EC側の項目名</span>
@@ -369,32 +440,32 @@ export default function FieldEditorV8({
               ) : null}
             </div>
           </section>
-        </div>
 
-        {/* 右の欄 */}
-        <div className={styles.side} data-design="Right">
           <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>出す場所</h2>
+            <div className={styles.sectionHead}>
+              <div>
+                <h2 className={styles.sectionTitle}>出す場所</h2>
+                <p className={styles.sectionDesc}>現在</p>
+              </div>
+            </div>
             <div className={styles.sectionBody}>
               <dl className={styles.useList}>
                 <div className={styles.useRow}>
-                  <dt className={styles.useName}>フォルダ</dt>
-                  <dd className={styles.useCount}>{destination}</dd>
+                  <dt className={styles.useName}>友だち詳細</dt>
+                  <dd className={styles.useCount}>いつも出す（{destination}）</dd>
                 </div>
                 <div className={styles.useRow}>
-                  <dt className={styles.useName}>友だち一覧</dt>
-                  <dd className={styles.useCount}>{isStarred ? '出す' : '出さない'}</dd>
-                </div>
-                <div className={styles.useRow}>
-                  <dt className={styles.useName}>テンプレート差し込み</dt>
+                  <dt className={styles.useName}>配信の絞り込み</dt>
                   <dd className={styles.useCount}>使える</dd>
                 </div>
-                {ecIsMaster ? (
-                  <div className={styles.useRow}>
-                    <dt className={styles.useName}>EC連携</dt>
-                    <dd className={styles.useCount}>EC側が正</dd>
-                  </div>
-                ) : null}
+                <div className={styles.useRow}>
+                  <dt className={styles.useName}>回答フォーム</dt>
+                  <dd className={styles.useCount}>答えで入れられる</dd>
+                </div>
+                <div className={styles.useRow}>
+                  <dt className={styles.useName}>テンプレート</dt>
+                  <dd className={styles.useCount}>差し込みで使える</dd>
+                </div>
               </dl>
             </div>
           </section>

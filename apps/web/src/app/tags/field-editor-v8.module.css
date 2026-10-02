@@ -1,4 +1,4 @@
-/* ★V8 友だち情報欄を作る・編集（`EhEXu`）。段・種類カード・右の欄・追従バーの配置。 */
+/* ★V8 友だち情報欄を作る・編集（`w9zY5`）。段・種類カード・種類の札・右の欄・追従バーの配置。 */
 
 .board {
   display: flex;
@@ -207,66 +207,82 @@
   color: var(--color-ink);
 }
 
-/* トグルの行（値の扱い）。 */
-.toggleRow {
+/* 右の欄の「種類（つづき）」の札。 */
+.typeChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.typeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--color-canvas);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.typeChip:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.typeChipOn {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-canvas));
+  color: var(--color-accent-deep, var(--color-accent));
+}
+
+.typeChip:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 「値の扱い」の選択肢：1行1入力。 */
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.optionRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 0;
+  gap: 8px;
 }
 
-.toggleRow + .toggleRow {
-  border-top: 1px solid var(--color-hairline);
-}
-
-.toggleLabel {
+.optionRemove {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
   font-size: 14px;
-  font-weight: 600;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.optionRemove:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
   color: var(--color-ink);
 }
 
-.toggleHint {
-  margin: 2px 0 0;
+.optionRemove:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* オプションのかっこ書き（板：ラベルに続く薄い字）。 */
+.optionNote {
   font-size: 11px;
   color: var(--color-ink-faint);
-}
-
-.toggle {
-  position: relative;
-  width: 48px;
-  height: 28px;
-  flex-shrink: 0;
-  border: none;
-  border-radius: var(--radius-pill, 9999px);
-  background: var(--color-hairline);
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.toggleOn {
-  background: var(--color-accent);
-}
-
-.toggleKnob {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-pill, 9999px);
-  background: var(--color-canvas);
-  box-shadow: var(--shadow-card);
-  transition: left 0.15s ease;
-}
-
-.toggleOn .toggleKnob {
-  left: 24px;
-}
-
-.toggle:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
 }
 
 .noteText {
