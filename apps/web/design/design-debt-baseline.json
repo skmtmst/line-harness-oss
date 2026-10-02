@@ -250,7 +250,7 @@
     "direct-secondary-button": 1
   },
   "app/scenarios/detail/detail-v8.tsx": {
-    "arbitrary-value": 3,
+    "arbitrary-value": 2,
     "unresolved-classname": 109
   },
   "app/scenarios/detail/scenario-detail-client.tsx": {
@@ -279,12 +279,26 @@
   "app/search-console/page.tsx": {
     "arbitrary-value": 2
   },
+  "app/settings/feature-settings-v8.tsx": {
+    "unresolved-classname": 55
+  },
+  "app/settings/file-scan/file-scan-v8.tsx": {
+    "unresolved-classname": 29,
+    "direct-th": 4
+  },
+  "app/settings/manual-links/manual-links-v8.tsx": {
+    "unresolved-classname": 14,
+    "direct-th": 6
+  },
   "app/settings/manual-links/page.tsx": {
     "unresolved-classname": 4
   },
   "app/settings/page.tsx": {
     "unresolved-classname": 1,
     "arbitrary-value": 15
+  },
+  "app/settings/settings-nav-v8.tsx": {
+    "unresolved-classname": 11
   },
   "app/staff/new/page.tsx": {
     "direct-secondary-button": 1,
