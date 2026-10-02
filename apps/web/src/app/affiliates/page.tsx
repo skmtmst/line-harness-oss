@@ -35,6 +35,10 @@ function AffiliatesRedirect() {
   const params = useSearchParams()
 
   useEffect(() => {
+    // useAdminTheme は最初の描画で 'v7' を返すため、テーマが v8 へ切り替わる
+    // 直前にこの器が一瞬載る。v8 が確定しているのに送ると
+    // /conversions → /affiliates の往復になるので、DOM の印で確かめてから送る。
+    if (document.documentElement.dataset.theme === 'v8') return
     const tab = params.get('tab')
     router.replace(`/conversions?tab=${tab && CONVERSIONS_TABS.has(tab) ? tab : 'affiliates'}`)
   }, [params, router])

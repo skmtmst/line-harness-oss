@@ -164,8 +164,8 @@ export default function ReportTabV8({
       return {
         id,
         name: value.conversions > 0
-          ? (inPeriod.find((i) => i.affiliateId === id)?.affiliateName ?? affiliates.find((a) => a.id === id)?.name ?? '名前を取得できませんでした')
-          : (affiliates.find((a) => a.id === id)?.name ?? '名前を取得できませんでした'),
+          ? (inPeriod.find((i) => i.affiliateId === id)?.affiliateName ?? affiliates.find((a) => a.id === id)?.name ?? '名前を読み込めませんでした')
+          : (affiliates.find((a) => a.id === id)?.name ?? '名前を読み込めませんでした'),
         conversions: value.conversions,
         revenue: value.revenue,
         reward: value.reward,

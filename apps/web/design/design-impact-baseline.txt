@@ -9,6 +9,13 @@ shared-button-importer app/affiliates/action-dialogs.tsx
 shared-button-importer app/affiliates/new/page.tsx
 shared-button-importer app/affiliates/payment-tab.tsx
 shared-button-importer app/affiliates/tabs.tsx
+shared-button-importer app/affiliates/v8-affiliates-tab.tsx
+shared-button-importer app/affiliates/v8-approvals-tab.tsx
+shared-button-importer app/affiliates/v8-drawer.tsx
+shared-button-importer app/affiliates/v8-offers-tab.tsx
+shared-button-importer app/affiliates/v8-payment-tab.tsx
+shared-button-importer app/affiliates/v8-report-tab.tsx
+shared-button-importer app/affiliates/v8-shared.tsx
 shared-button-importer app/analytics/page.tsx
 shared-button-importer app/analytics/reports/new/page.tsx
 shared-button-importer app/auto-replies/edit/wizard-v8.tsx

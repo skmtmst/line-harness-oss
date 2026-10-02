@@ -139,7 +139,6 @@ export default function PaymentTabV8({
   const summaries = useMemo(() => new Map(items.map((item) => [item.affiliateId, item])), [items])
   const rows = useMemo(() => preview?.affiliates ?? [], [preview])
   const missingBanks = rows.filter((item) => !item.bankProfileRegistered).length
-  const bankOkCount = rows.filter((item) => item.bankProfileRegistered).length
   const shown = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('ja-JP')
     return rows.filter((item) => {

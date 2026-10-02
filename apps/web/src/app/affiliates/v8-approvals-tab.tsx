@@ -332,7 +332,7 @@ export default function ApprovalsTabV8({
     const lines = shownItems.map((item) => [
       formatDateTime(item.createdAt),
       personNameText(item.friendName),
-      item.affiliateName ?? '名前を取得できませんでした',
+      item.affiliateName ?? '名前を読み込めませんでした',
       item.lineAccountName ?? 'アカウント未設定',
       item.offerName ?? '未設定',
       item.conversionPointName ?? '未設定',
@@ -556,7 +556,7 @@ export default function ApprovalsTabV8({
                         <span className={styles.cellMain} style={{ fontWeight: 600 }}>{personNameText(item.friendName)}</span>
                         <span className={styles.cellSub}>{formatDateTime(item.createdAt)} に成果</span>
                       </td>
-                      <td><span className={styles.cellMain}>{item.affiliateName ?? '名前を取得できませんでした'}</span></td>
+                      <td><span className={styles.cellMain}>{item.affiliateName ?? '名前を読み込めませんでした'}</span></td>
                       <td><span className={styles.cellMain} style={{ color: 'var(--color-ink-secondary)' }}>{item.lineAccountName ?? 'アカウント未設定'}</span></td>
                       <td>
                         <span className={styles.cellMain}>{item.offerName ?? '未設定'}</span>
@@ -692,7 +692,7 @@ export default function ApprovalsTabV8({
           onCancel={() => setDetailItem(null)}
         >
           <p style={{ margin: 0, fontSize: 14, color: 'var(--color-ink-secondary)' }}>
-            {personNameText(detailItem.friendName)}／{detailItem.affiliateName ?? '紹介者名を取得できませんでした'}／{detailItem.offerName ?? '案件未設定'}
+            {personNameText(detailItem.friendName)}／{detailItem.affiliateName ?? '紹介者名を読み込めませんでした'}／{detailItem.offerName ?? '案件未設定'}
           </p>
           <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--color-ink-faint)' }}>
             {formatDateTime(detailItem.createdAt)}・{detailItem.lineAccountName ?? 'アカウント未設定'}・{detailItem.conversionPointName ?? '成果地点未設定'}・{formatYenNullable(detailItem.value)}
@@ -750,7 +750,7 @@ export default function ApprovalsTabV8({
           <ul style={{ margin: '8px 0 0', maxHeight: 192, overflowY: 'auto', fontSize: 14, color: 'var(--color-ink-secondary)', paddingLeft: 18 }}>
             {bulkConfirm.items.map((item) => (
               <li key={item.eventId}>
-                {personNameText(item.friendName)}／{item.affiliateName ?? '紹介者名を取得できませんでした'}／{item.offerName ?? '案件未設定'}
+                {personNameText(item.friendName)}／{item.affiliateName ?? '紹介者名を読み込めませんでした'}／{item.offerName ?? '案件未設定'}
               </li>
             ))}
           </ul>

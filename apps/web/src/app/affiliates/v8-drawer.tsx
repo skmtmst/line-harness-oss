@@ -280,7 +280,7 @@ export default function AffiliateDrawerV8({
               {/* 読めなかったことを0件として描かない */}
               {!report && (
                 <section className={styles.drawerSection}>
-                  <h4 className={styles.drawerSectionTitle}>この期間の集計を取得できませんでした</h4>
+                  <h4 className={styles.drawerSectionTitle}>この期間の集計を読み込めませんでした</h4>
                   <p style={{ margin: 0, color: 'var(--color-ink-secondary)', fontSize: 12, lineHeight: 1.6 }}>
                     選んだ期間にこの人の成果が1件も無いか、集計が読めませんでした。
                     リンクと成果の記録は消えていません。
@@ -320,7 +320,7 @@ export default function AffiliateDrawerV8({
                 <section className={styles.drawerSection}>
                   <h4 className={styles.drawerSectionTitle}>案件別の内訳</h4>
                   <div className={styles.tableScroll}>
-                    <table className={styles.table} style={{ border: '1px solid var(--color-divider)', borderRadius: 'var(--radius-control)' }}>
+                    <table className={`${styles.table} ${styles.drawerTable}`}>
                       <thead>
                         <tr>
                           <th>案件</th>
@@ -408,7 +408,7 @@ export default function AffiliateDrawerV8({
                 ) : (
                   <>
                     <div className={styles.tableScroll}>
-                      <table className={styles.table} style={{ border: '1px solid var(--color-divider)', borderRadius: 'var(--radius-control)' }}>
+                      <table className={`${styles.table} ${styles.drawerTable}`}>
                         <thead>
                           <tr>
                             <th>友だち</th>
