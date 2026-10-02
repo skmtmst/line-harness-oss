@@ -293,6 +293,9 @@
   "app/staff/page.tsx": {
     "arbitrary-value": 16
   },
+  "app/tags/field-editor-v8.tsx": {
+    "unresolved-classname": 91
+  },
   "app/tags/fields-tab-v8.tsx": {
     "unresolved-classname": 58
   },

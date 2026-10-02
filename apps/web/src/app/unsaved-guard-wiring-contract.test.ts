@@ -57,6 +57,7 @@ const GUARDED = [
   'app/settings/page.tsx',
   'app/settings/file-scan/page.tsx',
   'app/staff/new/page.tsx',
+  'app/tags/field-editor-v8.tsx',
   'app/tags/fields/edit/page.tsx',
   'app/tags/fields/new/page.tsx',
   'app/tags/searches/edit/page.tsx',

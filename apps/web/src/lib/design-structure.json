@@ -6,27 +6,73 @@
       "node": "csVox",
       "name": "V6 37-11 運営・ナレッジ一覧",
       "sections": [],
-      "parts": ["ナレッジ一覧", "解決の根拠", "下書き保存", "承認して有効にする"],
+      "parts": [
+        "ナレッジ一覧",
+        "解決の根拠",
+        "下書き保存",
+        "承認して有効にする"
+      ],
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": ["csVox", "UWx1S", "DHdsw", "o5u371", "ZAOc7"],
-        "requiredViewports": [1440, 1920],
+        "referenceNodeIds": [
+          "csVox",
+          "UWx1S",
+          "DHdsw",
+          "o5u371",
+          "ZAOc7"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
         "reason": "実ノードを2026-09-21に再取得。画面比較中。共通アクセント色とマニュアル導線の差分・全状態の確認が残る。"
       }
     },
     "/hq/billing": {
       "node": "OjkqO clQZw",
       "name": "V6 36-2 課金プラン・36-2-A 年払い",
-      "sections": ["Status", "Interval", "Plans", "Note", "History"],
-      "parts": ["課金プラン", "月払い", "年払い", "約15% OFF", "年額", "このプランにする", "支払い履歴"],
+      "sections": [
+        "Status",
+        "Interval",
+        "Plans",
+        "Note",
+        "History"
+      ],
+      "parts": [
+        "課金プラン",
+        "月払い",
+        "年払い",
+        "約15% OFF",
+        "年額",
+        "このプランにする",
+        "支払い履歴"
+      ],
       "sectionNodes": {
-        "month": ["bNTX7", "T4S2Qb", "sWyx8", "MAzqO", "x6Xjm"],
-        "year": ["D9Ics", "k8DFrR", "TIeHO", "CqhfL", "N4u2jV"]
+        "month": [
+          "bNTX7",
+          "T4S2Qb",
+          "sWyx8",
+          "MAzqO",
+          "x6Xjm"
+        ],
+        "year": [
+          "D9Ics",
+          "k8DFrR",
+          "TIeHO",
+          "CqhfL",
+          "N4u2jV"
+        ]
       },
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": ["OjkqO", "clQZw"],
-        "requiredViewports": [1440, 1920],
+        "referenceNodeIds": [
+          "OjkqO",
+          "clQZw"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
         "reason": "既存の共通シェル・配色などに正本との差分があるため、機能・表示確認と画面全体の完全一致は区別する。プロの申込みはMasatoの追加指示を優先。"
       }
     },
@@ -1180,10 +1226,36 @@
       "node": "Q4bkTg IhSBB v0HaI BuVDB Im2b1",
       "visualVerification": {
         "status": "verified",
-        "referenceNodeIds": ["Q4bkTg", "IhSBB", "v0HaI", "BuVDB", "Im2b1"],
-        "requiredViewports": [1440, 1920],
-        "referenceScreenshots": ["docs/design-reference/inflow-v6/Q4bkTg.png", "docs/design-reference/inflow-v6/IhSBB.png", "docs/design-reference/inflow-v6/v0HaI.png", "docs/design-reference/inflow-v6/BuVDB.png", "docs/design-reference/inflow-v6/Im2b1.png"],
-        "implementationScreenshots": ["docs/design-qa/inflow-v6/Q4bkTg-1440.png", "docs/design-qa/inflow-v6/Q4bkTg-1920.png", "docs/design-qa/inflow-v6/IhSBB-1440.png", "docs/design-qa/inflow-v6/IhSBB-1920.png", "docs/design-qa/inflow-v6/v0HaI-1440.png", "docs/design-qa/inflow-v6/v0HaI-1920.png", "docs/design-qa/inflow-v6/BuVDB-1440.png", "docs/design-qa/inflow-v6/BuVDB-1920.png", "docs/design-qa/inflow-v6/Im2b1-1440.png", "docs/design-qa/inflow-v6/Im2b1-1920.png"],
+        "referenceNodeIds": [
+          "Q4bkTg",
+          "IhSBB",
+          "v0HaI",
+          "BuVDB",
+          "Im2b1"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "referenceScreenshots": [
+          "docs/design-reference/inflow-v6/Q4bkTg.png",
+          "docs/design-reference/inflow-v6/IhSBB.png",
+          "docs/design-reference/inflow-v6/v0HaI.png",
+          "docs/design-reference/inflow-v6/BuVDB.png",
+          "docs/design-reference/inflow-v6/Im2b1.png"
+        ],
+        "implementationScreenshots": [
+          "docs/design-qa/inflow-v6/Q4bkTg-1440.png",
+          "docs/design-qa/inflow-v6/Q4bkTg-1920.png",
+          "docs/design-qa/inflow-v6/IhSBB-1440.png",
+          "docs/design-qa/inflow-v6/IhSBB-1920.png",
+          "docs/design-qa/inflow-v6/v0HaI-1440.png",
+          "docs/design-qa/inflow-v6/v0HaI-1920.png",
+          "docs/design-qa/inflow-v6/BuVDB-1440.png",
+          "docs/design-qa/inflow-v6/BuVDB-1920.png",
+          "docs/design-qa/inflow-v6/Im2b1-1440.png",
+          "docs/design-qa/inflow-v6/Im2b1-1920.png"
+        ],
         "checkedAt": "2026-09-06T20:00:00+09:00"
       },
       "name": "V6 18 流入と計測（4タブ）",
@@ -1265,10 +1337,20 @@
       "node": "TEVk8",
       "visualVerification": {
         "status": "verified",
-        "referenceNodeIds": ["TEVk8"],
-        "requiredViewports": [1440, 1920],
-        "referenceScreenshots": ["docs/design-reference/inflow-v6/TEVk8.png"],
-        "implementationScreenshots": ["docs/design-qa/inflow-v6/TEVk8-1440.png", "docs/design-qa/inflow-v6/TEVk8-1920.png"],
+        "referenceNodeIds": [
+          "TEVk8"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "referenceScreenshots": [
+          "docs/design-reference/inflow-v6/TEVk8.png"
+        ],
+        "implementationScreenshots": [
+          "docs/design-qa/inflow-v6/TEVk8-1440.png",
+          "docs/design-qa/inflow-v6/TEVk8-1920.png"
+        ],
         "checkedAt": "2026-09-06T20:00:00+09:00"
       },
       "name": "V6 18-1-C 流入リンクをつくる",
@@ -1486,10 +1568,24 @@
       "node": "JupxW UIaM7",
       "visualVerification": {
         "status": "verified",
-        "referenceNodeIds": ["JupxW", "UIaM7"],
-        "requiredViewports": [1440, 1920],
-        "referenceScreenshots": ["docs/design-reference/inflow-v6/JupxW.png", "docs/design-reference/inflow-v6/UIaM7.png"],
-        "implementationScreenshots": ["docs/design-qa/inflow-v6/JupxW-1440.png", "docs/design-qa/inflow-v6/JupxW-1920.png", "docs/design-qa/inflow-v6/UIaM7-open-1440.png", "docs/design-qa/inflow-v6/UIaM7-open-1920.png"],
+        "referenceNodeIds": [
+          "JupxW",
+          "UIaM7"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "referenceScreenshots": [
+          "docs/design-reference/inflow-v6/JupxW.png",
+          "docs/design-reference/inflow-v6/UIaM7.png"
+        ],
+        "implementationScreenshots": [
+          "docs/design-qa/inflow-v6/JupxW-1440.png",
+          "docs/design-qa/inflow-v6/JupxW-1920.png",
+          "docs/design-qa/inflow-v6/UIaM7-open-1440.png",
+          "docs/design-qa/inflow-v6/UIaM7-open-1920.png"
+        ],
         "checkedAt": "2026-09-06T20:00:00+09:00"
       },
       "name": "V6 18-1-D 流入元の詳細・18-1-E 削除確認",
@@ -2283,28 +2379,33 @@
       }
     },
     "/tags/fields/new": {
-      "node": "A1ZYeP",
-      "name": "V6 4-2-A 友だち情報欄を追加",
+      "node": "EhEXu",
+      "name": "★V8 友だち情報欄を作る・編集",
       "visualVerification": {
         "status": "unverified",
         "referenceNodeIds": [
-          "A1ZYeP"
+          "EhEXu"
         ],
         "requiredViewports": [
           1440,
           1920
         ],
-        "reason": "V6へ実装済み。Claudeの同条件画像比較待ち"
+        "reason": "★V8（オーナー決定 2026-10-01、Pencil EhEXu）へ V8 版エディタ field-editor-v8 を実装。節の印は v7 分（Basic/Value/Immutable）と V8 分（Head/Body/Left/Right）の和集合。同条件の画像比較は未実施"
       },
       "sections": [
         "Basic",
-        "Value",
-        "Immutable"
+        "Body",
+        "Head",
+        "Immutable",
+        "Left",
+        "Right",
+        "Value"
       ],
       "parts": [
         "友だち情報欄",
         "項目を作る",
-        "基本情報",
+        "項目を編集",
+        "基本",
         "項目名",
         "必須",
         "差し込み名",
@@ -2315,9 +2416,11 @@
         "友だち一覧に表示",
         "個人情報として保護",
         "EC側を正とする",
+        "出す場所",
+        "いまの使用状況",
         "作成後に変更できないもの",
         "キャンセル",
-        "項目を作る"
+        "保存する"
       ]
     },
     "/tags/fields/migrate": {
@@ -2900,7 +3003,9 @@
         "配信内容を保存"
       ],
       "implementationGaps": {
-        "parts": ["吹き出しを追加する"],
+        "parts": [
+          "吹き出しを追加する"
+        ],
         "reason": "複数吹き出しは保存APIが1通分の本文しか受け取らない。無反応の「差し替える」「消す」「吹き出しを追加する」は出さず、1通で届くことを明示する（#989 NEXT-16）。"
       }
     },
