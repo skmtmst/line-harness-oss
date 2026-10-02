@@ -31,6 +31,10 @@
   "app/auto-replies/runs/page.tsx": {
     "unresolved-classname": 30
   },
+  "app/auto-replies/runs/runs-v8.tsx": {
+    "unresolved-classname": 71,
+    "direct-th": 7
+  },
   "app/automations/new/page.tsx": {
     "unresolved-classname": 55
   },
