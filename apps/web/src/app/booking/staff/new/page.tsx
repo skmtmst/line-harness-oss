@@ -20,6 +20,8 @@ import Select from '@/components/shared/select'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { canEditFeature } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import StaffNewV8 from './staff-new-v8'
 
 /**
  * 予約スタッフを登録する（設計 V2 8-2-2 / node bEL9g）。
@@ -30,6 +32,12 @@ import { usePageTitle } from '@/components/shell/page-chrome'
  * 設計どおり、担当メニューをここで選べるようにした。
  */
 export default function NewBookingStaffPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <StaffNewV8 />
+  return <NewBookingStaffV7 />
+}
+
+function NewBookingStaffV7() {
   const { selectedAccountId } = useAccount()
   // /booking/staff/new はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
   usePageTitle('予約スタッフを登録')
