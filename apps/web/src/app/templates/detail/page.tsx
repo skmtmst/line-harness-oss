@@ -16,7 +16,9 @@ import VersionHistory, { type HistoryVersion } from '@/components/shared/version
 import FlexPreviewComponent from '@/components/flex-preview'
 import { validateFlexContent } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import TemplateDetailV8 from './detail-v8'
 import { templateDeleteDescription } from '../template-delete-message'
 import { messageTypeText } from '../template-message-type'
 import { isTemplateDetailData } from '../template-detail-data'
@@ -724,11 +726,16 @@ function CompareBlock({
   )
 }
 
+function TemplateDetailGate() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <TemplateDetailV8 /> : <TemplateDetailInner />
+}
+
 export default function TemplateDetailPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <TemplateDetailInner />
+      <TemplateDetailGate />
     </Suspense>
   )
 }
