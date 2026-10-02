@@ -133,6 +133,7 @@ shared-button-importer app/nen-members/photo-reward-policy.tsx
 shared-button-importer app/nen/health/page.tsx
 shared-button-importer app/nen/health/summary-drawer.tsx
 shared-button-importer app/nen/members/lifetime-tab.tsx
+shared-button-importer app/nen/members/members-v8.tsx
 shared-button-importer app/nen/members/rank-settings-tab.tsx
 shared-button-importer app/nen/pets/feeding-tab.tsx
 shared-button-importer app/nen/pets/page.tsx

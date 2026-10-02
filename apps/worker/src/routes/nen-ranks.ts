@@ -362,14 +362,23 @@ nenRanks.get('/api/nen/members', async (c) => {
   const ranks = await getNenRankSettings(c.env.DB, accountId);
   const sortParam = c.req.query('sort');
   const petParam = c.req.query('pet');
+  const linkParam = c.req.query('link');
+  // ★V8「○○以上」の札：区切りに合うランクキーをカンマ区切りで受ける。
+  const rankKeys = (c.req.query('ranks') ?? '')
+    .split(',')
+    .map((key) => key.trim())
+    .filter((key) => key && ranks.some((rank) => rank.rank_key === key))
+    .slice(0, 8);
   const options: NenMemberListOptions = {
     accountIds,
     rankKey: c.req.query('rank') || null,
+    rankKeys,
+    linkedOnly: linkParam === 'linked' || linkParam === 'unlinked' ? linkParam : undefined,
     petFilter: petParam === 'with' || petParam === 'without' ? petParam : 'any',
     query: c.req.query('q') ?? '',
     sort: sortParam === 'lifetime_desc' || sortParam === 'balance_desc' || sortParam === 'recent' ? sortParam : 'annual_desc',
     page: Math.max(1, Number.parseInt(c.req.query('page') ?? '1', 10) || 1),
-    pageSize: 20,
+    pageSize: Math.max(1, Math.min(Number.parseInt(c.req.query('pageSize') ?? '20', 10) || 20, 100)),
   };
   const [{ items, total }, kpis] = await Promise.all([
     listNenMembers(c.env.DB, options),

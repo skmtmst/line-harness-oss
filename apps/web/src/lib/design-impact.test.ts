@@ -127,6 +127,8 @@ describe('共通部品の影響範囲', () => {
       'app/nen/health/health-tab.tsx',
       // 2026-09-16: 然の会員一覧（★V6 37-1）。20人ずつのページ送り。
       'app/nen/members/members-tab.tsx',
+      // ★V8-B 会員一覧（AOWoJ）。表の下にページ送りを置く。
+      'app/nen/members/members-v8.tsx',
       'app/nen/pets/pets-tab.tsx',
       'app/ops/audit/page.tsx',
       // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
