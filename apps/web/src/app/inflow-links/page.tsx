@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ApiError, api, fetchApi } from '@/lib/api'
@@ -726,10 +726,23 @@ function InflowLinksPageInner({
   useEffect(() => {
     onRouteCountChange?.(routeCountAvailable ? accountFilteredRows.length : null)
   }, [onRouteCountChange, routeCountAvailable, accountFilteredRows.length])
-  const totalClicks = summary?.totalClicks ?? sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
-  const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
+  /*
+    帯は画面全体の要約なので、クリックと平均の追加率もフォルダの選択・
+    検索文字・友だち有無の絞り込みで変わってはいけない。実 Worker の
+    ref-summary は routeTotal / totalClicks / averageAddRate を返さないので、
+    通常はここで選択アカウント範囲（絞り込みの前）から数える。
+    summary が全体値を返しているときはそちらを優先する。
+  */
+  /*
+    実 Worker の ref-summary は routeTotal / totalClicks / averageAddRate を
+    返さないので、通常は選択アカウント範囲（絞り込みの前）から数える。
+    summary が全体値を返しているときはそちらを優先する。
+  */
+  const accountClicks = accountFilteredRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
+  const accountFriendsForRate = accountFilteredRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
+  const totalClicks = summary?.totalClicks ?? accountClicks
   const addRate = summaryAvailable && totalClicks > 0
-    ? summary?.averageAddRate ?? Math.round((totalFriends / totalClicks) * 100)
+    ? summary?.averageAddRate ?? Math.round((accountFriendsForRate / totalClicks) * 100)
     : null
 
   const exportCurrentRows = () => {
@@ -968,7 +981,17 @@ function InflowLinksPageInner({
           />
         )
       ) : (
-        <div className="overflow-hidden rounded-control border border-hairline bg-canvas">
+        <div
+          className="overflow-hidden rounded-control border border-hairline bg-canvas"
+          data-scroll-x
+          style={{ '--scroll-min': '1060px' } as CSSProperties}
+        >
+          {/*
+            ★V8（夕21・STATES-ALL）：1152 幅で見出しと日付の列があふれる。
+            全列が要る表なので列は消さず、1366px 未満では横送りにする
+            （globals.css の [data-scroll-x]。最小幅は表ごとに --scroll-min
+            で渡す）。v7・広い幅では従来どおり。
+          */}
           <table className="w-full table-fixed text-xs">
             <colgroup>
               {/* ★V7：REF は流入元名の下へ。名前が「Googl…」まで削られていたので列を1つ減らし、

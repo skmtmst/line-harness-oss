@@ -47,7 +47,7 @@ import {
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
-import { resolveLineCredential } from '@line-crm/db';
+import { getFolderById, resolveLineCredential } from '@line-crm/db';
 import { createBroadcast, getBroadcastById, type Broadcast } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
@@ -106,6 +106,20 @@ events.use('/api/events/admin/*', async (c, next) => {
   }
   await next();
 });
+
+// 分類だけの変更も既存の版チェックに従う。folder_id は従来の読み取り名を残す。
+function withFolder(row: Record<string, unknown> | null) {
+  return row ? { ...row, folderId: row.folder_id ?? null } : row;
+}
+
+async function validEventFolder(c: Context<Env>, folderId: unknown, accountIds: string[]): Promise<boolean> {
+  if (folderId === null) return true;
+  if (typeof folderId !== 'string' || !folderId.trim()) return false;
+  const folder = await getFolderById(c.env.DB, folderId);
+  return !!folder && folder.kind === 'event' && (folder.account_id === null
+    || (accountIds.includes(folder.account_id)
+      && await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [folder.account_id])));
+}
 
 function getAccountId(c: Context<Env>): string | null {
   return c.req.query('account_id') ?? null;
@@ -442,6 +456,10 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
     return bad(c, ACCOUNT_ACCESS_ERROR, 403);
   }
 
+  if ('folderId' in body && !await validEventFolder(c, body.folderId,
+    body.target_type === 'multi-account-dedup' ? body.account_ids as string[] : [account_id])) {
+    return bad(c, 'invalid_folder', 422);
+  }
   const id = crypto.randomUUID();
   const targetType = (body.target_type as EventTargetType | undefined) ?? 'single';
   const accountIds = targetType === 'multi-account-dedup' ? (body.account_ids as string[]) : null;
@@ -476,8 +494,8 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
          visible_tag_id, waitlist_enabled, entry_cutoff_hours_before,
          questions_json,
          current_published_version_id,
-         lifecycle_status, lifecycle_changed_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         lifecycle_status, lifecycle_changed_at, folder_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -515,6 +533,7 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
       // 管理表示がずれる（lifecycle_status が正本・移行 492 の決め）。
       isPublished ? 'published' : 'draft',
       new Date().toISOString(),
+      body.folderId ?? null,
     );
   if (publishedVersionId) {
     await c.env.DB.batch([
@@ -540,7 +559,7 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
     .prepare(`SELECT * FROM events WHERE id = ?`)
     .bind(id)
     .first();
-  return c.json(row, 201);
+  return c.json(withFolder(row), 201);
 });
 
 export interface FutureEventSlotSummary {
@@ -647,6 +666,9 @@ events.get('/api/events/admin/events', async (c) => {
              AND EXISTS (SELECT 1 FROM json_each(e.account_ids) WHERE value = ?))
        )`];
   const params: unknown[] = [account_id, account_id];
+  const folderId = c.req.query('folderId');
+  if (folderId === '__ungrouped__') conditions.push('e.folder_id IS NULL');
+  else if (folderId) { conditions.push('e.folder_id = ?'); params.push(folderId); }
   if (q) {
     /*
      * #625: LIKE ではなく instr() で部分一致する。
@@ -767,7 +789,7 @@ events.get('/api/events/admin/events', async (c) => {
     }>();
   return c.json({
     ...buildOffsetListResponse({
-      items: results ?? [],
+      items: (results ?? []).map(row => withFolder(row as Record<string, unknown>)),
       total: counted?.c ?? 0,
       paging,
       sort: sort === 'name'
@@ -793,7 +815,7 @@ events.get('/api/events/admin/events/:id', async (c) => {
     .bind(c.req.param('id'), account_id, account_id)
     .first();
   if (!row) return bad(c, 'not_found', 404);
-  return c.json(row);
+  return c.json(withFolder(row));
 });
 
 events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async (c) => {
@@ -858,6 +880,15 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
       setValues.push(body[k]);
     }
   }
+  if ('folderId' in body) {
+    const targetType = body.target_type ?? exists.target_type;
+    const accountIds = targetType === 'multi-account-dedup'
+      ? (body.account_ids as string[] | undefined) ?? JSON.parse(exists.account_ids as string)
+      : [account_id];
+    if (!await validEventFolder(c, body.folderId, accountIds)) return bad(c, 'invalid_folder', 422);
+    setClauses.push('folder_id = ?');
+    setValues.push(body.folderId);
+  }
   // JSON-encoded columns (broadcasts と同じ扱い): account_ids / dedup_priority
   // null は NULL として書く、配列は JSON.stringify する。
   if (Object.prototype.hasOwnProperty.call(body, 'account_ids')) {
@@ -894,7 +925,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
   if (setClauses.length === 0) {
     if (exists.version !== expectedVersion) return bad(c, 'version_conflict', 409);
     const row = await c.env.DB.prepare(`SELECT * FROM events WHERE id = ?`).bind(id).first();
-    return c.json(row);
+    return c.json(withFolder(row));
   }
   const nextVersion = (expectedVersion as number) + 1;
   const nextPublished = (body.is_published ?? exists.is_published) === 1;
@@ -994,7 +1025,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
     await rebuildRemindersForEvent(c.env.DB, id);
   }
   const row = await c.env.DB.prepare(`SELECT * FROM events WHERE id = ?`).bind(id).first();
-  return c.json(row);
+  return c.json(withFolder(row));
 });
 
 // Cancel all pending reminders for an event's confirmed bookings, then
