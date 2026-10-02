@@ -4,6 +4,7 @@ shared-button-importer app/accounts/handover/page.tsx
 shared-button-importer app/accounts/migration.tsx
 shared-button-importer app/accounts/new/page.tsx
 shared-button-importer app/accounts/page.tsx
+shared-button-importer app/accounts/uid-migration-v8.tsx
 shared-button-importer app/affiliates/action-dialogs.tsx
 shared-button-importer app/affiliates/new/page.tsx
 shared-button-importer app/affiliates/payment-tab.tsx
@@ -60,6 +61,7 @@ shared-button-importer app/contents/vars/new/page.tsx
 shared-button-importer app/contents/vars/page.tsx
 shared-button-importer app/conversions/new/page.tsx
 shared-button-importer app/conversions/page.tsx
+shared-button-importer app/duplicates/duplicates-v8.tsx
 shared-button-importer app/duplicates/page.tsx
 shared-button-importer app/ec-commerce/connector-panel.tsx
 shared-button-importer app/ec-commerce/identity-candidates/page.tsx
@@ -82,7 +84,10 @@ shared-button-importer app/friend-add-settings/publish/page.tsx
 shared-button-importer app/friend-add-settings/runs/detail/page.tsx
 shared-button-importer app/friend-add-settings/runs/page.tsx
 shared-button-importer app/friends/detail/page.tsx
+shared-button-importer app/friends/friends-nav-v8.tsx
+shared-button-importer app/friends/identity-candidates/identity-candidates-v8.tsx
 shared-button-importer app/friends/identity-candidates/page.tsx
+shared-button-importer app/friends/migrations/migrations-v8.tsx
 shared-button-importer app/friends/migrations/page.tsx
 shared-button-importer app/friends/page.tsx
 shared-button-importer app/getting-started/feature-set-card.tsx
@@ -220,6 +225,7 @@ shared-button-importer app/templates/questions/new/page.tsx
 shared-button-importer app/templates/template-asset-editor.tsx
 shared-button-importer app/updates/page.tsx
 shared-button-importer app/users/page.tsx
+shared-button-importer app/users/users-v8.tsx
 shared-button-importer app/webhooks/api-tokens-panel.tsx
 shared-button-importer app/webhooks/edit/page.tsx
 shared-button-importer app/webhooks/google-sheets-panel.tsx
@@ -293,6 +299,7 @@ shared-button-importer components/inflow-links/site-script.tsx
 shared-button-importer components/layout/scrollable-tabs.tsx
 shared-button-importer components/line-notifications/notification-run-list.tsx
 shared-button-importer components/merged-person/merged-delivery-dialog.tsx
+shared-button-importer components/merged-person/merged-person-detail-v8.tsx
 shared-button-importer components/merged-person/merged-person-detail.tsx
 shared-button-importer components/merged-person/merged-person-sections.tsx
 shared-button-importer components/merged-person/merged-profile-dialog.tsx

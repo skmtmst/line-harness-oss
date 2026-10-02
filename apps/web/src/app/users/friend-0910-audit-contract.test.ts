@@ -4,7 +4,11 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = [
+  'page.tsx',
+  'use-merged-users.ts',
+  'users-v8.tsx',
+].map((name) => readFileSync(join(HERE, name), 'utf8')).join('\n')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const ROUTE = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'users-grouped.ts'),
