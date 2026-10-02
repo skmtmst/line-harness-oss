@@ -103,7 +103,7 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
  * タグには archived を active に戻す口が無い（司令塔裁定・Issue #710）。
  * 戻せないので、名前・説明の訂正だけは常に許す。
  */
-function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
+export function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
   tag: Tag
   accountId: string
   onCancel: () => void

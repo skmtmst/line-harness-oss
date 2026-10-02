@@ -23,44 +23,15 @@ import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import DefaultValueInput from '@/components/friend-fields/default-value-input'
+import EditFieldPageV8 from '../../edit-field-page-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { storedDefaultLabels, sameLabels } from '../default-labels'
 
 const NEEDS_OPTIONS = new Set(['select', 'multi_select'])
 const FILE_TYPES = new Set(['image', 'pdf'])
 
 function isLockedField(field: FriendField): boolean {
   return field.isInherited === true
-}
-
-/*
- * R182: 保存済みの既定値はID（複数選択はIDの配列のJSON）で入っている。
- * 画面は選択肢名で持つため、読み込み時と同じ戻し方で「保存済みの
- * 選択肢名」を作り、未保存の判定に使う。IDのまま比べると、単一選択は
- * 開いた瞬間に未保存扱いになり、複数選択は変えても未保存にならない。
- */
-function storedDefaultLabels(field: FriendField): { single: string; multi: string[] } {
-  const stored = field.defaultValue ?? ''
-  const labels = field.options ?? []
-  const definitions = field.optionDefinitions ?? null
-  const toLabel = (entry: string): string | null =>
-    definitions?.find((item) => item.id === entry)?.label
-    ?? (labels.includes(entry) ? entry : null)
-  if (field.type === 'multi_select') {
-    let entries: string[] = []
-    try {
-      const parsed: unknown = JSON.parse(stored)
-      if (Array.isArray(parsed)) entries = parsed.map(String)
-    } catch { entries = [] }
-    return { single: '', multi: entries.map(toLabel).filter((item): item is string => item !== null) }
-  }
-  if (field.type === 'select' && stored) return { single: toLabel(stored) ?? '', multi: [] }
-  return { single: stored, multi: [] }
-}
-
-function sameLabels(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false
-  const sortedA = [...a].sort()
-  const sortedB = [...b].sort()
-  return sortedA.every((item, index) => item === sortedB[index])
 }
 
 function Toggle({ checked, onChange, label, hint, disabled }: { checked: boolean; onChange: (next: boolean) => void; label: string; hint: string; disabled?: boolean }) {
@@ -501,5 +472,6 @@ function EditFriendFieldForm() {
 }
 
 export default function EditFriendFieldPage() {
-  return <FeatureGate feature="friend_fields"><Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}><EditFriendFieldForm /></Suspense></FeatureGate>
+  const theme = useAdminTheme()
+  return <FeatureGate feature="friend_fields"><Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>{theme === 'v8' ? <EditFieldPageV8 /> : <EditFriendFieldForm />}</Suspense></FeatureGate>
 }

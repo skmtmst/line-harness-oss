@@ -1229,7 +1229,10 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
     const pageItems = paging ? sorted.slice(paging.offset, paging.offset + paging.limit) : sorted;
     // 各 group の代表画像 (default_page_id の image_r2_key、なければ order_index=0 の page) を取得。
     // 一覧カードでサムネを出すために 1 クエリで JOIN する。
+    // ★V8 一覧の「大・6面・切替タブ 2」の表示にはページ数と代表ページの面数も要るので、
+    // 同じ1クエリで数える。
     const imageByGroupId = new Map<string, { key: string; contentType: string | null }>();
+    const shapeByGroupId = new Map<string, { pageCount: number; areaCount: number }>();
     if (pageItems.length > 0) {
       const placeholders = pageItems.map(() => '?').join(',');
       const result = await c.env.DB
@@ -1243,12 +1246,23 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
             COALESCE(
               (SELECT image_content_type FROM rich_menu_pages WHERE id = g.default_page_id),
               (SELECT image_content_type FROM rich_menu_pages WHERE group_id = g.id ORDER BY order_index LIMIT 1)
-            ) AS image_content_type
+            ) AS image_content_type,
+            (SELECT COUNT(*) FROM rich_menu_pages p WHERE p.group_id = g.id) AS page_count,
+            (SELECT COUNT(*) FROM rich_menu_areas a WHERE a.page_id = COALESCE(
+              g.default_page_id,
+              (SELECT p2.id FROM rich_menu_pages p2 WHERE p2.group_id = g.id ORDER BY p2.order_index LIMIT 1)
+            )) AS default_area_count
            FROM rich_menu_groups g
           WHERE g.id IN (${placeholders})`,
         )
         .bind(...pageItems.map((g) => g.id))
-        .all<{ group_id: string; image_r2_key: string | null; image_content_type: string | null }>();
+        .all<{
+          group_id: string;
+          image_r2_key: string | null;
+          image_content_type: string | null;
+          page_count: number;
+          default_area_count: number;
+        }>();
       for (const r of result.results ?? []) {
         if (r.image_r2_key) {
           imageByGroupId.set(r.group_id, {
@@ -1256,11 +1270,45 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
             contentType: r.image_content_type,
           });
         }
+        shapeByGroupId.set(r.group_id, {
+          pageCount: r.page_count ?? 0,
+          areaCount: r.default_area_count ?? 0,
+        });
       }
     }
+    /*
+     * ★V8 一覧の「誰に出すか」列の「対象 N人」。条件で出し分けている行だけ、
+     * このページに出る分を数える（ページ内で打ち切るので、行数ぶんを超える
+     * 問い合わせにはならない）。条件が読めない行は null のまま残す。
+     */
+    const audienceByGroupId = new Map<string, number>();
+    await Promise.all(pageItems.map(async (g) => {
+      if (!g.targetingEnabled || !g.targetingCondition) return;
+      const condition = parseCondition(g.targetingCondition);
+      if (!condition) return;
+      try {
+        const where = buildSegmentWhere(condition);
+        const row = await c.env.DB
+          .prepare(
+            `SELECT COUNT(*) AS count
+               FROM friends f
+              WHERE f.line_account_id = ?
+                AND f.is_following = 1
+                AND (${where.sql})`,
+          )
+          .bind(accountId, ...where.bindings)
+          .first<{ count: number }>();
+        if (row) audienceByGroupId.set(g.id, row.count);
+      } catch {
+        // 数えられない行があっても一覧は出す。その行だけ人数を出さない。
+      }
+    }));
     const items = pageItems.map((g) => ({
         ...g,
         thumbnailR2Key: imageByGroupId.get(g.id)?.key ?? null,
+        pageCount: shapeByGroupId.get(g.id)?.pageCount ?? 0,
+        defaultPageAreaCount: shapeByGroupId.get(g.id)?.areaCount ?? 0,
+        audienceCount: audienceByGroupId.get(g.id) ?? null,
       }));
     if (paging) {
       const sort = sortKey === 'taps'
