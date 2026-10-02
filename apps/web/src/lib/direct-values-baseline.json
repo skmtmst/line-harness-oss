@@ -39,6 +39,11 @@
     "radius": 5,
     "shadow": 0
   },
+  "app/reminders/wizard-v8.module.css": {
+    "color": 0,
+    "radius": 0,
+    "shadow": 1
+  },
   "app/staff/page.tsx": {
     "color": 2,
     "radius": 0,
