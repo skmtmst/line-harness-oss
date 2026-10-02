@@ -133,6 +133,12 @@ describe('共通部品の影響範囲', () => {
       // なかった。サーバが数えた総数でページ送りを出すため共通へ寄せた。
       'app/settings/file-scan/page.tsx',
       'app/staff/page.tsx',
+      // 友だち属性V8の4タブ（タグ・情報欄・対応マーク・保存した検索）。
+      // 表の下にページ送りがあり、1ページごとの件数を選べる。
+      'app/tags/fields-tab-v8.tsx',
+      'app/tags/marks-v8.tsx',
+      'app/tags/searches-v8.tsx',
+      'app/tags/tags-tab-v8.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
       'app/webinars/page.tsx',
