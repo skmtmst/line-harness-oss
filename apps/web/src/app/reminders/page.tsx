@@ -8,6 +8,8 @@ import type { ApiResponse, Folder, ReminderTriggerType } from '@line-crm/shared'
 import { api, fetchApi } from '@/lib/api'
 import { useOffsetServerList, type ServerListResponse } from '@/lib/use-server-list'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import RemindersListV8 from './list-v8'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ListKpis from '@/components/shared/list-kpis'
 import { PRESETS as LIST_STATE_PRESETS } from '@/components/shared/list-state'
@@ -61,7 +63,7 @@ function rowView(reminder: Reminder) {
   return { subtitle: reminder.timingSummary ?? `${timing}${reminder.sendAtTime ? ` ${reminder.sendAtTime}` : ''} ／ テキスト ${reminder.stepCount ?? 0}通`, status, base: reminder.baseDateSummary ?? (reminder.triggerType === 'booking' ? '予約日時' : reminder.triggerType === 'event' ? 'イベント開催日' : reminder.triggerType === 'friend_field' ? '友だち情報欄の日付' : '指定日時'), planned: reminder.plannedDeliveries == null ? '—' : `${reminder.plannedDeliveries}通`, last }
 }
 
-export default function RemindersPage() {
+function RemindersPageV7() {
   usePageTitle('リマインダ')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
@@ -247,4 +249,13 @@ export default function RemindersPage() {
     </div>
     <ConfirmDialog open={confirmOpen} title={`「${selectedName}」を削除しますか？`} description="削除すると未送信の通知予定はすべて取り消されます。送信済みの履歴は監査記録として残り、この操作は取り消せません。" confirmLabel="削除する" destructive busy={deleting} error={deleteError} onConfirm={() => void handleDeleteSelected()} onCancel={() => { if (!deleting) { setConfirmOpen(false); setDeleteError('') } }} />
   </div>
+}
+
+/*
+ * 見た目テーマが v8 のときだけ新しい一覧（`list-v8.tsx`、Pencil `apLqS`）
+ * に切り替える。v7 の見た目は `RemindersPageV7` のまま変えない。
+ */
+export default function RemindersPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <RemindersListV8 /> : <RemindersPageV7 />
 }
