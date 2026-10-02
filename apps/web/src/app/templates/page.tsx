@@ -37,6 +37,8 @@ import { messageTypeText } from './template-message-type'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import TemplatesListV8 from './list-v8'
 import { ArrowRight, Bot, MessageCircle, Star, TriangleAlert, Workflow, X } from 'lucide-react'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 
@@ -143,7 +145,7 @@ function normalizeTemplateSearchText(value: string): string {
   return value.normalize('NFKC').toLocaleLowerCase('ja-JP').trim().replace(/\s+/gu, ' ')
 }
 
-export default function TemplatesPage() {
+function TemplatesPageV7() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   /*
    * N-144: テンプレートの作成・編集・公開・削除は API が requireRole('owner',
@@ -1601,4 +1603,14 @@ export default function TemplatesPage() {
       </div>
     </div>
   )
+}
+
+/*
+ * ★V8: data-theme="v8" のときだけ新しい一覧（`v19Ivv`）を出す。
+ * v7 の本体（TemplatesPageV7）は変えない——種類タブ・フォルダ・絞り込み・
+ * 詳細の引き出しはすべてそのまま残る。
+ */
+export default function TemplatesPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <TemplatesListV8 /> : <TemplatesPageV7 />
 }

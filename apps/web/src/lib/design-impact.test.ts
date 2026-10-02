@@ -145,6 +145,9 @@ describe('共通部品の影響範囲', () => {
       'app/tags/marks-v8.tsx',
       'app/tags/searches-v8.tsx',
       'app/tags/tags-tab-v8.tsx',
+      // ★V8 テンプレート一覧（v19Ivv）。表の下にページ送りがあり、
+      // 1ページごとの件数を選べる。
+      'app/templates/list-v8.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
       'app/webinars/page.tsx',
