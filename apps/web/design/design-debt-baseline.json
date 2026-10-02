@@ -129,6 +129,10 @@
     "unresolved-classname": 4,
     "arbitrary-value": 1
   },
+  "app/form-submissions/list-v8.tsx": {
+    "unresolved-classname": 93,
+    "direct-th": 6
+  },
   "app/form-submissions/page.tsx": {
     "arbitrary-value": 4
   },
@@ -250,7 +254,7 @@
     "direct-secondary-button": 1
   },
   "app/scenarios/detail/detail-v8.tsx": {
-    "arbitrary-value": 3,
+    "arbitrary-value": 2,
     "unresolved-classname": 109
   },
   "app/scenarios/detail/scenario-detail-client.tsx": {

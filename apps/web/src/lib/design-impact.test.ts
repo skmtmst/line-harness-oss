@@ -98,6 +98,8 @@ describe('共通部品の影響範囲', () => {
       'app/events/bookings/page.tsx',
       'app/events/page.tsx',
       // 2026-09-24(★V7 #701): 回答フォーム一覧の自前の「前へ／次へ」を共通へ寄せた。1ページだけのときは出さない。
+      // ★V8 回答フォーム一覧（I3L41O）。表の下にページ送りを置く。
+      'app/form-submissions/list-v8.tsx',
       'app/form-submissions/page.tsx',
       // #543: 一覧の到達不能な回答表（M2削除）と共に共通Paginationの利用を外した。
       'app/form-submissions/responses/page.tsx',
