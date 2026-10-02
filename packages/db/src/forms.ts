@@ -1187,6 +1187,13 @@ export interface FormDateFieldAnalytics {
   maxDate: string | null;
 }
 
+export interface FormRatingFieldAnalytics {
+  key: string;
+  label: string;
+  answered: number;
+  average: number | null;
+}
+
 export interface FormSubmissionAnalytics {
   startedUnique: number;
   submitted: number;
@@ -1194,6 +1201,7 @@ export interface FormSubmissionAnalytics {
   destinationWrites: Record<FormDestinationWriteStatus, number>;
   dateAnsweredUniqueFriends: number;
   dateFields: FormDateFieldAnalytics[];
+  ratingFields: FormRatingFieldAnalytics[];
 }
 
 /** 回答一覧のKPI。ページ内ではなく、選択中アカウントの全回答をD1で集計する。 */
@@ -1202,6 +1210,7 @@ export async function getFormSubmissionAnalytics(
   formId: string,
   lineAccountId: string,
   dateFields: Array<{ key: string; label: string }>,
+  ratingFields: Array<{ key: string; label: string }> = [],
 ): Promise<FormSubmissionAnalytics> {
   const [submissionSummary, openSummary] = await Promise.all([
     db.prepare(
@@ -1288,6 +1297,43 @@ export async function getFormSubmissionAnalytics(
     dateAnsweredUniqueFriends = Number(row?.unique_friends ?? 0);
   }
 
+  const normalizedRatingFields = [...new Map(
+    ratingFields.filter((field) => field.key).map((field) => [field.key, field]),
+  ).values()];
+  const ratingFieldResults: FormRatingFieldAnalytics[] = [];
+  for (const field of normalizedRatingFields) {
+    // 1〜5の整数だけを平均に入れる。不正な旧値（0・6・小数・文字）は
+    // CASTで0へ混ぜず、未回答として数えない。未回答の平均はnull。
+    const row = await db.prepare(
+      `SELECT COUNT(*) AS answered,
+              AVG(CASE
+                WHEN TRIM(CAST(answer.value AS TEXT)) IN ('1', '2', '3', '4', '5') THEN CAST(answer.value AS REAL)
+                ELSE NULL
+              END) AS average
+         FROM form_submissions fs
+         JOIN friends f ON f.id = fs.friend_id
+         JOIN json_each(CASE WHEN json_valid(fs.data) THEN fs.data ELSE '{}' END) answer
+        WHERE fs.form_id = ?
+          AND f.line_account_id = ?
+          AND fs.is_test = 0
+          AND answer.key = ?
+          AND TRIM(CAST(answer.value AS TEXT)) IN ('1', '2', '3', '4', '5')`,
+    ).bind(formId, lineAccountId, field.key).first<{
+      answered: number;
+      average: number | null;
+    }>();
+    const answered = Number(row?.answered ?? 0);
+    const average = row?.average === null || row?.average === undefined
+      ? null
+      : Math.round(Number(row.average) * 10) / 10;
+    ratingFieldResults.push({
+      key: field.key,
+      label: field.label,
+      answered,
+      average: answered === 0 ? null : average,
+    });
+  }
+
   return {
     startedUnique,
     submitted,
@@ -1302,6 +1348,7 @@ export async function getFormSubmissionAnalytics(
     },
     dateAnsweredUniqueFriends,
     dateFields: dateFieldResults,
+    ratingFields: ratingFieldResults,
   };
 }
 
