@@ -245,12 +245,20 @@
   "app/rich-menus/edit/page.tsx": {
     "arbitrary-value": 10
   },
-  "app/rich-menus/page.tsx": {
-    "arbitrary-value": 10,
+  "app/rich-menus/external-import.tsx": {
+    "arbitrary-value": 5,
     "direct-secondary-button": 1
   },
+  "app/rich-menus/list-v8.tsx": {
+    "unresolved-classname": 81,
+    "direct-th": 6,
+    "arbitrary-value": 1
+  },
+  "app/rich-menus/page.tsx": {
+    "arbitrary-value": 5
+  },
   "app/scenarios/detail/detail-v8.tsx": {
-    "arbitrary-value": 3,
+    "arbitrary-value": 2,
     "unresolved-classname": 109
   },
   "app/scenarios/detail/scenario-detail-client.tsx": {
@@ -293,6 +301,12 @@
   "app/staff/page.tsx": {
     "arbitrary-value": 16
   },
+  "app/tags/field-editor-v8.tsx": {
+    "unresolved-classname": 91
+  },
+  "app/tags/field-migrate-v8.tsx": {
+    "unresolved-classname": 72
+  },
   "app/tags/fields-tab-v8.tsx": {
     "unresolved-classname": 58
   },
@@ -305,14 +319,29 @@
   "app/tags/list-v8.tsx": {
     "unresolved-classname": 6
   },
+  "app/tags/mark-editor-v8.tsx": {
+    "unresolved-classname": 52
+  },
   "app/tags/marks-v8.tsx": {
     "unresolved-classname": 51
+  },
+  "app/tags/search-editor-v8.tsx": {
+    "unresolved-classname": 53
   },
   "app/tags/searches-v8.tsx": {
     "unresolved-classname": 59
   },
+  "app/tags/tag-editor-v8.tsx": {
+    "unresolved-classname": 113
+  },
   "app/tags/tags-tab-v8.tsx": {
     "unresolved-classname": 67
+  },
+  "app/templates/asset-editor-v8.tsx": {
+    "unresolved-classname": 63
+  },
+  "app/templates/carousel/carousel-v8.tsx": {
+    "unresolved-classname": 49
   },
   "app/templates/carousel/page.tsx": {
     "unresolved-classname": 7,
@@ -326,8 +355,14 @@
     "arbitrary-value": 2,
     "direct-secondary-button": 1
   },
+  "app/templates/edit-v8.tsx": {
+    "unresolved-classname": 24
+  },
   "app/templates/edit/page.tsx": {
     "unresolved-classname": 1
+  },
+  "app/templates/editor-v8.tsx": {
+    "unresolved-classname": 19
   },
   "app/templates/list-v8.tsx": {
     "unresolved-classname": 81,
@@ -336,6 +371,9 @@
   "app/templates/page.tsx": {
     "unresolved-classname": 6,
     "arbitrary-value": 12
+  },
+  "app/templates/questions/question-v8.tsx": {
+    "unresolved-classname": 17
   },
   "app/webhooks/edit/page.tsx": {
     "unresolved-classname": 4

@@ -482,7 +482,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold text-ink">顧客情報</h3>
           </div>
-          <Button variant="secondary" className="mr-14 h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-[11px] text-ink-faint" type="button" ref={settingsButtonRef} onClick={() => {
+          <Button variant="secondary" className="mr-14 v7:h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-[11px] text-ink-faint" type="button" ref={settingsButtonRef} onClick={() => {
               if (!showSettings) updateSettingsPanelPos()
               setShowSettings(!showSettings)
             }} aria-expanded={showSettings}>
