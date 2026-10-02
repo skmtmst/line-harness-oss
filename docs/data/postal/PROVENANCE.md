@@ -18,7 +18,7 @@
 
 ## 取込SQLの分割適用の設計（D1の文長上限・途中ready対応）
 
-- 公式D1上限（2026-10-02確認、https://developers.cloudflare.com/d1/platform/limits/ ）: 1文の長さは最大100,000バイト、1問合せの束縛変数は最大100個。22MBを1文のINSERTにすると上限を超えるため、生成SQLは1文が80KBを超えないようバイト数で区切った複文にする（文数・上限値は生成manifest.jsonの `importBatches`・`statementByteBudget`・`statementByteLimit` に記録）。
+- 公式D1上限（2026-10-02確認、https://developers.cloudflare.com/d1/platform/limits/ ）: 1文の長さは最大100,000バイト、1問合せの束縛変数は最大100個。22MBを1文のINSERTにすると上限を超えるため、生成SQLはtuple部分の分割予算を80,000バイトにした複文にする。今回の公式データを使った実生成文は最大81,029バイトで、文全体が100,000バイト以内と確認済み（文数・上限値は生成manifest.jsonの `importBatches`・`statementByteBudget`・`statementByteLimit` に記録）。
 - 適用順と途中readyの防止: (1) 開始3文で旧完了記録と旧本体を消し、新完了記録を `row_count = -1`（取込中）で置く。(2) 本体の複文を順に入れる。(3) 末尾1文で完了記録を全件数に更新。どれも `DELETE`・`INSERT OR REPLACE`・`UPDATE` のため再適用は冪等。順に適用し、途中で失敗したら止める。
 - 先に完了記録を置く方式では、旧全国版と同件数の新データで旧件数と新完了記録が一致し、途中でも全国版と誤認する。これを防ぐため、旧本体は開始時に消し、完了記録は取込中の印（-1）で置く。取込中の `expectedRows` は 0、`fullDataset` は false。
 - 末尾の更新まで来て初めて件数一致が全国版と名乗る。開始だけ・1文だけ・途中失敗では false のまま。再適用で最後まで入れ直せば件数が一致し、初めて全国版と名乗る。
