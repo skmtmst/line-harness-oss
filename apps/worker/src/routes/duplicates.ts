@@ -35,6 +35,7 @@ interface DuplicatesStatsDTO {
   perAccount: PerAccountStatDTO[];
   pairwiseOverlap: PairwiseOverlapDTO[];
   computedAt: string;
+  overlappingDeliveryCount: number | null;
 }
 
 function serializePerAccount(row: PerAccountStat): PerAccountStatDTO {
@@ -66,6 +67,7 @@ function serializeDuplicatesStats(stats: DuplicatesStats): DuplicatesStatsDTO {
     perAccount: stats.per_account.map(serializePerAccount),
     pairwiseOverlap: stats.pairwise_overlap.map(serializePairwise),
     computedAt: stats.computed_at,
+    overlappingDeliveryCount: stats.overlapping_delivery_count ?? null,
   };
 }
 

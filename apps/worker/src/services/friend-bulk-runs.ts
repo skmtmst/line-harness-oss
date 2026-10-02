@@ -37,6 +37,8 @@ import { AutomationActionError, type ActionDefinition, type AutomationActionExec
 import { compileSavedSearch } from './saved-search-filter.js';
 import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from './friend-tag-attach.js';
 
+import { bulkMessageThreshold, getBulkMessageApproval } from './friend-bulk-message-approval.js';
+
 const MAX_TARGETS = 10_000;
 const ITEM_LEASE_MINUTES = 5;
 const DEFAULT_PROCESS_LIMIT = 100;
@@ -549,6 +551,9 @@ export async function startFriendBulkRun(
       428,
     );
   }
+  const threshold = result.prepared.operation.kind === 'send_message'
+    ? await bulkMessageThreshold(db, [...new Set(result.targets.map((item) => item.lineAccountId).filter((id): id is string => !!id))])
+    : undefined;
   const now = input.now ?? new Date().toISOString();
   const scheduledAt = input.scheduledAt == null ? null : parseIso(input.scheduledAt, '実行予定日時');
   try {
@@ -563,6 +568,7 @@ export async function startFriendBulkRun(
       reversible: result.prepared.reversible,
       idempotencyKey: input.idempotencyKey,
       scheduledAt,
+      messageApprovalThreshold: threshold !== undefined && result.targets.length >= threshold ? threshold : undefined,
       now,
     });
   } catch (error) {
@@ -1011,7 +1017,40 @@ export async function processFriendBulkRun(
   if (!run) throw new FriendBulkRunError('run_not_found', '一括操作が見つかりません', 404);
   const now = options.now ?? new Date().toISOString();
   if (run.scheduled_at && run.scheduled_at > now) return { processed: 0, status: run.status };
+  const approval = await getBulkMessageApproval(db, runId);
+  if (approval && !['approved', 'confirmed'].includes(approval.status)) return { processed: 0, status: run.status };
+  if (approval?.status === 'confirmed') {
+    const { countActiveOperators } = await import('./broadcast-approval.js');
+    if (await countActiveOperators(db) > 1) {
+      await db.prepare(`UPDATE friend_bulk_message_approvals SET status = 'pending', decided_by = NULL,
+        decided_at = NULL, confirmed_count = NULL WHERE run_id = ? AND status = 'confirmed'`).bind(runId).run();
+      return { processed: 0, status: run.status };
+    }
+  }
   const operation = JSON.parse(run.operation_json) as FriendBulkOperation;
+  // 既存の台帳や再試行でも承認を迂回させない。固定した対象数で判定する。
+  if (operation.kind === 'send_message' && !approval) {
+    const accounts = await db.prepare('SELECT DISTINCT line_account_id FROM friend_bulk_run_items WHERE run_id = ?')
+      .bind(runId).all<{ line_account_id: string }>();
+    const count = await db.prepare('SELECT COUNT(*) AS count FROM friend_bulk_run_items WHERE run_id = ?')
+      .bind(runId).first<{ count: number }>();
+    const threshold = await bulkMessageThreshold(db, accounts.results.map((row) => row.line_account_id));
+    if ((count?.count ?? 0) >= threshold) {
+      await db.batch([
+        db.prepare(`INSERT OR IGNORE INTO friend_bulk_message_approvals
+          (run_id, status, recipient_count, threshold, requested_by, requested_at)
+          VALUES (?, 'pending', ?, ?, ?, ?)`)
+          .bind(runId, count!.count, threshold, run.created_by, now),
+        db.prepare(`INSERT INTO friend_bulk_message_approval_events (id, run_id, actor_staff_id, action, created_at)
+          SELECT ?, run_id, requested_by, 'requested', ? FROM friend_bulk_message_approvals
+          WHERE run_id = ? AND requested_at = ? AND status = 'pending'`)
+          .bind(crypto.randomUUID(), now, runId, now),
+        db.prepare(`UPDATE friend_bulk_runs SET status = 'waiting', updated_at = ? WHERE id = ?`)
+          .bind(now, runId),
+      ]);
+      return { processed: 0, status: 'waiting' };
+    }
+  }
   const plan = run.execution_plan_json ? JSON.parse(run.execution_plan_json) as ActionDefinition[] : null;
   const executors = options.executors ?? createAutomationActionExecutors(options.executorDependencies);
   const items = await getFriendBulkRunItemRows(db, runId) as ItemRow[];
