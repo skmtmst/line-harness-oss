@@ -28,14 +28,16 @@ function typeKeys(): string[] {
   )
 }
 
-/** 実口 GET /api/nen-campaigns/settings が返す形の鍵。 */
+/** 実口 GET /api/nen-campaigns/settings が返す形の鍵（一覧も409の最新も同じ組み立て）。 */
 function workerKeys(): string[] {
   const source = read('apps/worker/src/routes/nen-campaigns.ts')
-  const block = source.match(/settings\.map\(\(row\) => \(\{([\s\S]*?)\}\)\) \}\);/)
+  const block = source.match(/function toCampaignSettingPayload\(row: CampaignRow\) \{([\s\S]*?)\n\}/)
   if (!block) throw new Error('settings の組み立てが見つかりません')
-  return sortedKeys(
-    [...block[1].matchAll(/^    (\w+): row\./gm)].map((found) => found[1]),
-  )
+  // 一覧は組み立てに formIssue を足して返す（409の最新には付けない）。
+  return sortedKeys([
+    ...[...block[1].matchAll(/^    (\w+): row\./gm)].map((found) => found[1]),
+    'formIssue',
+  ])
 }
 
 /** 見本の1件ぶんの鍵。 */

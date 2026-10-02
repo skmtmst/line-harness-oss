@@ -2399,6 +2399,10 @@ export async function getReminderDeliveryRunSummary(
   errors: number;
   targetCount: number;
   nextScheduledAt: string | null;
+  /** 画面の「今月送った」。月の区切りは利用者の日本時間で数える。 */
+  sentThisMonth: number;
+  /** 画面の「これから送る（今後7日）」。期限切れの未送分行も残っているので含める。 */
+  scheduledNext7Days: number;
 }> {
   const bindings: unknown[] = [reminderId];
   const scopePredicate = reminderRowScopePredicate('line_account_id', scope, bindings);
@@ -2408,6 +2412,14 @@ export async function getReminderDeliveryRunSummary(
        SUM(CASE WHEN status IN ('queued', 'claimed', 'retry_wait') THEN 1 ELSE 0 END) AS scheduled,
        SUM(CASE WHEN status IN ('skipped', 'cancelled') THEN 1 ELSE 0 END) AS stopped,
        SUM(CASE WHEN status = 'permanent_failed' THEN 1 ELSE 0 END) AS errors,
+       SUM(CASE
+         WHEN status = 'succeeded'
+           AND strftime('%Y-%m', completed_at, '+9 hours') = strftime('%Y-%m', 'now', '+9 hours')
+         THEN 1 ELSE 0 END) AS sent_this_month,
+       SUM(CASE
+         WHEN status IN ('queued', 'claimed') AND scheduled_at <= datetime('now', '+7 days') THEN 1
+         WHEN status = 'retry_wait' AND next_retry_at <= datetime('now', '+7 days') THEN 1
+         ELSE 0 END) AS scheduled_next7_days,
        COUNT(DISTINCT friend_reminder_id) AS target_count,
        MIN(CASE
          WHEN status = 'retry_wait' THEN next_retry_at
@@ -2419,6 +2431,8 @@ export async function getReminderDeliveryRunSummary(
     scheduled: number | null;
     stopped: number | null;
     errors: number | null;
+    sent_this_month: number | null;
+    scheduled_next7_days: number | null;
     target_count: number | null;
     next_scheduled_at: string | null;
   }>();
@@ -2427,6 +2441,8 @@ export async function getReminderDeliveryRunSummary(
     scheduled: Number(row?.scheduled ?? 0),
     stopped: Number(row?.stopped ?? 0),
     errors: Number(row?.errors ?? 0),
+    sentThisMonth: Number(row?.sent_this_month ?? 0),
+    scheduledNext7Days: Number(row?.scheduled_next7_days ?? 0),
     targetCount: Number(row?.target_count ?? 0),
     nextScheduledAt: row?.next_scheduled_at ?? null,
   };
