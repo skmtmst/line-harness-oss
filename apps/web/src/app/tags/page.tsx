@@ -2,11 +2,15 @@
 
 import { Suspense } from 'react'
 import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
+import TagsListV8 from './list-v8'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
- * 友だち属性（4タブ）の入口。中身は `tags-page-v4.tsx` が正本。
- * ここは選んだアカウントを渡すだけにする。
+ * 友だち属性（4タブ）の入口。
+ *
+ * 見た目テーマが v8 のときだけ新しい一覧（`list-v8.tsx`）を出す。
+ * v7 では従来どおり `tags-page-v4.tsx`（見た目は1画素も変えない）。
  *
  * #972 U029: 390pxではタブ行と右端の「CSVで一括登録」が重なっていた。
  * 共通タブ（components/shared/tabs）は触らず、この画面の印の下にある
@@ -15,10 +19,15 @@ import { useAccount } from '@/contexts/account-context'
  */
 export default function TagsPage() {
   const { selectedAccountId } = useAccount()
+  const theme = useAdminTheme()
   return (
     <div data-tabs-row>
       <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>
-        <TagsPageV4 accountId={selectedAccountId} />
+        {theme === 'v8' ? (
+          <TagsListV8 accountId={selectedAccountId} />
+        ) : (
+          <TagsPageV4 accountId={selectedAccountId} />
+        )}
       </Suspense>
       <style>{`
         /* タブ行（nav > span.items + span.actions）。収まる幅では1行のまま。 */

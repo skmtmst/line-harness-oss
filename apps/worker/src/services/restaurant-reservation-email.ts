@@ -4,7 +4,7 @@ import { dbFor } from './db-router.js';
 import { parserFor, type ParsedReservationEmail } from './parsers/index.js';
 
 const MAX_PARSE_BYTES = 2 * 1024 * 1024;
-const DEFAULT_STAY_MINUTES = 120;
+export const DEFAULT_STAY_MINUTES = 120;
 const DEFAULT_HOLD_END_HOUR = 23;
 
 export type RestaurantMediaRow = {
@@ -123,6 +123,9 @@ async function markEvent(
   await dbFor(env, storeId).prepare(`UPDATE rt_sync_events
     SET status = ?, payload_json = json_patch(payload_json, ?), error_message = ?, processed_at = datetime('now')
     WHERE id = ?`).bind(status, JSON.stringify(payload), errorMessage, eventId).run();
+  await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails SET status = ?, quarantine_reason = ?
+    WHERE store_id = ? AND message_id = (SELECT external_event_id FROM rt_sync_events WHERE id = ? AND provider = 'email')`)
+    .bind(status === 'failed' ? 'quarantined' : 'received', errorMessage, storeId, eventId).run();
 }
 
 function endAt(startsAt: string, stayMinutes: number): string {
