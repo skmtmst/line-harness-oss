@@ -408,6 +408,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/events/admin/occurrences/{id}/waitlist/reorder',
   'POST /api/events/admin/occurrences/{id}/waitlist/skip',
   'POST /api/events/liff/bookings/{id}/change',
+  'POST /api/friends/bulk-runs/{id}/approve',
   'POST /api/friends/{id}/tags',
   'POST /api/file-scans/{id}/release',
   'POST /api/file-scans/{id}/retry',
