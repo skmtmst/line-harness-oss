@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { jstNow, nextVersionToken } from './utils.js';
 
 /**
  * 運営からのお知らせ配信 ★V6 37-7 と契約者専用LINE（migration 429）。
@@ -120,9 +120,16 @@ export interface AnnouncementInput {
 
 export async function createPlatformAnnouncement(
   db: D1Database,
-  input: AnnouncementInput & { status: 'draft' | 'scheduled'; createdByStaffId: string; createdByName: string },
+  input: AnnouncementInput & {
+    status: 'draft' | 'scheduled'; createdByStaffId: string; createdByName: string;
+    /*
+     * M512: 二重押し止めの再実行キーをそのまま行IDにする（broadcasts と同じ
+     * 決めごと）。省略時は従来どおり採番する。migration なしで冪等にする。
+     */
+    id?: string;
+  },
 ): Promise<PlatformAnnouncement> {
-  const id = crypto.randomUUID();
+  const id = input.id ?? crypto.randomUUID();
   const now = jstNow();
   await db
     .prepare(`INSERT INTO platform_announcements
@@ -139,15 +146,24 @@ export async function updatePlatformAnnouncement(
   db: D1Database,
   id: string,
   input: AnnouncementInput & { status: 'draft' | 'scheduled' },
+  /*
+   * M513: 古い画面からの保存を止める版。渡されたときだけ updated_at の一致
+   * も条件に入れる。当たらなければ null を返し、呼び出し側が読み直して
+   * 404・配信済み・競合を区別する。省略時は従来どおり。
+   */
+  expectedUpdatedAt?: string | null,
 ): Promise<PlatformAnnouncement | null> {
-  await db
+  const result = await db
     .prepare(`UPDATE platform_announcements
                  SET subject = ?, body = ?, audience_kind = ?, audience_plans = ?, audience_tenant_ids = ?, channels = ?,
                      status = ?, publish_at = ?, updated_at = ?
-               WHERE id = ? AND status IN ('draft', 'scheduled')`)
+               WHERE id = ? AND status IN ('draft', 'scheduled')
+                 AND (? IS NULL OR updated_at = ?)`)
     .bind(input.subject, input.body, input.audienceKind, JSON.stringify(input.audiencePlans), JSON.stringify(input.audienceTenantIds),
-      JSON.stringify(input.channels), input.status, input.publishAt, jstNow(), id)
+      JSON.stringify(input.channels), input.status, input.publishAt, nextVersionToken(expectedUpdatedAt), id,
+      expectedUpdatedAt ?? null, expectedUpdatedAt ?? null)
     .run();
+  if ((result.meta?.changes ?? 0) === 0) return null;
   return getPlatformAnnouncement(db, id);
 }
 

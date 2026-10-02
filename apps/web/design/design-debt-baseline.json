@@ -160,6 +160,10 @@
   "app/form-submissions/page.tsx": {
     "arbitrary-value": 4
   },
+  "app/friend-add-settings/list-v8.tsx": {
+    "unresolved-classname": 77,
+    "direct-th": 6
+  },
   "app/friend-add-settings/page.tsx": {
     "arbitrary-value": 2
   },
@@ -858,5 +862,22 @@
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 8,
     "arbitrary-value": 2
+  },
+  "app/reminders/basics-form-v8.tsx": {
+    "unresolved-classname": 39
+  },
+  "app/reminders/detail/detail-v8.tsx": {
+    "unresolved-classname": 69,
+    "direct-th": 23
+  },
+  "app/reminders/edit/edit-v8.tsx": {
+    "unresolved-classname": 168,
+    "direct-th": 4
+  },
+  "app/reminders/new/new-v8.tsx": {
+    "unresolved-classname": 6
+  },
+  "app/reminders/wizard-v8-ui.tsx": {
+    "unresolved-classname": 33
   }
 }
