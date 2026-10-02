@@ -119,6 +119,8 @@ describe('共通部品の影響範囲', () => {
       'app/inflow-links/_components/ref-orders.tsx',
       // #565: 送信履歴が増えても描画を際限なく重くしないよう、20件ずつのページ送りに寄せた。
       'app/inflow-links/ad-integration.tsx',
+      // ★V8-B 流入と計測の一覧（xbHxg）。表の下にページ送りを置く。
+      'app/inflow-links/inflow-list-v8.tsx',
       'app/inflow-links/page.tsx',
       // #291: 顧客へのお知らせ9種類を、設計どおり1ページ6件に区切る。
       'app/line-notifications/page.tsx',
