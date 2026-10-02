@@ -1,5 +1,8 @@
 'use client'
 
+import ReadonlyHeader from '@/app/hq/readonly-header-v8'
+import '@/app/hq/readonly-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { BannerKpis, BannerNote, BannerTabs, type BannerTab } from '@/components/hq/banners/banner-shell'
@@ -26,6 +29,7 @@ export default function HqBannersPage() {
 }
 
 function HqBannersInner() {
+  const theme = useAdminTheme()
   usePageTitle('バナー生成')
   const router = useRouter()
   const params = useSearchParams()
@@ -72,7 +76,8 @@ function HqBannersInner() {
   }
 
   return (
-    <div data-design-node={tab === 'projects' ? 'aH6NX' : 'w3ZDsD'} className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' ? tab === 'projects' ? 'B9ZAr' : 'W5Wxr' : tab === 'projects' ? 'aH6NX' : 'w3ZDsD'} className="v8-ro-hq-page flex flex-col gap-4">
+      {theme === 'v8' && <ReadonlyHeader title="バナー生成" description={tab === 'projects' ? 'プロジェクトの画像と、生成の利用状況を確認します。' : '作った画像を用途やプロジェクトから探します。'} />}
       <BannerTabs
         current={tab}
         onChange={changeTab}
@@ -84,7 +89,7 @@ function HqBannersInner() {
           )
         }
       />
-      <BannerKpis stats={stats} usage={usage} loading={summaryLoading} />
+      {theme === 'v8' ? <div data-ro-kpis><BannerKpis stats={stats} usage={usage} loading={summaryLoading} /></div> : <BannerKpis stats={stats} usage={usage} loading={summaryLoading} />}
       <BannerNote />
       {tab === 'projects' ? (
         <ProjectsSection usage={usage} onChanged={() => void loadSummary()} headerActions={setProjectActions} />

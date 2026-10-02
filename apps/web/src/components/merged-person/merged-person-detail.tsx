@@ -1,17 +1,11 @@
 'use client'
 
-import React, { useCallback, useEffect, useState } from 'react'
-import type { MergedPersonDeliveryPriority, MergedPersonLinkedFriend } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
-import { api, ApiError, type MergedPersonWithCandidates } from '@/lib/api'
 import MergedDeliveryDialog from './merged-delivery-dialog'
-import MergedProfileDialog, {
-  emptyProfileCandidateDraft,
-  type ProfileCandidateDraft,
-} from './merged-profile-dialog'
+import MergedProfileDialog from './merged-profile-dialog'
 import {
   MergedAdminCard,
   MergedDeliveryCard,
@@ -20,7 +14,7 @@ import {
   MergedProfileCard,
   MergedProfileValues,
 } from './merged-person-sections'
-import { failureOf, type MergedPersonFailure } from './merged-person-view'
+import { useMergedPerson } from './use-merged-person'
 import styles from './merged-person-detail.module.css'
 
 /**
@@ -33,8 +27,6 @@ import styles from './merged-person-detail.module.css'
  * **取得できた0件は各節の中で「まだありません」**と書く。失敗を0件と
  * 同じ文にすると、読めていないだけなのに「消えた」に見える。
  */
-type Phase = 'loading' | 'ready' | 'error' | 'forbidden'
-
 export default function MergedPersonDetailView({
   personId,
   onClose,
@@ -42,160 +34,33 @@ export default function MergedPersonDetailView({
   personId: string
   onClose: () => void
 }) {
-  const [phase, setPhase] = useState<Phase>('loading')
-  const [person, setPerson] = useState<MergedPersonWithCandidates | null>(null)
-  const [failure, setFailure] = useState<MergedPersonFailure | null>(null)
-  const [editing, setEditing] = useState(false)
-  const [profileEditing, setProfileEditing] = useState(false)
-  const [profileDraft, setProfileDraft] = useState<ProfileCandidateDraft>({})
-  const [profileSaving, setProfileSaving] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState('')
-  const [reloadKey, setReloadKey] = useState(0)
-  const [unlinkTarget, setUnlinkTarget] = useState<MergedPersonLinkedFriend | null>(null)
-  const [unlinkReason, setUnlinkReason] = useState('')
-  const [unlinking, setUnlinking] = useState(false)
-
-  useEffect(() => {
-    let alive = true
-    setPhase('loading')
-    setFailure(null)
-    api.mergedPeople
-      .get(personId)
-      .then((res) => {
-        if (!alive) return
-        /*
-         * 200 でも `success: false` が返ることがある（画面確認のモックも
-         * この形で失敗を返す）。中身を読む前に必ず見る。
-         */
-        if (!res.success) {
-          setFailure(failureOf(null))
-          setPhase('error')
-          return
-        }
-        setPerson({ ...res.data, profileCandidates: res.data.profileCandidates ?? [], tagCandidates: res.data.tagCandidates ?? [] })
-        setPhase('ready')
-      })
-      .catch((error: unknown) => {
-        if (!alive) return
-        const next = error instanceof ApiError
-          ? failureOf({ status: error.status, code: error.code })
-          : failureOf(null)
-        setFailure(next)
-        setPhase(next.kind === 'forbidden' ? 'forbidden' : 'error')
-      })
-    return () => {
-      alive = false
-    }
-  }, [personId, reloadKey])
-
-  const save = useCallback(
-    (rows: MergedPersonDeliveryPriority[]) => {
-      if (!person) return
-      setSaving(true)
-      setSaveError('')
-      api.mergedPeople
-        .updateDeliveryPriorities(person.id, {
-          expectedRevision: person.revision,
-          priorities: rows.map((row) => ({
-            purpose: row.purpose,
-            friendId: row.friendId,
-            priority: row.priority,
-            isActive: row.isActive,
-            reason: row.reason,
-          })),
-        })
-        .then((res) => {
-          if (!res.success) {
-            setSaveError(failureOf(null).description)
-            return
-          }
-          setPerson((current) => current ? { ...res.data, profileCandidates: current.profileCandidates, tagCandidates: current.tagCandidates } : null)
-          setEditing(false)
-        })
-        .catch((error: unknown) => {
-          const next = error instanceof ApiError
-            ? failureOf({ status: error.status, code: error.code })
-            : failureOf(null)
-          setSaveError(`${next.title}。${next.description}`)
-        })
-        .finally(() => setSaving(false))
-    },
-    [person],
-  )
-
-  const unlink = useCallback(() => {
-    if (!person || !unlinkTarget || !unlinkReason.trim()) return
-    setUnlinking(true)
-    setSaveError('')
-    api.mergedPeople.unlink(person.id, unlinkTarget.friendId, {
-      expectedRevision: person.revision,
-      reason: unlinkReason.trim(),
-    }).then((res) => {
-      if (!res.success) {
-        setSaveError(failureOf(null).description)
-        return
-      }
-      setUnlinkTarget(null)
-      setUnlinkReason('')
-      setReloadKey((key) => key + 1)
-    }).catch((error: unknown) => {
-      const next = error instanceof ApiError
-        ? failureOf({ status: error.status, code: error.code })
-        : failureOf(null)
-      setSaveError(`${next.title}。${next.description}`)
-      /*
-       * R389: 版の競合は古い結び付きのまま残さない。解除の窓を閉じて
-       * 最新を読み直し、成功した対象だけが解除済みになる。
-       */
-      if (error instanceof ApiError && error.status === 409) {
-        setUnlinkTarget(null)
-        setUnlinkReason('')
-        setReloadKey((key) => key + 1)
-      }
-    }).finally(() => setUnlinking(false))
-  }, [person, unlinkReason, unlinkTarget])
-
-  const openProfileEditor = useCallback(() => {
-    if (!person) return
-    setSaveError('')
-    setProfileDraft(emptyProfileCandidateDraft(person.profileCandidates))
-    setProfileEditing(true)
-  }, [person])
-
-  const saveProfile = useCallback(() => {
-    if (!person) return
-    const selections = person.profileCandidates.flatMap((field) => {
-      const draft = profileDraft[field.fieldKey]
-      const optionIndex = Number(draft?.optionIndex)
-      const option = draft?.optionIndex !== '' && Number.isInteger(optionIndex) && optionIndex >= 0
-        ? field.options[optionIndex]
-        : undefined
-      return option?.candidateId && draft
-        ? [{ fieldKey: field.fieldKey, candidateId: option.candidateId, updateMode: draft.updateMode }]
-        : []
-    })
-    if (selections.length === 0) return
-    setProfileSaving(true)
-    setSaveError('')
-    api.mergedPeople.updateProfileValues(person.id, {
-      expectedRevision: person.revision,
-      selections,
-    }).then((res) => {
-      if (!res.success) {
-        setSaveError(failureOf(null).description)
-        return
-      }
-      setPerson(res.data)
-      setProfileEditing(false)
-      setProfileDraft({})
-    }).catch((error: unknown) => {
-      const next = error instanceof ApiError
-        ? failureOf({ status: error.status, code: error.code })
-        : failureOf(null)
-      setSaveError(`${next.title}。${next.description}`)
-    }).finally(() => setProfileSaving(false))
-  }, [person, profileDraft])
+  // 読み込み・保存・解除のロジックは use-merged-person.ts が正本。
+  // ★V8 の詳細（merged-person-detail-v8.tsx）も同じ口を使う。
+  const {
+    phase,
+    person,
+    failure,
+    editing,
+    setEditing,
+    profileEditing,
+    setProfileEditing,
+    profileDraft,
+    setProfileDraft,
+    profileSaving,
+    saving,
+    saveError,
+    setSaveError,
+    reload,
+    save,
+    unlinkTarget,
+    setUnlinkTarget,
+    unlinkReason,
+    setUnlinkReason,
+    unlinking,
+    unlink,
+    openProfileEditor,
+    saveProfile,
+  } = useMergedPerson(personId)
 
   if (phase === 'loading') return <ListState kind="loading" />
   if (phase === 'forbidden') {
@@ -220,7 +85,7 @@ export default function MergedPersonDetailView({
         kind="error"
         title={failure?.title}
         description={failure?.description}
-        onRetry={() => setReloadKey((key) => key + 1)}
+        onRetry={reload}
       />
     )
   }
@@ -255,7 +120,7 @@ export default function MergedPersonDetailView({
       {saveError ? (
         <p className={styles.warn} role="alert">
           {saveError}{' '}
-          <button type="button" className={styles.crumbLink} onClick={() => setReloadKey((key) => key + 1)}>
+          <button type="button" className={styles.crumbLink} onClick={reload}>
             読み直す
           </button>
         </p>

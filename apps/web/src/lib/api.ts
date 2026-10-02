@@ -3787,7 +3787,7 @@ export type ListStats = {
     completed: number
     sentThisWeek: number
   }
-  reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
+  reminders: { total: number; active: number; waiting: number; sentThisMonth: number; failed: number }
 }
 
 /**
@@ -3991,6 +3991,8 @@ export type RichMenuGroupListItem = {
   targetingEnabled: boolean
   folderId: string | null
   displayOrder: number
+  /** トークを開いたときメニューを出した状態にするか（公開する形に含まれる）。 */
+  defaultOpen: boolean
   thumbnailR2Key: string | null
   /** ★V8 一覧の「大・6面・切替タブ N」。ページの束の数。 */
   pageCount?: number
@@ -12620,6 +12622,8 @@ export const api = {
         targetingPriority: number;
         targetingEnabled: boolean;
         folderId: string | null;
+        /** トークを開いたときメニューを出した状態にするか（公開する形に含まれる）。 */
+        defaultOpen: boolean;
         /** M951: 保存時に送り返す版。古い版での保存は 409 で止まる。 */
         version: number;
         createdAt: string;
@@ -12691,6 +12695,8 @@ export const api = {
       targetingEnabled?: boolean;
       targetingCondition?: string | null;
       targetingPriority?: number;
+      /** V8: トークを開いたときメニューを出した状態にするか。 */
+      defaultOpen?: boolean;
       /** N-164: 登録メディアを既定ページの画像として使う。 */
       imageMediaId?: string;
       pages: Array<{
@@ -12726,6 +12732,8 @@ export const api = {
       folderId?: string | null;
       /** 160: 自分で決める並び順。 */
       displayOrder?: number;
+      /** V8: トークを開いたときメニューを出した状態にするか。 */
+      defaultOpen?: boolean;
       pages?: Array<{
         id?: string;
         name: string;

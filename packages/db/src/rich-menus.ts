@@ -35,6 +35,8 @@ export interface RichMenuGroup {
   folder_id: string | null;
   /** 160: 自分で決める並び順。小さいほど先。 */
   display_order: number;
+  /** V8: トークを開いたときメニューを出した状態にするか（LINE の `selected`）。 */
+  default_open: number;
   /** M951: 下書き保存の版。保存のたびに +1。古い画面からの保存は 409 で止める。 */
   version: number;
   created_at: string;
@@ -135,6 +137,8 @@ export interface CreateRichMenuGroupInput {
   targetingEnabled?: boolean;
   targetingCondition?: string | null;
   targetingPriority?: number;
+  /** V8: トークを開いたときメニューを出した状態にするか。 */
+  defaultOpen?: boolean;
 }
 
 export interface UpdateRichMenuGroupMetaInput {
@@ -149,6 +153,8 @@ export interface UpdateRichMenuGroupMetaInput {
   folderId?: string | null;
   /** 160: 自分で決める並び順。 */
   displayOrder?: number;
+  /** V8: トークを開いたときメニューを出した状態にするか（LINE の `selected`）。 */
+  defaultOpen?: boolean;
 }
 
 export type RichMenuAreaWithParsed = RichMenuArea & {
@@ -617,8 +623,8 @@ export async function createRichMenuGroup(
            (id, account_id, name, chat_bar_text, size, default_page_id,
             folder_id, is_default_for_all, status,
             targeting_condition, targeting_priority, targeting_enabled,
-            created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`,
+            default_open, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         groupId,
@@ -632,6 +638,7 @@ export async function createRichMenuGroup(
         input.targetingCondition ?? null,
         input.targetingPriority ?? 0,
         input.targetingEnabled ? 1 : 0,
+        input.defaultOpen ? 1 : 0,
         now,
         now,
       ),
@@ -720,6 +727,10 @@ function buildMetaSets(patch: UpdateRichMenuGroupMetaInput): { sets: string[]; v
   if (patch.displayOrder !== undefined) {
     sets.push('display_order = ?');
     vals.push(patch.displayOrder);
+  }
+  if (patch.defaultOpen !== undefined) {
+    sets.push('default_open = ?');
+    vals.push(patch.defaultOpen ? 1 : 0);
   }
   if (sets.length === 0) return null;
   return { sets, vals };
@@ -2026,8 +2037,9 @@ export async function duplicateRichMenuGroupAtomic(
         `INSERT INTO rich_menu_groups
            (id, account_id, name, chat_bar_text, size, default_page_id,
             is_default_for_all, status, targeting_condition, targeting_priority,
-            targeting_enabled, folder_id, display_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 0, 'draft', ?, ?, ?, ?, ?, ?, ?)`,
+            targeting_enabled, folder_id, display_order, default_open,
+            created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 0, 'draft', ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         newGroupId,
@@ -2041,6 +2053,7 @@ export async function duplicateRichMenuGroupAtomic(
         source.targeting_enabled,
         source.folder_id,
         source.display_order,
+        source.default_open,
         now,
         now,
       ),
