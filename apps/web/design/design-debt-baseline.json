@@ -280,6 +280,12 @@
   "app/tags/tags-tab-v8.tsx": {
     "unresolved-classname": 67
   },
+  "app/templates/asset-editor-v8.tsx": {
+    "unresolved-classname": 63
+  },
+  "app/templates/carousel/carousel-v8.tsx": {
+    "unresolved-classname": 49
+  },
   "app/templates/carousel/page.tsx": {
     "unresolved-classname": 7,
     "arbitrary-value": 1
@@ -288,12 +294,21 @@
     "arbitrary-value": 2,
     "direct-secondary-button": 1
   },
+  "app/templates/edit-v8.tsx": {
+    "unresolved-classname": 24
+  },
   "app/templates/edit/page.tsx": {
     "unresolved-classname": 1
+  },
+  "app/templates/editor-v8.tsx": {
+    "unresolved-classname": 19
   },
   "app/templates/page.tsx": {
     "unresolved-classname": 6,
     "arbitrary-value": 12
+  },
+  "app/templates/questions/question-v8.tsx": {
+    "unresolved-classname": 17
   },
   "app/webhooks/edit/page.tsx": {
     "unresolved-classname": 4

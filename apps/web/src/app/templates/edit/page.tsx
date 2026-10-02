@@ -12,6 +12,8 @@ import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import TemplateEditV8 from '../edit-v8'
 import TemplateAssetEditor from '../template-asset-editor'
 import type { TemplateDetailData } from '../template-detail-data'
 import { isTemplateDetailData } from '../template-detail-data'
@@ -26,12 +28,12 @@ import {
   type TemplateReferenceState,
 } from '@/components/templates/message-template-editor'
 
-interface ReferenceLoaders {
+export interface ReferenceLoaders {
   friendFields: (accountId: string) => ReturnType<typeof api.friendFields.list>
   commonVars: (accountId: string) => ReturnType<typeof api.commonVars.list>
 }
 
-async function loadTemplateReferences(
+export async function loadTemplateReferences(
   accountId: string,
   loaders: ReferenceLoaders = {
     friendFields: (id) => api.friendFields.list(id, undefined, { suppressFeatureDisabledEvent: true }),
@@ -69,7 +71,7 @@ const EMPTY_REFERENCES = EMPTY_TEMPLATE_REFERENCES
  * 「上のバーで選んでいるもの」と「開いているテンプレートの所属」は別物。
  * この2つを1つの変数で扱うと、切り替えた瞬間に取り違える。
  */
-interface TemplateAccountBinding {
+export interface TemplateAccountBinding {
   templateId: string | null
   /**
    * **いま画面にある中身が、その `templateId` のものとして確定しているか。**
@@ -83,14 +85,14 @@ interface TemplateAccountBinding {
   selectedAccountId: string | null
 }
 
-type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
+export type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
 
-const ACCOUNT_MISMATCH_MESSAGE =
+export const ACCOUNT_MISMATCH_MESSAGE =
   '別のLINE公式アカウントに切り替わっています。上のバーでこのテンプレートのアカウントへ戻すと保存できます。'
 
-const TEMPLATE_LOAD_FAILED_MESSAGE = '読み込めませんでした。開き直してください。'
+export const TEMPLATE_LOAD_FAILED_MESSAGE = '読み込めませんでした。開き直してください。'
 
-const TEMPLATE_LOADING_MESSAGE =
+export const TEMPLATE_LOADING_MESSAGE =
   'テンプレートを読み込んでいます。読み終わるまで保存できません。'
 
 /**
@@ -104,7 +106,7 @@ const TEMPLATE_LOADING_MESSAGE =
  * 取得が終わるまでは `null`。終わる前に選択中アカウントで読むと、
  * 一瞬だけ別アカウントの候補が並び、その隙に選べてしまう。
  */
-function resolveEditorAccountId(binding: TemplateAccountBinding): string | null {
+export function resolveEditorAccountId(binding: TemplateAccountBinding): string | null {
   if (!binding.templateId) return binding.selectedAccountId
   if (binding.templateStatus !== 'ready') return null
   // 所属を持たない旧データだけ、選択中アカウントの候補で編集する。
@@ -112,7 +114,7 @@ function resolveEditorAccountId(binding: TemplateAccountBinding): string | null 
 }
 
 /** 開いているテンプレートの所属と、上のバーの選択が食い違っているか。 */
-function templateAccountMismatch(binding: TemplateAccountBinding): boolean {
+export function templateAccountMismatch(binding: TemplateAccountBinding): boolean {
   if (!binding.templateId || binding.templateStatus !== 'ready') return false
   if (!binding.templateAccountId || !binding.selectedAccountId) return false
   return binding.templateAccountId !== binding.selectedAccountId
@@ -125,7 +127,7 @@ function templateAccountMismatch(binding: TemplateAccountBinding): boolean {
  * 送り先へ送ってよいか」の話で、押す前から決まる。押してから知らせる
  * のでは、押せてしまう瞬間があるのと同じ。
  */
-function templateSaveGuard(binding: TemplateAccountBinding): string | null {
+export function templateSaveGuard(binding: TemplateAccountBinding): string | null {
   if (binding.templateId) {
     if (binding.templateStatus === 'failed') return TEMPLATE_LOAD_FAILED_MESSAGE
     /*
@@ -148,7 +150,7 @@ function templateSaveGuard(binding: TemplateAccountBinding): string | null {
  *
  * 捨てたときは `null`、読めなかったときは `'failed'`。
  */
-async function requestTemplateReferences(request: {
+export async function requestTemplateReferences(request: {
   load: (accountId: string) => Promise<TemplateReferences>
   accountId: string
   generation: number
@@ -162,7 +164,7 @@ async function requestTemplateReferences(request: {
   }
 }
 
-interface TemplateSaveInput extends TemplateAccountBinding {
+export interface TemplateSaveInput extends TemplateAccountBinding {
   name: string
   category: string
   messageType: string
@@ -177,7 +179,7 @@ interface TemplateSaveInput extends TemplateAccountBinding {
  * A のテンプレートとして保存される。保存する口 (`PUT /api/templates/:id`)
  * は所属アカウントを受け取らないので、サーバー側では気づけない。
  */
-function validateTemplateSave(input: TemplateSaveInput): string | null {
+export function validateTemplateSave(input: TemplateSaveInput): string | null {
   const guard = templateSaveGuard(input)
   if (guard) return guard
   if (!input.templateId && !input.selectedAccountId) return '上のバーでLINE公式アカウントを選んでください'
@@ -193,7 +195,7 @@ function validateTemplateSave(input: TemplateSaveInput): string | null {
   return null
 }
 
-interface TemplateSaveOps {
+export interface TemplateSaveOps {
   create: typeof api.templates.create
   update: typeof api.templates.update
 }
@@ -204,10 +206,10 @@ interface TemplateSaveOps {
  * 画面側でボタンを塞ぐだけだと、状態が入れ替わる途中の押下を拾えない。
  * 送る直前に、送り先と中身が同じテンプレートのものか確かめ直す。
  */
-async function saveTemplateEdit(
+export async function saveTemplateEdit(
   input: TemplateSaveInput,
   ops: TemplateSaveOps = { create: api.templates.create, update: api.templates.update },
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const blocked = validateTemplateSave(input)
   if (blocked) return { ok: false, error: blocked }
 
@@ -222,7 +224,8 @@ async function saveTemplateEdit(
     const res = input.templateId
       ? await ops.update(input.templateId, payload)
       : await ops.create({ accountId: input.selectedAccountId as string, ...payload })
-    return res.success ? { ok: true } : { ok: false, error: res.error }
+    // ★V8「保存して公開」は保存した id をそのまま公開口へ渡すため返す。
+    return res.success ? { ok: true, id: res.data.id } : { ok: false, error: res.error }
   } catch (e) {
     // WRITE-01: 権限不足・所属違い・機能オフの理由が見えるようにする。
     // 内部文（API error: 5xx 等）は画面へ出さない。
@@ -236,7 +239,7 @@ async function saveTemplateEdit(
  * 「保存できません」だけでは戻し方が分からない。どのアカウントのものか、
  * 候補は何のままかを一緒に出す。
  */
-function TemplateAccountNotice({
+export function TemplateAccountNotice({
   binding,
   templateAccountLabel,
   selectedAccountLabel,
@@ -267,7 +270,7 @@ function TemplateAccountNotice({
  */
 
 /** 詳細口（GET /api/templates/:id）が返す利用先の形。 */
-type TemplateUsedBy = TemplateDetailData['usedBy']
+export type TemplateUsedBy = TemplateDetailData['usedBy']
 
 /**
  * 利用先の1行分（IDEA-11）。
@@ -275,7 +278,7 @@ type TemplateUsedBy = TemplateDetailData['usedBy']
  * 一覧のドロワーと同じ行き先へ揃える。旧形式オートメーションは
  * 開ける画面が無いので、リンクにせずその旨を添える。
  */
-function templateUsageEntries(usedBy: TemplateUsedBy): Array<{
+export function templateUsageEntries(usedBy: TemplateUsedBy): Array<{
   key: string
   href: string | null
   label: string
@@ -330,7 +333,7 @@ function templateUsageEntries(usedBy: TemplateUsedBy): Array<{
  * 保存の手前に出す。出さないと、自動応答やシナリオで使われている
  * 本文が予告なしに差し替わる。
  */
-function TemplateUsageNotice({ usedBy, published }: { usedBy: TemplateUsedBy; published: boolean }) {
+export function TemplateUsageNotice({ usedBy, published }: { usedBy: TemplateUsedBy; published: boolean }) {
   const entries = templateUsageEntries(usedBy)
   return (
     <section
@@ -376,7 +379,7 @@ function TemplateUsageNotice({ usedBy, published }: { usedBy: TemplateUsedBy; pu
 }
 
 /** 編集中の中身。テンプレート1件分の下書き。 */
-interface TemplateDraft {
+export interface TemplateDraft {
   name: string
   category: string
   folderId: string | null
@@ -391,7 +394,7 @@ interface TemplateDraft {
  * URL の id だけ先に変わり、中身が前のテンプレートのまま残る瞬間ができる。
  * その瞬間に保存すると、前のテンプレートの本文が新しい id へ入る。
  */
-interface TemplateEditorState {
+export interface TemplateEditorState {
   requestedId: string | null
   status: TemplateLoadStatus
   templateAccountId: string | null
@@ -405,7 +408,7 @@ interface TemplateEditorState {
   usedBy: TemplateUsedBy | null
 }
 
-function newTemplateEditorState(templateId: string | null, visual: boolean): TemplateEditorState {
+export function newTemplateEditorState(templateId: string | null, visual: boolean): TemplateEditorState {
   return {
     requestedId: templateId,
     status: templateId ? 'loading' : 'idle',
@@ -709,9 +712,18 @@ function TemplateEditPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <TemplateEditInner />
+      <TemplateEditThemed />
     </Suspense>
   )
+}
+
+/*
+ * ★V8: data-theme="v8" のときだけ新しい作る画面（edit-v8.tsx）を出す。
+ * v7 の TemplateEditInner は見た目も動きもそのまま残す。
+ */
+function TemplateEditThemed() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <TemplateEditV8 /> : <TemplateEditInner />
 }
 
 /*

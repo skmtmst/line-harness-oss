@@ -7,7 +7,6 @@ import { api } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import LinePreview from '@/components/shared/line-preview'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -18,6 +17,8 @@ import InlineActionList, { useActionOptions } from '@/components/auto-replies/in
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import CarouselEditorV8 from './carousel-v8'
 import {
   readInlineActions,
   toActionPayload,
@@ -32,14 +33,14 @@ import Button from '@/components/shared/button'
  * そばに出して、保存する前に気づけるようにしている。
  */
 
-const MAX_COLUMNS = 10
-const MAX_ACTIONS = 3
-const TITLE_MAX = 40
-const TEXT_MAX_WITH_IMAGE = 60
-const TEXT_MAX_WITHOUT_IMAGE = 120
+export const MAX_COLUMNS = 10
+export const MAX_ACTIONS = 3
+export const TITLE_MAX = 40
+export const TEXT_MAX_WITH_IMAGE = 60
+export const TEXT_MAX_WITHOUT_IMAGE = 120
 
 /** 選択肢1つぶん。 */
-interface Choice {
+export interface Choice {
   label: string
   /** 'uri'（URLを開く）か 'action'（押されたときに何かする）。 */
   kind: 'uri' | 'action'
@@ -48,22 +49,22 @@ interface Choice {
   actions: InlineAction[]
 }
 
-interface Panel {
+export interface Panel {
   thumbnailImageUrl: string
   title: string
   text: string
   actions: Choice[]
 }
 
-function emptyChoice(): Choice {
+export function emptyChoice(): Choice {
   return { label: '', kind: 'uri', uri: '', actions: [] }
 }
 
-function emptyPanel(): Panel {
+export function emptyPanel(): Panel {
   return { thumbnailImageUrl: '', title: '', text: '', actions: [emptyChoice()] }
 }
 
-function visualPanels(): Panel[] {
+export function visualPanels(): Panel[] {
   return Array.from({ length: 5 }, (_, index) => ({
     thumbnailImageUrl: '',
     title: index === 1 ? '夏の定番セット（送料込み）' : `パネル ${index + 1}`,
@@ -83,7 +84,7 @@ function visualPanels(): Panel[] {
  * ときまだ決まっていない**ので、いったん空で作り、id が返ってから埋めて
  * 保存し直す（saveCarousel の2段階目）。
  */
-function buildCarouselContent(panels: Panel[], templateId: string): string {
+export function buildCarouselContent(panels: Panel[], templateId: string): string {
   return JSON.stringify(
     panels.map((p, ci) => ({
       ...(p.thumbnailImageUrl.trim() ? { thumbnailImageUrl: p.thumbnailImageUrl.trim() } : {}),
@@ -105,7 +106,7 @@ function buildCarouselContent(panels: Panel[], templateId: string): string {
 }
 
 /** 選択肢ごとのアクションは、パネル番号 → 選択肢番号 の入れ子で持つ。 */
-function buildCarouselActions(panels: Panel[]): Record<string, Record<string, unknown[]>> {
+export function buildCarouselActions(panels: Panel[]): Record<string, Record<string, unknown[]>> {
   const carouselActions: Record<string, Record<string, unknown[]>> = {}
   panels.forEach((p, ci) => {
     p.actions
@@ -123,7 +124,7 @@ function buildCarouselActions(panels: Panel[]): Record<string, Record<string, un
  * D009: 未保存の見分けに入れる中身。保存の口へ送る項目とそろえる。
  * `createdId` は人の入力ではないので入れない。
  */
-interface CarouselDirtyState {
+export interface CarouselDirtyState {
   name: string
   panels: Panel[]
   folderId: string | null
@@ -136,11 +137,11 @@ interface CarouselDirtyState {
  * 「保存していない変更がある」とする。比べるのは値だけで、順番も含める
  * （パネルの並び替えも失われる作業のため）。
  */
-function carouselSnapshot(state: CarouselDirtyState): string {
+export function carouselSnapshot(state: CarouselDirtyState): string {
   return JSON.stringify(state)
 }
 
-interface CarouselSaveInput {
+export interface CarouselSaveInput {
   /**
    * 保存先のテンプレート id。URL の `?id=`、またはこの画面での保存が
    * 「作成」まで済んで「postback 埋め直し」で止まったときの作成済み id。
@@ -156,8 +157,12 @@ interface CarouselSaveInput {
   tapLimitText: string
 }
 
-type CarouselSaveResult =
-  | { ok: true }
+export type CarouselSaveResult =
+  | {
+      ok: true
+      /** ★V8「保存して公開」が直後に公開口へ渡す保存先の id。 */
+      id: string
+    }
   | {
       ok: false
       error: string
@@ -168,7 +173,7 @@ type CarouselSaveResult =
       createdId?: string
     }
 
-interface CarouselSaveOps {
+export interface CarouselSaveOps {
   create: typeof api.templates.create
   update: typeof api.templates.update
 }
@@ -182,7 +187,7 @@ interface CarouselSaveOps {
  * 返す。次の保存はそれを `templateId` へ入れて呼ばれるので、同じ
  * テンプレートへの更新としてやり直せ、二重に作られない。
  */
-async function saveCarousel(
+export async function saveCarousel(
   input: CarouselSaveInput,
   ops: CarouselSaveOps = { create: api.templates.create, update: api.templates.update },
 ): Promise<CarouselSaveResult> {
@@ -213,7 +218,7 @@ async function saveCarousel(
         folderId: input.folderId,
         ...carouselOptions,
       })
-      return res.success ? { ok: true } : fail(res.error)
+      return res.success ? { ok: true, id: input.templateId } : fail(res.error)
     }
 
     const created = await ops.create({
@@ -237,7 +242,7 @@ async function saveCarousel(
       })
       if (!fixed.success) return fail(fixed.error)
     }
-    return { ok: true }
+    return { ok: true, id: createdId }
   } catch (e) {
     return fail(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
   }
@@ -962,11 +967,20 @@ function CarouselEditorInner() {
   )
 }
 
+/*
+ * ★V8: data-theme="v8" のときだけ新しい作る画面（carousel-v8.tsx）を出す。
+ * v7 の CarouselEditorInner は見た目も動きもそのまま残す。
+ */
+function CarouselEditorThemed() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <CarouselEditorV8 /> : <CarouselEditorInner />
+}
+
 function CarouselEditorPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <CarouselEditorInner />
+      <CarouselEditorThemed />
     </Suspense>
   )
 }
