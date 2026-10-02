@@ -1,18 +1,19 @@
 /* V6 T4S2Qb / k8DFrR。共有Toggleの操作性を保ち、この画面の40×22に合わせる。 */
-[data-theme='v8'] .v8-hq-billing-intervalToggle[role='switch'] {
+/* 従来の表示でも同じ大きさにするため、版の限定は付けない。 */
+.v8-hq-billing-intervalToggle[role='switch'] {
   width: 40px;
   height: 22px;
 }
 
-[data-theme='v8'] .v8-hq-billing-intervalToggle[role='switch']::after {
+.v8-hq-billing-intervalToggle[role='switch']::after {
   width: 18px;
   height: 18px;
 }
 
-[data-theme='v8'] .v8-hq-billing-intervalToggle[aria-checked='true'] {
+.v8-hq-billing-intervalToggle[aria-checked='true'] {
   background: var(--color-accent-deep);
 }
 
-[data-theme='v8'] .v8-hq-billing-intervalToggle[aria-checked='true']::after {
+.v8-hq-billing-intervalToggle[aria-checked='true']::after {
   transform: translateX(18px);
 }
