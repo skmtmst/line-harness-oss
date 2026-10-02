@@ -262,14 +262,29 @@
   "app/tags/field-migrate-v8.tsx": {
     "unresolved-classname": 72
   },
+  "app/tags/fields-tab-v8.tsx": {
+    "unresolved-classname": 58
+  },
   "app/tags/fields/migrate/page.tsx": {
     "arbitrary-value": 1
   },
   "app/tags/folders/new/page.tsx": {
     "arbitrary-value": 6
   },
+  "app/tags/list-v8.tsx": {
+    "unresolved-classname": 6
+  },
+  "app/tags/marks-v8.tsx": {
+    "unresolved-classname": 51
+  },
   "app/tags/search-editor-v8.tsx": {
     "unresolved-classname": 53
+  },
+  "app/tags/searches-v8.tsx": {
+    "unresolved-classname": 59
+  },
+  "app/tags/tags-tab-v8.tsx": {
+    "unresolved-classname": 67
   },
   "app/templates/carousel/page.tsx": {
     "unresolved-classname": 7,
