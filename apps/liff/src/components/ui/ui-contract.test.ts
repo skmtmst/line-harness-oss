@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * LIFF ★V7 の見た目の契約 (予約まわり)。
+ * LIFF ★V8 の見た目の契約 (予約まわり)。
  *
  * 流儀は qa-guard.test.ts と同じ (描画試験はしない。文面を読む)。
  * 動き (保存・送信・読み直し) の試験は別にあり、ここでは見た目だけ見る。
@@ -21,7 +21,7 @@ function ui(name: string): string {
   return readFileSync(join(UI, name), 'utf8');
 }
 
-/** ★V7 に作り替えた文面。Event 系は別 PR なので外す。 */
+/** ★V8 の見た目で読む文面。Event 系は別 PR なので外す。 */
 const V7_FILES = [
   ui('Icon.tsx'),
   ui('Button.tsx'),
@@ -47,7 +47,7 @@ const V7_FILES = [
   src('pages', 'Webinar.tsx'),
 ];
 
-describe('★V7 の色はトークンだけ', () => {
+describe('★V8 の色はトークンだけ', () => {
   it('素の Tailwind 色・16進数・青ボタン・LINE の明るい緑のボタン地が無い', () => {
     for (const text of V7_FILES) {
       expect(text).not.toMatch(/#[0-9a-fA-F]{3,8}/);
@@ -69,10 +69,11 @@ describe('★V7 の色はトークンだけ', () => {
 
   it('Button の主は濃い緑・白文字、副は白の地に枠', () => {
     const button = ui('Button.tsx');
-    expect(button).toContain('bg-accent-deep');
+    // ★V8 の LIFF 専用の濃い緑 (#03873a = --color-liff-primary)。
+    expect(button).toContain('bg-liff-primary');
     expect(button).toContain('text-white');
     expect(button).toContain('bg-canvas');
-    expect(button).toContain('border-hairline');
+    expect(button).toContain('border-liff-line-strong');
   });
 });
 
@@ -89,8 +90,9 @@ describe('LoadErrorView は日本語＋読み直しだけ', () => {
     const view = src('components', 'LoadErrorView.tsx');
     expect(view).toContain('RETRY_LABEL');
     expect(view).toContain('onRetry');
-    expect(view).toContain('cloud-off');
-    expect(view).toContain('bg-state-mark');
+    // ★V8 (zz9R3): 切れた電波の印＋薄い文字。
+    expect(view).toContain('wifi-off');
+    expect(view).toContain('text-liff-idle');
     expect(view).toContain('LOAD_FAILED_MESSAGE');
     expect(view).toContain('note');
     // 画面に出るのは日本語の文とボタンの1文だけ。部品名・定数名は除く。
@@ -144,15 +146,21 @@ describe('読み込み中・失敗の間は下の帯を出さない', () => {
     }
     const booking = src('pages', 'Booking.tsx');
     expect(booking).toContain('onLoadState');
-    // 下の帯3つ (担当・日時・確認へ) すべてが合図待ち。素の帯は無い。
-    expect(booking.match(/stepReady && \(/g)?.length ?? 0).toBe(3);
+    // 下の帯2つ (担当・日時へ) が合図待ち。日時の帯は DateTimePicker が
+    // 中身 (空きが読めたとき) だけ出すので、Booking 側の帯は無い。
+    expect(booking.match(/stepReady && \(/g)?.length ?? 0).toBe(2);
+    const picker = src('components', 'DateTimePicker.tsx');
+    expect(picker).toContain('weekHasOpen');
   });
 });
 
-describe('送信した画面は中央寄せ＋暦の印', () => {
-  it('Done の履歴ボタンに calendar-days がある', () => {
-    expect(src('components', 'Done.tsx')).toContain('calendar-days');
-    expect(src('pages', 'Booking.tsx')).toContain('justify-center');
+describe('受け付けましたの画面 (★V8・VU6Xi)', () => {
+  it('緑の丸の印＋履歴ボタンに calendar-days があり、帯に LINEに戻る', () => {
+    const done = src('components', 'Done.tsx');
+    expect(done).toContain('calendar-days');
+    expect(done).toContain('bg-liff-soft');
+    expect(done).toContain('LINEに戻る');
+    expect(done).toContain('予約の履歴を見る');
   });
 });
 
@@ -164,10 +172,11 @@ describe('撮り直しの3点', () => {
     expect(picker).toContain("block: 'nearest'");
   });
 
-  it('日時の帯は選ぶ前「日時を選んでください」・選んだら「M/D HH:MM で確認へ」', () => {
-    const booking = src('pages', 'Booking.tsx');
-    expect(booking).toContain('日時を選んでください');
-    expect(booking).toContain('で確認へ');
+  it('日時の帯は選ぶ前「時間を選ぶ」・選んだら日時の行＋「内容を確かめる」(peek は別文)', () => {
+    const picker = src('components', 'DateTimePicker.tsx');
+    expect(picker).toContain('時間を選ぶ');
+    expect(picker).toContain('内容を確かめる');
+    expect(src('pages', 'Booking.tsx')).toContain('この時間で予約に進む');
   });
 
   it('中央寄せの本文は行末の1〜2文字落ちを防ぐ (説明文は pretty)', () => {

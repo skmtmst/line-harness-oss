@@ -2,6 +2,8 @@
 
 import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import AffiliatesV8 from './affiliates-v8'
 
 /**
  * 旧URLはV6正本へ集約する。
@@ -33,6 +35,10 @@ function AffiliatesRedirect() {
   const params = useSearchParams()
 
   useEffect(() => {
+    // useAdminTheme は最初の描画で 'v7' を返すため、テーマが v8 へ切り替わる
+    // 直前にこの器が一瞬載る。v8 が確定しているのに送ると
+    // /conversions → /affiliates の往復になるので、DOM の印で確かめてから送る。
+    if (document.documentElement.dataset.theme === 'v8') return
     const tab = params.get('tab')
     router.replace(`/conversions?tab=${tab && CONVERSIONS_TABS.has(tab) ? tab : 'affiliates'}`)
   }, [params, router])
@@ -44,11 +50,21 @@ function AffiliatesRedirect() {
   )
 }
 
+/**
+ * ★V8：テーマが v8 のときは「成果とアフィリエイト」専用の画面（affiliates-v8.tsx）
+ * を出す。v7 はこれまでどおり /conversions の共通タブへ送る。
+ */
+function AffiliatesSwitch() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <AffiliatesV8 />
+  return <AffiliatesRedirect />
+}
+
 export default function AffiliatesPage() {
   return (
     // useSearchParams は静的書き出しのため Suspense の中でしか使えない。
     <Suspense>
-      <AffiliatesRedirect />
+      <AffiliatesSwitch />
     </Suspense>
   )
 }
