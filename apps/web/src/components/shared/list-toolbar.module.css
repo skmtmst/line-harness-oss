@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
   /*
    * ★V7 `Xn1Mz`「一覧の上の道具の並び」。どの一覧も同じ2行。
@@ -102,10 +103,37 @@
   }
 
   /*
-   * ★V8「道具の1段」（c4n9Kr）：段と段の間は 12。置く道具は
-   * すべて高さ 36・角丸 control（各部品側の v8 規定が効く）。
+   * ★V8「道具の1段」（c4n9Kr）：帯は1段・高さ64。余白は上下14・
+   * 左右24、道具の間は 8。v7 の2段組みは変えない。
+   *
+   * v8 では row1/row2/filters の入れ子を display:contents で
+   * ほぐし、中身を帯の直接の子として1段に並べる。並びは
+   * Pencil の順：検索 → 絞り込み → 道具 → 右端に並び順・件数。
+   * 入りきらない幅では flex-wrap で下へ折り返す。
    */
   [data-theme='v8'] .toolbar {
-    gap: 12px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 24px;
+  }
+
+  [data-theme='v8'] .row1,
+  [data-theme='v8'] .row2,
+  [data-theme='v8'] .filters {
+    display: contents;
+  }
+
+  [data-theme='v8'] .filters > * {
+    order: 2;
+  }
+
+  [data-theme='v8'] .row1 > *:not(.search) {
+    order: 3;
+  }
+
+  [data-theme='v8'] .trailing {
+    order: 4;
   }
 }

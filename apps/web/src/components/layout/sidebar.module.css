@@ -311,3 +311,93 @@
   border: 2px solid var(--color-shell);
   padding: 0 2px;
 }
+
+/* ---------------------------------------------------------------------
+ * ★V8 移行（夕44-A・部品 T7XSI6 版 2026-10-02-01）：組の開閉・項目の詰め
+ *
+ * 項目の上下を 5px、組の中の間を 1px に詰めて、9 組 48 項目が
+ * 高さ 1000 の板に収まるようにする。組の見出しは押せる開閉で、
+ * 畳んだ組は見出しだけ残る（組が丸ごと消えることはない）。
+ * 画面の高さが足りないときは .nav だけが縦に送られ、下の「設定」と
+ * 版は下端に固定される（nav が flex:1 なので追加の指定は要らない）。
+ * ------------------------------------------------------------------- */
+[data-theme="v8"] .item {
+  height: auto;
+  min-height: 0;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+[data-theme="v8"] .section {
+  gap: 1px;
+}
+
+/* 組の見出し（押すと開閉）。右の矢印で今の開き方を示す。v7 には出ない。 */
+.sectionToggle {
+  display: flex;
+  height: 34px;
+  width: 100%;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 12px 12px 5px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+[data-theme="v8"] .sectionToggle {
+  font-size: var(--text-micro);
+  font-weight: 500;
+}
+
+.sectionToggle:hover {
+  color: var(--color-ink-secondary);
+}
+
+.sectionToggle:focus-visible {
+  border-radius: var(--radius-control);
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.sectionChevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  margin-bottom: 1px;
+  transition: transform var(--motion-fast) var(--motion-ease-out);
+}
+
+/* 畳んでいる組は右を向く（開いているときは下向き）。 */
+.sectionChevronClosed {
+  transform: rotate(-90deg);
+}
+
+/*
+ * 版の上に置く「設定」の入口（夕41・部品 njl8e）。v8 でだけ描く。
+ * 上に1本の細い線でメニューの項目と切り分ける。
+ */
+.settingsEntry {
+  border-top: 1px solid var(--color-hairline);
+  padding: 4px 12px;
+}
+
+/* 畳んだ帯では組の見出しを隠し、項目はアイコン1行分（40px）に揃える。 */
+[data-theme="v8"] .desktop[data-collapsed] .sectionToggle {
+  display: none;
+}
+
+[data-theme="v8"] .desktop[data-collapsed] .item {
+  height: 40px;
+}
+
+/* 畳んだ帯でも「設定」の歯車は出す（版の枠は collapseHide で隠れる）。 */
+[data-theme="v8"] .desktop[data-collapsed] .settingsEntry {
+  padding: 4px 12px;
+}
+
+/* v8 では下端に「設定」と版が入るので、空の76px枠は置かない。 */
+[data-theme="v8"] .footer {
+  display: none;
+}

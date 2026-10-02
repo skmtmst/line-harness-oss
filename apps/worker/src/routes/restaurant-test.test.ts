@@ -180,6 +180,88 @@ beforeEach(() => {
   };
 });
 
+describe('電話予約のLINE確認通知', () => {
+  const path = '/api/restaurant-test/reservations/manual?account_id=account-1';
+  const body = { storeId: 'store-ginza', customerName: '試験用のお客さま', guestCount: 2,
+    startsAt: '2026-11-10T10:00:00.000Z', endsAt: '2026-11-10T12:00:00.000Z', lineUid: 'U' + '1'.repeat(32), notifyLine: true };
+  function seedFriend(following = 1, accountId = 'account-2') {
+    seedRestaurantFixture();
+    testDb.raw.exec(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
+      VALUES ('account-2', '試験店舗', 'fixture-channel', 'unused', 'unused-token');`);
+    testDb.raw.prepare('INSERT INTO friends (id, line_user_id, line_account_id, is_following) VALUES (?, ?, ?, ?)')
+      .run('friend-fixture', body.lineUid, accountId, following);
+  }
+  async function notice(input: unknown = body) {
+    const res = await request(path, input);
+    expect(res.status).toBe(201);
+    const result = await res.json() as { data: { id: string; tableId: string; syncDirection: string; lineNotice: { sent: boolean; reason: string | null } } };
+    expect(result.data.syncDirection).toBe('inbound_only');
+    expect(testDb.raw.prepare('SELECT id FROM rt_reservations WHERE id = ?').get(result.data.id)).toBeDefined();
+    return result.data;
+  }
+  it('友だちへの送信に既存の確認文面を使い、自動通知として履歴を残す', async () => {
+    seedFriend();
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await notice({ ...body, courseId: 'menu-ginza' });
+    expect(result.lineNotice).toEqual({ sent: true, reason: null });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://api.line.me/v2/bot/message/push');
+    const headers = new Headers(init.headers);
+    expect(headers.has('X-Line-Harness-Source')).toBe(false);
+    expect(headers.get('X-Line-Retry-Key')).toBe(result.id);
+    expect(JSON.parse(init.body as string)).toMatchObject({ to: body.lineUid,
+      messages: [{ type: 'text', text: expect.stringContaining('予約が確定しました。') }] });
+    expect(JSON.parse(init.body as string).messages[0].text).toContain('テストコース');
+    expect(JSON.parse(init.body as string).messages[0].text).toContain('2026-11-10 19:00');
+    expect(testDb.raw.prepare("SELECT source FROM messages_log WHERE friend_id = 'friend-fixture'").get()).toEqual({ source: 'external' });
+  });
+  it.each([undefined, false])('notifyLine=%sでは送らず、従来の予約結果を返す', async notifyLine => {
+    seedFriend();
+    const { notifyLine: _notifyLine, ...oldBody } = body;
+    expect((await notice({ ...oldBody, notifyLine })).lineNotice).toEqual({ sent: false, reason: 'not_requested' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it('ブロック中は送らず、予約は保存する', async () => {
+    seedFriend(0);
+    expect((await notice()).lineNotice).toEqual({ sent: false, reason: 'blocked' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it.each([body.lineUid, null])('別アカウントの友だち・UID未入力には送らない (%s)', async lineUid => {
+    seedFriend(1, 'account-3');
+    expect((await notice({ ...body, lineUid })).lineNotice).toEqual({ sent: false, reason: 'not_friend' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it.each(['account-2', '*'])('送信停止を守る (%s)', async scope => {
+    seedFriend();
+    testDb.raw.prepare("INSERT INTO operation_control_sets (scope_key, line_account_id, states_json, updated_at) VALUES (?, ?, ?, '2026-10-02')")
+      .run(scope, scope === '*' ? null : scope, '{"broadcast_dispatch":"stopped"}');
+    expect((await notice()).lineNotice).toEqual({ sent: false, reason: 'sending_disabled' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it('送信失敗でも予約と在庫を保存し、例外の本文は返さない', async () => {
+    seedFriend();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('試験用の非公開本文', { status: 500 })));
+    const result = await notice();
+    expect(result.lineNotice).toEqual({ sent: false, reason: 'send_failed' });
+    expect(JSON.stringify(result)).not.toContain('非公開本文');
+    expect(testDb.raw.prepare("SELECT status FROM rt_reservations WHERE id = ?").get(result.id)).toEqual({ status: 'confirmed' });
+  });
+  it('停止中・アーカイブ済みアカウントには送らない', async () => {
+    seedFriend();
+    testDb.raw.prepare("UPDATE line_accounts SET archived_at = '2026-10-02' WHERE id = 'account-2'").run();
+    expect((await notice()).lineNotice).toEqual({ sent: false, reason: 'account_unavailable' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it('未確定の予約に確定文面を送らず、notifyLineの型を検証する', async () => {
+    seedFriend();
+    expect((await notice({ ...body, status: 'pending' })).lineNotice).toEqual({ sent: false, reason: 'not_confirmed' });
+    expect((await request(path, { ...body, notifyLine: 'true' })).status).toBe(400);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+});
+
 describe('飲食店向けテストAPI', () => {
   it('無効な環境では専用APIを404にする', async () => {
     env.RESTAURANT_TEST_ENABLED = 'false';
@@ -986,6 +1068,20 @@ describe('飲食店向けテストAPI', () => {
     expect(conflict.status).toBe(409);
   });
 
+  it('卓の位置と結合を保存し、省略時は保持・nullで結合を解除する', async () => {
+    seedRestaurantFixture();
+    const path = '/api/restaurant-test/tables/table-ginza?account_id=account-1';
+    expect((await requestWithMethod(path, 'PATCH', { floorX: 0, floorY: 120, joinGroup: '組1' })).status).toBe(200);
+    expect((await requestWithMethod(path, 'PATCH', { label: '配置済み' })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT floor_x, floor_y, join_group FROM rt_tables WHERE id = ?').get('table-ginza'))
+      .toEqual({ floor_x: 0, floor_y: 120, join_group: '組1' });
+    expect((await requestWithMethod(path, 'PATCH', { joinGroup: null })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT join_group FROM rt_tables WHERE id = ?').get('table-ginza')).toEqual({ join_group: null });
+    for (const body of [{ floorX: 1.5 }, { floorY: null }, { joinGroup: 3 }]) {
+      expect((await requestWithMethod(path, 'PATCH', body)).status).toBe(400);
+    }
+  });
+
   it('R107: 卓を変更・停止・再開しても予約の参照を残し、別組織の卓は変更しない', async () => {
     seedRestaurantFixture();
     const path = '/api/restaurant-test/tables/table-ginza?account_id=account-1';
@@ -1068,5 +1164,66 @@ describe('飲食店向けテストAPI', () => {
     expect(newer.status).toBe(201);
     const row = testDb.raw.prepare("SELECT guest_count FROM rt_reservations WHERE external_id = 'RB-FRESH'").get() as { guest_count: number };
     expect(row.guest_count).toBe(4);
+  });
+});
+
+
+describe('V8-B 予約経路と隔離メール', () => {
+  function seedEmails() {
+    seedRestaurantFixture();
+    testDb.raw.exec(`INSERT INTO rt_media (id, code, name, parser_key) VALUES ('hp', 'hotpepper', 'ホットペッパー', 'hotpepper');
+      INSERT INTO rt_media (id, code, name, parser_key, is_active) VALUES ('tc', 'tablecheck', 'TableCheck', 'tablecheck', 0);
+      INSERT INTO rt_inbound_emails (id, message_id, store_id, media_id, status, quarantine_reason) VALUES
+        ('email-1', 'message-1', 'store-ginza', 'hp', 'quarantined', 'unprocessed:kind_unknown');
+      INSERT INTO rt_inbound_emails (id, message_id, store_id, media_id, status, received_at) VALUES
+        ('email-2', 'message-2', 'store-ginza', 'hp', 'received', datetime('now', '-3 days')),
+        ('email-other', 'message-other', 'store-yokohama', 'hp', 'quarantined', datetime('now'));
+      INSERT INTO rt_inventory_slots (id, store_id, starts_at, total_capacity) VALUES ('slot', 'store-ginza', '2026-10-15T10:00:00.000Z', 4);`);
+  }
+  it('店舗別の今日の受信件数・隔離件数と準備中の媒体を返す', async () => {
+    seedEmails();
+    const res = await request('/api/restaurant-test/channels?account_id=account-1&storeId=store-ginza');
+    expect(res.status).toBe(200);
+    const data = (await res.json() as any).data;
+    expect(data.find((row: any) => row.code === 'hotpepper')).toMatchObject({ receiveMethod: 'email_forward', todayCount: 1, unreadableCount: 1, status: 'receiving' });
+    expect(data.find((row: any) => row.code === 'tablecheck')).toMatchObject({ status: 'preparing', todayCount: 0 });
+    expect(data.find((row: any) => row.code === 'restaurant_board')).toMatchObject({ receiveMethod: 'direct' });
+    const list = await request('/api/restaurant-test/inbound-emails?account_id=account-1&storeId=store-ginza&status=quarantined');
+    const result = await list.json() as any;
+    expect(result.total).toBe(1);
+    expect(result.data[0]).toMatchObject({ id: 'email-1', reason: 'unprocessed:kind_unknown' });
+    expect(result.data[0]).not.toHaveProperty('r2_key');
+    expect((await request('/api/restaurant-test/channels?account_id=account-2&storeId=store-yokohama')).status).toBe(400);
+    expect((await request('/api/restaurant-test/inbound-emails?account_id=account-2&storeId=store-yokohama')).status).toBe(400);
+  });
+  it('隔離メールを予約と在庫へ一度だけ取り込む', async () => {
+    seedEmails();
+    const path = '/api/restaurant-test/inbound-emails/email-1/manual-import?account_id=account-1';
+    const body = { customerName: '取り込み確認', guestCount: 2, startsAt: '2026-10-15T19:00:00+09:00' };
+    expect((await request(path, { ...body, guestCount: 0 })).status).toBe(400);
+    const first = await request(path, body);
+    expect(first.status).toBe(201);
+    const id = (await first.json() as any).data.id;
+    expect(testDb.raw.prepare('SELECT ends_at FROM rt_reservations WHERE id = ?').get(id)).toEqual({ ends_at: '2026-10-15T12:00:00.000Z' });
+    const repeated = await request(path, body);
+    expect((await repeated.json() as any).data).toMatchObject({ id, duplicate: true });
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS n FROM rt_reservations WHERE inbound_email_id = 'email-1'").get()).toEqual({ n: 1 });
+    expect(testDb.raw.prepare("SELECT reserved_count FROM rt_inventory_slots WHERE id = 'slot'").get()).toEqual({ reserved_count: 2 });
+    expect(testDb.raw.prepare("SELECT status FROM rt_inbound_emails WHERE id = 'email-1'").get()).toEqual({ status: 'received' });
+    expect((await request('/api/restaurant-test/inbound-emails/email-2/manual-import?account_id=account-1', body)).status).toBe(409);
+  });
+  it('予約が埋まっていてもメールを失わず未割当の予約として取り込む', async () => {
+    seedEmails();
+    const response = await request('/api/restaurant-test/inbound-emails/email-1/manual-import?account_id=account-1', { customerName: '満席確認', guestCount: 10, startsAt: '2026-10-15T10:00:00Z', endsAt: '2026-10-15T12:00:00Z' });
+    expect(response.status).toBe(201);
+    expect((await response.json() as any).data.tableId).toBeNull();
+  });
+  it('選択中の店舗以外のメールと経路を見せず、取り込ませない', async () => {
+    seedEmails();
+    const token = await createAdminSession();
+    await requestAs('/api/restaurant-test/stores/store-ginza/select?account_id=account-1', token, {});
+    expect((await requestAs('/api/restaurant-test/channels?account_id=account-1&storeId=store-yokohama', token)).status).toBe(400);
+    expect((await requestAs('/api/restaurant-test/inbound-emails?account_id=account-1&storeId=store-yokohama', token)).status).toBe(400);
+    expect((await requestAs('/api/restaurant-test/inbound-emails/email-other/manual-import?account_id=account-1', token, {})).status).toBe(404);
   });
 });
