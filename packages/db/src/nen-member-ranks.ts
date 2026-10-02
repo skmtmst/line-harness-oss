@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { dbTableExists, jstNow } from './utils.js';
 
 /**
  * 然-NEN- 会員ランク（通年）・ライフタイム・マイル。★V6 37-1（`IqL2Z`）／37-1-A（`p7xHl`）／37-1-B（`Vt65m`）。
@@ -350,6 +350,10 @@ export interface NenMemberListOptions {
   /** 見える line_account_id。null は未割り当て。 */
   accountIds: Array<string | null>;
   rankKey?: string | null;
+  /** いずれかのランクに属する会員だけ（★V8「○○以上」の札。rankKey より優先）。 */
+  rankKeys?: string[];
+  /** ECの会員と結びついているかで絞る（★V8「EC未連携」の札）。 */
+  linkedOnly?: 'linked' | 'unlinked';
   petFilter?: 'any' | 'with' | 'without';
   query?: string;
   sort?: 'annual_desc' | 'lifetime_desc' | 'balance_desc' | 'recent';
@@ -374,9 +378,17 @@ export async function listNenMembers(
   const scope = accountWhere(options.accountIds, 'f.line_account_id');
   const where: string[] = [scope.sql, 'f.is_following = 1'];
   const binds: unknown[] = [...scope.binds];
-  if (options.rankKey) {
+  if (options.rankKeys && options.rankKeys.length > 0) {
+    where.push(`s.member_rank_key IN (${options.rankKeys.map(() => '?').join(',')})`);
+    binds.push(...options.rankKeys);
+  } else if (options.rankKey) {
     where.push('s.member_rank_key = ?');
     binds.push(options.rankKey);
+  }
+  if (options.linkedOnly === 'linked') {
+    where.push(`s.customer_id IS NOT NULL AND s.customer_id <> ''`);
+  } else if (options.linkedOnly === 'unlinked') {
+    where.push(`(s.customer_id IS NULL OR s.customer_id = '')`);
   }
   if (options.petFilter === 'with') where.push('EXISTS (SELECT 1 FROM nen_pet_profiles p WHERE p.friend_id = f.id)');
   if (options.petFilter === 'without') where.push('NOT EXISTS (SELECT 1 FROM nen_pet_profiles p WHERE p.friend_id = f.id)');
@@ -420,6 +432,13 @@ export interface NenMemberKpis {
   balanceTotal: number;
   usedThisMonth: number;
   byRank: Record<string, number>;
+  /** ECの会員と結びついている会員の数（★V8 会員帯「LINE 連携済み」）。 */
+  linkedMembers: number;
+  /** ペットを登録している会員の数（★V8 会員帯「ペット登録あり」）。 */
+  petMembers: number;
+  /** 当月（JST）の入金済み注文の合計額と買った会員の数（★V8 会員帯「今月の購入」）。 */
+  monthPurchaseYen: number;
+  monthBuyers: number;
 }
 
 export async function getNenMemberKpis(db: D1Database, accountIds: Array<string | null>): Promise<NenMemberKpis> {
@@ -429,10 +448,15 @@ export async function getNenMemberKpis(db: D1Database, accountIds: Array<string 
             COALESCE(SUM(s.annual_miles_yen), 0) AS annual_total,
             COALESCE(SUM(s.lifetime_miles_yen), 0) AS lifetime_total,
             COALESCE(SUM(s.mile_balance), 0) AS balance_total,
-            COALESCE(SUM(s.miles_used_this_month), 0) AS used_this_month
+            COALESCE(SUM(s.miles_used_this_month), 0) AS used_this_month,
+            SUM(CASE WHEN s.customer_id IS NOT NULL AND s.customer_id <> '' THEN 1 ELSE 0 END) AS linked_members,
+            SUM(CASE WHEN EXISTS (SELECT 1 FROM nen_pet_profiles p WHERE p.friend_id = f.id) THEN 1 ELSE 0 END) AS pet_members
        FROM nen_ec_member_snapshots s JOIN friends f ON f.id = s.friend_id
       WHERE ${scope.sql} AND f.is_following = 1`,
-  ).bind(...scope.binds).first<{ members: number; annual_total: number; lifetime_total: number; balance_total: number; used_this_month: number }>();
+  ).bind(...scope.binds).first<{
+    members: number; annual_total: number; lifetime_total: number; balance_total: number; used_this_month: number;
+    linked_members: number | null; pet_members: number | null;
+  }>();
   const ranks = await db.prepare(
     `SELECT COALESCE(s.member_rank_key, '') AS rank_key, COUNT(*) AS count
        FROM nen_ec_member_snapshots s JOIN friends f ON f.id = s.friend_id
@@ -441,6 +465,30 @@ export async function getNenMemberKpis(db: D1Database, accountIds: Array<string 
   ).bind(...scope.binds).all<{ rank_key: string; count: number }>();
   const byRank: Record<string, number> = {};
   for (const row of ranks.results) byRank[row.rank_key] = Number(row.count);
+
+  /*
+   * 「今月の購入」は ec_orders の当月（JST）の入金済み注文から計る。
+   * 注文の口が無い環境（機能だけ使うアカウント）では 0 を返す。
+   */
+  let monthPurchaseYen = 0;
+  let monthBuyers = 0;
+  if (await dbTableExists(db, 'ec_orders')) {
+    const monthScope = accountWhere(accountIds, 'o.line_account_id');
+    // JSTの月頭 00:00 をUTCの瞬間へ直す（JST 1日0時＝UTC 前月末日15時）。
+    const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const monthStartUtc = new Date(Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), 1) - 9 * 60 * 60 * 1000).toISOString();
+    const monthly = await db.prepare(
+      `SELECT COALESCE(SUM(o.total_amount_minor), 0) AS yen,
+              COUNT(DISTINCT COALESCE(o.friend_id, 'c:' || o.customer_id)) AS buyers
+         FROM ec_orders o
+        WHERE ${monthScope.sql}
+          AND o.normalized_status = 'current'
+          AND datetime(o.ordered_at) >= datetime(?)`,
+    ).bind(...monthScope.binds, monthStartUtc).first<{ yen: number | null; buyers: number | null }>();
+    monthPurchaseYen = Number(monthly?.yen ?? 0);
+    monthBuyers = Number(monthly?.buyers ?? 0);
+  }
+
   return {
     members: Number(totals?.members ?? 0),
     annualTotalYen: Number(totals?.annual_total ?? 0),
@@ -448,6 +496,10 @@ export async function getNenMemberKpis(db: D1Database, accountIds: Array<string 
     balanceTotal: Number(totals?.balance_total ?? 0),
     usedThisMonth: Number(totals?.used_this_month ?? 0),
     byRank,
+    linkedMembers: Number(totals?.linked_members ?? 0),
+    petMembers: Number(totals?.pet_members ?? 0),
+    monthPurchaseYen,
+    monthBuyers,
   };
 }
 

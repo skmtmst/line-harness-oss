@@ -14,10 +14,11 @@ import type { BookingAvailabilitySlot } from '@/lib/api'
  * （apps/liff/src/components/DateTimePicker.tsx）と同じ構造かを
  * 実Reactで確かめる。
  *
- * 実LIFF（★V7）: 「日時を選んでください」の下にリスト／カレンダーの
- * 切り替え。リストは日付の札が横に並び（枠の無い日は「満席」で押せない）、
- * カレンダーは月の表（●空きあり／満／休＋印の見方）。
+ * 実LIFF（★V8・M2p63S/k3aJKU/ADutg）: 「日時を選んでください」の下に
+ * 「週で見る／カレンダー」の切り替え。週は5日の並び（空き・満・休み）、
+ * カレンダーは月の表（●空きあり／灰色は満席・休み）。
  * どちらも選んだ日の時刻ボタンが3列（grid-cols-3）で並ぶ。
+ * 空きが無い週は「この週は空きがありません」＋次の手の案内を出す。
  * 「空き枠の内訳」は実画面に無い。
  */
 
@@ -50,15 +51,19 @@ function slot(date: string, start: string): BookingAvailabilitySlot {
 
 afterEach(cleanup)
 
-describe('前提: 実LIFFが「日時を選んでください」＋リスト／カレンダー切替＋3列時刻ボタンの構造', () => {
+describe('前提: 実LIFFが「日時を選んでください」＋週／カレンダー切替＋3列時刻ボタンの構造', () => {
   it('LIFF側の文言と構造が変わっていない（変わったらプレビューも追随が必要）', () => {
     expect(LIFF_SOURCE).toContain('日時を選んでください')
-    expect(LIFF_SOURCE).toContain('この期間に空きはありません。')
+    // ★V8（板 ADutg・k3aJKU）：空きなしは週「この週は空きがありません」、
+    // 月「この月は空きがありません。」（V7 の「この期間に空きはありません。」は
+    // ★V8 で週・月の分かれた案内へ変わった。#1203 で契約を更新）。
+    expect(LIFF_SOURCE).toContain('この週は空きがありません')
+    expect(LIFF_SOURCE).toContain('この月は空きがありません。')
     // 読み込み中・失敗は共通部品（LoadingView・LoadErrorView）で出す。
     expect(LIFF_SOURCE).toContain('LoadingView')
     expect(LIFF_SOURCE).toContain('LoadErrorView')
     expect(LIFF_USER_MESSAGE_SOURCE).toContain('読み込み中...')
-    // 失敗は題「読み込めませんでした」＋本文 LOAD_FAILED_MESSAGE（★V7）。
+    // 失敗は題「読み込めませんでした」＋本文 LOAD_FAILED_MESSAGE。
     expect(LIFF_USER_MESSAGE_SOURCE).toContain(
       '電波の良いところで、もう一度お試しください。',
     )
@@ -66,12 +71,14 @@ describe('前提: 実LIFFが「日時を選んでください」＋リスト／�
     // 旧い見せ方（枠ごとの文言・赤いそのまま表示・題と本文の重ね）が復活していない。
     expect(LIFF_SOURCE).not.toContain('空き枠を取得中...')
     expect(LIFF_SOURCE).not.toContain('text-red-600')
-    // ★V7: リストは日付の横並び札（枠無しは「満席」）、時刻は選んだ日の3列。
+    // ★V8: 「週で見る」は5日の並び（空き・満・休み）、時刻は選んだ日の3列。
+    expect(LIFF_SOURCE).toContain('週で見る')
+    expect(LIFF_SOURCE).toContain('grid-cols-5')
     expect(LIFF_SOURCE).toContain('grid-cols-3')
     expect(LIFF_SOURCE).toContain('満席')
     expect(LIFF_SOURCE).toContain('aria-label="日付"')
     expect(LIFF_SOURCE).not.toContain('grid-cols-4')
-    // カレンダーは月の表（7列・●／満／休の印＋印の見方）。
+    // カレンダーは月の表（7列・●空きあり／灰色は満席・休みの印の見方）。
     expect(LIFF_SOURCE).toContain('grid-cols-7')
     expect(LIFF_SOURCE).toContain('お休み')
     expect(LIFF_SOURCE).toContain('radiogroup')
@@ -205,11 +212,16 @@ describe('プレビューが実LIFFと同じ構造で描画される', () => {
     list.unmount()
   })
 
-  it('空きが無いときは実LIFFと同じ「この期間に空きはありません。」', () => {
+  it('空きが無いときは実LIFFと同じ「この週は空きがありません」（★V8・ADutg）', () => {
     render(
       <LiffDateTimePreview status="ready" slots={[]} menuName="カット" staffName="田中" />,
     )
-    expect(screen.getByText('この期間に空きはありません。')).toBeTruthy()
+    expect(screen.getByText('この週は空きがありません')).toBeTruthy()
+    expect(
+      screen.getByText(
+        '次の週を見るか、担当を「指名なし」にすると見つかることがあります。',
+      ),
+    ).toBeTruthy()
   })
 
   it('取得中・失敗は実LIFFの共通部品と同じ文言とボタンで出す', () => {

@@ -6,8 +6,16 @@ import { parseFriendCsv } from './friend-csv'
 import { parseUidCsv } from '../../accounts/migration'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const CSV_PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const UID_PAGE = readFileSync(join(HERE, '../../accounts/migration.tsx'), 'utf8')
+const CSV_PAGE = [
+  'page.tsx',
+  'use-friend-migrations.ts',
+  'migrations-v8.tsx',
+].map((name) => readFileSync(join(HERE, name), 'utf8')).join('\n')
+const UID_PAGE = [
+  'migration.tsx',
+  'use-uid-migration.ts',
+  'uid-migration-v8.tsx',
+].map((name) => readFileSync(join(HERE, '../../accounts', name), 'utf8')).join('\n')
 
 describe('V6 機能3 UID・CSV移行', () => {
   it('UID対応表の必須列を読み取る', () => {

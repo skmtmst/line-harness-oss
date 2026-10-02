@@ -1165,11 +1165,11 @@ export const NEN_COLUMNS = [
 ]
 
 export const NEN_PETS = [
-  { id: 'nen-pet-momo', friendId: 'friend-1', customerId: 'customer-1', name: 'ももちゃん', animalType: 'dog', gender: 'female', birthday: '2022-09-02', ownerName: '高橋 直人', lineUserId: 'Uvisualfriend000001' },
-  { id: 'nen-pet-sora', friendId: 'friend-2', customerId: 'customer-2', name: 'そらくん', animalType: 'cat', gender: 'male', birthday: '2024-08-28', ownerName: '前田 さくら', lineUserId: 'Uvisualfriend000002' },
-  { id: 'nen-pet-komugi', friendId: 'friend-3', customerId: 'customer-3', name: 'こむぎちゃん', animalType: 'dog', gender: 'female', birthday: '2018-11-14', ownerName: '木村 亮', lineUserId: 'Uvisualfriend000003' },
-  { id: 'nen-pet-leo', friendId: 'friend-4', customerId: 'customer-4', name: 'レオくん', animalType: 'dog', gender: 'male', birthday: null, ownerName: '大西 健一', lineUserId: 'Uvisualfriend000004' },
-  { id: 'nen-pet-purin', friendId: 'friend-5', customerId: 'customer-5', name: 'ぷりんちゃん', animalType: 'other', gender: 'female', birthday: '2022-10-05', ownerName: '中村 彩', lineUserId: 'Uvisualfriend000005' },
+  { id: 'nen-pet-momo', friendId: 'friend-1', customerId: 'customer-1', name: 'ももちゃん', animalType: 'dog', gender: 'female', birthday: '2022-09-02', ownerName: '高橋 直人', lineUserId: 'Uvisualfriend000001', updatedAt: '2026-09-10T10:00:00.000+09:00' },
+  { id: 'nen-pet-sora', friendId: 'friend-2', customerId: 'customer-2', name: 'そらくん', animalType: 'cat', gender: 'male', birthday: '2024-08-28', ownerName: '前田 さくら', lineUserId: 'Uvisualfriend000002', updatedAt: '2026-09-10T10:00:00.000+09:00' },
+  { id: 'nen-pet-komugi', friendId: 'friend-3', customerId: 'customer-3', name: 'こむぎちゃん', animalType: 'dog', gender: 'female', birthday: '2018-11-14', ownerName: '木村 亮', lineUserId: 'Uvisualfriend000003', updatedAt: '2026-09-10T10:00:00.000+09:00' },
+  { id: 'nen-pet-leo', friendId: 'friend-4', customerId: 'customer-4', name: 'レオくん', animalType: 'dog', gender: 'male', birthday: null, ownerName: '大西 健一', lineUserId: 'Uvisualfriend000004', updatedAt: '2026-09-10T10:00:00.000+09:00' },
+  { id: 'nen-pet-purin', friendId: 'friend-5', customerId: 'customer-5', name: 'ぷりんちゃん', animalType: 'other', gender: 'female', birthday: '2022-10-05', ownerName: '中村 彩', lineUserId: 'Uvisualfriend000005', updatedAt: '2026-09-10T10:00:00.000+09:00' },
 ]
 
 const nenJob = (id, campaignKey, label, friendName, scheduledAt, status, attempts, sentAt, triggerLabel, reactionLabel, lineAccountName = 'LINE 本店') => ({
@@ -2617,10 +2617,16 @@ const RUN_BASE = {
 }
 
 export const REMINDER_RUNS = {
-  reminder: { id: 'reminder-1', name: '予約前日のお知らせ', isActive: true },
+  reminder: {
+    id: 'reminder-1', name: '予約前日のお知らせ', isActive: true,
+    /** V8詳細（rbAig）はこの3つで「いまの状態」の札と操作を分ける。 */
+    lifecycleStatus: 'published', stopConditions: null, hasPublishedVersion: true,
+  },
   summary: {
     sent: 1126, scheduled: 398, stopped: 28, errors: 2,
     targetCount: 398, nextScheduledAt: '2026-08-24T09:00:00+09:00',
+    /* V8詳細の「いまの状態」。`getReminderDeliveryRunSummary` の追加列と同じ意味。 */
+    sentThisMonth: 386, scheduledNext7Days: 124,
   },
   steps: [
     {
@@ -7039,9 +7045,10 @@ export const HQ_BANNER_IMAGES = [
 /** 然-NEN- 会員のランク設定。本物は `settingsResponse` の形。 */
 export const NEN_RANK_SETTINGS = {
   ranks: [
-    { id: 'nen-rank-gold', key: 'gold', name: 'ゴールド', annualThresholdYen: 100000, mileRatePercent: 5, tagId: 'tag-nen-gold', tagName: 'NENゴールド', memberCount: 4 },
-    { id: 'nen-rank-silver', key: 'silver', name: 'シルバー', annualThresholdYen: 30000, mileRatePercent: 3, tagId: 'tag-nen-silver', tagName: 'NENシルバー', memberCount: 6 },
-    { id: 'nen-rank-bronze', key: 'bronze', name: 'ブロンズ', annualThresholdYen: 0, mileRatePercent: 1, tagId: 'tag-nen-bronze', tagName: 'NENブロンズ', memberCount: 2 },
+    { id: 'nen-rank-platinum', key: 'platinum', name: 'プラチナ', annualThresholdYen: 200000, mileRatePercent: 3, tagId: 'tag-nen-platinum', tagName: '会員ランク：プラチナ', memberCount: 1 },
+    { id: 'nen-rank-gold', key: 'gold', name: 'ゴールド', annualThresholdYen: 50000, mileRatePercent: 2, tagId: 'tag-nen-gold', tagName: '会員ランク：ゴールド', memberCount: 3 },
+    { id: 'nen-rank-silver', key: 'silver', name: 'シルバー', annualThresholdYen: 20000, mileRatePercent: 1.5, tagId: 'tag-nen-silver', tagName: '会員ランク：シルバー', memberCount: 2 },
+    { id: 'nen-rank-bronze', key: 'bronze', name: 'ブロンズ', annualThresholdYen: 0, mileRatePercent: 1, tagId: 'tag-nen-bronze', tagName: '会員ランク：ブロンズ', memberCount: 6 },
   ],
   rules: {
     yearStartMonth: 1, applyOnReach: 'immediate', keepUntil: 'next_year_end', countOrders: 'paid',
@@ -7050,34 +7057,91 @@ export const NEN_RANK_SETTINGS = {
   milestones: [
     { id: 'nen-milestone-1', thresholdYen: 100000, title: '10万円到達', benefitKind: null, benefitNote: null, notifyOnReach: true, reachedCount: 4 },
   ],
-  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { gold: 4, silver: 6, bronze: 2 } },
+  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { platinum: 1, gold: 3, silver: 2, bronze: 6 }, linkedMembers: 9, petMembers: 8, monthPurchaseYen: 186400, monthBuyers: 7 },
 }
 
 /** 然-NEN- 会員の一覧。本物は `GET /api/nen/members` の形。 */
 export const NEN_MEMBER_LIST = {
   items: [
     {
-      friendId: 'friend-1', name: '高橋 直人', pictureUrl: null, customerId: 'customer-1',
-      rankKey: 'gold', rankName: 'ゴールド', mileRatePercent: 5,
-      annualMilesYen: 128000, lifetimeMilesYen: 486000, mileBalance: 8200,
-      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-05T10:00:00+09:00', purchaseCount: 14,
-      petCount: 1, petNames: 'ももちゃん', syncedAt: '2026-09-07T09:00:00+09:00',
+      friendId: 'friend-1', name: '田中 明子', pictureUrl: null, customerId: '10234',
+      rankKey: 'platinum', rankName: 'プラチナ', mileRatePercent: 3,
+      annualMilesYen: 82400, lifetimeMilesYen: 312000, mileBalance: 1240,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-28T10:00:00+09:00', purchaseCount: 14,
+      petCount: 2, petNames: 'こむぎ・ハナ', syncedAt: '2026-09-07T09:00:00+09:00',
     },
     {
-      friendId: 'friend-2', name: '前田 さくら', pictureUrl: null, customerId: 'customer-2',
-      rankKey: 'silver', rankName: 'シルバー', mileRatePercent: 3,
-      annualMilesYen: 42000, lifetimeMilesYen: 96000, mileBalance: 3100,
-      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-02T10:00:00+09:00', purchaseCount: 6,
-      petCount: 1, petNames: 'そらくん', syncedAt: '2026-09-07T09:00:00+09:00',
+      friendId: 'friend-2', name: '佐藤 健', pictureUrl: null, customerId: '10198',
+      rankKey: 'gold', rankName: 'ゴールド', mileRatePercent: 2,
+      annualMilesYen: 56100, lifetimeMilesYen: 148300, mileBalance: 860,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-21T10:00:00+09:00', purchaseCount: 9,
+      petCount: 2, petNames: 'そら・ピヨ', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-3', name: '鈴木 真理', pictureUrl: null, customerId: '10311',
+      rankKey: 'silver', rankName: 'シルバー', mileRatePercent: 1.5,
+      annualMilesYen: 31800, lifetimeMilesYen: 64500, mileBalance: 420,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-30T10:00:00+09:00', purchaseCount: 6,
+      petCount: 2, petNames: 'もも・ちび', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-4', name: '山田 太郎', pictureUrl: null, customerId: '10288',
+      rankKey: 'gold', rankName: 'ゴールド', mileRatePercent: 2,
+      annualMilesYen: 52000, lifetimeMilesYen: 98000, mileBalance: 640,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-12T10:00:00+09:00', purchaseCount: 8,
+      petCount: 0, petNames: null, syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-5', name: '坂本 真人', pictureUrl: null, customerId: '10301',
+      rankKey: 'gold', rankName: 'ゴールド', mileRatePercent: 2,
+      annualMilesYen: 50400, lifetimeMilesYen: 76200, mileBalance: 510,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-18T10:00:00+09:00', purchaseCount: 7,
+      petCount: 1, petNames: 'レオ', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-6', name: '中村 彩', pictureUrl: null, customerId: '10340',
+      rankKey: 'silver', rankName: 'シルバー', mileRatePercent: 1.5,
+      annualMilesYen: 28700, lifetimeMilesYen: 41900, mileBalance: 300,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-08-30T10:00:00+09:00', purchaseCount: 5,
+      petCount: 1, petNames: 'くう', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-7', name: '高橋 優', pictureUrl: null, customerId: null,
+      rankKey: 'bronze', rankName: 'ブロンズ', mileRatePercent: 1,
+      annualMilesYen: 12000, lifetimeMilesYen: 12000, mileBalance: 0,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-25T10:00:00+09:00', purchaseCount: 2,
+      petCount: 1, petNames: 'ラッキー', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-8', name: '伊藤 さくら', pictureUrl: null, customerId: '10455',
+      rankKey: 'bronze', rankName: 'ブロンズ', mileRatePercent: 1,
+      annualMilesYen: 8900, lifetimeMilesYen: 8900, mileBalance: 90,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-02T10:00:00+09:00', purchaseCount: 1,
+      petCount: 1, petNames: 'まる', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-9', name: '小林 健太', pictureUrl: null, customerId: null,
+      rankKey: 'bronze', rankName: 'ブロンズ', mileRatePercent: 1,
+      annualMilesYen: 6200, lifetimeMilesYen: 6200, mileBalance: 0,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-08-18T10:00:00+09:00', purchaseCount: 1,
+      petCount: 0, petNames: null, syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-10', name: '加藤 舞', pictureUrl: null, customerId: '10470',
+      rankKey: 'bronze', rankName: 'ブロンズ', mileRatePercent: 1,
+      annualMilesYen: 4800, lifetimeMilesYen: 4800, mileBalance: 48,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-27T10:00:00+09:00', purchaseCount: 1,
+      petCount: 1, petNames: 'ココ', syncedAt: '2026-09-07T09:00:00+09:00',
     },
   ],
-  total: 2,
+  total: 12,
   page: 1,
-  pageSize: 20,
-  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { gold: 4, silver: 6, bronze: 2 } },
+  pageSize: 10,
+  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { platinum: 1, gold: 3, silver: 2, bronze: 6 }, linkedMembers: 9, petMembers: 8, monthPurchaseYen: 186400, monthBuyers: 7 },
   ranks: [
-    { key: 'gold', name: 'ゴールド', annualThresholdYen: 100000, mileRatePercent: 5 },
-    { key: 'silver', name: 'シルバー', annualThresholdYen: 30000, mileRatePercent: 3 },
+    { key: 'platinum', name: 'プラチナ', annualThresholdYen: 200000, mileRatePercent: 3 },
+    { key: 'gold', name: 'ゴールド', annualThresholdYen: 50000, mileRatePercent: 2 },
+    { key: 'silver', name: 'シルバー', annualThresholdYen: 20000, mileRatePercent: 1.5 },
     { key: 'bronze', name: 'ブロンズ', annualThresholdYen: 0, mileRatePercent: 1 },
   ],
 }

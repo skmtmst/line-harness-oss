@@ -46,6 +46,8 @@ import {
   scheduleToPayload,
 } from './first-step-form'
 import { formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ScenarioFirstStepV8 from '../first-step-v8'
 
 /**
  * ステップの作成（設計の3段目）。
@@ -61,9 +63,10 @@ import { formatNumber } from '@/lib/format'
  * 適当な本文を入れて先へ進む。
  */
 export default function ScenarioFirstStepPage() {
+  const theme = useAdminTheme()
   return (
     <Suspense fallback={<div className="text-ink-faint py-12 text-center text-sm">読み込み中…</div>}>
-      <FirstStepContent />
+      {theme === 'v8' ? <ScenarioFirstStepV8 /> : <FirstStepContent />}
     </Suspense>
   )
 }

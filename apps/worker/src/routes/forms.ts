@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import {
   getForms,
   getFormsWithStats,
+  FORM_SUBMIT_CLAIM_STALE_MS,
   getFormById,
   type FormSubmitClaim,
   type FormSubmitClaimScope,
@@ -198,11 +199,9 @@ const NON_PAGINATED_SUBMISSIONS_MAX = 200;
 const FORM_IDEMPOTENCY_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 /** 同じキーの再送を受け付ける期間。通信の再送や連打はこの中に収まる。 */
 const FORM_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
-/**
- * 処理中の予約を止まったとみなす期間。Webhook の待ち時間(10秒)や副作用の
- * 実行を覆う余裕を持たせ、生きている処理の横取りはしない。
- */
-const FORM_SUBMIT_CLAIM_STALE_MS = 60 * 1000;
+// 処理中の予約を止まったとみなす期間(FORM_SUBMIT_CLAIM_STALE_MS)は
+// @line-crm/db 側の定数を使う。一覧の未完の札・数の帯と同じ目安でないと
+// 「止まっているのに数えない」すれ違いが起きるため。
 /** 回答 data の上限。項目数と JSON 全体の大きさの両方を見る。 */
 const FORM_SUBMIT_DATA_MAX_FIELDS = 200;
 const FORM_SUBMIT_DATA_MAX_BYTES = 100 * 1024;
@@ -216,7 +215,9 @@ const FORM_LIST_PAGE_FALLBACK_LIMIT = 20;
 
 /** 一覧の絞り込み。知らない値は「すべて」へ落とす（画面と同じ規則）。 */
 function validFormListFilter(value: string | undefined): FormListFilter {
-  return value === 'published' || value === 'draft' || value === 'stored' ? value : 'all';
+  return value === 'published' || value === 'draft' || value === 'stored' || value === 'pending'
+    ? value
+    : 'all';
 }
 
 /** 一覧の並び順。知らない値は「最新の回答順」へ落とす（画面と同じ規則）。 */
@@ -357,6 +358,10 @@ function serializeForm(
     monthlySubmitCount: (row as Partial<DbFormWithStats>).monthly_submit_count ?? null,
     monthlyOpenCount: (row as Partial<DbFormWithStats>).monthly_open_count ?? null,
     monthlyCompletionRate: (row as Partial<DbFormWithStats>).monthly_completion_rate ?? null,
+    // ★V8 一覧の「後処理の未完」の札。一覧取得のときだけ付き、
+    // それ以外は null（未完が無いとは言わない）。
+    pendingPostActionCount:
+      (row as Partial<DbFormWithStats>).pending_post_action_count ?? null,
     ogTitle: row.og_title,
     ogDescription: row.og_description,
     ogImageUrl: row.og_image_url,

@@ -677,7 +677,7 @@ export default function QuestionEditor({
           )
         })}
 
-        <Button variant="secondary" className="text-ink-secondary rounded-card h-10 w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
+        <Button variant="secondary" className="text-ink-secondary rounded-card v7:h-10 w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
             onChange({
               ...value,
               choices: [...value.choices, { key: newChoiceKey(), label: '', behavior: 'none' }],

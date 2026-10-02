@@ -124,11 +124,23 @@
 }
 
 /*
- * ★V8「選ぶカード」：余白 14・選ぶと枠 1.5px の濃い緑＋地 accent-soft。
- * 形と動き（120ms ease-out）は v7 のまま。
+ * ★V8「選ぶカード」（fNPdg/r3xz1W）：余白 14・高さ 98・選ぶと枠 1.5px の
+ * 濃い緑＋地 accent-soft。題は 13/600・1.5、説明は 12・1行で「…」
+ * （オーナー決定）。形と動き（120ms ease-out）は v7 のまま。
  */
 [data-theme='v8'] .card {
+  min-height: 98px;
   padding: 14px;
+}
+
+[data-theme='v8'] .title {
+  font-size: var(--text-label);
+}
+
+[data-theme='v8'] .note {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 [data-theme='v8'] .checked,

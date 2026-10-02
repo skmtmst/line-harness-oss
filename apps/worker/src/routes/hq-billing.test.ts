@@ -6,6 +6,7 @@ import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const stripe = vi.hoisted(() => ({
+  createInvoicePreview: vi.fn(),
   createCustomer: vi.fn(),
   createCheckoutSession: vi.fn(),
   createPortalSession: vi.fn(),
@@ -483,5 +484,68 @@ describe('課金 Webhook', () => {
     const res = await webhook({ id: 'evt_9', type: 'customer.subscription.updated', data: { object: { id: 'sub_x', status: 'active', customer: 'cus_unknown', items: { data: [] } } } });
     expect((await res.json<{ data: { matched: boolean } }>()).data.matched).toBe(false);
     expect(tenantRow().plan_status).toBe('trialing');
+  });
+});
+
+
+describe('即時変更の日割り見積り', () => {
+  const path = '/api/hq/billing/preview?planKey=standard&interval=month';
+  beforeEach(() => {
+    setTenant({ plan_key: 'light', plan_status: 'active', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1' });
+    stripe.retrieveSubscription.mockResolvedValue({ id: 'sub_1', customer: 'cus_1', status: 'active', items: { data: [{ id: 'si_1', quantity: 1, price: { id: 'price_light' } }] } });
+    stripe.retrievePrice.mockImplementation(async (_env, id) => ({ unit_amount: id.endsWith('_year') ? 303000 : 30300, currency: 'jpy', recurring: { interval: id.endsWith('_year') ? 'year' : 'month' } }));
+    stripe.createInvoicePreview.mockImplementation(async (_env, input) => ({
+      currency: 'jpy', amount_due: 40400, lines: { has_more: false, data: [
+        { amount: -5000, proration: true, period: { start: input.prorationDate } },
+        { amount: 15100, proration: true, period: { start: input.prorationDate } },
+        { amount: 700, proration: true, period: { start: input.prorationDate - 1 } },
+        { amount: 30300, proration: false, type: 'subscription', subscription_item: 'si_1', period: { start: 1790812800 } },
+      ] },
+    }));
+  });
+  it('現在の時刻で参考額を読み、過去の日割り明細を除き、契約を変更しない', async () => {
+    const before = tenantRow();
+    const now = Math.floor(Date.now() / 1000);
+    const res = await call('GET', path);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    const { data } = await res.json<{ data: Record<string, unknown> }>();
+    expect(data).toMatchObject({ afterAmountYen: 30300, amountDueYen: 40400, prorationDifferenceYen: 10100, isEstimate: true, nextBillingAt: new Date(1790812800 * 1000).toISOString() });
+    expect(stripe.createInvoicePreview.mock.calls[0][1]).toMatchObject({ subscriptionId: 'sub_1', itemId: 'si_1', priceId: 'price_standard', quantity: 1 });
+    expect(stripe.createInvoicePreview.mock.calls[0][1].prorationDate).toBeGreaterThanOrEqual(now);
+    expect(tenantRow()).toEqual(before);
+    expect(stripe.createCustomer).not.toHaveBeenCalled();
+    expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
+  });
+  it('年払いの価格を使い、マイナスの差額も返す', async () => {
+    stripe.createInvoicePreview.mockImplementationOnce(async (_env, input) => ({ currency: 'jpy', amount_due: 0, lines: { has_more: false, data: [{ amount: -1000, proration: true, period: { start: input.prorationDate } }] } }));
+    const res = await call('GET', path.replace('month', 'year'));
+    expect((await res.json<{ data: Record<string, unknown> }>()).data).toMatchObject({ afterAmountYen: 303000, prorationDifferenceYen: -1000, nextBillingAt: null });
+  });
+  it.each(['admin', 'staff'] as const)('オーナー以外（%s）は拒否する', async (role) => {
+    expect((await call('GET', path, undefined, { staff: staffOf({ role }) })).status).toBe(403);
+    expect(stripe.createInvoicePreview).not.toHaveBeenCalled();
+  });
+  it('未認証、設定なし、不正入力、契約なしを外部呼び出し前に拒否する', async () => {
+    expect((await call('GET', path, undefined, { staff: null })).status).toBe(403);
+    expect((await call('GET', path, undefined, { env: { STRIPE_SECRET_KEY: undefined } })).status).toBe(503);
+    expect((await call('GET', path, undefined, { env: { STRIPE_PRICE_STANDARD: undefined } })).status).toBe(503);
+    expect((await call('GET', path.replace('month', 'week'))).status).toBe(400);
+    expect((await call('GET', path.replace('standard', 'other'))).status).toBe(400);
+    setTenant({ stripe_subscription_id: null });
+    expect((await call('GET', path)).status).toBe(409);
+    expect(stripe.createInvoicePreview).not.toHaveBeenCalled();
+  });
+  it('自分の統括の契約だけを読む', async () => {
+    expect((await call('GET', path, undefined, { staff: staffOf({ tenantId: 'other' }) })).status).toBe(404);
+    expect(stripe.retrieveSubscription).not.toHaveBeenCalled();
+  });
+  it('外部失敗や不完全な明細は金額を作らず502にする', async () => {
+    stripe.createInvoicePreview.mockRejectedValueOnce(new Error('secret details'));
+    const failed = await call('GET', path);
+    expect(failed.status).toBe(502);
+    expect(await failed.text()).not.toContain('secret details');
+    stripe.createInvoicePreview.mockResolvedValueOnce({ currency: 'jpy', lines: { has_more: true, data: [] } });
+    expect((await call('GET', path)).status).toBe(502);
   });
 });

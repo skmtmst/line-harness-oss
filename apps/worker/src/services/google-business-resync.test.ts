@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { encryptCredential, setAccountSetting } from '@line-crm/db';
-import { processGoogleBusinessDailyMetrics, processGoogleBusinessHourlyResync } from './google-business-resync.js';
+import {
+  processGoogleBusinessDailyMetrics,
+  processGoogleBusinessHourlyResync,
+  processGoogleBusinessTokenKeepalive,
+} from './google-business-resync.js';
 import type { FetchLike } from './google-business.js';
 
 type Env = import('../index.js').Env;
@@ -175,6 +179,68 @@ describe('processGoogleBusinessHourlyResync', () => {
     expect(result.reviewsSynced).toBe(1);
     const review = testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_reviews WHERE store_id = ?').get('store-shibuya') as { n: number };
     expect(review.n).toBe(1);
+  });
+});
+
+describe('processGoogleBusinessTokenKeepalive', () => {
+  /** トークン更新だけは注入fetchではなくグローバルfetchを使うため、ここで差し替える。 */
+  function stubTokenEndpoint(options: { fail?: boolean } = {}): Array<string> {
+    const hits: Array<string> = [];
+    vi.stubGlobal('fetch', async (input: unknown) => {
+      const url = String(input);
+      hits.push(url);
+      if (options.fail) {
+        return jsonResponse({ error: 'invalid_grant' }, 400);
+      }
+      return jsonResponse({ access_token: 'fresh-access', expires_in: 3600, token_type: 'Bearer' });
+    });
+    return hits;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('有効期限が残っていても、場所未選択・機能offの接続までまとめて更新する', async () => {
+    // 渋谷店は access_token が2099年まで有効（= 通常の経路ならリフレッシュしない）＋機能off。
+    await setAccountSetting(testDb.db, 'account-2', 'feature.restaurant_test', 'false');
+    // 恵比寿店は場所を選ぶ前（pending_location）。再同期の対象外なので放置失効する側。
+    seedStore('store-ebisu', 'account-3', 'EBISU');
+    await seedConnection('conn-2', 'store-ebisu', 'account-3', LOCATION2);
+    testDb.raw
+      .prepare(`UPDATE rt_google_connections SET status = 'pending_location', location_name = NULL WHERE store_id = ?`)
+      .run('store-ebisu');
+    const hits = stubTokenEndpoint();
+
+    const result = await processGoogleBusinessTokenKeepalive(env, { now: NOW });
+
+    expect(result).toEqual({ refreshed: 2, failed: 0 });
+    expect(hits).toHaveLength(2);
+    expect(hits.every((url) => url.includes('oauth2.googleapis.com/token'))).toBe(true);
+    // 新しいアクセストークンの期限が入っている（= 実際に使われた証拠）。
+    for (const storeId of ['store-shibuya', 'store-ebisu']) {
+      const row = connectionRow(storeId);
+      expect(Date.parse(String(row.access_token_expires_at))).toBeGreaterThan(Date.now());
+    }
+  });
+
+  it('失効していれば顧客の操作より先に expired へ落とす', async () => {
+    stubTokenEndpoint({ fail: true });
+
+    const result = await processGoogleBusinessTokenKeepalive(env, { now: NOW });
+
+    expect(result).toEqual({ refreshed: 0, failed: 1 });
+    expect(connectionRow('store-shibuya').status).toBe('expired');
+  });
+
+  it('リフレッシュトークンを持たない接続は対象にしない', async () => {
+    testDb.raw.prepare('UPDATE rt_google_connections SET refresh_token_enc = NULL WHERE store_id = ?').run('store-shibuya');
+    const hits = stubTokenEndpoint();
+
+    const result = await processGoogleBusinessTokenKeepalive(env, { now: NOW });
+
+    expect(result).toEqual({ refreshed: 0, failed: 0 });
+    expect(hits).toHaveLength(0);
   });
 });
 

@@ -20,6 +20,7 @@ const net = vi.hoisted(() => ({
 vi.mock('next/link', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),

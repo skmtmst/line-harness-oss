@@ -230,19 +230,59 @@ const server = createServer(async (req, res) => {
 
   const method = req.method ?? 'GET';
 
+  // ---- 上の帯 (店名) ----
+  if (method === 'GET' && pathname === '/api/liff/config') {
+    json(res, 200, {
+      success: true,
+      data: { botBasicId: '@qa', accountName: '然 -NEN-', accountId: 'qa-account' },
+    });
+    return;
+  }
+
   // ---- 予約 ----
   if (method === 'GET' && pathname === '/api/liff/booking/menus') {
     json(res, 200, {
       menus: [
         {
           id: 'qa-menu-1',
-          name: 'QA カット',
-          category_label: 'ヘア',
-          description: '撮影用の見本メニューです。',
+          name: 'トリミング（小型犬）',
+          category_label: 'トリミング',
+          description: 'シャンプー・カット・爪切り',
+          duration_minutes: 105,
+          buffer_after_minutes: 15,
+          base_price: 8400,
+          cancel_deadline_hours_before: 24,
+          sort_order: 1,
+        },
+        {
+          id: 'qa-menu-2',
+          name: 'トリミング（中型犬）',
+          category_label: 'トリミング',
+          description: 'シャンプー・カット・爪切り',
+          duration_minutes: 150,
+          buffer_after_minutes: 15,
+          base_price: 12600,
+          sort_order: 2,
+        },
+        {
+          id: 'qa-menu-3',
+          name: 'シャンプーのみ',
+          category_label: 'お手入れ',
+          description: null,
           duration_minutes: 60,
           buffer_after_minutes: 10,
-          base_price: 3000,
-          sort_order: 1,
+          base_price: 4200,
+          sort_order: 3,
+        },
+        {
+          id: 'qa-menu-4',
+          name: '初回相談',
+          category_label: '相談',
+          description: 'はじめての方向け',
+          duration_minutes: 30,
+          buffer_after_minutes: 0,
+          base_price: 0,
+          sort_order: 4,
         },
       ],
     });
@@ -251,17 +291,42 @@ const server = createServer(async (req, res) => {
   {
     const m = pathname.match(/^\/api\/liff\/booking\/menus\/([^/]+)\/staff$/);
     if (method === 'GET' && m) {
+      const menuId = m[1];
+      const basePrice =
+        menuId === 'qa-menu-2' ? 12600 : menuId === 'qa-menu-3' ? 4200 : menuId === 'qa-menu-4' ? 0 : 8400;
+      const duration =
+        menuId === 'qa-menu-2' ? 150 : menuId === 'qa-menu-3' ? 60 : menuId === 'qa-menu-4' ? 30 : 105;
       json(res, 200, {
         staff: [
           {
+            id: 'qa-staff-any',
+            display_name: '指名なし',
+            role: null,
+            profile_image_url: null,
+            bio: null,
+            is_designation_optional: 1,
+            price: basePrice,
+            duration_minutes: duration,
+          },
+          {
             id: 'qa-staff-1',
-            display_name: 'QA スタッフ',
-            role: 'スタイリスト',
+            display_name: '佐々木',
+            role: 'トリマー',
             profile_image_url: null,
             bio: null,
             is_designation_optional: 0,
-            price: 3000,
-            duration_minutes: 60,
+            price: basePrice,
+            duration_minutes: duration,
+          },
+          {
+            id: 'qa-staff-2',
+            display_name: '高田',
+            role: 'トリマー',
+            profile_image_url: null,
+            bio: null,
+            is_designation_optional: 0,
+            price: basePrice,
+            duration_minutes: duration,
           },
         ],
       });
@@ -318,10 +383,19 @@ const server = createServer(async (req, res) => {
       upcoming: [
         {
           id: 'qa-history-1',
-          starts_at: '2026-10-01T10:00:00+09:00',
+          starts_at: '2026-10-02T13:00:00+09:00',
+          status: 'requested',
+          customer_note: null,
+          menu_name: 'トリミング（小型犬）',
+          staff_name: 'QA スタッフ',
+          profile_image_url: null,
+        },
+        {
+          id: 'qa-history-2',
+          starts_at: '2026-10-20T10:00:00+09:00',
           status: 'confirmed',
           customer_note: null,
-          menu_name: 'QA カット',
+          menu_name: 'シャンプーのみ',
           staff_name: 'QA スタッフ',
           profile_image_url: null,
         },

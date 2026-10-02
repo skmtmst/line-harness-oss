@@ -3,7 +3,13 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
+const HERE = dirname(fileURLToPath(import.meta.url))
+const PAGE_V7 = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = [
+  'page.tsx',
+  'use-duplicates-data.ts',
+  'duplicates-v8.tsx',
+].map((name) => readFileSync(join(HERE, name), 'utf8')).join('\n')
 
 /**
  * #984 LAY-12/16: 重複検出の表見出しと0件の件数表示。
@@ -14,11 +20,12 @@ const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.ts
  */
 describe('重複検出の表見出しと0件表示（#984 LAY-12/16）', () => {
   it('見出しは共通の TableHeadRow/Th を通す', () => {
-    expect(PAGE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
+    expect(PAGE_V7).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
     // ★V7: 表の中の状態行は TableStateRow に寄せる。見出しの共通化は変えない。
-    expect(PAGE).toContain("import { TableStateRow } from '@/components/shared/table'")
-    expect(PAGE).toContain('<TableHeadRow>')
-    expect(PAGE).not.toMatch(/<th\b/)
+    expect(PAGE_V7).toContain("import { TableStateRow } from '@/components/shared/table'")
+    expect(PAGE_V7).toContain('<TableHeadRow>')
+    // v7 の表は共通部品。v8（duplicates-v8.tsx）は板どおりの CSS 表なので対象外。
+    expect(PAGE_V7).not.toMatch(/<th\b/)
   })
 
   it('候補が0件のとき「1〜0組」を出さない', () => {

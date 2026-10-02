@@ -1,5 +1,13 @@
 'use client'
 
+import ActionMenu from '@/components/shared/action-menu'
+import IconButton from '@/components/shared/icon-button'
+import { MoreHorizontal } from 'lucide-react'
+
+import '@/app/notifications/readonly-v8.css'
+import { ReadonlyDesignNode } from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, Plus, Search, X } from 'lucide-react'
@@ -39,6 +47,8 @@ function channelLabel(channels: string[]): string {
 
 export default function OperatorNotificationRules({ lineAccountId }: { lineAccountId: string | null }) {
   usePageTitle('運用者へのお知らせ')
+  const theme = useAdminTheme()
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [rules, setRules] = useState<OperatorNotificationRule[]>([])
   const [summary, setSummary] = useState<OperatorNotificationSummary | null>(null)
   const [state, setState] = useState<LoadState>('loading')
@@ -138,9 +148,9 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
 
   const listState = !lineAccountId ? 'account-required' : state === 'ready' && rules.length === 0 ? 'empty' : state === 'ready' && visible.length === 0 ? 'filtered-empty' : state
 
-  return <section data-design-node="DpxOK" data-list-state={listState} className="space-y-4">
+  return <ReadonlyDesignNode node="u8xibp"><section data-design-node="DpxOK" data-list-state={listState} className="space-y-4">
     <NoteBar>この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。</NoteBar>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div data-ro-kpis="true" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <KpiCard title="出しているお知らせ" value={state === 'ready' ? summary?.published ?? null : null} unit="件" detail={state === 'ready' ? `うち止めている ${summary?.stopped ?? '—'}` : undefined} variant="v6" />
       <KpiCard title="受け取る人" value={state === 'ready' ? summary?.recipients ?? null : null} unit="人" detail={state === 'ready' ? `受け取れる人がいない ${summary?.missingRecipients ?? '—'}件` : undefined} variant="v6" />
       <KpiCard title="今日届いた数" value={state === 'ready' ? summary?.acceptedToday ?? null : null} unit="件" detail="" help="重複を除いた件数です" variant="v6" />
@@ -176,9 +186,9 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
         <Td><span className={rule.recipientCount > 0 ? 'text-ink-secondary' : 'font-semibold text-warning'}>{rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし'}</span></Td>
         <Td>{conditionsOf(rule).scheduleLabel ?? 'いつでも'}</Td>
         <Td>{rule.occurredToday > 0 ? `${rule.occurredToday}件` : '—'}</Td>
-        <Td><div className="flex flex-wrap items-center gap-2"><Button onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>{rule.status === 'draft' ? <Button variant="secondary" onClick={() => void publish(rule)} disabled={busy === rule.id || rule.recipientCount === 0}>{rule.recipientCount === 0 ? '受け取る人を決める' : '公開'}</Button> : <Button onClick={() => void stop(rule)} disabled={busy === rule.id}>止める</Button>}</div></Td>
+        <Td>{theme === 'v8' ? <><IconButton aria-label={`${rule.name}の操作`} aria-haspopup="menu" aria-expanded={openMenuId === rule.id} onClick={() => setOpenMenuId(openMenuId === rule.id ? null : rule.id)}><MoreHorizontal aria-hidden="true" size={16} /></IconButton><ActionMenu open={openMenuId === rule.id} onClose={() => setOpenMenuId(null)} ariaLabel={`${rule.name}の操作`} items={[{ id: 'test', label: '自分にテスト', disabled: busy === rule.id, onSelect: () => { setOpenMenuId(null); void testSend(rule) } }, rule.status === 'draft' ? { id: 'publish', label: '公開', disabled: busy === rule.id || rule.recipientCount === 0, disabledReason: rule.recipientCount === 0 ? '受け取る人を決めてください' : undefined, onSelect: () => { setOpenMenuId(null); void publish(rule) } } : { id: 'stop', label: '止める', disabled: busy === rule.id, onSelect: () => { setOpenMenuId(null); void stop(rule) } }]} /></> : <div className="flex flex-wrap items-center gap-2"><Button onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>{rule.status === 'draft' ? <Button variant="secondary" onClick={() => void publish(rule)} disabled={busy === rule.id || rule.recipientCount === 0}>{rule.recipientCount === 0 ? '受け取る人を決める' : '公開'}</Button> : <Button onClick={() => void stop(rule)} disabled={busy === rule.id}>止める</Button>}</div>}</Td>
       </Tr>)}</tbody></DataTable>}
     {state === 'ready' && rules.length > 0 ? <div className="flex items-center justify-between"><ListRange total={summary?.total ?? rules.length} first={1} last={rules.length} /></div> : null}
     {showExport ? <div role="dialog" aria-modal="true" aria-label="CSVを書き出す理由" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4"><div ref={exportPanelRef} className="w-full max-w-md rounded-card border border-hairline bg-canvas p-5 shadow-float"><div className="flex items-start justify-between gap-3"><h2 className="font-bold text-ink">CSVを書き出す理由</h2><button type="button" onClick={() => setShowExport(false)} disabled={busy === 'csv'} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div><p className="mt-2 text-sm text-ink-secondary">個人情報を含むため、確認した目的を記録します。</p><input autoFocus value={exportReason} onChange={(event) => setExportReason(event.target.value)} className="mt-4 w-full rounded-control border border-hairline px-3 py-2 text-sm" placeholder="例：月次の運用確認" /><div className="mt-4 flex justify-end gap-2"><Button onClick={() => setShowExport(false)}>キャンセル</Button><Button variant="primary" onClick={() => void exportCsv()} disabled={!exportReason.trim() || busy === 'csv'}>書き出す</Button></div></div></div> : null}
-  </section>
+  </section></ReadonlyDesignNode>
 }

@@ -1,5 +1,7 @@
 'use client'
 
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import Link from 'next/link'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, api, fetchApi, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
@@ -309,6 +311,7 @@ export default function NotificationRunList({
   lineAccountId: string | null
   mode: 'history' | 'failures'
 }) {
+  const theme = useAdminTheme()
   const [page, setPage] = useState(1)
   const currentScopeKey = `${lineAccountId ?? 'none'}:${mode}`
 
@@ -405,7 +408,7 @@ export default function NotificationRunList({
   })
 
   const title = mode === 'failures' ? '送れなかったもの' : 'お知らせの記録'
-  const nodeId = mode === 'failures' ? 'X8JCA5' : 'Se65i'
+  const nodeId = theme === 'v8' ? (mode === 'failures' ? 'DrwMm' : 'PZBVb') : (mode === 'failures' ? 'X8JCA5' : 'Se65i')
   // 前世代の書き込みは、いつ届いても表示に反映しない（レンダー時点の比較だけで決める）。
   const visibleState: LoadState = loaded.generation === generation ? loaded.state : lineAccountId ? 'loading' : 'ready'
   const scopedResult = loaded.generation === generation ? loaded.result : null
@@ -440,7 +443,7 @@ export default function NotificationRunList({
 
   return (
     <section className="space-y-4" data-design-node={nodeId} data-list-state={listState} aria-label={title}>
-      <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${mode === 'history' ? 'xl:grid-cols-4' : ''}`}>
+      <div data-ro-kpis="true" className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${mode === 'history' ? 'xl:grid-cols-4' : ''}`}>
         {mode === 'failures' ? <>
           <KpiCard title="届かなかった" value={summary?.failed ?? null} unit="通" detail={summaryDetail('確認と連絡が必要')} variant="v6" loading={visibleState === 'loading'} badgeTone="danger" />
           <KpiCard title="送信対象外" value={summary?.excluded ?? null} unit="通" detail={summaryDetail('つながりや設定を確認')} variant="v6" loading={visibleState === 'loading'} />

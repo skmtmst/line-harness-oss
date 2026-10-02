@@ -21,6 +21,8 @@ import type { FriendFieldMigrationPreview, FriendFieldMigrationRun } from '@/lib
 import { createResponseGate } from '@/lib/latest-request'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { formatDateTime } from '@/lib/format'
+import FieldMigrateV8 from '@/app/tags/field-migrate-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
 
@@ -614,5 +616,6 @@ function MigrateFriendField() {
 }
 
 export default function MigrateFriendFieldPage() {
-  return <FeatureGate feature="friend_fields"><Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}><MigrateFriendField /></Suspense></FeatureGate>
+  const theme = useAdminTheme()
+  return <FeatureGate feature="friend_fields"><Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>{theme === 'v8' ? <FieldMigrateV8 /> : <MigrateFriendField />}</Suspense></FeatureGate>
 }

@@ -113,7 +113,32 @@ import {
   getBookingCustomerContext,
 } from '../services/booking-admin-detail.js';
 
+import {
+  getBookingAutoAssign,
+  saveBookingAutoAssign,
+  getBookingChannels,
+  listBookingConflicts,
+  notifyBookingConflicts,
+  bookingAutomaticNotificationAllowed,
+} from '../services/booking-channels.js';
+
 const booking = new Hono<Env>();
+
+// 予約の作成・変更・承認の成功後に、同じ店舗内の重なりを確認する。
+booking.use('*', async (c, next) => {
+  await next();
+  const path = c.req.path;
+  const mutation = (c.req.method === 'POST' || c.req.method === 'PATCH') && (
+    path === '/api/liff/booking/requests' || path === '/api/booking/admin/bookings'
+    || /^\/api\/booking\/admin\/(bookings|requests)\/[^/]+(\/reassign)?$/.test(path));
+  if (!mutation || c.res.status < 200 || c.res.status >= 300) return;
+  try {
+    const accountId = path.startsWith('/api/liff/') ? await resolveAccountIdFromLiff(c) : await resolveAccountIdAdmin(c);
+    if (accountId) await notifyBookingConflicts(c.env.DB, accountId);
+  } catch {
+    console.warn('booking_conflict_notification_failed');
+  }
+});
 const BOOKING_CONFIRMED_AUTOMATION_EVENT = 'calendar_booked' as const;
 
 // 管理画面の予約APIはすべて account_id を受け取る。認証済みでも、URLだけを
@@ -643,6 +668,29 @@ booking.get('/api/liff/booking/settings', async (c) => {
   });
 });
 
+async function needsAutoAssignment(c: Context<Env>, accountId: string, staffId: string): Promise<boolean> {
+  if (!staffId) return true;
+  if (!await getBookingAutoAssign(c.env.DB, accountId)) return false;
+  const staff = await c.env.DB.prepare('SELECT is_designation_optional FROM staff WHERE id = ? AND line_account_id = ?').bind(staffId, accountId).first<{ is_designation_optional: number }>();
+  return staff?.is_designation_optional === 1;
+}
+
+async function autoAssignBookingStaff(c: Context<Env>, accountId: string, menuId: string, startsAtRaw: string, customerFacing: boolean): Promise<string | null> {
+  if (!await getBookingAutoAssign(c.env.DB, accountId)) return null;
+  const startsAt = new Date(startsAtRaw);
+  if (!Number.isFinite(startsAt.getTime()) || startsAt.getTime() < Date.now()) return null;
+  const timeZone = await getAccountTimeZone(c.env.DB, accountId);
+  const date = tzDateStr(timeZone, startsAt);
+  const latest = await getAvailability(c.env.DB, {
+    lineAccountId: accountId, menuId, from: date, to: date, now: new Date(),
+    minLeadTimeMinutes: customerFacing ? DEFAULT_ACCOUNT_SETTINGS.min_lead_time_minutes : 0,
+    applyStoreRules: customerFacing, googleCredentials: googleCredentials(c.env),
+  });
+  const rows = await c.env.DB.prepare('SELECT id FROM staff WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL AND is_designation_optional = 0').bind(accountId).all<{ id: string }>();
+  const actualStaff = new Set(rows.results.map((staff) => staff.id));
+  return latest.by_staff.find((staff) => actualStaff.has(staff.staff_id) && findLatestSlotForInstant(staff.slots,startsAt) !== null)?.staff_id ?? null;
+}
+
 booking.post('/api/liff/booking/requests', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
@@ -661,7 +709,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
     party_size?: unknown;
   }>();
   if (body.party_size !== undefined && body.party_size !== 1) return c.json({ error: 'unsupported_party_size' }, 422);
-  if (!body.menu_id || !body.staff_id || !body.starts_at) {
+  if (!body.menu_id || !body.starts_at) {
     return c.json({ error: 'missing_params' }, 400);
   }
   const friendId = await resolveFriendId(c, callerLineUserId, accountId);
@@ -686,6 +734,12 @@ booking.post('/api/liff/booking/requests', async (c) => {
     .first<{ is_following: number }>();
   if (!friend || friend.is_following === 0) {
     return c.json({ error: 'cannot_book' }, 403);
+  }
+
+  if (await needsAutoAssignment(c,accountId,body.staff_id)) {
+    const assigned = await autoAssignBookingStaff(c,accountId,body.menu_id,body.starts_at,true);
+    if (!assigned) return c.json({ error: 'auto_assignment_unavailable' }, 409);
+    body.staff_id = assigned;
   }
 
   // Menu + staff_menu lookup (must be offered)
@@ -1569,6 +1623,28 @@ function readBookingMenuResources(body: Record<string, unknown>):
   }
   return { ok: true, expectedVersion: Number(body.expectedVersion), resources };
 }
+
+booking.get('/api/booking/admin/channels', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  c.header('Cache-Control', 'no-store');
+  return c.json({ success: true, data: await getBookingChannels(c.env.DB, accountId, googleCredentials(c.env)) });
+});
+
+booking.put('/api/booking/admin/channels/settings', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const body = await c.req.json<{ autoAssign?: unknown }>().catch(() => null);
+  if (!body || typeof body.autoAssign !== 'boolean') return c.json({ error: 'invalid_auto_assign' }, 400);
+  await saveBookingAutoAssign(c.env.DB, accountId, body.autoAssign);
+  return c.json({ success: true, data: { autoAssign: body.autoAssign } });
+});
+
+booking.get('/api/booking/admin/conflicts', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  return c.json({ success: true, data: { conflicts: await listBookingConflicts(c.env.DB, accountId) } });
+});
 
 booking.get('/api/booking/admin/settings', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
@@ -2731,22 +2807,24 @@ booking.get('/api/booking/admin/bookings/:id/audit-logs', async (c) => {
  * - 外部反映（Google・変更通知・リマインダ再作成）の失敗で予約は
  *   巻き戻さない。台帳に retry_wait/failed を残し、再試行口から回収する。
  */
-booking.patch('/api/booking/admin/bookings/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+type AdminBookingPatch = {
+  lock_version?: unknown;
+  menu_id?: string;
+  staff_id?: string;
+  starts_at?: string;
+  price?: unknown;
+  customer_note?: unknown;
+  internal_note?: unknown;
+  notification_policy?: unknown;
+  send_change_notification?: unknown;
+  reason?: unknown;
+};
+
+async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch) {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
-  const bookingId = c.req.param('id');
-  const body = await c.req.json<{
-    lock_version?: unknown;
-    menu_id?: string;
-    staff_id?: string;
-    starts_at?: string;
-    price?: unknown;
-    customer_note?: unknown;
-    internal_note?: unknown;
-    notification_policy?: unknown;
-    send_change_notification?: unknown;
-    reason?: unknown;
-  }>().catch(() => null);
+  const bookingId = c.req.param('id')!;
+  const body = override ?? await c.req.json<AdminBookingPatch>().catch(() => null);
   if (!body) return c.json({ error: 'invalid_json' }, 400);
   if (!Number.isInteger(body.lock_version) || Number(body.lock_version) < 0) {
     return c.json({ error: 'missing_lock_version' }, 400);
@@ -3203,7 +3281,8 @@ booking.patch('/api/booking/admin/bookings/:id', requireRole('owner', 'admin', '
   // ---- 変更案内の LINE 通知 ----
   // 明示的に送らない指定が無い限り、連携済みの予約には変更を知らせる。
   // 未連携の予約では送らない (operation 行も作らない)。
-  const wantsChangeNotice = Boolean(row.friend_id) && body.send_change_notification !== false;
+  const changeNoticeRequested = Boolean(row.friend_id) && body.send_change_notification !== false;
+  const wantsChangeNotice = changeNoticeRequested && await bookingAutomaticNotificationAllowed(c.env.DB, accountId);
   let changeOperationId: string | null = null;
   if (wantsChangeNotice) {
     changeOperationId = await queueBookingOperation(c.env.DB, {
@@ -3237,6 +3316,7 @@ booking.patch('/api/booking/admin/bookings/:id', requireRole('owner', 'admin', '
       : googleSync === 'retry_wait' ? 'failed'
       : googleSync === 'skipped' ? 'not_configured' : 'not_applicable',
     change_notification: wantsChangeNotice ? 'queued' : 'not_applicable',
+    change_notification_reason: !wantsChangeNotice && changeNoticeRequested ? 'sending_stopped' : null,
     // R336: V6 通知同期の結果。failed のときは監査 (v6_sync_failed) にも残し、
     // 日時差分の無い再保存でも reconcile で回復する。
     v6_sync: v6Sync,
@@ -3250,6 +3330,20 @@ booking.patch('/api/booking/admin/bookings/:id', requireRole('owner', 'admin', '
     reminders_created: remindersCreated,
     operations: operationRows,
   });
+}
+
+booking.patch('/api/booking/admin/bookings/:id', requireRole('owner', 'admin', 'staff'), (c) => updateAdminBooking(c));
+
+booking.post('/api/booking/admin/bookings/:id/reassign', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const body = await c.req.json<{ staffId?: unknown; notifyCustomer?: unknown }>().catch(() => null);
+  if (!body || typeof body.staffId !== 'string' || !body.staffId.trim() || typeof body.notifyCustomer !== 'boolean') return c.json({ error: 'invalid_reassign' }, 400);
+  const row = await c.env.DB.prepare('SELECT lock_version,starts_at,staff_id FROM bookings WHERE id=? AND line_account_id=?').bind(c.req.param('id'),accountId).first<{ lock_version: number; starts_at: string; staff_id: string }>();
+  if (!row) return c.json({ error: 'booking_not_found' }, 404);
+  // 移動APIでは必ず今の空き判定を通す。過去の実績修正は通常の変更口へ。
+  if (Date.parse(row.starts_at) < Date.now() || row.staff_id === body.staffId.trim()) return c.json({ error: 'slot_not_available' }, 409);
+  return updateAdminBooking(c, { lock_version: row.lock_version, staff_id: body.staffId.trim(), send_change_notification: body.notifyCustomer });
 });
 
 /**
@@ -3700,7 +3794,6 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     (!friendInput && !customerInput)
     || (friendInput && customerInput)
     || !body.menu_id
-    || !body.staff_id
     || !body.starts_at
   ) {
     return c.json({ error: 'missing_params' }, 400);
@@ -3826,6 +3919,12 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   }
 
   // staff が同じ account に属することを保証（別 tenant の staff への予約を防ぐ）。
+  if (await needsAutoAssignment(c,accountId,body.staff_id)) {
+    const assigned = await autoAssignBookingStaff(c,accountId,body.menu_id,body.starts_at,false);
+    if (!assigned) return c.json({ error: 'auto_assignment_unavailable' }, 409);
+    body.staff_id = assigned;
+  }
+
   if (!(await assertStaffInAccount(c.env.DB, body.staff_id, accountId))) {
     return c.json({ error: 'staff_not_found' }, 404);
   }

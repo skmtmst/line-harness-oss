@@ -335,7 +335,8 @@ describe('食い違ったまま保存させない', () => {
   it('所属と選択が揃っていれば、いつもどおり保存する', async () => {
     const result = await T.saveTemplateEdit(saveInput())
 
-    expect(result).toEqual({ ok: true })
+    // 成功時も id を返す（「保存して公開」が直後に公開APIへ渡すため）。
+    expect(result).toEqual({ ok: true, id: 'existing' })
     expect(calls).toHaveLength(1)
     expect(calls[0].method).toBe('PUT')
     expect(calls[0].path).toBe('/api/templates/template-a')
