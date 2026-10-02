@@ -677,7 +677,7 @@
 .talkBubble {
   max-width: 85%;
   padding: 8px 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: 12px;
@@ -701,7 +701,7 @@
 .talkImage {
   display: block;
   max-width: 85%;
-  border-radius: 12px;
+  border-radius: var(--radius-card, 12px);
 }
 
 /* 複製の窓（`Al4Ek`）の中の案内。 */

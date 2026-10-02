@@ -19,14 +19,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   BarChart3,
-  CheckCircle2,
   Copy,
-  Eye,
-  MoreHorizontal,
-  Pause,
   Pencil,
-  Play,
-  Send,
 } from 'lucide-react'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
 import { api, ApiError, type ScenarioRuns, type ScenarioTriggerItem } from '@/lib/api'
@@ -104,7 +98,6 @@ import { MoreAction } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StatusChip from '@/components/shared/status-chip'
 import Notice from '@/components/shared/notice'
-import { Th } from '@/components/shared/table'
 import Select from '@/components/shared/select'
 import {
   scenarioReachBarWidth,
@@ -124,12 +117,6 @@ import { scenarioReferenceData } from '@/components/scenarios/scenario-reference
 import { formatDateTime, formatNumber } from '@/lib/format'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
-
-const triggerOptions: { value: ScenarioTriggerType; label: string }[] = [
-  { value: 'friend_add', label: '友だち追加時' },
-  { value: 'tag_added', label: 'タグ付与時' },
-  { value: 'manual', label: '手動' },
-]
 
 /*
  * 送れる種別（132 で拡張）。
@@ -297,65 +284,6 @@ interface ScenarioStats {
 
 function FlexPreview({ content }: { content: string }) {
   return <FlexPreviewComponent content={content} maxWidth={300} />
-}
-
-function ImagePreview({ content }: { content: string }) {
-  try {
-    const parsed = JSON.parse(content)
-    const url = parsed.previewImageUrl || parsed.originalContentUrl
-    return (
-      <div>
-        <span className="text-xs font-medium text-chip-alt bg-chip-alt-soft px-2 py-0.5 rounded-mini mb-2 inline-block">画像</span>
-        {url ? (
-          <img src={url} alt="preview" className="border-hairline rounded-card mt-1 max-w-[200px] border" />
-        ) : (
-          <p className="text-xs text-ink-faint">プレビューなし</p>
-        )}
-      </div>
-    )
-  } catch {
-    return <p className="text-xs text-status-danger">画像 JSON パースエラー</p>
-  }
-}
-
-/**
- * 設定の札1枚。設計は5枚を横に並べ、直せるものだけ右上に入口を出す。
- *
- * 直す先が無いものに入口を付けると、押しても何も起きない札ができる。
- * action を渡さなければ、読むだけの札になる。
- */
-function SettingCard({
-  label,
-  action,
-  onAction,
-  qaOpen,
-  children,
-}: {
-  label: string
-  action?: string
-  onAction?: () => void
-  /** 画面確認で、同じ文言の別ボタンを誤って押さないための安定した入口。 */
-  qaOpen?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="bg-canvas rounded-card border-hairline border p-4">
-      <div className="mb-1.5 flex items-baseline justify-between gap-2">
-        <p className="text-ink-faint text-xs">{label}</p>
-        {action && onAction && (
-          <button
-            type="button"
-            data-qa-open={qaOpen}
-            onClick={onAction}
-            className="text-action shrink-0 text-xs hover:underline"
-          >
-            {action}
-          </button>
-        )}
-      </div>
-      {children}
-    </div>
-  )
 }
 
 /**
@@ -587,11 +515,6 @@ export default function ScenarioDetailV8({
   const [tags, setTags] = useState<TagOpt[]>([])
 
   const deliveryMode: DeliveryMode = (scenario?.deliveryMode ?? 'relative') as DeliveryMode
-  const latestStartedAt = runs?.subscriptions[0]?.startedAt ?? null
-  const latestStartedLabel = latestStartedAt
-    ? formatDateTime(new Date(latestStartedAt))
-    : null
-
   const loadScenario = useCallback(async (fresh = false) => {
     setLoading(true)
     setError('')
@@ -2121,7 +2044,7 @@ export default function ScenarioDetailV8({
           runs.quota.state === 'unlimited'
             ? '送信数の上限はありません'
             : runs.quota.remaining === null
-              ? (runs.quota.reason ?? '送信枠を取得できませんでした')
+              ? (runs.quota.reason ?? '送信枠を読み込めませんでした')
               : `残り${formatNumber(runs.quota.remaining)}通です`,
       }
     }
@@ -2130,7 +2053,7 @@ export default function ScenarioDetailV8({
   const startAccountLabel =
     scenario.lineAccountId === null
       ? '全アカウント共通'
-      : (accounts.find((a) => a.id === scenario.lineAccountId)?.name ?? '—（取得できません）')
+      : (accounts.find((a) => a.id === scenario.lineAccountId)?.name ?? '—（名前を読み込めません）')
   const startCompleteSummary = ON_COMPLETE_LABEL[(scenario.onCompleteMode ?? 'pause') as OnCompleteMode]
 
   return (
@@ -2396,7 +2319,7 @@ export default function ScenarioDetailV8({
               <p className={styles.kpiDetail}>
                 {runs?.steps[0]?.opened.state === 'available' && runs.steps[0].opened.value !== null
                   ? `うち開封 ${runs.steps[0].opened.value}%`
-                  : '開封率は取得できません'}
+                  : '開封率は未集計です'}
               </p>
             </div>
             <div className={styles.kpi}>
@@ -2410,7 +2333,7 @@ export default function ScenarioDetailV8({
               <p className={styles.kpiDetail}>
                 {runs?.steps[0]?.failed.state === 'available'
                   ? ''
-                  : (runs?.steps[0]?.failed.reason ?? 'この集計からは取得できません')}
+                  : (runs?.steps[0]?.failed.reason ?? 'この集計からは分かりません')}
               </p>
             </div>
             <div className={styles.kpi}>
@@ -2845,7 +2768,7 @@ export default function ScenarioDetailV8({
               ]}
             />
             {folderState === 'error' && (
-              <p className="text-status-danger text-xs">フォルダ一覧を取得できませんでした。</p>
+              <p className="text-status-danger text-xs">フォルダ一覧を読み込めませんでした。</p>
             )}
             {editFolderMissing && (
               <p className="text-warning text-xs">
@@ -2889,7 +2812,7 @@ export default function ScenarioDetailV8({
                 ? ` → 対象：${formatNumber(simulation.audience.newStartPlanned)}人`
                 : preflightLoading
                   ? ' → 対象：試算中…'
-                  : ' → 対象：取得できません'}
+                  : ' → 対象：まだ分かりません'}
             </p>
           </div>
           <div>

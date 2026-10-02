@@ -473,7 +473,7 @@ export default function ScenarioResultsV8() {
               <p className={styles.kpiDetail}>
                 {runs?.steps[0]?.opened.state === 'available' && runs.steps[0].opened.value !== null
                   ? `うち開封 ${runs.steps[0].opened.value}%`
-                  : '開封率は取得できません'}
+                  : '開封率は未集計です'}
               </p>
             </div>
             <div className={styles.kpi}>
@@ -487,7 +487,7 @@ export default function ScenarioResultsV8() {
               <p className={styles.kpiDetail}>
                 {(runs?.steps ?? []).some((s) => s.failed.state === 'available')
                   ? ''
-                  : (runs?.steps[0]?.failed.reason ?? 'この集計からは取得できません')}
+                  : (runs?.steps[0]?.failed.reason ?? 'この集計からは分かりません')}
               </p>
             </div>
             <div className={styles.kpi}>
@@ -518,7 +518,7 @@ export default function ScenarioResultsV8() {
           <section className={styles.panel}>
             <h2 className={styles.panelTitle}>通ごとの結果</h2>
             <NoteBar tone="info">
-              LINEでは通ごとの開封・クリック・失敗をすべて取得できません。取得できない指標は「—」で表示します。
+              LINEでは通ごとの開封・クリック・失敗のすべては分かりません。分からない指標は「—」で表示します。
             </NoteBar>
             {sortedSteps.length === 0 ? (
               <ListState kind="empty" title="配信内容がまだありません" description="シナリオ編集からメッセージを追加してください。" />
