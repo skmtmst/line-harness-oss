@@ -1,5 +1,9 @@
 'use client'
 
+import '@/app/notifications/readonly-v8.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
@@ -354,7 +358,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
   return (
     <>
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse gridClassName={styles.kpis}>
+      <KpiCollapse data-ro-kpis="true" gridClassName={styles.kpis}>
         <KpiCard variant="v6" title="今日 取り込んだ" value={overview?.last24h ?? null} unit="件" detail={overview?.byType.map((item) => `${item.label} ${formatNumber(item.count)}`).join('・') ?? '内訳は未取得'} />
         <KpiCard variant="v6" title="つながっていない注文" value={overview?.identityPending ?? null} unit="件" detail="LINEの友だちが見つかりません" badge="つき合わせ" badgeTone="neutral" />
         <KpiCard variant="v6" title="取り込みに失敗" value={overview?.failed ?? null} unit="件" detail="3回やり直しても入りませんでした" badge="確認" badgeTone="neutral" />
@@ -430,7 +434,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                 ? '条件に合う取り込みの記録はありません'
                 : undefined}
           description={listState === 'empty' && !accountId
-            ? '左のメニュー上部で、確認するLINEアカウントを選びます。'
+            ? 'LINEアカウントを選ぶ欄で、確認するアカウントを選びます。'
             : listState === 'empty' && recordsNarrowing
               ? '検索語や表示条件を変えてください。'
               : undefined}
@@ -544,11 +548,13 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 }
 
 function EcCommercePageInner() {
+  const theme = useAdminTheme()
   const tab = useMergedTab(EC_TABS, 'tab', 'events')
   const { selectedAccountId } = useAccount()
 
   return (
-    <div className={styles.root} data-design="Head">
+    <div className={`${styles.root} ${tab === 'connector' ? '' : 'v8-ro-notifications-page'}`} data-design="Head" data-design-node={theme === 'v8' && tab !== 'connector' ? (tab === 'subscriptions' ? 'wqC8x' : 'GmVR5') : undefined}>
+      {theme === 'v8' && tab !== 'connector' && <ReadonlyHeaderV8 title="EC連携" description="取り込みの記録・会員のつき合わせ・定期便の状況を確認できます。" />}
       {/* マニュアルは共通トップバーに置く。本文に「ECの注文・定期便を取り込み、LINEの配信や成果へつなげます。」という重複説明は置かない。 */}
       <PageHeaderH2
         /* 1段だけのパンくずは上の帯の画面名と重複するので出さない。 */

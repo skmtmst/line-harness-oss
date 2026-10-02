@@ -3994,6 +3994,12 @@ export type RichMenuGroupListItem = {
   /** トークを開いたときメニューを出した状態にするか（公開する形に含まれる）。 */
   defaultOpen: boolean
   thumbnailR2Key: string | null
+  /** ★V8 一覧の「大・6面・切替タブ N」。ページの束の数。 */
+  pageCount?: number
+  /** 代表ページ（既定、なければ先頭）の面の数。 */
+  defaultPageAreaCount?: number
+  /** ★V8 一覧の「対象 N人」。条件で出し分ける行だけ、当てはまる友だちの数。 */
+  audienceCount?: number | null
   monthlyStats?: {
     from: string
     to: string

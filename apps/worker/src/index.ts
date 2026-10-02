@@ -1882,6 +1882,20 @@ async function runSixHourlyHeavyJobs(
         }
       },
     });
+    jobs.push({
+      // Googleビジネス: 認可を切らさないための先回り更新。再同期が回らない接続
+      // （場所未選択・機能off）のトークンも6時間ごとに使って、放置による失効を防ぐ。
+      name: 'google business token keepalive',
+      run: async () => {
+        const { processGoogleBusinessTokenKeepalive } = await import('./services/google-business-resync.js');
+        const result = await processGoogleBusinessTokenKeepalive(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.refreshed + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'google_business_token_keepalive_tick', ...result }));
+        }
+      },
+    });
   }
 
   await runIsolatedScheduledJobs(jobs);
