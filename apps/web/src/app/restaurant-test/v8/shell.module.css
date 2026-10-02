@@ -1,0 +1,313 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * ★V8-B 飲食店向け（テスト）の共通の器。
+ * 板の頭（題・説明・店舗を選ぶ欄）・検証環境の帯・数のカード・
+ * 白い枠（パネル）・表の形は、Pencil「★V8-B 画面の地図」の
+ * 飲食店向けの行（CHz31 ほか）が正本。トークンだけを使う。
+ */
+
+/* 板の頭：題（22/700）＋説明（13）＋右端に店舗を選ぶ欄 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-metric);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: 1.6;
+}
+
+.storePicker {
+  width: 210px;
+  flex: 0 0 auto;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* 検証環境の帯（CHz31「検証環境の帯」）：薄い金色の地＋緑の札＋右の注意 */
+.boundary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border: 1px solid var(--color-nen-border);
+  border-radius: var(--radius-control);
+  background: var(--color-nen-ivory);
+}
+
+.boundaryBadge {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--text-lh, 1.5);
+}
+
+.boundaryText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.boundaryNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.boundaryNote::before {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: var(--radius-chart-bar);
+  background: var(--color-nen-gold);
+  content: '';
+}
+
+/* 数の並び（CHz31「数の並び」）：同じ幅のカード、間 12 */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.statLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 600;
+}
+
+.statValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-metric);
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.statValueWarning {
+  color: var(--color-warning);
+}
+
+.statNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+/* 白い枠（CHz31「枠 店舗一覧」）：頭は題14/700＋説明11、下に細い線 */
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  overflow: hidden;
+}
+
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.panelHeadText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+}
+
+.panelDescription {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.panelAside {
+  flex: 0 0 auto;
+  color: var(--color-warning);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.panelAsideOk {
+  color: var(--color-success);
+}
+
+.panelBody {
+  padding: 20px;
+}
+
+.panelBodyFlush {
+  padding: 0;
+}
+
+/* 表（板「表」）：見出しは薄い地＋11/600、行は上の細い線で割る */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table thead th {
+  padding: 9px 20px;
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table tbody td {
+  padding: 10px 20px;
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  vertical-align: middle;
+}
+
+.cellMain {
+  color: var(--color-action);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellSub {
+  margin: 0;
+  margin-top: 2px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 下の2枚（全店アクション・同期方針）を半々に並べる */
+.halfGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1279.98px) {
+  .halfGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.actionRow {
+  display: flex;
+  gap: 12px;
+}
+
+.actionRow > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.noteTitle {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.noteText {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: 1.7;
+}
+
+/* 操作の結果の帯 */
+.notice {
+  padding: 10px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  font-size: var(--text-label);
+}
+
+.noticeSuccess {
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.noticeError {
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+/* 状態（読み込み中・失敗・まだ無い）は同じ枠・同じ高さ */
+.stateBox {
+  padding: 40px 20px;
+}
+}
