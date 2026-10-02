@@ -187,6 +187,7 @@ shared-button-importer app/tags/edit-field-page-v8.tsx
 shared-button-importer app/tags/field-editor-v8.tsx
 shared-button-importer app/tags/fields/new/page.tsx
 shared-button-importer app/tags/folders/new/page.tsx
+shared-button-importer app/tags/mark-editor-v8.tsx
 shared-button-importer app/tags/searches/edit/page.tsx
 shared-button-importer app/tags/tag-editor-v8.tsx
 shared-button-importer app/tags/list-v8.tsx

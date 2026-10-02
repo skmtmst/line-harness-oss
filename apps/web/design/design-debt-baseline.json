@@ -308,6 +308,9 @@
   "app/tags/list-v8.tsx": {
     "unresolved-classname": 6
   },
+  "app/tags/mark-editor-v8.tsx": {
+    "unresolved-classname": 52
+  },
   "app/tags/marks-v8.tsx": {
     "unresolved-classname": 51
   },

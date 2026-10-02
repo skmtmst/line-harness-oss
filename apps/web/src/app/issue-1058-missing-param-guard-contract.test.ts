@@ -46,7 +46,9 @@ describe('#1058 必須パラメータ欠落時のガード', () => {
     expect(page).toContain('編集する対応マークが指定されていません')
     expect(page).toContain('backHref="/tags?tab=marks"')
     expect(page).toContain('if (!id)')
-    expect(page).toContain('return <SupportMarkEditor markId={id} />')
+    // ★V8 切替で return が三項演算子になった。id 非null到達と v7/v8 両経路の引き渡しを検査する。
+    expect(page).toContain('<SupportMarkEditor markId={id} />')
+    expect(page).toContain('<MarkEditorV8 markId={id} />')
     // 新規作成は /tags/marks/new が担う。編集側へ undefined を渡さない。
     expect(page).not.toContain('markId={id ?? undefined}')
   })
