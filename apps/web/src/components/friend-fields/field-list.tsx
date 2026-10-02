@@ -16,6 +16,9 @@ import Notice from '@/components/shared/notice'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { Th } from '@/components/shared/table'
 import Select from '@/components/shared/select'
+import Pagination from '@/components/shared/pagination'
+import PageSizeSelect, { PAGE_SIZE_OPTIONS, usePageSize } from '@/components/ui/page-size-select'
+import { useIsV8 } from '@/lib/use-admin-theme'
 
 export const FIELD_TYPE_HINTS: Record<FriendFieldType, string> = {
   text: '短いテキスト', textarea: '長い文章', number: '体重など', date: '誕生日など', datetime: '予約日時など',
@@ -76,6 +79,13 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
   const [type, setType] = useState<'all' | FriendFieldType>('all')
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<FriendField | null>(null)
+  /*
+    夕28: v8 は道具の段の右端に「表示件数」（10・20・50・画面ごとに覚える）
+    とページ送りを持つ。v7 は従来どおり全件を並べる（見た目も動きも変えない）。
+  */
+  const isV8 = useIsV8()
+  const [pageSize, setPageSize] = usePageSize('friend-fields')
+  const [page, setPage] = useState(1)
 
   /*
     ATTR-01: アカウント切替のあとに届いた古い応答で一覧を上書きしない。
@@ -149,6 +159,12 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
     if (type !== 'all' && field.type !== type) return false
     return true
   }), [items, query, type])
+
+  /* v8 だけ1ページ分に切る。v7 は全件のまま。絞り込みや件数が変わると1ページ目へ戻る。 */
+  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const shown = isV8 ? visible.slice((currentPage - 1) * pageSize, currentPage * pageSize) : visible
+  useEffect(() => setPage(1), [query, type, pageSize])
 
   /*
     並び替えの保存。ドラッグとキーボード（N-049）で同じ経路を使う。
@@ -283,6 +299,10 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
           options={[{ value: 'all', label: 'すべて' }, ...Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => ({ value, label }))]}
         />
         <span className="flex-1" />
+        {/* 夕28: 道具の段の右端に「表示件数」（v8 だけ。v7 は件数欄を出さない）。 */}
+        <span className="v8-only">
+          <PageSizeSelect value={pageSize} onChange={setPageSize} options={[...PAGE_SIZE_OPTIONS]} />
+        </span>
         {/* 追加ボタンはタブの右に1個だけ（#1014 ATTR-22）。一覧の中には置かない。 */}
       </div>
 
@@ -320,7 +340,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
               : status === 'error' ? <tr><td colSpan={7} className="p-0"><ListState kind="error" description={error || '友だち情報欄を読み込めませんでした。'} onRetry={() => void load()} /></td></tr>
               : items.length === 0 ? <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="まだ友だち情報欄がありません" description="「＋ 項目を追加」から最初の項目を作ってください。" /></td></tr>
               : visible.length === 0 ? <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="条件に合う項目はありません" description="項目名か種類を変えてください。" /></td></tr>
-              : visible.map((field) => <tr key={field.id} className="hover:bg-canvas-sunken">
+              : shown.map((field) => <tr key={field.id} className="hover:bg-canvas-sunken">
                   <td draggable={!field.isInherited} onDragStart={() => setDragId(field.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(field.id)} className={`${field.isInherited ? 'cursor-not-allowed' : 'cursor-grab'} px-3 py-3 text-hairline`}><ReorderGrip label={field.name} disabled={field.isInherited} disabledReason="共通項目は移行後に並び替えできます" onMove={(direction) => void keyboardMove(field.id, direction)} /></td>
                   {/*
                     ATTR-05: 項目名から編集画面へ進める。以前は文字だけで
@@ -355,7 +375,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
         ) : null}
         {status === 'ready' && visible.length > 0 ? (
           <ul className="divide-y divide-hairline md:hidden">
-            {visible.map((field) => (
+            {shown.map((field) => (
               <li key={field.id} className="px-3 py-3">
                 <div className="flex items-start gap-2">
                   <span className="pt-1 text-hairline">
@@ -381,6 +401,13 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
           </ul>
         ) : null}
       </div>
+
+      {/* 夕28: ページ送り（v8 だけ）。中身を出せていないときは出さない。 */}
+      {isV8 && status === 'ready' && visible.length > 0 ? (
+        <div className="mt-[14px] flex items-center justify-end">
+          <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
+        </div>
+      ) : null}
 
       <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 shadow-card"><h2 className="text-sm font-bold text-ink">既定値・種類・削除の安全確認</h2><p className="mt-1 text-xs leading-relaxed text-ink-faint">既定値は空欄送信事故を防ぎます。種類は新規登録後に変更不可とし、値が入っている項目は削除せず新しい項目へ移行します。</p></section>
       <ConfirmDialog open={pendingDelete !== null} title={`項目「${pendingDelete?.name ?? ''}」を削除しますか？`} description="値が入っていない項目だけ削除できます。この操作は元に戻せません。" confirmLabel="削除する" destructive onCancel={() => setPendingDelete(null)} onConfirm={() => { const target = pendingDelete; setPendingDelete(null); if (target) void remove(target) }} />

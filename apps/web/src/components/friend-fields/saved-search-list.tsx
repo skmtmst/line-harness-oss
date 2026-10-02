@@ -15,6 +15,9 @@ import ListState from '@/components/shared/list-state'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import Pagination from '@/components/shared/pagination'
+import PageSizeSelect, { PAGE_SIZE_OPTIONS, usePageSize } from '@/components/ui/page-size-select'
+import { useIsV8 } from '@/lib/use-admin-theme'
 import { describeSavedCondition, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
 import {
   filterSavedSearches,
@@ -81,6 +84,13 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
   const [query, setQuery] = useState('')
   const [usageFilter, setUsageFilter] = useState<SavedSearchUsageFilter>('all')
   const [matchFilter, setMatchFilter] = useState<'all' | 'matched' | 'zero' | 'unknown'>('all')
+  /*
+    夕28: v8 は道具の段の右端に「表示件数」（10・20・50・画面ごとに覚える）
+    とページ送りを持つ。v7 は従来どおり全件を並べる。
+  */
+  const isV8 = useIsV8()
+  const [pageSize, setPageSize] = usePageSize('saved-searches')
+  const [page, setPage] = useState(1)
   const loadSequence = useRef(0)
 
   const load = useCallback(async () => {
@@ -238,6 +248,12 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     return matchFilter === 'zero' ? count === 0 : count > 0
   })
 
+  /* v8 だけ1ページ分に切る。v7 は全件のまま。絞り込みや件数が変わると1ページ目へ戻る。 */
+  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const shown = isV8 ? visible.slice((currentPage - 1) * pageSize, currentPage * pageSize) : visible
+  useEffect(() => setPage(1), [query, usageFilter, matchFilter, pageSize])
+
   return (
     <div data-design-node="QKx8Q">
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -319,6 +335,10 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           ]}
         />
         <span className="flex-1" />
+        {/* 夕28: 道具の段の右端に「表示件数」（v8 だけ。v7 は件数欄を出さない）。 */}
+        <span className="v8-only">
+          <PageSizeSelect value={pageSize} onChange={setPageSize} options={[...PAGE_SIZE_OPTIONS]} />
+        </span>
         {/*
           作る導線はタブの右に1個だけ（#1014 ATTR-22）。
           「保存条件からコピー」は一覧内の第二導線だったので、ここからは外す。
@@ -378,7 +398,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
               </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-hairline">
-          {visible.map((search) => {
+          {shown.map((search) => {
             const { all, any, note } = splitConditions(search.conditions, tags, conditionLabels)
             const deleteDisabled = !search.lineAccountId || search.canDelete !== true
             const deleteTitle = !search.lineAccountId
@@ -475,7 +495,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
             名前・人数・使用先・操作を同じカード内に収める。
           */}
           <ul className="divide-y divide-hairline md:hidden">
-            {visible.map((search) => {
+            {shown.map((search) => {
               const deleteDisabled = !search.lineAccountId || search.canDelete !== true
               const deleteTitle = !search.lineAccountId
                 ? '管理者が対象アカウントを割り当てるまで変更できません'
@@ -535,6 +555,13 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           </ul>
         </div>
       )}
+
+      {/* 夕28: ページ送り（v8 だけ）。中身を出せていないときは出さない。 */}
+      {isV8 && ready && visible.length > 0 ? (
+        <div className="mt-[14px] flex items-center justify-end">
+          <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
+        </div>
+      ) : null}
 
       {/*
         読めていないときに「0 / 50 件」と書かない。**まだ余裕がある**と

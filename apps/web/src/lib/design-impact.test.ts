@@ -137,6 +137,10 @@ describe('共通部品の影響範囲', () => {
       'app/webhooks/webhook-overviews.tsx',
       'app/webinars/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',
+      // 夕28: 友だち属性の残り3タブにもページ送りと同じ段の「表示件数」を足した。
+      'components/friend-fields/field-list.tsx',
+      'components/friend-fields/mark-list.tsx',
+      'components/friend-fields/saved-search-list.tsx',
       'components/friend-fields/tags-page-v4.tsx',
       'components/friends/friend-list-table.tsx',
       'components/inbox/inbox-list.tsx',

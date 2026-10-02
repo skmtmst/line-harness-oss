@@ -20,6 +20,8 @@ import Disclosure from '@/components/shared/disclosure'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
+import PageSizeSelect, { PAGE_SIZE_OPTIONS, usePageSize } from '@/components/ui/page-size-select'
+import { useIsV8 } from '@/lib/use-admin-theme'
 import Pagination from '@/components/shared/pagination'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
@@ -608,7 +610,9 @@ export default function TagsPageV4({
    * 1つずつしか選べないと、「未使用」かつ「今月増えた」が出せない。
    */
   const [quick, setQuick] = useState<string[]>([])
-  const [pageSize, setPageSize] = useState(20)
+  /* 夕28: 選んだ件数は画面ごとに覚える（lh-page-size:tags）。 */
+  const isV8 = useIsV8()
+  const [pageSize, setPageSize] = usePageSize('tags')
   const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
@@ -972,9 +976,19 @@ export default function TagsPageV4({
                     ほかの欄と同じく幅96・短い文字（`20件`）にそろえる。
                   */}
                   <span className="ml-auto flex shrink-0 items-center gap-2">
-                    <span className="w-24">
-                      <Select aria-label="表示件数" className="w-full" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={[20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件` }))} size="page-size" />
-                    </span>
+                    {/*
+                      夕28: 件数の選び口は v8 では共通部品（「表示件数」＋「20件表示」）。
+                      v7 は従来の短い欄のまま（見た目を変えない）。DOM に両方を
+                      置かず、テーマで1つだけ描く（同名の欄が2つになると
+                      読み上げ・試験で区別がつかない）。
+                    */}
+                    {isV8 ? (
+                      <PageSizeSelect value={pageSize} onChange={setPageSize} options={[...PAGE_SIZE_OPTIONS]} />
+                    ) : (
+                      <span className="w-24">
+                        <Select aria-label="表示件数" className="w-full" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size}件` }))} size="page-size" />
+                      </span>
+                    )}
                     <span className="whitespace-nowrap text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
                   </span>
                 </>

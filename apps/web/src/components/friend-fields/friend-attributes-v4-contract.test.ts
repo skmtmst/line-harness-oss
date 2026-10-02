@@ -65,9 +65,12 @@ describe('友だち属性 V4 contract', () => {
     expect(page).toContain('copySource.tag.linkedActions?.find')
   })
 
-  it('一覧は20・30・40・50件で切り替え、ページを無限に横並びにしない', () => {
+  it('一覧は10・20・50件で切り替え、ページを無限に横並びにしない', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
-    expect(source).toMatch(/\[20,\s*30,\s*40,\s*50\]/)
+    // 夕28: 件数の選択肢は全画面で 10・20・50（共通の PAGE_SIZE_OPTIONS）にそろえ、
+    // 選んだ件数は画面ごとに覚える（usePageSize）。
+    expect(source).toContain('PAGE_SIZE_OPTIONS')
+    expect(source).toContain("usePageSize('tags')")
     // 2026-08-26: ページ送りは共通部品 `Pagination`（設計 `Blot6`）へ寄せた。
     // 自前で組むと、高さ38・角丸・現在ページの緑がほかの一覧とずれる。
     expect(source).toContain('<Pagination')
