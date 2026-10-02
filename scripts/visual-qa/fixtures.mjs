@@ -3234,6 +3234,12 @@ export const BROADCAST_LIST_META = {
     openRate: 69.4,
   },
   pagination: { total: 24, limit: 20, cursor: 0, nextCursor: '20' },
+  /*
+   * 絞り込みの札の横の数（10の状態で数えたもの。V8 一覧が読む）。
+   * 合計は pagination.total と同じ24にそろえる——数が合わないと
+   * 絵の見比べで「札とページ送りで数が違う」に見える。
+   */
+  statusCounts: { all: 24, scheduled: 6, draft: 5, pending_approval: 2, sent: 9, partial_failed: 1, failed: 1 },
 }
 
 /** 機能6。予約完了画面に出すSlack通知設定。 */

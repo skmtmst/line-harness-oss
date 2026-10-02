@@ -63,6 +63,7 @@ import { broadcasts } from './routes/broadcasts.js';
 import { broadcastApprovals } from './routes/broadcast-approvals.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
+import { lineAccountTags } from './routes/line-account-tags.js';
 import { lineAccounts } from './routes/line-accounts.js';
 import { gettingStarted } from './routes/getting-started.js';
 import { recipes } from './routes/recipes.js';
@@ -307,6 +308,8 @@ export type Env = {
     GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?: string;
     ECCUBE_WEBHOOK_SECRET?: string;
     NEN_EC_BASE_URL?: string;
+    /** ECの会員別ランクAPIを配備した後だけ true にする。未設定は送信停止。 */
+    NEN_EC_MEMBER_RANK_SYNC_ENABLED?: string;
     NEN_RICH_MENU_STORE_URL?: string;
     WORKER_URL: string;
     // Admin auth topology (see middleware/admin-auth-config.ts):
@@ -487,6 +490,7 @@ app.route('/', broadcastApprovals);
 app.route('/', broadcasts);
 app.route('/', broadcastMessageAssets);
 app.route('/', users);
+app.route('/', lineAccountTags);
 app.route('/', lineAccounts);
 app.route('/', brand);
 app.route('/', conversions);

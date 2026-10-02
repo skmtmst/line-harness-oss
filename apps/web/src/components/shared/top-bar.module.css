@@ -304,6 +304,27 @@
   white-space: nowrap;
 }
 
+/* ページが渡した手前の段。戻れるのでリンク色＋押せる形にする。 */
+.crumbFromWrap {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.crumbFromLink {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crumbFromLink:hover {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
 .crumbSep {
   color: var(--color-ink-faint);
 }

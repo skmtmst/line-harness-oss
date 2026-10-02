@@ -66,6 +66,26 @@ const spec = {
           },
         },
       },
+      LineAccountTag: {
+        type: 'object',
+        required: ['id', 'name', 'color', 'displayOrder', 'createdAt', 'updatedAt'],
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string', maxLength: 100 },
+          color: { type: ['string', 'null'], pattern: '^#[0-9a-fA-F]{6}$' },
+          displayOrder: { type: 'integer', minimum: 0 },
+          createdAt: { type: 'string' },
+          updatedAt: { type: 'string' },
+        },
+      },
+      LineAccountTagInput: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', minLength: 1, maxLength: 100, description: '前後の空白は除く' },
+          color: { type: ['string', 'null'], pattern: '^#[0-9a-fA-F]{6}$' },
+          displayOrder: { type: 'integer', minimum: 0 },
+        },
+      },
       TagDeleteImpact: {
         type: 'object',
         required: ['tag', 'friendCount', 'references', 'blockingReferenceCount', 'canDelete'],
@@ -601,6 +621,37 @@ const spec = {
         tags: ['NEN Members'], summary: 'ランク（名前・通年のしきい値・マイル還元）を一括保存し、ECへ同期してタグを付け替える',
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'ranks'], properties: { accountId: { type: 'string' }, ranks: { type: 'array', maxItems: 8, items: { type: 'object', required: ['name', 'annualThresholdYen', 'mileRatePercent'], properties: { id: { type: 'string', nullable: true }, name: { type: 'string', maxLength: 20 }, annualThresholdYen: { type: 'integer', minimum: 0 }, mileRatePercent: { type: 'number', minimum: 0, maximum: 10 } } } } } } } } },
         responses: { '200': { description: 'Saved settings with sync result' }, '400': { description: 'Validation failed' }, '403': { description: 'Owner or admin role required' } },
+      },
+    },
+    '/api/nen/rank-settings/{id}': {
+      delete: {
+        tags: ['NEN Members'], summary: 'ランクを削除し、会員を移し先へ変更する',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'expectedVersion'],
+          properties: { accountId: { type: 'string' }, replacementRankId: { type: 'string', nullable: true }, expectedVersion: { type: 'integer', minimum: 1 } } } } } },
+        responses: { '200': { description: '移し替え件数、操作ID、ECの成功・失敗・同期待ち件数と会員別の理由。未設定ならECへ送らずpending' },
+          '400': { description: '入力不備' }, '403': { description: 'オーナーまたは管理者権限が必要' },
+          '404': { description: 'ランクが見つからない' }, '409': { description: '版の競合または削除不可' } },
+      },
+    },
+    '/api/nen/rank-settings/member-sync/{operationId}': {
+      get: {
+        tags: ['NEN Members'], summary: '保存した会員別EC送信の結果と失敗理由を取得する',
+        parameters: [{ name: 'operationId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'afterId', in: 'query', schema: { type: 'string' } }],
+        responses: { '200': { description: '操作全体の件数、会員別の結果（100人まで）、次のページのnextCursor' },
+          '403': { description: 'オーナーまたは管理者権限が必要' }, '404': { description: '記録が見つからない' } },
+      },
+    },
+    '/api/nen/rank-settings/member-sync/{operationId}/retry': {
+      post: {
+        tags: ['NEN Members'], summary: '未成功の会員を最初の版・担当者・鍵でECへ送り直す（1回100人まで）',
+        parameters: [{ name: 'operationId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId'],
+          properties: { accountId: { type: 'string' } } } } } },
+        responses: { '200': { description: '成功・失敗・同期待ちの件数と理由。成功済みは再送しない。送信停止中はpending' },
+          '403': { description: 'オーナーまたは管理者権限が必要' }, '404': { description: '記録が見つからない' } },
       },
     },
     '/api/nen/rank-settings/resync': {
@@ -1236,6 +1287,23 @@ const spec = {
     },
     '/api/friends/count': {
       get: { tags: ['Friends'], summary: '友だち数取得', responses: { '200': { description: 'Count' } } },
+    },
+    '/api/friends/bulk-runs/{id}/approve': {
+      post: {
+        tags: ['Friends'],
+        summary: '人数基準を超えた一括送信の実行承認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { confirmedRecipientCount: { anyOf: [{ type: 'integer' }, { type: 'string' }], description: '1人運用の人数確認（整数または空でない数値文字列。対象人数と一致する場合のみ）' } } } } } },
+        responses: {
+          '202': { description: '承認を受け付けた（approval を返す。送信の完了は実行の取得で確認）' },
+          '400': { description: '指定を読み取れません' },
+          '403': { description: '承認する権限がありません' },
+          '404': { description: '一括操作が見つかりません' },
+          '409': { description: '承認待ちなし・期限切れ・人数不一致・本人の承認' },
+          '413': { description: '一括操作の指定が大きすぎます' },
+          '500': { description: '一括操作を処理できませんでした' },
+        },
+      },
     },
     '/api/friends/{id}': {
       get: {
@@ -3424,6 +3492,68 @@ const spec = {
         summary: 'UUID紐付き友だち一覧',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { '200': { description: 'Linked friends/accounts' } },
+      },
+    },
+    // ── LINE Account Tags ───────────────────────────────────────────────────
+    '/api/line-account-tags': {
+      get: {
+        tags: ['LINE Accounts'],
+        summary: '統括内のアカウントタグ一覧',
+        responses: {
+          '200': { description: 'アカウントタグの一覧（並び順・名前順）', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'array', items: { $ref: '#/components/schemas/LineAccountTag' } } } } } } },
+          '403': { description: 'Owner or admin role required' },
+        },
+      },
+      post: {
+        tags: ['LINE Accounts'],
+        summary: 'アカウントタグを作成',
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/LineAccountTagInput', required: ['name'] } } } },
+        responses: {
+          '201': { description: '作成したアカウントタグ', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { $ref: '#/components/schemas/LineAccountTag' } } } } } },
+          '400': { description: 'Invalid name, color or displayOrder' },
+          '403': { description: 'Owner or admin role required' },
+          '409': { description: 'Same tag name already exists in the tenant' },
+        },
+      },
+    },
+    '/api/line-account-tags/{id}': {
+      patch: {
+        tags: ['LINE Accounts'],
+        summary: 'アカウントタグの名前・色・並び順を変更',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/LineAccountTagInput', minProperties: 1 } } } },
+        responses: {
+          '200': { description: '変更後のアカウントタグ', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { $ref: '#/components/schemas/LineAccountTag' } } } } } },
+          '400': { description: 'Invalid name, color or displayOrder' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Tag not found' },
+          '409': { description: 'Same tag name already exists in the tenant' },
+        },
+      },
+      delete: {
+        tags: ['LINE Accounts'],
+        summary: 'アカウントタグを削除（付与も外す）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '削除したタグID', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } } } } } } },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Tag not found' },
+        },
+      },
+    },
+    '/api/line-accounts/{id}/tags': {
+      put: {
+        tags: ['LINE Accounts'],
+        summary: 'LINEアカウントのタグをまとめて置き換え',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['tagIds'], properties: { tagIds: { type: 'array', maxItems: 100, items: { type: 'string', minLength: 1 }, description: '同じ統括のアカウントタグID。重複は1つにまとめる' } } } } } },
+        responses: {
+          '200': { description: '置き換え後のタグ', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'object', required: ['id', 'tags'], properties: { id: { type: 'string' }, tags: { type: 'array', items: { $ref: '#/components/schemas/LineAccountTag' } } } } } } } } },
+          '400': { description: 'tagIds is not an array or contains tags outside the tenant' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Account not found or not accessible' },
+          '409': { description: 'ACCOUNT_ARCHIVED' },
+        },
       },
     },
     // ── LINE Accounts ───────────────────────────────────────────────────────

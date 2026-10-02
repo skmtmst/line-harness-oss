@@ -8311,6 +8311,11 @@ export const api = {
       limit?: number
       cursor?: string | number
       status?: string
+      /**
+       * ★V8: 絞り込みの札は10の状態（displayStatus）で絞る。
+       * カンマ区切りで複数受ける（例 'failed,partial_failed' = エラー）。
+       */
+      displayStatus?: string
       folderId?: string
       /** 'newest' (既定) または 'oldest'。一覧の並び順選択と連動する。 */
       sort?: 'newest' | 'oldest'
@@ -8320,11 +8325,14 @@ export const api = {
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.cursor !== undefined && params.cursor !== '') query.set('cursor', String(params.cursor))
       if (params?.status) query.set('status', params.status)
+      if (params?.displayStatus) query.set('displayStatus', params.displayStatus)
       if (params?.folderId) query.set('folderId', params.folderId)
       if (params?.sort && params.sort !== 'newest') query.set('sort', params.sort)
       const qs = query.toString()
       return fetchApi<ApiResponse<ApiBroadcast[]> & {
         kpis?: BroadcastListKpis
+        /** ★V8: 札ごとの件数（フォルダは効く、状態の札は効かせない集団）。 */
+        statusCounts?: Record<string, number>
         pagination?: { total: number; limit: number; cursor: number; nextCursor: string | null }
       }>(`/api/broadcasts${qs ? `?${qs}` : ''}`)
     },
