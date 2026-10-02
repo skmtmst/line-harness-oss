@@ -499,6 +499,26 @@
   --color-border-soft: #1d1d1f14;
   --shadow-segment-ring: inset 0 0 0 1px var(--color-border-soft);
   --shadow-segment-thumb: 0 1px 2px #1d1d1f1a;
+
+  /*
+   * 夕15 一斉配信の右欄のスマホ（app/broadcasts/phone-mock-v8.module.css）。
+   * 画面の中の飾りなので管理画面のテーマ色とは別物として `bphone` で分ける。
+   * 共有の LINE 見本（components/shared/line-preview）とは別の絵で、
+   * 角丸・地の色も違う。値は Pencil `F3X1Mo` / `cgiGB` / `cdZBf` の実測。
+   */
+  --v8-bphone-ink: #171a1f;          /* 器の地・島・帯の中の字・ホームの線 */
+  --v8-bphone-talk: #7f93c4;         /* トークの地 */
+  --v8-bphone-chrome: #ffffff;       /* 帯の地・緑の上の字 */
+  --v8-bphone-sub: #4a525e;          /* 帯の副の字 */
+  --v8-bphone-chip: rgb(255 255 255 / 0.55); /* トークの中の札の地 */
+  --v8-bphone-chip-ink: #3c4450;     /* 札の字 */
+  --v8-bphone-send: #06c755;         /* 送信ボタンの緑（LINE の緑） */
+  --v8-bphone-hairline: rgb(15 23 32 / 0.06); /* 帯の区切り線 */
+  --v8-bphone-shadow: 0 12px 32px rgb(15 23 32 / 0.18); /* 器が下へ落とす影 */
+  --v8-bphone-shell-radius: 44px;    /* 器の角丸 */
+  --v8-bphone-screen-radius: 34px;   /* 画面の角丸 */
+  /* 一覧の日付窓（list-v8.module.css の datePopover）が落とす影 */
+  --v8-popover-shadow: 0 8px 24px rgb(15 23 32 / 0.12);
 }
 
 /*

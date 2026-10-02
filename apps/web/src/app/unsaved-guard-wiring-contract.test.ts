@@ -135,6 +135,8 @@ const EXEMPTIONS: Record<string, string> = {
     '分類の変更は選んだ直後に即時保存し、下書きを持たない',
   'components/friend-fields/tags-page-v4.tsx':
     '一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
+  'app/broadcasts/list-v8.tsx':
+    '一覧と絞り込みが中心。フォルダ・並び替え・保存した検索など一覧上の操作は押した直後に即時保存し、配信の作成は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
   'app/tags/tags-tab-v8.tsx':
     'tags-page-v4.tsx と同じ一覧のV8版。一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
   'app/booking/menus/page.tsx':

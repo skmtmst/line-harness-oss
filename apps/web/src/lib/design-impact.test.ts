@@ -69,6 +69,8 @@ describe('共通部品の影響範囲', () => {
       'app/booking/bookings/page.tsx',
       // #370: 予約メニュー8件を設計どおり1ページ6件に区切る。
       'app/booking/menus/page.tsx',
+      // #1145(★V8): 一斉配信の一覧。20件ずつのページ送りを共通へ寄せた。
+      'app/broadcasts/list-v8.tsx',
       'app/common-actions/page.tsx',
       // N-193/N-205: 登録メディア選択窓。20件ずつのページ送りを共通へ寄せた。
       'app/contents/media-picker-dialog.tsx',
