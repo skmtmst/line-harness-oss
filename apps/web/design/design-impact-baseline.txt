@@ -185,6 +185,9 @@ shared-button-importer app/restaurant-test/google/google-profile.tsx
 shared-button-importer app/restaurant-test/restaurant-console.tsx
 shared-button-importer app/restaurant-test/stores/new/page.tsx
 shared-button-importer app/restaurant-test/stores/new/terms-consent.tsx
+shared-button-importer app/restaurant-test/v8/approvals.tsx
+shared-button-importer app/restaurant-test/v8/dashboard.tsx
+shared-button-importer app/restaurant-test/v8/organization.tsx
 shared-button-importer app/rich-menus/connections/page.tsx
 shared-button-importer app/rich-menus/edit/page.tsx
 shared-button-importer app/rich-menus/edit/prepublish-check-section.tsx
