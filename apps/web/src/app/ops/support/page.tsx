@@ -263,6 +263,24 @@ export default function OpsSupportPage() {
     setReplyFromAi(null)
   }
 
+  const [confirmReply, setConfirmReply] = useState(false)
+
+  /** 板 `GgP2d` の小窓の「下書きを消す」。AIの下書きは削除口へ、手書きは文面だけ消す。 */
+  const clearDraftFromConfirm = async () => {
+    if (!detail || busy) return
+    if (replyFromAi) {
+      setBusy(true)
+      const res = await opsCall(api.ops.support.deleteDraft(detail.ticket.id))
+      setBusy(false)
+      if (!res.success) { setError(res.error || '下書きを消せませんでした'); return }
+      setReply('')
+      setReplyFromAi(null)
+    } else {
+      setReply('')
+    }
+    setConfirmReply(false)
+  }
+
   const send = async () => {
     if (!detail || !reply.trim()) return
     setBusy(true)
@@ -272,6 +290,7 @@ export default function OpsSupportPage() {
     if (!res.success) { setError(res.error || '返信できませんでした'); return }
     setReply('')
     setReplyFromAi(null)
+    setConfirmReply(false)
     setNotice(res.data.mailSent
       ? `${res.data.ticket.ticketLabel} に返信しました。登録メールにも送りました`
       : res.data.mailSkippedReason === 'no_email'
@@ -392,6 +411,51 @@ export default function OpsSupportPage() {
           <p className="text-caption text-ink-secondary md:col-span-2">電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。</p>
         </div>
       </Dialog>
+
+      {/* 板 `GgP2d`「この返事を送りますか？」。宛先・状態・根拠・本文を見てから送る。 */}
+      {ticket ? (
+        <Dialog
+          open={confirmReply}
+          title="この返事を送りますか？"
+          busy={busy}
+          error={error || undefined}
+          designNode="GgP2d"
+          onCancel={() => { if (!busy) setConfirmReply(false) }}
+          footer={(
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy}>下書きを消す</Button>
+              <span className="ml-auto flex items-center gap-2">
+                <Button onClick={() => { if (!busy) setConfirmReply(false) }} disabled={busy}>戻って直す</Button>
+                <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…">送って解決にする</Button>
+              </span>
+            </div>
+          )}
+        >
+          <div className="flex flex-col gap-4">
+            <dl className="grid gap-1.5 rounded-card bg-canvas-sunken px-4 py-3">
+              <div className="flex gap-3">
+                <dt className="w-16 shrink-0 text-caption text-ink-faint">宛先</dt>
+                <dd className="text-caption font-medium text-ink">{`${ticket.tenantName}（担当：${ticket.staffName || '—'}）・${ticket.channelLabel}`}</dd>
+              </div>
+              <div className="flex gap-3">
+                <dt className="w-16 shrink-0 text-caption text-ink-faint">状態</dt>
+                <dd className="text-caption font-medium text-ink">{`${ticket.stageLabel} → 解決（送ったあと）`}</dd>
+              </div>
+              <div className="flex gap-3">
+                <dt className="w-16 shrink-0 text-caption text-ink-faint">優先度</dt>
+                <dd className="text-caption font-medium text-ink">{ticket.priorityLabel}</dd>
+              </div>
+            </dl>
+            {replyFromAi && references.length > 0 ? (
+              <div className="rounded-card bg-canvas-sunken px-4 py-3">
+                <p className="text-caption font-semibold text-ink">AI の下書きの根拠</p>
+                <p className="mt-1 text-caption text-ink-secondary">{references.map((ref) => `ナレッジ「${ref.title}」`).join('・')}をもとに作成</p>
+              </div>
+            ) : null}
+            <p className="whitespace-pre-wrap text-caption text-ink">{reply}</p>
+          </div>
+        </Dialog>
+      ) : null}
 
       {notice ? <p role="status" className="mb-3 text-caption text-accent-deep">{notice}</p> : null}
       {/*
@@ -568,7 +632,7 @@ export default function OpsSupportPage() {
                   </p>
                   <span className="ml-auto flex items-center gap-2">
                     <Button size="field" onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
-                    <Button size="field" variant="primary" onClick={() => void send()} disabled={busy || closed || aiBusy || !reply.trim()}>返信する</Button>
+                    <Button size="field" variant="primary" onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || closed || aiBusy || !reply.trim()}>返信する</Button>
                   </span>
                 </div>
               </div>
