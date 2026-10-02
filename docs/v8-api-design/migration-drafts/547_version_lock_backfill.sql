@@ -45,13 +45,19 @@ CREATE TABLE IF NOT EXISTS v8_edit_receipts (
   method TEXT NOT NULL CHECK (method IN ('PUT', 'PATCH', 'POST')),
   path TEXT NOT NULL,
   idempotency_key TEXT NOT NULL,
+  -- 補正（02複合版対応）: templatesは (published_version, draft_revision) の組が
+  -- 版正本。公開でdraft_revisionが0へ戻るため、単一version列では公開前draft1と
+  -- 公開後draft1が衝突する。version_epoch に公開版を入れ、version に下書き版を
+  -- 入れる（templates以外は epoch 0）。templates既存2列の変更・UNIQUE削除はしない。
+  version_epoch INTEGER NOT NULL DEFAULT 0
+    CHECK (typeof(version_epoch) = 'integer' AND version_epoch >= 0),
   version INTEGER NOT NULL CHECK (typeof(version) = 'integer' AND version >= 0),
   request_hash TEXT NOT NULL,
   actor_id TEXT NOT NULL,
   replay_response_json TEXT NOT NULL DEFAULT '{"state":"pending"}'
     CHECK (json_valid(replay_response_json)),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  UNIQUE (resource_kind, resource_id, tenant_id, account_scope, version),
+  UNIQUE (resource_kind, resource_id, tenant_id, account_scope, version_epoch, version),
   UNIQUE (tenant_id, account_scope, resource_kind, resource_id, method, path, idempotency_key, actor_id)
 );
 

@@ -21,15 +21,17 @@
 | forms | `content_revision` / `expectedContentRevision`（`revision` は削除影響・訪問回答用で別） | `expectedContentRevision` | 管理編集の要求receiptは現行なし（`form_submit_claims` は公開回答submit台帳であり流用不可）。547の `v8_edit_receipts` を使う |
 | common_vars＋versions | `version` / `expectedVersion`（routeは影響proofも照合） | `expectedVersion` | 履歴UNIQUE `403:20` |
 | tags＋action子/requests | `version` / `expectedVersion`（必須） | `expectedVersion` | 編集は `tag_update_requests`（541）。作成系列とは分離する |
-| notification_rules | content version / `expectedVersion`（任意。`isActive` だけは版を上げない） | `expectedVersion` | なし |
+| notification_rules | content version / `expectedVersion`（legacy PUT・helper任意。operator draft PATCH必須。`isActive` だけは版を上げない） | `expectedVersion` | なし |
 | friend_add_rules＋versions | `lock_version` / `expectedVersion`（任意。`version_number` は公開/下書き番号で別） | `expectedVersion` | 308系列 |
 | hq_templates | `revision` / `expectedRevision`（必須） | `expectedRevision` | なし |
 | staff_members | `policy_version` / `expectedPolicyVersion`（任意） | `expectedPolicyVersion` | permission receipts別 |
 | booking settings/menu/resources | `version` / `expectedVersion`（helperにoptionalあり。初回作成はexpected 0） | `expectedVersion` | booking-idempotency |
-| templates＋versions | `draft_revision` と `published_version`（保存と公開の両比較値） | 両方 | なし |
+| templates＋versions | `draft_revision` と `published_version`（保存と公開の両比較値） | 両方 | なし（receiptは `version_epoch`=公開版・`version`=下書き版の組。その他resourceはepoch 0） |
 | support_marks / friend_fields(+values) / saved_searches / broadcasts / users | `version` / `revision` / `lock_version`（258/259/300〜305） | 各expected | 536/537/540/541系列 |
 
 根拠: 監査01-02 `cas-current-contracts.json`、migration `258/259/274/300/301/302/303/305/308/348/390/403/536/537/540〜543`（base `4639c6e`）。
+
+- notification_rulesの任意・必須の分け方（補正。既存必須を弱めない）: DB helper（`packages/db/src/notifications.ts:99/121`、expectedVersion任意）とlegacy PUTは任意のまま。operator draft PATCH（`apps/worker/src/routes/notifications.ts:618〜622`）は版なしを400で拒否するため必須。この必須はbase4639時点からある既存契約であり、flag off/onどちらのresourceでも保存する。
 
 ## 整数版がない主要機能（実装へ進める設計＋DDL案）
 
@@ -76,7 +78,7 @@ PATCHの例（tags。methodと版名はresourceの現行どおり）:
 ## guard（具体的成立証拠。bare EXISTSは使わない）
 
 - 同じUPDATE WHEREにid・tenant・account・非削除・読取版を含め、0行なら成功なし。先読み比較だけでは同時更新を防げない。
-- CASの直後に `changes() = 1` を確認できた場合だけoperation receipt行を作る。receiptは今回唯一のopID・hash・version・tenant・account・actor・resource・method・ヘッダIdempotency-Keyを持ち、同scope再送のreplay応答を保存する（候補547 `v8_edit_receipts`。versionは整数・非負CHECK、opIDはNULL禁止）。
+- CASの直後に `changes() = 1` を確認できた場合だけoperation receipt行を作る。receiptは今回唯一のopID・hash・version・tenant・account・actor・resource・method・ヘッダIdempotency-Keyを持ち、同scope再送のreplay応答を保存する（候補547 `v8_edit_receipts`。versionは整数・非負CHECK、opIDはNULL禁止）。templatesは `version_epoch`=公開版・`version`=下書き版の組で持ち、その他resourceはepoch 0とする（winner UNIQUE・lookup・後続guardも組で一致させる。単一version運用への置換・UNIQUE削除はしない）。
 - 全後続（子表・history・監査・outbox）のINSERT/UPDATEはreceipt存在を条件にする。単なる `EXISTS(resource id)` はCAS失敗時も真になるためguard不足であり使わない。
 - 親CAS＋子表＋history＋idempotency receiptを同一の成功に結び付ける。D1 batch中の0行UPDATEはSQLエラーではないため、後から409を返すだけでは他SQL取消の証明にならない。成立条件不足は実SQLエラー（制約・trigger）でbatch全体をrollbackするか、永続operation状態＋補償で回収する。
 - 同一key・同一payloadの再送は同じ成功を返し、同key・異payload・古いeditorの新要求は別契約（409）。操作用keyや実行時生成値を編集版へ置換しない。
@@ -105,9 +107,9 @@ WHERE id = :resourceId AND account_id = :account AND lock_version = :expected
 
 INSERT INTO v8_edit_receipts
 (op_id, resource_kind, resource_id, tenant_id, line_account_id,
- method, path, idempotency_key, version, request_hash, actor_id, created_at)
+ method, path, idempotency_key, version_epoch, version, request_hash, actor_id, created_at)
 SELECT :op, 'richMenuGroup', :resourceId, :tenant, :account,
-       'PATCH', :concretePath, :headerKey, :expected + 1, :hash, :actor, :serverTime
+       'PATCH', :concretePath, :headerKey, 0, :expected + 1, :hash, :actor, :serverTime
 WHERE changes() = 1;
 
 UPDATE rich_menu_pages SET name = :pageName, updated_at = :serverTime
@@ -116,6 +118,7 @@ WHERE id = :pageId AND group_id = :resourceId
               WHERE op_id = :op AND request_hash = :hash
                 AND tenant_id = :tenant AND line_account_id = :account
                 AND resource_kind = 'richMenuGroup' AND resource_id = :resourceId
+                AND version_epoch = 0
                 AND version = :expected + 1 AND actor_id = :actor);
 
 UPDATE v8_edit_receipts
@@ -126,7 +129,8 @@ SET replay_response_json = (
       AND name = :pageName AND updated_at = :serverTime))
 WHERE op_id = :op AND request_hash = :hash AND tenant_id = :tenant
   AND line_account_id = :account AND resource_id = :resourceId
-  AND resource_kind = 'richMenuGroup' AND version = :expected + 1 AND actor_id = :actor;
+  AND resource_kind = 'richMenuGroup' AND version_epoch = 0
+  AND version = :expected + 1 AND actor_id = :actor;
 ```
 
 - 親CAS0なら今回receipt0・child0。既存receiptがあっても今回op不一致で副作用0、HTTP409へ。CAS成功後child条件不成立は最後のscalar=NULL→receiptのNOT NULL違反でbatch全取消。childの削除/全置換やhistory/outboxも同じfresh guardと完了条件が必要。この4文は全resourceの完成実装を意味しない。
@@ -144,17 +148,28 @@ WHERE op_id = :op AND request_hash = :hash AND tenant_id = :tenant
 | hq_templates | actorなし / updated_at | revision一致の成功receipt |
 | staff_members | 編集actorなし / updated_at | policy_version一致の成功receipt（permission receiptのstaff_idは対象であり変更者ではない） |
 | booking settings / menus / resources | settings/menu/resource actorなし、bookingsはupdated_by_staff_id / updated_at | 対応versionの成功receipt。実menu表名はmenus |
-| templates | draft編集actorなし / updated_at | draft_revisionと公開版の組に対応する成功receipt |
+| templates | draft編集actorなし / updated_at | (`version_epoch`=公開版, `version`=下書き版)の組に対応する成功receipt。その他resourceはepoch 0 |
 
 ```sql
 SELECT actor_id, created_at FROM v8_edit_receipts
 WHERE tenant_id = :tenant AND account_scope = :accountScope
-  AND resource_kind = :kind AND resource_id = :id AND version = :currentVersion
+  AND resource_kind = :kind AND resource_id = :id
+  AND version_epoch = :currentPublishedVersion AND version = :currentVersion
   AND replay_response_json != '{"state":"pending"}';
 ```
 
+- 上の例SQL（rich-menu group）はtemplatesではないため epoch は `0` 固定でbindする。templatesの保存では `version_epoch` に読取時の `published_version`、`version` に読取時の `draft_revision + 1` をbindし、後続guard・lookupも同じ組で絞る。
+- 汎用winner lookupのbind対応: `:currentPublishedVersion` はtemplatesなら現在の `published_version`、その他resourceなら必ず `0`。`:currentVersion` は現在の成功後の `draft_revision`（templates）／通常 `version`（その他）。成功receiptの組と一致するものだけがwinner。
+
 - 名称解決は同会社・表示権限付き。actor/timeはこの版を成功させたreceiptだけから返す。resourceの許可field差分のみ返し、相手の全本文は返さない。
 - 旧版・feature OFF・未移行writerや手動更新の可能性があるresourceではreceiptを現在のwinnerと認定しない。`updatedByName=null`、確認できる行のserver updated_atだけ（なければnull）。creator/published/test/decided actorを編集者へ流用しない。全writerが新CASを通ることが有効化ゲート。
+
+## 複合版receiptの受入条件（設計のみ。実行はしない）
+
+- 公開前draft1のreceipt（epoch=1, version=1）と公開後draft1のreceipt（epoch=2, version=1）が同resourceに共存でき、winner UNIQUEに衝突しない。
+- 同じ複合版（同epoch・同version）への2回目の保存は409（同key・異payloadは `IDEMPOTENCY_CONFLICT`、同key・同payloadはreplay）。黙って上書きしない。ここでいう競合とは、同じ古いexpected tupleから同じresult tupleを得ようとする別要求同士の衝突を指す。最新tupleを再読し、新しいkeyで次の版へ保存する正当な要求は成功できる。同key・同payloadのreplayは既存規約どおり先に判定する。
+- templates以外のresourceは常にepoch 0でreceiptを作り、単一version運用と一致する。
+- templates既存2列（`draft_revision`・`published_version`）の変更、UNIQUE削除、単一version列への置換はしない。
 
 ## 権限表
 
