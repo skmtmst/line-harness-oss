@@ -227,6 +227,9 @@
   /* ★V7 の 12px 段（カード・ダイアログ・知らせ）。card と同値なのは意図。 */
   --radius-panel: 12px;
   --radius-icon: 3px;
+  --radius-none: 0;
+  --radius-chart-dot: 2px;
+  --radius-chart-bar: 4px;
   /* Pencil `$radius-xs`(6px)。行の中の小さな札（フォルダ・連動）。 */
   --radius-mini: 6px;
   /* Pencil ★V8 印のタイル（C9CaMS・E7USZ9・A2mryd）。小22→7、中28・大32→9。 */

@@ -1,7 +1,7 @@
 'use client'
 
 import KpiCard from '@/components/shared/kpi-card'
-import ro from '@/app/ops/readonly-v8.module.css'
+import '@/app/ops/readonly-v8.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Search } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -85,7 +85,7 @@ export default function KnowledgeList() {
     setEditing(res.data)
   }
   return <div className={styles.page} data-design-node="csVox">
-    {theme === 'v8' ? <div className={ro.metrics} aria-label="条件に合う記事とこのページの状況">
+    {theme === 'v8' ? <div className="v8-ro-ops-metrics" aria-label="条件に合う記事とこのページの状況">
       <KpiCard variant="v6" title="条件に合う記事" value={loaded && !error ? total : null} unit="件" detail="" loading={!loaded} />
       <KpiCard variant="v6" title="このページの承認待ち" value={loaded && !error ? rows.filter(row => row.reviewState === 'pending').length : null} unit="件" detail="" loading={!loaded} />
       <KpiCard variant="v6" title="このページの承認済み" value={loaded && !error ? rows.filter(row => knowledgeState(row).label === '承認済み').length : null} unit="件" detail="" loading={!loaded} />

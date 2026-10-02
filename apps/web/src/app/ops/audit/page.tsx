@@ -4,9 +4,8 @@ import DateField from '@/components/shared/date-field'
 import { Download } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
-import OpsPageHeader from '@/app/ops/readonly-header-v8'
-import ro from '@/app/ops/readonly-v8.module.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
+import '@/app/ops/readonly-v8.css'
 import { AUDIT_ACTION_LABEL, auditActionChip, formatDateTime, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
@@ -36,7 +35,6 @@ const CSV_PAGE = 500
 const CSV_MAX = 20_000
 
 export default function OpsAuditPage() {
-  const theme = useAdminTheme()
   const [rows, setRows] = useState<OpsAuditRow[]>([])
   const [total, setTotal] = useState(0)
   const [filter, setFilter] = useState('')
@@ -104,7 +102,7 @@ export default function OpsAuditPage() {
   const last = Math.min(page * PAGE, total)
 
   return (
-    <div data-design-node={theme === 'v8' ? 'e7ljE' : 'oEzZz'} className={`${ro.page} ${ro.audit} flex flex-col gap-4`}>
+    <ReadonlyDesignNode node="e7ljE"><div data-design-node="oEzZz" className="v8-ro-ops-page v8-ro-ops-audit flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader title="監査ログ" />
       <div className="flex flex-wrap items-center gap-3">
@@ -187,6 +185,6 @@ export default function OpsAuditPage() {
         <ListRange total={total} first={first} last={last} />
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="監査ログのページ" disabled={loading} />
       </div>
-    </div>
+    </div></ReadonlyDesignNode>
   )
 }
