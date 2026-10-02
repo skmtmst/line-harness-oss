@@ -1,45 +1,36 @@
 'use client'
 
-import Stepper from '@/components/shared/stepper'
-import { Suspense, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+/*
+ * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil `dnzqC`）。
+ *
+ * v7（mode/page.tsx の ScenarioModePageV7）と動きは同じ。変えるのは置き場だけ：
+ * 手順の帯は見出しの下、操作は追従バーの真ん中
+ * （キャンセル・あとで決める・この方式で保存する。オーナー決定 2026-10-01）。
+ *
+ * `id` なしで開いたときはまだ行を作らない。方式の確定か
+ * 「あとで決める」ではじめて作成する（#949 N-055）。
+ */
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import Stepper from '@/components/shared/stepper'
+import StickyBar from '@/components/shared/sticky-bar'
+import { TextField } from '@/components/shared/text-field'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import TargetMissing from '@/components/shared/target-missing'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import ScenarioModeV8 from '../mode-v8'
-import './scenario-mode.css'
+import styles from './mode-v8.module.css'
 
-/**
- * 配信方式の選択（設計）。
- *
- * `id` ありで来たときは既存のシナリオの方式を保存する。`id` なし
- * （一覧の「＋ シナリオを作成」から来たとき）は**まだ行を作らず**、
- * 名前とフォルダを決めて方式を選んだ時点ではじめて作成する
- * （#949 N-055）。途中で閉じても一覧に空の行は残らない。
- *
- * 以前はモーダルの中で方式と名前をまとめて決めていた。並べた具体例が
- * 入りきらず、どちらを選ぶと何が変わるのかを読まずに押していた。
- */
-export default function ScenarioModePage() {
-  const theme = useAdminTheme()
-  return (
-    <Suspense fallback={<div className="text-ink-faint py-12 text-center text-sm">読み込み中…</div>}>
-      {theme === 'v8' ? <ScenarioModeV8 /> : <ScenarioModeContent />}
-    </Suspense>
-  )
-}
-
-function ScenarioModeContent() {
+export default function ScenarioModeV8() {
   usePageTitle('シナリオを作成')
+  usePageCrumbs([{ label: 'シナリオ配信', href: '/scenarios' }])
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -49,23 +40,14 @@ function ScenarioModeContent() {
   const [scenarioState, setScenarioState] = useState<'loading' | 'ready' | 'error'>(
     id ? 'loading' : 'ready',
   )
-  /*
-   * D023: id ありの読み込み失敗は決まった文だけで読み直し口が無い。
-   * 捕まえた失敗を共通部品へ渡し、その場で読み直せるようにする
-   * （403 は再試行を出さない、429 は待ち案内）。
-   */
   const [scenarioError, setScenarioError] = useState<unknown>(null)
   const [scenarioReloadKey, setScenarioReloadKey] = useState(0)
   const [saving, setSaving] = useState<DeliveryMode | null>(null)
-  /*
-   * ★V7: 2択はカードごとの緑ボタンで即確定させない。カード全体を選ぶ
-   * ラジオ選択にし、確定は画面1つの主ボタンにまとめる。
-   */
   const [selectedMode, setSelectedMode] = useState<DeliveryMode | null>(null)
   const [error, setError] = useState('')
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState('')
-  const nameInputRef = useRef<HTMLInputElement>(null)
+  const nameWrapRef = useRef<HTMLDivElement>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderId, setFolderId] = useState('')
   const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -122,27 +104,27 @@ function ScenarioModeContent() {
     let active = true
     // id があるときだけ既存の行を読む。新規（id なし）は読む行が無い。
     if (id) {
-    setScenarioState('loading')
-    setScenarioError(null)
-    void scenarioReferenceData.scenario(id)
-      .then((res) => {
-        if (!active) return
-        if (res.success) {
-          setScenario(res.data)
-          setName(res.data.name)
-          setFolderId(res.data.folderId ?? '')
-          setScenarioState('ready')
-        } else {
-          setScenarioError(null)
-          setScenarioState('error')
-        }
-      })
-      .catch((caught) => {
-        if (active) {
-          setScenarioError(caught)
-          setScenarioState('error')
-        }
-      })
+      setScenarioState('loading')
+      setScenarioError(null)
+      void scenarioReferenceData.scenario(id)
+        .then((res) => {
+          if (!active) return
+          if (res.success) {
+            setScenario(res.data)
+            setName(res.data.name)
+            setFolderId(res.data.folderId ?? '')
+            setScenarioState('ready')
+          } else {
+            setScenarioError(null)
+            setScenarioState('error')
+          }
+        })
+        .catch((caught) => {
+          if (active) {
+            setScenarioError(caught)
+            setScenarioState('error')
+          }
+        })
     }
     return () => { active = false }
   }, [id, scenarioReloadKey])
@@ -183,7 +165,7 @@ function ScenarioModeContent() {
     if (name.trim()) return false
     setError('シナリオ名を入力してください')
     setNameError('シナリオ名を入力してください')
-    const input = nameInputRef.current
+    const input = nameWrapRef.current?.querySelector('input')
     if (input) {
       input.focus()
       input.scrollIntoView({ block: 'center' })
@@ -300,25 +282,24 @@ function ScenarioModeContent() {
         ?? (folderId ? '名前を確認できません' : '未分類')
   const selectedFolderMissing = Boolean(folderId && !folders.some((folder) => folder.id === folderId))
 
+  const disabled = (Boolean(id) && !scenario) || detailsSaving || saving !== null
+
   return (
-    <div data-design-node="cCB7r" data-list-state={scenarioState} aria-busy={scenarioState === 'loading'} className="flex flex-col gap-4">
-      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <div data-design="Head" className="flex items-center justify-between">
-        <nav data-design="Crumb" className="text-ink-faint text-xs">
-          <Link href="/scenarios" className="hover:underline">
-            シナリオ配信
-          </Link>
-          <span className="mx-1.5">/</span>
-          <span>新規作成</span>
-        </nav>
-        {/* 見た目を手書きしない。共通ボタンで高さをそろえる。 */}
-        <Button href="/scenarios">キャンセル</Button>
+    <div className={styles.board} data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
+      <div className={styles.head} data-design="Head">
+        <div>
+          <h2 className={styles.headTitle}>{id ? '配信方式を変える' : 'シナリオを作る'}</h2>
+          <p className={styles.headDescription}>
+            シナリオの名前と、メッセージを届ける時間の決め方を選びます。
+          </p>
+        </div>
       </div>
 
       <Stepper
         label="シナリオ作成の進み方"
         steps={[
-          // id なしは「これから作る」。名前と方式をこの画面でまとめて決める。
+          // id なし（新規）は名前と方式をこの画面でまとめて決めるので1段目は current。
+          // id あり（既存の下書きを開いた）は1段目は済んでいる（#949 N-055）。
           { label: 'シナリオ情報', state: id ? 'done' : 'current' },
           { label: '配信方式', state: 'current' },
           { label: '1通目を設定', state: 'todo' },
@@ -365,54 +346,49 @@ function ScenarioModeContent() {
         {error && <Notice tone="danger" message={error} />}
       </div>
 
-      <div data-design="Name" className="bg-canvas rounded-card border-hairline border p-4">
-        <h2 className="text-ink text-sm font-bold">シナリオ情報</h2>
-        <div className="mt-2 grid max-w-4xl gap-4 md:grid-cols-2">
-          <label className="block">
-            <span className="text-ink-secondary mb-1 block text-xs font-medium">
-              シナリオ名 <span className="text-danger">*</span>
-            </span>
-            <input
-              ref={nameInputRef}
-              type="text"
+      <section className={styles.section} data-design="Name">
+        <h3 className={styles.sectionTitle}>シナリオ情報</h3>
+        <div className={styles.sectionBody}>
+          <div className={styles.field} ref={nameWrapRef}>
+            <span className={styles.fieldLabel}>シナリオ名 <RequiredBadge /></span>
+            <TextField
               value={name}
-              disabled={(Boolean(id) && !scenario) || detailsSaving || saving !== null}
+              disabled={disabled}
               onChange={(e) => { setName(e.target.value); if (nameError) setNameError('') }}
               onBlur={() => void saveDetails()}
               placeholder="例: 友だち追加ウェルカム"
-              aria-invalid={nameError ? true : undefined}
+              invalid={Boolean(nameError)}
               aria-describedby={nameError ? 'scenario-name-error' : undefined}
-              className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
             {nameError ? (
-              <span id="scenario-name-error" className="mt-1 block text-xs font-semibold text-danger">
+              <span id="scenario-name-error" className={styles.fieldError}>
                 {nameError}
               </span>
             ) : null}
-          </label>
+          </div>
 
-          <label className="block">
-            <span className="text-ink-secondary mb-1 block text-xs font-medium">フォルダ：</span>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>フォルダ</span>
             <span title={selectedFolderName} className="block">
-            <Select
-              value={folderId}
-              disabled={(Boolean(id) && !scenario) || folderState !== 'ready' || detailsSaving || saving !== null}
-              onChange={(value) => {
-                const nextFolderId = value
-                setFolderId(nextFolderId)
-                void saveDetails(nextFolderId)
-              }}
-              aria-label="シナリオのフォルダ"
-              size="full"
-              options={[
-                { value: '', label: '未分類' },
-                ...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : []),
-                ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-              ]}
-            />
-
-            </span>            {folderState !== 'ready' || detailsSaving ? (
-              <span className="text-ink-faint mt-1 block text-xs">
+              <Select
+                value={folderId}
+                disabled={(Boolean(id) && !scenario) || folderState !== 'ready' || detailsSaving || saving !== null}
+                onChange={(value) => {
+                  const nextFolderId = value
+                  setFolderId(nextFolderId)
+                  void saveDetails(nextFolderId)
+                }}
+                aria-label="シナリオのフォルダ"
+                size="full"
+                options={[
+                  { value: '', label: '未分類' },
+                  ...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : []),
+                  ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+                ]}
+              />
+            </span>
+            {folderState !== 'ready' || detailsSaving ? (
+              <span className={styles.fieldHint}>
                 {folderState === 'loading'
                   ? 'フォルダを読み込んでいます。'
                   : folderState === 'error'
@@ -426,80 +402,83 @@ function ScenarioModeContent() {
               別範囲の値を上書きしてしまう。
             */}
             {folderState === 'ready' && selectedFolderMissing ? (
-              <span className="text-warning mt-1 block text-xs">
+              <span className={styles.fieldHint} style={{ color: 'var(--color-warning)' }}>
                 選択中のフォルダはこのアカウントの候補にありません（別アカウントまたは削除済み）。このまま保存すると外れます。
               </span>
             ) : null}
-          </label>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <fieldset data-design="Choices">
+      <fieldset className={styles.section} data-design="Choices" style={{ border: '1px solid var(--color-hairline)' }}>
         <legend className="sr-only">配信方式</legend>
-        <div className="grid gap-4 xl:grid-cols-2">
-        <ModeCard
-          mode="absolute_time"
-          selected={selectedMode === 'absolute_time'}
-          onSelect={setSelectedMode}
-          title="時刻で指定"
-          lead="配信時刻がそろうため、開封されやすい時間帯に寄せられます。"
-          body="配信のタイミングを「購読開始から〇日後の〇時」と指定できます。メルマガのような決まった時間の定期配信ができます。"
-          uses={['メルマガ配信', '定期リマインド', '朝夜の固定配信']}
-          result="2人とも同じ時刻に届く（1通目 15:00 ／ 2通目 20:00）"
-          note="購読開始時刻が最初の配信時刻を過ぎている場合、翌日の配信時刻から配信が開始されます。"
-          rows={[
-            { who: '友だち A', start: '4/1 12:00 に購読開始', first: '4/1 15:00', second: '4/2 20:00' },
-            { who: '友だち B', start: '4/1 14:00 に購読開始', first: '4/1 15:00', second: '4/2 20:00' },
-          ]}
-          heads={['当日 15:00', '翌日 20:00']}
-          disabled={(Boolean(id) && !scenario) || detailsSaving}
-        />
-        <ModeCard
-          mode="elapsed"
-          title="経過時間で指定"
-          lead="友だち追加の時刻を起点にするため、一人ひとりに同じ体験を届けられます。"
-          body="配信のタイミングを「購読開始から〇日と〇時間後」と指定できます。「友だち追加から5時間限定」のような期間限定の配信ができます。"
-          uses={['期間限定オファー', '初回フォロー', 'カウントダウン']}
-          result="経過時間は2人とも同じ。購読開始が2時間遅い分、配信時刻も2時間うしろにズレる"
-          note="購読開始時刻によっては夜間の配信となる場合があります。"
-          rows={[
-            { who: '友だち A', start: '4/1 12:00 に購読開始', first: '4/1 15:00', second: '4/2 20:00', gaps: ['+3時間', '+1日と8時間'] },
-            { who: '友だち B', start: '4/1 14:00 に購読開始', first: '4/1 17:00', second: '4/2 22:00', gaps: ['+3時間', '+1日と8時間'] },
-          ]}
-          selected={selectedMode === 'elapsed'}
-          onSelect={setSelectedMode}
-          disabled={(Boolean(id) && !scenario) || detailsSaving}
-        />
+        <h3 className={styles.sectionTitle}>配信方式</h3>
+        <p className={styles.sectionDesc}>
+          届ける時間の決め方を選びます。どちらを選んでも、作成後にメッセージの追加・並べ替えができます。
+        </p>
+        <div className={styles.sectionBody}>
+          <div className={styles.modeGrid}>
+            <ModeCardV8
+              mode="absolute_time"
+              selected={selectedMode === 'absolute_time'}
+              onSelect={setSelectedMode}
+              title="時刻で指定"
+              lead="配信時刻がそろうため、開封されやすい時間帯に寄せられます。「購読開始から〇日後の〇時」と指定します。"
+              uses={['メルマガ配信', '定期リマインド', '朝夜の固定配信']}
+              result="2人とも同じ時刻に届く（1通目 15:00 ／ 2通目 20:00）"
+              note="購読開始時刻が最初の配信時刻を過ぎている場合、翌日の配信時刻から配信が開始されます。"
+              rows={[
+                { who: '友だち A', start: '4/1 12:00 に購読開始', first: '4/1 15:00', second: '4/2 20:00' },
+                { who: '友だち B', start: '4/1 14:00 に購読開始', first: '4/1 15:00', second: '4/2 20:00' },
+              ]}
+              heads={['当日 15:00', '翌日 20:00']}
+              disabled={(Boolean(id) && !scenario) || detailsSaving}
+            />
+            <ModeCardV8
+              mode="elapsed"
+              title="経過時間で指定"
+              lead="友だち追加の時刻を起点にするため、一人ひとりに同じ体験を届けられます。「購読開始から〇日と〇時間後」と指定します。"
+              uses={['期間限定オファー', '初回フォロー', 'カウントダウン']}
+              result="経過時間は2人とも同じ。購読開始が2時間遅い分、配信時刻も2時間うしろにズレる"
+              note="購読開始時刻によっては夜間の配信となる場合があります。"
+              rows={[
+                { who: '友だち A', start: '4/1 12:00 に購読開始', first: '4/1 15:00', second: '4/2 20:00', gaps: ['+3時間', '+1日と8時間'] },
+                { who: '友だち B', start: '4/1 14:00 に購読開始', first: '4/1 17:00', second: '4/2 22:00', gaps: ['+3時間', '+1日と8時間'] },
+              ]}
+              selected={selectedMode === 'elapsed'}
+              onSelect={setSelectedMode}
+              disabled={(Boolean(id) && !scenario) || detailsSaving}
+            />
+          </div>
         </div>
       </fieldset>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <p className="text-ink-faint text-xs">
-          どちらを選んでも、作成後にステップの追加・並べ替えができます。
-          {/* 1通だけ試しに送る受け口が無いので、テスト送信とは書かない。 */}
-        </p>
-        <div className="ml-auto flex flex-wrap items-center gap-3">
-          <Button
-            variant="secondary"
-            disabled={(Boolean(id) && !scenario) || saving !== null || detailsSaving}
-            onClick={() => void continueAsDraft()}
-          >
-            あとで決める（下書きとして保存）
-          </Button>
-          <Button
-            variant="primary"
-            disabled={!selectedMode || (Boolean(id) && !scenario) || saving !== null || detailsSaving}
-            onClick={() => { if (selectedMode) void choose(selectedMode) }} busy={saving !== null} busyLabel="作成中…">
-            {id ? 'この方式で保存する' : 'この方式で作る'}
-          </Button>
-        </div>
-      </div>
+      <StickyBar
+        status={saving ? '作成しています' : detailsSaving ? '保存しています' : undefined}
+        actions={(
+          <>
+            <Button href="/scenarios">キャンセル</Button>
+            <Button
+              variant="secondary"
+              disabled={disabled}
+              onClick={() => void continueAsDraft()}
+            >
+              あとで決める（下書きとして保存）
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!selectedMode || disabled}
+              onClick={() => { if (selectedMode) void choose(selectedMode) }} busy={saving !== null} busyLabel="作成中…">
+              {id ? 'この方式で保存する' : 'この方式で作る'}
+            </Button>
+          </>
+        )}
+      />
     </div>
   )
 }
 
 // ── 部品 ────────────────────────────────────────────────────────────────────
-
 
 function scenarioSaveError(cause: unknown): string {
   if (cause instanceof ApiError) {
@@ -518,14 +497,16 @@ function scenarioModeError(cause: unknown): string {
   return '配信方式を保存できませんでした。時間をおいてもう一度お試しください。'
 }
 
-function ModeCard({
+/**
+ * ★V8 配信方式のカード。カード全体を選ぶラジオ選択（本物の
+ * input[type=radio]）。確定は追従バーの主ボタンにまとめる（★V7 と同じ決まり）。
+ */
+function ModeCardV8({
   mode,
   selected,
   onSelect,
   title,
-  recommended,
   lead,
-  body,
   uses,
   rows,
   heads,
@@ -537,9 +518,7 @@ function ModeCard({
   selected: boolean
   onSelect: (mode: DeliveryMode) => void
   title: string
-  recommended?: boolean
   lead: string
-  body: string
   uses: string[]
   rows: Array<{ who: string; start: string; first: string; second: string; gaps?: string[] }>
   heads?: string[]
@@ -548,9 +527,7 @@ function ModeCard({
   disabled: boolean
 }) {
   return (
-    // ★V7: カード全体を選ぶラジオ選択。本物の input[type=radio] を使い、
-    // 選択中は枠と淡い面で示す（色だけに頼らない）。確定は画面下の主ボタン。
-    <label className={`rounded-card flex h-full cursor-pointer flex-col border bg-canvas p-5 ${selected ? 'border-accent bg-accent-soft' : 'border-hairline'} ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}>
+    <label className={`${styles.modeCard} ${selected ? styles.modeCardOn : ''}`}>
       <input
         type="radio"
         name="delivery-mode"
@@ -560,11 +537,10 @@ function ModeCard({
         onChange={() => onSelect(mode)}
         className="sr-only"
       />
-      <div className="flex items-start gap-3">
-        {/* 絵文字は使わない。端末やフォントで見た目が変わるうえ、
-            色が乗って見出しより目立つ。線の記号にする。 */}
-        <span className="bg-accent-soft text-accent-deep rounded-card flex h-9 w-9 shrink-0 items-center justify-center">
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+      <div className={styles.modeHead}>
+        {/* 絵文字は使わない。線の記号にする。 */}
+        <span className={styles.modeIcon} aria-hidden="true">
+          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="9" />
             {mode === 'absolute_time' ? (
               <path strokeLinecap="round" d="M12 7v5l3 2" />
@@ -573,81 +549,35 @@ function ModeCard({
             )}
           </svg>
         </span>
-        <div className="min-w-0">
-          <h2 className="text-ink flex flex-wrap items-center gap-2 text-lg font-bold">
-            {title}
-            {recommended && (
-              <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-0.5 text-xs font-medium">
-                おすすめ
-              </span>
-            )}
-          </h2>
-          <p className="text-ink-secondary mt-0.5 text-xs leading-relaxed">{lead}</p>
-        </div>
+        <h4 className={styles.modeTitle}>{title}</h4>
       </div>
-
-      <p className="text-ink mt-3 text-sm leading-relaxed">{body}</p>
-
-      <div className="mt-2 flex flex-wrap gap-2">
-        {uses.map(u => (
-          <span key={u} className="bg-canvas-sunken text-ink-secondary rounded-control px-2 py-1 text-xs">
-            {u}
-          </span>
-        ))}
-      </div>
-
-      {/*
-        具体例。どちらを選ぶと何が変わるかは、言葉より並べた時刻のほうが早い。
-        同じ日の違う時刻に始めた2人で、届く時刻がそろうか・ズレるかを見せる。
-      */}
-      <div className={`border-hairline rounded-card border p-4 ${mode === 'absolute_time' ? 'mt-0' : 'mt-2'}`}>
-        <p className="text-ink-secondary text-xs">具体例：同じ日の違う時刻に購読開始した2人</p>
-        {heads && (
-          <div className={`${mode === 'absolute_time' ? 'mt-0' : 'mt-2'} flex gap-2 pl-[9.5rem]`}>
-            {heads.map(h => (
-              <span
-                key={h}
-                className="bg-accent-deep text-on-accent rounded-control flex-1 px-2 py-1 text-center text-xs font-medium"
-              >
-                {h}
-              </span>
+      <p className={styles.modeLead}>{lead}</p>
+      <ul className={styles.modeUses} aria-label="向いている使い方">
+        {uses.map((use) => <li key={use} className={styles.modeUse}>{use}</li>)}
+      </ul>
+      <div>
+        <p className={styles.exampleTitle}>具体例：同じ日の違う時刻に購読開始した2人</p>
+        <table className={styles.exampleTable}>
+          <thead>
+            <tr>
+              <th scope="col" />
+              <th scope="col">1通目{heads?.[0] ? `（${heads[0]}）` : ''}</th>
+              <th scope="col">2通目{heads?.[1] ? `（${heads[1]}）` : ''}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.who}>
+                <td>{row.who}<br /><span className={styles.fieldHint}>{row.start}</span></td>
+                <td>{row.first}{row.gaps?.[0] ? `（${row.gaps[0]}）` : ''}</td>
+                <td>{row.second}{row.gaps?.[1] ? `（${row.gaps[1]}）` : ''}</td>
+              </tr>
             ))}
-          </div>
-        )}
-        <div className={mode === 'absolute_time' ? 'mt-0 space-y-0' : 'mt-1 space-y-1'}>
-          {rows.map(r => (
-            <div key={r.who} className="flex items-center gap-2">
-              <div className="w-36 shrink-0">
-                <p className="text-ink text-xs font-medium">{r.who}</p>
-                <p className="text-ink-faint text-[11px]">{r.start}</p>
-              </div>
-              <Slot order="1通目" at={r.first} gap={r.gaps?.[0]} />
-              <Slot order="2通目" at={r.second} gap={r.gaps?.[1]} />
-            </div>
-          ))}
-        </div>
-        <p className={`border-hairline text-ink-secondary rounded-control border px-3 py-2 text-xs leading-relaxed ${mode === 'absolute_time' ? 'mt-0' : 'mt-2'}`}>
-          {result}
-        </p>
-        <p className={`text-ink-faint text-[11px] leading-relaxed ${mode === 'absolute_time' ? 'mt-0' : 'mt-1'}`}>※ {note}</p>
+          </tbody>
+        </table>
       </div>
-
+      <p className={styles.modeResult}>{result}</p>
+      <p className={styles.modeNote}>{note}</p>
     </label>
-  )
-}
-
-function Slot({ order, at, gap }: { order: string; at: string; gap?: string }) {
-  return (
-    <div className="min-w-0 flex-1">
-      {gap && (
-        <p className="bg-info-bg text-info rounded-pill mb-1 px-2 py-0.5 text-center text-[10px]">
-          {gap}
-        </p>
-      )}
-      <div className="border-hairline rounded-control bg-canvas border px-2 py-1.5 text-center">
-        <p className="text-ink-faint text-[10px]">{order}</p>
-        <p className="text-ink text-xs font-medium">{at}</p>
-      </div>
-    </div>
   )
 }

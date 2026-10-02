@@ -1,7 +1,17 @@
 'use client'
 
-import { Suspense, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+/*
+ * ★V8 シナリオを作る②：1通目を設定（Pencil `V6xAo`）。
+ *
+ * v7（first-step/page.tsx の FirstStepContentV7）と動きは同じ。
+ * 変えるのは置き場だけ：左に「誰に送るか・いつ・1通目の内容」の段、
+ * 右の欄（380）に本物のスマホ、操作は追従バーの真ん中
+ * （キャンセル・1通目はあとで書く・作って編集へ）。
+ *
+ * 1通目は飛ばせる。書かせないと進めない形にすると、あとで考えたい人が
+ * 適当な本文を入れて先へ進む。
+ */
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   countTemplateTextCharacters,
@@ -31,45 +41,23 @@ import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { TimeField } from '@/components/shared/date-time-field'
 import StepPreview from '@/components/scenarios/step-preview'
 import CharCounter, { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter'
-import styles from './first-step.module.css'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
 import { pruneCondition } from '@/lib/segment-condition'
 import Select from '@/components/shared/select'
+import Stepper from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import StickyBar from '@/components/shared/sticky-bar'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { RequiredBadge } from '@/components/shared/form-controls'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import {
   restoreFirstStep,
   scheduleToPayload,
-} from './first-step-form'
+} from './first-step/first-step-form'
 import { formatNumber } from '@/lib/format'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import ScenarioFirstStepV8 from '../first-step-v8'
-
-/**
- * ステップの作成（設計の3段目）。
- *
- * 配信方式の選択の絵に「シナリオ情報 → 配信方式の選択 → ステップの作成」と
- * 3段が描かれている。3段目の絵は無いので、案Aとして起こした
- * （`docs/scenario-create-flow-proposal.md`）。
- *
- * ここで名前を決めるのが要点。1段目の画面が無いぶん、名前を聞く場所が
- * どこにも無く、一覧に「新しいシナリオ」が並んでしまう。
- *
- * 1通目は飛ばせる。書かせないと進めない形にすると、あとで考えたい人が
- * 適当な本文を入れて先へ進む。
- */
-export default function ScenarioFirstStepPage() {
-  const theme = useAdminTheme()
-  return (
-    <Suspense fallback={<div className="text-ink-faint py-12 text-center text-sm">読み込み中…</div>}>
-      {theme === 'v8' ? <ScenarioFirstStepV8 /> : <FirstStepContent />}
-    </Suspense>
-  )
-}
+import styles from './first-step-v8.module.css'
 
 const modeLabel: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
@@ -82,8 +70,9 @@ type LoadState = 'idle' | 'loading' | 'ready' | 'error'
 
 const TIME_RE = /^\d{2}:\d{2}$/
 
-function FirstStepContent() {
+export default function ScenarioFirstStepV8() {
   usePageTitle('1通目を設定')
+  usePageCrumbs([{ label: 'シナリオ配信', href: '/scenarios' }])
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -459,6 +448,23 @@ function FirstStepContent() {
     goDetail()
   }
 
+  /* 「いつ」の右に出す届く日時の例。今日からの実日付で示す（「当日」とだけ書くと
+     実は翌日、という食い違いを出さないため）。 */
+  const arrivalExample = (() => {
+    const base = new Date()
+    const day = new Date(base)
+    day.setDate(day.getDate() + offsetDays)
+    const dateLabel = `${day.getMonth() + 1}/${day.getDate()}`
+    if (mode === 'absolute_time') {
+      return TIME_RE.test(deliveryTime)
+        ? `例：今日 ${base.getHours()}:${String(base.getMinutes()).padStart(2, '0')} に追加 → ${dateLabel} ${deliveryTime} に届く`
+        : '時刻を選ぶと届く日時の例が出ます'
+    }
+    const arrival = new Date(day)
+    arrival.setHours(arrival.getHours() + offsetHours, arrival.getMinutes() + offsetMinutesRemainder)
+    return `例：今日 ${base.getHours()}:${String(base.getMinutes()).padStart(2, '0')} に追加 → ${arrival.getMonth() + 1}/${arrival.getDate()} ${String(arrival.getHours()).padStart(2, '0')}:${String(arrival.getMinutes()).padStart(2, '0')} に届く`
+  })()
+
   if (!id) {
     return (
       <TargetMissing
@@ -472,23 +478,19 @@ function FirstStepContent() {
   }
 
   return (
-    <div data-design-node="kk8dz" className="flex flex-col gap-4">
-      <div data-design="Head" className="flex items-center justify-between">
-        <nav data-design="Crumb" className="text-ink-faint text-xs">
-          <Link href="/scenarios" className="hover:underline">
-            シナリオ配信
-          </Link>
-          <span className="mx-1.5">/</span>
-          <span>1通目を設定</span>
-        </nav>
-        <Button variant="secondary" className="text-ink-secondary items-center px-3 py-2 font-medium h-auto whitespace-normal" href="/scenarios">
-          ✕ キャンセル
-        </Button>
+    <div className={styles.board}>
+      <div className={styles.head} data-design="Head">
+        <div>
+          <h2 className={styles.headTitle}>1通目を設定</h2>
+          <p className={styles.headDescription}>
+            配信方式：{modeLabel[mode]}　・　シナリオ：{scenario?.name ?? '読み込み中'}
+          </p>
+        </div>
       </div>
 
       {/*
         対象が無い（取得失敗）ときは、進み方・案内・入力のどれも出さない。
-        代わりに ★V7 TargetMissing を出す（設計 `x5cgUH`）。
+        代わりに TargetMissing を出す。
       */}
       {loadState === 'error' ? (
         loadMissing || !error ? (
@@ -508,22 +510,17 @@ function FirstStepContent() {
           />
         )
       ) : (
-        <div className="flex flex-col gap-4">
-          <ol
-            aria-label="シナリオ作成の進み方"
-            className="bg-canvas border-hairline flex flex-wrap items-center gap-3 rounded-card border px-4 py-3 text-xs"
-          >
-            <StepMark n={1} label="シナリオ情報" state="done" />
-            <StepLine />
-            <StepMark n={2} label="配信方式" state="done" />
-            <StepLine />
-            <StepMark n={3} label="1通目を設定" state="current" />
-          </ol>
+        <>
+          <Stepper
+            label="シナリオ作成の進み方"
+            steps={[
+              { label: 'シナリオ情報', state: 'done' },
+              { label: '配信方式', state: 'done' },
+              { label: '1通目を設定', state: 'current' },
+            ]}
+          />
 
           <div data-design="Notice" className="space-y-2">
-            <Notice tone="success">
-              配信方式：{modeLabel[mode]}　・　シナリオ：{scenario?.name ?? '読み込み中'}
-            </Notice>
             {error && <Notice tone="danger" message={error} />}
           </div>
 
@@ -533,340 +530,343 @@ function FirstStepContent() {
              * 取得前に入力を許すと、届いた既存の1通目が入力を上書きするか、
              * まだ知らない既存通へ重ねて保存してしまう。
              */
-            <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
-              <p className="text-ink-faint text-sm">シナリオを読み込んでいます…</p>
-            </div>
+            <section className={styles.section}>
+              <p className={styles.sectionDesc}>シナリオを読み込んでいます…</p>
+            </section>
           ) : (
-        <div className="flex flex-col gap-4">
-      {/*
-        左に入力、右にプレビュー。プレビューは付いてくる（sticky）ので、
-        下の選択肢を書いているあいだも、届く形と時刻が視界に残る。
-        狭い画面では縦に積む。
-      */}
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_500px] xl:items-start">
-      <div data-design="Form" className="space-y-4">
-        {/*
-          配信対象の絞り込み。Lステップの「配信対象の絞り込み」と同じ3つ。
-
-          ここで決めるのは**この1通目を誰に送るか**であって、シナリオが
-          いつ始まるかではない。開始のきっかけ（友だち追加時など）は
-          シナリオ編集の「シナリオ情報」と、「友だち追加時の配信」で決める。
-          2か所で同じことを聞くと、どちらが効くのか分からなくなる。
-        */}
-        <section className="bg-canvas rounded-card border-hairline border p-5">
-          <h2 className="text-ink text-base font-bold">この1通目を誰に送るか</h2>
-          <p className="text-ink-secondary mt-0.5 text-xs leading-relaxed">
-            この1通目を誰に送るかを決めます。開始のきっかけは、このあとの編集画面で決められます。
-          </p>
-
-          <RadioCardGroup legend="この1通目を誰に送るか" className="mt-4">
-            {(
-              [
-                { value: 'all', label: 'シナリオ購読中の全員に配信する' },
-                { value: 'tag', label: 'タグで絞り込んで配信する' },
-                { value: 'advanced', label: '詳細条件で絞り込んで配信する' },
-              ] as const
-            ).map(opt => (
-              <RadioCard
-                key={opt.value}
-                name="targetMode"
-                value={opt.value}
-                checked={targetMode === opt.value}
-                onChange={() => setTargetMode(opt.value)}
-                title={opt.label}
-              />
-            ))}
-          </RadioCardGroup>
-
-          {targetMode === 'tag' && (
-            <label className="mt-4 block">
-              <span className="text-ink-secondary mb-1 block text-xs font-medium">
-                タグで絞り込み <span className="text-danger">*</span>
-              </span>
-              <Select
-                value={targetTagId}
-                onChange={value => setTargetTagId(value)}
-                aria-label="絞り込みに使うタグ"
-                size="full"
-                className="max-w-md"
-                options={[
-                  { value: '', label: '-- 選んでください --' },
-                  ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
-                ]}
-              />
-            </label>
-          )}
-
-          {targetMode === 'advanced' && (
-            <div className="mt-4">
-              <span className="text-ink-secondary mb-1 block text-xs font-medium">詳細条件で絞り込み</span>
+            <>
               {/*
-                共通ボタンは PC 40px・タッチ 44px。隣の入力欄やプルダウンと
-                同じ基準線に乗る（SCENARIO-19 / UX-01）。
+                左に入力、右にプレビュー。プレビューは付いてくる（sticky）ので、
+                下の選択肢を書いているあいだも、届く形と時刻が視界に残る。
+                狭い画面では縦に積む。
               */}
-              <Button onClick={() => setConditionOpen(true)} className="px-4">
-                {targetCondition ? describeCondition(targetCondition) : '絞り込み'}
-              </Button>
-            </div>
-          )}
-        </section>
+              <div className={styles.split} data-design="Body">
+                <div className={styles.main} data-design="Form">
+                  {/*
+                    配信対象の絞り込み。Lステップの「配信対象の絞り込み」と同じ3つ。
 
-        <section className="bg-canvas rounded-card border-hairline border p-5">
-          <h2 className="text-ink text-base font-bold">1通目の内容</h2>
-          <p className="text-ink-secondary mt-0.5 text-xs leading-relaxed">
-            空のままでも進めます。テンプレートや画像は、このあとの編集画面で選べます。
-          </p>
+                    ここで決めるのは**この1通目を誰に送るか**であって、シナリオが
+                    いつ始まるかではない。開始のきっかけ（友だち追加時など）は
+                    シナリオ編集の「シナリオ情報」と、「友だち追加時の配信」で決める。
+                    2か所で同じことを聞くと、どちらが効くのか分からなくなる。
+                  */}
+                  <section className={styles.section}>
+                    <h3 className={styles.sectionTitle}>この1通目を誰に送るか</h3>
+                    <p className={styles.sectionDesc}>
+                      この1通目を誰に送るかを決めます。開始のきっかけは、このあとの編集画面で決められます。
+                    </p>
+                    <div className={styles.sectionBody}>
+                      <RadioCardGroup legend="この1通目を誰に送るか">
+                        {(
+                          [
+                            { value: 'all', label: 'シナリオ購読中の全員に配信する' },
+                            { value: 'tag', label: 'タグで絞り込んで配信する' },
+                            { value: 'advanced', label: '詳細条件で絞り込んで配信する' },
+                          ] as const
+                        ).map(opt => (
+                          <RadioCard
+                            key={opt.value}
+                            name="targetMode"
+                            value={opt.value}
+                            checked={targetMode === opt.value}
+                            onChange={() => setTargetMode(opt.value)}
+                            title={opt.label}
+                          />
+                        ))}
+                      </RadioCardGroup>
 
-          <div className="mt-4 flex flex-wrap items-end gap-3">
-            <label className="block">
-              <span className="text-ink-secondary mb-1 block text-xs font-medium">
-                購読開始から
-              </span>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  min={0}
-                  value={offsetDays}
-                  onChange={e => setOffsetDays(Math.max(0, Number(e.target.value)))}
-                  className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3`}
-                />
-                <span className="text-ink-secondary text-sm">日後</span>
-              </div>
-            </label>
-            {mode === 'absolute_time' ? (
-              <span className="block">
-                <span className="text-ink-secondary mb-1 block text-xs font-medium">配信する時刻</span>
-                <TimeField
-                  value={deliveryTime}
-                  onChange={setDeliveryTime}
-                  aria-label="配信する時刻"
-                />
-              </span>
-            ) : (
-              <label className="block">
-                <span className="text-ink-secondary mb-1 block text-xs font-medium">さらに</span>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    min={0}
-                    max={23}
-                    value={offsetHours}
-                    onChange={e =>
-                      setOffsetHours(Math.min(23, Math.max(0, Number(e.target.value))))
-                    }
-                    className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3`}
-                  />
-                  <span className="text-ink-secondary text-sm">時間</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={59}
-                    value={offsetMinutesRemainder}
-                    onChange={e =>
-                      setOffsetMinutesRemainder(Math.min(59, Math.max(0, Number(e.target.value))))
-                    }
-                    className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3`}
-                  />
-                  <span className="text-ink-secondary text-sm">分後</span>
-                </div>
-              </label>
-            )}
-          </div>
+                      {targetMode === 'tag' && (
+                        <div className={styles.field}>
+                          <span className={styles.fieldLabel}>タグで絞り込み <RequiredBadge /></span>
+                          <Select
+                            value={targetTagId}
+                            onChange={value => setTargetTagId(value)}
+                            aria-label="絞り込みに使うタグ"
+                            size="full"
+                            options={[
+                              { value: '', label: '-- 選んでください --' },
+                              ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
+                            ]}
+                          />
+                        </div>
+                      )}
 
-          {/*
-            配信内容の設定。種別はLステップの並びに合わせてタブで出す。
-            作れないものも並べたうえで押せなくしてある（並びごと消すと、
-            この管理画面で送れないことが分からない）。
-          */}
-          <div className="mt-5">
-            <RadioCardGroup legend="配信内容の作り方" className="mb-3 flex flex-wrap gap-4">
-              {(
-                [
-                  { value: 'compose', label: 'この画面で作る' },
-                  { value: 'template', label: 'テンプレートから選ぶ' },
-                ] as const
-              ).map(o => (
-                <RadioCard
-                  key={o.value}
-                  name="contentMode"
-                  value={o.value}
-                  checked={contentMode === o.value}
-                  onChange={() => changeContentMode(o.value)}
-                  title={o.label}
-                />
-              ))}
-            </RadioCardGroup>
-
-            {preserved && restoreNotice && (
-              <Notice tone="warn" message={restoreNotice} className="mb-3" />
-            )}
-
-            {contentMode === 'compose' ? (
-              <MessageTypeTabs value={kind} onChange={changeKind}>
-                {kind === 'text' && (
-                  <div>
-                    {/*
-                      「本文」の字と入力欄を結び付ける。押したら欄へ移る
-                      （共通方針 UX-01 のラベル→入力の構造）。
-                    */}
-                    <label
-                      htmlFor="first-step-body"
-                      className="text-ink-secondary mb-1 block text-xs font-medium"
-                    >
-                      本文
-                    </label>
-                    <div className="mb-2">
-                      <InsertToolbar targetRef={bodyRef} value={body} onChange={editBody} />
+                      {targetMode === 'advanced' && (
+                        <div className={styles.field}>
+                          <span className={styles.fieldLabel}>詳細条件で絞り込み</span>
+                          <div>
+                            <Button onClick={() => setConditionOpen(true)}>
+                              {targetCondition ? describeCondition(targetCondition) : '絞り込み'}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {/*
-                      SCENARIO-19: 高さと伸び方は first-step.module.css の
-                      bodyField が持つ（160px 下限・内容に応じて伸長）。
-                      手動でも広げられるよう resize は禁じない。
-                    */}
-                    <textarea
-                      id="first-step-body"
-                      ref={bodyRef}
-                      value={body}
-                      onChange={e => editBody(e.target.value)}
-                      placeholder="はじめまして。友だち追加ありがとうございます。"
-                      className={`${styles.bodyField} border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none`}
-                    />
-                    <CharCounter length={bodyLength} />
-                  </div>
-                )}
+                  </section>
 
-                {kind === 'image' && (
-                  <div className="max-w-md">
-                    <ImageUploader
-                      mode="line-image"
-                      value={image}
-                      onChange={editImage}
-                      label="送る画像"
-                    />
-                  </div>
-                )}
+                  {/* 「いつ」の段。右に届く日時の例を出す。 */}
+                  <section className={styles.section}>
+                    <h3 className={styles.sectionTitle}>いつ</h3>
+                    <div className={styles.sectionBody}>
+                      <div className={styles.whenRow}>
+                        <div className={styles.field}>
+                          <span className={styles.fieldLabel}>購読開始から</span>
+                          <div className={styles.whenInputs}>
+                            <input
+                              type="number"
+                              min={0}
+                              value={offsetDays}
+                              onChange={e => setOffsetDays(Math.max(0, Number(e.target.value)))}
+                              className={styles.whenNumber}
+                              aria-label="購読開始から何日後"
+                            />
+                            <span className={styles.whenUnit}>日後</span>
+                          </div>
+                        </div>
+                        {mode === 'absolute_time' ? (
+                          <div className={styles.field}>
+                            <span className={styles.fieldLabel}>配信する時刻</span>
+                            <div className={styles.whenInputs}>
+                              <TimeField
+                                value={deliveryTime}
+                                onChange={setDeliveryTime}
+                                aria-label="配信する時刻"
+                              />
+                              {/* 時刻を消す：選び直す入口を残す（空では保存できない）。
+                                  ★V8 の絵にある操作で、消したあとは時刻を選ぶまで
+                                  保存を止める（下の検査が同じ決まり）。 */}
+                              {deliveryTime ? (
+                                <Button variant="secondary" onClick={() => setDeliveryTime('')}>
+                                  時刻を消す
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={styles.field}>
+                            <span className={styles.fieldLabel}>さらに</span>
+                            <div className={styles.whenInputs}>
+                              <input
+                                type="number"
+                                min={0}
+                                max={23}
+                                value={offsetHours}
+                                onChange={e =>
+                                  setOffsetHours(Math.min(23, Math.max(0, Number(e.target.value))))
+                                }
+                                className={styles.whenNumber}
+                                aria-label="さらに何時間後"
+                              />
+                              <span className={styles.whenUnit}>時間</span>
+                              <input
+                                type="number"
+                                min={0}
+                                max={59}
+                                value={offsetMinutesRemainder}
+                                onChange={e =>
+                                  setOffsetMinutesRemainder(Math.min(59, Math.max(0, Number(e.target.value))))
+                                }
+                                className={styles.whenNumber}
+                                aria-label="さらに何分後"
+                              />
+                              <span className={styles.whenUnit}>分後</span>
+                            </div>
+                          </div>
+                        )}
+                        <p className={styles.whenAside}>{arrivalExample}</p>
+                      </div>
+                    </div>
+                  </section>
 
-                {kind === 'question' && (
-                  <QuestionEditor value={question} onChange={editQuestion} />
-                )}
+                  {/* 1通目の内容。種別はタブで、作れないものは押せないまま並べる。 */}
+                  <section className={styles.section}>
+                    <h3 className={styles.sectionTitle}>1通目の内容</h3>
+                    <p className={styles.sectionDesc}>
+                      空のままでも進めます。テンプレートや画像は、このあとの編集画面でも選べます。
+                    </p>
+                    <div className={styles.sectionBody}>
+                      <RadioCardGroup legend="配信内容の作り方" className="flex flex-wrap gap-4">
+                        {(
+                          [
+                            { value: 'compose', label: 'この画面で作る' },
+                            { value: 'template', label: 'テンプレートから選ぶ' },
+                          ] as const
+                        ).map(o => (
+                          <RadioCard
+                            key={o.value}
+                            name="contentMode"
+                            value={o.value}
+                            checked={contentMode === o.value}
+                            onChange={() => changeContentMode(o.value)}
+                            title={o.label}
+                          />
+                        ))}
+                      </RadioCardGroup>
 
-                {(kind === 'location' || kind === 'video' || kind === 'audio' || kind === 'sticker') && (
-                  <MessageKindFields kind={kind} value={kindState} onChange={editKindState} />
-                )}
+                      {preserved && restoreNotice && (
+                        <Notice tone="warn" message={restoreNotice} />
+                      )}
 
-                {/*
-                  カルーセルはテンプレートを指す形で持つ。この画面では作らない
-                  （組み立てが重く、編集画面を2つ持つと片方だけ直して食い違う）。
-                */}
-                {kind === 'carousel' && (
-                  <CarouselPicker value={templateId} onChange={editTemplateId} />
-                )}
-              </MessageTypeTabs>
-            ) : (
-              <div>
-                <label className="block">
-                  <span className="text-ink-secondary mb-1 block text-xs font-medium">テンプレート</span>
-                  <Select
-                    value={templateId}
-                    onChange={value => editTemplateId(value)}
-                    aria-label="配信するテンプレート"
-                    size="full"
-                    className="max-w-md"
-                    options={[
-                      { value: '', label: '選んでください' },
-                      ...templates.map((template) => ({
-                        value: template.id,
-                        label: `${template.name}（${
-                          { text: 'テキスト', image: 'リッチメッセージ', flex: 'カードタイプ', carousel: 'カルーセル' }[
-                            template.messageType as 'text' | 'image' | 'flex' | 'carousel'
-                          ] ?? template.messageType
-                        }）`,
-                      })),
-                    ]}
+                      {contentMode === 'compose' ? (
+                        <MessageTypeTabs value={kind} onChange={changeKind}>
+                          {kind === 'text' && (
+                            <div>
+                              {/*
+                                「本文」の字と入力欄を結び付ける。押したら欄へ移る
+                                （共通方針 UX-01 のラベル→入力の構造）。
+                              */}
+                              <label
+                                htmlFor="first-step-body"
+                                className={styles.fieldLabel}
+                              >
+                                本文
+                              </label>
+                              <div className="mb-2">
+                                <InsertToolbar targetRef={bodyRef} value={body} onChange={editBody} />
+                              </div>
+                              <textarea
+                                id="first-step-body"
+                                ref={bodyRef}
+                                value={body}
+                                onChange={e => editBody(e.target.value)}
+                                placeholder="はじめまして。友だち追加ありがとうございます。"
+                                className={`${styles.bodyField} border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none`}
+                              />
+                              <CharCounter length={bodyLength} />
+                            </div>
+                          )}
+
+                          {kind === 'image' && (
+                            <div className="max-w-md">
+                              <ImageUploader
+                                mode="line-image"
+                                value={image}
+                                onChange={editImage}
+                                label="送る画像"
+                              />
+                            </div>
+                          )}
+
+                          {kind === 'question' && (
+                            <QuestionEditor value={question} onChange={editQuestion} />
+                          )}
+
+                          {(kind === 'location' || kind === 'video' || kind === 'audio' || kind === 'sticker') && (
+                            <MessageKindFields kind={kind} value={kindState} onChange={editKindState} />
+                          )}
+
+                          {/*
+                            カルーセルはテンプレートを指す形で持つ。この画面では作らない
+                            （組み立てが重く、編集画面を2つ持つと片方だけ直して食い違う）。
+                          */}
+                          {kind === 'carousel' && (
+                            <CarouselPicker value={templateId} onChange={editTemplateId} />
+                          )}
+                        </MessageTypeTabs>
+                      ) : (
+                        <div className={styles.field}>
+                          <span className={styles.fieldLabel}>テンプレート</span>
+                          <Select
+                            value={templateId}
+                            onChange={value => editTemplateId(value)}
+                            aria-label="配信するテンプレート"
+                            size="full"
+                            options={[
+                              { value: '', label: '選んでください' },
+                              ...templates.map((template) => ({
+                                value: template.id,
+                                label: `${template.name}（${
+                                  { text: 'テキスト', image: 'リッチメッセージ', flex: 'カードタイプ', carousel: 'カルーセル' }[
+                                    template.messageType as 'text' | 'image' | 'flex' | 'carousel'
+                                  ] ?? template.messageType
+                                }）`,
+                              })),
+                            ]}
+                          />
+                          {/* テンプレートを指す形にしておくと、テンプレート側を直したときに
+                              この通の中身も一緒に変わる。 */}
+                          <span className={styles.fieldHint}>
+                            テンプレートを直すと、この通の中身も一緒に変わります。
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                </div>
+
+                {/* 右の欄：届く見え方の本物のスマホ。 */}
+                <div className={styles.side} data-design="Right">
+                  <StepPreview
+                    deliveryMode={mode}
+                    offsetDays={offsetDays}
+                    deliveryTime={deliveryTime}
+                    offsetHours={offsetHours}
+                    offsetMinutes={offsetMinutesRemainder}
+                    kind={contentMode === 'template' ? 'text' : kind}
+                    templateName={
+                      // テンプレート参照（テンプレートから選ぶ／カルーセル）のときだけ名前を出す。
+                      contentMode === 'template' || kind === 'carousel'
+                        ? (templates.find(t => t.id === templateId)?.name ?? null)
+                        : null
+                    }
+                    body={body}
+                    imageUrl={image?.mode === 'line-image' ? image.previewImageUrl : null}
+                    question={contentMode === 'compose' && kind === 'question' ? question : null}
+                    kindState={kindState}
+                    audienceLabel={
+                      targetMode === 'all'
+                        ? 'シナリオ購読中の全員'
+                        : targetMode === 'tag'
+                          ? (() => {
+                              // 2回探すと間に変わる余地がある。1回探して使い回す（#495 軽17）。
+                              const tagName = tags.find(t => t.id === targetTagId)?.name
+                              return tagName ? `タグ「${tagName}」がある人` : 'タグで絞り込む（未選択）'
+                            })()
+                          : targetCondition
+                            ? describeCondition(targetCondition)
+                            : '詳細条件で絞り込む（未設定）'
+                    }
                   />
-                </label>
-                {/* テンプレートを指す形にしておくと、テンプレート側を直したときに
-                    この通の中身も一緒に変わる。 */}
-                <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-                  テンプレートを直すと、この通の中身も一緒に変わります。
-                </p>
+                </div>
               </div>
-            )}
-          </div>
-        </section>
-      </div>
 
-        <div className="xl:sticky xl:top-4">
-          <StepPreview
-            deliveryMode={mode}
-            offsetDays={offsetDays}
-            deliveryTime={deliveryTime}
-            offsetHours={offsetHours}
-            offsetMinutes={offsetMinutesRemainder}
-            kind={contentMode === 'template' ? 'text' : kind}
-            templateName={
-              // テンプレート参照（テンプレートから選ぶ／カルーセル）のときだけ名前を出す。
-              contentMode === 'template' || kind === 'carousel'
-                ? (templates.find(t => t.id === templateId)?.name ?? null)
-                : null
-            }
-            body={body}
-            imageUrl={image?.mode === 'line-image' ? image.previewImageUrl : null}
-            question={contentMode === 'compose' && kind === 'question' ? question : null}
-            kindState={kindState}
-            audienceLabel={
-              targetMode === 'all'
-                ? 'シナリオ購読中の全員'
-                : targetMode === 'tag'
-                  ? (() => {
-                      // 2回探すと間に変わる余地がある。1回探して使い回す（#495 軽17）。
-                      const tagName = tags.find(t => t.id === targetTagId)?.name
-                      return tagName ? `タグ「${tagName}」がある人` : 'タグで絞り込む（未選択）'
-                    })()
-                  : targetCondition
-                    ? describeCondition(targetCondition)
-                    : '詳細条件で絞り込む（未設定）'
-            }
-          />
-        </div>
-      </div>
+              {/*
+                上限を超えたまま押せると、LINEに渡してから弾かれる。押せない形にして、
+                理由を操作のそばに置く。「押したのに何も起きない」を作らない。
+              */}
+              {bodyOverLimit && (
+                <Notice tone="danger">
+                  本文が {formatNumber(LINE_TEXT_LIMIT)} 字を超えています。
+                  LINEが受け付けないため、この状態では保存できません。
+                </Notice>
+              )}
 
-      {/*
-        上限を超えたまま押せると、LINEに渡してから弾かれる。押せない形にして、
-        理由を操作のそばに置く。「押したのに何も起きない」を作らない。
-      */}
-      {bodyOverLimit && (
-        <Notice tone="danger" className="mt-4">
-          本文が {formatNumber(LINE_TEXT_LIMIT)} 字を超えています。
-          LINEが受け付けないため、この状態では保存できません。
-        </Notice>
-      )}
-
-      {/*
-        保存系の操作は本文の最下部の追従バーにだけ置く
-        （`docs/v6-common-rules.md` §1-6、#642）。左は削除・状態用に
-        空け、操作群は中央へ揃える。
-      */}
-      <StickyBar
-        actions={(
-          <>
-            <button
-              type="button"
-              onClick={() => void skip()}
-              disabled={saving}
-              className="text-ink-secondary hover:text-ink text-sm disabled:opacity-50"
-            >
-              1通目はあとで書く
-            </button>
-            <Button variant="primary" className="px-5 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void submit()} disabled={saving || bodyOverLimit || loadState !== 'ready'}>
-              {saving ? '保存中…' : '作って編集へ →'}
-            </Button>
-          </>
-        )}
-      />
-        </div>
-      )}
-        </div>
+              {/*
+                保存系の操作は追従バーにだけ置く。左は削除・状態用に空け、
+                操作群は中央へ揃える（オーナー決定 2026-10-01）。
+              */}
+              <StickyBar
+                status={saving ? '保存しています' : undefined}
+                actions={(
+                  <>
+                    <Button href="/scenarios">キャンセル</Button>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => void skip()}
+                      disabled={saving}
+                    >
+                      1通目はあとで書く
+                    </Button>
+                    <Button variant="primary" type="button" onClick={() => void submit()} disabled={saving || bodyOverLimit || loadState !== 'ready'} busy={saving} busyLabel="保存中…">
+                      作って編集へ →
+                    </Button>
+                  </>
+                )}
+              />
+            </>
+          )}
+        </>
       )}
 
       {/* 詳細条件。中身はシナリオ編集と同じ部品を使う。 */}
@@ -883,35 +883,4 @@ function FirstStepContent() {
       )}
     </div>
   )
-}
-
-function StepMark({
-  n,
-  label,
-  state,
-}: {
-  n: number
-  label: string
-  state: 'done' | 'current' | 'todo'
-}) {
-  return (
-    <li className="flex items-center gap-2">
-      <span
-        className={`rounded-pill flex h-6 w-6 items-center justify-center text-xs font-medium ${
-          state === 'done'
-            ? 'bg-accent-deep text-on-accent'
-            : state === 'current'
-              ? 'border-accent text-accent-deep border-2'
-              : 'border-hairline text-ink-faint border'
-        }`}
-      >
-        {state === 'done' ? '✓' : n}
-      </span>
-      <span className={state === 'todo' ? 'text-ink-faint' : 'text-ink font-bold'}>{label}</span>
-    </li>
-  )
-}
-
-function StepLine() {
-  return <li aria-hidden className="border-hairline w-10 border-t" />
 }
