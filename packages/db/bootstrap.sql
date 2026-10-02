@@ -2769,6 +2769,26 @@ CREATE TABLE friend_add_send_claims (
   PRIMARY KEY (line_account_id, friend_id)
 );
 
+CREATE TABLE friend_bulk_message_approval_events (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES friend_bulk_runs(id),
+  actor_staff_id TEXT NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('requested', 'approved', 'confirmed', 'expired')),
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE friend_bulk_message_approvals (
+  run_id TEXT PRIMARY KEY REFERENCES friend_bulk_runs(id),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'confirmed', 'expired')),
+  recipient_count INTEGER NOT NULL,
+  threshold INTEGER NOT NULL,
+  requested_by TEXT NOT NULL,
+  requested_at TEXT NOT NULL,
+  decided_by TEXT,
+  decided_at TEXT,
+  confirmed_count INTEGER
+);
+
 CREATE TABLE friend_bulk_run_items (
   id                TEXT PRIMARY KEY,
   run_id            TEXT NOT NULL REFERENCES friend_bulk_runs(id) ON DELETE CASCADE,
@@ -4458,6 +4478,27 @@ CREATE TABLE nen_lifetime_milestones (
   sort_order      INTEGER NOT NULL DEFAULT 0,
   created_at      TEXT NOT NULL,
   updated_at      TEXT NOT NULL
+);
+
+CREATE TABLE nen_member_rank_sync (
+  id TEXT PRIMARY KEY,
+  operation_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  friend_id TEXT NOT NULL,
+  customer_id TEXT,
+  rank_key TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  expected_version INTEGER CHECK (expected_version IS NULL OR expected_version >= 0),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'failed', 'synced')),
+  error_code TEXT,
+  error_reason TEXT,
+  result_version INTEGER,
+  duplicate INTEGER NOT NULL DEFAULT 0,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (operation_id, friend_id)
 );
 
 CREATE TABLE nen_pet_profiles (
@@ -8595,6 +8636,9 @@ CREATE INDEX idx_nen_lifetime_milestones_account
   ON nen_lifetime_milestones(line_account_id, threshold_yen);
 
 CREATE INDEX idx_nen_member_rank ON nen_ec_member_snapshots(member_rank, purchase_amount DESC);
+
+CREATE INDEX idx_nen_member_rank_sync_operation
+  ON nen_member_rank_sync(line_account_id, operation_id, status);
 
 CREATE INDEX idx_nen_pet_profiles_birthday
   ON nen_pet_profiles(substr(birthday, 6, 2), friend_id);

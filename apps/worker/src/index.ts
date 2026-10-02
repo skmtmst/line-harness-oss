@@ -308,6 +308,8 @@ export type Env = {
     GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?: string;
     ECCUBE_WEBHOOK_SECRET?: string;
     NEN_EC_BASE_URL?: string;
+    /** ECの会員別ランクAPIを配備した後だけ true にする。未設定は送信停止。 */
+    NEN_EC_MEMBER_RANK_SYNC_ENABLED?: string;
     NEN_RICH_MENU_STORE_URL?: string;
     WORKER_URL: string;
     // Admin auth topology (see middleware/admin-auth-config.ts):

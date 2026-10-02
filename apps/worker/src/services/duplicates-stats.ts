@@ -27,6 +27,8 @@ export interface DuplicatesStats {
   pairwise_overlap: PairwiseOverlap[];
   /** ISO timestamp when this snapshot was computed against D1. */
   computed_at: string;
+  /** 統合ユーザーの送信実績から数えた余分な通数。取得不能は null。 */
+  overlapping_delivery_count: number | null;
 }
 
 /**
@@ -137,6 +139,34 @@ function accountFilterClause(column: string, accountIds: string[] | undefined): 
   return `AND ${column} IN (${accountIds.map(() => '?').join(',')})`;
 }
 
+/** 1配信の本文が複数通でも、本人の1友だち分は正規の送信として残す。 */
+export async function countOverlappingDeliveries(
+  db: D1Database,
+  accountIds?: string[],
+): Promise<number | null> {
+  try {
+    const row = await db.prepare(`
+      WITH delivered AS (
+        SELECT friends.user_id, m.broadcast_id, friends.id, COUNT(*) AS messages
+        FROM messages_log m JOIN friends ON friends.id = m.friend_id
+        JOIN users u ON u.id = friends.user_id
+        WHERE m.direction = 'outgoing' AND m.broadcast_id IS NOT NULL
+          AND (m.delivery_type IS NULL OR m.delivery_type != 'test')
+          ${accountFilterClause('friends.line_account_id', accountIds)}
+        GROUP BY friends.user_id, m.broadcast_id, friends.id
+      ), overlaps AS (
+        SELECT SUM(messages) - MAX(messages) AS extra
+        FROM delivered GROUP BY user_id, broadcast_id
+      )
+      SELECT COALESCE(SUM(extra), 0) AS count FROM overlaps
+    `).bind(...(accountIds ?? [])).first<{ count: number }>();
+    return typeof row?.count === 'number' ? row.count : null;
+  } catch {
+    // 実績未接続・未取得を0通と見せない。本文や個人情報は記録しない。
+    return null;
+  }
+}
+
 export async function computeDuplicatesStats(
   db: D1Database,
   options: { forceRefresh?: boolean; accountIds?: string[] } = {},
@@ -245,6 +275,7 @@ export async function computeDuplicatesStats(
     per_account,
     pairwise_overlap,
     computed_at: new Date().toISOString(),
+    overlapping_delivery_count: await countOverlappingDeliveries(db, accountIds),
   };
 
   // Don't cache an empty/zero snapshot — it would mask a real outage
