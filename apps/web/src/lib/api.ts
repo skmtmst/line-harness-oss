@@ -3882,6 +3882,10 @@ export type ReminderDeliveryRunsResponse = {
     errors: number
     targetCount: number
     nextScheduledAt: string | null
+    /** 日本時間の当月に送信済みの件数。 */
+    sentThisMonth: number
+    /** 今後7日以内（期限切れの未送分を含む）に送る予定の件数。 */
+    scheduledNext7Days: number
   }
   steps: Array<{
     id: string
@@ -11113,6 +11117,15 @@ export const api = {
         `/api/friend-add-rules/${encodeURIComponent(ruleId)}?account_id=${encodeURIComponent(accountId)}`,
         { method: 'DELETE' },
       ),
+    /**
+     * 一覧のつまみで動かした順を優先順位としてまとめて書く（★V8 MRhef）。
+     * 受け皿を除く全件を順に渡す。件数が違えば 409（読み直し）。
+     */
+    reorder: (accountId: string, friendKind: FriendAddRuleKind, ids: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>('/api/friend-add-rules/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({ accountId, friendKind, ids }),
+      }),
   },
   nenCampaigns: {
     /** 期間は日数か、★V6 37-6 の「今月・先月」のための from/to（ISO 8601）。 */

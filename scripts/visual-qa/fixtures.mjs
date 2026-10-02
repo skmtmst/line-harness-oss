@@ -2617,10 +2617,16 @@ const RUN_BASE = {
 }
 
 export const REMINDER_RUNS = {
-  reminder: { id: 'reminder-1', name: '予約前日のお知らせ', isActive: true },
+  reminder: {
+    id: 'reminder-1', name: '予約前日のお知らせ', isActive: true,
+    /** V8詳細（rbAig）はこの3つで「いまの状態」の札と操作を分ける。 */
+    lifecycleStatus: 'published', stopConditions: null, hasPublishedVersion: true,
+  },
   summary: {
     sent: 1126, scheduled: 398, stopped: 28, errors: 2,
     targetCount: 398, nextScheduledAt: '2026-08-24T09:00:00+09:00',
+    /* V8詳細の「いまの状態」。`getReminderDeliveryRunSummary` の追加列と同じ意味。 */
+    sentThisMonth: 386, scheduledNext7Days: 124,
   },
   steps: [
     {
