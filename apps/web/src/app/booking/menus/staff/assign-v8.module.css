@@ -161,7 +161,8 @@
 
 .unitField:focus-within {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent-soft);
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
 }
 
 .unitField input {
