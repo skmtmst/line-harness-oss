@@ -1392,6 +1392,14 @@ function visualQaWriteBody(method, pathname) {
     }
     return FRIEND_ADD_RULE_VALIDATE
   }
+  if (method === 'PATCH' && pathname === '/api/friend-add-rules/reorder') {
+    // 本物は受け皿以外の全ID一致しか受け付けない (409 ORDER_CHANGED)。
+    // 画面確認では固定で成功を返す。失敗系は visualState=error。
+    if (query.get('visualState') === 'error') {
+      return { success: false, code: 'ORDER_CHANGED', error: 'ほかの画面で並び順が変わりました。' }
+    }
+    return { success: true }
+  }
   if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/publish$/.test(pathname)) {
     if (query.get('visualState') === 'error') {
       return { success: false, error: '公開前にテストを成功させてください' }
@@ -1610,6 +1618,8 @@ const RAW_PATTERNS = [
   })],
   /* メニューに就ける担当。器は `{staff}`。包むと選ぶ口が0件になる。 */
   [/^\/api\/booking\/admin\/menus\/[^/]+\/staff$/, { staff: BOOKING_MENU_STAFF }],
+  /* スタッフロール本人の予約スタッフ（本人勤務 E3YDK）。器は `{staff}`。包むと `.find` で落ちる。 */
+  [/^\/api\/booking\/admin\/staff\/me$/, { staff: [BOOKING_STAFF[0]] }],
   /* `tksPc` の通常・読込中・失敗を分けるため、通常だけ本番と同じ器で返す。 */
   [/^\/api\/booking\/admin\/staff\/[^/]+\/shifts$/, { shifts: BOOKING_STAFF_SHIFTS }],
   [/^\/api\/booking\/admin\/staff\/[^/]+\/availability-rules$/, { rules: BOOKING_AVAILABILITY_RULES }],
@@ -2205,10 +2215,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     // 検索とフォルダ絞りはサーバ側で全件に効かせる (本物と同じ契約)。
     const q = (query.get('q') ?? '').trim().toLocaleLowerCase('ja-JP')
     const folder = query.get('folder') ?? ''
+    const status = query.get('status') ?? ''
     const items = FRIEND_ADD_RULES.items
-      .filter((item) => !q || item.name.toLocaleLowerCase('ja-JP').includes(q))
+      // 本物は設定名と流入リンク名の両方を検索する（V8 一覧の検索欄と同じ）。
+      .filter((item) => !q
+        || item.name.toLocaleLowerCase('ja-JP').includes(q)
+        || (item.routeNames ?? []).some((name) => name.toLocaleLowerCase('ja-JP').includes(q)))
       .filter((item) => !folder
         || (folder === '__uncategorized' ? item.folderName == null : item.folderName === folder))
+      .filter((item) => !status || item.status === status)
     const counts = new Map()
     for (const item of FRIEND_ADD_RULES.items) {
       counts.set(item.folderName ?? null, (counts.get(item.folderName ?? null) ?? 0) + 1)

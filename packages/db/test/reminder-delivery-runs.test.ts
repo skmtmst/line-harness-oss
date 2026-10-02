@@ -246,6 +246,8 @@ describe('リマインダ実行記録', () => {
       errors: 0,
       targetCount: 1,
       nextScheduledAt: null,
+      sentThisMonth: 0,
+      scheduledNext7Days: 0,
     })
     const list = await listReminderDeliveryRuns(db, {
       reminderId: 'reminder-1',

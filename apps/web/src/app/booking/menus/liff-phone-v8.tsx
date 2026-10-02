@@ -39,7 +39,7 @@ function formatJpDay(date: string): string {
   return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${WEEKDAY_JP[d.getUTCDay()]}）`
 }
 
-function priceLabel(menu: BookingMenu): string {
+function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>): string {
   if (menu.price_mode === 'free') return '無料'
   if (menu.price_mode === 'inquiry') return 'お問い合わせ'
   return `¥${menu.base_price.toLocaleString('ja-JP')}`
@@ -83,10 +83,13 @@ function PhoneChrome({ step, children }: { step: number; children: React.ReactNo
   )
 }
 
-function MenuCard({ menu, picked, check }: { menu: BookingMenu; picked?: boolean; check?: boolean }) {
+/** 写しのメニューカード。作りかけ（Pick だけ）でも描けるよう、使う欄だけを要求する。 */
+type PhoneMenuCard = Pick<BookingMenu, 'id' | 'name' | 'description' | 'duration_minutes' | 'base_price' | 'price_mode'>
+
+function MenuCard({ menu, picked, check }: { menu: PhoneMenuCard; picked?: boolean; check?: boolean }) {
   return (
     <div className={`${styles.phoneCard} ${picked ? styles.phoneCardPicked : ''}`}>
-      <span className={styles.phoneThumb} aria-hidden="true">{menu.name.slice(0, 1)}</span>
+      <span className={styles.phoneThumb} aria-hidden="true" />
       <span className={styles.phoneCardBody}>
         <span className={styles.phoneCardName}>{menu.name}</span>
         {menu.description && <span className={styles.phoneCardDesc}>{menu.description}</span>}
@@ -102,10 +105,20 @@ function MenuCard({ menu, picked, check }: { menu: BookingMenu; picked?: boolean
   )
 }
 
-/** ① メニューを選ぶ。 */
-export function LiffPhoneMenuStep({ menus, status = 'ready' }: { menus: BookingMenu[]; status?: 'loading' | 'ready' | 'error' }) {
+/** ① メニューを選ぶ。draft は作りかけのメニュー（作る・直す画面から）。 */
+export function LiffPhoneMenuStep({
+  menus,
+  draft,
+  status = 'ready',
+}: {
+  menus: BookingMenu[]
+  /** 作りかけ・直しかけのメニュー。先頭に選ばれた状態で出す（QqER7 の写し）。 */
+  draft?: Pick<BookingMenu, 'id' | 'name' | 'category_label' | 'description' | 'duration_minutes' | 'base_price' | 'price_mode' | 'sort_order' | 'is_active' | 'auto_tag_id'> | null
+  status?: 'loading' | 'ready' | 'error'
+}) {
   const shown = menus.filter((m) => m.is_active).sort((a, b) => a.sort_order - b.sort_order)
-  const categories = [...new Set(shown.map((m) => m.category_label).filter((c): c is string => Boolean(c)))]
+  const list = draft ? [draft, ...shown.filter((m) => m.id !== draft.id)] : shown
+  const categories = [...new Set(list.map((m) => m.category_label).filter((c): c is string => Boolean(c)))]
   return (
     <PhoneChrome step={1}>
       <div className={styles.phoneBody}>
@@ -114,7 +127,7 @@ export function LiffPhoneMenuStep({ menus, status = 'ready' }: { menus: BookingM
           <p className={styles.phoneSub}>読み込んでいます…</p>
         ) : status === 'error' ? (
           <p className={styles.phoneSub}>読み込めませんでした。</p>
-        ) : shown.length === 0 ? (
+        ) : list.length === 0 ? (
           <p className={styles.phoneSub}>受付中のメニューはまだありません。</p>
         ) : (
           <>
@@ -124,14 +137,14 @@ export function LiffPhoneMenuStep({ menus, status = 'ready' }: { menus: BookingM
                 {categories.slice(0, 3).map((c) => <span key={c} className={styles.phoneCat}>{c}</span>)}
               </div>
             )}
-            {shown.slice(0, 4).map((menu, i) => (
-              <MenuCard key={menu.id} menu={menu} picked={i === 0} check={i === 0} />
+            {list.slice(0, 4).map((menu, i) => (
+              <MenuCard key={menu.id} menu={menu} picked={draft ? menu.id === draft.id : i === 0} check={draft ? menu.id === draft.id : i === 0} />
             ))}
           </>
         )}
       </div>
       <div className={styles.phoneFoot}>
-        <span className={`${styles.phoneCta} ${shown.length === 0 ? styles.phoneCtaOff : ''}`}>
+        <span className={`${styles.phoneCta} ${list.length === 0 ? styles.phoneCtaOff : ''}`}>
           担当を選ぶ
         </span>
       </div>

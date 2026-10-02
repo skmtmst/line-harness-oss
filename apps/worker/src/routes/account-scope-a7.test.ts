@@ -43,7 +43,9 @@ function app(firstResult: FirstResult = null) {
             bind: (...bindings: unknown[]) => { entry.bindings = bindings; return statement; },
             first: vi.fn(async () => firstResult),
             all: vi.fn(async () => ({ results: [] })),
-            run: vi.fn(async () => ({})),
+            // D1 の run は { meta: { changes } } を返す。形が無いと
+            // 更新の成否を見分けられない（M509 の版照合）。
+            run: vi.fn(async () => ({ success: true, meta: { changes: 1 } })),
           };
           return statement;
         },
