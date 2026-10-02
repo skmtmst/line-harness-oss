@@ -46,10 +46,10 @@ function seed(raw: Database.Database): void {
   `);
 }
 
-function harness(role: 'owner' | 'admin' | 'staff', env: Record<string, unknown> = {}) {
+function harness(role: 'owner' | 'admin' | 'staff', env: Record<string, unknown> = {}, staff: Record<string, unknown> = {}) {
   const app = new Hono<any>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'staff-a', name: '担当者', role, readOnly: false, permissionKeys: [], accountScope: 'all' });
+    c.set('staff', { id: 'staff-a', name: '担当者', role, readOnly: false, permissionKeys: [], accountScope: 'all', ...staff });
     c.env = { DB: db, NEN_EC_BASE_URL: 'https://ec.test', ECCUBE_WEBHOOK_SECRET: 'x'.repeat(40), ...env };
     await next();
   });
@@ -187,6 +187,120 @@ describe('PUT /api/nen/rank-settings', () => {
     expect(body.data.sync.status).toBe('failed');
     expect(body.data.sync.error).toContain('未設定');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('DELETE /api/nen/rank-settings/:id', () => {
+  async function initial() {
+    return (await json(harness('owner'), 'GET', `/api/nen/rank-settings?accountId=${ACCOUNT}`)).body.data;
+  }
+  const deletion = (id: string, body: unknown, role: 'owner' | 'admin' | 'staff' = 'owner') =>
+    json(harness(role), 'DELETE', `/api/nen/rank-settings/${id}`, body);
+
+  it('会員とタグを移し替え、外部へ送らず次の同期待ちにする', async () => {
+    const data = await initial();
+    const source = data.ranks.find((r: any) => r.key === 'platinum');
+    const target = data.ranks.find((r: any) => r.key === 'gold');
+    sql.pragma('foreign_keys = ON');
+    sql.prepare('INSERT INTO friend_tags (friend_id, tag_id) VALUES (?, ?)').run('friend-a', source.tagId);
+    const result = await deletion(source.id, { accountId: ACCOUNT, replacementRankId: target.id, expectedVersion: data.rules.version });
+    expect(result.status).toBe(200);
+    expect(result.body.data).toEqual({ id: source.id, replacementRankId: target.id, movedMembers: 1, version: 2, ecSync: 'pending', message: '次の同期で反映' });
+    expect(sql.prepare('SELECT member_rank_key, member_rank, mile_rate_percent FROM nen_ec_member_snapshots WHERE friend_id = ?').get('friend-a'))
+      .toEqual({ member_rank_key: 'gold', member_rank: 'ゴールド', mile_rate_percent: 2 });
+    expect(sql.prepare('SELECT tag_id FROM friend_tags WHERE friend_id = ?').all('friend-a')).toEqual([{ tag_id: target.tagId }]);
+    expect(sql.prepare('SELECT sync_status, sync_error FROM nen_rank_rules WHERE line_account_id = ?').get(ACCOUNT)).toEqual({ sync_status: 'pending', sync_error: null });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('ECのキーがまだ無い会員も表示中のランクから移し、ブロック中の会員も取り残さない', async () => {
+    const data = await initial();
+    sql.prepare('UPDATE friends SET is_following = 0 WHERE id = ?').run('friend-b');
+    const source = data.ranks.find((r: any) => r.key === 'gold');
+    const target = data.ranks.find((r: any) => r.key === 'regular');
+    const result = await deletion(source.id, { accountId: ACCOUNT, replacementRankId: target.id, expectedVersion: 1 });
+    expect(result.body.data.movedMembers).toBe(1);
+    expect(sql.prepare('SELECT member_rank_key FROM nen_ec_member_snapshots WHERE friend_id = ?').get('friend-b')).toEqual({ member_rank_key: 'regular' });
+    expect(sql.prepare('SELECT member_rank_key FROM nen_ec_member_snapshots WHERE friend_id = ?').get('friend-c')).toEqual({ member_rank_key: 'regular' });
+    expect(sql.prepare('SELECT member_rank_key FROM nen_ec_member_snapshots WHERE friend_id = ?').get('friend-a')).toEqual({ member_rank_key: 'platinum' });
+  });
+
+  it('会員がいるなら移す先を必須にし、会員がいないなら省略できる', async () => {
+    const data = await initial();
+    const platinum = data.ranks.find((r: any) => r.key === 'platinum');
+    const silver = data.ranks.find((r: any) => r.key === 'silver');
+    expect((await deletion(platinum.id, { accountId: ACCOUNT, expectedVersion: 1 })).status).toBe(400);
+    const empty = await deletion(silver.id, { accountId: ACCOUNT, expectedVersion: 1 });
+    expect(empty.body.data).toMatchObject({ movedMembers: 0, replacementRankId: null, ecSync: 'pending', version: 2 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('0円のランク、自分・別アカウント・存在しない移し先は拒否する', async () => {
+    const data = await initial();
+    const source = data.ranks.find((r: any) => r.key === 'platinum');
+    const regular = data.ranks.find((r: any) => r.key === 'regular');
+    expect((await deletion(regular.id, { accountId: ACCOUNT, expectedVersion: 1 })).status).toBe(409);
+    for (const replacementRankId of [source.id, 'missing', '']) {
+      expect((await deletion(source.id, { accountId: ACCOUNT, replacementRankId, expectedVersion: 1 })).status).toBe(400);
+    }
+    const other = (await json(harness('owner'), 'GET', '/api/nen/rank-settings?accountId=account-other')).body.data.ranks[0];
+    expect((await deletion(source.id, { accountId: ACCOUNT, replacementRankId: other.id, expectedVersion: 1 })).status).toBe(400);
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_rank_settings WHERE line_account_id = ?').get(ACCOUNT)).toEqual({ n: 4 });
+  });
+
+  it('版の未指定・型違い・古い版、権限不足、別アカウントの削除は拒否する', async () => {
+    const data = await initial();
+    const source = data.ranks.find((r: any) => r.key === 'platinum');
+    const target = data.ranks.find((r: any) => r.key === 'gold');
+    for (const expectedVersion of [undefined, '1', 0, 1.5]) {
+      expect((await deletion(source.id, { accountId: ACCOUNT, replacementRankId: target.id, expectedVersion })).status).toBe(400);
+    }
+    expect((await deletion(source.id, { accountId: ACCOUNT, replacementRankId: target.id, expectedVersion: 2 })).status).toBe(409);
+    expect((await deletion(source.id, { accountId: ACCOUNT, replacementRankId: target.id, expectedVersion: 1 }, 'staff')).status).toBe(403);
+    await json(harness('owner'), 'GET', '/api/nen/rank-settings?accountId=account-other');
+    expect((await deletion(source.id, { accountId: 'account-other', expectedVersion: 1 })).status).toBe(404);
+    const restricted = harness('admin', {}, { tenantId: 'tenant-other' });
+    expect((await json(restricted, 'DELETE', `/api/nen/rank-settings/${source.id}`, { accountId: ACCOUNT, replacementRankId: target.id, expectedVersion: 1 })).status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('一括保存から移し替えを省略して削除できない', async () => {
+    const data = await initial();
+    const result = await json(harness('owner'), 'PUT', '/api/nen/rank-settings', { accountId: ACCOUNT,
+      ranks: data.ranks.filter((r: any) => r.key !== 'platinum') });
+    expect(result.status).toBe(400);
+    expect(result.body.error).toContain('削除操作');
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_rank_settings WHERE line_account_id = ?').get(ACCOUNT)).toEqual({ n: 4 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('読んだ後に別の担当者が版を変えたら、会員・タグ・ランクを変更しない', async () => {
+    const data = await initial();
+    const source = data.ranks.find((r: any) => r.key === 'platinum');
+    const target = data.ranks.find((r: any) => r.key === 'gold');
+    const batch = db.batch.bind(db);
+    db.batch = async (statements) => {
+      sql.prepare('UPDATE nen_rank_rules SET version = 2 WHERE line_account_id = ?').run(ACCOUNT);
+      return batch(statements);
+    };
+    const result = await deletion(source.id, { accountId: ACCOUNT, replacementRankId: target.id, expectedVersion: 1 });
+    expect(result.status).toBe(409);
+    expect(sql.prepare('SELECT member_rank_key FROM nen_ec_member_snapshots WHERE friend_id = ?').get('friend-a')).toEqual({ member_rank_key: 'platinum' });
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM friend_tags').get()).toEqual({ n: 0 });
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_rank_settings WHERE line_account_id = ?').get(ACCOUNT)).toEqual({ n: 4 });
+  });
+
+  it('途中の保存に失敗したら会員・タグ・削除・版をすべて戻す', async () => {
+    const data = await initial();
+    const source = data.ranks.find((r: any) => r.key === 'platinum');
+    const target = data.ranks.find((r: any) => r.key === 'gold');
+    sql.exec("CREATE TRIGGER reject_rank_move BEFORE UPDATE ON nen_ec_member_snapshots BEGIN SELECT RAISE(ABORT, '試験用の失敗'); END");
+    const result = await deletion(source.id, { accountId: ACCOUNT, replacementRankId: target.id, expectedVersion: 1 });
+    expect(result.status).toBe(500);
+    expect(sql.prepare('SELECT member_rank_key FROM nen_ec_member_snapshots WHERE friend_id = ?').get('friend-a')).toEqual({ member_rank_key: 'platinum' });
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM friend_tags').get()).toEqual({ n: 0 });
+    expect(sql.prepare('SELECT version, sync_error FROM nen_rank_rules WHERE line_account_id = ?').get(ACCOUNT)).toEqual({ version: 1, sync_error: null });
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_rank_settings WHERE line_account_id = ?').get(ACCOUNT)).toEqual({ n: 4 });
   });
 });
 

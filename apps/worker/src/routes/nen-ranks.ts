@@ -15,6 +15,7 @@ import {
   saveNenRankSettings,
   setNenRankSyncStatus,
   setNenRankTagId,
+  validateNenRankInputs,
   type NenMemberListOptions,
   type NenRankSetting,
 } from '@line-crm/db';
@@ -23,6 +24,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { NenRankSyncError, buildNenRankSyncPayload, pushNenRankSettingsToEc } from '../services/nen-rank-sync.js';
 import { refreshAllNenTags } from '../services/nen-tag-sync.js';
+import { deleteNenRank, NenRankDeleteError } from '../services/nen-rank-delete.js';
 import {
   ENERGY_FACTORS,
   NenFeedingValidationError,
@@ -169,6 +171,28 @@ nenRanks.get('/api/nen/rank-settings', async (c) => {
   return c.json({ success: true, data: await settingsResponse(c, accountId) });
 });
 
+nenRanks.delete('/api/nen/rank-settings/:id', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ accountId?: string; replacementRankId?: unknown; expectedVersion?: unknown }>().catch(() => null);
+  const accountId = accountIdFrom(c, body);
+  const denied = await requireAccount(c, accountId);
+  if (denied) return denied;
+  if (!body || typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1) {
+    return c.json({ success: false, error: 'expectedVersionには読み込んだ版を指定してください' }, 400);
+  }
+  if (body.replacementRankId != null && (typeof body.replacementRankId !== 'string' || !body.replacementRankId.trim())) {
+    return c.json({ success: false, error: '移す先のランクを選んでください' }, 400);
+  }
+  try {
+    const data = await deleteNenRank(c.env.DB, accountId, c.req.param('id'),
+      typeof body.replacementRankId === 'string' ? body.replacementRankId : null, body.expectedVersion,
+      (ranks, now) => ensureRankTags(c.env.DB, ranks, now));
+    return c.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof NenRankDeleteError) return c.json({ success: false, error: error.message }, error.status);
+    return c.json({ success: false, error: 'ランクを削除できませんでした。読み直してからもう一度お試しください' }, 500);
+  }
+});
+
 type RankBody = { accountId?: string; ranks?: Array<{ id?: string | null; name?: unknown; annualThresholdYen?: unknown; mileRatePercent?: unknown }> };
 
 nenRanks.put('/api/nen/rank-settings', requireRole('owner', 'admin'), async (c) => {
@@ -180,6 +204,12 @@ nenRanks.put('/api/nen/rank-settings', requireRole('owner', 'admin'), async (c) 
   const now = jstNow();
   try {
     await ensureNenRankDefaults(c.env.DB, accountId, now);
+    validateNenRankInputs(body.ranks.map((rank) => ({ id: typeof rank.id === 'string' ? rank.id : null,
+      name: String(rank.name ?? ''), annualThresholdYen: Number(rank.annualThresholdYen), mileRatePercent: Number(rank.mileRatePercent) })));
+    const existing = await getNenRankSettings(c.env.DB, accountId);
+    if (existing.some((rank) => !body.ranks!.some((input) => input.id === rank.id))) {
+      return c.json({ success: false, error: 'ランクの削除は、版と移す先を指定して削除操作から行ってください' }, 400);
+    }
     const saved = await saveNenRankSettings(c.env.DB, accountId, body.ranks.map((rank) => ({
       id: typeof rank.id === 'string' ? rank.id : null,
       name: String(rank.name ?? ''),
