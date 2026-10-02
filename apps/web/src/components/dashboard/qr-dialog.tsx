@@ -471,7 +471,7 @@ export default function QrDialog({
                   type="button"
                   onClick={copy}
                   disabled={blocked}
-                  className="min-h-11 shrink-0"
+                  className="v7:min-h-11 shrink-0"
                 >
                   コピー
                 </Button>

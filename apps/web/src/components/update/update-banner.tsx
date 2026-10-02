@@ -1,83 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import {
-  getCurrentVersion,
-  getManifest,
-  detectFork,
-  findLatestUpgrade,
-  type ReleaseEntry,
-} from '@/lib/update-client'
+import { MANUAL_UPDATE_GUIDE_URL, useUpdateStatus } from './use-update-status'
 import { UpdateButton } from './update-button'
 
-type Status =
-  | { kind: 'loading' }
-  | { kind: 'latest'; version: string }
-  | { kind: 'fork'; reason: string; version: string }
-  | { kind: 'upgrade'; current: string; target: ReleaseEntry }
-
-const updateBannerEnabled = process.env.NEXT_PUBLIC_UPDATE_BANNER_ENABLED !== 'false'
-
-// inject-version を通さないビルド (自前 CI/CD やローカル dev) のバージョン placeholder。
-// この場合「manifest に無い」のは当たり前なので fork 警告バナーは出さない。
-const DEV_VERSION = '0.0.0-dev'
-
-export const MANUAL_UPDATE_GUIDE_URL =
-  'https://github.com/Shudesu/line-harness-oss/blob/main/docs/wiki/26-Manual-Update.md'
+export { MANUAL_UPDATE_GUIDE_URL }
 
 export function UpdateBanner() {
-  const [status, setStatus] = useState<Status>({ kind: 'loading' })
-
-  useEffect(() => {
-    // visual-qa は Pencil と同じ画面状態だけを撮る。運用環境向けの告知は
-    // 撮影器が付ける一時印で外し、通常利用時の表示条件は変えない。
-    try {
-      if (window.sessionStorage.getItem('lh_visual_qa_capture') === '1') return
-    } catch {
-      // ストレージを使えない環境では通常の表示判定を続ける。
-    }
-    if (!updateBannerEnabled) return
-
-    let cancelled = false
-    ;(async () => {
-      try {
-        const current = await getCurrentVersion()
-        if (cancelled) return
-        // バージョン未埋め込みビルドでは manifest 照合自体が無意味なので
-        // バナーを出さない (自前デプロイ運用では正常な状態)。
-        if (current.version === DEV_VERSION) return
-        const manifest = await getManifest()
-        if (cancelled) return
-        const fork = detectFork(current, manifest)
-        if (fork.kind === 'fork') {
-          setStatus({
-            kind: 'fork',
-            reason: fork.reason,
-            version: current.version,
-          })
-          return
-        }
-        const upgrade = findLatestUpgrade(manifest, current.version)
-        if (!upgrade) {
-          setStatus({ kind: 'latest', version: current.version })
-        } else {
-          setStatus({
-            kind: 'upgrade',
-            current: current.version,
-            target: upgrade,
-          })
-        }
-      } catch (e) {
-        // Banner is best-effort: do not break the dashboard if /admin/version
-        // or the Worker-hosted manifest proxy is unreachable. Phase 9 will add a
-        // visible error chip; for Phase 6 we just stay in `loading` (null).
-        console.error('update banner failed', e)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const status = useUpdateStatus()
 
   if (status.kind === 'loading') return null
 
