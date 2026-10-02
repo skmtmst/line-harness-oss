@@ -607,14 +607,17 @@
       ]
     },
     "/booking/menus/new": {
-      "node": "GhOb3",
-      "name": "V6 28-1-B 予約メニューをつくる",
+      "node": "GhOb3 QqER7 v5L19Z",
+      "name": "V8 予約メニューをつくる（V6 28-1-B、v7 見た目併存）",
       "sections": [
         "Crumb",
         "Head",
         "Body",
         "Left",
-        "Right"
+        "Right",
+        "Bar",
+        "Side",
+        "Savebar"
       ],
       "parts": [
         "お客様が予約するときに選ぶ内容を登録します。",

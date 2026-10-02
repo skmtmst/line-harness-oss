@@ -22,6 +22,7 @@ const GUARDED = [
   'app/affiliate-offers/new/page.tsx',
   'app/analytics/reports/new/page.tsx',
   'app/auto-replies/edit/wizard-v8.tsx',
+  'app/booking/menus/new/menu-form-v8.tsx',
   'app/booking/menus/new/page.tsx',
   'app/booking/menus/settings-v8.tsx',
   'app/booking/menus/staff/page.tsx',

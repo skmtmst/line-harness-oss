@@ -50,6 +50,10 @@
   "app/booking/menus/liff-phone-v8.tsx": {
     "unresolved-classname": 75
   },
+  "app/booking/menus/new/menu-form-v8.tsx": {
+    "unresolved-classname": 117,
+    "arbitrary-value": 1
+  },
   "app/booking/menus/new/page.tsx": {
     "unresolved-classname": 11
   },
@@ -256,7 +260,7 @@
     "direct-secondary-button": 1
   },
   "app/scenarios/detail/detail-v8.tsx": {
-    "arbitrary-value": 3,
+    "arbitrary-value": 2,
     "unresolved-classname": 109
   },
   "app/scenarios/detail/scenario-detail-client.tsx": {

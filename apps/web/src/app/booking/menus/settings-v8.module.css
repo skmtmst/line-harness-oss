@@ -1205,7 +1205,7 @@
   align-items: center;
   height: 44px;
   padding: 0 12px;
-  border-bottom: 1px solid var(--color-v8-liff-line);
+  border-bottom: 1px solid var(--v8-liff-line);
 }
 
 /* 左の×・右の•••（LIFF の共通バー）。 */
@@ -1255,16 +1255,16 @@
 .phoneStepLine {
   height: 3px;
   border-radius: var(--v8-liff-step-radius);
-  background: var(--color-v8-liff-line);
+  background: var(--v8-liff-line);
 }
 
 .phoneStepDone .phoneStepLine,
 .phoneStepNow .phoneStepLine {
-  background: var(--color-v8-liff-primary);
+  background: var(--v8-liff-primary);
 }
 
 .phoneStepLabel {
-  color: var(--color-v8-liff-idle);
+  color: var(--v8-liff-idle);
   font-size: 10px;
   font-weight: 500;
   white-space: nowrap;
@@ -1295,7 +1295,7 @@
 
 .phoneSub {
   margin: -8px 0 0;
-  color: var(--color-v8-liff-sub);
+  color: var(--v8-liff-sub);
   font-size: 11.5px;
 }
 
@@ -1310,8 +1310,8 @@
   padding: 6px 12px;
   border: 0;
   border-radius: var(--radius-pill);
-  background: var(--color-v8-liff-chip);
-  color: var(--color-v8-liff-sub);
+  background: var(--v8-liff-chip);
+  color: var(--v8-liff-sub);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1328,16 +1328,16 @@
   gap: 12px;
   width: 100%;
   padding: 14px;
-  border: 1px solid var(--color-v8-liff-line);
+  border: 1px solid var(--v8-liff-line);
   border-radius: var(--v8-liff-card-radius);
   background: var(--color-canvas);
   text-align: left;
 }
 
 .phoneCardPicked {
-  border-color: var(--color-v8-liff-primary);
-  background: var(--color-v8-liff-primary-soft);
-  outline: 1px solid var(--color-v8-liff-primary);
+  border-color: var(--v8-liff-primary);
+  background: var(--v8-liff-primary-soft);
+  outline: 1px solid var(--v8-liff-primary);
   outline-offset: 0;
 }
 
@@ -1346,8 +1346,8 @@
   height: 56px;
   flex-shrink: 0;
   border-radius: var(--radius-control);
-  background: var(--color-v8-liff-thumb);
-  color: var(--color-v8-liff-thumb-ink);
+  background: var(--v8-liff-thumb);
+  color: var(--v8-liff-thumb-ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1374,7 +1374,7 @@
 
 .phoneCardDesc {
   overflow: hidden;
-  color: var(--color-v8-liff-sub);
+  color: var(--v8-liff-sub);
   font-size: 11.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1394,7 +1394,7 @@
 }
 
 .phoneCardPrice {
-  color: var(--color-v8-liff-primary);
+  color: var(--v8-liff-primary);
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -1406,8 +1406,8 @@
   height: 48px;
   flex-shrink: 0;
   border-radius: var(--radius-control);
-  background: var(--color-v8-liff-thumb);
-  color: var(--color-v8-liff-thumb-ink);
+  background: var(--v8-liff-thumb);
+  color: var(--v8-liff-thumb-ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1416,13 +1416,13 @@
 }
 
 .phoneAvatarPlain {
-  background: var(--color-v8-liff-chip);
-  color: var(--color-v8-liff-sub);
+  background: var(--v8-liff-chip);
+  color: var(--v8-liff-sub);
 }
 
 .phoneCardCheck {
   flex-shrink: 0;
-  color: var(--color-v8-liff-primary);
+  color: var(--v8-liff-primary);
 }
 
 /* 週の日付の札。両はしに週送りの ‹ › 。 */
@@ -1434,7 +1434,7 @@
 
 .phoneDayNav {
   flex-shrink: 0;
-  color: var(--color-v8-liff-sub);
+  color: var(--v8-liff-sub);
   font-size: 14px;
   font-weight: 600;
 }
@@ -1446,22 +1446,22 @@
   align-items: center;
   gap: 2px;
   padding: 8px 4px;
-  border: 1px solid var(--color-v8-liff-line);
+  border: 1px solid var(--v8-liff-line);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
   min-width: 0;
 }
 
 .phoneDayNow {
-  border-color: var(--color-v8-liff-primary);
-  background: var(--color-v8-liff-primary-soft);
-  outline: 1px solid var(--color-v8-liff-primary);
+  border-color: var(--v8-liff-primary);
+  background: var(--v8-liff-primary-soft);
+  outline: 1px solid var(--v8-liff-primary);
   outline-offset: 0;
 }
 
 .phoneDayOff {
-  border-color: var(--color-v8-liff-line);
-  background: var(--color-v8-liff-off);
+  border-color: var(--v8-liff-line);
+  background: var(--v8-liff-off);
 }
 
 .phoneDayDow {
@@ -1477,7 +1477,7 @@
 }
 
 .phoneDayState {
-  color: var(--color-v8-liff-primary);
+  color: var(--v8-liff-primary);
   font-size: 9px;
   font-weight: 600;
 }
@@ -1495,7 +1495,7 @@
 
 .phoneSlot {
   padding: 9px 0;
-  border: 1px solid var(--color-v8-liff-slot-line);
+  border: 1px solid var(--v8-liff-slot-line);
   border-radius: var(--radius-control);
   color: var(--color-ink);
   font-size: 13px;
@@ -1505,15 +1505,15 @@
 }
 
 .phoneSlotNow {
-  border-color: var(--color-v8-liff-primary);
-  background: var(--color-v8-liff-primary);
+  border-color: var(--v8-liff-primary);
+  background: var(--v8-liff-primary);
   color: var(--color-canvas);
 }
 
 .phoneSlotOff {
-  border-color: var(--color-v8-liff-off);
-  background: var(--color-v8-liff-off);
-  color: var(--color-v8-liff-idle);
+  border-color: var(--v8-liff-off);
+  background: var(--v8-liff-off);
+  color: var(--v8-liff-idle);
 }
 
 .phoneSectionLabel {
@@ -1529,11 +1529,11 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px 16px 30px;
-  border-top: 1px solid var(--color-v8-liff-line);
+  border-top: 1px solid var(--v8-liff-line);
 }
 
 .phoneFootPick {
-  color: var(--color-v8-liff-primary);
+  color: var(--v8-liff-primary);
   font-size: 12px;
   font-weight: 600;
   text-align: center;
@@ -1547,15 +1547,15 @@
   height: 48px;
   border: 0;
   border-radius: var(--radius-control);
-  background: var(--color-v8-liff-primary);
+  background: var(--v8-liff-primary);
   color: var(--color-canvas);
   font-size: 15px;
   font-weight: 700;
 }
 
 .phoneCtaOff {
-  background: var(--color-v8-liff-chip);
-  color: var(--color-v8-liff-idle);
+  background: var(--v8-liff-chip);
+  color: var(--v8-liff-idle);
 }
 
 .phoneBack {
@@ -1571,7 +1571,7 @@
 .phoneViewSwitch {
   display: flex;
   border-radius: var(--radius-control);
-  background: var(--color-v8-liff-chip);
+  background: var(--v8-liff-chip);
   padding: 3px;
 }
 
