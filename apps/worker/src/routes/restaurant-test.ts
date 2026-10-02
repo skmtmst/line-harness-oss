@@ -14,6 +14,7 @@ import {
   canAccessLineAccount,
   getVisibleLineAccountScope,
 } from '../services/account-access.js';
+import { sendRestaurantLineConfirmation, type RestaurantLineNotice } from '../services/restaurant-line-confirmation.js';
 import { dbFor } from '../services/db-router.js';
 import {
   issueRestaurantIntakeAddress,
@@ -29,6 +30,8 @@ import {
 import { fetchBotProfile } from '../lib/bot-profile.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { restaurantTableCapacity, validateRestaurantOpeningHours } from '../services/restaurant-inventory.js';
+import { DEFAULT_STAY_MINUTES } from '../services/restaurant-reservation-email.js';
+import { restaurantChannelState, restaurantDayBounds } from '../services/restaurant-channels.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import {
@@ -40,9 +43,8 @@ import {
 /**
  * 飲食店向け（テスト）の専用API。
  *
- * `/api/restaurant-test` 以外の既存機能には依存せず、外部サービスへの
- * fetch/send は意図的に実装しない。媒体連携は管理者が投入した受信データを
- * 検証する一方向だけである。
+ * 媒体連携は管理者が投入した受信データを検証する一方向である。
+ * 手動予約の確認通知は、明示的に選んだときだけ既存のHarness経路で送る。
  */
 export const restaurantTest = new Hono<Env>();
 
@@ -911,6 +913,105 @@ restaurantTest.post('/api/restaurant-test/intake-addresses', requireRole('owner'
   }
 });
 
+restaurantTest.get('/api/restaurant-test/channels', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const storeId = c.req.query('storeId') || organization.scopedStoreId;
+  if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  const db = dbFor(c.env, storeId);
+  const store = await db.prepare('SELECT timezone FROM rt_stores WHERE id = ?').bind(storeId).first<{ timezone: string }>();
+  const [from, to] = restaurantDayBounds(store!.timezone);
+  const media = await db.prepare(`SELECT m.id, m.code, m.name, m.is_active,
+    (SELECT COUNT(*) FROM rt_inbound_emails e WHERE e.store_id = ? AND e.media_id = m.id AND datetime(e.received_at) >= datetime(?) AND datetime(e.received_at) < datetime(?)) AS todayCount,
+    (SELECT MAX(received_at) FROM rt_inbound_emails e WHERE e.store_id = ? AND e.media_id = m.id) AS lastReceivedAt,
+    (SELECT COUNT(*) FROM rt_inbound_emails e WHERE e.store_id = ? AND e.media_id = m.id AND e.status = 'quarantined') AS unreadableCount
+    FROM rt_media m ORDER BY m.code`).bind(storeId, from, to, storeId, storeId)
+    .all<{ id: string; code: string; name: string; is_active: number; todayCount: number; lastReceivedAt: string | null; unreadableCount: number }>();
+  const data = media.results.map(({ is_active, ...row }) => ({ ...row, receiveMethod: 'email_forward', ...restaurantChannelState(row.lastReceivedAt, is_active === 1) }));
+  for (const [code, name] of [['restaurant_board', 'レストランボード'], ['reszaiko', 'レス在庫']] as const) {
+    const row = await db.prepare(`SELECT COUNT(CASE WHEN datetime(received_at) >= datetime(?) AND datetime(received_at) < datetime(?) THEN 1 END) AS todayCount,
+      MAX(received_at) AS lastReceivedAt, COUNT(CASE WHEN status = 'failed' THEN 1 END) AS unreadableCount
+      FROM rt_sync_events WHERE store_id = ? AND provider = ?`).bind(from, to, storeId, code)
+      .first<{ todayCount: number; lastReceivedAt: string | null; unreadableCount: number }>();
+    data.push({ id: code, code, name, ...row!, receiveMethod: 'direct', ...restaurantChannelState(row!.lastReceivedAt, true) });
+  }
+  const manual = await db.prepare(`SELECT COUNT(CASE WHEN datetime(created_at) >= datetime(?) AND datetime(created_at) < datetime(?) THEN 1 END) AS todayCount,
+    MAX(created_at) AS lastReceivedAt FROM rt_reservations WHERE store_id = ? AND source IN ('manual', 'phone', 'line') AND inbound_email_id IS NULL`)
+    .bind(from, to, storeId).first<{ todayCount: number; lastReceivedAt: string | null }>();
+  data.push({ id: 'manual', code: 'manual', name: '手入力・電話・LINE', ...manual!, unreadableCount: 0, receiveMethod: 'manual', ...restaurantChannelState(manual!.lastReceivedAt, true) });
+  return c.json({ success: true, data });
+});
+
+restaurantTest.get('/api/restaurant-test/inbound-emails', requireRole('owner', 'admin'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const storeId = c.req.query('storeId') || organization.scopedStoreId;
+  if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  if ((c.req.query('status') || 'quarantined') !== 'quarantined') return c.json({ success: false, error: 'status は quarantined を指定してください' }, 400);
+  const limit = Math.min(200, Math.max(1, Number.parseInt(c.req.query('limit') || '100', 10) || 100));
+  const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+  const rows = await dbFor(c.env, storeId).prepare(`SELECT e.id, e.store_id AS storeId, e.received_at AS receivedAt,
+    e.status, e.quarantine_reason AS reason, m.code AS mediaCode, m.name AS mediaName
+    FROM rt_inbound_emails e LEFT JOIN rt_media m ON m.id = e.media_id
+    WHERE e.store_id = ? AND e.status = 'quarantined' ORDER BY e.received_at DESC, e.id LIMIT ? OFFSET ?`)
+    .bind(storeId, limit, offset).all();
+  const count = await dbFor(c.env, storeId).prepare("SELECT COUNT(*) AS total FROM rt_inbound_emails WHERE store_id = ? AND status = 'quarantined'").bind(storeId).first<{ total: number }>();
+  return c.json({ success: true, data: rows.results, total: count!.total });
+});
+
+restaurantTest.post('/api/restaurant-test/inbound-emails/:id/manual-import', requireRole('owner', 'admin'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const db = dbFor(c.env);
+  const email = await db.prepare(`SELECT e.id, e.store_id, e.status, e.media_id, m.code AS media_code FROM rt_inbound_emails e
+    JOIN rt_stores s ON s.id = e.store_id LEFT JOIN rt_media m ON m.id = e.media_id
+    WHERE e.id = ? AND s.organization_id = ? AND (? IS NULL OR s.id = ?)`)
+    .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
+    .first<{ id: string; store_id: string; status: string; media_id: string | null; media_code: string | null }>();
+  if (!email) return c.json({ success: false, error: 'メールが見つかりません' }, 404);
+  const existing = await db.prepare("SELECT id, table_id FROM rt_reservations WHERE inbound_email_id = ? AND parser_key = 'manual_import'").bind(email.id).first<{ id: string; table_id: string | null }>();
+  if (existing) return c.json({ success: true, data: { id: existing.id, tableId: existing.table_id, duplicate: true } });
+  if (email.status !== 'quarantined') return c.json({ success: false, error: '手で取り込めるのは読めなかったメールだけです' }, 409);
+  const body: Record<string, unknown> = (await c.req.json<Record<string, unknown>>().catch(() => null)) || {};
+  const start = typeof body.startsAt === 'string' ? Date.parse(body.startsAt) : NaN;
+  const endsAt = body.endsAt ?? (Number.isFinite(start) ? new Date(start + DEFAULT_STAY_MINUTES * 60_000).toISOString() : undefined);
+  const checked = validateInboundReservation({ ...body, endsAt, externalId: `email-${email.id}`, status: 'confirmed' });
+  if (!checked.ok) return c.json({ success: false, error: checked.error }, 400);
+  const reservation = checked.value;
+  const key = `reservation:${email.store_id}:${reservation.startsAt}`;
+  const owner = crypto.randomUUID();
+  if (!await acquireLock(db, key, owner)) return c.json({ success: false, error: '同じ時間帯を別の担当者が更新中です' }, 409);
+  try {
+    const tables = await db.prepare(`SELECT t.id, t.min_capacity, t.max_capacity, t.is_active FROM rt_tables t WHERE t.store_id = ?
+      AND NOT EXISTS (SELECT 1 FROM rt_reservations r WHERE r.store_id = t.store_id AND r.table_id = t.id
+        AND r.status NOT IN ('cancelled', 'no_show') AND datetime(r.starts_at) < datetime(?) AND datetime(r.ends_at) > datetime(?))`)
+      .bind(email.store_id, reservation.endsAt, reservation.startsAt).all<{ id: string; min_capacity: number; max_capacity: number; is_active: number }>();
+    const tableId = chooseRestaurantTable(tables.results.map((t) => ({ id: t.id, minCapacity: t.min_capacity, maxCapacity: t.max_capacity, isActive: t.is_active === 1 })), reservation.guestCount);
+    const id = crypto.randomUUID();
+    const source = isRestaurantReservationSource(email.media_code) ? email.media_code : 'manual';
+    const writes = await db.batch([
+      db.prepare(`INSERT INTO rt_reservations (id, store_id, source, external_id, customer_name, guest_count, starts_at, ends_at, table_id, status, media_id, inbound_email_id, parser_key, note)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, 'manual_import', ?
+        WHERE EXISTS (SELECT 1 FROM rt_inbound_emails WHERE id = ? AND status = 'quarantined')
+        ON CONFLICT(store_id, source, external_id) DO NOTHING`).bind(id, email.store_id, source, reservation.externalId, reservation.customerName, reservation.guestCount,
+          reservation.startsAt, reservation.endsAt, tableId, email.media_id, email.id, `担当者 ${c.get('staff')?.id || '管理者'} が手で取り込み`, email.id),
+      db.prepare(`UPDATE rt_inbound_emails SET status = 'received', quarantine_reason = NULL WHERE id = ?
+        AND EXISTS (SELECT 1 FROM rt_reservations WHERE inbound_email_id = ? AND parser_key = 'manual_import')`).bind(email.id, email.id),
+      db.prepare(`UPDATE rt_inventory_slots SET reserved_count = reserved_count + ?, updated_at = datetime('now')
+        WHERE store_id = ? AND datetime(starts_at) = datetime(?) AND EXISTS (SELECT 1 FROM rt_reservations WHERE id = ?)` )
+        .bind(reservation.guestCount, email.store_id, reservation.startsAt, id),
+    ]);
+    const saved = await db.prepare("SELECT id, table_id FROM rt_reservations WHERE inbound_email_id = ? AND parser_key = 'manual_import'").bind(email.id).first<{ id: string; table_id: string | null }>();
+    if (!saved) return c.json({ success: false, error: 'メールの状態が変わりました。読み直してください' }, 409);
+    return c.json({ success: true, data: { id: saved.id, tableId: saved.table_id, duplicate: !writes[0].meta.changes } }, writes[0].meta.changes ? 201 : 200);
+  } finally {
+    await releaseLock(db, key, owner);
+  }
+});
+
 restaurantTest.patch('/api/restaurant-test/approvals/:id', requireRole('owner', 'admin'), async (c) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
@@ -1032,6 +1133,9 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<Record<string, unknown>>();
+  if (body.notifyLine !== undefined && typeof body.notifyLine !== 'boolean') {
+    return c.json({ success: false, error: 'notifyLine は true または false を指定してください' }, 400);
+  }
   const storeId = typeof body.storeId === 'string' ? body.storeId : '';
   if (!storeId || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
   const checked = validateInboundReservation({ ...body, externalId: `manual-${crypto.randomUUID()}` });
@@ -1039,6 +1143,7 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
   const lockKey = `reservation:${storeId}:${checked.value.startsAt}`;
   const lockOwner = crypto.randomUUID();
   if (!await acquireLock(dbFor(c.env, storeId), lockKey, lockOwner)) return c.json({ success: false, error: '同じ時間帯を別の担当者が更新中です' }, 409);
+  let saved: { id: string; tableId: string | null };
   try {
     const tables = await dbFor(c.env, storeId).prepare('SELECT id, min_capacity, max_capacity, is_active FROM rt_tables WHERE store_id = ?').bind(storeId).all<{ id: string; min_capacity: number; max_capacity: number; is_active: number }>();
     if (checked.value.tableId && !tables.results.some((table) => table.id === checked.value.tableId && table.is_active === 1)) {
@@ -1063,10 +1168,18 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
     if (reservationSlotActive(checked.value.status)) {
       await adjustInventoryReservedCount(dbFor(c.env, storeId), storeId, checked.value.startsAt, checked.value.guestCount);
     }
-    return c.json({ success: true, data: { id, tableId, syncDirection: 'inbound_only' } }, 201);
+    saved = { id, tableId };
   } finally {
     await releaseLock(dbFor(c.env, storeId), lockKey, lockOwner);
   }
+  const lineNotice: RestaurantLineNotice = body.notifyLine === true
+    ? await sendRestaurantLineConfirmation(c, {
+      reservationId: saved.id, storeId, tenantId: organization.tenant_id ?? DEFAULT_TENANT_ID,
+      lineUid: checked.value.lineUid ?? null, startsAt: checked.value.startsAt,
+      courseId: checked.value.courseId ?? null, status: checked.value.status ?? 'confirmed',
+    })
+    : { sent: false, reason: 'not_requested' };
+  return c.json({ success: true, data: { ...saved, syncDirection: 'inbound_only', lineNotice } }, 201);
 });
 
 /**
@@ -1342,9 +1455,9 @@ restaurantTest.patch('/api/restaurant-test/tables/:id', requireRole('owner', 'ad
   const current = await dbFor(c.env).prepare(`SELECT t.* FROM rt_tables t JOIN rt_stores s ON s.id = t.store_id
     WHERE t.id = ? AND s.organization_id = ? AND (? IS NULL OR s.id = ?)`)
     .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
-    .first<{ store_id: string; code: string; label: string; seat_type: string; min_capacity: number; max_capacity: number; is_active: number }>();
+    .first<{ store_id: string; code: string; label: string; seat_type: string; min_capacity: number; max_capacity: number; is_active: number; floor_x: number; floor_y: number; join_group: string | null }>();
   if (!current) return c.json({ success: false, error: '卓が見つかりません' }, 404);
-  const body = await c.req.json<{ code?: string; label?: string; seatType?: string; minCapacity?: number; maxCapacity?: number; isActive?: boolean }>();
+  const body = await c.req.json<{ code?: string; label?: string; seatType?: string; minCapacity?: number; maxCapacity?: number; isActive?: boolean; floorX?: number; floorY?: number; joinGroup?: string | null }>();
   const code = body.code === undefined ? current.code : body.code;
   const label = body.label === undefined ? current.label : body.label;
   const seatType = body.seatType === undefined ? current.seat_type : body.seatType;
@@ -1353,11 +1466,14 @@ restaurantTest.patch('/api/restaurant-test/tables/:id', requireRole('owner', 'ad
   if (typeof code !== 'string' || !code.trim() || typeof label !== 'string' || !label.trim()
     || !['counter', 'table', 'private_room', 'terrace'].includes(seatType)
     || !Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max < min
-    || (body.isActive !== undefined && typeof body.isActive !== 'boolean')) {
+    || (body.isActive !== undefined && typeof body.isActive !== 'boolean')
+    || (body.floorX !== undefined && !Number.isSafeInteger(body.floorX))
+    || (body.floorY !== undefined && !Number.isSafeInteger(body.floorY))
+    || (body.joinGroup !== undefined && body.joinGroup !== null && (typeof body.joinGroup !== 'string' || body.joinGroup.length > 100))) {
     return c.json({ success: false, error: '卓の入力内容が正しくありません' }, 400);
   }
-  await dbFor(c.env, current.store_id).prepare(`UPDATE rt_tables SET code = ?, label = ?, seat_type = ?, min_capacity = ?, max_capacity = ?, is_active = ?, updated_at = datetime('now') WHERE id = ?`)
-    .bind(code.trim(), label.trim(), seatType, min, max, body.isActive === undefined ? current.is_active : Number(body.isActive), c.req.param('id')).run();
+  await dbFor(c.env, current.store_id).prepare(`UPDATE rt_tables SET code = ?, label = ?, seat_type = ?, min_capacity = ?, max_capacity = ?, is_active = ?, floor_x = ?, floor_y = ?, join_group = ?, updated_at = datetime('now') WHERE id = ?`)
+    .bind(code.trim(), label.trim(), seatType, min, max, body.isActive === undefined ? current.is_active : Number(body.isActive), body.floorX ?? current.floor_x, body.floorY ?? current.floor_y, body.joinGroup === undefined ? current.join_group : body.joinGroup?.trim() || null, c.req.param('id')).run();
   return c.json({ success: true, data: { id: c.req.param('id') } });
 });
 

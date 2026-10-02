@@ -20,12 +20,12 @@ import { Th } from '@/components/shared/table'
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-function autoRuleLabel(mark: MarkRow): string {
+export function autoRuleLabel(mark: MarkRow): string {
   if (mark.automationRules.length > 0) return mark.automationRules.map((rule) => rule.name).join('・')
   return mark.autoOnInbound ? '受信時' : '—'
 }
 
-const DISPLAY_TARGET_LABELS: Record<NonNullable<MarkRow['displayTargets']>[number], string> = {
+export const DISPLAY_TARGET_LABELS: Record<NonNullable<MarkRow['displayTargets']>[number], string> = {
   inbox: '受信箱', friend_list: '友だち一覧', friend_detail: '友だち詳細', dashboard: 'ダッシュボード', broadcast: '一斉配信', automation: 'オートメーション',
 }
 
@@ -39,7 +39,7 @@ const DISPLAY_TARGET_LABELS: Record<NonNullable<MarkRow['displayTargets']>[numbe
  * `usedIn` が無いのは「参照0」ではなく**まだ取れていない**状態。0件と
  * 言い切ると、消してよいマークだと読めてしまうので `—` を出す。
  */
-function usageLabel(mark: MarkRow): string {
+export function usageLabel(mark: MarkRow): string {
   const display = mark.displayTargets?.map((target) => DISPLAY_TARGET_LABELS[target]) ?? []
   const usedIn = mark.usedIn
   const parts: string[] = []
@@ -51,7 +51,7 @@ function usageLabel(mark: MarkRow): string {
   return [...display, ...parts].length ? [...display, ...parts].join('・') : mark.usedIn === undefined ? '—' : 'なし'
 }
 
-function referenceCount(mark: MarkRow): number {
+export function referenceCount(mark: MarkRow): number {
   return (mark.usedIn?.broadcasts ?? 0)
     + (mark.usedIn?.scenarios ?? 0)
     + (mark.usedIn?.autoReplies ?? 0)
@@ -59,11 +59,11 @@ function referenceCount(mark: MarkRow): number {
     + (mark.usedIn?.automations ?? 0)
 }
 
-function isUsed(mark: MarkRow): boolean {
+export function isUsed(mark: MarkRow): boolean {
   return mark.friendCount > 0 || referenceCount(mark) > 0
 }
 
-function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, error, onReplacement, onCancel, onConfirm }: {
+export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, error, onReplacement, onCancel, onConfirm }: {
   mark: MarkRow
   impact: SupportMarkArchiveImpact | null
   replacementMarkId: string

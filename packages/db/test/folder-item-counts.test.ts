@@ -112,8 +112,8 @@ describe('getFolderItemCounts(#631)', () => {
     expect(asBoth!.byFolderId['folder-1']).toBe(7)
   })
 
-  it('対応表に無い種別（event・#730）は undefined を返す。0件と混同しない', async () => {
-    const counts = await getFolderItemCounts(db, 'event', {
+  it('対応表に無い種別（friend_field）は undefined を返す。0件と混同しない', async () => {
+    const counts = await getFolderItemCounts(db, 'friend_field', {
       allowedAccountIds: ['account-a'],
       canSeeUnassigned: false,
     })

@@ -1,0 +1,24 @@
+/*
+ * 友だち一覧のグリッド列。列幅は section が --friend-cols / --friend-cols-narrow
+ * で渡す（表示項目の編集で列が増減するため、値はここに書けない）。
+ * 印は data-friend-cols 属性で付ける（className に styles.x の識別子を
+ * 混ぜると design-debt が静的に読めず unresolved になるため）。
+ */
+[data-friend-cols] {
+  grid-template-columns: var(--friend-cols);
+}
+
+/*
+ * ★V8（夕14・WIDTHS-20261001）：1280px など 1366px 未満の幅では
+ * 右の列が板の外に切れる。AGENTS.md の順番（横に送るより先に
+ * 「大事でない列を隠す」）に従い、流入元の列を隠す。流入元は
+ * 追加時に一度だけ付く計測値で、友だち詳細にもあるので辿れる。
+ */
+@media (max-width: 1365px) {
+  [data-theme='v8'] [data-friend-cols] {
+    grid-template-columns: var(--friend-cols-narrow);
+  }
+  [data-theme='v8'] [data-friend-cols] > [data-column='source'] {
+    display: none;
+  }
+}

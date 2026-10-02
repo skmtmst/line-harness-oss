@@ -397,6 +397,7 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['POST', '/api/restaurant-test/stores/selection/clear'],
   ['GET', '/api/restaurant-test/snapshot'],
   ['GET', '/api/restaurant-test/opening-hours'],
+  ['GET', '/api/restaurant-test/channels'],
   ['POST', '/api/restaurant-test/reservations/manual'],
   // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
   ['GET', '/api/restaurant-test/google/connection'],
