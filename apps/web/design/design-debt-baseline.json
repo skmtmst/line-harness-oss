@@ -298,7 +298,7 @@
     "arbitrary-value": 15
   },
   "app/settings/settings-nav-v8.tsx": {
-    "unresolved-classname": 11
+    "unresolved-classname": 9
   },
   "app/staff/new/page.tsx": {
     "direct-secondary-button": 1,

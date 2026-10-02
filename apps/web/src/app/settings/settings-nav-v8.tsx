@@ -76,13 +76,7 @@ export function SettingsNavV8() {
     <nav className={styles.nav} aria-label="設定の中のメニュー">
       <p className={styles.navTitle}>設定の中のメニュー</p>
       <ul>
-        {/* 会社とロゴは API 待ち。押せるのに違う画面へ行かないよう、開く先ができるまでリンクにしない。 */}
-        <li>
-          <span className={`${styles.navItem} ${styles.navStatic}`}>
-            会社とロゴ
-            <span className={styles.navSoon}>準備中</span>
-          </span>
-        </li>
+        {/* 会社とロゴは API 待ち。開く先ができるまでメニューへ出さない（今の作りの形を保つ）。 */}
         {TOP_LINKS.map((link) => item(link))}
         {item({ href: '/settings', label: '機能設定' })}
         {showManualLinks && item({ href: '/settings/manual-links', label: 'マニュアルの正本表' }, true)}
