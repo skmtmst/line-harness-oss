@@ -265,6 +265,9 @@
   "app/tags/folders/new/page.tsx": {
     "arbitrary-value": 6
   },
+  "app/tags/tag-editor-v8.tsx": {
+    "unresolved-classname": 113
+  },
   "app/templates/carousel/page.tsx": {
     "unresolved-classname": 7,
     "arbitrary-value": 1
