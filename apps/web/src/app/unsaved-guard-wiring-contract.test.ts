@@ -179,6 +179,8 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 の勤務とシフト（d5fmnM・E3YDK・wvGke）。各段がそれぞれの「保存」「作る」「足す」でその場で確定し、画面に残る下書きを持たない。v7 の staff-detail.tsx と同じ構造（番兵は shifts/page.tsx 側の GUARDED 行が担保）',
   'components/inflow-links/site-script.tsx':
     'サイトの追加・編集・停止理由の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
+  'app/restaurant-test/v8/organization.tsx':
+    '★V8 の組織・権限（bSp4h）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。行内のフォームは保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
 }
 
 /*
