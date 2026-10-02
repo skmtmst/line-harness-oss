@@ -1,0 +1,82 @@
+@layer properties, theme, base, components, utilities;
+
+:global([data-theme='v8']) .page { min-width: 0; color: var(--color-ink); }
+:global([data-theme='v8']) .legacyHead { display: none; }
+:global([data-theme='v8']) .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 20px 24px 12px; }
+:global([data-theme='v8']) .header > div { flex: 1 1 0; min-width: 0; }
+:global([data-theme='v8']) .header h1 { font-size: 20px; font-weight: 600; }
+:global([data-theme='v8']) .header p { margin-top: 4px; color: var(--color-ink-secondary); font-size: 13px; }
+:global([data-theme='v8']) .navigation { border-bottom: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .groups { display: inline-flex; margin: 0 24px 4px; padding: 3px; border-radius: 10px; background: var(--color-surface-pearl); gap: 2px; }
+:global([data-theme='v8']) .groups a { padding: 5px 12px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--color-ink-secondary); }
+:global([data-theme='v8']) .groups a[aria-current] { color: var(--color-ink); background: var(--color-canvas); box-shadow: 0 1px 2px rgb(29 29 31 / 0.08); }
+:global([data-theme='v8']) .tabs { display: flex; flex-wrap: wrap; gap: 24px; padding: 0 24px; }
+:global([data-theme='v8']) .tabs a { padding: 7px 0 10px; font-size: 13px; font-weight: 600; color: var(--color-ink-secondary); border-bottom: 2px solid transparent; white-space: nowrap; }
+:global([data-theme='v8']) .tabs a[aria-current] { color: var(--color-ink); border-color: var(--color-ink); }
+:global([data-theme='v8']) .readOnly { margin: 12px 24px; padding: 10px 12px; background: var(--color-surface-pearl); border-radius: 10px; font-size: 13px; color: var(--color-ink-secondary); }
+:global([data-theme='v8']) .content > div { min-width: 0; }
+:global([data-theme='v8']) .content > div:not(.friends) { padding: 16px 24px; }
+:global([data-theme='v8']) .content :global(.grid):has(> :global([data-design-version])) { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 0 -24px 14px; border-bottom: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .kpis > div,
+:global([data-theme='v8']) .content :global(.grid) > :global([data-design-version]) { min-height: 115px; padding: 16px 20px; border: 0; border-right: 1px solid var(--color-hairline); border-radius: 0; box-shadow: none; background: transparent; }
+:global([data-theme='v8']) .kpis > div:last-child,
+:global([data-theme='v8']) .content :global(.grid) > :global([data-design-version]):last-child { border-right: 0; }
+:global([data-theme='v8']) .content :global(table) { width: 100%; table-layout: fixed; font-size: 13px; }
+:global([data-theme='v8']) .content :global(th),
+:global([data-theme='v8']) .content :global(td) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 10px; padding-right: 10px; }
+:global([data-theme='v8']) .content :global(th):first-child { width: 26%; }
+:global([data-theme='v8']) .content :global(td) :global(p) { overflow: hidden; text-overflow: ellipsis; }
+:global([data-theme='v8']) .friendsBody { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; padding: 14px 24px; }
+:global([data-theme='v8']) .trend,
+:global([data-theme='v8']) .breakdown { min-width: 0; border: 1px solid var(--color-hairline); border-radius: 12px; padding: 20px; }
+:global([data-theme='v8']) .sectionHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+:global([data-theme='v8']) .sectionHead h2,
+:global([data-theme='v8']) .breakdown h2 { font-size: 15px; font-weight: 600; }
+:global([data-theme='v8']) .legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 16px 0; font-size: 12px; color: var(--color-ink-secondary); }
+:global([data-theme='v8']) .legend span:first-child::before,
+:global([data-theme='v8']) .legend span:nth-child(2)::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; background: var(--color-accent-deep); }
+:global([data-theme='v8']) .legend span:nth-child(2)::before { background: var(--color-ink-faint); }
+:global([data-theme='v8']) .selection,
+:global([data-theme='v8']) .campaigns { margin-top: 12px; padding: 10px 12px; background: var(--color-surface-pearl); border-radius: 10px; font-size: 12px; }
+:global([data-theme='v8']) .chartFooter { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }
+:global([data-theme='v8']) .friendsAside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+:global([data-theme='v8']) .breakdown > p { font-size: 12px; color: var(--color-ink-secondary); margin: 12px 0; }
+:global([data-theme='v8']) .breakdown > a { display: block; margin-top: 12px; font-size: 13px; color: var(--color-action); }
+:global([data-theme='v8']) .breakdown table th:not(:first-child),
+:global([data-theme='v8']) .breakdown table td:nth-child(n + 3) { display: none; }
+:global([data-theme='v8']) .breakdown table th:first-child { width: 70%; }
+:global([data-theme='v8']) .breakdown table td { padding: 8px 0; }
+:global([data-theme='v8']) .state { display: grid; place-items: center; min-height: 260px; font-size: 13px; color: var(--color-ink-secondary); }
+@media (max-width: 1351px) {
+  :global([data-theme='v8']) .friendsBody { grid-template-columns: minmax(0, 1fr); }
+  :global([data-theme='v8']) .friendsAside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :global([data-theme='v8']) .header { flex-wrap: wrap; }
+  :global([data-theme='v8']) .kpis > div { padding: 14px 16px; }
+}
+:global([data-theme='v8']) .page a:focus-visible { outline: 2px solid var(--color-accent-deep); outline-offset: 3px; }
+
+.rowMenu { display: none; }
+:global([data-theme='v8']) .legacyActions { display: none; }
+:global([data-theme='v8']) .rowMenu { display: block; position: relative; text-align: right; }
+:global([data-theme='v8']) .rowMenu summary { cursor: pointer; display: inline-flex; justify-content: center; align-items: center; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .rowMenu a { display: block; padding: 8px; color: var(--color-action); font-size: 12px; }
+:global([data-theme='v8']) .routeBars { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+:global([data-theme='v8']) .routeBars li > div:first-child { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+:global([data-theme='v8']) .routeBars li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:global([data-theme='v8']) .routeBars strong { flex-shrink: 0; font-size: 12px; font-weight: 600; }
+:global([data-theme='v8']) .routeBar { margin-top: 5px; height: 6px; border-radius: 4px; background: var(--color-surface-pearl); }
+:global([data-theme='v8']) .routeBar span { display: block; height: 100%; border-radius: inherit; background: var(--color-accent-deep); }
+:global([data-theme='v8']) .reactions { display: flex; flex-direction: column; gap: 12px; }
+:global([data-theme='v8']) .reactions > * { margin-top: 0; }
+:global([data-theme='v8']) .reactions .hours { order: 2; border: 0; padding: 16px 0; }
+:global([data-theme='v8']) .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; font-size: 12px; color: var(--color-ink-secondary); }
+:global([data-theme='v8']) .pagination > span { margin-right: auto; }
+
+/* 白い板の既存の余白は、画面内で見出しと帯へ配り直す。シェルは変更しない。 */
+:global([data-theme='v8']) .page { margin: -20px -24px 0; }
+:global([data-theme='v8']) .kpis > :global([data-search-metric]) { min-height: 115px; border: 0; border-right: 1px solid var(--color-hairline); border-radius: 0; }
+:global([data-theme='v8']) .kpis > :global([data-search-metric]):last-child { border-right: 0; }
+:global([data-theme='v8']) .page > :global([data-design='Head']),
+:global([data-theme='v8']) .page > :global(.space-y-5) { margin-inline: 24px; }
+:global([data-theme='v8']) .content :global(.grid):has(> :global([data-design-version]):nth-child(5)) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
