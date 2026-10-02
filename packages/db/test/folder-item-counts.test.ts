@@ -216,9 +216,9 @@ describe('FOLDER_ITEM_COUNT_TABLES(#631)', () => {
     }
   })
 
-  it('対応表は統一パターンの9種別ちょうど。新しい種別が増減したらこの試験が気づく', () => {
+  it('対応表は統一パターンの10種別ちょうど。新しい種別が増減したらこの試験が気づく', () => {
     expect(Object.keys(FOLDER_ITEM_COUNT_TABLES).sort()).toEqual(
-      ['auto_reply', 'broadcast', 'common_var', 'media', 'reminder', 'rich_menu', 'scenario', 'tag', 'template'].sort(),
+      ['auto_reply', 'broadcast', 'broadcast_message_asset', 'common_var', 'media', 'reminder', 'rich_menu', 'scenario', 'tag', 'template'].sort(),
     )
   })
 

@@ -1518,6 +1518,27 @@ CREATE TABLE broadcast_approval_events (
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE broadcast_asset_publish_keys (
+  asset_id TEXT NOT NULL REFERENCES broadcast_message_assets(id) ON DELETE CASCADE,
+  idempotency_key TEXT NOT NULL,
+  published_version INTEGER NOT NULL,
+  draft_revision INTEGER NOT NULL,
+  draft_fingerprint TEXT NOT NULL DEFAULT '',
+  payload_json TEXT CHECK (payload_json IS NULL OR json_valid(payload_json)),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (asset_id, idempotency_key)
+);
+
+CREATE TABLE broadcast_asset_versions (
+  id TEXT PRIMARY KEY,
+  asset_id TEXT NOT NULL REFERENCES broadcast_message_assets(id) ON DELETE CASCADE,
+  version_number INTEGER NOT NULL,
+  payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
+  created_by_staff_id TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE (asset_id, version_number)
+);
+
 CREATE TABLE broadcast_insights (
   id                  TEXT PRIMARY KEY,
   broadcast_id        TEXT NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
@@ -1555,7 +1576,7 @@ CREATE TABLE broadcast_message_assets (
   payload_json    TEXT NOT NULL CHECK (json_valid(payload_json)),
   created_at      TEXT NOT NULL,
   updated_at      TEXT NOT NULL
-);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, published_version INTEGER NOT NULL DEFAULT 0, published_at TEXT, draft_payload_json TEXT CHECK (draft_payload_json IS NULL OR json_valid(draft_payload_json)), draft_revision INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE broadcast_saved_views (
   id               TEXT PRIMARY KEY,
@@ -2498,14 +2519,16 @@ CREATE TABLE "folders" (
   kind          TEXT NOT NULL CHECK (kind IN (
                   'tag','template','scenario','reminder','auto_reply',
                   'rich_menu','webinar','form','media','common_var',
-                  'mileage_rule','automation','event','entry_route','broadcast')),
+                  'mileage_rule','automation','event','entry_route','broadcast',
+                  'broadcast_message_asset')),
   name          TEXT NOT NULL,
   parent_id     TEXT REFERENCES folders(id) ON DELETE CASCADE,
   display_order INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
-  color         TEXT
-, account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+  color         TEXT,
+  account_id    TEXT REFERENCES line_accounts(id) ON DELETE CASCADE
+);
 
 CREATE TABLE form_accounts (
   form_id         TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
@@ -5280,6 +5303,16 @@ CREATE TABLE pool_accounts (
   UNIQUE(pool_id, line_account_id)
 );
 
+CREATE TABLE postal_codes (
+  postal_code TEXT NOT NULL,
+  prefecture TEXT NOT NULL,
+  city TEXT NOT NULL,
+  town TEXT NOT NULL DEFAULT '',
+  source_name TEXT,
+  imported_at TEXT,
+  PRIMARY KEY (postal_code, prefecture, city, town)
+);
+
 CREATE TABLE "recipe_clone_items" (
   id         TEXT PRIMARY KEY,
   run_id     TEXT NOT NULL REFERENCES "recipe_clone_runs"(id) ON DELETE CASCADE,
@@ -7700,6 +7733,9 @@ CREATE INDEX idx_broadcast_after_action_runs_due
 CREATE INDEX idx_broadcast_approval_events_broadcast
   ON broadcast_approval_events (broadcast_id, created_at DESC);
 
+CREATE INDEX idx_broadcast_asset_versions_asset
+  ON broadcast_asset_versions(asset_id, version_number DESC);
+
 CREATE INDEX idx_broadcast_insights_broadcast_id ON broadcast_insights(broadcast_id);
 
 CREATE INDEX idx_broadcast_insights_status ON broadcast_insights(status);
@@ -7987,10 +8023,7 @@ CREATE UNIQUE INDEX idx_field_migration_runs_idempotency
 CREATE INDEX idx_field_migration_runs_scope
   ON field_migration_runs(tenant_id, line_account_id, created_at DESC);
 
-CREATE INDEX idx_folders_kind_order ON folders(kind, display_order);
-
-CREATE INDEX idx_folders_webinar_account_order_333
-  ON folders(kind, account_id, display_order, name);
+CREATE INDEX idx_folders_kind_order_549 ON folders(kind, display_order);
 
 CREATE INDEX idx_form_accounts_account
   ON form_accounts(line_account_id, form_id);
@@ -8737,6 +8770,9 @@ CREATE INDEX idx_platform_knowledge_articles_kind_review
 CREATE INDEX idx_platform_knowledge_articles_review ON platform_knowledge_articles(review_state, status, kind);
 
 CREATE INDEX idx_platform_knowledge_jobs_pending ON platform_knowledge_jobs(status, lease_until);
+
+CREATE INDEX idx_postal_codes_code
+  ON postal_codes(postal_code);
 
 CREATE INDEX idx_recipe_clone_items_v316_run
   ON recipe_clone_items(run_id, created_at, id);

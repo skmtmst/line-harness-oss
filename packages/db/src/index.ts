@@ -60,6 +60,7 @@ export * from './entry-route-genres';
 export * from './entry-route-stop-suppressions';
 export * from './tracked-links';
 export * from './forms';
+export * from './postal-codes';
 export * from './ad-platforms';
 export * from './ad-costs';
 export * from './staff';
