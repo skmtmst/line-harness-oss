@@ -19,6 +19,7 @@ const accountStore = vi.hoisted(() => ({ id: 'account-a' }))
 vi.mock('next/link', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: accountStore.id, loading: false }),

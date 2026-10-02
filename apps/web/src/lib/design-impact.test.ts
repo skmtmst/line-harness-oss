@@ -62,6 +62,10 @@ describe('共通部品の影響範囲', () => {
       // 2026-09-02: 案件一覧が自前のページ送りを持たないまま全件を出していた。
       // 設計 `GH8VL` は表の下にページ送りがある。共通へ寄せた。
       'app/affiliates/tabs.tsx',
+      // ★V8-B 成果とアフィリエイト（OylSV 成果承認・h7dmB 案件・aINnz 支払い）。
+      'app/affiliates/v8-approvals-tab.tsx',
+      'app/affiliates/v8-offers-tab.tsx',
+      'app/affiliates/v8-payment-tab.tsx',
       // ★V8 自動応答一覧（uE9gf）。表の下にページ送りを置く。
       'app/auto-replies/list-v8.tsx',
       // 2026-09-04: 自動応答の実行結果が入った。表の下にページ送りがある。
