@@ -25,6 +25,8 @@ import { scenarioReferenceData } from '@/components/scenarios/scenario-reference
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 import { shortDateTime } from '@/lib/hq-banners'
 import { formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ScenarioResultsV8 from './results-v8'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -778,10 +780,20 @@ function ResultsInner() {
   )
 }
 
+/*
+ * ★V8 への切り替えはテーマで行う。data-theme="v8" のときだけ
+ * results-v8.tsx（Pencil `X4STXS`）を描き、それ以外は今までどおりの
+ * v7 を出す。検索パラメータ（?id=）を読むので Suspense の中で分ける。
+ */
+function ResultsGate() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <ScenarioResultsV8 /> : <ResultsInner />
+}
+
 export default function ScenarioResultsPage() {
   return (
     <Suspense fallback={<ListState kind="loading" title="配信結果を読み込んでいます" />}>
-      <ResultsInner />
+      <ResultsGate />
     </Suspense>
   )
 }

@@ -315,3 +315,528 @@ describe('R391 保管状態の本人は詳細と履歴を開ける', () => {
     expect(response.status).toBe(403);
   });
 });
+
+/*
+ * F-3 UID移行の新規作成（create）。
+ * オーナー承認 2026-10-02：対応表の移行先UIDで友だちを作り、移行元の名前を
+ * 引き継ぐ。切り戻しでは作った友だちを残し、結び付けだけ戻す。同じUIDが
+ * 対象アカウントにあれば作らず採用し、並行作成・再送は一人に収束させる。
+ * 対象外アカウントのUIDは越境させない。実SQLiteに実ルートを載せる。
+ */
+const creator: AuthenticatedStaff = {
+  id: 'owner-1', name: '作成者', role: 'owner', readOnly: false, tenantId: DEFAULT_TENANT_ID,
+};
+
+function seedCreateRun(
+  testDb: SqliteD1,
+  options?: {
+    status?: string; decision?: string; newUid?: string | null;
+    withTarget?: boolean; withElsewhere?: boolean; oldAccount?: string;
+  },
+): void {
+  const { raw } = testDb;
+  const status = options?.status ?? 'ready';
+  const decision = options?.decision ?? 'create';
+  const newUid = options?.newUid === undefined ? 'UNEW-9' : options.newUid;
+  for (const [id, name, tenant] of [
+    ['acc-from', '移行元', DEFAULT_TENANT_ID],
+    ['acc-to', '移行先', DEFAULT_TENANT_ID],
+    ['acc-other', '他店', 'tenant-other'],
+  ]) {
+    raw.prepare(`
+      INSERT INTO line_accounts (
+        id, channel_id, name, channel_access_token, channel_secret, tenant_id
+      ) VALUES (?, ?, ?, 'token', 'secret', ?)
+    `).run(id, `channel-${id}`, name, tenant);
+  }
+  insertFriend(raw, 'f-old', {
+    line_account_id: options?.oldAccount ?? 'acc-from', line_user_id: 'UOLD-9',
+    display_name: '旧表示', real_name: '旧本名', system_display_name: '旧システム名',
+    user_id: null,
+  });
+  if (options?.withTarget) {
+    insertFriend(raw, 'f-made', {
+      line_account_id: 'acc-to', line_user_id: 'UNEW-9',
+      display_name: '既存表示', user_id: null,
+    });
+  }
+  if (options?.withElsewhere) {
+    insertFriend(raw, 'f-other', {
+      line_account_id: 'acc-other', line_user_id: 'UNEW-9',
+      display_name: '他店表示', user_id: null,
+    });
+  }
+  raw.prepare(`
+    INSERT INTO users (
+      id, tenant_id, status, display_name, revision, created_by, created_at, updated_at
+    ) VALUES ('user-u2', ?, 'active', '別の本人', 1, 'owner-1',
+      '2026-08-30T09:00:00.000Z', '2026-08-30T09:00:00.000Z')
+  `).run(DEFAULT_TENANT_ID);
+  raw.prepare(`
+    INSERT INTO uid_migration_runs (
+      id, from_account_id, to_account_id, purpose, source_kind, source_filename,
+      status, dry_run_revision, total_count, auto_count, review_count,
+      unmatched_count, conflict_count, applied_count, failed_count,
+      created_by, created_at
+    ) VALUES ('run-9', 'acc-from', 'acc-to', '移行F3', 'csv', 'map.csv',
+      ?, 1, 1, 0, 0, 1, 0, 0, 0, 'owner-1', '2026-08-30T09:00:00.000Z')
+  `).run(status);
+  raw.prepare(`
+    INSERT INTO uid_migration_items (
+      id, run_id, old_uid, new_uid, old_friend_id, new_friend_id,
+      evidence_type, evidence_json, classification, decision, result,
+      created_at, updated_at
+    ) VALUES ('item-9', 'run-9', 'UOLD-9', ?, 'f-old', NULL,
+      'operator_csv', '{}', 'unmatched', ?, 'pending',
+      '2026-08-30T09:00:00.000Z', '2026-08-30T09:00:00.000Z')
+  `).run(newUid, decision);
+}
+
+function createItem(testDb: SqliteD1) {
+  return testDb.raw.prepare('SELECT * FROM uid_migration_items WHERE id = ?').get('item-9') as {
+    result: string; error_message: string | null; new_friend_id: string | null;
+    before_json: string | null; after_json: string | null;
+  };
+}
+
+function countUid(testDb: SqliteD1, accountId: string, lineUserId: string): number {
+  return (testDb.raw.prepare(
+    'SELECT COUNT(*) AS count FROM friends WHERE line_account_id = ? AND line_user_id = ?',
+  ).get(accountId, lineUserId) as { count: number }).count;
+}
+
+/*
+ * 友だちへの INSERT の直前に別担当の作成を差し込む。先着行を作ってから
+ * 制約違反を起こし、並行作成の競合を再現する。
+ */
+function raceOnFriendInsert(db: D1Database, raw: SqliteD1['raw']): D1Database {
+  let armed = true;
+  const prepare = (sql: string) => {
+    const statement = db.prepare(sql);
+    return {
+      ...statement,
+      bind: (...args: unknown[]) => {
+        const bound = (statement as unknown as { bind: (...a: unknown[]) => D1PreparedStatement }).bind(...args);
+        if (!armed || !/INSERT INTO friends/i.test(sql)) return bound;
+        return {
+          ...bound,
+          run: (async () => {
+            armed = false;
+            raw.prepare(`INSERT INTO friends (
+              id, line_user_id, line_account_id, display_name, created_at, updated_at
+            ) VALUES ('f-rival', 'UNEW-9', 'acc-to', '先着',
+              '2026-08-30T09:00:00.000Z', '2026-08-30T09:00:00.000Z')`).run();
+            throw new Error('UNIQUE constraint failed: friends.line_user_id');
+          }) as D1PreparedStatement['run'],
+        };
+      },
+    };
+  };
+  return { ...db, prepare } as unknown as D1Database;
+}
+
+describe('F-3 移行先UIDの新規作成と名前引継ぎ', () => {
+  it('移行先UIDで友だちを作り移行元の名前を引き継ぐ', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb);
+    const response = await appFor(testDb.db, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(testDb.db),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, data: { status: 'completed' } });
+    const made = testDb.raw.prepare(
+      'SELECT * FROM friends WHERE line_account_id = ? AND line_user_id = ?',
+    ).get('acc-to', 'UNEW-9') as {
+      id: string; user_id: string | null; display_name: string | null;
+      real_name: string | null; system_display_name: string | null;
+    };
+    expect(made.display_name).toBe('旧表示');
+    expect(made.real_name).toBe('旧本名');
+    expect(made.system_display_name).toBe('旧システム名');
+    expect(made.user_id).not.toBeNull();
+    expect(friendUserId(testDb, 'f-old')).toBe(made.user_id);
+    const item = createItem(testDb);
+    expect(item.result).toBe('applied');
+    expect(item.new_friend_id).toBe(made.id);
+    expect(JSON.parse(item.before_json!)).toEqual({ oldUserId: null, newUserId: null });
+    expect(JSON.parse(item.after_json!)).toEqual({ userId: made.user_id });
+  });
+
+  it('同じUIDが対象アカウントにあれば作らず採用する', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb, { withTarget: true });
+    const response = await appFor(testDb.db, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(testDb.db),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, data: { status: 'completed' } });
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(1);
+    const item = createItem(testDb);
+    expect(item.result).toBe('applied');
+    expect(item.new_friend_id).toBe('f-made');
+    expect(friendUserId(testDb, 'f-old')).toBe(friendUserId(testDb, 'f-made'));
+  });
+
+  it('対象外アカウントのUIDは越境させず失敗にし何も書かない', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb, { withElsewhere: true });
+    const before = (testDb.raw.prepare('SELECT COUNT(*) AS count FROM friends').get() as { count: number }).count;
+    const response = await appFor(testDb.db, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(testDb.db),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, data: { status: 'failed' } });
+    const item = createItem(testDb);
+    expect(item.result).toBe('failed');
+    expect(item.error_message).toContain('別のLINEアカウント');
+    expect(item.new_friend_id).toBeNull();
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(0);
+    expect((testDb.raw.prepare('SELECT COUNT(*) AS count FROM friends').get() as { count: number }).count).toBe(before);
+    expect(friendUserId(testDb, 'f-old')).toBeNull();
+  });
+
+  it('並行作成の競合は作り直さず一人に収束させる', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb);
+    const racyDb = raceOnFriendInsert(testDb.db, testDb.raw);
+    const response = await appFor(racyDb, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(racyDb),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, data: { status: 'completed' } });
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(1);
+    const item = createItem(testDb);
+    expect(item.result).toBe('applied');
+    expect(item.new_friend_id).toBe('f-rival');
+    expect(friendUserId(testDb, 'f-old')).toBe(friendUserId(testDb, 'f-rival'));
+  });
+
+  it('再送は作り直さず対象アカウントの行を採用する', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb, { status: 'failed' });
+    testDb.raw.prepare(`UPDATE uid_migration_runs SET failed_count = 1 WHERE id = 'run-9'`).run();
+    testDb.raw.prepare(`UPDATE uid_migration_items SET result = 'failed' WHERE id = 'item-9'`).run();
+    insertFriend(testDb.raw, 'f-made', {
+      line_account_id: 'acc-to', line_user_id: 'UNEW-9',
+      display_name: '再送前の作成分', user_id: null,
+    });
+    const response = await appFor(testDb.db, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(testDb.db),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, data: { status: 'completed' } });
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(1);
+    const item = createItem(testDb);
+    expect(item.result).toBe('applied');
+    expect(item.new_friend_id).toBe('f-made');
+  });
+
+  it('作成者本人の実行は承認規約で止まり副作用は0', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb);
+    const before = (testDb.raw.prepare('SELECT COUNT(*) AS count FROM friends').get() as { count: number }).count;
+    const response = await appFor(testDb.db, creator).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(testDb.db),
+    );
+    expect(response.status).toBe(409);
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(0);
+    expect((testDb.raw.prepare('SELECT COUNT(*) AS count FROM friends').get() as { count: number }).count).toBe(before);
+    expect(createItem(testDb).result).toBe('pending');
+  });
+
+  it('CAS失敗時は作った行を消して副作用を0に戻す', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb);
+    const racyDb = raceOnPairPrecheck(
+      testDb.db, testDb.raw, `UPDATE friends SET user_id = 'user-u2' WHERE id = 'f-old'`,
+    );
+    const response = await appFor(racyDb, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(racyDb),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, data: { status: 'failed' } });
+    // 再連携先は残し、今作った行は消える。
+    expect(friendUserId(testDb, 'f-old')).toBe('user-u2');
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(0);
+    const item = createItem(testDb);
+    expect(item.result).toBe('failed');
+    expect(item.new_friend_id).toBeNull();
+  });
+
+  it('移行先UIDがなければcreateは選べない', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb, { status: 'review', decision: 'pending', newUid: null });
+    const response = await appFor(testDb.db, executor).fetch(
+      new Request('https://example.com/api/friends/migrations/run-9/items/item-9', {
+        method: 'PATCH', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ decision: 'create' }),
+      }), envFor(testDb.db),
+    );
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining('新規作成できません') });
+  });
+
+  it('移行先UIDがあればcreateを選べる', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb, { status: 'review', decision: 'pending' });
+    const response = await appFor(testDb.db, executor).fetch(
+      new Request('https://example.com/api/friends/migrations/run-9/items/item-9', {
+        method: 'PATCH', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ decision: 'create' }),
+      }), envFor(testDb.db),
+    );
+    expect(response.status).toBe(200);
+    const decided = testDb.raw.prepare(
+      'SELECT decision FROM uid_migration_items WHERE id = ?',
+    ).get('item-9') as { decision: string };
+    expect(decided.decision).toBe('create');
+  });
+});
+
+/*
+ * 項目参照の確定（SET new_friend_id）の直後に別担当の操作を差し込む。
+ * pair の確認読み自体がずれる競合を再現する。
+ */
+function raceBeforePairRead(db: D1Database, raw: SqliteD1['raw'], moveSql: string): D1Database {
+  let armed = true;
+  const prepare = (sql: string) => {
+    const statement = db.prepare(sql);
+    return {
+      ...statement,
+      bind: (...args: unknown[]) => {
+        const bound = (statement as unknown as { bind: (...a: unknown[]) => D1PreparedStatement }).bind(...args);
+        if (!armed || !/SET new_friend_id/i.test(sql)) return bound;
+        return {
+          ...bound,
+          run: (async () => {
+            const result = await bound.run();
+            armed = false;
+            raw.exec(moveSql);
+            return result;
+          }) as D1PreparedStatement['run'],
+        };
+      },
+    };
+  };
+  return { ...db, prepare } as unknown as D1Database;
+}
+
+/*
+ * 項目参照の確定（SET new_friend_id）を一度だけ落とす。
+ * INSERT成立→参照UPDATE故障の把握漏れを再現する。
+ */
+function throwOnItemPointer(db: D1Database): D1Database {
+  let armed = true;
+  const prepare = (sql: string) => {
+    const statement = db.prepare(sql);
+    return {
+      ...statement,
+      bind: (...args: unknown[]) => {
+        const bound = (statement as unknown as { bind: (...a: unknown[]) => D1PreparedStatement }).bind(...args);
+        if (!armed || !/SET new_friend_id/i.test(sql)) return bound;
+        return {
+          ...bound,
+          run: (async () => {
+            armed = false;
+            throw new Error('item pointer update failed');
+          }) as D1PreparedStatement['run'],
+        };
+      },
+    };
+  };
+  return { ...db, prepare } as unknown as D1Database;
+}
+
+const RECORD_WRITES = Symbol('recordWrites');
+
+/*
+ * 成功記録の batch（result='applied' を含む書込み）だけを落とす。
+ * pair まで進んで記録が落ちた場合の副作用を再現する。
+ */
+function failOnRecordWrites(db: D1Database, raw?: SqliteD1['raw'], moveSql?: string): D1Database {
+  const prepare = (sql: string) => {
+    const statement = db.prepare(sql);
+    const tagged = /SET result = 'applied'/i.test(sql);
+    return {
+      ...statement,
+      bind: (...args: unknown[]) => {
+        const bound = (statement as unknown as { bind: (...a: unknown[]) => D1PreparedStatement }).bind(...args);
+        return (tagged
+          ? { ...bound, [RECORD_WRITES]: true }
+          : bound) as D1PreparedStatement;
+      },
+    };
+  };
+  const batch = async (statements: D1PreparedStatement[]) => {
+    if (statements.some((statement) => (statement as unknown as Record<symbol, boolean>)[RECORD_WRITES])) {
+      if (raw && moveSql) raw.exec(moveSql);
+      throw new Error('recordWrites failed');
+    }
+    return db.batch(statements);
+  };
+  return { ...db, prepare, batch } as unknown as D1Database;
+}
+
+describe('F-3 障害時の副作用0（監査メモ対応）', () => {
+  it('pair確認前に移行元が消えても作った行は残さない', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb);
+    const racyDb = raceBeforePairRead(
+      testDb.db, testDb.raw, `DELETE FROM friends WHERE id = 'f-old'`,
+    );
+    const response = await appFor(racyDb, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(racyDb),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, data: { status: 'failed' } });
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(0);
+    const item = createItem(testDb);
+    expect(item.result).toBe('failed');
+    expect(item.new_friend_id).toBeNull();
+    expect(item.before_json).toBeNull();
+    expect(item.after_json).toBeNull();
+  });
+
+  it('記録batchが落ちても結び付き・作成分・本人行を残さない', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb);
+    const usersBefore = (testDb.raw.prepare('SELECT COUNT(*) AS count FROM users').get() as { count: number }).count;
+    const brokenDb = failOnRecordWrites(testDb.db);
+    const response = await appFor(brokenDb, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(brokenDb),
+    );
+    expect(response.status).toBe(500);
+    // 成功記録がないため再試行・切り戻しから取り残される中間状態を残さない。
+    expect(friendUserId(testDb, 'f-old')).toBeNull();
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(0);
+    const item = createItem(testDb);
+    expect(item.result).toBe('pending');
+    expect(item.new_friend_id).toBeNull();
+    expect((testDb.raw.prepare('SELECT COUNT(*) AS count FROM users').get() as { count: number }).count).toBe(usersBefore);
+    const run = testDb.raw.prepare('SELECT status FROM uid_migration_runs WHERE id = ?').get('run-9') as { status: string };
+    expect(run.status).toBe('failed');
+  });
+
+  it('作った行が別処理に紐付いたら消さず参照だけ外す', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb);
+    const racyDb = raceOnPairPrecheck(
+      testDb.db, testDb.raw,
+      `UPDATE friends SET user_id = 'user-u2' WHERE line_account_id = 'acc-to' AND line_user_id = 'UNEW-9'`,
+    );
+    const response = await appFor(racyDb, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(racyDb),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, data: { status: 'failed' } });
+    // 別処理の結び付きは残し、項目の参照だけ外す（食い違わせない）。
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(1);
+    const kept = testDb.raw.prepare(
+      'SELECT user_id FROM friends WHERE line_account_id = ? AND line_user_id = ?',
+    ).get('acc-to', 'UNEW-9') as { user_id: string | null };
+    expect(kept.user_id).toBe('user-u2');
+    expect(friendUserId(testDb, 'f-old')).toBeNull();
+    const item = createItem(testDb);
+    expect(item.result).toBe('failed');
+    expect(item.new_friend_id).toBeNull();
+  });
+
+  it('記録失敗と片側relinkでは他者側を保持し自側だけ戻す', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb);
+    const usersBefore = (testDb.raw.prepare('SELECT COUNT(*) AS count FROM users').get() as { count: number }).count;
+    const brokenDb = failOnRecordWrites(
+      testDb.db, testDb.raw, `UPDATE friends SET user_id = 'user-u2' WHERE id = 'f-old'`,
+    );
+    const response = await appFor(brokenDb, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(brokenDb),
+    );
+    expect(response.status).toBe(500);
+    // 他処理が結び付け直した旧側は保持し、本操作が設定した新側だけ戻る。
+    expect(friendUserId(testDb, 'f-old')).toBe('user-u2');
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(0);
+    const item = createItem(testDb);
+    expect(item.result).toBe('pending');
+    expect(item.new_friend_id).toBeNull();
+    expect((testDb.raw.prepare('SELECT COUNT(*) AS count FROM users').get() as { count: number }).count).toBe(usersBefore);
+    const run = testDb.raw.prepare('SELECT status FROM uid_migration_runs WHERE id = ?').get('run-9') as { status: string };
+    expect(run.status).toBe('failed');
+  });
+
+  it('項目参照のUPDATEが落ちても作った行を把握して消す', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb);
+    const usersBefore = (testDb.raw.prepare('SELECT COUNT(*) AS count FROM users').get() as { count: number }).count;
+    const brokenDb = throwOnItemPointer(testDb.db);
+    const response = await appFor(brokenDb, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(brokenDb),
+    );
+    expect(response.status).toBe(500);
+    // INSERT成立直後から追跡しているため、参照UPDATE故障でも取り残さない。
+    expect(friendUserId(testDb, 'f-old')).toBeNull();
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(0);
+    const item = createItem(testDb);
+    expect(item.result).toBe('pending');
+    expect(item.new_friend_id).toBeNull();
+    expect((testDb.raw.prepare('SELECT COUNT(*) AS count FROM users').get() as { count: number }).count).toBe(usersBefore);
+    const run = testDb.raw.prepare('SELECT status FROM uid_migration_runs WHERE id = ?').get('run-9') as { status: string };
+    expect(run.status).toBe('failed');
+  });
+
+  it('成功済みの再実行は止まり重複を作らない', async () => {
+    const testDb = createTestD1();
+    seedCreateRun(testDb);
+    const first = await appFor(testDb.db, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(testDb.db),
+    );
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({ success: true, data: { status: 'completed' } });
+    const second = await appFor(testDb.db, executor).fetch(
+      post('/api/friends/migrations/run-9/execute'), envFor(testDb.db),
+    );
+    expect(second.status).toBe(409);
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(1);
+    expect(createItem(testDb).result).toBe('applied');
+  });
+});
+
+describe('F-3 切り戻しは作った友だちを残し結び付けだけ戻す', () => {
+  function seedAppliedCreate(testDb: SqliteD1): void {
+    seedCreateRun(testDb, { status: 'completed' });
+    testDb.raw.prepare(`
+      INSERT INTO users (
+        id, tenant_id, status, display_name, revision, created_by, created_at, updated_at
+      ) VALUES ('user-u1', ?, 'active', '移行先の本人', 2, 'owner-2',
+        '2026-08-30T09:00:00.000Z', '2026-08-30T09:00:00.000Z')
+    `).run(DEFAULT_TENANT_ID);
+    insertFriend(testDb.raw, 'f-made', {
+      line_account_id: 'acc-to', line_user_id: 'UNEW-9',
+      display_name: '旧表示', user_id: 'user-u1',
+    });
+    testDb.raw.prepare(`UPDATE friends SET user_id = 'user-u1' WHERE id = 'f-old'`).run();
+    testDb.raw.prepare(`UPDATE uid_migration_runs SET applied_count = 1 WHERE id = 'run-9'`).run();
+    testDb.raw.prepare(`
+      UPDATE uid_migration_items
+        SET result = 'applied', new_friend_id = 'f-made',
+            before_json = '{"oldUserId":null,"newUserId":null}',
+            after_json = '{"userId":"user-u1"}'
+        WHERE id = 'item-9'
+    `).run();
+  }
+
+  it('作った行は残し旧友だちの結び付けだけ戻る', async () => {
+    const testDb = createTestD1();
+    seedAppliedCreate(testDb);
+    const response = await appFor(testDb.db, executor).fetch(
+      post('/api/friends/migrations/run-9/rollback'), envFor(testDb.db),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, data: { rolledBack: 1 } });
+    // 作った友だちは残る（行は消さない）。
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(1);
+    // 結び付けだけ戻る。
+    expect(friendUserId(testDb, 'f-old')).toBeNull();
+    expect(friendUserId(testDb, 'f-made')).toBeNull();
+    expect(createItem(testDb).result).toBe('rolled_back');
+  });
+});
