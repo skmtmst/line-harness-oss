@@ -286,7 +286,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           {/* #935 N-305: 以前は実在しないタブ名を指していた。設計の語「配信フロー」は残し、行き先を実在するタブへ直す。 */}
           <Link href="/nen-campaigns?tab=auto" className="text-action hover:underline">配信フロー</Link><span>›</span><span>{setting.label}</span>
         </nav>
-        <Button onClick={() => setTestSearchOpen((open) => !open)} className="h-10"><FlaskConical aria-hidden size={17} />自分にテストを送る</Button>
+        <Button onClick={() => setTestSearchOpen((open) => !open)} className="v7:h-10"><FlaskConical aria-hidden size={17} />自分にテストを送る</Button>
       </div>
 
       {error && <Notice tone="danger" message={error} />}

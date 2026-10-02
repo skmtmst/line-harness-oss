@@ -33,6 +33,8 @@ import { canEditFeature } from '@/lib/staff-capability'
 import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import BookingSettingsV8 from './settings-v8'
 import BookingStaffPage from '@/app/booking/staff/page'
 import ListRange from '@/components/ui/list-range'
 import MenuVersionHistory from './menu-version-history'
@@ -1620,7 +1622,18 @@ export default function MenusPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <MenusPageHost />
+      <MenusPageEntry />
     </Suspense>
   )
+}
+
+/**
+ * 見た目テーマが v8 のときは新しい予約設定（settings-v8.tsx、5タブ＋右の
+ * LIFF 写し）、v7 では従来の画面をそのまま出す。
+ */
+function MenusPageEntry() {
+  const theme = useAdminTheme()
+  const { selectedAccountId } = useAccount()
+  if (theme === 'v8') return <BookingSettingsV8 accountId={selectedAccountId} />
+  return <MenusPageHost />
 }

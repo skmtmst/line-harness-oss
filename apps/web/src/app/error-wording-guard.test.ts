@@ -70,6 +70,8 @@ const KNOWN_FILES: string[] = [
   'app/restaurant-test/google/google-business.tsx',
   'app/restaurant-test/google/google-profile.tsx',
   'app/rich-menus/edit/page.tsx',
+  // page.tsx から分けた取り込み画面へ、v7 の持ち越し文が移った分。
+  'app/rich-menus/external-import.tsx',
   'app/rich-menus/page.tsx',
   'app/scenarios/detail/scenario-detail-client.tsx',
   'app/scenarios/page.tsx',

@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
-import OpsPageHeader from '@/components/ops/ops-page-header'
+import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
+import '@/app/ops/readonly-v8.css'
 import { formatDate, formatDateTime, planLabel, planStatusChip, tenantDetailHref, tenantUseStatusChip, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
@@ -119,11 +120,11 @@ export default function OpsTenantsPage() {
   }
 
   return (
-    <div data-design-node="X9f5jy" className="flex flex-col gap-4">
+    <ReadonlyDesignNode node="XWtYC"><div data-design-node="X9f5jy" className="v8-ro-ops-page v8-ro-ops-tenants flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader title="契約先アカウント" />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="v8-ro-ops-metrics grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard variant="v6" title="契約中" value={summary ? summary.active : null} unit="社" detail="" help="請求が生きている契約先（決済失敗を含む）" loading={loading && !summary} />
         <KpiCard variant="v6" title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail="期限切れ前に案内" loading={loading && !summary} />
         <KpiCard variant="v6" title="停止中" value={summary ? summary.suspended : null} unit="社" detail="" help="運営が止めた契約先です" badge={summary?.suspended ? '確認' : undefined} badgeTone="warning" loading={loading && !summary} />
@@ -246,6 +247,6 @@ export default function OpsTenantsPage() {
         </DataTable>
       )}
       {!loading && visible.length > 0 ? <p className="mt-2"><Chip tone="neutral">{visible.length} 件</Chip></p> : null}
-    </div>
+    </div></ReadonlyDesignNode>
   )
 }

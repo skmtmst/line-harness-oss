@@ -14,6 +14,8 @@ import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
+import NewFieldPageV8 from '../../new-field-page-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import Select from '@/components/shared/select'
 import ListState from '@/components/shared/list-state'
 import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
@@ -335,5 +337,6 @@ function NewFriendFieldForm() {
 }
 
 export default function NewFriendFieldPage() {
-  return <FeatureGate feature="friend_fields"><Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}><NewFriendFieldForm /></Suspense></FeatureGate>
+  const theme = useAdminTheme()
+  return <FeatureGate feature="friend_fields"><Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>{theme === 'v8' ? <NewFieldPageV8 /> : <NewFriendFieldForm />}</Suspense></FeatureGate>
 }

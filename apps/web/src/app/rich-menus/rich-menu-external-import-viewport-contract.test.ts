@@ -14,7 +14,9 @@ import { describe, expect, it } from 'vitest'
  */
 
 const directory = dirname(fileURLToPath(import.meta.url))
+// 取り込み画面の中身は external-import.tsx（★V7・★V8 の一覧で共有）。
 const source = readFileSync(join(directory, 'page.tsx'), 'utf8')
+  + readFileSync(join(directory, 'external-import.tsx'), 'utf8')
 
 describe('LAY-06: 取り込み画面はビュー全幅で開く', () => {
   it('固定の left-64 だけにせず、小画面は左右0・PCはメニュー幅だけ空ける', () => {

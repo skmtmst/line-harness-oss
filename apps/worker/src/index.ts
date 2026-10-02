@@ -105,6 +105,7 @@ import { richMenus } from './routes/rich-menus.js';
 import { trackedLinks } from './routes/tracked-links.js';
 import { entryRoutes } from './routes/entry-routes.js';
 import { forms } from './routes/forms.js';
+import { postalCode } from './routes/postal-code.js';
 import { adPlatforms } from './routes/ad-platforms.js';
 import { adCosts } from './routes/ad-costs.js';
 import { webMeasurement } from './routes/web-measurement.js';
@@ -527,6 +528,7 @@ app.route('/', richMenus);
 app.route('/', trackedLinks);
 app.route('/', entryRoutes);
 app.route('/', forms);
+app.route('/', postalCode);
 app.route('/', adPlatforms);
 app.route('/', adCosts);
 // Web計測の公開口と計測サイトの管理(#819)。
@@ -1877,6 +1879,20 @@ async function runSixHourlyHeavyJobs(
         });
         if (result.synced + result.failed > 0) {
           console.log(JSON.stringify({ event: 'google_business_metrics_tick', ...result }));
+        }
+      },
+    });
+    jobs.push({
+      // Googleビジネス: 認可を切らさないための先回り更新。再同期が回らない接続
+      // （場所未選択・機能off）のトークンも6時間ごとに使って、放置による失効を防ぐ。
+      name: 'google business token keepalive',
+      run: async () => {
+        const { processGoogleBusinessTokenKeepalive } = await import('./services/google-business-resync.js');
+        const result = await processGoogleBusinessTokenKeepalive(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.refreshed + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'google_business_token_keepalive_tick', ...result }));
         }
       },
     });

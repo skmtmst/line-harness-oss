@@ -322,7 +322,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
         </div>
       ))}
 
-      <Button variant="secondary" className="text-ink-secondary rounded-card h-10 w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
+      <Button variant="secondary" className="text-ink-secondary rounded-card v7:h-10 w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
           update({
             ...condition,
             groups: [...(condition.groups ?? []), { operator: 'OR', rules: [] }],
@@ -418,7 +418,7 @@ function TagPicker({
   const shown = collapsed ? rest.slice(0, LIMIT) : rest
 
   const chip = (tag: Option, on: boolean) => (
-    <Button variant="primary" className={(`rounded-pill h-8 px-3 text-xs transition-colors ${
+    <Button variant="primary" className={(`rounded-pill v7:h-8 px-3 text-xs transition-colors ${
         on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
       }`) + ' whitespace-normal'} key={tag.id} type="button" onClick={() => onToggle(tag.id)}>
       {tag.name}
@@ -442,7 +442,7 @@ function TagPicker({
         {shown.map((tag) => chip(tag, false))}
       </div>
       {collapsed && (
-        <Button variant="secondary" className="text-ink-secondary h-8 px-3 text-xs whitespace-normal" type="button" onClick={() => setShowAll(true)}>
+        <Button variant="secondary" className="text-ink-secondary v7:h-8 px-3 text-xs whitespace-normal" type="button" onClick={() => setShowAll(true)}>
           残り {rest.length - LIMIT} 件を表示
         </Button>
       )}
@@ -634,7 +634,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
             {marks.map((mark) => {
               const on = selected.includes(mark.id)
               return (
-                <Button variant="primary" className={(`rounded-pill h-8 px-3 text-xs transition-colors ${
+                <Button variant="primary" className={(`rounded-pill v7:h-8 px-3 text-xs transition-colors ${
                     on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
                   }`) + ' whitespace-normal'} key={mark.id} type="button" onClick={() =>
                     onChange({
