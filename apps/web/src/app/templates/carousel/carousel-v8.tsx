@@ -43,7 +43,7 @@ import {
   saveCarousel,
   visualPanels,
   type Panel,
-} from './page'
+} from './carousel-core'
 
 function CarouselEditorV8Inner() {
   const router = useRouter()

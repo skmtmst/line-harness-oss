@@ -54,7 +54,7 @@ import {
   type TemplateAccountBinding,
   type TemplateEditorState,
   type TemplateSaveInput,
-} from './edit/page'
+} from './edit/edit-core'
 import TemplateAssetEditorV8 from './asset-editor-v8'
 
 const EMPTY_REFERENCES = EMPTY_TEMPLATE_REFERENCES
