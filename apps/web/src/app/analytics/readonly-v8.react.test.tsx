@@ -7,7 +7,7 @@ import AnalyticsPage from './page'
 const state = vi.hoisted(() => ({ role: 'viewer', query: '', account: 'account-a', calls: [] as string[] }))
 const metric = (value: number | null) => ({ value, state: value === null ? 'unavailable' : 'available', reason: value === null ? '未取得' : null })
 vi.mock('next/link', () => ({ default: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a> }))
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(state.query) }))
+vi.mock('next/navigation', () => ({ usePathname: () => '/analytics', useSearchParams: () => new URLSearchParams(state.query) }))
 vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/components/layout/merged-tabs', () => ({ default: () => null, useMergedTab: () => 'friends' }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account, loading: false }) }))

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import ReadonlyHeaderV8 from '../analytics/readonly-header-v8'
 import AnalyticsNavigationV8 from '../analytics/navigation-v8'
-import styles from '../analytics/readonly-v8.module.css'
+import '../analytics/readonly-v8.css'
 import MergedTabs from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
@@ -269,10 +270,10 @@ export default function SearchConsolePage() {
     : null
 
   return (
-    <div className={`flex flex-col gap-4 ${styles.page}`} data-design-node={theme === 'v8' ? 'h1G4d' : undefined}>
-      {theme === 'v8' && <><header className={styles.header}><div><h1>Search Console</h1><p>Google検索での表示回数・クリック・掲載順位を見ます。検索から友だち追加への突合は取得できません。</p></div></header><AnalyticsNavigationV8 active="search" /></>}
+    <div className="flex flex-col gap-4 v8-ro-analytics-page" data-design-node={theme === 'v8' ? 'h1G4d' : undefined}>
+      {theme === 'v8' && <><ReadonlyHeaderV8 title="Search Console" description="Google検索での表示回数・クリック・掲載順位を見ます。検索から友だち追加への突合は未取得です。" /><AnalyticsNavigationV8 active="search" /></>}
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <div className={styles.legacyHead}><MergedTabs basePath="/analytics" tabs={ANALYTICS_TABS} active="search" /></div>
+      <div className="v8-ro-analytics-legacyHead"><MergedTabs basePath="/analytics" tabs={ANALYTICS_TABS} active="search" /></div>
 
       <div data-design="Head" className="flex flex-wrap items-center justify-end gap-2">
         {data ? <Button onClick={exportCsv}>CSVで書き出す</Button> : null}
@@ -320,7 +321,7 @@ export default function SearchConsolePage() {
             </div>
             <p className="text-ink-faint whitespace-nowrap">集計期間 {data.startDate.replaceAll('-', '/')} 〜 {data.endDate.replaceAll('-', '/')}</p>
           </div>
-          <div className={`grid grid-cols-2 gap-4 lg:grid-cols-4 ${styles.kpis}`}>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 v8-ro-analytics-kpis">
             {metrics.map((item) => <MetricCard key={item.key} label={item.label} value={item.value} current={data.summary[item.key]} previous={data.previousSummary[item.key]} color={item.color} lowerIsBetter={item.lower} />)}
           </div>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
