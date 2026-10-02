@@ -97,14 +97,14 @@ export default function FriendMigrationsV8() {
                   checked={m.columns.includes(value)}
                   onCheckedChange={() => m.toggleColumn(value)}
                   disabled={unavailable}
-                  description={unavailable ? 'まだ書き出せません（準備中）' : undefined}
+                  description={unavailable ? 'まだ書き出せません' : undefined}
                 >
                   {label}
                 </Checkbox>
               ))}
             </fieldset>
             <p className={styles.sectionDesc} style={{ margin: 0 }}>
-              文字コード：UTF-8（Shift_JISの書き出しは準備中）
+              文字コード：UTF-8（Shift_JISの書き出しはまだ使えません）
             </p>
           </div>
           <div className={styles.cardCenter}>
