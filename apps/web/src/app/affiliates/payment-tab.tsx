@@ -61,7 +61,7 @@ export function currentAffiliateSettlementPeriod(now = new Date()): { periodFrom
   }
 }
 
-function SettlementCloseDialog({
+export function SettlementCloseDialog({
   preview,
   accountId,
   onClose,
@@ -180,7 +180,7 @@ function SettlementCloseDialog({
   )
 }
 
-function PayoutStepUpDialog({
+export function PayoutStepUpDialog({
   batch,
   accountId,
   onClose,
