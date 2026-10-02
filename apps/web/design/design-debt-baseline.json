@@ -296,6 +296,9 @@
   "app/tags/field-editor-v8.tsx": {
     "unresolved-classname": 91
   },
+  "app/tags/field-migrate-v8.tsx": {
+    "unresolved-classname": 72
+  },
   "app/tags/fields-tab-v8.tsx": {
     "unresolved-classname": 58
   },
@@ -313,6 +316,9 @@
   },
   "app/tags/marks-v8.tsx": {
     "unresolved-classname": 51
+  },
+  "app/tags/search-editor-v8.tsx": {
+    "unresolved-classname": 53
   },
   "app/tags/searches-v8.tsx": {
     "unresolved-classname": 59

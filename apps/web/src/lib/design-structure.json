@@ -2424,27 +2424,27 @@
       ]
     },
     "/tags/fields/migrate": {
-      "node": "KoT6c",
-      "name": "V6 4-2-B 友だち情報欄を移行",
+      "node": "GobMd",
+      "name": "★V8 友だち情報欄を移行",
       "visualVerification": {
         "status": "unverified",
         "referenceNodeIds": [
-          "KoT6c"
+          "GobMd"
         ],
         "requiredViewports": [
           1440,
           1920
         ],
-        "reason": "事前確認→明示実行（ATTR-09/10）まで実装済み。実行結果節を追加した。同条件の画像比較は未実施"
+        "reason": "★V8（オーナー決定 2026-10-01、Pencil GobMd）へ V8 版移行画面 field-migrate-v8 を実装。節の印は Head/Fields/Preview/Usage/Result。同条件の画像比較は未実施"
       },
       "sections": [
         "Fields",
+        "Head",
         "Preview",
-        "Usage",
-        "Result"
+        "Result",
+        "Usage"
       ],
       "parts": [
-        "友だち情報欄",
         "項目を移行",
         "いま使っている項目",
         "移行先の項目",
