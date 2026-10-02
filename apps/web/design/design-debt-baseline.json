@@ -479,6 +479,9 @@
   "components/layout/page-header-h2.tsx": {
     "unresolved-classname": 5
   },
+  "components/layout/settings-inner-nav.tsx": {
+    "unresolved-classname": 7
+  },
   "components/layout/sidebar-identity.tsx": {
     "unresolved-classname": 6
   },

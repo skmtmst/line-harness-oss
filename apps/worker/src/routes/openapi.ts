@@ -66,6 +66,26 @@ const spec = {
           },
         },
       },
+      LineAccountTag: {
+        type: 'object',
+        required: ['id', 'name', 'color', 'displayOrder', 'createdAt', 'updatedAt'],
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string', maxLength: 100 },
+          color: { type: ['string', 'null'], pattern: '^#[0-9a-fA-F]{6}$' },
+          displayOrder: { type: 'integer', minimum: 0 },
+          createdAt: { type: 'string' },
+          updatedAt: { type: 'string' },
+        },
+      },
+      LineAccountTagInput: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', minLength: 1, maxLength: 100, description: '前後の空白は除く' },
+          color: { type: ['string', 'null'], pattern: '^#[0-9a-fA-F]{6}$' },
+          displayOrder: { type: 'integer', minimum: 0 },
+        },
+      },
       TagDeleteImpact: {
         type: 'object',
         required: ['tag', 'friendCount', 'references', 'blockingReferenceCount', 'canDelete'],
@@ -3417,6 +3437,68 @@ const spec = {
         summary: 'UUID紐付き友だち一覧',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { '200': { description: 'Linked friends/accounts' } },
+      },
+    },
+    // ── LINE Account Tags ───────────────────────────────────────────────────
+    '/api/line-account-tags': {
+      get: {
+        tags: ['LINE Accounts'],
+        summary: '統括内のアカウントタグ一覧',
+        responses: {
+          '200': { description: 'アカウントタグの一覧（並び順・名前順）', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'array', items: { $ref: '#/components/schemas/LineAccountTag' } } } } } } },
+          '403': { description: 'Owner or admin role required' },
+        },
+      },
+      post: {
+        tags: ['LINE Accounts'],
+        summary: 'アカウントタグを作成',
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/LineAccountTagInput', required: ['name'] } } } },
+        responses: {
+          '201': { description: '作成したアカウントタグ', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { $ref: '#/components/schemas/LineAccountTag' } } } } } },
+          '400': { description: 'Invalid name, color or displayOrder' },
+          '403': { description: 'Owner or admin role required' },
+          '409': { description: 'Same tag name already exists in the tenant' },
+        },
+      },
+    },
+    '/api/line-account-tags/{id}': {
+      patch: {
+        tags: ['LINE Accounts'],
+        summary: 'アカウントタグの名前・色・並び順を変更',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/LineAccountTagInput', minProperties: 1 } } } },
+        responses: {
+          '200': { description: '変更後のアカウントタグ', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { $ref: '#/components/schemas/LineAccountTag' } } } } } },
+          '400': { description: 'Invalid name, color or displayOrder' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Tag not found' },
+          '409': { description: 'Same tag name already exists in the tenant' },
+        },
+      },
+      delete: {
+        tags: ['LINE Accounts'],
+        summary: 'アカウントタグを削除（付与も外す）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '削除したタグID', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } } } } } } },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Tag not found' },
+        },
+      },
+    },
+    '/api/line-accounts/{id}/tags': {
+      put: {
+        tags: ['LINE Accounts'],
+        summary: 'LINEアカウントのタグをまとめて置き換え',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['tagIds'], properties: { tagIds: { type: 'array', maxItems: 100, items: { type: 'string', minLength: 1 }, description: '同じ統括のアカウントタグID。重複は1つにまとめる' } } } } } },
+        responses: {
+          '200': { description: '置き換え後のタグ', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: { type: 'object', required: ['id', 'tags'], properties: { id: { type: 'string' }, tags: { type: 'array', items: { $ref: '#/components/schemas/LineAccountTag' } } } } } } } } },
+          '400': { description: 'tagIds is not an array or contains tags outside the tenant' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Account not found or not accessible' },
+          '409': { description: 'ACCOUNT_ARCHIVED' },
+        },
       },
     },
     // ── LINE Accounts ───────────────────────────────────────────────────────
