@@ -6048,6 +6048,21 @@ CREATE TABLE rt_memberships (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE rt_menu_change_requests (
+  id TEXT PRIMARY KEY,
+  approval_id TEXT NOT NULL UNIQUE REFERENCES rt_approval_requests(id),
+  menu_id TEXT NOT NULL REFERENCES rt_menu_items(id),
+  store_id TEXT NOT NULL REFERENCES rt_stores(id),
+  before_price INTEGER NOT NULL CHECK (before_price >= 0),
+  after_price INTEGER NOT NULL CHECK (after_price >= 0),
+  requested_by TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'returned', 'applied', 'failed')),
+  return_reason TEXT,
+  failure_reason TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE rt_menu_items (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -6061,7 +6076,7 @@ CREATE TABLE rt_menu_items (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active', 'archived')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, published_once INTEGER NOT NULL DEFAULT 0 CHECK (published_once IN (0, 1)), publication_history_unknown INTEGER NOT NULL DEFAULT 0 CHECK (publication_history_unknown IN (0, 1)));
 
 CREATE TABLE rt_opening_hours_settings (
   store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -8912,6 +8927,8 @@ CREATE UNIQUE INDEX idx_rt_manual_email_import ON rt_reservations(inbound_email_
 
 CREATE INDEX idx_rt_memberships_org ON rt_memberships(organization_id, store_id, role);
 
+CREATE UNIQUE INDEX idx_rt_menu_change_pending ON rt_menu_change_requests(menu_id) WHERE status IN ('pending', 'approved');
+
 CREATE INDEX idx_rt_menu_store ON rt_menu_items(store_id, status, kind);
 
 CREATE INDEX idx_rt_org_agreements_org
@@ -9435,6 +9452,14 @@ CREATE TRIGGER rt_inventory_table_delete AFTER DELETE ON rt_tables BEGIN UPDATE 
 CREATE TRIGGER rt_inventory_table_insert AFTER INSERT ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = NEW.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id = NEW.store_id; END;
 
 CREATE TRIGGER rt_inventory_table_update AFTER UPDATE OF max_capacity, is_active, store_id ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = rt_inventory_slots.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id IN (OLD.store_id, NEW.store_id); END;
+
+CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_requests WHEN OLD.status = 'pending' AND NEW.status = 'approved' BEGIN UPDATE rt_menu_items SET price = NEW.after_price, updated_at = datetime('now') WHERE id = NEW.menu_id AND store_id = NEW.store_id AND price = NEW.before_price; UPDATE rt_menu_change_requests SET status = CASE WHEN changes() = 1 THEN 'applied' ELSE 'failed' END, failure_reason = CASE WHEN changes() = 1 THEN NULL ELSE 'メニューが変更または削除されています。再申請してください' END, updated_at = datetime('now') WHERE id = NEW.id; END;
+
+CREATE TRIGGER rt_menu_change_review AFTER UPDATE OF status ON rt_approval_requests WHEN NEW.kind = 'menu_change' AND OLD.status = 'pending' AND NEW.status IN ('approved', 'returned') BEGIN UPDATE rt_menu_change_requests SET status = NEW.status, return_reason = CASE WHEN NEW.status = 'returned' THEN NEW.review_comment ELSE NULL END, updated_at = datetime('now') WHERE approval_id = NEW.id AND status = 'pending'; END;
+
+CREATE TRIGGER rt_menu_published_insert AFTER INSERT ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
+
+CREATE TRIGGER rt_menu_published_update AFTER UPDATE OF status ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
 
 CREATE TRIGGER trg_action_score_published_version_immutable
 BEFORE UPDATE ON action_score_rule_versions
