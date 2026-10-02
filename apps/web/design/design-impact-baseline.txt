@@ -172,10 +172,12 @@ shared-button-importer app/settings/page.tsx
 shared-button-importer app/staff/email-change/page.tsx
 shared-button-importer app/staff/invite/page.tsx
 shared-button-importer app/staff/page.tsx
+shared-button-importer app/tags/field-migrate-v8.tsx
 shared-button-importer app/tags/fields/edit/page.tsx
 shared-button-importer app/tags/fields/migrate/page.tsx
 shared-button-importer app/tags/fields/new/page.tsx
 shared-button-importer app/tags/folders/new/page.tsx
+shared-button-importer app/tags/search-editor-v8.tsx
 shared-button-importer app/tags/searches/edit/page.tsx
 shared-button-importer app/templates/carousel/page.tsx
 shared-button-importer app/templates/detail/page.tsx

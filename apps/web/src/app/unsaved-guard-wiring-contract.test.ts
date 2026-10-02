@@ -58,6 +58,7 @@ const GUARDED = [
   'app/staff/new/page.tsx',
   'app/tags/fields/edit/page.tsx',
   'app/tags/fields/new/page.tsx',
+  'app/tags/search-editor-v8.tsx',
   'app/tags/searches/edit/page.tsx',
   'app/templates/carousel/page.tsx',
   'app/templates/questions/new/page.tsx',
@@ -127,6 +128,8 @@ const EXEMPTIONS: Record<string, string> = {
     '一覧と絞り込みが中心。作る操作は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
   'app/inflow-links/page.tsx':
     '一覧の一括操作（移動・再開）は押した直後に即時保存し、下書きを持たない',
+  'app/tags/field-migrate-v8.tsx':
+    '★V8 の項目移行画面（GobMd）。事前確認→明示実行の2段階で、途中離脱で失うのは確認状態だけ。離脱番兵の v7 同等画面（fields/migrate/page.tsx）と同じ扱い',
   'app/inflow-links/detail/page.tsx':
     '転送先の編集は保存ボタン確定式。下書き・dirty 管理がなく番兵の扱いは別途検討',
   'app/mileage/score-rules/page.tsx':
