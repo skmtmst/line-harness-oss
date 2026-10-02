@@ -39,6 +39,10 @@
     "unresolved-classname": 71,
     "direct-th": 7
   },
+  "app/automations/list-v8.tsx": {
+    "unresolved-classname": 82,
+    "direct-th": 7
+  },
   "app/automations/new/page.tsx": {
     "unresolved-classname": 55
   },

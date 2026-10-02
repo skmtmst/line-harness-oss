@@ -1,0 +1,548 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B オートメーション一覧（Pencil V8-B の板：一覧 `LWQXd`、
+ * 見本 `c7dxp`、状態 `S3pdQ`、1152px `En14p`、閲覧のみ `nH9L8`）。
+ *
+ * フォルダの列は機能追加 F-13（フォルダ API）待ちで置かない。
+ * 「＋ ルールを作る」は道具の段の左（見本 En14p の畳んだ形）に固定する。
+ *
+ * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+/* 見出しブロック：画面名＋一行の説明＋右に「見本から作る」。 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 数の帯：4つのマス。アイコンつき（LWQXd）。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.kpiLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpiLabel svg {
+  color: var(--color-ink-faint);
+}
+
+.kpiValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.kpiDetail {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* 「動いた記録で見る →」。失敗の数の帯の中の導線。 */
+.kpiLink {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.kpiLink:hover {
+  text-decoration: underline;
+}
+
+/* 道具の段：作る・検索・状態の札・並び・よく使う絞り込み・件数。 */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+.toolbarLabel {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.searchWrap {
+  width: 280px;
+  min-width: 160px;
+}
+
+/* 操作の失敗の帯。 */
+.errorBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.errorBand button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* 表。 */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: top;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.cellTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.cellTitle:hover {
+  color: var(--color-action-hover);
+  text-decoration: underline;
+}
+
+.cellTitle:disabled {
+  color: var(--color-ink);
+  cursor: default;
+}
+
+.cellTitle:disabled:hover {
+  text-decoration: none;
+}
+
+/* 閲覧のみのときのルール名（リンクではない素の名前）。 */
+.cellTitleStatic {
+  color: var(--color-ink);
+  cursor: default;
+}
+
+.cellTitleStatic:hover {
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.cellSub {
+  display: block;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellText {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.countCell {
+  white-space: nowrap;
+}
+
+.countMain {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.countFail {
+  display: block;
+  color: var(--color-danger);
+  font-size: 11px;
+}
+
+.countMuted {
+  display: block;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* 状態の札。 */
+.statePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statePillActive {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.statePillStopped {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+.stateDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.opsCell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.opsRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.menuButton:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.menuButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 表の下の案内（行の「…」の中身）。 */
+.tableNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* 読み込み中の骨格の行。 */
+.skeletonRows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.skeletonRow:last-child {
+  border-bottom: 0;
+}
+
+.skeletonDot {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+
+.skeletonBar {
+  height: 12px;
+  flex: 1;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+}
+
+/* ページ送りの行。左に件数、右にページ送り。 */
+.pagerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 空・失敗の1枚（S3pdQ）。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  text-align: center;
+}
+
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.stateIconError {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stateDesc {
+  margin: 0;
+  max-width: 420px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.stateActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ===== 見本タブ（c7dxp）：きっかけの札＋カードの並び ===== */
+.templateTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.templateToolsLabel {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.templateGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.templateCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.templateName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.templateLine {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.templateLineLabel {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+}
+
+.templateLineValue {
+  min-width: 0;
+  color: var(--color-ink-secondary);
+}
+
+.templateCardButton {
+  margin-top: auto;
+}
+
+/* ===== 板が 1100px を切ったら（画面幅で約 1352px 未満） ===== */
+@container (max-width: 1099px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* さらに狭い板では数の帯も1列に。 */
+@container (max-width: 560px) {
+  .kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .searchWrap {
+    width: 100%;
+  }
+}

@@ -32,6 +32,8 @@ import {
   type AutomationEventType,
 } from '@line-crm/shared'
 import { formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import AutomationsListV8 from './list-v8'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -274,7 +276,19 @@ const MERGED_TABS = [
 /** 一覧の1ページぶん。口は全件返すので、ここで切り出す。 */
 const AUTOMATION_PAGE_SIZE = 6
 
+/*
+ * ★V8-B 分岐：一覧（ルール・見本の2区画）だけを `data-theme="v8"` の下で
+ * 積み替える（板 `LWQXd` / `c7dxp`）。作る器（/automations/new）・下書きの
+ * 編集面（/automations/drafts）・動いた記録（/automations/runs）は別PR。
+ * v7 の見た目・動きは `AutomationsPageV7` がそのまま持つ。
+ */
 export default function AutomationsPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <AutomationsListV8 />
+  return <AutomationsPageV7 />
+}
+
+function AutomationsPageV7() {
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const tab = useMergedTab(MERGED_TABS)
