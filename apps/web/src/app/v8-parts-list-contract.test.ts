@@ -55,15 +55,18 @@ describe('V8 移行④b — 一覧まわり', () => {
     expect(blocks).toContain('font-size: var(--text-caption)')
   })
 
-  it('道具の1段：段と段の間は 12', () => {
+  it('道具の1段：1段の帯・余白14/24・道具の間は 8', () => {
     const blocks = v8Blocks(css('list-toolbar.module.css'), 'list-toolbar')
-    expect(blocks).toContain('gap: 12px')
+    expect(blocks).toContain('gap: 8px')
+    expect(blocks).toContain('padding: 14px 24px')
   })
 
-  it('ページ送り：高さ36・数字のマスは 36×36', () => {
+  it('ページ送り：余白10/20・間6・ボタンは 32×32', () => {
     const blocks = v8Blocks(css('pagination.module.css'), 'pagination')
-    expect(blocks).toContain('height: 36px')
-    expect(blocks).toContain('width: 36px')
+    expect(blocks).toContain('padding: 10px 20px')
+    expect(blocks).toContain('gap: 6px')
+    expect(blocks).toContain('height: 32px')
+    expect(blocks).toContain('width: 32px')
   })
 
   it('数の帯：4枚のカードではなく1本の帯を縦線で割る（data-kpi-strip）', () => {
