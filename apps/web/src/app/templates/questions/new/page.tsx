@@ -24,6 +24,8 @@ import type { Folder } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import QuestionTemplateV8 from '../question-v8'
 
 function displayText(value: string): string {
   return value
@@ -351,10 +353,19 @@ function QuestionTemplatePageInner() {
   )
 }
 
+/*
+ * ★V8: data-theme="v8" のときだけ新しい作る画面（../question-v8）を出す。
+ * v7 の QuestionTemplatePageInner は見た目も動きもそのまま残す。
+ */
+function QuestionTemplateThemed() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <QuestionTemplateV8 /> : <QuestionTemplatePageInner />
+}
+
 export default function QuestionTemplatePage() {
   return (
     <Suspense fallback={<ListState kind="loading" title="質問テンプレートを準備しています" />}>
-      <QuestionTemplatePageInner />
+      <QuestionTemplateThemed />
     </Suspense>
   )
 }

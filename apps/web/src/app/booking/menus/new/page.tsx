@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { api, ApiError, bookingApi, type BookingSettings, type BookingStaff } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
@@ -23,9 +23,11 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { bookingMenuError } from '../menu-validation'
 import { formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import MenuFormV8 from './menu-form-v8'
 
 /**
- * メニューを追加する（設計 V6 28-1-B / node GhOb3）。
+ * メニューを追加する（設計 V6 28-1-B / node GhOb3、★V8 は QqER7）。
  *
  * 設計は左に番号つきの4節、右に「予約画面での見え方」と「気をつけること」。
  * 入力欄だけ縦に並んでいると、どこまで埋めれば予約を受けられるのかが
@@ -33,6 +35,16 @@ import { formatNumber } from '@/lib/format'
  * 保存できてしまうのに予約が入らないという分かりにくい失敗をする。
  */
 export default function NewBookingMenuPage() {
+  // 見た目テーマが v8 のときだけ新しい器（menu-form-v8.tsx）。v7 はそのまま。
+  const theme = useAdminTheme()
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      {theme === 'v8' ? <MenuFormV8 /> : <NewBookingMenuPageV7 />}
+    </Suspense>
+  )
+}
+
+function NewBookingMenuPageV7() {
   // N-411: メニュー作成は '/booking/menus' の実効permission必須。
   // 鍵の無い人がフォームを埋めて保存時403になるのを防ぐ。
   const [canEditMenus] = useState(() =>

@@ -15,6 +15,8 @@ import { isForbiddenOrRateLimited, loadFailureCopy, loadFailureNotice } from '@/
 import ListState from '@/components/shared/list-state'
 import { describeSaveFailure } from '@/lib/api'
 import { canEditFeature } from '@/lib/staff-capability'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import AssignMatrixV8 from './assign-v8'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
@@ -603,7 +605,17 @@ function Kpi({
 export default function MenuStaffMatrix() {
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <MenuStaffMatrixContent />
+      <MenuStaffMatrixEntry />
     </Suspense>
   )
+}
+
+/**
+ * 見た目テーマが v8 のときは新しい「担当メニューをまとめて決める」
+ * （assign-v8.tsx、板 ooufy）、v7 では従来の割当表をそのまま出す。
+ */
+function MenuStaffMatrixEntry() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <AssignMatrixV8 />
+  return <MenuStaffMatrixContent />
 }

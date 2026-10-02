@@ -3,6 +3,7 @@
 import { Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  ApiError,
   api,
   type OpsAnnouncement,
   type OpsAnnouncementAudience,
@@ -11,8 +12,9 @@ import {
   type OpsAudiencePreview,
   type OpsTenantRow,
 } from '@/lib/api'
-import OpsPageHeader from '@/components/ops/ops-page-header'
-import { formatDateTime, opsCall } from '@/components/ops/ops-ui'
+import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
+import '@/app/ops/readonly-v8.css'
+import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
 import { previewLabel, toLocalInput, toPublishAt } from './format'
 import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
@@ -79,6 +81,13 @@ export default function OpsAnnouncementsPage() {
   const [tenants, setTenants] = useState<OpsTenantRow[]>([])
   const [form, setForm] = useState<Form>(EMPTY)
   const [editingId, setEditingId] = useState<string | null>(null)
+  /*
+   * M512: 作る欄の再実行キー。二重押し・通信再送でも1件だけ作る。
+   * 保存できたら・作り直すときは新しいキーに替える。
+   */
+  const [createKey, setCreateKey] = useState(() => crypto.randomUUID())
+  /* M513: 直し始めたときの版。違う版からの保存は最新の内容つきで409になる。 */
+  const [editingUpdatedAt, setEditingUpdatedAt] = useState<string | null>(null)
   const [preview, setPreview] = useState<OpsAudiencePreview | null>(null)
   const [busy, setBusy] = useState(false)
   /*
@@ -158,25 +167,60 @@ export default function OpsAnnouncementsPage() {
     if (validation) { setFormError(validation); return }
     setBusy(true)
     setFormError('')
-    const res = await opsCall(editingId ? api.ops.announcements.update(editingId, input(mode)) : api.ops.announcements.create(input(mode)))
-    setBusy(false)
     setConfirmSend(false)
-    if (!res.success) { setFormError(res.error || '保存できませんでした'); return }
-    setNotice(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${res.data.recipientsTotal}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
-    setBaseline(EMPTY)
-    setForm(EMPTY)
-    setEditingId(null)
-    await load()
+    try {
+      const res = editingId
+        ? await api.ops.announcements.update(editingId, input(mode), editingUpdatedAt ?? undefined)
+        : await api.ops.announcements.create(input(mode), createKey)
+      if (!res.success) { setFormError('保存できませんでした'); return }
+      setNotice(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${res.data.recipientsTotal}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
+      setBaseline(EMPTY)
+      setForm(EMPTY)
+      setEditingId(null)
+      setEditingUpdatedAt(null)
+      setCreateKey(crypto.randomUUID())
+      await load()
+    } catch (error) {
+      // M512/M513: 二重押しの取り違え・ほかの人の先行保存は理由を言い分け、
+      // 最新の一覧を見せる。入力は残したまま保存し直せる。
+      if (error instanceof ApiError && error.status === 409) {
+        if (error.code === 'IDEMPOTENCY_CONFLICT') {
+          setFormError('同じ再実行キーが別の内容に使われています。作り直してください。')
+          setCreateKey(crypto.randomUUID())
+          return
+        }
+        const latest = (error.data as { latest?: { updatedAt?: string } } | null)?.latest
+        if (latest?.updatedAt) setEditingUpdatedAt(latest.updatedAt)
+        setFormError(error.message && !error.message.startsWith('API error:')
+          ? error.message
+          : 'ほかの人が先に保存しました。一覧を読み直してから、もう一度保存してください。入力した内容はそのまま残っています。')
+        await load()
+        return
+      }
+      setFormError(error instanceof ApiError ? opsErrorMessage(error) : '保存できませんでした')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const edit = (a: OpsAnnouncement) => {
     const loaded: Form = { subject: a.subject, body: a.body, audienceKind: a.audienceKind, audiencePlans: a.audiencePlans, audienceTenantIds: a.audienceTenantIds, channels: a.channels, publishAt: toLocalInput(a.publishAt) }
     setEditingId(a.id)
+    setEditingUpdatedAt(a.updatedAt)
     setBaseline(loaded)
     setForm(loaded)
     setFormError('')
     setNotice('')
     window.scrollTo({ top: 0 })
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditingUpdatedAt(null)
+    setBaseline(EMPTY)
+    setForm(EMPTY)
+    setFormError('')
+    setCreateKey(crypto.randomUUID())
   }
 
   const remove = async () => {
@@ -193,7 +237,7 @@ export default function OpsAnnouncementsPage() {
   const scheduled = form.publishAt.trim().length > 0
 
   return (
-    <div data-design-node="q2CokV" className="flex flex-col gap-4">
+    <ReadonlyDesignNode node="tQ2MJ"><div data-design-node="q2CokV" className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader
         title="お知らせ"
@@ -262,10 +306,10 @@ export default function OpsAnnouncementsPage() {
             <DateTimeField value={form.publishAt} onChange={(v) => setForm((f) => ({ ...f, publishAt: v }))} aria-label="公開日時（日本時間）" />
             <span className="text-micro text-ink-faint">空のまま「今すぐ送る」を押すとすぐに送ります。日時を入れると「配信を予約する」に変わります（日本時間）。</span>
           </div>
-          {editingId ? <Button onClick={() => { setEditingId(null); setBaseline(EMPTY); setForm(EMPTY); setFormError('') }}>キャンセル</Button> : null}
+          {editingId ? <Button onClick={cancelEdit}>直すのをやめる</Button> : null}
         </section>
 
-        <section aria-label="配信済みの表" className="rounded-card border border-hairline bg-canvas xl:col-span-3">
+        <section aria-label="配信済みの表" className="v8-ro-ops-page rounded-card border border-hairline bg-canvas xl:col-span-3">
           <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
             <h3 className="text-label font-semibold text-ink">配信済み・予約・下書き</h3>
             <span className="text-micro text-ink-faint">{linked ? `契約者専用LINEの登録 ${linked.linked}人 / ${linked.total}人` : ''}</span>
@@ -361,6 +405,6 @@ export default function OpsAnnouncementsPage() {
         onCancel={() => { if (!busy) setDeleting(null) }}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></ReadonlyDesignNode>
   )
 }

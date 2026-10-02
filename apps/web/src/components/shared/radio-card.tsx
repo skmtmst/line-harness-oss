@@ -109,7 +109,7 @@ export default function RadioCard({
       />
       <span className={styles.body}>
         <strong className={styles.title}>{title}</strong>
-        {note ? <small className={styles.note}>{note}</small> : null}
+        {note ? <small className={styles.note} title={typeof note === 'string' ? note : undefined}>{note}</small> : null}
         {disabled && disabledReason ? <small className={styles.reason}>{disabledReason}</small> : null}
       </span>
     </label>

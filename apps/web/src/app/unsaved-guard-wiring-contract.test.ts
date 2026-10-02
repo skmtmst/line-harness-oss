@@ -22,9 +22,13 @@ const GUARDED = [
   'app/affiliate-offers/new/page.tsx',
   'app/analytics/reports/new/page.tsx',
   'app/auto-replies/edit/wizard-v8.tsx',
+  'app/booking/menus/new/menu-form-v8.tsx',
   'app/booking/menus/new/page.tsx',
+  'app/booking/menus/settings-v8.tsx',
+  'app/booking/menus/staff/assign-v8.tsx',
   'app/booking/menus/staff/page.tsx',
   'app/booking/staff/new/page.tsx',
+  'app/booking/staff/new/staff-new-v8.tsx',
   'app/booking/staff/shifts/page.tsx',
   'app/contents/vars/edit/page.tsx',
   'app/contents/vars/new/page.tsx',
@@ -46,21 +50,28 @@ const GUARDED = [
   'app/nen/members/rank-settings-tab.tsx',
   'app/nen/pets/feeding-tab.tsx',
   'app/ops/announcements/page.tsx',
+  'app/reminders/edit/edit-v8.tsx',
   'app/reminders/edit/issue469-reminder-screens.tsx',
+  'app/reminders/new/new-v8.tsx',
   'app/reminders/new/page.tsx',
   'app/restaurant-test/google/google-business.tsx',
   'app/restaurant-test/google/google-posts.tsx',
   'app/restaurant-test/google/google-profile.tsx',
   'app/restaurant-test/stores/new/page.tsx',
   'app/rich-menus/edit/page.tsx',
+  'app/rich-menus/new/create-v8.tsx',
   'app/rich-menus/new/page.tsx',
   'app/settings/page.tsx',
   'app/settings/file-scan/page.tsx',
   'app/staff/new/page.tsx',
+  'app/tags/field-editor-v8.tsx',
   'app/tags/fields/edit/page.tsx',
   'app/tags/fields/new/page.tsx',
+  'app/tags/mark-editor-v8.tsx',
+  'app/tags/search-editor-v8.tsx',
   'app/tags/searches/edit/page.tsx',
   'app/templates/carousel/page.tsx',
+  'app/templates/editor-v8.tsx',
   'app/templates/questions/new/page.tsx',
   'app/webhooks/new/page.tsx',
   'app/webinars/edit/page.tsx',
@@ -77,8 +88,16 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string> = {
+  'app/templates/edit-v8.tsx': 'app/templates/editor-v8.tsx',
+  'app/templates/asset-editor-v8.tsx': 'app/templates/editor-v8.tsx',
+  'app/templates/carousel/carousel-v8.tsx': 'app/templates/editor-v8.tsx',
+  'app/templates/questions/question-v8.tsx': 'app/templates/editor-v8.tsx',
   'components/webinars/webinar-form.tsx': 'app/webinars/edit/page.tsx',
   'components/webinars/webinar-notifications.tsx': 'app/webinars/edit/page.tsx',
+  // ★V8 版の描画。番兵（useUnsavedGuard）は同じ画面の page.tsx が
+  // 共有フック経由で持つ。どちらのテーマでも同じ番兵が効く。
+  'app/settings/feature-settings-v8.tsx': 'app/settings/page.tsx',
+  'app/settings/file-scan/file-scan-v8.tsx': 'app/settings/file-scan/page.tsx',
 }
 
 /*
@@ -102,6 +121,8 @@ const EXEMPTIONS: Record<string, string> = {
     '入力を端末の下書きへ随時保存し、閉じる確認はエディタ内で済ませる設計。画面離脱への警告は要検討',
   'app/nen-campaigns/nen-overview.tsx':
     '紹介文の下書きは大きな一覧コンポーネント内のローカル状態。親の番兵へ載せるには報告口が要るため別途検討',
+  'app/reminders/detail/detail-v8.tsx':
+    '登録者の基準日は行内の小さな編集で「基準日を保存」で確定する。detail/page.tsx の registrants-panel（番兵なし）と同じ画面の★V8版のため、同じ扱いでここに置く',
   'app/scenarios/detail/detail-v8.tsx':
     'scenario-detail-client.tsx（s1 手動保存で番兵なし）と同じ画面の★V8版。番兵の要否は元の画面と一緒に決めるため、同じ扱いでここに置く',
   'app/scenarios/mode/page.tsx':
@@ -134,6 +155,8 @@ const EXEMPTIONS: Record<string, string> = {
     '一覧と絞り込みが中心。作る操作は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
   'app/inflow-links/page.tsx':
     '一覧の一括操作（移動・再開）は押した直後に即時保存し、下書きを持たない',
+  'app/tags/field-migrate-v8.tsx':
+    '★V8 の項目移行画面（GobMd）。事前確認→明示実行の2段階で、途中離脱で失うのは確認状態だけ。離脱番兵の v7 同等画面（fields/migrate/page.tsx）と同じ扱い',
   'app/inflow-links/detail/page.tsx':
     '転送先の編集は保存ボタン確定式。下書き・dirty 管理がなく番兵の扱いは別途検討',
   'app/mileage/score-rules/page.tsx':
@@ -152,6 +175,10 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 の自動応答一覧（uE9gf）。一覧上の操作（停止・再開・フォルダ移動・並び替え・複製・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。止める窓の理由欄は閉じると戻るダイアログ内の入力',
   'app/booking/menus/page.tsx':
     '予約メニュー編集窓（Dialog）内の dirty。×・Esc・背景・キャンセルは窓内の破棄確認に集め、閉じると入力は戻る仕様で画面離脱ガードの対象外',
+  'app/booking/menus/edit-menu-dialog.tsx':
+    'app/booking/menus/page.tsx から切り出したメニュー編集窓。dirty は窓の中だけで、閉じると入力は戻る仕様で画面離脱ガードの対象外',
+  'app/booking/staff/shifts/staff-detail-v8.tsx':
+    '★V8 の勤務とシフト（d5fmnM・E3YDK・wvGke）。各段がそれぞれの「保存」「作る」「足す」でその場で確定し、画面に残る下書きを持たない。v7 の staff-detail.tsx と同じ構造（番兵は shifts/page.tsx 側の GUARDED 行が担保）',
   'components/inflow-links/site-script.tsx':
     'サイトの追加・編集・停止理由の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
 }
@@ -182,8 +209,7 @@ const UNTRIAGED: Record<string, string> = {
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/booking/bookings/detail/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/booking/staff/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  /* 予約設定V8化でスタッフ編集窓を staff-edit-dialog.tsx へ切り出し、page.tsx から編集画面の印が無くなったので行を消した。 */
   'app/broadcasts/page.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/chats/page.tsx':
@@ -301,9 +327,21 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
     ).toEqual([])
   })
 
+  /*
+   * 画面の守りを共有フック（同じフォルダの use-*.ts）へ寄せた画面は、
+   * フックの中身も合わせて1つの画面として見る。
+   */
+  function screenSources(file: string): string {
+    const dir = dirname(join(SRC, file))
+    const hooks = readdirSync(dir)
+      .filter((name) => /^use-[^/]+\.ts$/.test(name) && !name.includes('.test.'))
+      .map((name) => readFileSync(join(dir, name), 'utf8'))
+    return [readFileSync(join(SRC, file), 'utf8'), ...hooks].join('\n')
+  }
+
   it('番兵を持つ画面は共通フックと離脱確認ダイアログを配線している', () => {
     for (const file of GUARDED) {
-      const source = readFileSync(join(SRC, file), 'utf8')
+      const source = screenSources(file)
       expect(source, file).toContain('useUnsavedGuard(')
       expect(source, `${file} の離脱確認`).toContain('leaveTarget !== null')
     }
@@ -311,7 +349,7 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
 
   it('親へ dirty を報告する画面の親は、共通フックで番兵を持っている', () => {
     for (const [file, parent] of Object.entries(COVERED_BY_PARENT)) {
-      const parentSource = readFileSync(join(SRC, parent), 'utf8')
+      const parentSource = screenSources(parent)
       expect(parentSource, `${file} の番兵を持つ親 ${parent}`).toContain('useUnsavedGuard(')
     }
   })

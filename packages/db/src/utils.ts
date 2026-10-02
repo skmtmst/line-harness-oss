@@ -44,6 +44,22 @@ export function isTimeBefore(a: string, b: string): boolean {
 }
 
 /**
+ * updated_at を版として使う更新の、次の版を返す。
+ *
+ * 同じミリ秒に2回書くと版が進まず、古い画面からの保存を見分けられない
+ * （M507・M509・M511・M513）。現在時刻が読んだ版以下のときは読んだ版の
+ * 1ms 先へ進め、版が必ず単調に進むようにする。読めない版のときは現在時刻。
+ */
+export function nextVersionToken(current: string | null | undefined, now: string = jstNow()): string {
+  if (!current) return now;
+  const currentMs = new Date(current).getTime();
+  if (!Number.isFinite(currentMs)) return now;
+  const nowMs = new Date(now).getTime();
+  if (!Number.isFinite(nowMs) || nowMs > currentMs) return now;
+  return toJstString(new Date(currentMs + 1));
+}
+
+/**
  * JSTの暦日（YYYY-MM-DD）。DBへ入る時刻はJST文字列（`jstNow`）なので、
  * 頭10文字と突き合わせて期間を切る。SQLiteの `date('now')` はUTCで
  * 9時間ずれるため、「今日」の境目の集計には使わない。

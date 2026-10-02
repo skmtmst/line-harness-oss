@@ -5662,6 +5662,9 @@ CREATE TABLE rich_menu_groups (
   folder_id           TEXT REFERENCES folders(id) ON DELETE SET NULL,
   -- 160: 自分で決める並び順。小さいほど先。同じなら更新の新しい順。
   display_order       INTEGER NOT NULL DEFAULT 0,
+  -- V8: トークを開いたときメニューを出した状態にするか（LINE payload の
+  -- `selected`）。0=閉じておく（従来どおり）、1=開いておく。
+  default_open        INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , publishing_owner TEXT, publishing_expires_at TEXT, publishing_generation INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1);
