@@ -5986,7 +5986,7 @@ CREATE TABLE rt_inbound_emails (
     CHECK (status IN ('storing', 'stored', 'received', 'quarantined', 'storage_failed', 'raw_deleted')),
   size_bytes INTEGER NOT NULL DEFAULT 0 CHECK (size_bytes >= 0),
   quarantine_reason TEXT
-);
+, media_id TEXT REFERENCES rt_media(id));
 
 CREATE TABLE rt_intake_addresses (
   id TEXT PRIMARY KEY,
@@ -6025,9 +6025,9 @@ CREATE TABLE rt_line_flows (
   UNIQUE(organization_id, store_id, flow_type)
 );
 
-CREATE TABLE rt_media (
+CREATE TABLE "rt_media" (
   id TEXT PRIMARY KEY,
-  code TEXT NOT NULL UNIQUE CHECK (code IN ('retty', 'gurunavi', 'tabelog', 'hotpepper')),
+  code TEXT NOT NULL UNIQUE CHECK (code IN ('retty', 'gurunavi', 'tabelog', 'hotpepper', 'google_reservation', 'ikyu', 'tablecheck')),
   name TEXT NOT NULL,
   sender_addresses TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(sender_addresses)),
   parser_key TEXT NOT NULL UNIQUE,
@@ -8914,6 +8914,8 @@ CREATE INDEX idx_rt_intake_addresses_store
   ON rt_intake_addresses (store_id, status);
 
 CREATE INDEX idx_rt_inventory_store_time ON rt_inventory_slots(store_id, starts_at);
+
+CREATE UNIQUE INDEX idx_rt_manual_email_import ON rt_reservations(inbound_email_id) WHERE parser_key = 'manual_import';
 
 CREATE INDEX idx_rt_memberships_org ON rt_memberships(organization_id, store_id, role);
 
