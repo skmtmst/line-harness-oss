@@ -7,7 +7,7 @@
  * - 形式説明 https://www.post.japanpost.jp/service/search/zipcode/download/utf-readme.html
  *
  * 使い方:
- *   node scripts/fetch-jp-postal-data.mjs --fetch [--url <zipのURL>] [--out data/postal]
+ *   node scripts/fetch-jp-postal-data.mjs --fetch --url <zipの直URL> [--out data/postal]
  *   node scripts/fetch-jp-postal-data.mjs --from-file <csv> [--source <名>] [--out <dir>]
  *
  * --fetch は公式配布のzipを落とし、解凍し、CSVを読み、重複・不正行を除き、
@@ -15,6 +15,22 @@
  * manifest.json（入力SHA・件数・時点）を出す。生CSV・zipは置き場に残すが
  * ソースへは入れない（.gitignoreのdata/postal一度きり*）。
  * manifest.jsonとPROVENANCEへの転記だけをコミットする。
+ *
+ * --fetch に直URLは必須（--url か環境変数 JP_POSTAL_ZIP_URL）。
+ * 配布ページの自動解析はしない。直URLは配布ページ
+ * https://www.post.japanpost.jp/service/search/zipcode/download/utf-zip.html
+ * で人が確認して渡す。URLなしの --fetch 単体はRC2で止まる。
+ *
+ * 取込SQLの分割設計（D1の文長上限 100KB 対応）:
+ * - 由来 https://developers.cloudflare.com/d1/platform/limits/
+ *   「Maximum SQL statement length 100,000 bytes」。1文のINSERTに
+ *   全行を連結すると上限を超えるため、1文が80KBを超えないよう
+ *   行数ではなくバイト数で区切って複文のINSERTにする。
+ * - 先頭は完了記録（postal_import_manifest）の1文、続いて本体の複文。
+ *   どれも INSERT OR REPLACE のため再適用は冪等。順に適用し、途中で
+ *   失敗したら止める。件数が完了記録と合うまで readiness は false の
+ *   まま（部分適用を全国版と名乗らない）。
+ * - 実D1への適用は番号ごとの明示承認後。勝手に適用しない。
  *
  * 注意:
  * - 公式公開データの取得は開発時のみ。顧客の郵便番号・住所を外部へ送らない。
@@ -124,18 +140,42 @@ function sqlQuote(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
+export const IMPORT_SQL_MAX_STATEMENT_BYTES = 80000;
+
+export function splitImportBatches(rows, sourceUrl, importedAt, maxBytes = IMPORT_SQL_MAX_STATEMENT_BYTES) {
+  const batches = [];
+  let current = [];
+  let currentBytes = 0;
+  for (const row of rows) {
+    const text = `(${[row.code, row.prefecture, row.city, row.town, sourceUrl, importedAt].map(sqlQuote).join(', ')})`;
+    const size = Buffer.byteLength(text, 'utf8') + 2;
+    if (current.length > 0 && currentBytes + size > maxBytes) {
+      batches.push(current);
+      current = [];
+      currentBytes = 0;
+    }
+    current.push({ row, text });
+    currentBytes += size;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
 export function buildImportSql({ rows, sourceUrl, inputSha256, inputBytes, manifestId, importedAt }) {
+  const batches = splitImportBatches(rows, sourceUrl, importedAt);
   const lines = [
     `-- 日本郵便の公開郵便番号データの取り込み（生成物）。実DB適用は承認後。`,
     `-- 由来: ${sourceUrl} / 入力SHA256: ${inputSha256} / ${rows.length}件 / ${importedAt}`,
+    `-- D1の1文上限100KBに合わせ、本体は${batches.length}文に分割（各80KB以内）。`,
+    `-- 適用順: 完了記録→本体の順。途中失敗で止め、件数一致まで全国版と名乗らない。`,
     `INSERT OR REPLACE INTO postal_import_manifest (id, source_url, input_sha256, input_bytes, row_count, imported_at)`,
     `  VALUES (${sqlQuote(manifestId)}, ${sqlQuote(sourceUrl)}, ${sqlQuote(inputSha256)}, ${inputBytes}, ${rows.length}, ${sqlQuote(importedAt)});`,
-    `INSERT OR REPLACE INTO postal_codes (postal_code, prefecture, city, town, source_name, imported_at) VALUES`,
   ];
-  const values = rows.map(
-    (r) => `  (${sqlQuote(r.code)}, ${sqlQuote(r.prefecture)}, ${sqlQuote(r.city)}, ${sqlQuote(r.town)}, ${sqlQuote(sourceUrl)}, ${sqlQuote(importedAt)})`,
-  );
-  return `${lines.join('\n')}\n${values.join(',\n')};\n`;
+  for (const batch of batches) {
+    lines.push(`INSERT OR REPLACE INTO postal_codes (postal_code, prefecture, city, town, source_name, imported_at) VALUES`);
+    lines.push(`${batch.map((b) => `  ${b.text}`).join(',\n')};`);
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 function jstStamp(date = new Date()) {
@@ -217,7 +257,7 @@ async function main() {
   }
 
   console.log('使い方:');
-  console.log('  node scripts/fetch-jp-postal-data.mjs --fetch [--url <zip>] [--out data/postal]');
+  console.log('  node scripts/fetch-jp-postal-data.mjs --fetch --url <zipの直URL> [--out data/postal]');
   console.log('  node scripts/fetch-jp-postal-data.mjs --from-file <csv> [--source <名>] [--out <dir>]');
   console.log(`配布ページ: ${DEFAULT_PAGE}`);
 }
@@ -245,6 +285,9 @@ async function buildFromCsv(csvPath, inputBytes, sourceUrl, outDir, stamp) {
     skippedRows: skipped,
     format: 'jp-post-utf-15col',
     importedAt,
+    importBatches: splitImportBatches(rows, sourceUrl, importedAt).length,
+    statementByteBudget: IMPORT_SQL_MAX_STATEMENT_BYTES,
+    statementByteLimit: 100000,
   };
   writeFileSync(join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   writeFileSync(

@@ -496,5 +496,5 @@
     "546_restaurant_menu_approval.sql",
     "549_broadcast_asset_publish_and_postal_lookup.sql"
   ],
-  "migrationCount": 494
+  "migrationCount": 495
 }
