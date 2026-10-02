@@ -1486,7 +1486,7 @@ function ConfirmStageV8({
                 <span className={styles.confirmVal}>
                   {preview
                     ? `今後7日 ${countLabel(preview.summary.next7Days, '通')}${preview.summary.duplicateCount > 0 ? `（重なり ${formatNumber(preview.summary.duplicateCount)}件はまとめる）` : ''}`
-                    : previewFailed ? '取得できませんでした' : '確認中'}
+                    : previewFailed ? '読み込めませんでした' : '確認中'}
                 </span>
                 <Button variant="secondary" size="field" href={editHref(reminderId, 'preview')}>変える</Button>
               </div>
