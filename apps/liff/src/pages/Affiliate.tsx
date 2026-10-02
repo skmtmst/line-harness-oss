@@ -7,7 +7,7 @@ import HelpTip from '../components/HelpTip.js';
 import Button from '../components/ui/Button.js';
 import Card from '../components/ui/Card.js';
 import Badge from '../components/ui/Badge.js';
-import PageHeader from '../components/ui/PageHeader.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
 import Icon from '../components/ui/Icon.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -316,13 +316,13 @@ function mileageSourceLabel(source: string): string {
 }
 
 /**
- * 貯まったマイル (6-a の上の黒いカード)。
+ * 貯まったマイル (S3uBl の上の深い緑のカード)。
  * 使えるマイル・確定待ち・内訳4つ・合算の注記を出す。
  */
 function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
   const { mileage, insights } = wallet;
   return (
-    <section aria-label="貯まったマイル" className="rounded-2xl bg-night p-5 text-white">
+    <section aria-label="貯まったマイル" className="rounded-2xl bg-liff-deep p-5 text-white">
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-semibold text-white/70">使えるマイル</p>
         {mileage.pending > 0 && (
@@ -373,7 +373,7 @@ function OpportunityCta({ item, secondary = false }: { item: MileageOpportunity;
       className={
         secondary
           ? 'mt-3 block rounded-lg border border-hairline bg-canvas py-2.5 text-center text-sm font-bold text-ink'
-          : 'mt-3 block rounded-lg bg-accent-deep py-3 text-center text-sm font-bold text-white'
+          : 'mt-3 block rounded-lg bg-liff-primary py-3 text-center text-sm font-bold text-white'
       }
     >
       {item.ctaLabel}
@@ -425,7 +425,7 @@ function MileageOpportunities({ items }: { items: MileageOpportunity[] }) {
                       aria-valuemax={100}
                       aria-label={`${item.title}の視聴進捗`}
                     >
-                      <span className="block h-full rounded-full bg-accent-deep" style={{ width: `${item.progressPercent}%` }} />
+                      <span className="block h-full rounded-full bg-liff-primary" style={{ width: `${item.progressPercent}%` }} />
                     </div>
                   </div>
                 )}
@@ -827,14 +827,9 @@ export default function Affiliate() {
 
   if (state.phase === 'not_registered') {
     return (
-      <div className="min-h-screen bg-ground">
-        <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-2 pb-12">
-          <div>
-            <PageHeader title="マイル・紹介" />
-            <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
-              貯まったマイルを確かめ、紹介リンクからさらに増やせます
-            </p>
-          </div>
+      <div className="min-h-screen bg-ground" data-design-node="S3uBl">
+        <LiffHeader title="マイル・紹介" />
+        <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-3 pb-12">
           {wallet && <MileageSummaryCard wallet={wallet} />}
           {wallet && <MileageOpportunities items={wallet.opportunities} />}
           <Card className="space-y-3 p-4 text-center">
@@ -901,16 +896,11 @@ export default function Affiliate() {
     });
   }
 
-  // 並びは 6-mile.png のとおり「貯まった → 増やす → 紹介の成果」。
+  // 並びは S3uBl のとおり「貯まった → 増やす → 紹介の成果」。
   return (
-    <div className="min-h-screen bg-ground">
-      <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-2 pb-12">
-        <div>
-          <PageHeader title="マイル・紹介" />
-          <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
-            貯まったマイルと、紹介の成果をまとめて見られます
-          </p>
-        </div>
+    <div className="min-h-screen bg-ground" data-design-node="S3uBl">
+      <LiffHeader title="マイル・紹介" />
+      <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-3 pb-12">
 
         {wallet && <MileageSummaryCard wallet={wallet} />}
 

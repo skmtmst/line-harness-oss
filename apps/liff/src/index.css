@@ -41,6 +41,8 @@
   --color-liff-note: #f2f6fe;
   /* 必須の札の地 (B8rCt・g9osGN。文字は --color-liff-sun)。 */
   --color-liff-required-bg: #fdecec;
+  /* マイルの貯まった箱の深い緑 (S3uBl)。主の緑より濃い。 */
+  --color-liff-deep: #0f3d24;
   --color-liff-wait-bg: #fff6e5;
   --color-liff-wait-ink: #b26b00;
   --color-liff-ok-bg: #e8f8ee;
