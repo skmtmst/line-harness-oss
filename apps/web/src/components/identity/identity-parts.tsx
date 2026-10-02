@@ -84,7 +84,7 @@ export function IdentitySubjectCard({
   return (
     <Card layout="vertical" className={styles.subject} data-identity-part="subject">
       <p className={styles.subjectSide}>{side}</p>
-      <p className={styles.subjectLabel}>{subject.label}</p>
+      <p className={styles.subjectLabel} title={subject.label}>{subject.label}</p>
       <p className={styles.subjectDetail}>
         {subject.detail ?? NOT_AVAILABLE}
         {subject.lineAccountName ? `／${subject.lineAccountName}` : ''}

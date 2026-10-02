@@ -2198,7 +2198,7 @@ export default function BroadcastForm({
               <div className="mt-4 overflow-hidden rounded-control border border-hairline">
                 {recentBroadcasts.length ? recentBroadcasts.map((broadcast) => (
                   <div key={broadcast.id} className="broadcast-recent-row grid items-center gap-3 border-b border-hairline px-3 py-2.5 text-xs last:border-b-0">
-                    <div className="min-w-0"><p className="truncate font-bold text-action">{broadcast.title}</p><p className="truncate text-ink-faint">{typeLabel(broadcast.messageType)} 1通</p></div>
+                    <div className="min-w-0"><p className="truncate font-bold text-action" title={broadcast.title}>{broadcast.title}</p><p className="truncate text-ink-faint">{typeLabel(broadcast.messageType)} 1通</p></div>
                     <span className="text-ink-secondary">{broadcast.status === 'sent' ? '送信済み' : broadcast.status === 'scheduled' ? '予約済み' : '下書き'}</span>
                     <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '未設定'}</span>
                     <button type="button" className="text-left font-semibold text-action hover:underline" onClick={() => duplicateRecent(broadcast)}>複製する</button>
