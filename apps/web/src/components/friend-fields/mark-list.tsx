@@ -63,7 +63,7 @@ function isUsed(mark: MarkRow): boolean {
   return mark.friendCount > 0 || referenceCount(mark) > 0
 }
 
-function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, error, onReplacement, onCancel, onConfirm }: {
+export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, error, onReplacement, onCancel, onConfirm }: {
   mark: MarkRow
   impact: SupportMarkArchiveImpact | null
   replacementMarkId: string

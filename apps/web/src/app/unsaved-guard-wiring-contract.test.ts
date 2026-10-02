@@ -58,6 +58,7 @@ const GUARDED = [
   'app/staff/new/page.tsx',
   'app/tags/fields/edit/page.tsx',
   'app/tags/fields/new/page.tsx',
+  'app/tags/mark-editor-v8.tsx',
   'app/tags/searches/edit/page.tsx',
   'app/templates/carousel/page.tsx',
   'app/templates/questions/new/page.tsx',
