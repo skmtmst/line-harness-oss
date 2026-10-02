@@ -3788,6 +3788,16 @@ export type ListStats = {
     sentThisWeek: number
   }
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number; failed: number }
+  /** ★V8 回答フォーム一覧の数の帯。古いWorkerの応答には無いので、画面は欠けたら「—」を出す。 */
+  forms?: {
+    total: number
+    published: number
+    draft: number
+    monthlySubmits: number
+    prevMonthSubmits: number
+    monthlyCompletionRate: number | null
+    pendingPostActions: number
+  }
 }
 
 /**
