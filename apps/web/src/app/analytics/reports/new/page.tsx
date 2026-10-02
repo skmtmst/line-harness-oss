@@ -6,12 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { TimeField } from '@/components/shared/date-time-field'
+import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import PageHeader from '@/components/shared/page-header'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
+import VersionCompare from '@/components/shared/version-compare'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useAdminTheme } from '@/lib/use-admin-theme'
@@ -91,8 +93,64 @@ function defaultAlertDrafts(enabled: boolean): Record<string, AlertRuleDraft> {
   return Object.fromEntries(ALERT_RULE_DEFS.map((def) => [def.id, { enabled, threshold: def.threshold, minimumSample: def.minimumSample }]))
 }
 
+const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'] as const
+
+const CHANNEL_LABEL: Record<string, string> = {
+  dashboard: '管理画面のお知らせ',
+  email: 'メール',
+  line: 'LINE',
+}
+
 function sectionTitleOf(id: string): string {
   return SECTION_CHOICES.find((choice) => choice.id === id)?.title ?? id
+}
+
+/*
+ * G83vi「違いを比べる」の比べる文。版の本文ではなく設定の要約。
+ * 最新と入力中の2つを作り、VersionCompare（行ごとの比べる）へ渡す。
+ */
+type ReportSummaryInput = {
+  name: string
+  sections: string[]
+  savedAnalysisIds: string[]
+  cadence: string
+  weekday: string
+  monthDay: string
+  sendTime: string
+  periodDays: string
+  staffIds: string[]
+  emails: string[]
+  channels: string[]
+  alertRules: Array<{ metric: string; operator: string; threshold: number; minimumSample: number }>
+  staffName: (id: string) => string
+  savedName: (id: string) => string
+}
+
+function describeReportSummary(input: ReportSummaryInput): string {
+  const sections = input.sections.map(sectionTitleOf)
+  const saved = input.savedAnalysisIds.map(input.savedName)
+  const recipients = [
+    ...input.staffIds.map(input.staffName),
+    ...input.emails,
+  ]
+  const schedule = input.cadence === 'monthly'
+    ? `毎月（${input.monthDay}日 ${input.sendTime}）`
+    : `毎週（${WEEKDAY_JA[Number(input.weekday)] ?? input.weekday}曜 ${input.sendTime}）`
+  const channels = input.channels.map((channel) => CHANNEL_LABEL[channel] ?? channel)
+  const alerts = input.alertRules.map((rule) => {
+    const def = ALERT_RULE_DEFS.find((item) => item.metric === rule.metric && item.operator === rule.operator)
+    return def ? `${def.name}（${rule.threshold}・最低${rule.minimumSample}件）` : 'その他の条件'
+  })
+  return [
+    `名前: ${input.name || '（名前なし）'}`,
+    `入れるもの: ${sections.length > 0 ? sections.join('、') : '（なし）'}`,
+    `保存した分析: ${saved.length > 0 ? saved.join('、') : 'なし'}`,
+    `宛先: ${recipients.length > 0 ? recipients.join('、') : '（なし）'}`,
+    `送る間かく: ${schedule}`,
+    `集計する期間: 前の${input.periodDays}日間`,
+    `通知方法: ${channels.length > 0 ? channels.join('、') : '（なし）'}`,
+    `知らせる条件: ${alerts.length > 0 ? alerts.join('、') : 'なし'}`,
+  ].join('\n')
 }
 
 /*
@@ -261,6 +319,10 @@ function AnalyticsReportFormPage() {
     setLoading(true)
     setError('')
     setConflictId(null)
+    setUpdateConflict(false)
+    setConflictLatest(null)
+    setCompareOpen(false)
+    setCompareError('')
     setNameError('')
     setOptions(null)
     // id が外れた/変わったとき前の編集対象が残ると、新規作成のつもりが旧レポートへ
@@ -426,12 +488,23 @@ function AnalyticsReportFormPage() {
   const [conflictId, setConflictId] = useState<string | null>(null)
   const theme = useAdminTheme()
   const v8 = theme === 'v8'
+  /*
+   * G83vi: なおし中にほかの人が先に保存した（409）。
+   * 入力は残したまま、板の頭の下に琥珀色の帯を出す。
+   * 最新の取り直しができたら比べる文に使い、できなくても帯は出す。
+   */
+  const [updateConflict, setUpdateConflict] = useState(false)
+  const [conflictLatest, setConflictLatest] = useState<AnalyticsReportSchedule | null>(null)
+  const [compareOpen, setCompareOpen] = useState(false)
+  const [compareBusy, setCompareBusy] = useState(false)
+  const [compareError, setCompareError] = useState('')
   // H5UoIu: 名前は必須。空のまま押したらお知らせに加えて欄の下にも出す。
   const [nameError, setNameError] = useState('')
 
   /*
-   * 保存する中身の検査と組み立て。文言・順番はそのまま。
-   * 画面への表示は呼ぶ側が行う。
+   * 保存する中身の検査と組み立て。submit（つくる・なおす）と
+   * saveOverLatest（G83vi「この内容で保存する」）の両方から使う。
+   * 文言・順番はそのまま。画面への表示は呼ぶ側が行う。
    */
   type ReportPayload = {
     name: string
@@ -564,11 +637,38 @@ function AnalyticsReportFormPage() {
       if (editing) {
         myAttempt.current = { key: `update:${editing.id}`, signature: JSON.stringify(payload) }
         latestAttemptRef.current = { seq: mySeq, ...myAttempt.current }
-        const response = await api.analytics.reportSchedules.update(selectedAccountId, editing.id, {
-          ...payload, expectedUpdatedAt: editing.updatedAt,
-        })
+        let response
+        try {
+          response = await api.analytics.reportSchedules.update(selectedAccountId, editing.id, {
+            ...payload, expectedUpdatedAt: editing.updatedAt,
+          })
+        } catch (caught) {
+          /*
+           * G83vi: ほかの人が先に保存した（409）。入力は残したまま、
+           * 板の頭の下に琥珀色の帯を出す（V8だけ。v7 は裏側の文のまま）。
+           * 最新を取り直せたら「違いを比べる」の比べる文に使う。
+           */
+          if (!(caught instanceof ApiError) || caught.status !== 409) throw caught
+          if (!isFresh()) return
+          setUpdateConflict(true)
+          setCompareOpen(false)
+          setCompareError('')
+          try {
+            const latest = await api.analytics.reportSchedules.list(selectedAccountId)
+            if (!isFresh()) return
+            if (latest.success) {
+              setConflictLatest(latest.data.items.find((item) => item.id === editing.id) ?? null)
+            }
+          } catch {
+            // 取り直しに失敗しても帯は出す。比べる文は出さない。
+          }
+          setError(caught.message)
+          return
+        }
         if (!isFresh()) return
         if (!response.success) throw new Error(response.error)
+        setUpdateConflict(false)
+        setConflictLatest(null)
         setEditing(response.data)
         notifyToast(response.data.status === 'paused'
           ? '定期レポートを更新しました。止まっている間は届きません。再開すると次の予定から届きます。'
@@ -632,6 +732,173 @@ function AnalyticsReportFormPage() {
     }
   }
 
+  /*
+   * G83vi「最新を読み込んで続ける」。取り直せた最新があればそのまま
+   * 画面へ戻し、なければ読み直す。どちらも入力中の内容は最新で置き換わる。
+   */
+  const applySchedule = (schedule: AnalyticsReportSchedule) => {
+    setEditing(schedule)
+    setName(schedule.name)
+    setSections(schedule.sections)
+    setSavedAnalysisIds(schedule.savedAnalysisIds)
+    setCadence(schedule.cadence)
+    setWeekday(String(schedule.weekday ?? 1))
+    setMonthDay(String(schedule.monthDay ?? 1))
+    setSendTime(schedule.sendTime)
+    setPeriodDays(String(schedule.periodDays))
+    setStaffIds(schedule.recipients.filter((item) => item.kind === 'staff' && item.staffId).map((item) => item.staffId as string))
+    setEmails(schedule.recipients.filter((item) => item.kind === 'email' && item.email).map((item) => item.email as string))
+    setDashboardEnabled(schedule.channels.includes('dashboard'))
+    setEmailEnabled(schedule.channels.includes('email'))
+    setLineEnabled(schedule.channels.includes('line'))
+    setAlertsEnabled(schedule.alertRules.length > 0)
+    const drafts = defaultAlertDrafts(false)
+    const extras: AnalyticsReportSchedule['alertRules'] = []
+    for (const rule of schedule.alertRules) {
+      const def = ALERT_RULE_DEFS.find((item) => item.metric === rule.metric && item.operator === rule.operator)
+      if (def) drafts[def.id] = { enabled: true, threshold: String(rule.threshold), minimumSample: String(rule.minimumSample) }
+      else extras.push(rule)
+    }
+    setAlertDrafts(drafts)
+    setExtraAlertRules(extras)
+    setBaseline(JSON.stringify([
+      schedule.name, schedule.sections, schedule.savedAnalysisIds, schedule.cadence,
+      String(schedule.weekday ?? 1), String(schedule.monthDay ?? 1), schedule.sendTime, String(schedule.periodDays),
+      schedule.recipients.filter((item) => item.kind === 'staff' && item.staffId).map((item) => item.staffId as string),
+      schedule.recipients.filter((item) => item.kind === 'email' && item.email).map((item) => (item.email as string).trim()).filter(Boolean),
+      schedule.channels.includes('dashboard'), schedule.channels.includes('email'), schedule.channels.includes('line'),
+      schedule.alertRules.length > 0, drafts, extras,
+    ]))
+    setUpdateConflict(false)
+    setConflictLatest(null)
+    setCompareOpen(false)
+    setCompareError('')
+    setError('')
+  }
+
+  const reloadLatest = () => {
+    if (conflictLatest) {
+      applySchedule(conflictLatest)
+      return
+    }
+    setCompareOpen(false)
+    setReloadSeq((n) => n + 1)
+  }
+
+  /*
+   * G83vi「比べてから保存」→比べる窓の「この内容で保存する」。
+   * 比べたうえで、取り直した最新の版つきで保存し直す（相手の変更のうえに
+   * 重ねる危ない操作なので、比べる窓の中からだけ押せる）。入力は残す。
+   * 失敗したら窓は閉じず、その場で理由を出してもう一度押せる。
+   */
+  const saveOverLatest = async () => {
+    if (!selectedAccountId || !options || !editing || !updateConflict || compareBusy) return
+    const built = buildReportPayload(options)
+    if (!built.ok) {
+      setCompareError(built.error)
+      return
+    }
+    setCompareBusy(true)
+    setCompareError('')
+    try {
+      const latest = await api.analytics.reportSchedules.list(selectedAccountId)
+      const found = latest.success
+        ? latest.data.items.find((item) => item.id === editing.id)
+        : undefined
+      if (!found) {
+        setCompareError('最新の内容を読み込めませんでした。窓を閉じて「最新を読み込んで続ける」を押してください。')
+        return
+      }
+      const mySeq = (saveSeqRef.current += 1)
+      const mySwitchSeq = switchSeqRef.current
+      const key = `update:${editing.id}`
+      const signature = JSON.stringify(built.payload)
+      latestAttemptRef.current = { seq: mySeq, key, signature }
+      const response = await api.analytics.reportSchedules.update(selectedAccountId, editing.id, {
+        ...built.payload, expectedUpdatedAt: found.updatedAt,
+      })
+      if (accountRef.current !== selectedAccountId || editIdRef.current !== editId || mySwitchSeq !== switchSeqRef.current) return
+      const current = latestAttemptRef.current
+      if (current.seq !== mySeq) return
+      if (!response.success) throw new Error(response.error)
+      setEditing(response.data)
+      setUpdateConflict(false)
+      setConflictLatest(null)
+      setCompareOpen(false)
+      setBaseline(JSON.stringify([
+        name, sections, savedAnalysisIds, cadence, weekday, monthDay, sendTime, periodDays,
+        staffIds.filter(Boolean),
+        emails.map((item) => item.trim()).filter(Boolean),
+        dashboardEnabled, emailEnabled, lineEnabled, alertsEnabled, alertDrafts, extraAlertRules,
+      ]))
+      notifyToast(`定期レポートを更新しました。次は${nextLabel}に届きます。`)
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 409) {
+        try {
+          const retry = await api.analytics.reportSchedules.list(selectedAccountId)
+          if (retry.success) {
+            setConflictLatest(retry.data.items.find((item) => item.id === editing.id) ?? null)
+          }
+        } catch {
+          // 取り直しに失敗しても窓は閉じない。
+        }
+        setCompareError('ほかの人がさらに先に保存しました。比べ直してから、もう一度お試しください。')
+        return
+      }
+      setCompareError(caught instanceof Error ? caught.message : '定期レポートを更新できませんでした')
+    } finally {
+      setCompareBusy(false)
+    }
+  }
+
+  /*
+   * G83vi「違いを比べる」の2つの文。最新が取れていないときは比べる窓を出さない。
+   */
+  const staffNameOf = (id: string) => options?.recipients.find((item) => item.id === id)?.name ?? id
+  const savedNameOf = (id: string) => options?.savedAnalyses.find((item) => item.id === id)?.name ?? id
+  const latestSummary = conflictLatest ? describeReportSummary({
+    name: conflictLatest.name,
+    sections: conflictLatest.sections,
+    savedAnalysisIds: conflictLatest.savedAnalysisIds,
+    cadence: conflictLatest.cadence,
+    weekday: String(conflictLatest.weekday ?? 1),
+    monthDay: String(conflictLatest.monthDay ?? 1),
+    sendTime: conflictLatest.sendTime,
+    periodDays: String(conflictLatest.periodDays),
+    staffIds: conflictLatest.recipients.filter((item) => item.kind === 'staff' && item.staffId).map((item) => item.staffId as string),
+    emails: conflictLatest.recipients.filter((item) => item.kind === 'email' && item.email).map((item) => item.email as string),
+    channels: conflictLatest.channels,
+    alertRules: conflictLatest.alertRules,
+    staffName: staffNameOf,
+    savedName: savedNameOf,
+  }) : ''
+  const parsedDraftAlerts = (): ReportSummaryInput['alertRules'] => {
+    const rules: ReportSummaryInput['alertRules'] = []
+    if (alertsEnabled) {
+      for (const def of ALERT_RULE_DEFS) {
+        const draft = alertDrafts[def.id]
+        if (!draft?.enabled) continue
+        const threshold = Number(draft.threshold)
+        const minimumSample = Number(draft.minimumSample)
+        if (!Number.isFinite(threshold) || !Number.isInteger(minimumSample)) continue
+        rules.push({ metric: def.metric, operator: def.operator, threshold, minimumSample })
+      }
+      for (const rule of extraAlertRules) rules.push(rule)
+    }
+    return rules
+  }
+  const draftSummary = describeReportSummary({
+    name, sections, savedAnalysisIds, cadence, weekday, monthDay, sendTime, periodDays,
+    staffIds, emails: emails.map((item) => item.trim()).filter(Boolean),
+    channels: [
+      ...(dashboardEnabled ? ['dashboard'] : []),
+      ...(emailEnabled ? ['email'] : []),
+      ...(lineEnabled ? ['line'] : []),
+    ],
+    alertRules: parsedDraftAlerts(),
+    staffName: staffNameOf,
+    savedName: savedNameOf,
+  })
 
   /*
    * つくる・なおし途中の離脱確認。基準（初期値または読み直した値）から
@@ -680,7 +947,7 @@ function AnalyticsReportFormPage() {
   return (
     // U054: 左右の余白は app-shell が持つ（16px/24px/40px）。
     // ここで px-6 を重ねるとスマホで入力幅が二重に削られる。
-    <div className={`text-ink mx-auto flex max-w-screen-2xl flex-col gap-4 pb-24 ${styles.page}`} data-design-node={v8 ? 'H5UoIu' : 'URqOA'}>
+    <div className={`text-ink mx-auto flex max-w-screen-2xl flex-col gap-4 pb-24 ${styles.page}`} data-design-node={v8 ? (updateConflict ? 'G83vi' : 'H5UoIu') : 'URqOA'}>
       {v8 && (
         <div className={styles.head}>
           <Link className={styles.back} href="/analytics">← 分析へ</Link>
@@ -695,6 +962,20 @@ function AnalyticsReportFormPage() {
           description=""
         />
       </div>
+      {v8 && updateConflict && (
+        <div className={styles.conflict} role="alert">
+          <div>
+            <p className={styles.conflictTitle}>ほかの人がこのレポートを先に保存しました</p>
+            <p className={styles.conflictSub}>このまま保存すると、相手の変更が消えます</p>
+          </div>
+          <div className={styles.conflictActions}>
+            {conflictLatest && (
+              <Button variant="secondary" onClick={() => { setCompareError(''); setCompareOpen(true) }}>違いを比べる</Button>
+            )}
+            <Button variant="secondary" onClick={() => reloadLatest()}>最新を読み込んで続ける</Button>
+          </div>
+        </div>
+      )}
       {!canManage && <div className="bg-canvas-sunken mb-4 rounded-control px-4 py-3 text-sm">運用担当は内容を確認できます。作成は統括または管理者が行います。</div>}
       {error && <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />}
       {/*
@@ -995,8 +1276,26 @@ function AnalyticsReportFormPage() {
         status={v8 ? null : (editing
           ? <>「{editing.name}」を直しています。保存すると、次の{nextLabel}から新しい内容で届きます。</>
           : <>まだ動いていません。つくると、次の{nextLabel}から届きはじめます。</>)}
-        actions={<><Link className="text-ink-secondary inline-flex h-10 items-center px-3 text-sm no-underline" href="/analytics">キャンセル</Link>{!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}<Button disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(false)} busy={saving} busyLabel={(editing ? '保存しています' : '作っています')}>{(editing ? '変更を保存する' : 'つくって動かす')}</Button></>}
+        actions={<><Link className="text-ink-secondary inline-flex h-10 items-center px-3 text-sm no-underline" href="/analytics">キャンセル</Link>{!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}<Button disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => { if (editing && v8 && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={(editing ? '保存しています' : '作っています')}>{(editing ? (v8 && updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす')}</Button></>}
       />
+      {v8 && (
+        <Dialog
+          open={compareOpen}
+          title="違いを比べる"
+          description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。"
+          onCancel={() => { if (!compareBusy) setCompareOpen(false) }}
+          footer={(
+            <>
+              <Button variant="secondary" disabled={compareBusy} onClick={() => reloadLatest()}>最新を読み込んで続ける</Button>
+              <Button disabled={compareBusy} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button>
+            </>
+          )}
+          error={compareError || undefined}
+          busy={compareBusy}
+        >
+          <VersionCompare before={latestSummary} after={draftSummary} />
+        </Dialog>
+      )}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した定期レポート" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
