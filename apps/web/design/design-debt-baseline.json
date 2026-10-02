@@ -18,11 +18,22 @@
   "app/analytics/page.tsx": {
     "arbitrary-value": 6
   },
+  "app/auto-replies/edit/wizard-v8.tsx": {
+    "unresolved-classname": 249
+  },
+  "app/auto-replies/list-v8.tsx": {
+    "unresolved-classname": 76,
+    "direct-th": 7
+  },
   "app/auto-replies/page.tsx": {
     "arbitrary-value": 18
   },
   "app/auto-replies/runs/page.tsx": {
     "unresolved-classname": 30
+  },
+  "app/auto-replies/runs/runs-v8.tsx": {
+    "unresolved-classname": 71,
+    "direct-th": 7
   },
   "app/automations/new/page.tsx": {
     "unresolved-classname": 55
@@ -55,13 +66,25 @@
     "direct-secondary-button": 2,
     "arbitrary-value": 2
   },
+  "app/broadcasts/detail-v8.tsx": {
+    "unresolved-classname": 75
+  },
   "app/broadcasts/detail/page.tsx": {
     "direct-secondary-button": 1
+  },
+  "app/broadcasts/list-v8.tsx": {
+    "unresolved-classname": 75
   },
   "app/broadcasts/page.tsx": {
     "arbitrary-value": 2,
     "unresolved-classname": 1,
     "direct-secondary-button": 1
+  },
+  "app/broadcasts/phone-mock-v8.tsx": {
+    "unresolved-classname": 16
+  },
+  "app/broadcasts/reserved-v8.tsx": {
+    "unresolved-classname": 35
   },
   "app/chats/page.tsx": {
     "arbitrary-value": 37,
@@ -226,12 +249,20 @@
     "arbitrary-value": 10,
     "direct-secondary-button": 1
   },
+  "app/scenarios/detail/detail-v8.tsx": {
+    "arbitrary-value": 3,
+    "unresolved-classname": 109
+  },
   "app/scenarios/detail/scenario-detail-client.tsx": {
     "arbitrary-value": 5
   },
   "app/scenarios/first-step/page.tsx": {
     "arbitrary-value": 1,
     "unresolved-classname": 4
+  },
+  "app/scenarios/list-v8.tsx": {
+    "unresolved-classname": 64,
+    "direct-th": 6
   },
   "app/scenarios/mode/page.tsx": {
     "arbitrary-value": 5
@@ -241,6 +272,9 @@
   },
   "app/scenarios/results/page.tsx": {
     "unresolved-classname": 17
+  },
+  "app/scenarios/results/results-v8.tsx": {
+    "unresolved-classname": 46
   },
   "app/search-console/page.tsx": {
     "arbitrary-value": 2
@@ -259,15 +293,34 @@
   "app/staff/page.tsx": {
     "arbitrary-value": 16
   },
+  "app/tags/fields-tab-v8.tsx": {
+    "unresolved-classname": 58
+  },
   "app/tags/fields/migrate/page.tsx": {
     "arbitrary-value": 1
   },
   "app/tags/folders/new/page.tsx": {
     "arbitrary-value": 6
   },
+  "app/tags/list-v8.tsx": {
+    "unresolved-classname": 6
+  },
+  "app/tags/marks-v8.tsx": {
+    "unresolved-classname": 51
+  },
+  "app/tags/searches-v8.tsx": {
+    "unresolved-classname": 59
+  },
+  "app/tags/tags-tab-v8.tsx": {
+    "unresolved-classname": 67
+  },
   "app/templates/carousel/page.tsx": {
     "unresolved-classname": 7,
     "arbitrary-value": 1
+  },
+  "app/templates/detail/detail-v8.tsx": {
+    "unresolved-classname": 85,
+    "direct-th": 5
   },
   "app/templates/detail/page.tsx": {
     "arbitrary-value": 2,
@@ -275,6 +328,10 @@
   },
   "app/templates/edit/page.tsx": {
     "unresolved-classname": 1
+  },
+  "app/templates/list-v8.tsx": {
+    "unresolved-classname": 81,
+    "direct-th": 8
   },
   "app/templates/page.tsx": {
     "unresolved-classname": 6,
@@ -464,6 +521,9 @@
   "components/layout/page-header-h2.tsx": {
     "unresolved-classname": 5
   },
+  "components/layout/settings-inner-nav.tsx": {
+    "unresolved-classname": 7
+  },
   "components/layout/sidebar-identity.tsx": {
     "unresolved-classname": 6
   },
@@ -647,7 +707,7 @@
     "unresolved-classname": 1
   },
   "components/shared/top-bar.tsx": {
-    "unresolved-classname": 31
+    "unresolved-classname": 35
   },
   "components/support/email-thread.tsx": {
     "arbitrary-value": 7

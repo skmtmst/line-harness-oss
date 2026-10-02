@@ -490,7 +490,14 @@
     "540_support_mark_rule_create_idempotency.sql",
     "541_tag_update_idempotency.sql",
     "542_line_account_login_liff_unique.sql",
-    "543_auto_reply_create_idempotency.sql"
+    "543_auto_reply_create_idempotency.sql",
+    "544_line_account_tags.sql",
+    "545_restaurant_channels.sql",
+    "546_restaurant_menu_approval.sql",
+    "547_restaurant_inventory_from_tables.sql",
+    "548_friend_bulk_message_approval.sql",
+    "549_broadcast_asset_publish_and_postal_lookup.sql",
+    "550_nen_member_rank_sync.sql"
   ],
-  "migrationCount": 491
+  "migrationCount": 498
 }

@@ -21,6 +21,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 const GUARDED = [
   'app/affiliate-offers/new/page.tsx',
   'app/analytics/reports/new/page.tsx',
+  'app/auto-replies/edit/wizard-v8.tsx',
   'app/booking/menus/new/page.tsx',
   'app/booking/menus/staff/page.tsx',
   'app/booking/staff/new/page.tsx',
@@ -101,6 +102,8 @@ const EXEMPTIONS: Record<string, string> = {
     '入力を端末の下書きへ随時保存し、閉じる確認はエディタ内で済ませる設計。画面離脱への警告は要検討',
   'app/nen-campaigns/nen-overview.tsx':
     '紹介文の下書きは大きな一覧コンポーネント内のローカル状態。親の番兵へ載せるには報告口が要るため別途検討',
+  'app/scenarios/detail/detail-v8.tsx':
+    'scenario-detail-client.tsx（s1 手動保存で番兵なし）と同じ画面の★V8版。番兵の要否は元の画面と一緒に決めるため、同じ扱いでここに置く',
   'app/scenarios/mode/page.tsx':
     '★V7: 方式選択はラジオの即時確定で未保存を持たない。名前・フォルダ欄は新規時は確定時に同送、既存時は欄内の保存で確定する小さな操作のため番兵を付けない',
   'app/staff/page.tsx':
@@ -135,6 +138,14 @@ const EXEMPTIONS: Record<string, string> = {
     '分類の変更は選んだ直後に即時保存し、下書きを持たない',
   'components/friend-fields/tags-page-v4.tsx':
     '一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
+  'app/broadcasts/list-v8.tsx':
+    '一覧と絞り込みが中心。フォルダ・並び替え・保存した検索など一覧上の操作は押した直後に即時保存し、配信の作成は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
+  'app/tags/tags-tab-v8.tsx':
+    'tags-page-v4.tsx と同じ一覧のV8版。一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
+  'app/scenarios/list-v8.tsx':
+    '★V8 のシナリオ一覧（axFrW）。一覧上の操作（停止・再開・フォルダ移動・並び替え・複製・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。複製窓の名前欄は閉じると戻るダイアログ内の入力',
+  'app/auto-replies/list-v8.tsx':
+    '★V8 の自動応答一覧（uE9gf）。一覧上の操作（停止・再開・フォルダ移動・並び替え・複製・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。止める窓の理由欄は閉じると戻るダイアログ内の入力',
   'app/booking/menus/page.tsx':
     '予約メニュー編集窓（Dialog）内の dirty。×・Esc・背景・キャンセルは窓内の破棄確認に集め、閉じると入力は戻る仕様で画面離脱ガードの対象外',
   'components/inflow-links/site-script.tsx':
@@ -208,6 +219,8 @@ const UNTRIAGED: Record<string, string> = {
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/templates/page.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/templates/list-v8.tsx':
+    '★V8 のテンプレート一覧（v19Ivv）。一覧上の操作（フォルダ移動・複製・削除・まとめて操作）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。種類を選ぶ窓は行き先を選ぶだけ',
   'app/templates/template-asset-editor.tsx':
     's2: テンプレート編集の本体（app/templates/edit から載る）。V6R-S2-a（board#1066）で付ける',
   'app/webhooks/edit/page.tsx':
