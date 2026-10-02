@@ -21,7 +21,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import DefaultValueInput from '@/components/friend-fields/default-value-input'
-import { sameLabels, storedDefaultLabels } from './fields/edit/page'
+import { sameLabels, storedDefaultLabels } from './fields/default-labels'
 import styles from './field-editor-v8.module.css'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
