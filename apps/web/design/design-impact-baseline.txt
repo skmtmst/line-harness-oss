@@ -202,8 +202,10 @@ shared-button-importer app/rich-menus/new/page.tsx
 shared-button-importer app/rich-menus/page.tsx
 shared-button-importer app/scenarios/detail/detail-v8.tsx
 shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
+shared-button-importer app/scenarios/first-step-v8.tsx
 shared-button-importer app/scenarios/list-v8.tsx
 shared-button-importer app/scenarios/first-step/page.tsx
+shared-button-importer app/scenarios/mode-v8.tsx
 shared-button-importer app/scenarios/mode/page.tsx
 shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx
