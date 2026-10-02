@@ -132,6 +132,8 @@ function serializeGroup(row: RichMenuGroup) {
     targetingEnabled: row.targeting_enabled === 1,
     folderId: row.folder_id,
     displayOrder: row.display_order,
+    // V8「トークを開いたとき メニューを開いておく」。LINE payload の selected。
+    defaultOpen: row.default_open === 1,
     // M951: 保存時に送り返す版。古い版での保存は 409 で止める。
     version: row.version ?? 1,
     createdAt: row.created_at,
@@ -188,6 +190,7 @@ function manualPublishFingerprint(row: RichMenuGroupWithPages): string {
     targetingEnabled: row.targeting_enabled === 1,
     folderId: row.folder_id,
     displayOrder: row.display_order,
+    defaultOpen: row.default_open === 1,
     pages: row.pages.map((page) => ({
       id: page.id,
       orderIndex: page.order_index,
@@ -268,6 +271,7 @@ function fingerprintFromSnapshot(snapshot: unknown): string | null {
     targetingEnabled: s.targetingEnabled === true,
     folderId: s.folderId,
     displayOrder: s.displayOrder,
+    defaultOpen: s.defaultOpen === true,
     pages,
   });
 }
@@ -581,6 +585,9 @@ function parseCreateBody(raw: unknown): Parsed<CreateRichMenuGroupInput> {
   if (r.targetingEnabled !== undefined && typeof r.targetingEnabled !== 'boolean') {
     return { ok: false, error: 'targetingEnabled must be boolean' };
   }
+  if (r.defaultOpen !== undefined && typeof r.defaultOpen !== 'boolean') {
+    return { ok: false, error: 'defaultOpen must be boolean' };
+  }
   if (r.targetingPriority !== undefined) {
     if (typeof r.targetingPriority !== 'number' || !Number.isInteger(r.targetingPriority)) {
       return { ok: false, error: 'targetingPriority must be an integer' };
@@ -619,6 +626,7 @@ function parseCreateBody(raw: unknown): Parsed<CreateRichMenuGroupInput> {
       targetingEnabled: r.targetingEnabled === true,
       targetingCondition,
       targetingPriority: typeof r.targetingPriority === 'number' ? r.targetingPriority : 0,
+      defaultOpen: r.defaultOpen === true,
     },
   };
 }
@@ -683,6 +691,10 @@ function parsePatchBody(raw: unknown): Parsed<{ meta: UpdateRichMenuGroupMetaInp
       return { ok: false, error: 'displayOrder must be an integer' };
     }
     meta.displayOrder = r.displayOrder;
+  }
+  if (r.defaultOpen !== undefined) {
+    if (typeof r.defaultOpen !== 'boolean') return { ok: false, error: 'defaultOpen must be boolean' };
+    meta.defaultOpen = r.defaultOpen;
   }
   let pages: RichMenuPageInput[] | undefined;
   if (r.pages !== undefined) {
@@ -1804,7 +1816,8 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
     existing.status === 'published'
     && (parsed.value.pages !== undefined
       || parsed.value.meta.chatBarText !== undefined
-      || parsed.value.meta.isDefaultForAll !== undefined)
+      || parsed.value.meta.isDefaultForAll !== undefined
+      || parsed.value.meta.defaultOpen !== undefined)
   ) {
     return c.json(
       {
@@ -2277,6 +2290,7 @@ async function buildPublishGroupInput(
     size: latestGroup.size,
     chatBarText: latestGroup.chat_bar_text,
     isDefaultForAll: latestGroup.is_default_for_all === 1,
+    defaultOpen: latestGroup.default_open === 1,
     formBaseUrl,
     pages: latestGroup.pages.map((p) => ({
       id: p.id, orderIndex: p.order_index, name: p.name,
