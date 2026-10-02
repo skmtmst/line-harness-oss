@@ -278,7 +278,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
         : null
   const detailOf = (whenAvailable: string): string => kpiReason ?? whenAvailable
   const kpis = [
-    { title: '項目数', icon: ClipboardList, value: summary?.total ?? null, unit: '件', detail: detailOf(typeof summary?.inUse === 'number' ? `使用中 ${summary.inUse}件` : '使用中の数は取得できません') },
+    { title: '項目数', icon: ClipboardList, value: summary?.total ?? null, unit: '件', detail: detailOf(typeof summary?.inUse === 'number' ? `使用中 ${summary.inUse}件` : '使用中の数は未集計') },
     { title: '登録済み友だち', icon: Users, value: summary?.registeredFriends ?? null, unit: '人', detail: detailOf('1項目以上を登録') },
     // 口そのものが無いときは、読込・失敗とは別の言葉にする（v7 と同じ）。
     { title: 'フォーム連携', icon: FileText, value: summary?.formLinks ?? null, unit: '件', detail: kpiReason ?? (summary?.formLinks === null ? notConnectedText('回答フォームの登録先') : '回答の登録先') },
@@ -499,7 +499,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                           </td>
                           <td className={styles.cellText}>{FIELD_TYPE_LABELS[field.type] ?? field.type}</td>
                           <td className={styles.cellText} style={{ fontVariantNumeric: 'tabular-nums' }}>{knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}</td>
-                          <td className={styles.cellMuted} title={field.formUsageCount === undefined ? '回答フォームの使用数を取得できません' : undefined}>
+                          <td className={styles.cellMuted} title={field.formUsageCount === undefined ? '回答フォームの使用数は未集計' : undefined}>
                             {field.formUsageCount === undefined ? '—' : `${field.formUsageCount}個`}
                           </td>
                           <td className={styles.cellMuted}><span className={styles.cellTruncate} title={destinationLabel(field)}>{destinationLabel(field)}</span></td>
