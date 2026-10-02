@@ -57,6 +57,8 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, pagination, importIndex).map((file) => relative(SRC, file))).toEqual([
       // m15c: 手書きのページ送りを共通 Pagination へ置き換えた10画面を足す。
       'app/accounts/migration.tsx',
+      // ★V8 LINEユーザーIDの移行（Z0jHp）。判断一覧は50件ずつのページ送り。
+      'app/accounts/uid-migration-v8.tsx',
       // 2026-09-02: 案件一覧が自前のページ送りを持たないまま全件を出していた。
       // 設計 `GH8VL` は表の下にページ送りがある。共通へ寄せた。
       'app/affiliates/tabs.tsx',
@@ -86,6 +88,8 @@ describe('共通部品の影響範囲', () => {
       'app/conversions/page.tsx',
       // #1011 FRIEND-11: 重複候補が50件を超えると後ろの候補へ辿れなかった。
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
+      // ★V8 重複しているかも（hn6Y8）。v7 と同じくサーバ総数でページ送り。
+      'app/duplicates/duplicates-v8.tsx',
       'app/duplicates/page.tsx',
       // #572: EC連携の取り込み記録が先頭20件しか出ず、21件目以降の失敗に
       // 届かなかった。状態絞りをサーバへ移し、共通へ寄せた。
@@ -150,6 +154,8 @@ describe('共通部品の影響範囲', () => {
       // ★V8 テンプレート一覧（v19Ivv）。表の下にページ送りがあり、
       // 1ページごとの件数を選べる。
       'app/templates/list-v8.tsx',
+      // ★V8 統合ユーザーの一覧（ADjK8）。20件ずつのページ送り。
+      'app/users/users-v8.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
       'app/webinars/page.tsx',

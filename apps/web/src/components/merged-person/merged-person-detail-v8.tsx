@@ -303,7 +303,7 @@ export default function MergedPersonDetailViewV8({
             value={m.unlinkReason}
             onChange={(event) => m.setUnlinkReason(event.target.value)}
             placeholder="確認した根拠を書いてください"
-            style={{ display: 'block', width: '100%', marginTop: 6, minHeight: 72, border: '1px solid var(--color-hairline)', borderRadius: 8, padding: '8px 10px', font: 'inherit', fontWeight: 400 }}
+            className={styles.reasonArea}
           />
         </label>
       </Dialog>

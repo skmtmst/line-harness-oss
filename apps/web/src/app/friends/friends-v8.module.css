@@ -107,7 +107,7 @@
   gap: 0;
   overflow: hidden;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
 }
 
@@ -196,7 +196,7 @@
   margin: 0;
   padding: 10px 14px;
   border: 1px solid var(--color-accent-border, var(--color-hairline));
-  border-radius: var(--radius-control, 8px);
+  border-radius: var(--radius-control);
   background: var(--color-accent-soft);
   color: var(--color-ink-secondary);
   font-size: 12px;
@@ -218,7 +218,7 @@
   margin: 0;
   padding: 10px 14px;
   border: 1px solid var(--color-danger);
-  border-radius: var(--radius-control, 8px);
+  border-radius: var(--radius-control);
   background: var(--color-danger-bg);
   color: var(--color-danger);
   font-size: 12px;
@@ -243,7 +243,7 @@
   gap: 12px;
   padding: 16px 20px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
 }
 
@@ -265,7 +265,7 @@
 .tableWrap {
   overflow-x: auto;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
 }
 
@@ -354,8 +354,8 @@
 }
 
 .pillStrong {
-  background: var(--color-success-bg, #e8f5ec);
-  color: var(--color-success, #1a7f4b);
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .pillWarn {
@@ -377,7 +377,7 @@
 .evidenceChip {
   padding: 2px 8px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-mini, 4px);
+  border-radius: var(--radius-mini);
   color: var(--color-ink-secondary);
   font-size: 11px;
   white-space: nowrap;
@@ -419,7 +419,7 @@
   gap: 8px;
   padding: 48px 24px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
   text-align: center;
 }
@@ -461,7 +461,7 @@
   gap: 1px;
   overflow: hidden;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
 }
 
@@ -488,7 +488,7 @@
 .skeletonBar {
   height: 12px;
   flex: 1;
-  border-radius: var(--radius-mini, 4px);
+  border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
 }
 
@@ -499,7 +499,7 @@
   gap: 0;
   padding: 16px 20px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
   overflow-x: auto;
 }
@@ -528,8 +528,8 @@
 }
 
 .stepDone .stepDot {
-  border-color: var(--color-success, #1a7f4b);
-  background: var(--color-success, #1a7f4b);
+  border-color: var(--color-success);
+  background: var(--color-success);
   color: var(--color-canvas);
 }
 
@@ -561,7 +561,7 @@
 }
 
 .stepLineDone {
-  background: var(--color-success, #1a7f4b);
+  background: var(--color-success);
 }
 
 /* ===== 候補確認（板2：A/Bを同じ高さで並べる） ===== */
@@ -578,7 +578,7 @@
   gap: 10px;
   padding: 16px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
 }
 
@@ -653,10 +653,10 @@
   gap: 8px;
   margin: 0;
   padding: 10px 14px;
-  border: 1px solid var(--color-success, #1a7f4b);
-  border-radius: var(--radius-control, 8px);
-  background: var(--color-success-bg, #e8f5ec);
-  color: var(--color-success, #1a7f4b);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-control);
+  background: var(--color-success-bg);
+  color: var(--color-success);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.6;
@@ -698,7 +698,7 @@
   gap: 12px;
   padding: 20px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
 }
 
@@ -742,7 +742,7 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
   overflow: hidden;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control, 8px);
+  border-radius: var(--radius-control);
 }
 
 .importSummary > div {
@@ -830,8 +830,8 @@
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 999px;
-  background: #e8f5ea;
+  border-radius: var(--radius-pill);
+  background: var(--color-success-bg);
   color: var(--color-accent-deep);
   font-size: 10px;
   font-weight: 700;
@@ -848,19 +848,19 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: 999px;
-  background: #f1f5f3;
-  border: 1px solid #e0e6e2;
-  color: #334155;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  border: 1px solid var(--color-hairline);
+  color: var(--color-ink-secondary);
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .evidenceChipWarn {
-  background: #fff7ed;
-  border-color: #f2d9b8;
-  color: var(--color-warn);
+  background: var(--color-status-warn-soft);
+  border-color: var(--color-status-warn);
+  color: var(--color-warning);
 }
 
 .infoBandRetry {
@@ -877,7 +877,7 @@
 }
 
 .stateIconError {
-  background: var(--color-danger-soft);
+  background: var(--color-status-danger-soft);
   color: var(--color-danger);
 }
 
@@ -914,8 +914,8 @@
   height: 20px;
   padding: 2px;
   border: 0;
-  border-radius: 999px;
-  background: #d7ddd9;
+  border-radius: var(--radius-pill);
+  background: var(--color-track);
   cursor: pointer;
   transition: background 0.15s ease;
 }
@@ -933,8 +933,8 @@
   display: block;
   width: 16px;
   height: 16px;
-  border-radius: 999px;
-  background: #fff;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
   transition: transform 0.15s ease;
 }
 
@@ -959,7 +959,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--color-divider-soft, #eceff0);
+  border-bottom: 1px solid var(--color-divider-soft);
   font-size: 13px;
 }
 
@@ -990,7 +990,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--color-divider-soft, #eceff0);
+  border-bottom: 1px solid var(--color-divider-soft);
   font-size: 13px;
 }
 
@@ -1121,9 +1121,9 @@ legend.fieldLabel {
   flex-direction: column;
   gap: 12px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-card);
   padding: 14px 16px;
-  background: var(--color-canvas-sunken, #f6f8f7);
+  background: var(--color-canvas-sunken);
 }
 
 /* 見出し行：題・説明・右端の札（状態バッジ等）を横に並べる。 */
@@ -1173,4 +1173,17 @@ legend.fieldLabel {
   margin-top: 2px;
   color: var(--color-ink-faint);
   font-size: 11px;
+}
+
+/* 解除の理由を書く欄 */
+.reasonArea {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  min-height: 72px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  padding: 8px 10px;
+  font: inherit;
+  font-weight: 400;
 }

@@ -306,7 +306,7 @@ export default function UsersV8() {
               return [
                 main,
                 <tr key={`${row.identityKey}-detail`}>
-                  <td colSpan={5} style={{ background: 'var(--color-canvas-sunken, #f6f8f7)' }}>
+                  <td colSpan={5} style={{ background: 'var(--color-canvas-sunken)' }}>
                     <div className={styles.duoCards} style={{ padding: '12px 16px' }}>
                       <div>
                         <p className={styles.sectionDesc} style={{ marginBottom: 6 }}>登録アカウント</p>
