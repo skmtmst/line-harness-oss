@@ -229,9 +229,16 @@
   "app/scenarios/detail/scenario-detail-client.tsx": {
     "arbitrary-value": 5
   },
+  "app/scenarios/first-step-v8.tsx": {
+    "unresolved-classname": 46
+  },
   "app/scenarios/first-step/page.tsx": {
     "arbitrary-value": 1,
     "unresolved-classname": 4
+  },
+  "app/scenarios/mode-v8.tsx": {
+    "unresolved-classname": 31,
+    "direct-th": 3
   },
   "app/scenarios/mode/page.tsx": {
     "arbitrary-value": 5

@@ -103,6 +103,10 @@ const EXEMPTIONS: Record<string, string> = {
     '紹介文の下書きは大きな一覧コンポーネント内のローカル状態。親の番兵へ載せるには報告口が要るため別途検討',
   'app/scenarios/mode/page.tsx':
     '★V7: 方式選択はラジオの即時確定で未保存を持たない。名前・フォルダ欄は新規時は確定時に同送、既存時は欄内の保存で確定する小さな操作のため番兵を付けない',
+  'app/scenarios/mode-v8.tsx':
+    'mode/page.tsx と同じ画面の★V8版。方式選択はラジオ＋主ボタンの確定式で、名前・フォルダ欄も既存時は欄内の保存で確定する。v7と同じ動きなので同じ扱い',
+  'app/scenarios/first-step-v8.tsx':
+    'first-step/page.tsx（s1 未判定）と同じ画面の★V8版。番兵の要否は元の画面と一緒に決めるため、同じ扱いでここに置く',
   'app/staff/page.tsx':
     '権限プレビューの「変更後の予定」。リンクは下書きを捨てて移る仕様として明示済み',
   'components/automations/automation-draft-editor.tsx':
