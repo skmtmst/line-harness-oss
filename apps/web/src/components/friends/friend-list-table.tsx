@@ -269,9 +269,23 @@ export default function FriendListTable({
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0">
-        <ListRange total={total} first={rangeStart} last={rangeEnd} />
-        <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} disabled={status !== 'ready'} ariaLabel="友だち一覧のページ" />
+      {/*
+        ★V8（jX2Uw）：ページ送りの帯が「件数＋ボタン」を持つ形。
+        v7 は帯の外に件数を出す（data-pagebar-out が v8 で隠す）、
+        v8 は帯の中の summary に出す。
+      */}
+      <div data-pagebar className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0">
+        <span data-pagebar-out>
+          <ListRange total={total} first={rangeStart} last={rangeEnd} />
+        </span>
+        <Pagination
+          page={page}
+          pageCount={pageCount}
+          onPageChange={onPageChange}
+          disabled={status !== 'ready'}
+          ariaLabel="友だち一覧のページ"
+          summary={<ListRange bare total={total} first={rangeStart} last={rangeEnd} />}
+        />
       </div>
       </RefreshCover>
     </section>
