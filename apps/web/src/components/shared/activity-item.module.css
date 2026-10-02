@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 動きの印・動きの行（Pencil ★V8 `x4FeKG`・`EsjP2`）。

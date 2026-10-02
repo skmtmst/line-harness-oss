@@ -391,6 +391,7 @@ export async function updateBannerImage(
 
 export interface BannerImageListFilter {
   tenantId: string;
+  delivered?: boolean;
   projectId?: string;
   favoriteOnly?: boolean;
   presetKey?: string;
@@ -410,6 +411,9 @@ export async function listBannerImages(
   const values: unknown[] = [filter.tenantId];
   if (filter.projectId) { conditions.push('i.project_id = ?'); values.push(filter.projectId); }
   if (filter.favoriteOnly) conditions.push('i.is_favorite = 1');
+  if (filter.delivered !== undefined) conditions.push(`${filter.delivered ? '' : 'NOT '}EXISTS (
+    SELECT 1 FROM banner_image_deliveries d WHERE d.banner_image_id = i.id
+  )`);
   if (filter.presetKey) { conditions.push('g.preset_key = ?'); values.push(filter.presetKey); }
   if (filter.query) {
     conditions.push('(g.text_lines LIKE ? OR g.final_prompt LIKE ? OR g.custom_prompt LIKE ? OR g.free_prompt LIKE ? OR m.filename LIKE ?)');

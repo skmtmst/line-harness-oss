@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 .badge {
   display: inline-flex;
@@ -69,6 +70,7 @@
   padding: 2px 8px;
   font-size: var(--text-caption);
   font-weight: 600;
+  line-height: var(--text-lh, 1.5); /* 12×1.5＋上下2 → 高さ22（mpVfY） */
 }
 
 [data-theme='v8'] .badge::before {

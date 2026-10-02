@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 印のタイル（Pencil ★V8 `C9CaMS`・`E7USZ9`・`A2mryd`）。

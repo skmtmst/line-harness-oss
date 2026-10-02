@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 処理の進み。Pencil ★V7 `xiHO8`。
@@ -70,6 +71,11 @@
   border-radius: var(--radius-mini); /* cornerRadius: 4 */
   background: var(--color-shell); /* fill: $shell */
   position: relative;
+}
+
+/* ★V8（夕13）：進みの棒の溝は track の色（TOKENS-20261001）。 */
+[data-theme="v8"] .track {
+  background: var(--color-track);
 }
 
 .fill {
