@@ -158,13 +158,14 @@ function seedAccount(testDb: SqliteD1, accountId: string): void {
 async function makeIntegration(
   testDb: SqliteD1,
   accountId: string,
+  status: 'connected' | 'pending_target' | 'expired' = 'connected',
 ): Promise<GoogleSheetsIntegrationRow> {
   const enc = await encryptCredential('refresh-token-1', ENCRYPTION_KEY);
   testDb.raw.prepare(
     `INSERT INTO google_sheets_integrations
        (id, line_account_id, google_account_email, refresh_token_enc, status, connected_at)
-     VALUES (?, ?, ?, ?, 'connected', ?)`,
-  ).run(`int-${accountId}`, accountId, `owner-${accountId}@example.com`, enc, NOW);
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(`int-${accountId}`, accountId, `owner-${accountId}@example.com`, enc, status, NOW);
   return (await testDb.db.prepare('SELECT * FROM google_sheets_integrations WHERE line_account_id = ?')
     .bind(accountId).first<GoogleSheetsIntegrationRow>())!;
 }
@@ -449,5 +450,42 @@ describe('TikTok利益計算：同期の安全性', () => {
     expect(result.createdSheets).toBe(1);
     expect((await settingsOf(testDb, 'acc-1')).spreadsheet_id).toBeNull();
     expect((await settingsOf(testDb, 'acc-2')).spreadsheet_id).toBe('sheet-new-1');
+  });
+
+  it('定期実行は #838 の書き出し先が未選択（pending_target）でも対象にする', async () => {
+    // Googleの認可は済んでいて更新用トークンもある状態。利益計算は自分で
+    // スプレッドシートを作るので #838 の書き出し先には依存しない。
+    // ここで除外すると、認可したのに毎回手動同期を押す羽目になる。
+    seedSettings(testDb, 'acc-1', {
+      enabled: 1, spreadsheet_id: null, spreadsheet_url: null,
+      status: 'pending', template_filled_at: null,
+    });
+    await makeIntegration(testDb, 'acc-1', 'pending_target');
+    const server = makeServer([]);
+
+    const result = await processTiktokPnlTick(envFor(testDb, false), {
+      now: NOW, fetch: server.fetch as never,
+    });
+
+    expect(result.createdSheets).toBe(1);
+    expect((await settingsOf(testDb, 'acc-1')).spreadsheet_id).toBe('sheet-new-1');
+  });
+
+  it('定期実行は認可切れ（expired）のアカウントを対象にしない', async () => {
+    // 認可が切れている間に走らせても失敗するだけで、連続失敗回数だけが増える。
+    seedSettings(testDb, 'acc-1', {
+      enabled: 1, spreadsheet_id: null, spreadsheet_url: null,
+      status: 'pending', template_filled_at: null,
+    });
+    await makeIntegration(testDb, 'acc-1', 'expired');
+    const server = makeServer([]);
+
+    const result = await processTiktokPnlTick(envFor(testDb, false), {
+      now: NOW, fetch: server.fetch as never,
+    });
+
+    expect(server.created).toEqual([]);
+    expect(result.createdSheets).toBe(0);
+    expect((await settingsOf(testDb, 'acc-1')).spreadsheet_id).toBeNull();
   });
 });

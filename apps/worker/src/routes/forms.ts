@@ -93,6 +93,7 @@ import {
 } from '../services/form-layout-effects.js';
 import {
   collectInputs,
+  formatAddressValue,
   layoutToFields,
   normalizeLayout,
   parseLayout,
@@ -697,6 +698,32 @@ function dateFieldsOfForm(form: DbForm): Array<{ key: string; label: string }> {
     .filter((field) => field.key);
 }
 
+function ratingFieldsOfForm(form: DbForm): Array<{ key: string; label: string }> {
+  const layout = form.layout ? parseLayout(form.layout, form.fields) : null;
+  if (layout) {
+    return collectInputs(layout)
+      .filter((block) => block.type === 'rating' && block.name)
+      .map((block) => ({ key: block.name, label: block.label || block.name }));
+  }
+  return parseFormFields(form.fields)
+    .filter((field) => field.type === 'rating')
+    .map((field) => ({
+      key: field.name ?? field.id ?? '',
+      label: field.label ?? field.name ?? field.id ?? '',
+    }))
+    .filter((field) => field.key);
+}
+
+function displayAnswerValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-';
+  if (Array.isArray(value)) return value.map(String).join(', ');
+  if (typeof value === 'object') {
+    const formatted = formatAddressValue(value);
+    return formatted === '' ? '-' : formatted;
+  }
+  return String(value);
+}
+
 async function writeLegacyFriendFields(
   db: D1Database,
   form: DbForm,
@@ -727,7 +754,9 @@ async function writeLegacyFriendFields(
           ? null
           : Array.isArray(answer)
             ? answer.join(', ')
-            : String(answer);
+            : typeof answer === 'object'
+              ? formatAddressValue(answer)
+              : String(answer);
       const checked = validateFriendFieldValue(target, rawForCheck);
       if (!checked.ok) {
         result.failed += 1;
@@ -1544,6 +1573,7 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
         id,
         c.req.query('account_id')!,
         dateFieldsOfForm(form),
+        ratingFieldsOfForm(form),
       ),
     ]);
     // N-168: 後処理の未完を運用者へ見せる。予約(claim)の工程記録と
@@ -3387,7 +3417,7 @@ async function runFormPostEffects(input: {
       const answerRows = entries.map(([key, value]) => {
         const field = form.fields ? (JSON.parse(form.fields) as Array<{ name: string; label: string }>).find((f: { name: string }) => f.name === key) : null;
         const label = field?.label || key;
-        const val = Array.isArray(value) ? value.join(', ') : (value !== null && value !== undefined && value !== '') ? String(value) : '-';
+        const val = displayAnswerValue(value);
         return {
           type: 'box' as const, layout: 'vertical' as const, margin: 'md' as const,
           contents: [
