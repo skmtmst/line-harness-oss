@@ -284,6 +284,10 @@
     "unresolved-classname": 7,
     "arbitrary-value": 1
   },
+  "app/templates/detail/detail-v8.tsx": {
+    "unresolved-classname": 85,
+    "direct-th": 5
+  },
   "app/templates/detail/page.tsx": {
     "arbitrary-value": 2,
     "direct-secondary-button": 1
