@@ -5,9 +5,15 @@
 
 ## 0. 用意するもの
 - Google Cloud コンソール https://console.cloud.google.com/ にログインできるGoogleアカウント（対象プロジェクトのオーナーまたは編集者）
-- 検証環境のURL（`apps/worker/wrangler.staging.toml` の `WORKER_PUBLIC_URL` / `ADMIN_PUBLIC_URL`）：
-  - Worker：`https://nen-line-stg.skmtmst.workers.dev`
-  - 管理画面：`https://nen-line-stg-admin.pages.dev`
+- 各環境のURL（`apps/worker/wrangler*.toml` の `WORKER_PUBLIC_URL` / `ADMIN_PUBLIC_URL`）：
+
+  | 環境 | Worker（`WORKER_PUBLIC_URL`） | 管理画面 |
+  | --- | --- | --- |
+  | 検証 | `https://stg-api.musubo.jp` | `https://stg-admin.musubo.jp` |
+  | 本番 | `https://api.musubo.jp` | `https://admin.musubo.jp` |
+
+  リダイレクトURIはこの `WORKER_PUBLIC_URL` だけを使う（コードもここから組み立てる）。
+  `*.workers.dev` や `*.pages.dev` で管理画面を開いた場合も、送られるURIは上の表のまま変わらない。
 
 ## 1. APIを有効にする（3つ）
 1. 画面上部の検索窓に「APIとサービス」と入れて開く → 左メニュー「ライブラリ」
@@ -20,7 +26,9 @@
 ## 2. OAuth同意画面を確認する
 1. 「APIとサービス」→「OAuth同意画面」
 2. **ユーザーの種類**：「外部」
-3. **公開ステータス**：いまは「テスト」のままで進める。テストのままだと許可の有効期限が**7日**で切れ、7日ごとに「再接続」が必要になる（仕様）。本番前に「本番環境に公開」へ切り替え、Googleの審査を受ける
+3. **公開ステータス**：
+   - **本番環境は必ず「本番環境に公開」にする。** 「テスト」のままだと許可の有効期限が**7日**で切れ、7日ごとにお店の人が「再接続」をしないとGoogle連携が止まる（Googleの仕様で、こちらのコードでは回避できない）。公開に切り替えるとGoogleの審査が入るので、本番開始の前に余裕をもって申請する
+   - 検証環境は「テスト」のままでよい。そのかわり7日ごとに再接続が必要になるのは想定どおり
 4. 「テストユーザー」に、**店舗を管理しているGoogleアカウント**を追加する
 5. 「スコープ」に次の3つが入っているか確認。無ければ「スコープを追加または削除」から追加
    - `.../auth/business.manage`
@@ -32,10 +40,15 @@
 2. **アプリケーションの種類**：「ウェブ アプリケーション」
 3. **名前**：`musubo LINE管理 検証環境`（本番用は別に作る。混ぜない）
 4. **承認済みのJavaScript生成元**：空でよい
-5. **承認済みのリダイレクトURI**に、次の1行を**そのまま**追加
-   ```
-   https://nen-line-stg.skmtmst.workers.dev/api/restaurant-test/google/oauth/callback
-   ```
+5. **承認済みのリダイレクトURI**に、使う環境の1行を**そのまま**追加
+   - 検証環境用のクライアント
+     ```
+     https://stg-api.musubo.jp/api/restaurant-test/google/oauth/callback
+     ```
+   - 本番環境用のクライアント（別に作る）
+     ```
+     https://api.musubo.jp/api/restaurant-test/google/oauth/callback
+     ```
 6. 「作成」→ 表示された**クライアントID**と**クライアントシークレット**を控える（「認証情報」から再表示できる）
 
 ## 4. 検証環境のWorkerに値を入れる
@@ -64,6 +77,12 @@ GOOGLE_BUSINESS_WRITE_ENABLED = "false"
 
 ## 困ったとき
 - 「この環境にはGoogle接続の設定がありません」→ 手順4のクライアントID／シークレットが未設定
-- Googleの画面で「redirect_uri_mismatch」→ 手順3-5のURIが1文字でも違う。コピーし直す
+- Googleの画面で「アクセスをブロック：このアプリのリクエストは無効です／エラー400: redirect_uri_mismatch」→ 手順3-5のURIが1文字でも違う。上の表の `WORKER_PUBLIC_URL` と見比べてコピーし直す。Workerの公開URLを変えたときは、ここも必ず合わせて直す
 - 「アクセスをブロック：このアプリは確認されていません」→ 手順2-4のテストユーザーに、ログインしたアカウントが入っていない
-- 「認可切れ」が7日ごとに出る → 手順2-3のとおり仕様。本番前に公開ステータスを変える
+- 「認可切れ」が7日ごとに出る → 手順2-3のとおり、公開ステータスが「テスト」のときのGoogleの仕様。本番環境では「本番環境に公開」にしておくこと
+
+## 認可を切らさないための仕組み（実装済み）
+- リダイレクトURIは環境ごとの `WORKER_PUBLIC_URL` に固定している。管理画面を `*.pages.dev` で開いても、独自ドメインで開いても、Googleへ送るURIは1つだけ（`redirect_uri_mismatch` が起きない）
+- 6時間ごとの `google business token keepalive` が、リフレッシュトークンを持つ接続を全部使って更新する。場所を選ぶ前の店舗や、Googleビジネス機能を一時的にoffにしている店舗も対象。Googleの「長く使われないトークンは無効化」を避けるため
+- それでも切れた場合（お店の人がGoogle側で許可を取り消した、パスワードを変えた等）は、画面に「再接続してください」が出る。口コミの下書きなど保存済みのデータは消えない
+- **残る失効要因は公開ステータス「テスト」の7日だけ。本番では必ず公開にすること**

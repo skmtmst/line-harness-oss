@@ -355,6 +355,14 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'google business token keepalive',
+    classification: { kind: 'core', reason: 'Google認可（リフレッシュトークン）の失効防止' },
+    enforcement: {
+      mode: 'exempt',
+      reason: '機能offの間もトークンを生かし続けるのが目的で、offで止めると放置失効して再接続が必要になる',
+    },
+  },
+  {
     name: 'automation deliveries',
     dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'automations' },
