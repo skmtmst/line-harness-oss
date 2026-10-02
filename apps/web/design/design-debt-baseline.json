@@ -223,14 +223,27 @@
   "app/recipes/page.tsx": {
     "unresolved-classname": 17
   },
+  "app/reminders/basics-form-v8.tsx": {
+    "unresolved-classname": 39
+  },
   "app/reminders/detail/page.tsx": {
     "unresolved-classname": 29
+  },
+  "app/reminders/edit/edit-v8.tsx": {
+    "unresolved-classname": 168,
+    "direct-th": 4
+  },
+  "app/reminders/new/new-v8.tsx": {
+    "unresolved-classname": 6
   },
   "app/reminders/new/page.tsx": {
     "unresolved-classname": 7
   },
   "app/reminders/page.tsx": {
     "arbitrary-value": 4
+  },
+  "app/reminders/wizard-v8-ui.tsx": {
+    "unresolved-classname": 33
   },
   "app/restaurant-test/restaurant-console.tsx": {
     "arbitrary-value": 11,

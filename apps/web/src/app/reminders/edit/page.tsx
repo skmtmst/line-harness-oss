@@ -6,7 +6,9 @@ import ReminderPublishFlow, {
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import TargetMissing from '@/components/shared/target-missing'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Issue469ReminderStepEditor, Issue469ReminderTestStage } from './issue469-reminder-screens'
+import ReminderEditV8 from './edit-v8'
 
 /**
  * リマインダの編集。
@@ -45,8 +47,19 @@ function MissingReminder() {
 
 function ReminderEditInner() {
   const params = useSearchParams()
+  const theme = useAdminTheme()
   const id = params.get('id') ?? ''
   const rawStage = params.get('stage')
+  /*
+   * ★V8：テーマが v8 のときだけ新しい作る流れ（edit-v8.tsx、板 VE1u5〜hjNpJ）へ。
+   * v7 の分岐（テスト段・公開フロー・通知編集）はこの下をそのまま残す。
+   */
+  if (theme === 'v8') {
+    if (!id) {
+      return <MissingReminder />
+    }
+    return <ReminderEditV8 reminderId={id} stage={rawStage} />
+  }
   if (rawStage === 'test' && id) {
     return <Issue469ReminderTestStage reminderId={id} />
   }
