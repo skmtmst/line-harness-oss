@@ -30,6 +30,8 @@ import { csvExportLine } from './csv-export'
 import BulkRunDialog from '@/components/friends/bulk-run-dialog'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { FRIENDS_MERGED_TABS } from './friends-tabs'
+import { FriendsListHeadV8 } from './friends-nav-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
 import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
@@ -853,12 +855,36 @@ function FriendsPageInner({
 
 function FriendsPageHost() {
   const tab = useMergedTab(MERGED_TABS)
+  const theme = useAdminTheme()
   const [notice, setNotice] = useState<Notice>(null)
   const [exportCurrentPage, setExportCurrentPage] = useState<(() => void) | null>(null)
   const registerExporter = useCallback(
     (exporter: (() => void) | null) => setExportCurrentPage(() => exporter),
     [],
   )
+
+  /*
+   * ★V8（specs/friends-data-menu.md・採用 D）：タブの段は出さず、低頻度の
+   * 管理画面は右上の「データ管理 ▾」へまとめる。道筋（URL）は変えない。
+   * 一覧タブは板の頭に「データ管理 ▾」（副）と「友だちを取り込む」（主）。
+   * 管理画面側（重複検出・統合ユーザー）は各 -v8 ファイルが
+   * 「← 友だち一覧 › データ管理 › 今の画面」の段を自分で出す。
+   */
+  if (theme === 'v8') {
+    return (
+      <div data-friends-page="v8" data-design-node="sdbsQ" className="flex flex-col gap-4">
+        {tab === 'list' ? (
+          <>
+            <FriendsListHeadV8 onExportCurrentPage={exportCurrentPage} />
+            <FriendsPageInner onNotice={setNotice} onExportReady={registerExporter} />
+          </>
+        ) : null}
+        {tab === 'duplicates' ? <EmbeddedPageProvider><DuplicatesPage /></EmbeddedPageProvider> : null}
+        {tab === 'merged' ? <EmbeddedPageProvider><MergedUsersPage /></EmbeddedPageProvider> : null}
+        {notice ? <NoticeDialog notice={notice} onClose={() => setNotice(null)} /> : null}
+      </div>
+    )
+  }
 
   return (
     <div data-friends-page="v6" data-design-node="PhxG6" className="flex flex-col gap-4">
