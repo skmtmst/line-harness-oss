@@ -55,4 +55,30 @@ describe('運営マスターの判定（staff_members の行から）', () => {
   it('env-owner は通らない', async () => {
     expect(await isPlatformAdminRow(testDb.db, { id: 'env-owner', role: 'owner', readOnly: false, tenantId: null })).toBe(false);
   });
+
+  /*
+   * 招待しただけの行（is_active=1 / activation_state='invited'）で互換を
+   * 切ってしまうと、運営マスターが 0 人のまま誰も /ops に入れなくなる。
+   * 招待メールが失効すると再送も運営権限を要求するため画面から復旧できない。
+   */
+  it('招待しただけでは互換を切らない（誰も入れなくなるのを防ぐ）', async () => {
+    testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES (?, 1, 'invited')`)
+      .run('other-owner');
+    expect(await isPlatformAdminRow(testDb.db, candidateFromStaffRow(row('legacy-owner')))).toBe(true);
+    expect(await isPlatformAdminRow(testDb.db, candidateFromStaffRow(row('other-owner')))).toBe(false);
+  });
+
+  it('2要素認証待ちでも互換を切らない', async () => {
+    testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES (?, 1, 'awaiting_totp')`)
+      .run('other-owner');
+    expect(await isPlatformAdminRow(testDb.db, candidateFromStaffRow(row('legacy-owner')))).toBe(true);
+    expect(await isPlatformAdminRow(testDb.db, candidateFromStaffRow(row('other-owner')))).toBe(false);
+  });
+
+  it('招待が完了して active になったら互換は消える', async () => {
+    testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES (?, 1, 'active')`)
+      .run('other-owner');
+    expect(await isPlatformAdminRow(testDb.db, candidateFromStaffRow(row('legacy-owner')))).toBe(false);
+    expect(await isPlatformAdminRow(testDb.db, candidateFromStaffRow(row('other-owner')))).toBe(true);
+  });
 });

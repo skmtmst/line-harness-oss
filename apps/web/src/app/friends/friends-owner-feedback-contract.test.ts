@@ -19,11 +19,12 @@ describe('友だち画面のオーナー指摘契約', () => {
   })
 
   it('未対応と注目のみを小さな押し口にし、選択中はチェックで示す', () => {
-    expect(PAGE).toContain('data-filter-chip="unhandled"')
-    expect(PAGE).toContain('data-filter-chip="attention"')
-    expect(PAGE).toContain('inline-flex h-8 shrink-0')
-    expect(PAGE).toContain("responseFilter === 'unhandled'\n              ? <Check")
-    expect(PAGE).toContain("attentionOnly\n              ? <Check")
+    // m13i: 札の形は共通 FilterChip 1つにそろえた。
+    // 小さな押し口（高さ32）・選択中の✓は部品側が持つ。ここでは結びだけ見る。
+    expect(PAGE).toContain("selected={responseFilter === 'unhandled'}")
+    expect(PAGE).toContain('selected={attentionOnly}')
+    expect(PAGE).toContain('未対応')
+    expect(PAGE).toContain('注目のみ')
   })
 
   it('友だち詳細のマイル残高を利用可能ラベルと同じ枠の一行に置く', () => {
@@ -48,8 +49,12 @@ describe('友だち画面のオーナー指摘契約', () => {
     expect(USERS).toContain('items-center gap-2')
     expect(USERS).toContain('<Button\n          type="button"\n          onClick={() => setPendingForceRefresh(true)}')
     expect(USER_FILTERS).toContain('flex min-w-0 flex-1 flex-nowrap items-center gap-2')
-    expect(USER_FILTERS).toContain('h-10 min-w-0 flex-1')
+    // #748: 検索欄は共有SearchField（内側が40px）へ移行。素のinputに直書きしない。
+    expect(USER_FILTERS).toContain('<SearchField')
+    expect(USER_FILTERS).toContain('min-w-0 flex-1')
     expect(USER_FILTERS).not.toContain('rounded-[14px] border')
-    expect(USER_FILTERS.match(/h-10/g)?.length).toBeGreaterThanOrEqual(4)
+    // 高さは部品側が持つ（SearchField・Select ともに40px。寸法の契約試験が守る）。
+    // ここでは操作行がその3部品でそろっていることだけ見る。
+    expect(USER_FILTERS.match(/<Select/g)?.length).toBeGreaterThanOrEqual(2)
   })
 })

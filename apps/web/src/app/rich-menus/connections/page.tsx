@@ -4,12 +4,15 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { CircleCheck } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import type { RichMenuAreaResponse } from '@/lib/api'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import PageHeader from '@/components/shared/page-header'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { analyzeConnections, type ConnectionPage } from './connection-analysis'
@@ -38,6 +41,8 @@ function ConnectionsContent() {
   const [group, setGroup] = useState<RichMenuGroup | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
 
   usePageTitle('切替メニューのつながり')
 
@@ -53,6 +58,7 @@ function ConnectionsContent() {
     setLoading(true)
     setGroup(null)
     setError('')
+    setMissing(false)
     try {
       const response = await api.richMenuGroups.get(groupId)
       if (
@@ -62,12 +68,17 @@ function ConnectionsContent() {
       if (!response.success) throw new Error(response.error)
       if (!isRichMenuGroupResponse(response.data)) throw new Error('取得失敗')
       setGroup(response.data)
-    } catch {
+    } catch (caught) {
       if (
         activeAccountIdRef.current !== accountId
         || requestGenerationRef.current !== requestGeneration
       ) return
       setGroup(null)
+      if (caught instanceof ApiError && caught.status === 404) {
+        setMissing(true)
+        setError('')
+        return
+      }
       setError('切替のつながりを表示できませんでした。通信を確認して、もう一度お試しください。')
     } finally {
       if (
@@ -94,10 +105,36 @@ function ConnectionsContent() {
     return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="表示するアカウントを上の切替から選んでください。" />
   }
   if (!groupId) {
-    return <ListState kind="empty" title="メニューを特定できませんでした" action={<Button href="/rich-menus">メニュー一覧へ戻る</Button>} />
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="つながりを見るメニューが指定されていません"
+        description="メニューの一覧から、つながりを見るメニューを選び直してください。"
+        backHref="/rich-menus"
+        backLabel="メニュー一覧へ戻る"
+      />
+    )
+  }
+  if (missing || (!error && (!group || !analysis))) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このメニューは見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/rich-menus"
+        backLabel="メニュー一覧へ戻る"
+      />
+    )
   }
   if (error || !group || !analysis) {
-    return <ListState kind="error" title="切替のつながりを表示できませんでした" description={error} onRetry={() => void load()} />
+    return (
+      <TargetMissing
+        kind="error"
+        title="切替のつながりを表示できませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
+      />
+    )
   }
   if (group.accountId !== selectedAccountId) {
     return <ListState kind="forbidden" title="選択中のアカウントでは表示できません" description="このメニューが所属するLINE公式アカウントへ切り替えてください。" />
@@ -116,18 +153,18 @@ function ConnectionsContent() {
 
   if (analysis.edges.length === 0) {
     return (
-      <div data-design-node="NXdDk" className="space-y-5 pb-24">
+      <div data-design-node="NXdDk" className="flex flex-col gap-4 pb-24">
         <ConnectionHeading group={group} />
-        <div className="grid gap-5 xl:grid-cols-3">
-          <section className="border-hairline bg-canvas rounded-card min-h-96 border p-6 shadow-sm xl:col-span-2">
+        <div className="grid gap-4 xl:grid-cols-3">
+          <section className="border-hairline bg-canvas rounded-card min-h-96 border p-6 shadow-card xl:col-span-2">
             <div className="flex items-start justify-between gap-3">
               <div><h2 className="text-ink text-base font-bold">つながりの図</h2><p className="text-ink-faint mt-1 text-xs">切替先を足すと、ここに「どのメニューからどこへ移れるか」が出ます</p></div>
-              <Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加</Button>
+              <Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加する</Button>
             </div>
             <div className="mt-16 flex min-h-64 flex-col items-center justify-center rounded-card border border-dashed border-hairline bg-canvas-sunken px-6 text-center">
               <p className="text-ink text-lg font-bold">まだ切替先がありません</p>
               <p className="text-ink-faint mt-2 max-w-md text-sm leading-6">このメニューだけで動きます。切替先を足すと、タブでメニューを行き来できます。</p>
-              <Button className="mt-5" variant="primary" href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加</Button>
+              <Button className="mt-5" variant="primary" href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加する</Button>
             </div>
           </section>
           <ConnectionAside />
@@ -138,23 +175,23 @@ function ConnectionsContent() {
   }
 
   return (
-    <div data-design-node="DIUbO" className="space-y-5 pb-24">
+    <div data-design-node="DIUbO" className="flex flex-col gap-4 pb-24">
       <ConnectionHeading group={group} />
-      <div className="grid gap-5 xl:grid-cols-3">
-        <div className="space-y-5 xl:col-span-2">
-          <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-3"><div><h2 className="text-ink text-base font-bold">つながりの図</h2><p className="text-ink-faint mt-1 text-xs">緑のタブが「別のメニューへ移る」ボタン</p></div><Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加（最大10枚）</Button></div>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="flex flex-col gap-4 xl:col-span-2">
+          <section className="border-hairline bg-canvas rounded-card border p-6 shadow-card">
+            <div className="flex items-start justify-between gap-3"><div><h2 className="text-ink text-base font-bold">つながりの図</h2><p className="text-ink-faint mt-1 text-xs">緑のタブが「別のメニューへ移る」ボタン</p></div><Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加する（最大10枚）</Button></div>
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               {pages.map((page, index) => {
                 const outgoing = analysis.edges.filter((edge) => edge.fromPageId === page.id)
                 const lacksReturn = missingDirectReturn.some((item) => item.id === page.id)
-                return <article key={page.id} className={`rounded-card border p-4 ${lacksReturn ? 'border-danger bg-danger-bg/30' : 'border-hairline'}`}><div className="flex items-center gap-3"><span className="bg-canvas-sunken flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold">{index + 1}</span><strong className="text-ink truncate text-sm" title={page.name}>{page.name}</strong></div><div className="mt-4 grid grid-cols-3 gap-1">{['A','B','C'].map((tab, tabIndex) => { const edge = outgoing[tabIndex]; return <div key={tab} className={`rounded-control border px-2 py-2 text-center text-xs font-bold ${edge ? 'border-accent bg-accent/10 text-accent' : 'border-hairline text-ink-faint'}`}>{tab}</div> })}</div>{lacksReturn ? <p className="text-danger mt-3 text-xs font-semibold">トップへ戻るタブがありません</p> : <p className="text-accent mt-3 flex items-center gap-1 text-xs"><CircleCheck size={13} />戻り道を確認済み</p>}</article>
+                return <article key={page.id} className={`rounded-card border p-4 ${lacksReturn ? 'border-danger bg-danger-bg/30' : 'border-hairline'}`}><div className="flex items-center gap-3"><span className="bg-canvas-sunken flex h-8 w-8 items-center justify-center rounded-pill text-sm font-semibold">{index + 1}</span><strong className="text-ink truncate text-sm" title={page.name}>{page.name}</strong></div><div className="mt-4 grid grid-cols-3 gap-1">{['A','B','C'].map((tab, tabIndex) => { const edge = outgoing[tabIndex]; return <div key={tab} className={`rounded-control border px-2 py-2 text-center text-xs font-medium ${edge ? 'border-accent bg-accent/10 text-accent-deep' : 'border-hairline text-ink-faint'}`}>{tab}</div> })}</div>{lacksReturn ? <p className="text-danger mt-3 text-xs font-semibold">トップへ戻るタブがありません</p> : <p className="text-accent-deep mt-3 flex items-center gap-1 text-xs"><CircleCheck size={13} />戻り道を確認済み</p>}</article>
               })}
             </div>
             {missingDirectReturn.length > 0 ? <NoteBar tone="warn">「{missingDirectReturn.map((page) => page.name).join('」「')}」からトップへ戻るタブがありません。お客さまが戻れなくなります。</NoteBar> : null}
           </section>
 
-          <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-sm">
+          <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
             <div className="px-5 py-4"><h2 className="text-ink text-sm font-bold">それぞれのメニューのタブ</h2></div>
             <table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th>メニュー</Th><Th>タブA</Th><Th>タブB</Th><Th>タブC</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{pages.map((page) => { const outgoing = analysis.edges.filter((edge) => edge.fromPageId === page.id); return <tr key={page.id}><td className="px-4 py-3 font-semibold">{page.name}</td>{[0,1,2].map((index) => { const edge = outgoing[index]; const target = edge?.targetPageId ? pageName.get(edge.targetPageId) : null; return <td key={index} className={`px-4 py-3 text-xs ${edge && !target ? 'text-danger font-semibold' : 'text-ink-secondary'}`}>{target ? `→ ${target}` : index === pages.indexOf(page) ? '（このページ）' : '未設定'}</td> })}</tr> })}</tbody></table>
           </section>
@@ -180,11 +217,11 @@ function ConnectionHeading({ group }: { group: RichMenuGroup }) {
 }
 
 function ConnectionAside() {
-  return <aside className="space-y-4"><section className="border-hairline bg-canvas rounded-card border p-5 shadow-sm"><h2 className="text-ink text-sm font-bold">LINEプレビュー</h2><p className="text-ink-faint mt-1 text-xs">「商品を見る」を開いたとき</p><div className="border-ink bg-canvas-sunken mt-4 overflow-hidden rounded-3xl border-4 p-3 shadow-inner"><div className="text-ink-faint flex min-h-60 items-center justify-center text-xs">トーク画面</div><div className="bg-canvas text-ink-secondary grid grid-cols-3 gap-1 rounded-lg p-2 text-center text-xs font-semibold"><span>トップ</span><span className="bg-accent-deep text-on-accent rounded px-2 py-1">商品</span><span>予約</span><span>新着</span><span>定番</span></div></div></section><section className="bg-warning-bg text-warning rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">切替メニューでよくある事故</h2><ul className="mt-2 space-y-1"><li>・戻るタブが無く、元のメニューに帰れない</li><li>・切替先が下書きのままで、押しても動かない</li><li>・切替先だけ「誰に出すか」が違う</li></ul></section></aside>
+  return <aside className="space-y-4"><LinePreview note="「商品を見る」を開いたときの見え方"><div className="rounded-card bg-canvas p-3"><div className="text-ink-faint flex min-h-60 items-center justify-center text-xs">トーク画面</div><div className="bg-canvas text-ink-secondary grid grid-cols-3 gap-1 rounded-control p-2 text-center text-xs font-semibold"><span>トップ</span><span className="bg-accent-deep text-on-accent rounded-mini px-2 py-1">商品</span><span>予約</span><span>新着</span><span>定番</span></div></div></LinePreview><Notice tone="warn"><h2 className="text-sm font-bold">切替メニューでよくある事故</h2><ul className="mt-2 space-y-1 text-xs"><li>・戻るタブが無く、元のメニューに帰れない</li><li>・切替先が下書きのままで、押しても動かない</li><li>・切替先だけ「誰に出すか」が違う</li></ul></Notice></aside>
 }
 
 function ConnectionFooter({ status, groupId }: { status: string; groupId: string }) {
-  return <div className="border-hairline bg-canvas fixed right-0 bottom-0 left-0 z-20 flex items-center justify-between border-t px-6 py-3 shadow-lg"><span className="text-ink-secondary text-sm">{status}</span><div className="flex gap-2"><Button href="/rich-menus">メニュー一覧へ</Button><Button variant="primary" href={`/rich-menus/edit?id=${encodeURIComponent(groupId)}`}>リッチメニューを保存</Button></div></div>
+  return <div className="border-hairline bg-canvas fixed right-0 bottom-0 left-0 z-20 flex items-center justify-between border-t px-6 py-3 shadow-float"><span className="text-ink-secondary text-sm">{status}</span><div className="flex gap-2"><Button href="/rich-menus">メニュー一覧へ</Button><Button variant="primary" href={`/rich-menus/edit?id=${encodeURIComponent(groupId)}`}>リッチメニューを保存する</Button></div></div>
 }
 
 export default function RichMenuConnectionsPage() {

@@ -29,8 +29,14 @@
    * `.friend-attributes-v2-shell`、検証用にSF系を固定する例外）と
    * 書き方が違うので「どれが正本か」が分かりにくかった。
    * 正本をここへ移し、body は `font-sans` で読む。
+   *
+   * ★V7「見た目の物差し」§3: 並びは「Inter, Noto Sans JP」。英字と数字は
+   * Inter、かなと漢字は Noto Sans JP に見える（Inter に日本語グリフが
+   * 無いので、かな・漢字は自動で次の書体に落ちる）。2つの変数は
+   * layout.tsx で next/font が html へ出す `--font-inter` /
+   * `--font-noto-sans-jp` で、ビルド時に同梱される。
    */
-  --font-sans: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --font-sans: var(--font-inter), var(--font-noto-sans-jp), "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
 
   /* --- 色 ---------------------------------------------------------------
    * アクセントはLINEブランドの緑1色。状態色（成功・注意・危険）とは
@@ -65,11 +71,39 @@
   --color-action-soft: #eaf4ff;
   --color-on-action: #ffffff;
 
+  /*
+   * #669 緑の意味は2つだけ。**主操作（CTA）と成功・有効状態。**
+   *
+   * 緑が「押せるもの」と「ただの情報」の両方に使われ、主操作が埋もれて
+   * いた（全32画面で accent-deep、6画面で success が同役で共存）。
+   * 役割とトークンの対応はこれ。以後は名前で参照し、生の緑・青
+   * （Tailwind の green/blue/emerald/teal 系）は新たに書かない。
+   *
+   *   主操作の面・白文字      → accent-deep（CTA の緑。白文字 5.44:1）
+   *   成功・完了の文字と地    → success / success-bg（成功の緑）
+   *   有効・選択中の印        → accent 系（トグルON・選択タブ・現在地・
+   *                              選択チップ。選ばれている状態の表示）
+   *   テキストリンク          → action（青。緑のリンクは書かない）
+   *   補助の小字・行の補足    → ink-secondary / ink-faint（緑にしない）
+   *   数値カードの数字        → ink（緑にしない。状態を示す数だけ success 等）
+   *   情報の案内              → info 系（ティール）か status-info 系（青）。
+   *                              どちらも「情報」だが、画面内の案内は info、
+   *                              状態の札は status-info に寄せる。
+   *
+   * success-bg と accent-soft は同値（#e8f8ee）だが名前で使い分ける。
+   * 成功の地は success-bg、選択・CTA の地は accent-soft と書く。
+   */
+
   /* 文字。Pencil V5を共通基盤とし、V6でも同じ変数を使う。
    * ink が本文、ink-secondary が補足、ink-faint がラベル。 */
   --color-ink: #1d1d1f;
   --color-ink-secondary: #4a5565;
-  --color-ink-faint: #6e7781;
+  /*
+   * ink-faint は 2026-09-24 に #6e7781 → #626a73。灰色の面（#ebedf1・#f5f5f7・
+   * #e8f8ee）の上で 3.9〜4.4:1 しかなく、AA の 4.5:1 に届かなかった。色あいは
+   * そのままで明るさだけ下げた（どの面でも 4.68:1 以上）。
+   */
+  --color-ink-faint: #626a73;
 
   /* 面。canvas がカードの地、canvas-sunken が一段沈んだ面。 */
   --color-canvas: #ffffff;
@@ -79,7 +113,8 @@
   --color-hairline: #dadde2;
 
   /* 状態。アクセントと混ぜない。 */
-  --color-success: #05913e;
+  /* 2026-09-24 に #05913e → #047833。白地 4.1:1・薄緑の地 3.7:1 で文字に使えなかった。 */
+  --color-success: #047833;
   --color-success-bg: #e8f8ee;
   --color-warning: #94600a;
   --color-warning-bg: #faf0dc;
@@ -97,7 +132,8 @@
   --color-status-danger: #e5484d;
   --color-status-danger-soft: #fef0f0;
   --color-step-idle: #eef0f3;
-  --color-surface-chrome: #ebedf1;
+  /* ★V7 の灰色語彙 `shell-gray`（hairline と shell の間）。旧名は surface-chrome。 */
+  --color-shell-gray: #ebedf1;
 
   /*
    * ★V6 で実測した色は、**別系統として持たない。**
@@ -115,8 +151,11 @@
   --color-divider-soft: #eaebed;
   --color-status-danger-selected: #ffe4e7;
   --color-status-danger-border: #f3b8bb;
-  /* 暗幕。Pencil `$scrim`（#11182755）。モーダルの下敷き（`docs/v6-common-rules.md` §1-7）。 */
-  --color-scrim: #11182755;
+  /*
+   * 暗幕。ダイアログ・引き出し（影の段3）の後ろを 40% で沈める
+   * （★V7「見た目の物差し」§1。Pencil `$scrim` の #111827 に 40% を掛ける）。
+   */
+  --color-scrim: #11182766;
   /*
    * 2つ目以降のタグの札。1つ目は `accent` 系で、それと分けるための色。
    *
@@ -131,10 +170,21 @@
   --color-avatar-slate: #536170;
   --color-avatar-green: #079b45;
 
-  /* LINEトークのプレビュー。実画面の青いトーク面と回答操作の緑。 */
-  --color-line-preview: #789bc5;
-  --color-line-preview-label: #5579a8;
-  --color-line-choice: #00a947;
+  /*
+   * LINEプレビュー共通部品のトーク背景色（B-6、★V7）。
+   * LINE のトーク背景色と同じ色あい。
+   *
+   * 以前は画面ごとに青い地（`line-preview` #4a6f9a）を敷いていたが、
+   * B-6 で1つの部品に寄せたため、古い2色は消した。
+   * 題・札・空の箱の字は `ink` 系の濃い字で載せる（約 7:1）。
+   * 白字だと約 2.4:1 しかなく、4.5:1 に届かない。
+   */
+  --color-line-talk: #8cabd9;
+  /*
+   * 回答の選択肢の緑。白地に文字として載るので AA の 4.5:1 が要る。
+   * 以前の #00a947 は 3.1:1。色あいはそのままに濃くした（4.64:1）。
+   */
+  --color-line-choice: #008739;
   --color-line-answer-bg: #e6f7ed;
   --color-line-answer: #08783b;
 
@@ -153,27 +203,37 @@
   /* --- 角丸 -------------------------------------------------------------
    * 大きさで役割を分ける。カードは card、押せるものは control、
    * 丸いものは pill。すべて rounded-lg で済ませない。
-   */
-  /*
-   * **カードは10px（Pencil `$radius-md`）。** 以前は 0.75rem(12px) で、
-   * 設計のモーダル枠（`$radius-panel` 12）と同じ値だった。1つの
-   * トークンがカードと窓の両方を指していたので、用途で分けた。
-   * 窓は `--radius-panel`(12) を使う。
    *
-   * 測ったNode: `pRHvc` 検索と絞り込み(h=132) / `k4Hz0X` 友だち一覧カード
-   * / `eHPwj` 一括操作バー(h=56) — いずれも `$radius-md`。
+   * ★V7 の正規4段（新規はここから選ぶ）: mini 6 / control 8 /
+   * panel 12 / pill 9999。icon 3・large 18 は使う画面が
+   * あるので残す。置き換えは画面ごとに検証して段階的に行う。 */
+  /*
+   * **カードは12px。** ★V7「見た目の物差し」§1 で丸みは 6 / 8 / 12 / 999
+   * の4段だけになり、カード・ダイアログ・知らせはすべて 12px。
+   * V6 では 10px（`$radius-md`）と窓の 12px を分けていたが、V7 では
+   * 同じ段に畳まれた。`--radius-card` は `--radius-panel` と同値で残し、
+   * 画面側の `rounded-card` はそのまま読み替わる。
+   *
+   * V6で測ったNode: `pRHvc` 検索と絞り込み(h=132) / `k4Hz0X` 友だち一覧カード
+   * / `eHPwj` 一括操作バー(h=56) — いずれも旧 `$radius-md`。
    */
-  --radius-card: 10px;
+  --radius-card: 12px;
   /*
    * 8px。**`0.5rem` ではなく `8px` と書く。** 単位が混ざると、同じ値の
    * トークンが2つあることを機械で見つけられない（`radius-v6-control` が
    * 8px で別名のまま残っていたのがそれ）。
    */
   --radius-control: 8px;
+  /* ★V7 の 12px 段（カード・ダイアログ・知らせ）。card と同値なのは意図。 */
   --radius-panel: 12px;
   --radius-icon: 3px;
   /* Pencil `$radius-xs`(6px)。行の中の小さな札（フォルダ・連動）。 */
   --radius-mini: 6px;
+  /* Pencil ★V8 印のタイル（C9CaMS・E7USZ9・A2mryd）。小22→7、中28・大32→9。 */
+  --radius-tile-sm: 7px;
+  --radius-tile: 9px;
+  /* Pencil ★V8 切り替えの項目（dtJVi）。器は $radius-control、中の項目は 8。 */
+  --radius-segment: 8px;
   /* Pencil `$radius-lg`(18px)。`PhxG6` の友だちアバター(40x40)と
      保存条件チップ用。Tailwind 既定の `rounded-lg` は上書きしない
      （既存85ファイルの角丸が8pxから18pxへ変わってしまう）。 */
@@ -197,22 +257,65 @@
 
   /* --- 文字サイズ ---------------------------------------------------------
    * V5/V6の共通部品が使う意味名。既存のTailwind組み込みサイズは残し、
-   * 画面移行時にこの語彙へ寄せる。 */
+   * 画面移行時にこの語彙へ寄せる。
+   *
+   * ★V7「見た目の物差し」§1 の正規6段（新規はここから選ぶ）:
+   *   micro 11/500/1.5（組の名前だけ）/ caption 12/400/1.6（補足・表の見出し）/
+   *   body 14/400/1.7（本文・表・入力欄）/ lead 16/600/1.4（カードの題）/
+   *   title 20/600/1.4（トップバーの画面名・ダイアログの題）/
+   *   hero 28/700/1.3（大きな数）
+   * nano 10・label 13・heading 18・metric 22・display 30 は使う画面が
+   * あるので残す。置き換えは画面ごとに検証して段階的に行う。
+   *
+   * 行の高さは Tailwind v4 の `--text-*--line-height` 同伴変数で持つ。
+   * `text-body` などを書くだけで物差しの行の高さが付く。 */
   --text-caption: 12px;
+  --text-caption--line-height: 1.6;
   --text-label: 13px;
   --text-body: 14px;
+  --text-body--line-height: 1.7;
   --text-lead: 16px;
+  --text-lead--line-height: 1.4;
   /*
    * Pencil `$size-title`(20)/`$size-heading`(18)。
    * 2026-08-26 に足した。共通トップバーの画面名が `var(--text-title)` を
    * 読んでいたが未定義で、16px に落ちていた（4-1 の画像比較で発覚）。
    */
   --text-heading: 18px;
+  --text-heading--line-height: 1.4;
   --text-title: 20px;
+  --text-title--line-height: 1.4;
+  /*
+   * 28px。★V7 の「大きな数」（数のカードの値）。旧 #704 の 24px から
+   * 物差し改定で 28px へ。太字 700 を許すのはこの段だけ（§2）なので、
+   * 700 はここに付けてしまう（`text-hero` と書くだけで太字になる）。
+   */
+  --text-hero: 28px;
+  --text-hero--line-height: 1.3;
+  --text-hero--font-weight: 700;
+
+  /*
+   * ★V7「見た目の物差し」§2: 太字は3段だけ。
+   *   600（題・表の見出し・ボタン）/ 500（ラベル・タブ）/ 400（本文・補足）
+   * 700・800 を許すのは大きな数（28px = text-hero）だけ。`font-bold` と
+   * `font-extrabold` はここで 600 に畳む（書き換える側は font-semibold
+   * と同じ意味になる）。
+   */
+  --font-weight-bold: 600;
+  --font-weight-extrabold: 600;
   --text-display: 30px;
   --text-metric: 22px;
   --text-micro: 11px;
+  --text-micro--line-height: 1.5;
   --text-nano: 10px;
+
+  /* --- 余白 -------------------------------------------------------------
+   * #704 の正規5段（新規はここから選ぶ）: 4 / 8 / 12 / 16 / 24。
+   * Tailwind の間隔は4px基準なので gap-1 / gap-2 / gap-3 / gap-4 / gap-6
+   * がそのまま正規段になる。5px→gap-1、7px→gap-2、11px→gap-3、
+   * 18px→gap-4、26px→gap-6 へ寄せる。間隔の基準（4px）は
+   * Tailwind 既定のままにし、専用トークンは作らない。
+   */
 
   /* --- 本体の幅 ---------------------------------------------------------
    * 設計のフレームは幅1920pxで描かれている。そこから常時表示のサイドバー
@@ -246,9 +349,734 @@
    * 入口が2つあった。** 名前を1本にして、`@theme` の中へ移した
    * （`@theme` の変数は `:root` にも出るので、`var(--shadow-card)` は
    * これまでどおり読める）。
+   *
+   * #673 で「Beautiful shadows」の sm へ差し替えた。近距離の薄い影・
+   * 下端の光・輪郭の1pxリングの3層で、1px罫線だけの硬さを残さない。
+   * 指標カード・フォルダパネル・右レール・各種カードはすべてここを読む。
+   *
+   * ★V7「仕上げ」§5: 影の色は黒ではなく ink（#1d1d1f）の透明にする。
    */
-  --shadow-card: 1px 1px 2px #1920261a;
-  --shadow-float: 0 6px 18px #19202626;
+  --shadow-card: 0px 2px 3px -1px rgba(29, 29, 31, 0.08), 0px 1px 0px 0px rgba(29, 29, 31, 0.02), 0px 0px 0px 1px rgba(29, 29, 31, 0.08);
+  /*
+   * 浮いて見える面（メニュー・ドロップダウン・知らせ・ふきだし）の影。
+   * ★V7 の段2。カードより一段強い層状影で、下の内容から浮き上がる。
+   * 表コンテナなど、カードより大きい面にもこちらを当てる。
+   */
+  --shadow-float: 0px 4px 8px -2px rgba(29, 29, 31, 0.08), 0px 12px 24px -4px rgba(29, 29, 31, 0.14), 0px 0px 0px 1px rgba(29, 29, 31, 0.08);
+  /*
+   * 最前面（ダイアログ・引き出し）の影。★V7 の段3。
+   * メニューより遠くに影を投げて、後ろの 40% 暗幕（--color-scrim）と
+   * 一緒にいちばん上にあることを示す。
+   */
+  --shadow-overlay: 0px 8px 16px -4px rgba(29, 29, 31, 0.10), 0px 24px 48px -8px rgba(29, 29, 31, 0.18), 0px 0px 0px 1px rgba(29, 29, 31, 0.08);
+
+  /*
+   * Tailwind の transition-colors などの既定の速さ（★V7 修正方針 §4）。
+   * 既定は 150ms・cubic-bezier(0.4,0,0.2,1) で、共通部品（120ms・motion-ease-out）と
+   * 速さが2通りあった（189か所）。物差しの値にそろえる。`@theme` は :root の
+   * --motion-* より先に読まれるので、値をそのまま書く。
+   */
+  --default-transition-duration: 120ms;
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* --- ★V8 で増える語彙 -------------------------------------------------
+   * V8 移行② で足した名前。値はどのテーマでも同じ新しい語彙なので
+   * `@theme` に置く（V8 だけ値が違うものは下の `[data-theme="v8"]` へ）。
+   * 移行が終わるまで v7 の画面はこれらを読まない。
+   *
+   * 出どころ: Pencil ★V8 板（lh-work/design/v8/）と COMPONENT-MAP.md の
+   * オーナー決まり。
+   */
+
+  /*
+   * 表の区切り線。hairline（#dadde2）より薄い #eceef1。
+   * 表の行の間・数の帯の縦線など、板の中の細かい割れ目に使う。
+   */
+  --color-divider: #eceef1;
+  /* 表の見出しの行の地（★V8 表の寸法「見出し 44・地 table-head」）。 */
+  --color-table-head: #fafafb;
+  /* 受信箱で自分が送った吹き出しの地（★V8 受信箱の型）。 */
+  --color-chat-outgoing: #dff5e7;
+  /*
+   * 白い板の枠と影（★V8 外側「灰色の地に白い板1枚」）。
+   * 枠は ink の 8%、影は 4% で、hairline の実線より弱い輪郭にする。
+   */
+  --color-board-line: #1d1d1f14;
+  --shadow-board: 0 1px 2px #1d1d1f0a;
+  /* 左メニューで「いまの項目」の白い札にのせる薄い影（ink 8%）。 */
+  --shadow-nav-active: 0 1px 2px #1d1d1f14;
+  /*
+   * 灰色の地の上での「乗せたとき」の薄い白（左メニューの項目の hover）。
+   * 地より少し明るいだけなので、板の中の hover には使わない。
+   */
+  --color-nav-hover: #ffffff8c;
+  /*
+   * 印のタイル（数の帯のアイコン地）の6色。**タイルの中だけで使う**決まりで、
+   * 状態の色・アクセントとは別系統。画面のボタンや文字には使わない。
+   */
+  --color-icon-tile-green: #16a34a;
+  --color-icon-tile-orange: #f97316;
+  --color-icon-tile-blue: #3b82f6;
+  --color-icon-tile-purple: #8b5cf6;
+  --color-icon-tile-slate: #64748b;
+  --color-icon-tile-red: #ef4444;
+
+  /*
+   * 主ボタンの緑の影＋内側の白い照り（Pencil V8 ボタン/主 doYdE の
+   * 2枚の影）。照りは緑の上に薄い白の内側線で、ボタンが平らに
+   * なりすぎないようにする。
+   */
+  --shadow-primary-action:
+    0 1px 2px #087a3e40,
+    inset 0 1px 0 rgb(255 255 255 / 0.15);
+  /* トグル・オフの地（Pencil V8 トグル/オフ LxHpj の #c9ced6）。 */
+  --color-toggle-off: #c9ced6;
+  /* 注目の星・オン（Pencil V8 w0R1PQ）：塗りは黄、縁は濃い黄。 */
+  --color-star-on: #fbbf24;
+  --color-star-on-edge: #f59e0b;
+}
+
+:root {
+  /* --- 動き（V7）------------------------------------------------------------
+   * Pencil ★V7「基礎 動き」（V7 文書 `bi8Au`）の物差し。部品の CSS は ms を
+   * 直接書かず、この4段と2本の曲線だけを使う。
+   *
+   *   instant  80 押した瞬間の反応
+   *   fast    120 色・枠の変化
+   *   base    200 形が描かれる・開く・閉じる
+   *   slow    300 画面の端から出る引き出しだけ
+   *
+   * 曲線に `--ease-*` を使わないのは、Tailwind の `ease-out` クラスが読む
+   * 同名の変数を上書きしてしまうため。
+   *
+   * `@theme` ではなく `:root` に置く。Tailwind は `@theme` の変数のうち
+   * クラスや画面のコードで使われたものしか出力せず、CSS Modules の
+   * `var()` だけから読む値は消えてしまう（dev で確かめた）。
+   */
+  --motion-instant: 80ms;
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 300ms;
+  /* 骨組みの明滅 1 周期（★V7 仕上げ §3）。transition ではなく animation の周期専用。 */
+  --motion-pulse: 1.2s;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8 テーマ（V8 移行②）
+ *
+ * `<html data-theme="v8">` のときだけ効く、V7 と値の違うトークン。
+ * ここに無いトークンは :root（＝V7）の値がそのまま効く。
+ * 既定は v7。検証環境は環境変数 NEXT_PUBLIC_ADMIN_THEME=v8、担当者は
+ * 設定画面の「画面の見た目（試作）」で切り替える（layout.tsx 参照）。
+ *
+ * 値の出どころは Pencil ★V8（~/Downloads/LINE-Harness-V8.pen）と
+ * lh-work/design/v8/COMPONENT-MAP.md。部品ごとの移行（④）で、部品が
+ * 必要とする値をここへ足していく。
+ *
+ *   control 8→10  ボタン・入力・選ぶ欄・探す欄の角丸（板「角丸 10」）
+ *   panel  12→16  白い板・ダイアログの角丸（板「角丸 16」、ダイアログ 16〜20）
+ *   text-lh  1.4→1.5  部品の文字の行の高さ（Pencil の部品は全部 1.5。
+ *     部品側は `line-height: var(--text-lh, 1.4)` と書き、v7 は
+ *     既定値 1.4 が効いて1画素も変わらない）
+ *   control-border  操作する部品の枠の色（入力・選ぶ・検索・チェック・
+ *     ラジオ・トグルのオフ・OTP・色を選ぶ・カードの中の印）。カードや
+ *     表・外側の板の枠は hairline のまま（#868e98、板「枠線の色」）
+ *   status-warn-soft  注意の薄い地は #fff7e6 → #fdf3e1（夕13・TOKENS）
+ *   track  #1d1d1f0a  進みの棒・切り替えの溝の地（夕13・TOKENS）
+ *   border-soft  #1d1d1f14  ダイアログ・ふきだしなど重なる物の縁（同上）
+ *   shadow-segment-ring / shadow-segment-thumb  切り替え（3つ）の
+ *     器の内側1pxの縁と、白いつまみの薄い影（同上）
+ */
+[data-theme="v8"] {
+  --radius-control: 10px;
+  --radius-panel: 16px;
+  --text-lh: 1.5;
+  --color-control-border: #868e98;
+  --color-status-warn-soft: #fdf3e1;
+  --color-track: #1d1d1f0a;
+  --color-border-soft: #1d1d1f14;
+  --shadow-segment-ring: inset 0 0 0 1px var(--color-border-soft);
+  --shadow-segment-thumb: 0 1px 2px #1d1d1f1a;
+}
+
+/*
+ * ★V8 LINEプレビューのスマホ（夕15・cfVyj）：LINE アプリの画面の写しの値。
+ * 管理画面のテーマ色とは別物なので `--v8-line-*` で分ける。値は Pencil の
+ * 実寸の写しで、直値はここだけに置く。部品側（line-preview.module.css）は
+ * var() で読む（色・丸み・影の直書きを数える試験が通る形）。
+ */
+[data-theme="v8"] {
+  --v8-line-shell: #111214;           /* 器の地 */
+  --v8-line-shell-edge: #3a3b3f;      /* 器の縁 */
+  --v8-line-shell-shadow: 0 12px 28px #1d1d1f29; /* 器が下へ落とす影 */
+  --v8-line-screen: #8cabd9;          /* トークの地（--color-line-talk と同色・別物） */
+  --v8-line-chrome: #ffffff;          /* 帯の地・帯の中の白い字 */
+  --v8-line-ink: #000000;             /* 時刻・島・電波の印 */
+  --v8-line-name: #1d1d1f;            /* トーク頭の名前 */
+  --v8-line-hairline: #e5e5ea;        /* 帯の区切り線 */
+  --v8-line-datechip: #00000026;      /* 日付の札の地 */
+  --v8-line-empty: #ffffffa6;         /* 空のときの薄い文 */
+  --v8-line-menu: #444444;            /* メニュー帯の字 */
+  --v8-line-homebar: #111111;         /* ホームの線 */
+  --v8-line-shell-radius: 52px;       /* 器の角丸 */
+  --v8-line-screen-radius: 42px;      /* 画面の角丸 */
+  --v8-line-homebar-radius: 3px;      /* ホームの線の角丸 */
+}
+
+/*
+ * ★V8 移行③: 外側（灰色の地・白い板1枚・上の帯）。
+ *
+ * 構造は v7 と同じ HTML のまま、v8 のときだけ見た目を切り替える。
+ * 画面をまたぐ規定（地の色・出し分けの印）はここへ。部品の中の値は
+ * 各部品の CSS Module が `[data-theme="v8"]` で上書きする。
+ *
+ * `.v8-only` / `.v7-only` は「そのテーマのときだけ出る要素」の印。
+ * v8 の新しい操作（検索・通知・メニュー畳み）は v7 では描かない。
+ */
+[data-theme="v8"] .v7-only {
+  display: none !important;
+}
+
+html:not([data-theme="v8"]) .v8-only {
+  display: none !important;
+}
+
+/* v8 の地は全体が shell の灰。板の白が浮くのはこの差で作る。 */
+[data-theme="v8"] body {
+  background-color: var(--color-shell);
+}
+
+/*
+ * ★V8（夕21）：全列が要る表だけ横送りにする（列は消さない）。
+ * 中の表・グリッドは `--scroll-min` で表ごとの最小幅を渡す。
+ *
+ * 端の影は「送れる方向にまだ列がある」印：スクロール位置に固定された
+ * 影（scroll）を、中身と一緒に動く白い覆い（local）が端で隠す
+ * （Verou のスクロール影）。端まで送る・戻ると影は消える。
+ */
+@media (max-width: 1365px) {
+  [data-theme="v8"] [data-scroll-x] {
+    overflow-x: auto;
+    background:
+      linear-gradient(to right, var(--color-canvas) 30%, rgb(255 255 255 / 0)) 0 0 / 40px 100% no-repeat local,
+      linear-gradient(to left, var(--color-canvas) 30%, rgb(255 255 255 / 0)) 100% 0 / 40px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgb(29 29 31 / 0.18), rgb(29 29 31 / 0)) 0 0 / 12px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgb(29 29 31 / 0.18), rgb(29 29 31 / 0)) 100% 0 / 12px 100% no-repeat scroll;
+    background-color: var(--color-canvas);
+  }
+  [data-theme="v8"] [data-scroll-x] > * {
+    min-width: var(--scroll-min, 0px);
+  }
+}
+
+/* v8 では上の帯を 1024px から出す（v7 は 1280px から）。畳んだ左
+   メニューと組むので、狭い PC 幅でも帯を畳まない。 */
+@media (min-width: 1024px) {
+  [data-theme="v8"] .v8-topbar-wrap {
+    display: block;
+  }
+}
+
+/*
+ * ★V8「骨格の行」（MOTION.md）：v7 の点滅（animate-pulse）ではなく、
+ * 光が左から右へ流れる（1200ms・繰り返し）。`data-skeleton` は
+ * shared/skeleton.tsx が付ける印。Tailwind の animate-pulse（utilities
+ * 層）よりここ（層なし）が強いので、v8 ではこの動きが勝つ。
+ * 「動きを減らす」設定では末尾の規定で一瞬になる。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] [data-skeleton] {
+    background-image: linear-gradient(
+      100deg,
+      transparent 40%,
+      rgb(255 255 255 / 0.55) 50%,
+      transparent 60%
+    );
+    background-size: 200% 100%;
+    animation: v8-skeleton-shimmer 1200ms linear infinite;
+  }
+}
+
+@keyframes v8-skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/*
+ * ★V8「手順」（NUOgw）：白い板の中に枠付きカードを重ねない。
+ * 段の丸・文字・つなぎ線は変えず、囲い（枠・地・余白）だけを取る。
+ */
+[data-theme="v8"] [data-part="stepper"] {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+/*
+ * ★V8「注目の星」（Pencil zcGgI / w0R1PQ・オーナー決定 2026-10-01）：
+ * オフは灰の線のまま、オンで黄色い塗り（#fbbf24）＋濃い黄の縁（#f59e0b）。
+ * 使う側（友だち一覧の行）は `data-part="attention-star"` を付けるだけ。
+ * オンになった瞬間、星が小さくふくらんで戻る（200ms・MOTION.md）。
+ */
+[data-theme="v8"] [data-part="attention-star"][aria-pressed="true"] svg {
+  color: var(--color-star-on-edge);
+  fill: var(--color-star-on);
+  stroke: var(--color-star-on-edge);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] [data-part="attention-star"][aria-pressed="true"] svg {
+    animation: v8-star-pop var(--motion-base) var(--motion-ease-out);
+  }
+}
+
+/*
+ * ★V8「ページ送り」（jX2Uw）：帯そのものが「件数＋ボタン」を持つ。
+ * 帯を包む行（data-pagebar）は高さ固定・余白をやめ、外に出していた
+ * 件数の文（data-pagebar-out）は帯の中の summary へ移すので隠す。
+ * v7 は今までどおり。
+ */
+[data-theme="v8"] [data-pagebar] {
+  height: auto;
+  padding: 0;
+}
+
+[data-theme="v8"] [data-pagebar-out] {
+  display: none;
+}
+
+@keyframes v8-star-pop {
+  0% {
+    transform: scale(0.85);
+  }
+
+  60% {
+    transform: scale(1.15);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * #673 触った感触（emil/apple/interaction-design）
+ *
+ * ここに書くのは「全画面で同じ触感」の規定だけ。`transition: all` は
+ * 使わず、動かすプロパティを列挙する。部品が持っている transition
+ * （共通 Button の CSS Module、`transition-colors` などのユーティリティ）
+ * は base 層より強いので、そのまま残る。この規定が効くのは
+ * transition を何も持たない要素だけで、既存の動きを上書きしない。
+ * ------------------------------------------------------------------- */
+/*
+ * 上の規定は、ファイル末尾の既存 `@layer base`（:lang(ja) の文節改行）に
+ * まとめる。@layer base を複数に分けると、層の中身を数える契約試験
+ * （japanese-line-break-contract）が取りこぼす。
+ */
+
+/*
+ * メニュー・モーダルの出入り。150–250msの ease-out で、開いた位置から
+ * 少し沈みながら現れる。共有部品（components/shared/）は変更できない
+ * ため、`data-design-part` の属性を入口にここへ置く。
+ *
+ * **@layer に入れない。** 部品の CSS Module はレイヤーに属さず常に
+ * 勝つので、層の中に書くと上書き規定（下の dialog の影）が効かない。
+ * 属性で対象を絞った規定なので、レイヤー外でも副作用は生じない
+ * （ファイル先頭の data-design-node 規定と同じ書き方）。
+ */
+@keyframes lh-surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 上に向かって開くメニューはトリガーの右上を起点にする。 */
+[data-design-part="action-menu"],
+[data-design-part="notification-panel"],
+aside[aria-label="フォルダ"] .shadow-lg {
+  animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
+  transform-origin: top right;
+}
+
+/* モーダルは中央から。最前面の影（★V7 段3）で浮かせる。 */
+[data-design-part="dialog"] {
+  animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
+}
+
+[data-design-part="dialog"][data-design-node] {
+  box-shadow: var(--shadow-overlay);
+}
+
+/* ---------------------------------------------------------------------
+ * ★V7 仕上げ「読み込みと初回表示の動き」（`z97zZN` §1・§3 / `sTJsh` §2）
+ * ------------------------------------------------------------------- */
+
+/*
+ * §3 骨組みの明滅。不透明度 1↔0.55・1.2秒の ease-in-out。光が流れる
+ * 演出（shimmer）は使わない。Tailwind 既定の `animate-pulse`（2秒・0.5）
+ * をここで V7 の速さに揃えるので、既存の骨組みもこの規定に乗る。
+ * 新しく骨組みを置くときは shared の `Skeleton` を使う。
+ * 「動きを減らす」設定では末尾の reduced-motion 規定が一瞬にする。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-pulse {
+    animation: v7-skeleton-pulse var(--motion-pulse) var(--motion-ease-in-out) infinite;
+  }
+}
+
+@keyframes v7-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/*
+ * §1 最初に開いたときの入り方。不透明度 0→1＋下から8px上がる、
+ * --motion-base(200ms) の ease-out。同じ段の中では 1 つずつ 40ms ずらし、
+ * 4 つ目以降は同時に出す（板の「全体 320ms 以内」）。ずらし幅の 40ms は
+ * 板の指定値で、--motion-* は transition の長さの系なのでここでは
+ * 直接値を書く。表の行には使わず、表ごとに 1 回だけかける
+ * （入れ物に `.v7-stagger` を付ける）。`both` の終端が最終表示なので、
+ * reduced-motion で一瞬に潰れても表示は正しい。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .v7-stagger > * {
+    animation: v7-rise var(--motion-base) var(--motion-ease-out) both;
+  }
+  .v7-stagger > :nth-child(2) {
+    animation-delay: 40ms;
+  }
+  .v7-stagger > :nth-child(3) {
+    animation-delay: 80ms;
+  }
+  .v7-stagger > :nth-child(n + 4) {
+    animation-delay: 120ms;
+  }
+}
+
+@keyframes v7-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/*
+ * `sTJsh` §2 前の表示を残したまま読み直す。読み直し中は中身を 0.55 に
+ * 薄め、上に 2px の線の帯を流す。出す・消すの判定（0.3 秒より早い応答
+ * では出さない）は shared `RefreshCover` が持つ。reduced-motion では
+ * 棒は左端に置いたままにする（止まっていても「読み直し中」の印になる）。
+ */
+.v7-refresh {
+  position: relative;
+}
+
+.v7-refresh-dim {
+  opacity: 0.55;
+}
+
+.v7-refresh-line {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: 2px;
+  overflow: hidden;
+}
+
+.v7-refresh-line::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  border-radius: 1px;
+  background: var(--color-accent);
+  content: '';
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .v7-refresh-line::before {
+    animation: v7-refresh-sweep 1s var(--motion-ease-in-out) infinite;
+  }
+}
+
+@keyframes v7-refresh-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+/*
+ * フォルダパネルは枠線だけの平らな面だったので、カードの影で面から
+ * 浮かせる。パネル内の「…」メニュー（Tailwind の shadow-lg）は
+ * メニューの影（float）へ寄せ、他のドロップダウンと揃える。
+ */
+aside[aria-label="フォルダ"] {
+  box-shadow: var(--shadow-card);
+}
+
+aside[aria-label="フォルダ"] .shadow-lg {
+  box-shadow: var(--shadow-float);
+}
+
+/*
+ * 欄の誤りは枠を赤くする（★V7 sTJsh §6）。共有入力部品は各自の CSS で
+ * 持っているが、画面に直接書いた `<input>` も同じ色になるようここで揃える。
+ */
+input[aria-invalid='true'],
+textarea[aria-invalid='true'],
+select[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+/*
+ * タッチ端末の入力欄は 16px 以上（★V7 修正方針 §3）。
+ * 共通部品（TextField・Select ほか）は各自で 16px にしているが、画面に直接書いた
+ * 入力欄は 12〜14px のままで、iPhone で押すと画面が拡大されていた（2026-09-24 の点検で
+ * /broadcasts 3・/tags 5 など）。層の外に置くのは、Tailwind の text-sm などより強くするため。
+ * 大きい字の欄は `max()` でそのまま残す。
+ */
+@media (pointer: coarse) {
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+/*
+ * 押したら少し沈む（★V7・オーナー指示 2026-09-24「ボタンもチェックボックスと同じように」）。
+ * 共通 Button・IconButton は各自の CSS で持つ。ここは画面に直接書いたボタンの分。
+ * 横いっぱいの行（.w-full）・タブ・候補・メニュー項目・切替は、行ごと縮むと不自然なので外す。
+ * 動きを減らす設定では出さない。
+ */
+@layer base {
+  button,
+  [role='button'] {
+    transition: scale var(--motion-instant) var(--motion-ease-out);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    :is(button, [role='button']):not(:disabled, [aria-disabled='true'], .w-full, [role='tab'], [role='option'], [role='menuitem'], [role='switch'], [role='gridcell'] *):active {
+      scale: 0.98;
+    }
+  }
+}
+
+/*
+ * 行ごとの削除のアイコン（aria-label が「〜を削除」）は、ふだんは灰色、指を乗せた時と
+ * キーボードで選んだ時だけ赤（★V7、2026-09-24）。一覧の行ごとに赤いごみ箱が並ぶと、
+ * 画面でいちばん目立つのが「消す」になっていた（44か所・書き方もばらばら）。
+ * 層の外に置くのは、各画面の text-danger より強くするため。確認の窓の「削除する」
+ * （文字のあるボタン）は aria-label を持たないので当たらない。
+ */
+button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
+  color: var(--color-ink-faint);
+}
+
+/*
+ * 動きを減らす設定（OS の「視差効果を減らす」など）では、すべての動きを
+ * 一瞬で最後の状態にする。部品ごとに書き忘れても、ここで止まる。
+ * `0.01ms` にするのは、`transitionend` を待つ処理が止まらないようにするため。
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * 日本語の改行を文節で行う（V7、手本は detail.design の Smarter Word Break）。
+ *
+ * AGENTS.md「短い文字列は単語の途中で改行しない」を、1文字ずつではなく
+ * 意味のまとまりで守る。Chromium で確かめた例（幅136px・14px）:
+ *   「保存していない変/更があります」→「保存していない/変更があります」
+ *   「LINEアカウントを選/んでください」→「LINEアカウントを/選んでください」
+ * 文節が1行に入り切らない狭い幅では、今までどおり1文字単位で折り返す。
+ *
+ * - `auto-phrase` は html の lang="ja" のときだけ効く（layout.tsx で指定済み）
+ * - 対応していないブラウザは今までどおり（1文字単位）。見た目が壊れることはない
+ * - 英数字・URL の扱いは今までの `normal` と同じ
+ * - 見出しは行の長さを揃えて、最後の行に1〜2文字だけ残るのを防ぐ
+ */
+/*
+ * `@layer base` に入れる。層の外に書くと Tailwind の utilities 層より強くなり、
+ * `truncate`（1行で省略）の見出しが折り返し、`break-all`（URL・秘密値を
+ * 途中で折る）が効かなくなった（2026-09-23 の点検で発覚）。base 層なら、
+ * 画面側のクラスが指定したときはそちらが勝つ。
+ */
+@layer base {
+  /*
+   * 数字は桁でそろえる（★V7「見た目の物差し」§3）。
+   * 以前は数が出る画面ごとに `tabular-nums` を付けていて、付け忘れた
+   * 場所で桁が揺れていた。全体の既定にして、個別に付けなくて済む
+   * ようにする。等幅でない数字にしたい場所だけ `proportional-nums` で
+   * 戻せる。かな・漢字・英字には効かない。
+   */
+  body {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * ★V7「見た目の物差し」§2: 太字は 600 / 500 / 400 の3段だけで、
+   * 700 は `text-hero`（28px の大きな数）だけ。ブラウザが勝手に
+   * 700 にする `<strong>`・`<b>`・`<th>` を 600 に畳む。
+   * 本文中の強調（strong/b）は 600 でも前後の 400 と分かれる。
+   */
+  strong,
+  b,
+  th {
+    font-weight: 600;
+  }
+
+  :lang(ja) {
+    word-break: auto-phrase;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  /*
+   * #673 押した感触。★V7 仕上げ §2「押した」にそろえて、沈む動きは
+   * 上の `scale` 規定（0.98倍・motion-instant）に一本化した。
+   * ここに残すのは色と影のなめらか化だけ。
+   *
+   * 部品が持っている transition（共通 Button の CSS Module、
+   * `transition-colors` などのユーティリティ）は base 層より強いので
+   * そのまま残る。この規定が効くのは transition を何も持たない
+   * ボタンだけで、既存の動きを上書きしない。
+   */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    transition:
+      background-color var(--motion-fast) ease-out,
+      border-color var(--motion-fast) ease-out,
+      color var(--motion-fast) ease-out,
+      box-shadow var(--motion-fast) ease-out,
+      opacity var(--motion-fast) ease-out;
+  }
+
+  /*
+   * #673 表の行のホバー。行全体が薄く変わり、操作列を含めて「今この行に
+   * 触れている」ことが分かる。選択中の行などユーティリティで背景を
+   * 指定した行はそちらが勝つ（base 層の規定のため）。
+   *
+   * タッチ端末ではタップ後にホバーが残ったままになるので、
+   * 「ホバーできる・精密なポインタ」の環境に限定する（#673）。
+   */
+  @media (hover: hover) and (pointer: fine) {
+    tbody tr {
+      transition: background-color var(--motion-fast) ease-out;
+    }
+    tbody tr:hover {
+      background-color: var(--color-canvas-sunken);
+    }
+
+    /*
+     * #639 タップ高さ・ホバーの規則。ホバーできる・精密なポインタの
+     * 環境に限定する（タッチ端末ではタップ後にホバーが残るため）。
+     *
+     * ボタンは背景の無い素の文字ボタンだけがここで変わる。背景も
+     * ホバーも持つ部品（共通 Button の CSS Module、`hover:bg-*` の
+     * ユーティリティ）は層の順序でそちらが勝つ。`transition: all`
+     * は使わず、動かすプロパティを列挙する（#648の教訓）。
+     */
+    button:not(:disabled, [role="switch"]):hover,
+    [role="button"]:not([aria-disabled="true"]):hover {
+      background-color: var(--color-canvas-sunken);
+    }
+
+    /*
+     * 文字リンクは色で応答する。`text-*` のユーティリティや部品の
+     * 色指定がある箇所はそちらが勝ち、色を持たない素のリンクだけ
+     * が操作色へ変わる。下線は付けない（枠付きボタンとして描いた
+     * リンクにまで線が入るため）。
+     */
+    a:hover {
+      color: var(--color-action-hover);
+    }
+  }
+
+  /*
+   * #639 主要操作の最小高さは 32px（推奨 36px 以上は部品側で持つ）。
+   * 高さを持つ部品（共通 Button 40px・ページネーション 38px・行内
+   * アイコン 32px・タブ 44px）はそのまま。ここで持ち上がるのは
+   * 高さの指定が無い素のボタン（ダイアログの「閉じる」など約28px）
+   * だけ。`min-height` なので高い部品は変わらない。
+   *
+   * スイッチ（role="switch"）は外す。20px の軌道とつまみの比率が
+   * 決まっているため、高さだけ伸ばすと形が壊れる。
+   */
+  button:not([role="switch"]),
+  [role="button"] {
+    min-height: 32px;
+  }
+
+  /*
+   * #639 タッチ端末では指の当たりとして 44px を確保する。部品側の
+   * 規定（共通 Button・行内操作の `@media (pointer: coarse)`）と
+   * 同じ入口。PC の見た目は変わらない。
+   */
+  @media (pointer: coarse) {
+    button:not([role="switch"]),
+    [role="button"] {
+      min-height: 44px;
+    }
+  }
+
+  /*
+   * #639 文字リンクの色変化はなめらかにする。対象は色と背景だけ。
+   */
+  a {
+    transition:
+      color var(--motion-fast) ease-out,
+      background-color var(--motion-fast) ease-out;
+  }
+
+  /*
+   * 素の入力欄のフォーカス（2026-09-25・使いやすさ点検 §8）。
+   * 共通部品を使っていない `input` / `select` / `textarea` も、共通部品と
+   * 同じ見た目（2px・action 色・外側に少し余白）にする。枠の色を緑に
+   * 変えるだけの合図はやめる（緑は「正常」の意味、白地で 3:1 未満）。
+   * base 層なので、部品側の指定（components 層・utilities 層）がある
+   * 箇所はそちらが勝つ。SearchField などの複合部品（外枠の
+   * `:focus-within` が正本）は部品側が勝ち、二重の輪郭にならない。
+   */
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--color-action);
+    outline-offset: 2px;
+  }
 }
 
 /*
@@ -327,4 +1155,133 @@ select:not([multiple]):not(.appearance-none) {
 [data-design-part="notification-panel"] > ul {
   min-height: 0;
   overflow-y: auto;
+}
+/* Googleビジネス V6（GB-1/2/3/16）：実画面幅でもタブと操作を見切れさせない。 */
+.gb-location-option:focus-within {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+.gb-accent-control {
+  accent-color: var(--color-accent-deep);
+}
+
+@media (min-width: 640px) {
+  .gb-confirm-details {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .gb-draft-grid {
+    grid-template-columns: minmax(0, 1fr) 390px;
+  }
+
+  .gb-confirm-grid {
+    grid-template-columns: minmax(0, 1fr) 390px;
+  }
+}
+
+/*
+ * フォルダ欄と表が横に並ぶ帯（1024〜1439px）: フォルダ欄を252pxから200pxへ
+ * 畳み、横の表へ幅を譲る。ページが `style={FOLDER_RAIL_STYLE}` で変数を
+ * インライン指定しているため、ここは属性セレクタ＋importantで上書きする。
+ * フォルダ名は長いとき省略表示＋titleで全文を読める。
+ * 1440px以上では表の幅に余裕があるので252pxに戻る。
+ */
+@media (min-width: 1024px) and (max-width: 1439.98px) {
+  [style*="--folder-rail-width"] {
+    --folder-rail-width: 12.5rem !important;
+  }
+}
+
+/*
+ * 谷間帯の列削減（コンテナクエリ）。表を包む要素に Tailwind の
+ * `@container`（container-type: inline-size）が付いている前提で、
+ * 表の実際の幅が足りない間だけ低優先列を畳む。
+ *
+ * なぜ目印クラスか: 共有部品（shared/table の Th・Td など）のCSSは
+ * カスケードレイヤーの外にあり Tailwind の hidden/table-cell に勝つため、
+ * 部品へ `hidden` を渡しても無視される（design-debt契約でゼロ許容）。
+ * そのため表示の切り替えはここの unlayered ルールで行う。
+ * 数字は「このピクセル未満で畳む」コンテナ幅。
+ */
+@container (max-width: 799.98px) {
+  .cq-hide-below-800 {
+    display: none;
+  }
+}
+
+@container (max-width: 829.98px) {
+  .cq-hide-below-830 {
+    display: none;
+  }
+}
+
+@container (max-width: 869.98px) {
+  .cq-hide-below-870 {
+    display: none;
+  }
+}
+
+@container (max-width: 879.98px) {
+  .cq-hide-below-880 {
+    display: none;
+  }
+}
+
+@container (max-width: 1009.98px) {
+  .cq-hide-below-1010 {
+    display: none;
+  }
+}
+
+@container (max-width: 1119.98px) {
+  .cq-hide-below-1120 {
+    display: none;
+  }
+}
+
+/* Googleビジネス第2段（GB-10〜GB-19）。主列 1126 ＋ 右カード 390（1920px 設計）。 */
+.gb-history-row {
+  grid-template-columns: 96px minmax(0, 1fr) 110px 128px 130px;
+}
+
+@media (min-width: 1024px) {
+  .gb-calendar-grid {
+    grid-template-columns: 480px minmax(0, 1fr);
+  }
+
+  .gb-edit-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .gb-compare-grid {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .gb-profile-grid {
+    grid-template-columns: minmax(0, 1fr) 390px;
+  }
+}
+
+@media (max-width: 1350px) {
+  .gb-review-filters {
+    flex-wrap: wrap;
+    height: auto;
+    padding-bottom: 8px;
+  }
+
+  .gb-review-filters > span:first-child {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+
+  .gb-review-filters > span:last-child {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+    padding-bottom: 0;
+  }
 }

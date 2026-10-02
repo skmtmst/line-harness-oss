@@ -112,7 +112,8 @@ describe('デザイン設定に無反応な操作面を残さない(#725)', () =
     await render()
     expect(buttonTexts()).not.toContain('保存する')
     // 閉じる・元に戻すは残す。どちらも押すと反応がある。
-    expect(buttonTexts()).toContain('閉じる')
+    // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
+    expect(host.querySelector('button[aria-label="閉じる"]')).toBeTruthy()
     expect(buttonTexts()).toContain('元に戻す')
   })
 
@@ -144,8 +145,9 @@ describe('デザイン設定に無反応な操作面を残さない(#725)', () =
     expect(spans).not.toContain('CSSで細かく')
     expect(host.textContent).not.toContain('CSSで細かく')
     // 区分そのものは見出しとして残っていて、中身は同時に見える。
-    const headings = Array.from(host.querySelectorAll('h3')).map((h) => h.textContent?.trim())
-    expect(headings).toContain('色')
+    // 「色」の見出しには決まりの「？」が付くため、前方一致で見る。
+    const headings = Array.from(host.querySelectorAll('h3')).map((h) => h.textContent?.trim() ?? '')
+    expect(headings.some((heading) => heading.startsWith('色'))).toBe(true)
     expect(headings).toContain('文字と角の丸み')
     expect(headings).toContain('リンクの見え方')
   })

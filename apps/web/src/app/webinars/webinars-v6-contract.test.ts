@@ -16,9 +16,9 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).toContain('更新が新しい順')
     expect(PAGE).toContain('作成が新しい順')
     expect(PAGE).toContain('名前順')
-    /* 共通の `SelectField` へ寄せたので、配列ではなく options で並ぶ。 */
-    for (const n of ['20件表示', '50件表示', '100件表示']) expect(PAGE).toContain(n)
-    expect(PAGE).toContain('setPageSize(Number(event.target.value))')
+    /* #668: 並び順・表示件数は共通部品（SortSelect / PageSizeSelect）。 */
+    expect(PAGE).toContain('SortSelect')
+    expect(PAGE).toContain('PageSizeSelect')
     expect(PAGE).not.toContain('申込が多い順')
     expect(PAGE).not.toContain('表示件数の切り替えは準備中です')
   })
@@ -26,8 +26,11 @@ describe('V6 ウェビナー一覧の契約', () => {
   it('公開中と下書きの条件をサーバーで絞り込む', () => {
     /* 取った1頁を画面で絞り直すと件数や頁数が変わる。絞りは口へ渡す。 */
     expect(PAGE).toContain('status: savedFilter || undefined')
-    expect(PAGE).toContain("{ key: 'active', label: '公開中のみ' }")
-    expect(PAGE).toContain("{ key: 'draft', label: '下書きのみ' }")
+    /* 札は共通 FilterChip。直書きの button には戻さない。 */
+    expect(PAGE).toContain("import FilterChip from '@/components/shared/filter-chip'")
+    expect(PAGE).toContain('<FilterChip')
+    expect(PAGE).toContain("label: '公開中のみ'")
+    expect(PAGE).toContain("label: '下書きのみ'")
     expect(PAGE).not.toContain('保存した条件は準備中です')
     expect(PAGE).not.toContain('foldered.filter')
   })
@@ -93,9 +96,10 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).not.toContain('保存した条件')
   })
 
-  it('同じ /webinars/new への操作名は「ウェビナーを作成」で一致する(DETAIL-02)', () => {
-    expect(PAGE).toContain('href="/webinars/new">ウェビナーを作成')
-    expect(PAGE).not.toContain('ウェビナーを作る')
+  it('同じ /webinars/new への操作名は「＋ ウェビナーを作る」で一致する(DETAIL-02)', () => {
+    expect(PAGE).toContain('href="/webinars/new">＋ ウェビナーを作る')
+    expect(PAGE).not.toContain('ウェビナーを作成')
+    expect(PAGE).not.toContain('ウェビナーをつくる')
   })
 
   it('動画欄は実メディア名を出し、slug.mp4 の偽名を作らない(DETAIL-18)', () => {

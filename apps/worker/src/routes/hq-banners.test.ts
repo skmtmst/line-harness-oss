@@ -417,6 +417,17 @@ describe('画像ライブラリと店舗への受け渡し', () => {
     expect((await res.json<{ data: unknown[] }>()).data).toHaveLength(0);
   });
 
+  it('配布状態の絞り込みをページ切り前にかけ、同じ画像は1件で返す', async () => {
+    const { image } = await generatedImage();
+    expect((await call('GET', '/api/hq/banners/images?delivered=1')).status).toBe(200);
+    expect((await (await call('GET', '/api/hq/banners/images?delivered=1')).json<{ data: unknown[] }>()).data).toHaveLength(0);
+    expect((await (await call('GET', '/api/hq/banners/images?delivered=0')).json<{ data: unknown[] }>()).data).toHaveLength(1);
+    await call('POST', `/api/hq/banners/images/${image.id}/deliver`, { lineAccountIds: ['account-1', 'account-2'] });
+    expect((await (await call('GET', '/api/hq/banners/images?delivered=1&limit=1')).json<{ data: { id: string }[] }>()).data.map(x => x.id)).toEqual([image.id]);
+    expect((await (await call('GET', '/api/hq/banners/images?delivered=0')).json<{ data: unknown[] }>()).data).toHaveLength(0);
+    expect((await call('GET', '/api/hq/banners/images?delivered=yes')).status).toBe(400);
+  });
+
   it('形式の合わないファイルは取り込まない', async () => {
     const { project } = await generatedImage();
     const res = await call('POST', `/api/hq/banners/projects/${project.id}/uploads`, {
@@ -469,6 +480,117 @@ describe('画像ライブラリと店舗への受け渡し', () => {
     expect((await res.json<{ data: unknown[] }>()).data).toHaveLength(0);
     const storeMedia = testDb.raw.prepare("SELECT COUNT(*) AS n FROM media WHERE line_account_id = 'account-1'").get() as { n: number };
     expect(storeMedia.n).toBe(1);
+  });
+});
+
+describe('用途寸法への整形（R120）', () => {
+  /** Cloudflare Images binding の代わり。渡された条件を記録し、JPEG の中身を返す。 */
+  function fakeImagesBinding() {
+    const calls: Array<{ width: number; height: number; fit: string; gravity: string }> = [];
+    const resized = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 9, 9, 9]);
+    const binding = {
+      input: () => ({
+        transform: (opts: { width: number; height: number; fit: string; gravity: string }) => {
+          calls.push({ ...opts });
+          return { output: async () => ({ image: () => new Blob([resized]).stream() }) };
+        },
+      }),
+    };
+    return { binding: binding as unknown as ImagesBinding, calls, resized };
+  }
+
+  async function queuedGeneration(presetKey = 'line_rich_message') {
+    const project = await createProject();
+    const res = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, {
+      ...GENERATE_BODY,
+      presetKey,
+      count: 1,
+    });
+    expect(res.status).toBe(201);
+    return (await res.json<{ data: { id: string } }>()).data;
+  }
+
+  it('binding があるときは用途の指定寸法で保存し、resized=true を返す', async () => {
+    const generation = await queuedGeneration('line_rich_message');
+    openai.generate.mockResolvedValue({ bytes: JPEG, mimeType: 'image/jpeg', model: 'gpt-image-1' });
+    const { binding, calls, resized } = fakeImagesBinding();
+
+    const res = await call('POST', `/api/hq/banners/generations/${generation.id}/run`, { gravity: 'center' }, {
+      env: { CF_IMAGES: binding },
+    });
+    expect(res.status).toBe(200);
+    const run = (await res.json<{
+      data: {
+        image: { media: { width: number; height: number; mimeType: string; sizeBytes: number } };
+        resized: boolean; targetWidth: number; targetHeight: number;
+      };
+    }>()).data;
+    expect(calls).toEqual([{ width: 1040, height: 1040, fit: 'cover', gravity: 'center' }]);
+    expect(run.resized).toBe(true);
+    expect(run.targetWidth).toBe(1040);
+    expect(run.targetHeight).toBe(1040);
+    expect(run.image.media).toMatchObject({ width: 1040, height: 1040, mimeType: 'image/jpeg', sizeBytes: resized.byteLength });
+
+    // R2 の実体も整形後の中身
+    const stored = [...r2.store.values()];
+    expect(stored).toHaveLength(1);
+    expect(stored[0].bytes).toEqual(resized);
+  });
+
+  it('リッチメニュー（小）は 2500×843 で保存される', async () => {
+    const generation = await queuedGeneration('line_rich_menu_small');
+    openai.generate.mockResolvedValue({ bytes: JPEG, mimeType: 'image/jpeg', model: 'gpt-image-1' });
+    const { binding, calls } = fakeImagesBinding();
+
+    const res = await call('POST', `/api/hq/banners/generations/${generation.id}/run`, undefined, {
+      env: { CF_IMAGES: binding },
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([{ width: 2500, height: 843, fit: 'cover', gravity: 'center' }]);
+    const run = (await res.json<{ data: { image: { media: { width: number; height: number } }; resized: boolean } }>()).data;
+    expect(run.image.media).toMatchObject({ width: 2500, height: 843 });
+    expect(run.resized).toBe(true);
+  });
+
+  it('切り抜きの位置（上・下）を binding へ渡す', async () => {
+    const generation = await queuedGeneration('sns_story');
+    openai.generate.mockResolvedValue({ bytes: JPEG, mimeType: 'image/jpeg', model: 'gpt-image-1' });
+    const { binding, calls } = fakeImagesBinding();
+
+    const res = await call('POST', `/api/hq/banners/generations/${generation.id}/run`, { gravity: 'top' }, {
+      env: { CF_IMAGES: binding },
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([{ width: 1080, height: 1920, fit: 'cover', gravity: 'top' }]);
+  });
+
+  it('中央・上・下以外は生成前に400で断り、OpenAI は呼ばない', async () => {
+    const generation = await queuedGeneration();
+    const res = await call('POST', `/api/hq/banners/generations/${generation.id}/run`, { gravity: 'left' });
+    expect(res.status).toBe(400);
+    expect((await res.json<{ error: string }>()).error).toContain('切り抜きの位置は中央・上・下から選んでください');
+    expect(openai.generate).not.toHaveBeenCalled();
+  });
+
+  it('binding が無い環境では元のまま保存し、resized=false を返す（落ちない）', async () => {
+    const generation = await queuedGeneration('line_rich_menu_small');
+    openai.generate.mockResolvedValue({ bytes: PNG, mimeType: 'image/png', model: 'gpt-image-1' });
+
+    const res = await call('POST', `/api/hq/banners/generations/${generation.id}/run`, { gravity: 'bottom' });
+    expect(res.status).toBe(200);
+    const run = (await res.json<{
+      data: {
+        image: { media: { width: number; height: number; mimeType: string } };
+        resized: boolean; targetWidth: number; targetHeight: number;
+      };
+    }>()).data;
+    expect(run.resized).toBe(false);
+    expect(run.targetWidth).toBe(2500);
+    expect(run.targetHeight).toBe(843);
+    // 実体は生成APIのままなので、記録も形式・寸法とも元に合わせる
+    expect(run.image.media).toMatchObject({ width: 1536, height: 1024, mimeType: 'image/png' });
+    expect([...r2.store.values()]).toHaveLength(1);
+    expect([...r2.store.values()][0].bytes).toEqual(PNG);
   });
 });
 

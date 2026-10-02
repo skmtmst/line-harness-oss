@@ -23,6 +23,7 @@ const dbMocks = vi.hoisted(() => ({
   replaceConversionDefinitionUsages: vi.fn(), deleteUnusedConversionDefinition: vi.fn(),
   getConversionDefinitionReport: vi.fn(), listConversionDefinitionsForExport: vi.fn(),
   reviseConversionDefinition: vi.fn(),
+  isExclusionSavable: vi.fn(() => true),
 }));
 const contractMocks = vi.hoisted(() => ({
   ConversionDefinitionError: class ConversionDefinitionError extends Error {

@@ -1,4 +1,4 @@
-import { boundedListLimit, jstNow, MAX_LIST_LIMIT } from './utils.js';
+import { boundedListLimit, jstDateString, jstNow, MAX_LIST_LIMIT } from './utils.js';
 // =============================================================================
 // Forms — Survey / questionnaire system (L社 回答フォーム equivalent)
 // =============================================================================
@@ -43,6 +43,8 @@ export interface FormSubmission {
   form_id: string;
   friend_id: string | null;
   form_version_id: string | null;
+  /** P（試し回答）：1 は公開前の試し。集計・一覧・書き戻しに出さない。 */
+  is_test: number;
   data: string; // JSON string
   destination_write_status: FormDestinationWriteStatus;
   destination_write_attempted: number | null;
@@ -86,6 +88,13 @@ export interface FormWithStats extends Form {
   last_submitted_at: string | null;
   used_by_accounts: FormUsedByAccount[];
   account_scope_review_required: boolean;
+  /**
+   * P（一覧の数）：日本時間の1日から数えた今月の回答完了数・開いた人数・完了率。
+   * 試しは入れない。開いた人数が 0 のとき完了率は null（「—」と出す）。
+   */
+  monthly_submit_count: number;
+  monthly_open_count: number;
+  monthly_completion_rate: number | null;
 }
 
 export interface FormAccountScope {
@@ -129,11 +138,20 @@ export async function getFormsWithStats(
   }
   // Single query: forms + last submission + per-account submission counts.
   // json_group_array returns '[]' (not NULL) when subquery yields no rows.
+  // P：試し（is_test=1）は最後の回答・利用先の数・今月の数のどこにも入れない。
+  // 今月は日本時間の1日から。DBの時刻はJST文字列なので頭7文字（YYYY-MM）で切る。
+  const monthPrefix = jstDateString().slice(0, 7);
   const result = await db
     .prepare(
       `SELECT
          f.*,
-         (SELECT MAX(created_at) FROM form_submissions WHERE form_id = f.id) AS last_submitted_at,
+         (SELECT MAX(created_at) FROM form_submissions WHERE form_id = f.id AND is_test = 0) AS last_submitted_at,
+         (SELECT COUNT(*) FROM form_submissions
+           WHERE form_id = f.id AND is_test = 0
+             AND substr(created_at, 1, 7) = ?) AS monthly_submit_count,
+         (SELECT COUNT(DISTINCT friend_id) FROM form_opens
+           WHERE form_id = f.id AND is_test = 0 AND friend_id IS NOT NULL
+             AND substr(opened_at, 1, 7) = ?) AS monthly_open_count,
          NOT EXISTS (
            SELECT 1 FROM form_accounts assigned WHERE assigned.form_id = f.id
          ) AS account_scope_review_required,
@@ -152,7 +170,7 @@ export async function getFormsWithStats(
               SELECT fr.line_account_id, COUNT(*) AS cnt
               FROM form_submissions fs
               JOIN friends fr ON fr.id = fs.friend_id
-              WHERE fs.form_id = f.id AND fr.line_account_id IS NOT NULL
+              WHERE fs.form_id = f.id AND fs.is_test = 0 AND fr.line_account_id IS NOT NULL
               GROUP BY fr.line_account_id
             ) sub ON sub.line_account_id = assigned.line_account_id
             WHERE assigned.form_id = f.id) AS used_by_accounts_json
@@ -163,15 +181,17 @@ export async function getFormsWithStats(
          last_submitted_at DESC,
          f.created_at DESC`,
     )
-    .bind(...accountIds, ...folderBinds)
+    .bind(monthPrefix, monthPrefix, ...accountIds, ...folderBinds)
     .all<Form & {
       last_submitted_at: string | null;
       account_scope_review_required: number;
       used_by_accounts_json: string | null;
+      monthly_submit_count: number;
+      monthly_open_count: number;
     }>();
 
   return result.results.map((row) => {
-    const { used_by_accounts_json, ...rest } = row;
+    const { used_by_accounts_json, monthly_submit_count, monthly_open_count, ...rest } = row;
     let parsed: FormUsedByAccount[] = [];
     if (used_by_accounts_json) {
       try {
@@ -181,10 +201,18 @@ export async function getFormsWithStats(
         parsed = [];
       }
     }
+    const monthlySubmits = Number(monthly_submit_count ?? 0);
+    const monthlyOpens = Number(monthly_open_count ?? 0);
     return {
       ...rest,
       account_scope_review_required: Boolean(rest.account_scope_review_required),
       used_by_accounts: parsed.map((account) => ({ ...account, count: account.count ?? 0 })),
+      monthly_submit_count: monthlySubmits,
+      monthly_open_count: monthlyOpens,
+      // 開いた人が 0 のときは null（「—」と出す。0% とは言わない）。
+      monthly_completion_rate: monthlyOpens === 0
+        ? null
+        : Math.round((monthlySubmits / monthlyOpens) * 1000) / 10,
     };
   });
 }
@@ -801,6 +829,28 @@ export async function updateForm(
   return updated ? { kind: 'updated', form: updated } : { kind: 'not_found' };
 }
 
+/**
+ * フォームのフォルダ所属だけを変える（R25）。
+ *
+ * 編集保存（`updateForm`）とは別の細い口。所属は版管理の対象外のため、
+ * 編集の版（`content_revision`）の確認も加算もしない。版を動かすと、
+ * 編集中の人の保存が 409 になったり、削除影響の確認（`revision`）が
+ * 無効になったりする。`updated_at` だけは進める（一覧の「更新」順に反映）。
+ *
+ * 見つからなければ `false` を返す（確認と削除のあいだに消えたとき用）。
+ */
+export async function setFormFolder(
+  db: D1Database,
+  id: string,
+  folderId: string | null,
+): Promise<boolean> {
+  const result = await db
+    .prepare(`UPDATE forms SET folder_id = ?, updated_at = ? WHERE id = ?`)
+    .bind(folderId, jstNow(), id)
+    .run();
+  return Number(result.meta?.changes ?? 0) === 1;
+}
+
 // ── Submissions ───────────────────────────────────────────────────────────────
 
 /**
@@ -824,7 +874,7 @@ export async function getFormSubmissions(
     .prepare(
       `SELECT fs.*, f.display_name as friend_name FROM form_submissions fs
        LEFT JOIN friends f ON f.id = fs.friend_id
-       WHERE fs.form_id = ? ORDER BY fs.created_at DESC LIMIT ?`,
+       WHERE fs.form_id = ? AND fs.is_test = 0 ORDER BY fs.created_at DESC LIMIT ?`,
     )
     .bind(formId, boundedListLimit(limit, MAX_LIST_LIMIT))
     .all<FormSubmission & { friend_name: string | null }>();
@@ -870,7 +920,7 @@ export async function getFormSubmissionsPage(
       `SELECT COUNT(*) AS total
          FROM form_submissions fs
          LEFT JOIN friends f ON f.id = fs.friend_id
-        WHERE fs.form_id = ?${accountClause}${searchClause}`,
+        WHERE fs.form_id = ? AND fs.is_test = 0${accountClause}${searchClause}`,
     )
     .bind(formId, ...accountBindings, ...searchBindings)
     .first<{ total: number }>();
@@ -878,7 +928,7 @@ export async function getFormSubmissionsPage(
     .prepare(
       `SELECT fs.*, f.display_name as friend_name FROM form_submissions fs
        LEFT JOIN friends f ON f.id = fs.friend_id
-       WHERE fs.form_id = ?${accountClause}${searchClause}
+       WHERE fs.form_id = ? AND fs.is_test = 0${accountClause}${searchClause}
        ORDER BY fs.created_at DESC, fs.id DESC
        LIMIT ? OFFSET ?`,
     )
@@ -899,7 +949,7 @@ export async function getFormSubmissionsByFriend(
       `SELECT fs.*, f.name AS form_name, f.fields AS form_fields
        FROM form_submissions fs
        JOIN forms f ON f.id = fs.form_id
-       WHERE fs.friend_id = ?
+       WHERE fs.friend_id = ? AND fs.is_test = 0
        ORDER BY fs.created_at DESC
        LIMIT ?`,
     )
@@ -919,7 +969,7 @@ export async function countFriendFormSubmissions(
   friendId: string,
 ): Promise<number> {
   const row = await db
-    .prepare('SELECT COUNT(*) AS total FROM form_submissions WHERE friend_id = ?')
+    .prepare('SELECT COUNT(*) AS total FROM form_submissions WHERE friend_id = ? AND is_test = 0')
     .bind(friendId)
     .first<{ total: number }>();
   return row?.total ?? 0;
@@ -953,7 +1003,7 @@ export async function getFormSubmissionsByFriendCursor(
       `SELECT fs.*, f.name AS form_name, f.fields AS form_fields
        FROM form_submissions fs
        JOIN forms f ON f.id = fs.form_id
-       WHERE fs.friend_id = ?${cursorClause}
+       WHERE fs.friend_id = ? AND fs.is_test = 0${cursorClause}
        ORDER BY fs.created_at DESC, fs.id DESC
        LIMIT ?`,
     )
@@ -973,6 +1023,8 @@ export interface CreateFormSubmissionInput {
   formVersionId?: string | null;
   friendId?: string | null;
   data: string; // JSON string
+  /** P（試し回答）：true は公開前の試し。集計に入れず、後処理もしない。 */
+  isTest?: boolean;
 }
 
 /**
@@ -991,10 +1043,10 @@ export async function insertFormSubmissionRecord(
   await db
     .prepare(
       `INSERT INTO form_submissions
-         (id, form_id, friend_id, form_version_id, data, destination_write_status, created_at)
-       VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+         (id, form_id, friend_id, form_version_id, is_test, data, destination_write_status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
     )
-    .bind(id, input.formId, input.friendId ?? null, input.formVersionId ?? null, input.data, now)
+    .bind(id, input.formId, input.friendId ?? null, input.formVersionId ?? null, input.isTest ? 1 : 0, input.data, now)
     .run();
 
   return (await db
@@ -1025,7 +1077,7 @@ export async function resyncFormSubmitCount(
   await db
     .prepare(
       `UPDATE forms
-          SET submit_count = (SELECT COUNT(*) FROM form_submissions WHERE form_id = ?),
+          SET submit_count = (SELECT COUNT(*) FROM form_submissions WHERE form_id = ? AND is_test = 0),
               updated_at = ?
         WHERE id = ?`,
     )
@@ -1162,7 +1214,7 @@ export async function getFormSubmissionAnalytics(
               COALESCE(SUM(CASE WHEN fs.destination_write_status = 'unknown' THEN 1 ELSE 0 END), 0) AS write_unknown
          FROM form_submissions fs
          JOIN friends f ON f.id = fs.friend_id
-        WHERE fs.form_id = ? AND f.line_account_id = ?`,
+        WHERE fs.form_id = ? AND f.line_account_id = ? AND fs.is_test = 0`,
     ).bind(formId, lineAccountId).first<{
       submitted: number;
       write_pending: number;
@@ -1176,7 +1228,7 @@ export async function getFormSubmissionAnalytics(
       `SELECT COUNT(DISTINCT fo.friend_id) AS started_unique
          FROM form_opens fo
          JOIN friends f ON f.id = fo.friend_id
-        WHERE fo.form_id = ? AND f.line_account_id = ?`,
+        WHERE fo.form_id = ? AND f.line_account_id = ? AND fo.is_test = 0`,
     ).bind(formId, lineAccountId).first<{ started_unique: number }>(),
   ]);
 
@@ -1197,6 +1249,7 @@ export async function getFormSubmissionAnalytics(
          JOIN json_each(CASE WHEN json_valid(fs.data) THEN fs.data ELSE '{}' END) answer
         WHERE fs.form_id = ?
           AND f.line_account_id = ?
+          AND fs.is_test = 0
           AND answer.key = ?
           AND answer.value IS NOT NULL
           AND TRIM(CAST(answer.value AS TEXT)) <> ''`,
@@ -1226,6 +1279,7 @@ export async function getFormSubmissionAnalytics(
          JOIN json_each(CASE WHEN json_valid(fs.data) THEN fs.data ELSE '{}' END) answer
         WHERE fs.form_id = ?
           AND f.line_account_id = ?
+          AND fs.is_test = 0
           AND answer.key IN (${placeholders})
           AND answer.value IS NOT NULL
           AND TRIM(CAST(answer.value AS TEXT)) <> ''`,
@@ -1261,7 +1315,7 @@ export async function countFormSubmissionsByFriend(
 ): Promise<number> {
   const row = await db
     .prepare(
-      `SELECT COUNT(*) AS n FROM form_submissions WHERE form_id = ? AND friend_id = ?`,
+      `SELECT COUNT(*) AS n FROM form_submissions WHERE form_id = ? AND friend_id = ? AND is_test = 0`,
     )
     .bind(formId, friendId)
     .first<{ n: number }>();
@@ -1749,11 +1803,101 @@ export async function getLatestFormSubmission(
   return db
     .prepare(
       `SELECT * FROM form_submissions
-       WHERE form_id = ? AND friend_id = ?
+       WHERE form_id = ? AND friend_id = ? AND is_test = 0
        ORDER BY created_at DESC LIMIT 1`,
     )
     .bind(formId, friendId)
     .first<FormSubmission>();
+}
+
+// ── 試し合言葉（P：公開前の試し） ─────────────────────────────────────
+//
+// 公開前の下書きを、お客さま画面で試すための合言葉。生の値は保存せず、
+// SHA-256 の16進だけを残す。試しで開く・答えるたびに期限を見る。
+// 試しの行（is_test=1）は集計・一覧・書き戻しのどこにも出さない。
+
+export interface FormTestToken {
+  id: string;
+  form_id: string;
+  token_hash: string;
+  created_by_staff_id: string | null;
+  expires_at: string;
+  created_at: string;
+}
+
+/** 有効な試し合言葉の数。発行の上限の判定に使う。 */
+export async function countActiveFormTestTokens(
+  db: D1Database,
+  formId: string,
+  now: string,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM form_test_tokens
+        WHERE form_id = ? AND expires_at > ?`,
+    )
+    .bind(formId, now)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+export async function insertFormTestToken(
+  db: D1Database,
+  input: {
+    id: string;
+    formId: string;
+    tokenHash: string;
+    createdByStaffId: string | null;
+    expiresAt: string;
+  },
+): Promise<FormTestToken> {
+  await db
+    .prepare(
+      `INSERT INTO form_test_tokens
+         (id, form_id, token_hash, created_by_staff_id, expires_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      input.id,
+      input.formId,
+      input.tokenHash,
+      input.createdByStaffId,
+      input.expiresAt,
+      jstNow(),
+    )
+    .run();
+  return (await db
+    .prepare(`SELECT * FROM form_test_tokens WHERE id = ?`)
+    .bind(input.id)
+    .first<FormTestToken>())!;
+}
+
+/** 試し合言葉の確認。期限切れは無いものとして扱う。 */
+export async function getValidFormTestToken(
+  db: D1Database,
+  formId: string,
+  tokenHash: string,
+  now: string,
+): Promise<FormTestToken | null> {
+  return db
+    .prepare(
+      `SELECT * FROM form_test_tokens
+        WHERE form_id = ? AND token_hash = ? AND expires_at > ?
+        ORDER BY created_at DESC LIMIT 1`,
+    )
+    .bind(formId, tokenHash, now)
+    .first<FormTestToken>();
+}
+
+/** 期限切れの試し合言葉の掃除。発行時に合わせて呼ぶ。 */
+export async function deleteExpiredFormTestTokens(
+  db: D1Database,
+  now: string,
+): Promise<void> {
+  await db
+    .prepare(`DELETE FROM form_test_tokens WHERE expires_at <= ?`)
+    .bind(now)
+    .run();
 }
 
 /**
@@ -1773,7 +1917,7 @@ export async function countChoiceUsage(
   const result = await db
     .prepare(
       `SELECT data FROM form_submissions
-       WHERE form_id = ?
+       WHERE form_id = ? AND is_test = 0
        ORDER BY created_at DESC LIMIT ?`,
     )
     .bind(formId, safeLimit)

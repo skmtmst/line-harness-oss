@@ -30,22 +30,27 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: m.account }),
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: m.push }) }))
-vi.mock('@/lib/api', () => ({
-  ApiError: class extends Error {},
-  api: {
-    tags: { list: async () => ({ success: true, data: [] }) },
-    mileage: { rules: async () => ({ success: true, data: [] }) },
-  },
-  bookingApi: {
-    createMenu: m.create,
-    listStaff: m.staff,
-    getSettings: async () => ({ success: true, data: { menuCount: 1 } }),
-    getStaffMenus: m.getMatrix,
-    putStaffMenus: m.putMatrix,
-  },
-}))
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ...actual,
+    ApiError: class extends Error {},
+    api: {
+      tags: { list: async () => ({ success: true, data: [] }) },
+      mileage: { rules: async () => ({ success: true, data: [] }) },
+    },
+    bookingApi: {
+      createMenu: m.create,
+      listStaff: m.staff,
+      getSettings: async () => ({ success: true, data: { menuCount: 1 } }),
+      getStaffMenus: m.getMatrix,
+      putStaffMenus: m.putMatrix,
+    },
+  }
+})
 
 import Page from './page'
+import { ApiError as MockApiError } from '@/lib/api'
 
 const flush = () => act(async () => { await Promise.resolve() })
 
@@ -167,7 +172,7 @@ describe('DEEP-17: アカウント切替で前の担当を持ち込まない', (
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
     })
-    expect(m.create).toHaveBeenCalledWith('B', expect.anything())
+    expect(m.create).toHaveBeenCalledWith('B', expect.anything(), expect.any(String))
     expect(m.create).toHaveBeenCalledTimes(1)
     for (const call of m.getMatrix.mock.calls) expect(call[0]).toBe('B')
     expect(m.getMatrix).not.toHaveBeenCalledWith('B', 'staff-A')
@@ -199,5 +204,92 @@ describe('DEEP-17: アカウント切替で前の担当を持ち込まない', (
     })
     expect(screen.getByText(/担当スタッフを読み込めませんでした/)).toBeTruthy()
     expect(m.create).not.toHaveBeenCalled()
+  })
+})
+
+describe('R535: 応答消失後の再送は同じキーで送る', () => {
+  it('作成POSTの応答を失っても、再操作は同じキーで送り直す', async () => {
+    // 1回目は応答消失（保存後に通信が切れた想定）、2回目は成功。
+    m.create.mockRejectedValueOnce(new Error('network'))
+    render(<Page />)
+    await fillName()
+    fireEvent.click(screen.getByLabelText('担当A'))
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+    })
+    expect(m.create).toHaveBeenCalledTimes(1)
+
+    // 失敗しても入力は残り、同じボタンで再送できる。
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+    })
+
+    expect(m.create).toHaveBeenCalledTimes(2)
+    const keys = m.create.mock.calls.map((call) => call[2])
+    expect(typeof keys[0]).toBe('string')
+    expect(keys[0]).not.toBe('')
+    // 同じ試行の再送は同じキー。サーバーは作り直さず作成済みIDを返す。
+    expect(keys[1]).toBe(keys[0])
+    expect(m.push).toHaveBeenCalledWith('/booking/menus?highlight=new-2')
+  })
+
+  it('アカウントを切り替えるとキーは替わる', async () => {
+    const v = render(<Page />)
+    await fillName()
+    fireEvent.click(screen.getByLabelText('担当A'))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+    })
+    const keyA = m.create.mock.calls[0][2]
+    expect(typeof keyA).toBe('string')
+
+    m.account = 'B'
+    await act(async () => { v.rerender(<Page />) })
+    await flush()
+    fireEvent.click(screen.getByLabelText('担当B'))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+    })
+
+    // 別アカウントは別の作成試行。前のキーを使い回さない。
+    const keyB = m.create.mock.calls[1][2]
+    expect(typeof keyB).toBe('string')
+    expect(keyB).not.toBe(keyA)
+  })
+})
+
+describe('R536: 担当候補の取得失敗は画面内で取り直せる', () => {
+  it('通信断のあと復旧すれば、入力を保ったまま再取得できる', async () => {
+    m.staff.mockRejectedValueOnce(new Error('network'))
+    render(<Page />)
+    await flush()
+
+    // 失敗の文と再試行の口が出る。未登録扱いにしない。
+    expect(screen.getByText(/入力はそのまま残っています/)).toBeTruthy()
+    expect(screen.queryByText(/まだスタッフが登録されていません/)).toBeNull()
+    const retry = screen.getByRole('button', { name: '担当をもう一度読み込む' })
+
+    fireEvent.change(screen.getByPlaceholderText('例: トリミング（小型犬）'), {
+      target: { value: '検証メニュー' },
+    })
+    await act(async () => {
+      fireEvent.click(retry)
+    })
+
+    // 取り直せたので候補が出る。入力は保たれている。
+    expect(screen.getByLabelText('担当A')).toBeTruthy()
+    expect(
+      (screen.getByPlaceholderText('例: トリミング（小型犬）') as HTMLInputElement).value,
+    ).toBe('検証メニュー')
+  })
+
+  it('403は権限案内に分かれ、再試行の口は出さない', async () => {
+    m.staff.mockRejectedValue(Object.assign(new MockApiError('forbidden'), { status: 403 }))
+    render(<Page />)
+    await flush()
+
+    expect(screen.getByText(/見る権限がありません/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '担当をもう一度読み込む' })).toBeNull()
   })
 })

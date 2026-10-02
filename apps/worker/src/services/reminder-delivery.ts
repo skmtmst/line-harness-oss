@@ -11,19 +11,27 @@
 import {
   claimReminderDeliveryRun,
   completeReminderDeliveryRunStatement,
+  getFriendReminderSendGate,
   getFriendReminderStatus,
   getPendingReminderDeliveries,
   completeReminderIfDone,
   failReminderDeliveryRun,
   getFriendById,
   getLineAccountById,
+  getReminderDeliveryRunSentPayload,
   getTemplateById,
+  getTemplateVersion,
+  holdExpiredLineRetryRuns,
   isOperationCapabilityStopped,
+  parseTemplateVersionSnapshot,
   releaseClaimedReminderRun,
+  saveReminderDeliveryRunSentPayload,
   skipReminderDeliveryRun,
   verifyClaimedRunBeforeSend,
+  listLineAccountsWithTenantStatus,
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
+import { isStoppedTenantStatus } from './tenant-runtime-status.js';
 import { addJitter, sleep } from './stealth.js';
 import { getSendPermissionForAccount, type SendPermission, type SendPermissionCache } from './send-entitlements.js';
 import { buildMessage } from './line-message.js';
@@ -35,7 +43,7 @@ import {
   externalDeliveryRetryAt,
   type SafeExternalDeliveryError,
 } from './external-delivery-retry.js';
-import type { ReminderStepRow } from '@line-crm/db';
+import type { ReminderDeliveryRunRow, ReminderStepRow } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
 import { featureJobCanRun } from './feature-enforcement.js';
 
@@ -74,19 +82,39 @@ export async function buildReminderStepMessage(
   // 下書き試験から呼ぶときは 'test_send' を渡す。台帳の送信種別が
   // 本番配信とテスト送信で分かれる。
   sourceKind: 'reminder' | 'test_send' = 'reminder',
+  // R346: 登録時のテンプレート版の写し {"テンプレートID": 公開版番号}。
+  // 無いときは今までどおり最新の版を読む（下書き試験・古い登録）。
+  options?: { pinnedTemplateVersions?: Record<string, number> | null },
 ): Promise<{
   message: Message;
   messageType: string;
   messageContent: string;
   templateId: string | null;
+  templateVersion: number | null;
 }> {
   let messageType = step.message_type;
   let messageContent = step.message_content;
+  let templateVersion: number | null = null;
   if (step.template_id) {
-    const template = await getTemplateById(db, step.template_id);
-    if (template) {
-      messageType = template.message_type;
-      messageContent = template.message_content;
+    // R346: 登録時の版があるときはその版で送る。新しい版にするのは
+    // 登録し直した時だけ。版履歴に無いときは今の版へ落ちる。
+    const pinned = options?.pinnedTemplateVersions?.[step.template_id];
+    if (pinned != null) {
+      const version = await getTemplateVersion(db, step.template_id, pinned);
+      if (version) {
+        messageType = version.message_type;
+        messageContent = version.message_content;
+        templateVersion = version.version_number;
+      }
+    }
+    if (templateVersion == null) {
+      const template = await getTemplateById(db, step.template_id);
+      if (template) {
+        messageType = template.message_type;
+        messageContent = template.message_content;
+        const live = Number(template.published_version);
+        templateVersion = Number.isFinite(live) && live > 0 ? live : null;
+      }
     }
   }
   const resolvedMeta = await resolveMetadata(db, friend);
@@ -105,7 +133,62 @@ export async function buildReminderStepMessage(
     messageType,
     messageContent: expanded,
     templateId: step.template_id,
+    templateVersion,
   };
+}
+
+/**
+ * R345: 1通の送信内容を決める。初回は作って実行行へ残し、
+ * 同じ再試行キーの再送は残した本文をそのまま使う。
+ * 受理ずみ（409）の再試行も初回と同じ要求になるため、履歴は初回の内容を表す。
+ * まだ送っていない通は今までどおり最新の差し込みで作る。
+ */
+async function resolveReminderRunMessage(
+  db: D1Database,
+  run: ReminderDeliveryRunRow,
+  step: ReminderStepRow,
+  friend: NonNullable<Awaited<ReturnType<typeof getFriendById>>>,
+  sendAt: Date,
+  pinnedTemplateVersions: Record<string, number> | null,
+  ownedLeases: string[],
+  nowIso: string,
+): Promise<{
+  message: Message;
+  messageType: string;
+  messageContent: string;
+  templateId: string | null;
+}> {
+  const saved = await getReminderDeliveryRunSentPayload(db, run.id);
+  if (saved) {
+    return {
+      message: buildMessage(saved.messageType, saved.messageContent),
+      messageType: saved.messageType,
+      messageContent: saved.messageContent,
+      templateId: saved.templateId,
+    };
+  }
+  const fresh = await buildReminderStepMessage(db, step, friend, sendAt, 'reminder', {
+    pinnedTemplateVersions,
+  });
+  // 先に残した処理があるときはそちらを使う（同じ実行の二重保存をしない）。
+  const persisted = await saveReminderDeliveryRunSentPayload(db, {
+    id: run.id,
+    messageType: fresh.messageType,
+    messageContent: fresh.messageContent,
+    templateId: fresh.templateId,
+    templateVersion: fresh.templateVersion,
+    now: nowIso,
+    expectedLeaseExpiresAt: ownedLeases,
+  });
+  if (persisted) {
+    return {
+      message: buildMessage(persisted.messageType, persisted.messageContent),
+      messageType: persisted.messageType,
+      messageContent: persisted.messageContent,
+      templateId: persisted.templateId,
+    };
+  }
+  return fresh;
 }
 
 /** Provider本文や秘密値を管理画面へ出さず、運用者が次の行動を選べる言葉へ直す。 */
@@ -134,7 +217,21 @@ export async function processReminderDeliveries(
   const now = options.now ?? new Date();
   const nowIso = now.toISOString();
   const leaseExpiresAt = new Date(now.getTime() + LEASE_MINUTES * 60_000).toISOString();
+
+  // R344: 再試行キーの期限を過ぎた結果不明は自動で送らない。
+  // 要確認として残し、人が確かめて手動で送る。
+  await holdExpiredLineRetryRuns(db, { now: nowIso });
+
   const pending = await getPendingReminderDeliveries(db);
+  const accountsWithStatus = await listLineAccountsWithTenantStatus(db);
+  const tenantStatusByAccount = new Map(
+    accountsWithStatus.map((account) => [account.id, account.tenant_status]),
+  );
+  // アカウントの稼働状態（X-1）。止めているアカウント宛の通は
+  // 「送らなかった」記録にして積まない。
+  const activeByAccount = new Map(
+    accountsWithStatus.map((account) => [account.id, Boolean(account.is_active)]),
+  );
   const result: ReminderDeliveryResult = { succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 0 };
   const sendPermissions: SendPermissionCache = new Map();
 
@@ -161,6 +258,80 @@ export async function processReminderDeliveries(
       ? (friend as unknown as Record<string, string | null>).line_account_id ?? null
       : null;
     const accountId = enrollment.line_account_id ?? friendAccountId;
+    if (accountId && isStoppedTenantStatus(tenantStatusByAccount.get(accountId))) {
+      // Materialize terminal skipped runs for steps that are already due. This
+      // keeps them unsent and prevents restore from becoming an overdue blast.
+      for (const step of enrollment.steps) {
+        const sendAt = resolveReminderSendAt(
+          new Date(enrollment.target_date),
+          {
+            offsetDays: step.offset_days,
+            sendAtTime: step.send_at_time,
+            offsetMinutes: step.offset_minutes,
+          },
+          enrollment.delivery_mode === 'time' ? 'time' : 'countdown',
+        );
+        if (sendAt.getTime() > now.getTime()) continue;
+        const run = await claimReminderDeliveryRun(db, {
+          lineAccountId: accountId,
+          reminderId: enrollment.reminder_id,
+          friendReminderId: enrollment.id,
+          friendId: enrollment.friend_id,
+          reminderStepId: step.id,
+          scheduledAt: sendAt.toISOString(),
+          now: nowIso,
+          leaseExpiresAt,
+        });
+        if (!run) continue;
+        await skipReminderDeliveryRun(db, {
+          id: run.id,
+          code: 'tenant_suspended',
+          message: '契約先の利用停止中に配信時刻を過ぎたため送信しませんでした。',
+          now: nowIso,
+          expectedLeaseExpiresAt: run.lease_expires_at ? [run.lease_expires_at] : [],
+        });
+        result.skipped++;
+      }
+      continue;
+    }
+    /*
+     * アカウント停止中（X-1、v6-33 §10-1）。期限の来た通は skipped の
+     * 実行行として残すので、再開しても自動では送り直さない。
+     */
+    if (accountId && activeByAccount.get(accountId) === false) {
+      for (const step of enrollment.steps) {
+        const sendAt = resolveReminderSendAt(
+          new Date(enrollment.target_date),
+          {
+            offsetDays: step.offset_days,
+            sendAtTime: step.send_at_time,
+            offsetMinutes: step.offset_minutes,
+          },
+          enrollment.delivery_mode === 'time' ? 'time' : 'countdown',
+        );
+        if (sendAt.getTime() > now.getTime()) continue;
+        const run = await claimReminderDeliveryRun(db, {
+          lineAccountId: accountId,
+          reminderId: enrollment.reminder_id,
+          friendReminderId: enrollment.id,
+          friendId: enrollment.friend_id,
+          reminderStepId: step.id,
+          scheduledAt: sendAt.toISOString(),
+          now: nowIso,
+          leaseExpiresAt,
+        });
+        if (!run) continue;
+        await skipReminderDeliveryRun(db, {
+          id: run.id,
+          code: 'account_inactive',
+          message: 'アカウントの送受信を止めている間に配信時刻を過ぎたため送信しませんでした。',
+          now: nowIso,
+          expectedLeaseExpiresAt: run.lease_expires_at ? [run.lease_expires_at] : [],
+        });
+        result.skipped++;
+      }
+      continue;
+    }
     // 機能オフ中はclaimせずactiveのまま残す。再オンで再開する。
     if (accountId && !await featureJobCanRun(db, { accountId, featureId: 'reminders', job: 'reminder deliveries' })) {
       result.skipped += enrollment.steps.length;
@@ -189,8 +360,13 @@ export async function processReminderDeliveries(
         result.held += 1;
         continue enrollmentLoop;
       }
+      // R339: 候補読込後の日時変更を見落とさない。実行行を作る前に
+      // 登録の現在値を読み直し、ずれた起点では古い予定を作らない。
+      // 次の tick で読み直すためここでは何も積まない。
+      const gate = await getFriendReminderSendGate(db, enrollment.id);
+      if (!gate || gate.status !== 'active' || gate.targetDate !== enrollment.target_date) continue;
       const sendAt = resolveReminderSendAt(
-        new Date(enrollment.target_date),
+        new Date(gate.targetDate),
         {
           offsetDays: step.offset_days,
           sendAtTime: step.send_at_time,
@@ -207,9 +383,14 @@ export async function processReminderDeliveries(
         scheduledAt: sendAt.toISOString(),
         now: nowIso,
         leaseExpiresAt,
+        expectedTargetDate: gate.targetDate,
       });
       // 別cronが送信中、再試行時刻前、または既に終端状態なら何もしない。
       if (!run) continue;
+      // R340: この貸出で付けた期限だけを以後の書込に使う。期限切れで
+      // 別処理へ移った後の書込は 0 件になり、上書きしない。
+      const claimLease = run.lease_expires_at;
+      const ownedLeases = (claimLease ? [claimLease] : []).concat([leaseExpiresAt]);
 
       // 取消と cron の競合対策: claimed 済みでも送る直前に登録を確認する。
       // 取消後に残った実行行は送らず止める (取消漏れの送信を防ぐ)。
@@ -220,8 +401,8 @@ export async function processReminderDeliveries(
           `UPDATE reminder_delivery_runs
               SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
                   next_retry_at = NULL, updated_at = ?
-            WHERE id = ? AND status = 'claimed'`,
-        ).bind(nowIso, nowIso, run.id).run();
+            WHERE id = ? AND status = 'claimed' AND lease_expires_at = ?`,
+        ).bind(nowIso, nowIso, run.id, claimLease).run();
         result.skipped++;
         continue enrollmentLoop;
       }
@@ -232,6 +413,7 @@ export async function processReminderDeliveries(
           code: 'friend_not_found',
           message: '友だち情報が見つからないため送信しませんでした。',
           now: nowIso,
+          expectedLeaseExpiresAt: claimLease ? [claimLease] : [],
         });
         result.skipped++;
         continue;
@@ -242,6 +424,7 @@ export async function processReminderDeliveries(
           code: 'friend_not_following',
           message: 'ブロックまたは友だち解除のため送信しませんでした。',
           now: nowIso,
+          expectedLeaseExpiresAt: claimLease ? [claimLease] : [],
         });
         result.skipped++;
         continue;
@@ -251,7 +434,13 @@ export async function processReminderDeliveries(
         const deliveryClient = await (options.resolveClient
           ? options.resolveClient(accountId, lineClient)
           : defaultResolveClient(db, accountId, lineClient));
-        const built = await buildReminderStepMessage(db, step, friend, sendAt);
+        // R346: この登録が使うテンプレート版。無い登録は今までどおり最新の版。
+        const pinnedTemplateVersions = parseTemplateVersionSnapshot(
+          enrollment.template_version_snapshot,
+        );
+        const built = await resolveReminderRunMessage(
+          db, run, step, friend, sendAt, pinnedTemplateVersions, ownedLeases, nowIso,
+        );
         // 取消と送信の競合対策: push の直前に送る権利を1文で確かめる。
         // この後 push まで待たない (間に取消が入る余地を残さない)。
         // 外部送信は巻き戻せないため、権利取得と取消確定の順序は DB の1文で
@@ -261,6 +450,8 @@ export async function processReminderDeliveries(
           friendReminderId: enrollment.id,
           now: nowIso,
           leaseExpiresAt,
+          expectedLeaseExpiresAt: claimLease ? [claimLease] : [],
+          expectedTargetDate: gate.targetDate,
         })) {
           result.skipped++;
           continue;
@@ -273,6 +464,8 @@ export async function processReminderDeliveries(
           friendReminderId: enrollment.id,
           now: nowIso,
           leaseExpiresAt,
+          expectedLeaseExpiresAt: ownedLeases,
+          expectedTargetDate: gate.targetDate,
         })) {
           result.skipped++;
           continue;
@@ -281,7 +474,7 @@ export async function processReminderDeliveries(
         // 切り替わった分は claim をキューへ戻し、失敗・skipped にはしない
         // (停止を理由に消さない。復旧後に届く)。
         if (await isOperationCapabilityStopped(db, accountId, 'reminder_dispatch')) {
-          await releaseClaimedReminderRun(db, { id: run.id, now: nowIso });
+          await releaseClaimedReminderRun(db, { id: run.id, now: nowIso, expectedLeaseExpiresAt: ownedLeases });
           result.held += 1;
           continue enrollmentLoop;
         }
@@ -319,6 +512,7 @@ export async function processReminderDeliveries(
             lineRequestId: response.requestId,
             messageLogId: logId,
             now: nowIso,
+            expectedLeaseExpiresAt: ownedLeases,
           }),
         ]);
         result.succeeded++;
@@ -342,7 +536,9 @@ export async function processReminderDeliveries(
           safe.retryable,
         )?.toISOString() ?? null;
         const exhausted = safe.retryable && !retryAt;
-        await failReminderDeliveryRun(db, {
+        // R340: 持ち主が移っているときは書けず false になる。
+        // 新しい持ち主が結果を記録するため、ここでは数えない。
+        const recorded = await failReminderDeliveryRun(db, {
           id: run.id,
           code: exhausted ? 'retry_exhausted' : safe.code,
           message: exhausted
@@ -350,7 +546,9 @@ export async function processReminderDeliveries(
             : safe.message,
           retryAt,
           now: nowIso,
+          expectedLeaseExpiresAt: ownedLeases,
         });
+        if (!recorded) continue;
         if (retryAt) result.retrying++;
         else result.failed++;
         console.error(JSON.stringify({

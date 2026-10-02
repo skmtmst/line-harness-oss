@@ -163,7 +163,7 @@ describe('差し替え候補の名前検索（N-205）', () => {
 
     // ページ送り（2ページ目）は offset 50 で読む。
     fixture.listQueue.push(ok([media('c-50', '候補50.png')], 51))
-    const next = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '次へ')!
+    const next = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label') === '次のページ')!
     await act(async () => { next.click(); await settle() })
     expect(fixture.listCalls.at(-1)?.params?.offset).toBe(50)
 
@@ -176,7 +176,8 @@ describe('差し替え候補の名前検索（N-205）', () => {
     // 検索で絞った候補を選ぶと、従来どおり影響確認へ進む。
     const trigger = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label') === '差し替え先')!
     await act(async () => { trigger.click(); await settle() })
-    const option = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '夏セール候補.png')!
+    // 候補は最上層（MenuPortal→document.body）に出る。窓の中にはいない。
+    const option = [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '夏セール候補.png')!
     await act(async () => { option.click(); await settle() })
     expect(fixture.impactCalls).toEqual([{ id: 'src-1', replacementId: 'hit-1', accountId: 'account-a' }])
   })
@@ -184,7 +185,7 @@ describe('差し替え候補の名前検索（N-205）', () => {
   it('候補の読込中・0件・失敗を分けて出す', async () => {
     fixture.listQueue.push(new Promise((resolve, reject) => { fixture.pending.push({ resolve, reject }) }))
     await renderDialog()
-    expect(dialog().textContent).toContain('差し替え候補を読み込んでいます…')
+    expect(dialog().textContent).toContain('差し替え候補を読み込んでいます')
 
     // 失敗（0件とも混ざらない案内）。
     await act(async () => {
@@ -226,7 +227,8 @@ describe('差し替え候補の名前検索（N-205）', () => {
     // 候補名は選択肢を開いた中にだけ出る。Aの古い候補は無く、Bの候補だけが並ぶ。
     const trigger = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label') === '差し替え先')!
     await act(async () => { trigger.click(); await settle() })
-    const listbox = dialog().querySelector<HTMLElement>('[role="listbox"]')!
+    // 候補は最上層（MenuPortal→document.body）に出る。窓の中にはいない。
+    const listbox = document.querySelector<HTMLElement>('[role="listbox"]')!
     expect(listbox.textContent).toContain('Bの候補.png')
     expect(listbox.textContent).not.toContain('Aの古い候補')
   })

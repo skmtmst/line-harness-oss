@@ -11,6 +11,9 @@ import {
   getConversionEvents,
   getConversionApprovalQueue,
   decideConversionApproval,
+  getApprovalNotificationState,
+  markApprovalNotified,
+  releaseApprovalNotification,
   getConversionApprovalNotifyInfo,
   getConversionOfferActionPlan,
   enrollFriendInScenario,
@@ -38,8 +41,13 @@ import {
   listConversionDefinitionEvents,
   getConversionDefinitionReport,
   listConversionDefinitionsForExport,
+  appendConversionReversal,
+  getReversedEventIds,
+  listConversionReversals,
+  getAttributionDecisionView,
   ConversionDefinitionError,
   CONVERSION_DEFINITION_USAGE_KINDS,
+  isExclusionSavable,
 } from '@line-crm/db';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { notifyAffiliateApproval } from '../services/affiliate-notifier.js';
@@ -269,7 +277,10 @@ function readDefinitionInput(body: Record<string, unknown>, options: { requireAc
     || (deduplicationMode === 'window' && (!Number.isInteger(windowDays) || windowDays! < 1 || windowDays! > 365))
     || (valueMode === 'fixed' && (fixedValue === null || !Number.isFinite(fixedValue) || fixedValue < 0))
     || (attributionDays !== null && (!Number.isInteger(attributionDays) || attributionDays < 1 || attributionDays > 365))
-    || (sourceType === 'url_reach' && (!targetUrl || !/^https?:\/\//.test(targetUrl)))) {
+    || (sourceType === 'url_reach' && (!targetUrl || !/^https?:\/\//.test(targetUrl)))
+    // R40: 壊れた数えない条件は保存させない。記録も試算も止まるか
+    // 全件数えるかに倒れてしまうため、入口で断つ。
+    || !isExclusionSavable(sourceConfig)) {
     return null;
   }
   return {
@@ -1014,6 +1025,15 @@ conversions.post('/api/conversions/ingest/:id', async (c) => {
         });
         return c.json({ success: false, error: 'Friend not found or out of scope' }, 422);
       }
+      // R40: 数えない条件に当てはまる受信は、失敗ではなく対象外として残す。
+      if (message === 'conversion_excluded') {
+        await log({
+          result: 'rejected', reason: 'excluded_by_condition',
+          sourceEventId: sourceEventId.trim().slice(0, 200),
+          friendId: resolvedFriendId, payloadShape, signatureSha256: signatureHash,
+        });
+        return c.json({ success: false, error: 'Excluded by the conversion point exclusion condition' }, 422);
+      }
       throw trackError;
     }
   } catch (error) {
@@ -1386,6 +1406,10 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
     if (err instanceof Error && err.message === 'conversion_friend_not_found') {
       return c.json({ success: false, error: 'このコンバージョンを記録する権限がありません' }, 403);
     }
+    // R40: 数えない条件に当てはまる人は記録しない。失敗ではなく対象外。
+    if (err instanceof Error && err.message === 'conversion_excluded') {
+      return c.json({ success: false, error: '「数えない条件」に当てはまるため記録できません' }, 422);
+    }
     console.error('POST /api/conversions/track error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -1415,6 +1439,10 @@ conversions.get('/api/conversions/events', conversionPermission('view'), async (
       offset: listOffset(c.req.query('offset')),
     });
 
+    // #819: 取消は追記の台帳。最新の追記が 'reverse' のものだけを
+    // 「取り消し中」として返す。
+    const reversedIds = await getReversedEventIds(c.env.DB, events.map((e) => e.id));
+
     return c.json({
       success: true,
       data: events.map((e) => ({
@@ -1425,6 +1453,7 @@ conversions.get('/api/conversions/events', conversionPermission('view'), async (
         affiliateCode: e.affiliate_code,
         metadata: e.metadata,
         createdAt: e.created_at,
+        reversed: reversedIds.has(e.id),
       })),
     });
   } catch (err) {
@@ -1432,6 +1461,118 @@ conversions.get('/api/conversions/events', conversionPermission('view'), async (
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+// GET /api/conversions/events/:id/reversals — 取消の履歴（新しい順）
+conversions.get(
+  '/api/conversions/events/:id/reversals',
+  conversionPermission('view'),
+  async (c) => {
+    try {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      const eventId = c.req.param('id');
+      const event = await c.env.DB
+        .prepare(
+          `SELECT ce.id, cp.line_account_id
+             FROM conversion_events ce
+             JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+            WHERE ce.id = ?`,
+        )
+        .bind(eventId)
+        .first<{ id: string; line_account_id: string | null }>();
+      if (!event) return c.json({ success: false, error: 'Event not found' }, 404);
+      if (
+        event.line_account_id !== null
+        && !scope.allowedAccountIds.includes(event.line_account_id)
+      ) {
+        return c.json({ success: false, error: 'Event not found' }, 404);
+      }
+      const rows = await listConversionReversals(c.env.DB, eventId);
+      return c.json({
+        success: true,
+        data: rows.map((r) => ({
+          id: r.id,
+          kind: r.kind,
+          reason: r.reason,
+          actorName: r.actor_name,
+          createdAt: r.created_at,
+        })),
+      });
+    } catch (err) {
+      console.error('GET /api/conversions/events/:id/reversals error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+// POST /api/conversions/events/:id/reversals — 取消と取消の取消を理由付きで追記
+conversions.post(
+  '/api/conversions/events/:id/reversals',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      const eventId = c.req.param('id');
+      const event = await c.env.DB
+        .prepare(
+          `SELECT ce.id, cp.line_account_id
+             FROM conversion_events ce
+             JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+            WHERE ce.id = ?`,
+        )
+        .bind(eventId)
+        .first<{ id: string; line_account_id: string | null }>();
+      if (!event) return c.json({ success: false, error: 'Event not found' }, 404);
+      if (
+        event.line_account_id !== null
+        && !scope.allowedAccountIds.includes(event.line_account_id)
+      ) {
+        return c.json({ success: false, error: 'Event not found' }, 404);
+      }
+
+      const body = await c.req.json<{ kind?: unknown; reason?: unknown }>();
+      const kind = body.kind === 'restore' ? 'restore' : body.kind === 'reverse' ? 'reverse' : null;
+      if (!kind) {
+        return c.json({ success: false, error: 'kind は reverse か restore で指定してください' }, 400);
+      }
+      const reason = String(body.reason ?? '').trim();
+      if (!reason || reason.length > 500) {
+        return c.json({ success: false, error: '理由を入れてください（500文字以内）' }, 400);
+      }
+      const staff = c.get('staff');
+      try {
+        const row = await appendConversionReversal(c.env.DB, {
+          conversionEventId: eventId,
+          kind,
+          reason,
+          actorId: staff?.id ?? null,
+          actorName: staff?.name ?? null,
+        });
+        auditLog(
+          c,
+          kind === 'reverse' ? 'conversion.event.reverse' : 'conversion.event.restore',
+          { kind: 'conversion_event', id: eventId },
+          { lineAccountId: event.line_account_id },
+        );
+        return c.json({
+          success: true,
+          data: { id: row.id, kind: row.kind, createdAt: row.created_at },
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '';
+        if (message === 'conversion_event_already_reversed') {
+          return c.json({ success: false, error: 'この成果はすでに取り消されています' }, 409);
+        }
+        if (message === 'conversion_event_not_reversed') {
+          return c.json({ success: false, error: 'この成果は取り消されていません' }, 409);
+        }
+        throw err;
+      }
+    } catch (err) {
+      console.error('POST /api/conversions/events/:id/reversals error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 // GET /api/conversions/report - V6 report; keep the old date-query response for the current screen
 conversions.get('/api/conversions/report', conversionPermission('view'), async (c) => {
@@ -1780,6 +1921,45 @@ function offerActionFailureMessage(failures: OfferActionFailure[]): string {
   );
 }
 
+// GET /api/conversions/events/:id/attribution - どの紹介に成果を付けたかの記録(#823)
+// 候補になった紹介を並べ、付けた先と付けなかった理由を1件ずつ返す。
+// 記録が無い昔の成果は 404。
+conversions.get('/api/conversions/events/:id/attribution', conversionPermission('view'), requireVisibleConversionEvent, async (c) => {
+  try {
+    const view = await getAttributionDecisionView(c.env.DB, c.req.param('id'));
+    if (!view) {
+      return c.json({ success: false, error: 'この成果の付け方の記録がありません' }, 404);
+    }
+    return c.json({
+      success: true,
+      data: {
+        conversionEventId: view.conversionEventId,
+        affiliateId: view.affiliateId,
+        refCode: view.refCode,
+        offerId: view.offerId,
+        offerVersionId: view.offerVersionId,
+        reason: view.reason,
+        windowDays: view.windowDays,
+        candidates: view.candidates.map((candidate) => ({
+          affiliateId: candidate.affiliateId,
+          affiliateName: candidate.affiliateName,
+          refCode: candidate.refCode,
+          touchedAt: candidate.touchedAt,
+          offerId: candidate.offerId,
+          offerName: candidate.offerName,
+          chosen: candidate.chosen,
+          skipReason: candidate.skipReason,
+          windowDays: candidate.windowDays,
+        })),
+        createdAt: view.createdAt,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/conversions/events/:id/attribution error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // PATCH /api/conversions/events/:id/approval - approve/reject an attributed CV
 conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermission, requireVisibleConversionEvent, async (c) => {
   // 監査は更新の成功が確定してから残す(#513 M7)。以前は検証の前に
@@ -1833,26 +2013,12 @@ conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermiss
     );
 
     // ASP: notify the attributed affiliate on approval only (never on reject).
-    // Best-effort — notifyAffiliateApproval swallows its own errors, but guard
-    // the info lookup too so a push failure can never fail the approval request.
-    // 判断が変わった1回だけ送る。案件動作の結果には左右されない（承認そのものは
-    // 成立している）。後段の動作が落ちたときの再送は already_set 側なので、
-    // ここを先に済ませておかないと紹介者への通知が欠ける。
-    if (parsed.status === 'approved' && decided.outcome === 'updated') {
-      try {
-        const info = await getConversionApprovalNotifyInfo(c.env.DB, c.req.param('id'));
-        if (info) {
-          await notifyAffiliateApproval(
-            c.env.DB,
-            c.env,
-            info.affiliateId,
-            info.offerName,
-            info.rewardAmount,
-          );
-        }
-      } catch (err) {
-        console.error('Affiliate approval notify failed (non-blocking):', err);
-      }
+    // Best-effort で承認を巻き添えにしない。案件動作の結果には左右されない
+    // （承認そのものは成立している）。
+    // m22u R354: 初回（updated）・再試行（already_set）のどちらでも、欠けた
+    // 通知は1回だけ送る。同じ承認世代の二重送信は送信記録で止める。
+    if (parsed.status === 'approved') {
+      await notifyApprovalOnce(c.env.DB, c.env, c.req.param('id'));
     }
 
     // 承認確定で案件の動作（タグ付与・シナリオ開始）を実行する(N-212)。
@@ -1920,6 +2086,55 @@ async function isEventVisibleToStaff(db: D1Database, staff: AuthenticatedStaff |
   return canAccessAllLineAccounts(db, staff, [row.line_account_id]);
 }
 
+/** m22u R355: 一括の対象ごとの所属。行が無い・所属不明は null。 */
+async function bulkItemAccountId(db: D1Database, eventId: string): Promise<string | null> {
+  const row = await db.prepare(
+    `SELECT cp.line_account_id AS line_account_id FROM conversion_events ce
+       JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+      WHERE ce.id = ?`,
+  ).bind(eventId).first<{ line_account_id: string | null }>();
+  return row?.line_account_id ?? null;
+}
+
+/**
+ * m22u R354: 承認通知を「欠けた分だけ1回」送る。
+ *
+ * 承認状態（updated/already_set）と通知の送信状態を分け、同じ承認世代の
+ * 通知は1回だけ送る。再試行の修復（already_set で版・マイルを補った場合）
+ * でも、未送信ならここで送る。
+ *
+ * 順番は「送信権の確保→送信→失敗時だけ解放」。読み直しの send だけでは
+ * 同じ判断の並行要求を止められない（両方が send=true を見て2件送る）ため、
+ * markApprovalNotified の CAS 結果が送ってよいかの正本。負けた側は送らない。
+ * 送信の途中で落ちたら記録を戻し、再試行で送り直せるようにする（欠落防止）。
+ * 通知の失敗は承認を巻き添えにしない（best-effort）。
+ */
+async function notifyApprovalOnce(
+  db: D1Database,
+  env: Env['Bindings'],
+  eventId: string,
+): Promise<void> {
+  try {
+    const state = await getApprovalNotificationState(db, eventId);
+    if (!state.send || !state.approvedAt) return;
+    const info = await getConversionApprovalNotifyInfo(db, eventId);
+    // R48: 紹介者が成果の通知を切っているときは送信処理に進まない。
+    if (!info || !info.notifyOnConversion) return;
+    const claimed = await markApprovalNotified(db, eventId, state.approvedAt);
+    if (!claimed) return;
+    try {
+      await notifyAffiliateApproval(db, env, info.affiliateId, info.offerName, info.rewardAmount);
+    } catch (err) {
+      // 送信の途中で落ちたら同じ世代の記録だけ戻す。世代が変わって
+      // いたら戻さない（新しい世代の未送信を消さない）。
+      await releaseApprovalNotification(db, eventId, state.approvedAt);
+      throw err;
+    }
+  } catch (err) {
+    console.error('Affiliate approval notify failed (non-blocking):', err);
+  }
+}
+
 conversions.post('/api/conversions/approvals/bulk', requireApprovalPermission, async (c) => {
   try {
     const body = await c.req
@@ -1932,59 +2147,71 @@ conversions.post('/api/conversions/approvals/bulk', requireApprovalPermission, a
       );
     }
     const result: BulkApprovalItemResult = { succeeded: [], conflicted: [], denied: [], failed: [] };
+    // m22u R355: 入口で有効と判定されたアカウントの集合。対象ごとに機能オフを
+    // 確認し、オフなら1件ずつ失敗として返す（A指定でB対象を通さない）。
+    const enabledAccounts = c.get('staff')?.featureEnabledLineAccountIds;
     for (const raw of body.items) {
       const item = (raw ?? {}) as { id?: unknown; status?: unknown; expectedStatus?: unknown };
-      if (typeof item.id !== 'string' || !item.id) {
-        result.failed.push({ id: '', error: 'id is required' });
-        continue;
-      }
-      const parsed = readApprovalDecision(item);
-      if (!parsed.ok) {
-        result.failed.push({ id: item.id, error: parsed.error });
-        continue;
-      }
-      const visible = await isEventVisibleToStaff(c.env.DB, c.get('staff'), item.id);
-      if (!visible) {
-        result.denied.push(item.id);
-        continue;
-      }
-      const decided = await decideConversionApproval(c.env.DB, item.id, parsed.status, parsed.expectedStatus);
-      if (decided.outcome === 'conflict') {
-        result.conflicted.push({ id: item.id, currentStatus: decided.currentStatus });
-        continue;
-      }
-      if (decided.outcome === 'not_found') {
-        result.failed.push({ id: item.id, error: 'Attributed conversion event not found' });
-        continue;
-      }
-      auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: item.id });
-      await syncAffiliateConversionMileage(c.env.DB, item.id, parsed.status);
-      if (parsed.status === 'approved' && decided.outcome === 'updated') {
-        try {
-          const info = await getConversionApprovalNotifyInfo(c.env.DB, item.id);
-          if (info) {
-            await notifyAffiliateApproval(c.env.DB, c.env, info.affiliateId, info.offerName, info.rewardAmount);
-          }
-        } catch (err) {
-          console.error('Affiliate approval notify failed (non-blocking):', err);
-        }
-      }
-      // 単体と同じく、承認確定で案件の動作を実行する(N-212)。未完は
-      // succeeded へ入れず failed に分け、全成功とは表示させない。
-      if (parsed.status === 'approved') {
-        try {
-          const actionFailures = await runApprovedConversionOfferActions(c.env.DB, item.id);
-          if (actionFailures.length > 0) {
-            result.failed.push({ id: item.id, error: offerActionFailureMessage(actionFailures) });
-            continue;
-          }
-        } catch (err) {
-          console.error(`offer actions failed (bulk, event=${item.id}):`, err);
-          result.failed.push({ id: item.id, error: '案件の動作を実行できませんでした' });
+      const itemId = typeof item.id === 'string' ? item.id : '';
+      try {
+        if (!itemId) {
+          result.failed.push({ id: '', error: 'id is required' });
           continue;
         }
+        const parsed = readApprovalDecision(item);
+        if (!parsed.ok) {
+          result.failed.push({ id: itemId, error: parsed.error });
+          continue;
+        }
+        const visible = await isEventVisibleToStaff(c.env.DB, c.get('staff'), itemId);
+        if (!visible) {
+          result.denied.push(itemId);
+          continue;
+        }
+        if (enabledAccounts !== undefined) {
+          const accountId = await bulkItemAccountId(c.env.DB, itemId);
+          if (accountId === null || !enabledAccounts.includes(accountId)) {
+            result.failed.push({ id: itemId, error: 'このLINEアカウントでは成果の承認機能がオフになっています' });
+            continue;
+          }
+        }
+        const decided = await decideConversionApproval(c.env.DB, itemId, parsed.status, parsed.expectedStatus);
+        if (decided.outcome === 'conflict') {
+          result.conflicted.push({ id: itemId, currentStatus: decided.currentStatus });
+          continue;
+        }
+        if (decided.outcome === 'not_found') {
+          result.failed.push({ id: itemId, error: 'Attributed conversion event not found' });
+          continue;
+        }
+        auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: itemId });
+        await syncAffiliateConversionMileage(c.env.DB, itemId, parsed.status);
+        // m22u R354: 初回・再試行のどちらでも、欠けた通知は1回だけ送る。
+        if (parsed.status === 'approved') {
+          await notifyApprovalOnce(c.env.DB, c.env, itemId);
+        }
+        // 単体と同じく、承認確定で案件の動作を実行する(N-212)。未完は
+        // succeeded へ入れず failed に分け、全成功とは表示させない。
+        if (parsed.status === 'approved') {
+          try {
+            const actionFailures = await runApprovedConversionOfferActions(c.env.DB, itemId);
+            if (actionFailures.length > 0) {
+              result.failed.push({ id: itemId, error: offerActionFailureMessage(actionFailures) });
+              continue;
+            }
+          } catch (err) {
+            console.error(`offer actions failed (bulk, event=${itemId}):`, err);
+            result.failed.push({ id: itemId, error: '案件の動作を実行できませんでした' });
+            continue;
+          }
+        }
+        result.succeeded.push(itemId);
+      } catch (err) {
+        // m22u R353: 途中の失敗で全体を500にしない。処理済み・失敗の一覧を
+        // 必ず返し、一部だけ承認済みのまま黙って止まらないようにする。
+        console.error(`bulk approval item failed (event=${itemId}):`, err);
+        result.failed.push({ id: itemId, error: '処理できませんでした。もう一度お試しください' });
       }
-      result.succeeded.push(item.id);
     }
     return c.json({ success: true, data: result });
   } catch (err) {

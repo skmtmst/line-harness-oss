@@ -2,16 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import PageHeader from '@/components/shared/page-header'
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, fetchApi, type AnalyticsUsageOverview } from '@/lib/api'
+import { clearFeatureSettingsCache, loadFeatureSettings } from '@/lib/feature-settings-cache'
 import { createAccountRequestGuard } from './account-request-guard'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import ThemePreviewSwitch from '@/components/theme-preview-switch'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   groupEnabledCount,
@@ -30,13 +36,15 @@ import {
   applyItemOrder,
   featureSettingsAreDirty,
   featureSettingsErrorMessage,
+  featureSettingsSaveConflictMessage,
   normalizeFeatureSettings,
   splitFeatureGroups,
 } from './feature-settings-view'
+import { formatDay, formatNumber } from '@/lib/format'
 
 function LockIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-ink-faint">
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 text-ink-faint">
       <path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
@@ -114,10 +122,6 @@ type FeatureSaveResponse = {
   data: { version: number }
 }
 
-type LeaveTarget =
-  | { kind: 'link'; href: string }
-  | { kind: 'history-back' }
-
 /*
  * オン／オフを持たない項目だけが使う、分類ごとの利用数バッジ。
  * 切り替えられる機能（keys を持つ行）は共有カタログの featureId で
@@ -153,16 +157,16 @@ function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: 
   return (
     <span
       className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold"
-      title={`${category.label}：作成 ${created.toLocaleString('ja-JP')}、利用中 ${inUse.toLocaleString('ja-JP')}`}
+      title={`${category.label}：作成 ${formatNumber(created)}、利用中 ${formatNumber(inUse)}`}
     >
-      利用中 {inUse.toLocaleString('ja-JP')} / 作成 {created.toLocaleString('ja-JP')}
+      利用中 {formatNumber(inUse)} / 作成 {formatNumber(created)}
     </span>
   )
 }
 
 /** 最終利用の日付だけを短く出す。時刻はバッジに入らないのでタイトルへ残す。 */
 function shortUsageDate(value: string): string {
-  return value.slice(0, 10).replaceAll('-', '/')
+  return formatDay(value)
 }
 
 /**
@@ -220,7 +224,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: {
       </>
     )
   }
-  const count = activity.value.toLocaleString('ja-JP')
+  const count = formatNumber(activity.value)
   if (activityBasis === 'current') {
     return (
       <span
@@ -266,14 +270,15 @@ function FeatureRow({ item, features, ordering, usage, featureUsage, usageRetry,
 }) {
   const enabled = itemIsEnabled(item, features)
   return (
-    <li className="flex min-h-14 items-center justify-between gap-3 px-3 py-2">
+    <li className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2">
       <div className="flex min-w-0 items-start gap-2.5">
         {ordering && <span className="mt-0.5"><GripIcon /></span>}
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="whitespace-nowrap text-sm font-bold text-ink">{item.label}</p>
+            {/* 監査 R66: 並び替え中は上下ボタンが増えて行幅が伸びる。狭い幅ではラベルを省略し、操作を下へ回す。 */}
+            <p className="truncate text-sm font-bold text-ink" title={item.label}>{item.label}</p>
             {sharedSwitch && (
-              <span className="rounded-pill border-hairline whitespace-nowrap border px-1.5 py-0.5 text-[9px] font-bold text-ink-faint">
+              <span className="rounded-pill border-hairline whitespace-nowrap border px-1.5 py-0.5 text-micro font-medium text-ink-faint">
                 同じスイッチ
               </span>
             )}
@@ -311,14 +316,22 @@ function FeatureRow({ item, features, ordering, usage, featureUsage, usageRetry,
             </Button>
           </>
         )}
-        {item.required && <span className="text-xs font-bold text-ink-faint">必須</span>}
-        {item.required && <LockIcon />}
-        <Toggle
-          checked={enabled}
-          locked={item.required}
-          label={item.required ? `${item.label}は必須機能です` : `${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
-          onChange={(next) => onToggle(item, next)}
-        />
+        {/*
+          ★V7：消せない項目は「必須」の札だけにする。以前は札・鍵の印・押せない切替の3つが並び、
+          押せない切替が「壊れている」ようにも見えた。
+        */}
+        {item.required ? (
+          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-pill bg-canvas-sunken px-2.5 py-1 text-xs font-semibold text-ink-secondary" title={`${item.label}は必須機能のため、オフにできません`}>
+            <LockIcon />
+            必須
+          </span>
+        ) : (
+          <Toggle
+            checked={enabled}
+            label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
+            onChange={(next) => onToggle(item, next)}
+          />
+        )}
       </div>
     </li>
   )
@@ -343,7 +356,7 @@ function FeatureSection({ group, features, ordering, usageByItemId, usageByFeatu
     if (key) switchCount.set(key, (switchCount.get(key) ?? 0) + 1)
   }
   return (
-    <section className="border-hairline overflow-hidden rounded-xl border bg-canvas">
+    <section className="border-hairline overflow-hidden rounded-card border bg-canvas">
       <div className="border-hairline bg-canvas-sunken flex min-h-12 items-center justify-between gap-3 border-b px-3 py-2.5">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <h2 className="text-sm font-bold text-ink">{group.label}</h2>
@@ -398,11 +411,11 @@ function SidebarPreview({ groups, features }: {
   }
   return (
     <aside data-design="サイドメニューの見え方" className="xl:sticky xl:top-6">
-      <div className="border-hairline bg-canvas overflow-hidden rounded-[22px] border">
+      <div className="border-hairline bg-canvas overflow-hidden rounded-card border">
         <div className="max-h-[calc(100vh-8rem)] space-y-4 overflow-y-auto px-6 pb-3 pt-6">
           {groups.map((group) => (
             <div key={group.id}>
-              <p className="mb-2 text-xs font-bold text-ink-faint">{group.label}</p>
+              <p className="mb-2 text-xs font-medium text-ink-faint">{group.label}</p>
               <div className="space-y-0.5 pl-3">
                 {group.items.map((item) => {
                   const enabled = itemIsEnabled(item, features)
@@ -413,7 +426,7 @@ function SidebarPreview({ groups, features }: {
                         enabled ? 'text-ink' : 'text-ink-faint'
                       }`}
                     >
-                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${enabled ? 'bg-accent' : 'bg-canvas-sunken'}`} />
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-pill ${enabled ? 'bg-accent' : 'bg-canvas-sunken'}`} />
                       <span className="truncate">{item.label}</span>
                       {!enabled && <EyeOffIcon className="ml-auto h-4 w-4 shrink-0 text-ink-faint" />}
                     </div>
@@ -439,7 +452,6 @@ function SidebarPreview({ groups, features }: {
 
 export default function SettingsPage() {
   const { selectedAccountId } = useAccount()
-  const router = useRouter()
   const [savedFeatures, setSavedFeatures] = useState<Record<string, boolean>>(CATALOG_DEFAULT_FEATURES)
   const [features, setFeatures] = useState<Record<string, boolean>>(CATALOG_DEFAULT_FEATURES)
   const [savedItemOrder, setSavedItemOrder] = useState<MenuItemOrder>({})
@@ -456,7 +468,12 @@ export default function SettingsPage() {
   /** GET で受けた版。保存時に送り返し、競合(409)を検出する。 */
   const [settingsVersion, setSettingsVersion] = useState(0)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  /*
+   * 監査 D019: 読み込みに失敗したら初期値のスイッチ一覧を本物の設定の
+   * ように出さない。失敗の印だけにして、偽の設定を触らせない。
+   */
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadErrorStatus, setLoadErrorStatus] = useState<number | undefined>(undefined)
   /**
    * 変更理由。サーバーが必須化しており、保存と同じ単位で監査へ残る。
    * 保存成功・取り消し・アカウント切替で空に戻す。
@@ -472,16 +489,39 @@ export default function SettingsPage() {
   const [impactError, setImpactError] = useState('')
   /** 既定値へ初期化する前の確認。保存済み設定へ戻す操作には使わない。 */
   const [resetToDefaultsOpen, setResetToDefaultsOpen] = useState(false)
-  /** dirtyなまま画面を離れようとした導線。空なら確認窓を閉じる。 */
-  const [leaveTarget, setLeaveTarget] = useState<LeaveTarget | null>(null)
-  const allowHistoryLeaveRef = useRef(false)
-  const skipRestoredPopRef = useRef(false)
   /**
    * 世代guard。アカウントが変わったら古い応答を捨てる。
    * Aの応答をBの画面へ混ぜないし、Aの版でBへ保存しない。
    */
   const accountGuard = useMemo(() => createAccountRequestGuard(), [])
   const accountRef = useRef(selectedAccountId)
+
+  /** 並び順を当てたあとの区分。画面も見え方の欄もこれを見る。 */
+  const groups = useMemo(() => {
+    return applyItemOrder(
+      visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }),
+      itemOrder,
+    )
+  }, [itemOrder, specializedFeatureKeys])
+
+  const currentOrder = useMemo(() => itemOrderFromGroups(groups), [groups])
+  const savedGroups = useMemo(() => applyItemOrder(
+    visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }),
+    savedItemOrder,
+  ), [savedItemOrder, specializedFeatureKeys])
+  const dirty = featureSettingsAreDirty({
+    savedFeatures,
+    features,
+    savedOrder: itemOrderFromGroups(savedGroups),
+    currentOrder,
+  })
+
+  /*
+   * 未保存の変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * ブラウザ離脱・画面内リンク・戻る操作を同じ確認対話へ寄せる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+
   useEffect(() => {
     if (accountRef.current !== selectedAccountId) {
       accountRef.current = selectedAccountId
@@ -498,15 +538,16 @@ export default function SettingsPage() {
       setUsageFailed(false)
       setOrdering(false)
       setError('')
-      setNotice('')
+      setLoadFailed(false)
+      setLoadErrorStatus(undefined)
       setImpactOpen(false)
       setImpactGroups([])
       setImpactError('')
       setResetToDefaultsOpen(false)
-      setLeaveTarget(null)
+      cancelLeave()
       setReason('')
     }
-  }, [selectedAccountId, accountGuard])
+  }, [selectedAccountId, accountGuard, cancelLeave])
 
   /**
    * 利用数だけ後から読む。設定の表示を重い集計で待たせない。
@@ -544,18 +585,24 @@ export default function SettingsPage() {
       setSpecializedFeatureKeys([])
       setUsageCategories([])
       setUsageFeatures([])
-      setLeaveTarget(null)
+      cancelLeave()
+      setLoadFailed(false)
+      setLoadErrorStatus(undefined)
       setLoading(false)
       return
     }
     const ticket = accountGuard.issue(selectedAccountId)
     setLoading(true)
     setError('')
+    setLoadFailed(false)
+    setLoadErrorStatus(undefined)
     try {
-      const response = await api.featureSettings.get(selectedAccountId)
+      // サイドバーと同じ答えを共有する。保存の合図で捨てられる。
+      const response = await loadFeatureSettings(selectedAccountId)
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (!response.success) {
         setError(response.error)
+        setLoadFailed(true)
         return
       }
       const next = normalizeFeatureSettings(response.data.features)
@@ -570,113 +617,16 @@ export default function SettingsPage() {
       void loadUsage()
     } catch (error) {
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
-      setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'load'))
+      const status = error instanceof ApiError ? error.status : undefined
+      setError(featureSettingsErrorMessage(status, 'load'))
+      setLoadFailed(true)
+      setLoadErrorStatus(status)
     } finally {
       if (accountGuard.isCurrent(ticket, selectedAccountId)) setLoading(false)
     }
-  }, [selectedAccountId, loadUsage, accountGuard])
+  }, [selectedAccountId, loadUsage, accountGuard, cancelLeave])
 
   useEffect(() => { void load() }, [load])
-
-  /** 並び順を当てたあとの区分。画面も見え方の欄もこれを見る。 */
-  const groups = useMemo(() => {
-    return applyItemOrder(
-      visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }),
-      itemOrder,
-    )
-  }, [itemOrder, specializedFeatureKeys])
-
-  const currentOrder = useMemo(() => itemOrderFromGroups(groups), [groups])
-  const savedGroups = useMemo(() => applyItemOrder(
-    visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }),
-    savedItemOrder,
-  ), [savedItemOrder, specializedFeatureKeys])
-  const dirty = featureSettingsAreDirty({
-    savedFeatures,
-    features,
-    savedOrder: itemOrderFromGroups(savedGroups),
-    currentOrder,
-  })
-  const dirtyRef = useRef(dirty)
-  dirtyRef.current = dirty
-
-  /*
-   * ブラウザ再読込・タブ終了だけは画面内のDialogを出せないので、標準の確認を
-   * dirtyな間だけ登録する。保存成功・account切替・unmountではeffect cleanupで外れる。
-   */
-  useEffect(() => {
-    if (!dirty) return
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!dirtyRef.current) return
-      event.preventDefault()
-      event.returnValue = ''
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [dirty])
-
-  /*
-   * 左メニュー等のLinkも含めて、同一タブの画面内遷移を捕まえる。
-   * browser backはブラウザ側が先に履歴を動かすため対象外にし、ここでは
-   * 「クリックして別の管理画面へ行く」導線だけを安全に止める。
-   */
-  useEffect(() => {
-    if (!dirty) return
-    const onDocumentClick = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-      const target = event.target as { closest?: (selector: string) => Element | null } | null
-      const anchor = target?.closest?.('a[href]') as HTMLAnchorElement | null
-      if (!anchor || anchor.target || anchor.hasAttribute('download')) return
-      const destination = new URL(anchor.href, window.location.href)
-      const current = new URL(window.location.href)
-      if (destination.origin !== current.origin || destination.href === current.href) return
-      event.preventDefault()
-      if (!saving) setLeaveTarget({ kind: 'link', href: `${destination.pathname}${destination.search}${destination.hash}` })
-    }
-    document.addEventListener('click', onDocumentClick, true)
-    return () => document.removeEventListener('click', onDocumentClick, true)
-  }, [dirty, saving])
-
-  /*
-   * App Routerにはpages routerのbeforePopStateがないため、戻る操作はpopstateで
-   * ただちに元の履歴位置へ戻してから確認する。確認後だけ次のpopstateを通す。
-   */
-  useEffect(() => {
-    if (!dirty) {
-      skipRestoredPopRef.current = false
-      return
-    }
-    const onPopState = () => {
-      if (allowHistoryLeaveRef.current) {
-        allowHistoryLeaveRef.current = false
-        return
-      }
-      // history.go(1)で現在画面へ戻った直後のpopstateは、もう一度止めない。
-      if (skipRestoredPopRef.current) {
-        skipRestoredPopRef.current = false
-        return
-      }
-      skipRestoredPopRef.current = true
-      window.history.go(1)
-      if (!saving) setLeaveTarget({ kind: 'history-back' })
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [dirty, saving])
-
-  const leaveWithoutSaving = useCallback(() => {
-    if (!leaveTarget || saving) return
-    // 遷移が始まる前にdirtyを外す。beforeunloadも不要な警告を出さない。
-    setSavedFeatures({ ...features })
-    setSavedItemOrder(currentOrder)
-    setLeaveTarget(null)
-    if (leaveTarget.kind === 'history-back') {
-      allowHistoryLeaveRef.current = true
-      window.history.back()
-      return
-    }
-    router.push(leaveTarget.href)
-  }, [leaveTarget, saving, features, currentOrder, router])
 
   const usageByItemId = useMemo(() => {
     const result = new Map<string, UsageCategory>()
@@ -704,7 +654,6 @@ export default function SettingsPage() {
       for (const key of item.keys) changed[key] = next
       return changed
     })
-    setNotice('')
   }
 
   const toggleGroup = (group: FeatureGroup, next: boolean) => {
@@ -716,7 +665,6 @@ export default function SettingsPage() {
       }
       return changed
     })
-    setNotice('')
   }
 
   /**
@@ -730,7 +678,6 @@ export default function SettingsPage() {
     if (!group) return
     const ids = group.items.map((item) => item.id)
     setItemOrder((current) => ({ ...current, [groupId]: moveItemWithinGroup(ids, itemId, direction) }))
-    setNotice('')
   }
 
   /** 最後に取得または保存成功した、現在のアカウントの状態へだけ戻す。 */
@@ -740,7 +687,7 @@ export default function SettingsPage() {
     setItemOrder({ ...savedItemOrder })
     setReason('')
     setError('')
-    setNotice('保存済みの機能設定に戻しました。')
+    notifyToast('保存済みの機能設定に戻しました。')
   }
 
   /** 既定値を下書きへ入れる。ここではAPIを呼ばず、保存を押すまでサーバーは変えない。 */
@@ -749,7 +696,7 @@ export default function SettingsPage() {
     setFeatures({ ...CATALOG_DEFAULT_FEATURES })
     setItemOrder({})
     setError('')
-    setNotice('初期値を下書きに入れました。保存すると反映されます。')
+    notifyToast('初期値を下書きに入れました。保存すると反映されます。')
     setResetToDefaultsOpen(false)
   }
 
@@ -809,22 +756,24 @@ export default function SettingsPage() {
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return null
       // ほかの管理者が先に保存したときは、編集中身は残したまま
       // 最新を読み直し、内容を確認してもう一度保存してもらう。
+      // 読み込めていないときの409は競合ではなく本当の理由にする（D019）。
       if (error instanceof ApiError && error.status === 409) {
         await reloadSaved()
-        setError(FEATURE_SETTINGS_CONFLICT_MESSAGE)
+        setError(loadFailed
+          ? featureSettingsSaveConflictMessage({ loadFailed, loadForbidden: loadErrorStatus === 403 })
+          : FEATURE_SETTINGS_CONFLICT_MESSAGE)
         return null
       }
       setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'save'))
       return null
     }
-  }, [selectedAccountId, features, settingsVersion, reloadSaved, accountGuard])
+  }, [selectedAccountId, features, settingsVersion, reloadSaved, accountGuard, loadFailed, loadErrorStatus])
 
   const persist = async (impactToken?: string): Promise<boolean> => {
     if (!selectedAccountId) return false
     const ticket = accountGuard.issue(selectedAccountId)
     setSaving(true)
     setError('')
-    setNotice('')
     try {
       const response = await fetchApi<FeatureSaveResponse>(
         `/api/settings/features?account_id=${encodeURIComponent(selectedAccountId)}`,
@@ -851,7 +800,9 @@ export default function SettingsPage() {
        * 読み直すまで誤った状態を見せる。サーバ値を読み直して確定する。
        */
       try {
-        const latest = await api.featureSettings.get(selectedAccountId)
+        // 保存した直後なので使い回しの答えは捨て、必ず取り直す。
+        clearFeatureSettingsCache(selectedAccountId)
+        const latest = await loadFeatureSettings(selectedAccountId)
         if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
         if (latest.success) {
           const serverFeatures = normalizeFeatureSettings(latest.data.features)
@@ -875,7 +826,7 @@ export default function SettingsPage() {
         setItemOrder(currentOrder)
       }
       setReason('')
-      setNotice('機能設定を保存しました。サイドメニューにも反映されています。')
+      notifyToast('機能設定を保存しました。サイドメニューにも反映されています。')
       window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
       return true
     } catch (error) {
@@ -897,9 +848,12 @@ export default function SettingsPage() {
       }
       // ほかの管理者が先に保存したときは、編集中身は残したまま
       // 最新を読み直し、内容を確認してもう一度保存してもらう。
+      // 読み込めていないときの409は競合ではなく本当の理由にする（D019）。
       if (error instanceof ApiError && error.status === 409) {
         await reloadSaved()
-        setError(FEATURE_SETTINGS_CONFLICT_MESSAGE)
+        setError(loadFailed
+          ? featureSettingsSaveConflictMessage({ loadFailed, loadForbidden: loadErrorStatus === 403 })
+          : FEATURE_SETTINGS_CONFLICT_MESSAGE)
         return false
       }
       setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'save'))
@@ -973,11 +927,12 @@ export default function SettingsPage() {
   }
 
   const impactSummary = (group: FeatureImpactGroup) => group.items
-    .map((item) => `${item.targetType} ${item.count.toLocaleString('ja-JP')}件`)
+    .map((item) => `${item.targetType} ${formatNumber(item.count)}件`)
     .join('、')
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/*
         U034: 390px・768pxでは右の操作（並び替え・保存など）が見出しを
         押しつぶし、題が1文字ずつ縦に割れていた。共通の PageHeader の形は
@@ -986,7 +941,6 @@ export default function SettingsPage() {
       */}
       <div data-page-header-wrap>
       <PageHeader
-        className="mb-5"
         breadcrumb={[{ label: '設定' }, { label: '機能設定' }]}
         title="機能設定"
         description=""
@@ -995,37 +949,35 @@ export default function SettingsPage() {
           <Button
             variant="secondary"
             onClick={() => setOrdering((current) => !current)}
-            disabled={loading || saving}
+            disabled={loading || saving || loadFailed}
           >
             {ordering ? '並び替えを閉じる' : '並びを変える'}
           </Button>
           <Button
             variant="secondary"
             onClick={discardChanges}
-            disabled={loading || saving || !dirty}
+            disabled={loading || saving || loadFailed || !dirty}
             title={!dirty && !loading ? '変更すると取り消せます' : undefined}
           >
-            変更を取り消す
+            キャンセル
           </Button>
           <Button
             variant="secondary"
             onClick={() => setResetToDefaultsOpen(true)}
-            disabled={loading || saving}
+            disabled={loading || saving || loadFailed}
           >
             初期値に戻す
           </Button>
           <Button
             variant="primary"
             onClick={() => void save()}
-            disabled={loading || saving || !dirty}
-            title={!dirty && !loading ? '変更すると保存できます' : undefined}
-          >
+            disabled={loading || saving || loadFailed || !dirty}
+            title={!dirty && !loading ? '変更すると保存できます' : undefined} busy={saving}>
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
               <path d="m4 10 3.5 3.5L16 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {saving ? '保存中…' : '機能設定を保存'}
+            </svg>機能設定を保存する
           </Button>
-          {!loading && !dirty && <span className="self-center text-xs text-ink-faint">変更すると保存できます</span>}
+          {!loading && !loadFailed && !dirty && <span className="self-center text-xs text-ink-faint">変更すると保存できます</span>}
           </>
         )}
       />
@@ -1035,13 +987,9 @@ export default function SettingsPage() {
       `}</style>
       </div>
 
-      <div className="bg-info-bg text-ink-secondary mb-4 flex items-start gap-3 rounded-card px-5 py-2.5 text-xs leading-relaxed">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mt-px h-4 w-4 shrink-0 text-info">
-          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M12 10.5v6M12 7.5h.01" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-        </svg>
-        <p>使わない機能をオフにすると、サイドメニューから消えます。オフにしても作ったデータは削除されません。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順はここでは変えません。「並びを変える」から入れ替えてください。</p>
-      </div>
+      <Notice tone="info" className="mb-4">
+        使わない機能をオフにすると、サイドメニューから消えます。オフにしても作ったデータは削除されません。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順はここでは変えません。「並びを変える」から入れ替えてください。
+      </Notice>
 
       {!selectedAccountId ? (
         <p className="border-hairline bg-canvas text-ink-faint rounded-card border p-8 text-center text-sm">
@@ -1050,13 +998,12 @@ export default function SettingsPage() {
       ) : (
         <>
           <div aria-live="polite">
-            {error && <div className="border-danger bg-danger-bg text-danger mb-4 rounded-control border p-4 text-sm">{error}</div>}
-            {notice && <div className="border-success bg-success-bg text-success mb-4 rounded-control border p-4 text-sm">{notice}</div>}
+            {error && !loadFailed && <Notice tone="danger" message={error} className="mb-4" />}
           </div>
 
-          {dirty && (
-            <div className="border-hairline bg-canvas rounded-card mb-4 flex flex-col gap-2 border p-4 sm:flex-row sm:items-center">
-              <label htmlFor="feature-settings-reason" className="text-ink shrink-0 text-sm font-bold">
+          {dirty && !loadFailed && (
+            <div className="border-hairline bg-canvas rounded-card flex flex-col gap-2 border p-4 sm:flex-row sm:items-center">
+              <label htmlFor="feature-settings-reason" className="text-ink shrink-0 text-sm font-medium">
                 変更理由<RequiredBadge />
               </label>
               <TextField
@@ -1072,15 +1019,27 @@ export default function SettingsPage() {
 
           {loading ? (
             <div className="border-hairline bg-canvas text-ink-faint rounded-card border p-10 text-center text-sm">読み込み中…</div>
+          ) : loadFailed ? (
+            /*
+             * 監査 D019: 読み込みに失敗したら初期値のスイッチ一覧を本物の
+             * 設定のように出さない。理由と再読み込みだけを出す。
+             * 403 は権限の理由のまま（再試行の口も残す）。
+             */
+            <ListState
+              kind="error"
+              title={error || '機能設定を読み込めませんでした'}
+              onRetry={() => void load()}
+            />
           ) : (
-            <div className={ordering ? 'grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]' : ''}>
+            <>
+            <div className={ordering ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'grid gap-4'}>
               {/*
                 利用状況の取得自体に失敗したとき。バッジは付かないので、
                 無表示のままにせず一覧の先頭で理由とやり直しを出す。
                 設定の切替はこの間も触れるままにする。
               */}
               {usageFailed && (
-                <div className="border-hairline bg-canvas-sunken text-ink-faint mb-4 flex items-center gap-2 rounded-card border px-4 py-2 text-xs">
+                <div className="border-hairline bg-canvas-sunken text-ink-faint flex items-center gap-2 rounded-card border px-4 py-2 text-xs">
                   <span>機能の利用状況を読めませんでした。設定の切替はそのまま使えます。</span>
                   <button
                     type="button"
@@ -1097,12 +1056,18 @@ export default function SettingsPage() {
                 sidebar-design.test.ts が見ている。ここで二重に縛ると、
                 項目を1つ足すたびに2か所直すことになる。
               */}
+              {/*
+                監査707: 390pxでは3列ぶんの幅が容器を超え、右側のスイッチ・
+                「まとめて切替」が域外に出ていた。基底をgrid-cols-1
+                （minmax(0,1fr)で縮小可能）にし、列のdivにもmin-w-0を
+                付けて狭幅で1列へ落とす。xl以上は3列のまま。
+              */}
               <div
                 data-design="機能の一覧"
-                className={ordering ? 'space-y-4' : 'grid items-start gap-4 xl:grid-cols-3'}
+                className={ordering ? 'min-w-0 space-y-4' : 'grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-3'}
               >
                 {(ordering ? [groups] : groupColumns).map((column, columnIndex) => (
-                  <div key={columnIndex} className="space-y-3">
+                  <div key={columnIndex} className="min-w-0 space-y-3">
                     {column.map((group) => (
                       <FeatureSection
                         key={group.id}
@@ -1129,11 +1094,19 @@ export default function SettingsPage() {
               {ordering && <div data-design="運営" className="rounded-card border-hairline bg-canvas mt-5 border p-4">
                 <p className="text-ink text-sm font-bold">運営</p>
                 <p className="text-ink-secondary mt-1 text-xs leading-5">お客さまの組織からは見えません。</p>
-                <Link href="/settings/manual-links" className="text-accent-deep mt-3 inline-block text-sm font-bold">
+                <Link href="/settings/manual-links" className="text-action mt-3 inline-block text-sm font-bold">
                   マニュアルの正本表
                 </Link>
               </div>}
             </div>
+
+            {/*
+              ★V8 移行②: 新しい見た目を担当者が試すための切り替え。
+              設定画面のいちばん下に1つだけ置く（このブラウザだけに効く）。
+              読み込み中・読み込み失敗の画面には出さない（偽の操作を置かない決まり）。
+            */}
+            <ThemePreviewSwitch />
+            </>
           )}
         </>
       )}
@@ -1154,25 +1127,26 @@ export default function SettingsPage() {
         onConfirm={resetToDefaults}
       />
 
-      <ConfirmDialog
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="未保存の変更があります"
-        description="保存せずに移動すると、この画面で変更した機能の表示・並び順は失われます。"
-        confirmLabel="保存せずに離れる"
-        cancelLabel="この画面に残る"
-        destructive
+        subject="この画面で変更した機能の表示・並び順"
         busy={saving}
         onCancel={() => {
-          if (!saving) setLeaveTarget(null)
+          if (!saving) cancelLeave()
         }}
-        onConfirm={leaveWithoutSaving}
+        onConfirm={() => {
+          // 遷移が始まる前にdirtyを外す。beforeunloadも不要な警告を出さない。
+          setSavedFeatures({ ...features })
+          setSavedItemOrder(currentOrder)
+          confirmLeave()
+        }}
       />
 
       <ConfirmDialog
         open={impactOpen}
         title="オフにする前に確認"
         description="止まる仕事があります。オフにしてもデータは削除されず、再度オンにすると再開できます。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。"
-        confirmLabel="確認して保存"
+        confirmLabel="確認して保存する"
         destructive
         busy={impactBusy || saving}
         error={impactError || undefined}

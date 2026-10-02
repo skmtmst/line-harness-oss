@@ -31,6 +31,7 @@ const fixture = vi.hoisted(() => ({
   getTestRecipients: vi.fn(),
   definitions: vi.fn(),
   metrics: vi.fn(),
+  sendCounts: vi.fn(),
   quota: vi.fn(),
   updateDraft: vi.fn(),
   createDefinition: vi.fn(),
@@ -111,6 +112,7 @@ vi.mock('@/lib/api', () => {
       lineNotifications: {
         definitions: fixture.definitions,
         metrics: fixture.metrics,
+        sendCounts: fixture.sendCounts,
         updateDraft: fixture.updateDraft,
         createDefinition: fixture.createDefinition,
         publishDefinition: fixture.publishDefinition,
@@ -279,6 +281,10 @@ beforeEach(() => {
   fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
   fixture.definitions.mockResolvedValue({ success: true, data: [] })
   fixture.metrics.mockResolvedValue({ success: true, data: { items: [] } })
+  fixture.sendCounts.mockResolvedValue({
+    success: true,
+    data: { sentToday: 0, sentLast30d: 0, byEventType: [], period: { today: '2026-09-15', from30d: '2026-08-17', to: '2026-09-15' } },
+  })
   fixture.quota.mockResolvedValue({
     success: true,
     data: {
@@ -649,7 +655,7 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
     fireEvent.change(introBox, { target: { value: 'Aで保存を押した時点の本文' } })
     await waitFor(() => expect(screen.getByText('未保存の変更があります')).toBeTruthy())
 
-    fireEvent.click(screen.getByRole('button', { name: 'お知らせを保存' }))
+    fireEvent.click(screen.getByRole('button', { name: 'お知らせを保存する' }))
     expect(committedToB).toBe(false)
 
     // act() を経由しない生の setState。レンダーと load() の受動effectが
@@ -743,7 +749,7 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
     // 送らず、宛先の読み込みが済んでから確認の中の送信ボタンを押す。
     fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
     await screen.findByLabelText('ご案内文')
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
     expect(fixture.testSend).not.toHaveBeenCalled()
     const confirmSend = await screen.findByRole('button', { name: 'テスト受信者 2名へ送信' })
     fireEvent.click(confirmSend)
@@ -1076,7 +1082,7 @@ describe('#678 実Reactで描いた編集画面', () => {
     // 折り返した分だけ本文の下余白を広げ、最後の入力欄が隠れないようにする。
     expect(html).toContain('pb-48 sm:pb-24')
     expect(html).toContain('顧客へのお知らせを公開')
-    expect(html).toContain('下書きを保存')
+    expect(html).toContain('下書きを保存する')
   })
 
   it('未保存の編集があることを画面に出す', () => {
@@ -1098,7 +1104,7 @@ describe('#678 実Reactで描いた編集画面', () => {
   it('定義がないお知らせには公開ボタンを出さない', () => {
     const html = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} definition={null} />)
     expect(html).not.toContain('顧客へのお知らせを公開')
-    expect(html).toContain('お知らせを保存')
+    expect(html).toContain('お知らせを保存する')
   })
 
   it('保存中は主要操作を押せなくする', () => {
@@ -1114,12 +1120,13 @@ describe('#678 実Reactで描いた画面全体', () => {
     expect(html).toContain('顧客へのお知らせ —')
   })
 
-  it('運用者件数は0件・読み込み中・取得失敗を書き分ける', () => {
+  it('運用者件数は0件・読み込み中・取得失敗・権限なしを書き分ける', () => {
     expect(operatorTabCountLabel('ready', 0)).toBe('0')
     expect(operatorTabCountLabel('ready', 7)).toBe('7')
     expect(operatorTabCountLabel('loading', null)).toBe('—')
     expect(operatorTabCountLabel('error', null)).toBe('取得失敗')
-    expect(operatorTabCountLabel('forbidden', null)).toBe('取得失敗')
+    // M031: 403は取れなかったのではなく権限が無い。「取得失敗」と混ぜない。
+    expect(operatorTabCountLabel('forbidden', null)).toBe('権限なし')
   })
 })
 
@@ -1161,7 +1168,49 @@ describe('#678 実DOMへマウントした画面全体', () => {
     expect(screen.getByText('運用者へのお知らせ 0')).toBeTruthy()
   })
 
-  it('403: 顧客のお知らせは「表示する権限がありません」を出し、再読み込みは出さない', async () => {
+  it('今日・この30日は送信履歴の数（取り込み累計やLINE集計の合計ではない）', async () => {
+    fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
+    // 取り込みは5件・LINE集計の合計は9件でも、行には出さない。
+    fixture.overview.mockResolvedValue({
+      success: true,
+      data: { last24h: 5, failed: 0, byType: [{ eventType: 'order.confirmed', label: '注文受付', count: 5 }] },
+    })
+    fixture.metrics.mockResolvedValue({
+      success: true,
+      data: {
+        items: [{
+          definitionId: 'definition-a',
+          notificationName: '注文受付',
+          accepted: { value: 9 },
+          displayed: { state: 'available', value: 8, reason: null },
+          clicked: { value: 1 },
+        }],
+        coverage: { individualOpenAvailable: false, lineAggregateOnly: true, unavailableIsNull: true },
+      },
+    })
+    fixture.sendCounts.mockResolvedValue({
+      success: true,
+      data: {
+        sentToday: 2,
+        sentLast30d: 7,
+        byEventType: [{ eventType: 'order.confirmed', today: 2, last30d: 7 }],
+        period: { today: '2026-09-15', from30d: '2026-08-17', to: '2026-09-15' },
+      },
+    })
+
+    render(<LineNotificationsPage />)
+
+    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    // 行の「今日」「この30日」は送信履歴の2通・7通。
+    expect(screen.getByText('2通')).toBeTruthy()
+    expect(screen.getByText('7通')).toBeTruthy()
+    expect(screen.queryByText('5通')).toBeNull()
+    expect(screen.queryByText('9通')).toBeNull()
+    // KPIの「今日 送った」も送信履歴の合計。
+    expect(screen.getByText('今日 送った')).toBeTruthy()
+  })
+
+  it('403: 顧客のお知らせは「表示する権限がありません」を出し、読み直す口は出さない', async () => {
     fixture.settings.mockRejectedValue(new ApiError(403))
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
@@ -1169,10 +1218,10 @@ describe('#678 実DOMへマウントした画面全体', () => {
     render(<LineNotificationsPage />)
 
     await waitFor(() => expect(screen.getByText('表示する権限がありません')).toBeTruthy())
-    expect(screen.queryByRole('button', { name: '再読み込み' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
   })
 
-  it('500: 「表示できませんでした」を出し、実物の再読み込みボタンを押すと実物のfetchをやり直して復旧する', async () => {
+  it('500: 「表示できませんでした」を出し、実物の読み直すボタンを押すと実物のfetchをやり直して復旧する', async () => {
     fixture.settings.mockRejectedValueOnce(new Error('internal error'))
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
@@ -1183,24 +1232,33 @@ describe('#678 実DOMへマウントした画面全体', () => {
     expect(fixture.settings).toHaveBeenCalledTimes(1)
 
     // 2回目からは成功する応答へ差し替えてから、実物のボタンを押す。
+    // ★V7 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
     fixture.settings.mockResolvedValueOnce({ success: true, data: [setting()] })
-    fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
     await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
     expect(fixture.settings).toHaveBeenCalledTimes(2)
     expect(screen.queryByText('顧客へのお知らせを表示できませんでした')).toBeNull()
   })
 
-  it('運用者だけ403/500になっても、顧客のお知らせは表示を続け、タブの数字だけ「取得失敗」にする', async () => {
+  it('運用者だけ403になっても顧客のお知らせは表示を続け、タブは「権限なし」にする', async () => {
     fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockRejectedValueOnce(new ApiError(403))
 
     const { unmount } = render(<LineNotificationsPage />)
     await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
-    expect(screen.getByText('運用者へのお知らせ 取得失敗')).toBeTruthy()
+    // M031: 403は「取得失敗」と混ぜない。押しても直らない再試行も出さない。
+    expect(screen.getByText('運用者へのお知らせ 権限なし')).toBeTruthy()
+    expect(screen.queryByText('運用者へのお知らせ 取得失敗')).toBeNull()
+    expect(screen.getByText(/見る権限がありません/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'もう一度' })).toBeNull()
     unmount()
+  })
 
+  it('運用者だけ500になっても、顧客のお知らせは表示を続け、タブの数字だけ「取得失敗」にする', async () => {
+    fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
+    fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockRejectedValueOnce(new Error('internal error'))
     render(<LineNotificationsPage />)
     await waitFor(() => expect(screen.getByText('運用者へのお知らせ 取得失敗')).toBeTruthy())
@@ -1232,7 +1290,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     expect(stored).not.toBeNull()
     expect(JSON.parse(stored!).introText).toBe(longIntro)
 
-    fireEvent.click(screen.getByRole('button', { name: 'お知らせを保存' }))
+    fireEvent.click(screen.getByRole('button', { name: 'お知らせを保存する' }))
     await waitFor(() => expect(fixture.createDefinition).toHaveBeenCalledTimes(1))
     // 保存APIへ渡した中身も、打ち込んだ長文のまま欠けたり切れたりしない。
     // N-330: 旧設定APIではなく、正本の定義を作る口へ送る。
@@ -1284,7 +1342,7 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
 
   it('確認にはアカウント・お知らせ・宛先・人数を出し、送信ボタンを押すまで送らない', async () => {
     await openEditor()
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
 
     // 開いただけでは送らない。宛先は実API口から読む。
     expect(fixture.testSend).not.toHaveBeenCalled()
@@ -1301,7 +1359,7 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
   it('テスト受信者が0人なら送信ボタンを出さず、登録画面への道筋を出す', async () => {
     fixture.getTestRecipients.mockResolvedValue({ success: true, data: [] })
     await openEditor()
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
 
     expect(await screen.findByText(/テスト受信者が登録されていません/)).toBeTruthy()
     // 宛先が数えられていないのに送らせない（ConfirmDialog は onConfirm 無しで実行ボタンを出さない）。
@@ -1313,7 +1371,7 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
   it('宛先の読み込みに失敗したら送信ボタンを出さない', async () => {
     fixture.getTestRecipients.mockRejectedValue(new Error('network down'))
     await openEditor()
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
 
     expect(await screen.findByText(/テスト受信者を読み込めませんでした/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /名へ送信/ })).toBeNull()
@@ -1322,7 +1380,7 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
 
   it('確認をキャンセルしたら送らない', async () => {
     await openEditor()
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByRole('button', { name: 'テスト受信者 2名へ送信' })
 

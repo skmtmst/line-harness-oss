@@ -43,12 +43,16 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
     ])
     if (generationRef.current !== generation) return
     let failed = false
-    if (recipientResult.status === 'fulfilled' && recipientResult.value.success) {
+    /*
+     * 配列でない応答は無いものとして扱う。そのまま置くと
+     * `recipients.filter` で画面ごと落ちる（全ルート監査 A1、2026-09-25）。
+     */
+    if (recipientResult.status === 'fulfilled' && recipientResult.value.success && Array.isArray(recipientResult.value.data)) {
       setRecipients(recipientResult.value.data)
     } else {
       failed = true
     }
-    if (loginUserResult.status === 'fulfilled' && loginUserResult.value.success) {
+    if (loginUserResult.status === 'fulfilled' && loginUserResult.value.success && Array.isArray(loginUserResult.value.data)) {
       setLoginUsers(loginUserResult.value.data)
     } else {
       failed = true
@@ -127,7 +131,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
     } finally { setSaving(false) }
   }
 
-  if (loading) return <p className="text-xs text-gray-400">読み込み中...</p>
+  if (loading) return <p className="text-xs text-ink-faint">読み込み中...</p>
   if (loadError) {
     return (
       <div className="mt-3">
@@ -152,10 +156,10 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
       {recipients.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {recipients.map(r => (
-            <span key={r.id} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs">
-              {r.pictureUrl && <img src={r.pictureUrl} alt="" className="w-4 h-4 rounded-full" />}
+            <span key={r.id} className="inline-flex items-center gap-1 px-2 py-1 bg-status-info-soft text-action rounded-pill text-xs">
+              {r.pictureUrl && <img src={r.pictureUrl} alt="" className="w-4 h-4 rounded-pill" />}
               {r.displayName}
-              <button onClick={() => removeRecipient(r.id)} className="text-blue-400 hover:text-blue-600 ml-0.5">×</button>
+              <button onClick={() => removeRecipient(r.id)} className="text-action hover:text-action ml-0.5">×</button>
             </span>
           ))}
         </div>
@@ -163,24 +167,24 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
 
       {/* LINE連携済みのログインユーザーは、友だち検索に埋もれないよう常に候補へ出す。 */}
       {availableLoginUsers.length > 0 && (
-        <div className="mb-2 rounded-lg border border-emerald-100 bg-emerald-50/60 p-2">
-          <p className="mb-1.5 text-[11px] font-medium text-emerald-800">ログインユーザーから追加</p>
+        <div className="mb-2 rounded-control border border-accent-border bg-accent-soft/60 p-2">
+          <p className="mb-1.5 text-[11px] font-medium text-success">ログインユーザーから追加</p>
           <div className="flex flex-wrap gap-1.5">
             {availableLoginUsers.map((candidate) => (
               <button
                 key={candidate.id}
                 type="button"
                 onClick={() => addRecipient(candidate)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:border-emerald-400 hover:bg-emerald-50"
+                className="inline-flex items-center gap-1.5 rounded-pill border border-accent-border bg-canvas px-2 py-1 text-xs font-medium text-success hover:border-accent hover:bg-accent-soft"
                 title={`${candidate.staffName}をテスト送信先に追加`}
               >
                 {candidate.pictureUrl ? (
-                  <img src={candidate.pictureUrl} alt="" className="h-4 w-4 rounded-full" />
+                  <img src={candidate.pictureUrl} alt="" className="h-4 w-4 rounded-pill" />
                 ) : (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[9px] font-bold">{candidate.staffName.charAt(0)}</span>
+                  <span className="flex h-4 w-4 items-center justify-center rounded-pill bg-accent-soft text-micro font-medium">{candidate.staffName.charAt(0)}</span>
                 )}
                 <span>{candidate.staffName}</span>
-                <span aria-hidden="true" className="text-emerald-500">＋</span>
+                <span aria-hidden="true" className="text-success">＋</span>
               </button>
             ))}
           </div>
@@ -194,23 +198,23 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
           placeholder="友だちを検索して追加..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="w-full border border-hairline rounded-control px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-action"
         />
-        {searching && <span className="absolute right-2 top-1.5 text-xs text-gray-400">検索中...</span>}
-        {saving && <span className="absolute right-2 top-1.5 text-xs text-green-500">保存中...</span>}
+        {searching && <span className="absolute right-2 top-1.5 text-xs text-ink-faint">検索中...</span>}
+        {saving && <span className="absolute right-2 top-1.5 text-xs text-success">保存中...</span>}
 
         {searchResults.length > 0 && (
-          <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+          <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-canvas border border-hairline rounded-control shadow-float max-h-40 overflow-y-auto">
             {searchResults.map(f => (
               <li key={f.id}>
                 <button
                   onClick={() => addRecipient(f)}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-left text-xs"
+                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-surface-pearl text-left text-xs"
                 >
                   {f.pictureUrl ? (
-                    <img src={f.pictureUrl} alt="" className="w-5 h-5 rounded-full" />
+                    <img src={f.pictureUrl} alt="" className="w-5 h-5 rounded-pill" />
                   ) : (
-                    <div className="w-5 h-5 rounded-full bg-gray-200" />
+                    <div className="w-5 h-5 rounded-pill bg-shell-gray" />
                   )}
                   {f.displayName}
                 </button>

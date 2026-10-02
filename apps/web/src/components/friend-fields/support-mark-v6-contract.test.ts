@@ -16,18 +16,22 @@ describe('V6 対応マーク', () => {
     // 見出しは表の中だけを見る。注釈や他の行に同じ言葉があっても通さない。
     const thead = element(LIST, 'thead')
     for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '表示先', '操作']) expect(thead).toContain(label)
-    expect(LIST).toContain('利用状態：すべて')
+    // 絞り込みは共通 Select。題と「すべて」の選択肢が分かれている。
+    expect(LIST).toContain('label="利用状態"')
+    expect(LIST).toContain("{ value: 'all', label: 'すべて' }")
     // ATTR-01: 取得時のアカウントを退避し、応答が届いた時点の選択と照合する。
     expect(LIST).toContain('api.supportMarks.list(account)')
   })
 
   it('追加編集画面は本文タイトルを置かず、トップバーへ画面名を渡す', () => {
     expect(EDITOR).toContain('data-design-node="GMvBd"')
-    expect(EDITOR).toContain("usePageTitle(editing ? '対応マークを編集' : '対応マークを追加')")
+    expect(EDITOR).toContain("usePageTitle(editing ? '対応マークを編集' : '対応マークを作る')")
     expect(EDITOR).not.toContain('<Header')
     expect(EDITOR).toContain('api.supportMarks.create')
     expect(EDITOR).toContain('api.supportMarks.update')
-    expect(EDITOR).toContain('api.supportMarks.list(selectedAccountId)')
+    // R510: 一覧の取得は再試行できる形（load 関数）に切り出した。
+    // 取得時のアカウントを退避し、その口を呼ぶ約束は変えない。
+    expect(EDITOR).toContain('api.supportMarks.list(account)')
     for (const label of ['マーク名', '色', '並び順', '新しい友だちに最初から付ける']) expect(EDITOR).toContain(label)
   })
 
@@ -42,7 +46,9 @@ describe('V6 対応マーク', () => {
   })
 
   it('保存と保管の失敗で内部のAPI文言をそのまま表示しない', () => {
-    expect(EDITOR).toContain('対応マークを保存できませんでした。状態を読み直してから、もう一度お試しください。')
+    // R511: 保存の失敗文は共通関数（失敗の文の共通関数）に寄せた。
+    // 403 の権限不足と通信の失敗を分け、API の本文をそのまま出さない約束は変えない。
+    expect(EDITOR).toContain('describeSaveFailure(reason)')
     expect(LIST).toContain('対応マークを保管できませんでした。状態を読み直してから、もう一度お試しください。')
     expect(EDITOR).not.toContain('reason instanceof ApiError ? reason.message')
     expect(LIST).not.toContain("reason instanceof ApiError ? reason.message : '削除できませんでした'")
@@ -79,6 +85,6 @@ describe('V6 対応マーク', () => {
 
   it('タブ行から追加画面へ進める', () => {
     expect(TABS).toContain('href="/tags/marks/new"')
-    expect(TABS).toContain('＋ マークを追加')
+    expect(TABS).toContain('＋ マークを作る')
   })
 })

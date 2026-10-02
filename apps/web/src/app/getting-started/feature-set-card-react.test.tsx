@@ -28,6 +28,7 @@ vi.mock('next/link', () => ({
 }))
 
 const { FeatureSetCard } = await import('./feature-set-card')
+const { clearFeatureSettingsCache } = await import('@/lib/feature-settings-cache')
 
 const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -40,6 +41,8 @@ let root: Root
 let mounted = false
 
 beforeEach(() => {
+  // 画面をまたぐ使い回しは試験ごとに捨てる（次の描画は今の応答を見る）。
+  clearFeatureSettingsCache()
   fixture.accountId = 'account-a'
   network.getStatus = 200
   network.version = 0

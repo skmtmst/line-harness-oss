@@ -1,13 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { api } from '@/lib/api'
+import { X } from 'lucide-react'
+import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import type { AutoReplyDraftInput, AutoReplyDraftVersion } from '@line-crm/shared'
-import type { SegmentCondition } from '@/lib/segment-condition'
+import { validateFlexContent } from '@line-crm/shared'
+import { findConditionDraftIssue, type SegmentCondition } from '@/lib/segment-condition'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import InlineActionList, { useActionOptions } from './inline-action-list'
 import {
+  applyMatchType,
   emptyKeywordRule,
+  exactAllMismatchNotice,
+  initialMatchType,
   readKeywordRules,
   readInlineActions,
   toKeywordPayload,
@@ -18,15 +23,23 @@ import {
   type HolidayRuleValue,
   type InlineAction,
 } from './draft-fields'
+import Notice from '@/components/shared/notice'
+import Disclosure from '@/components/shared/disclosure'
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Select from '@/components/shared/select'
+import { TimeField } from '@/components/shared/date-time-field'
 import StickyBar from '@/components/shared/sticky-bar'
+import LinePreview from '@/components/shared/line-preview'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import {
   MESSAGE_KIND_WORDS,
   messageKindWord,
   responseTypeWord,
 } from '@/app/auto-replies/auto-reply-words'
+import { formatNumber } from '@/lib/format'
 
 export interface AutoReplyDraft {
   id?: string
@@ -185,6 +198,21 @@ export function toVersionDraft(
  * なる（#494 軽13）。知らない値は内部値を出さず「その他のメッセージ」。
  */
 
+/**
+ * R28: 窓の中で見せる順番の手がかり。一覧が評価順に並べた中での位置と、
+ * 先に見るルールの名前だけを持つ。数字の入力は持たない。
+ */
+export interface AutoReplyOrderHint {
+  /** 評価順での1始まりの位置。新規・不明なら null。 */
+  position: number | null
+  /** 同じ並びの件数。不明なら null。 */
+  total: number | null
+  /** このルールより先に見るルール（近い3件まで）。 */
+  earlier: Array<{ id: string; name: string }>
+  /** 先に見るルールの全部の件数。 */
+  earlierTotal: number
+}
+
 interface Props {
   draft: AutoReplyDraft
   templates: Array<{ id: string; name: string; messageType: string; messageContent: string }>
@@ -195,6 +223,8 @@ interface Props {
   /** V6ページ表示では、1画面に1段だけ出す。一覧内の編集ダイアログは全項目を出す。 */
   step?: 'basic' | 'trigger' | 'response'
   onStepChange?: (step: 'basic' | 'trigger' | 'response') => void
+  /** 一覧から開いたときに渡す順番の手がかり。URL編集では未指定。 */
+  orderHint?: AutoReplyOrderHint | null
 }
 
 type ResponseMode = 'silent' | 'template' | 'inline-text' | 'inline-flex' | 'inline-image'
@@ -262,9 +292,20 @@ export default function EditDialog({
   page = false,
   step = 'basic',
   onStepChange,
+  orderHint = null,
 }: Props) {
   const [keyword, setKeyword] = useState(draft.keyword)
-  const [matchType, setMatchType] = useState<'exact' | 'contains'>(draft.matchType)
+  /*
+   * R29: 開いたときは「効いている当て方」（保存された行があれば行）を出す。
+   * 行だけ古いまま選んだことにならないよう、選び直したら全行へ載せる。
+   */
+  const [matchType, setMatchType] = useState<'exact' | 'contains'>(() =>
+    initialMatchType(draft),
+  )
+  const changeMatchType = (next: 'exact' | 'contains') => {
+    setMatchType(next)
+    setKeywordRules((current) => applyMatchType(current, next))
+  }
   const [mode, setMode] = useState<ResponseMode>(detectMode(draft))
   const [templateId, setTemplateId] = useState<string | null>(draft.templateId)
   const [responseContent, setResponseContent] = useState(draft.responseContent)
@@ -279,7 +320,11 @@ export default function EditDialog({
   const [skipWhenOperatorActive, setSkipWhenOperatorActive] = useState(
     draft.skipWhenOperatorActive ?? false,
   )
-  const [priority, setPriority] = useState(String(draft.priority ?? 0))
+  /*
+   * R28: 順番の数字は窓の中では変えず、そのまま送り返す。順番を変えるのは
+   * 一覧の上下入れ替えだけ。保存時に値を落とすと並びが崩れるので残す。
+   */
+  const [priority] = useState(String(draft.priority ?? 0))
   const [messageKinds, setMessageKinds] = useState<string[]>(draft.messageKinds ?? [])
   const [receiveSources, setReceiveSources] = useState<Array<'line' | 'email'>>(
     draft.receiveSources?.length ? draft.receiveSources : ['line'],
@@ -288,6 +333,11 @@ export default function EditDialog({
     readKeywordRules(draft),
   )
   const [weekdays, setWeekdays] = useState<number[]>(draft.responseWeekdays ?? [])
+  /*
+   * R252: 最後の曜日を外そうとしたときに欄の下で出す理由。
+   * 選び直したら消える（残り続けると次の操作の説明に見える）。
+   */
+  const [weekdayNotice, setWeekdayNotice] = useState<string | null>(null)
   const [holidayRule, setHolidayRule] = useState<HolidayRuleValue>(
     (draft.responseHolidayRule as HolidayRuleValue) ?? 'ignore',
   )
@@ -315,6 +365,22 @@ export default function EditDialog({
   const [friendConditionOpen, setFriendConditionOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /*
+   * m26c R551: 下書き保存の競合（409）で、先行内容との比較と読み直しの
+   * 導線を出す。入力は保持し、読み直すまで消さない。
+   * m26c R569: 公開中ルールの一覧編集は下書きへ保存される。稼働中は
+   * 無変更なので、公開フローへ案内する。
+   */
+  const [conflictInfo, setConflictInfo] = useState<{
+    keyword: string
+    responseContent: string
+  } | null>(null)
+  const [draftSaved, setDraftSaved] = useState(false)
+  /*
+   * m26c R570: 新規作成の確認キーは窓ごとに1つ振り、窓を閉じるまで変えない。
+   * 成功の応答を失って同じ窓から送り直しても同じキーになり、二重に作らない。
+   */
+  const [createKey] = useState(() => crypto.randomUUID())
   // アクションで選ぶもの（タグ・友だち情報・対応マーク・シナリオ・共通情報）。
   const actionOptions = useActionOptions()
   // 一覧内で開く編集窓は共通のoverlay制御へ寄せる。Escape・Tab循環・背景
@@ -353,10 +419,28 @@ export default function EditDialog({
   const imageTemplates = templates.filter((t) => t.messageType === 'image')
 
   const handleSave = async () => {
+    /*
+     * R29: 空の行は送らない（送るとAPIが400で断る）。
+     * 先頭の keyword / matchType は行と同じものを送る。判定側が読むのは
+     * 行のほうなので、ここが食い違うと選んだ当て方で動かない。
+     */
+    const effectiveRules = keywordRules.filter((rule) => rule.keyword.trim() !== '')
+    const firstKeyword = effectiveRules[0]?.keyword.trim() ?? ''
     // 一律で応答するならキーワードは要らない。
-    if (!respondToAll && !keyword.trim()) {
+    if (!respondToAll && !firstKeyword) {
       setError('キーワードを入力してください')
       return
+    }
+    /*
+     * R200: 「連投を防ぐ」は送る前に欄の名前と許容範囲で止める。
+     * 保存口も同じ文言で断るが、ここで先に止めると往復しない。
+     */
+    if (cooldown.trim() !== '') {
+      const cooldownValue = Number(cooldown)
+      if (!Number.isInteger(cooldownValue) || cooldownValue < 0 || cooldownValue > 10080) {
+        setError('「連投を防ぐ」は0〜10080の整数（分）で入力してください')
+        return
+      }
     }
     if (mode === 'template' && !templateId) { setError('テンプレートを選んでください'); return }
     if (mode === 'inline-text' && !responseContent.trim()) {
@@ -364,19 +448,26 @@ export default function EditDialog({
     }
     if (mode === 'inline-flex') {
       if (!responseContent.trim()) { setError('カードの内容を入力してください'); return }
-      try {
-        JSON.parse(responseContent)
-      } catch {
-        // カード形式なのにJSONでない本文を保存すると、送信側がテキストへ落として
-        // そのまま送ってしまう。ここで止める。
-        setError('カードの内容をJSON形式で入力してください'); return
-      }
+      // R201: JSONとして読めるだけでは足りない。`{}` のような構造のない内容は
+      // 送信時に落ちるだけなので、保存の側で止める（保存口も同じ判定）。
+      const flexError = validateFlexContent('flex', responseContent)
+      if (flexError) { setError(flexError); return }
     }
     if (mode === 'inline-image' && !readLineImageContent(responseContent)) {
       // テキストのまま画像形式で保存させない（画像選択部品がJSONを書く）。
       setError('返信する画像を選んでください'); return
     }
+    /*
+     * R243: 空の「いずれか」のかたまり・未完成の行がある下書きは保存しない。
+     * そのまま送ると「絞り込みなし」へ黙って落ちる。編集中の表示は消さず、
+     * 不足の案内だけ出してAPI要求は0にする（page/listどちらの保存口もここ）。
+     * 素の空（null）は「絞り込みなし」として有効なので通す。
+     */
+    const conditionIssue = findConditionDraftIssue(friendConditions)
+    if (conditionIssue) { setError(conditionIssue); return }
     setError('')
+    setConflictInfo(null)
+    setDraftSaved(false)
     setSaving(true)
     try {
       const body: {
@@ -404,9 +495,10 @@ export default function EditDialog({
         name: string | null;
         keywordMatchMode: 'any' | 'all';
         folderId: string | null;
+        internalMemo: string | null;
       } = {
-        keyword,
-        matchType,
+        keyword: firstKeyword || keyword,
+        matchType: effectiveRules[0]?.matchType ?? matchType,
         responseType:
           mode === 'silent' ? 'silent'
           : mode === 'inline-flex' ? 'flex'
@@ -435,13 +527,15 @@ export default function EditDialog({
         responseWeekdays: weekdays.length === 0 || weekdays.length === 7 ? null : weekdays,
         responseHolidayRule: holidayRule === 'ignore' ? null : holidayRule,
         oncePerFriend,
-        // 1行だけで、中身が上の「キーワード」と同じなら、複数行として持たない。
-        keywords: keywordRules.length > 0 ? keywordRules.map(toKeywordPayload) : null,
+        keywords: effectiveRules.length > 0 ? effectiveRules.map(toKeywordPayload) : null,
         friendConditions,
         respondToAll,
         name: ruleName.trim() || null,
         keywordMatchMode,
         folderId: folderId || null,
+        // 新規作成・一覧の編集のどちらの保存口でも送る。ここに入れないと
+        // 入力したメモが保存要求に乗らず、再び開いたとき空になる（AUTOREPLY-09）。
+        internalMemo: internalMemo.trim() || null,
       }
       if (mode === 'template' && templateId) {
         const tpl = templates.find((t) => t.id === templateId)
@@ -471,16 +565,40 @@ export default function EditDialog({
           expectedVersion: draft.versionNumber,
         })
       } else if (draft.id) {
-        await api.autoReplies.update(draft.id, body)
+        const updated = await api.autoReplies.update(draft.id, body)
+        if (updated.success && updated.data?.draftSaved) {
+          // m26c R569: 稼働中は無変更で下書きへ載った。閉じずに公開フローへ案内する。
+          setDraftSaved(true)
+          setSaving(false)
+          return
+        }
       } else {
         // AUTOREPLY-08: 新規作成は常に止まった状態で保存する。チェックを
         // 付けて作る形にすると「オフで保存したのに動く」の逆が起きる。
         // 動かすのは保存後の再開・公開操作だけ。
-        await api.autoReplies.create({ ...body, isActive: false })
+        await api.autoReplies.create({ ...body, isActive: false }, createKey)
       }
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました')
+      // m26c R551: 競合は入力を保持したまま、先行内容との比較と読み直しを出す。
+      if (e instanceof ApiError && e.status === 409) {
+        const data = e.data as {
+          currentVersion?: number
+          current?: { keyword?: string; responseContent?: string }
+        } | null
+        setError(e.message || 'ほかの変更が先に保存されました。最新の状態を読み直してください')
+        if (data?.current) {
+          setConflictInfo({
+            keyword: typeof data.current.keyword === 'string' ? data.current.keyword : '',
+            responseContent:
+              typeof data.current.responseContent === 'string' ? data.current.responseContent : '',
+          })
+        }
+      } else {
+        // R570: 409以外は既存 WRITE-01 の案内に寄せる。素の内部文
+        //（`API error: 500` など）は出さない。入力は保持したまま。
+        setError(describeSaveFailure(e))
+      }
     }
     setSaving(false)
   }
@@ -530,8 +648,7 @@ export default function EditDialog({
     <>
       {page ? (
         <>
-          <Button type="button" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中...' : '下書き保存'}
+          <Button type="button" onClick={handleSave} disabled={saving} busy={saving} busyLabel="保存中...">下書きを保存する
           </Button>
           {step === 'basic' && <Button type="button" variant="primary" onClick={() => moveTo('trigger')}>反応条件へ</Button>}
           {step === 'trigger' && <Button type="button" variant="primary" onClick={() => moveTo('response')}>何を返すかへ</Button>}
@@ -540,8 +657,7 @@ export default function EditDialog({
       ) : (
         <>
           <Button type="button" onClick={onClose}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中...' : '保存'}
+          <Button type="button" variant="primary" onClick={handleSave} disabled={saving} busy={saving} busyLabel="保存中...">保存する
           </Button>
         </>
       )}
@@ -550,7 +666,7 @@ export default function EditDialog({
 
   return (
     <div
-      className={page ? 'space-y-4' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'}
+      className={page ? 'space-y-4' : 'fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4'}
       data-design-node={page ? step === 'basic' ? 'K7vg2' : step === 'trigger' ? 'nzWIX' : 'ivDoe' : undefined}
       role={page ? undefined : 'presentation'}
       onMouseDown={page ? undefined : (event) => {
@@ -558,46 +674,59 @@ export default function EditDialog({
       }}
     >
       {/*
-       * 手順表示（StepTrail）は edit/page.tsx が出す。
+       * 手順表示（Stepper）は edit/page.tsx が出す。
        * この窓は一覧のダイアログとページの両方で使うため、ここに置くと
        * 手順の無い一覧にも Steps の節が混入する。
        */}
       <div className={page ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]' : ''}>
       <div
         ref={dialogRef}
-        className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white shadow-xl'}
+        className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-control bg-canvas shadow-float'}
         role={page ? undefined : 'dialog'}
         aria-modal={page ? undefined : true}
         aria-labelledby={page ? undefined : 'auto-reply-edit-dialog-title'}
         tabIndex={page ? undefined : -1}
       >
-        <div className={`border-hairline border-b px-5 ${page ? 'py-3' : 'py-4'}`}>
-          <h3 id={page ? undefined : 'auto-reply-edit-dialog-title'} className="text-base font-semibold">
-            {page
-              ? step === 'basic'
-                ? '基本設定'
-                : step === 'trigger'
-                  ? 'どんなときに動くか'
-                  : '何を返すか'
-              : draft.id ? '自動応答編集' : '自動応答を作る'}
-          </h3>
-          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-            {page
-              ? step === 'basic'
-                ? '名前と管理方法を決めて、反応条件へ進みます。'
-                : step === 'trigger'
-                  ? '受信した言葉・曜日・時間帯・相手を組み合わせます。'
-                  : '返信内容と、応答した後に行う処理を設定します。'
-              : '受け取ったメッセージに自動で返します。曜日や時間帯、友だちの条件で出し分けできます。'}
-          </p>
+        <div className={`border-hairline flex items-start justify-between gap-3 border-b px-5 ${page ? 'py-3' : 'py-4'}`}>
+          <div className="min-w-0">
+            <h3 id={page ? undefined : 'auto-reply-edit-dialog-title'} className="text-base font-semibold">
+              {page
+                ? step === 'basic'
+                  ? '基本設定'
+                  : step === 'trigger'
+                    ? 'どんなときに動くか'
+                    : '何を返すか'
+                : draft.id ? '自動応答編集' : '自動応答を作る'}
+            </h3>
+            <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+              {page
+                ? step === 'basic'
+                  ? '名前と管理方法を決めて、反応条件へ進みます。'
+                  : step === 'trigger'
+                    ? '受信した言葉・曜日・時間帯・相手を組み合わせます。'
+                    : '返信内容と、応答した後に行う処理を設定します。'
+                : '受け取ったメッセージに自動で返します。曜日や時間帯、友だちの条件で出し分けできます。'}
+            </p>
+          </div>
+          {!page ? (
+            <button
+              type="button"
+              onClick={closeOverlay}
+              disabled={saving}
+              aria-label="閉じる"
+              className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
+            >
+              <X aria-hidden="true" className="h-5 w-5" />
+            </button>
+          ) : null}
         </div>
-        <div className={page ? 'space-y-4 p-4' : 'space-y-4 p-5'}>
+        <div className={page ? 'space-y-4 p-4' : 'min-h-0 flex-1 space-y-4 overflow-y-auto p-5'}>
           {showBasic ? (
             <>
           <section className="space-y-4">
             {!page && <div>
               <h2 className="text-ink text-lg font-bold">基本設定</h2>
-              <p className="text-ink-faint mt-1 text-xs">ルール名・フォルダ・優先順位を設定します。</p>
+              <p className="text-ink-faint mt-1 text-xs">ルール名・フォルダを決めます。動く順番は一覧で上下を入れ替えて決めます。</p>
             </div>}
 
             <div className={page ? 'grid items-start gap-3 xl:grid-cols-4' : ''}>
@@ -623,33 +752,37 @@ export default function EditDialog({
                 フォルダ
               </label>
               <div className="mt-1 flex items-center gap-2">
-                <select
+                <Select
                   id="auto-reply-folder"
+                  aria-label="フォルダ"
                   value={folderId}
-                  onChange={(e) => setFolderId(e.target.value)}
+                  onChange={setFolderId}
                   disabled={foldersLoadState !== 'ready'}
-                  className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-                >
-                  <option value="">
-                    {foldersLoadState === 'loading'
-                      ? 'フォルダを読み込み中'
-                      : foldersLoadState === 'error'
-                        ? 'フォルダを読み込めませんでした'
-                        : '未分類'}
-                  </option>
-                  {folderId && !folders.some((folder) => folder.id === folderId) && (
-                    <option value={folderId}>
-                      {foldersLoadState === 'ready'
-                        ? '現在のフォルダ（一覧にありません）'
-                        : '現在のフォルダ（名前を確認できません）'}
-                    </option>
-                  )}
-                  {folders.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    {
+                      value: '',
+                      label:
+                        foldersLoadState === 'loading'
+                          ? 'フォルダを読み込み中'
+                          : foldersLoadState === 'error'
+                            ? 'フォルダを読み込めませんでした'
+                            : '未分類',
+                    },
+                    ...(folderId && !folders.some((folder) => folder.id === folderId)
+                      ? [
+                          {
+                            value: folderId,
+                            label:
+                              foldersLoadState === 'ready'
+                                ? '現在のフォルダ（一覧にありません）'
+                                : '現在のフォルダ（名前を確認できません）',
+                          },
+                        ]
+                      : []),
+                    ...folders.map((f) => ({ value: f.id, label: f.name })),
+                  ]}
+                  size="full"
+                />
                 {foldersLoadState === 'error' && (
                   <Button onClick={() => setFoldersReloadToken((value) => value + 1)}>
                     再読み込み
@@ -663,18 +796,38 @@ export default function EditDialog({
               )}
             </div>
             <div className={page ? 'contents' : 'grid gap-3 md:grid-cols-2'}>
-              <label className="block">
-                <span className="text-ink-secondary text-xs">優先順位</span>
-                <select
-                  value={priority}
-                  onChange={(event) => setPriority(event.target.value)}
-                  className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm"
-                >
-                  {Array.from({ length: 14 }, (_, index) => index + 1).map((value) => (
-                    <option key={value} value={value}>{value}（高いほど先に判定）</option>
-                  ))}
-                </select>
-              </label>
+              {/*
+                R28: 順番は数字で打たせず、一覧の並びで決める。ここでは
+                実際の判定順（Worker と同じ・上から1つだけ動く）での位置と、
+                先に当たるかもしれないルールだけ出す。
+                m15c の共通 Select への1本化はフォルダ欄で活かす。
+              */}
+              <div className="block">
+                <span className="text-ink-secondary text-xs">動く順番</span>
+                <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+                  一覧の上から順に1つだけ動きます。
+                  {orderHint?.position != null && orderHint?.total != null
+                    ? `このルールは上から ${orderHint.position} 番目（全${orderHint.total}件中）です。`
+                    : draft.id
+                      ? '順番は一覧の「評価順」で入れ替えます。'
+                      : '新しく作るルールは、一覧のいちばん下に足されます。'}
+                </p>
+                {orderHint && orderHint.earlier.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-ink-secondary text-xs">このルールより先に当たるかもしれないルール</p>
+                    <ul className="text-ink-faint mt-1 list-disc space-y-0.5 pl-5 text-xs">
+                      {orderHint.earlier.slice(0, 3).map((rule) => (
+                        <li key={rule.id} className="truncate" title={rule.name}>
+                          {rule.name}
+                        </li>
+                      ))}
+                    </ul>
+                    {orderHint.earlierTotal > 3 && (
+                      <p className="text-ink-faint mt-0.5 text-xs">ほか {orderHint.earlierTotal - 3}件</p>
+                    )}
+                  </div>
+                )}
+              </div>
               <label className={page ? 'block xl:col-span-4' : 'block'}>
                 <span className="text-ink-secondary text-xs">社内メモ <span className="text-ink-faint">任意</span></span>
                 <textarea
@@ -703,8 +856,8 @@ export default function EditDialog({
                   <Button type="button" className="shrink-0 self-start" onClick={() => moveTo('trigger')}>反応条件を開く</Button>
                 </div>
                 <dl className="mt-4 grid gap-3">
-                  <div className="rounded-control bg-canvas-sunken p-3"><dt className="text-ink-faint text-xs">受信メッセージ</dt><dd className="text-ink mt-1 text-sm font-bold">{conditionSummary}</dd></div>
-                  <div className="rounded-control bg-canvas-sunken p-3"><dt className="text-ink-faint text-xs">時間帯</dt><dd className="text-ink mt-1 text-sm font-bold">{timeSummary}</dd></div>
+                  <div className="rounded-control bg-canvas-sunken p-3"><dt className="text-ink-faint text-xs">受信メッセージ</dt><dd className="text-ink mt-1 text-sm font-medium">{conditionSummary}</dd></div>
+                  <div className="rounded-control bg-canvas-sunken p-3"><dt className="text-ink-faint text-xs">時間帯</dt><dd className="text-ink mt-1 text-sm font-medium">{timeSummary}</dd></div>
                 </dl>
               </section>
               <section className="rounded-card border border-hairline p-4">
@@ -742,7 +895,7 @@ export default function EditDialog({
                 type="button"
                 aria-pressed={!respondToAll}
                 onClick={() => setRespondToAll(false)}
-                className={`rounded-control border px-3 py-1.5 text-xs ${!respondToAll ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                className={`rounded-control border px-3 py-1.5 text-xs ${!respondToAll ? 'border-accent bg-accent-soft text-ink font-medium' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
               >
                 キーワードで応答
               </button>
@@ -750,7 +903,7 @@ export default function EditDialog({
                 type="button"
                 aria-pressed={respondToAll}
                 onClick={() => setRespondToAll(true)}
-                className={`rounded-control border px-3 py-1.5 text-xs ${respondToAll ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                className={`rounded-control border px-3 py-1.5 text-xs ${respondToAll ? 'border-accent bg-accent-soft text-ink font-medium' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
               >
                 一律で応答
               </button>
@@ -771,7 +924,7 @@ export default function EditDialog({
                 {keywordRules.map((rule, index) => (
                   <div key={`keyword-${index}`} className="flex items-center gap-2">
                     {index > 0 && (
-                      <span className="text-ink-faint w-10 shrink-0 text-center text-xs font-bold">
+                      <span className="text-ink-faint w-10 shrink-0 text-center text-xs font-medium">
                         {keywordMatchMode === 'all' ? 'かつ' : 'または'}
                       </span>
                     )}
@@ -800,16 +953,16 @@ export default function EditDialog({
                           setKeyword(next[0]?.keyword ?? '')
                         }}
                       >
-                        削除
+                        削除する
                       </Button>
                     )}
                   </div>
                 ))}
                 <Button
                   type="button"
-                  onClick={() => setKeywordRules((current) => [...current, emptyKeywordRule()])}
+                  onClick={() => setKeywordRules((current) => [...current, emptyKeywordRule(matchType)])}
                 >
-                  ＋ キーワードを追加
+                  ＋ キーワードを追加する
                 </Button>
               </div>
             )}
@@ -829,7 +982,7 @@ export default function EditDialog({
                   type="button"
                   aria-pressed={keywordMatchMode === o.value}
                   onClick={() => setKeywordMatchMode(o.value)}
-                  className={`rounded-control border px-3 py-1.5 text-xs ${keywordMatchMode === o.value ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                  className={`rounded-control border px-3 py-1.5 text-xs ${keywordMatchMode === o.value ? 'border-accent bg-accent-soft text-ink font-medium' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
                   {o.label}
                 </button>
@@ -839,6 +992,15 @@ export default function EditDialog({
               「すべて」は絞り込みに使います。「予約」と「キャンセル」の両方が入った文にだけ
               返す、という形です。片方だけの問い合わせには返しません。
             </p>
+            {/*
+              R257: 異なる文言の完全一致をすべて必須にすると不成立になる。
+              条件を勝手に変えず、理由だけを知らせて保存は止めない。
+            */}
+            {exactAllMismatchNotice(keywordRules, keywordMatchMode) ? (
+              <Notice tone="warn" className="mb-3">
+                {exactAllMismatchNotice(keywordRules, keywordMatchMode)}
+              </Notice>
+            ) : null}
 
             <label className="text-ink-secondary mb-1 block text-xs">一致のしかた</label>
             <div className="flex gap-2">
@@ -847,8 +1009,8 @@ export default function EditDialog({
                   key={mt}
                   type="button"
                   aria-pressed={matchType === mt}
-                  onClick={() => setMatchType(mt)}
-                  className={`rounded-control border px-3 py-1.5 text-xs ${matchType === mt ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                  onClick={() => changeMatchType(mt)}
+                  className={`rounded-control border px-3 py-1.5 text-xs ${matchType === mt ? 'border-accent bg-accent-soft text-ink font-medium' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
                   {mt === 'exact' ? '完全一致' : '部分一致'}
                 </button>
@@ -856,7 +1018,7 @@ export default function EditDialog({
             </div>
           </div>
           {/* 返す条件。キーワードが合っても、ここに当てはまらなければ返さない。 */}
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
+          <div className="border-hairline space-y-3 rounded-control border p-3">
             <p className="text-ink text-sm font-semibold">2. いつ・誰に反応するか</p>
             <p className="text-ink-faint text-xs">
               複数のキーワードは、下の「すべて必須／どれか1つ」でつなぎ方を決めます。
@@ -865,33 +1027,63 @@ export default function EditDialog({
             <div>
               <p className="text-ink-faint mb-1.5 text-xs">応答する曜日</p>
               <div className="flex flex-wrap gap-1.5">
+                {/*
+                  R252: 「すべての曜日」は押す操作として明示する。
+                  空（何も選ばない）＝全曜日、という暗黙の読み替えを
+                  見た目に載せないと、最後の1つを外したときに全曜日へ
+                  広がって見える。
+                */}
+                <button
+                  type="button"
+                  aria-pressed={weekdays.length === 0}
+                  onClick={() => {
+                    setWeekdays([])
+                    setWeekdayNotice(null)
+                  }}
+                  className={`rounded-control border px-2.5 py-1 text-xs transition-colors ${
+                    weekdays.length === 0
+                      ? 'border-accent bg-accent-soft text-ink font-bold'
+                      : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                  }`}
+                >
+                  すべての曜日
+                </button>
                 {WEEKDAY_LABELS.map((label, day) => {
                   const on = weekdays.length === 0 || weekdays.includes(day)
                   return (
-                    <button
-                      key={day}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => {
+                    <Button variant="secondary" className={(`rounded-control border px-2.5 py-1 text-xs transition-colors ${
+                        on
+                          ? 'border-accent bg-accent-soft text-ink'
+                          : 'border-hairline text-ink-faint'
+                      }`) + ' h-auto whitespace-normal'} key={day} type="button" aria-pressed={on} onClick={() => {
                         // 何も選ばない＝すべての曜日。最初の1つを押したときは
                         // 「その曜日だけ」にする（全部入りから1つ外す、ではない）。
                         if (weekdays.length === 0) {
                           setWeekdays([day])
+                          setWeekdayNotice(null)
                           return
                         }
-                        const next = weekdays.includes(day)
-                          ? weekdays.filter((d) => d !== day)
-                          : [...weekdays, day].sort((a, b) => a - b)
-                        setWeekdays(next)
-                      }}
-                      className={`rounded-control border px-2.5 py-1 text-xs transition-colors ${
-                        on
-                          ? 'border-accent bg-accent-soft text-ink'
-                          : 'border-hairline text-ink-faint'
-                      }`}
-                    >
+                        if (weekdays.includes(day)) {
+                          /*
+                           * 最後の1つは外さない。外すと空＝全曜日になり、
+                           * 減らすつもりの操作で対象が広がる（R252）。
+                           * 受信元の選択（最後の1つは残す）と同じ扱い。
+                           */
+                          if (weekdays.length === 1) {
+                            setWeekdayNotice(
+                              '曜日は1つ以上必要です。すべてにする場合は「すべての曜日」を押してください。',
+                            )
+                            return
+                          }
+                          setWeekdays(weekdays.filter((d) => d !== day))
+                          setWeekdayNotice(null)
+                          return
+                        }
+                        setWeekdays([...weekdays, day].sort((a, b) => a - b))
+                        setWeekdayNotice(null)
+                      }}>
                       {label}
-                    </button>
+                    </Button>
                   )
                 })}
               </div>
@@ -900,27 +1092,27 @@ export default function EditDialog({
                   ? 'すべての曜日で応答します。'
                   : `${weekdays.map((d) => WEEKDAY_LABELS[d]).join('・')}曜だけ応答します。`}
               </p>
+              {weekdayNotice ? (
+                <p role="status" className="text-ink-secondary mt-1 text-[11px]">
+                  {weekdayNotice}
+                </p>
+              ) : null}
             </div>
 
             {!page && <div>
-              <p className="text-ink-faint mb-1.5 text-xs">祝日</p>
-              <div className="space-y-1">
+              <RadioCardGroup legend="祝日">
                 {HOLIDAY_RULE_LABELS.map((option) => (
-                  <label key={option.value} className="flex cursor-pointer items-start gap-2">
-                    <input
-                      type="radio"
-                      name="ar-holiday"
-                      checked={holidayRule === option.value}
-                      onChange={() => setHolidayRule(option.value)}
-                      className="mt-0.5"
-                    />
-                    <span className="text-sm">
-                      {option.label}
-                      <span className="text-ink-faint block text-[11px]">{option.hint}</span>
-                    </span>
-                  </label>
+                  <RadioCard
+                    key={option.value}
+                    name="ar-holiday"
+                    value={option.value}
+                    checked={holidayRule === option.value}
+                    onChange={() => setHolidayRule(option.value)}
+                    title={option.label}
+                    note={option.hint}
+                  />
                 ))}
-              </div>
+              </RadioCardGroup>
             </div>}
 
             <div className="flex flex-wrap items-end gap-3">
@@ -929,20 +1121,19 @@ export default function EditDialog({
                   時間帯（JST）
                 </label>
                 <div className="flex items-center gap-1.5">
-                  <input
+                  <TimeField
                     id="ar-from"
-                    type="time"
                     value={activeFrom}
-                    onChange={(e) => setActiveFrom(e.target.value)}
-                    className="border-hairline rounded-control border px-2 py-1.5 text-sm"
+                    onChange={setActiveFrom}
+                    aria-label="時間帯の始まり"
+                    className="w-32"
                   />
                   <span className="text-ink-faint text-xs">〜</span>
-                  <input
+                  <TimeField
                     aria-label="時間帯の終わり"
-                    type="time"
                     value={activeUntil}
-                    onChange={(e) => setActiveUntil(e.target.value)}
-                    className="border-hairline rounded-control border px-2 py-1.5 text-sm"
+                    onChange={setActiveUntil}
+                    className="w-32"
                   />
                 </div>
               </div>
@@ -977,10 +1168,11 @@ export default function EditDialog({
                 {MESSAGE_KIND_WORDS.map(({ key, label }) => {
                   const on = messageKinds.length === 0 || messageKinds.includes(key)
                   return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() =>
+                    <Button variant="primary" className={(`rounded-pill px-2.5 py-1 text-xs transition-colors ${
+                        on
+                          ? 'bg-accent-deep text-on-accent'
+                          : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                      }`) + ' border-0 h-auto whitespace-normal'} key={key} type="button" aria-pressed={on} onClick={() =>
                         setMessageKinds((prev) => {
                           // 何も選んでいない状態は「全部」を意味する。そこから
                           // 1つ外すには、いったん全部を入れてから外す。
@@ -989,15 +1181,9 @@ export default function EditDialog({
                             ? base.filter((k) => k !== key)
                             : [...base, key]
                         })
-                      }
-                      className={`rounded-pill px-2.5 py-1 text-xs transition-colors ${
-                        on
-                          ? 'bg-accent-deep text-on-accent'
-                          : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                      }`}
-                    >
+                      }>
                       {label}
-                    </button>
+                    </Button>
                   )
                 })}
               </div>
@@ -1013,17 +1199,16 @@ export default function EditDialog({
                   {([['line', 'LINE'], ['email', 'メール']] as const).map(([source, label]) => {
                     const checked = receiveSources.includes(source)
                     return (
-                      <label key={source} className="border-hairline rounded-control flex items-center gap-2 border px-3 py-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => setReceiveSources((current) => {
-                            if (checked) return current.length === 1 ? current : current.filter((item) => item !== source)
-                            return [...current, source]
-                          })}
-                        />
+                      <Checkbox
+                        key={source}
+                        checked={checked}
+                        onCheckedChange={() => setReceiveSources((current) => {
+                          if (checked) return current.length === 1 ? current : current.filter((item) => item !== source)
+                          return [...current, source]
+                        })}
+                      >
                         {label}
-                      </label>
+                      </Checkbox>
                     )
                   })}
                 </div>
@@ -1040,7 +1225,7 @@ export default function EditDialog({
                       ? <span className="text-ink-faint">受信なし</span>
                       : draft.receiveSourceCounts.map((item) => (
                         <span key={item.source} className="bg-canvas-sunken rounded-pill px-2 py-1 text-xs">
-                          {messageKindWord(item.source)} {item.count.toLocaleString()}件
+                          {messageKindWord(item.source)} {formatNumber(item.count)}件
                         </span>
                       ))}
                 </div>
@@ -1048,53 +1233,32 @@ export default function EditDialog({
               </div>
             )}
 
-            {!page && <label className="flex cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                checked={skipWhenOperatorActive}
-                onChange={(e) => setSkipWhenOperatorActive(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span className="text-ink-secondary text-xs">
-                担当者が対応中のトークでは返さない
-                <span className="text-ink-faint block text-[11px]">
-                  「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。
-                  未対応のまま放置されているトークには返します。
-                  予約・支払いなどの自動通知は別の送信経路なので止まりません。
-                </span>
-              </span>
-            </label>}
+            {!page && <Checkbox
+              checked={skipWhenOperatorActive}
+              onCheckedChange={setSkipWhenOperatorActive}
+              description="「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。未対応のまま放置されているトークには返します。予約・支払いなどの自動通知は別の送信経路なので止まりません。"
+            >
+              担当者が対応中のトークでは返さない
+            </Checkbox>}
 
             {!page && <div>
-              <p className="text-ink-faint mb-1.5 text-xs">応答する回数</p>
-              <div className="space-y-1">
-                <label className="flex cursor-pointer items-start gap-2">
-                  <input
-                    type="radio"
-                    name="ar-once"
-                    checked={!oncePerFriend}
-                    onChange={() => setOncePerFriend(false)}
-                    className="mt-0.5"
-                  />
-                  <span className="text-sm">何度でも応答する</span>
-                </label>
-                <label className="flex cursor-pointer items-start gap-2">
-                  <input
-                    type="radio"
-                    name="ar-once"
-                    checked={oncePerFriend}
-                    onChange={() => setOncePerFriend(true)}
-                    className="mt-0.5"
-                  />
-                  <span className="text-sm">
-                    1人につき1回だけ応答する
-                    <span className="text-ink-faint block text-[11px]">
-                      このルールで一度応答した人には、以後どのキーワードでも応答しません。
-                      上の「連投を防ぐ」は時間をあけるだけですが、こちらは二度と応答しません。
-                    </span>
-                  </span>
-                </label>
-              </div>
+              <RadioCardGroup legend="応答する回数">
+                <RadioCard
+                  name="ar-once"
+                  value="many"
+                  checked={!oncePerFriend}
+                  onChange={() => setOncePerFriend(false)}
+                  title="何度でも応答する"
+                />
+                <RadioCard
+                  name="ar-once"
+                  value="once"
+                  checked={oncePerFriend}
+                  onChange={() => setOncePerFriend(true)}
+                  title="1人につき1回だけ応答する"
+                  note="このルールで一度応答した人には、以後どのキーワードでも応答しません。上の「連投を防ぐ」は時間をあけるだけですが、こちらは二度と応答しません。"
+                />
+              </RadioCardGroup>
             </div>}
 
             <div>
@@ -1131,7 +1295,7 @@ export default function EditDialog({
                   />
                   <p className="text-ink-faint mt-1 text-xs">条件を入れないと、全員に応答します。</p>
                   <div className="bg-canvas-sunken mt-3 rounded-control p-3 text-xs">
-                    <p className="text-ink font-medium">この条件に当たった受信</p>
+                    <p className="text-ink font-semibold">この条件に当たった受信</p>
                     <p className="text-ink-faint mt-1">過去28日の受信に、この条件をあてはめた結果です。これから来る受信の件数ではありません。</p>
                     <p className="text-ink-faint mt-2">標準互換15軸：名前・個別メモ・ステータスメッセージ・友だち登録日・タグ・友だち情報・シナリオ・イベント予約・カレンダー予約・共通情報・リマインダ・回答フォーム・最終反応日・その他・対応マーク</p>
                     <p className="text-ink-faint mt-1">この画面だけの6軸：担当者・流入経路・配信状況・予約状況・購入履歴・ブロック状態</p>
@@ -1163,7 +1327,7 @@ export default function EditDialog({
                   type="button"
                   aria-pressed={mode === key}
                   onClick={() => setMode(key)}
-                  className={`rounded-control border px-3 py-1.5 text-xs ${mode === key ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                  className={`rounded-control border px-3 py-1.5 text-xs ${mode === key ? 'border-accent bg-accent-soft text-ink font-medium' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
                   {label}
                 </button>
@@ -1178,35 +1342,23 @@ export default function EditDialog({
           {mode === 'template' && (
             <div className={page ? 'rounded-card border-hairline space-y-3 border bg-canvas-sunken p-3' : ''}>
               <label htmlFor="auto-reply-template" className="text-ink-secondary mb-1 block text-xs">テンプレート</label>
-              <select
+              {/*
+                共通の選び欄は束見出しを持てないため、種類を名前の頭に付けて
+                1列に並べる（カード／テキスト／画像の区別は残す）。
+              */}
+              <Select
                 id="auto-reply-template"
+                aria-label="テンプレート"
                 value={templateId ?? ''}
-                onChange={(e) => setTemplateId(e.target.value || null)}
-                className="border-hairline rounded-control focus:ring-accent w-full border bg-canvas px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-              >
-                <option value="">-- 選択 --</option>
-                {flexTemplates.length > 0 && (
-                  <optgroup label="カード">
-                    {flexTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {textTemplates.length > 0 && (
-                  <optgroup label="テキスト">
-                    {textTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {imageTemplates.length > 0 && (
-                  <optgroup label="画像">
-                    {imageTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
+                onChange={(value) => setTemplateId(value || null)}
+                options={[
+                  { value: '', label: '-- 選択 --' },
+                  ...flexTemplates.map((t) => ({ value: t.id, label: `カード：${t.name}` })),
+                  ...textTemplates.map((t) => ({ value: t.id, label: `テキスト：${t.name}` })),
+                  ...imageTemplates.map((t) => ({ value: t.id, label: `画像：${t.name}` })),
+                ]}
+                size="full"
+              />
               {templates.length === 0 && (
                 <p className="text-warning mt-1 text-xs">
                   テンプレートがありません。<a href="/templates" className="underline">/templates</a> で作成してください。
@@ -1295,24 +1447,10 @@ export default function EditDialog({
               返信はしません。応答したときに実行する処理だけを下で設定します。
             </p>
           )}
-          {!page && <div>
-            <label htmlFor="ar-priority" className="text-ink-faint mb-1 block text-xs">
-              評価順
-            </label>
-            <input
-              id="ar-priority"
-              type="number"
-              min={-9999}
-              max={9999}
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="border-hairline rounded-control w-24 border px-2 py-1.5 text-sm tabular-nums"
-            />
-            <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">
-              小さいほど先に見ます。上から順に見て、最初に当てはまった1つだけが動きます。
-              間に挿し込めるよう、10・20・30 のように間を空けておくと後で楽です。
-            </p>
-          </div>}
+          {/*
+            R28: 評価順の数字入力は置かない（基本設定の「動く順番」に一本化）。
+            順番を変えるときは一覧の「評価順」で上下を入れ替える。
+          */}
 
 
           {/*
@@ -1320,7 +1458,7 @@ export default function EditDialog({
            * ページ表示に置いていた見本の文章と処理の無い追加ボタンは、実設定と
            * 見分けが付かないので、ダイアログと同じ実編集部品へ結び付ける（U003）。
            */}
-          <div className={page ? 'border-hairline rounded-card space-y-3 border p-4' : 'border-hairline space-y-3 rounded-lg border p-3'}>
+          <div className={page ? 'border-hairline rounded-card space-y-3 border p-4' : 'border-hairline space-y-3 rounded-control border p-3'}>
             <div>
               <p className="text-ink text-sm font-semibold">
                 {page ? '配信後のアクション' : '4. 応答したときに行うこと'}
@@ -1345,17 +1483,19 @@ export default function EditDialog({
             <div className="border-hairline grid gap-3 rounded-card border p-4 md:grid-cols-2">
               <label className="block">
                 <span className="text-ink-secondary text-xs">返信を待つ時間</span>
-                <select
+                <Select
+                  aria-label="返信を待つ時間"
                   value={replyDelaySeconds}
-                  onChange={(event) => setReplyDelaySeconds(event.target.value)}
-                  className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm"
-                >
-                  <option value="0">すぐに返信</option>
-                  <option value="10">10秒後</option>
-                  <option value="30">30秒後</option>
-                  <option value="60">1分後</option>
-                  <option value="300">5分後</option>
-                </select>
+                  onChange={setReplyDelaySeconds}
+                  options={[
+                    { value: '0', label: 'すぐに返信' },
+                    { value: '10', label: '10秒後' },
+                    { value: '30', label: '30秒後' },
+                    { value: '60', label: '1分後' },
+                    { value: '300', label: '5分後' },
+                  ]}
+                  size="full"
+                />
               </label>
               <label className="block">
                 <span className="text-ink-secondary text-xs">同じ人への連続返信</span>
@@ -1384,36 +1524,24 @@ export default function EditDialog({
                 </div>
               </div>
               <div className="md:col-span-2">
-                <label className="flex cursor-pointer items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={skipWhenOperatorActive}
-                    onChange={(event) => setSkipWhenOperatorActive(event.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                  />
-                  <span className="text-ink-secondary text-xs">
-                    担当者が対応中のトークでは返さない
-                    <span className="text-ink-faint block text-xs">
-                      「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。
-                      未対応のまま放置されているトークには返します。
-                      予約・支払いなどの自動通知は別の送信経路なので止まりません。
-                    </span>
-                  </span>
-                </label>
+                <Checkbox
+                  checked={skipWhenOperatorActive}
+                  onCheckedChange={setSkipWhenOperatorActive}
+                  description="「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。未対応のまま放置されているトークには返します。予約・支払いなどの自動通知は別の送信経路なので止まりません。"
+                >
+                  担当者が対応中のトークでは返さない
+                </Checkbox>
               </div>
             </div>
           )}
 
           {draft.id ? (
-            <label className="inline-flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span className="text-ink-secondary text-xs">この応答をオンにする</span>
-            </label>
+            <Checkbox
+              checked={isActive}
+              onCheckedChange={setIsActive}
+            >
+              この応答をオンにする
+            </Checkbox>
           ) : (
             // AUTOREPLY-08: 新しい応答は止まった状態で保存される。
             // 有効化は一覧の「再開」や公開前の確認から、別の操作で行う。
@@ -1424,9 +1552,50 @@ export default function EditDialog({
           </section>
             </>
           ) : null}
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <p className="text-xs text-danger">{error}</p>}
+          {conflictInfo && (
+            <Notice tone="warn">
+              <p>ほかの担当者の保存が先に入っています。あなたの入力は消えていません。</p>
+              <Disclosure size="compact" title="先に保存された内容と比べる">
+                <dl className="mt-2 space-y-1 text-xs">
+                  <div className="flex gap-2">
+                    <dt className="text-ink-faint shrink-0">言葉</dt>
+                    <dd className="text-ink font-medium">{conflictInfo.keyword || '—'}</dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="text-ink-faint shrink-0">返信</dt>
+                    <dd className="text-ink whitespace-pre-wrap font-medium">
+                      {conflictInfo.responseContent || '—'}
+                    </dd>
+                  </div>
+                </dl>
+              </Disclosure>
+              <div className="mt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => window.location.reload()}
+                >
+                  最新の状態を読み直す
+                </Button>
+              </div>
+            </Notice>
+          )}
+          {draftSaved && draft.id && (
+            <Notice
+              tone="info"
+              message="稼働中の定義は変えていません。下書きに保存しました。競合の確認・テストを経て公開してください。"
+              action={
+                <Button type="button" href={`/auto-replies/publish?id=${encodeURIComponent(draft.id)}`}>
+                  公開フローへ進む
+                </Button>
+              }
+              onClose={() => onSaved()}
+            />
+          )}
         </div>
-        {!page && <StickyBar className="mx-5 mb-4" actions={stickyActions} />}
+        {/* ★V7: 窓の中身だけをスクロールさせ、保存の段は窓の下に固定する。 */}
+        {!page && <StickyBar className="mx-5 mb-4 shrink-0" actions={stickyActions} />}
       </div>
       {page && (
         /*
@@ -1453,38 +1622,38 @@ export default function EditDialog({
               {step === 'trigger' ? 'この条件の判定' : step === 'response' ? '返信の設定' : '設定内容'}
             </h3>
             <dl className="divide-hairline mt-3 divide-y text-xs">
-              <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">状態</dt><dd className="text-ink font-medium">{isActive ? '有効' : '停止中'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">状態</dt><dd className="text-ink font-semibold">{isActive ? '有効' : '停止中'}</dd></div>
               {step === 'basic' && (
                 <>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">優先順位</dt><dd className="text-ink font-medium">{priority || '未入力'}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">過去28日の応答</dt><dd className="text-ink font-medium">{draft.matchedLast28Days == null ? '—（未取得）' : `${draft.matchedLast28Days}件`}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">同時に当たるルール</dt><dd className="text-ink font-medium">{draft.conflictAttentionCount == null ? '—（未取得）' : draft.conflictAttentionCount === 0 ? 'なし' : `${draft.conflictAttentionCount}件`}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">動く順番</dt><dd className="text-ink font-semibold">{orderHint?.position != null && orderHint?.total != null ? `上から ${orderHint.position} 番目` : '一覧の「評価順」のとおり'}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">過去28日の応答</dt><dd className="text-ink font-semibold">{draft.matchedLast28Days == null ? '—（未取得）' : `${draft.matchedLast28Days}件`}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">同時に当たるルール</dt><dd className="text-ink font-semibold">{draft.conflictAttentionCount == null ? '—（未取得）' : draft.conflictAttentionCount === 0 ? 'なし' : `${draft.conflictAttentionCount}件`}</dd></div>
                 </>
               )}
               {step === 'trigger' && (
                 <>
                   <div className="py-3"><dt className="text-ink-faint">受信メッセージ</dt><dd className="text-ink mt-1 font-medium">{conditionSummary}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">曜日・時間</dt><dd className="text-ink font-medium">{timeSummary}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">相手</dt><dd className="text-ink font-medium">{friendConditions ? '条件あり' : 'すべての友だち'}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">28日間の一致</dt><dd className="text-ink font-medium">{draft.matchedLast28Days == null ? '—（未取得）' : `${draft.matchedLast28Days}件`}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">曜日・時間</dt><dd className="text-ink font-semibold">{timeSummary}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">相手</dt><dd className="text-ink font-semibold">{friendConditions ? '条件あり' : 'すべての友だち'}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">28日間の一致</dt><dd className="text-ink font-semibold">{draft.matchedLast28Days == null ? '—（未取得）' : `${draft.matchedLast28Days}件`}</dd></div>
                 </>
               )}
               {step === 'response' && (
                 <>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">返信</dt><dd className="text-ink font-medium">{responseSummary}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">実行すること</dt><dd className="text-ink font-medium">{actions.length}件</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">連続返信</dt><dd className="text-ink font-medium">{cooldown ? `${cooldown}分あける` : '制限なし'}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">待ち時間</dt><dd className="text-ink font-medium">{replyDelaySummary}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">対応中のトーク</dt><dd className="text-ink font-medium">{skipWhenOperatorActive ? '返さない' : '返す'}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">不一致時</dt><dd className="text-ink font-medium">{unmatchedSummary}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">返信</dt><dd className="text-ink font-semibold">{responseSummary}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">実行すること</dt><dd className="text-ink font-semibold">{actions.length}件</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">連続返信</dt><dd className="text-ink font-semibold">{cooldown ? `${cooldown}分あける` : '制限なし'}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">待ち時間</dt><dd className="text-ink font-semibold">{replyDelaySummary}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">対応中のトーク</dt><dd className="text-ink font-semibold">{skipWhenOperatorActive ? '返さない' : '返す'}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">不一致時</dt><dd className="text-ink font-semibold">{unmatchedSummary}</dd></div>
                 </>
               )}
             </dl>
           </div>
           {step !== 'trigger' && (
-            <div style={{ minHeight: 388 }} className={`bg-line-preview overflow-hidden rounded-card border-hairline border ${step === 'response' ? 'order-1' : 'order-2'}`}>
-              <p className="text-on-accent py-4 text-center text-sm font-semibold">LINEプレビュー</p>
-              <div className="bg-canvas mx-4 mb-4 rounded-card p-4 text-sm leading-relaxed text-ink">
+            <div style={{ minHeight: 388 }} className={step === 'response' ? 'order-1' : 'order-2'}>
+            <LinePreview>
+              <div className="rounded-card bg-canvas p-4 text-sm leading-relaxed text-ink">
                 {mode === 'silent'
                   ? '返信はせず、設定したアクションだけを実行します。'
                   : mode === 'template'
@@ -1512,13 +1681,13 @@ export default function EditDialog({
                         : responseContent || '返信内容を入力すると、ここに表示されます。'}
               </div>
               {step === 'response' && (
-                <div className="mx-4 mb-4 rounded-card bg-canvas p-3">
+                <div className="rounded-card mt-3 bg-canvas p-3">
                   <p className="text-ink-faint text-micro">表示見本 — ボタン付きメッセージの見え方</p>
                   <div className="mt-2 space-y-1.5" aria-hidden="true">
                     {['予約を確認', '日程を変更', 'キャンセル'].map((label) => (
                       <p
                         key={label}
-                        className="border-line-answer text-line-answer rounded-control border py-1.5 text-center text-xs font-bold"
+                        className="border-line-answer text-line-answer rounded-control border py-1.5 text-center text-xs font-medium"
                       >
                         {label}
                       </p>
@@ -1526,14 +1695,15 @@ export default function EditDialog({
                   </div>
                 </div>
               )}
+            </LinePreview>
             </div>
           )}
           <div className="order-3 bg-canvas rounded-card border-hairline border p-4 text-xs">
             <p className="text-ink font-semibold">{step === 'trigger' ? '過去28日の受信' : '動作の確認'}</p>
             {step === 'trigger' ? (
               <>
-                <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{draft.matchedLast28Days == null ? '—' : `${draft.matchedLast28Days.toLocaleString()}件`}</p>
-                <p className="text-ink-faint mt-1 leading-relaxed">{receiveCount == null ? '受信総数は未取得です。' : `受信 ${receiveCount.toLocaleString()}件の実測集計です。`}</p>
+                <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{draft.matchedLast28Days == null ? '—' : `${formatNumber(draft.matchedLast28Days)}件`}</p>
+                <p className="text-ink-faint mt-1 leading-relaxed">{receiveCount == null ? '受信総数は未取得です。' : `受信 ${formatNumber(receiveCount)}件の実測集計です。`}</p>
                 <p className="text-ink-faint mt-3 leading-relaxed">利用できる条件：タグ・友だち情報・シナリオ・予約・流入経路・対応状況など</p>
               </>
             ) : (

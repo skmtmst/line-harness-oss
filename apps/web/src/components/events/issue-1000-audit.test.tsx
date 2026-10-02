@@ -43,6 +43,23 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 vi.mock('@/components/shared/image-uploader', () => ({ default: () => null }))
 
+/*
+ * 時刻の選び欄は共通 Select（listbox）。ここで見たいのは選んだ後の
+ * 予約枠の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 let host: HTMLDivElement, root: Root
 const ev = { ...EVENT_DEFAULT_DRAFT, id: 'event-1', name: 'Audit Event' }
 const old = {
@@ -78,10 +95,52 @@ async function render(step: 1 | 2 | 3, eventId: string | null = 'event-1') {
   await act(async () => root.render(<EventWizard accountId="account-a" eventId={eventId} step={step} />))
 }
 async function change(id: string, value: string) {
-  await act(async () => { fireEvent.change(host.querySelector('#' + id)!, { target: { value } }) })
+  await act(async () => { fireEvent.change(document.querySelector('#' + id)!, { target: { value } }) })
+}
+
+/** 日付の選択（★V7）で YYYY-MM-DD を選ぶ。値は今までどおりの文字列。 */
+async function pickDate(id: string, iso: string) {
+  const [y, mo, d] = iso.split('-').map(Number)
+  const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
+  await act(async () => { fireEvent.click(document.querySelector('#' + id)!) })
+  for (let i = 0; i < 36; i += 1) {
+    const grid = document.querySelector('[role="grid"]')
+    const label = grid?.getAttribute('aria-label')
+    if (label === `${y}年${mo}月`) break
+    const target = y * 12 + mo
+    const currentLabel = /^(\d+)年(\d+)月$/.exec(label ?? '')
+    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : target
+    const nav = [...document.querySelectorAll('button')].find(
+      (b) => b.getAttribute('aria-label') === (target > current ? '次の月' : '前の月'),
+    )!
+    await act(async () => { fireEvent.click(nav) })
+  }
+  const day = [...document.querySelectorAll('button')].find((b) =>
+    (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
+  )!
+  await act(async () => { fireEvent.click(day) })
+}
+
+/** 時刻の選択（★V7）で HH:mm を選ぶ。 */
+async function pickTime(id: string, hhmm: string) {
+  const [hour, minute] = hhmm.split(':')
+  await act(async () => { fireEvent.click(document.querySelector('#' + id)!) })
+  const picker = document.querySelector('[role="dialog"][aria-label="時刻を選ぶ"]')!
+  await act(async () => {
+    fireEvent.change(picker.querySelector('select[aria-label="時"]')!, { target: { value: hour } })
+    fireEvent.change(picker.querySelector('select[aria-label="分"]')!, { target: { value: minute } })
+  })
+}
+
+/** 日付の選択を空にする。 */
+async function clearDate(id: string) {
+  await act(async () => { fireEvent.click(document.querySelector('#' + id)!) })
+  const dialog = document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!
+  const clear = [...dialog.querySelectorAll('button')].find((b) => b.textContent?.trim() === '消す')!
+  await act(async () => { fireEvent.click(clear) })
 }
 async function click(text: string) {
-  const b = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === text)!
+  const b = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === text)!
   expect(b).toBeTruthy()
   await act(async () => b.click())
 }
@@ -101,7 +160,7 @@ it('D08: 定員0では作成/更新APIを一切呼ばない', async () => {
 it('D08: 日付が空でも作成/更新APIを呼ばない', async () => {
   await render(1, null)
   await change('ev-name', 'Audit Event')
-  await change('first-slot-date', '')
+  await clearDate('first-slot-date')
   await click('概要を保存して次へ')
   expect(host.textContent).toContain('開催日と開始時刻を入力してください')
   expect(st.createEvent).not.toHaveBeenCalled()
@@ -120,12 +179,12 @@ it('D08: 所要時間が不正でも作成/更新APIを呼ばない', async () =
 
 it('D09: 早い日時の枠を追加して次へ進んでも既存枠を書き換えない', async () => {
   await render(2)
-  await change('slot-date', '2026-09-21')
-  await change('slot-start', '10:00')
-  await change('slot-end', '11:00')
+  await pickDate('slot-date', '2026-09-21')
+  await pickTime('slot-start', '10:00')
+  await pickTime('slot-end', '11:00')
   await change('slot-cap', '7')
   st.listSlots.mockResolvedValue({ items: [early, old] })
-  await click('この枠を追加')
+  await click('この枠を追加する')
   await click('保存して公開設定へ')
   // ②→③の保存はイベント設定だけ。枠一覧の追加とは分離し、
   // slots[0](=追加した早い枠)へ古い枠の日時・定員を送らない。
@@ -135,12 +194,12 @@ it('D09: 早い日時の枠を追加して次へ進んでも既存枠を書き�
 
 it('D09: ①に戻って保存しても、更新先は概要段階で確定した枠IDだけ', async () => {
   await render(2)
-  await change('slot-date', '2026-09-21')
-  await change('slot-start', '10:00')
-  await change('slot-end', '11:00')
+  await pickDate('slot-date', '2026-09-21')
+  await pickTime('slot-start', '10:00')
+  await pickTime('slot-end', '11:00')
   await change('slot-cap', '7')
   st.listSlots.mockResolvedValue({ items: [early, old] })
-  await click('この枠を追加')
+  await click('この枠を追加する')
   // ①へ戻って保存。firstSlotの値は old-slot から読んだものなので、
   // 早い枠(early-slot)ではなく old-slot へだけ送る。
   await render(1, 'event-1')
@@ -149,6 +208,7 @@ it('D09: ①に戻って保存しても、更新先は概要段階で確定し�
   expect(st.updateSlot).toHaveBeenCalledWith(
     'account-a', 'event-1', 'old-slot',
     expect.objectContaining({ starts_at: old.starts_at, ends_at: old.ends_at, capacity: 12 }),
+    1,
   )
 })
 
@@ -156,16 +216,16 @@ it('D11: 一括追加の途中失敗後は、残りだけを再送する', async
   await render(2)
   // 3枠をまとめて追加する下見を作る。初期曜日は土日のみなので木・金を足し、
   // 10/1(木)・10/2(金)・10/3(土)が一致するようにする。
-  await change('bulk-start', '2026-10-01')
-  await change('bulk-end', '2026-10-03')
+  await pickDate('bulk-start', '2026-10-01')
+  await pickDate('bulk-end', '2026-10-03')
   for (const label of ['木', '金']) {
-    const b = Array.from(host.querySelectorAll('button')).find((x) => x.textContent?.trim() === label)!
+    const b = Array.from(document.querySelectorAll('button')).find((x) => x.textContent?.trim() === label)!
     await act(async () => b.click())
   }
   // 時間帯を90分ちょうどにして1日1枠にする。
-  await change('band-end', '15:30')
+  await pickTime('band-end', '15:30')
   await change('bulk-cap', '10')
-  await click('まとめて追加')
+  await click('まとめて追加する')
   // 確認ダイアログは document.body への portal で描かれる。
   expect(document.body.textContent).toContain('3件の予約枠を追加しますか？')
 
@@ -174,7 +234,7 @@ it('D11: 一括追加の途中失敗後は、残りだけを再送する', async
     new EventSlotsPartialError('1件まで追加されました', [early]),
   )
   const dialogClick = async (text: string) => {
-    const b = Array.from(document.body.querySelectorAll('button'))
+    const b = Array.from(document.body.querySelectorAll('[role="dialog"] button, [role="alertdialog"] button'))
       .find((x) => x.textContent?.trim() === text)!
     expect(b).toBeTruthy()
     await act(async () => b.click())

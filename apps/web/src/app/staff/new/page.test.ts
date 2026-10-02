@@ -21,4 +21,8 @@ describe('店舗側のユーザー追加', () => {
     expect(source).toContain('/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/')
     expect(source).toContain('担当範囲は')
   })
+  it('メールアドレスは254文字までで保存前に止める（M959）', () => {
+    expect(source).toContain('254')
+    expect(source).toContain('maxLength')
+  })
 })

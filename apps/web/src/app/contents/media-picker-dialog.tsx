@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Pagination from '@/components/shared/pagination'
+import ListState from '@/components/shared/list-state'
 import { TextField } from '@/components/shared/text-field'
 
 /** 1ページに並べる候補数。検索と併用するので多すぎない数に抑える。 */
@@ -121,11 +122,6 @@ export default function MediaPickerDialog({
       title={title}
       description={description ?? '登録済みのメディアから選んで、この画面の設定へ反映します。'}
       onCancel={onClose}
-      footer={
-        <div className="flex justify-end">
-          <Button type="button" onClick={onClose}>閉じる</Button>
-        </div>
-      }
     >
       <div className="space-y-3" data-qa-media-picker>
         <form
@@ -146,26 +142,32 @@ export default function MediaPickerDialog({
         </form>
 
         {phase === 'loading' ? (
-          <p className="text-ink-faint py-6 text-center text-xs" role="status">
-            メディアを読み込んでいます…
-          </p>
+          <ListState kind="loading" title="メディアを読み込んでいます" />
         ) : phase === 'error' ? (
-          <div className="py-6 text-center">
-            <p className="text-danger text-xs" role="alert">
-              メディアを読み込めませんでした。通信状態を確認して、もう一度お試しください。
-            </p>
-            <Button type="button" className="mt-3" onClick={() => setReloadKey((key) => key + 1)}>
-              読み直す
-            </Button>
-          </div>
+          <ListState
+            kind="error"
+            title="メディアを読み込めませんでした"
+            description="通信状態を確認して、もう一度お試しください。"
+            onRetry={() => setReloadKey((key) => key + 1)}
+          />
         ) : phase === 'empty' ? (
-          <p className="text-ink-faint py-6 text-center text-xs">
-            {accountId
-              ? query
-                ? `「${query}」に合うメディアが見つかりませんでした。`
-                : '選べるメディアがまだありません。先に登録メディアへ追加してください。'
-              : '上のバーでLINE公式アカウントを選んでください。'}
-          </p>
+          <ListState
+            kind="empty"
+            title={
+              accountId
+                ? query
+                  ? `「${query}」に合うメディアが見つかりませんでした`
+                  : '選べるメディアがまだありません'
+                : 'LINE公式アカウントを選んでください'
+            }
+            description={
+              accountId
+                ? query
+                  ? '検索語を変えてください。'
+                  : '先に登録メディアへ追加してください。'
+                : '上のバーで選ぶと、ここに並びます。'
+            }
+          />
         ) : (
           <>
             <ul

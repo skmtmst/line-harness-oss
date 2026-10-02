@@ -160,7 +160,8 @@ function analyzeCompoundBlocks(text: string): CompoundBlockResult[] {
 }
 
 describe(`実行時SQLの compound SELECT が D1 の上限(${D1_MAX_COMPOUND_SELECT_TERMS}項)を超えない`, () => {
-  test('apps/worker/src・packages/db/src 配下（試験を除く）を走査して、超えるものが無いことを確かめる', () => {
+  // 545件超のTSをAST走査するためCIの並列負荷で5秒既定を超えることがある。判定は変えず制限だけ延ばす。
+  test('apps/worker/src・packages/db/src 配下（試験を除く）を走査して、超えるものが無いことを確かめる', { timeout: 30000 }, () => {
     const violations: string[] = [];
     for (const root of SCAN_ROOTS) {
       const files = listSourceFiles(root.dir);

@@ -3,9 +3,12 @@
 import { Images, Plus, Sparkles, Upload, X } from 'lucide-react'
 import { useId, useRef, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
-import SelectField from '@/components/shared/select-field'
+import HelpTip from '@/components/shared/help-tip'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import {
+  CROP_POSITION_OPTIONS,
   CUSTOM_PROMPT_MAX,
   FREE_PROMPT_MAX,
   MAIN_COLOR_SWATCHES,
@@ -16,6 +19,7 @@ import {
   isHexColor,
   presetOptionLabel,
   tileCaption,
+  type BannerCropPosition,
   type BannerGenerationInput,
   type BannerImage,
   type BannerPreset,
@@ -70,41 +74,72 @@ export default function GenerationPanel({
       style={{ maxWidth: 390 }}
       aria-label="画像を生成"
     >
-      <div className="flex h-14 items-center gap-2 px-4">
-        <Sparkles aria-hidden="true" className="h-4.5 w-4.5 text-accent-deep" />
+      <div className="flex min-h-14 flex-wrap items-center gap-2 px-4 py-2">
+        <Sparkles aria-hidden="true" className="h-4.5 w-4.5 text-ink-faint" />
         <h2 className="text-body font-bold text-ink">画像を生成</h2>
         <span className="flex-1" />
-        <fieldset className="flex rounded-control bg-shell p-0.5" disabled={disabled}>
-          <legend className="sr-only">生成のしかた</legend>
+        <RadioCardGroup legend="生成のしかた" className="flex flex-wrap gap-1">
           <ModeOption
             name={`${uid}-mode`}
+            value="banner"
             checked={value.mode === 'banner'}
+            disabled={disabled}
             onSelect={() => set('mode', 'banner')}
             label="バナー"
           />
           <ModeOption
             name={`${uid}-mode`}
+            value="free"
             checked={value.mode === 'free'}
+            disabled={disabled}
             onSelect={() => set('mode', 'free')}
             label="自由入力"
           />
-        </fieldset>
+        </RadioCardGroup>
       </div>
       <div className="border-t border-hairline" />
 
       <div data-design-node="E8oZc" className="flex flex-col gap-4 p-4">
         <Field label="用途" note="LINE と SNS の規格から選ぶ" htmlFor={`${uid}-preset`}>
-          <SelectField
+          <Select
+            aria-label="用途"
+            size="full"
             id={`${uid}-preset`}
             className="w-full"
-            style={{ width: '100%' }}
             value={value.presetKey}
             disabled={disabled}
-            onChange={(event) => set('presetKey', event.target.value)}
+            onChange={(value) => set('presetKey', value)}
             options={value.presetKey ? presetOptions : [{ value: '', label: '用途を選んでください' }, ...presetOptions]}
           />
           {selectedPreset ? <p className="text-micro text-ink-faint">{selectedPreset.note}</p> : null}
         </Field>
+
+        {selectedPreset ? (
+          <Field
+            label="切り抜きの位置"
+            note="生成後に用途の寸法へ整える"
+            help={
+              <HelpTip label="切り抜きの位置の説明">
+                生成は3種類の大きさだけなので、用途の寸法に合うよう切り抜きます。選んだ側を残します。
+              </HelpTip>
+            }
+          >
+            <fieldset className="grid grid-cols-3 gap-1.5" disabled={disabled}>
+              <legend className="sr-only">切り抜きの位置</legend>
+              {CROP_POSITION_OPTIONS.map((option) => (
+                <SegmentOption
+                  key={option.value}
+                  name={`${uid}-crop`}
+                  value={option.value}
+                  checked={value.cropPosition === option.value}
+                  onSelect={() => set('cropPosition', option.value)}
+                  label={option.label}
+                />
+              ))}
+            </fieldset>
+            <CropPreview preset={selectedPreset} crop={value.cropPosition} />
+          </Field>
+        ) : null}
 
         <Field label="参照画像" note="任意・元にする画像を1枚">
           <div data-design-node="jZi2W" className="flex flex-col gap-2">
@@ -115,7 +150,7 @@ export default function GenerationPanel({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={reference.media.url} alt="" className="h-14 w-14 shrink-0 rounded-mini bg-step-idle object-cover" />
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <p className="truncate text-label font-bold text-ink">{referenceTitle(reference)}</p>
+                    <p className="truncate text-label font-medium text-ink">{referenceTitle(reference)}</p>
                     <p className="truncate text-micro text-ink-faint">{tileCaption(reference, presets)}</p>
                   </div>
                   <Button disabled={disabled || referenceBusy} onClick={() => set('referenceImageId', null)}>
@@ -124,8 +159,8 @@ export default function GenerationPanel({
                 </div>
                 <fieldset data-design-node="RPm7W" className="grid grid-cols-2 gap-1.5" disabled={disabled}>
                   <legend className="sr-only">参照画像の使い方</legend>
-                  <SegmentOption name={`${uid}-ref`} checked={value.referenceMode === 'edit'} onSelect={() => set('referenceMode', 'edit')} label="土台に描き直す" />
-                  <SegmentOption name={`${uid}-ref`} checked={value.referenceMode === 'inspire'} onSelect={() => set('referenceMode', 'inspire')} label="雰囲気を参考にする" />
+                  <SegmentOption name={`${uid}-ref`} value="edit" checked={value.referenceMode === 'edit'} onSelect={() => set('referenceMode', 'edit')} label="土台に描き直す" />
+                  <SegmentOption name={`${uid}-ref`} value="inspire" checked={value.referenceMode === 'inspire'} onSelect={() => set('referenceMode', 'inspire')} label="雰囲気を参考にする" />
                 </fieldset>
                 <p className="text-micro text-ink-faint">
                   描き直す: 構図と配色を保ったまま、文字や背景を指示で変えます。参考にする: 色やトーンだけ引き継いで新しく作ります。
@@ -138,9 +173,8 @@ export default function GenerationPanel({
                     <Images aria-hidden="true" className="h-4 w-4" />
                     ライブラリから選ぶ
                   </Button>
-                  <Button disabled={disabled || referenceBusy} onClick={() => fileRef.current?.click()} className="w-full">
-                    <Upload aria-hidden="true" className="h-4 w-4" />
-                    {referenceBusy ? '取り込んでいます…' : 'ファイルを選ぶ'}
+                  <Button disabled={disabled || referenceBusy} onClick={() => fileRef.current?.click()} className="w-full" busy={referenceBusy} busyLabel="取り込んでいます…">
+                    <Upload aria-hidden="true" className="h-4 w-4" />ファイルを選ぶ
                   </Button>
                   <input
                     ref={fileRef}
@@ -199,7 +233,7 @@ export default function GenerationPanel({
                     type="button"
                     disabled={disabled}
                     onClick={() => set('textLines', [...value.textLines, ''])}
-                    className="inline-flex items-center gap-1 self-start text-caption font-semibold text-accent-deep hover:underline disabled:opacity-50"
+                    className="inline-flex items-center gap-1 self-start text-caption font-semibold text-action hover:underline disabled:opacity-50"
                   >
                     <Plus aria-hidden="true" className="h-3.5 w-3.5" />
                     行を足す
@@ -231,8 +265,8 @@ export default function GenerationPanel({
             <Field label="人物">
               <fieldset className="grid grid-cols-2 gap-1.5" disabled={disabled}>
                 <legend className="sr-only">人物</legend>
-                <SegmentOption name={`${uid}-person`} checked={value.personOption === 'without'} onSelect={() => set('personOption', 'without')} label="入れない" />
-                <SegmentOption name={`${uid}-person`} checked={value.personOption === 'with'} onSelect={() => set('personOption', 'with')} label="入れる" />
+                <SegmentOption name={`${uid}-person`} value="without" checked={value.personOption === 'without'} onSelect={() => set('personOption', 'without')} label="入れない" />
+                <SegmentOption name={`${uid}-person`} value="with" checked={value.personOption === 'with'} onSelect={() => set('personOption', 'with')} label="入れる" />
               </fieldset>
             </Field>
 
@@ -272,6 +306,7 @@ export default function GenerationPanel({
               <SegmentOption
                 key={n}
                 name={`${uid}-count`}
+                value={String(n)}
                 checked={value.count === n}
                 onSelect={() => set('count', n)}
                 label={`${n}枚`}
@@ -293,20 +328,22 @@ function Field({
   label,
   note,
   htmlFor,
+  help,
   children,
 }: {
   label: string
   note?: string
   htmlFor?: string
+  help?: ReactNode
   children: ReactNode
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
         {htmlFor ? (
-          <label htmlFor={htmlFor} className="text-label font-bold text-ink">{label}</label>
+          <label htmlFor={htmlFor} className="text-label font-medium text-ink">{label}</label>
         ) : (
-          <span className="text-label font-bold text-ink">{label}</span>
+          <span className="text-label font-medium text-ink">{label}{help ? <span className="ml-1">{help}</span> : null}</span>
         )}
         {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
       </div>
@@ -315,35 +352,53 @@ function Field({
   )
 }
 
-/** モード切替の1つ。Pencil `h9nAp5`。選ばれている方だけ白地。 */
-function ModeOption({ name, checked, onSelect, label }: { name: string; checked: boolean; onSelect: () => void; label: string }) {
+/**
+ * 切り抜きのプレビュー（R120）。生成元の枠（APIの大きさの比率）の中に、
+ * 用途の寸法の比率の窓を、選んだ位置（上・中央・下）で置く。
+ * 縦横比が同じ用途では窓が枠いっぱいになる（切り抜き無し・拡大だけ）。
+ */
+export function CropPreview({ preset, crop }: { preset: BannerPreset; crop: BannerCropPosition }) {
+  const api = /^(\d+)x(\d+)$/.exec(preset.apiSize)
+  const sourceW = api ? Number(api[1]) : preset.targetWidth
+  const sourceH = api ? Number(api[2]) : preset.targetHeight
+  // cover で用途寸法へ拡大したとき、元画像のどの範囲が残るか。
+  const scale = Math.max(preset.targetWidth / sourceW, preset.targetHeight / sourceH)
+  const windowW = Math.min((preset.targetWidth / (sourceW * scale)) * 100, 100)
+  const windowH = Math.min((preset.targetHeight / (sourceH * scale)) * 100, 100)
+  const top = crop === 'top' ? 0 : crop === 'bottom' ? 100 - windowH : (100 - windowH) / 2
+  const left = (100 - windowW) / 2
   return (
-    <label
-      className={
-        checked
-          ? 'cursor-pointer rounded-mini bg-canvas px-2.5 py-1 text-caption font-bold text-ink shadow-card'
-          : 'cursor-pointer rounded-mini px-2.5 py-1 text-caption font-semibold text-ink-faint hover:text-ink'
-      }
-    >
-      <input type="radio" name={name} className="sr-only" checked={checked} onChange={onSelect} />
-      {label}
-    </label>
+    <div>
+      <div
+        role="img"
+        aria-label={`生成後にこの範囲で${preset.targetWidth}×${preset.targetHeight}に整えます`}
+        className="relative w-full overflow-hidden rounded-mini bg-canvas-sunken"
+        style={{ aspectRatio: `${sourceW} / ${sourceH}` }}
+      >
+        <div
+          aria-hidden="true"
+          className="absolute border-2 border-dashed border-ink-faint bg-canvas"
+          style={{ width: `${windowW}%`, height: `${windowH}%`, top: `${top}%`, left: `${left}%` }}
+        />
+      </div>
+      <p className="mt-1 text-micro text-ink-faint">
+        生成後にこの範囲で{preset.targetWidth}×{preset.targetHeight}に整えます
+      </p>
+    </div>
   )
 }
 
-/** 人物・枚数の選択肢。Pencil `UgooV` / `ndNQM`。高さ44。 */
-function SegmentOption({ name, checked, onSelect, label }: { name: string; checked: boolean; onSelect: () => void; label: string }) {
+/** モード切替の1つ。Pencil `h9nAp5`。共通の選ぶ部品で出す。 */
+function ModeOption({ name, value, checked, disabled, onSelect, label }: { name: string; value: string; checked: boolean; disabled?: boolean; onSelect: () => void; label: string }) {
   return (
-    <label
-      className={
-        checked
-          ? 'flex h-11 cursor-pointer items-center justify-center rounded-control border border-accent bg-accent-soft text-label font-bold text-accent-deep has-focus-visible:outline-2'
-          : 'flex h-11 cursor-pointer items-center justify-center rounded-control border border-divider-soft bg-canvas text-label font-semibold text-ink hover:bg-canvas-sunken has-focus-visible:outline-2'
-      }
-    >
-      <input type="radio" name={name} className="sr-only" checked={checked} onChange={onSelect} />
-      {label}
-    </label>
+    <RadioCard name={name} value={value} checked={checked} disabled={disabled} onChange={onSelect} title={label} />
+  )
+}
+
+/** 人物・枚数の選択肢。Pencil `UgooV` / `ndNQM`。共通の選ぶ部品で出す。 */
+function SegmentOption({ name, value, checked, onSelect, label }: { name: string; value: string; checked: boolean; onSelect: () => void; label: string }) {
+  return (
+    <RadioCard name={name} value={value} checked={checked} onChange={onSelect} title={label} />
   )
 }
 
@@ -369,32 +424,22 @@ function ColorPicker({
   return (
     <fieldset className="flex flex-col gap-1.5" disabled={disabled}>
       <legend className="flex w-full items-baseline justify-between gap-2">
-        <span className="text-label font-bold text-ink">{label}</span>
+        <span className="text-label font-medium text-ink">{label}</span>
         {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
       </legend>
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap gap-1.5">
         {swatches.map((hex) => {
           const checked = (value ?? '').toUpperCase() === hex
           return (
-            <label
+            <RadioCard
               key={hex}
+              name={name}
+              value={hex}
+              checked={checked}
+              onChange={() => onChange(hex)}
               title={hex}
-              className={
-                checked
-                  ? 'h-6.5 w-6.5 cursor-pointer rounded-mini border-2 border-accent-deep'
-                  : 'h-6.5 w-6.5 cursor-pointer rounded-mini border border-divider-soft'
-              }
-              style={{ backgroundColor: hex }}
-            >
-              <input
-                type="radio"
-                name={name}
-                className="sr-only"
-                checked={checked}
-                onChange={() => onChange(hex)}
-                aria-label={`${label} ${hex}`}
-              />
-            </label>
+              note={<span aria-hidden="true" style={{ backgroundColor: hex }} className="border-hairline inline-block h-4 w-4 rounded-pill border" />}
+            />
           )
         })}
       </div>

@@ -2,6 +2,7 @@ import { Hono, type MiddlewareHandler } from 'hono';
 import {
   getEntryRoutes,
   getEntryRouteById,
+  getLineAccountById,
   createEntryRoute,
   updateEntryRoute,
   deleteEntryRoute,
@@ -11,6 +12,8 @@ import {
   createEntryRouteGenre,
   updateEntryRouteGenre,
 } from '@line-crm/db';
+import { QrCapacityError, encodeQr } from '../lib/qr-matrix.js';
+import { QrPdfError, buildQrPrintPdf } from '../lib/qr-print-pdf.js';
 import type { EntryRoute, EntryRouteGenre } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -52,6 +55,9 @@ function serialize(row: EntryRoute) {
     introTemplateId: row.intro_template_id,
     runAccountFriendAddScenarios: row.run_account_friend_add_scenarios === 1,
     isActive: row.is_active === 1,
+    stoppedAt: row.stopped_at ?? null,
+    stoppedReason: row.stopped_reason ?? null,
+    lineAccountId: row.line_account_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -182,6 +188,11 @@ entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), async (c) =
       introTemplateId?: string | null;
       runAccountFriendAddScenarios?: boolean;
       isActive?: boolean;
+      /** R39: 画面のヘッダーで選んだ所属。機能強制ミドルウェアが読む鍵と同名で受ける。 */
+      lineAccountId?: string | null;
+      line_account_id?: string | null;
+      accountId?: string | null;
+      account_id?: string | null;
     }>();
     const refCode = body.refCode?.trim();
     const name = body.name?.trim();
@@ -195,8 +206,27 @@ entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), async (c) =
     if ((genre?.length ?? 0) > 80 || name.length > 120) {
       return c.json({ success: false, error: 'ジャンルは80文字、名前は120文字以内で入力してください' }, 400);
     }
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-    const row = await createEntryRoute(c.env.DB, { ...body, refCode, name, genre, tenantId });
+    const staff = c.get('staff');
+    // R39: 送りに所属が無いと機能強制で止まる。担当アカウント制の職員は
+    // 自分の所属へ倒し、それでも無ければ作らせない。
+    const lineAccountId = body.lineAccountId?.trim()
+      || body.line_account_id?.trim()
+      || body.accountId?.trim()
+      || body.account_id?.trim()
+      || staff.assignedLineAccountId
+      || null;
+    if (!lineAccountId) {
+      return c.json({
+        success: false,
+        error: 'LINEアカウントを指定してください',
+        code: 'LINE_ACCOUNT_REQUIRED',
+      }, 400);
+    }
+    // N-011 と同じ境界で照合する。範囲外の指定は「ない」ものとして404にする。
+    const decision = await resolveRequestBoundary(c.env.DB, staff, lineAccountId);
+    if (!decision.allowed) return c.json({ success: false, error: 'Not found' }, 404);
+    const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+    const row = await createEntryRoute(c.env.DB, { ...body, refCode, name, genre, tenantId, lineAccountId });
     return c.json({ success: true, data: serialize(row) }, 201);
   } catch (err) {
     console.error('POST /api/entry-routes error:', err);
@@ -229,6 +259,7 @@ entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), async 
         introTemplateId: string | null;
         runAccountFriendAddScenarios: boolean;
         isActive: boolean;
+        stoppedReason?: string | null;
       }>
     >();
     if (body.refCode !== undefined && body.refCode.trim() !== existing.ref_code) {
@@ -239,6 +270,10 @@ entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), async 
     }
     if (body.name !== undefined && (!body.name.trim() || body.name.trim().length > 120)) {
       return c.json({ success: false, error: '名前は1〜120文字で入力してください' }, 400);
+    }
+    if (body.stoppedReason !== undefined && body.stoppedReason !== null
+      && (typeof body.stoppedReason !== 'string' || body.stoppedReason.trim().length > 200)) {
+      return c.json({ success: false, error: '停止理由は200文字以内で入力してください' }, 400);
     }
     delete body.refCode;
     if (typeof body.genre === 'string') body.genre = body.genre.trim();
@@ -294,6 +329,62 @@ entryRoutes.delete('/api/entry-routes/:id', requireRole('owner', 'admin'), async
     return c.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/entry-routes/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/entry-routes/:id/qr-pdf — printing sheet (A4, 1 page)
+entryRoutes.post('/api/entry-routes/:id/qr-pdf', requireEntryRouteManagement(), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const staff = c.get('staff');
+    const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+    const existing = await getEntryRouteById(c.env.DB, id);
+    if (!existing || !canAccessEntryRoute(existing, tenantId)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (!await canAccessEntryRouteAccount(c.env.DB, staff, existing)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    // 止めた経路は QR も印刷も出さない。画面も同じ文を見せる。
+    if (existing.is_active !== 1) {
+      return c.json({ success: false, error: 'この経路は停止しています' }, 409);
+    }
+    const url = `${new URL(c.req.url).origin}/r/${existing.ref_code}`;
+    let symbol;
+    try {
+      symbol = encodeQr(url);
+    } catch (err) {
+      if (err instanceof QrCapacityError) {
+        return c.json({ success: false, error: 'URLが長すぎてQRにできません' }, 400);
+      }
+      throw err;
+    }
+    const account = existing.line_account_id
+      ? await getLineAccountById(c.env.DB, existing.line_account_id)
+      : null;
+    const accountName = account?.name?.trim() || existing.name;
+    const jst = new Date(Date.now() + 9 * 3_600_000).toISOString();
+    const issuedAt = `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
+    let pdf: Uint8Array;
+    try {
+      pdf = buildQrPrintPdf({ accountName, url, issuedAt, qr: symbol });
+    } catch (err) {
+      if (err instanceof QrPdfError) {
+        return c.json({ success: false, error: '印刷用PDFを作れませんでした' }, 400);
+      }
+      throw err;
+    }
+    // ref_code は半角英数字だけなので、そのままファイル名に使える。
+    return new Response(pdf, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="qr-${existing.ref_code}.pdf"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/entry-routes/:id/qr-pdf error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

@@ -1,11 +1,20 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import { X } from 'lucide-react'
+import Select from '@/components/shared/select'
 import { useEffect, useState } from 'react'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import type { TrafficPool, PoolAccount, LineAccount } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
+import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import HelpTip from '@/components/shared/help-tip'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
+import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 
 export default function PoolsPage() {
   usePageTitle('プール管理')
@@ -14,19 +23,31 @@ export default function PoolsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  // どこも無効と確定したときは口を発行せず、この案内を直接出す。
+  // 403 の応答自体が console error になるため、取ってから切り替えるのでは遅い。
+  const [featureOff, setFeatureOff] = useState(false)
 
   const load = async () => {
     setLoading(true)
     setError('')
+    setFeatureOff(false)
+    // 有効な場所が1つも無ければ GET /api/traffic-pools を発行しない（#703）。
+    // 判定と取得の隙間で切られたときは従来どおり共通ゲートが案内へ切り替える。
+    if (!(await isPoolsFeatureAvailable())) {
+      setPools([])
+      setFeatureOff(true)
+      setLoading(false)
+      return
+    }
     try {
       const [poolsRes, accRes] = await Promise.all([api.pools.list(), api.lineAccounts.list()])
       if (poolsRes.success) setPools(poolsRes.data)
-      else setError('プール一覧の取得に失敗しました')
+      else setError('プール一覧の取得に失敗しました。もう一度読み込んでください。')
       if (accRes.success) setAccounts(accRes.data)
     } catch (err) {
       // FEATURE_DISABLED は共通ゲートが案内へ切り替える。それ以外だけここで伝える。
       if (!(err instanceof ApiError && err.code === 'FEATURE_DISABLED')) {
-        setError('プール一覧の取得に失敗しました')
+        setError('プール一覧の取得に失敗しました。もう一度読み込んでください。')
       }
     } finally {
       setLoading(false)
@@ -42,34 +63,68 @@ export default function PoolsPage() {
     a.slug === 'main' ? -1 : b.slug === 'main' ? 1 : a.name.localeCompare(b.name),
   )
 
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <span className="text-sm text-gray-500">{pools.length} プール</span>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
-        >
-          + 新規プール
-        </button>
+  // 無効と確定したときは管理UIを出さず、共通ゲートと同じ案内だけ出す。
+  if (featureOff) {
+    return (
+      <div>
+        <FeatureDisabledScreen featureId="multi_store_hierarchy" />
       </div>
+    )
+  }
 
-      {error && (
-        <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm mb-4">
-          {error}
-        </div>
-      )}
+  // 読み込み済み・失敗なし・0件のときは空状態だけ出す。件数と右上の
+  // 作成口を残すと、同じ緑ボタンが2つ・同じ0が2か所に重複する。
+  const isEmpty = !loading && !error && sortedPools.length === 0
 
-      {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          読み込み中...
-        </div>
+  return (
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      {isEmpty ? (
+        <section className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="まだプールがありません"
+            description="プールは、来たお客様を振り分けるLINEアカウントをまとめる入れ物です。"
+            action={
+              <Button variant="primary" onClick={() => setShowCreate(true)}>
+                ＋ プールをつくる
+              </Button>
+            }
+          />
+        </section>
       ) : (
-        <div className="space-y-3">
-          {sortedPools.map((pool) => (
-            <PoolCard key={pool.id} pool={pool} accounts={accounts} onChange={load} />
-          ))}
-        </div>
+        <>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-ink-secondary">{pools.length} プール</span>
+            <Button variant="primary" onClick={() => setShowCreate(true)}>
+              ＋ プールをつくる
+            </Button>
+          </div>
+
+          {loading && pools.length === 0 ? (
+            <ListState kind="loading" />
+          ) : error && pools.length === 0 ? (
+            <ListState
+              kind="error"
+              title="プール一覧を表示できませんでした"
+              description="プール一覧の取得に失敗しました。もう一度読み込んでください。"
+              onRetry={() => { void load() }}
+            />
+          ) : (
+            <div className="flex flex-col gap-4">
+              {error ? (
+                <Notice
+                  tone="danger"
+                  message={error}
+                  action={<button type="button" onClick={() => { void load() }} className="shrink-0 font-medium underline">もう一度読み込む</button>}
+                />
+              ) : null}
+              {sortedPools.map((pool) => (
+                <PoolCard key={pool.id} pool={pool} accounts={accounts} onChange={load} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {showCreate && (
@@ -137,32 +192,30 @@ function PoolCard({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded p-4">
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <h3 className="font-medium">
-            {pool.name}
+    <div className="bg-canvas border-hairline rounded-card border p-4">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="min-w-0">
+          <h3 className="flex items-center gap-2 font-semibold">
+            <span className="min-w-0 truncate" title={pool.name}>{pool.name}</span>
             {isMain && (
-              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+              <StatusBadge tone="info" size="compact">
                 既定
-              </span>
+              </StatusBadge>
             )}
           </h3>
-          <p className="text-xs text-gray-500 font-mono">{pool.slug}</p>
+          <p className="text-xs text-ink-faint font-mono truncate" title={pool.slug}>{pool.slug}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onCopy}
-            className="text-xs px-2 py-1 border border-gray-200 rounded hover:bg-gray-50"
-          >
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="secondary" onClick={onCopy}>
             {copied ? '✓ コピー済' : '公開 URL コピー'}
-          </button>
+          </Button>
           {!isMain && (
             <button
+              type="button"
               onClick={() => { setDeleteError(''); setConfirmOpen(true) }}
-              className="text-xs px-2 py-1 text-red-600 hover:bg-red-50 rounded"
+              className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs"
             >
-              削除
+              削除する
             </button>
           )}
         </div>
@@ -273,15 +326,16 @@ function PoolAccountList({
           return (
             <li
               key={m.id}
-              className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded"
+              className="bg-canvas-sunken rounded-mini flex items-center justify-between gap-2 px-2 py-1"
             >
-              <span>{acc?.name ?? m.lineAccountId}</span>
+              <span className="min-w-0 truncate" title={acc?.name ?? m.lineAccountId}>{acc?.name ?? m.lineAccountId}</span>
               <button
+                type="button"
                 onClick={() => {
                   setRemoveError('')
                   setRemoveTarget({ id: m.id, name: acc?.name ?? m.lineAccountId })
                 }}
-                className="text-xs text-red-600 hover:underline"
+                className="text-danger shrink-0 text-xs hover:underline"
               >
                 外す
               </button>
@@ -289,20 +343,20 @@ function PoolAccountList({
           )
         })}
         {members.length === 0 && !listError && (
-          <li className="text-xs text-gray-400">所属アカウントなし</li>
+          <li className="text-xs text-ink-faint">所属アカウントなし</li>
         )}
       </ul>
       {listError && (
-        <p className="mt-1 text-xs text-red-600">{listError}</p>
+        <p className="text-danger mt-1 text-xs">{listError}</p>
       )}
       {candidates.length > 0 && (
         <div className="mt-2">
-          <SelectField
-            defaultValue=""
-            onChange={(e) => {
-              if (e.target.value) {
-                void onAdd(e.target.value)
-                e.target.value = ''
+          <Select
+            aria-label="追加するアカウント"
+            value=""
+            onChange={(value) => {
+              if (value) {
+                void onAdd(value)
               }
             }}
             options={[{ value: '', label: '＋ アカウントを追加' }, ...candidates.map((a) => ({ value: a.id, label: a.name }))]}
@@ -342,6 +396,9 @@ function CreatePoolModal({
   const [activeAccountId, setActiveAccountId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  // 共通ダイアログと同じ約束: 開いたら窓の中へフォーカス・Tabは窓の中・
+  // Escapeで閉じる・閉じたら起点へ戻す・背面はスクロールしない。
+  const panelRef = useOverlayFocus(true, onClose)
 
   const onSubmit = async () => {
     if (!slug || !name || !activeAccountId) return
@@ -350,7 +407,7 @@ function CreatePoolModal({
     try {
       const res = await api.pools.create({ slug, name, activeAccountId })
       if (res.success) onCreated()
-      else setError(res.error ?? '作成に失敗しました')
+      else setError(res.error ?? '作成に失敗しました。通信を確かめて、もう一度お試しください。')
     } catch (err) {
       // 400系はAPIの理由（slug重複など）、403・5xxは運用の言葉へ写す（WRITE-01）。
       setError(describeSaveFailure(err))
@@ -361,42 +418,76 @@ function CreatePoolModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-md p-6 space-y-3">
-        <h2 className="text-lg font-medium">新規プール</h2>
+    <div className="bg-scrim fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-pool-title"
+        className="bg-canvas rounded-card w-full max-w-md space-y-3 p-6"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="create-pool-title" className="text-lg font-semibold">新規プール</h2>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         {error && (
-          <div className="p-2 rounded bg-red-50 border border-red-200 text-red-700 text-xs">
-            {error}
-          </div>
+          <Notice tone="danger" message={error} />
         )}
-        <input
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          placeholder="slug (例: brand-a)"
-          className="w-full border border-gray-200 rounded px-3 py-2 text-sm font-mono"
-        />
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="表示名 (例: ブランドA)"
-          className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
-        />
-        <SelectField
-          value={activeAccountId}
-          onChange={(e) => setActiveAccountId(e.target.value)}
-          options={[{ value: '', label: '最初の所属アカウントを選択' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
-        />
-        <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-          <button onClick={onClose} className="text-sm px-3 py-1.5 text-gray-600">
+        {/*
+          R617: 項目名がplaceholderだけだと、入力後に何の欄か消える。
+          labelと入力欄はhtmlForとidで結び付ける。暗黙の関連付けだと、
+          labelの中のHelpTipのbuttonが先に来て入力欄へ結び付かなくなる
+          （実ブラウザで input.labels が空になる）ため、HelpTipはlabelの
+          外へ置き、入力欄の読み上げ名に混ざらないようにする。
+          読み上げ名（placeholder・aria-label由来）は元からあるので残す。
+        */}
+        <div>
+          <div className="mb-1 flex items-center gap-1">
+            <label htmlFor="create-pool-slug" className="text-ink-secondary text-sm font-medium">slug</label>
+            <HelpTip label="slugの説明">
+              公開URLに使う識別子です。
+            </HelpTip>
+          </div>
+          <input
+            id="create-pool-slug"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+            placeholder="例: brand-a"
+            className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 font-mono text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="create-pool-name" className="text-ink-secondary mb-1 block text-sm font-medium">表示名</label>
+          <input
+            id="create-pool-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="例: ブランドA"
+            className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="create-pool-account" className="text-ink-secondary mb-1 block text-sm font-medium">最初の所属アカウント</label>
+          <Select
+            id="create-pool-account"
+            aria-label="最初の所属アカウント"
+            value={activeAccountId}
+            onChange={(value) => setActiveAccountId(value)}
+            options={[{ value: '', label: '最初の所属アカウントを選択' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+          />
+        </div>
+        <div className="border-hairline flex justify-end gap-2 border-t pt-2">
+          <Button variant="secondary" onClick={onClose}>
             キャンセル
-          </button>
-          <button
-            onClick={onSubmit}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => { void onSubmit() }}
             disabled={submitting || !slug || !name || !activeAccountId}
-            className="text-sm px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50"
-          >
-            {submitting ? '作成中…' : '作成'}
-          </button>
+            className="text-sm px-3 py-1.5 rounded-mini bg-action text-on-accent hover:brightness-90 disabled:opacity-50" busy={submitting} busyLabel="作成中…">作る
+          </Button>
         </div>
       </div>
     </div>

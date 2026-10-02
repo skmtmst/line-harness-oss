@@ -1,4 +1,5 @@
 import type { LineAccount } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /**
  * LINEアカウントの詳細・編集（設計 ★V6 33-3 `T9rA9`）。
@@ -50,8 +51,8 @@ export function capacityLabel(account: LineAccount): string {
   const cap = account.friendCapacity
   const warn = account.capacityWarnAt
   if (cap === null || cap === undefined) return '上限は未設定'
-  const warnText = warn === null || warn === undefined ? '警告なし' : `警告 ${warn.toLocaleString('ja-JP')}`
-  return `上限 ${cap.toLocaleString('ja-JP')}／${warnText}`
+  const warnText = warn === null || warn === undefined ? '警告なし' : `警告 ${formatNumber(warn)}`
+  return `上限 ${formatNumber(cap)}／${warnText}`
 }
 
 /**
@@ -60,7 +61,7 @@ export function capacityLabel(account: LineAccount): string {
  * **できないものは押し口を出さず、理由を書く**（`v6-common-rules.md` §7-10）。
  */
 export interface AccountAction {
-  key: 'stop' | 'copy' | 'handover' | 'archive'
+  key: 'stop' | 'copy' | 'handover' | 'archive' | 'restore'
   title: string
   description: string
   actionLabel: string
@@ -69,13 +70,25 @@ export interface AccountAction {
 }
 
 export function accountActions(account: LineAccount): AccountAction[] {
+  // アーカイブ済みは「戻す」だけを出す。記録は読めるが、あらたな変更は受けない。
+  if (account.archivedAt) {
+    return [
+      {
+        key: 'restore',
+        title: 'アーカイブから戻す',
+        description: '一覧へ戻します。戻った直後は「止まっている」状態です。送受信を始めるには、接続を確かめてから再開します。',
+        actionLabel: 'アーカイブから戻す',
+        blockedReason: null,
+      },
+    ]
+  }
   return [
     {
       key: 'stop',
       title: account.isActive ? '送受信を止める' : '送受信を再開する',
       description: account.isActive
         ? '止めているあいだ、配信も受信もしません。友だちと履歴はそのまま残ります。いつでも戻せます。'
-        : '再開すると、配信と受信が動き始めます。止めているあいだに予約していた配信は、自動で送り直しません。',
+        : '再開の前にLINEとの接続を確かめます。止めているあいだに予約していた配信は、自動で送り直しません。',
       actionLabel: account.isActive ? '送受信を止める' : '送受信を再開する',
       blockedReason: null,
     },
@@ -99,8 +112,7 @@ export function accountActions(account: LineAccount): AccountAction[] {
       title: 'アーカイブする',
       description: '一覧から外します。送受信は止まり、記録は残ります。あとから戻せます。',
       actionLabel: 'アーカイブする',
-      // `archived_at` がまだ無い（台帳 #128）。いまの DELETE は物理削除。
-      blockedReason: 'アーカイブは、まだ繋がっていません。いまの削除は取り消せないため、押し口を出していません。',
+      blockedReason: null,
     },
   ]
 }

@@ -7,7 +7,7 @@ const ITEMS: Array<{ label: string; kind: string; detail: string }> = [
   { label: '体重', kind: '数値（kg）', detail: '「今日の目安」の元。8週で ±10% 以上変わると「気になる変化」に出ます。' },
   { label: '心拍数', kind: '数値（回／分）', detail: '30日のまとめで平均を出します。' },
   { label: '呼吸数', kind: '数値（回／分）', detail: '30日のまとめで平均を出します。' },
-  { label: '便', kind: '正常／やわらかい／かたい／下痢／血が混じる／その他', detail: '下痢・血が混じる が3回続くと「気になる変化」に出ます。' },
+  { label: '便', kind: '正常／やわらかい／かたい／下痢／血が混じる／その他', detail: '正常でない便 が3回続くと「気になる変化」に出ます。' },
   { label: '食いつき', kind: '良好／普通／不良', detail: '不良 が3回続くと「気になる変化」に出ます。' },
   { label: '皮膚', kind: '問題なし／かゆそう／赤み／その他', detail: '30日のまとめで回数を出します。' },
   { label: '涙やけ', kind: '問題なし／少し気になる／気になる', detail: '30日のまとめで回数を出します。' },
@@ -35,7 +35,7 @@ export default function ItemsTab() {
       </div>
       <div data-design="Body" data-design-node="health-items-body" className="grid gap-4 xl:grid-cols-2">
         <section className="rounded-card border border-hairline bg-canvas p-5">
-          <h2 className="text-label font-bold text-ink">お客様が記録する項目</h2>
+          <h2 className="text-label font-semibold text-ink">お客様が記録する項目</h2>
           <dl className="mt-3 flex flex-col gap-3">
             {ITEMS.map((item) => (
               <div key={item.label} className="flex flex-col gap-1 border-t border-hairline pt-3">
@@ -46,7 +46,7 @@ export default function ItemsTab() {
           </dl>
         </section>
         <section className="rounded-card border border-hairline bg-canvas p-5">
-          <h2 className="text-label font-bold text-ink">「気になる変化」の決まり</h2>
+          <h2 className="text-label font-semibold text-ink">「気になる変化」の決まり</h2>
           <dl className="mt-3 flex flex-col gap-3">
             {CHANGES.map((item) => (
               <div key={item.label} className="flex flex-col gap-1 border-t border-hairline pt-3">

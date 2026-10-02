@@ -205,3 +205,17 @@ export function startVisiblePoll(options: VisiblePollOptions): VisiblePollHandle
     wake: resume,
   }
 }
+
+/**
+ * 画面が隠れている間は何もしない形に包む（V6R-S3-g）。
+ *
+ * `startVisiblePoll` の5秒起点に合わない、決まった間隔（5分など）の `setInterval` 用。
+ * 隠れたタブで回り続けて、誰も見ていない画面のために取り直すのを止める。
+ * 表示に戻ったら次の回から普通に動く。
+ */
+export function onlyWhenVisible(run: () => void): () => void {
+  return () => {
+    if (typeof document !== 'undefined' && document.hidden === true) return
+    run()
+  }
+}

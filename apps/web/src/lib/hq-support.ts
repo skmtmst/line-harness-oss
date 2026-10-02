@@ -6,6 +6,18 @@
 export type HqSupportKind = 'usage' | 'bug' | 'billing' | 'feature' | 'other'
 export type HqSupportStatus = 'open' | 'answered' | 'closed'
 
+/** 停止中でもお問い合わせ画面だけを組み立てられる表示用情報。 */
+export interface HqSupportContext {
+  kinds: Array<{ key: HqSupportKind; label: string }>
+  accounts: Array<{ id: string; name: string }>
+  sender: {
+    tenantName: string
+    name: string
+    email: string | null
+    planLabel: string
+  }
+}
+
 export interface HqSupportRequest {
   id: string
   kind: HqSupportKind

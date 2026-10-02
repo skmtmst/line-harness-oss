@@ -63,7 +63,18 @@ export async function stripeRequest<T>(
     payload = body ? encodeForm(body) : '';
     if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
   }
-  const res = await fetchImpl(url, { method, headers, body: payload });
+  /*
+   * M023：Stripe への輸送失敗（到達不能）は fetch 自体の throw になる。
+   * 包まずに投げると口側の汎用 500（内部文）へ落ちる。502 の
+   * StripeApiError に包み、口側の日本語案内（502）へ載せる。
+   * 実際の決済・送信はしない（試験は偽の応答で）。
+   */
+  let res: Response;
+  try {
+    res = await fetchImpl(url, { method, headers, body: payload });
+  } catch {
+    throw new StripeApiError(502, '決済サービスにつながりませんでした', 'network_unreachable');
+  }
   const text = await res.text();
   let json: unknown = null;
   try {
@@ -121,11 +132,32 @@ export interface StripeInvoice {
   status: string | null;
   amount_paid: number;
   amount_due: number;
+  amount_remaining: number;
   currency: string;
   created: number;
+  customer: string | null;
+  subscription: string | null;
+  charge: string | { id: string; amount_refunded: number } | null;
+  period_start: number | null;
+  period_end: number | null;
+  status_transitions?: { paid_at?: number | null } | null;
   hosted_invoice_url: string | null;
   invoice_pdf: string | null;
-  lines?: { data: Array<{ description: string | null }> };
+  lines?: { data: Array<{
+    description: string | null;
+    price?: { recurring?: { interval?: string | null } | null } | null;
+  }> };
+}
+
+export interface StripeInvoiceListOptions {
+  limit?: number;
+  startingAfter?: string;
+  createdGte?: number;
+}
+
+export interface StripePaymentIntent {
+  id: string;
+  invoice: string | null;
 }
 
 export const stripeApi = {
@@ -167,6 +199,21 @@ export const stripeApi = {
   retrieveSubscription: (env: StripeEnv, subscriptionId: string, fetchImpl?: typeof fetch) =>
     stripeRequest<StripeSubscription>(env, 'GET', `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, undefined, { fetchImpl }),
 
-  listInvoices: (env: StripeEnv, customerId: string, limit = 12, fetchImpl?: typeof fetch) =>
-    stripeRequest<{ data: StripeInvoice[] }>(env, 'GET', '/v1/invoices', { customer: customerId, limit }, { fetchImpl }),
+  // charge.refunded の Charge に invoice が付かず payment_intent だけの場合の解決用。
+  // PaymentIntent.invoice は請求書払いなら常にIDが入る（2024-06-20 API版で有効）。
+  retrievePaymentIntent: (env: StripeEnv, paymentIntentId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripePaymentIntent>(env, 'GET', `/v1/payment_intents/${encodeURIComponent(paymentIntentId)}`, undefined, { fetchImpl }),
+
+  listInvoices: (
+    env: StripeEnv,
+    customerId: string,
+    options: StripeInvoiceListOptions = {},
+    fetchImpl?: typeof fetch,
+  ) => stripeRequest<{ data: StripeInvoice[]; has_more: boolean }>(env, 'GET', '/v1/invoices', {
+    customer: customerId,
+    limit: options.limit ?? 100,
+    starting_after: options.startingAfter,
+    created: options.createdGte === undefined ? undefined : { gte: options.createdGte },
+    expand: ['data.charge'],
+  }, { fetchImpl }),
 };

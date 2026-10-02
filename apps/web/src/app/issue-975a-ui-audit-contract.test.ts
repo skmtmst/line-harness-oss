@@ -27,7 +27,7 @@ describe('U043: テンプレート行の操作は「編集」と「…」メニ�
   it('副操作はメニュー項目として渡す', () => {
     expect(page).toContain("label: '一斉配信で使う'")
     expect(page).toContain("label: '使用先を見る'")
-    expect(page).toContain("label: 'テンプレートを削除'")
+    expect(page).toContain("label: 'テンプレートを削除する'")
     expect(page).toContain("tone: 'danger'")
   })
 })
@@ -36,15 +36,17 @@ describe('U044: 767px以下ではテンプレート一覧をカードへ畳む',
   const page = read('templates/page.tsx')
   const styles = read('templates/templates-v6.module.css')
 
-  it('表のマークアップは残し、CSSでカードに変える', () => {
-    expect(page).toContain('data-template-list')
-    expect(styles).toContain('@media (max-width: 767.98px)')
-    // CSS module はpureモード（各セレクタにローカルクラスが必須）。
-    // 属性セレクタを行頭に書くと next build が止まるので `.body` を起点にする。
-    expect(styles).toMatch(/\.body \[data-template-list\] tbody tr \{\s*display: flex/)
-    expect(styles).toMatch(/\.body \[data-template-list\] thead \{\s*display: none/)
-    expect(styles).toMatch(/\.body \[data-template-list\] table \{\s*min-width: 0/)
-    expect(styles).not.toMatch(/^\s*\[data-template-list\]/m)
+  /*
+   * ★V7 監査の直し A（`LD96g`・m18c）で書き換え。以前の「表のままCSSで
+   * 畳む」形は、名前欄の `max-w-0` が残ってスマホで名前が消える原因だった。
+   * 共通の一覧カード（`MobileTableCards`・767px以下だけ）に任せ、表は
+   * 768px 以上だけ出す。見た目の固定の書き換えで、動きの約束は変えない。
+   */
+  it('表のマークアップは残し、767px以下は共通カードに任せる', () => {
+    expect(page).toContain('MobileTableCards')
+    expect(page).toContain('hidden md:block')
+    expect(page).not.toContain('data-template-list')
+    expect(styles).not.toContain('[data-template-list]')
     expect(styles).not.toMatch(/^\s*:global\(/m)
   })
 })
@@ -125,19 +127,16 @@ describe('U058: 差し込み操作は本文の欄より後に置く', () => {
 })
 
 describe('U063: 長い選択肢のプルダウンは欄いっぱいに広げる', () => {
-  it('共有部品の SelectField には触らず、画面側の属性スコープで幅を上書きする', () => {
-    // shared/ は Claude 所有領域。size="full" のような部品改変はしない。
-    const component = read('../components/shared/select-field.tsx')
-    expect(component).not.toContain("'full'")
+  it('運用者通知の選び欄は欄いっぱいに広げる（部品の full 指定）', () => {
+    // 選び欄は Select 1 本化済み。幅は部品の size="full" で持たせる。
     const operator = read('line-notifications/operator/new/page.tsx')
-    expect(operator).not.toContain('size="full"')
-    expect(operator).toContain('data-selects-wide')
-    expect(operator).toContain('[data-selects-wide] select { width: 100%; }')
+    expect(operator.match(/size="full"/g)?.length).toBeGreaterThanOrEqual(7)
+    expect(operator).not.toContain('[data-selects-wide] select')
   })
   it('共通アクションの見本選択は内容に合わせて広がる', () => {
     const page = read('common-actions/new/page.tsx')
     expect(page).toContain('data-example-select')
-    expect(page).toContain('[data-example-select] select { width: auto; max-width: 100%; }')
+    expect(page).toContain('[data-example-select] .min-w-48 { width: auto; max-width: 100%; }')
   })
   it('特典の選択は部品が持つ full 指定を使う（Select側は既存のprop）', () => {
     const rewards = read('mileage/rewards/edit/page.tsx')

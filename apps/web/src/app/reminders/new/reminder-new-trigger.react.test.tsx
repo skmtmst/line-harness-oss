@@ -13,6 +13,23 @@ const fixture = vi.hoisted(() => ({
 }))
 
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の起点の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.account, loading: false }),
 }))
@@ -357,7 +374,7 @@ describe('ひな形から作る', () => {
     const row = screen.getByText('予約の前日案内').closest('tr') as HTMLElement
     fireEvent.click(within(row).getByRole('button', { name: 'このひな形を使う' }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'やめる' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
 
     expect((screen.getByLabelText('基準日に使う情報欄') as HTMLSelectElement).value).toBe('field-birthday-account-1')
   })
@@ -369,12 +386,12 @@ describe('保存状態の表示', () => {
     render(<NewReminderPage />)
     await screen.findByRole('button', { name: /対象設定へ/ })
     expect(fixture.createDraft).not.toHaveBeenCalled()
-    expect(screen.queryByText('下書き保存')).toBeNull()
+    expect(screen.queryByText('下書きを保存する')).toBeNull()
     expect(screen.getAllByText('未保存').length).toBeGreaterThan(0)
   })
 
   it('保存に失敗したら失敗と出し、次の画面へ進まない', async () => {
-    fixture.createDraft.mockResolvedValue({ success: false, error: '保存に失敗しました' })
+    fixture.createDraft.mockResolvedValue({ success: false, error: '保存に失敗しました。通信を確かめて、もう一度お試しください。' })
     render(<NewReminderPage />)
     fillName()
     fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))

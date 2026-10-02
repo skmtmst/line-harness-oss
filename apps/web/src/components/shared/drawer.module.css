@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 .overlay {
   position: fixed;
   inset: 0;
@@ -15,7 +17,8 @@
   flex-direction: column;
   border-left: 1px solid var(--color-hairline);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
+  /* ★V7 の影は3段。画面の端から出る引き出しは最前面（段3）。 */
+  box-shadow: var(--shadow-overlay);
   color: var(--color-ink);
 }
 
@@ -57,7 +60,7 @@
   margin: 0;
   color: var(--color-ink);
   font-size: var(--text-lead);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
 }
 
@@ -162,4 +165,5 @@
     padding-right: 16px;
     padding-left: 16px;
   }
+}
 }

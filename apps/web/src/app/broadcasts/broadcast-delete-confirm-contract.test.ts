@@ -80,9 +80,10 @@ describe('一斉配信一覧の削除確認', () => {
     /*
      * 窓の本文は「予約済みかどうか」で分岐する。**送信済みにも削除を出すと、
      * else の枝が「まだ送っていないので、友だちには何も届きません。」という
-     * 嘘の文を出す。** 削除の口は下書きと予約済みだけに置く。
+     * 嘘の文を出す。** 削除の口（…メニューの中の危ない操作）は下書きと
+     * 予約済みだけに置く（★V7 Xn1Mz：行にゴミ箱ボタンは置かない）。
      */
-    expect(PAGE).toContain("{(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (")
+    expect(PAGE).toContain("destructiveItem={(broadcast.status === 'draft' || broadcast.status === 'scheduled')")
   })
 
   it('何を消すのかを、配信名と影響で読み合わせる', () => {
@@ -103,6 +104,8 @@ describe('一斉配信一覧の削除確認', () => {
   })
 
   it('削除ボタンは窓を開くだけで、押した時点では消さない', () => {
-    expect(PAGE).toContain("onClick={() => { setDeleteError(''); setDeleteTarget(broadcast) }}")
+    // m13f：行を押すと詳細へ行くため、行の中の操作は行へ伝えない。開くだけの動きは同じ。
+    expect(PAGE).toContain('onClick={(event) => event.stopPropagation()}')
+    expect(PAGE).toContain("onSelect: () => { setDeleteError(''); setDeleteTarget(broadcast) }")
   })
 })

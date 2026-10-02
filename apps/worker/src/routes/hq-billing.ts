@@ -5,7 +5,10 @@ import {
   getTenantBilling,
   getTenantBillingByStripeCustomer,
   recordBillingEvent,
+  toJstString,
+  updateBillingInvoiceRefund,
   updateTenantBilling,
+  upsertBillingInvoice,
   type TenantBilling,
   type TenantPlanStatus,
 } from '@line-crm/db';
@@ -24,7 +27,8 @@ import {
   type BillingInterval,
   type PlanKey,
 } from '../services/billing-plans.js';
-import { StripeApiError, stripeApi, type StripeSubscription } from '../services/stripe-api.js';
+import { billingInvoiceInput } from '../services/billing-invoices-sync.js';
+import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
 
 /**
@@ -265,7 +269,7 @@ hqBilling.get('/api/hq/billing/invoices', requireRole('owner', 'admin'), async (
   try {
     const billing = await getTenantBilling(c.env.DB, tenantOf(c));
     if (!billing?.stripe_customer_id || !stripeReady(c)) return c.json({ success: true, data: [] });
-    const invoices = await stripeApi.listInvoices(c.env, billing.stripe_customer_id, 12);
+    const invoices = await stripeApi.listInvoices(c.env, billing.stripe_customer_id, { limit: 12 });
     return c.json({
       success: true,
       data: invoices.data.map((inv) => ({
@@ -295,6 +299,37 @@ interface BillingWebhookEvent {
   id: string;
   type: string;
   data: { object: Record<string, unknown> };
+}
+
+function stripeExpandableId(value: unknown): string | null {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && typeof (value as { id?: unknown }).id === 'string') {
+    return (value as { id: string }).id;
+  }
+  return null;
+}
+
+/**
+ * charge.refunded の Charge に invoice が直接付かず payment_intent だけの場合の解決。
+ * Stripe Billing の請求書払いなら PaymentIntent.invoice に請求書IDが入っているため、
+ * それを1回だけ問い合わせて確認する。取得できなければ対象外（EC-CUBEなど）として扱う。
+ */
+async function resolveRefundedInvoiceId(c: Context<Env>, object: Record<string, unknown>): Promise<string | null> {
+  const direct = stripeExpandableId(object.invoice);
+  if (direct) return direct;
+  const paymentIntentId = stripeExpandableId(object.payment_intent);
+  if (!paymentIntentId || !stripeReady(c)) return null;
+  try {
+    const paymentIntent = await stripeApi.retrievePaymentIntent(c.env, paymentIntentId);
+    return typeof paymentIntent.invoice === 'string' ? paymentIntent.invoice : null;
+  } catch (error) {
+    console.warn(JSON.stringify({
+      message: 'billing webhook: payment_intent lookup failed',
+      paymentIntentId,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    return null;
+  }
 }
 
 async function findTenantForEvent(c: Context<Env>, object: Record<string, unknown>): Promise<TenantBilling | null> {
@@ -332,9 +367,19 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
 
   try {
     const object = event.data.object;
+    const refundedInvoiceId = event.type === 'charge.refunded'
+      ? await resolveRefundedInvoiceId(c, object)
+      : undefined;
     const tenant = await findTenantForEvent(c, object);
     const first = await recordBillingEvent(c.env.DB, { id: event.id, type: event.type, tenantId: tenant?.id ?? null, summary: event.type });
     if (!first) return c.json({ success: true, data: { received: true, duplicate: true } });
+    if (refundedInvoiceId === null) {
+      console.info(JSON.stringify({
+        message: 'billing webhook: charge.refunded 対象外',
+        eventId: event.id,
+        reason: 'Stripe Billing請求書でない',
+      }));
+    }
     if (!tenant) {
       console.warn('billing webhook: tenant not found for event', event.type);
       return c.json({ success: true, data: { received: true, matched: false } });
@@ -385,11 +430,43 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
         break;
       }
       case 'invoice.paid': {
+        await upsertBillingInvoice(c.env.DB, billingInvoiceInput(object as unknown as StripeInvoice, {
+          tenantId: tenant.id,
+          fallbackPaidAt: toJstString(new Date()),
+        }));
         if (tenant.plan_status === 'past_due') await updateTenantBilling(c.env.DB, tenant.id, { plan_status: 'active' });
         break;
       }
       case 'invoice.payment_failed': {
+        await upsertBillingInvoice(c.env.DB, billingInvoiceInput({
+          ...(object as unknown as StripeInvoice),
+          status: 'open',
+        }, { tenantId: tenant.id }));
         if (tenant.plan_status === 'active') await updateTenantBilling(c.env.DB, tenant.id, { plan_status: 'past_due' });
+        break;
+      }
+      case 'invoice.voided': {
+        await upsertBillingInvoice(c.env.DB, billingInvoiceInput({
+          ...(object as unknown as StripeInvoice),
+          status: 'void',
+        }, { tenantId: tenant.id }));
+        break;
+      }
+      case 'charge.refunded': {
+        if (refundedInvoiceId) {
+          const updated = await updateBillingInvoiceRefund(c.env.DB, {
+            invoiceId: refundedInvoiceId,
+            amountRefunded: typeof object.amount_refunded === 'number' ? object.amount_refunded : 0,
+          });
+          if (!updated) {
+            console.warn(JSON.stringify({
+              message: 'billing webhook: charge.refunded 更新対象なし',
+              eventId: event.id,
+              invoiceId: refundedInvoiceId,
+              reason: 'billing_invoice_not_found',
+            }));
+          }
+        }
         break;
       }
       default:

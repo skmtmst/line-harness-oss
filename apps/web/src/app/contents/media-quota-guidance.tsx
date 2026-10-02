@@ -27,14 +27,14 @@ export function MediaQuotaGuidance({
       {quota.state === 'full' ? (
         <div className="mt-1">
           <p className="text-danger text-xs">保存容量の上限に達しました。新しいファイルは保存できません。</p>
-          <button type="button" onClick={onShowNearLimit} className="text-accent-deep mt-0.5 text-xs underline">
+          <button type="button" onClick={onShowNearLimit} className="text-action mt-0.5 text-xs underline">
             上限に近いものを見る
           </button>
         </div>
       ) : quota.state === 'warning' || quota.state === 'notice' ? (
         <div className="mt-1">
           <p className="text-warning text-xs">保存容量の80%以上を使っています。不要なファイルを整理してください。</p>
-          <button type="button" onClick={onShowNearLimit} className="text-accent-deep mt-0.5 text-xs underline">
+          <button type="button" onClick={onShowNearLimit} className="text-action mt-0.5 text-xs underline">
             上限に近いものを見る
           </button>
         </div>

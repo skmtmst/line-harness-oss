@@ -355,19 +355,26 @@ authEmail.post('/api/auth/password/login', async (c) => {
 
   await clearAuthThrottle(c.env.DB, throttleKey);
   if (body.next === 'ops') {
-    const admin = await isPlatformAdminRow(c.env.DB, candidateFromStaffRow(staff));
-    if (!admin) {
-      const pending = await getPlatformAdminRecord(c.env.DB, staff.id);
-      if (!(pending?.is_active === 1 && pending.activation_state === 'awaiting_totp')) {
-        const invited = pending?.is_active === 1 && pending.activation_state === 'invited';
-        return c.json({
-          success: false,
-          error: invited
-            ? '招待メールのリンクから登録を完了してください'
-            : 'このアカウントは運営メンバーとして有効ではありません',
-          code: invited ? 'ops_invite_pending' : 'not_platform_admin',
-        }, 403);
-      }
+    const pending = await getPlatformAdminRecord(c.env.DB, staff.id);
+    const awaitingTotp = pending?.is_active === 1 && pending.activation_state === 'awaiting_totp';
+    /*
+     * 自分自身の招待が保留中なら、互換判定で入れる立場（既定の統括のオーナー）
+     * でも招待リンクへ案内する。登録の途中を飛ばして入らせない。
+     * 他人の招待が保留中なだけの場合は互換判定を残す（誰も入れなくなるのを防ぐ）。
+     */
+    if (pending?.is_active === 1 && pending.activation_state === 'invited') {
+      return c.json({
+        success: false,
+        error: '招待メールのリンクから登録を完了してください',
+        code: 'ops_invite_pending',
+      }, 403);
+    }
+    if (!awaitingTotp && !(await isPlatformAdminRow(c.env.DB, candidateFromStaffRow(staff)))) {
+      return c.json({
+        success: false,
+        error: 'このアカウントは運営メンバーとして有効ではありません',
+        code: 'not_platform_admin',
+      }, 403);
     }
   }
   if (twoFactorRequired(staff)) {

@@ -10,10 +10,13 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
   type CampaignRow,
+  NEN_CAMPAIGN_FORM_ISSUE_LABELS,
   buildDefaultColumnIntro,
   buildNenDeliveryMessages,
+  campaignButtonFormId,
   getNenBirthdayCouponSetting,
   getNenCampaign,
+  nenCampaignFormIssue,
   queueColumnDelivery,
   saveNenBirthdayCouponSetting,
   saveNenCampaignAccountSetting,
@@ -21,6 +24,7 @@ import {
 } from '../services/nen-engagement.js';
 import { syncNenPetTags } from '../services/nen-tag-sync.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import {
   buildNenColumnStorageFields,
   isNenColumnSlugConflict,
@@ -186,9 +190,17 @@ nenCampaigns.get('/api/nen-campaigns/settings', async (c) => {
   const keys = await c.env.DB.prepare(
     `SELECT campaign_key FROM nen_campaign_settings WHERE category != 'transactional' ORDER BY rowid`,
   ).all<{ campaign_key: string }>();
-  const settings = (await Promise.all(
+  const campaigns = (await Promise.all(
     keys.results.map((row) => getNenCampaign(c.env.DB, row.campaign_key, accountId)),
   )).filter((row): row is CampaignRow => Boolean(row));
+  /*
+   * NEN-07: つなぐ回答フォームが使えなくなった稼働中設定を一覧・編集画面で
+   * 「設定不足」と出せるよう、配信ごとに判定を行へ添えてから返す。
+   */
+  const settings = await Promise.all(campaigns.map(async (row) => ({
+    ...row,
+    form_issue: await nenCampaignFormIssue(c.env.DB, row, accountId),
+  })));
   return c.json({ success: true, data: settings.map((row) => ({
     campaignKey: row.campaign_key,
     label: row.label,
@@ -205,6 +217,7 @@ nenCampaigns.get('/api/nen-campaigns/settings', async (c) => {
     dedupWindowDays: row.dedup_window_days ?? 30,
     excludeFormRespondents: row.exclude_form_respondents === 1,
     afterActions: row.after_actions ?? [],
+    formIssue: row.form_issue,
     updatedAt: row.updated_at ?? '',
   })) });
 });
@@ -255,6 +268,42 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
       || typeof excludeFormRespondents !== 'boolean') {
     return c.json({ success: false, error: 'Invalid delivery safeguards' }, 400);
   }
+  /*
+   * NEN-07 (#1078): 「回答フォームを開く」設定はつなぐフォームが今も使える
+   * ことを確かめる。ボタンのURLだけフォームを指している(押されたあとの
+   * 設定を外した残り・古い設定)は「開くつもりなのに未選択」と同じ扱いにして
+   * 保存を止める。口コミ回答の除外も有効なフォーム選択が前提。
+   */
+  const formAction = afterActions.find((action) => action.kind === 'open_form');
+  /*
+   * 判定は「これから保存しようとする中身」で行う。除外フラグと旧open_formの
+   * 残骸はリクエスト側の値を反映させないと、設定不足を解除する保存まで
+   * 既存の不足判定で弾かれてしまう。
+   */
+  const proposed: CampaignRow = {
+    ...current,
+    after_actions: afterActions,
+    form_action_dropped: 0,
+    exclude_form_respondents: excludeFormRespondents ? 1 : 0,
+    button_url: buttonUrl || null,
+  };
+  const buttonFormId = campaignButtonFormId(proposed);
+  if (buttonFormId !== null && buttonFormId !== formAction?.formId) {
+    return c.json({
+      success: false,
+      error: 'ボタンのURLは回答フォームを指していますが、「押されたあとにすること」でフォームが選ばれていません。先にフォームを選んでください',
+    }, 400);
+  }
+  if (excludeFormRespondents && !formAction) {
+    return c.json({
+      success: false,
+      error: '「すでに口コミを書いた人には送らない」には回答フォームの選択が必要です',
+    }, 400);
+  }
+  const formIssue = await nenCampaignFormIssue(c.env.DB, proposed, accountId);
+  if (formIssue) {
+    return c.json({ success: false, error: NEN_CAMPAIGN_FORM_ISSUE_LABELS[formIssue] }, 400);
+  }
   await saveNenCampaignAccountSetting(c.env.DB, accountId, {
     ...current,
     is_enabled: body.isEnabled ? 1 : 0,
@@ -289,6 +338,19 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireRole
   }
   const current = await getNenCampaign(c.env.DB, key, accountId);
   if (!current) return c.json({ success: false, error: 'Campaign not found' }, 404);
+  /*
+   * NEN-07 (#1078): つなぐ回答フォームが使えない設定は稼働開始を止める。
+   * 停止はどんな状態でも実行できる(止められなくなると復旧できない)。
+   */
+  if (body.isEnabled) {
+    const formIssue = await nenCampaignFormIssue(c.env.DB, current, accountId);
+    if (formIssue) {
+      return c.json({
+        success: false,
+        error: `設定不足のため動かせません。${NEN_CAMPAIGN_FORM_ISSUE_LABELS[formIssue]}。編集画面でフォームを選び直してください`,
+      }, 409);
+    }
+  }
   await saveNenCampaignAccountSetting(c.env.DB, accountId, {
     ...current,
     is_enabled: body.isEnabled ? 1 : 0,
@@ -297,15 +359,43 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireRole
   return c.json({ success: true });
 });
 
+type NenCampaignDraft = {
+  title?: string; bodyText?: string; buttonLabel?: string; buttonUrl?: string; imageUrl?: string;
+};
+
+/**
+ * テスト送信に乗せる編集中の下書き。保存済みの値を上書きするだけで、本配信の設定は変えない。
+ * 保存と同じ検査を通す（監査 R65: プレビューと違う保存済み本文が飛んでいた）。
+ */
+function applyCampaignDraft(campaign: CampaignRow, draft: NenCampaignDraft | undefined): CampaignRow | { error: string } {
+  if (!draft) return campaign;
+  const title = draft.title === undefined ? campaign.title : draft.title.trim();
+  const bodyText = draft.bodyText === undefined ? campaign.body_text : draft.bodyText;
+  const buttonLabel = draft.buttonLabel === undefined ? campaign.button_label ?? '' : draft.buttonLabel.trim();
+  const buttonUrl = draft.buttonUrl === undefined ? campaign.button_url ?? '' : draft.buttonUrl.trim();
+  const imageUrl = draft.imageUrl === undefined ? campaign.image_url ?? '' : draft.imageUrl.trim();
+  if (!title || title.length > 120 || !bodyText.trim()) {
+    return { error: 'Invalid campaign values' };
+  }
+  const bodyCheck = checkNenCampaignBodyLength(bodyText);
+  if (!bodyCheck.fits) {
+    return { error: `本文は${NEN_CAMPAIGN_BODY_MAX_LENGTH.toLocaleString('ja-JP')}字以内で入力してください（現在${bodyCheck.length.toLocaleString('ja-JP')}字）` };
+  }
+  if (buttonLabel.length > 20 || !isUrl(buttonUrl) || !isUrl(imageUrl)) {
+    return { error: 'Invalid campaign values' };
+  }
+  return { ...campaign, title, body_text: bodyText, button_label: buttonLabel, button_url: buttonUrl, image_url: imageUrl };
+}
+
 nenCampaigns.post('/api/nen-campaigns/test-send', requireRole('owner', 'admin'), async (c) => {
-  const body = await c.req.json<{ campaignKey?: string; accountId?: string; friendId?: string }>().catch(() => null);
+  const body = await c.req.json<{ campaignKey?: string; accountId?: string; friendId?: string; draft?: NenCampaignDraft }>().catch(() => null);
   if (!body?.campaignKey || !CAMPAIGN_KEYS.has(body.campaignKey) || !body.accountId || !body.friendId) {
     return c.json({ success: false, error: 'campaignKey, accountId and friendId are required' }, 400);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
-  const [campaign, account, friend] = await Promise.all([
+  const [savedCampaign, account, friend] = await Promise.all([
     getNenCampaign(c.env.DB, body.campaignKey, body.accountId),
     getLineAccountById(c.env.DB, body.accountId),
     getTestRecipient(c, body.accountId, body.friendId),
@@ -313,7 +403,9 @@ nenCampaigns.post('/api/nen-campaigns/test-send', requireRole('owner', 'admin'),
   // テスト送信先は「設定 › アカウント › テスト送信先」に登録され、かつ友だち追加中の人だけ。
   // 画面が理由を言えるよう、送信先の問題は code で分ける。
   if (!friend) return c.json({ success: false, code: 'test_recipient_unavailable', error: 'テスト送信先が登録されていないか、友だち追加されていません' }, 404);
-  if (!campaign || !account) return c.json({ success: false, error: 'Test target not found' }, 404);
+  if (!savedCampaign || !account) return c.json({ success: false, error: 'Test target not found' }, 404);
+  const campaign = applyCampaignDraft(savedCampaign, body.draft);
+  if ('error' in campaign) return c.json({ success: false, error: campaign.error }, 400);
   const sample = {
     event: {
       event_id: `test-${crypto.randomUUID()}`, event_type: 'ec.order.shipped', occurred_at: new Date().toISOString(),
@@ -559,11 +651,43 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireRole('owner
   if (!body?.accountId || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
+  /*
+   * M506: 複製の要求キー。二重押し・応答消失後の再送は同じ複製へ戻し、
+   * 2本目を作らない。キーは複製行の主キーになる。
+   */
+  const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
+  if (idempotencyKey && !isValidIdempotencyKey(idempotencyKey)) {
+    return c.json({ success: false, error: 'Idempotency-Key はUUIDで送ってください' }, 400);
+  }
+  const sourceId = c.req.param('id');
+  const findDuplicate = () => c.env.DB.prepare(
+    `SELECT id, source_column_id FROM nen_columns WHERE id = ? AND line_account_id = ?`,
+  ).bind(idempotencyKey, body.accountId).first<{ id: string; source_column_id: string | null }>();
   try {
-    const data = await duplicateNenColumn(c.env.DB, { id: c.req.param('id'), lineAccountId: body.accountId });
+    if (idempotencyKey) {
+      const existing = await findDuplicate();
+      if (existing) {
+        if (existing.source_column_id !== sourceId) {
+          return c.json({ success: false, error: '同じ操作で内容の違う複製が既にあります' }, 409);
+        }
+        c.header('Idempotency-Replayed', 'true');
+        return c.json({ success: true, data: { id: existing.id, sourceColumnId: sourceId }, replayed: true }, 200);
+      }
+    }
+    const data = await duplicateNenColumn(c.env.DB, {
+      id: sourceId, lineAccountId: body.accountId, newId: idempotencyKey ?? undefined,
+    });
     auditLog(c, 'nen.column.duplicate', { kind: 'nen_column', id: data.id });
     return c.json({ success: true, data }, 201);
   } catch (error) {
+    // 同時実行の競合で負けた側。勝った複製を読み直して返す。
+    if (idempotencyKey) {
+      const raced = await findDuplicate();
+      if (raced && raced.source_column_id === sourceId) {
+        c.header('Idempotency-Replayed', 'true');
+        return c.json({ success: true, data: { id: raced.id, sourceColumnId: sourceId }, replayed: true }, 200);
+      }
+    }
     return columnOperationError(c, error);
   }
 });
@@ -814,10 +938,12 @@ nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), asyn
   const now = jstNow();
   const id = crypto.randomUUID();
   await c.env.DB.prepare(
-    `INSERT INTO nen_pet_profiles (id, friend_id, customer_id, name, animal_type, gender, birthday, breed, weight_kg, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO nen_pet_profiles (id, friend_id, customer_id, name, animal_type, gender, birthday, breed, weight_kg, created_at, updated_at, weight_updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(id, body.friendId, typeof body.customerId === 'string' ? body.customerId : null,
-    input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, now, now).run();
+    input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, now, now,
+    // 体重を入れて登録したときだけ「測った日＝登録日」を記録（監査 R57）。
+    input.weightKg == null ? null : now).run();
   await syncNenPetTags(c.env.DB, body.friendId);
   return c.json({ success: true, data: { id } }, 201);
 });
@@ -850,9 +976,15 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), a
     breed: patch.breed === undefined ? pet.breed : patch.breed,
     weightKg: patch.weightKg === undefined ? pet.weight_kg : patch.weightKg,
   };
+  // 監査 R57: 「体重の更新」は体重が実際に変わったときだけ動かす。
+  // 名前だけの編集や同じ値の再送では日付を維持する。
+  const weightTouched = patch.weightKg !== undefined && patch.weightKg !== pet.weight_kg;
   await c.env.DB.prepare(
-    `UPDATE nen_pet_profiles SET name = ?, animal_type = ?, gender = ?, birthday = ?, breed = ?, weight_kg = ?, updated_at = ? WHERE id = ?`,
-  ).bind(input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, jstNow(), c.req.param('id')).run();
+    `UPDATE nen_pet_profiles SET name = ?, animal_type = ?, gender = ?, birthday = ?, breed = ?, weight_kg = ?, updated_at = ?,
+       weight_updated_at = CASE WHEN ? THEN ? ELSE weight_updated_at END
+     WHERE id = ?`,
+  ).bind(input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, jstNow(),
+    weightTouched ? 1 : 0, jstNow(), c.req.param('id')).run();
   // 誕生日を明示して変えたときだけ、古い日付へ予約済みの誕生日クーポン配信を
   // 取消し、次の日次走査で新しい誕生日から組み直させる。発行済みの今年分は残る。
   if (patch.birthday !== undefined && (pet.birthday ?? null) !== patch.birthday) {

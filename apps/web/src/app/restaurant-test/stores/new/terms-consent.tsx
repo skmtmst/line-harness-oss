@@ -2,9 +2,11 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Checkbox from '@/components/shared/checkbox'
 import TermsDocumentContent from '@/components/legal/terms-document'
 import { TERMS_DOCUMENT, TERMS_IS_DRAFT } from '@/content/terms/musubo-terms'
 import { canSubmitTerms, hasReadTerms } from './terms-state'
+import Button from '@/components/shared/button'
 
 export default function TermsConsent({ onAgree }: { onAgree: () => Promise<void> }) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -62,26 +64,17 @@ export default function TermsConsent({ onAgree }: { onAgree: () => Promise<void>
     >
       <TermsDocumentContent />
     </div>
-    <label className={`flex items-start gap-3 rounded-control border border-hairline px-4 py-3 text-sm font-semibold ${readToEnd ? 'cursor-pointer text-ink' : 'cursor-not-allowed text-ink-faint'}`}>
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={!readToEnd || saving}
-        onChange={(event) => setChecked(event.target.checked)}
-        className="mt-0.5 h-4 w-4 accent-accent"
-      />
-      上記の利用規約および個人情報の取扱いに同意します
-    </label>
+    <Checkbox
+      checked={checked}
+      disabled={!readToEnd || saving}
+      onCheckedChange={setChecked}
+      className="rounded-control border border-hairline px-4 py-3"
+    >上記の利用規約および個人情報の取扱いに同意します</Checkbox>
     {disabledReason && <p className="text-xs font-semibold text-warning">{disabledReason}</p>}
     {error && <p role="alert" className="text-xs font-semibold text-danger">{error}</p>}
     <div className="flex flex-wrap items-center justify-between gap-3">
       <Link href="/restaurant-test/terms" className="text-xs font-semibold text-action">利用規約を別画面で読む</Link>
-      <button
-        type="button"
-        disabled={!canSubmitTerms(readToEnd, checked) || saving}
-        onClick={() => void agree()}
-        className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40"
-      >{saving ? '同意を記録中…' : '同意して次へ進む'}</button>
+      <Button variant="primary" className="px-5 py-2.5 border-0 h-auto whitespace-normal" type="button" disabled={!canSubmitTerms(readToEnd, checked) || saving} onClick={() => void agree()}>{saving ? '同意を記録中…' : '同意して次へ進む'}</Button>
     </div>
   </div>
 }

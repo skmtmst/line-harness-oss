@@ -55,6 +55,7 @@ export default function FriendIdentityCandidatesPage() {
         failure={review.failure}
         emptyTitle="確認する候補はありません"
         emptyDescription="同じ人の疑いが見つかると、ここに並びます。"
+        onRetry={review.reload}
       />
 
       {review.state === 'ready' && detail ? (
@@ -79,7 +80,10 @@ export default function FriendIdentityCandidatesPage() {
               <div className="mt-2 overflow-hidden rounded-control border border-hairline">
                 <DataTable className="table-fixed text-xs">
                   <thead className="bg-canvas-sunken text-ink-secondary">
-                    <TableHeadRow><Th>項目</Th><Th>候補A</Th><Th>候補B</Th><Th>採用する値</Th></TableHeadRow>
+                    <TableHeadRow>{/*
+                      表の外側の余白は左右で同じにする（20px）。
+                      採用する値の列は文字数に合わせた固定幅にし、残りは候補の列で吸収する。
+                    */}<Th className="pl-5">項目</Th><Th>候補A</Th><Th>候補B</Th><Th className="w-36 pr-5">採用する値</Th></TableHeadRow>
                   </thead>
                   <tbody className="divide-y divide-hairline">
                     {profileCandidates.map((field) => {
@@ -87,18 +91,18 @@ export default function FriendIdentityCandidatesPage() {
                       const right = field.options.find((option) => option.sourceFriendId === detail.right.id)
                       return (
                         <Tr key={field.fieldKey}>
-                          <Td><span className="font-semibold text-ink">{field.fieldLabel}</span></Td>
-                          <Td>{left?.valuePreview ?? '—'}</Td>
-                          <Td>{right?.valuePreview ?? '—'}</Td>
-                          <Td>判定時に選択</Td>
+                          <Td className="pl-5"><span className="font-semibold text-ink">{field.fieldLabel}</span></Td>
+                          <Td><span>{left?.valuePreview ?? '—'}</span></Td>
+                          <Td><span>{right?.valuePreview ?? '—'}</span></Td>
+                          <Td className="pr-5"><span>判定時に選択</span></Td>
                         </Tr>
                       )
                     })}
                     {tagCandidates.length > 0 ? (
                       <Tr>
-                        <Td><span className="font-semibold text-ink">タグ</span></Td>
-                        <Td colSpan={2}>{tagCandidates.map((tag) => tag.name).join('・')}</Td>
-                        <Td>元の友だちに保持</Td>
+                        <Td className="pl-5"><span className="font-semibold text-ink">タグ</span></Td>
+                        <Td colSpan={2}><span>{tagCandidates.map((tag) => tag.name).join('・')}</span></Td>
+                        <Td className="pr-5"><span>元の友だちに保持</span></Td>
                       </Tr>
                     ) : null}
                   </tbody>

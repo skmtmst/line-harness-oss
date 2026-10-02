@@ -134,7 +134,6 @@ describe('画面の一覧', () => {
       '/friends',
       '/friends/detail',
       '/tags',
-      '/tags-v2',
       '/tags/fields/new',
       '/tags/fields/migrate',
       '/scenarios',
@@ -171,6 +170,7 @@ describe('画面の一覧', () => {
       '/inflow-links/new',
       '/form-submissions/edit',
       '/mileage/earning-rules/new',
+      '/mileage/earning-rules/edit',
       '/automations/new',
       '/webhooks/new',
       '/booking/bookings/detail',
@@ -212,9 +212,13 @@ describe('旧ルートのリダイレクト', () => {
     ['/users', '/friends'],
     ['/support', '/chats'],
     ['/updates', '/emergency'],
-    ['/pools', '/accounts'],
-    ['/affiliates', '/conversions'],
     ['/booking/staff', '/booking/menus'],
+    // Issue #638: サイトマップ/案内URLとして出回った実体の無い5本。
+    ['/booking/menus/list', '/booking/menus'],
+    ['/booking/schedule', '/booking/staff/shifts'],
+    ['/booking/rules', '/booking/menus'],
+    ['/booking', '/booking/bookings'],
+    ['/dashboard/scenarios', '/scenarios'],
   ] as const;
 
   const redirects = readFileSync(join(PUBLIC_DIR, '_redirects'), 'utf8');
@@ -230,6 +234,19 @@ describe('旧ルートのリダイレクト', () => {
     expect(line).toContain('308');
   });
 
+  it('/affiliates は _redirects に戻さず、画面側が ?tab= を保って /conversions へ送る', () => {
+    // Pages の _redirects はクエリを条件にできない。静的 308 で
+    // /conversions?tab=affiliates へ固定すると、/affiliates?tab=offers の
+    // tab が落ちる。受け皿は /affiliates の page.tsx（クライアント側で
+    // router.replace）なので、ここでは「行が無いこと」と「画面があること」
+    // の両方を固定する。
+    const line = redirects
+      .split('\n')
+      .find((l) => !l.trimStart().startsWith('#') && l.trim().startsWith('/affiliates '));
+    expect(line, '/affiliates を _redirects の静的 308 に戻すと ?tab= が落ちます').toBeFalsy();
+    expect(ROUTE_SET.has('/affiliates'), '/affiliates の画面がありません').toBe(true);
+  });
+
   it('リダイレクト先の画面が実在する', () => {
     for (const line of redirects.split('\n')) {
       const trimmed = line.trim();
@@ -241,8 +258,20 @@ describe('旧ルートのリダイレクト', () => {
     }
   });
 
+  it('/pools はリダイレクトせず、プール管理の画面がそのまま開く (監査R127)', () => {
+    // /pools → /accounts?tab=pools の旧リダイレクトは、統合時代の残り。
+    // accounts 画面は pools の札を処理しないため、直接URL・再読み込みで
+    // アカウント一覧に落ちていた。専用画面が /pools にあるので、
+    // 「行が無いこと」と「画面があること」の両方を固定する。
+    const line = redirects
+      .split('\n')
+      .find((l) => !l.trimStart().startsWith('#') && l.trim().startsWith('/pools '));
+    expect(line, '/pools を _redirects に戻すと直接表示がアカウント一覧に落ちます').toBeFalsy();
+    expect(ROUTE_SET.has('/pools'), '/pools の画面がありません').toBe(true);
+  });
+
   it('作成画面は残っている（親だけをリダイレクトしている）', () => {
-    // /pools は /accounts?tab=pools へ飛ばすが、/pools/new は残す。
+    // 親のリダイレクトがある場合も、/new のような下の階層は残す。
     // 下の階層まで巻き込むと、作成画面へ行けなくなる。
     for (const child of ['/pools/new', '/affiliates/new']) {
       if (!ROUTE_SET.has(child)) continue;

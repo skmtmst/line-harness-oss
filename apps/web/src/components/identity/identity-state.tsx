@@ -24,11 +24,21 @@ export function IdentityStateBlock({
   failure,
   emptyTitle,
   emptyDescription,
+  onRetry,
+  retrying = false,
 }: {
   state: IdentityViewState
   failure: IdentityFailure | null
   emptyTitle: string
   emptyDescription: string
+  /**
+   * M013：読み直し。`error` のときだけ共通部品が押し口を出す。
+   * 権限不足には出さない（押しても直らないため）。
+   * 読み直している間は失敗面が読込面へ切り替わるので二度押しできない。
+   */
+  onRetry?: () => void
+  /** 読み直している間。二度押しを止める。 */
+  retrying?: boolean
 }) {
   if (state === 'ready') return null
   if (state === 'loading') return <ListState kind="loading" />
@@ -36,5 +46,13 @@ export function IdentityStateBlock({
     return <ListState kind="empty" title={emptyTitle} description={emptyDescription} />
   }
   const kind = state === 'forbidden' ? 'forbidden' : 'error'
-  return <ListState kind={kind} title={failure?.title} description={failure?.description} />
+  return (
+    <ListState
+      kind={kind}
+      title={failure?.title}
+      description={failure?.description}
+      onRetry={kind === 'error' ? onRetry : undefined}
+      retrying={retrying}
+    />
+  )
 }

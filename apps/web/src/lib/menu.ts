@@ -195,7 +195,7 @@ export const MENU_SECTIONS: MenuSection[] = [
       { href: '/restaurant-test/tables', label: '座席・卓管理', icon: 'M4 6h16M6 6v12m12-12v12M4 18h16M9 10h6v4H9z', id: 'restaurant-tables', note: 'フロア、席種、収容人数、結合ルール', featureKey: 'restaurant_test' },
       { href: '/restaurant-test/inventory', label: '予約枠・在庫', icon: 'M3 5h18v14H3zM3 10h18M8 5v14M13 5v14M18 5v14', id: 'restaurant-inventory', note: '時間帯と媒体別の受入枠を管理', featureKey: 'restaurant_test' },
       { href: '/restaurant-test/menu', label: 'メニュー管理', icon: 'M4 6h16M4 10h16M4 14h10M4 18h10', id: 'restaurant-menu', note: 'コース・単品・価格・アレルギー情報', featureKey: 'restaurant_test' },
-      { href: '/restaurant-test/google', label: 'Google・口コミ', icon: 'M21 12a9 9 0 11-2.64-6.36M21 4v6h-6', id: 'restaurant-google', note: 'GBP口コミ返信と最新情報の下書き管理', featureKey: 'restaurant_test' },
+      { href: '/restaurant-test/google', label: 'Googleビジネス', icon: 'M21 12a9 9 0 11-2.64-6.36M21 4v6h-6', id: 'restaurant-google', note: 'Googleの口コミ確認・AI返信下書き・公開', featureKey: 'restaurant_test' },
       { href: '/restaurant-test/line-followup', label: 'LINE来店フォロー', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z', id: 'restaurant-line-followup', note: '予約前・来店後・口コミ・会員証のLINEカード', featureKey: 'restaurant_test' },
     ],
   },
@@ -220,26 +220,55 @@ export const MENU_SECTION_BY_ID = new Map(MENU_SECTIONS.map((section) => [sectio
  * 通す（キーのクエリは「この組が揃っていること」の条件として読む）。
  * 値は所属先の MenuItem.id。値が示す項目がメニューから外れた場合、
  * 宣言は効かず通常のパス一致へ戻る（サイドバー側でそう扱う）。
+ *
+ * 値を配列にすると「候補の順」で宣言できる。左から順に、いまの人の
+ * メニューに見えている最初の項目が選ばれる（Issue #708）。
+ * 受付枠 `/booking/staff/shifts` は、担当者には「自分の勤務」、
+ * 管理者には「予約設定」の一部として見せたいため、2つの候補を持つ。
  */
-export const SCREEN_MENU_OWNER: Record<string, string> = {
+export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
   '/accounts?tab=migration': 'friends',
+  /*
+   * /conversions の1画面に「成果とアフィリエイト」と「コンバージョン」の
+   * 2機能が同居する（conversions-tab-title.ts と同じ対応）。左メニューは
+   * 2項目に分かれているので、開いているタブ側の項目を選ぶ。宣言が無いと
+   * 案件タブを開いても「コンバージョン」が光り、画面名と食い違う。
+   */
+  '/conversions?tab=affiliates': 'affiliates',
+  '/conversions?tab=offers': 'affiliates',
+  '/conversions?tab=approvals': 'affiliates',
+  '/conversions?tab=payment': 'affiliates',
+  '/conversions?tab=points': 'conversions',
+  '/conversions?tab=report': 'conversions',
+  /*
+   * 受付枠は /booking/menus のタブと見た目を揃えているが、URLは
+   * /booking/staff/shifts に置いてある。メニューの項目は担当者向けの
+   * 「自分の勤務」（staffOnly）なので、管理者の画面では選ぶものが無く、
+   * どの所属か分からなくなっていた（Issue #708）。担当者は自分の勤務、
+   * 管理者は予約設定を選ぶ。
+   */
+  '/booking/staff/shifts': ['booking-own-shifts', 'booking-menus'],
 }
 
 /**
- * いまの画面が宣言済みの所属を持つなら、その MenuItem.id を返す。
+ * いまの画面が宣言済みの所属を持つなら、所属先候補の MenuItem.id を
+ * 優先順で返す。宣言が無ければ undefined。
  *
  * `?tab=migration&from=sidebar` のように宣言へ無いパラメータが
  * 増えても、`tab=migration` が揃っている限り同じ画面として扱う。
  * パラメータの並び順にも依存しない。
+ *
+ * 候補が複数ある画面（受付枠など）では、呼ぶ側が「いまの人に見えている
+ * 最初の項目」を選ぶ（Issue #708）。
  */
-export function menuOwnerForScreen(pathname: string, search: string): string | undefined {
+export function menuOwnerForScreen(pathname: string, search: string): readonly string[] | undefined {
   const current = new URLSearchParams(search)
-  for (const [screen, ownerId] of Object.entries(SCREEN_MENU_OWNER)) {
+  for (const [screen, owner] of Object.entries(SCREEN_MENU_OWNER)) {
     const [path, query = ''] = screen.split('?')
     if (path !== pathname) continue
     const required = new URLSearchParams(query)
     const satisfied = Array.from(required.entries()).every(([key, value]) => current.get(key) === value)
-    if (satisfied) return ownerId
+    if (satisfied) return typeof owner === 'string' ? [owner] : owner
   }
   return undefined
 }

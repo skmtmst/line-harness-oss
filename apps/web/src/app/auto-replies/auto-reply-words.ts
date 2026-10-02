@@ -109,7 +109,9 @@ export function effectiveAccountWord(
 ): { mark: string; note: string } {
   if (status === 'not_applicable') {
     return {
-      mark: '',
+      // 消し線だけだと「デ」のような文字に見えて、押せる印かどうか
+      // 読み取れなかった（監査 A13）。無効の印を明示する。
+      mark: '✕',
       note: 'このアカウントでは動きません。別のアカウント専用の設定です',
     }
   }
@@ -159,18 +161,27 @@ export const EFFECTIVE_LEGEND: ReadonlyArray<{
   },
   {
     status: 'not_applicable',
-    mark: '',
+    mark: '✕',
     text: 'このアカウントでは動きません。別のアカウント専用の設定です。',
   },
 ]
 
-/** 応答したときに行うこと。設定を開かずに何をするルールか読めるようにする。 */
+/**
+ * 応答したときに行うこと。設定を開かずに何をするルールか読めるようにする。
+ *
+ * R256: 対応済み9種は編集画面（シナリオの終了後の処理 #961・`ACTION_KINDS`）
+ * と同じ名称にする。未知の将来種別だけが「その他の処理」になる。
+ */
 const ACTION_WORDS: Record<string, string> = {
-  tag: 'タグ',
-  friend_field: '友だち情報',
-  support_mark: '対応マーク',
-  scenario: 'シナリオ',
-  common_var: '共通情報',
+  tag: 'タグ操作',
+  friend_field: '友だち情報操作',
+  support_mark: '対応マーク操作',
+  scenario: 'シナリオ操作',
+  common_var: '共通情報操作',
+  send_message: 'テキスト送信',
+  send_template: 'テンプレート送信',
+  reminder: 'リマインダ操作',
+  event_booking: 'イベント予約操作',
 }
 
 export function actionWord(actionType: string): string {
@@ -235,8 +246,10 @@ export function keywordRules(rule: {
 /**
  * 「どんなときに動くか」の先頭行と、読める形の全文。
  *
- * 先頭行は幅が狭いので「言葉・言葉・ほかN件」まで。全文は title に
+ * 先頭行は幅が狭いので「言葉・言葉・ほかNつ」まで。全文は title に
  * 一致方法と「どれか1つ／すべて」のまとめ方まで書く。
+ * m22d: キーワードの数え残しは「つ」にし、「件」は数のカードだけに残す
+ * （ほかN件だと、有効・要確認の「3件」と同じ「3件」が3回出る）。
  */
 export function triggerSummary(rule: {
   keyword: string
@@ -263,7 +276,7 @@ export function triggerSummary(rule: {
   const shown = rules.slice(0, 2).map((item) => `「${item.keyword}」`).join('')
   const rest = rules.length - 2
   return {
-    text: rest > 0 ? `${shown}ほか${rest}件` : shown,
+    text: rest > 0 ? `${shown}ほか${rest}つ` : shown,
     title: `${details} — ${mode}`,
   }
 }

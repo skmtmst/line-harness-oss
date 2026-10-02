@@ -269,16 +269,20 @@ describe('切り戻しの可否と照合（FRIEND-34/35/36）', () => {
       { id: 'f-old', user_id: 'user-merged' },
       { id: 'f-new', user_id: 'user-merged' },
     ] });
-    vi.mocked(env.DB.batch).mockResolvedValue([{ meta: { changes: 1 } }, { meta: { changes: 1 } }] as never);
+    // R396: ペア2件の書き戻しは1文で2件一致する。
+    run.mockResolvedValue({ meta: { changes: 2 } });
+    vi.mocked(env.DB.batch).mockResolvedValue([{ meta: { changes: 1 } }, { meta: { changes: 1 } }, { meta: { changes: 1 } }] as never);
     const response = await appFor().fetch(post('/api/friends/migrations/run-1/rollback', {}), env);
     expect(response.status).toBe(200);
     const body = await response.json() as { data: { status: string; rolledBack: number; rollbackable: boolean } };
     expect(body.data.status).toBe('rolled_back');
     expect(body.data.rolledBack).toBe(1);
     expect(body.data.rollbackable).toBe(false);
-    // FRIEND-35: 現在値をWHERE条件に含む書き戻し（照合と書込みの二重防御）。
+    // FRIEND-35/R396: 現在値をWHERE条件に含む書き戻し（照合と書込みの二重防御）。
+    // ペア2件は1文（CASE）で同時に戻し、部分復旧を出さない。
     const sqls = prepare.mock.calls.map(([sql]) => String(sql));
-    expect(sqls.some((sql) => /UPDATE friends SET user_id = \?, updated_at = \? WHERE id = \? AND user_id = \?/.test(sql))).toBe(true);
+    expect(sqls.some((sql) => /UPDATE friends\s+SET user_id = CASE/i.test(sql))).toBe(true);
+    expect(sqls.some((sql) => /user_id IS \?/.test(sql))).toBe(true);
     // 失敗行（item-2）へは何も書かない。
     expect(env.DB.batch).toHaveBeenCalledTimes(1);
   });
@@ -374,5 +378,27 @@ describe('一部失敗からの再実行（FRIEND-34）', () => {
     expect(response.status).toBe(200);
     const body = await response.json() as { data: { decisionCounts: { link: number; exclude: number } } };
     expect(body.data.decisionCounts).toMatchObject({ link: 3, exclude: 2 });
+  });
+});
+
+describe('R114 書き出す項目の選択', () => {
+  it('未対応の項目は作らせず理由を返す', async () => {
+    for (const columns of [['basic', 'tags_fields'], ['support'], ['basic', 'tags_fields', 'support']]) {
+      const response = await appFor().fetch(post('/api/friends/exports', {
+        accountId: 'from', columns, encoding: 'utf-8',
+      }), env);
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ error: expect.stringContaining('まだ使えません') });
+    }
+  });
+
+  it('基本だけは作れる', async () => {
+    first.mockResolvedValue({ count: 3 });
+    const response = await appFor().fetch(post('/api/friends/exports', {
+      accountId: 'from', columns: ['basic'], encoding: 'utf-8',
+    }), env);
+    expect(response.status).toBe(201);
+    const body = await response.json() as { success: boolean; data: { rowCount: number } };
+    expect(body.data.rowCount).toBe(3);
   });
 });

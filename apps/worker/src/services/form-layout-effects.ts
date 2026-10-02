@@ -53,6 +53,12 @@ export interface FormGateInput {
   answers: FormAnswers;
   /** 判定の基準時刻。テストから固定できるようにしてある */
   now?: Date;
+  /**
+   * P（試し回答）：true のとき、1人1回・全体上限・選択肢定員を見ない。
+   * 試しは本物の枠を消費せず、本物の回答歴にも数えない。入力の形と
+   * 回答期限は本物と同じに見る。
+   */
+  isTest?: boolean;
 }
 
 /**
@@ -65,6 +71,7 @@ export async function checkFormGates(input: FormGateInput): Promise<string | nul
   const { db, formId, layout, friendId, submitCount, answers } = input;
   const options = layout.options ?? {};
   const now = input.now ?? new Date();
+  const isTest = input.isTest === true;
 
   // 回答期限
   if (options.deadline?.enabled && options.deadline.endsAt) {
@@ -74,8 +81,8 @@ export async function checkFormGates(input: FormGateInput): Promise<string | nul
     }
   }
 
-  // 全体の受付上限
-  if (options.totalLimit?.enabled && typeof options.totalLimit.max === 'number') {
+  // 全体の受付上限（試しは枠を消費しないので見ない）
+  if (!isTest && options.totalLimit?.enabled && typeof options.totalLimit.max === 'number') {
     if (submitCount >= options.totalLimit.max) {
       return options.totalLimit.message || 'このフォームは受付を終了しました';
     }
@@ -85,17 +92,19 @@ export async function checkFormGates(input: FormGateInput): Promise<string | nul
   const invalid = validateAnswers(layout, answers);
   if (invalid) return invalid;
 
-  // 1人1回
-  if (options.oncePerFriend?.enabled) {
+  // 1人1回（試しは本物の回答歴に数えず、試し同士でも縛らない）
+  if (!isTest && options.oncePerFriend?.enabled) {
     const already = await countFormSubmissionsByFriend(db, formId, friendId);
     if (already > 0) {
       return options.oncePerFriend.message || 'このフォームは、お一人さま1回までです';
     }
   }
 
-  // 選択肢の定員
-  const full = await findFullChoice(db, formId, layout, answers);
-  if (full) return `「${full}」は定員に達しました`;
+  // 選択肢の定員（試しは枠を消費しないので見ない）
+  if (!isTest) {
+    const full = await findFullChoice(db, formId, layout, answers);
+    if (full) return `「${full}」は定員に達しました`;
+  }
 
   return null;
 }

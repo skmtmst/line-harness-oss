@@ -357,6 +357,194 @@ describe('V6オートメーションの一覧・対象見込み・1人テスト'
     expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM automation_runs`).get())
       .toEqual({ count: 0 });
   });
+
+  /*
+   * 監査 R487: 下書きが呼ぶ共通アクションは `common_action_bindings` で
+   * 版を固定する。**束の切り替えは下書きの版・指紋を変えない**ので、
+   * 確認画面が持つ版の一式（expectedCommonActions）と照合しないと、
+   * 確認後に別担当が切り替えた新版をそのまま送ってしまう。
+   */
+  describe('1人テストの共通アクション版照合（R487）', () => {
+    function addCommonAction(
+      raw: Database.Database,
+      input: { id: string; versions: Array<{ id: string; number: number; actions?: unknown[] }> },
+    ): void {
+      raw.prepare(
+        `INSERT INTO common_actions (id, line_account_id, name, status)
+         VALUES (?, 'account-1', ?, 'published')`,
+      ).run(input.id, `共通アクション ${input.id}`);
+      for (const version of input.versions) {
+        raw.prepare(
+          `INSERT INTO common_action_versions
+             (id, common_action_id, version_number, status, action_config, published_at)
+           VALUES (?, ?, ?, 'published', ?, datetime('now'))`,
+        ).run(
+          version.id, input.id, version.number,
+          JSON.stringify(version.actions ?? []),
+        );
+      }
+    }
+
+    function addBinding(
+      raw: Database.Database,
+      input: { commonActionId: string; versionId: string; consumerId: string; consumerPath: string },
+    ): void {
+      raw.prepare(
+        `INSERT INTO common_action_bindings
+           (id, line_account_id, common_action_id, common_action_version_id,
+            consumer_type, consumer_id, consumer_path)
+         VALUES (?, 'account-1', ?, ?, 'automation', ?, ?)`,
+      ).run(
+        `bind-${input.consumerId}-${input.consumerPath}`,
+        input.commonActionId, input.versionId, input.consumerId, input.consumerPath,
+      );
+    }
+
+    function addDraftWithCommonAction(raw: Database.Database, id: string): string {
+      return addDefinition(raw, {
+        id,
+        status: 'draft',
+        actions: [{
+          id: 'step-1', type: 'common_action',
+          params: { commonActionId: 'ca-1' }, onFailure: 'stop',
+        }],
+      });
+    }
+
+    const CONFIRMED_CV1 = [{ stepId: 'step-1', commonActionId: 'ca-1', versionId: 'cv-1' }];
+
+    function seedCommonActionDraft(raw: Database.Database, id: string): string {
+      addCommonAction(raw, {
+        id: 'ca-1',
+        versions: [
+          {
+            id: 'cv-1', number: 1,
+            actions: [{ id: 'inner', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop' }],
+          },
+          {
+            id: 'cv-2', number: 2,
+            actions: [{ id: 'inner', type: 'send_message', params: { content: '新しい文面' }, onFailure: 'stop' }],
+          },
+        ],
+      });
+      const versionId = addDraftWithCommonAction(raw, id);
+      addBinding(raw, {
+        commonActionId: 'ca-1', versionId: 'cv-1', consumerId: id, consumerPath: 'step-1',
+      });
+      return versionId;
+    }
+
+    it('確認した版と同じなら実行でき、実行記録に固定版が残る', async () => {
+      const versionId = seedCommonActionDraft(testDb.raw, 'ca-draft-ok');
+      const result = await runAutomationTest(testDb.db, {
+        automationId: 'ca-draft-ok',
+        versionId: await revisionOf(testDb.raw, versionId),
+        friendId: 'friend-1',
+        lineAccountId: 'account-1',
+        expectedCommonActions: CONFIRMED_CV1,
+      });
+      expect(result.status).toBe('success');
+      // 実行計画のマーカーに固定版が焼き付いている。
+      expect(testDb.raw.prepare(
+        `SELECT step_key, action_type, common_action_version_id
+           FROM automation_run_steps WHERE step_key = 'step-1'`,
+      ).get()).toEqual({
+        step_key: 'step-1', action_type: 'common_action_marker',
+        common_action_version_id: 'cv-1',
+      });
+      // 版の中身の処理も走っている（friend-1 に tag-1 が付く）。
+      expect(testDb.raw.prepare(
+        `SELECT COUNT(*) AS count FROM friend_tags WHERE friend_id = 'friend-1' AND tag_id = 'tag-1'`,
+      ).get()).toEqual({ count: 1 });
+    });
+
+    it('共通アクションを含むのに照合用の一式が来なければ409で実行行も残さない', async () => {
+      const versionId = seedCommonActionDraft(testDb.raw, 'ca-draft-nocheck');
+      await expect(runAutomationTest(testDb.db, {
+        automationId: 'ca-draft-nocheck',
+        versionId: await revisionOf(testDb.raw, versionId),
+        friendId: 'friend-1',
+        lineAccountId: 'account-1',
+      })).rejects.toMatchObject({ code: 'version_conflict' });
+      expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM automation_runs').get())
+        .toEqual({ count: 0 });
+    });
+
+    it('確認したあとに束が新版へ切り替わっていたら409で実行行も残さない', async () => {
+      const versionId = seedCommonActionDraft(testDb.raw, 'ca-draft-switched');
+      const confirmed = await revisionOf(testDb.raw, versionId);
+      // 別担当が利用先管理で利用版を cv-1 → cv-2 へ切り替える。
+      testDb.raw.prepare(
+        `UPDATE common_action_bindings SET common_action_version_id = 'cv-2'
+          WHERE consumer_id = 'ca-draft-switched' AND consumer_path = 'step-1'`,
+      ).run();
+      await expect(runAutomationTest(testDb.db, {
+        automationId: 'ca-draft-switched',
+        versionId: confirmed,
+        friendId: 'friend-1',
+        lineAccountId: 'account-1',
+        expectedCommonActions: CONFIRMED_CV1,
+      })).rejects.toMatchObject({ code: 'version_conflict' });
+      expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM automation_runs').get())
+        .toEqual({ count: 0 });
+    });
+
+    it('確認していない別の版を指定されても409', async () => {
+      const versionId = seedCommonActionDraft(testDb.raw, 'ca-draft-wrong');
+      await expect(runAutomationTest(testDb.db, {
+        automationId: 'ca-draft-wrong',
+        versionId: await revisionOf(testDb.raw, versionId),
+        friendId: 'friend-1',
+        lineAccountId: 'account-1',
+        expectedCommonActions: [{ stepId: 'step-1', commonActionId: 'ca-1', versionId: 'cv-2' }],
+      })).rejects.toMatchObject({ code: 'version_conflict' });
+      expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM automation_runs').get())
+        .toEqual({ count: 0 });
+    });
+
+    it('入口の照合を通った直後に束が切り替わっても、焼き付いた計画と照合して送らず取消へ閉じる', async () => {
+      const versionId = seedCommonActionDraft(testDb.raw, 'ca-draft-late');
+      const confirmed = await revisionOf(testDb.raw, versionId);
+      /*
+       * `checkExpectedCommonActions` が通ったあと、`startAutomationRun` が
+       * 定義＋版を読む直前に束を切り替える。実行計画には cv-2 が焼き付くが、
+       * 送る前の見張りが marker 段の版を確認済みの一式と照合して止める。
+       */
+      let interrupted = false;
+      const racingDb = new Proxy(testDb.db, {
+        get(target, key: string, receiver: unknown) {
+          if (key !== 'prepare') return Reflect.get(target, key, receiver) as unknown;
+          return (sql: string) => {
+            if (!interrupted && sql.includes('FROM automation_definitions d')) {
+              interrupted = true;
+              testDb.raw.prepare(
+                `UPDATE common_action_bindings SET common_action_version_id = 'cv-2'
+                  WHERE consumer_id = 'ca-draft-late' AND consumer_path = 'step-1'`,
+              ).run();
+            }
+            return target.prepare(sql);
+          };
+        },
+      }) as D1Database;
+      await expect(runAutomationTest(racingDb, {
+        automationId: 'ca-draft-late',
+        versionId: confirmed,
+        friendId: 'friend-1',
+        lineAccountId: 'account-1',
+        expectedCommonActions: CONFIRMED_CV1,
+      })).rejects.toMatchObject({ code: 'version_conflict' });
+      expect(interrupted).toBe(true);
+      // 送っていない。手順は積まれただけで1つも動かしていない。
+      expect(testDb.raw.prepare(
+        "SELECT COUNT(*) AS count FROM automation_run_steps WHERE status <> 'queued' AND status <> 'cancelled'",
+      ).get()).toEqual({ count: 0 });
+      // 実行記録は履歴として残るが「取消」で閉じる（消せない決めごと）。
+      expect(testDb.raw.prepare('SELECT status, is_test FROM automation_runs').get())
+        .toEqual({ status: 'cancelled', is_test: 1 });
+      expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM friend_tags').get())
+        .toEqual({ count: 0 });
+    });
+  });
 });
 
 /*

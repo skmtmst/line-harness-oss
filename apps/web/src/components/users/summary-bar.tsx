@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import type { UserRowData } from './user-row'
 import { api } from '@/lib/api'
 import { createLatestRequestGuard } from './summary-request-guard'
@@ -17,7 +17,7 @@ type LoadStatus = 'loading' | 'ready' | 'error'
 /**
  * 統合ユーザー（設計 `r7eSi`）の指標カード。
  *
- * 面・角丸・文字は共通 SummaryCard に任せる。ここで手書きしていたときは
+ * 面・角丸・文字は共通 KpiCard に任せる。ここで手書きしていたときは
  * 値が24pxになっていて、設計の22pxと1画面ぶんずれていた。
  */
 export default function SummaryBar({ rows = [] }: { rows?: UserRowData[] }) {
@@ -63,19 +63,19 @@ export default function SummaryBar({ rows = [] }: { rows?: UserRowData[] }) {
 
   return (
     <div
-      className="grid grid-cols-2 gap-4 sm:grid-cols-4"
+      className="grid grid-cols-2 gap-4 sm:grid-cols-3"
       data-design-node="r7eSi"
       data-users-summary="v6"
       data-summary-state={status}
     >
-      <SummaryCard
+      <KpiCard
         title="統合ユーザー"
         value={stats?.uniquePeople ?? null}
         unit="人"
         detail={detailOf('重複を1人にまとめた数')}
         loading={loading}
       />
-      <SummaryCard
+      <KpiCard
         title="紐付く友だち"
         value={stats?.totalFollowing ?? null}
         unit="件"
@@ -86,20 +86,17 @@ export default function SummaryBar({ rows = [] }: { rows?: UserRowData[] }) {
         friendDups は行ベースの「余分な登録行数」(SUM(row_cnt - 1))。
         1人が3アカウントに居れば +2 と数える。通数でも金額でもない。
       */}
-      <SummaryCard
+      <KpiCard
         title="UID連携済み"
         value={status === 'ready' ? linkedUidCount : null}
         unit="人"
         detail={detailOf('このページでUID確認済み')}
         loading={loading}
       />
-      <SummaryCard
-        title="重複配信の削減"
-        value={null}
-        unit="通/月"
-        detail={detailOf('配信前プレビューの実績を接続後に表示')}
-        loading={loading}
-      />
+      {/*
+        「重複配信の削減」は未接続の機能のため、カードごと出さない。
+        通数・接続後の断り書きは、つながってから足す。
+      */}
     </div>
   )
 }

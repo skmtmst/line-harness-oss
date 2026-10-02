@@ -23,17 +23,11 @@ vi.mock('@/components/friend-fields/support-mark-editor', () => ({
     return <div data-testid="support-mark-editor" />
   },
 }))
-vi.mock('@/components/shared/list-state', () => ({
-  default: ({ title, action }: { title: string; action?: React.ReactNode }) => (
-    <div>{title}{action}</div>
+vi.mock('@/components/shared/target-missing', () => ({
+  default: ({ title, backLabel, backHref }: { title: string; backLabel?: string; backHref?: string }) => (
+    <div>{title}<a href={backHref}>{backLabel}</a></div>
   ),
 }))
-vi.mock('@/components/shared/button', () => ({
-  default: ({ href, children }: { href?: string; children: React.ReactNode }) => (
-    <a href={href}>{children}</a>
-  ),
-}))
-
 import Page from './page'
 
 afterEach(() => {
@@ -45,7 +39,7 @@ afterEach(() => {
 describe('#1058 対応マーク編集の `?id=` 欠落', () => {
   it('`?id=` なしでは作成フォームを出さず、一覧へ戻す案内を出す', () => {
     render(<Page />)
-    expect(screen.getByText('対象の対応マークが指定されていません')).toBeTruthy()
+    expect(screen.getByText('編集する対応マークが指定されていません')).toBeTruthy()
     expect(screen.getByText('対応マークの一覧へ戻る').closest('a')?.getAttribute('href'))
       .toBe('/tags?tab=marks')
     // 編集器そのものは描かない（作成フォームが出ない）。
@@ -57,6 +51,6 @@ describe('#1058 対応マーク編集の `?id=` 欠落', () => {
     render(<Page />)
     expect(screen.getByTestId('support-mark-editor')).toBeTruthy()
     expect(captured.markId).toBe('mark-1')
-    expect(screen.queryByText('対象の対応マークが指定されていません')).toBeNull()
+    expect(screen.queryByText('編集する対応マークが指定されていません')).toBeNull()
   })
 })

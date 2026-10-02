@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import {
   api,
@@ -11,12 +11,18 @@ import {
 } from '@/lib/api'
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import ActionMenu from '@/components/shared/action-menu'
+import MenuPortal from '@/components/shared/menu-portal'
+import { MoreAction } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import type { ButtonProps } from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
+import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -41,7 +47,18 @@ import {
   personNameText,
 } from './affiliate-display'
 import { AffiliateArchiveDialog } from './action-dialogs'
+import AttributionSection from './attribution-view'
+import OfferTermsDialog, {
+  EMPTY_TERMS,
+  OfferTermsFields,
+  parseOfferTermsInput,
+  toDateInput,
+  type OfferTermsFieldValues,
+  type ParsedOfferTerms,
+} from './offer-terms'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import Toggle from '@/components/shared/toggle'
 import {
   OFFER_FILTERS,
   OFFER_PAGE_SIZES,
@@ -54,6 +71,7 @@ import {
   type OfferFilter,
   type OfferSort,
 } from './offer-list-view'
+import { formatDay, formatNumber } from '@/lib/format'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -141,7 +159,7 @@ interface ReportV2 {
 
   **`as unknown as ReportV2` は嘘をつく。** 集計は期間で絞れるので、
   その期間に成果が1件も無い紹介者は**行そのものが返らない**。
-  一覧には載っているので押せてしまい、`report.clicks.toLocaleString()` で
+  一覧には載っているので押せてしまい、`formatNumber(report.clicks)` で
   **内訳の面ごと落ちていた。**（`Cannot read properties of undefined`）
 
   0件と「この期間に記録が無い」を混ぜないため、読めないときは `null` にして
@@ -180,11 +198,25 @@ function formatDate(iso: string | null): string {
   if (!iso) return '—'
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  return formatDay(date)
 }
 
 function formatYen(n: number): string {
-  return `¥${Math.round(n).toLocaleString('ja-JP')}`
+  return `¥${formatNumber(Math.round(n))}`
+}
+
+/*
+  R292: 既存リンクの配布URL。Worker の `resolveLinkBaseUrl` と同じ優先順位。
+  1. 管理画面で決めた短縮ドメイン（`link_base_url`）があれば、その直下。
+  2. 無ければ Worker の `/r/`（`NEXT_PUBLIC_API_URL` が Worker のURL）。
+  呼び出し側で付け足しの `/r` を増やさない（Worker の契約どおり）。
+*/
+const WORKER_BASE = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
+
+function distributionUrl(refCode: string, customBase: string | null): string {
+  if (customBase) return `${customBase.replace(/\/$/, '')}/${refCode}`
+  if (WORKER_BASE) return `${WORKER_BASE}/r/${encodeURIComponent(refCode)}`
+  return ''
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -238,7 +270,7 @@ async function listAllConversionApprovals(
       limit: APPROVAL_PAGE_SIZE,
       offset: startOffset + page * APPROVAL_PAGE_SIZE,
     })
-    if (!res.success) throw new Error('承認の読み込みに失敗しました')
+    if (!res.success) throw new Error('承認の読み込みに失敗しました。もう一度読み込んでください。')
     items.push(...res.data)
     if (res.data.length < APPROVAL_PAGE_SIZE) return { items, truncated: false }
   }
@@ -249,7 +281,14 @@ async function listAllConversionApprovals(
 // Affiliators tab — list + inline detail panel
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
+export function AffiliatorsTab({
+  accountId,
+  focusAffiliateId,
+}: {
+  accountId: string | null
+  /** R291: 停止前の確認から戻ってきたとき、最初に開く紹介者。 */
+  focusAffiliateId?: string | null
+}) {
   // ── list ───────────────────────────────────────────────────────────────────
   const [rows, setRows] = useState<AffiliateListRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -284,6 +323,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   // ── create modal ────────────────────────────────────────────────────────────
   const [createOpen, setCreateOpen] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null)
+  // 行の「…」メニューの開き先（EC連携の一覧と同じ形）
+  const [rowMenuId, setRowMenuId] = useState<string | null>(null)
 
   // ── journeys (cursor-paginated) ────────────────────────────────────────────
   const [journeys, setJourneys] = useState<JourneySummary[]>([])
@@ -292,6 +333,16 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   const [journeyMore, setJourneyMore] = useState(false)
   const [journeyLoadingMore, setJourneyLoadingMore] = useState(false)
   const journeyCursorRef = useRef<{ beforeAt: string; beforeId: string } | null>(null)
+  /*
+    R289: 内訳の読み込みの世代番号。紹介者を切り替えたら前の世代の遅い
+    応答を捨てる（#916 の会員一覧・友だち詳細と同じ形）。集計・リンク・
+    動線・追加読み込みの全経路で、選んでいる途中の世代だけを入れる。
+  */
+  const detailGenRef = useRef(0)
+  const selectedIdRef = useRef<string | null>(null)
+  const isCurrentDetail = useCallback((id: string, gen: number) => (
+    detailGenRef.current === gen && selectedIdRef.current === id
+  ), [])
 
   // ── load list ──────────────────────────────────────────────────────────────
   const loadList = useCallback(async () => {
@@ -336,6 +387,71 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   }, [])
 
   useEffect(() => { void loadList() }, [loadList])
+
+  /*
+    R290: 「今月の成果の流れ」のクリック・友だち追加・成果は、今月の範囲で
+    取り直す。一覧の集計は累計のまま（一覧の表は累計で見る）なので、流れ用
+    だけ別に今月の allReport を読む。認めた・承認は承認の一覧の今月分。
+  */
+  const [monthlyFunnel, setMonthlyFunnel] = useState<{
+    clicks: number
+    friends: number
+    conversions: number
+  } | null>(null)
+  const [monthlyState, setMonthlyState] = useState<ConfirmedState>('loading')
+  const loadMonthlyFunnel = useCallback(async () => {
+    setMonthlyState('loading')
+    try {
+      const res = await api.affiliates.allReport({
+        startDate: settlementPeriod.periodFrom,
+        endDate: settlementPeriod.periodTo,
+      })
+      if (!res.success) throw new Error('monthly report fetch failed')
+      const list = res.data as unknown as AffiliateReportRow[]
+      setMonthlyFunnel({
+        clicks: list.reduce((sum, row) => sum + row.totalClicks, 0),
+        friends: list.reduce((sum, row) => sum + row.friendAdds, 0),
+        conversions: list.reduce((sum, row) => sum + row.totalConversions, 0),
+      })
+      setMonthlyState('ready')
+    } catch {
+      // R293: 取れていない数を0として描かない。再試行で戻す。
+      setMonthlyFunnel(null)
+      setMonthlyState('error')
+    }
+  }, [settlementPeriod])
+
+  useEffect(() => { void loadMonthlyFunnel() }, [loadMonthlyFunnel])
+
+  /*
+    R292: 配布URLの土台（短縮ドメイン）。取れなくても Worker の `/r/` で
+    URLは作れるので、ここでは失敗の面を出さない。
+  */
+  const [linkBaseUrl, setLinkBaseUrl] = useState<string | null>(null)
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void api.accountSettings.getLinkBaseUrl().then((res) => {
+      if (cancelled || !res.success || !res.data) return
+      setLinkBaseUrl(res.data)
+    }).catch(() => { /* 取れなくても /r/ で作れる */ })
+    return () => { cancelled = true }
+  }, [])
+  /*
+    R292: URLの取り出しとコピーは計測を起こさない。文字を写すだけで、
+    クリック記録の口もリンク発行の口も呼ばない。
+  */
+  const copyLinkUrl = useCallback(async (link: AffiliateLink) => {
+    const url = distributionUrl(link.ref_code, linkBaseUrl)
+    if (!url) return
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiedLinkId(link.id)
+      window.setTimeout(() => {
+        setCopiedLinkId((current) => (current === link.id ? null : current))
+      }, 2000)
+    } catch { /* 書けないときは選んで写せる（URLは表示のまま） */ }
+  }, [linkBaseUrl])
 
   useEffect(() => {
     let cancelled = false
@@ -386,7 +502,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   }, [accountId, settlementPeriod])
 
   // ── load detail (report v2 + links) ────────────────────────────────────────
-  const loadDetail = useCallback(async (id: string) => {
+  const loadDetail = useCallback(async (id: string, gen: number) => {
     setDetailLoading(true)
     setDetailError(false)
     setReport(null)
@@ -400,23 +516,28 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         api.affiliates.reportV2(id),
         api.affiliates.links(id),
       ])
+      // R289: 選んでいる途中の世代だけ入れる。遅れて届いた前の世代は捨てる。
+      if (!isCurrentDetail(id, gen)) return
       /* **形を確かめてから入れる。** 読めない返事を入れると、描くときに落ちる。 */
       setReport(reportRes.success ? asReportV2(reportRes.data) : null)
       if (linksRes.success) setLinks(linksRes.data as unknown as AffiliateLink[])
       // 失敗は握りつぶさず、内訳面に再試行を出す（#554 点検#505中7）。
       if (!reportRes.success || !linksRes.success) setDetailError(true)
     } catch {
+      if (!isCurrentDetail(id, gen)) return
       setDetailError(true)
     }
+    if (!isCurrentDetail(id, gen)) return
     setDetailLoading(false)
-  }, [])
+  }, [isCurrentDetail])
 
   // ── load first page of journeys ────────────────────────────────────────────
-  const loadJourneys = useCallback(async (id: string) => {
+  const loadJourneys = useCallback(async (id: string, gen: number) => {
     setJourneyLoading(true)
     setJourneyError(false)
     try {
       const res = await api.affiliates.journeys(id, { limit: JOURNEY_PAGE_SIZE })
+      if (!isCurrentDetail(id, gen)) return
       if (res.success) {
         setJourneys(res.data)
         journeyCursorRef.current = res.nextCursor ?? null
@@ -425,13 +546,15 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         setJourneyError(true)
       }
     } catch {
+      if (!isCurrentDetail(id, gen)) return
       setJourneyError(true)
     }
+    if (!isCurrentDetail(id, gen)) return
     setJourneyLoading(false)
-  }, [])
+  }, [isCurrentDetail])
 
   // ── load more journeys ─────────────────────────────────────────────────────
-  const loadMoreJourneys = useCallback(async (id: string) => {
+  const loadMoreJourneys = useCallback(async (id: string, gen: number) => {
     if (journeyLoadingMore) return
     const cursor = journeyCursorRef.current
     if (!cursor) { setJourneyMore(false); return }
@@ -442,6 +565,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         beforeAt: cursor.beforeAt,
         beforeId: cursor.beforeId,
       })
+      // R289: 追加読み込みの遅い応答も、別の紹介者へは混ぜない。
+      if (!isCurrentDetail(id, gen)) return
       if (res.success) {
         setJourneys((prev) => {
           const seen = new Set(prev.map((j) => j.friendId))
@@ -454,21 +579,48 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         setJourneyError(true)
       }
     } catch {
+      if (!isCurrentDetail(id, gen)) return
       setJourneyError(true)
     }
+    // 読み込み中の印だけは必ず戻す（古い世代の応答でも印を残さない）。
     setJourneyLoadingMore(false)
-  }, [journeyLoadingMore])
+  }, [isCurrentDetail, journeyLoadingMore])
 
   // ── row click ──────────────────────────────────────────────────────────────
   const handleRowClick = useCallback((id: string) => {
     if (selectedId === id) {
+      // R289: 閉じたあとに届く応答も捨てるため、世代を進める。
+      detailGenRef.current += 1
+      selectedIdRef.current = null
       setSelectedId(null)
       return
     }
+    // R289: 世代を進めて、いま選んだ紹介者の応答だけ入れる。
+    detailGenRef.current += 1
+    selectedIdRef.current = id
+    const gen = detailGenRef.current
     setSelectedId(id)
-    void loadDetail(id)
-    void loadJourneys(id)
+    void loadDetail(id, gen)
+    void loadJourneys(id, gen)
   }, [selectedId, loadDetail, loadJourneys])
+
+  /*
+    R291: 停止前の確認（`?affiliate=`）から来たとき、その紹介者の内訳を
+    開く。一覧が読めてから1回だけ。閉じたあとは普通に操作できる。
+  */
+  const focusConsumedRef = useRef(false)
+  useEffect(() => {
+    if (!focusAffiliateId || focusConsumedRef.current) return
+    if (loading || error) return
+    if (!rows.some((row) => row.id === focusAffiliateId)) return
+    focusConsumedRef.current = true
+    detailGenRef.current += 1
+    selectedIdRef.current = focusAffiliateId
+    const gen = detailGenRef.current
+    setSelectedId(focusAffiliateId)
+    void loadDetail(focusAffiliateId, gen)
+    void loadJourneys(focusAffiliateId, gen)
+  }, [focusAffiliateId, rows, loading, error, loadDetail, loadJourneys])
 
   const shownRows = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('ja-JP')
@@ -502,11 +654,17 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
     ?? paymentItems.reduce((sum, item) => sum + item.approvedReward, 0)
   const heldTotal = paymentItems.reduce((sum, item) => sum + item.heldReward, 0)
   const payoutCycle = paymentItems.find((item) => item.payoutCycle?.trim())?.payoutCycle ?? null
+  /*
+    R293: 流れの各段は、取れていないときに0を描かない。実値0のときだけ0。
+    読み込み中・取得失敗は「—」にし、失敗は再試行で戻す。
+  */
   const funnel = {
-    clicks: rows.reduce((sum, row) => sum + row.totalClicks, 0),
-    friends: rows.reduce((sum, row) => sum + row.friendAdds, 0),
-    conversions: rows.reduce((sum, row) => sum + row.totalConversions, 0),
-    approved: approvedThisMonth.length,
+    clicks: monthlyState === 'ready' && monthlyFunnel ? monthlyFunnel.clicks : null,
+    friends: monthlyState === 'ready' && monthlyFunnel ? monthlyFunnel.friends : null,
+    conversions: monthlyState === 'ready' && monthlyFunnel ? monthlyFunnel.conversions : null,
+    approved: approvalState === 'ready' ? approvedThisMonth.length : null,
+    reward: paymentState === 'ready' ? paymentTotal : null,
+    held: paymentState === 'ready' ? heldTotal : null,
   }
 
   const exportAffiliatesCsv = () => {
@@ -534,12 +692,9 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div data-design-node="PouPn" data-affiliate-design="v6">
-      <NoteBar>
-        紹介リンクを渡した人ごとに、クリックから成果までの流れと確定した報酬を確認できます。
-      </NoteBar>
-
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div data-design-node="PouPn" data-affiliate-design="v6" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <KpiCard
           title="今月の成果"
           value={confirmedValue(approvalState, approvedTotals.count)}
@@ -561,50 +716,69 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
           detail={confirmedDetail(paymentState, payoutCycle ? `${payoutCycle}・支払日は未接続` : '締め日・支払日は未接続')}
           loading={paymentState === 'loading'}
         />
-        <KpiCard
-          title="未払い残高"
-          value={null}
-          unit=""
-          detail="支払済み台帳が接続されると表示されます"
-          loading={paymentState === 'loading'}
-        />
       </div>
 
-      <section className="bg-canvas rounded-card border-hairline mb-4 border p-4" aria-label="今月の成果の流れ">
+      <NoteBar>
+        紹介リンクを渡した人ごとに、クリックから成果までの流れと確定した報酬を確認できます。
+      </NoteBar>
+
+      <section className="bg-canvas rounded-card border-hairline border p-4" aria-label="今月の成果の流れ">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="text-ink text-sm font-semibold">今月の成果の流れ</h3>
-          <span className="text-ink-faint text-xs">どこで人が減っているかを1本で見る</span>
+          <h3 className="text-ink flex items-center gap-1 text-sm font-semibold">
+            今月の成果の流れ
+            {/*
+              R290: 段ごとの数え方の違いは「？」に集約する。本文に補足を書いて
+              箱を高くしない（共通ルール 2-1b）。
+            */}
+            <HelpTip label="今月の成果の流れの説明">
+              クリック・友だち追加・成果は今月に起きた数を数えています。認めた・承認は承認の一覧にある今月の成果で、数え方が違うため段差は目安です。
+            </HelpTip>
+          </h3>
+          <span className="flex items-center gap-2">
+            <span className="text-ink-faint text-xs">どこで人が減っているかを1本で見る</span>
+            {monthlyState === 'error' ? (
+              <AffiliateButton onClick={() => { void loadMonthlyFunnel() }}>
+                もう一度読み込む
+              </AffiliateButton>
+            ) : null}
+          </span>
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-          {[
-            ['クリック', funnel.clicks],
-            ['友だち追加', funnel.friends],
-            ['成果', funnel.conversions],
-            ['認めた・承認', funnel.approved],
-          ].map(([label, value]) => (
+          {(
+            [
+              ['クリック', funnel.clicks],
+              ['友だち追加', funnel.friends],
+              ['成果', funnel.conversions],
+              ['認めた・承認', funnel.approved],
+            ] as Array<[label: string, value: number | null]>
+          ).map(([label, value]) => (
             <div key={label} className="bg-canvas-sunken rounded-control px-3 py-2">
               <p className="text-ink-faint text-xs">{label}</p>
               <p className="text-ink mt-1 text-lg font-semibold tabular-nums">
-                {Number(value).toLocaleString('ja-JP')}件
+                {value === null ? '—' : `${formatNumber(value)}件`}
               </p>
             </div>
           ))}
           <div className="bg-accent-soft rounded-control px-3 py-2">
             <p className="text-ink-faint text-xs">報酬</p>
-            <p className="text-ink mt-1 text-lg font-semibold tabular-nums">{formatYen(paymentTotal)}</p>
-            <p className="text-ink-faint mt-0.5 text-xs">保留中 {formatYen(heldTotal)} を含む</p>
+            <p className="text-ink mt-1 text-lg font-semibold tabular-nums">
+              {funnel.reward === null ? '—' : formatYen(funnel.reward)}
+            </p>
+            <p className="text-ink-faint mt-0.5 text-xs">
+              {funnel.held === null ? '—' : `保留中 ${formatYen(funnel.held)} を含む`}
+            </p>
           </div>
         </div>
       </section>
 
-      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+      <div className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3">
         <SearchField
           placeholder="名前・紹介コードで検索"
           aria-label="名前・紹介コードで検索"
           value={query}
           onChange={(value) => { setQuery(value); setPage(1) }}
           onClear={() => { setQuery(''); setPage(1) }}
-          className="w-full md:max-w-md"
+          className="min-w-52 flex-1"
         />
         <span className="text-ink-faint whitespace-nowrap text-xs">並び順</span>
         <Select
@@ -625,15 +799,22 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
           onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
           size="page-size"
         />
+        {/* 作る操作は行の左。たまに使う CSV は右に残す。 */}
+        <AffiliateButton variant="primary" onClick={() => setCreateOpen(true)}>
+          ＋ アフィリエイターを作る
+        </AffiliateButton>
         <AffiliateButton onClick={exportAffiliatesCsv} disabled={shownRows.length === 0} className="ml-auto">
           CSVで書き出す
         </AffiliateButton>
-        <AffiliateButton variant="primary" onClick={() => setCreateOpen(true)}>
-          アフィリエイターを追加
-        </AffiliateButton>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterChip
+          selected={filters.length === 0}
+          onChange={() => { setFilters([]); setPage(1) }}
+        >
+          すべて
+        </FilterChip>
         {([
           ['active', '計測中'],
           ['inactive', '停止中'],
@@ -656,6 +837,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
 
       {createOpen && (
         <CreateAffiliateModal
+          accountId={accountId}
           onClose={() => setCreateOpen(false)}
           onCreated={() => { void loadList() }}
         />
@@ -677,29 +859,37 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
       ) : loading ? (
         <ListState kind="loading" title="紹介者を読み込んでいます" />
       ) : rows.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="紹介者はまだ登録されていません"
-          description="紹介してくれる方を登録すると、専用リンクと成果を管理できます。"
-          action={<Button variant="primary" onClick={() => setCreateOpen(true)}>アフィリエイターを追加</Button>}
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="紹介者はまだ登録されていません"
+            description="紹介してくれる方を登録すると、専用リンクと成果を管理できます。"
+            action={<Button variant="primary" onClick={() => setCreateOpen(true)}>＋ アフィリエイターを作る</Button>}
+          />
+        </div>
       ) : shownRows.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="絞り込みに合う紹介者がいません"
-          description="検索語を変えるか、絞り込みの札を外すと表示されます。"
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="絞り込みに合う紹介者がいません"
+            description="検索語を変えるか、絞り込みの札を外すと表示されます。"
+          />
+        </div>
       ) : (
         <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
           <table className="w-full min-w-[720px]">
             <thead>
               <TableHeadRow>
-                <Th>アフィリエイター</Th>
+                {/*
+                  表の外側の余白は左右で同じにする（左端 pl-5・右端 pr-5）。
+                  操作列は中身の幅で固定する。残りは数値の列で吸収する。
+                */}
+                <Th className="pl-5">アフィリエイター</Th>
                 <Th align="right">紹介リンク</Th>
                 <Th align="right">友だち追加</Th>
                 <Th align="right">成果</Th>
                 <Th align="right">報酬</Th>
-                <Th align="center">操作</Th>
+                <Th align="center" className="w-44 pr-5">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
@@ -712,35 +902,52 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                       className={`cursor-pointer transition-colors ${isExpanded ? 'bg-canvas-sunken' : 'hover:bg-canvas-sunken'}`}
                       onClick={() => handleRowClick(row.id)}
                     >
-                      <td className="text-ink px-4 py-3 text-sm font-medium">
+                      <td className="text-ink py-3 pr-4 pl-5 text-sm font-medium">
                         <span className="block truncate" title={row.name}>{row.name}</span>
                         <span className="text-action mt-0.5 block font-mono text-xs">{row.code}</span>
+                        {/* #670 16: 状態は名前の下の札で出す。操作セルに置くと操作と読める。 */}
+                        <span className="mt-1 block"><Chip tone={row.isActive ? 'ok' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</Chip></span>
                       </td>
                       <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                        {row.linkCount.toLocaleString()}本
+                        {formatNumber(row.linkCount)}本
                       </td>
                       <td className="text-action px-4 py-3 text-right text-sm font-semibold tabular-nums">
-                        {row.friendAdds.toLocaleString()}人
+                        {formatNumber(row.friendAdds)}人
                       </td>
                       <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
-                        {row.totalConversions.toLocaleString()}件
+                        {formatNumber(row.totalConversions)}件
                       </td>
                       <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                         {formatYen(row.rewardAmount)}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      {/* 行の操作は枠つきボタン＋「…」へ集約。紹介を止めるは確認画面つき。 */}
+                      <td className="py-3 pr-5 pl-4 text-center" onClick={(event) => event.stopPropagation()}>
                         <div className="flex flex-wrap items-center justify-center gap-2">
-                          <span className="text-action text-xs font-medium">{isExpanded ? '閉じる' : '成果を見る'}</span>
-                          <span className="text-ink-faint text-xs">{row.isActive ? '計測中' : '停止中'}</span>
                           <AffiliateButton
-                            aria-label={`${row.name}の紹介停止を確認`}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setArchiveTarget({ id: row.id, name: row.name })
-                            }}
+                            aria-label={isExpanded ? `${row.name}の成果を閉じる` : `${row.name}の成果を見る`}
+                            onClick={() => handleRowClick(row.id)}
                           >
-                            紹介を止める
+                            {isExpanded ? '閉じる' : '成果を見る'}
                           </AffiliateButton>
+                          <span className="relative inline-flex">
+                            <MoreAction
+                              label={`${row.name}のその他操作`}
+                              aria-expanded={rowMenuId === row.id}
+                              onClick={() => setRowMenuId((current) => (current === row.id ? null : row.id))}
+                            />
+                            <ActionMenu
+                              open={rowMenuId === row.id}
+                              ariaLabel={`${row.name}の操作`}
+                              onClose={() => setRowMenuId(null)}
+                              items={[
+                                {
+                                  id: 'archive',
+                                  label: '紹介を止める',
+                                  onSelect: () => setArchiveTarget({ id: row.id, name: row.name }),
+                                },
+                              ]}
+                            />
+                          </span>
                         </div>
                       </td>
                     </tr>
@@ -777,10 +984,10 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                   <p className="text-danger mt-4 text-sm">締め対象を確認できませんでした。金額を0とは扱いません。</p>
                                 ) : settlement ? (
                                   <dl className="mt-4 grid gap-3 sm:grid-cols-4">
-                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">今回の金額</dt><dd className="text-ink mt-1 font-bold tabular-nums">{formatYen(settlement.amount)}</dd></div>
-                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果</dt><dd className="text-ink mt-1 font-bold tabular-nums">{settlement.conversionCount.toLocaleString('ja-JP')}件</dd></div>
-                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 font-bold">{formatDate(accountSettlement?.periodTo ?? null)}</dd></div>
-                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">振込先</dt><dd className={`mt-1 font-bold ${settlement.bankProfileRegistered ? 'text-success' : 'text-warning'}`}>{settlement.bankProfileRegistered ? '登録済み' : '未登録'}</dd><p className="text-ink-faint mt-1 text-xs">口座番号は本人だけに表示</p></div>
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">今回の金額</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatYen(settlement.amount)}</dd></div>
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果</dt><dd className="text-ink mt-1 font-medium tabular-nums">{formatNumber(settlement.conversionCount)}件</dd></div>
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 font-medium">{formatDate(accountSettlement?.periodTo ?? null)}</dd></div>
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">振込先</dt><dd className={`mt-1 font-medium ${settlement.bankProfileRegistered ? 'text-success' : 'text-warning'}`}>{settlement.bankProfileRegistered ? '登録済み' : '未登録'}</dd><p className="text-ink-faint mt-1 text-xs">口座番号は本人だけに表示</p></div>
                                   </dl>
                                 ) : (
                                   <p className="text-ink-faint mt-4 text-sm">この方には、今回締められる報酬がありません。</p>
@@ -800,7 +1007,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                     リンクと成果の記録は消えていません。期間を広げて確かめてください。
                                   </p>
                                   {detailError ? (
-                                    <AffiliateButton onClick={() => { void loadDetail(row.id) }} className="mt-3">
+                                    <AffiliateButton onClick={() => { void loadDetail(row.id, detailGenRef.current) }} className="mt-3">
                                       もう一度読み込む
                                     </AffiliateButton>
                                   ) : null}
@@ -810,23 +1017,23 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                               {/* v2 summary cards */}
                               {report && (
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                  <div className="bg-canvas rounded-lg p-4 border border-hairline">
+                                  <div className="bg-canvas rounded-control p-4 border border-hairline">
                                     <p className="text-xs text-ink-secondary">{CLICK_SUMMARY_LABEL}</p>
-                                    <p className="text-2xl font-bold text-ink mt-1">{report.clicks.toLocaleString()}</p>
+                                    <p className="text-2xl font-bold text-ink mt-1">{formatNumber(report.clicks)}</p>
                                   </div>
-                                  <div className="bg-canvas rounded-lg p-4 border border-hairline">
+                                  <div className="bg-canvas rounded-control p-4 border border-hairline">
                                     <p className="text-xs text-ink-secondary">友だち追加</p>
-                                    <p className="text-2xl font-bold text-status-info mt-1">{report.friendAdds.toLocaleString()}</p>
+                                    <p className="text-2xl font-bold text-status-info mt-1">{formatNumber(report.friendAdds)}</p>
                                   </div>
-                                  <div className="bg-canvas rounded-lg p-4 border border-hairline">
+                                  <div className="bg-canvas rounded-control p-4 border border-hairline">
                                     <p className="text-xs text-ink-secondary">CV 件数（却下除く）</p>
-                                    <p className="text-2xl font-bold text-ink mt-1">{report.conversions.toLocaleString()}</p>
+                                    <p className="text-2xl font-bold text-ink mt-1">{formatNumber(report.conversions)}</p>
                                   </div>
-                                  <div className="bg-success-bg rounded-lg p-4 border border-hairline">
+                                  <div className="bg-success-bg rounded-control p-4 border border-hairline">
                                     <p className="text-xs text-ink-secondary">確定報酬</p>
                                     <p className="text-2xl font-bold text-success mt-1">{formatYen(report.confirmedReward)}</p>
                                     <p className="text-[11px] text-ink-secondary mt-1">
-                                      承認済み {report.conversionsApproved.toLocaleString()}件 / 審査中 {report.conversionsPending.toLocaleString()}件 / 却下 {report.conversionsRejected.toLocaleString()}件
+                                      承認済み {formatNumber(report.conversionsApproved)}件 / 審査中 {formatNumber(report.conversionsPending)}件 / 却下 {formatNumber(report.conversionsRejected)}件
                                     </p>
                                   </div>
                                 </div>
@@ -852,8 +1059,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                           <tr key={o.offerId}>
                                             <td className="py-1 pr-4 text-ink">{o.offerName}</td>
                                             <td className="py-1 pr-4 text-right text-ink-secondary">{formatYen(o.rewardAmount)}</td>
-                                            <td className="py-1 pr-4 text-right font-semibold text-ink">{o.conversionsApproved.toLocaleString()}</td>
-                                            <td className="py-1 pr-4 text-right text-ink-secondary">{o.conversionsPending.toLocaleString()}</td>
+                                            <td className="py-1 pr-4 text-right font-semibold text-ink">{formatNumber(o.conversionsApproved)}</td>
+                                            <td className="py-1 pr-4 text-right text-ink-secondary">{formatNumber(o.conversionsPending)}</td>
                                             <td className="py-1 text-right font-semibold text-success">{formatYen(o.confirmedReward)}</td>
                                           </tr>
                                         ))}
@@ -866,14 +1073,14 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                               {/* Duplicate flags */}
                               {report && report.duplicateFlags.length > 0 && (
                                 <div>
-                                  <p className="text-xs font-semibold text-amber-700 uppercase mb-2">
+                                  <p className="text-xs font-semibold text-warning uppercase mb-2">
                                     {duplicateFlagHeading(report.duplicateFlags.length)}
                                   </p>
                                   <div className="flex flex-wrap gap-2">
                                     {report.duplicateFlags.map((f) => (
                                       <span
                                         key={f.friendId}
-                                        className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800"
+                                        className="inline-flex items-center gap-1 px-2 py-1 bg-status-warn-soft border border-status-warn rounded-mini text-xs text-status-warn-deep"
                                       >
                                         ⚠ {duplicateFriendNameText(f.friendId, journeys)}
                                       </span>
@@ -910,6 +1117,11 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                               )}
 
                               {/* Links table */}
+                              {/*
+                                R292: 既存リンクの配布URLとコピー。作ったときの
+                                画面を閉じたあとでも、同じ有効リンクを取り出せる。
+                                見出しは増やさない（直書きの借金を増やさない）。
+                              */}
                               {links.length > 0 && (
                                 <div>
                                   <p className="text-xs font-semibold text-ink-secondary uppercase mb-2">
@@ -927,26 +1139,46 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-hairline">
-                                        {links.map((link) => (
+                                        {links.map((link) => {
+                                          const linkCode = link.ref_code
+                                          const url = distributionUrl(linkCode, linkBaseUrl)
+                                          return (
                                           <tr key={link.id}>
-                                            <td className="py-1 pr-4 font-mono text-status-info">{link.ref_code}</td>
+                                            <td className="py-1 pr-4">
+                                              <span className="font-mono text-status-info">{linkCode}</span>
+                                              {url ? (
+                                                <span className="mt-1 flex items-center gap-2">
+                                                  <span className="block max-w-56 truncate font-mono text-xs text-ink-secondary" title={url}>
+                                                    {url}
+                                                  </span>
+                                                  <AffiliateButton
+                                                    aria-label={`${linkCode}の配布URLをコピー`}
+                                                    onClick={() => { void copyLinkUrl(link) }}
+                                                  >
+                                                    {copiedLinkId === link.id ? 'コピー済' : 'コピー'}
+                                                  </AffiliateButton>
+                                                </span>
+                                              ) : null}
+                                            </td>
                                             <td className="py-1 pr-4 text-ink-secondary">{link.label ?? '—'}</td>
                                             <td className="py-1 pr-4">
                                               {link.offer_name ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-status-info-soft text-status-info">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-pill text-xs font-medium bg-status-info-soft text-status-info">
                                                   {link.offer_name}
                                                 </span>
                                               ) : <span className="text-ink-faint">—</span>}
                                             </td>
-                                            <td className="py-1 pr-4 text-right font-semibold text-ink">{link.click_count.toLocaleString()}</td>
+                                            <td className="py-1 pr-4 text-right font-semibold text-ink">{formatNumber(link.click_count)}</td>
                                             <td className="py-1">
                                               {link.is_active
-                                                ? <span className="text-xs text-green-600">有効</span>
+                                                /* #670 22: green-600 は白地で 3.3:1 しかなく AA 未満。共通トークンの濃い緑へ。 */
+                                                ? <span className="text-xs font-semibold text-success">有効</span>
                                                 : <span className="text-xs text-ink-faint">無効</span>
                                               }
                                             </td>
                                           </tr>
-                                        ))}
+                                          )
+                                        })}
                                       </tbody>
                                     </table>
                                   </div>
@@ -963,7 +1195,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                 ) : journeyError && journeys.length === 0 ? (
                                   <div>
                                     <p className="text-sm text-danger">動線を読み込めませんでした。記録は消えていません。</p>
-                                    <AffiliateButton onClick={() => { void loadJourneys(row.id) }} className="mt-3">
+                                    <AffiliateButton onClick={() => { void loadJourneys(row.id, detailGenRef.current) }} className="mt-3">
                                       もう一度読み込む
                                     </AffiliateButton>
                                   </div>
@@ -988,7 +1220,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                           {journeys.map((j) => {
                                             const isDup = report?.duplicateFlags.some((f) => f.friendId === j.friendId)
                                             return (
-                                              <tr key={j.friendId} className={isDup ? 'bg-amber-50' : ''}>
+                                              <tr key={j.friendId} className={isDup ? 'bg-status-warn-soft' : ''}>
                                                 <td className={`py-1 pr-4 ${j.displayName ? 'text-ink' : 'text-ink-faint italic'}`}>
                                                   {isDup && <span className="mr-1">⚠</span>}
                                                   {personNameText(j.displayName)}
@@ -1010,9 +1242,9 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                     ) : null}
                                     {journeyMore && (
                                       <button
-                                        onClick={() => { void loadMoreJourneys(row.id) }}
+                                        onClick={() => { void loadMoreJourneys(row.id, detailGenRef.current) }}
                                         disabled={journeyLoadingMore}
-                                        className="mt-3 px-4 py-2 text-sm text-blue-700 hover:bg-blue-100 disabled:opacity-50 rounded-md border border-blue-200"
+                                        className="mt-3 px-4 py-2 text-sm text-action hover:bg-status-info-soft disabled:opacity-50 rounded-mini border border-status-info-soft"
                                       >
                                         {journeyLoadingMore ? '読み込み中...' : 'さらに読み込む'}
                                       </button>
@@ -1057,16 +1289,24 @@ interface FriendOption {
   displayName: string | null
 }
 
-function CreateAffiliateModal({
+export function CreateAffiliateModal({
+  accountId,
   onClose,
   onCreated,
 }: {
+  accountId: string | null
   onClose: () => void
   onCreated: () => void
 }) {
   const [search, setSearch] = useState('')
   const [options, setOptions] = useState<FriendOption[]>([])
   const [searching, setSearching] = useState(false)
+  const [suggestDismissed, setSuggestDismissed] = useState(false)
+  // R294: 0件と失敗を候補枠の中で言い分けるための状態。
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [searchedTerm, setSearchedTerm] = useState<string | null>(null)
+  const [retryNonce, setRetryNonce] = useState(0)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<FriendOption | null>(null)
   const [commissionRate, setCommissionRate] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -1078,9 +1318,10 @@ function CreateAffiliateModal({
   useEffect(() => {
     if (selected) return
     const term = search.trim()
-    if (!term) { setOptions([]); return }
+    if (!term) { setOptions([]); setSearchError(null); setSearchedTerm(null); return }
     let cancelled = false
     setSearching(true)
+    setSearchError(null)
     const t = setTimeout(async () => {
       try {
         const res = await api.friends.list({ search: term, limit: 20, includeTags: false })
@@ -1089,12 +1330,36 @@ function CreateAffiliateModal({
           setOptions(
             res.data.items.map((f) => ({ id: f.id, displayName: f.displayName })),
           )
+          setSearchError(null)
+        } else {
+          // R294: 失敗を黙らせない。候補枠の中で再試行を出す。
+          setOptions([])
+          setSearchError('候補を読み込めませんでした')
         }
-      } catch { /* silent */ }
-      finally { if (!cancelled) setSearching(false) }
+      } catch {
+        if (cancelled) return
+        setOptions([])
+        setSearchError('候補を読み込めませんでした')
+      }
+      finally {
+        if (cancelled) return
+        setSearchedTerm(term)
+        setSearching(false)
+      }
     }, 250)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [search, selected])
+  }, [search, selected, retryNonce])
+
+  // R294: 検索語・状態がそろったら候補枠を開いたままにする。0件でも
+  // 「該当なし」を出すため、候補があるときだけ開く作りはやめる。
+  const searchTerm = search.trim()
+  const suggestOpen = !suggestDismissed
+    && Boolean(searchTerm)
+    && (searching || searchError !== null || searchedTerm === searchTerm || options.length > 0)
+  const retrySearch = useCallback(() => {
+    setSuggestDismissed(false)
+    setRetryNonce((n) => n + 1)
+  }, [])
 
   const handleSubmit = useCallback(async () => {
     if (submitting) return
@@ -1113,10 +1378,11 @@ function CreateAffiliateModal({
       const res = await api.affiliates.create({
         friendId: selected.id,
         commissionRate: rate,
+        lineAccountId: accountId ?? undefined,
       })
       if (!res.success) {
         // 409 → friend already an affiliate; surface the server message.
-        setFormError(res.error ?? '作成に失敗しました')
+        setFormError(res.error ?? '作成に失敗しました。通信を確かめて、もう一度お試しください。')
         setSubmitting(false)
         return
       }
@@ -1127,11 +1393,11 @@ function CreateAffiliateModal({
         onClose()
       }
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : '作成に失敗しました')
+      setFormError(e instanceof Error ? e.message : '作成に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSubmitting(false)
     }
-  }, [submitting, selected, commissionRate, onCreated, onClose])
+  }, [submitting, selected, commissionRate, accountId, onCreated, onClose])
 
   const handleCopy = useCallback(async () => {
     if (!issuedUrl) return
@@ -1142,63 +1408,66 @@ function CreateAffiliateModal({
     } catch { /* clipboard unavailable — user can select manually */ }
   }, [issuedUrl])
 
+  /*
+    R295: 手作りの窓をやめ、共通の窓（Dialog）を使う。初期フォーカス・
+    Tab の循環・Escape・起動元への復帰は共通部品が持つ。
+    成功画面のフッターに「閉じる」は置かない（右上の×だけ。監査7 #809）。
+  */
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
+    <Dialog
+      open
+      title="アフィリエイター新規作成"
+      busy={submitting}
+      onCancel={onClose}
+      footer={issuedUrl ? (
+        <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+          <Button variant="primary" onClick={() => { void handleCopy() }}>
+            {copied ? 'コピー済' : 'コピー'}
+          </Button>
+        </div>
+      ) : (
+        <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+          <Button onClick={onClose} disabled={submitting}>
+            キャンセル
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => { void handleSubmit() }}
+            disabled={submitting || !selected} busy={submitting} busyLabel="作成中...">作る
+          </Button>
+        </div>
+      )}
     >
-      <div
-        className="w-full max-w-md bg-white rounded-lg shadow-xl p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          アフィリエイター新規作成
-        </h2>
-
         {issuedUrl ? (
           // ── Success state: show issued link with a copy button ────────────
           <div className="space-y-4">
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-ink-secondary">
               アフィリエイターを作成し、初期リンクを発行しました。
             </p>
-            <div className="flex items-stretch gap-2">
-              <input
-                readOnly
-                value={issuedUrl}
-                className="flex-1 px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-gray-50 text-gray-800"
-              />
-              <button
-                onClick={() => { void handleCopy() }}
-                className="px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md whitespace-nowrap"
-              >
-                {copied ? 'コピー済' : 'コピー'}
-              </button>
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md"
-              >
-                閉じる
-              </button>
-            </div>
+            <input
+              readOnly
+              value={issuedUrl}
+              aria-label="発行した初期リンク"
+              className="border-hairline rounded-control bg-canvas-sunken text-ink w-full px-3 py-2 font-mono text-sm"
+            />
           </div>
         ) : (
           // ── Form state ────────────────────────────────────────────────────
           <div className="space-y-4">
             {/* Friend selector */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                LINE 友だち <span className="text-red-500">*</span>
+              <label htmlFor="aff-friend-search" className="mb-1 block text-sm font-medium text-ink-secondary">
+                LINE 友だち <span className="text-danger">*</span>
               </label>
               {selected ? (
-                <div className="flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
-                  <span className="text-sm text-gray-800">
-                    {selected.displayName ?? <span className="text-gray-400 italic">不明</span>}
+                <div className="flex items-center justify-between rounded-control border border-hairline bg-canvas-sunken px-3 py-2">
+                  <span className="text-sm text-ink">
+                    {selected.displayName ?? <span className="italic text-ink-faint">不明</span>}
                   </span>
                   <button
+                    type="button"
                     onClick={() => { setSelected(null); setSearch('') }}
-                    className="text-xs text-blue-600 hover:underline"
+                    className="text-xs text-action hover:underline"
                   >
                     変更
                   </button>
@@ -1206,83 +1475,89 @@ function CreateAffiliateModal({
               ) : (
                 <div className="relative">
                   <input
+                    ref={searchInputRef}
+                    id="aff-friend-search"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => { setSearch(e.target.value); setSuggestDismissed(false) }}
                     placeholder="名前で検索..."
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full rounded-control border border-hairline px-3 py-2 text-sm"
                   />
-                  {(searching || options.length > 0) && search.trim() && (
-                    <div className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg">
+                  <MenuPortal
+                    open={suggestOpen}
+                    align="start"
+                    matchWidth
+                    getAnchor={() => searchInputRef.current}
+                    onClose={() => setSuggestDismissed(true)}
+                  >
+                    <div
+                      className="max-h-56 overflow-y-auto rounded-control border border-hairline bg-canvas shadow-float"
+                      // 最上層では absolute 指定を無効にする（位置は器が決める）。
+                      style={{ position: 'static', width: '100%' }}
+                    >
                       {searching ? (
-                        <div className="px-3 py-2 text-sm text-gray-400">検索中...</div>
+                        <div className="px-3 py-2 text-sm text-ink-faint">検索中...</div>
+                      ) : searchError !== null ? (
+                        <div className="px-3 py-2 text-sm">
+                          <p className="text-danger">{searchError}</p>
+                          <button
+                            type="button"
+                            onClick={retrySearch}
+                            className="text-action mt-1 text-xs hover:underline"
+                          >
+                            もう一度試す
+                          </button>
+                        </div>
                       ) : options.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-gray-400">該当なし</div>
+                        <div className="px-3 py-2 text-sm text-ink-faint">該当なし。検索語を変えてお試しください。</div>
                       ) : (
                         options.map((f) => (
                           <button
                             key={f.id}
+                            type="button"
                             onClick={() => { setSelected(f); setOptions([]) }}
-                            className="block w-full text-left px-3 py-2 text-sm text-gray-800 hover:bg-blue-50"
+                            className="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-accent-soft"
                           >
-                            {f.displayName ?? <span className="text-gray-400 italic">不明</span>}
+                            {f.displayName ?? <span className="italic text-ink-faint">不明</span>}
                           </button>
                         ))
                       )}
                     </div>
-                  )}
+                  </MenuPortal>
                 </div>
               )}
             </div>
 
             {/* Commission rate */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="aff-commission-rate" className="mb-1 block text-sm font-medium text-ink-secondary">
                 報酬率（%・省略可）
               </label>
               <div className="relative">
                 <input
+                  id="aff-commission-rate"
                   type="number"
                   min={0}
                   step="0.1"
                   value={commissionRate}
                   onChange={(e) => setCommissionRate(e.target.value)}
                   placeholder="例: 10"
-                  className="w-full px-3 py-2 pr-8 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full rounded-control border border-hairline px-3 py-2 pr-8 text-sm"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-faint">%</span>
               </div>
             </div>
 
             {/* Random-code notice */}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-ink-faint">
               アフィリコードは推測されないよう自動でランダム生成されます（手入力は不要）。
             </p>
 
             {formError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
-                {formError}
-              </div>
+              <Notice tone="danger" message={formError} />
             )}
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md"
-              >
-                キャンセル
-              </button>
-              <button
-                onClick={() => { void handleSubmit() }}
-                disabled={submitting || !selected}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md"
-              >
-                {submitting ? '作成中...' : '作成'}
-              </button>
-            </div>
           </div>
         )}
-      </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -1292,18 +1567,12 @@ function CreateAffiliateModal({
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDay(iso)
 }
 
 function formatYenNullable(n: number | null): string {
   if (n === null) return '—'
-  return `¥${Math.round(n).toLocaleString('ja-JP')}`
+  return `¥${formatNumber(Math.round(n))}`
 }
 
 // ── Offer form modal ─────────────────────────────────────────────────────────
@@ -1319,6 +1588,12 @@ interface OfferFormProps {
 
 function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }: OfferFormProps) {
   const isEdit = Boolean(initial)
+  // R286: 読み上げの項目名。見えている項目名と入力欄を htmlFor・id で結ぶ。
+  const fieldId = useId()
+  const nameId = `${fieldId}-name`
+  const descriptionId = `${fieldId}-description`
+  const rewardAmountId = `${fieldId}-reward-amount`
+  const rewardMilesId = `${fieldId}-reward-miles`
   const [name, setName] = useState(initial?.name ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [rewardAmount, setRewardAmount] = useState(
@@ -1333,6 +1608,46 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
   const [isActive, setIsActive] = useState(initial?.isActive ?? true)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // 決まりの欄（#823）。編集では今の版で埋める。読み込めるまでは
+  // 差分に含めない（読み込めないまま保存して上限を消さないため）。
+  const [terms, setTerms] = useState<OfferTermsFieldValues>(EMPTY_TERMS)
+  const [termsBase, setTermsBase] = useState<ParsedOfferTerms | null>(null)
+  const [termsLoaded, setTermsLoaded] = useState(!initial)
+
+  useEffect(() => {
+    if (!initial) return
+    let cancelled = false
+    void api.affiliateOffers.capStatus(initial.id)
+      .then((res) => {
+        if (cancelled || !res.success || !res.data) return
+        const version = res.data.version
+        const base: ParsedOfferTerms = {
+          windowDays: version?.windowDays ?? 30,
+          capTotal: version?.capTotal ?? null,
+          capMonthlyPerAffiliate: version?.capMonthlyPerAffiliate ?? null,
+          receptionFrom: version?.receptionFrom ?? null,
+          receptionTo: version?.receptionTo ?? null,
+        }
+        if (cancelled) return
+        setTermsBase(base)
+        setTerms({
+          windowDays: String(base.windowDays ?? 30),
+          capTotal: base.capTotal != null ? String(base.capTotal) : '',
+          capMonthly: base.capMonthlyPerAffiliate != null ? String(base.capMonthlyPerAffiliate) : '',
+          receptionFrom: toDateInput(base.receptionFrom),
+          receptionTo: toDateInput(base.receptionTo),
+        })
+        setTermsLoaded(true)
+      })
+      .catch(() => {
+        // 決まりが読めなくても、名前・報酬の編集はできる。決まりの差分は送らない。
+        if (!cancelled) setTermsLoaded(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [initial])
 
   // 選べるタグ・シナリオは「いま選んでいるLINEアカウントの有効なもの」だけに
   // 絞る（#798）。別アカウントのものを選ばせると保存時にサーバーが止める。
@@ -1370,6 +1685,32 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
       setFormError('付与マイルは0以上の整数で入力してください')
       return
     }
+    // 決まりの欄（#823）。壊れた値は欄の下ではなく箱の誤りで見せる。
+    const parsed = parseOfferTermsInput(terms)
+    if (parsed.error) {
+      setFormError(parsed.error)
+      return
+    }
+    // 編集では変えた決まりだけ送る。変えていない保存で版を増やさない。
+    // 読み込めなかったときは決まりを送らない（上限の消失を防ぐ）。
+    const termsDiff: ParsedOfferTerms = {}
+    if (isEdit && termsLoaded && termsBase) {
+      if (parsed.terms.windowDays !== undefined && parsed.terms.windowDays !== termsBase.windowDays) {
+        termsDiff.windowDays = parsed.terms.windowDays
+      }
+      if (parsed.terms.capTotal !== termsBase.capTotal) {
+        termsDiff.capTotal = parsed.terms.capTotal
+      }
+      if (parsed.terms.capMonthlyPerAffiliate !== termsBase.capMonthlyPerAffiliate) {
+        termsDiff.capMonthlyPerAffiliate = parsed.terms.capMonthlyPerAffiliate
+      }
+      if (parsed.terms.receptionFrom !== termsBase.receptionFrom) {
+        termsDiff.receptionFrom = parsed.terms.receptionFrom
+      }
+      if (parsed.terms.receptionTo !== termsBase.receptionTo) {
+        termsDiff.receptionTo = parsed.terms.receptionTo
+      }
+    }
 
     setSubmitting(true)
     try {
@@ -1379,6 +1720,7 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
           description: description.trim() || null,
           rewardAmount: reward,
           rewardMiles: miles,
+          ...termsDiff,
           lineAccountId: lineAccountId || null,
           tagId: tagId || null,
           scenarioId: scenarioId || null,
@@ -1387,7 +1729,7 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
         if (!res.success) {
           // 失敗応答は非2xxで fetchApi が例外にするので、ここに来るのは
           // 2xx なのに success:false の形だけ。それでも文言があれば見せる。
-          setFormError((res as { error?: string }).error ?? '更新に失敗しました')
+          setFormError((res as { error?: string }).error ?? '更新に失敗しました。通信を確かめて、もう一度お試しください。')
           setSubmitting(false)
           return
         }
@@ -1397,12 +1739,17 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
           description: description.trim() || null,
           rewardAmount: reward,
           rewardMiles: miles,
+          windowDays: parsed.terms.windowDays,
+          capTotal: parsed.terms.capTotal,
+          capMonthlyPerAffiliate: parsed.terms.capMonthlyPerAffiliate,
+          receptionFrom: parsed.terms.receptionFrom,
+          receptionTo: parsed.terms.receptionTo,
           lineAccountId: lineAccountId || null,
           tagId: tagId || null,
           scenarioId: scenarioId || null,
         })
         if (!res.success) {
-          setFormError((res as { error?: string }).error ?? '作成に失敗しました')
+          setFormError((res as { error?: string }).error ?? '作成に失敗しました。通信を確かめて、もう一度お試しください。')
           setSubmitting(false)
           return
         }
@@ -1410,183 +1757,134 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
       onSaved()
       onClose()
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : '保存に失敗しました')
+      setFormError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSubmitting(false)
     }
-  }, [submitting, name, description, rewardAmount, rewardMiles, lineAccountId, tagId, scenarioId, isActive, isEdit, initial, onSaved, onClose])
+  }, [submitting, name, description, rewardAmount, rewardMiles, terms, termsLoaded, termsBase, lineAccountId, tagId, scenarioId, isActive, isEdit, initial, onSaved, onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-base font-semibold text-gray-900">
-            {isEdit ? '案件を編集' : '案件を新規作成'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-            aria-label="閉じる"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+    <Dialog
+      open
+      title={isEdit ? '案件を編集' : '案件を新規作成'}
+      busy={submitting}
+      error={formError ?? undefined}
+      confirmLabel={isEdit ? '更新' : '作成'}
+      cancelLabel="キャンセル"
+      onConfirm={() => { void handleSubmit() }}
+      onCancel={onClose}
+    >
+      <div className="space-y-4">
+        <div>
+          <label htmlFor={nameId} className="text-ink-secondary mb-1 block text-xs font-medium">
+            案件名 <span className="text-danger">*</span>
+          </label>
+          <input
+            id={nameId}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="例: 無料体験申込"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+          />
         </div>
 
-        <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
-          {formError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {formError}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              案件名 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="例: 無料体験申込"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">説明</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              placeholder="案件の説明（任意）"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">報酬額（円）</label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={rewardAmount}
-              onChange={(e) => setRewardAmount(e.target.value)}
-              placeholder="例: 3000"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">成果承認時の付与マイル</label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={rewardMiles}
-              onChange={(e) => setRewardMiles(e.target.value)}
-              placeholder="例: 500"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="mt-1 text-[11px] text-gray-400">承認された紹介1件ごとに紹介者へ付与します</p>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">誘導 LINE アカウント</label>
-            <select
-              value={lineAccountId}
-              onChange={(e) => setLineAccountId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">— 選択しない —</option>
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">タグ</label>
-            <select
-              value={tagId}
-              onChange={(e) => setTagId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">— 選択しない —</option>
-              {accountTags.map((tag) => (
-                <option key={tag.id} value={tag.id}>
-                  {tag.name}
-                </option>
-              ))}
-              {tagIdStale && (
-                <option value={tagId}>
-                  {staleTagName ?? tagId}（このアカウントでは使えません）
-                </option>
-              )}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">シナリオ</label>
-            <select
-              value={scenarioId}
-              onChange={(e) => setScenarioId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">— 選択しない —</option>
-              {accountScenarios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-              {scenarioIdStale && (
-                <option value={scenarioId}>
-                  {staleScenarioName ?? scenarioId}（このアカウントでは使えません）
-                </option>
-              )}
-            </select>
-          </div>
-
-          {isEdit && (
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsActive((v) => !v)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  isActive ? 'bg-blue-600' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    isActive ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-              <span className="text-sm text-gray-700">{isActive ? '有効' : '無効'}</span>
-            </div>
-          )}
+        <div>
+          <label htmlFor={descriptionId} className="text-ink-secondary mb-1 block text-xs font-medium">説明</label>
+          <textarea
+            id={descriptionId}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            placeholder="案件の説明（任意）"
+            className="border-hairline rounded-control bg-canvas text-ink w-full resize-none border px-3 py-2 text-sm focus:outline-none"
+          />
         </div>
 
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            キャンセル
-          </button>
-          <button
-            onClick={() => { void handleSubmit() }}
-            disabled={submitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg"
-          >
-            {submitting ? '保存中...' : isEdit ? '更新' : '作成'}
-          </button>
+        <div>
+          <label htmlFor={rewardAmountId} className="text-ink-secondary mb-1 block text-xs font-medium">報酬額（円）</label>
+          <input
+            id={rewardAmountId}
+            type="number"
+            min="0"
+            step="1"
+            value={rewardAmount}
+            onChange={(e) => setRewardAmount(e.target.value)}
+            placeholder="例: 3000"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+          />
         </div>
+
+        <div>
+          <label htmlFor={rewardMilesId} className="text-ink-secondary mb-1 block text-xs font-medium">成果承認時の付与マイル</label>
+          <input
+            id={rewardMilesId}
+            type="number"
+            min="0"
+            step="1"
+            value={rewardMiles}
+            onChange={(e) => setRewardMiles(e.target.value)}
+            placeholder="例: 500"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+          />
+          <p className="text-ink-faint mt-1 text-[11px]">承認された紹介1件ごとに紹介者へ付与します</p>
+        </div>
+
+        <OfferTermsFields values={terms} onChange={setTerms} />
+
+        <div>
+          <label className="text-ink-secondary mb-1 block text-xs font-medium">誘導 LINE アカウント</label>
+          <Select
+            aria-label="誘導 LINE アカウント"
+            value={lineAccountId}
+            onChange={(value) => setLineAccountId(value)}
+            options={[{ value: '', label: '— 選択しない —' }, ...accounts.map((acc) => ({ value: acc.id, label: acc.name }))]}
+            className="w-full"
+            size="full"
+          />
+        </div>
+
+        <div>
+          <label className="text-ink-secondary mb-1 block text-xs font-medium">タグ</label>
+          <Select
+            aria-label="タグ"
+            value={tagId}
+            onChange={(value) => setTagId(value)}
+            options={[
+              { value: '', label: '— 選択しない —' },
+              ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
+              ...(tagIdStale ? [{ value: tagId, label: `${staleTagName ?? tagId}（このアカウントでは使えません）` }] : []),
+            ]}
+            className="w-full"
+            size="full"
+          />
+        </div>
+
+        <div>
+          <label className="text-ink-secondary mb-1 block text-xs font-medium">シナリオ</label>
+          <Select
+            aria-label="シナリオ"
+            value={scenarioId}
+            onChange={(value) => setScenarioId(value)}
+            options={[
+              { value: '', label: '— 選択しない —' },
+              ...accountScenarios.map((s) => ({ value: s.id, label: s.name })),
+              ...(scenarioIdStale ? [{ value: scenarioId, label: `${staleScenarioName ?? scenarioId}（このアカウントでは使えません）` }] : []),
+            ]}
+            className="w-full"
+            size="full"
+          />
+        </div>
+
+        {isEdit && (
+          <Toggle
+            checked={isActive}
+            onChange={setIsActive}
+            label={isActive ? '有効' : '無効'}
+          />
+        )}
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -1599,8 +1897,15 @@ type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 const APPROVAL_FILTER_ALL = 'all'
 const APPROVAL_FILTER_UNASSIGNED = '__unassigned__'
 
-export function ApprovalQueue() {
+export function ApprovalQueue({
+  focusAffiliateId,
+}: {
+  /** R291: 停止前の確認から来たとき、最初から絞る紹介者。 */
+  focusAffiliateId?: string | null
+} = {}) {
   const [status, setStatus] = useState<ApprovalStatus>('pending')
+  // R291: 紹介者の停止前に「認めるのを待っている成果」の明細を見るための絞り。
+  const [affiliateFilter, setAffiliateFilter] = useState<string | null>(focusAffiliateId ?? null)
   const [items, setItems] = useState<ConversionApprovalItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1696,10 +2001,10 @@ export function ApprovalQueue() {
         setError('ほかの人が先に判断しました。一覧を読み直しました。')
         await loadItems()
       } else {
-        setError(res.error ?? '承認に失敗しました')
+        setError(res.error ?? '承認に失敗しました。通信を確かめて、もう一度お試しください。')
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : '承認に失敗しました')
+      setError(e instanceof Error ? e.message : '承認に失敗しました。通信を確かめて、もう一度お試しください。')
     }
     setActioning(null)
   }, [actioning, loadItems])
@@ -1716,10 +2021,10 @@ export function ApprovalQueue() {
         setError('ほかの人が先に判断しました。一覧を読み直しました。')
         await loadItems()
       } else {
-        setError(res.error ?? '却下に失敗しました')
+        setError(res.error ?? '却下に失敗しました。通信を確かめて、もう一度お試しください。')
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : '却下に失敗しました')
+      setError(e instanceof Error ? e.message : '却下に失敗しました。通信を確かめて、もう一度お試しください。')
     }
     setActioning(null)
   }, [actioning, loadItems])
@@ -1770,6 +2075,9 @@ export function ApprovalQueue() {
         setError(res.error ?? 'まとめて処理できませんでした')
       }
     } catch (e) {
+      // m22u R353: 通信などで結果が不明のときは一覧を読み直す。Worker は
+      // 途中まで進んだ分を保存しているため、表示と保存状態を合わせる。
+      await loadItems()
       setError(e instanceof Error ? e.message : 'まとめて処理できませんでした')
     } finally {
       setBulkConfirm(null)
@@ -1777,13 +2085,26 @@ export function ApprovalQueue() {
     }
   }, [loadItems])
 
+  /*
+    R291: 紹介者絞りはアカウント絞りの前段。ここを通った行だけが数えられ・
+    選ばれ・まとめて処理される（確認窓の対象紹介者・件数と一致する明細）。
+  */
+  const scopedItems = useMemo(() => (
+    affiliateFilter ? items.filter((item) => item.affiliateId === affiliateFilter) : items
+  ), [affiliateFilter, items])
+  const affiliateFilterName = affiliateFilter
+    ? (scopedItems[0]?.affiliateName
+      ?? items.find((item) => item.affiliateId === affiliateFilter)?.affiliateName
+      ?? null)
+    : null
+
   // N-218: アカウント絞りは一覧・件数・一括操作すべての元にする。
   // ここを通った行だけが数えられ・選ばれ・まとめて処理される。
   const accountItems = useMemo(() => {
-    if (accountFilter === APPROVAL_FILTER_ALL) return items
-    if (accountFilter === APPROVAL_FILTER_UNASSIGNED) return items.filter((item) => !item.lineAccountId)
-    return items.filter((item) => item.lineAccountId === accountFilter)
-  }, [accountFilter, items])
+    if (accountFilter === APPROVAL_FILTER_ALL) return scopedItems
+    if (accountFilter === APPROVAL_FILTER_UNASSIGNED) return scopedItems.filter((item) => !item.lineAccountId)
+    return scopedItems.filter((item) => item.lineAccountId === accountFilter)
+  }, [accountFilter, scopedItems])
 
   // 絞りの選択肢。権限内アカウント(lineAccounts.list は scope 済み)へ、
   // 読み込んだ行にだけあるIDと未割当を足す。行が無いアカウントは
@@ -1915,14 +2236,14 @@ export function ApprovalQueue() {
   }
 
   return (
-    <div data-design-node="n5VVTb" data-approval-design="v6">
+    <div data-design-node="n5VVTb" data-approval-design="v6" className="flex flex-col gap-4">
       <NoteBar tone={flaggedCount > 0 ? 'warn' : 'info'}>
         {flaggedCount > 0
           ? `${flaggedCount}件は同じ友だちや同じ注文の重複、返金・取り消し済みの注文が疑われます。内容を確認してから判断してください。`
           : '成果を認めると報酬が確定します。確認が必要な成果は、まとめて承認の対象から外れます。'}
       </NoteBar>
 
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="認めるのを待っている"
           value={loading || error ? null : counts.pending}
@@ -1934,7 +2255,8 @@ export function ApprovalQueue() {
           title="確認したほうがよい"
           value={loading || error ? null : flaggedCount}
           unit={loading || error ? '' : '件'}
-          detail="同じ友だち・同じ注文の重複や、返金・取り消し済みの注文の成果"
+          detail=""
+          help="同じ友だち・同じ注文の重複や、返金・取り消し済みの注文の成果です"
           loading={loading}
         />
         <KpiCard
@@ -1948,12 +2270,13 @@ export function ApprovalQueue() {
           title="待たせている日数"
           value={loading || error ? null : Math.round(averageWaitDays * 10) / 10}
           unit={loading || error ? '' : '日'}
-          detail="承認待ちの平均"
+          detail=""
+          help="承認待ちの平均日数です"
           loading={loading}
         />
       </div>
 
-      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+      <div className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3">
         <SearchField
           placeholder="友だち・紹介者・案件・成果地点・注文番号で検索"
           aria-label="成果承認を検索"
@@ -2010,7 +2333,21 @@ export function ApprovalQueue() {
         )}
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
+        {/*
+          R291: 停止前の確認から来た紹介者絞り。押すと外れて一覧へ戻れる。
+          件数はこの紹介者の承認待ち（確認窓の数と一致）。
+        */}
+        {affiliateFilter ? (
+          <FilterChip
+            selected
+            onChange={() => { setAffiliateFilter(null); setPage(1); setSelected(new Set()) }}
+            count={counts.pending}
+            title="紹介者の絞りを外して、すべての成果に戻ります"
+          >
+            紹介者：{affiliateFilterName ?? '名前を確認できません'}
+          </FilterChip>
+        ) : null}
         {(['pending', 'approved', 'rejected'] as const).map((s) => (
           <FilterChip
             key={s}
@@ -2022,16 +2359,18 @@ export function ApprovalQueue() {
               setPage(1)
               setSelected(new Set())
             }}
+            count={counts[s]}
           >
-            {s === 'pending' ? '認めるのを待っている' : s === 'approved' ? '認めた' : '却下した'} {counts[s]}
+            {s === 'pending' ? '認めるのを待っている' : s === 'approved' ? '認めた' : '却下した'}
           </FilterChip>
         ))}
         {status === 'pending' && (
           <FilterChip
             selected={flaggedOnly}
             onChange={(value) => { setFlaggedOnly(value); setPage(1); setSelected(new Set()) }}
+            count={flaggedCount}
           >
-            確認したほうがよい {flaggedCount}
+            確認したほうがよい
           </FilterChip>
         )}
       </div>
@@ -2046,11 +2385,13 @@ export function ApprovalQueue() {
       ) : loading ? (
         <ListState kind="loading" title="成果を読み込んでいます" />
       ) : shownItems.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="条件に合う成果がありません"
-          description="状態や検索語を変えると、ほかの成果を確認できます。"
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="条件に合う成果がありません"
+            description="状態や検索語を変えると、ほかの成果を確認できます。"
+          />
+        </div>
       ) : (
         <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
           <table className="w-full min-w-[820px]">
@@ -2059,15 +2400,14 @@ export function ApprovalQueue() {
                 <Th>
                   <span className="flex items-center gap-2">
                     {status === 'pending' && (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         aria-label="このページの確認不要な成果をすべて選ぶ"
                         checked={allSafeSelected}
-                        onChange={(event) => {
+                        onCheckedChange={(checked) => {
                           setSelected((current) => {
                             const next = new Set(current)
                             for (const eventId of safePendingIds) {
-                              if (event.target.checked) next.add(eventId)
+                              if (checked) next.add(eventId)
                               else next.delete(eventId)
                             }
                             return next
@@ -2100,21 +2440,20 @@ export function ApprovalQueue() {
                   <td className="text-ink px-4 py-3 text-sm">
                     <div className="flex items-start gap-2">
                     {status === 'pending' && (
-                      <input
-                        type="checkbox"
-                        className="mt-1"
+                      <Checkbox
                         aria-label={`${personNameText(item.friendName)}の成果を選ぶ`}
                         checked={selected.has(item.eventId)}
                         disabled={needsReview}
                         title={needsReview ? '確認が必要な成果はまとめて承認できません' : undefined}
-                        onChange={(event) => {
+                        onCheckedChange={(checked) => {
                           setSelected((current) => {
                             const next = new Set(current)
-                            if (event.target.checked) next.add(item.eventId)
+                            if (checked) next.add(item.eventId)
                             else next.delete(item.eventId)
                             return next
                           })
                         }}
+                        className="mt-1"
                       />
                     )}
                     <span>
@@ -2132,9 +2471,12 @@ export function ApprovalQueue() {
                   <td className="text-ink-secondary px-4 py-3 text-sm">
                     <span className="text-ink block font-medium">{item.offerName ?? '未設定'}</span>
                     <span className="text-ink-faint mt-0.5 block text-xs">{item.conversionPointName ?? '成果地点は未設定'}</span>
+                    {/* R51: 成果金額と確定報酬は別項目。ここは成果の金額。 */}
+                    <span className="text-ink-faint mt-0.5 block text-xs">成果額 {formatYenNullable(item.value)}</span>
                   </td>
                   <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
-                    {formatYenNullable(item.value)}
+                    {/* R51: 報酬列は確定した報酬額。まだ決まっていなければ「未確定」。 */}
+                    {item.rewardAmount != null ? formatYenNullable(item.rewardAmount) : '未確定'}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {needsReview ? (
@@ -2220,7 +2562,7 @@ export function ApprovalQueue() {
                 <div className="flex gap-2">
                   <dt className="text-ink-faint shrink-0">確定した報酬</dt>
                   <dd className="text-ink-secondary">
-                    {detailItem.rewardAmount != null ? `¥${Math.round(detailItem.rewardAmount).toLocaleString('ja-JP')}` : '未確定'}
+                    {detailItem.rewardAmount != null ? `¥${formatNumber(Math.round(detailItem.rewardAmount))}` : '未確定'}
                   </dd>
                 </div>
                 <div className="flex gap-2">
@@ -2232,6 +2574,7 @@ export function ApprovalQueue() {
                   </dd>
                 </div>
               </dl>
+              <AttributionSection eventId={detailItem.eventId} />
             </div>
             <AffiliateButton onClick={() => setDetailItem(null)}>閉じる</AffiliateButton>
           </div>
@@ -2342,6 +2685,7 @@ function OffersList({
   error,
   filtered,
   onEdit,
+  onTerms,
   onRefresh,
 }: {
   offers: AffiliateOffer[]
@@ -2353,6 +2697,7 @@ function OffersList({
   /** 案件はあるが、絞り込みに合う行が無い。 */
   filtered: boolean
   onEdit: (offer: AffiliateOffer) => void
+  onTerms: (offer: AffiliateOffer) => void
   onRefresh: () => void
 }) {
   if (error) {
@@ -2370,20 +2715,25 @@ function OffersList({
     return <ListState kind="loading" title="案件を読み込んでいます" />
   }
 
+  // 空の案内も表と同じカード（白地・枠・角丸）の中に出す。灰色の地だけにしない。
   if (offers.length === 0) {
-    return filtered ? (
-      <ListState
-        kind="empty"
-        title="絞り込みに合う案件がありません"
-        description="検索語を変えるか、絞り込みの札を外すと表示されます。"
-      />
-    ) : (
-      <ListState
-        kind="empty"
-        title="案件はまだ登録されていません"
-        description="何をしたら成果になり、いくら払うかを決めると、アフィリエイターが紹介できるようになります。"
-        action={<Button href="/affiliate-offers/new" variant="primary">案件を作る</Button>}
-      />
+    return (
+      <div className="bg-canvas rounded-card border-hairline border">
+        {filtered ? (
+          <ListState
+            kind="empty"
+            title="絞り込みに合う案件がありません"
+            description="検索語を変えるか、絞り込みの札を外すと表示されます。"
+          />
+        ) : (
+          <ListState
+            kind="empty"
+            title="案件はまだ登録されていません"
+            description="何をしたら成果になり、いくら払うかを決めると、アフィリエイターが紹介できるようになります。"
+            action={<Button href="/affiliate-offers/new" variant="primary">＋ 案件を作る</Button>}
+          />
+        )}
+      </div>
     )
   }
 
@@ -2392,12 +2742,13 @@ function OffersList({
       <table className="w-full min-w-[760px]">
         <thead>
           <TableHeadRow>
+            {/* 表の外側の余白は左右で同じにし、操作は右端にそろえる。 */}
             <Th>案件</Th>
             <Th align="right">報酬</Th>
             <Th>成果が出たときの動き</Th>
             <Th align="right">紹介している人</Th>
             <Th align="right">成果</Th>
-            <Th align="center">操作</Th>
+            <Th align="right">操作</Th>
           </TableHeadRow>
         </thead>
         <tbody className="divide-hairline divide-y">
@@ -2409,7 +2760,7 @@ function OffersList({
               </td>
               <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                 {formatYenNullable(offer.rewardAmount)}
-                {offer.rewardMiles > 0 && <span className="text-ink-faint block text-xs">＋{offer.rewardMiles.toLocaleString()}マイル</span>}
+                {offer.rewardMiles > 0 && <span className="text-ink-faint block text-xs">＋{formatNumber(offer.rewardMiles)}マイル</span>}
               </td>
               <td className="text-ink-secondary px-4 py-3 text-sm">
                 {offer.tagId ? (
@@ -2417,24 +2768,30 @@ function OffersList({
                 ) : offer.scenarioId ? (
                   <>シナリオ「{scenarioMap.get(offer.scenarioId) ?? '名前を確認できません'}」を始める</>
                 ) : offer.rewardMiles > 0 ? (
-                  <>{offer.rewardMiles.toLocaleString()}マイルを付ける</>
+                  <>{formatNumber(offer.rewardMiles)}マイルを付ける</>
                 ) : (
                   <span className="text-warning">何も設定されていません</span>
                 )}
               </td>
               <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
-                {(offerStats.get(offer.id)?.introducers ?? 0).toLocaleString()}人
+                {formatNumber((offerStats.get(offer.id)?.introducers ?? 0))}人
               </td>
               <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
-                {(offerStats.get(offer.id)?.conversions ?? 0).toLocaleString()}件
+                {formatNumber((offerStats.get(offer.id)?.conversions ?? 0))}件
                 <span className="text-ink-faint block text-xs">確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
               </td>
-              <td className="px-4 py-3 text-center">
+              <td className="px-4 py-3 text-right whitespace-nowrap">
                 <button
                   onClick={() => onEdit(offer)}
                   className="text-action text-xs font-medium hover:underline"
                 >
                   編集
+                </button>
+                <button
+                  onClick={() => onTerms(offer)}
+                  className="text-action ml-2 text-xs font-medium hover:underline"
+                >
+                  決まり
                 </button>
                 <span className="text-ink-faint ml-2 text-xs">{offer.isActive ? '公開中' : '停止・終了'}</span>
               </td>
@@ -2459,6 +2816,7 @@ export function OffersTab() {
 
   const [formOpen, setFormOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<AffiliateOffer | null>(null)
+  const [termsTarget, setTermsTarget] = useState<AffiliateOffer | null>(null)
 
   // 一覧の見せ方。どれも読み込んだ行から数えられるので、画面の中で動かす。
   const [query, setQuery] = useState('')
@@ -2597,12 +2955,12 @@ export function OffersTab() {
   }
 
   return (
-    <div data-design-node="GH8VL" data-affiliate-offers-design="v6">
-      <NoteBar>
+    <div data-design-node="GH8VL" data-affiliate-offers-design="v6" className="flex flex-col gap-4">
+      <NoteBar help="案件は、何をしたら成果になりいくら払うかの組み合わせです" helpLabel="案件の意味">
         案件は「何をしたら成果になり、いくら払うか」の組み合わせです。アフィリエイターはこの案件を選んで紹介します。
       </NoteBar>
 
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard title="紹介できる案件" value={openCount} unit="件" detail={`公開中。停止・終了 ${offers.length - openCount}件`} />
         <KpiCard
           title="いちばん成果が出た案件"
@@ -2612,10 +2970,13 @@ export function OffersTab() {
           detail={confirmedDetail(confirmedState, topOffer ? `${topOffer.name}・確定 ${formatYen(offerStats.get(topOffer.id)?.reward ?? 0)}${confirmedTruncated ? '（直近5000件まで）' : ''}` : '成果はまだありません')}
         />
         <KpiCard
-          title="1件あたりの平均報酬"
+          title="平均報酬額"
           value={averageReward}
           unit="円"
           detail={`いちばん高い案件 ${formatYen(Math.max(0, ...rewardValues))}`}
+          /* m22d: 「1件あたり」は単位の意味なので見出しの「？」へ移し、
+             件数は「紹介できる案件」と「動きが未設定の案件」の2か所だけにする。 */
+          help="成果1件あたりの平均です"
         />
         <KpiCard
           title="動きが未設定の案件"
@@ -2629,7 +2990,7 @@ export function OffersTab() {
 
       <div
         data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+        className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3"
       >
         <SearchField
           placeholder="案件名・説明で検索"
@@ -2655,15 +3016,16 @@ export function OffersTab() {
           size="page-size"
         />
         {/* 「並び順を保存」は設計にあるが、保存する口が無いので置かない。 */}
+        {/* 作る操作は行の左。たまに使う CSV は右に残す。 */}
+        <Button href="/affiliate-offers/new" variant="primary">
+          ＋ 案件を作る
+        </Button>
         <AffiliateButton onClick={exportCsv} disabled={shown.length === 0} className="ml-auto">
           CSVで書き出す
         </AffiliateButton>
-        <Button href="/affiliate-offers/new" variant="primary">
-          案件を作る
-        </Button>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {OFFER_FILTERS.map((f) => (
           <FilterChip
             key={f.key}
@@ -2689,10 +3051,11 @@ export function OffersTab() {
         error={offersError}
         filtered={offers.length > 0 && shown.length === 0}
         onEdit={handleEdit}
+        onTerms={setTermsTarget}
         onRefresh={loadOffers}
       />
 
-      <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
+      <div data-design="tf" className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-ink-faint text-xs font-semibold tabular-nums">
           {shown.length === offers.length
             ? `全 ${offers.length}件`
@@ -2703,7 +3066,7 @@ export function OffersTab() {
         )}
       </div>
 
-      <section className="bg-canvas rounded-card border-hairline mt-4 border p-4">
+      <section className="bg-canvas rounded-card border-hairline border p-4">
         <h3 className="text-ink text-sm font-semibold">アフィリエイターと案件のちがい</h3>
         <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
           <li>・アフィリエイター＝紹介してくれる人。紹介コードを持ちます</li>
@@ -2721,6 +3084,10 @@ export function OffersTab() {
           onClose={() => setFormOpen(false)}
           onSaved={() => { void loadOffers() }}
         />
+      )}
+
+      {termsTarget && (
+        <OfferTermsDialog offer={termsTarget} onClose={() => setTermsTarget(null)} />
       )}
     </div>
   )
@@ -2773,20 +3140,20 @@ function SettlementEditor({
       setSaved(true)
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました')
+      setError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="rounded-lg border border-gray-100 bg-white p-4">
-      <p className="mb-3 text-xs font-semibold uppercase text-gray-500">支払いの取り決め</p>
+    <div className="rounded-control border border-divider-soft bg-canvas p-4">
+      <p className="mb-3 text-xs font-semibold uppercase text-ink-faint">支払いの取り決め</p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
           <label
             htmlFor={`aff-email-${affiliate.id}`}
-            className="mb-1 block text-xs font-medium text-gray-700"
+            className="mb-1 block text-xs font-medium text-ink-secondary"
           >
             連絡先
           </label>
@@ -2799,13 +3166,13 @@ function SettlementEditor({
               setSaved(false)
             }}
             placeholder="partner@example.com"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
           />
         </div>
         <div>
           <label
             htmlFor={`aff-hold-${affiliate.id}`}
-            className="mb-1 block text-xs font-medium text-gray-700"
+            className="mb-1 block text-xs font-medium text-ink-secondary"
           >
             確定までの保留
           </label>
@@ -2821,15 +3188,15 @@ function SettlementEditor({
                 setSaved(false)
               }}
               placeholder="なし"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-mini border border-hairline px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-action"
             />
-            <span className="whitespace-nowrap text-xs text-gray-400">日</span>
+            <span className="whitespace-nowrap text-xs text-ink-faint">日</span>
           </div>
         </div>
         <div>
           <label
             htmlFor={`aff-cycle-${affiliate.id}`}
-            className="mb-1 block text-xs font-medium text-gray-700"
+            className="mb-1 block text-xs font-medium text-ink-secondary"
           >
             支払いサイクル
           </label>
@@ -2843,35 +3210,28 @@ function SettlementEditor({
             }}
             placeholder="例: 月末締め翌月末払い"
             maxLength={100}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
           />
         </div>
       </div>
-      <label className="mt-3 flex cursor-pointer items-start gap-2">
-        <input
-          type="checkbox"
-          checked={notify}
-          onChange={(e) => {
-            setNotify(e.target.checked)
-            setSaved(false)
-          }}
-          className="mt-0.5 rounded border-gray-300"
-        />
-        <span className="text-xs text-gray-600">成果が出たときに本人へ知らせる</span>
-      </label>
-      <p className="mt-2 text-[11px] text-gray-400">
+      <Checkbox
+        checked={notify}
+        onCheckedChange={(checked) => {
+          setNotify(checked)
+          setSaved(false)
+        }}
+        className="mt-3"
+      >成果が出たときに本人へ知らせる</Checkbox>
+      <p className="mt-2 text-[11px] text-ink-faint">
         保留日数と支払いサイクルは取り決めの記録です。報酬の計算そのものには使いません。
       </p>
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
       <div className="mt-3 flex items-center gap-2">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-        >
-          {saving ? '保存中...' : '取り決めを保存'}
-        </button>
-        {saved && <span className="text-xs text-emerald-600">保存しました</span>}
+        <Button variant="secondary" className="rounded-mini px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-surface-pearl h-auto whitespace-normal" onClick={save} disabled={saving}>
+          {saving ? '保存中...' : '取り決めを保存する'}
+        </Button>
+        {/* #670 22: emerald-600 は白地で 3.8:1 しかなく AA 未満。共通トークンの濃い緑へ。 */}
+        {saved && <span className="text-xs font-semibold text-success">保存しました</span>}
       </div>
     </div>
   )

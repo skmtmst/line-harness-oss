@@ -9,11 +9,15 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
+import TargetMissing from '@/components/shared/target-missing'
+import { notifyToast } from '@/components/shared/toast'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { useAccount } from '@/contexts/account-context'
-import { api, type ApiBroadcast } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { audienceSummary } from '@/lib/broadcast-summary'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type AudienceEstimate = {
   audienceCount: number
@@ -32,30 +36,14 @@ function formatJst(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function formatJstSentence(value: string | null): string {
   if (!value) return '日時未設定'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '日時未設定'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function belongsToAccount(broadcast: ApiBroadcast, selectedAccountId: string | null): boolean {
@@ -81,7 +69,12 @@ function ReservedBroadcastContent() {
   } | null>(null)
   const [notificationText, setNotificationText] = useState('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  /*
+   * 存在しない予約（404）と通信の失敗（503など）は別の案内にする（R582）。
+   * 存在しないものに「もう一度読み込む」だけ出しても直らないし、
+   * 通信の失敗に一覧へ戻る口だけ出しても続けられない。
+   */
+  const [notFound, setNotFound] = useState(false)
   /*
     予約の取消。**送信が始まったあとは戻せない**ので、押す前に何が起きるかを
     読ませ、押している間は受け付けない。取り消しても中身は消えず、下書きに
@@ -92,7 +85,6 @@ function ReservedBroadcastContent() {
   const [cancelError, setCancelError] = useState('')
   const [cancelled, setCancelled] = useState(false)
   const [actionBusy, setActionBusy] = useState<'test' | 'duplicate' | null>(null)
-  const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
   const duplicateKey = useRef<string | null>(null)
   const requestGeneration = useRef(0)
@@ -105,20 +97,19 @@ function ReservedBroadcastContent() {
     if (!id) {
       if (!isCurrent()) return
       setBroadcast(null)
-      setError('予約した配信を特定できませんでした。')
       setLoading(false)
       return
     }
 
     setLoading(true)
-    setError('')
+    setNotFound(false)
     setEstimate(null)
     try {
       const result = await api.broadcasts.get(id)
       if (!isCurrent()) return
       if (!result.success) {
         setBroadcast(null)
-        setError('予約した配信を表示できませんでした。')
+        setNotFound(true)
         return
       }
 
@@ -126,7 +117,12 @@ function ReservedBroadcastContent() {
       // 宛先が絞り込みのときだけ、条件に出すタグ名・シナリオ名を取る。
       // 取れなくても予約の表示自体は出し続ける（型だけの表記に残る）。
       if (result.data.targetType === 'tag' || result.data.targetType === 'segment') {
-        void Promise.allSettled([api.tags.list(), api.scenarios.list()])
+        // R23横展開: この予約のアカウントの候補だけで名前を解決する。
+        const audienceAccountId = result.data.lineAccountId
+        void Promise.allSettled([
+          api.tags.list(audienceAccountId ? { accountId: audienceAccountId } : undefined),
+          api.scenarios.list(audienceAccountId ? { accountId: audienceAccountId } : undefined),
+        ])
           .then(([tagsRes, scenariosRes]) => {
             if (!isCurrent()) return
             const tags = tagsRes.status === 'fulfilled' && tagsRes.value.success ? tagsRes.value.data : null
@@ -165,10 +161,15 @@ function ReservedBroadcastContent() {
           if (isCurrent()) setEstimate(null)
         })
       await Promise.all([notifyTask, estimateTask])
-    } catch {
+    } catch (err) {
       if (!isCurrent()) return
       setBroadcast(null)
-      setError('予約した配信を表示できませんでした。通信を確認して、もう一度お試しください。')
+      // 実Workerは存在しない予約を404で返す。汎用の通信失敗と混ぜない。
+      if (err instanceof ApiError && err.status === 404) {
+        setNotFound(true)
+      } else {
+        setNotFound(false)
+      }
     } finally {
       if (isCurrent()) setLoading(false)
     }
@@ -181,17 +182,47 @@ function ReservedBroadcastContent() {
     }
   }, [load])
 
+  /*
+   * `?id=` なしで開くと読み込みが始まらない。対象未指定は失敗ではないので、
+   * 落とさず予定へ戻して選び直させる（全ルート監査 A2、2026-09-25）。
+   */
+  if (!id) {
+    return (
+      <ListState
+        kind="empty"
+        title="予約した配信が指定されていません"
+        description="配信予定から、確認する予約を選び直してください。"
+        action={<Button href="/broadcasts">配信予定へ戻る</Button>}
+      />
+    )
+  }
   if (accountLoading || loading) {
     return <ListState kind="loading" title="予約結果を確認しています" />
   }
 
-  if (error || !broadcast) {
+  /*
+   * R582: 対象なしは存在しない旨と配信予定への戻り口だけ。
+   * 通信の失敗（503など）は同画面での再試行だけ。混ぜない。
+   */
+  if (notFound) {
     return (
-      <ListState
+      <TargetMissing
+        kind="not-found"
+        title="予約した配信が見つかりません"
+        description="削除されたか、配信予定から選び直してください。"
+        backHref="/broadcasts"
+        backLabel="配信予定へ戻る"
+      />
+    )
+  }
+
+  if (!broadcast) {
+    return (
+      <TargetMissing
         kind="error"
         title="予約結果を表示できませんでした"
-        description={error || '予約した配信が見つかりませんでした。'}
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        description="通信が切れたか、サーバーが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
       />
     )
   }
@@ -229,19 +260,18 @@ function ReservedBroadcastContent() {
         (scenarioId) => audienceNames.scenarios.find((s) => s.id === scenarioId)?.name ?? null,
       )
     : TARGET_LABELS[broadcast.targetType]
-  const audienceLabel = `${audienceTarget}${audienceCount === null ? '' : ` ${audienceCount.toLocaleString('ja-JP')}人`}`
+  const audienceLabel = `${audienceTarget}${audienceCount === null ? '' : ` ${formatNumber(audienceCount)}人`}`
   const scheduledLabel = formatJst(broadcast.scheduledAt)
   const scheduledSentenceLabel = formatJstSentence(broadcast.scheduledAt)
 
   const testSend = async () => {
     if (actionBusy) return
     setActionBusy('test')
-    setActionMessage('')
     setActionError('')
     try {
       const result = await api.broadcasts.testSend(broadcast.id)
       if (!result.success) throw new Error(result.error)
-      setActionMessage(`テスト送信が完了しました（成功 ${result.sent ?? 0}件・失敗 ${result.failed ?? 0}件）。`)
+      notifyToast(`テスト送信が完了しました（成功 ${result.sent ?? 0}件・失敗 ${result.failed ?? 0}件）。`)
     } catch {
       setActionError('テスト送信できませんでした。テスト送信先の設定と配信内容を確認してください。')
     } finally {
@@ -252,7 +282,6 @@ function ReservedBroadcastContent() {
   const duplicateBroadcast = async () => {
     if (actionBusy) return
     setActionBusy('duplicate')
-    setActionMessage('')
     setActionError('')
     duplicateKey.current ??= crypto.randomUUID()
     try {
@@ -272,7 +301,7 @@ function ReservedBroadcastContent() {
         measureOpens: broadcast.measureOpens,
       }, { idempotencyKey: duplicateKey.current })
       if (!result.success) throw new Error(result.error)
-      router.push(`/broadcasts?id=${encodeURIComponent(result.data.id)}`)
+      router.push(`/broadcasts/detail?id=${encodeURIComponent(result.data.id)}`)
     } catch {
       setActionError('複製できませんでした。通信を確認して、もう一度お試しください。')
     } finally {
@@ -299,15 +328,15 @@ function ReservedBroadcastContent() {
         固定の右列で本文が潰れるので、1列に畳んで下へ並べる。
       */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <section id="reservation-summary" style={{ minHeight: 760 }} className="bg-canvas border-hairline rounded-card min-w-0 flex-1 border px-6 py-8 text-center shadow-sm">
-          <span className="bg-accent-soft text-accent mx-auto flex h-14 w-14 items-center justify-center rounded-full">
+        <section id="reservation-summary" style={{ minHeight: 760 }} className="bg-canvas border-hairline rounded-card min-w-0 flex-1 border px-6 py-8 text-center shadow-card">
+          <span className="bg-accent-soft text-accent-deep mx-auto flex h-14 w-14 items-center justify-center rounded-pill">
             <CalendarCheck2 size={28} aria-hidden="true" />
           </span>
           <h2 className="text-ink mt-5 text-xl font-bold">一斉配信を予約しました</h2>
           <p className="text-ink-secondary mt-3 text-sm font-semibold">
             {audienceCount === null
               ? `${scheduledSentenceLabel}に配信します。対象人数は現在確認できません。`
-              : `${scheduledSentenceLabel}に、${audienceCount.toLocaleString('ja-JP')}人へ配信します。`}
+              : `${scheduledSentenceLabel}に、${formatNumber(audienceCount)}人へ配信します。`}
           </p>
 
           <dl className="bg-canvas-sunken border-hairline mx-auto mt-5 max-w-3xl rounded-card border px-5 text-sm">
@@ -330,24 +359,24 @@ function ReservedBroadcastContent() {
 
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button href="/broadcasts"><List size={16} aria-hidden="true" />一覧へ戻る</Button>
-            <Button variant="primary" href={`/broadcasts?id=${encodeURIComponent(broadcast.id)}`}>
+            <Button variant="primary" href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`}>
               <Eye size={16} aria-hidden="true" />予約内容を確認
             </Button>
           </div>
         </section>
 
-        <aside className="bg-canvas border-hairline rounded-card shrink-0 border p-4 shadow-sm lg:w-97.5">
+        <aside className="bg-canvas border-hairline rounded-card shrink-0 border p-4 shadow-card lg:w-97.5">
           <h2 className="text-ink text-base font-bold">次にできること</h2>
           <p className="text-ink-faint mt-1 text-xs">予約後も開始前まで確認・取消できます。</p>
           <div className="mt-4 grid gap-2">
-            <Button href={`/broadcasts?id=${encodeURIComponent(broadcast.id)}`} className="w-full">
+            <Button href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`} className="w-full">
               <Eye size={16} aria-hidden="true" />予約の内容を見る
             </Button>
-            <Button onClick={() => void testSend()} disabled={actionBusy !== null} className="w-full">
-              <Send size={16} aria-hidden="true" />{actionBusy === 'test' ? 'テスト送信中…' : 'テスト送信する'}
+            <Button onClick={() => void testSend()} disabled={actionBusy !== null} className="w-full" busy={actionBusy === 'test'} busyLabel="テスト送信中…">
+              <Send size={16} aria-hidden="true" />テストを送る
             </Button>
-            <Button onClick={() => void duplicateBroadcast()} disabled={actionBusy !== null} className="w-full">
-              <Copy size={16} aria-hidden="true" />{actionBusy === 'duplicate' ? '複製中…' : '複製して別配信を作る'}
+            <Button onClick={() => void duplicateBroadcast()} disabled={actionBusy !== null} className="w-full" busy={actionBusy === 'duplicate'} busyLabel="複製中…">
+              <Copy size={16} aria-hidden="true" />複製して別配信を作る
             </Button>
             {broadcast.status === 'scheduled' && !cancelled && (
               <Button onClick={() => { setCancelError(''); setCancelOpen(true) }} disabled={actionBusy !== null} className="w-full">
@@ -356,25 +385,22 @@ function ReservedBroadcastContent() {
             )}
           </div>
           <p className="text-ink-faint mt-4 text-xs">配信内容: {bubbleCount}通</p>
-          {estimate ? <p className="text-ink-faint mt-1 text-xs">除外見込み: {estimate.hiddenExcluded.toLocaleString('ja-JP')}人</p> : null}
-          {actionMessage ? <p role="status" className="bg-success-bg text-success rounded-control mt-3 px-3 py-2 text-xs">{actionMessage}</p> : null}
-          {actionError ? <p role="alert" className="bg-danger-bg text-danger rounded-control mt-3 px-3 py-2 text-xs">{actionError}</p> : null}
+          {estimate ? <p className="text-ink-faint mt-1 text-xs">除外見込み: {formatNumber(estimate.hiddenExcluded)}人</p> : null}
+          {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} className="mt-3" /> : null}
         </aside>
       </div>
 
       {estimate?.warnings.length ? (
-        <section className="rounded-card border border-warning-bg bg-warning-bg p-4 text-sm text-warning">
+        <Notice tone="warn">
           <p className="font-bold">配信前に確認すること</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {estimate.warnings.map((warning, index) => <li key={`${warning.level}-${index}`}>{warning.message}</li>)}
           </ul>
-        </section>
+        </Notice>
       ) : null}
 
       {cancelled && (
-        <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
-          予約を取り消しました。内容は下書きとして残っています。
-        </p>
+        <Notice tone="success" message="予約を取り消しました。内容は下書きとして残っています。" />
       )}
 
       <ConfirmDialog

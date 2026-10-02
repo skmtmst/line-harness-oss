@@ -162,7 +162,10 @@ describe('画面', () => {
   })
 
   it('excludes evidence only for this reply, accumulates exclusions, and does not send automatically', async () => {
-    availableReferences = [{ id: 'ref-a', title: 'フォームの根拠', version: 1 }, { id: 'ref-b', title: '配信の根拠', version: 2 }]
+    availableReferences = [
+      { id: 'ref-a', title: 'フォームの根拠', version: 1, articleKind: 'verified' },
+      { id: 'ref-b', title: '配信の根拠', version: 2, articleKind: 'answer_example' },
+    ]
     await act(async () => root.render(<OpsSupportPage />)); await flush()
     const click = async (label: string) => {
       await act(async () => Array.from(host.querySelectorAll('button')).find(b => b.textContent === label)!.click()); await flush()
@@ -207,7 +210,8 @@ describe('画面', () => {
     expect(text).toContain('回答フォームからタグが付かない')
     expect(text).toContain('管理画面のお問い合わせ')
     expect(text).toContain('6人中5人')
-    expect(text).toContain('12件（未解決 0）')
+    // m22d: 一覧の件数と重なる「○件」は出さない。未解決を先に言う。
+    expect(text).toContain('これまで12のうち未解決0件')
     expect(text).toContain('musubo 運営 ／ 坂本 真人')
     expect(text).toContain('a.png（契約先から）')
     expect(text).toContain('AIで下書きを作る')

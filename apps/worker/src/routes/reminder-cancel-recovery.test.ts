@@ -45,11 +45,19 @@ vi.mock('@line-crm/db', async (importOriginal) => ({
   ...bookingCustomerMocks,
 }));
 
-const availabilityMocks = { computeSlots: vi.fn(() => []) };
-vi.mock('../services/availability.js', () => availabilityMocks);
+const availabilityMocks = vi.hoisted(() => ({ computeSlots: vi.fn(() => []) }));
+// 空き枠の計算だけ差し替える。通知文面の時刻・タイムゾーン変換は本物を使う。
+vi.mock('../services/availability.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/availability.js')>()),
+  ...availabilityMocks,
+}));
 
-const notifierMocks = { sendBookingNotification: vi.fn() };
-vi.mock('../services/booking-notifier.js', () => notifierMocks);
+const notifierMocks = vi.hoisted(() => ({ sendBookingNotification: vi.fn() }));
+// 送る側だけ差し替える。文面の組み立て（時刻・残り時間）は本物を使う。
+vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+  ...notifierMocks,
+}));
 
 const eventNotifierMocks = vi.hoisted(() => ({ sendEventBookingNotification: vi.fn(async () => {}) }));
 vi.mock('../services/event-booking-notifier.js', () => eventNotifierMocks);
@@ -224,6 +232,7 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
           friendReminderId: 'FR-1',
           now: '2026-09-10T00:00:00.000Z',
           leaseExpiresAt: '2026-09-10T00:05:00.000Z',
+          expectedLeaseExpiresAt: '2026-09-10T00:05:00.000Z',
         });
       });
       const cancellation = cancelV6RemindersForSource(cancelling, {
@@ -1454,7 +1463,6 @@ describe('旧表の取消後送信 (自主検証)', () => {
 
       const result = await processDueReminders(hooked, {
         now: LEGACY_NOW,
-        reminderHoursBefore: 24,
         sender: async (p) => {
           sentTo.push(p.toLineUserId);
         },
@@ -1483,7 +1491,6 @@ describe('旧表の取消後送信 (自主検証)', () => {
       const sentTo: string[] = [];
       const result = await processDueReminders(dual.db1, {
         now: LEGACY_NOW,
-        reminderHoursBefore: 24,
         sender: async (p) => {
           sentTo.push(p.toLineUserId);
         },
@@ -1506,7 +1513,6 @@ describe('旧表の取消後送信 (自主検証)', () => {
       const sentTo: string[] = [];
       const run = (db: D1Database) => processDueReminders(db, {
         now: LEGACY_NOW,
-        reminderHoursBefore: 24,
         sender: async (p) => {
           sentTo.push(p.toLineUserId);
         },
@@ -1618,7 +1624,6 @@ describe('旧表の取消後送信 (自主検証)', () => {
       seedLegacyBookingReminder(dual.raw1);
       const result = await processDueReminders(dual.db1, {
         now: LEGACY_NOW,
-        reminderHoursBefore: 24,
         sender: async () => {
           throw new Error('line down');
         },
@@ -1658,7 +1663,6 @@ describe('旧表の送信直前に予約状態そのものを見る (自主検�
 
       const result = await processDueReminders(hooked, {
         now: LEGACY_NOW,
-        reminderHoursBefore: 24,
         sender: async (p) => {
           sentTo.push(p.toLineUserId);
         },
@@ -1759,7 +1763,6 @@ describe('旧表の恒久失敗を上限で打ち切る (自主検証)', () => {
       const sentTo: string[] = [];
       const run = () => processDueReminders(dual.db1, {
         now: LEGACY_NOW,
-        reminderHoursBefore: 24,
         sender: async (p) => {
           sentTo.push(p.toLineUserId);
         },
@@ -1843,7 +1846,6 @@ describe('旧表の恒久失敗を上限で打ち切る (自主検証)', () => {
       const sentTo: string[] = [];
       const run = () => processDueReminders(dual.db1, {
         now: LEGACY_NOW,
-        reminderHoursBefore: 24,
         sender: async (p) => {
           sentTo.push(p.toLineUserId);
         },

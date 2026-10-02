@@ -11,10 +11,18 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fetchApi = vi.hoisted(() => vi.fn())
+const apiFolders = vi.hoisted(() => ({
+  list: vi.fn(),
+  create: vi.fn(),
+  update: vi.fn(),
+  delete: vi.fn(),
+  swapOrder: vi.fn(),
+}))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
-  return { ...actual, fetchApi }
+  // `api.folders.*` は内部で生の fetchApi を掴むため、部品ごと差し替える。
+  return { ...actual, fetchApi, api: { ...(actual as unknown as { api: object }).api, folders: apiFolders } }
 })
 
 vi.mock('next/link', () => ({
@@ -73,6 +81,7 @@ const unassignedForm = {
 }
 
 function mockDefault() {
+  apiFolders.list.mockImplementation(async () => ({ success: true, data: [] }))
   fetchApi.mockImplementation(async (path: string) => {
     if (path.startsWith('/api/forms/unassigned')) {
       return { success: true, data: [unassignedForm] }
@@ -131,8 +140,11 @@ describe('回答フォーム一覧の管理者確認(#724)', () => {
     expect(host.textContent).toContain('旧フォーム要確認')
     expect(host.textContent).toContain('管理者確認')
     expect(host.textContent).toContain('#771')
-    // 割り当て操作は置かない
-    expect(host.querySelector('td button')).toBeNull()
+    // 割り当て操作は置かない（「？」の説明は操作ではないため除く）
+    const rowActions = [...host.querySelectorAll('td button')].filter(
+      (button) => !(button.getAttribute('aria-label') ?? '').endsWith('の説明'),
+    )
+    expect(rowActions).toEqual([])
   })
 
   it('専用口が403なら確認できるものは無いと案内する', async () => {

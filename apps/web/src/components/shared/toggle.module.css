@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 /*
  * スイッチ。Pencil V5 の機能設定（31-1）で43個並ぶ。
  *
@@ -11,10 +13,14 @@
   width: 36px; /* width: 36 */
   height: 20px; /* height: 20 */
   border-radius: var(--radius-pill); /* cornerRadius: $radius-full */
-  background: var(--color-step-idle);
+  /*
+   * ★V7（2026-09-24、better-accessibility：部品の見分けは 3:1）。オフの地は $step-idle（#eef0f3）で
+   * 白い地と 1.1:1 しかなく、切替があること自体が見えなかった。ink-faint を 72% にして約 3.2:1。
+   */
+  background: color-mix(in srgb, var(--color-ink-faint) 72%, var(--color-canvas));
   border: none;
   cursor: pointer;
-  transition: background-color 120ms ease-out;
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
   flex: none;
 }
 
@@ -27,11 +33,12 @@
   height: 16px;
   border-radius: var(--radius-pill);
   background: var(--color-canvas); /* fill: $canvas */
-  transition: transform 120ms ease-out;
+  transition: transform var(--motion-fast) var(--motion-ease-out);
 }
 
 .on {
-  background: var(--color-accent); /* fill: $accent */
+  /* ★V7：明るい緑は白い地と 2.26:1。濃い緑で 5.44:1。 */
+  background: var(--color-accent-deep); /* fill: $accent-deep */
 }
 
 .on::after {
@@ -49,6 +56,24 @@
 }
 
 .toggle:focus-visible {
-  outline: 2px solid var(--color-status-info);
+  outline: 2px solid var(--color-action);
   outline-offset: 2px;
+}
+
+/*
+ * ★V8「トグル」（bkjTv・LxHpj）：大きさ・つまみ・オンの緑は v7 と同じ。
+ * オフの地は操作する部品の枠色（control-border）に合わせる。
+ * 「消せない項目」はオフに見せてはいけないので髪線の灰のまま保つ。
+ */
+[data-theme='v8'] .toggle {
+  background: var(--color-control-border);
+}
+
+[data-theme='v8'] .on {
+  background: var(--color-accent-deep);
+}
+
+[data-theme='v8'] .locked {
+  background: var(--color-hairline);
+}
 }

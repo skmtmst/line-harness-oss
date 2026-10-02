@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   BookOpen,
   Building2,
@@ -20,11 +20,11 @@ import {
 } from 'lucide-react'
 import { api, type OpsMe } from '@/lib/api'
 import Button from '@/components/shared/button'
+import MenuPortal from '@/components/shared/menu-portal'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import OpsEnvBar from './ops-env-bar'
 import ImpersonationBar from './impersonation-bar'
-import TopBar from '@/components/shared/top-bar'
 
 /**
  * 運営コンソールの外枠。★V6 37 系。
@@ -43,12 +43,6 @@ const MENU: Array<{ href: string; label: string; icon: typeof LayoutDashboard }>
   { href: '/ops/audit', label: '監査ログ', icon: ScrollText },
 ]
 
-const OpsPageTitleContext = createContext<(title: string) => void>(() => {})
-export function useOpsPageTitle(title: string) {
-  const setTitle = useContext(OpsPageTitleContext)
-  useEffect(() => { setTitle(title); return () => setTitle('') }, [setTitle, title])
-}
-
 export default function OpsShell({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -56,7 +50,8 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   const [checked, setChecked] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [navOpen, setNavOpen] = useState(false)
-  const [pageTitle, setPageTitle] = useState('')
+  // ★V7：担当者の取得だけ落ちても外枠は落とさない。本文は普通に出す。
+  const [meError, setMeError] = useState('')
 
   /*
    * 狭い画面のメニューは開閉式。画面を移ったら閉じ、開いている間は
@@ -94,17 +89,37 @@ export default function OpsShell({ children }: { children: ReactNode }) {
         router.replace(body.data.platformAdminState === 'awaiting_totp' ? '/ops/two-factor' : '/ops/login?error=not_platform_admin')
         return
       }
-      const meRes = await api.ops.me()
-      if (!meRes.success) throw new Error(meRes.error)
-      setMe(meRes.data)
       setLoadError('')
-      setChecked(true)
     } catch (caught) {
       // 認証済みなのに後続APIが失敗した場合までログインへ戻すと、原因を隠したまま
       // ログイン画面とのループになる。401 だけを上で戻し、それ以外は画面に残す。
-      setLoadError(caught instanceof Error ? caught.message : '運営コンソールを読み込めませんでした')
+      // 口の生文言（英語の `Failed to fetch` など）をそのまま出さない。
+      setLoadError(
+        caught instanceof TypeError
+          ? '通信できませんでした。ネットワークを確認してもう一度お試しください'
+          : caught instanceof Error && caught.message
+            ? caught.message
+            : '運営コンソールを読み込めませんでした',
+      )
       setChecked(true)
+      return
     }
+    // セッションは通った。担当者の取得だけ落ちても外枠は落とさない。
+    try {
+      const meRes = await api.ops.me()
+      if (!meRes.success) throw new Error(meRes.error)
+      setMe(meRes.data)
+      setMeError('')
+    } catch (caught) {
+      setMeError(
+        caught instanceof TypeError
+          ? '通信できませんでした。ネットワークを確認してもう一度お試しください'
+          : caught instanceof Error && caught.message
+            ? caught.message
+            : '担当者の情報を読み込めませんでした',
+      )
+    }
+    setChecked(true)
   }, [router])
 
   useEffect(() => { void load() }, [load])
@@ -112,16 +127,18 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   if (!checked) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-canvas-sunken">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-hairline border-t-accent-deep" />
+        <div className="h-8 w-8 animate-spin rounded-pill border-2 border-hairline border-t-accent-deep" />
       </div>
     )
   }
 
-  if (loadError || !me) {
+  // ★V7：セッション以外の失敗（担当者の取得）で外枠ごと落とさない。
+  // 担当者が読めていない間は、外枠と本文を出したまま左下に1行出す。
+  if (loadError) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-canvas-sunken px-4">
-        <div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-6 text-center shadow-sm">
-          <p role="alert" className="text-label font-bold text-status-danger">{loadError || '運営コンソールを読み込めませんでした'}</p>
+        <div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-6 text-center shadow-card">
+          <p role="alert" className="text-label font-medium text-danger">{loadError || '運営コンソールを読み込めませんでした'}</p>
           <div className="mt-4 flex justify-center gap-2">
             <Button variant="primary" onClick={() => { setChecked(false); setLoadError(''); void load() }}>もう一度試す</Button>
             <Button onClick={() => void logoutAndGoToLogin('/ops/login')}>ログインへ戻る</Button>
@@ -131,35 +148,15 @@ export default function OpsShell({ children }: { children: ReactNode }) {
     )
   }
 
-  // V6 csVox: environment strip belongs to the content column, not above
-  // the sidebar. Existing authentication and account-menu behavior is unchanged.
-  if (pathname === '/ops/knowledge' || pathname === '/ops/support') return (
-    <OpsPageTitleContext.Provider value={setPageTitle}>
-    <div className="flex min-h-svh bg-shell" data-design-node="jIZP0" data-knowledge-shell>
-      <OpsSidebar me={me} pathname={pathname} open={navOpen} onClose={() => setNavOpen(false)} />
-      <main className="min-w-0 flex-1">
-        <OpsEnvBar />
-        {me.impersonation ? <ImpersonationBar initial={me.impersonation} onChange={() => void load()} /> : null}
-        <div className="flex h-12 items-center border-b border-hairline bg-canvas px-4 xl:hidden">
-          <button type="button" aria-expanded={navOpen} onClick={() => setNavOpen(true)}
-            className="flex min-h-11 items-center gap-2 rounded-md px-2 text-label font-bold text-ink hover:bg-canvas-sunken">
-            <Menu aria-hidden="true" className="h-5 w-5" />メニュー
-          </button>
-        </div>
-        <TopBar title={pathname === '/ops/knowledge' ? 'ナレッジ' : pageTitle || 'お問い合わせ'} accounts={[]} selectedAccountId="" onAccountChange={() => {}} showAccountSwitcher={false}
-          roleLabel="運営" userName={me.name} onLogout={() => logoutAndGoToLogin('/ops/login')} />
-        <div className="px-10 pb-8 pt-3.5">{children}</div>
-      </main>
-    </div>
-    </OpsPageTitleContext.Provider>
-  )
-
+  // ★V7: 外枠は全画面で同じ形にする。運営の帯（TopBar）は使わず、
+  // 画面名は各画面の OpsPageHeader が出す。認証とアカウントメニューの
+  // 振る舞いは変えない。
   return (
     <div className="flex min-h-svh flex-col bg-canvas-sunken" data-design-node="jIZP0">
       <OpsEnvBar />
-      {me.impersonation ? <ImpersonationBar initial={me.impersonation} onChange={() => void load()} /> : null}
+      {me?.impersonation ? <ImpersonationBar initial={me.impersonation} onChange={() => void load()} /> : null}
       <div className="flex flex-1">
-        <OpsSidebar me={me} pathname={pathname} open={navOpen} onClose={() => setNavOpen(false)} />
+        <OpsSidebar me={me} meError={meError} onRetryMe={() => { setChecked(false); setMeError(''); void load() }} pathname={pathname} open={navOpen} onClose={() => setNavOpen(false)} />
         <main className="min-w-0 flex-1">
           {/*
            * 1280px未満ではナビを常設しない。256pxの帯が残ると本文が潰れて
@@ -170,20 +167,24 @@ export default function OpsShell({ children }: { children: ReactNode }) {
               type="button"
               aria-expanded={navOpen}
               onClick={() => setNavOpen(true)}
-              className="flex min-h-11 items-center gap-2 rounded-md px-2 text-label font-bold text-ink hover:bg-canvas-sunken"
+              className="flex min-h-11 items-center gap-2 rounded-mini px-2 text-label font-medium text-ink hover:bg-canvas-sunken"
             >
               <Menu aria-hidden="true" className="h-5 w-5" />
               メニュー
             </button>
           </div>
-          <div className="mx-auto max-w-screen-2xl px-4 pb-8 pt-4 xl:px-10">{children}</div>
+          {/*
+           * ★V7: 本文は外枠の幅いっぱいに広げる。`max-w` で絞ると 1920px で
+           * 右が大きく空く。左右の余白（16px／40px）はここが持つ。
+           */}
+          <div className="px-4 pb-8 pt-4 xl:px-10">{children}</div>
         </main>
       </div>
     </div>
   )
 }
 
-function OpsSidebar({ me, pathname, open, onClose }: { me: OpsMe; pathname: string; open: boolean; onClose: () => void }) {
+function OpsSidebar({ me, meError, onRetryMe, pathname, open, onClose }: { me: OpsMe | null; meError: string; onRetryMe: () => void; pathname: string; open: boolean; onClose: () => void }) {
   return (
     <>
       {/* 狭い画面でメニューを開いたときの暗幕。押すと閉じる。 */}
@@ -197,19 +198,19 @@ function OpsSidebar({ me, pathname, open, onClose }: { me: OpsMe; pathname: stri
       ) : null}
       <aside
         aria-label="運営メニュー"
-        className={`${open ? 'flex' : 'hidden'} fixed inset-y-0 left-0 z-50 w-64 shrink-0 flex-col overflow-y-auto border-r border-hairline bg-canvas shadow-xl xl:static xl:z-auto xl:flex xl:shadow-none`}
+        className={`${open ? 'flex' : 'hidden'} fixed inset-y-0 left-0 z-50 w-64 shrink-0 flex-col overflow-y-auto border-r border-hairline bg-canvas shadow-float xl:static xl:z-auto xl:flex xl:shadow-none`}
       >
       <div className="flex items-center gap-3 px-4 py-4">
-        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent-deep text-lg font-bold text-on-accent">m</span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-mini bg-accent-deep text-lg font-bold text-on-accent">m</span>
         <div className="min-w-0">
-          <p className="truncate text-label font-bold text-ink">musubo</p>
+          <p className="truncate text-label font-medium text-ink">musubo</p>
           <p className="truncate text-nano text-ink-faint">運営コンソール</p>
         </div>
         <button
           type="button"
           aria-label="メニューを閉じる"
           onClick={onClose}
-          className="ml-auto flex min-h-11 min-w-11 items-center justify-center rounded-md text-ink-secondary hover:bg-canvas-sunken xl:hidden"
+          className="ml-auto flex min-h-11 min-w-11 items-center justify-center rounded-mini text-ink-secondary hover:bg-canvas-sunken xl:hidden"
         >
           <X aria-hidden="true" className="h-5 w-5" />
         </button>
@@ -226,7 +227,7 @@ function OpsSidebar({ me, pathname, open, onClose }: { me: OpsMe; pathname: stri
                 <Link
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex h-10 items-center gap-3 rounded-md px-3 text-label ${active ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}
+                  className={`flex h-10 items-center gap-3 rounded-mini px-3 text-label ${active ? 'bg-accent-soft font-medium text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}
                 >
                   <Icon aria-hidden="true" className={`h-4.5 w-4.5 ${active ? 'text-accent-deep' : 'text-ink-secondary'}`} />
                   {item.label}
@@ -237,7 +238,21 @@ function OpsSidebar({ me, pathname, open, onClose }: { me: OpsMe; pathname: stri
         </ul>
       </nav>
       <div className="h-px bg-hairline" />
-      <OpsAccountMenu me={me} />
+      {me ? (
+        <OpsAccountMenu me={me} />
+      ) : (
+        // ★V7：担当者だけ読めていない間は、左下に小さく1行出す。外枠は残す。
+        <div className="px-4 py-3">
+          <p className="text-nano text-ink-secondary" role="status">
+            {meError || '担当者を読み込んでいます'}
+            {meError ? (
+              <button type="button" onClick={onRetryMe} className="text-action ml-2 font-semibold hover:underline">
+                もう一度
+              </button>
+            ) : null}
+          </p>
+        </div>
+      )}
       </aside>
     </>
   )
@@ -246,37 +261,34 @@ function OpsSidebar({ me, pathname, open, onClose }: { me: OpsMe; pathname: stri
 /** 左下のログイン中アカウント。押すと上にメニューが開く（★V6 37-9 `pxiUt`）。 */
 function OpsAccountMenu({ me }: { me: OpsMe }) {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
 
-  useEffect(() => {
-    if (!open) return
-    const onPointer = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false)
-    }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', onPointer)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onPointer)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
+  // 外側を押したとき・Esc の扱いは MenuPortal に任せる。
+  // 下に場所が無ければ上へ開く（場所の判断も器がする）。
 
   const initial = me.name.trim().charAt(0) || 'M'
 
   return (
-    <div ref={rootRef} className="relative px-3 py-3">
+    <div className="relative px-3 py-3">
       {open ? (
+        <MenuPortal
+          open={open}
+          align="start"
+          getAnchor={() => triggerRef.current}
+          onClose={() => setOpen(false)}
+        >
         <div
           role="menu"
           data-design-node="RmC2T"
-          className="absolute bottom-full left-3 z-20 mb-2 w-60 rounded-md border border-hairline bg-canvas py-2 shadow-lg"
+          className="w-60 rounded-mini border border-hairline bg-canvas py-2 shadow-float"
+          // 最上層では absolute 指定を無効にする（位置は器が決める）。
+          style={{ position: 'static' }}
         >
           <div className="px-3.5 pb-2.5 pt-1.5">
-            <p className="text-label font-bold text-ink">{me.name}</p>
+            <p className="text-label font-medium text-ink">{me.name}</p>
             {me.email ? <p className="text-nano text-ink-faint">{me.email}</p> : null}
             <p className="mt-1 flex items-center gap-1.5">
-              <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-nano font-bold text-accent-deep">運営マスター</span>
+              <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-nano font-medium text-accent-deep">運営マスター</span>
               <span className="text-nano text-ink-faint">{me.totpEnabled ? '2要素認証 設定済み' : '2要素認証 未設定'}</span>
             </p>
           </div>
@@ -289,24 +301,26 @@ function OpsAccountMenu({ me }: { me: OpsMe }) {
             type="button"
             role="menuitem"
             onClick={() => void logoutAndGoToLogin('/ops/login')}
-            className="flex h-10 w-full items-center gap-2.5 px-3.5 text-label font-bold text-status-danger hover:bg-status-danger-soft"
+            className="flex h-10 w-full items-center gap-2.5 px-3.5 text-label font-medium text-danger hover:bg-status-danger-soft"
           >
             <LogOut aria-hidden="true" className="h-4 w-4" />
             ログアウト
           </button>
         </div>
+        </MenuPortal>
       ) : null}
       <button
+        ref={triggerRef}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2.5 rounded-md px-1 py-1 text-left hover:bg-canvas-sunken"
+        className="flex w-full items-center gap-2.5 rounded-mini px-1 py-1 text-left hover:bg-canvas-sunken"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-label font-bold text-on-accent">{initial}</span>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-ink text-label font-medium text-on-accent">{initial}</span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-label font-bold text-ink">{me.name}</span>
-          <span className="mt-0.5 inline-block rounded-full bg-accent-soft px-1.5 text-nano font-bold text-accent-deep">運営マスター</span>
+          <span className="block truncate text-label font-medium text-ink">{me.name}</span>
+          <span className="mt-0.5 inline-block rounded-pill bg-accent-soft px-1.5 text-nano font-medium text-accent-deep">運営マスター</span>
         </span>
         <ChevronsUpDown aria-hidden="true" className="h-4 w-4 text-ink-faint" />
       </button>
@@ -319,7 +333,7 @@ function MenuLink({ href, icon: Icon, highlight, children }: { href: string; ico
     <Link
       href={href}
       role="menuitem"
-      className={`flex h-10 items-center gap-2.5 px-3.5 text-label ${highlight ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}
+      className={`flex h-10 items-center gap-2.5 px-3.5 text-label ${highlight ? 'bg-accent-soft font-medium text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}
     >
       <Icon aria-hidden="true" className={`h-4 w-4 ${highlight ? 'text-accent-deep' : 'text-ink-secondary'}`} />
       {children}

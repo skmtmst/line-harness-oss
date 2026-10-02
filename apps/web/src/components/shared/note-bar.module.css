@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 /*
  * 案内帯。「この画面は何をするところか」を一行で言う帯。
  *
@@ -29,6 +31,12 @@
   color: var(--color-status-info); /* fill: $status-info */
 }
 
+/* V6 `d61vBH`。通常の操作案内をmusuboの緑で示す。 */
+.success {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
 /* 気をつけてほしいこと。 */
 .warn {
   border: 1px solid var(--color-status-warn);
@@ -47,4 +55,14 @@
 .action {
   margin-left: auto;
   flex: none;
+}
+
+/*
+ * 「？」の吹き出しの中の「くわしく」。見た目は HelpTip 側が持つ。
+ * ここでは押せるものとして輪郭の存在を契約へ示す。
+ */
+.note a:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 1px;
+}
 }

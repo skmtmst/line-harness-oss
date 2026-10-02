@@ -1,5 +1,6 @@
 import { fetchApi } from './api'
 import type { ApiResponse } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 然-NEN- マイペット（★V6 37-3）／健康日記（★V6 37-4）。
@@ -38,6 +39,8 @@ export interface NenPetRow {
   feeding: { dailyKcal: number; dailyGrams: number | null; factorLabel: string; stageLabel: string; venisonGrams: number | null; venisonKcal: number; treatName: string | null } | null
   imageUrl: string | null
   updatedAt: string
+  /** 「体重の更新」列に出す日。体重を測った・直した日だけで、名前の編集では動かない（監査 R57）。 */
+  weightUpdatedAt: string
   weightStale: boolean
   owner: { friendId: string; name: string; pictureUrl: string | null; customerId: string | null }
 }
@@ -128,6 +131,18 @@ export interface NenHealthSummaryData {
     }>
   }
   labels: { stool: Record<string, string>; appetite: Record<string, string> }
+}
+
+/**
+ * 一覧の頭数表示。0頭のときは範囲を付けず「0頭」だけにする。
+ * 範囲の計算に `pageSize` が要るが、取れていないときに `NaN` を
+ * 出さない（全ルート監査 A3、2026-09-25）。
+ */
+export function headCountLabel(total: number, page: number, pageSize: number): string {
+  if (total === 0) return '0頭'
+  const from = (page - 1) * pageSize + 1
+  const to = Math.min(total, page * pageSize)
+  return `${formatNumber(total)}頭中 ${from}〜${to}頭`
 }
 
 function qs(params: Record<string, string | number | undefined>): string {

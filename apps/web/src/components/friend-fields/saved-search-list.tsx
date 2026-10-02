@@ -2,16 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Trash2 } from 'lucide-react'
+import { RowActions } from '@/components/shared/row-actions'
 import ReorderGrip from './reorder-grip'
 import { mergeVisibleOrder } from './reorder-utils'
 import type { SavedSearch, SavedSearchCondition, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
+import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { describeSavedCondition, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
 import {
@@ -19,15 +21,16 @@ import {
   savedSearchKpiValues,
   type SavedSearchUsageFilter,
 } from './saved-search-kpis'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
-function isSavedSearchCondition(item: unknown): item is SavedSearchCondition {
+export function isSavedSearchCondition(item: unknown): item is SavedSearchCondition {
   if (!item || typeof item !== 'object') return false
   const value = item as Partial<SavedSearchCondition>
   return typeof value.kind === 'string' && typeof value.op === 'string'
 }
 
 /** 保存した条件の中身。all（かつ）と any（または）に分けて返す。 */
-function splitConditions(
+export function splitConditions(
   conditions: unknown,
   tags: Tag[],
   labels: SavedSearchConditionLabels,
@@ -47,7 +50,7 @@ function splitConditions(
   }
 }
 
-const USAGE_KIND_LABELS = {
+export const USAGE_KIND_LABELS = {
   broadcast: '一斉配信',
   automation: 'オートメーション',
   scenario: 'シナリオ',
@@ -106,7 +109,8 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       一覧そのものは使える。
     */
     void Promise.allSettled([
-      api.tags.list(),
+      // R23横展開: タグ候補も今のアカウントだけ（表示名の取り違え防止）。
+      api.tags.list({ accountId }),
       api.supportMarks.list(accountId, { suppressFeatureDisabledEvent: true }),
       api.scenarios.list({ accountId }),
       api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true }),
@@ -165,7 +169,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       await api.savedSearches.delete(search.id, accountId)
       void load()
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : '削除に失敗しました')
+      setError(reason instanceof ApiError ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。')
     }
   }
 
@@ -226,16 +230,21 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     // 「未集計」を選んだときだけ未集計の行を出す。数字の絞り込みには混ぜない。
     if (matchFilter === 'unknown') return uncounted
     if (uncounted) return matchFilter === 'all'
+    /*
+     * R178: 「すべて」は0人も含めた全件。以前はここが `count > 0` だった
+     * ため、0人の検索が初期一覧から消え、保存失敗と誤認されていた。
+     */
+    if (matchFilter === 'all') return true
     return matchFilter === 'zero' ? count === 0 : count > 0
   })
 
   return (
     <div data-design-node="QKx8Q">
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard title="保存した条件" value={kpis.total} unit="件" detail="上限50件" loading={loading} variant="v6" />
-        <SummaryCard title="配信で使用中" value={kpis.usedInBroadcasts} unit="件" detail="変更時は影響確認" loading={loading} variant="v6" />
-        <SummaryCard title="該当者0人" value={kpis.zeroMatches} unit="件" detail="条件の見直し候補" loading={loading} variant="v6" />
-        <SummaryCard title="今月の呼び出し" value={kpis.callsThisMonth} unit="回" detail={kpis.callsThisMonth === null ? '呼び出し記録は未接続' : '配信・自動処理'} loading={loading} variant="v6" />
+        <KpiCard title="保存した条件" value={kpis.total} unit="件" detail="上限50件" loading={loading} variant="v6" />
+        <KpiCard title="配信で使用中" value={kpis.usedInBroadcasts} unit="件" detail="変更時は影響確認" loading={loading} variant="v6" />
+        <KpiCard title="該当者0人" value={kpis.zeroMatches} unit="件" detail="条件の見直し候補" loading={loading} variant="v6" />
+        <KpiCard title="今月の呼び出し" value={kpis.callsThisMonth} unit="回" detail={kpis.callsThisMonth === null ? '呼び出し記録は未接続' : '配信・自動処理'} loading={loading} variant="v6" />
       </div>
 
       {/*
@@ -247,18 +256,19 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       </p>
 
       {!accountId && (
-        <div className="bg-info-bg text-info mb-4 rounded-lg p-4 text-sm">
+        <Notice tone="info" className="mb-4">
           上部でLINE公式アカウントを選んでください。
-        </div>
+        </Notice>
       )}
 
       {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-          {retryOrder ? (
+        <Notice
+          tone="danger"
+          className="mb-4"
+          action={retryOrder ? (
             <button
               type="button"
-              className="ml-2 font-semibold underline underline-offset-2"
+              className="font-semibold underline underline-offset-2"
               onClick={() => {
                 const next = retryOrder
                 setRetryOrder(null)
@@ -267,8 +277,10 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
             >
               再試行
             </button>
-          ) : null}
-        </div>
+          ) : undefined}
+        >
+          {error}
+        </Notice>
       )}
 
       {/*
@@ -282,30 +294,30 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           onChange={(event) => setQuery(event.target.value)}
           placeholder="条件名で検索"
           aria-label="条件名で検索"
-          className="h-9 w-40 rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent"
+          className="h-9 w-40 rounded-control border border-hairline bg-canvas px-3 text-label"
         />
-        <select
+        <Select
           value={usageFilter}
-          onChange={(event) => setUsageFilter(event.target.value as SavedSearchUsageFilter)}
+          onChange={(value) => setUsageFilter(value as SavedSearchUsageFilter)}
           aria-label="使用先"
-          className="v6-select h-9 w-36 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"
-        >
-          <option value="all">使用先：すべて</option>
-          <option value="used">使用中</option>
-          <option value="unused">未使用</option>
-        </select>
-        <select
+          options={[
+            { value: 'all', label: '使用先：すべて' },
+            { value: 'used', label: '使用中' },
+            { value: 'unused', label: '未使用' },
+          ]}
+        />
+        <Select
           value={matchFilter}
-          onChange={(event) => setMatchFilter(event.target.value as typeof matchFilter)}
+          onChange={(value) => setMatchFilter(value as typeof matchFilter)}
           aria-label="該当人数"
-          className="v6-select h-9 w-36 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"
-        >
-          <option value="all">該当人数：すべて</option>
-          <option value="matched">1人以上</option>
-          <option value="zero">0人</option>
-          {/* ATTR-08: 未集計・集計失敗は「0人」とは別の状態として探せる。 */}
-          <option value="unknown">未集計</option>
-        </select>
+          options={[
+            { value: 'all', label: '該当人数：すべて' },
+            { value: 'matched', label: '1人以上' },
+            { value: 'zero', label: '0人' },
+            // ATTR-08: 未集計・集計失敗は「0人」とは別の状態として探せる。
+            { value: 'unknown', label: '未集計' },
+          ]}
+        />
         <span className="flex-1" />
         {/*
           作る導線はタブの右に1個だけ（#1014 ATTR-22）。
@@ -328,7 +340,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
         <ListState
           kind="error"
           description={loadError}
-          action={<Button type="button" onClick={() => void load()}>保存した検索を再読み込み</Button>}
+          action={<Button type="button" onClick={() => void load()}>保存した検索を読み直す</Button>}
         />
       ) : items.length === 0 ? (
         /*
@@ -347,7 +359,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           条件に合う保存した検索はありません。条件名か使用先を変えてください。
         </p>
       ) : (
-        <div className="overflow-hidden rounded-card border border-hairline bg-canvas [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
           {/*
             960px以上は表（#1014 ATTR-15）。該当・共有・操作は短い言葉なので
             幅を絞り、はみ出た「条件の要約」と「更新者・日時」に回す。
@@ -421,7 +433,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                   {note ? <p className="text-ink-faint">{note}</p> : null}
                 </td>
                 <td className="px-3 py-3 align-top tabular-nums text-ink" title={search.matchCountError ?? undefined}>
-                  {search.matchCount === null || search.matchCount === undefined ? '—' : `${search.matchCount.toLocaleString('ja-JP')}人`}
+                  {search.matchCount === null || search.matchCount === undefined ? '—' : `${formatNumber(search.matchCount)}人`}
                 </td>
                 <td className="px-3 py-3 align-top">
                   <span className={`rounded-pill px-2 py-0.5 text-[11px] ${search.isShared ? 'bg-action-soft text-action' : 'bg-canvas-sunken text-ink-secondary'}`}>
@@ -433,21 +445,25 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                 </td>
                 <td className="px-3 py-3 align-top text-xs text-ink">
                   <p>{search.updatedBy ?? search.createdBy ?? '—'}</p>
-                  <p className="text-ink-faint">{new Date(search.updatedAt ?? search.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                  <p className="text-ink-faint">{formatDateTime(search.updatedAt ?? search.createdAt)}</p>
                 </td>
                 <td className="px-3 py-3 align-top">
-                  <div className="flex items-center gap-2">
-                    {search.lineAccountId ? <Link href={`/friends?savedSearch=${search.id}`} className="whitespace-nowrap text-xs font-semibold text-action hover:underline">友だち一覧へ</Link> : null}
-                  <button
-                    onClick={() => remove(search)}
-                    disabled={deleteDisabled}
-                    aria-label={`${search.name}を削除`}
-                    title={deleteTitle}
-                    className="rounded-md p-1 text-danger hover:bg-danger-bg disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Trash2 aria-hidden="true" size={16} />
-                  </button>
-                  </div>
+                  {/*
+                    ★V7 `Xn1Mz`：行の操作は「主な1つ＋…」。削除はメニューの
+                    中の危ない操作へ。ゴミ箱の印だけのボタンは行に直に置かない。
+                    押せない理由（使用中・未確認など）はメニューに出す。
+                  */}
+                  <RowActions
+                    subjectName={search.name}
+                    detail={search.lineAccountId ? { label: '友だち一覧へ', href: `/friends?savedSearch=${search.id}` } : undefined}
+                    destructiveItem={{
+                      id: 'delete',
+                      label: '削除する',
+                      disabled: deleteDisabled,
+                      disabledReason: deleteDisabled ? deleteTitle : undefined,
+                      onSelect: () => remove(search),
+                    }}
+                  />
                 </td>
               </tr>
             )
@@ -492,20 +508,25 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                         {all.length === 0 && any.length === 0 ? '指定なし' : null}
                       </p>
                       <p className="mt-1 text-xs text-ink-faint">
-                        {search.matchCount === null || search.matchCount === undefined ? '該当 —' : `該当 ${search.matchCount.toLocaleString('ja-JP')}人`}・{search.usedIn === undefined ? '使用先 —' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((usage) => `${USAGE_KIND_LABELS[usage.kind]}「${usage.name}」`).join('・')}
+                        {search.matchCount === null || search.matchCount === undefined ? '該当 —' : `該当 ${formatNumber(search.matchCount)}人`}・{search.usedIn === undefined ? '使用先 —' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((usage) => `${USAGE_KIND_LABELS[usage.kind]}「${usage.name}」`).join('・')}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 pt-1">
-                      {search.lineAccountId ? <Link href={`/friends?savedSearch=${search.id}`} className="whitespace-nowrap text-xs font-semibold text-action hover:underline">一覧へ</Link> : null}
-                      <button
-                        onClick={() => remove(search)}
-                        disabled={deleteDisabled}
-                        aria-label={`${search.name}を削除`}
-                        title={deleteTitle}
-                        className="rounded-md p-1 text-danger hover:bg-danger-bg disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Trash2 aria-hidden="true" size={16} />
-                      </button>
+                      {/*
+                        ★V7 `Xn1Mz`：行の操作は「主な1つ＋…」。削除はメニューの
+                        中の危ない操作へ。ゴミ箱の印だけのボタンは行に直に置かない。
+                      */}
+                      <RowActions
+                        subjectName={search.name}
+                        detail={search.lineAccountId ? { label: '一覧へ', href: `/friends?savedSearch=${search.id}` } : undefined}
+                        destructiveItem={{
+                          id: 'delete',
+                          label: '削除する',
+                          disabled: deleteDisabled,
+                          disabledReason: deleteDisabled ? deleteTitle : undefined,
+                          onSelect: () => remove(search),
+                        }}
+                      />
                     </div>
                   </div>
                 </li>

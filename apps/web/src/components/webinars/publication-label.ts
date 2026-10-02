@@ -1,3 +1,4 @@
+import { formatDay, formatTime } from '@/lib/format'
 /**
  * 公開状態の日本語表示。3画面で別実装になっていた分岐の正本。
  *
@@ -22,18 +23,9 @@ export function formatPublicationDate(
   if (!value) return null
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
-  const dateText = date.toLocaleDateString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    timeZone: 'Asia/Tokyo',
-  })
+  const dateText = formatDay(date)
   if (!withTime) return dateText
-  const time = date.toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Tokyo',
-  })
+  const time = formatTime(date)
   return `${dateText} ${time}`
 }
 

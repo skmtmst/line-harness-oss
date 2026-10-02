@@ -1,13 +1,25 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
+import { TimeField } from '@/components/shared/date-time-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard from '@/components/shared/radio-card'
 import Breadcrumb from '@/components/shared/breadcrumb'
+import Disclosure from '@/components/shared/disclosure'
+import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Pagination from '@/components/shared/pagination'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { RowActions } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import {
   api,
   ApiError,
@@ -22,8 +34,13 @@ import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import BookingStaffPage from '@/app/booking/staff/page'
+import ListRange from '@/components/ui/list-range'
+import MenuVersionHistory from './menu-version-history'
 import { bookingMenuError } from './menu-validation'
-import { bookingWindowEnd, businessHourSummary } from '../lib/format-time'
+import { bookingWindowEnd, businessHourSummary, minutesBeforeLabel } from '../lib/format-time'
+/* R309: 金額列は割当表・スタッフ追加の候補と同じ共通表示にする。 */
+import { menuPriceLabel } from '../lib/menu-price'
+import { formatHoursBeforeHint, formatMinutesLengthHint } from '@/lib/format-duration'
 
 /**
  * 予約設定（設計 V2 8-2 / node nFCBf）。
@@ -59,14 +76,7 @@ function bookingRulesErrorMessage(error: unknown, action: '読み込み' | '保�
   return `予約の基本ルールを${action}できませんでした。通信状態を確認して、もう一度お試しください。`
 }
 
-/**
- * 一覧の金額列。料金モードが先で、金額はその次。
- * 「お問い合わせ」は金額ではないので ¥ を付けず、無料とも混ぜない。
- */
-function menuPriceLabel(menu: BookingMenu): string {
-  if (menu.price_mode === 'inquiry') return 'お問い合わせ'
-  return menu.base_price === 0 ? '無料' : `¥${menu.base_price.toLocaleString()}`
-}
+
 
 function supportingDetail(
   hasAccount: boolean,
@@ -85,6 +95,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const [settings, setSettings] = useState<BookingSettings | null>(null)
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [editing, setEditing] = useState<BookingMenu | null>(null)
+  const [historyTarget, setHistoryTarget] = useState<BookingMenu | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // copy 状態は menu.id 単位で持つ。複数メニューを連続でコピーしたとき
@@ -92,6 +103,8 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const [visibilityTarget, setVisibilityTarget] = useState<BookingMenu | null>(null)
   const [updatingVisibility, setUpdatingVisibility] = useState(false)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
+  const [reorderBusy, setReorderBusy] = useState(false)
+  const [reorderError, setReorderError] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   /** メニューID → 担当できるスタッフの表示名。 */
   const [menuStaff, setMenuStaff] = useState<Map<string, string[]>>(new Map())
@@ -180,6 +193,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   useEffect(() => {
     // 切替前accountの編集窓を、新しいaccount上へ残さない。
     setEditing(null)
+    setHistoryTarget(null)
   }, [selectedAccountId])
 
   useEffect(() => {
@@ -188,8 +202,9 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
 
   useEffect(() => {
     let cancelled = false
+    // R23横展開: 候補は今のアカウントだけ。切替で取り直す（窓側の絞りは安全網として残す）。
     api.tags
-      .list()
+      .list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
       .then((r) => {
         if (!cancelled && r.success) setTags(r.data)
       })
@@ -199,7 +214,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   /**
    * モーダル保存は読み込んだ版を expectedVersion として送る。
@@ -215,6 +230,44 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     await bookingApi.updateMenu(selectedAccountId, m.id, version, m)
     setEditing(null)
     await load()
+  }
+
+  /**
+   * #709残件: 28の行頭の持ち手飾りは掴めないため置かず、
+   * 代わりに操作列の「…」の中の上へ・下へで隣と並び順を入れ替える。
+   * 専用の並び替えAPIやdnd実装は無いので、既存の updateMenu（PUT・版つき）で
+   * 2件の sort_order を交換する。仕様書の一括更新口は未実装のため作らない。
+   */
+  async function moveMenu(menu: BookingMenu, delta: -1 | 1) {
+    if (!selectedAccountId || reorderBusy) return
+    const ordered = [...items].sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
+    const index = ordered.findIndex((m) => m.id === menu.id)
+    const nextIndex = index + delta
+    if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return
+    const other = ordered[nextIndex]
+    const version = menu.version
+    const otherVersion = other.version
+    if (typeof version !== 'number' || !Number.isInteger(version) || version < 1
+      || typeof otherVersion !== 'number' || !Number.isInteger(otherVersion) || otherVersion < 1) {
+      await load()
+      setReorderError('最新の状態を読み直しました。もう一度お試しください。')
+      return
+    }
+    setReorderBusy(true)
+    setReorderError(null)
+    try {
+      // PUT は送らなかった項目まで既定値で上書きしてしまうため、
+      // 版つきの全項目を送る（編集窓の保存と同じ形）。
+      await bookingApi.updateMenu(selectedAccountId, menu.id, version, { ...menu, sort_order: other.sort_order })
+      await bookingApi.updateMenu(selectedAccountId, other.id, otherVersion, { ...other, sort_order: menu.sort_order })
+      await load()
+    } catch (error) {
+      // 1件目だけ通った場合もあり得るので、実際の並びを取り直して見せる。
+      setReorderError(bookingErrorMessage(error, '保存'))
+      await load()
+    } finally {
+      setReorderBusy(false)
+    }
   }
 
   /**
@@ -337,9 +390,13 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         />
       </div>
 
-      <div data-design="Bar" className="bg-info-bg text-info mb-4 rounded-control px-4 py-3 text-xs font-semibold">
-        ⓘ　上から並んだ順に、お客様の画面に出ます。かかる時間を長めにしておくと、あとの予約とぶつかりません。金額を空けておくと「お問い合わせ」と出ます。
-      </div>
+      <Notice data-design="Bar" tone="info" message="上から並んだ順に、お客様の画面に出ます。順番は操作列の「…」から変えられます。" className="mb-4" />
+      <Disclosure size="compact" title="時間と金額の決め方" hint="2項目" className="mb-4">
+        <ul className="list-disc space-y-1 pl-5 text-sm">
+          <li>かかる時間を長めにしておくと、あとの予約とぶつかりません。</li>
+          <li>金額を空けておくと「お問い合わせ」と出ます。</li>
+        </ul>
+      </Disclosure>
 
       {activeTab === 'rules' ? (
         <BookingRulesSummary
@@ -373,44 +430,58 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
             action={canEditMenus ? <Button variant="primary" href="/booking/menus/new">＋ 予約メニューを作る</Button> : undefined}
           />
         </div>
-      ) : (
-        <div
-          data-design="Table"
-          className="bg-canvas rounded-card border border-hairline overflow-hidden"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px]">
+      ) : (<>
+        {reorderError && (
+          <Notice tone="danger" message={reorderError} onClose={() => setReorderError(null)} className="mb-3" />
+        )}
+        <DataTable data-design="Table">
               <thead>
-                <tr className="bg-canvas-sunken border-b border-hairline">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">メニュー</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">かかる時間</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">金額</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">だれが受けられるか</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">
+                <TableHeadRow>
+                  <Th style={{ width: '26%' }}>メニュー</Th>
+                  <Th style={{ width: '12%' }}>かかる時間</Th>
+                  <Th style={{ width: '10%' }} align="right">金額</Th>
+                  {/* 担当者名は長さが読めないため幅を指定しない。残りを吸って表を器に合わせる。 */}
+                  <Th>だれが受けられるか</Th>
+                  <Th style={{ width: '12%' }} align="right">
                     この30日
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
-                </tr>
+                  </Th>
+                  {/*
+                    #707: 390pxで表を横スクロールしても操作列を右端へ留める。
+                    操作列は固定幅（176px）。割合にすると中身
+                    （「中身を見る」＋「…」約138px）が器からはみ出す。
+                    残りは割合と自動の列で吸う。
+                  */}
+                  <Th align="right" className="sticky right-0 w-44 bg-canvas-sunken">操作</Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {visible.map((m) => (
-                  <tr key={m.id} className={`hover:bg-canvas-sunken ${m.is_active ? '' : 'text-ink-faint'}`}>
-                    <td className="px-4 py-3 text-sm font-medium">
-                      <span className="text-ink-faint mr-4" aria-hidden="true">⠿</span>{m.name}{m.is_active ? '' : '（休止中）'}
+              <tbody>
+                {visible.map((m) => {
+                  const orderIndex = shown.findIndex((item) => item.id === m.id)
+                  const canMoveUp = orderIndex > 0
+                  const canMoveDown = orderIndex >= 0 && orderIndex < shown.length - 1
+                  return (
+                  <Tr key={m.id} interactive className={m.is_active ? '' : 'text-ink-faint'}>
+                    <Td className="font-medium">
+                      {/*
+                        行頭の持ち手の飾りは置かない。ドラッグで並び替えられる
+                        ように見えるが実際は押せない印になる（監査 A12・#709）。
+                        並び順は操作列の「…」の中の上へ・下へで変える。
+                      */}
+                      <span>{m.name}{m.is_active ? '' : '（休止中）'}</span>
                       {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
                       {m.category_label && (
-                        <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded px-2 py-0.5 text-xs">
+                        <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded-mini px-2 py-0.5 text-xs">
                           {m.category_label}
                         </span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
+                    </Td>
+                    <Td className="text-ink-secondary tabular-nums">
                       {m.duration_minutes} 分
-                    </td>
-                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-accent font-semibold' : ''}`}>
+                    </Td>
+                    <Td align="right" className={`tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-ink font-semibold' : ''}`}>
                       {menuPriceLabel(m)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-ink-secondary">
+                    </Td>
+                    <Td className="text-ink-secondary">
                       {/*
                        * #953 E-05: 休止中でも担当の割当は残る。is_active を先に見て
                        * 「だれもいません」と出すと、割当済みなのに未割当に見える。
@@ -423,37 +494,80 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                       ) : (
                         <span className="text-xs">{(menuStaff.get(m.id) ?? []).join('・')}</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums">
+                    </Td>
+                    <Td align="right" className="tabular-nums">
                       {`${bookingCounts.get(m.id) ?? 0} 件`}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex gap-2 text-xs">
-                        {/* QSLEH の行操作は共通Button（高さ36px）より小さいため、
-                            表の行高を設計どおり保つ専用の小ボタンにする。 */}
-                        <button onClick={() => setEditing(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
-                          中身を見る
-                        </button>
-                        {canEditMenus && (
-                          <button onClick={() => setVisibilityTarget(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
-                            止める・出す
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                    </Td>
+                    <ActionCell className="sticky right-0 bg-canvas">
+                      {/*
+                        ★V7 行の操作の決まり：主な1つ＋「…」。共通の RowActions を使う。
+                        4つ並べると1440pxで器から72pxはみ出す。上へ・下へ・止める／再開は
+                        「…」の中へ集め、キーボード操作はメニューの ↑↓・Enter で行う。
+                      */}
+                      <RowActions
+                        subjectName={m.name}
+                        detail={{ label: '中身を見る', onClick: () => setEditing(m) }}
+                        menuItems={[
+                          {
+                            id: 'history',
+                            label: '版の履歴',
+                            onSelect: () => setHistoryTarget(m),
+                          },
+                          ...(canEditMenus ? [
+                          {
+                            id: 'move-up',
+                            label: '上へ',
+                            disabled: reorderBusy || !canMoveUp,
+                            disabledReason: !canMoveUp ? 'いちばん上です' : '並び替えを保存中です',
+                            onSelect: () => void moveMenu(m, -1),
+                          },
+                          {
+                            id: 'move-down',
+                            label: '下へ',
+                            disabled: reorderBusy || !canMoveDown,
+                            disabledReason: !canMoveDown ? 'いちばん下です' : '並び替えを保存中です',
+                            onSelect: () => void moveMenu(m, 1),
+                          },
+                          {
+                            id: 'visibility',
+                            label: m.is_active ? '止める' : '再開',
+                            dividerBefore: true,
+                            onSelect: () => setVisibilityTarget(m),
+                          },
+                          ] : [])]}
+                      />
+                    </ActionCell>
+                  </Tr>
+                  )
+                })}
               </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        </DataTable>
+      </>)}
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-ink-faint text-xs">メニュー {settings?.menuCount ?? items.length}つのうち {visible.length}つを表示</span>
+        <ListRange label="メニュー" total={settings?.menuCount ?? items.length} first={visible.length === 0 ? 0 : (page - 1) * MENU_PAGE_SIZE + 1} last={(page - 1) * MENU_PAGE_SIZE + visible.length} />
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="予約メニューのページ送り" />
       </div>
       </>}
+
+      {historyTarget && selectedAccountId && (
+        <MenuVersionHistory
+          menuId={historyTarget.id}
+          menuName={historyTarget.name}
+          currentVersion={historyTarget.version ?? 1}
+          accountId={selectedAccountId}
+          canRevert={canEditMenus}
+          onReverted={(version) => {
+            setItems((current) => current.map((item) => item.id === historyTarget.id
+              ? { ...item, version }
+              : item))
+            setHistoryTarget((current) => current && current.id === historyTarget.id
+              ? { ...current, version }
+              : current)
+          }}
+          onClose={() => setHistoryTarget(null)}
+        />
+      )}
 
       {editing && (
         <EditMenuModal
@@ -509,10 +623,15 @@ function BookingRulesSummary({ accountId, settings, items, loading, error, canMa
     return <ListState kind="error" description={error ?? '予約の基本ルールを読み込めませんでした。'} onRetry={onRetry} />
   }
 
+  /*
+   * R92: 空欄のメニューは店舗の予約ルールを使う（Worker の
+   * effectiveBookingRules と同じ）。「制限なし」「直前まで」は動きと
+   * 違うため、上書き表では店舗設定を使うと出す。新規作成画面と同じ案内。
+   */
   const rows = [
-    { label: '先の予約が取れる範囲', key: 'booking_window_days' as const, unit: '日先まで', none: '制限なし' },
-    { label: '受付の締め切り', key: 'cutoff_hours_before' as const, unit: '時間前', none: '直前まで' },
-    { label: 'キャンセル期限', key: 'cancel_deadline_hours_before' as const, unit: '時間前', none: '制限なし' },
+    { label: '先の予約が取れる範囲', key: 'booking_window_days' as const, unit: '日先まで', none: '店舗設定を使う' },
+    { label: '受付の締め切り', key: 'cutoff_hours_before' as const, unit: '時間前', none: '店舗設定を使う' },
+    { label: 'キャンセルの期限', key: 'cancel_deadline_hours_before' as const, unit: '時間前', none: '店舗設定を使う' },
   ]
   return (
     <section data-booking-rules className="space-y-4">
@@ -533,24 +652,61 @@ function BookingRulesSummary({ accountId, settings, items, loading, error, canMa
           <h3 className="text-ink text-sm font-semibold">メニューごとの上書き</h3>
           <p className="text-ink-faint mt-1 text-xs">個別に値を入れたメニューは、下の値が優先されます。</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-canvas-sunken text-ink-secondary">
-              <tr><th className="px-4 py-3 text-left font-medium">メニュー</th>{rows.map((row) => <th key={row.key} className="px-4 py-3 text-left font-medium">{row.label}</th>)}</tr>
+        {/*
+          #734: 390pxでは列が多くて入りきらない。共通の表は外枠で横スクロールし、
+          列幅を均等に分ける（以前の最小幅 560px の指定はやめた）。
+        */}
+        {/* 外のカードが枠線を持つため、表の枠は消して二重線にしない。 */}
+        <DataTable className="rounded-none border-0">
+            <thead>
+              <TableHeadRow><Th>メニュー</Th>{rows.map((row) => <Th key={row.key} className="whitespace-nowrap">{row.label}</Th>)}</TableHeadRow>
             </thead>
-            <tbody className="divide-hairline divide-y">
+            <tbody>
               {items.map((menu) => (
-                <tr key={menu.id}>
-                  <td className="px-4 py-3 font-medium">{menu.name}</td>
-                  {rows.map((row) => <td key={row.key} className="text-ink-secondary px-4 py-3 tabular-nums">{menu[row.key] == null ? row.none : `${menu[row.key]}${row.unit}`}</td>)}
-                </tr>
+                <Tr key={menu.id}>
+                  <Td className="font-medium whitespace-nowrap">{menu.name}</Td>
+                  {rows.map((row) => <Td key={row.key} className="text-ink-secondary tabular-nums whitespace-nowrap">{menu[row.key] == null ? row.none : `${menu[row.key]}${row.unit}`}</Td>)}
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </DataTable>
       </div>}
     </section>
   )
+}
+
+/** 予約で使いうる主要タイムゾーン。既定は Asia/Tokyo。 */
+const TIME_ZONE_CHOICES = [
+  'Asia/Tokyo',
+  'Asia/Seoul',
+  'Asia/Shanghai',
+  'Asia/Taipei',
+  'Asia/Singapore',
+  'Asia/Bangkok',
+  'Australia/Sydney',
+  'Pacific/Auckland',
+  'Pacific/Honolulu',
+  'America/Los_Angeles',
+  'America/New_York',
+  'Europe/London',
+  'Europe/Paris',
+  'UTC',
+]
+
+/**
+ * 保存済みのタイムゾーンが候補にもIANAの一覧にも無いときだけ true（監査6 #710）。
+ * 昔の自由入力で残った綴り違いに気づけるよう、注意書きを出すための判定。
+ * IANAの一覧を取れない環境では警告しない（選択自体は動く）。
+ */
+function isUnknownTimeZone(zone: string): boolean {
+  if (TIME_ZONE_CHOICES.includes(zone)) return false
+  try {
+    const supportedValuesOf = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf
+    if (typeof supportedValuesOf !== 'function') return false
+    return !supportedValuesOf.call(Intl, 'timeZone').includes(zone)
+  } catch {
+    return false
+  }
 }
 
 function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
@@ -564,17 +720,37 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   const [draft, setDraft] = useState(initial)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
+  /* R311: 受付の締め切り・キャンセルの期限の空欄。0にせず保存を止める。 */
+  const [cutoffEmpty, setCutoffEmpty] = useState(false)
+  const [cancelEmpty, setCancelEmpty] = useState(false)
+  // 店舗切替でこの画面は作り直される（key=accountId）。外れた応答は何も残さない。
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
+  /*
+   * R161: メニュータブへ移ると編集窓が外れて入力が消えるため、
+   * 未保存の変更がある間はタブ移動・画面移動の前に確認窓を挟む。
+   * 空欄フラグも dirty に含める（draft には載らないため）。
+   * 新規作成画面・担当割当画面と同じ共通ガードを使う。
+   */
+  const rulesDirty = JSON.stringify(draft) !== JSON.stringify(initial) || cutoffEmpty || cancelEmpty
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: rulesDirty, busy: saving })
 
   function set<K extends keyof BookingSettings>(key: K, value: BookingSettings[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
-    setSaved(false)
   }
 
   async function submit() {
+    // R311: 空欄のまま保存しない。消しただけでは0分前（直前まで可能）にしない。
+    const emptyLabels = [
+      cutoffEmpty ? '受付の締め切り' : null,
+      cancelEmpty ? 'キャンセルの期限' : null,
+    ].filter((label): label is string => label !== null)
+    if (emptyLabels.length > 0) {
+      setSaveError(`「${emptyLabels.join('」「')}」が空欄です。空欄のまま保存できません。直前まで可能にするときは0と入力してください。`)
+      return
+    }
     setSaving(true)
     setSaveError(null)
-    setSaved(false)
     try {
       const response = await bookingApi.saveSettings(accountId, {
         expectedVersion: draft.version,
@@ -586,12 +762,17 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
         approvalMode: draft.approvalMode,
         holdMinutes: draft.holdMinutes,
         slotGranularityMinutes: draft.slotGranularityMinutes,
+        liffDateView: draft.liffDateView ?? 'list',
         reminderDayBeforeTime: draft.reminderDayBeforeTime || null,
         reminderHoursBefore: draft.reminderHoursBefore,
       })
       if (!response.success) throw new Error('booking_settings_save_failed')
+      // 保存待ちに店舗が変わっていたら、旧店舗の応答を新店舗へ反映しない。
+      if (!mountedRef.current) return
       setDraft(response.data)
-      setSaved(true)
+      setCutoffEmpty(false)
+      setCancelEmpty(false)
+      notifyToast('予約の基本ルールを保存しました。')
       onSaved(response.data)
     } catch (saveFailure) {
       setSaveError(bookingRulesErrorMessage(saveFailure, '保存'))
@@ -605,33 +786,43 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
       <fieldset disabled={!canEdit} className="contents">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Field label="タイムゾーン" required>
-          <input
+          {/*
+           * IANA名の自由入力は綴り違いで予約全体がずれるため、候補から選ぶ形へ。
+           * 保存済みの値が候補に無いときは先頭に足して、黙って書き換えない。
+           */}
+          <Select
             aria-label="タイムゾーン"
-            type="text"
             value={draft.timeZone}
-            onChange={(event) => set('timeZone', event.target.value)}
-            placeholder="Asia/Tokyo"
-            className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+            onChange={(value) => set('timeZone', value)}
+            options={(TIME_ZONE_CHOICES.includes(draft.timeZone)
+              ? TIME_ZONE_CHOICES
+              : [draft.timeZone, ...TIME_ZONE_CHOICES]
+            ).map((zone) => ({ value: zone, label: zone }))}
           />
+          {isUnknownTimeZone(draft.timeZone) ? (
+            <p className="text-danger mt-1 text-xs">一覧にないタイムゾーンです。綴りを確認してください（よく使う値: Asia/Tokyo）。</p>
+          ) : null}
         </Field>
         <RuleNumberField label="何日先まで受け付けるか" unit="日" min={1} max={365} value={draft.bookingWindowDays} onChange={(value) => set('bookingWindowDays', value)} />
-        <RuleNumberField label="受付の締め切り" unit="分前" min={0} max={43200} value={draft.cutoffMinutesBefore} onChange={(value) => set('cutoffMinutesBefore', value)} />
-        <RuleNumberField label="キャンセルの期限" unit="分前" min={0} max={43200} value={draft.cancelDeadlineMinutesBefore} onChange={(value) => set('cancelDeadlineMinutesBefore', value)} />
+        <RuleNumberField label="受付の締め切り" unit="分前" min={0} max={43200} value={draft.cutoffMinutesBefore} onChange={(value) => set('cutoffMinutesBefore', value)} trackEmpty={setCutoffEmpty} humanize={minutesBeforeLabel} />
+        <RuleNumberField label="キャンセルの期限" unit="分前" min={0} max={43200} value={draft.cancelDeadlineMinutesBefore} onChange={(value) => set('cancelDeadlineMinutesBefore', value)} trackEmpty={setCancelEmpty} humanize={minutesBeforeLabel} />
         <RuleNumberField label="1人が同時に持てる予約" unit="件" min={1} max={100} value={draft.maxActiveBookingsPerFriend} onChange={(value) => set('maxActiveBookingsPerFriend', value)} />
         <Field label="予約の承認" required>
-          <SelectField
+          <Select
+            aria-label="予約の承認"
             value={draft.approvalMode}
-            onChange={(event) => set('approvalMode', event.target.value as 'automatic' | 'manual')}
+            onChange={(value) => set('approvalMode', value as 'automatic' | 'manual')}
             options={[{ value: 'automatic', label: '自動で確定' }, { value: 'manual', label: '確認してから確定' }]}
           />
         </Field>
-        <RuleNumberField label="仮押さえの保持時間" unit="分" min={1} max={1440} value={draft.holdMinutes} onChange={(value) => set('holdMinutes', value)} />
+        <RuleNumberField label="仮押さえの保持時間" unit="分" min={1} max={1440} value={draft.holdMinutes} onChange={(value) => set('holdMinutes', value)} humanize={formatMinutesLengthHint} />
         <Field label="予約枠の間隔" required>
-          <SelectField
+          <Select
+            aria-label="予約枠の間隔"
             value={String(draft.slotGranularityMinutes)}
-            onChange={(event) => set(
+            onChange={(value) => set(
               'slotGranularityMinutes',
-              Number(event.target.value) as BookingSettings['slotGranularityMinutes'],
+              Number(value) as BookingSettings['slotGranularityMinutes'],
             )}
             options={[5, 10, 15, 30, 60].map((value) => ({ value: String(value), label: `${value}分` }))}
           />
@@ -640,35 +831,64 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
             空欄にすると従来どおり（前日=24時間前、当日=2時間前）。 */}
         <Field label="前日のお知らせを送る時刻">
           <div className="flex items-center gap-2">
-            <input
+            <TimeField
               aria-label="前日のお知らせを送る時刻"
-              type="time"
               value={draft.reminderDayBeforeTime ?? ''}
-              onChange={(event) => set('reminderDayBeforeTime', event.target.value || null)}
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2"
+              onChange={(v) => set('reminderDayBeforeTime', v || null)}
+              className="w-full"
             />
             <span className="text-ink-faint whitespace-nowrap text-xs">空欄は24時間前</span>
           </div>
         </Field>
-        <RuleNumberField label="当日のお知らせを送るタイミング" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} />
+        <RuleNumberField label="当日のお知らせを送るタイミング" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} humanize={formatHoursBeforeHint} />
       </div>
-      <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。</p>
-      {saveError && (
-        <div className="bg-danger-bg text-danger mt-4 rounded-control p-3 text-sm" role="alert">
-          <p>{saveError}</p>
-          {saveError.includes('先に保存') && <button type="button" onClick={onRetry} className="mt-2 font-semibold underline">最新の内容を読み直す</button>}
+      <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。空欄のまま保存できません。</p>
+      <div className="border-hairline mt-5 border-t pt-4">
+        <div className="flex items-center gap-1">
+          <span id="liff-date-view-label" className="text-ink-secondary text-xs font-medium">
+            日時を選ぶ画面の最初の形
+          </span>
+          <HelpTip label="日時を選ぶ画面の最初の形の説明">
+            お客さんは画面の上で切り替えられます。ここで決めるのは最初に開いた時の形です。
+          </HelpTip>
         </div>
+        <div role="radiogroup" aria-labelledby="liff-date-view-label" className="mt-2 grid gap-3 sm:grid-cols-2">
+          {([
+            { value: 'list', title: 'リスト', desc: '日付を横に並べ、その日の時刻を選ぶ' },
+            { value: 'calendar', title: 'カレンダー', desc: '月の表から日を選び、その日の時刻を選ぶ' },
+          ] as const).map((option) => {
+            const checked = (draft.liffDateView ?? 'list') === option.value
+            return (
+              <RadioCard
+                key={option.value}
+                name="liff-date-view"
+                value={option.value}
+                checked={checked}
+                onChange={() => set('liffDateView', option.value)}
+                title={option.title}
+                note={option.desc}
+              />
+            )
+          })}
+        </div>
+      </div>
+      {saveError && (
+        <Notice
+          tone="danger"
+          message={saveError}
+          onClose={() => setSaveError(null)}
+          className="mt-4"
+          action={saveError.includes('先に保存') ? <button type="button" onClick={onRetry} className="font-semibold underline">最新の内容を読み直す</button> : undefined}
+        />
       )}
-      {saved && <p className="text-success mt-4 text-sm font-semibold" role="status">予約の基本ルールを保存しました。</p>}
       </fieldset>
       {canEdit ? (
         <div className="border-hairline mt-5 flex justify-end border-t pt-4">
           <Button
             onClick={() => void submit()}
             disabled={saving}
-            variant="primary"
-          >
-            {saving ? '保存中…' : initial.version === 0 ? '基本ルールを作成' : '変更を保存'}
+            variant="primary" busy={saving}>
+            {initial.version === 0 ? '基本ルールを作る' : '保存する'}
           </Button>
         </div>
       ) : (
@@ -676,18 +896,50 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
           予約設定の変更権限がないため、閲覧のみです。
         </p>
       )}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="予約の基本ルールへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
 
-function RuleNumberField({ label, unit, min, max, value, onChange }: {
+function RuleNumberField({ label, unit, min, max, value, onChange, trackEmpty, humanize }: {
   label: string
   unit: string
   min: number
   max: number
   value: number
   onChange: (value: number) => void
+  /**
+   * R311: 空欄を0にせず別扱いするときだけ渡す。渡した欄は編集中の文字を
+   * 欄が持ち、空欄の間は onChange を呼ばない（空欄→0の自動変化をしない）。
+   * 保存前の空欄チェックは呼び出し側で行う。渡さない欄は従来どおり。
+   */
+  trackEmpty?: (empty: boolean) => void
+  /** 入力値を時間・日の単位へ読み替える（例: 1440分 → 24時間前）。 */
+  humanize?: (value: number) => string | null
 }) {
+  const [text, setText] = useState<string | null>(null)
+  const trackEmptyRef = useRef(trackEmpty)
+  trackEmptyRef.current = trackEmpty
+  // 直前に親から受け取った値。変わったときだけ編集中の文字を捨てる。
+  const lastValueRef = useRef(value)
+  // 保存が通ると親の値が変わる。そのときだけ編集中の文字を捨てる。
+  // マウント直後・同じ値の再描画では捨てない。描画の反映が遅れて
+  // 入力のあとに回ってきても、入力中の文字を残す（R311の揺れ対策）。
+  useEffect(() => {
+    if (lastValueRef.current !== value) {
+      lastValueRef.current = value
+      setText(null)
+      trackEmptyRef.current?.(false)
+    }
+  }, [value])
+  const shown = text ?? value
+  // 古い行には無い項目が undefined で来ることがある。旧表示と同じく空欄で出す。
+  const hintNumber = typeof shown === 'number'
+    ? shown
+    : typeof shown !== 'string' || shown.trim() === ''
+      ? null
+      : Number(shown)
+  const hint = hintNumber === null || Number.isNaN(hintNumber) ? null : humanize?.(hintNumber)
   return (
     <Field label={label} required>
       <div className="flex items-center gap-2">
@@ -696,12 +948,22 @@ function RuleNumberField({ label, unit, min, max, value, onChange }: {
           type="number"
           min={min}
           max={max}
-          value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
-          className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2"
+          value={shown ?? ''}
+          onChange={(event) => {
+            const raw = event.target.value
+            if (!trackEmpty) {
+              onChange(Number(raw))
+              return
+            }
+            setText(raw)
+            trackEmpty(raw === '')
+            if (raw !== '') onChange(Number(raw))
+          }}
+          className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2"
         />
         <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
       </div>
+      {hint ? <p className="text-ink-faint mt-1 text-xs">＝{hint}</p> : null}
     </Field>
   )
 }
@@ -769,6 +1031,35 @@ function EditMenuModal({
   ))
   const resourceSubmitRef = useRef(false)
   const resourceLoadGenerationRef = useRef(0)
+  /** 破棄確認の表示。×・Esc・背景・キャンセルは dirty のときだけここへ寄せる。 */
+  const [showDiscard, setShowDiscard] = useState(false)
+  /*
+   * R305: 未保存の変更があるか。フォームと設備の割当を開いた直後と比べ、
+   * 変わっていれば閉じる前に破棄確認を挟む。保存の成否自体は submit 側の
+   * 扱いのまま変えない。
+   */
+  const initialSnapshot = useRef<string | null>(null)
+  if (initialSnapshot.current === null) {
+    initialSnapshot.current = JSON.stringify({
+      form: menu,
+      resources: [...(menu.assigned_resources ?? [])]
+        .map((item) => [item.resourceId, item.quantity] as const)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    })
+  }
+  const dirty = JSON.stringify({
+    form,
+    resources: [...resourceAssignments.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  }) !== initialSnapshot.current
+  /** 閉じる操作は共通 Dialog（×・Esc・背景）から全部ここへ集まる。 */
+  function requestClose() {
+    if (dirty && !saving) {
+      setShowDiscard(true)
+      return
+    }
+    onClose()
+  }
 
   useEffect(() => {
     const generation = ++resourceLoadGenerationRef.current
@@ -907,19 +1198,40 @@ function EditMenuModal({
     }
   }
 
+  /*
+   * R305: 手作りの窓を共通の Dialog へ置き換えた。初期フォーカス・Tabの循環・
+   * Esc取消・閉じた後の元ボタンへの復帰は共通部品が持つ。×・Esc・背景・
+   * キャンセルは requestClose へ集め、未保存なら破棄確認を挟む。
+   */
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b border-hairline">
-          <h2 className="text-base font-semibold">メニュー編集</h2>
-        </div>
-        <div className="px-6 py-4 space-y-4">
+    <>
+      <Dialog
+        open
+        title="メニュー編集"
+        onCancel={requestClose}
+        busy={saving}
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button type="button" onClick={requestClose} disabled={saving}>
+              キャンセル
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void submit()}
+              disabled={saving || !canEdit}
+              title={canEdit ? undefined : '予約メニューの変更権限がありません'} busy={saving}>保存する
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
           <Field label="名前" required>
             <input
               type="text"
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm focus:outline-none focus:ring-2"
               placeholder="例: カット"
             />
           </Field>
@@ -928,7 +1240,7 @@ function EditMenuModal({
               type="text"
               value={form.category_label ?? ''}
               onChange={(e) => set('category_label', e.target.value)}
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm focus:outline-none focus:ring-2"
               placeholder="例: カット / カラー / パーマ"
             />
           </Field>
@@ -942,11 +1254,11 @@ function EditMenuModal({
             />
           </Field>
           <Field label="料金の形" required>
-            <SelectField
+            <Select
               aria-label="料金の形"
               value={form.price_mode ?? 'fixed'}
-              onChange={(e) => {
-                const mode = e.target.value as NonNullable<BookingMenu['price_mode']>
+              onChange={(value) => {
+                const mode = value as NonNullable<BookingMenu['price_mode']>
                 // 無料・お問い合わせは金額を持たない。DB CHECK と Worker の
                 // readPriceModeAndAmount に合わせて base_price=0 にそろえる。
                 setForm((current) => ({
@@ -989,9 +1301,10 @@ function EditMenuModal({
             />
           </div>
           <Field label="予約申込時に自動付与するタグ">
-            <SelectField
+            <Select
+              aria-label="予約申込時に自動付与するタグ"
               value={form.auto_tag_id ?? ''}
-              onChange={(e) => set('auto_tag_id', e.target.value === '' ? null : e.target.value)}
+              onChange={(value) => set('auto_tag_id', value === '' ? null : value)}
               options={[
                 { value: '', label: '— なし —' },
                 ...(danglingAutoTag
@@ -1018,7 +1331,7 @@ function EditMenuModal({
             </p>
           </Field>
 
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
+          <div className="border-hairline space-y-3 rounded-control border p-3">
             <div>
               <p className="text-ink-secondary text-sm font-semibold">このメニューで使う設備</p>
               <p className="text-ink-faint mt-1 text-xs">部屋・席・機材を複数選び、1件の予約に必要な数を指定します。</p>
@@ -1041,19 +1354,18 @@ function EditMenuModal({
                   const checked = resourceAssignments.has(resource.id)
                   return (
                     <div key={resource.id} className="bg-canvas-sunken rounded-control flex items-center gap-3 p-2">
-                      <label className="flex min-w-0 flex-1 items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={!canManageResources || (!resource.isActive && !checked)}
-                          onChange={(event) => toggleResource(resource.id, event.target.checked)}
-                        />
+                      <Checkbox
+                        checked={checked}
+                        disabled={!canManageResources || (!resource.isActive && !checked)}
+                        onCheckedChange={(value) => toggleResource(resource.id, value)}
+                        className="min-w-0 flex-1"
+                      >
                         <span className="truncate" title={resource.name}>{resource.name}</span>
                         {!resource.isActive && <span className="text-warning text-xs">停止中・新規受付不可</span>}
                         {resource.isActive && checked
                           && (resourceAssignments.get(resource.id) ?? 1) > resource.capacity
                           && <span className="text-warning text-xs">必要数が受付上限超過・新規受付不可</span>}
-                      </label>
+                      </Checkbox>
                       {checked && (
                         <label className="flex items-center gap-1 text-xs">
                           必要数
@@ -1078,9 +1390,9 @@ function EditMenuModal({
                 type="button"
                 onClick={() => void submitResources()}
                 disabled={resourceSaving || resourceLoadError !== null}
-                className="border-accent text-accent rounded-control border px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                className="border-accent text-accent-deep rounded-control border px-3 py-2 text-sm font-semibold disabled:opacity-50"
               >
-                {resourceSaving ? '設備の割当を保存中…' : '設備の割当を保存'}
+                {resourceSaving ? '設備の割当を保存中…' : '設備の割当を保存する'}
               </button>
             ) : (
               <p className="text-ink-faint text-xs">設備の割当は閲覧のみです。変更は管理者へ依頼してください。</p>
@@ -1088,8 +1400,8 @@ function EditMenuModal({
             {resourceMessage && <p role="status" className="text-xs text-ink-secondary">{resourceMessage}</p>}
           </div>
 
-          {/* 受付条件。空欄は「制限しない」で、これまでと同じ動きになる。 */}
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
+          {/* 受付条件。空欄は店舗の予約ルールを使う（新規作成画面と同じ）。 */}
+          <div className="border-hairline space-y-3 rounded-control border p-3">
             <p className="text-ink-secondary text-sm font-semibold">受付条件</p>
             <div className="grid grid-cols-2 gap-3">
               <NumField
@@ -1117,7 +1429,7 @@ function EditMenuModal({
               />
             </div>
             <p className="text-ink-faint text-xs leading-relaxed">
-              空欄は「制限しない」です。<br />
+              空欄は店舗の予約ルールを使います。<br />
               「同時に受ける件数」を2以上にすると、<strong>このメニュー同士だけ</strong>が同じ枠に入ります。
               別のメニューの予約が入っている時間には、件数にかかわらず入りません。<br />
               キャンセルの期限はお客様の画面に表示されます。管理画面からはいつでもキャンセルできます。
@@ -1129,7 +1441,7 @@ function EditMenuModal({
                 onChange={(e) => set('intake_question', e.target.value === '' ? null : e.target.value)}
                 placeholder="例: 気になっている箇所はありますか？"
                 maxLength={200}
-                className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm focus:outline-none focus:ring-2"
               />
               <p className="text-ink-faint mt-1 text-xs">
                 空欄なら質問しません。回答は予約のメモとして残ります。
@@ -1137,23 +1449,18 @@ function EditMenuModal({
             </Field>
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={Boolean(form.is_active)}
-              onChange={(e) => set('is_active', e.target.checked ? 1 : 0)}
-              className="rounded"
-            />
-            有効（顧客に表示する）
-          </label>
+          <Checkbox
+            checked={Boolean(form.is_active)}
+            onCheckedChange={(value) => set('is_active', value ? 1 : 0)}
+          >有効（顧客に表示する）</Checkbox>
           {err && (
             <div role="alert">
-              <p className="text-xs text-red-600">{err}</p>
+              <p className="text-danger text-xs">{err}</p>
               {conflict && (
                 <button
                   type="button"
                   onClick={() => void onReloadLatest()}
-                  className="text-accent mt-1 text-xs font-semibold underline"
+                  className="text-action mt-1 text-xs font-semibold underline"
                 >
                   最新の内容を読み直す
                 </button>
@@ -1161,24 +1468,18 @@ function EditMenuModal({
             </div>
           )}
         </div>
-        <div className="px-6 py-4 border-t border-hairline flex gap-2 justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg"
-          >
-            キャンセル
-          </button>
-          <button
-            onClick={submit}
-            disabled={saving || !canEdit}
-            title={canEdit ? undefined : '予約メニューの変更権限がありません'}
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
-          >
-            {saving ? '保存中…' : '保存'}
-          </button>
-        </div>
-      </div>
-    </div>
+      </Dialog>
+      <ConfirmDialog
+        open={showDiscard}
+        title="変更を破棄しますか？"
+        description="保存していない変更は消えます。閉じてよければ破棄を選んでください。"
+        confirmLabel="破棄する"
+        cancelLabel="編集に戻る"
+        primaryAction="cancel"
+        onConfirm={onClose}
+        onCancel={() => setShowDiscard(false)}
+      />
+    </>
   )
 }
 
@@ -1187,7 +1488,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <label className="block">
       <span className="block text-xs font-medium text-ink-secondary mb-1">
         {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
+        {required && <span className="text-danger ml-0.5">*</span>}
       </span>
       {children}
     </label>
@@ -1195,10 +1496,10 @@ function Field({ label, required, children }: { label: string; required?: boolea
 }
 
 /**
- * 空欄を「制限しない」として扱う数値欄。
+ * 空欄を「店舗の予約ルールを使う」として扱う数値欄（R92）。
  *
- * 0 を「制限しない」に使わないのは、0時間前・0日先という読み方も
- * できてしまい、どちらの意味か画面から判断できないため。
+ * 空欄のメニューは Worker が店舗値で埋める（effectiveBookingRules）ため、
+ * 「制限しない」とは案内しない。新規作成画面の placeholder とそろえる。
  */
 function NullableNumField({
   label,
@@ -1218,9 +1519,9 @@ function NullableNumField({
           type="number"
           min={1}
           value={value ?? ''}
-          placeholder="なし"
+          placeholder="店舗設定"
           onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-          className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2"
+          className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2"
         />
         <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
       </div>
@@ -1240,7 +1541,7 @@ function NumField({
         type="number"
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 tabular-nums"
+        className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm focus:outline-none focus:ring-2 tabular-nums"
       />
     </Field>
   )
@@ -1250,26 +1551,39 @@ function MenusPageHost() {
   const tab = useMergedTab(MERGED_TABS)
   const { selectedAccount } = useAccount()
   const [menuCount, setMenuCount] = useState<number | null>(null)
+  // R91: メニューがあるときも作れるよう、見出しに常設の入口を置く。
+  // 編集権限の判定は一覧の中と同じ実効permissionで揃える。
+  // 緑の塗りは1画面1つ。空のときは空状態が主役なので見出し側は脇役にする。
+  const [canEditMenus, setCanEditMenus] = useState(false)
+  useEffect(() => {
+    setCanEditMenus(canEditFeature('/booking/menus'))
+  }, [])
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const previewUrl = selectedAccount?.liffId
     ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
     : null
   return (
-    <div>
-      <div data-design="Head" className="mb-5 flex min-h-10 flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         <Breadcrumb items={[{ label: '予約' }, { label: '予約設定' }]} />
-        {previewUrl && <Button href={previewUrl}>お客様に見える画面を確かめる</Button>}
+        <div className="flex flex-wrap items-center gap-2">
+          {tab === 'menus' && canEditMenus
+            ? <Button variant={menuCount ? 'primary' : 'secondary'} href="/booking/menus/new">＋ 予約メニューを作る</Button>
+            : null}
+          {previewUrl && <Button href={previewUrl}>お客様に見える画面を確かめる</Button>}
+        </div>
       </div>
       {/* 既存の2タブはこの画面の中で切り替わり、
           受付時間は別URLへ移動する。
           MergedTabs は「同じ画面の中で切り替わるもの」しか扱えないので
           ここは手で並べている。 */}
-      <div data-design="Tabs" className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
+      <div data-design="Tabs" className="border-hairline flex flex-wrap gap-1 border-b">
         <Link
           href="/booking/menus?tab=menus"
-          className={`rounded-t-md px-4 py-2 text-sm ${
+          className={`rounded-t-mini px-4 py-2 text-sm ${
             tab === 'menus'
-              ? 'border-accent text-accent border-b-2 font-medium'
+              ? 'border-accent text-accent-deep border-b-2 font-medium'
               : 'text-ink-faint hover:text-ink-secondary'
           }`}
         >
@@ -1277,7 +1591,7 @@ function MenusPageHost() {
         </Link>
         <Link
           href="/booking/staff/shifts"
-          className={`rounded-t-md px-4 py-2 text-sm ${
+          className={`rounded-t-mini px-4 py-2 text-sm ${
             'text-ink-faint hover:text-ink-secondary'
           }`}
         >
@@ -1285,13 +1599,13 @@ function MenusPageHost() {
         </Link>
         <Link
           href="/booking/staff/shifts#special"
-          className="text-ink-faint hover:text-ink-secondary rounded-t-md px-4 py-2 text-sm"
+          className="text-ink-faint hover:text-ink-secondary rounded-t-mini px-4 py-2 text-sm"
         >
           休業日
         </Link>
         <Link
           href="/booking/menus?tab=rules"
-          className={`rounded-t-md px-4 py-2 text-sm ${tab === 'rules' ? 'border-accent text-ink border-b-2 font-medium' : 'text-ink-faint hover:text-ink-secondary'}`}
+          className={`rounded-t-mini px-4 py-2 text-sm ${tab === 'rules' ? 'border-accent text-ink border-b-2 font-medium' : 'text-ink-faint hover:text-ink-secondary'}`}
         >
           予約のルール
         </Link>

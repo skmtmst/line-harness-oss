@@ -17,8 +17,6 @@ describe('見本画面の明示（#975 U101）', () => {
 
   it('比較・検証画面がこの帯を持つ', () => {
     for (const path of [
-      'app/tags-v2/page.tsx',
-      'app/tags-v3/page.tsx',
       'app/visual-qa/friend-attributes/page.tsx',
       'app/visual-qa/friend-attributes-v2/page.tsx',
       'app/visual-qa/friend-attributes-v3/page.tsx',

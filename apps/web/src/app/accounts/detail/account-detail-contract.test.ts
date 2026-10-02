@@ -50,7 +50,7 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
     */
     expect(PAGE).toContain('if (!id)')
     expect(PAGE).toContain('見るアカウントが指定されていません')
-    expect(PAGE).toContain('href="/accounts"')
+    expect(PAGE).toContain('backHref="/accounts"')
   })
 
   it('動的セグメントを使わない', () => {
@@ -96,14 +96,28 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
   it('できないことは押し口を出さず、理由を書く', () => {
     /*
       `v6-common-rules.md` §7-10「出す＝使える」。
-      写す口とアーカイブはまだ無い（台帳 #128）。
+      写す口だけはまだ無い（台帳 #128）。アーカイブは X-1 で繋いだ。
     */
     const actions = accountActions(account())
     const blocked = actions.filter((a) => a.blockedReason !== null).map((a) => a.key)
-    expect(blocked).toEqual(['copy', 'archive'])
+    expect(blocked).toEqual(['copy'])
     // 押せるものには理由を付けない。
     expect(actions.find((a) => a.key === 'stop')?.blockedReason).toBeNull()
     expect(actions.find((a) => a.key === 'handover')?.blockedReason).toBeNull()
+    expect(actions.find((a) => a.key === 'archive')?.blockedReason).toBeNull()
+  })
+
+  it('アーカイブ済みは「戻す」だけを出す', () => {
+    const actions = accountActions(account({ archivedAt: '2026-10-01 00:00:00+09:00' }))
+    expect(actions.map((a) => a.key)).toEqual(['restore'])
+    expect(actions[0].actionLabel).toBe('アーカイブから戻す')
+  })
+
+  it('止める・再開するには理由が必須', () => {
+    // X-1: 理由なしの停止を画面から送らせない。入力欄と必須表示が出る。
+    expect(PAGE).toContain('止める理由')
+    expect(PAGE).toContain('再開する理由')
+    expect(PAGE).toContain('（必須）')
   })
 
   it('止める・再開するで言葉が変わる', () => {
@@ -124,5 +138,13 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
   it('止める前に、何が止まって何が残るかを読ませる', () => {
     expect(PAGE).toContain('友だちと履歴はそのまま残ります')
     expect(PAGE).toContain('予約している配信は止まります')
+  })
+})
+
+describe('Webhookの突合カードの縦並び（監査・崩れ2）', () => {
+  it('狭い脇カードの4行は札の上・値の下に置く', () => {
+    for (const label of ['LINE側に登録したURL', 'Webhookの利用', '最後のテスト', '最後の受信']) {
+      expect(PAGE).toContain(`StackedRow label="${label}"`)
+    }
   })
 })

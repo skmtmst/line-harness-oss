@@ -1,19 +1,38 @@
 'use client'
 
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import StickyBar from '@/components/shared/sticky-bar'
-import { ApiError } from '@/lib/api'
+import ValidationSummary from '@/components/shared/validation-summary'
+import { describeSaveFailure } from '@/lib/api'
+import type { FormErrors } from '@/lib/use-form-errors'
 
-const SAVE_FALLBACK = '保存に失敗しました。入力内容を確認して、もう一度お試しください。'
-
+/*
+ * D005: `ApiError.message` は安全と判定されない応答では `API error: <番号>` の
+ * 内部文になる。そのまま出すと運用者に意味が伝わらない。保存の失敗文は
+ * `describeSaveFailure`（状態別の立て直し文）に寄せ、作る画面でそろえる。
+ */
 export function createPageErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message
-  if (error instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) return error.message
-  return SAVE_FALLBACK
+  return describeSaveFailure(error)
+}
+
+/**
+ * 保存後の戻り先に `highlight` を足す。
+ *
+ * 親URLは `/mileage?tab=earning-rules` のように既にクエリを持つことがある。
+ * `${url}?highlight=` と文字で連結すると `?tab=…?highlight=…` のように
+ * `?` が2つ並ぶ壊れたURLになり、タブ指定ごと読めなくなる（MILEAGE-09）。
+ * 既存のクエリとハッシュはそのまま保ち、`highlight` だけを書き換える。
+ */
+export function createPageReturnHref(parentHref: string, id: string | void): string {
+  if (!id) return parentHref
+  const url = new URL(parentHref, 'https://create-page.invalid')
+  url.searchParams.set('highlight', String(id))
+  return `${url.pathname}${url.search}${url.hash}`
 }
 
 /**
@@ -54,6 +73,19 @@ export interface CreatePageProps {
   /** 保存前の確認。文字列を返すとその内容をエラーとして出し、保存しない */
   validate?: () => string | null
   /**
+   * 保存の失敗文。省略時は `createPageErrorMessage`（`describeSaveFailure`）。
+   * M030: 発行の失敗を原文のまま出さないよう、画面はここに
+   * `describeApiFailure(err, action, { forbidden })` を渡す
+   * （403は権限の案内・429は待ち案内・400は直し方つき）。
+   */
+  describeError?: (error: unknown) => string
+  /**
+   * 欄ごとの検査（★V7 sTJsh §6）。渡すと保存時に全欄を検査し、落ちた欄は
+   * 欄の下に理由・上にまとめを出して1つ目へフォーカスを移す。
+   * 欄は離れた時点でも1回だけ検査される（`useFormErrors` 参照）。
+   */
+  fields?: FormErrors
+  /**
    * 右の列。設計では作成画面の多くが「入力の左」と「見え方・注意の右」に
    * 分かれている。入力しながら、お客様側にどう出るかを見られるようにする。
    */
@@ -79,6 +111,8 @@ export default function CreatePage({
   successHref,
   onReset,
   validate,
+  describeError,
+  fields,
   aside,
   saveLabel,
   showHeader = true,
@@ -91,16 +125,57 @@ export default function CreatePage({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /*
+   * エラーが入力の検証文か、保存の失敗文かを分ける。
+   * 検証文は入力を直した時点で古くなるので、直したら消す（R610）。
+   * 保存の失敗文（重複・権限・通信）は送り直すまで直ったか分からないので、
+   * 次の保存操作まで残す。
+   */
+  const [errorKind, setErrorKind] = useState<'validate' | 'save' | null>(null)
+
+  /*
+   * R610: 不正な入力で保存を押した後、正しく直しても古い検証文が残ると、
+   * まだ不正なのか判断できない。検証文だけは今の入力と突き合わせ、
+   * 直っていれば消す。理由が変わっていれば今の文に寄せる。
+   */
+  useEffect(() => {
+    if (!error || errorKind !== 'validate') return
+    let current: string | null = null
+    try {
+      current = validate?.() ?? null
+    } catch {
+      return
+    }
+    if (current == null) {
+      setError('')
+      setErrorKind(null)
+    } else if (current !== error) {
+      setError(current)
+    }
+  }, [error, errorKind, validate])
 
   const run = async (andAnother: boolean) => {
     if (saving) return
     const validationError = validate?.()
+    /*
+     * 欄ごとの検査がある画面では、保存時に全欄をもう一度見て、落ちた欄は
+     * 欄の下に理由・上にまとめを出す（★V7 sTJsh §6）。直し方が分かる文なので
+     * 「保存できませんでした」だけの帯にはしない。画面全体の条件
+     * （アカウント未選択など）とは両方出す。
+     */
+    const fieldProblems = fields?.submit() ?? []
     if (validationError) {
       setError(validationError)
+      setErrorKind('validate')
+      return
+    }
+    if (fieldProblems.length > 0) {
+      setError('')
       return
     }
     setSaving(true)
     setError('')
+    setErrorKind(null)
     setNotice('')
     try {
       const id = await onSave()
@@ -110,9 +185,10 @@ export default function CreatePage({
         return
       }
       // 作った行を一覧で目立たせる。どこに増えたのか探させない。
-      router.push(successHref ? successHref(id) : id ? `${parent[1]}?highlight=${id}` : parent[1])
+      router.push(successHref ? successHref(id) : createPageReturnHref(parent[1], id))
     } catch (e) {
-      setError(createPageErrorMessage(e))
+      setError(describeError ? describeError(e) : createPageErrorMessage(e))
+      setErrorKind('save')
     } finally {
       setSaving(false)
     }
@@ -130,27 +206,19 @@ export default function CreatePage({
           保存して続けて作る
         </Button>
       )}
-      <Button variant="primary" onClick={() => run(false)} disabled={saving}>
-        {saving ? '保存中...' : (saveLabel ?? '保存')}
+      <Button variant="primary" onClick={() => run(false)} disabled={saving} busy={saving} busyLabel="保存中...">
+        {(saveLabel ?? '保存する')}
       </Button>
     </>
   ) : (
     <>
-      <button
-        onClick={() => run(false)}
-        disabled={saving}
-        className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-      >
-        {saving ? '保存中...' : (saveLabel ?? '保存')}
-      </button>
+      <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => run(false)} disabled={saving}>
+        {saving ? '保存中...' : (saveLabel ?? '保存する')}
+      </Button>
       {onReset && (
-        <button
-          onClick={() => run(true)}
-          disabled={saving}
-          className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-        >
+        <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => run(true)} disabled={saving}>
           保存して続けて作る
-        </button>
+        </Button>
       )}
       <Link
         href={parent[1]}
@@ -185,6 +253,10 @@ export default function CreatePage({
             v6 ? 'rounded-card space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
           } ${aside ? 'min-w-0 flex-1' : 'max-w-2xl'}`}
         >
+          {/* 保存時に落ちた欄のまとめ（★V7 sTJsh §6）。欄の上の方に出す。 */}
+          {fields ? (
+            <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} />
+          ) : null}
           {children}
 
           {error && <p className="text-danger text-sm">{error}</p>}
@@ -229,21 +301,28 @@ export function FormSection({
   step,
   label,
   note,
+  help,
   children,
 }: {
   step: number
   label: string
   note?: string
+  /**
+   * 節の言葉の意味・仕様。見出しのすぐ右の「？」へ入れる
+   * （★V7・§2-1b）。警告・直し方は note のまま残す。
+   */
+  help?: ReactNode
   children: ReactNode
 }) {
   const v6 = useContext(VariantContext) === 'v6'
+  const hasHelp = help !== undefined && help !== null
   return (
     <section
       className={`border-hairline border-b last:border-b-0 last:pb-0 ${v6 ? 'pb-3' : 'pb-5'}`}
     >
       <div className="mb-3 flex items-start gap-2">
         <span
-          className={`bg-accent text-on-accent mt-0.5 flex shrink-0 items-center justify-center rounded-full font-semibold ${
+          className={`bg-accent text-on-accent mt-0.5 flex shrink-0 items-center justify-center rounded-pill font-semibold ${
             v6 ? 'h-6 w-6 text-[13px]' : 'h-5 w-5 text-xs'
           }`}
         >
@@ -252,6 +331,7 @@ export function FormSection({
         <div>
           <h2 className={v6 ? 'text-ink text-lead font-bold' : 'text-ink text-sm font-semibold'}>
             {label}
+            {hasHelp ? <HelpTip label={`${label}の説明`}>{help}</HelpTip> : null}
           </h2>
           {note && (
             <p className={v6 ? 'text-ink-faint text-micro mt-0.5 font-medium' : 'text-ink-faint mt-0.5 text-xs'}>

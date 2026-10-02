@@ -7,9 +7,10 @@ import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
-import { authRequest, confirmError, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
+import { authRequest, confirmError, internalAuthFailureCopy, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 /**
@@ -77,7 +78,7 @@ function CompleteInner() {
     })
     if (!res.ok || !res.data) {
       if (res.errors) setMessages((current) => ({ ...current, ...res.errors }))
-      setError(res.error || '登録を完了できませんでした')
+      setError(internalAuthFailureCopy(res.status, res.error) ?? res.error ?? '登録を完了できませんでした')
       setBusy(false)
       return
     }
@@ -89,7 +90,11 @@ function CompleteInner() {
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
-    else if (res.csrfToken) localStorage.setItem('lh_csrf', res.csrfToken)
+    else if (res.csrfToken) {
+      // M045: 保存に失敗しても登録は進める（Cookie のセッションで足りる）。
+      // 投げたままにすると登録中の表示で止まる。
+      try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie session is sufficient */ }
+    }
     window.location.assign('/hq')
   }
 
@@ -122,9 +127,7 @@ function CompleteInner() {
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
-          <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-status-danger">
-            {error}
-          </p>
+          <Notice tone="danger" message={error} />
         ) : null}
         <AuthField label="メールアドレス" hint="確認済み・ここでは変えられません" htmlFor="complete-email">
           <div id="complete-email" className="flex h-11 w-full items-center justify-between rounded-control border border-hairline bg-surface-pearl px-3 text-label text-ink-secondary">
@@ -160,8 +163,7 @@ function CompleteInner() {
         <AuthField label="パスワード（確認）" htmlFor="complete-confirm" error={messages.confirm}>
           <PasswordField id="complete-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(messages.confirm)} autoComplete="new-password" />
         </AuthField>
-        <Button type="submit" variant="primary" disabled={busy} className="w-full">
-          {busy ? '登録しています…' : '無料で始める'}
+        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="登録しています…">無料で始める
         </Button>
       </form>
     </AuthCard>

@@ -1,22 +1,28 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
+import { X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ApiError, api, fetchApi } from '@/lib/api'
+import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import TargetMissing from '@/components/shared/target-missing'
 import EditRouteModal from '../_components/edit-route-modal'
 import RefOrdersPanel, { type RefOrdersResult } from '../_components/ref-orders'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import type {
+  ApiResponse,
   EntryRoute,
   EntryRouteFunnel,
   Scenario,
   Tag,
   TrafficPool,
 } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /** 選んだ流入元の人数、成果、友だち、追加時の動きをまとめて表示する。 */
 
@@ -63,6 +69,10 @@ function InflowLinkDetailPageContent() {
   const [editingRoute, setEditingRoute] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 右の内訳を取りに行っている間。 */
+  const [routeLoading, setRouteLoading] = useState(false)
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [routeMissing, setRouteMissing] = useState(false)
   const [copied, setCopied] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -83,24 +93,22 @@ function InflowLinkDetailPageContent() {
   // 左のリンク一覧。流入件数を添えるので、集計も一緒に引く。
   useEffect(() => {
     let cancelled = false
+    // プールは補助データ。機能がオフでもリンク詳細画面そのものは止めない。
+    // 403 の応答自体が console error になるため、有効と分からない限り
+    // 口を発行しない（#703）。
+    const poolsRequest: Promise<ApiResponse<TrafficPool[]>> = isPoolsFeatureAvailable().then((ok) =>
+      ok
+        ? api.pools.list({ suppressFeatureDisabledEvent: true })
+        : { success: false as const, error: 'feature_disabled' },
+    )
     void Promise.allSettled([
       api.entryRoutes.list(),
-      api.tags.list(),
-      api.scenarios.list(),
-      // プールは補助データ。機能がオフでもリンク詳細画面そのものは止めない。
-      api.pools.list({ suppressFeatureDisabledEvent: true }),
-      // 編集窓の「追加直後に送るメッセージ」選択肢に使う。
-      api.templates.list(),
+      poolsRequest,
       api.staff.me(),
-    ]).then(([r, t, sc, p, tp, me]) => {
+    ]).then(([r, p, me]) => {
       if (cancelled) return
       if (r.status === 'fulfilled' && r.value.success) setRoutes(r.value.data)
-      if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
-      if (sc.status === 'fulfilled' && sc.value.success) setScenarios(sc.value.data)
       if (p.status === 'fulfilled' && p.value.success) setPools(p.value.data)
-      if (tp.status === 'fulfilled' && tp.value.success) {
-        setTemplates(tp.value.data as unknown as MessageTemplate[])
-      }
       if (me.status === 'fulfilled' && me.value.success) {
         setCanPermanentlyDelete(me.value.data.role === 'owner' || me.value.data.role === 'admin')
       }
@@ -111,6 +119,33 @@ function InflowLinkDetailPageContent() {
     }
   }, [])
 
+  /*
+   * R23横展開: 名前の解決・編集窓の候補は、この経路のアカウントだけ。
+   * 経路が変わったら取り直す。別アカウントの同名タグ混入防止。
+   */
+  const routeAccountId = route?.lineAccountId ?? null
+  useEffect(() => {
+    let cancelled = false
+    if (!route) return () => { cancelled = true }
+    const accountParams = routeAccountId ? { accountId: routeAccountId } : undefined
+    void Promise.allSettled([
+      api.tags.list(accountParams),
+      api.scenarios.list(accountParams),
+      // 編集窓の「追加直後に送るメッセージ」選択肢に使う。
+      api.templates.list(undefined, routeAccountId ?? undefined),
+    ]).then(([t, sc, tp]) => {
+      if (cancelled) return
+      if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
+      if (sc.status === 'fulfilled' && sc.value.success) setScenarios(sc.value.data)
+      if (tp.status === 'fulfilled' && tp.value.success) {
+        setTemplates(tp.value.data as unknown as MessageTemplate[])
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [route, routeAccountId])
+
   // 右の内訳。リンクを選び直すたびに引き直す。
   useEffect(() => {
     if (!selectedId) {
@@ -119,10 +154,14 @@ function InflowLinkDetailPageContent() {
       setFunnelError(false)
       setFriends([])
       setOrdersSummary(null)
+      setRouteMissing(false)
+      setError('')
       return
     }
     let cancelled = false
     setError('')
+    setRouteMissing(false)
+    setRouteLoading(true)
     // #514-12: 段階の失敗を読込中のままにしない。再読み込みは funnelAttempt で引き直す。
     setFunnel(null)
     setFunnelError(false)
@@ -145,9 +184,12 @@ function InflowLinkDetailPageContent() {
         } catch {
           if (!cancelled) setFriends([])
         }
-      } else setError('リンクの取得に失敗しました')
+      } else if (r.status === 'rejected' && r.reason instanceof ApiError && r.reason.status === 404) {
+        setRouteMissing(true)
+      } else setError('リンクの取得に失敗しました。もう一度読み込んでください。')
       if (f.status === 'fulfilled' && f.value.success) setFunnel(f.value.data)
       else if (!cancelled) setFunnelError(true)
+      if (!cancelled) setRouteLoading(false)
     })
     return () => {
       cancelled = true
@@ -157,14 +199,18 @@ function InflowLinkDetailPageContent() {
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const url = route ? `${workerBase}/r/${encodeURIComponent(route.refCode)}` : null
 
+  /** コピーできなかったとき、選んでコピーできる欄をその場に出す（ブラウザの入力窓は使わない。V6R-S3-f）。 */
+  const [copyFailed, setCopyFailed] = useState(false)
+
   async function copyUrl() {
     if (!url) return
     try {
       await navigator.clipboard.writeText(url)
       setCopied(true)
+      setCopyFailed(false)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      window.prompt('コピーしてください:', url)
+      setCopyFailed(true)
     }
   }
 
@@ -217,11 +263,51 @@ function InflowLinkDetailPageContent() {
     ? (scenarios.find((s) => s.id === route.scenarioId)?.name ?? null)
     : null
   const poolName = route?.poolId ? (pools.find((p) => p.id === route.poolId)?.name ?? null) : null
+  // R269: 追加直後に送るメッセージも実際の設定から組み立てる。口に
+  // マイル付与の欄は無いので、設計見本の値は実動作として出さない。
+  const introTemplateName = route?.introTemplateId
+    ? (templates.find((t) => t.id === route.introTemplateId)?.name ?? null)
+    : null
 
   const addRate = useMemo(() => {
     if (!funnel || funnel.click_count === 0) return null
     return Math.round((funnel.friend_add_count / funnel.click_count) * 1000) / 10
   }, [funnel])
+
+  if (!selectedId) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="見る流入経路が指定されていません"
+        description="一覧から、見たい流入経路を選び直してください。"
+        backHref="/inflow-links"
+        backLabel="流入経路の一覧へ戻る"
+      />
+    )
+  }
+
+  if (error) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="流入経路を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => setFunnelAttempt((n) => n + 1)}
+      />
+    )
+  }
+
+  if (routeMissing || (!loading && !routeLoading && !route)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この流入経路は見つかりません"
+        description="削除されたか、リンクが古くなっています。一覧から選び直してください。"
+        backHref="/inflow-links"
+        backLabel="流入経路の一覧へ戻る"
+      />
+    )
+  }
 
   return (
     <div data-design-node="JupxW" data-design="Body">
@@ -233,25 +319,28 @@ function InflowLinkDetailPageContent() {
         <span>リンクの詳細</span>
       </nav>
 
-      {error && <p className="text-danger mb-3 text-sm">{error}</p>}
-      {/*
-        U097: 「表示できませんでした」のあとに戻る操作が無かった。
-        一覧へ戻るリンクを文のそばに置く。
-      */}
       {!route ? (
         <div className="rounded-card border border-hairline bg-canvas p-12 text-center text-sm text-ink-faint">
-          {loading ? '読み込み中…' : (
-            <>
-              <p>流入元を表示できませんでした。削除されたか、リンクが古くなっています。</p>
-              <Link href="/inflow-links" className="text-action mt-3 inline-block font-semibold hover:underline">流入経路の一覧へ戻る</Link>
-            </>
-          )}
+          読み込み中…
         </div>
       ) : <>
         <div data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div><div className="flex items-center gap-2"><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold"># {route.refCode}</span><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.genre || '未分類'}</span></div><p className="mt-2 text-sm text-ink-faint">{route.createdAt.slice(5, 10).replace('-', '/')} に発行。{url} を通った人の記録です。</p></div>
-          <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary" onClick={() => setEditingRoute(true)}>この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の${canPermanentlyDelete ? '削除' : '受付停止'}を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setDeleteConfirmationName(''); setRedirectTargetId(''); setDeleteOpen(true) }}>{canPermanentlyDelete ? 'この経路を削除' : '受付を止める'}</Button></div>
+          <div><div className="flex items-center gap-2"><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold"># {route.refCode}</span><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.genre || '未分類'}</span>{/* R273: 一覧・一括操作と同じ言葉で受付状態を出す。赤は使わない（★V7）。 */}<span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.isActive ? '受付中' : '停止中'}</span></div><p className="mt-2 text-sm text-ink-faint">{route.createdAt.slice(5, 10).replace('-', '/')} に発行。{url} を通った人の記録です。</p></div>
+          <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary" onClick={() => setEditingRoute(true)}>この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の${canPermanentlyDelete ? '削除' : '受付停止'}を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setDeleteConfirmationName(''); setRedirectTargetId(''); setDeleteOpen(true) }}>{canPermanentlyDelete ? 'この経路を削除する' : '受付を止める'}</Button></div>
         </div>
+        {copyFailed && url && (
+          <div role="alert" className="mb-4 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3 text-sm text-ink-secondary">
+            <p>コピーできませんでした。下の欄を選んでコピーしてください。</p>
+            <input
+              readOnly
+              autoFocus
+              value={url}
+              aria-label="流入経路のURL"
+              onFocus={(e) => e.currentTarget.select()}
+              className="w-full rounded-control border border-hairline bg-canvas px-3 py-2 font-mono text-xs"
+            />
+          </div>
+        )}
         {/*
           口から取れない数は書かない（#514 重大3）。funnel の4数は累計。
           残数・ブロック数・1人あたり金額の集計口は無いので「—」+理由表示。
@@ -262,7 +351,7 @@ function InflowLinkDetailPageContent() {
           最初に来た友だち）の注文だけを数える。友だちに結びついていない注文や
           経路の分からない注文は未計測としてここには出ない。
         */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6"><MetricCard label="クリック" value={funnel?.click_count} unit="回" detail="累計" /><MetricCard label="友だちになった" value={funnel?.friend_add_count} unit="人" detail={`追加率 ${addRate ?? '—'}%`} /><MetricCard label="いま残っている" value={null} unit="人" detail="残数とブロック数の集計は未接続です" /><MetricCard label="成果" value={funnel?.cv_count} unit="件" detail="1人あたりの金額は未接続です" /><MetricCard label="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? 'この経路から来た人の注文（累計）' : '注文の集計を取得できていません'} /><MetricCard label="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? `返金 ${ordersSummary.refunded.toLocaleString('ja-JP')}・取消 ${ordersSummary.cancelled.toLocaleString('ja-JP')}` : '注文の集計を取得できていません'} /></div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6"><MetricCard label="クリック" value={funnel?.click_count} unit="回" detail="累計" /><MetricCard label="友だちになった" value={funnel?.friend_add_count} unit="人" detail={`追加率 ${addRate ?? '—'}%`} /><MetricCard label="いま残っている" value={null} unit="人" detail="残数とブロック数の集計は未接続です" /><MetricCard label="成果" value={funnel?.cv_count} unit="件" detail="1人あたりの金額は未接続です" /><MetricCard label="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? 'この経路から来た人の注文（累計）' : '注文の集計を取得できていません'} /><MetricCard label="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? `返金 ${formatNumber(ordersSummary.refunded)}・取消 ${formatNumber(ordersSummary.cancelled)}` : '注文の集計を取得できていません'} /></div>
         {/*
           IDEA-18: 集計の期間・帰属ルール・計測できる範囲の断り書き。
           未計測を0と読ませないため、数えられないものを明記する。
@@ -274,7 +363,7 @@ function InflowLinkDetailPageContent() {
           同じ注文は取り込み元ごとの注文番号で1件にまとまるため、再取込で二重に増えません。
         </p>
         <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4">
-          <main data-design="Left" className="space-y-4 xl:col-span-3">
+          <div data-design="Left" className="space-y-4 xl:col-span-3">
             <section><h2 className="text-lg font-bold text-ink">この経路から来た人の、その後</h2><p className="text-xs text-ink-faint">来ただけで終わっていないかを見ます。</p><div className="mt-3 rounded-card border border-hairline bg-canvas p-4">{funnel ? <FunnelView funnel={funnel} /> : funnelError ? <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-ink-secondary">段階を取得できませんでした。集計データは消えていません。</p><Button variant="secondary" onClick={() => setFunnelAttempt((n) => n + 1)}>段階を再読み込み</Button></div> : <p className="text-xs text-ink-faint">読み込み中…</p>}</div></section>
             <section><h2 className="text-lg font-bold text-ink">この経路から来た友だち</h2><p className="text-xs text-ink-faint">新しい順</p>{friends.length === 0 ? <p className="mt-3 text-xs text-ink-faint">この経路から来た友だちは、まだ記録されていません。</p> : <div className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-xs"><thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>友だち</Th><Th>いつ来たか</Th><Th>いまの状態</Th><Th>この人の成果</Th><Th>マイル</Th><Th align="right">確認</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{friends.slice(0, 5).map((friend) => <tr key={friend.id}><td className="px-3 py-3 font-semibold text-ink"><span className="block">{friend.displayName}</span><span className="block truncate font-normal text-ink-faint">はじめて見たページ {friend.firstPage ?? '—'}</span></td><td className="px-3 py-3 text-ink-secondary">{friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/') : '日時不明'}</td><td className="px-3 py-3 font-semibold text-ink-secondary">{friend.currentStatus ?? '—'}</td><td className="px-3 py-3 text-ink-secondary">{friend.conversion ?? '—'}</td><td className="px-3 py-3 font-semibold text-ink">{friend.miles ?? '—'}</td><td className="px-3 py-3 text-right"><Link href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} className="text-action hover:underline">友だちを見る</Link></td></tr>)}</tbody></table></div>}</section>
             {/*
@@ -282,16 +371,17 @@ function InflowLinkDetailPageContent() {
               「購入 ○件」とこの一覧の全件数をそのままつき合わせられる。
             */}
             <section><h2 className="text-lg font-bold text-ink">この経路からの注文</h2><p className="text-xs text-ink-faint">上の「購入」の数と同じ条件の明細です。返金・取り消しは状態に出ます。</p><div className="mt-3 rounded-card border border-hairline bg-canvas p-4">{route ? <RefOrdersPanel refCode={route.refCode} onSummaryChange={setOrdersSummary} /> : null}</div></section>
-          </main>
+          </div>
           <aside data-design="Right" className="space-y-4">
             {/*
-              「マイルを 100 付ける」は設計（Pencil ★V6・design-structure.json）に
-              ある文言のため残す。口から取れない定数ではあるが、設計をコード
-              だけで消さない（#514 重大3のうち本行は司令塔へ判断依頼 #531）。
+              R269: 口にマイル付与の欄は無い。設計見本のマイル固定値は
+              実動作として出さず、実際の設定（シナリオ・タグ・追加直後メッセージ）
+              だけを組み立てる。連動先の名前が取れないときは取得できない旨を出す。
             */}
-            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">この経路にしていること</h2><ul className="mt-3 space-y-3 text-xs text-ink-secondary"><li>{route.scenarioId ? `シナリオ「${scenarioName ?? '取得できません'}」を始める` : 'シナリオは始めない'}</li><li>{route.tagId ? `タグ「${tagName ?? '取得できません'}」を付ける` : 'タグは付けない'}</li><li>マイルを 100 付ける</li></ul></section>
-            <section className="rounded-card border border-status-warn bg-status-warn-soft p-5"><h2 className="text-sm font-bold text-status-warn-deep">気づいたこと</h2><p className="mt-3 text-xs text-status-warn-deep">反応・ブロックの集計は未接続のため表示できません</p></section>
-            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">つながる先</h2><ul className="mt-3 space-y-2 text-xs text-action"><li>→ シナリオ配信</li><li>→ 友だち</li><li>→ 成果とアフィリエイト</li><li>→ コンバージョン</li><li>→ 分析</li></ul></section>
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">この経路にしていること</h2><ul className="mt-3 space-y-3 text-xs text-ink-secondary"><li>{route.scenarioId ? `シナリオ「${scenarioName ?? '取得できません'}」を始める` : 'シナリオは始めない'}</li><li>{route.tagId ? `タグ「${tagName ?? '取得できません'}」を付ける` : 'タグは付けない'}</li><li>{route.introTemplateId ? `追加直後に「${introTemplateName ?? '取得できません'}」を送る` : '追加直後に送るメッセージはない'}</li></ul></section>
+            <Notice tone="warn"><h2 className="text-sm font-bold">気づいたこと</h2><p className="mt-3 text-xs">反応・ブロックの集計は未接続のため表示できません</p></Notice>
+            {/* R272: 関連5項目は実際のリンクにする。押せない飾りにしない。 */}
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">つながる先</h2><ul className="mt-3 space-y-2 text-xs font-semibold text-action"><li><Link href="/scenarios">→ シナリオ配信</Link></li><li><Link href="/friends">→ 友だち</Link></li><li><Link href="/conversions?tab=affiliates">→ 成果とアフィリエイト</Link></li><li><Link href="/conversions">→ コンバージョン</Link></li><li><Link href="/analytics">→ 分析</Link></li></ul></section>
           </aside>
         </div>
       </>}
@@ -310,17 +400,17 @@ function InflowLinkDetailPageContent() {
         }}
       />}
       {deleteOpen && route && <div className="fixed inset-0 z-70 flex items-center justify-center bg-ink/35 p-4" data-design-node="UIaM7" role="dialog" aria-modal="true" aria-labelledby="inflow-delete-title">
-        <div ref={deleteDialogRef} tabIndex={-1} className="w-full overflow-hidden rounded-card bg-canvas shadow-2xl" style={{ maxWidth: 840 }}>
-          <div className="flex items-start gap-3 border-b border-hairline px-6 py-5" style={{ minHeight: 96 }}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger-bg text-xl font-bold text-danger">!</span><div><h2 id="inflow-delete-title" className="text-xl font-bold text-ink">「{route.name}」を削除しますか？</h2><p className="mt-1 text-sm text-ink-faint">このURLは {route.createdAt.slice(5, 10).replace('-', '/')} から使われています。消すと同じURLは開けなくなります。</p></div></div>
+        <div ref={deleteDialogRef} tabIndex={-1} className="w-full overflow-hidden rounded-card bg-canvas shadow-overlay" style={{ maxWidth: 840 }}>
+          <div className="flex items-start gap-3 border-b border-hairline px-6 py-5" style={{ minHeight: 96 }}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill bg-danger-bg text-xl font-bold text-danger">!</span><div className="min-w-0 flex-1"><h2 id="inflow-delete-title" className="text-xl font-bold text-ink">「{route.name}」を削除しますか？</h2><p className="mt-1 text-sm text-ink-faint">このURLは {route.createdAt.slice(5, 10).replace('-', '/')} から使われています。消すと同じURLは開けなくなります。</p></div><button type="button" onClick={() => setDeleteOpen(false)} disabled={deleting} aria-label="閉じる" className="rounded-mini shrink-0 p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div>
           <div className="space-y-4 p-6">
-            <section className="rounded-control border border-status-danger bg-danger-bg p-4 text-status-danger"><h3 className="text-sm font-bold">削除すると、次のことが起きます</h3><div className="mt-3 divide-y divide-danger/15"><div className="flex items-center justify-between gap-4 py-2"><div><p className="text-sm font-bold">貼り付けたURL・QRコード</p><p className="mt-0.5 text-xs">このURLを置いた投稿や広告から開けなくなります。</p></div><span className="rounded-pill bg-canvas px-3 py-1 text-xs font-bold">差し替えが必要</span></div><div className="flex items-center justify-between gap-4 py-2"><div><p className="text-sm font-bold">この経路から来た記録</p><p className="mt-0.5 text-xs">{funnel?.friend_add_count ?? 0}人の流入元と成果は過去の記録として残ります。</p></div><span className="rounded-pill bg-canvas px-3 py-1 text-xs font-bold">記録は残る</span></div><div className="flex items-center justify-between gap-4 py-2"><div><p className="text-sm font-bold">追加時の動き</p><p className="mt-0.5 text-xs">新しい友だちへのタグ付けとシナリオ開始が止まります。</p></div><span className="rounded-pill bg-canvas px-3 py-1 text-xs font-bold">受付を停止</span></div></div></section>
+            <Notice tone="danger"><h3 className="text-sm font-bold">削除すると、次のことが起きます</h3><div className="mt-3 divide-y divide-danger/15"><div className="flex items-center justify-between gap-4 py-2"><div><p className="text-sm font-bold">貼り付けたURL・QRコード</p><p className="mt-0.5 text-xs">このURLを置いた投稿や広告から開けなくなります。</p></div><span className="rounded-pill bg-canvas px-3 py-1 text-xs font-bold">差し替えが必要</span></div><div className="flex items-center justify-between gap-4 py-2"><div><p className="text-sm font-bold">この経路から来た記録</p><p className="mt-0.5 text-xs">{funnel?.friend_add_count ?? 0}人の流入元と成果は過去の記録として残ります。</p></div><span className="rounded-pill bg-canvas px-3 py-1 text-xs font-bold">記録は残る</span></div><div className="flex items-center justify-between gap-4 py-2"><div><p className="text-sm font-bold">追加時の動き</p><p className="mt-0.5 text-xs">新しい友だちへのタグ付けとシナリオ開始が止まります。</p></div><span className="rounded-pill bg-canvas px-3 py-1 text-xs font-bold">受付を停止</span></div></div></Notice>
             <p className="rounded-control bg-success-bg px-4 py-3 text-xs font-semibold text-success">この経路から来た友だちと、付いたタグ・進んでいるシナリオは消えません。</p>
-            <div><h3 className="text-sm font-bold text-ink">どうしますか？</h3><div className="mt-2 grid gap-2">{([['stop','新しい人を受けるのをやめる（おすすめ）','URLは残し、「受付を終了しました」と表示します。','休'],['redirect','別の流入リンクへ送るようにする','印刷ずみのQRコードを別の経路へつなぎます。','→'],['delete','このまま削除する','利用履歴がない経路だけ完全に削除できます。元には戻せません。','×']] as const).filter(([value]) => value !== 'delete' || canPermanentlyDelete).map(([value,title,description,icon]) => <button key={value} type="button" disabled={deleting} onClick={() => setDeleteChoice(value)} className={`flex w-full items-center gap-3 rounded-control border p-3 text-left ${deleteChoice === value ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas'}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${deleteChoice === value ? 'border-accent bg-accent text-on-accent' : 'border-hairline text-ink-faint'}`}>{icon}</span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">{title}</span><span className="mt-0.5 block text-xs text-ink-faint">{description}</span></span><span className="text-ink-faint">›</span></button>)}</div></div>
-            {deleteChoice === 'redirect' && <div><p className="text-sm font-bold text-ink">転送先のリンク</p><Select aria-label="転送先のリンク" id="inflow-redirect-target" value={redirectTargetId} disabled={deleting} onChange={setRedirectTargetId} size="full" options={[{ value: '', label: '選んでください' }, ...routes.filter((candidate) => candidate.id !== route.id).map((candidate) => ({ value: candidate.id, label: `${candidate.name}（#${candidate.refCode}）` }))]} /><p className="text-ink-faint mt-1 text-xs">先頭を自動で選ぶことはしません。必ず選んでください。</p></div>}
-            {deleteChoice === 'delete' && <div className="rounded-control border border-status-danger bg-danger-bg p-4"><label htmlFor="inflow-delete-confirmation" className="text-sm font-bold text-status-danger">完全削除するには「{route.name}」と入力</label><input id="inflow-delete-confirmation" value={deleteConfirmationName} disabled={deleting} onChange={(event) => setDeleteConfirmationName(event.target.value)} autoComplete="off" className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink" /><p className="mt-1 text-xs text-status-danger">空白や大文字・小文字も含め、現在の経路名と同じ入力が必要です。</p></div>}
-            {deleteError && <p className="rounded-control bg-danger-bg px-4 py-3 text-sm text-status-danger">{deleteError}</p>}
+            <div><h3 className="text-sm font-bold text-ink">どうしますか？</h3><div className="mt-2 grid gap-2">{([['stop','新しい人を受けるのをやめる（おすすめ）','URLは残し、「受付を終了しました」と表示します。','休'],['redirect','別の流入リンクへ送るようにする','印刷ずみのQRコードを別の経路へつなぎます。','→'],['delete','このまま削除する','利用履歴がない経路だけ完全に削除できます。元には戻せません。','×']] as const).filter(([value]) => value !== 'delete' || canPermanentlyDelete).map(([value,title,description,icon]) => <button key={value} type="button" disabled={deleting} onClick={() => { setDeleteChoice(value); setDeleteError('') }} className={`flex w-full items-center gap-3 rounded-control border p-3 text-left ${deleteChoice === value ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas'}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-pill border text-xs font-bold ${deleteChoice === value ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline text-ink-faint'}`}>{icon}</span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">{title}</span><span className="mt-0.5 block text-xs text-ink-faint">{description}</span></span><span className="text-ink-faint">›</span></button>)}</div></div>
+            {deleteChoice === 'redirect' && <div><p className="text-sm font-semibold text-ink">転送先のリンク</p><Select aria-label="転送先のリンク" id="inflow-redirect-target" value={redirectTargetId} disabled={deleting} onChange={setRedirectTargetId} size="full" options={[{ value: '', label: '選んでください' }, ...routes.filter((candidate) => candidate.id !== route.id).map((candidate) => ({ value: candidate.id, label: `${candidate.name}（#${candidate.refCode}）` }))]} /><p className="text-ink-faint mt-1 text-xs">先頭を自動で選ぶことはしません。必ず選んでください。</p></div>}
+            {deleteChoice === 'delete' && <div className="rounded-control border border-status-danger bg-danger-bg p-4"><label htmlFor="inflow-delete-confirmation" className="text-sm font-medium text-danger">完全削除するには「{route.name}」と入力</label><input id="inflow-delete-confirmation" value={deleteConfirmationName} disabled={deleting} onChange={(event) => setDeleteConfirmationName(event.target.value)} autoComplete="off" className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink" /><p className="mt-1 text-xs text-danger">空白や大文字・小文字も含め、現在の経路名と同じ入力が必要です。</p></div>}
+            {deleteError && <Notice tone="danger" message={deleteError} />}
           </div>
-          <div className="flex items-center justify-between border-t border-hairline px-6 py-4" style={{ minHeight: 82 }}><p className="max-w-md text-xs text-ink-faint">選んだ方法を確認してから進みます。過去の友だち・タグ・分析記録は消えません。</p><div className="flex gap-2"><Button variant="secondary" disabled={deleting} onClick={() => setDeleteOpen(false)}>キャンセル</Button><Button onClick={() => void applyDeleteChoice()} disabled={deleting || (deleteChoice === 'delete' && deleteConfirmationName !== route.name)}>{deleteChoice === 'stop' ? '受けるのをやめる' : deleteChoice === 'redirect' ? '別のリンクへ送る' : 'この経路を削除'}</Button></div></div>
+          <div className="flex items-center justify-between border-t border-hairline px-6 py-4" style={{ minHeight: 82 }}><p className="max-w-md text-xs text-ink-faint">選んだ方法を確認してから進みます。過去の友だち・タグ・分析記録は消えません。</p><div className="flex gap-2"><Button variant="secondary" disabled={deleting} onClick={() => setDeleteOpen(false)}>キャンセル</Button><Button onClick={() => void applyDeleteChoice()} disabled={deleting || (deleteChoice === 'delete' && deleteConfirmationName !== route.name)}>{deleteChoice === 'stop' ? '受けるのをやめる' : deleteChoice === 'redirect' ? '別のリンクへ送る' : 'この経路を削除する'}</Button></div></div>
         </div>
       </div>}
     </div>
@@ -332,7 +422,7 @@ function MetricCard({ label, value, unit, detail }: { label: string; value: numb
     <div className="rounded-card border border-hairline bg-canvas p-4">
       <dt className="text-ink-faint text-xs">{label}</dt>
       <dd className="text-ink text-xl font-bold tabular-nums">
-        {value == null ? '—' : value.toLocaleString()}
+        {value == null ? '—' : formatNumber(value)}
         <span className="text-ink-faint ml-0.5 text-xs font-normal">{unit}</span>
       </dd>
       <p className="mt-1 text-xs text-ink-faint">{detail}</p>
@@ -368,7 +458,7 @@ function FunnelView({ funnel }: { funnel: EntryRouteFunnel }) {
                   進まなかった」に読める。取れていないだけなら、
                   施策を止める判断を誤る。
                 */}
-                {typeof s.value === 'number' ? s.value.toLocaleString() : '—'}
+                {typeof s.value === 'number' ? formatNumber(s.value) : '—'}
                 {typeof s.value === 'number' && pct !== null && (
                   <span className="ml-1.5 text-xs font-normal text-ink-faint">{pct}%</span>
                 )}

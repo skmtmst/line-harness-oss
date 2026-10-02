@@ -20,14 +20,23 @@ export type ReminderTestSendPhase =
   | { kind: 'sending' }
   | { kind: 'unknown'; message: string }
   | { kind: 'failed'; message: string }
-  | { kind: 'succeeded'; recipientName: string; testedAt: string }
+  /*
+   * REMINDER-12: 送り先は「自分のLINE（self）」と「登録済みテスト宛先
+   * （registered）」を区別する。文言はこの種別に合わせる。
+   */
+  | {
+      kind: 'succeeded'
+      recipientName: string
+      recipientKind: 'self' | 'registered' | null
+      testedAt: string
+    }
 
 /**
  * `send()` の呼び出し側への結果。画面に出す状態は `phase` が持つので、
  * ここでは「窓を閉じるか・送信先を読み直すか」といった後始末の分岐だけを返す。
  */
 export type ReminderTestSendOutcome =
-  | { kind: 'succeeded'; recipientName: string; testedAt: string }
+  | { kind: 'succeeded'; recipientName: string; recipientKind: 'self' | 'registered' | null; testedAt: string }
   | { kind: 'failed'; recipientFault: boolean }
   | { kind: 'unknown' }
   /** 送信中に対象のリマインダが切り替わった。応答は画面へ反映していない。 */
@@ -85,8 +94,9 @@ export function useReminderTestSend(reminderId: string | null) {
         return { kind: 'failed', recipientFault }
       }
       const data = response.data
-      setPhase({ kind: 'succeeded', recipientName: data.recipientName, testedAt: data.testedAt })
-      return { kind: 'succeeded', recipientName: data.recipientName, testedAt: data.testedAt }
+      const recipientKind = data.recipientKind === 'self' ? 'self' : data.recipientKind === 'registered' ? 'registered' : null
+      setPhase({ kind: 'succeeded', recipientName: data.recipientName, recipientKind, testedAt: data.testedAt })
+      return { kind: 'succeeded', recipientName: data.recipientName, recipientKind, testedAt: data.testedAt }
     } catch {
       if (generationRef.current !== generation) return { kind: 'stale' }
       setPhase({

@@ -176,6 +176,8 @@ describe('リマインダ下書きのAPI契約', () => {
       version,
       expect.objectContaining({ lineAccountId: 'account-1' }),
       '123e4567-e89b-42d3-a456-426614174000',
+      // REMINDER-12: 操作者を渡し、本人宛てと登録宛先を区別する。
+      { staffId: 'staff-1' },
     )
     expect(dbMocks.recordReminderDraftTest).toHaveBeenCalledWith(
       expect.anything(),

@@ -8,7 +8,10 @@ import type {
   IdentityReprocessMode,
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Dialog from '@/components/shared/dialog'
+import Select from '@/components/shared/select'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import {
   canSubmitDecision,
@@ -106,54 +109,43 @@ export default function IdentityDecisionDialog({
       footer={
         <div className={styles.actions}>
           <Button type="button" onClick={onCancel} disabled={busy}>
-            やめる
+            キャンセル
           </Button>
           {/* 理由が空のまま押せると、履歴に「なぜそう決めたか」が残らない。 */}
-          <Button type="button" variant="primary" onClick={submit} disabled={!ready}>
-            {busy ? '処理中…' : decisionText(decision)}
+          <Button type="button" variant="primary" onClick={submit} disabled={!ready} busy={busy} busyLabel="処理中…">
+            {decisionText(decision)}
           </Button>
         </div>
       }
     >
       <div className={styles.dialogBody}>
-        <div className={styles.choices} role="radiogroup" aria-label="判定">
+        <RadioCardGroup legend="判定" className={styles.choices}>
           {DECISIONS.map((item) => (
-            <label
+            <RadioCard
               key={item}
-              className={`${styles.choice} ${decision === item ? styles.choiceOn : ''}`}
-            >
-              <input
-                type="radio"
-                name="identity-decision"
-                value={item}
-                checked={decision === item}
-                onChange={() => setDecision(item)}
-              />
-              <span className={styles.choiceText}>
-                <span className={styles.choiceTitle}>{decisionText(item)}</span>
-                <span className={styles.choiceNote}>{decisionNote(item)}</span>
-              </span>
-            </label>
+              name="identity-decision"
+              value={item}
+              checked={decision === item}
+              onChange={() => setDecision(item)}
+              title={decisionText(item)}
+              note={decisionNote(item)}
+            />
           ))}
-        </div>
+        </RadioCardGroup>
 
         {canReprocess ? (
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="identity-reprocess">
               過去の扱い
             </label>
-            <select
+            <Select
+              aria-label="過去の扱い"
               id="identity-reprocess"
-              className={styles.reason}
               value={mode}
-              onChange={(event) => setMode(event.target.value as IdentityReprocessMode)}
-            >
-              {REPROCESS_MODES.map((item) => (
-                <option key={item} value={item}>
-                  {reprocessText(item)}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setMode(value as IdentityReprocessMode)}
+              options={REPROCESS_MODES.map((item) => ({ value: item, label: reprocessText(item) }))}
+              size="full"
+            />
           </div>
         ) : null}
 
@@ -163,17 +155,16 @@ export default function IdentityDecisionDialog({
             {profileCandidates.map((field) => (
               <label key={field.fieldKey} className={styles.fieldLabel}>
                 {field.fieldLabel}
-                <select
-                  className={styles.reason}
+                <Select
+                  aria-label={field.fieldLabel}
                   value={profileSelections[field.fieldKey] ?? ''}
-                  onChange={(event) => setProfileSelections((current) => ({ ...current, [field.fieldKey]: event.target.value }))}
-                >
-                  {field.options.map((option) => (
-                    <option key={option.sourceFriendId} value={option.sourceFriendId}>
-                      {option.sourceLabel}：{option.valuePreview ?? '未登録'}{option.verified ? '（確認済み）' : ''}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setProfileSelections((current) => ({ ...current, [field.fieldKey]: value }))}
+                  options={field.options.map((option) => ({
+                    value: option.sourceFriendId,
+                    label: `${option.sourceLabel}：${option.valuePreview ?? '未登録'}${option.verified ? '（確認済み）' : ''}`,
+                  }))}
+                  size="full"
+                />
               </label>
             ))}
           </div>
@@ -187,14 +178,11 @@ export default function IdentityDecisionDialog({
               'プライバシーポリシーと利用規約に、この使い方が書いてある',
               'LINEの規約と、プロバイダーの決めごとに反していない',
             ].map((label, index) => (
-              <label key={label} className={styles.choice}>
-                <input
-                  type="checkbox"
-                  checked={consents[index]}
-                  onChange={(event) => setConsents((current) => current.map((value, itemIndex) => itemIndex === index ? event.target.checked : value))}
-                />
-                <span className={styles.choiceNote}>{label}</span>
-              </label>
+              <Checkbox
+                key={label}
+                checked={consents[index]}
+                onCheckedChange={(checked) => setConsents((current) => current.map((value, itemIndex) => itemIndex === index ? checked : value))}
+              >{label}</Checkbox>
             ))}
           </div>
         ) : null}

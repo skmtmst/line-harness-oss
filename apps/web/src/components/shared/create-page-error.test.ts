@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
-import { createPageErrorMessage } from './create-page'
+import { createPageErrorMessage, createPageReturnHref } from './create-page'
 
 describe('CreatePage error message', () => {
   it('APIが許可した案内はそのまま表示する', () => {
@@ -10,6 +10,63 @@ describe('CreatePage error message', () => {
 
   it('内部の英語エラーを運用者向けの日本語へ置き換える', () => {
     expect(createPageErrorMessage(new Error('conversion create failed')))
-      .toBe('保存に失敗しました。入力内容を確認して、もう一度お試しください。')
+      .toBe('保存できませんでした。通信が切れている可能性があります。接続を確かめて、もう一度お試しください。')
+  })
+
+  /*
+   * D005: 保存が405/500で失敗しても `API error: 405` のような内部文面を
+   * そのまま出さない。運用者向けの文（何が起きたか・どうすればよいか）にする。
+   */
+  it('405・500は内部文面を出さず、立て直し方まで書く', () => {
+    for (const status of [405, 500, 502]) {
+      const message = createPageErrorMessage(new ApiError(status, `API error: ${status}`))
+      expect(message).not.toMatch(/API error/)
+      expect(message).toContain('もう一度お試しください')
+    }
+  })
+
+  it('403は権限の案内、429は待ち時間の案内にする', () => {
+    expect(createPageErrorMessage(new ApiError(403, 'API error: 403')))
+      .toContain('権限')
+    expect(createPageErrorMessage(new ApiError(429, 'API error: 429')))
+      .toContain('少し待ってから')
+  })
+})
+
+/*
+ * MILEAGE-09: 保存後の戻り先。親URLが `/mileage?tab=earning-rules` のように
+ * クエリを持っていても `?` を増やさず、タブを保ったまま新しい行を目立たせる。
+ */
+describe('CreatePage の戻り先URL（highlight）', () => {
+  it('クエリを持たない親URLには ?highlight= を足す', () => {
+    expect(createPageReturnHref('/webhooks', 'wh-1')).toBe('/webhooks?highlight=wh-1')
+  })
+
+  it('クエリを持つ親URLには &highlight= を足し、既存の指定を保つ', () => {
+    expect(createPageReturnHref('/mileage?tab=earning-rules', 'rule-9'))
+      .toBe('/mileage?tab=earning-rules&highlight=rule-9')
+  })
+
+  it('複数クエリ・ハッシュを持つ親URLでも、既存分を全部保つ', () => {
+    expect(createPageReturnHref('/list?tab=a&filter=on#section-2', 'id-3'))
+      .toBe('/list?tab=a&filter=on&highlight=id-3#section-2')
+  })
+
+  it('既に highlight が付いていれば重ねず書き換える', () => {
+    expect(createPageReturnHref('/mileage?tab=earning-rules&highlight=old', 'new'))
+      .toBe('/mileage?tab=earning-rules&highlight=new')
+  })
+
+  it('IDに予約文字があっても、壊れたURLを作らない', () => {
+    const href = createPageReturnHref('/mileage?tab=earning-rules', 'a?b&c')
+    expect(href.startsWith('/mileage?')).toBe(true)
+    // '?' は1つだけ。2つ並ぶと tab 指定ごと読めなくなる。
+    expect(href.split('?')).toHaveLength(2)
+    expect(new URL(href, 'https://x.invalid').searchParams.get('highlight')).toBe('a?b&c')
+  })
+
+  it('IDが無ければ親URLへそのまま戻る', () => {
+    expect(createPageReturnHref('/mileage?tab=earning-rules', undefined))
+      .toBe('/mileage?tab=earning-rules')
   })
 })

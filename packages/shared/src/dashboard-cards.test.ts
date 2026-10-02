@@ -7,10 +7,10 @@ import {
 } from "./dashboard-cards";
 
 describe("DASHBOARD_CARD_GROUPS", () => {
-  it("画面が送る22枚すべてを含み、IDに重複がない", () => {
+  it("画面が送る23枚すべてを含み、IDに重複がない", () => {
     const all = Object.values(DASHBOARD_CARD_GROUPS).flat();
-    expect(all).toHaveLength(22);
-    expect(new Set(all).size).toBe(22);
+    expect(all).toHaveLength(23);
+    expect(new Set(all).size).toBe(23);
   });
 
   it("DASH-01の原因だった support-mark-status を right 区分に含む", () => {

@@ -56,6 +56,24 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
+/*
+ * 時刻の選び欄は共通 Select（listbox）。ここで見たいのは選んだ後の
+ * 予約の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 /** 通信そのものを差し替える。api・fetchApiは実物を通す。 */
 function installFetch() {
   vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
@@ -275,7 +293,7 @@ async function openFriend(friendId: string) {
 }
 
 function textarea(): HTMLTextAreaElement | null {
-  return host.querySelector('textarea[aria-label="メッセージを入力"]')
+  return document.querySelector('textarea[aria-label="メッセージを入力"]')
 }
 
 async function typeMessage(text: string) {
@@ -289,13 +307,46 @@ async function typeMessage(text: string) {
 }
 
 async function typeDatetime(text: string) {
-  const el = host.querySelector<HTMLInputElement>('#schedule-at')
-  if (!el) throw new Error('予約日時の入力が見つからない')
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
-  await act(async () => {
-    setter.call(el, text)
-    el.dispatchEvent(new Event('input', { bubbles: true }))
-  })
+  // 日時の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm（日本時間）。
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(text)
+  if (!match) throw new Error('日時が読めない')
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const week = '日月火水木金土'[new Date(year, month - 1, day).getDay()]
+  const dialog = () => document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
+  const trigger = document.querySelector<HTMLElement>('#schedule-at')
+  if (!trigger) throw new Error('予約日時の入力が見つからない')
+  if (!dialog()) await click(trigger)
+  const dateButton = dialog()?.querySelector('button[aria-label="日付"]')
+  if (dateButton) await click(dateButton)
+  for (let i = 0; i < 36; i += 1) {
+    const grid = document.querySelector('[role="grid"]')
+    const label = grid?.getAttribute('aria-label')
+    if (label === `${year}年${month}月`) break
+    const target = year * 12 + month
+    const currentLabel = /^(\d+)年(\d+)月$/.exec(label ?? '')
+    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : target
+    const nav = [...document.querySelectorAll('button')].find(
+      (b) => b.getAttribute('aria-label') === (target > current ? '次の月' : '前の月'),
+    )
+    if (!nav) throw new Error('暦が見つからない')
+    await click(nav)
+  }
+  // 今日の日付には「、今日」が付くので前方一致で探す。
+  await click(
+    [...document.querySelectorAll('button')].find((b) =>
+      (b.getAttribute('aria-label') ?? '').startsWith(`${year}年${month}月${day}日（${week}）`),
+    ) ?? null,
+  )
+  for (const [label, v] of [['時', match[4]], ['分', match[5]]] as const) {
+    const select = dialog()?.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)
+    if (!select) throw new Error('時刻の選択が見つからない')
+    await act(async () => {
+      select.value = v
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+  }
 }
 
 async function click(el: Element | null) {
@@ -306,20 +357,20 @@ async function click(el: Element | null) {
 }
 
 function talkPaneText(): string {
-  const pane = host.querySelector('[data-inbox-v4="talk-pane"]')
+  const pane = document.querySelector('[data-inbox-v4="talk-pane"]')
   return pane?.textContent ?? ''
 }
 
 function scheduleToggleText(): string {
-  return host.querySelector('[data-inbox-v6="schedule-toggle"]')?.textContent ?? ''
+  return document.querySelector('[data-inbox-v6="schedule-toggle"]')?.textContent ?? ''
 }
 
 function scheduledRowsText(): string {
-  return [...host.querySelectorAll('[data-inbox-v6="scheduled-row"]')].map((row) => row.textContent).join('\n')
+  return [...document.querySelectorAll('[data-inbox-v6="scheduled-row"]')].map((row) => row.textContent).join('\n')
 }
 
 async function openSchedulePanel() {
-  const toggle = host.querySelector('[data-inbox-v6="schedule-toggle"]')
+  const toggle = document.querySelector('[data-inbox-v6="schedule-toggle"]')
   if (toggle?.getAttribute('aria-expanded') !== 'true') await click(toggle)
 }
 
@@ -381,7 +432,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
 
     // 0件として黙るのではなく、読み込めなかったことと再読み込み口が出る。
     expect(host.textContent).toContain('予約の一覧を読み込めませんでした。')
-    expect(host.querySelector('[data-inbox-v6="scheduled-retry"]')).not.toBeNull()
+    expect(document.querySelector('[data-inbox-v6="scheduled-retry"]')).not.toBeNull()
     expect(scheduleToggleText()).toBe('予約')
   })
 
@@ -403,7 +454,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     expect(talkPaneText()).toContain('Aの最新')
 
     // 「前のメッセージ」を押す → Aの過去分の要求がpendingで残る。
-    const olderButton = [...host.querySelectorAll('button')].find((b) => b.textContent === '前のメッセージ')
+    const olderButton = [...document.querySelectorAll('button')].find((b) => b.textContent === '前のメッセージ')
     await click(olderButton ?? null)
     await flush()
     expect(net.calls.some((c) => c.startsWith('GET /api/chats/friend-a?') && c.includes('beforeId='))).toBe(true)
@@ -442,7 +493,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
 
     // Aへ送信を開始し、応答は保留のまま。(ダイレクト送信パネルにも
     // 「送信」ボタンがあるので、トーク画面の中に限定する)
-    const pane = host.querySelector('[data-inbox-v4="talk-pane"]')
+    const pane = document.querySelector('[data-inbox-v4="talk-pane"]')
     const sendButton = [...(pane?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '送信')
     await click(sendButton ?? null)
     await flush()
@@ -507,7 +558,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     await typeDatetime('2026-09-25T10:30')
 
     const scheduleButton = () =>
-      [...host.querySelectorAll('button')].find((b) => b.textContent === 'この日時で予約する' || b.textContent === '予約中...')
+      [...document.querySelectorAll('button')].find((b) => b.textContent === 'この日時で予約する' || b.textContent === '予約中...')
 
     // 1回目: 通信中に保留 → 失敗させる。
     await click(scheduleButton() ?? null)

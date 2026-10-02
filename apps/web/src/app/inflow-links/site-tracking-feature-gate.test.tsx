@@ -21,6 +21,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 import InflowLinksPage from './page'
+import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -50,6 +51,8 @@ const ALL_ON: Record<string, boolean> = { site_tracking: true, inflow_tracking: 
 
 describe('site_tracking の画面ゲート(#859)', () => {
   beforeEach(() => {
+    // 表示可否は画面間で共有される（V6R-S0-b）。試験ごとに応答を替えるので毎回捨てる。
+    clearFeatureVisibilityCache()
     stubFetch(ALL_ON)
     currentParams = ''
     host = document.createElement('div')

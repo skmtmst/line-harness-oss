@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ConversionsPage from './page'
 
@@ -130,6 +131,10 @@ function byText(text: string): HTMLButtonElement | undefined {
     .find((node) => node.textContent?.trim() === text) as HTMLButtonElement | undefined
 }
 
+function byLabel(label: string): HTMLButtonElement | undefined {
+  return document.body.querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement | undefined
+}
+
 function field(label: string): HTMLInputElement | HTMLSelectElement | undefined {
   return (document.body.querySelector(`[aria-label="${label}"]`) ?? undefined) as
     HTMLInputElement | HTMLSelectElement | undefined
@@ -149,8 +154,9 @@ async function type(node: HTMLInputElement, value: string) {
   })
 }
 
-/** 一覧から詳細を開き、編集の窓まで進める。 */
+/** 一覧から詳細を開き、編集の窓まで進める。詳細は行の「その他操作」メニューの中。 */
 async function openEditDialog() {
+  await click(byLabel('購入のその他操作'))
   await click(byText('中身を見る'))
   await click(byText('編集'))
 }
@@ -236,6 +242,151 @@ describe('成果地点の編集（N-252）', () => {
     expect(document.body.textContent).toContain('名前を入れてください')
   })
 
+describe('編集も起点に合う金額の決め方にする', () => {
+  const TAG_SOURCE = {
+    ...DEFINITION,
+    id: 'point-tag',
+    name: 'タグ付け',
+    sourceType: 'tag_added',
+    valueMode: 'source',
+    value: 200,
+    deduplicationMode: 'once_per_friend',
+  }
+  const ORDER_SOURCE = {
+    ...DEFINITION,
+    id: 'point-order',
+    name: '注文',
+    sourceType: 'ec_order_confirmed',
+    valueMode: 'source',
+    value: null,
+  }
+
+  /** 一覧の口が返す成果地点を差し替える。版上げの口は成功のまま。 */
+  function stubList(items: unknown[]) {
+    vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
+      const raw = typeof input === 'string' ? input : String(input)
+      const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
+      let body: unknown = null
+      try { body = init?.body ? JSON.parse(String(init.body)) : null } catch { body = init?.body ?? null }
+      net.calls.push({ path, method: init?.method ?? 'GET', body })
+      if (/^\/api\/conversions\/definitions\/[^/]+\/revise/.test(path)) {
+        return new Response(JSON.stringify(net.reviseBody ?? {
+          success: true, data: { id: 'point-x', version: 4, revisionId: 'rev-1', movedUsages: 1, updatedAt: '' },
+        }), { status: net.reviseStatus, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (path.startsWith('/api/conversions/definitions')) {
+        return new Response(JSON.stringify({ ...listBody(), data: { ...listBody().data, items } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (path.startsWith('/api/conversions/report') || path.startsWith('/api/conversions/definition-report')) {
+        return new Response(JSON.stringify({ success: true, data: { kpis: {}, daily: [], byDefinition: [], byRoute: [] } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ success: true, data: {} }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    })
+  }
+
+  async function openEditDialogFor(name: string) {
+    await click(byLabel(`${name}のその他操作`))
+    await click(byText('中身を見る'))
+    await click(byText('編集'))
+  }
+
+  /** 金額の決め方欄の知らせ。窓が開いていないときは落ちる。 */
+  function amountNotice(): string | null {
+    const trigger = byLabel('金額の決め方')
+    expect(trigger, '編集の窓が開いていません').toBeTruthy()
+    return trigger!.closest('label')?.querySelector('[role="status"]')?.textContent ?? null
+  }
+
+  /** 金額の決め方の候補を開いて文字を全部読む。 */
+  async function openOptions(): Promise<string> {
+    await click(byLabel('金額の決め方'))
+    return [...document.body.querySelectorAll('li[role="option"]')]
+      .map((node) => node.textContent ?? '').join('')
+  }
+
+  it('起点に合わない決め方は開いたときに既定へ戻して知らせ、注文の金額は出さない', async () => {
+    stubList([TAG_SOURCE])
+    await mount()
+    await openEditDialogFor('タグ付け')
+    // 昔の版に残っていた注文の金額は、合う既定(金額を数えない)へ戻る。
+    expect(byLabel('金額の決め方')?.textContent).toContain('金額を数えない')
+    expect(amountNotice()).toContain('金額の決め方を')
+    expect(amountNotice()).toContain('戻しました')
+    // 候補に連携元の金額は出ない。
+    expect(await openOptions()).not.toContain('連携元の金額を使う')
+    // 閉じて保存すると既定が送られる。
+    await click(byLabel('金額の決め方'))
+    await click(byText('この内容にする'))
+    const revise = net.calls.find((call) => call.path.includes('/revise'))
+    expect(revise, '編集の口が呼ばれていません').toBeTruthy()
+    expect(revise!.body).toMatchObject({ valueMode: 'none', fixedValue: null })
+  })
+
+  it('注文起点の注文の金額はそのまま残り、知らせも出ない', async () => {
+    stubList([ORDER_SOURCE])
+    await mount()
+    await openEditDialogFor('注文')
+    expect(byLabel('金額の決め方')?.textContent).toContain('連携元の金額を使う')
+    expect(amountNotice()).toBeNull()
+    expect(await openOptions()).toContain('連携元の金額を使う')
+  })
+})
+
+describe('S4-OR 編集の数えない条件は空のかたまりを黙って落とさない', () => {
+  /** 編集の窓の中の or 追加ボタン。作成と同じ共通部品。 */
+  function orAddButton(): HTMLElement | undefined {
+    return [...document.body.querySelectorAll('button')]
+      .find((node) => node.textContent?.includes('いずれか1つ以上を満たす'))
+  }
+
+  /** 編集の窓の中の条件の足し口。最初は1つ、or 追加で2つ。 */
+  function kindPickers(): HTMLElement[] {
+    return [...document.body.querySelectorAll('[role="combobox"]')]
+      .filter((node) => node.getAttribute('aria-label') === '追加する条件を選ぶ')
+  }
+
+  function pickKind(node: HTMLElement, query: string) {
+    fireEvent.focus(node)
+    fireEvent.change(node, { target: { value: query } })
+    fireEvent.keyDown(node, { key: 'ArrowDown' })
+    fireEvent.keyDown(node, { key: 'Enter' })
+  }
+
+  it('空の or かたまりのまま決めると案内が出て、版上げの口は呼ばれない', async () => {
+    await mount()
+    await openEditDialog()
+    expect(kindPickers()).toHaveLength(1)
+    await click(orAddButton())
+    expect(kindPickers()).toHaveLength(2)
+    await click(byText('この内容にする'))
+
+    expect(document.body.textContent).toContain('空の「いずれか」の条件のかたまりがあります')
+    expect(net.calls.filter((call) => call.path.includes('/revise'))).toHaveLength(0)
+    // 窓は開いたまま。下書きも残る。
+    expect(kindPickers()).toHaveLength(2)
+  })
+
+  it('かたまりに条件を入れると決められ、除外として送られる', async () => {
+    await mount()
+    await openEditDialog()
+    await click(orAddButton())
+    await act(async () => {
+      pickKind(kindPickers()[1], '行動スコア')
+    })
+    await click(byText('この内容にする'))
+
+    const revise = net.calls.find((call) => call.path.includes('/revise'))
+    expect(revise, '編集の口が呼ばれていません').toBeTruthy()
+    const exclusion = (revise!.body as { sourceConfig: { exclusion: {
+      groups: Array<{ rules: Array<{ type: string }> }> } | null } }).sourceConfig.exclusion
+    expect(exclusion?.groups).toHaveLength(1)
+    expect(exclusion?.groups?.[0].rules[0].type).toBe('score_range')
+  })
+})
+
+describe('停止済み成果地点の編集導線', () => {
   it('停止済みの成果地点には編集の導線を出さない', async () => {
     const stopped = { ...DEFINITION, status: 'stopped', stoppedAt: '2026-09-02T00:00:00.000+09:00' }
     vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
@@ -250,9 +401,12 @@ describe('成果地点の編集（N-252）', () => {
         { status: 200, headers: { 'Content-Type': 'application/json' } })
     })
     await mount()
+    await click(byLabel('購入のその他操作'))
     await click(byText('中身を見る'))
     // 詳細は開いている（この判定が空振りしないことを先に確かめる）。
-    expect(byText('閉じる')).toBeTruthy()
+    // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
+    expect(byLabel('閉じる')).toBeTruthy()
     expect(byText('編集')).toBeUndefined()
   })
+})
 })

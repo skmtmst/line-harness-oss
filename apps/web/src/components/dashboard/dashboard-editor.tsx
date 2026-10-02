@@ -8,6 +8,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  type Announcements,
   type DragEndEvent,
 } from '@dnd-kit/core'
 import {
@@ -24,8 +25,11 @@ import {
   type DashboardCardGroup,
   type DashboardCardId,
 } from '@line-crm/shared'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Notice from '@/components/shared/notice'
 
 /*
  * カードIDと区分の正本は @line-crm/shared の DASHBOARD_CARD_GROUPS。
@@ -70,8 +74,10 @@ const CARD_META: Record<DashboardCardId, { label: string; description: string; d
   'connection-status': { label: '接続状態', description: '右サイド', defaultVisible: true },
   'support-mark-status': { label: '現在の対応状況', description: '右サイド', defaultVisible: true },
   'friend-status': { label: '友だちの状態', description: '右サイド｜有効数・ブロック率', defaultVisible: false },
-  /* カードの実表題は「今後の予約」。載せるのは予約だけなので、編集パネルの名前も揃える（DASH-10）。 */
-  'upcoming': { label: '今後の予約', description: '右サイド', defaultVisible: true },
+  /* M: 予約だけでなく予約配信・リマインダも載せるので、表題と名前を「今後の予定」にした。 */
+  'upcoming': { label: '今後の予定', description: '右サイド', defaultVisible: true },
+  /* L (#824): 通知の送達台帳から数えた今日の失敗。出どころはカードの「？」に出す。 */
+  'delivery-failures': { label: '配信の失敗', description: '右サイド｜今日・出どころ付き', defaultVisible: true },
   'monthly-delivery': { label: '今月の配信', description: '右サイド', defaultVisible: true },
   'recent-results': { label: '最近の成果', description: '右サイド', defaultVisible: true },
   'booking-status': { label: '予約状況', description: '右サイド｜本日・変更・キャンセル', defaultVisible: false },
@@ -138,6 +144,21 @@ export function reorderDashboardItems(
   return arrayMove(items, oldIndex, newIndex)
 }
 
+/*
+ * R116: ドラッグを使わない1つずつの移動。タッチやマウスだけ、キーボード
+ * だけのどちらでも順番を変えられるようにする。端では何もしない。
+ */
+export function moveDashboardItem(
+  items: DashboardPreferenceItem[],
+  id: DashboardCardId,
+  direction: 'up' | 'down',
+): DashboardPreferenceItem[] {
+  const index = items.findIndex((item) => item.id === id)
+  const next = direction === 'up' ? index - 1 : index + 1
+  if (index < 0 || next < 0 || next >= items.length) return items
+  return arrayMove(items, index, next)
+}
+
 /** 「今日やること」の5枚目をONにしたとき、並びのいちばん下を自動でOFFにする。 */
 export function toggleDashboardItem(
   items: DashboardPreferenceItem[],
@@ -175,34 +196,62 @@ function GripIcon() {
   )
 }
 
-function SortableCardRow({ item, definition, onToggle }: {
+function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onToggle }: {
   item: DashboardPreferenceItem
   definition: CardDefinition
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMove: (direction: 'up' | 'down') => void
   onToggle: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
 
   return (
-    <div ref={setNodeRef} style={style} className={`border-hairline flex h-[54px] items-center gap-2.5 border-b px-3 last:border-b-0 ${isDragging ? 'bg-action-soft relative z-10 shadow-md' : 'bg-canvas'}`}>
-      <button type="button" aria-label={`${definition.label}をドラッグして並べ替え`} className="text-ink-faint hover:text-ink touch-none cursor-grab rounded p-0.5 active:cursor-grabbing" {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} className={`border-hairline flex h-[54px] items-center gap-2.5 border-b px-3 last:border-b-0 ${isDragging ? 'bg-action-soft relative z-10 shadow-card' : 'bg-canvas'}`}>
+      <button type="button" aria-label={`${definition.label}をドラッグして並べ替え`} className="text-ink-faint hover:text-ink touch-none cursor-grab rounded-mini p-0.5 active:cursor-grabbing" {...attributes} {...listeners}>
         <GripIcon />
       </button>
       <div className="min-w-0 flex-1">
         <p className="text-ink truncate text-sm font-medium" title={definition.label}>{definition.label}</p>
         <p className="text-ink-faint truncate text-[11px]" title={definition.description}>{definition.description}</p>
       </div>
-      <label className="relative inline-flex shrink-0 cursor-pointer items-center">
-        <input type="checkbox" checked={item.visible} onChange={onToggle} className="peer sr-only" aria-label={`${definition.label}を${item.visible ? '非表示' : '表示'}にする`} />
-        <span className="bg-hairline peer-checked:bg-accent h-6 w-[42px] rounded-pill transition-colors" />
-        <span className="bg-canvas absolute left-0.5 h-5 w-5 rounded-full shadow-sm transition-transform peer-checked:translate-x-[18px]" />
-      </label>
+      {/*
+        R116: ドラッグが難しいときの上下ボタン。タッチやマウスだけでも
+        1つずつ動かせる。端では押せない。
+      */}
+      <div role="group" aria-label={`${definition.label}の順番`} className="flex shrink-0 items-center">
+        <button
+          type="button"
+          aria-label={`${definition.label}を1つ上へ移動`}
+          disabled={!canMoveUp}
+          onClick={() => onMove('up')}
+          className="text-ink-faint hover:text-ink rounded-mini p-1 disabled:opacity-30"
+        >
+          <ChevronUp aria-hidden="true" className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          aria-label={`${definition.label}を1つ下へ移動`}
+          disabled={!canMoveDown}
+          onClick={() => onMove('down')}
+          className="text-ink-faint hover:text-ink rounded-mini p-1 disabled:opacity-30"
+        >
+          <ChevronDown aria-hidden="true" className="h-4 w-4" />
+        </button>
+      </div>
+      <Checkbox
+        checked={item.visible}
+        onCheckedChange={onToggle}
+        aria-label={`${definition.label}を${item.visible ? '非表示' : '表示'}にする`}
+        className="shrink-0"
+      />
     </div>
   )
 }
 
 function PreviewCard({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
-  return <div className={`rounded-lg border px-2 py-2 text-[10px] font-medium ${muted ? 'border-dashed border-hairline text-ink-faint' : 'border-hairline bg-canvas text-ink shadow-[1px_1px_2px_rgba(29,29,31,0.10)]'}`}>{children}</div>
+  return <div className={`rounded-control border px-2 py-2 text-[10px] font-medium ${muted ? 'border-dashed border-hairline text-ink-faint' : 'border-hairline bg-canvas text-ink shadow-card'}`}>{children}</div>
 }
 
 /*
@@ -225,14 +274,7 @@ function DashboardPreview({ draft }: { draft: DashboardPreferences }) {
         <p className="text-ink-faint text-[11px]">実際のダッシュボードと同じ順番で表示します。</p>
         <div className="flex gap-1" role="tablist" aria-label="プレビューの画面幅">
           {([['pc', 'PC'], ['mobile', 'スマホ']] as const).map(([key, text]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={device === key}
-              onClick={() => setDevice(key)}
-              className={`rounded-pill border px-2.5 py-1 text-[10px] font-medium ${device === key ? 'border-accent bg-accent text-on-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}
-            >{text}</button>
+            <Button variant="primary" className={(`rounded-pill border px-2.5 py-1 text-[10px] font-medium ${device === key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary'}`) + ' h-auto whitespace-normal'} key={key} type="button" role="tab" aria-selected={device === key} onClick={() => setDevice(key)}>{text}</Button>
           ))}
         </div>
       </div>
@@ -288,6 +330,8 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
   const [mode, setMode] = useState<'cards' | 'preview'>('cards')
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [reloading, setReloading] = useState(false)
+  /* R116: ボタン移動の結果を日本語で読み上げる。 */
+  const [announcement, setAnnouncement] = useState('')
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -341,9 +385,39 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
     }))
   }
 
+  /* R116: 上下ボタンでの移動。端では何もしない。結果は日本語で読み上げる。 */
+  const handleMove = (group: DashboardGroup, id: DashboardCardId, direction: 'up' | 'down') => {
+    const next = moveDashboardItem(draft[group], id, direction)
+    if (next === draft[group]) return
+    setDraft({ ...draft, [group]: next })
+    const position = next.findIndex((item) => item.id === id) + 1
+    setAnnouncement(`${CARD_DEFINITION_MAP.get(id)?.label ?? id}を${position}番目へ移動しました`)
+  }
+
+  /*
+   * R116: ドラッグ中の読み上げも日本語にする。dnd-kit の既定は英語で、
+   * 位置も伝わらない。`draft` は描画時点の並びで、指している先の番号を言う。
+   */
+  const japaneseAnnouncements = (group: DashboardGroup): Announcements => {
+    const labelOf = (id: unknown) => CARD_DEFINITION_MAP.get(id as DashboardCardId)?.label ?? String(id)
+    const positionOf = (id: unknown) => draft[group].findIndex((item) => item.id === id) + 1
+    return {
+      onDragStart: ({ active }) => `${labelOf(active.id)}を持ち上げました。今の位置は${positionOf(active.id)}番目です。`,
+      onDragOver: ({ active, over }) => {
+        if (!over || active.id === over.id) return undefined
+        return `${labelOf(active.id)}を${labelOf(over.id)}の位置へ移動します。`
+      },
+      onDragEnd: ({ active, over }) => {
+        if (!over || active.id === over.id) return `${labelOf(active.id)}の位置は変わりませんでした。`
+        return `${labelOf(active.id)}を${positionOf(over.id)}番目へ移動しました。`
+      },
+      onDragCancel: ({ active }) => `${labelOf(active.id)}の移動をやめました。`,
+    }
+  }
+
   return (
     <div data-design="Editor" className="bg-ink/30 fixed inset-0 z-50 flex justify-end" role="presentation" onMouseDown={() => { if (!saving) onCancel() }}>
-      <aside ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="dashboard-editor-title" className="bg-canvas flex h-full w-full max-w-[540px] flex-col shadow-[-8px_0_28px_rgba(26,28,26,0.14)]" onMouseDown={(event) => event.stopPropagation()}>
+      <aside ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="dashboard-editor-title" className="bg-canvas flex h-full w-full max-w-[540px] flex-col shadow-float" onMouseDown={(event) => event.stopPropagation()}>
         <header className="border-hairline border-b px-[22px] pb-4 pt-5">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -353,7 +427,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
             <button type="button" onClick={onCancel} disabled={saving} aria-label="閉じる" className="text-ink-faint hover:text-ink rounded-control p-1.5"><CloseIcon /></button>
           </div>
           <div className="mt-4 flex items-center justify-between gap-4">
-            <p className="text-ink-secondary text-xs">持ち手をドラッグして移動。スイッチで表示を切り替えます。</p>
+            <p className="text-ink-secondary text-xs">持ち手をドラッグして移動。上下ボタン・キーボードでも順番を変更。スイッチで表示を切り替えます。</p>
             {/*
               「初期状態に戻す」は個人配置の削除なので、パネル内の確認を
               挟んでから実行する（A01-02）。1回目のクリックは確認を出すだけで、
@@ -381,7 +455,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
                   type="button"
                   onClick={() => setConfirmingReset(false)}
                   className="font-medium underline"
-                >やめる</button>
+                >キャンセル</button>
               </div>
             </div>
           ) : null}
@@ -391,13 +465,16 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
           </div>
         </header>
 
+        {/* R116: 上下ボタンで動かした結果を読み上げる（見た目には出さない）。 */}
+        <p role="status" className="sr-only">{announcement}</p>
+
         {/*
           配置の保存・初期化の失敗はこのパネルの上部へ出す（DASH-05）。
           再試行は「意図した配置操作」だけを実行し、概要の再取得はしない。
         */}
         {saveError ? (
           <div role="alert" className="bg-danger-bg text-danger mx-[22px] mt-3 rounded-control px-3 py-2.5 text-xs leading-relaxed">
-            <p className="font-medium">{saveError}</p>
+            <p className="font-semibold">{saveError}</p>
             <div className="mt-1.5 flex flex-wrap gap-3">
               <button
                 type="button"
@@ -429,24 +506,42 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
                       設計 `ZN0ov` は「「今日やること」は4枠までです」を独立した1行で出す。
                       繋げると、上限の文と操作の案内が1つの札に見える。
                     */}
-                    <span className="text-ink-faint text-[11px]">ドラッグで順番変更</span>
+                    <span className="text-ink-faint text-[11px]">上下ボタン・ドラッグで順番変更</span>
                   </div>
-                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => handleDragEnd(group, event)}>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    accessibility={{
+                      announcements: japaneseAnnouncements(group),
+                      screenReaderInstructions: { draggable: '持ち上げるには Space を押し、上下の矢印キーで移動し、Space で置きます。Esc でやめます。' },
+                    }}
+                    onDragEnd={(event) => handleDragEnd(group, event)}
+                  >
                     <SortableContext items={draft[group].map((item) => item.id)} strategy={verticalListSortingStrategy}>
-                      <div className="border-hairline overflow-hidden rounded-[9px] border">
-                        {draft[group].map((item) => {
+                      <div className="border-hairline overflow-hidden rounded-control border">
+                        {draft[group].map((item, index) => {
                           const definition = CARD_DEFINITION_MAP.get(item.id)
                           if (!definition) return null
-                          return <SortableCardRow key={item.id} item={item} definition={definition} onToggle={() => toggle(group, item.id)} />
+                          return (
+                            <SortableCardRow
+                              key={item.id}
+                              item={item}
+                              definition={definition}
+                              canMoveUp={index > 0}
+                              canMoveDown={index < draft[group].length - 1}
+                              onMove={(direction) => handleMove(group, item.id, direction)}
+                              onToggle={() => toggle(group, item.id)}
+                            />
+                          )
                         })}
                       </div>
                     </SortableContext>
                   </DndContext>
                   {group === 'today' ? (
-                    <div className="bg-status-warn-soft text-status-warn-deep mt-3 rounded-control px-3 py-2.5 text-xs leading-relaxed">
+                    <Notice tone="warn" className="mt-3">
                       <p className="font-semibold">「今日やること」は4枠までです</p>
                       <p className="mt-1">5つ目をONにすると、いちばん下のカードが自動でOFFになります。順番を入れ替えて、先に出したい4つを上に置いてください。</p>
-                    </div>
+                    </Notice>
                   ) : null}
                 </section>
               ))}
@@ -456,7 +551,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
 
         <footer className="border-hairline flex items-center justify-center gap-2 border-t px-[22px] py-4">
           <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
-          <Button onClick={() => onApply(draft)} disabled={saving} aria-busy={saving} variant="primary">{saving ? '保存中…' : 'ダッシュボードに反映'}</Button>
+          <Button onClick={() => onApply(draft)} disabled={saving} aria-busy={saving} variant="primary" busy={saving}>ダッシュボードに反映</Button>
         </footer>
       </aside>
     </div>

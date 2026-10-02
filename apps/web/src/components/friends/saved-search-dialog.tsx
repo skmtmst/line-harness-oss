@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { api, type FriendSavedView } from '@/lib/api'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import type { AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
 import {
   conditionsToEditorState,
@@ -12,6 +14,7 @@ import {
   savedSearchParams,
   savedSearchSummary,
 } from '@/components/friends/saved-search-utils'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 「保存した検索」の呼び出し窓（N-039）。
@@ -88,20 +91,35 @@ export default function SavedSearchDialog({
         className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-card"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <h2 id="saved-search-title" className="shrink-0 px-5 pt-5 text-lg font-bold text-ink">保存した検索</h2>
+        <div className="flex shrink-0 items-start justify-between gap-3 px-5 pt-5">
+          <h2 id="saved-search-title" className="text-lg font-bold text-ink">保存した検索</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="閉じる"
+            className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"
+          >
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-1">
         {loading ? <p className="mt-4 text-sm text-ink-faint">読み込み中…</p> : null}
         {error ? (
-          <div className="mt-4 rounded-control bg-status-danger-soft p-3 text-sm text-danger">
-            <p>{error}</p>
-            <button
-              type="button"
-              onClick={() => setReloadKey((key) => key + 1)}
-              className="mt-2 font-semibold text-action underline"
-            >
-              再読み込み
-            </button>
-          </div>
+          <Notice
+            tone="danger"
+            className="mt-4"
+            action={(
+              <button
+                type="button"
+                onClick={() => setReloadKey((key) => key + 1)}
+                className="font-semibold text-action underline"
+              >
+                再読み込み
+              </button>
+            )}
+          >
+            {error}
+          </Notice>
         ) : null}
         {!loading && !error && saved.length > 0 ? (
           <div className="mt-4 space-y-2">
@@ -122,12 +140,11 @@ export default function SavedSearchDialog({
           </div>
         ) : null}
         </div>
-        <div className="mt-4 flex shrink-0 items-center justify-end gap-2 border-t border-divider-soft px-5 py-4">
-          <Button onClick={onClose}>閉じる</Button>
-          {!loading && !error && saved.length === 0 ? (
+        {!loading && !error && saved.length === 0 ? (
+          <div className="mt-4 flex shrink-0 items-center justify-end gap-2 border-t border-divider-soft px-5 py-4">
             <Button variant="primary" onClick={onOpenAdvanced}>詳細条件を設定</Button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </section>
     </div>
   )
@@ -194,8 +211,8 @@ function SavedSearchItem({
         </button>
       ) : null}
       <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-accent">
-          {search.match.total === null ? search.match.error ?? '人数を確認できません' : `${search.match.total.toLocaleString('ja-JP')}人`}
+        <span className="text-xs font-semibold text-ink">
+          {search.match.total === null ? search.match.error ?? '人数を確認できません' : `${formatNumber(search.match.total)}人`}
         </span>
         <Button
           variant="primary"

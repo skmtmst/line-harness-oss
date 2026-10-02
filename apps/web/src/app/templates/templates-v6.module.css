@@ -1,6 +1,10 @@
-.createActions,
-.body {
+.createActions {
   margin-top: 18px;
+}
+
+.body {
+  /* 親の gap-4（16px）で間隔を作るため、ここでは余白を足さない。 */
+  margin-top: 0;
 }
 
 .contentLayout {
@@ -26,47 +30,8 @@
 }
 
 /*
- * U044: 767px 以下は表を1件ずつのカードへ畳む。390px で右端が
- * 画面外へ逃げる表を縮めるより、種類・名前・利用先・更新・操作を
- * 1件ずつの区画に積んだほうが読める。マークアップは表のままにして、
- * 見え方だけ変える（行の詳細を開く操作と検査は同じ DOM で動く）。
+ * ★V7 監査の直し A（`LD96g`）：767px 以下は表を出さず、共通の一覧カード
+ * （`MobileTableCards`・`md:hidden`）に任せる。以前ここにあったCSS畳み込みは、
+ * 名前欄の `max-w-0` が残って名前が消える原因だったので撤去した。
+ * 768px 以上は表のまま（`hidden md:block`）。
  */
-@media (max-width: 767.98px) {
-  /*
-   * css-loader はpureモード（各セレクタにローカルクラスが必須）なので、
-   * `.body`（JSXで styles.body を当て済み）を起点に属性・要素セレクタを
-   * 下へ伸ばす。先頭が属性セレクタだと CssSyntaxError で止まる。
-   */
-  .body [data-template-list] table {
-    min-width: 0;
-  }
-
-  .body [data-template-list] thead {
-    display: none;
-  }
-
-  .body [data-template-list] tbody tr {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    column-gap: 12px;
-    padding: 12px 16px;
-  }
-
-  .body [data-template-list] tbody td {
-    display: block;
-    padding: 2px 0;
-  }
-
-  /* 名前と先読みは1行目を全部使う。 */
-  .body [data-template-list] tbody td:first-child {
-    width: 100%;
-    padding-bottom: 6px;
-  }
-
-  /* 操作は最後の行の右端へ。 */
-  .body [data-template-list] tbody td:last-child {
-    margin-left: auto;
-    padding-top: 6px;
-  }
-}

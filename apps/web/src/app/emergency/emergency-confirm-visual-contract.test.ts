@@ -9,8 +9,8 @@ describe('V6 緊急停止の最終確認 U0BwS', () => {
     // 低い画面ではみ出さないよう、高さ700に上限を併せる(#518 8)。
     expect(page).toContain("style={{ height: 700, maxHeight: 'calc(100vh - 32px)', maxWidth: 720 }}")
     expect(page).toContain('停止前にすでにLINEへ渡したものは取り消せません。')
-    expect(page).toContain('<p className="text-xs font-bold text-ink">理由</p>')
-    expect(page).toContain('<p className="text-xs font-bold text-success">止まらないもの</p>')
+    expect(page).toContain('<p className="text-xs font-medium text-ink">理由</p>')
+    expect(page).toContain('<p className="text-xs font-medium text-success">止まらないもの</p>')
     expect(page).toContain('style={{ width: 280 }}')
   })
 })

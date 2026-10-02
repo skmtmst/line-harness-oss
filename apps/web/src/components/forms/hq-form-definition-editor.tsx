@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { newBlockId, type FormBlock, type FormInputType, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared'
 import type { FormDefinition } from '@/lib/hq-templates-api'
 import BlockEditor, { BLOCK_MENU } from './block-editor'
@@ -9,10 +9,12 @@ import OptionsDialog from './options-dialog'
 import { EMPTY_REFS, type FormRefs } from './form-refs'
 import { normalizeSectionName } from './section-name'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import StickyBar from '@/components/shared/sticky-bar'
+import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import {
   formJumpsInto,
@@ -58,11 +60,16 @@ export default function HqFormDefinitionEditor({
   const [tab, setTab] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [showAddMenu, setShowAddMenu] = useState(false)
+  const addMenuWrapRef = useRef<HTMLDivElement>(null)
   const [showOptions, setShowOptions] = useState(false)
   const [renameSectionIndex, setRenameSectionIndex] = useState<number | null>(null)
   const [renameSectionName, setRenameSectionName] = useState('')
   const [removeSectionIndex, setRemoveSectionIndex] = useState<number | null>(null)
   const [localError, setLocalError] = useState('')
+  // 親から渡る保存の知らせは、画面の中の文で出さず Toast（右下・4秒）へ送る。
+  useEffect(() => {
+    if (notice) notifyToast(notice)
+  }, [notice])
   const undoStack = useRef<FormLayout[]>([])
   const redoStack = useRef<FormLayout[]>([])
 
@@ -200,34 +207,33 @@ export default function HqFormDefinitionEditor({
   }
 
   return <div>
-    {(localError || error) && <Notice className="mb-4" tone="error" message={localError || error} />}
-    {notice && <Notice className="mb-4" tone="success" message={notice} />}
+    {(localError || error) && <Notice className="mb-4" tone="danger" message={localError || error} />}
     <div className="mb-4 grid gap-4 rounded-card border border-hairline bg-canvas p-4 sm:grid-cols-2 xl:grid-cols-4">
       <Field label="フォーム名" htmlFor="hq-form-name" required><TextInput id="hq-form-name" value={value.name} onChange={event => setValue(current => ({ ...current, name: event.target.value }))} /></Field>
       <Field label="公開状態"><p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-sm">配布先へ非公開の下書きとして保存</p></Field>
-      <Field label="回答したときに付けるタグ" htmlFor="hq-form-tag"><SelectField id="hq-form-tag" value={value.onSubmitTagId} onChange={event => setValue(current => ({ ...current, onSubmitTagId: event.target.value }))} options={[{ value: '', label: '— 付けない —' }, ...portableRefs.tags.map(tag => ({ value: tag.id, label: tag.name }))]} /></Field>
+      <Field label="回答したときに付けるタグ" htmlFor="hq-form-tag"><Select aria-label="回答したときに付けるタグ" id="hq-form-tag" value={value.onSubmitTagId} onChange={tagId => setValue(current => ({ ...current, onSubmitTagId: tagId }))} options={[{ value: '', label: '— 付けない —' }, ...portableRefs.tags.map(tag => ({ value: tag.id, label: tag.name }))]} /></Field>
       <Field label="回答用URL"><p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-sm text-ink-faint">配布先で発行</p></Field>
     </div>
     <div className="grid gap-4 xl:grid-cols-3">
-      <section className="xl:sticky xl:top-4 xl:col-span-1 xl:self-start"><h2 className="mb-1 text-xs font-medium text-ink-secondary">お客さまに見える形</h2><FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} /></section>
+      <section className="xl:sticky xl:top-4 xl:col-span-1 xl:self-start"><h2 className="mb-1 text-xs font-semibold text-ink-secondary">お客さまに見える形</h2><FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} /></section>
       <section className="min-w-0 xl:col-span-2">
         <div className="flex flex-wrap items-center gap-1 border-b border-hairline pb-2">
-          <button type="button" aria-pressed={tab === HEADER_TAB} onClick={() => setTab(HEADER_TAB)} className="rounded-control px-3 py-1.5 text-sm aria-pressed:bg-accent-soft aria-pressed:text-accent">共通ヘッダ</button>
-          {layout.sections.map((section, index) => <span key={section.id} className="flex items-center"><button type="button" aria-pressed={tab === index} onClick={() => setTab(index)} onDoubleClick={() => renameSection(index)} className="rounded-control px-3 py-1.5 text-sm aria-pressed:bg-accent-soft aria-pressed:text-accent">{section.name}</button>{tab === index && <><button type="button" onClick={() => duplicateSection(index)} className="px-1 text-xs text-ink-faint">複製</button>{layout.sections.length > 1 && <button type="button" onClick={() => requestRemoveSection(index)} className="px-1 text-xs text-danger">削除</button>}</>}</span>)}
-          <button type="button" onClick={addSection} className="rounded-control px-2 py-1.5 text-sm font-bold text-accent">＋</button>
+          <button type="button" aria-pressed={tab === HEADER_TAB} onClick={() => setTab(HEADER_TAB)} className="rounded-control px-3 py-1.5 text-sm aria-pressed:bg-accent-soft aria-pressed:text-accent-deep">共通ヘッダ</button>
+          {layout.sections.map((section, index) => <span key={section.id} className="flex items-center"><button type="button" aria-pressed={tab === index} onClick={() => setTab(index)} onDoubleClick={() => renameSection(index)} className="rounded-control px-3 py-1.5 text-sm aria-pressed:bg-accent-soft aria-pressed:text-accent-deep">{section.name}</button>{tab === index && <><button type="button" onClick={() => duplicateSection(index)} className="px-1 text-xs text-ink-faint">複製</button>{layout.sections.length > 1 && <button type="button" onClick={() => requestRemoveSection(index)} className="px-1 text-xs text-danger">削除する</button>}</>}</span>)}
+          <button type="button" onClick={addSection} className="rounded-control px-2 py-1.5 text-sm font-bold text-action">＋</button>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 py-2"><span className="text-sm font-bold">ブロック設定</span><div className="flex flex-wrap items-center gap-1">
           <button type="button" onClick={undo} className="rounded-control px-2 py-1 text-xs">元に戻す</button><button type="button" onClick={redo} className="rounded-control px-2 py-1 text-xs">やり直す</button>
           <button type="button" onClick={() => moveBlock(-1)} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs disabled:opacity-40">上に移動</button><button type="button" onClick={() => moveBlock(1)} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs disabled:opacity-40">下に移動</button>
-          <button type="button" onClick={duplicateBlock} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs disabled:opacity-40">複製</button><button type="button" onClick={removeBlock} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs text-danger disabled:opacity-40">削除</button>
-          <div className="relative"><Button type="button" variant="primary" onClick={() => setShowAddMenu(open => !open)}>＋ ブロックを追加（12種）</Button>{showAddMenu && <div className="absolute right-0 z-20 mt-1 w-48 rounded-card border border-hairline bg-canvas py-1 shadow-lg">{BLOCK_MENU.map(item => <button type="button" key={`${item.kind}-${item.type ?? ''}`} onClick={() => addBlock(item.kind, item.type)} className="block w-full px-3 py-1.5 text-left text-sm hover:bg-canvas-sunken">{item.label}</button>)}</div>}</div>
+          <button type="button" onClick={duplicateBlock} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs disabled:opacity-40">複製</button><button type="button" onClick={removeBlock} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs text-danger disabled:opacity-40">削除する</button>
+          <div className="relative" ref={addMenuWrapRef}><Button type="button" variant="primary" aria-expanded={showAddMenu} aria-haspopup="menu" onClick={() => setShowAddMenu(open => !open)}>＋ ブロックを追加する（12種）</Button><ActionMenu open={showAddMenu} ariaLabel="追加するブロック" onClose={() => setShowAddMenu(false)} anchorRef={addMenuWrapRef} items={['飾り', '入力'].flatMap(group => BLOCK_MENU.filter(menu => menu.group === group).map((menu, index) => ({ id: `${menu.kind}-${menu.type ?? ''}`, label: menu.label, sectionBefore: index === 0 ? group : undefined, onSelect: () => addBlock(menu.kind, menu.type) })))} /></div>
           <Button type="button" onClick={() => setShowOptions(true)}>オプション設定</Button>
         </div></div>
         <div className="space-y-3">{blocks.length === 0 ? <p className="rounded-card border border-dashed border-hairline bg-canvas p-8 text-center text-sm text-ink-faint">「ブロックを追加」から作ってください</p> : blocks.map((block, index) => <BlockEditor key={block.id} block={block} index={index} sections={layout.sections} refs={portableRefs} inHeader={tab === HEADER_TAB} selected={block.id === selectedBlockId} onSelect={() => setSelectedBlockId(block.id)} onChange={patch => patchBlock(block.id, patch)} />)}</div>
         <div className="mt-4 rounded-card border border-hairline bg-canvas p-4"><Field label="説明" htmlFor="hq-form-description"><TextArea id="hq-form-description" rows={2} value={value.description} onChange={event => setValue(current => ({ ...current, description: event.target.value }))} /></Field></div>
       </section>
     </div>
-    <StickyBar actions={<div className="flex gap-2"><Button type="button" onClick={onCancel}>やめる</Button><Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '保存中...' : 'フォームを保存'}</Button></div>} />
+    <StickyBar actions={<div className="flex gap-2"><Button type="button" onClick={onCancel}>キャンセル</Button><Button type="button" variant="primary" disabled={saving} onClick={() => void save()} busy={saving} busyLabel="保存中...">フォームを保存する</Button></div>} />
     {showOptions && <OptionsDialog value={layout.options} refs={portableRefs} onChange={(options: FormOptions) => setLayout(previous => ({ ...previous, options }))} onClose={() => setShowOptions(false)} onSave={async () => { await save(); setShowOptions(false) }} />}
     <ConfirmDialog open={renameSectionIndex !== null} title="ページの名前を変更" description="ページ名を入力してください。" confirmLabel="変更する" onCancel={() => { setRenameSectionIndex(null); setRenameSectionName('') }} onConfirm={applySectionName}>
       <Field label="ページの名前" htmlFor="hq-form-section-name"><TextInput id="hq-form-section-name" value={renameSectionName} onChange={event => setRenameSectionName(event.target.value)} /></Field>

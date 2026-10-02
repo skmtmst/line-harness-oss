@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 export type UnsavedLeaveTarget =
   | { kind: 'link'; href: string }
   | { kind: 'history-back' }
+  | { kind: 'action'; run: () => void }
 
 /**
  * 未保存の変更がある間、画面を離れる操作を止める。
@@ -14,17 +15,38 @@ export type UnsavedLeaveTarget =
  * - 左メニュー等の画面内リンク: クリックを捕まえて確認対話を出す
  * - 戻る操作: popstate で元の履歴位置へ戻してから確認対話を出す
  *
- * 保存成功や「保存せずに移動」の確認後は markClean() で dirty を外し、
+ * 保存成功や「保存せずに移る」の確認後は markClean() で dirty を外し、
  * 警告がもう出ないようにする。
  */
-export function useUnsavedGuard(options: { dirty: boolean; busy?: boolean }) {
-  const { dirty, busy = false } = options
+export function useUnsavedGuard(options: {
+  dirty: boolean
+  busy?: boolean
+  /**
+   * 戻る・進むの行き先が「同じ画面の中の移動」かを返す。
+   * 段(pane)の切替だけがURLに出る画面では、戻る・進むは離脱ではない。
+   * true のとき popstate を止めず・確認も出さず、そのまま通す。
+   */
+  samePage?: (destination: URL) => boolean
+  /**
+   * 「保存せずに移る」が確定したあと・実際に移動する直前に呼ぶ。
+   * クエリだけ変わる画面内遷移（コンポーネントがアンマウントされない）でも
+   * 「変更は消えます」と約束した通り、画面の入力を初期状態へ戻せるようにする。
+   */
+  onDiscard?: () => void
+}) {
+  const { dirty, busy = false, samePage, onDiscard } = options
   const router = useRouter()
   const [leaveTarget, setLeaveTarget] = useState<UnsavedLeaveTarget | null>(null)
   const dirtyRef = useRef(dirty)
   dirtyRef.current = dirty
+  const samePageRef = useRef(samePage)
+  samePageRef.current = samePage
+  const onDiscardRef = useRef(onDiscard)
+  onDiscardRef.current = onDiscard
   const allowHistoryLeaveRef = useRef(false)
   const skipRestoredPopRef = useRef(false)
+  /* 公開成功など「離れてよい」と決まった遷移の直前に立てる解除印。 */
+  const disarmedRef = useRef(false)
 
   /*
    * ブラウザ再読込・タブ終了だけは画面内のDialogを出せないので、標準の確認を
@@ -33,7 +55,7 @@ export function useUnsavedGuard(options: { dirty: boolean; busy?: boolean }) {
   useEffect(() => {
     if (!dirty) return
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!dirtyRef.current) return
+      if (disarmedRef.current || !dirtyRef.current) return
       event.preventDefault()
       event.returnValue = ''
     }
@@ -49,6 +71,7 @@ export function useUnsavedGuard(options: { dirty: boolean; busy?: boolean }) {
   useEffect(() => {
     if (!dirty) return
     const onDocumentClick = (event: MouseEvent) => {
+      if (disarmedRef.current) return
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
       const target = event.target as { closest?: (selector: string) => Element | null } | null
       const anchor = target?.closest?.('a[href]') as HTMLAnchorElement | null
@@ -56,6 +79,9 @@ export function useUnsavedGuard(options: { dirty: boolean; busy?: boolean }) {
       const destination = new URL(anchor.href, window.location.href)
       const current = new URL(window.location.href)
       if (destination.origin !== current.origin || destination.href === current.href) return
+      // パスとクエリが同じで hash だけが変わる移動は画面内の見出しジャンプ。
+      // 画面を離れないので確認を出さない（離すと「#見出し」リンクが全部確認になる）。
+      if (destination.pathname === current.pathname && destination.search === current.search) return
       event.preventDefault()
       if (!busy) setLeaveTarget({ kind: 'link', href: `${destination.pathname}${destination.search}${destination.hash}` })
     }
@@ -70,9 +96,11 @@ export function useUnsavedGuard(options: { dirty: boolean; busy?: boolean }) {
   useEffect(() => {
     if (!dirty) {
       skipRestoredPopRef.current = false
+      disarmedRef.current = false
       return
     }
     const onPopState = () => {
+      if (disarmedRef.current) return
       if (allowHistoryLeaveRef.current) {
         allowHistoryLeaveRef.current = false
         return
@@ -82,6 +110,11 @@ export function useUnsavedGuard(options: { dirty: boolean; busy?: boolean }) {
         skipRestoredPopRef.current = false
         return
       }
+      /*
+       * paneの切替だけが変わる、同じ画面の中の戻る・進むは離脱ではない。
+       * ここで止めると「同じ画面に居たまま」なのに離脱確認が出る。
+       */
+      if (samePageRef.current?.(new URL(window.location.href))) return
       skipRestoredPopRef.current = true
       window.history.go(1)
       if (!busy) setLeaveTarget({ kind: 'history-back' })
@@ -90,13 +123,29 @@ export function useUnsavedGuard(options: { dirty: boolean; busy?: boolean }) {
     return () => window.removeEventListener('popstate', onPopState)
   }, [dirty, busy])
 
-  /** 確認で「保存せずに移動」が選ばれたとき、予定していた移動を実行する。 */
+  /**
+   * 確認で「保存せずに移る」が選ばれたとき、予定していた移動を実行する。
+   *
+   * `onDiscard` は移動の直前に呼ぶ。「変更は消えます」と約束したあと、
+   * クエリだけ変わる画面内遷移（コンポーネントがアンマウントされない）でも
+   * 画面の入力を初期状態へ戻せるようにするため。
+   */
   const confirmLeave = useCallback(() => {
     if (!leaveTarget || busy) return
     setLeaveTarget(null)
+    onDiscardRef.current?.()
     if (leaveTarget.kind === 'history-back') {
       allowHistoryLeaveRef.current = true
       window.history.back()
+      return
+    }
+    if (leaveTarget.kind === 'action') {
+      /*
+       * 保留していた操作（一覧へ戻るボタン等の router.push）を再実行する。
+       * 実行前に腕を下ろしておかないと、操作の中の遷移が再度止まる。
+       */
+      disarmedRef.current = true
+      leaveTarget.run()
       return
     }
     router.push(leaveTarget.href)
@@ -104,5 +153,28 @@ export function useUnsavedGuard(options: { dirty: boolean; busy?: boolean }) {
 
   const cancelLeave = useCallback(() => setLeaveTarget(null), [])
 
-  return { leaveTarget, confirmLeave, cancelLeave }
+  /*
+   * リンクではない離れる操作（`<button onClick>` からの router.push や、
+   * 画面内で閉じる操作）にも同じ確認を挟む入口。dirty でなければ操作を
+   * そのまま実行し、dirty なら操作を保留して確認対話を出す。
+   */
+  const guarded = useCallback((action: () => void) => {
+    if (disarmedRef.current || !dirtyRef.current) {
+      action()
+      return
+    }
+    if (!busy) setLeaveTarget({ kind: 'action', run: action })
+  }, [busy])
+
+  /*
+   * 公開成功のあとの画面遷移のように「未保存でも警告せず離れてよい」と
+   * 決まった遷移の直前に呼ぶ。beforeunload・戻る・画面内リンクのどれも
+   * もう止めない。画面に留まって dirty が降りたら自動で腕を戻す。
+   */
+  const disarm = useCallback(() => {
+    disarmedRef.current = true
+    setLeaveTarget(null)
+  }, [])
+
+  return { leaveTarget, confirmLeave, cancelLeave, disarm, guarded }
 }

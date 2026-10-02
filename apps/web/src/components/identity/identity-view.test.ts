@@ -65,6 +65,16 @@ describe('失敗の言い換え', () => {
     expect(forbidden.title).toBe('この候補を見る権限がありません')
   })
 
+  /*
+   * M014：重複候補はオーナー・管理者だけが開ける（権限表に担当者の鍵は無い）。
+   * 付けられない鍵への「追加を依頼」ではなく、開いてもらう案内にする。
+   */
+  it('権限不足は「開いてもらう」案内にし、付与の約束をしない（M014）', () => {
+    const forbidden = failureOf({ status: 403, code: 'FORBIDDEN' })
+    expect(forbidden.description).toContain('オーナーか管理者の方に開いてもらってください')
+    expect(forbidden.description).not.toContain('追加を依頼')
+  })
+
   it('版が競合したら読み直しを促す', () => {
     const stale = failureOf({ status: 409, code: 'STALE_CANDIDATE' })
     expect(stale.kind).toBe('stale')

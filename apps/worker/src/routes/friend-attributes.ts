@@ -3,7 +3,8 @@ import {
   getSupportMarksWithUsage,
   getSupportMarkArchiveImpact,
   getSupportMarkById,
-  createSupportMarkWithAutomationRules,
+  createSupportMarkIdempotent,
+  SupportMarkCreateError,
   updateSupportMark,
   reorderSupportMarks,
   replaceAndArchiveSupportMark,
@@ -36,6 +37,7 @@ import {
   getFolderById,
   createFolder,
   updateFolder,
+  swapFolderOrder,
   deleteFolder,
   isFolderKind,
   getWebinarFolderCounts,
@@ -60,10 +62,11 @@ import {
 } from '../services/saved-search-insights.js';
 import {
   archiveSupportMarkAutomationRule,
-  createSupportMarkAutomationRule,
+  createSupportMarkAutomationRuleIdempotent,
   listSupportMarkAutomationRules,
   listSupportMarkAutomationRulesForAccount,
   SUPPORT_MARK_RULE_EVENTS,
+  SupportMarkRuleCreateError,
   updateSupportMarkAutomationRule,
   validateSupportMarkAutomationRuleInput,
   type SaveSupportMarkAutomationRule,
@@ -345,6 +348,14 @@ function serializeFolder(row: Folder, count?: number, itemCount?: number) {
 /** 色は #RRGGBB だけ許す。名前付きの色を混ぜると、画面での見た目が揃わない。 */
 const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
+/**
+ * 対応マーク名の長さ上限（D030）。
+ *
+ * 情報欄の選択肢ラベルと同じ100文字。一覧・詳細・配信設定での表示崩れと、
+ * DB容量の無制限消費を防ぐ。作成（POST）と編集（PATCH）で同じ値を使う。
+ */
+const SUPPORT_MARK_NAME_MAX = 100;
+
 function supportMarkRuleInput(body: Record<string, unknown>): SaveSupportMarkAutomationRule | null {
   const event = body.event;
   const priority = Number(body.priority ?? 0);
@@ -418,9 +429,22 @@ friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), async
   try {
     const scope = await supportMarkAccess(c);
     if (scope instanceof Response) return scope;
+    /*
+     * R512: 応答だけ失った再試行で二重に作らないため、要求キーを必須にする。
+     * 同じキー・同じ内容の再送は保存済みのマークを返し、同じキーに
+     * 異なる内容が来たら作らず409で止める（保管の口と同じ約束）。
+     */
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
+    if (!idempotencyKey || idempotencyKey.length > 128) {
+      return c.json({ success: false, error: 'Idempotency-Keyを指定してください' }, 400);
+    }
     const body = await c.req.json<Record<string, unknown>>();
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'マークの名前を入力してください' }, 400);
+    // D030: 長さの上限が無く、長い名前が一覧や配信設定の表示を壊す。作成と編集で同じ上限にする。
+    if (name.length > SUPPORT_MARK_NAME_MAX) {
+      return c.json({ success: false, error: `マークの名前は${SUPPORT_MARK_NAME_MAX}文字以内で入力してください` }, 400);
+    }
     if (body.color !== undefined && !COLOR_PATTERN.test(String(body.color))) {
       return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
     }
@@ -444,16 +468,30 @@ friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), async
     } catch {
       return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 422);
     }
-    const mark = await createSupportMarkWithAutomationRules(c.env.DB, scope, {
+    const { mark, replayed } = await createSupportMarkIdempotent(c.env.DB, scope, {
       name,
       color: body.color ? String(body.color) : undefined,
       isDefault: body.isDefault === true,
       autoOnInbound: body.autoOnInbound === true,
       displayOrder,
-    }, c.get('staff').id, automationRules as SaveSupportMarkAutomationRule[]);
-    const createdRules = await listSupportMarkAutomationRules(c.env.DB, scope, mark.id) ?? [];
-    return c.json({ success: true, data: serializeMark(mark, createdRules) }, 201);
+    }, c.get('staff').id, automationRules as SaveSupportMarkAutomationRule[], idempotencyKey);
+    /*
+     * D028: 書き込みは上の確定で終わっている。読み戻しだけ失敗したときに
+     * 500で「失敗」と見せると、利用者が送り直して同名マークが増える。
+     * 読めなくても作成自体は成功として返し、ルールは次の一覧読み直しで見える。
+     */
+    let createdRules: Awaited<ReturnType<typeof listSupportMarkAutomationRules>> = [];
+    try {
+      createdRules = await listSupportMarkAutomationRules(c.env.DB, scope, mark.id) ?? [];
+    } catch (err) {
+      console.error('POST /api/support-marks rules reload failed, returning mark only:', err);
+    }
+    // 再送で保存済みを返したときは200、新しく作ったときは201。
+    return c.json({ success: true, data: serializeMark(mark, createdRules) }, replayed ? 200 : 201);
   } catch (err) {
+    if (err instanceof SupportMarkCreateError) {
+      return c.json({ success: false, code: err.code, error: err.message }, 409);
+    }
     console.error('POST /api/support-marks error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -500,6 +538,40 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
     if (body.color !== undefined && !COLOR_PATTERN.test(String(body.color))) {
       return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
     }
+    /*
+     * D032: 作成（POST）と同じ検査を編集でもする。空名・長い名前・
+     * 範囲外の順序は400で止め、型違いを500（DBの束縛失敗）にしない。
+     */
+    let name: string | undefined;
+    if (body.name !== undefined) {
+      if (typeof body.name !== 'string') {
+        return c.json({ success: false, error: 'マークの名前を入力してください' }, 400);
+      }
+      name = body.name.trim();
+      if (!name) return c.json({ success: false, error: 'マークの名前を入力してください' }, 400);
+      if (name.length > SUPPORT_MARK_NAME_MAX) {
+        return c.json({ success: false, error: `マークの名前は${SUPPORT_MARK_NAME_MAX}文字以内で入力してください` }, 400);
+      }
+    }
+    let displayOrder: number | undefined;
+    if (body.displayOrder !== undefined) {
+      const order = Number(body.displayOrder);
+      if (!Number.isInteger(order) || order < 0 || order > 10_000) {
+        return c.json({ success: false, error: '並び順は0〜10000の整数で指定してください' }, 400);
+      }
+      displayOrder = order;
+    }
+    /*
+     * R513: 読んだときの版を送り、変わっていたら409で止める。
+     * 版が無い古い呼び出しは従来どおり上書きする（後方互換）。
+     */
+    let expectedVersion: number | undefined;
+    if (body.expectedVersion !== undefined) {
+      expectedVersion = Number(body.expectedVersion);
+      if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+        return c.json({ success: false, error: '最新の版を指定してください' }, 400);
+      }
+    }
     // 既定を外す操作は止める。既定が1つも無いと、新しい友だちに何も付かない。
     // 別のマークを既定にすれば、こちらは自動で外れる。
     if (body.isDefault === false && existing.is_default === 1) {
@@ -527,13 +599,23 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
       }
     }
     const mark = await updateSupportMark(c.env.DB, id, scope, {
-      name: body.name === undefined ? undefined : String(body.name).trim(),
+      name,
       color: body.color === undefined ? undefined : String(body.color),
       isDefault: body.isDefault === undefined ? undefined : body.isDefault === true,
       autoOnInbound: body.autoOnInbound === undefined ? undefined : body.autoOnInbound === true,
-      displayOrder: body.displayOrder === undefined ? undefined : Number(body.displayOrder),
+      displayOrder,
       actorId: c.get('staff').id,
+      expectedVersion,
     });
+    if (mark === 'conflict') {
+      const latest = await getSupportMarkById(c.env.DB, id, scope);
+      return c.json({
+        success: false,
+        error: 'ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。',
+        code: 'SUPPORT_MARK_VERSION_CONFLICT',
+        data: latest ? { latest: serializeMark(latest) } : undefined,
+      }, 409);
+    }
     return c.json({ success: true, data: serializeMark(mark!) });
   } catch (err) {
     console.error('PATCH /api/support-marks/:id error:', err);
@@ -565,14 +647,27 @@ friendAttributes.post(
     try {
       const scope = await supportMarkAccess(c);
       if (scope instanceof Response) return scope;
+      /*
+       * D034: 応答だけ失った再試行で二重に作らないため、要求キーを必須にする。
+       * 同じキー・同じ内容の再送は保存済みのルールを返し、同じキーに
+       * 異なる内容が来たら作らず409で止める（マーク作成のR512と同じ約束）。
+       */
+      const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
+      if (!idempotencyKey || idempotencyKey.length > 128) {
+        return c.json({ success: false, error: 'Idempotency-Keyを指定してください' }, 400);
+      }
       const input = supportMarkRuleInput(await c.req.json<Record<string, unknown>>());
       if (!input) return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 400);
-      const rule = await createSupportMarkAutomationRule(
-        c.env.DB, scope, c.req.param('id'), c.get('staff').id, input,
+      const created = await createSupportMarkAutomationRuleIdempotent(
+        c.env.DB, scope, c.req.param('id'), c.get('staff').id, input, idempotencyKey,
       );
-      if (!rule) return c.json({ success: false, error: '対応マークが見つかりません' }, 404);
-      return c.json({ success: true, data: rule }, 201);
+      if (!created) return c.json({ success: false, error: '対応マークが見つかりません' }, 404);
+      // 再送で保存済みを返したときは200、新しく作ったときは201。
+      return c.json({ success: true, data: created.rule }, created.replayed ? 200 : 201);
     } catch (err) {
+      if (err instanceof SupportMarkRuleCreateError) {
+        return c.json({ success: false, code: err.code, error: err.message }, 409);
+      }
       const reason = err instanceof Error ? err.message : '';
       if (reason.startsWith('rule_') || reason === 'manual_protection_invalid') {
         return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 422);
@@ -699,16 +794,22 @@ friendAttributes.post(
         return c.json({ success: false, error: 'Idempotency-Keyを指定してください' }, 400);
       }
       const body = await c.req.json<Record<string, unknown>>();
-      const replacementMarkId = typeof body.replacementMarkId === 'string'
+      const replacementRaw = typeof body.replacementMarkId === 'string'
         ? body.replacementMarkId.trim()
         : '';
+      /*
+       * R180: 使っている友だちが0人のときは置換先なしで保管できる。
+       * 空の置換先はここでは null へ倒し、0人かどうかの判定は
+       * `archiveSupportMarkWithReplacement` が最新の実値で行う。
+       */
+      const replacementMarkId = replacementRaw === '' ? null : replacementRaw;
       const impactRevision = typeof body.impactRevision === 'string'
         ? body.impactRevision.trim()
         : '';
       const expectedVersion = Number(body.expectedVersion);
-      if (!replacementMarkId || !impactRevision
+      if (!impactRevision
         || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
-        return c.json({ success: false, error: '置換先・確認版・現在版を指定してください' }, 400);
+        return c.json({ success: false, error: '確認版・現在版を指定してください' }, 400);
       }
       const result = await archiveSupportMarkWithReplacement(c.env.DB, scope, {
         markId: c.req.param('id'),
@@ -718,7 +819,9 @@ friendAttributes.post(
         idempotencyKey,
         actorId: c.get('staff').id,
       });
-      const replacement = await getSupportMarkById(c.env.DB, replacementMarkId, scope);
+      const replacement = replacementMarkId === null
+        ? null
+        : await getSupportMarkById(c.env.DB, replacementMarkId, scope);
       return c.json({
         success: true,
         data: {
@@ -1486,13 +1589,13 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'フォルダ名を入力してください' }, 400);
 
-    const accountId = body.kind === 'webinar' || body.kind === 'tag' || body.kind === 'template'
+    const accountId = body.kind === 'webinar' || body.kind === 'tag' || body.kind === 'template' || body.kind === 'form'
       ? (typeof body.accountId === 'string' ? body.accountId.trim() : '')
       : '';
     // テンプレートのフォルダはアカウント単位（N-147）。accountId なしで作れるのは
     // 全アカウントを見られる人だけ（タグと同じ決まり）。画面は必ず選択中の
-    // アカウントを送る。
-    if ((body.kind === 'tag' || body.kind === 'template') && !accountId) {
+    // アカウントを送る。回答フォームの箱（R25）も同じく選択中のアカウントに付ける。
+    if ((body.kind === 'tag' || body.kind === 'template' || body.kind === 'form') && !accountId) {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'account_id_required' }, 400);
     }
@@ -1604,6 +1707,46 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
     return c.json({ success: true, data: serializeFolder(folder!) });
   } catch (err) {
     console.error('PATCH /api/folders/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/*
+ * V6R-S2-c: 隣り合う2つのフォルダの並びを、1回で入れ替える。
+ *
+ * 以前は画面が PATCH を2回送っていた。1回目だけ成功すると同じ番号のフォルダが
+ * 2つ残り、番号が同じ2つは入れ替えても並びが変わらなかった。
+ * 同じ種類・同じアカウント・同じ親のフォルダ同士だけを受け付ける。
+ */
+friendAttributes.post('/api/folders/:id/swap-order', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+    const withId = typeof body.withId === 'string' ? body.withId.trim() : '';
+    if (!withId || withId === id) {
+      return c.json({ success: false, error: '入れ替える相手のフォルダを指定してください' }, 400);
+    }
+    const [a, b] = await Promise.all([getFolderById(c.env.DB, id), getFolderById(c.env.DB, withId)]);
+    if (!a || !b) return c.json({ success: false, error: 'Not found' }, 404);
+    const requested = typeof body.accountId === 'string' ? body.accountId.trim() : c.req.query('account_id')?.trim();
+    for (const folder of [a, b]) {
+      const access = await folderBoundary(c, folder, requested);
+      if (access) return access;
+    }
+    if (a.kind === 'webinar') {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!requested) return c.json({ success: false, error: 'account_id_required' }, 400);
+      if (!scope.allowedAccountIds.includes(requested) || a.account_id !== requested) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+    }
+    if (a.kind !== b.kind || (a.account_id ?? null) !== (b.account_id ?? null) || (a.parent_id ?? null) !== (b.parent_id ?? null)) {
+      return c.json({ success: false, error: '同じ場所のフォルダだけ並べ替えられます' }, 400);
+    }
+    await swapFolderOrder(c.env.DB, a, b);
+    return c.json({ success: true, data: { swapped: [id, withId] } });
+  } catch (err) {
+    console.error('POST /api/folders/:id/swap-order error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

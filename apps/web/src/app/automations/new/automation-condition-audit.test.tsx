@@ -28,6 +28,24 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 // 権限フックは happy-dom の localStorage を読むため、固定で通す。
 vi.mock('@/components/automations/use-common-action-permission', () => ({ useCanManageCommonActions: () => true }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の条件の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
@@ -168,7 +186,17 @@ async function fillMinimum(el: HTMLElement): Promise<void> {
 
 /** 条件部品で「名前に『田中』を含む」を組み立てる。 */
 async function addNameCondition(el: HTMLElement): Promise<void> {
-  await clickButton(el, '名前')
+  // m22c: 札ボタンではなく検索できる足し口（Combobox）で足す。
+  const picker = el.querySelector('input[aria-label="追加する条件を選ぶ"]') as HTMLInputElement
+  expect(picker, '条件の足し口が出ていない').toBeTruthy()
+  await act(async () => { picker.focus() })
+  await typeText(picker, '名前')
+  await act(async () => {
+    picker.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+  })
+  await act(async () => {
+    picker.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  })
   const input = el.querySelector('input[aria-label="名前に含む文字"]') as HTMLInputElement
   expect(input, '名前の条件の入力欄が出ていない').toBeTruthy()
   await typeText(input, '田中')
@@ -185,7 +213,7 @@ describe('AUTOMATION-02/04: 条件は保存する形のまま要約へ出る', (
     expect(el.textContent).toContain('名前に「田中」を含む人')
     expect(el.textContent).not.toContain('条件なし')
 
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await act(async () => { await drainMicrotasks() })
 
     // A04: 計算側（buildSegmentWhere）が読める { text, targets } の形で送る。
@@ -229,7 +257,7 @@ describe('AUTOMATION-02/04: 条件は保存する形のまま要約へ出る', (
 
     // 読めない条件は黙って消さない。理由を出して、保存を止める。
     expect(el.textContent).toContain('保存されていた条件は読めませんでした')
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await act(async () => { await drainMicrotasks() })
     expect(el.textContent).toContain('条件を付け直してください')
     expect(mockUpdate).not.toHaveBeenCalled()
@@ -238,7 +266,7 @@ describe('AUTOMATION-02/04: 条件は保存する形のまま要約へ出る', (
     await clickButton(el, '以前の条件を外して付け直す')
     expect(el.textContent).not.toContain('保存されていた条件は読めませんでした')
 
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await act(async () => { await drainMicrotasks() })
     // 条件を外す判断をしたあとなので、空の条件として保存できる。
     expect(mockUpdate).toHaveBeenCalledWith(
@@ -253,12 +281,12 @@ describe('AUTOMATION-03: 人数の確認は保存とは別の成否', () => {
     mockPreview.mockRejectedValue(new Error('server error'))
     const el = await mountPage()
     await fillMinimum(el)
-    await clickButton(el, '下書きに保存')
+    await clickButton(el, '下書きを保存する')
     await act(async () => { await drainMicrotasks() })
 
     // 保存は済んでいる。失敗しているのは人数の確認だけ。
     expect(el.textContent).toContain('下書きに保存しました')
-    expect(el.textContent).toContain('人数の確認に失敗しました')
+    expect(el.textContent).toContain('人数の確認に失敗しました。通信を確かめて、もう一度お試しください。')
     expect(el.textContent).not.toContain('保存できませんでした')
     expect(el.textContent).toContain('人数を数えられませんでした。下書きは保存されています。')
 

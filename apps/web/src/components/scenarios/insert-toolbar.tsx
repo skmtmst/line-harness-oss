@@ -18,6 +18,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { scenarioReferenceData } from './scenario-reference-data'
+import DateField from '@/components/shared/date-field'
+import MenuPortal from '@/components/shared/menu-portal'
+import Button from '@/components/shared/button'
 
 /** 日付の書き方。worker の interpolation-date.ts と同じ並び。 */
 const DATE_FORMATS: { token: string; label: string; example: string }[] = [
@@ -56,7 +59,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
   const [fields, setFields] = useState<Option[]>([])
   const [vars, setVars] = useState<Option[]>([])
   const [targetDate, setTargetDate] = useState('')
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -81,15 +84,8 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     })()
   }, [selectedAccountId, fieldsEnabled, varsEnabled])
 
-  // 外を押したら閉じる。開いたままだと下の入力欄が押せない。
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(null)
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [open])
+  // 外を押したら閉じる扱いは MenuPortal に任せる（箱の中の押しで閉じない）。
+  // 開くボタンの押し直しはトグルになる。
 
   /**
    * カーソルの位置に入れる。
@@ -117,62 +113,65 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
   }
 
   const menuButton = (key: string, label: string, token?: string) => (
-    <button
-      type="button"
-      onClick={() => token ? insert(token) : setOpen(open === key ? null : key)}
-      aria-expanded={open === key}
-      className={`border-hairline rounded-control h-8 border px-2.5 text-xs transition-colors ${
-        open === key ? 'bg-accent-soft text-accent border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
-      }`}
-    >
+    <Button variant="secondary" className={(`border-hairline rounded-control h-8 border px-2.5 text-xs transition-colors ${
+        open === key ? 'bg-accent-soft text-accent-deep border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
+      }`) + ' whitespace-normal'} type="button" ref={(element) => {
+        buttonRefs.current[key] = element
+      }} onClick={() => token ? insert(token) : setOpen(open === key ? null : key)} aria-expanded={open === key}>
       {label}
-    </button>
+    </Button>
   )
 
-  const list = (items: Option[], empty: string) => (
-    <div className="border-hairline rounded-card absolute z-20 mt-1 max-h-64 w-64 overflow-y-auto border bg-white shadow-lg">
-      {items.length === 0 ? (
-        <p className="text-ink-faint px-3 py-4 text-center text-xs">{empty}</p>
-      ) : (
-        items.map((o) => (
-          <button
-            key={o.token}
-            type="button"
-            onClick={() => insert(o.token)}
-            className="hover:bg-canvas-sunken block w-full px-3 py-2 text-left text-xs"
-          >
-            <span className="text-ink block">{o.label}</span>
-            {o.hint && <span className="text-ink-faint block">{o.hint}</span>}
-          </button>
-        ))
-      )}
-    </div>
+  const list = (menuKey: string, items: Option[], empty: string) => (
+    <MenuPortal
+      open={open === menuKey}
+      align="start"
+      getAnchor={() => buttonRefs.current[menuKey] ?? null}
+      onClose={() => setOpen(null)}
+    >
+      <div
+        className="border-hairline rounded-card bg-canvas max-h-64 w-64 overflow-y-auto border shadow-float"
+        // 最上層では absolute 指定を無効にする（位置は器が決める）。
+        style={{ position: 'static' }}
+      >
+        {items.length === 0 ? (
+          <p className="text-ink-faint px-3 py-4 text-center text-xs">{empty}</p>
+        ) : (
+          items.map((o) => (
+            <button
+              key={o.token}
+              type="button"
+              onClick={() => insert(o.token)}
+              className="hover:bg-canvas-sunken block w-full px-3 py-2 text-left text-xs"
+            >
+              <span className="text-ink block">{o.label}</span>
+              {o.hint && <span className="text-ink-faint block">{o.hint}</span>}
+            </button>
+          ))
+        )}
+      </div>
+    </MenuPortal>
   )
 
   return (
-    <div ref={wrapRef} className="relative flex flex-wrap items-center gap-1.5">
+    <div className="relative flex flex-wrap items-center gap-1.5">
       <span className="text-ink-faint text-xs">差し込み</span>
 
-      <button
-        type="button"
-        onClick={() => insert('{{name}}')}
-        className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-8 border px-2.5 text-xs"
-      >
+      <Button variant="secondary" className="text-ink-secondary h-8 px-2.5 text-xs whitespace-normal" type="button" onClick={() => insert('{{name}}')}>
         名前
-      </button>
+      </Button>
 
       {fieldsEnabled && (
         <div className="relative">
           {menuButton('field', '友だち情報')}
-          {open === 'field' &&
-            list(fields, '友だち情報欄がまだありません')}
+          {list('field', fields, '友だち情報欄がまだありません')}
         </div>
       )}
 
       {varsEnabled && (
         <div className="relative">
           {menuButton('var', '共通情報')}
-          {open === 'var' && list(vars, '共通情報がまだありません')}
+          {list('var', vars, '共通情報がまだありません')}
         </div>
       )}
 
@@ -180,53 +179,52 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
 
       <div className="relative">
         {menuButton('date', '配信日')}
-        {open === 'date' &&
-          list(
-            DATE_FORMATS.map((f) => ({ token: f.token, label: f.label, hint: f.example })),
-            '',
-          )}
+        {list(
+          'date',
+          DATE_FORMATS.map((f) => ({ token: f.token, label: f.label, hint: f.example })),
+          '',
+        )}
       </div>
 
       <div className="relative">
         {menuButton('other', 'その他')}
-        {open === 'other' && (
-          <div className="border-hairline rounded-card absolute z-20 mt-1 w-72 border bg-white p-3 shadow-lg">
-            <p className="text-ink text-xs font-bold">目標日までの日数</p>
+        <MenuPortal
+          open={open === 'other'}
+          align="start"
+          getAnchor={() => buttonRefs.current.other ?? null}
+          onClose={() => setOpen(null)}
+        >
+          <div
+            className="border-hairline rounded-card bg-canvas w-72 border p-3 shadow-float"
+            // 最上層では absolute 指定を無効にする（位置は器が決める）。
+            style={{ position: 'static' }}
+          >
+            <p className="text-ink text-xs font-medium">目標日までの日数</p>
             <p className="text-ink-faint mt-0.5 mb-2 text-xs leading-relaxed">
               「あと3日」のように出ます。配信のたびに数え直すので、書き換えは要りません。
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="date"
+              <DateField
                 value={targetDate}
-                onChange={(e) => setTargetDate(e.target.value)}
-                className="border-hairline rounded-control text-ink h-8 min-w-0 flex-1 border px-2 text-xs"
+                onChange={setTargetDate}
+                aria-label="目標日"
+                className="min-w-0 flex-1"
               />
-              <button
-                type="button"
-                disabled={!targetDate}
-                onClick={() => insert(`{{days_until:${targetDate}}}`)}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-8 shrink-0 border px-3 text-xs disabled:opacity-40"
-              >
+              <Button variant="secondary" className="text-ink-secondary h-8 shrink-0 px-3 text-xs whitespace-normal" type="button" disabled={!targetDate} onClick={() => insert(`{{days_until:${targetDate}}}`)}>
                 入れる
-              </button>
+              </Button>
             </div>
 
-            <p className="text-ink text-xs font-bold mt-3">配信日から何日後かの日付</p>
+            <p className="text-ink text-xs font-medium mt-3">配信日から何日後かの日付</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {[1, 3, 7, 14, 30].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => insert(`{{date+${n}}}`)}
-                  className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-8 border px-2.5 text-xs"
-                >
+                <Button variant="secondary" className="text-ink-secondary h-8 px-2.5 text-xs whitespace-normal" key={n} type="button" onClick={() => insert(`{{date+${n}}}`)}>
                   {n}日後
-                </button>
+                </Button>
               ))}
             </div>
           </div>
-        )}
+        </MenuPortal>
       </div>
     </div>
   )

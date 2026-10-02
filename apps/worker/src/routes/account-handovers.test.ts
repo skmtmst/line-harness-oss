@@ -27,6 +27,15 @@ const db = {
   markExecuting: vi.fn(),
   completeHandover: vi.fn(),
   cancelHandover: vi.fn(),
+  rollbackHandover: vi.fn(),
+  // 実物と同じ形で期限を返す（完了+7日。未完了は null）。
+  rollbackDeadlineOf: (row: { completed_at: string | null }) =>
+    row.completed_at
+      ? new Date(new Date(row.completed_at).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      : null,
+  // step-up の台帳。テストでは x-step-up-token 付きなら通す。
+  consumeStepUpGrant: vi.fn(),
+  getAdminSessionByTokenHash: vi.fn(),
 };
 vi.mock('@line-crm/db', () => db);
 
@@ -46,10 +55,10 @@ const bind = vi.fn((..._values: unknown[]) => ({
 const prepare = vi.fn((_sql: string) => ({ bind }));
 const env = { DB: { prepare } as unknown as D1Database };
 
-function makeApp() {
+function makeApp(role: 'owner' | 'staff' = 'owner') {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'u-1', name: 'テスト', role: 'owner', readOnly: false });
+    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false });
     return next();
   });
   app.route('/', accountHandovers);
@@ -60,6 +69,19 @@ function post(path: string, body: unknown) {
   return new Request(`https://example.com${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+// 本実行・切り戻しは本人確認（step-up）が要る。grant は1回限りなので、
+// リクエストごとに新しいトークン値を付ける。
+function stepUpPost(path: string, body: unknown) {
+  return new Request(`https://example.com${path}`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-step-up-token': `grant-${crypto.randomUUID()}`,
+    },
     body: JSON.stringify(body),
   });
 }
@@ -104,6 +126,8 @@ beforeEach(() => {
   db.listDecisions.mockResolvedValue([]);
   db.unresolvedReviewCount.mockResolvedValue(0);
   db.savePreview.mockResolvedValue({ ok: true });
+  db.consumeStepUpGrant.mockResolvedValue(true);
+  db.getAdminSessionByTokenHash.mockResolvedValue(null);
   db.countsAddUp.mockImplementation(
     (counts: Record<string, number>, total: number) =>
       counts.auto + counts.review + counts.unmatched + counts.lookalike === total,
@@ -147,6 +171,7 @@ describe('段3 事前確認', () => {
     expect(db.savePreview).toHaveBeenCalledWith(expect.anything(), 'ho-1', {
       sourceFriendTotal: 100,
       counts: { auto: 60, review: 20, unmatched: 15, lookalike: 5 },
+      declaredFriendTotal: null,
     });
   });
 
@@ -312,7 +337,7 @@ describe('段5 本実行', () => {
   it('要確認がのこっていたら 422 で止め、件数を言う', async () => {
     db.getHandoverById.mockResolvedValue({ ...HANDOVER, source_friend_total: 100, review_count: 5 });
     db.unresolvedReviewCount.mockResolvedValue(3);
-    const res = await makeApp().fetch(post('/api/account-handovers/ho-1/execute', {}), env);
+    const res = await makeApp().fetch(stepUpPost('/api/account-handovers/ho-1/execute', {}), env);
     expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({
       error: '要確認が3件のこっています。全部決めてから実行してください',
@@ -322,7 +347,7 @@ describe('段5 本実行', () => {
 
   it('事前確認をしていなければ止める', async () => {
     db.getHandoverById.mockResolvedValue({ ...HANDOVER, source_friend_total: null });
-    const res = await makeApp().fetch(post('/api/account-handovers/ho-1/execute', {}), env);
+    const res = await makeApp().fetch(stepUpPost('/api/account-handovers/ho-1/execute', {}), env);
     expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({ error: '先に事前確認をしてください' });
   });
@@ -333,7 +358,7 @@ describe('段5 本実行', () => {
       status: 'completed',
       source_friend_total: 10,
     });
-    const res = await makeApp().fetch(post('/api/account-handovers/ho-1/execute', {}), env);
+    const res = await makeApp().fetch(stepUpPost('/api/account-handovers/ho-1/execute', {}), env);
     expect(res.status).toBe(409);
   });
 
@@ -348,7 +373,7 @@ describe('段5 本実行', () => {
       { from_friend_id: 'f-2', decision: 'new', to_friend_id: null },
       { from_friend_id: 'f-3', decision: 'skip', to_friend_id: null },
     ]);
-    const res = await makeApp().fetch(post('/api/account-handovers/ho-1/execute', {}), env);
+    const res = await makeApp().fetch(stepUpPost('/api/account-handovers/ho-1/execute', {}), env);
     expect(res.status).toBe(200);
     // skip は動かさない。予定は 2 件。
     expect(await res.json()).toMatchObject({ data: { plannedCount: 2 } });
@@ -357,6 +382,63 @@ describe('段5 本実行', () => {
       failedCount: 0,
       failureReason: null,
     });
+  });
+
+  // X-3。移し元システムの申告件数と事前確認の合計が違うままでは本実行しない。
+  it('申告件数が事前確認と違うときは 422 で止め、両方の数を言う', async () => {
+    db.getHandoverById.mockResolvedValue({
+      ...HANDOVER,
+      source_friend_total: 100,
+      declared_friend_total: 98,
+      review_count: 0,
+    });
+    const res = await makeApp().fetch(stepUpPost('/api/account-handovers/ho-1/execute', {}), env);
+    expect(res.status).toBe(422);
+    const body = await res.json() as { error: string };
+    expect(body.error).toContain('98');
+    expect(body.error).toContain('100');
+    expect(db.markExecuting).not.toHaveBeenCalled();
+  });
+
+  it('本人確認が無いと 401 で止める', async () => {
+    db.getHandoverById.mockResolvedValue({ ...HANDOVER, source_friend_total: 3, review_count: 0 });
+    const res = await makeApp().fetch(post('/api/account-handovers/ho-1/execute', {}), env);
+    expect(res.status).toBe(401);
+    expect(db.markExecuting).not.toHaveBeenCalled();
+  });
+});
+
+// X-5。本実行から7日以内・1回だけの切り戻し。
+describe('段6 切り戻し', () => {
+  const completed = {
+    ...HANDOVER,
+    status: 'completed' as const,
+    source_friend_total: 10,
+    completed_at: new Date().toISOString(),
+    rolled_back_at: null,
+  };
+
+  it('本人確認つきで戻し、戻した人数を返す', async () => {
+    db.getHandoverById.mockResolvedValue(completed);
+    db.rollbackHandover.mockResolvedValue({ ok: true, restoredCount: 7 });
+    const res = await makeApp().fetch(stepUpPost('/api/account-handovers/ho-1/rollback', { note: 'やり直し' }), env);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { restoredCount: 7 } });
+  });
+
+  it('戻せないものは 422 で理由を言う', async () => {
+    db.getHandoverById.mockResolvedValue(completed);
+    db.rollbackHandover.mockResolvedValue({ ok: false, error: '切り戻せる期限（7日間）を過ぎています' });
+    const res = await makeApp().fetch(stepUpPost('/api/account-handovers/ho-1/rollback', {}), env);
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ error: '切り戻せる期限（7日間）を過ぎています' });
+  });
+
+  it('本人確認が無いと 401 で止める', async () => {
+    db.getHandoverById.mockResolvedValue(completed);
+    const res = await makeApp().fetch(post('/api/account-handovers/ho-1/rollback', {}), env);
+    expect(res.status).toBe(401);
+    expect(db.rollbackHandover).not.toHaveBeenCalled();
   });
 });
 
@@ -368,5 +450,43 @@ describe('見える範囲', () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+});
+
+describe('見るだけの担当者の変更拒否（R522）', () => {
+  // 口側の境目 requireRole('owner', 'admin') を役割×操作の表で固定する。
+  // 画面の出し分け（canManageRole）と同じ表。直しを戻すと赤くなる。
+  it.each([
+    ['発行', 'POST', '/api/account-handovers', { fromAccountId: 'acc-from' }],
+    ['連結', 'POST', '/api/account-handovers/link', { code: 'ABCD-EFGH-JKMN', toAccountId: 'acc-to' }],
+    ['事前確認', 'POST', '/api/account-handovers/ho-1/preview', {
+      sourceFriendTotal: 2,
+      counts: { auto: 1, review: 1, unmatched: 0, lookalike: 0 },
+    }],
+    ['判断の保存', 'PUT', '/api/account-handovers/ho-1/decisions', { decisions: [] }],
+    ['本実行', 'POST', '/api/account-handovers/ho-1/execute', {}],
+    ['取り消し', 'POST', '/api/account-handovers/ho-1/cancel', {}],
+    ['切り戻し', 'POST', '/api/account-handovers/ho-1/rollback', {}],
+  ])('%sはstaffに403を返す', async (_label, method, path, body) => {
+    const res = await makeApp('staff').fetch(
+      new Request(`https://example.com${path}`, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it.each([
+    ['詳細の読み取り', '/api/account-handovers/ho-1'],
+    ['一覧の読み取り', '/api/line-accounts/acc-from/handovers'],
+  ])('%sはstaffにも許す', async (_label, path) => {
+    const res = await makeApp('staff').fetch(
+      new Request(`https://example.com${path}`),
+      env,
+    );
+    expect(res.status).not.toBe(403);
   });
 });

@@ -1,5 +1,6 @@
 import { MANUAL_LINKS } from '@/lib/manual-links'
 import type { ManualLink } from '@/lib/api'
+import { formatDateTime } from '@/lib/format'
 
 /**
  * 設計 ★V6 34-4「マニュアルの正本表」（`f9oUm`）。
@@ -92,14 +93,7 @@ export function checkedLabel(checkedAt: string | null): string {
   if (/^\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}$/.test(checkedAt)) return checkedAt
   const date = new Date(checkedAt)
   if (Number.isNaN(date.getTime())) return checkedAt
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 /** 絞り込みの区分。設計の「状態：すべて」。 */

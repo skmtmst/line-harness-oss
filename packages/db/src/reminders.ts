@@ -62,6 +62,11 @@ export interface FriendReminderRow {
   created_at: string;
   updated_at: string;
   reminder_version_id: string | null;
+  /**
+   * R346: 登録時に使っていたテンプレートの公開版。
+   * {"テンプレートID": 公開版番号} の JSON。NULL は今までどおり最新の版を読む。
+   */
+  template_version_snapshot: string | null;
   source_kind: string;
   source_id: string | null;
   source_event_id: string | null;
@@ -84,6 +89,35 @@ export type ReminderRegistrantMutation =
   | { state: 'updated' | 'replayed'; row: FriendReminderRow }
   | { state: 'conflict' | 'not_found' };
 
+/**
+ * R348/R349: 行ごとの送信元アカウントで絞るための担当範囲。
+ * getVisibleLineAccountScope と同じ形。未指定なら従来の条件のまま
+ * （親ルールと友だちの所属一致）。経路側は必ず渡す。
+ */
+export interface ReminderRowScope {
+  allowedAccountIds: string[];
+  canSeeUnassigned: boolean;
+}
+
+/**
+ * 送信元アカウントの列に対する絞り込み条件を作る。見える範囲が空なら
+ * 何も通さない（`1 = 0`）。未所属の行は見てよい人だけに残す。
+ */
+function reminderRowScopePredicate(
+  column: string,
+  scope: ReminderRowScope | undefined,
+  bindings: unknown[],
+): string | null {
+  if (!scope) return null;
+  const parts: string[] = [];
+  if (scope.allowedAccountIds.length > 0) {
+    parts.push(`${column} IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`);
+    bindings.push(...scope.allowedAccountIds);
+  }
+  if (scope.canSeeUnassigned) parts.push(`${column} IS NULL`);
+  return parts.length > 0 ? `(${parts.join(' OR ')})` : '1 = 0';
+}
+
 export interface ReminderDraftStepInput {
   stableStepId: string;
   offsetMinutes: number;
@@ -94,6 +128,13 @@ export interface ReminderDraftStepInput {
   templateId?: string | null;
   targetCondition?: Record<string, unknown>;
   action?: Record<string, unknown>;
+}
+
+/** 対象の絞り込み条件。SegmentCondition と同じ形 (operator/rules/groups)。 */
+export interface ReminderTargetCondition {
+  operator: 'AND' | 'OR';
+  rules: Array<{ type: string; value: unknown }>;
+  groups?: ReminderTargetCondition[];
 }
 
 export interface ReminderDraftSettings {
@@ -111,6 +152,11 @@ export interface ReminderDraftSettings {
   triggerOffsetMinutes?: number | null;
   sendAtTime?: string | null;
   targetTagId?: string | null;
+  /**
+   * 対象の絞り込み条件 (SegmentCondition と同じ形)。あるときは
+   * targetTagId よりこちらが勝つ。settings_snapshot の JSON にだけ持つ。
+   */
+  targetCondition?: ReminderTargetCondition | null;
   folderId?: string | null;
   stopConditions: {
     bookingCancelled: boolean;
@@ -164,6 +210,15 @@ export interface ReminderDeliveryRunRow {
   last_error_message: string | null;
   line_request_id: string | null;
   message_log_id: string | null;
+  /**
+   * R345: 初回に送った本文（差し込み済み）と使った版。
+   * 同じ再試行キーの再送はここから送り、履歴もここから残す。
+   * NULL は「まだ送っていない」→今までどおり最新の内容で作る。
+   */
+  sent_message_type: string | null;
+  sent_message_content: string | null;
+  sent_template_id: string | null;
+  sent_template_version: number | null;
   manual_retry_key: string | null;
   started_at: string | null;
   completed_at: string | null;
@@ -286,6 +341,17 @@ export async function updateReminder(
   const values: unknown[] = [];
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
   if (updates.description !== undefined) { sets.push('description = ?'); values.push(updates.description); }
+  if (updates.isActive === true) {
+    /*
+     * R146 監査：公開版の無い下書きを「再開」させない。通すと公開版IDが
+     * null のまま is_active=1・lifecycle_status=published になり、公開して
+     * いない設定が稼働中に見える。止める方（false）は従来どおり通す。
+     */
+    const current = await getReminderById(db, id);
+    if (current && current.current_published_version_id == null) {
+      throw new Error('REMINDER_NOT_PUBLISHED');
+    }
+  }
   if (updates.isActive !== undefined) {
     sets.push('is_active = ?');
     values.push(updates.isActive ? 1 : 0);
@@ -460,7 +526,7 @@ export async function saveReminderDraftVersion(
   db: D1Database,
   reminderId: string,
   settings: ReminderDraftSettings,
-  options: { expectedVersionId?: string | null } = {},
+  options: { expectedVersionId?: string | null; expectedUpdatedAt?: string | null } = {},
 ): Promise<ReminderVersionRow> {
   const reminder = await getReminderById(db, reminderId);
   if (!reminder) throw new Error('REMINDER_NOT_FOUND');
@@ -468,9 +534,17 @@ export async function saveReminderDraftVersion(
   const existing = await getReminderDraftVersion(db, reminderId);
   // N-080 (#869): 開いたときの版を指定されたら照合する。別タブで先に保存・
   // 公開された下書きへ、古い画面の内容をそのまま上書きさせない。
-  if (options.expectedVersionId !== undefined
-      && (existing?.id ?? null) !== options.expectedVersionId) {
-    throw new Error('REMINDER_DRAFT_CONFLICT');
+  // R148 監査：通常保存は版IDを付け替えないため、版IDだけでは A の保存後に
+  // B が古い内容で保存しても比較が通る。保存のたびに変わる updated_at も
+  // 合わせて照合し、ずれていれば 409 で止める（ミリ秒精度）。
+  if (options.expectedVersionId !== undefined) {
+    const idMatches = (existing?.id ?? null) === options.expectedVersionId;
+    const stampMatches = options.expectedUpdatedAt === undefined
+      || options.expectedUpdatedAt === null
+      || existing?.updated_at === options.expectedUpdatedAt;
+    if (!idMatches || !stampMatches) {
+      throw new Error('REMINDER_DRAFT_CONFLICT');
+    }
   }
   const versionId = existing?.id ?? crypto.randomUUID();
 
@@ -788,6 +862,49 @@ async function ensureReminderPublishedVersion(
   return current.current_published_version_id;
 }
 
+/**
+ * R346: 登録時に使っていたテンプレートの公開版を写す。
+ * {"テンプレートID": 公開版番号} の JSON。本文は作らない。
+ * まだ公開されていない・消えたテンプレートは載せず、送るときに今の版を読む。
+ */
+export async function snapshotReminderTemplateVersions(
+  db: D1Database,
+  templateIds: Array<string | null>,
+): Promise<string | null> {
+  const ids = [...new Set(templateIds.filter((id): id is string => !!id))];
+  if (ids.length === 0) return null;
+  const rows = await db.prepare(
+    `SELECT id, published_version FROM templates WHERE id IN (${ids.map(() => '?').join(', ')})`,
+  ).bind(...ids).all<{ id: string; published_version: number }>();
+  const map: Record<string, number> = {};
+  for (const row of rows.results ?? []) {
+    const version = Number(row.published_version);
+    if (Number.isFinite(version) && version > 0) map[row.id] = version;
+  }
+  return Object.keys(map).length > 0 ? JSON.stringify(map) : null;
+}
+
+/**
+ * R346: 登録に残した版指定を読む。壊れた記録は「指定なし」と同じにする。
+ */
+export function parseTemplateVersionSnapshot(
+  value: string | null | undefined,
+): Record<string, number> | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const map: Record<string, number> = {};
+    for (const [key, version] of Object.entries(parsed as Record<string, unknown>)) {
+      const n = Number(version);
+      if (key && Number.isFinite(n) && n > 0) map[key] = n;
+    }
+    return Object.keys(map).length > 0 ? map : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function enrollFriendInReminder(
   db: D1Database,
   input: {
@@ -838,16 +955,24 @@ export async function enrollFriendInReminder(
   const versionId = await ensureReminderPublishedVersion(db, reminder);
   const id = crypto.randomUUID();
   const now = jstNow();
+  // R346: この登録が使うテンプレートの公開版を写す。新しい版にするのは
+  // 登録し直した時だけ。版履歴に無い分は送るときに今の版を読む。
+  const versionSteps = await getReminderVersionSteps(db, versionId);
+  const templateSnapshot = await snapshotReminderTemplateVersions(
+    db,
+    versionSteps.map((step) => step.template_id),
+  );
   await db.prepare(
     `INSERT INTO friend_reminders
-       (id, friend_id, reminder_id, reminder_version_id, target_date,
+       (id, friend_id, reminder_id, reminder_version_id, template_version_snapshot, target_date,
         source_kind, source_id, source_event_id, timezone, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id,
     input.friendId,
     input.reminderId,
     versionId,
+    templateSnapshot,
     input.targetDate,
     input.sourceKind ?? 'manual',
     input.sourceId ?? null,
@@ -865,40 +990,53 @@ export async function getFriendReminders(db: D1Database, friendId: string): Prom
   return result.results;
 }
 
-/** リマインダの登録者一覧。壊れた別アカウント行は表示・操作の対象にしない。 */
+/**
+ * R348: リマインダの登録者一覧。親ルールの今の所属ではなく、友だちの
+ * 所属（＝送信元アカウント）が見える担当に出す。所属を変えても旧登録が
+ * 一覧から消えず、取消・日時変更の対象に残る。担当外の友だちの行は出さない。
+ * scope 未指定の内部呼び出しは従来どおり親子の所属一致だけを通す。
+ */
 export async function listReminderRegistrants(
   db: D1Database,
   reminderId: string,
+  scope?: ReminderRowScope,
 ): Promise<ReminderRegistrantRow[]> {
+  const bindings: unknown[] = [reminderId];
+  const scopePredicate = reminderRowScopePredicate('f.line_account_id', scope, bindings);
+  const predicate = scopePredicate ?? '(r.line_account_id IS NULL OR f.line_account_id IS NULL OR r.line_account_id = f.line_account_id)';
   const result = await db.prepare(
     `SELECT fr.*, f.display_name AS friend_name, f.line_account_id AS friend_line_account_id
        FROM friend_reminders fr
        JOIN friends f ON f.id = fr.friend_id
        JOIN reminders r ON r.id = fr.reminder_id
       WHERE fr.reminder_id = ?
-        AND (r.line_account_id IS NULL OR f.line_account_id IS NULL OR r.line_account_id = f.line_account_id)
+        AND ${predicate}
       ORDER BY fr.target_date ASC, fr.created_at ASC, fr.id ASC`,
-  ).bind(reminderId).all<ReminderRegistrantRow>();
+  ).bind(...bindings).all<ReminderRegistrantRow>();
   return result.results;
 }
 
 /**
- * 一覧操作の対象行を、リマインダ・友だちの所属が一致する場合だけ読む。
- * route 側のリマインダ可視性チェックに加え、移行前の不正な結合を通さない。
+ * R348: 一覧操作の対象行を、友だちの所属が見える担当にだけ読む。
+ * scope 未指定の内部呼び出しは従来どおり親子の所属一致だけを通す。
  */
 export async function getReminderRegistrantById(
   db: D1Database,
   reminderId: string,
   enrollmentId: string,
+  scope?: ReminderRowScope,
 ): Promise<FriendReminderRow | null> {
+  const bindings: unknown[] = [enrollmentId, reminderId];
+  const scopePredicate = reminderRowScopePredicate('f.line_account_id', scope, bindings);
+  const predicate = scopePredicate ?? '(r.line_account_id IS NULL OR f.line_account_id IS NULL OR r.line_account_id = f.line_account_id)';
   return db.prepare(
     `SELECT fr.*
        FROM friend_reminders fr
        JOIN friends f ON f.id = fr.friend_id
        JOIN reminders r ON r.id = fr.reminder_id
       WHERE fr.id = ? AND fr.reminder_id = ?
-        AND (r.line_account_id IS NULL OR f.line_account_id IS NULL OR r.line_account_id = f.line_account_id)`,
-  ).bind(enrollmentId, reminderId).first<FriendReminderRow>();
+        AND ${predicate}`,
+  ).bind(...bindings).first<FriendReminderRow>();
 }
 
 function replayOrConflict(
@@ -922,9 +1060,9 @@ function replayOrConflict(
  */
 export async function moveReminderRegistrantTargetDate(
   db: D1Database,
-  input: { reminderId: string; enrollmentId: string; targetDate: string; expectedLockVersion: number; now?: string },
+  input: { reminderId: string; enrollmentId: string; targetDate: string; expectedLockVersion: number; now?: string; scope?: ReminderRowScope },
 ): Promise<ReminderRegistrantMutation> {
-  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId);
+  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope);
   if (!current) return { state: 'not_found' };
   if (current.status !== 'active' || current.lock_version !== input.expectedLockVersion || current.target_date === input.targetDate) {
     return replayOrConflict(current, input.expectedLockVersion, 'active', input.targetDate);
@@ -951,21 +1089,21 @@ export async function moveReminderRegistrantTargetDate(
   ]);
   if (Number(results[0]?.meta?.changes ?? 0) === 0) {
     return replayOrConflict(
-      await getReminderRegistrantById(db, input.reminderId, input.enrollmentId),
+      await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope),
       input.expectedLockVersion,
       'active',
       input.targetDate,
     );
   }
-  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId))! };
+  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope))! };
 }
 
 /** 手動取消。外部送信済み・送信履歴は消さず、未送信の実行だけを止める。 */
 export async function cancelReminderRegistrant(
   db: D1Database,
-  input: { reminderId: string; enrollmentId: string; expectedLockVersion: number; cancelReason: string; now?: string },
+  input: { reminderId: string; enrollmentId: string; expectedLockVersion: number; cancelReason: string; now?: string; scope?: ReminderRowScope },
 ): Promise<ReminderRegistrantMutation> {
-  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId);
+  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope);
   if (!current) return { state: 'not_found' };
   if (current.status !== 'active' || current.lock_version !== input.expectedLockVersion) {
     return replayOrConflict(current, input.expectedLockVersion, 'cancelled');
@@ -991,34 +1129,136 @@ export async function cancelReminderRegistrant(
     ).bind(now, now, input.enrollmentId, input.reminderId, input.expectedLockVersion + 1),
   ]);
   if (Number(results[0]?.meta?.changes ?? 0) === 0) {
-    return replayOrConflict(await getReminderRegistrantById(db, input.reminderId, input.enrollmentId), input.expectedLockVersion, 'cancelled');
+    return replayOrConflict(await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope), input.expectedLockVersion, 'cancelled');
   }
-  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId))! };
+  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope))! };
+}
+
+export interface ResumeExpectedRun {
+  reminderStepId: string;
+  scheduledAt: string;
 }
 
 /**
- * 取消済み登録を再開する。旧実行行は復活させず、保存済み版と送信済み履歴から
- * cron が未送信分だけを作り直すので、過去の送信内容・残高には触れない。
+ * R341: 再開で取消の記録を外して予定を作り直す。
+ *
+ * 取消時に止めた未来の実行行は cancelled のまま残り、一意制約が新しい
+ * 行の作成を塞ぐ。そのままでは再開後に送られない。未来の予定時刻に
+ * 対応する cancelled 行だけ queued へ戻し、行が無い通は新しく作る。
+ * 送信ずみ・過去時刻の通には触らない (再送・遅延 blast を起こさない)。
+ */
+export async function reopenCancelledDeliveryRuns(
+  db: D1Database,
+  input: {
+    friendReminderId: string;
+    reminderId: string;
+    friendId: string;
+    lineAccountId: string | null;
+    runs: ResumeExpectedRun[];
+    now: string;
+  },
+): Promise<{ reopened: number; created: number }> {
+  let reopened = 0;
+  let created = 0;
+  const statements: D1PreparedStatement[] = [];
+  for (const run of input.runs) {
+    const existing = await db.prepare(
+      `SELECT id, status FROM reminder_delivery_runs
+        WHERE friend_reminder_id = ? AND reminder_step_id = ? AND scheduled_at = ?`,
+    ).bind(input.friendReminderId, run.reminderStepId, run.scheduledAt)
+      .all<{ id: string; status: string }>();
+    const rows = existing.results ?? [];
+    if (rows.some((row) => row.status !== 'cancelled')) continue;
+    const cancelled = rows.filter((row) => row.status === 'cancelled');
+    if (cancelled.length > 0) {
+      const placeholders = chunkPlaceholders(cancelled.map((row) => row.id));
+      statements.push(
+        db.prepare(
+          `UPDATE reminder_delivery_runs
+              SET status = 'queued', completed_at = NULL,
+                  lease_expires_at = NULL, next_retry_at = NULL,
+                  retry_cycle_attempt_count = 0,
+                  last_error_code = NULL, last_error_message = NULL,
+                  updated_at = ?
+            WHERE id IN (${placeholders}) AND status = 'cancelled'`,
+        ).bind(input.now, ...cancelled.map((row) => row.id)),
+      );
+      reopened += cancelled.length;
+    } else {
+      statements.push(
+        db.prepare(
+          `INSERT OR IGNORE INTO reminder_delivery_runs
+             (id, line_account_id, reminder_id, friend_reminder_id, friend_id,
+              reminder_step_id, scheduled_at, idempotency_key, line_retry_key,
+              status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?)`,
+        ).bind(
+          crypto.randomUUID(),
+          input.lineAccountId,
+          input.reminderId,
+          input.friendReminderId,
+          input.friendId,
+          run.reminderStepId,
+          run.scheduledAt,
+          crypto.randomUUID(),
+          crypto.randomUUID(),
+          input.now,
+          input.now,
+        ),
+      );
+      created += 1;
+    }
+  }
+  if (statements.length > 0) await db.batch(statements);
+  return { reopened, created };
+}
+
+/**
+ * 取消済み登録を再開する。未送信の未来予定は expectedRuns から作り直す
+ * (R341)。保存済み版と送信済み履歴には触れない。
  */
 export async function resumeReminderRegistrant(
   db: D1Database,
-  input: { reminderId: string; enrollmentId: string; expectedLockVersion: number; now?: string },
+  input: {
+    reminderId: string;
+    enrollmentId: string;
+    expectedLockVersion: number;
+    now?: string;
+    /** 再開後に送るべき未来の通。未指定なら登録の有効化だけ行う。 */
+    expectedRuns?: ResumeExpectedRun[];
+    scope?: ReminderRowScope;
+  },
 ): Promise<ReminderRegistrantMutation> {
-  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId);
+  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope);
   if (!current) return { state: 'not_found' };
   if (current.status !== 'cancelled' || current.lock_version !== input.expectedLockVersion) {
     return replayOrConflict(current, input.expectedLockVersion, 'active');
   }
   const now = input.now ?? jstNow();
+  // 予定の作り直しを先に行う。登録が cancelled の間の queued 行は
+  // runner が拾わないため、この順序でも送信は起きない。登録の有効化が
+  // 失敗しても再開の再試行で回復できる。
+  if (input.expectedRuns && input.expectedRuns.length > 0) {
+    const friend = await db.prepare(`SELECT line_account_id FROM friends WHERE id = ?`)
+      .bind(current.friend_id).first<{ line_account_id: string | null }>();
+    await reopenCancelledDeliveryRuns(db, {
+      friendReminderId: input.enrollmentId,
+      reminderId: input.reminderId,
+      friendId: current.friend_id,
+      lineAccountId: friend?.line_account_id ?? null,
+      runs: input.expectedRuns,
+      now,
+    });
+  }
   const result = await db.prepare(
     `UPDATE friend_reminders
         SET status = 'active', cancel_reason = NULL, completed_at = NULL, updated_at = ?, lock_version = lock_version + 1
       WHERE id = ? AND reminder_id = ? AND status = 'cancelled' AND lock_version = ?`,
   ).bind(now, input.enrollmentId, input.reminderId, input.expectedLockVersion).run();
   if (Number(result.meta?.changes ?? 0) === 0) {
-    return replayOrConflict(await getReminderRegistrantById(db, input.reminderId, input.enrollmentId), input.expectedLockVersion, 'active');
+    return replayOrConflict(await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope), input.expectedLockVersion, 'active');
   }
-  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId))! };
+  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope))! };
 }
 
 export async function cancelFriendReminder(db: D1Database, id: string): Promise<void> {
@@ -1489,7 +1729,14 @@ export async function markReminderStepDelivered(db: D1Database, friendReminderId
     .bind(id, friendReminderId, reminderStepId).run();
 }
 
-/** 全ステップ配信済みならcompletedにする */
+/**
+ * 全ステップ配信済みならcompletedにする。
+ *
+ * R337: 完了の判定は「今の通知予定が全部済んだ時だけ」。日時変更で古い
+ * 実行行が cancelled になり新しい queued 行が積まれた状態では、旧行を
+ * 完了数に含めない。未送信の将来予定 (queued/retry_wait/claimed) が
+ * 1通でもあれば active を保持する。
+ */
 export async function completeReminderIfDone(db: D1Database, friendReminderId: string, reminderId: string): Promise<void> {
   const enrollment = await db.prepare(
     `SELECT reminder_version_id FROM friend_reminders WHERE id = ? AND reminder_id = ?`,
@@ -1512,8 +1759,16 @@ export async function completeReminderIfDone(db: D1Database, friendReminderId: s
             AND status IN ('succeeded', 'skipped', 'permanent_failed', 'cancelled')
        )`,
   ).bind(friendReminderId, friendReminderId).first<{ count: number }>();
+  const pendingSteps = await db.prepare(
+    `SELECT COUNT(DISTINCT reminder_step_id) AS count
+       FROM reminder_delivery_runs
+      WHERE friend_reminder_id = ?
+        AND status IN ('queued', 'retry_wait', 'claimed')`,
+  ).bind(friendReminderId).first<{ count: number }>();
 
-  if (totalSteps && deliveredSteps && deliveredSteps.count >= totalSteps.count) {
+  if (totalSteps && deliveredSteps
+    && deliveredSteps.count >= totalSteps.count
+    && Number(pendingSteps?.count ?? 0) === 0) {
     const now = jstNow();
     // 取消ずみの登録を完了で上書きしない (取消と cron の競合対策)。
     await db.prepare(
@@ -1527,6 +1782,96 @@ export async function completeReminderIfDone(db: D1Database, friendReminderId: s
 // =============================================================================
 // V6 リマインダ実行記録（269）
 // =============================================================================
+
+/**
+ * R344: LINE 再試行キーの有効期限 (24時間。公式仕様による)。
+ * 最初の外部要求からこの時間を過ぎた結果不明の通知は、自動で再送しない。
+ */
+export const LINE_RETRY_KEY_VALIDITY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * R344: 有効期限を過ぎた結果不明の通知を自動送信から外す。
+ *
+ * 受理ずみか未送信か分からないまま 24 時間を超えた retry_wait 行は、
+ * 再試行予定を止めて要確認として残す (last_error に理由を残し、一覧に
+ * 出る)。人が確かめた手動再試行は別操作として送れる。
+ * 戻り値は止めた件数。
+ */
+export async function holdExpiredLineRetryRuns(
+  db: D1Database,
+  input: { now: string },
+): Promise<number> {
+  const cutoff = new Date(new Date(input.now).getTime() - LINE_RETRY_KEY_VALIDITY_MS).toISOString();
+  const held = await db.prepare(
+    `UPDATE reminder_delivery_runs
+        SET next_retry_at = NULL,
+            last_error_code = 'retry_key_expired',
+            last_error_message = 'LINEの重複防止期限（24時間）を過ぎたため自動送信を止めました。内容を確かめて手動で再試行してください。',
+            updated_at = ?
+      WHERE status = 'retry_wait'
+        AND next_retry_at IS NOT NULL
+        AND started_at IS NOT NULL
+        AND started_at <= ?`,
+  ).bind(input.now, cutoff).run();
+  return Number(held.meta?.changes ?? 0);
+}
+
+/**
+ * 送信直前の照合で使う登録の現在値。候補読込後の日時変更・ルール停止を
+ * 実行行作成・claim・送信の各境界で見直す (R339)。
+ */
+export async function getFriendReminderSendGate(
+  db: D1Database,
+  friendReminderId: string,
+): Promise<{ status: string; targetDate: string } | null> {
+  return db.prepare(
+    `SELECT status, target_date AS targetDate FROM friend_reminders WHERE id = ?`,
+  ).bind(friendReminderId).first<{ status: string; targetDate: string }>();
+}
+
+/**
+ * R338: 予約に紐づく登録は、予約の通知方針が両方 OFF なら送らない。
+ *
+ * 予約変更 PATCH が方針を OFF にしても、送信権取得ずみの登録は active の
+ * まま残る。最終送信の claim・検証で現在の方針を読み直し、止める。
+ * 紐づく予約行が無い旧データは従来どおり送る側に倒す (route 側の既定値)。
+ */
+function bookingPolicyGateSql(): string {
+  return `(
+    fr.source_kind IS NULL OR fr.source_kind != 'booking'
+    OR NOT EXISTS (
+      SELECT 1 FROM bookings b
+       WHERE (b.id = fr.source_id OR b.id = fr.source_event_id)
+         AND json_extract(b.notification_policy_snapshot, '$.day_before') IS 0
+         AND json_extract(b.notification_policy_snapshot, '$.hours_before') IS 0
+    )
+  )`;
+}
+
+/**
+ * R339: 候補読込後にルールが止まっても古い候補のまま送らない。
+ * 一覧の読込条件 (getPendingReminderDeliveries) と同じ述語。
+ */
+function activeRuleGateSql(): string {
+  return `EXISTS (
+    SELECT 1 FROM reminders r
+     WHERE r.id = fr.reminder_id AND r.is_active = 1 AND r.deleted_at IS NULL
+  )`;
+}
+
+/**
+ * R340: 持ち主付きの貸出述語。lease_expires_at を貸出ごとの識別子として
+ * 使い、検証・完了・失敗・解放は自分が今の持ち主のときだけ通す。
+ * 期限切れの古い処理の書込は 0 件になり、新しい処理を上書きしない。
+ */
+function ownerGateSql(leases: Array<string | null | undefined>): { sql: string; bindings: unknown[] } {
+  const owned = leases.filter((lease): lease is string => lease != null);
+  if (owned.length === 0) return { sql: '1 = 0', bindings: [] };
+  return {
+    sql: `lease_expires_at IN (${owned.map(() => '?').join(',')})`,
+    bindings: owned,
+  };
+}
 
 /**
  * 1通ぶんの実行行を作り、同時実行のうち1つだけが送信を担当する。
@@ -1545,6 +1890,12 @@ export async function claimReminderDeliveryRun(
     scheduledAt: string;
     now: string;
     leaseExpiresAt: string;
+    /**
+     * R339: 候補読込後に日時変更が入っても古い基準日で実行行を作らない。
+     * 呼び出し側が直前に読み直した target_date を渡し、一致するときだけ
+     * 握る。未指定なら従来どおり起点を問わない。
+     */
+    expectedTargetDate?: string | null;
   },
 ): Promise<ReminderDeliveryRunRow | null> {
   const id = crypto.randomUUID();
@@ -1579,6 +1930,13 @@ export async function claimReminderDeliveryRun(
 
   // 取消と取得の競合対策: 登録が active のままのときだけ握る (原子的)。
   // getPending (active 読み) から claim の間に取消が入っても、ここで弾く。
+  // R338/R339: 予約の通知方針 OFF とルール停止もここで読み直す。
+  // 日時変更で起点がずれた登録は、読み直した起点と合うときだけ握る。
+  const targetBindings: unknown[] = [];
+  const targetGate = input.expectedTargetDate != null
+    ? `AND fr.target_date = ?`
+    : '';
+  if (input.expectedTargetDate != null) targetBindings.push(input.expectedTargetDate);
   const claimed = await db.prepare(
     `UPDATE reminder_delivery_runs
         SET status = 'claimed',
@@ -1590,7 +1948,13 @@ export async function claimReminderDeliveryRun(
             updated_at = ?
       WHERE id = ?
         AND scheduled_at <= ?
-        AND EXISTS (SELECT 1 FROM friend_reminders WHERE id = ? AND status = 'active')
+        AND EXISTS (
+          SELECT 1 FROM friend_reminders fr
+           WHERE fr.id = ? AND fr.status = 'active'
+             ${targetGate}
+             AND ${activeRuleGateSql()}
+             AND ${bookingPolicyGateSql()}
+        )
         AND (
           status = 'queued'
           OR (status = 'retry_wait' AND next_retry_at IS NOT NULL AND next_retry_at <= ?)
@@ -1603,6 +1967,7 @@ export async function claimReminderDeliveryRun(
     row.id,
     input.now,
     input.friendReminderId,
+    ...targetBindings,
     input.now,
     input.now,
   ).run();
@@ -1634,8 +1999,14 @@ export async function claimReminderDeliveryRun(
  */
 export async function releaseClaimedReminderRun(
   db: D1Database,
-  input: { id: string; now: string },
+  input: { id: string; now: string; expectedLeaseExpiresAt: string | string[] },
 ): Promise<void> {
+  // R340: 自分が握った claimed 行だけキューへ戻す。
+  const owner = ownerGateSql(
+    Array.isArray(input.expectedLeaseExpiresAt)
+      ? input.expectedLeaseExpiresAt
+      : [input.expectedLeaseExpiresAt],
+  );
   await db
     .prepare(
       `UPDATE reminder_delivery_runs
@@ -1645,9 +2016,9 @@ export async function releaseClaimedReminderRun(
               lease_expires_at = NULL,
               next_retry_at = NULL,
               updated_at = ?
-        WHERE id = ? AND status = 'claimed'`,
+        WHERE id = ? AND status = 'claimed' AND ${owner.sql}`,
     )
-    .bind(input.now, input.id)
+    .bind(input.now, input.id, ...owner.bindings)
     .run();
 }
 
@@ -1658,26 +2029,61 @@ export async function releaseClaimedReminderRun(
  * 「まだ claimed かつ登録が active」を確かめ、貸出期限を延ばす。
  * だめなら実行行を止めて false を返す (送らない)。
  * 取消側が先に実行行を止めていた場合も false になる (二重に送らない)。
+ *
+ * R338/R339: 予約の通知方針 OFF・ルール停止・起点ずれもここで読み直す。
+ * R340: 自分が今の持ち主のときだけ通す。期限切れの古い処理の検証は
+ * 0 件になり、新しい処理の期限を縮めない。持ち主でないときは行に
+ * 触らず false を返す (別処理の claim を殺さない)。
  */
 export async function verifyClaimedRunBeforeSend(
   db: D1Database,
-  input: { id: string; friendReminderId: string; now: string; leaseExpiresAt: string },
+  input: {
+    id: string;
+    friendReminderId: string;
+    now: string;
+    leaseExpiresAt: string;
+    expectedLeaseExpiresAt: string | string[];
+    expectedTargetDate?: string | null;
+  },
 ): Promise<boolean> {
+  const owner = ownerGateSql(
+    Array.isArray(input.expectedLeaseExpiresAt)
+      ? input.expectedLeaseExpiresAt
+      : [input.expectedLeaseExpiresAt],
+  );
+  const targetGate = input.expectedTargetDate != null ? `AND fr.target_date = ?` : '';
+  const targetBindings = input.expectedTargetDate != null ? [input.expectedTargetDate] : [];
   const verified = await db.prepare(
     `UPDATE reminder_delivery_runs
         SET lease_expires_at = ?, updated_at = ?
       WHERE id = ?
         AND status = 'claimed'
-        AND EXISTS (SELECT 1 FROM friend_reminders WHERE id = ? AND status = 'active')`,
-  ).bind(input.leaseExpiresAt, input.now, input.id, input.friendReminderId).run();
+        AND ${owner.sql}
+        AND EXISTS (
+          SELECT 1 FROM friend_reminders fr
+           WHERE fr.id = ? AND fr.status = 'active'
+             ${targetGate}
+             AND ${activeRuleGateSql()}
+             AND ${bookingPolicyGateSql()}
+        )`,
+  ).bind(
+    input.leaseExpiresAt, input.now, input.id, ...owner.bindings,
+    input.friendReminderId, ...targetBindings,
+  ).run();
   if ((verified.meta?.changes ?? 0) === 1) return true;
+  // 持ち主が別処理へ移っているときは行に触らない。
+  // 自分の貸出のまま通らなかったときだけ止める (従来の取消回収)。
+  const mine = await db.prepare(
+    `SELECT 1 AS ok FROM reminder_delivery_runs WHERE id = ? AND ${owner.sql}`,
+  ).bind(input.id, ...owner.bindings).first<{ ok: number }>();
+  if (!mine) return false;
   await db.prepare(
     `UPDATE reminder_delivery_runs
         SET status = 'cancelled', completed_at = ?,
             lease_expires_at = NULL, next_retry_at = NULL, updated_at = ?
       WHERE id = ?
-        AND status IN ('queued', 'retry_wait', 'claimed')`,
-  ).bind(input.now, input.now, input.id).run();
+        AND status IN ('queued', 'retry_wait', 'claimed') AND ${owner.sql}`,
+  ).bind(input.now, input.now, input.id, ...owner.bindings).run();
   return false;
 }
 
@@ -1696,14 +2102,21 @@ export function completeReminderDeliveryRunStatement(
     lineRequestId: string | null;
     messageLogId: string;
     now: string;
+    /** R340: 自分が今の持ち主のときだけ成功にする。 */
+    expectedLeaseExpiresAt: string | string[];
   },
 ): D1PreparedStatement {
+  const owner = ownerGateSql(
+    Array.isArray(input.expectedLeaseExpiresAt)
+      ? input.expectedLeaseExpiresAt
+      : [input.expectedLeaseExpiresAt],
+  );
   return db.prepare(
     `UPDATE reminder_delivery_runs
         SET status = 'succeeded', line_request_id = ?, message_log_id = ?, completed_at = ?,
             lease_expires_at = NULL, next_retry_at = NULL,
             last_error_code = NULL, last_error_message = NULL, updated_at = ?
-      WHERE id = ? AND status = 'claimed'
+      WHERE id = ? AND status = 'claimed' AND ${owner.sql}
         AND EXISTS (SELECT 1 FROM friend_reminders WHERE id = ? AND status = 'active')`,
   ).bind(
     input.lineRequestId,
@@ -1711,21 +2124,28 @@ export function completeReminderDeliveryRunStatement(
     input.now,
     input.now,
     input.id,
+    ...owner.bindings,
     input.friendReminderId,
   );
 }
 
 export async function skipReminderDeliveryRun(
   db: D1Database,
-  input: { id: string; code: string; message: string; now: string },
+  input: { id: string; code: string; message: string; now: string; expectedLeaseExpiresAt: string | string[] },
 ): Promise<void> {
+  // R340: 自分が握った行だけ止める。
+  const owner = ownerGateSql(
+    Array.isArray(input.expectedLeaseExpiresAt)
+      ? input.expectedLeaseExpiresAt
+      : [input.expectedLeaseExpiresAt],
+  );
   await db.prepare(
     `UPDATE reminder_delivery_runs
         SET status = 'skipped', last_error_code = ?, last_error_message = ?,
             completed_at = ?, lease_expires_at = NULL, next_retry_at = NULL,
             updated_at = ?
-      WHERE id = ? AND status = 'claimed'`,
-  ).bind(input.code, input.message, input.now, input.now, input.id).run();
+      WHERE id = ? AND status = 'claimed' AND ${owner.sql}`,
+  ).bind(input.code, input.message, input.now, input.now, input.id, ...owner.bindings).run();
 }
 
 export async function failReminderDeliveryRun(
@@ -1736,16 +2156,23 @@ export async function failReminderDeliveryRun(
     message: string;
     retryAt: string | null;
     now: string;
+    /** R340: 自分が今の持ち主のときだけ失敗にする。書けたら true。 */
+    expectedLeaseExpiresAt: string | string[];
   },
-): Promise<void> {
+): Promise<boolean> {
+  const owner = ownerGateSql(
+    Array.isArray(input.expectedLeaseExpiresAt)
+      ? input.expectedLeaseExpiresAt
+      : [input.expectedLeaseExpiresAt],
+  );
   const status: ReminderDeliveryRunStatus = input.retryAt ? 'retry_wait' : 'permanent_failed';
-  await db.prepare(
+  const recorded = await db.prepare(
     `UPDATE reminder_delivery_runs
         SET status = ?, last_error_code = ?, last_error_message = ?,
             next_retry_at = ?, lease_expires_at = NULL,
             completed_at = CASE WHEN ? = 'permanent_failed' THEN ? ELSE NULL END,
             updated_at = ?
-      WHERE id = ? AND status = 'claimed'`,
+      WHERE id = ? AND status = 'claimed' AND ${owner.sql}`,
   ).bind(
     status,
     input.code,
@@ -1755,7 +2182,9 @@ export async function failReminderDeliveryRun(
     input.now,
     input.now,
     input.id,
+    ...owner.bindings,
   ).run();
+  return (recorded.meta?.changes ?? 0) === 1;
 }
 
 export async function getReminderDeliveryRunById(
@@ -1765,6 +2194,81 @@ export async function getReminderDeliveryRunById(
   return db.prepare(`SELECT * FROM reminder_delivery_runs WHERE id = ?`)
     .bind(id)
     .first<ReminderDeliveryRunRow>();
+}
+
+export interface ReminderDeliveryRunSentPayload {
+  messageType: string;
+  messageContent: string;
+  templateId: string | null;
+  templateVersion: number | null;
+}
+
+/**
+ * R345: 初回に送った本文（差し込み済み）を読む。
+ * まだ送っていなければ null（呼び出し側は今までどおり最新の内容で作る）。
+ */
+export async function getReminderDeliveryRunSentPayload(
+  db: D1Database,
+  runId: string,
+): Promise<ReminderDeliveryRunSentPayload | null> {
+  const row = await db.prepare(
+    `SELECT sent_message_type, sent_message_content, sent_template_id, sent_template_version
+       FROM reminder_delivery_runs WHERE id = ?`,
+  ).bind(runId).first<{
+    sent_message_type: string | null;
+    sent_message_content: string | null;
+    sent_template_id: string | null;
+    sent_template_version: number | null;
+  }>();
+  if (!row || row.sent_message_content == null || row.sent_message_type == null) return null;
+  return {
+    messageType: row.sent_message_type,
+    messageContent: row.sent_message_content,
+    templateId: row.sent_template_id,
+    templateVersion: row.sent_template_version == null ? null : Number(row.sent_template_version),
+  };
+}
+
+/**
+ * R345: 初回に送る本文を残し、残っている本文を返す。
+ * 先に残した処理があるときはそちらを返し、上書きしない
+ * （同じ実行の二重保存・別処理の上書きをしない）。
+ * 貸出を失っているときは残せず null を返す（呼び出し側は作りたてを使うが、
+ * 直後の検証で止まるため送らない）。
+ */
+export async function saveReminderDeliveryRunSentPayload(
+  db: D1Database,
+  input: {
+    id: string;
+    messageType: string;
+    messageContent: string;
+    templateId: string | null;
+    templateVersion: number | null;
+    now: string;
+    /** R340: 自分が今の持ち主のときだけ残す。 */
+    expectedLeaseExpiresAt: string | string[];
+  },
+): Promise<ReminderDeliveryRunSentPayload | null> {
+  const owner = ownerGateSql(
+    Array.isArray(input.expectedLeaseExpiresAt)
+      ? input.expectedLeaseExpiresAt
+      : [input.expectedLeaseExpiresAt],
+  );
+  await db.prepare(
+    `UPDATE reminder_delivery_runs
+        SET sent_message_type = ?, sent_message_content = ?,
+            sent_template_id = ?, sent_template_version = ?, updated_at = ?
+      WHERE id = ? AND sent_message_content IS NULL AND ${owner.sql}`,
+  ).bind(
+    input.messageType,
+    input.messageContent,
+    input.templateId,
+    input.templateVersion,
+    input.now,
+    input.id,
+    ...owner.bindings,
+  ).run();
+  return getReminderDeliveryRunSentPayload(db, input.id);
 }
 
 export type RetryReminderDeliveryRunResult =
@@ -1795,15 +2299,18 @@ export async function retryReminderDeliveryRun(
     return { kind: 'conflict', run: row };
   }
 
+  // R342: 手動再試行でも同じ通知には同じ X-Line-Retry-Key を使う。
+  // 受理ずみの通知を別キーで送り直すと重複する。同じキーなら LINE 側が
+  // 受理ずみを 409 で返し、元の受理IDで履歴を回復できる (R343)。
   const [changed] = await db.batch([
     db.prepare(
       `UPDATE reminder_delivery_runs
           SET status = 'queued', retry_cycle_attempt_count = 0,
               next_retry_at = NULL, lease_expires_at = NULL,
-              completed_at = NULL, manual_retry_key = ?, line_retry_key = ?,
+              completed_at = NULL, manual_retry_key = ?,
               updated_at = ?
         WHERE id = ? AND status IN ('retry_wait', 'permanent_failed')`,
-    ).bind(input.requestKey, crypto.randomUUID(), input.now, row.id),
+    ).bind(input.requestKey, input.now, row.id),
     // permanent_failed で全通が終端になった登録は completed になる。
     // 手動再試行をcronが拾えるよう、この1件だけ同じbatchでactiveへ戻す。
     db.prepare(
@@ -1833,6 +2340,8 @@ export async function listReminderDeliveryRuns(
     search?: string;
     limit: number;
     offset: number;
+    /** R349: 実行行の送信元アカウントで絞る。未指定なら従来どおり全行。 */
+    scope?: ReminderRowScope;
   },
 ): Promise<{ items: ReminderDeliveryRunListRow[]; total: number }> {
   const where = ['rdr.reminder_id = ?'];
@@ -1845,6 +2354,8 @@ export async function listReminderDeliveryRuns(
     where.push(`COALESCE(f.display_name, '') LIKE ? ESCAPE '\\'`);
     bindings.push(`%${input.search.replace(/[\\%_]/g, '\\$&')}%`);
   }
+  const scopePredicate = reminderRowScopePredicate('rdr.line_account_id', input.scope, bindings);
+  if (scopePredicate) where.push(scopePredicate);
   const predicate = where.join(' AND ');
   const total = await db.prepare(
     `SELECT COUNT(*) AS count
@@ -1879,6 +2390,8 @@ export async function listReminderDeliveryRuns(
 export async function getReminderDeliveryRunSummary(
   db: D1Database,
   reminderId: string,
+  /** R349: 集計も実行行の送信元アカウントで絞る。未指定なら従来どおり全行。 */
+  scope?: ReminderRowScope,
 ): Promise<{
   sent: number;
   scheduled: number;
@@ -1887,6 +2400,8 @@ export async function getReminderDeliveryRunSummary(
   targetCount: number;
   nextScheduledAt: string | null;
 }> {
+  const bindings: unknown[] = [reminderId];
+  const scopePredicate = reminderRowScopePredicate('line_account_id', scope, bindings);
   const row = await db.prepare(
     `SELECT
        SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) AS sent,
@@ -1898,8 +2413,8 @@ export async function getReminderDeliveryRunSummary(
          WHEN status = 'retry_wait' THEN next_retry_at
          WHEN status IN ('queued', 'claimed') THEN scheduled_at
        END) AS next_scheduled_at
-     FROM reminder_delivery_runs WHERE reminder_id = ?`,
-  ).bind(reminderId).first<{
+     FROM reminder_delivery_runs WHERE reminder_id = ?${scopePredicate ? ` AND ${scopePredicate}` : ''}`,
+  ).bind(...bindings).first<{
     sent: number | null;
     scheduled: number | null;
     stopped: number | null;
@@ -1929,17 +2444,24 @@ export interface ReminderDeliveryStepSummaryRow {
 export async function getReminderDeliveryStepSummaries(
   db: D1Database,
   reminderId: string,
+  /** R349: 通ごとの集計も実行行の送信元アカウントで絞る。未指定なら従来どおり全行。 */
+  scope?: ReminderRowScope,
 ): Promise<ReminderDeliveryStepSummaryRow[]> {
+  // 結合条件の `?` が WHERE より前にあるため、束ねる順序も合わせる。
+  const scopeBindings: unknown[] = [];
+  const scopePredicate = reminderRowScopePredicate('rdr.line_account_id', scope, scopeBindings);
+  const bindings: unknown[] = [...scopeBindings, reminderId];
   const rows = await db.prepare(
     `SELECT rs.id, rs.offset_minutes, rs.message_type, rs.message_content,
             SUM(CASE WHEN rdr.status = 'succeeded' THEN 1 ELSE 0 END) AS sent,
             SUM(CASE WHEN rdr.status = 'permanent_failed' THEN 1 ELSE 0 END) AS errors
        FROM reminder_steps rs
-       LEFT JOIN reminder_delivery_runs rdr ON rdr.reminder_step_id = rs.id
+       LEFT JOIN reminder_delivery_runs rdr
+         ON rdr.reminder_step_id = rs.id${scopePredicate ? ` AND ${scopePredicate}` : ''}
       WHERE rs.reminder_id = ?
       GROUP BY rs.id, rs.offset_minutes, rs.message_type, rs.message_content
       ORDER BY rs.offset_minutes ASC, rs.id ASC`,
-  ).bind(reminderId).all<ReminderDeliveryStepSummaryRow>();
+  ).bind(...bindings).all<ReminderDeliveryStepSummaryRow>();
   return rows.results.map((row) => ({
     ...row,
     sent: Number(row.sent ?? 0),
@@ -2039,6 +2561,12 @@ export async function enrollFriendsInReminderOnce(
 ): Promise<number> {
   let enrolled = 0;
   const now = jstNow();
+  // R346: まとめ登録も1件ずつと同じ版で送る。この束が使うテンプレートの
+  // 公開版を1度だけ写し、新しい行に付ける（ある行は触らない）。
+  const bulkTemplateSnapshot = await snapshotReminderTemplateVersions(
+    db,
+    (await getReminderSteps(db, reminderId)).map((step) => step.template_id),
+  );
 
   for (let offset = 0; offset < candidates.length; offset += FRIEND_REMINDER_INSERT_CHUNK) {
     const chunk = candidates.slice(offset, offset + FRIEND_REMINDER_INSERT_CHUNK);
@@ -2051,13 +2579,13 @@ export async function enrollFriendsInReminderOnce(
         candidate.targetDate,
       );
     }
-    bindings.push(reminderId, now, now);
+    bindings.push(reminderId, bulkTemplateSnapshot, now, now);
 
     const result = await db.prepare(
       `WITH candidates(id, friend_id, target_date) AS (VALUES ${values})
        INSERT OR IGNORE INTO friend_reminders
-         (id, friend_id, reminder_id, target_date, created_at, updated_at)
-       SELECT c.id, c.friend_id, ?, c.target_date, ?, ?
+         (id, friend_id, reminder_id, target_date, template_version_snapshot, created_at, updated_at)
+       SELECT c.id, c.friend_id, ?, c.target_date, ?, ?, ?
          FROM candidates c
         WHERE NOT EXISTS (
           SELECT 1

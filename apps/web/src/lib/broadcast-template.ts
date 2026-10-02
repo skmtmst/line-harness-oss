@@ -2,7 +2,13 @@ import type {
   BroadcastBubble,
   BroadcastBubbleType,
   BroadcastMessageAsset,
+  BroadcastMessageButton,
 } from '@/lib/api'
+import {
+  convertBroadcastAsset,
+  isBroadcastAssetKind,
+  type BroadcastAssetKind,
+} from '@line-crm/shared'
 import {
   serializeMessageKind,
   type MessageKind,
@@ -112,10 +118,41 @@ export function bubbleLegacyMessage(bubble: BroadcastBubble): {
     const json = state ? serializeMessageKind(bubble.type as MessageKind, state) : null
     return { messageType: bubble.type as BroadcastMessageKind, messageContent: json ?? '' }
   }
-  if (bubble.type === 'rich_message' || bubble.type === 'card_message') {
-    return { messageType: 'flex', messageContent: JSON.stringify(bubble.content) }
+  if (isBroadcastAssetKind(bubble.type)) {
+    /*
+     * 配信用素材は、LINE へそのまま渡せる種別へ明示的に直す。
+     * 中身の JSON を本文に落とすと、素材の管理名やIDがそのまま相手の
+     * トークに届く（監査 R144）。直せない素材は空にして、保存の前に
+     * assetBubbleError が止める。
+     */
+    const converted = convertBroadcastAsset(
+      bubble.type as BroadcastAssetKind,
+      String(bubble.content.assetName ?? ''),
+      bubble.content as Record<string, unknown>,
+    )
+    if (!converted.ok) return { messageType: 'text', messageContent: '' }
+    return { messageType: converted.message.messageType, messageContent: converted.message.messageContent }
   }
   return { messageType: 'text', messageContent: JSON.stringify(bubble.content) }
+}
+
+/**
+ * 素材の吹き出しが送れる形になっているか。空文字なら問題なし。
+ *
+ * 選んでいない（assetId が無い）ときと、選んだ素材が送れる形に直せない
+ * ときに、利用者への直し方を返す。保存の検査（bubblesError）と Worker の
+ * 複数吹き出し解析が同じ変換を見るので、画面では通るのに送信で断られる
+ * 形にならない。
+ */
+export function assetBubbleError(bubble: BroadcastBubble): string {
+  if (!isBroadcastAssetKind(bubble.type)) return ''
+  if (!bubble.content.assetId) return 'テンプレートを選択してください'
+  const converted = convertBroadcastAsset(
+    bubble.type as BroadcastAssetKind,
+    String(bubble.content.assetName ?? ''),
+    bubble.content as Record<string, unknown>,
+  )
+  return converted.ok ? '' : converted.error
 }
 
 /** 一斉配信が LINE へ渡せる種別。worker の `BroadcastMessageType` と同じ。 */
@@ -131,6 +168,24 @@ export type BroadcastMessageKind =
 
 /** 位置情報・音声・スタンプ。シナリオと同じ入力欄・同じ並べ方を使う。 */
 const KIND_FIELD_TYPES = new Set<BroadcastBubbleType>(['location', 'audio', 'sticker'])
+
+/**
+ * ボタンがそのまま保存できる形になっているか。空文字なら問題なし。
+ *
+ * 空の名前・空のURL・https でないURLを区別して返す。保存の検査と
+ * 作成5段の帯が同じ関数を見る（監査 R206）。Worker 側の検査と文言を
+ * そろえているので、画面で通ったものが保存で断られない。
+ */
+export function messageButtonsError(buttons: BroadcastMessageButton[]): string {
+  if (buttons.length > 4) return 'ボタンは4つまでです'
+  for (const [index, button] of buttons.entries()) {
+    const number = index + 1
+    if (!button.label.trim()) return `ボタン${number}の名前を入力してください`
+    if (!button.value.trim()) return `ボタン${number}のURLを入力してください`
+    if (!/^https:\/\//i.test(button.value.trim())) return `ボタン${number}のURLは https:// から始めてください`
+  }
+  return ''
+}
 
 export function isContentTemplateType(type: BroadcastBubbleType): boolean {
   return ['rich_message', 'card_message', 'coupon', 'research'].includes(type)

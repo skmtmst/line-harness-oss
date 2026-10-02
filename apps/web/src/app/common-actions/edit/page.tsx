@@ -11,11 +11,14 @@ import {
 } from '@/lib/api'
 import CommonActionEditor from '@/components/automations/common-action-editor'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
+import TargetMissing from '@/components/shared/target-missing'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { TextArea, TextField } from '@/components/shared/text-field'
-import BranchEditors, { newBranchStep, updateBranchStep } from '../branch-editor'
+import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from '../branch-editor'
+import { mergeOrderedActions, stepNumbers } from '../action-order'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
@@ -30,10 +33,17 @@ function EditCommonActionInner() {
   const [description, setDescription] = useState('')
   const [actions, setActions] = useState<CommonActionStep[]>([])
   const [draftVersionId, setDraftVersionId] = useState('')
+  /* 監査 R473: 読み取り時の改訂番号。保存時に照合し、先行保存があれば409で止まる。 */
+  const [draftRevision, setDraftRevision] = useState(1)
+  const [saveConflict, setSaveConflict] = useState(false)
   const [resources, setResources] = useState<CommonActionResources>(EMPTY_RESOURCES)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /** 取得の失敗の内訳（保存の失敗とは分ける）。 */
+  const [loadFailure, setLoadFailure] = useState<'missing' | 'forbidden' | 'no-draft' | 'error' | null>(null)
+  /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     // U096: 対象が無いURLでは取りに行かない。無いまま叩くと
@@ -48,6 +58,9 @@ function EditCommonActionInner() {
     }
     let cancelled = false
     setLoading(true)
+    /* 監査 R584: 再読込を始めたら古い取得失敗文を消す。残ると復旧が分からない。 */
+    setError('')
+    setLoadFailure(null)
     Promise.all([
       api.commonActions.get(id, selectedAccountId),
       api.commonActions.resources(selectedAccountId, id),
@@ -56,11 +69,23 @@ function EditCommonActionInner() {
       if (!detailResponse.success || !resourceResponse.success) throw new Error('下書きを読み込めませんでした')
       const detail = detailResponse.data
       const draft = detail.versions.find((version) => version.id === detail.currentDraftVersionId)
-      if (!draft) throw new Error('編集中の下書きがありません。版の画面から新版を作ってください。')
+      /*
+       * 監査 R583: 下書きなしは通信の失敗ではない。再読込では直らないので
+       * 通信障害の1枚にせず、版の画面で新版を作る案内にする。
+       */
+      if (!draft) {
+        setError('編集中の下書きがありません。公開済みの版はそのままです。')
+        setLoadFailure('no-draft')
+        return
+      }
       setName(detail.name)
       setDescription(detail.description ?? '')
       setActions(draft.actions)
       setDraftVersionId(draft.id)
+      setDraftRevision(draft.draftRevision ?? 1)
+      setSaveConflict(false)
+      /* 監査 R584: 復旧後は古い取得失敗文を残さない。編集欄の下に出し直さない。 */
+      setError('')
       setResources(resourceResponse.data)
     }).catch((caught) => {
       /*
@@ -70,18 +95,21 @@ function EditCommonActionInner() {
       if (cancelled) return
       if (caught instanceof ApiError && caught.status === 404) {
         setError('この共通アクションは削除されたか、別のLINEアカウントのものです。')
+        setLoadFailure('missing')
       } else if (caught instanceof ApiError && caught.status === 403) {
         setError('この共通アクションを編集する権限がありません。')
+        setLoadFailure('forbidden')
       } else {
         setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:')
           ? caught.message
           : '下書きを読み込めませんでした。通信の状態を確認して、もう一度お試しください。')
+        setLoadFailure('error')
       }
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
-  }, [accountLoading, canManage, id, selectedAccountId])
+  }, [accountLoading, canManage, id, reloadKey, selectedAccountId])
 
   const save = async () => {
     if (!selectedAccountId || !draftVersionId) {
@@ -94,9 +122,11 @@ function EditCommonActionInner() {
     }
     setSaving(true)
     setError('')
+    setSaveConflict(false)
     try {
       await api.commonActions.updateDraft(id, selectedAccountId, {
         expectedDraftVersionId: draftVersionId,
+        expectedDraftRevision: draftRevision,
         name: name.trim(),
         description: description.trim() || null,
         actions,
@@ -104,25 +134,30 @@ function EditCommonActionInner() {
       router.push(`/common-actions/versions?id=${encodeURIComponent(id)}`)
     } catch (caught) {
       setError(caught instanceof ApiError || caught instanceof Error ? caught.message : '下書きを保存できませんでした')
+      // 監査 R473: 先行保存との競合は入力を保持したまま、読み直しへ導く。
+      if (caught instanceof ApiError && caught.status === 409) setSaveConflict(true)
     } finally {
       setSaving(false)
     }
   }
 
-  const branches = actions.filter((action) => action.type === 'branch')
   const plainActions = actions.filter((action) => action.type !== 'branch')
-  const updateBranch = (branchId: string, patch: { tagId?: string; thenId?: string; elseId?: string }) => {
+  const updateBranch = (branchId: string, patch: BranchPatch) => {
     setActions((current) => current.map((step) => step.id === branchId ? updateBranchStep(step, patch) : step))
   }
 
   // U096: 対象未指定を専用の案内にする。取得に行かず、一覧へ戻す。
-  if (!id) return (
-    <div className="border-hairline rounded-card border bg-canvas p-6">
-      <h2 className="text-ink text-lg font-semibold">編集する共通アクションが指定されていません</h2>
-      <p className="text-ink-secondary mt-2 text-sm">一覧から編集する共通アクションを選び直してください。</p>
-      <Button href="/common-actions" className="mt-4">共通アクション一覧へ戻る</Button>
-    </div>
-  )
+  if (!id) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="編集する共通アクションが指定されていません"
+        description="一覧から編集する共通アクションを選び直してください。"
+        backHref="/common-actions"
+        backLabel="共通アクション一覧へ戻る"
+      />
+    )
+  }
   /*
     U096: アカウント未選択と「対象が無い」を分ける。未選択のまま描くと
     空っぽの編集画面が出て、何が足りないか分からない。
@@ -148,6 +183,57 @@ function EditCommonActionInner() {
     </div>
   )
 
+  /*
+    対象が無い（取得失敗）ときは、見出し・入力・右の案内・固定バー
+    のどれも出さない。代わりに ★V7 TargetMissing を出す。
+  */
+  if (error && !draftVersionId && loadFailure === 'forbidden') {
+    return (
+      <ListState
+        kind="forbidden"
+        title="この共通アクションを編集する権限がありません"
+        description="権限のある人に確認するか、別のLINEアカウントを選んでください。"
+        action={<Button href={`/common-actions/versions?id=${encodeURIComponent(id)}`}>版の画面へ戻る</Button>}
+      />
+    )
+  }
+  if (error && !draftVersionId && loadFailure === 'missing') {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この共通アクションは見つかりません"
+        description="削除されたか、別のLINEアカウントのものです。版の画面から選び直してください。"
+        backHref={`/common-actions/versions?id=${encodeURIComponent(id)}`}
+        backLabel="版の画面へ戻る"
+      />
+    )
+  }
+  /*
+   * 監査 R583: 下書きなしは通信障害ではない。再読込の口ではなく、
+   * ★V7 TargetMissing で版の画面（前の版から新版を作る入口）へ戻す。
+   */
+  if (error && !draftVersionId && loadFailure === 'no-draft') {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="編集中の下書きがありません"
+        description="公開済みの版はそのままです。版の画面で前の版から新版を作ると、編集を続けられます。"
+        backHref={`/common-actions/versions?id=${encodeURIComponent(id)}`}
+        backLabel="版の画面へ戻る"
+      />
+    )
+  }
+  if (error && !draftVersionId) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="下書きを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => setReloadKey((k) => k + 1)}
+      />
+    )
+  }
+
   return (
     <div data-design-node="py5CG" className="pb-24">
       <PageHeader
@@ -160,60 +246,55 @@ function EditCommonActionInner() {
         description="公開済みの版は変えず、新しい下書きだけを編集します。"
       />
 
-      {error && !draftVersionId ? (
-        <div className="border-danger bg-danger-bg text-danger rounded-card border p-6" role="alert">
-          <p className="font-semibold">下書きを編集できません</p>
-          <p className="mt-1 text-sm">{error}</p>
-          <Button href={`/common-actions/versions?id=${encodeURIComponent(id)}`} className="mt-4">版の画面へ戻る</Button>
-        </div>
-      ) : (
-        <>
-          <div className="common-action-editor-grid grid items-start gap-4">
-            <div className="space-y-4">
-              <section className="border-hairline rounded-card border bg-canvas p-5">
-                <h2 className="text-ink font-semibold">名前と説明</h2>
-                <div className="mt-4 space-y-4">
-                  <label className="text-ink-secondary block text-sm">共通アクション名<TextField value={name} onChange={(event) => setName(event.target.value)} maxLength={120} className="mt-1" /></label>
-                  <label className="text-ink-secondary block text-sm">説明<TextArea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1" /></label>
-                </div>
-              </section>
-              <section>
-                <h2 className="text-ink mb-3 font-semibold">順番に動かす処理</h2>
-                <CommonActionEditor value={plainActions} resources={resources} onChange={(next) => setActions([...next, ...branches])} />
-                <BranchEditors
-                  branches={branches}
-                  offset={plainActions.length}
-                  resources={resources}
-                  onUpdate={updateBranch}
-                  onRemove={(branchId) => setActions((current) => current.filter((step) => step.id !== branchId))}
-                />
-                <Button className="mt-3" onClick={() => setActions((current) => [...current, newBranchStep()])}>条件で分ける</Button>
-              </section>
+      <div className="common-action-editor-grid grid items-start gap-4">
+        <div className="space-y-4">
+          <section className="border-hairline rounded-card border bg-canvas p-5">
+            <h2 className="text-ink font-semibold">名前と説明</h2>
+            <div className="mt-4 space-y-4">
+              <label className="text-ink-secondary block text-sm">共通アクション名<TextField value={name} onChange={(event) => setName(event.target.value)} maxLength={120} className="mt-1" /></label>
+              <label className="text-ink-secondary block text-sm">説明<TextArea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1" /></label>
             </div>
-            <aside className="space-y-4 xl:sticky xl:top-4">
-              <section className="border-hairline rounded-card border bg-canvas p-5">
-                <h2 className="text-ink font-semibold">保存しても利用先は変わりません</h2>
-                <p className="text-ink-secondary mt-2 text-sm leading-6">下書きを保存したあと、版の画面で公開します。さらに利用先ごとの更新が必要です。</p>
-              </section>
-              <section className="border-warning bg-warning-bg rounded-card border p-5">
-                <h2 className="text-ink font-semibold">公開前の確認</h2>
-                <p className="text-ink-secondary mt-2 text-sm leading-6">参照先、失敗時の動き、処理の順番が正しいかを確認してください。循環や使えない参照は公開時に止まります。</p>
-              </section>
-            </aside>
-          </div>
-          {error ? <p className="text-danger mt-4 text-sm" role="alert">{error}</p> : null}
-          <StickyBar
-            status={saving ? '下書きを保存しています' : '公開済みの版には影響しません'}
-            actions={(
-              <>
-                <Button href={`/common-actions/versions?id=${encodeURIComponent(id)}`}>編集をやめる</Button>
-                <Button variant="primary" onClick={() => void save()} disabled={saving}>下書きを保存</Button>
-              </>
-            )}
-          />
-          <style jsx>{`@media (min-width: 1280px) { .common-action-editor-grid { grid-template-columns: minmax(0, 1fr) 390px; } }`}</style>
-        </>
-      )}
+          </section>
+          <section>
+            <h2 className="text-ink mb-3 font-semibold">順番に動かす処理</h2>
+            {/* 監査 R474: 分岐の位置を保ち、通常処理の編集で順序を変えない。番号は実行順。 */}
+            <CommonActionEditor value={plainActions} resources={resources} stepNumbers={stepNumbers(actions)} onChange={(next) => setActions((current) => mergeOrderedActions(current, next))} />
+            <BranchEditors
+              steps={actions}
+              resources={resources}
+              onUpdate={updateBranch}
+              onRemove={(branchId) => setActions((current) => current.filter((step) => step.id !== branchId))}
+            />
+            <Button className="mt-3" onClick={() => setActions((current) => [...current, newBranchStep()])}>条件で分ける</Button>
+          </section>
+        </div>
+        <aside className="space-y-4 xl:sticky xl:top-4">
+          <section className="border-hairline rounded-card border bg-canvas p-5">
+            <h2 className="text-ink font-semibold">保存しても利用先は変わりません</h2>
+            <p className="text-ink-secondary mt-2 text-sm leading-6">下書きを保存したあと、版の画面で公開します。さらに利用先ごとの更新が必要です。</p>
+          </section>
+          <section className="border-warning bg-warning-bg rounded-card border p-5">
+            <h2 className="text-ink font-semibold">公開前の確認</h2>
+            <p className="text-ink-secondary mt-2 text-sm leading-6">参照先、失敗時の動き、処理の順番が正しいかを確認してください。循環や使えない参照は公開時に止まります。</p>
+          </section>
+        </aside>
+      </div>
+      {error ? <p className="text-danger mt-4 text-sm" role="alert">{error}</p> : null}
+      {saveConflict ? (
+        <div className="mt-4">
+          <Button onClick={() => { setSaveConflict(false); setReloadKey((key) => key + 1) }}>最新の内容を読み込み直す</Button>
+        </div>
+      ) : null}
+      <StickyBar
+        status={saving ? '下書きを保存しています' : '公開済みの版には影響しません'}
+        actions={(
+          <>
+            <Button href={`/common-actions/versions?id=${encodeURIComponent(id)}`}>キャンセル</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={saving}>下書きを保存する</Button>
+          </>
+        )}
+      />
+      <style jsx>{`@media (min-width: 1280px) { .common-action-editor-grid { grid-template-columns: minmax(0, 1fr) 390px; } }`}</style>
     </div>
   )
 }

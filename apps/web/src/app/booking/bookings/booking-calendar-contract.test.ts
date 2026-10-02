@@ -17,7 +17,9 @@ describe('V6 予約管理の時間台帳', () => {
     expect(CALENDAR).toContain('function WeekGrid')
     expect(CALENDAR).toContain('repeat(${Math.max(staff.length, 1)}, minmax(0, 1fr))')
     expect(CALENDAR).toContain("'64px repeat(7, minmax(0, 1fr))'")
-    expect(CALENDAR).toContain('LINEからの予約（緑）と電話の予約（青）')
+    // ★V7：色の見方は帯ではなく小さな凡例（● LINEからの予約 ● 電話の予約）。
+    expect(CALENDAR).toContain('●</span> LINEからの予約')
+    expect(CALENDAR).toContain('●</span> 電話の予約')
   })
 
   test('格子ごとに走査せず辞書へ束ねる(点検#516の中1)', () => {
@@ -27,8 +29,11 @@ describe('V6 予約管理の時間台帳', () => {
   })
 
   test('電話予約はLINE予約と同じ格子へ出し、未連携の理由も隠さない', () => {
+    // R88: 受付経路は source で分ける。担当者の代理入力
+    // （source=operator＋friend_idあり）をLINEに数えない。
+    expect(CALENDAR).toContain('function isLineBooking')
+    expect(CALENDAR).toContain("booking.source === 'liff'")
     expect(CALENDAR).toContain('function isPhoneBooking')
-    expect(CALENDAR).toContain("!booking.friend_id")
     expect(CALENDAR).toContain('電話予約のお客さま')
     expect(CALENDAR).toContain('LINE未連携の方には当日の連絡ができません。')
   })
@@ -37,10 +42,11 @@ describe('V6 予約管理の時間台帳', () => {
     for (const text of [
       'LINEの友だちなら、名前で探して結びつけてください。',
       'お客様に何を送りますか',
-      'LINEプレビュー',
       'この方について',
       'つながる先',
     ]) expect(CREATE).toContain(text)
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(CREATE).toContain('<LinePreview')
     expect(CREATE).toContain('予約と顧客台帳に残ります')
   })
 
@@ -65,11 +71,19 @@ describe('V6 予約管理の時間台帳', () => {
     expect(CALENDAR).toContain('`/booking/bookings/new?${params.toString()}`')
     expect(CALENDAR).toContain("date: input.day")
     expect(CALENDAR).toContain("params.set('staff', input.staffName)")
-    expect(CALENDAR).toContain('aria-label="この空き枠に予約を入れる"')
+    // R315: 空き枠の読み上げ名は日付・開始時刻・担当を含む固有の名前。
+    // 70本すべて同じ名前では、読み上げの一覧から目的の日時を選べない。
+    expect(CALENDAR).toContain('function slotAriaLabel')
+    expect(CALENDAR).toContain('空きあり')
+    expect(CALENDAR).toContain('label={entryLabel}')
+    expect(CALENDAR).not.toContain('aria-label="この空き枠に予約を入れる"')
     // 操作できない人（canCreate=false）は「あき」の文字だけ。押せる形に見せない。
     expect(CALENDAR).toContain('if (!href) {')
-    expect(CALENDAR).toContain('canCreate && slot ? newBookingHref({ day, time: slot.start, staffName: name, menuId: slot.menuId }) : undefined')
-    expect(CALENDAR).toContain('canCreate && slot ? newBookingHref({ day, time: slot.start, staffName: slot.staffName, menuId: slot.menuId }) : undefined')
+    // R87: 予約ありのマスでも重ならない枠の入口は残す。重なりは時刻で確かめる。
+    expect(CALENDAR).toContain('function slotOverlapsBookings')
+    expect(CALENDAR).toContain('cell.length === 0 || !slotOverlapsBookings(slot, cell)')
+    expect(CALENDAR).toContain("newBookingHref({ day, time: slot.start, staffName: name, menuId: slot.menuId })")
+    expect(CALENDAR).toContain("newBookingHref({ day, time: slot.start, staffName: slot.staffName, menuId: slot.menuId })")
   })
 
   test('BOOKING-01: 空きはマス数ではなく空き枠APIの実績から計算する', () => {
@@ -99,11 +113,23 @@ describe('V6 予約管理の時間台帳', () => {
   test('BOOKING-01: 実際に取れる枠だけが代理予約の入口になる', () => {
     // remaining>0 の枠があるマスだけ入口にし、取れないマスは「—」。
     expect(CALENDAR).toContain('slot.remaining <= 0')
-    expect(CALENDAR).toContain('aria-label="受け付けていない時間"')
+    // ★V7：受け付けていないマスは空のまま、読み上げだけ伝える。
+    expect(CALENDAR).toContain('<span className="sr-only">受け付けていない時間</span>')
     // 入口は枠を出したメニューと実際の開始時刻・担当を事前入力し、
     // メニュー候補のない入口へ遷移させない。
     expect(CALENDAR).toContain("params.set('menu', input.menuId)")
     expect(CALENDAR).toContain('time: slot.start')
+  })
+
+  test('R86: 取消・拒否・期限切れは件数・売上見込みから外しカードに状態を出す', () => {
+    expect(CALENDAR).toContain('HISTORY_STATUSES')
+    expect(CALENDAR).toContain('activeItems')
+    expect(CALENDAR).toContain('（{statusMark}）')
+  })
+
+  test('R85: 週表は狭い画面で横スクロールし日付を重ねない', () => {
+    expect(CALENDAR).toContain('overflow-x-auto')
+    expect(CALENDAR).toContain('minWidth: 560')
   })
 
   test('URLの日付・時刻・担当は下書きより優先して事前入力する (#933 N-399)', () => {

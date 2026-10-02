@@ -61,14 +61,25 @@ function ruleFixture() {
     draftVersion: 7,
     draftUpdatedAt: '2026-09-10T01:00:00.000Z',
     publishedVersion: 1,
-    metrics30d: { eligible: 10, granted: 8, excluded: 2 },
+    metrics30d: { eligible: 10, granted: 8, grantedMiles: 800, excluded: 2 },
   }
 }
 
+/* D022: 見本は実APIの形に合わせる（monthChange・rankCounts・expiringMiles30d・nextExpiringAt・measuredAt は必須）。 */
 const friendsOverview = {
   items: [],
-  summary: { totalMembers: 1, withBalanceCount: 1, available: 100, pending: 0 },
+  summary: {
+    totalMembers: 1,
+    withBalanceCount: 1,
+    available: 100,
+    pending: 0,
+    monthChange: 0,
+    rankCounts: [],
+    expiringMiles30d: null,
+    nextExpiringAt: null,
+  },
   pagination: { total: 1, limit: 1, offset: 0 },
+  measuredAt: '2026-09-10T00:00:00.000Z',
 }
 
 /*
@@ -183,13 +194,30 @@ async function renderPage() {
   })
 }
 
-async function waitForPublishButton(): Promise<HTMLButtonElement> {
+async function waitForRowMenuButton(): Promise<HTMLButtonElement> {
   for (let i = 0; i < 40; i += 1) {
     await act(async () => { await Promise.resolve() })
-    const button = container.querySelector('button[aria-label="あいさつでたまるの下書きを公開して反映する"]')
+    const button = container.querySelector('button[aria-label="あいさつでたまるのその他操作"]')
     if (button) return button as HTMLButtonElement
   }
-  throw new Error('公開ボタンが出ませんでした')
+  throw new Error('その他操作のボタンが出ませんでした')
+}
+
+async function waitForPublishItem(): Promise<HTMLButtonElement> {
+  for (let i = 0; i < 40; i += 1) {
+    await act(async () => { await Promise.resolve() })
+    // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const items = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+    const item = items.find((node) => node.textContent?.trim() === '公開して反映')
+    if (item) return item
+  }
+  throw new Error('公開して反映の項目が出ませんでした')
+}
+
+/* 「公開して反映」は行の「その他操作」メニューの中。開いてから項目を押す。 */
+async function openPublishDialog() {
+  await act(async () => { (await waitForRowMenuButton()).click() })
+  await act(async () => { (await waitForPublishItem()).click() })
 }
 
 function dialog(): HTMLElement | null {
@@ -223,7 +251,7 @@ describe('たまる決めごとの公開確認(本物のReact)', () => {
     await renderPage()
 
     // ボタンを押しただけでは送らない。確認窓が出る。
-    await act(async () => { (await waitForPublishButton()).click() })
+    await openPublishDialog()
     await settle()
     expect(net.publishes()).toHaveLength(0)
     expect(dialog()).not.toBeNull()
@@ -246,7 +274,7 @@ describe('たまる決めごとの公開確認(本物のReact)', () => {
     })
     await renderPage()
 
-    await act(async () => { (await waitForPublishButton()).click() })
+    await openPublishDialog()
     await settle()
     expect(dialog()).not.toBeNull()
 
@@ -265,7 +293,7 @@ describe('たまる決めごとの公開確認(本物のReact)', () => {
     })
     await renderPage()
 
-    await act(async () => { (await waitForPublishButton()).click() })
+    await openPublishDialog()
     await settle()
     await act(async () => { dialogConfirm()?.click() })
     await settle(10)

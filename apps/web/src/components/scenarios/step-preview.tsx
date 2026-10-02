@@ -12,6 +12,8 @@
  */
 
 import { Clock } from 'lucide-react'
+import LinePreview from '@/components/shared/line-preview'
+import Notice from '@/components/shared/notice'
 import styles from './step-preview.module.css'
 import type { DeliveryMode } from '@line-crm/shared'
 import type { ScenarioQuestion } from './question-editor'
@@ -37,9 +39,28 @@ export interface StepPreviewProps {
   kindState?: MessageKindState
   /** 誰に送るか。札に出す。 */
   audienceLabel: string
+  /**
+   * R213: いま触っている通の番号。新規1通目のときは 1（省略時も 1）。
+   * 2通目以降の編集で 1通目と案内すると、前後の流れを取り違える。
+   */
+  stepOrder?: number
+  /**
+   * R236: 送ったあとどうするか。右の設定サマリーの「配信後」に出す。
+   * 省略時は次へ進む（送ったあとの既定）。一時停止の編集欄がある画面は
+   * その値を渡す。渡さないと、一時停止中も「次へ進む」のまま残る。
+   */
+  afterSend?: 'continue' | 'pause'
 }
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
+
+/** 配信時刻の形（worker の validateStepSchedule と同じ）。空や崩れた値は受けない。 */
+export const DELIVERY_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+
+/** 時刻指定なのに時刻が入っているか。消したままは「未設定」として扱う。 */
+export function isDeliveryTimeSet(deliveryTime: string): boolean {
+  return DELIVERY_TIME_RE.test(deliveryTime.trim())
+}
 
 /** 日本時間で見た「いま」。端末が海外時刻でも、配信はJSTで動く。 */
 function nowJst(): Date {
@@ -76,7 +97,15 @@ export function computeDeliveryAt(
 ): Date {
   const at = new Date(start.getTime())
   if (mode === 'absolute_time') {
-    const [h, m] = deliveryTime.split(':').map((n) => Number(n) || 0)
+    /*
+     * R235: 時刻を消したまま（''）来ると、分の取り出しが undefined になり
+     * setHours が Invalid Date を作って「NaN月NaN日」が出ていた。形が違う
+     * 値は 0時0分に倒さず、呼び側が未設定表示にする（下の timeMissing）。
+     * ここでは壊れた日時を作らないことだけを守る。
+     */
+    const parts = deliveryTime.split(':').map((n) => Number(n))
+    const h = Number.isFinite(parts[0]) ? (parts[0] as number) : 0
+    const m = Number.isFinite(parts[1]) ? (parts[1] as number) : 0
     at.setDate(at.getDate() + offsetDays)
     at.setHours(h, m, 0, 0)
     if (at.getTime() < start.getTime()) at.setDate(at.getDate() + 1)
@@ -88,6 +117,47 @@ export function computeDeliveryAt(
   return at
 }
 
+/**
+ * 編集中の予定入力を、プレビューが受け取る「日・時間・分」へそろえる。
+ *
+ * 方式ごとに入力欄の持ち方が違う：
+ *   relative … delayMinutes が合計の分（日・時間・分へ分解する）
+ *   elapsed  … offsetDays ＋ offsetHours ＋ offsetMinutesRemainder
+ *   absolute_time … offsetDays ＋ deliveryTime（時間・分は使わない）
+ *
+ * 呼び出し側で欄を個別に写すと「分だけ渡し忘れ」が起き、設定内容は
+ * 「1分後」なのに配信の流れ・設定サマリーが「すぐに」のまま残る
+ * （#616 SC-02b）。ここで1か所に決める。
+ */
+export function previewOffsets(
+  mode: DeliveryMode,
+  schedule: {
+    delayMinutes: number
+    offsetDays: number
+    offsetHours: number
+    offsetMinutesRemainder: number
+  },
+): { offsetDays: number; offsetHours: number; offsetMinutes: number } {
+  if (mode === 'absolute_time') {
+    return { offsetDays: Math.max(0, schedule.offsetDays), offsetHours: 0, offsetMinutes: 0 }
+  }
+  if (mode === 'relative') {
+    const total = Number.isFinite(schedule.delayMinutes)
+      ? Math.max(0, Math.floor(schedule.delayMinutes))
+      : 0
+    return {
+      offsetDays: Math.floor(total / 1440),
+      offsetHours: Math.floor((total % 1440) / 60),
+      offsetMinutes: total % 60,
+    }
+  }
+  return {
+    offsetDays: Math.max(0, schedule.offsetDays),
+    offsetHours: Math.max(0, schedule.offsetHours),
+    offsetMinutes: Math.max(0, schedule.offsetMinutesRemainder),
+  }
+}
+
 function scheduleWords(
   mode: DeliveryMode,
   offsetDays: number,
@@ -96,6 +166,8 @@ function scheduleWords(
   offsetMinutes = 0,
 ): string {
   if (mode === 'absolute_time') {
+    // R235: 時刻が空のまま「当日の 」と出すと、設定が済んだように見える。未設定とはっきり言う。
+    if (!isDeliveryTimeSet(deliveryTime)) return '時刻が未入力です'
     return offsetDays === 0 ? `当日の ${deliveryTime}` : `${offsetDays}日後の ${deliveryTime}`
   }
   const parts: string[] = []
@@ -143,45 +215,50 @@ export default function StepPreview({
   question,
   kindState,
   audienceLabel,
+  stepOrder = 1,
+  afterSend = 'continue',
 }: StepPreviewProps) {
+  const stepLabel = `${stepOrder}通目`
   const start = nowJst()
+  /*
+   * R235: 時刻を消したままは予定未設定として出し、日付計算へ渡さない。
+   * 計算した日時を出すと、00:00 に倒れた値か NaN のどちらかが出て、
+   * どちらも「設定が済んだ」か「壊れた」ように見える。
+   */
+  const timeMissing = deliveryMode === 'absolute_time' && !isDeliveryTimeSet(deliveryTime)
   const at = computeDeliveryAt(
     start,
     deliveryMode,
     offsetDays,
-    deliveryTime,
+    timeMissing ? '00:00' : deliveryTime,
     offsetHours,
     offsetMinutes,
   )
   const words = scheduleWords(deliveryMode, offsetDays, deliveryTime, offsetHours, offsetMinutes)
-  const rolled = rolledToNextDay(start, at, deliveryMode, offsetDays)
+  const rolled = !timeMissing && rolledToNextDay(start, at, deliveryMode, offsetDays)
 
   return (
     <aside
-      aria-label="1通目の下見"
+      aria-label={`${stepLabel}の下見`}
       className={`${styles.preview} border-hairline bg-canvas border p-4`}
     >
-      <section className="bg-line-preview -mx-4 -mt-4 mb-4 min-h-75 rounded-t-card p-4">
-        <h3 className="text-on-accent text-center text-sm font-bold">LINEプレビュー</h3>
-        <p className="mt-3 flex justify-center">
-          <span className="bg-line-preview-label text-on-accent rounded-pill inline-flex items-center gap-1 px-2.5 py-1 text-micro font-semibold">
-            <Clock aria-hidden size={13} strokeWidth={1.75} />
-            {words}に届きます（1通目）
-          </span>
-        </p>
-        <div className="mt-4">
+      {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。届く日時は見える札のまま残す。 */}
+      <div className="-mx-4 -mt-4 mb-4">
+        <LinePreview
+          caption={<span className="inline-flex items-center gap-1"><Clock aria-hidden size={13} strokeWidth={1.75} />{timeMissing ? `時刻を入れると届く日時が出ます（${stepLabel}）` : `${words}に届きます（${stepLabel}）`}</span>}
+        >
           {templateName ? (
             <Bubble>
               <span className="text-ink-faint text-micro">テンプレート</span>
-              <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+              <span className="text-ink mt-0.5 block text-label font-medium">{templateName}</span>
             </Bubble>
           ) : body.trim() ? (
             <Bubble>{renderPreviewBody(body)}</Bubble>
           ) : (
             <Placeholder>本文を書くと、ここに出ます</Placeholder>
           )}
-        </div>
-      </section>
+        </LinePreview>
+      </div>
 
       <h3 className="text-ink text-sm font-bold">配信の流れ</h3>
       <p className="text-ink-faint mt-0.5 text-micro leading-relaxed">
@@ -196,16 +273,16 @@ export default function StepPreview({
       <div className="bg-canvas-sunken rounded-card mt-3 space-y-2 p-3">
         {/* 届く日時の帯（設計 h=26 r=full 11/600 アイコン13）。 */}
         <p className="flex justify-center">
-          <span className={`${styles.band} bg-accent-soft text-accent rounded-pill flex items-center gap-1 px-2.5 text-micro font-semibold`}>
+          <span className={`${styles.band} bg-accent-soft text-accent-deep rounded-pill flex items-center gap-1 px-2.5 text-micro font-semibold`}>
             <Clock aria-hidden size={13} strokeWidth={1.75} />
-            {words}・{formatJst(at)}
+            {timeMissing ? '時刻が未入力です' : `${words}・${formatJst(at)}`}
           </span>
         </p>
 
         {templateName ? (
           <Bubble>
             <span className="text-ink-faint text-micro">テンプレート</span>
-            <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+            <span className="text-ink mt-0.5 block text-label font-medium">{templateName}</span>
           </Bubble>
         ) : kind === 'image' ? (
           imageUrl ? (
@@ -223,14 +300,14 @@ export default function StepPreview({
           <>
             {question.intro?.trim() ? <Bubble>{question.intro}</Bubble> : null}
             <Bubble>
-              <span className="text-ink block text-label font-bold">
+              <span className="text-ink block text-label font-medium">
                 {question.text.trim() || '（質問文がまだ空です）'}
               </span>
               <span className="mt-2 block space-y-1.5">
                 {question.choices.map((choice, i) => (
                   <span
                     key={i}
-                    className={`rounded-control block px-3 py-2 text-center text-label font-bold ${
+                    className={`rounded-control block px-3 py-2 text-center text-label font-medium ${
                       i === 0
                         ? 'bg-accent-deep text-on-accent'
                         : 'border-hairline text-ink-secondary border'
@@ -246,7 +323,7 @@ export default function StepPreview({
           templateName ? (
             <Bubble>
               <span className="text-ink-faint text-micro">カルーセル</span>
-              <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+              <span className="text-ink mt-0.5 block text-label font-medium">{templateName}</span>
               <span className="text-ink-faint mt-1 block text-micro">
                 実際の見た目は、カルーセルの編集画面で確かめられます。
               </span>
@@ -257,7 +334,7 @@ export default function StepPreview({
         ) : kind === 'location' ? (
           kindState?.location.latitude && kindState.location.longitude ? (
             <Bubble>
-              <span className="text-ink block text-label font-bold">
+              <span className="text-ink block text-label font-medium">
                 {kindState.location.title.trim() || '場所'}
               </span>
               {kindState.location.address.trim() && (
@@ -325,10 +402,10 @@ export default function StepPreview({
         疑うことになる。理由をその場に出す。
       */}
       {rolled && (
-        <p className="text-warning bg-warning-bg rounded-control mt-2 px-2 py-1.5 text-micro leading-relaxed">
+        <Notice tone="warn" className="mt-2">
           いまはもう {deliveryTime} を過ぎているため、翌日になります。
           購読開始が {deliveryTime} より前なら、その日のうちに届きます。
-        </p>
+        </Notice>
       )}
 
       {/*
@@ -343,20 +420,34 @@ export default function StepPreview({
         </p>
       )}
 
+      {/*
+        R213: 新規1通目の案内を使い回さない。2通目以降の編集中に
+        「2通目からは、このあとの編集画面で足せます」と出すと、
+        いま触っている通と順序を取り違える。
+      */}
       <p className="text-ink-faint border-hairline mt-3 border-t pt-3 text-micro leading-relaxed">
-        2通目からは、このあとの編集画面で足せます。足すと、ここと同じ形で届く日時が並びます。
+        {stepOrder <= 1
+          ? '2通目からは、このあとの編集画面で足せます。足すと、ここと同じ形で届く日時が並びます。'
+          : `いま編集中の${stepLabel}の見本です。前後の通は、一覧の並びで確認できます。`}
       </p>
 
       <section className="border-hairline mt-3 border-t pt-3">
         <h3 className="text-ink text-sm font-bold">設定サマリー</h3>
         <dl className="mt-2 divide-y divide-hairline text-xs">
           <SummaryRow label="配信対象" value={audienceLabel} />
-          <SummaryRow label="配信日時" value={`${words}・${formatJst(at)}`} />
+          <SummaryRow label="配信日時" value={timeMissing ? '時刻を入力してください' : `${words}・${formatJst(at)}`} />
           <SummaryRow
             label="送信数"
             value={templateName ? 'テンプレート 1通' : `${kind === 'text' ? 'テキスト' : 'メッセージ'} 1通`}
           />
-          <SummaryRow label="配信後" value="次のステップへ進む" />
+          {/*
+            R236: 送信後を「ここで一時停止する」にしても、ここだけ
+            「次のステップへ進む」のまま残っていた。隣の設定内容の札
+            （scenario-step-audience.ts の describeAfterSend）と同じ
+            言い方にそろえる。部品から画面側の関数を読まないので、
+            同じ2つの値をここで出す。
+          */}
+          <SummaryRow label="配信後" value={afterSend === 'pause' ? '送信後に一時停止' : '次へ進む'} />
         </dl>
       </section>
     </aside>

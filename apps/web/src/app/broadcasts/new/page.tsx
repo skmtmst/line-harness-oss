@@ -70,7 +70,12 @@ function scoreRangeCondition(params: URLSearchParams): SegmentCondition | null {
   const max = parse('scoreMax')
   if (min === null && max === null) return null
   if (min !== null && max !== null && min > max) return null
-  return { operator: 'AND', rules: [{ type: 'score_range', value: { min, max } }] }
+  // R300: 行動スコアの帯から来たときは「点数がついている人」だけを対象にする。
+  const scoredOnly = params.get('scoredOnly') === '1'
+  return {
+    operator: 'AND',
+    rules: [{ type: 'score_range', value: { min, max, ...(scoredOnly ? { scoredOnly: true } : {}) } }],
+  }
 }
 
 /**
@@ -99,6 +104,8 @@ function NewBroadcastPageContent() {
   const searchParams = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [tags, setTags] = useState<Tag[]>([])
+  /** R581: タグ候補の取得状態。失敗と真の0件を分けて案内するために持つ。 */
+  const [tagsStatus, setTagsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loading, setLoading] = useState(true)
   const audienceId = searchParams.get('audienceId')?.trim() ?? ''
   const [audience, setAudience] = useState<AudienceHandoff | null>(null)
@@ -130,13 +137,27 @@ function NewBroadcastPageContent() {
   }
 
   const load = useCallback(async () => {
+    /*
+     * R581: 取得失敗を「候補なし」と誤案内しない。成功以外・通信失敗は
+     * 失敗として持ち、フォーム側で再試行できるようにする。
+     * m23m: タグ候補が取れなくても配信は作れる。取れない失敗で画面を落とさない。
+     */
+    setTagsStatus('loading')
     try {
-      const res = await api.tags.list()
-      if (res.success) setTags(res.data)
+      // R23横展開: 条件づくりのタグ候補は今のアカウントだけ。切替で取り直す。
+      const res = await api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
+      if (res.success) {
+        setTags(res.data)
+        setTagsStatus('ready')
+      } else {
+        setTagsStatus('error')
+      }
+    } catch {
+      setTagsStatus('error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
     void load()
@@ -182,7 +203,8 @@ function NewBroadcastPageContent() {
   const audiencePending = Boolean(effectiveAudienceId) && Boolean(selectedAccountId) && !audience && !audienceError
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {loading || audiencePending || (effectiveAudienceId && accountLoading) ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
@@ -193,7 +215,7 @@ function NewBroadcastPageContent() {
             対象者を確認するには、先にLINE公式アカウントを選んでください。
           </p>
           <div className="mt-4 flex items-center justify-center gap-3">
-            <Link href="/analytics" className="text-accent text-sm font-medium hover:underline">
+            <Link href="/analytics" className="text-action text-sm font-medium hover:underline">
               分析画面へ戻る
             </Link>
           </div>
@@ -208,7 +230,7 @@ function NewBroadcastPageContent() {
                 : '対象者が見つかりません。別のアカウントで作られたか、取り消されています。'}
           </p>
           <div className="mt-4 flex items-center justify-center gap-3">
-            <Link href="/analytics" className="text-accent text-sm font-medium hover:underline">
+            <Link href="/analytics" className="text-action text-sm font-medium hover:underline">
               分析画面へ戻る
             </Link>
             <Button
@@ -225,12 +247,14 @@ function NewBroadcastPageContent() {
       ) : (
         <>
           {conditionParamInvalid ? (
-            <p className="bg-canvas rounded-card border-hairline text-ink-secondary mb-3 border px-4 py-3 text-xs">
+            <p className="bg-canvas rounded-card border-hairline text-ink-secondary border px-4 py-3 text-xs">
               引き継がれた絞り込み条件を読めませんでした。条件なしの作成画面を開いています。
             </p>
           ) : null}
           <BroadcastForm
             tags={tags}
+            tagsStatus={tagsStatus}
+            onRetryTags={() => { void load() }}
           onSuccess={(broadcast) => router.push(
             broadcast.status === 'scheduled'
               ? `/broadcasts/reserved?id=${encodeURIComponent(broadcast.id)}`
@@ -239,7 +263,7 @@ function NewBroadcastPageContent() {
                * 送信ボタンのある詳細画面へ進める（IDEA-06: 保存と送信を
                * ひとつの操作に見せない）。
                */
-              : `/broadcasts?id=${encodeURIComponent(broadcast.id)}`,
+              : `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`,
           )}
           onCancel={() => router.push('/broadcasts')}
           openTemplatePickerInitially={searchParams.get('templatePicker') === '1'}

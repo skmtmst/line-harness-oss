@@ -1,14 +1,16 @@
 'use client'
 
-import React, { Suspense, useEffect, useState } from 'react'
+import React, { Suspense, useEffect, useId, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import DateTimeField from '@/components/shared/date-time-field'
 import Card, { CardHeader } from '@/components/shared/card'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { Field as FormField, RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import PageHeader from '@/components/shared/page-header'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -29,7 +31,9 @@ import {
   type ColumnDraft,
   type Failure,
 } from './column-form'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import styles from './column.module.css'
+import { formatNumber } from '@/lib/format'
 
 /**
  * NENコラムを書く（設計 `ymXJK` 21-1-E／契約 #618）。
@@ -40,6 +44,8 @@ import styles from './column.module.css'
  * （引き継ぎ `v6-nen-column-create-handoff.md` の完了条件）。
  */
 function NewNenColumnInner() {
+  /* ★V7: 画面名は共通トップバーにだけ置く。共通 PageHeader が同じ題を隠す。 */
+  usePageTitle('コラムを書く')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [draft, setDraft] = useState<ColumnDraft>(EMPTY_DRAFT)
@@ -57,9 +63,21 @@ function NewNenColumnInner() {
   const dirty = JSON.stringify(draft) !== JSON.stringify(EMPTY_DRAFT)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
+  // R23横展開: 対象タグの候補は今のアカウントだけ。切替で取り直す。
+  const [tagPruneNotice, setTagPruneNotice] = useState<string | null>(null)
   useEffect(() => {
-    void api.tags.list().then((response) => response.success && setTags(response.data)).catch(() => undefined)
-  }, [])
+    void api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
+      .then((response) => response.success && setTags(response.data)).catch(() => undefined)
+  }, [selectedAccountId])
+  // R23横展開(m18hと同じ形): 新しい候補にない対象タグは外して知らせる。
+  useEffect(() => {
+    if (draft.targetMode !== 'tag' || !draft.targetTagId) return
+    if (!tags.some((tag) => tag.id === draft.targetTagId)) {
+      setDraft({ ...draft, targetTagId: '' })
+      setTagPruneNotice('選んでいたタグは、今のアカウントにないため外しました。選び直してください。')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tags])
   useEffect(() => {
     if (!selectedAccountId || (draft.targetMode === 'tag' && !draft.targetTagId)) {
       setAudienceCount(null)
@@ -144,6 +162,7 @@ function NewNenColumnInner() {
           {failure.message}
         </p>
       ) : null}
+      {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} className="mb-3" /> : null}
 
       <div className={styles.split}>
         <div className={styles.main}>
@@ -250,7 +269,7 @@ function NewNenColumnInner() {
                 />
               </FormField>
             ) : null}
-            <p className={styles.note}>この条件では {audienceCount == null ? '—' : audienceCount.toLocaleString('ja-JP')}人に届きます。</p>
+            <p className={styles.note}>この条件では {audienceCount == null ? '—' : formatNumber(audienceCount)}人に届きます。</p>
             <Field label="配信日時（日本時間）" type="datetime-local" value={draft.scheduledAt} error={errorFor('scheduledAt')} onChange={(v) => setDraft((d) => ({ ...d, scheduledAt: v }))} />
             {/* NEN-06: ここで入れた日時は下書きに記録されるだけで、まだ予約されない。
                 実際の配信は一覧でコラムを選んで「この内容で予約する」を押したときだけ始まる。 */}
@@ -361,23 +380,13 @@ function NewNenColumnInner() {
               data-qa-open="ymXJK"
               disabled={!canSubmit({ draft, busy })}
               onMouseDown={() => setTouched(true)}
-              onClick={() => void save()}
-            >
-              {busy ? '保存中…' : '下書きに保存'}
+              onClick={() => void save()} busy={busy}>下書きを保存する
             </Button>
           </>
         )}
       />
       {/* #935 N-301: 入力途中で離れるときの確認。 */}
-      <ConfirmDialog
-        open={leaveTarget !== null}
-        title="入力中の内容があります"
-        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="入力を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
@@ -394,23 +403,37 @@ function Field({
   error?: string
   type?: 'text' | 'datetime-local'
 }) {
+  // 日時の選択は押し口＋箱の作りで、包んだ `<label>` が押下を欄本体へ
+  // 再送達して開閉が裏返る。見出しと欄を並べ、見出しの `htmlFor` で結ぶ。
+  const fieldId = useId()
   return (
-    <label className={styles.field}>
-      <span className={styles.fieldLabel}>
+    <span className={styles.field}>
+      <label htmlFor={fieldId} className={styles.fieldLabel}>
         {label}
         {required ? <RequiredBadge /> : null}
         {max ? <span className={styles.count}>{value.trim().length} / {max}</span> : null}
-      </span>
-      <input
-        type={type ?? 'text'}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        aria-invalid={error ? true : undefined}
-        className={`${styles.input} ${error ? styles.inputError : ''}`}
-      />
+      </label>
+      {type === 'datetime-local' ? (
+        <DateTimeField
+          id={fieldId}
+          value={value}
+          onChange={onChange}
+          invalid={Boolean(error)}
+          placeholder={placeholder}
+        />
+      ) : (
+        <input
+          id={fieldId}
+          type={type ?? 'text'}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          className={`${styles.input} ${error ? styles.inputError : ''}`}
+        />
+      )}
       {error ? <span className={styles.fieldError}>{error}</span> : null}
-    </label>
+    </span>
   )
 }
 

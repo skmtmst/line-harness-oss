@@ -7,6 +7,8 @@ import {
   getDashboardOverview,
   getDashboardDefaultPreference,
   getDashboardPreference,
+  getDashboardUpcoming,
+  getDeliveryFailureOrigins,
   getListStats,
   getLineAccountById,
   getLineAccountsByIds,
@@ -74,10 +76,16 @@ function readDashboardCards(value: unknown): DashboardCards | null {
     for (const candidate of input) {
       if (!candidate || typeof candidate !== 'object') return null;
       const item = candidate as { id?: unknown; visible?: unknown };
-      if (typeof item.id !== 'string' || !DASHBOARD_CARD_GROUPS[group].has(item.id)) return null;
+      if (typeof item.id !== 'string' || item.id.length === 0) return null;
       if (typeof item.visible !== 'boolean' || seen.has(item.id)) return null;
       seen.add(item.id);
-      items.push({ id: item.id, visible: item.visible });
+      /*
+       * 機能OFF・廃止で候補から外れたIDが残っていても保存全体を400に
+       * しない。未知IDは visible=false で保持し、表示には使わない。
+       * 並びは残るため、機能が戻ったときに配置が復活する。
+       */
+      const known = DASHBOARD_CARD_GROUPS[group].has(item.id);
+      items.push({ id: item.id, visible: known && item.visible });
     }
     if (group === 'today' && items.filter((item) => item.visible).length > DASHBOARD_TODAY_VISIBLE_LIMIT) return null;
     out[group] = items;
@@ -195,6 +203,16 @@ dashboard.get('/api/dashboard/overview', async (c) => {
     }
 
     const statsScope = { allowedAccountIds: [accountId], includeUnassigned: false };
+    /*
+     * 受信箱の数だけは、受信箱の一覧と同じ範囲で数える。MAIL は LINE
+     * アカウントを持たないため、未割り当てが見える担当者の範囲では MAIL も
+     * 合わせる（受信箱の「すべて」と同じ条件）。見えない範囲では LINE だけ。
+     */
+    const visibleScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const inboxScope = {
+      allowedAccountIds: [accountId],
+      includeUnassigned: visibleScope.canSeeUnassigned,
+    };
     const quotaToken = selectedAccount.channel_access_token;
     /*
      * LINE の送信枠は外部APIなので、DB集計と並行して始め、待つ時間に上限を
@@ -203,7 +221,7 @@ dashboard.get('/api/dashboard/overview', async (c) => {
      * 友だち数などの成功分は使える状態にする。
      */
     const [overview, quota] = await Promise.all([
-      getDashboardOverview(c.env.DB, period, statsScope),
+      getDashboardOverview(c.env.DB, period, statsScope, inboxScope),
       fetchQuota(quotaToken, QUOTA_OVERVIEW_BUDGET_MS),
     ]);
     if (quota.failed) {
@@ -262,6 +280,9 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
     const overview = await getDashboardOverview(c.env.DB, period, {
       allowedAccountIds: visibleScope.allowedAccountIds,
       includeUnassigned: false,
+    }, {
+      allowedAccountIds: visibleScope.allowedAccountIds,
+      includeUnassigned: visibleScope.canSeeUnassigned,
     });
     const credentialAccounts = await getLineAccountsByIds(
       c.env.DB,
@@ -423,6 +444,61 @@ dashboard.put('/api/dashboard/preferences/default', requireRole('owner'), async 
   } catch (err) {
     console.error('PUT /api/dashboard/preferences/default error:', err);
     return c.json({ success: false as const, error: '会社の既定配置を保存できませんでした' }, 500);
+  }
+});
+
+/**
+ * M (今後の予定): 06予約配信・07リマインダ・27予約を7日分だけ束ねる。
+ *
+ * 新しい表は作らず、読むだけ。各機能の画面へのつなぎは一覧へのリンクに
+ * 留める。`days` は1〜31に収める(収まらない値は1〜31へ丸める)。
+ */
+dashboard.get('/api/dashboard/upcoming', async (c) => {
+  try {
+    const access = await requireVisibleAccount(c);
+    if ('response' in access) return access.response;
+    const rawDays = Number(c.req.query('days') ?? 7);
+    const days = Number.isFinite(rawDays) ? Math.min(Math.max(Math.floor(rawDays), 1), 31) : 7;
+    const data = await getDashboardUpcoming(c.env.DB, {
+      lineAccountId: access.accountId,
+      now: new Date().toISOString(),
+      days,
+    });
+    return c.json({ success: true as const, data });
+  } catch (err) {
+    console.error('GET /api/dashboard/upcoming error:', err);
+    return c.json({ success: false as const, error: '今後の予定を取得できませんでした' }, 500);
+  }
+});
+
+/** 日本時間の今日 0:00。失敗の「今日ぶん」の既定の境目。 */
+function jstDayStart(now: Date): string {
+  return `${new Date(now.getTime() + 9 * 3_600_000).toISOString().slice(0, 10)}T00:00:00+09:00`;
+}
+
+/**
+ * L (#824 数字の出どころ): 失敗の数を通知の送達台帳から出どころ別に数える。
+ *
+ * 同じ失敗は通知1件として数え、送り直しは数えない。件数は台帳の件数と
+ * 一致する。カードの「i」はこの応答の出どころと時点を見せる。
+ */
+dashboard.get('/api/dashboard/delivery-failure-origins', async (c) => {
+  try {
+    const access = await requireVisibleAccount(c);
+    if ('response' in access) return access.response;
+    const rawSince = c.req.query('since');
+    const since = rawSince ?? jstDayStart(new Date());
+    if (!Number.isFinite(Date.parse(since))) {
+      return c.json({ success: false as const, error: '日時の指定が正しくありません' }, 400);
+    }
+    const data = await getDeliveryFailureOrigins(c.env.DB, {
+      lineAccountId: access.accountId,
+      since,
+    });
+    return c.json({ success: true as const, data });
+  } catch (err) {
+    console.error('GET /api/dashboard/delivery-failure-origins error:', err);
+    return c.json({ success: false as const, error: '失敗の出どころを取得できませんでした' }, 500);
   }
 });
 

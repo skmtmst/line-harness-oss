@@ -34,6 +34,24 @@ vi.mock('./inline-action-list', () => ({
   useActionOptions: () => ({ tags: [], fields: [], marks: [], scenarios: [], vars: [] }),
 }))
 vi.mock('@/components/shared/condition-builder', () => ({ default: () => null }))
+
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の応答の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => (
+    <select aria-label={label} id={id} value={value} onChange={(e) => onChange((e.target as HTMLSelectElement).value)}>
+      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+  ),
+}))
 vi.mock('@/components/shared/image-uploader', () => ({
   default: ({ value, onChange, label }: {
     value: { originalContentUrl: string; previewImageUrl: string } | null
@@ -191,7 +209,7 @@ async function setValue(
   })
 }
 
-const saveButton = () => buttonByText('下書き保存')
+const saveButton = () => buttonByText('下書きを保存する')
 
 describe('U001: ページ表示でもテンプレートを選べる', () => {
   it('新規作成で「テンプレートから」を選ぶと選択欄が出る', async () => {
@@ -331,7 +349,7 @@ describe('U003: 処理のない返信ボタンを置かない', () => {
   })
 })
 
-describe('U049: 手順表示は共通の StepTrail（edit/page.tsx 側で描画）', () => {
+describe('U049: 手順表示は共通の Stepper（edit/page.tsx 側で描画）', () => {
   it('編集窓の内側には Steps の節を持たない（一覧画面へ混入しないため）', async () => {
     mountPage(newDraft, 'basic')
     await flush()
@@ -375,6 +393,102 @@ describe('U053: 見出しが末尾1文字だけで折り返さない', () => {
     const row = heading!.closest('.flex')!
     expect(row.className).toContain('flex-col')
     expect(row.className).toContain('sm:flex-row')
+  })
+})
+
+describe('R200: 連投を防ぐの範囲外は日本語で止める', () => {
+  function mountModal(draft: AutoReplyDraft = newDraft) {
+    const onSaved = vi.fn()
+    act(() => {
+      root.render(
+        <EditDialog draft={draft} templates={templates} onClose={() => {}} onSaved={onSaved} />,
+      )
+    })
+    return { onSaved }
+  }
+
+  const modalSave = () => buttonByText('保存する')
+
+  it.each(['-1', '1.5'])('「%s」では送らず欄の名前と許容範囲を出す', async (value) => {
+    mountModal()
+    await flush()
+    await setValue(host.querySelector<HTMLInputElement>('#ar-cooldown')!, value)
+    await click(modalSave())
+    await flush()
+    expect(mocks.create).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('「連投を防ぐ」は0〜10080の整数')
+  })
+
+  it('0〜10080の整数は通る', async () => {
+    mountModal()
+    await flush()
+    await setValue(host.querySelector<HTMLInputElement>('#ar-cooldown')!, '60')
+    await click(modalSave())
+    await flush()
+    expect(mocks.create).toHaveBeenCalledTimes(1)
+    expect((mocks.create.mock.calls[0][0] as Record<string, unknown>).cooldownMinutes).toBe(60)
+  })
+
+  it('空の追加行は除外して保存する（保存を妨げない）', async () => {
+    mountPage(
+      {
+        ...newDraft,
+        keywords: [{ keyword: '予約', matchType: 'contains' }],
+      },
+      'trigger',
+    )
+    await flush()
+    await click(buttonByText('＋ キーワードを追加する'))
+    expect(host.querySelector<HTMLInputElement>('input[aria-label="キーワード2"]')).not.toBeNull()
+    await click(saveButton())
+    await flush()
+    expect(mocks.create).toHaveBeenCalledTimes(1)
+    const body = mocks.create.mock.calls[0][0] as Record<string, unknown>
+    expect((body.keywords as unknown[]).length).toBe(1)
+  })
+})
+
+describe('R201: 構造のないカード内容は保存しない', () => {
+  function mountModal(draft: AutoReplyDraft = newDraft) {
+    act(() => {
+      root.render(
+        <EditDialog draft={draft} templates={templates} onClose={() => {}} onSaved={() => {}} />,
+      )
+    })
+  }
+
+  // 編集窓には本文欄が複数ある（社内メモなど）。カード用の欄は見本で見分ける。
+  const cardTextarea = () => {
+    const found = Array.from(host.querySelectorAll<HTMLTextAreaElement>('textarea')).find((el) =>
+      el.placeholder.includes('bubble'),
+    )
+    if (!found) throw new Error('カードの内容欄が見つかりません')
+    return found
+  }
+
+  it.each(['{}', '[]', 'null'])('「%s」では送らずカードの形を求める', async (value) => {
+    mountModal()
+    await flush()
+    await click(buttonByText('カードを直接作る'))
+    await setValue(cardTextarea(), value)
+    await click(buttonByText('保存する'))
+    await flush()
+    expect(mocks.create).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('バブルかカルーセル')
+  })
+
+  it('正常なバブルは保存できる', async () => {
+    mountModal()
+    await flush()
+    await click(buttonByText('カードを直接作る'))
+    await setValue(
+      cardTextarea(),
+      '{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[]}}',
+    )
+    await click(buttonByText('保存する'))
+    await flush()
+    expect(mocks.create).toHaveBeenCalledTimes(1)
+    expect((mocks.create.mock.calls[0][0] as Record<string, unknown>).responseType).toBe('flex')
   })
 })
 

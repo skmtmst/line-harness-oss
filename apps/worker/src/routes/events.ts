@@ -47,7 +47,7 @@ import {
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
-import { resolveLineCredential } from '@line-crm/db';
+import { getFolderById, resolveLineCredential } from '@line-crm/db';
 import { createBroadcast, getBroadcastById, type Broadcast } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
@@ -57,7 +57,20 @@ import {
   getEventOccurrenceApplicants,
   getEventOccurrenceUsedSeats,
   promoteEventWaitlist,
+  reorderEventWaitlist,
+  skipEventWaitlist,
 } from '../services/event-waitlist.js';
+import {
+  applyEventChange,
+  canTransitionLifecycle,
+  findChangeLogByIdempotency,
+  isLifecycleStatus,
+  lifecycleReasonRequired,
+  lifecycleToPublishedFlag,
+  markChangeLogNotified,
+  previewEventChange,
+  writeEventChangeLog,
+} from '../services/event-change-review.js';
 import {
   createEventApplicantSnapshot,
   getEventApplicantSnapshot,
@@ -93,6 +106,20 @@ events.use('/api/events/admin/*', async (c, next) => {
   }
   await next();
 });
+
+// 分類だけの変更も既存の版チェックに従う。folder_id は従来の読み取り名を残す。
+function withFolder(row: Record<string, unknown> | null) {
+  return row ? { ...row, folderId: row.folder_id ?? null } : row;
+}
+
+async function validEventFolder(c: Context<Env>, folderId: unknown, accountIds: string[]): Promise<boolean> {
+  if (folderId === null) return true;
+  if (typeof folderId !== 'string' || !folderId.trim()) return false;
+  const folder = await getFolderById(c.env.DB, folderId);
+  return !!folder && folder.kind === 'event' && (folder.account_id === null
+    || (accountIds.includes(folder.account_id)
+      && await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [folder.account_id])));
+}
 
 function getAccountId(c: Context<Env>): string | null {
   return c.req.query('account_id') ?? null;
@@ -183,6 +210,110 @@ function serializeAnswerSnapshot(value: unknown): { ok: true; json: string | nul
   } catch {
     return { ok: false };
   }
+}
+
+// ----------------------------------------------------------------
+// 申込時のカスタム質問 (#841)
+// events.questions_json に定義、event_bookings.answer_snapshot_json に
+// {質問id: 回答} として保存する。id が変わると過去の回答と紐付かなくなるので、
+// 画面が送ってきた id はそのまま採用し、無い分だけ連番で補う。
+// ----------------------------------------------------------------
+
+const EVENT_QUESTION_TYPES = new Set(['text', 'textarea', 'radio', 'checkbox']);
+const EVENT_QUESTIONS_MAX = 10;
+const EVENT_QUESTION_LABEL_MAX = 100;
+const EVENT_QUESTION_OPTIONS_MAX = 20;
+const EVENT_QUESTION_OPTION_MAX = 100;
+
+export interface EventQuestion {
+  id: string;
+  label: string;
+  type: 'text' | 'textarea' | 'radio' | 'checkbox';
+  required: boolean;
+  options: string[] | null;
+}
+
+function normalizeEventQuestions(
+  value: unknown,
+): { ok: true; questions: EventQuestion[] } | { ok: false; code: string } {
+  if (value == null) return { ok: true, questions: [] };
+  if (!Array.isArray(value) || value.length > EVENT_QUESTIONS_MAX) {
+    return { ok: false, code: 'invalid_questions' };
+  }
+  const used = new Set<string>();
+  const out: EventQuestion[] = [];
+  for (const [i, raw] of value.entries()) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return { ok: false, code: 'invalid_questions' };
+    }
+    const q = raw as Record<string, unknown>;
+    const label = typeof q.label === 'string' ? q.label.trim() : '';
+    if (!label || label.length > EVENT_QUESTION_LABEL_MAX) {
+      return { ok: false, code: 'invalid_questions' };
+    }
+    const type = String(q.type ?? '');
+    if (!EVENT_QUESTION_TYPES.has(type)) {
+      return { ok: false, code: 'invalid_questions' };
+    }
+    let options: string[] | null = null;
+    if (type === 'radio' || type === 'checkbox') {
+      if (!Array.isArray(q.options) || q.options.length === 0
+          || q.options.length > EVENT_QUESTION_OPTIONS_MAX
+          || !q.options.every((o) => typeof o === 'string' && o.trim().length > 0 && o.length <= EVENT_QUESTION_OPTION_MAX)) {
+        return { ok: false, code: 'invalid_questions' };
+      }
+      options = (q.options as string[]).map((o) => o.trim());
+    }
+    const id = typeof q.id === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(q.id)
+      ? q.id
+      : `q${i + 1}`;
+    if (used.has(id)) return { ok: false, code: 'invalid_questions' };
+    used.add(id);
+    out.push({ id, label, type: type as EventQuestion['type'], required: q.required === true, options });
+  }
+  return { ok: true, questions: out };
+}
+
+function parseEventQuestions(json: unknown): EventQuestion[] {
+  if (typeof json !== 'string' || !json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    const n = normalizeEventQuestions(parsed);
+    return n.ok ? n.questions : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 必須質問への回答が揃っているか。回答の形は「質問id → 文字列(単一選択)・
+ * 文字列配列(複数選択)」。定義に無い質問idへの回答は保存だけして無視する
+ * (公開中に質問を編集された場合のずれを許容するため)。
+ */
+function validateEventAnswers(
+  questions: EventQuestion[],
+  answers: unknown,
+): boolean {
+  if (questions.length === 0) return true;
+  if (answers == null) {
+    return questions.every((q) => !q.required);
+  }
+  if (typeof answers !== 'object' || Array.isArray(answers)) return false;
+  const map = answers as Record<string, unknown>;
+  for (const q of questions) {
+    const a = map[q.id];
+    const empty = a == null
+      || (typeof a === 'string' && a.trim() === '')
+      || (Array.isArray(a) && a.length === 0);
+    if (q.required && empty) return false;
+    if (empty) continue;
+    if (q.type === 'checkbox') {
+      if (!Array.isArray(a) || !a.every((x) => typeof x === 'string')) return false;
+    } else if (typeof a !== 'string') {
+      return false;
+    }
+  }
+  return true;
 }
 
 async function resolveAccountIdFromLiff(c: Context<Env>): Promise<string | null> {
@@ -302,6 +433,10 @@ function validateEventInput(
       }
     }
   }
+  if (has('questions') && body.questions != null) {
+    const q = normalizeEventQuestions(body.questions);
+    if (!q.ok) return { ok: false, code: q.code };
+  }
   return { ok: true };
 }
 
@@ -321,6 +456,10 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
     return bad(c, ACCOUNT_ACCESS_ERROR, 403);
   }
 
+  if ('folderId' in body && !await validEventFolder(c, body.folderId,
+    body.target_type === 'multi-account-dedup' ? body.account_ids as string[] : [account_id])) {
+    return bad(c, 'invalid_folder', 422);
+  }
   const id = crypto.randomUUID();
   const targetType = (body.target_type as EventTargetType | undefined) ?? 'single';
   const accountIds = targetType === 'multi-account-dedup' ? (body.account_ids as string[]) : null;
@@ -353,8 +492,10 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
          confirmation_message_extra, reminder_message_extra,
          og_title, og_description, og_image_url,
          visible_tag_id, waitlist_enabled, entry_cutoff_hours_before,
-         current_published_version_id
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         questions_json,
+         current_published_version_id,
+         lifecycle_status, lifecycle_changed_at, folder_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -384,7 +525,15 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
       (body.visible_tag_id as string | null | undefined) ?? null,
       (body.waitlist_enabled as number | undefined) ?? 0,
       (body.entry_cutoff_hours_before as number | null | undefined) ?? null,
+      // validateEventInput で形は検証済み。id未指定の分だけここで連番を補う。
+      body.questions == null ? null : JSON.stringify((normalizeEventQuestions(body.questions) as { questions: EventQuestion[] }).questions),
       publishedVersionId,
+      // m26g R576: 作成時も公開フラグと保存する状態を両書きする。
+      // 公開で作った行が下書きのままでは、顧客 GET の可視性と
+      // 管理表示がずれる（lifecycle_status が正本・移行 492 の決め）。
+      isPublished ? 'published' : 'draft',
+      new Date().toISOString(),
+      body.folderId ?? null,
     );
   if (publishedVersionId) {
     await c.env.DB.batch([
@@ -410,8 +559,92 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
     .prepare(`SELECT * FROM events WHERE id = ?`)
     .bind(id)
     .first();
-  return c.json(row, 201);
+  return c.json(withFolder(row), 201);
 });
+
+export interface FutureEventSlotSummary {
+  /** 今後の有効な開催枠の数（R79: イベント数ではなく枠数）。 */
+  upcoming_slots: number;
+  /** 今後の枠への有効な申込席数（requested+confirmed+offered+accepted）。 */
+  upcoming_active: number;
+  /** 今後の枠の定員合計。定員なしの枠が混ざるときは null。 */
+  upcoming_capacity: number | null;
+  /** 申込率（%）。定員が分からないときは null。 */
+  fill_rate: number | null;
+  /** 残り1〜3席の今後の枠の数。 */
+  nearly_full: number;
+  /** 7日以内で定員の半分未満の今後の枠の数。 */
+  low_applications: number;
+  /** いちばん近い今後の枠の開始日時。無いときは null。 */
+  nearest_upcoming_starts_at: string | null;
+  /** いちばん近い「申込が少ない」枠の開始日時。無いときは null。 */
+  nearest_low_starts_at: string | null;
+}
+
+/**
+ * 今後の開催枠だけを数える（R79/R80）。
+ *
+ * 目安の決めごとは画面の summarizeEventAttention と同じ:
+ * あと少しで満席 = 残り1〜3席、申し込みが少ない = 7日以内で定員の半分未満。
+ */
+export function summarizeFutureEventSlots(
+  slots: ReadonlyArray<{
+    starts_at: string;
+    capacity: number | null;
+    active_count: number | null;
+  }>,
+  nowMs = Date.now(),
+): FutureEventSlotSummary {
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  let upcomingActive = 0;
+  let upcomingCapacity = 0;
+  let capacityUnknown = false;
+  let nearlyFull = 0;
+  let lowApplications = 0;
+  let nearestUpcoming: string | null = null;
+  let nearestLow: string | null = null;
+  for (const slot of slots) {
+    const active = slot.active_count ?? 0;
+    const capacity = slot.capacity;
+    upcomingActive += active;
+    if (capacity == null) {
+      capacityUnknown = true;
+    } else {
+      upcomingCapacity += capacity;
+    }
+    if (nearestUpcoming === null || slot.starts_at < nearestUpcoming) {
+      nearestUpcoming = slot.starts_at;
+    }
+    if (capacity != null && capacity > 0) {
+      if (capacity - active >= 1 && capacity - active <= 3) nearlyFull += 1;
+      const startMs = Date.parse(slot.starts_at);
+      if (
+        Number.isFinite(startMs) &&
+        startMs <= nowMs + weekMs &&
+        active / capacity < 0.5
+      ) {
+        lowApplications += 1;
+        if (nearestLow === null || slot.starts_at < nearestLow) {
+          nearestLow = slot.starts_at;
+        }
+      }
+    }
+  }
+  const capacity = capacityUnknown ? null : upcomingCapacity;
+  return {
+    upcoming_slots: slots.length,
+    upcoming_active: upcomingActive,
+    upcoming_capacity: capacity,
+    fill_rate:
+      capacity !== null && capacity > 0
+        ? Math.round((upcomingActive / capacity) * 100)
+        : null,
+    nearly_full: nearlyFull,
+    low_applications: lowApplications,
+    nearest_upcoming_starts_at: nearestUpcoming,
+    nearest_low_starts_at: nearestLow,
+  };
+}
 
 events.get('/api/events/admin/events', async (c) => {
   const account_id = getAccountId(c);
@@ -433,11 +666,27 @@ events.get('/api/events/admin/events', async (c) => {
              AND EXISTS (SELECT 1 FROM json_each(e.account_ids) WHERE value = ?))
        )`];
   const params: unknown[] = [account_id, account_id];
+  const folderId = c.req.query('folderId');
+  if (folderId === '__ungrouped__') conditions.push('e.folder_id IS NULL');
+  else if (folderId) { conditions.push('e.folder_id = ?'); params.push(folderId); }
   if (q) {
-    conditions.push(`e.name LIKE ? ESCAPE '\\'`);
-    params.push(`%${q.replace(/[\\%_]/g, '\\$&')}%`);
+    /*
+     * #625: LIKE ではなく instr() で部分一致する。
+     * D1 の LIKE/GLOB パターンは最大50バイト。`%<検索語>%` を束縛すると
+     * 48バイト超の検索語で SQLite エラー(500)になっていた。
+     */
+    conditions.push(`instr(lower(e.name), lower(?)) > 0`);
+    params.push(q);
   }
-  if (filter === 'open') conditions.push(`e.is_published = 1`);
+  /*
+   * R81: 「受付中のみ」は公開済みだけでなく、今後の有効な枠がある行だけ。
+   * 終わった回しかない行を返すと、一覧の状態も受付中になり、終わった
+   * イベントを募集中として選んでしまう。
+   */
+  if (filter === 'open') conditions.push(`e.is_published = 1
+    AND EXISTS (SELECT 1 FROM event_slots s
+                 WHERE s.event_id = e.id AND s.deleted_at IS NULL AND s.is_active = 1
+                   AND s.starts_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now'))`);
   if (filter === 'pending') conditions.push(`EXISTS (
     SELECT 1 FROM event_bookings pending WHERE pending.event_id = e.id AND pending.status = 'requested'
   )`);
@@ -501,14 +750,54 @@ events.get('/api/events/admin/events', async (c) => {
     )
     .bind(...params, paging.limit, paging.offset)
     .all();
-  return c.json(buildOffsetListResponse({
-    items: results ?? [],
-    total: counted?.c ?? 0,
-    paging,
-    sort: sort === 'name'
-      ? [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }]
-      : [{ field: 'next_slot_starts_at', direction: 'asc' }, { field: 'id', direction: 'asc' }],
-  }));
+  /*
+   * R79/R80: 上部の数値カードは「今後の開催回」の全体像を出す。
+   * ページ内の行だけを数えると、20件目以降があるときに全体が小さく見える
+   * (R80)。イベント単位の合計（過去の回を含む）を開催回の数として出すと、
+   * 集客すべき回を見誤る (R79)。絞り込み条件に合う全イベントの「今後の枠」
+   * だけを数え直し、ページ切りとは別の summary として返す。
+   * 残り1〜3席・7日以内で半分未満の目安は、画面の summarizeEventAttention
+   * と同じ値にすること。片方だけ変えると数が食い違う。
+   */
+  const { results: futureSlots } = await c.env.DB
+    .prepare(
+      `SELECT
+         s.id, s.event_id, s.starts_at, s.capacity,
+         ((SELECT COALESCE(SUM(b.party_size), 0)
+             FROM event_bookings b
+            WHERE b.slot_id = s.id AND b.status IN ('requested','confirmed'))
+          + (SELECT COALESCE(SUM(w.party_size), 0)
+               FROM event_waitlist w
+              WHERE w.slot_id = s.id AND w.status IN ('offered','accepted'))
+         ) AS active_count
+       FROM event_slots s
+       WHERE s.deleted_at IS NULL
+         AND s.is_active = 1
+         AND s.starts_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now')
+         -- 数値カードは受付の見通し。下書きの枠を混ぜると、まだ出せない回まで
+         -- 「これからの回」に数えてしまう。画面の summarizeEventAttention と
+         -- 同じく公開済みだけを数える。
+         AND EXISTS (SELECT 1 FROM events e WHERE e.id = s.event_id AND e.is_published = 1 AND ${conditions.join(' AND ')})`,
+    )
+    .bind(...params)
+    .all<{
+      id: string;
+      event_id: string;
+      starts_at: string;
+      capacity: number | null;
+      active_count: number;
+    }>();
+  return c.json({
+    ...buildOffsetListResponse({
+      items: (results ?? []).map(row => withFolder(row as Record<string, unknown>)),
+      total: counted?.c ?? 0,
+      paging,
+      sort: sort === 'name'
+        ? [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }]
+        : [{ field: 'next_slot_starts_at', direction: 'asc' }, { field: 'id', direction: 'asc' }],
+    }),
+    summary: summarizeFutureEventSlots(futureSlots ?? []),
+  });
 });
 
 events.get('/api/events/admin/events/:id', async (c) => {
@@ -526,7 +815,7 @@ events.get('/api/events/admin/events/:id', async (c) => {
     .bind(c.req.param('id'), account_id, account_id)
     .first();
   if (!row) return bad(c, 'not_found', 404);
-  return c.json(row);
+  return c.json(withFolder(row));
 });
 
 events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async (c) => {
@@ -591,6 +880,15 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
       setValues.push(body[k]);
     }
   }
+  if ('folderId' in body) {
+    const targetType = body.target_type ?? exists.target_type;
+    const accountIds = targetType === 'multi-account-dedup'
+      ? (body.account_ids as string[] | undefined) ?? JSON.parse(exists.account_ids as string)
+      : [account_id];
+    if (!await validEventFolder(c, body.folderId, accountIds)) return bad(c, 'invalid_folder', 422);
+    setClauses.push('folder_id = ?');
+    setValues.push(body.folderId);
+  }
   // JSON-encoded columns (broadcasts と同じ扱い): account_ids / dedup_priority
   // null は NULL として書く、配列は JSON.stringify する。
   if (Object.prototype.hasOwnProperty.call(body, 'account_ids')) {
@@ -600,6 +898,16 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
   if (Object.prototype.hasOwnProperty.call(body, 'dedup_priority')) {
     setClauses.push('dedup_priority = ?');
     setValues.push(body.dedup_priority == null ? null : JSON.stringify(body.dedup_priority));
+  }
+  // 質問の定義は questions_json 列に正規化して保存する(account_ids と同じ
+  // JSON 列の扱い)。null を送ると定義ごと消える。
+  if (Object.prototype.hasOwnProperty.call(body, 'questions')) {
+    setClauses.push('questions_json = ?');
+    setValues.push(
+      body.questions == null
+        ? null
+        : JSON.stringify((normalizeEventQuestions(body.questions) as { questions: EventQuestion[] }).questions),
+    );
   }
   // multi-account-dedup に切り替わったら line_account_id sentinel を account_ids[0] に合わせる
   if (body.target_type === 'multi-account-dedup' && Array.isArray(body.account_ids) && (body.account_ids as string[]).length > 0) {
@@ -617,10 +925,44 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
   if (setClauses.length === 0) {
     if (exists.version !== expectedVersion) return bad(c, 'version_conflict', 409);
     const row = await c.env.DB.prepare(`SELECT * FROM events WHERE id = ?`).bind(id).first();
-    return c.json(row);
+    return c.json(withFolder(row));
   }
   const nextVersion = (expectedVersion as number) + 1;
   const nextPublished = (body.is_published ?? exists.is_published) === 1;
+  // m26g R576: 公開フラグと保存する状態の両書き。lifecycle 口では
+  // is_published へ両書きしているが、通常 PUT は lifecycle_status を
+  // 触らず、is_published=1・lifecycle=draft の不整合行を作っていた。
+  // その行は管理表示が「下書き」なのに顧客 GET が 200 になる。
+  // 公開フラグが実際に切り替わるときだけ、保存する状態も連動させる。
+  // 内容だけの保存（一時停止中の名前直し等）では状態を壊さない。
+  const currentLifecycle = isLifecycleStatus(exists.lifecycle_status)
+    ? exists.lifecycle_status
+    : exists.is_published === 1 ? 'published' : 'draft';
+  let nextLifecycle: string | null = null;
+  if (Object.prototype.hasOwnProperty.call(body, 'is_published')
+    && body.is_published !== exists.is_published) {
+    const target = body.is_published === 1 ? 'published' : 'draft';
+    if (target !== currentLifecycle) {
+      if (canTransitionLifecycle(currentLifecycle, target)) {
+        nextLifecycle = target;
+      } else if (currentLifecycle === 'published' && target === 'draft') {
+        // 編集画面の公開ラジオは下書きに戻す操作を許している（lifecycle 口の
+        // 遷移表は published→draft を禁じるが、あちらは状態操作の口の決め）。
+        // ここでは「公開表示なのに顧客に届かない」逆向きの不整合を消すため、
+        // 公開中→下書きの切替だけは編集の口でも受けて両書きする。
+        nextLifecycle = target;
+      } else {
+        // 終了・中止からの公開など、終端状態の復活は内容編集では受けない。
+        // 状態操作の口（lifecycle）で理由つきにやり直してもらう。
+        return bad(c, 'lifecycle_transition_invalid', 409);
+      }
+    }
+  }
+  if (nextLifecycle !== null) {
+    setClauses.push('lifecycle_status = ?');
+    setValues.push(nextLifecycle);
+    setClauses.push(`lifecycle_changed_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`);
+  }
   const writeToken = crypto.randomUUID();
   const publishedVersionId = nextPublished ? crypto.randomUUID() : null;
   const nextEvent = { ...exists, ...body } as Record<string, unknown>;
@@ -683,7 +1025,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
     await rebuildRemindersForEvent(c.env.DB, id);
   }
   const row = await c.env.DB.prepare(`SELECT * FROM events WHERE id = ?`).bind(id).first();
-  return c.json(row);
+  return c.json(withFolder(row));
 });
 
 // Cancel all pending reminders for an event's confirmed bookings, then
@@ -781,6 +1123,372 @@ events.delete('/api/events/admin/events/:id', requireRole('owner', 'admin'), asy
   if ((result.meta?.changes ?? 0) === 0) return bad(c, 'not_found', 404);
   return new Response(null, { status: 204 });
 });
+
+// ============================================================
+// U: イベントの状態・変更確認・待ちの手動操作
+// v6-29 §10・§11-2。状態を変える操作は event_change_logs に残す。
+// ============================================================
+
+/** 変更の記録に残す操作者。staff ミドルウェアが無い口では null。 */
+function changeActor(c: Context<Env>): { id: string | null; role: string | null } {
+  try {
+    const staff = c.get('staff') as { id?: string; role?: string } | undefined;
+    return { id: staff?.id ?? null, role: staff?.role ?? null };
+  } catch {
+    return { id: null, role: null };
+  }
+}
+
+function waitlistReason(body: Record<string, unknown>): string | null {
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+  return reason.length > 0 ? reason : null;
+}
+
+// POST /api/events/admin/events/:id/lifecycle
+// 状態の切替（下書き・公開中・一時停止・終了・中止）。
+// is_published へ両書きするので、旧来の口の公開可否はそのまま動く。
+events.post('/api/events/admin/events/:id/lifecycle', requireRole('owner', 'admin'), async (c) => {
+  const account_id = getAccountId(c);
+  if (!account_id) return bad(c, 'account_id_required', 400);
+  const id = c.req.param('id');
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!isLifecycleStatus(body.to)) return bad(c, 'invalid_lifecycle_status', 422);
+  const to = body.to;
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+  if (lifecycleReasonRequired(to) && reason.length === 0) {
+    return bad(c, 'lifecycle_reason_required', 422);
+  }
+  const idemKey = typeof body.idempotency_key === 'string' && body.idempotency_key.length > 0
+    ? body.idempotency_key
+    : null;
+  if (idemKey) {
+    const dup = await findChangeLogByIdempotency(c.env.DB, account_id, idemKey);
+    if (dup) return c.json({ success: true, deduplicated: true, log_id: dup.id });
+  }
+  const exists = await c.env.DB
+    .prepare(
+      `SELECT id, version, is_published, lifecycle_status, line_account_id, target_type, account_ids
+         FROM events WHERE id = ? AND deleted_at IS NULL`,
+    )
+    .bind(id)
+    .first<{
+      id: string;
+      version: number;
+      is_published: number;
+      lifecycle_status: string | null;
+      line_account_id: string;
+      target_type: string;
+      account_ids: string | null;
+    }>();
+  if (!exists) return bad(c, 'not_found', 404);
+  if (!(await ownsEvent(c.env.DB, id, account_id))) return bad(c, 'not_found', 404);
+  const from = isLifecycleStatus(exists.lifecycle_status)
+    ? exists.lifecycle_status
+    : exists.is_published === 1 ? 'published' : 'draft';
+  if (from === to) {
+    return c.json({ success: true, lifecycle_status: to, version: exists.version, unchanged: true });
+  }
+  if (!canTransitionLifecycle(from, to)) return bad(c, 'lifecycle_transition_invalid', 409);
+  const nowIso = new Date().toISOString();
+  const updated = await c.env.DB
+    .prepare(
+      `UPDATE events
+          SET lifecycle_status = ?, lifecycle_changed_at = ?, lifecycle_change_reason = ?,
+              is_published = ?, version = version + 1, updated_at = ?
+        WHERE id = ? AND version = ?`,
+    )
+    .bind(to, nowIso, reason.length > 0 ? reason : null, lifecycleToPublishedFlag(to), nowIso, id, exists.version)
+    .run();
+  if ((updated.meta?.changes ?? 0) === 0) return bad(c, 'version_conflict', 409);
+  const actor = changeActor(c);
+  const log = await writeEventChangeLog(c.env.DB, {
+    lineAccountId: account_id,
+    eventId: id,
+    actorId: actor.id,
+    actorRole: actor.role,
+    action: 'lifecycle',
+    reason: reason.length > 0 ? reason : null,
+    beforeJson: JSON.stringify({ lifecycle_status: from }),
+    afterJson: JSON.stringify({ lifecycle_status: to }),
+    idempotencyKey: idemKey,
+    nowIso,
+  });
+  return c.json({ success: true, lifecycle_status: to, version: exists.version + 1, log_id: log.id });
+});
+
+// POST /api/events/admin/events/:id/change-review
+// 変更の事前表示（読み取り専用）。影響人数と止める理由を返す。
+events.post('/api/events/admin/events/:id/change-review', requireRole('owner', 'admin'), async (c) => {
+  const account_id = getAccountId(c);
+  if (!account_id) return bad(c, 'account_id_required', 400);
+  const body = (await c.req.json().catch(() => ({}))) as {
+    slot_changes?: Array<{
+      slot_id?: unknown;
+      starts_at?: string;
+      ends_at?: string;
+      capacity?: number | null;
+      is_active?: number;
+    }>;
+    event_changes?: { venue_name?: string | null; venue_url?: string | null };
+  };
+  if (!Array.isArray(body.slot_changes)) return bad(c, 'slot_changes_required', 422);
+  for (const change of body.slot_changes) {
+    if (typeof change?.slot_id !== 'string' || change.slot_id.length === 0) {
+      return bad(c, 'invalid_slot_id', 422);
+    }
+    if (change.capacity !== undefined
+      && change.capacity !== null
+      && (!Number.isInteger(change.capacity) || (change.capacity as number) < 1)) {
+      return bad(c, 'invalid_capacity', 422);
+    }
+    if (change.is_active !== undefined && change.is_active !== 0 && change.is_active !== 1) {
+      return bad(c, 'invalid_is_active', 422);
+    }
+  }
+  const result = await previewEventChange(c.env.DB, {
+    eventId: c.req.param('id'),
+    lineAccountId: account_id,
+    slotChanges: body.slot_changes as Array<{
+      slot_id: string;
+      starts_at?: string;
+      ends_at?: string;
+      capacity?: number | null;
+      is_active?: number;
+    }>,
+    eventChanges: body.event_changes,
+  });
+  if ('kind' in result) return bad(c, 'not_found', 404);
+  return c.json(result);
+});
+
+// POST /api/events/admin/events/:id/change-review/apply
+// 変更確認の適用。版の一致で直列化し、二重実行は冪等キーで吸収する。
+// 日時・会場が動いた回の確定申込へは best-effort で LINE 通知する。
+events.post(
+  '/api/events/admin/events/:id/change-review/apply',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const account_id = getAccountId(c);
+    if (!account_id) return bad(c, 'account_id_required', 400);
+    const body = (await c.req.json().catch(() => ({}))) as {
+      expected_version?: unknown;
+      change_reason?: unknown;
+      idempotency_key?: unknown;
+      slot_changes?: Array<{
+        slot_id?: unknown;
+        starts_at?: string;
+        ends_at?: string;
+        capacity?: number | null;
+        is_active?: number;
+      }>;
+      event_changes?: { venue_name?: string | null; venue_url?: string | null };
+    };
+    if (!Number.isInteger(body.expected_version) || (body.expected_version as number) < 1) {
+      return bad(c, 'expected_version_required', 422);
+    }
+    if (typeof body.idempotency_key !== 'string' || body.idempotency_key.length === 0) {
+      return bad(c, 'idempotency_key_required', 400);
+    }
+    if (!Array.isArray(body.slot_changes)) return bad(c, 'slot_changes_required', 422);
+    for (const change of body.slot_changes) {
+      if (typeof change?.slot_id !== 'string' || change.slot_id.length === 0) {
+        return bad(c, 'invalid_slot_id', 422);
+      }
+    }
+    const actor = changeActor(c);
+    const result = await applyEventChange(c.env.DB, {
+      eventId: c.req.param('id'),
+      lineAccountId: account_id,
+      actorId: actor.id,
+      actorRole: actor.role,
+      expectedVersion: body.expected_version as number,
+      changeReason: typeof body.change_reason === 'string' ? body.change_reason : null,
+      idempotencyKey: body.idempotency_key,
+      slotChanges: body.slot_changes as Array<{
+        slot_id: string;
+        starts_at?: string;
+        ends_at?: string;
+        capacity?: number | null;
+        is_active?: number;
+      }>,
+      eventChanges: body.event_changes,
+    });
+    if (result.kind === 'not_found') return bad(c, 'not_found', 404);
+    if (result.kind === 'conflict') return bad(c, 'version_conflict', 409);
+    if (result.kind === 'invalid') return bad(c, result.error, 422);
+    if (result.kind === 'duplicate') {
+      return c.json({ success: true, deduplicated: true, log_id: result.logId });
+    }
+    // 日時・会場の変更を確定申込へ知らせる。届かなくても適用は確定済み
+    // なので、送達数は記録に残すだけにする（失敗で 500 にしない）。
+    let notified = 0;
+    if (result.notifyTargets.length > 0) {
+      try {
+        const acc = await c.env.DB
+          .prepare(
+            `SELECT la.channel_access_token, la.channel_access_token_encrypted,
+                    e.name AS event_name, e.venue_name, e.venue_url
+               FROM line_accounts la
+               JOIN events e ON e.id = ?
+              WHERE la.id = ?`,
+          )
+          .bind(c.req.param('id'), account_id)
+          .first<{
+            channel_access_token: string;
+            channel_access_token_encrypted: string | null;
+            event_name: string;
+            venue_name: string | null;
+            venue_url: string | null;
+          }>();
+        if (acc?.channel_access_token) {
+          const accessToken = await resolveLineCredential(
+            acc.channel_access_token_encrypted,
+            acc.channel_access_token,
+            { lineAccountId: account_id, field: 'channel_access_token' },
+          );
+          const slotStarts = await c.env.DB
+            .prepare(`SELECT id, starts_at FROM event_slots WHERE event_id = ?`)
+            .bind(c.req.param('id'))
+            .all<{ id: string; starts_at: string }>();
+          const startsBySlot = new Map(
+            (slotStarts.results ?? []).map((s) => [s.id, s.starts_at] as const),
+          );
+          for (const target of result.notifyTargets) {
+            try {
+              await sendEventBookingNotification({
+                channelAccessToken: accessToken,
+                toLineUserId: target.lineUserId,
+                kind: 'schedule_changed',
+                ctx: {
+                  eventName: acc.event_name,
+                  startsAtJst: startsAtJst(startsBySlot.get(target.slotId) ?? new Date().toISOString()),
+                  venueName: acc.venue_name,
+                  venueUrl: acc.venue_url,
+                  changeSummary: result.changeSummary || null,
+                },
+              });
+              notified += 1;
+            } catch (error) {
+              console.error('[event-change] notify failed:', error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[event-change] notify setup failed:', error);
+      }
+      await markChangeLogNotified(c.env.DB, result.logId, notified);
+    }
+    auditLog(c, 'event.change.apply', { kind: 'event', id: c.req.param('id') }, {
+      lineAccountId: account_id,
+    });
+    return c.json({
+      success: true,
+      version: result.version,
+      log_id: result.logId,
+      affected_confirmed: result.affectedConfirmed,
+      affected_waiting: result.affectedWaiting,
+      notified,
+    });
+  },
+);
+
+// POST /api/events/admin/occurrences/:id/waitlist/reorder
+// 待ち順の手動変更。理由が必須。枠の waiting 全件の並べ直しで受ける。
+events.post(
+  '/api/events/admin/occurrences/:id/waitlist/reorder',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const account_id = getAccountId(c);
+    if (!account_id) return bad(c, 'account_id_required', 400);
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const reason = waitlistReason(body);
+    if (!reason) return bad(c, 'waitlist_reason_required', 422);
+    if (!Array.isArray(body.ordered_ids)) return bad(c, 'ordered_ids_required', 422);
+    const expectedVersion = body.expected_version ?? body.expectedVersion;
+    const result = await reorderEventWaitlist(c.env.DB, {
+      occurrenceId: c.req.param('id'),
+      lineAccountId: account_id,
+      orderedIds: body.ordered_ids as string[],
+      expectedVersion: Number.isInteger(expectedVersion) ? (expectedVersion as number) : undefined,
+    });
+    if (result.kind === 'not_found') return bad(c, 'not_found', 404);
+    if (result.kind === 'conflict') {
+      return c.json({ error: 'version_conflict', currentVersion: result.currentVersion }, 409);
+    }
+    if (result.kind === 'invalid') return bad(c, result.error, 422);
+    const actor = changeActor(c);
+    const occurrence = await c.env.DB
+      .prepare(`SELECT event_id FROM event_slots WHERE id = ?`)
+      .bind(c.req.param('id'))
+      .first<{ event_id: string }>();
+    const log = await writeEventChangeLog(c.env.DB, {
+      lineAccountId: account_id,
+      eventId: occurrence?.event_id ?? '',
+      slotId: c.req.param('id'),
+      actorId: actor.id,
+      actorRole: actor.role,
+      action: 'waitlist_reorder',
+      reason,
+      afterJson: JSON.stringify({ order: result.order }),
+    });
+    return c.json({
+      success: true,
+      occurrence_version: result.occurrenceVersion,
+      order: result.order,
+      log_id: log.id,
+    });
+  },
+);
+
+// POST /api/events/admin/occurrences/:id/waitlist/skip
+// 飛ばし（今回の案内を見送り、最後尾へ回す）。理由が必須。行は消さない。
+events.post(
+  '/api/events/admin/occurrences/:id/waitlist/skip',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const account_id = getAccountId(c);
+    if (!account_id) return bad(c, 'account_id_required', 400);
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const reason = waitlistReason(body);
+    if (!reason) return bad(c, 'waitlist_reason_required', 422);
+    if (typeof body.waitlist_id !== 'string' || body.waitlist_id.length === 0) {
+      return bad(c, 'waitlist_id_required', 422);
+    }
+    const expectedVersion = body.expected_version ?? body.expectedVersion;
+    const result = await skipEventWaitlist(c.env.DB, {
+      occurrenceId: c.req.param('id'),
+      waitlistId: body.waitlist_id,
+      lineAccountId: account_id,
+      expectedVersion: Number.isInteger(expectedVersion) ? (expectedVersion as number) : undefined,
+    });
+    if (result.kind === 'not_found') return bad(c, 'not_found', 404);
+    if (result.kind === 'conflict') {
+      return c.json({ error: 'version_conflict', currentVersion: result.currentVersion }, 409);
+    }
+    if (result.kind === 'invalid') return bad(c, result.error, 422);
+    const actor = changeActor(c);
+    const occurrence = await c.env.DB
+      .prepare(`SELECT event_id FROM event_slots WHERE id = ?`)
+      .bind(c.req.param('id'))
+      .first<{ event_id: string }>();
+    const log = await writeEventChangeLog(c.env.DB, {
+      lineAccountId: account_id,
+      eventId: occurrence?.event_id ?? '',
+      slotId: c.req.param('id'),
+      actorId: actor.id,
+      actorRole: actor.role,
+      action: 'waitlist_skip',
+      reason,
+      afterJson: JSON.stringify({ waitlist_id: result.waitlistId }),
+    });
+    return c.json({
+      success: true,
+      occurrence_version: result.occurrenceVersion,
+      waitlist_id: result.waitlistId,
+      log_id: log.id,
+    });
+  },
+);
 
 // ============================================================
 // Admin: event_slots CRUD
@@ -1053,15 +1761,19 @@ events.post(
   async (c) => {
     const accountId = getAccountId(c);
     if (!accountId) return bad(c, 'account_id_required', 400);
-    const body = (await c.req.json().catch(() => ({}))) as { expectedVersion?: unknown };
-    if (!Number.isInteger(body.expectedVersion) || (body.expectedVersion as number) < 1) {
+    const rawBody = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    // U: 手動の繰り上げは理由が必須（順番の変更・飛ばしと同じ決めごと）。
+    const reason = waitlistReason(rawBody);
+    if (!reason) return bad(c, 'waitlist_reason_required', 422);
+    const expectedVersion = rawBody.expectedVersion ?? rawBody.expected_version;
+    if (!Number.isInteger(expectedVersion) || (expectedVersion as number) < 1) {
       return bad(c, 'expected_version_required', 422);
     }
     try {
       const result = await promoteEventWaitlist(c.env.DB, {
         occurrenceId: c.req.param('id'),
         lineAccountId: accountId,
-        expectedVersion: body.expectedVersion as number,
+        expectedVersion: expectedVersion as number,
         sender: createEventWaitlistOfferSender(c.env.DB, { liffUrl: c.env.LIFF_URL }),
       });
       if (result.kind === 'not_found') return bad(c, 'not_found', 404);
@@ -1070,6 +1782,23 @@ events.post(
           { error: 'version_conflict', currentVersion: result.currentVersion },
           409,
         );
+      }
+      if (result.kind === 'promoted') {
+        const actor = changeActor(c);
+        const occurrence = await c.env.DB
+          .prepare(`SELECT event_id FROM event_slots WHERE id = ?`)
+          .bind(c.req.param('id'))
+          .first<{ event_id: string }>();
+        await writeEventChangeLog(c.env.DB, {
+          lineAccountId: accountId,
+          eventId: occurrence?.event_id ?? '',
+          slotId: c.req.param('id'),
+          actorId: actor.id,
+          actorRole: actor.role,
+          action: 'waitlist_promote',
+          reason,
+          afterJson: JSON.stringify({ waitlist_id: result.promoted.waitlistId }),
+        });
       }
       return c.json({ success: true, data: result });
     } catch (error) {
@@ -1213,7 +1942,24 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
     .bind(slot_id, event_id)
     .first<Record<string, unknown>>();
   if (!slot) return bad(c, 'not_found', 404);
-  const body = (await c.req.json().catch(() => ({}))) as SlotInput;
+  const body = (await c.req.json().catch(() => ({}))) as SlotInput & {
+    expected_version?: unknown;
+    expectedVersion?: unknown;
+  };
+  // m26g R577: 枠の並行編集・有効切替の競合検出（v6-29 §13「変更系は
+  // 期待版を必須にし、版競合は 409 で最新内容と差分を返す」）。
+  // 版なしの更新は受けず、古い版は 409 + 最新の枠を返す。画面は
+  // 読み直して差分を見せる。イベント本体 PUT と同じ決め。
+  const slotExpectedVersion = body.expected_version ?? body.expectedVersion;
+  if (!Number.isInteger(slotExpectedVersion) || (slotExpectedVersion as number) < 1) {
+    return bad(c, 'expected_version_required', 422);
+  }
+  if ((slot.version as number) !== slotExpectedVersion) {
+    // 古い画面からの操作は、枠時刻の通知作り直しなどの副作用を
+    // 走らせる前に止める。書き込み時の条件付き更新が最終の審判で、
+    // こちらは速やかな失敗のための事前確認。
+    return c.json({ error: 'version_conflict', data: { current: slot } }, 409);
+  }
   // when only one of starts_at / ends_at is provided, range check uses existing values
   const merged: SlotInput = {
     starts_at: body.starts_at ?? (slot.starts_at as string),
@@ -1326,11 +2072,21 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
     }
   }
   setClauses.push(`updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`);
-  setValues.push(slot_id);
-  await c.env.DB
-    .prepare(`UPDATE event_slots SET ${setClauses.join(', ')} WHERE id = ?`)
+  setClauses.push(`version = version + 1`);
+  setValues.push(slot_id, slotExpectedVersion);
+  const slotUpdated = await c.env.DB
+    .prepare(`UPDATE event_slots SET ${setClauses.join(', ')} WHERE id = ? AND version = ? AND deleted_at IS NULL`)
     .bind(...setValues)
     .run();
+  if ((slotUpdated.meta?.changes ?? 0) === 0) {
+    const current = await c.env.DB.prepare(`SELECT * FROM event_slots WHERE id = ?`).bind(slot_id).first();
+    if (!current || (current as Record<string, unknown>).deleted_at != null) {
+      return bad(c, 'not_found', 404);
+    }
+    // 敗者に最新内容（差分のもと）を返す。画面は ApiError.data.current
+    // で読んで、一覧の読み直しと合わせて見せる。
+    return c.json({ error: 'version_conflict', data: { current } }, 409);
+  }
   if (slotStartsAtChanging) {
     // 旧表の作り直しは更新後の枠時刻を読むため、枠更新の後に行う。
     await rebuildRemindersForSlot(c.env.DB, slot_id);
@@ -1363,7 +2119,7 @@ events.get('/api/liff/events/me', async (c) => {
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventImageUrl') ELSE e.image_url END AS event_image_url,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
-                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END AS venue_url,
+                CASE WHEN b.status = 'confirmed' THEN CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END ELSE NULL END AS venue_url,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotEndsAt') ELSE s.ends_at END AS slot_ends_at
@@ -1379,7 +2135,7 @@ events.get('/api/liff/events/me', async (c) => {
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventImageUrl') ELSE e.image_url END AS event_image_url,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
-                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END AS venue_url,
+                CASE WHEN b.status = 'confirmed' THEN CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END ELSE NULL END AS venue_url,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotEndsAt') ELSE s.ends_at END AS slot_ends_at
@@ -1414,7 +2170,7 @@ events.get('/api/liff/events/me/:bookingId', async (c) => {
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventImageUrl') ELSE e.image_url END AS event_image_url,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
-              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END AS venue_url,
+              CASE WHEN b.status = 'confirmed' THEN CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END ELSE NULL END AS venue_url,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventDescription') ELSE e.description END AS event_description,
               CASE WHEN b.status = 'confirmed' THEN CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.confirmationMessageExtra') ELSE e.confirmation_message_extra END ELSE NULL END AS confirmation_message_extra,
@@ -1551,6 +2307,283 @@ events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
   return c.json({ ok: true });
 });
 
+// ----------------------------------------------------------------
+// U-3 LIFF: my booking occurrence change (atomic)
+// v6-29 §7-3。本人の開催回変更は「新しい席を確保できた時だけ元の申込を
+// 取り消す」まとめて1つの操作。確保に失敗したら旧予約を維持する。
+// ----------------------------------------------------------------
+events.post('/api/events/liff/bookings/:id/change', async (c) => {
+  const account_id = await resolveAccountIdFromLiff(c);
+  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
+  const idemKey = c.req.header('Idempotency-Key');
+  if (!idemKey) return bad(c, 'idempotency_key_required', 400);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  const friend = await c.env.DB
+    .prepare(
+      `SELECT id, user_id, picture_url FROM friends
+        WHERE line_user_id = ? AND line_account_id = ? AND is_following = 1`,
+    )
+    .bind(callerLineUserId, account_id)
+    .first<{ id: string; user_id: string | null; picture_url: string | null }>();
+  if (!friend) return bad(c, 'friend_not_found', 404);
+
+  const reservation = await reserveEventIdempotency(c.env.DB, {
+    key: idemKey,
+    lineAccountId: account_id,
+    friendId: friend.id,
+    ttlMinutes: EVENT_IDEMPOTENCY_TTL_MINUTES,
+    now: new Date(),
+  });
+  if (reservation.kind === 'cached') {
+    return c.json(
+      reservation.body as Record<string, unknown>,
+      reservation.status as 200 | 201 | 400 | 409 | 410 | 422,
+    );
+  }
+  if (reservation.kind === 'in_progress') {
+    return bad(c, 'idempotent_in_progress', 429);
+  }
+  const finalize = async (status: number, body: unknown): Promise<Response> => {
+    await finalizeEventIdempotencyResponse(c.env.DB, {
+      key: idemKey,
+      lineAccountId: account_id,
+      friendId: friend.id,
+      status,
+      body,
+    });
+    return c.json(body as Record<string, unknown>, status as 200 | 201 | 400 | 409 | 410 | 422);
+  };
+  try {
+    return await runChangeFlow();
+  } catch (e) {
+    console.error('[event-booking] change flow threw', e);
+    return finalize(500, { error: 'internal_error' });
+  }
+
+  async function runChangeFlow(): Promise<Response> {
+    if (friend == null) throw new Error('runChangeFlow: friend missing');
+    if (callerLineUserId == null) throw new Error('runChangeFlow: callerLineUserId missing');
+    if (account_id == null) throw new Error('runChangeFlow: line account missing');
+
+    const bookingId = c.req.param('id');
+    const current = await c.env.DB
+      .prepare(
+        `SELECT b.id, b.status, b.line_account_id, b.event_id, b.slot_id, b.friend_id,
+                b.party_size, b.identity_key, b.customer_note, b.answer_snapshot_json,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at
+           FROM event_bookings b
+           JOIN events e ON e.id = b.event_id
+           JOIN event_slots s ON s.id = b.slot_id
+          WHERE b.id = ? AND b.friend_id = ? AND b.line_account_id = ?`,
+      )
+      .bind(bookingId, friend.id, account_id)
+      .first<{
+        id: string;
+        status: string;
+        line_account_id: string;
+        event_id: string;
+        slot_id: string;
+        friend_id: string;
+        party_size: number;
+        identity_key: string;
+        customer_note: string | null;
+        answer_snapshot_json: string | null;
+        cancel_deadline_hours_before: number | null;
+        slot_starts_at: string;
+      }>();
+    if (!current) return finalize(404, { error: 'not_found' });
+    if (current.status !== 'requested' && current.status !== 'confirmed') {
+      return finalize(409, { error: 'invalid_state' });
+    }
+
+    const body = (await c.req.json().catch(() => ({}))) as { to_slot_id?: unknown };
+    if (typeof body.to_slot_id !== 'string' || body.to_slot_id.length === 0) {
+      return finalize(422, { error: 'invalid_slot_id' });
+    }
+    if (body.to_slot_id === current.slot_id) return finalize(422, { error: 'same_slot' });
+
+    const event = await c.env.DB
+      .prepare(
+        `SELECT id, name, image_url, description, venue_name, venue_url,
+                confirmation_message_extra, cancel_deadline_hours_before,
+                requires_approval, approval_deadline_hours, current_published_version_id,
+                max_bookings_per_friend,
+                reminder_day_before_enabled, reminder_hours_before,
+                entry_cutoff_hours_before
+           FROM events
+          WHERE id = ? AND deleted_at IS NULL AND is_published = 1
+            AND (lifecycle_status IS NULL OR lifecycle_status = 'published') AND (
+            (target_type = 'single' AND line_account_id = ?)
+            OR (target_type = 'multi-account-dedup'
+                AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))
+          )`,
+      )
+      .bind(current.event_id, account_id, account_id)
+      .first<EventDbRow & { entry_cutoff_hours_before: number | null }>();
+    if (!event) return finalize(409, { error: 'event_unpublished' });
+
+    // 変更締切は取消締切と同じ決め方（申込時の版があればそれを優先）。
+    if (current.cancel_deadline_hours_before == null) {
+      return finalize(403, { error: 'change_not_allowed' });
+    }
+    const deadlineMs =
+      new Date(current.slot_starts_at).getTime() - current.cancel_deadline_hours_before * 3600_000;
+    if (deadlineMs <= Date.now()) return finalize(409, { error: 'change_deadline_passed' });
+
+    const target = await c.env.DB
+      .prepare(
+        `SELECT id, event_id, starts_at, ends_at, is_active, capacity, deleted_at
+           FROM event_slots WHERE id = ? AND event_id = ? AND deleted_at IS NULL`,
+      )
+      .bind(body.to_slot_id, event.id)
+      .first<SlotDbRow & { capacity: number | null }>();
+    if (!target || target.is_active !== 1) return finalize(409, { error: 'slot_inactive' });
+    if (new Date(target.starts_at).getTime() <= Date.now()) {
+      return finalize(410, { error: 'slot_started' });
+    }
+    if (event.entry_cutoff_hours_before != null) {
+      const cutoffAt =
+        new Date(target.starts_at).getTime() - event.entry_cutoff_hours_before * 3600_000;
+      if (Date.now() >= cutoffAt) return finalize(410, { error: 'entry_closed' });
+    }
+
+    // 本人上限は「移動後」の姿で見る。旧予約は取り消すので数えない。
+    if (event.max_bookings_per_friend != null) {
+      const others = await c.env.DB
+        .prepare(
+          `SELECT COUNT(*) AS c FROM event_bookings
+            WHERE event_id = ? AND identity_key = ?
+              AND status IN ('requested','confirmed') AND id != ?`,
+        )
+        .bind(event.id, current.identity_key, current.id)
+        .first<{ c: number }>();
+      if ((others?.c ?? 0) >= event.max_bookings_per_friend) {
+        return finalize(409, { error: 'over_friend_limit' });
+      }
+    }
+
+    const nowIso = new Date().toISOString();
+    const newId = crypto.randomUUID();
+    const bookingSnapshotJson = eventBookingSnapshot(event, {
+      starts_at: target.starts_at,
+      ends_at: target.ends_at,
+    });
+    // 新しい席の確保。満席なら旧予約を維持したまま 409 で返す。
+    if (target.capacity != null) {
+      const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, target.id);
+      if (usedSeats + current.party_size > target.capacity) {
+        return finalize(409, { error: 'slot_full' });
+      }
+    }
+    await c.env.DB
+      .prepare(
+        `INSERT INTO event_bookings
+           (id, line_account_id, event_id, slot_id, friend_id, status, customer_note,
+            requested_at, identity_key, party_size, answer_snapshot_json,
+            event_version_id, event_snapshot_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        newId, account_id, event.id, target.id, friend.id, current.status,
+        current.customer_note, nowIso, current.identity_key, current.party_size,
+        current.answer_snapshot_json,
+        event.current_published_version_id, bookingSnapshotJson,
+      )
+      .run();
+    if (target.capacity != null) {
+      const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, target.id);
+      if (usedSeats > target.capacity) {
+        await c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId).run();
+        return finalize(409, { error: 'slot_full' });
+      }
+    }
+
+    // 旧予約の取消（条件付き）。並走する取消・変更に負けたら新行を巻き戻す。
+    // cancelled_by は CHECK 制約の範囲で 'friend'（本人の操作）。
+    // 変更であることは event_change_logs の booking_change に残す。
+    const cancelled = await c.env.DB
+      .prepare(
+        `UPDATE event_bookings
+            SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend', updated_at = ?
+          WHERE id = ? AND status IN ('requested', 'confirmed')`,
+      )
+      .bind(nowIso, nowIso, current.id)
+      .run();
+    if ((cancelled.meta?.changes ?? 0) === 0) {
+      await c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId).run();
+      return finalize(409, { error: 'invalid_state' });
+    }
+
+    // 旧回の未送信予定を止める。送信権の貸出中は新旧とも巻き戻して 409。
+    try {
+      await cancelByTrigger(c.env.DB, {
+        triggerType: 'event',
+        sourceId: current.id,
+        sourceEventId: current.id,
+        friendId: friend.id,
+        startsAtIso: current.slot_starts_at,
+        lineAccountId: current.line_account_id,
+        cancelReason: `event_change:${current.id}:by:friend`,
+        failOnSendInFlight: true,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+        await c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId).run();
+        await c.env.DB
+          .prepare(
+            `UPDATE event_bookings
+                SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
+              WHERE id = ? AND status = 'cancelled'`,
+          )
+          .bind(current.status, nowIso, current.id)
+          .run();
+        return finalize(409, { error: 'send_in_flight_retry' });
+      }
+      throw error;
+    }
+    await cancelPendingRemindersFor(c.env.DB, current.id);
+    if (current.status === 'confirmed') {
+      const reminders = computeRemindersForBooking({
+        starts_at_utc: target.starts_at,
+        reminder_day_before_enabled: event.reminder_day_before_enabled === 1,
+        reminder_hours_before: event.reminder_hours_before,
+      });
+      await insertRemindersForBooking(c.env.DB, newId, reminders);
+      await enrollByTrigger(c.env.DB, {
+        triggerType: 'event',
+        friendId: friend.id,
+        startsAtIso: target.starts_at,
+        sourceId: newId,
+        sourceEventId: newId,
+        eventId: event.id,
+        lineAccountId: account_id,
+      }).catch((err) => console.error('reminder enroll (event change) failed:', err));
+    }
+    // 空いた旧回の席を待ちへ回す（取消と同じ1回だけの起動）。
+    await enqueueEventWaitlistPromotion(c.env.DB, {
+      lineAccountId: current.line_account_id,
+      eventId: current.event_id,
+      occurrenceId: current.slot_id,
+      sourceKey: `booking-change:${newId}`,
+    });
+    await writeEventChangeLog(c.env.DB, {
+      lineAccountId: account_id,
+      eventId: event.id,
+      slotId: target.id,
+      actorId: friend.id,
+      actorRole: 'friend',
+      action: 'booking_change',
+      beforeJson: JSON.stringify({ booking_id: current.id, slot_id: current.slot_id }),
+      afterJson: JSON.stringify({ booking_id: newId, slot_id: target.id }),
+      idempotencyKey: idemKey,
+      nowIso,
+    });
+    return finalize(200, { id: newId, status: current.status });
+  }
+});
+
 // ============================================================
 // LIFF: read-only event/slots
 // ============================================================
@@ -1561,7 +2594,8 @@ events.get('/api/liff/events/:id', async (c) => {
   const row = await c.env.DB
     .prepare(
       `SELECT * FROM events
-        WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
+        WHERE id = ? AND deleted_at IS NULL AND is_published = 1
+          AND (lifecycle_status IS NULL OR lifecycle_status = 'published') AND (
           (target_type = 'single' AND line_account_id = ?)
           OR (target_type = 'multi-account-dedup'
               AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))
@@ -1625,7 +2659,17 @@ events.get('/api/liff/events/:id', async (c) => {
     if (!me) return bad(c, 'not_found', 404);
   }
 
-  return c.json({ ...row, my_existing_booking: myExistingBooking });
+  // questions_json は生JSON文字列のまま返すと利用側で二重parseになるので、
+  // 画面がそのまま使える配列として添える（定義が無ければ空配列）。
+  // U: オンラインの URL は確定した人にだけ見せる。確定前・未申込には
+  // 渡さない（会場名の表示はそのまま残す）。
+  const venueVisible = myExistingBooking?.status === 'confirmed';
+  return c.json({
+    ...row,
+    venue_url: venueVisible ? row.venue_url : null,
+    questions: parseEventQuestions(row.questions_json),
+    my_existing_booking: myExistingBooking,
+  });
 });
 
 events.get('/api/liff/events/:id/slots', async (c) => {
@@ -1634,7 +2678,8 @@ events.get('/api/liff/events/:id/slots', async (c) => {
   const ev = await c.env.DB
     .prepare(
       `SELECT id FROM events
-        WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
+        WHERE id = ? AND deleted_at IS NULL AND is_published = 1
+          AND (lifecycle_status IS NULL OR lifecycle_status = 'published') AND (
           (target_type = 'single' AND line_account_id = ?)
           OR (target_type = 'multi-account-dedup'
               AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))
@@ -1671,6 +2716,8 @@ interface EventDbRow {
   waitlist_enabled: number;
   /** 申込の締め切り（開始の何時間前まで）。null なら開始まで受ける */
   entry_cutoff_hours_before: number | null;
+  /** 申込時のカスタム質問定義 (#841)。未設定なら NULL。 */
+  questions_json: string | null;
 }
 
 interface SlotDbRow {
@@ -1870,9 +2917,11 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
               requires_approval, approval_deadline_hours, current_published_version_id,
               max_bookings_per_friend,
               reminder_day_before_enabled, reminder_hours_before,
-              visible_tag_id, waitlist_enabled, entry_cutoff_hours_before
+              visible_tag_id, waitlist_enabled, entry_cutoff_hours_before,
+              questions_json
          FROM events
-        WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
+        WHERE id = ? AND deleted_at IS NULL AND is_published = 1
+          AND (lifecycle_status IS NULL OR lifecycle_status = 'published') AND (
           (target_type = 'single' AND line_account_id = ?)
           OR (target_type = 'multi-account-dedup'
               AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))
@@ -1903,6 +2952,11 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
   const partySize = requestedPartySize as number;
   const answerSnapshot = serializeAnswerSnapshot(body.answers);
   if (!answerSnapshot.ok) return finalize(422, { error: 'invalid_answers' });
+  // 必須の質問に答えていない申込は受け付けない。定義に無いidへの回答は
+  // 編集途中のずれとして許容し、保存だけする。
+  if (!validateEventAnswers(parseEventQuestions(event.questions_json), body.answers)) {
+    return finalize(422, { error: 'missing_required_answers' });
+  }
   const firstParticipationCheckedAt = new Date().toISOString();
   const attended = await c.env.DB
     .prepare(

@@ -1,13 +1,14 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ApiError, api, fetchApi } from '@/lib/api'
+import { tagTextColor } from '@/lib/presentation'
 import KpiCard from '@/components/shared/kpi-card'
 import { useAccount } from '@/contexts/account-context'
-import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
+import type { ApiResponse, EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
 import EditRouteModal from './_components/edit-route-modal'
 import GenreModal from './_components/create-genre-modal'
 import { shouldShowReferralRow } from './visibility'
@@ -16,20 +17,26 @@ import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import type { FeatureKey } from '@/lib/feature-settings'
 import AdIntegration from './ad-integration'
 import RefOrdersPanel from './_components/ref-orders'
+import ReferralQrModal, { type ReferralQrRoute } from './referral-qr-modal'
 import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
-import Chip from '@/components/shared/chip'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Dialog from '@/components/shared/dialog'
+import Disclosure from '@/components/shared/disclosure'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import { loadFailureCopy } from '@/components/shared/api-error-message'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
 import Select from '@/components/shared/select'
+import { formatDay, formatNumber } from '@/lib/format'
 
 interface MessageTemplate {
   id: string
@@ -180,6 +187,12 @@ function InflowLinksPageInner({
   const [loading, setLoading] = useState(true)
   // 一覧そのものを引けなかったとき。空（1件も無い）と言い分けるために持つ。
   const [loadFailed, setLoadFailed] = useState(false)
+  /*
+   * M029: 引けなかった原因そのもの。403は権限の案内にし、押しても
+   * 直らない再試行の口は出さない。429は待ち秒数を添えて再試行を残す。
+   * `ListState kind="error"` に `error` ごと渡す（m23mの共通文）。
+   */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [sort, setSort] = useState<RouteSort>('friends-desc')
   const [filter, setFilter] = useState<RouteFilter>('all')
   const [pageSize, setPageSize] = useState(20)
@@ -198,7 +211,7 @@ function InflowLinksPageInner({
   const [selectedGenre, setSelectedGenre] = useState('')
   const [search, setSearch] = useState('')
   const [editingGenre, setEditingGenre] = useState<EntryRouteGenre | 'new' | null>(null)
-  const [qrRoute, setQrRoute] = useState<{ refCode: string; name: string; genre: string | null } | null>(null)
+  const [qrRoute, setQrRoute] = useState<ReferralQrRoute | null>(null)
   // Expanded-row state for showing friends acquired through a given ref.
   // Mirrors the legacy /affiliates page UX — click row → load via
   // /api/analytics/ref/:refCode → render friend list inline.
@@ -229,6 +242,7 @@ function InflowLinksPageInner({
       requestGeneration === loadRequestRef.current && accountAtRequest === latestAccountRef.current
     setLoading(true)
     setLoadFailed(false)
+    setLoadError(null)
     // ref-summary は selectedAccountId を渡すと「そのアカで実流入があった
     // ref_code のみ」に絞れる。pool_id NULL のリンクが多い現状ではアカ別の
     // pool 紐付け判定よりも、こちらの実流入ベースの方が運用実態に合う。
@@ -286,10 +300,12 @@ function InflowLinksPageInner({
           })),
         )
       }
-    } catch {
+    } catch (e) {
       if (!isCurrent()) return
       // 一覧そのものが引けない。空と言い分けるため、失敗として覚える。
+      // M029: 原因も残し、403・429を言い分けた1枚にする。
       setLoadFailed(true)
+      setLoadError(e)
       setSummary(null)
       setSummaryAvailable(false)
     } finally {
@@ -349,22 +365,36 @@ function InflowLinksPageInner({
       && generation === loadRequestRef.current
       && accountAtRequest === latestAccountRef.current
     const loadAuxiliary = async () => {
-      const [p, s, t, tagRes] = await Promise.all([
-        // プールは補助データ。multi_store_hierarchy がオフでも画面全体を
-        // 共通ゲートへ切り替えず、プール列だけ無しで既存リンクを表示する。
-        featureAllowed('multi_store_hierarchy')
-          ? api.pools.list({ suppressFeatureDisabledEvent: true }).catch(() => ({
+      // プールは補助データ。multi_store_hierarchy がオフでも画面全体を
+      // 共通ゲートへ切り替えず、プール列だけ無しで既存リンクを表示する。
+      // 403 の応答自体が console error になるため、有効と分からない限り
+      // 口を発行しない（#703）。可視性が未確定のときだけ共有判定で確かめる。
+      const poolsPromise: Promise<ApiResponse<TrafficPool[]>> = visibility.features != null
+        ? (visibility.features['multi_store_hierarchy'] === true
+          ? api.pools.list({ suppressFeatureDisabledEvent: true }).catch((): ApiResponse<TrafficPool[]> => ({
+            success: false as const,
+            error: 'feature_disabled',
+          }))
+          : Promise.resolve({ success: false as const, error: 'feature_disabled' }))
+        : isPoolsFeatureAvailable(selectedAccountId ? [selectedAccountId] : null).then((ok) =>
+          ok
+            ? api.pools.list({ suppressFeatureDisabledEvent: true }).catch((): ApiResponse<TrafficPool[]> => ({
               success: false as const,
-              data: [] as TrafficPool[],
+              error: 'feature_disabled',
             }))
-          : Promise.resolve({ success: false as const, data: [] as TrafficPool[] }),
+            : { success: false as const, error: 'feature_disabled' },
+        )
+      // R23横展開: 行の名前解決に使う候補は今のアカウントだけ。
+      const candidateParams = accountAtRequest ? { accountId: accountAtRequest } : undefined
+      const [p, s, t, tagRes] = await Promise.all([
+        poolsPromise,
         featureAllowed('scenarios')
-          ? api.scenarios.list().catch(() => ({ success: false as const, data: [] as Scenario[] }))
+          ? api.scenarios.list(candidateParams).catch(() => ({ success: false as const, data: [] as Scenario[] }))
           : Promise.resolve({ success: false as const, data: [] as Scenario[] }),
         featureAllowed('templates')
           ? api.messageTemplates.list().catch(() => ({ success: false as const, data: [] as MessageTemplate[] }))
           : Promise.resolve({ success: false as const, data: [] as MessageTemplate[] }),
-        api.tags.list().catch(() => ({ success: false, data: [] as Tag[] })),
+        api.tags.list(candidateParams).catch(() => ({ success: false, data: [] as Tag[] })),
       ])
       if (!isCurrent()) return
       if (p.success) setPools(p.data)
@@ -462,6 +492,11 @@ function InflowLinksPageInner({
     scenarioId: string | null
     /** entry_route のみ意味を持つ (並走/上書き)。他は null。 */
     runAccountFriendAddScenarios: boolean | null
+    /**
+     * entry_route は登録の有効・無効。tracked_link 行は有効のみ並ぶので true、
+     * 未登録 ref は概念が無いので null。停止中は QR を出さない判定に使う。
+     */
+    isActive: boolean | null
     stats: RefRouteStats | undefined
   }
 
@@ -509,6 +544,7 @@ function InflowLinksPageInner({
         tagId: r.tagId,
         scenarioId: r.scenarioId,
         runAccountFriendAddScenarios: r.runAccountFriendAddScenarios,
+        isActive: r.isActive,
         stats: statsByRef.get(r.refCode),
       })
     }
@@ -533,6 +569,7 @@ function InflowLinksPageInner({
         tagId: null,
         scenarioId: tl.scenarioId,
         runAccountFriendAddScenarios: null,
+        isActive: true,
         stats: statsByRef.get(tl.id),
       })
     }
@@ -548,6 +585,7 @@ function InflowLinksPageInner({
         tagId: null,
         scenarioId: null,
         runAccountFriendAddScenarios: null,
+        isActive: null,
         stats: s,
       })
     }
@@ -648,25 +686,22 @@ function InflowLinksPageInner({
   }, [page, pageCount])
   const genreOptions = availableGenres.map((genre) => genre.name)
 
-  const formatDate = (iso: string | null) => {
-    if (!iso) return '—'
-    return new Date(iso).toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    })
-  }
+  // ★V7：他の一覧と同じ「8月25日（月）」。今年でないときだけ年を付ける。
+  const formatDate = (iso: string | null) => formatDay(iso)
 
   // 設計のKPI。stats は期間を受け取らないので、出せるのは累計だけ。
-  // 「稼働中」は登録済みの行。orphan（外部が発行した未登録 ref）は流入実績が
-  // あるだけで、こちらから止める・直すができないので数に入れない。
+  // R273: 「受付中」は isActive が真の登録済み行だけを数える。orphan（外部が
+  // 発行した未登録 ref）は流入実績があるだけで、こちらから止める・直すが
+  // できないので数に入れない。停止中も別に数え、一覧・一括操作・詳細と同じ
+  // 言葉（受付中・停止中）で出す。
   // 帯は画面全体の要約なので、**フォルダの選択や検索文字で数が変わってはいけない。**
   // ここを `sortedRows`（フォルダ＋検索で絞ったもの）から数えていたため、
   // フォルダ列が「SNS 2／未分類 1」と出ている横で帯が「流入元 0件」になっていた。
   // フォルダ列の件数は `accountFilteredRows` から数えている（下の `:genreCount`）ので、
   // 同じ画面の中で数え方が2通りある状態だった。帯もそちらに揃える。
   const accountRouteCount = summary?.routeTotal ?? accountFilteredRows.length
-  const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan').length
+  const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan' && r.isActive === true).length
+  const stoppedRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan' && r.isActive === false).length
   /*
     **読み込めていないときに0件と書かない。**
 
@@ -677,6 +712,12 @@ function InflowLinksPageInner({
   */
   const routeCountAvailable = !loading && !loadFailed
   /*
+   * M029: 取得失敗の1枚の中身。403は権限の案内で再試行なし、
+   * 429は待ち秒数つきで再試行あり、それ以外は今までどおりの1枚。
+   * 原因が無い（成功応答の失敗）は共通の1枚に倒す。
+   */
+  const loadFailure = loadError ? loadFailureCopy(loadError, '流入経路') : null
+  /*
     #980: 「流入経路」タブの件数は一覧と同じ集合から数えてホストへ渡す。
     フォルダ選択・検索・絞り込みで変わる数ではなく、「このアカウントに
     見えている流入経路の総数」= accountFilteredRows（FolderPanel の
@@ -685,10 +726,23 @@ function InflowLinksPageInner({
   useEffect(() => {
     onRouteCountChange?.(routeCountAvailable ? accountFilteredRows.length : null)
   }, [onRouteCountChange, routeCountAvailable, accountFilteredRows.length])
-  const totalClicks = summary?.totalClicks ?? sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
-  const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
+  /*
+    帯は画面全体の要約なので、クリックと平均の追加率もフォルダの選択・
+    検索文字・友だち有無の絞り込みで変わってはいけない。実 Worker の
+    ref-summary は routeTotal / totalClicks / averageAddRate を返さないので、
+    通常はここで選択アカウント範囲（絞り込みの前）から数える。
+    summary が全体値を返しているときはそちらを優先する。
+  */
+  /*
+    実 Worker の ref-summary は routeTotal / totalClicks / averageAddRate を
+    返さないので、通常は選択アカウント範囲（絞り込みの前）から数える。
+    summary が全体値を返しているときはそちらを優先する。
+  */
+  const accountClicks = accountFilteredRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
+  const accountFriendsForRate = accountFilteredRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
+  const totalClicks = summary?.totalClicks ?? accountClicks
   const addRate = summaryAvailable && totalClicks > 0
-    ? summary?.averageAddRate ?? Math.round((totalFriends / totalClicks) * 100)
+    ? summary?.averageAddRate ?? Math.round((accountFriendsForRate / totalClicks) * 100)
     : null
 
   const exportCurrentRows = () => {
@@ -714,11 +768,12 @@ function InflowLinksPageInner({
   }
 
   return (
-    <div>
-      <p data-design="Head" className="mb-4 text-sm text-ink-faint">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <p data-design="Head" className="text-sm text-ink-faint">
         どこから友だちが来たかを計測します。発行したURLごとにクリック・友だち追加・その後の成果まで追えます。
       </p>
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="流入元"
           value={routeCountAvailable ? accountRouteCount : null}
@@ -727,7 +782,7 @@ function InflowLinksPageInner({
             routeCountAvailable
               ? summary?.routeTotal != null
                 ? '4つのフォルダ・今月 8/01〜8/25'
-                : `稼働中 ${activeRouteCount}`
+                : `受付中 ${activeRouteCount}・停止中 ${stoppedRouteCount}`
               : loading
                 ? '読み込んでいます'
                 : '読み込めませんでした'
@@ -745,7 +800,7 @@ function InflowLinksPageInner({
           unit="人"
           detail={
             summaryAvailable && summary
-              ? `累計。そのうち経路が分かる人 ${summary.friendsWithRef.toLocaleString('ja-JP')}人`
+              ? `累計。そのうち経路が分かる人 ${formatNumber(summary.friendsWithRef)}人`
               : loading
                 ? '読み込んでいます'
                 : '取得できません'
@@ -766,30 +821,27 @@ function InflowLinksPageInner({
       </div>
 
       {/*
-        設計の帯。**なぜこの画面が要るのか**を先に書く。
-        「友だち追加」だけでは経路が分からないことを知らないと、
-        ここで発行したURLを通さずに配って、あとから数が合わないことになる。
+        ★V7：説明の帯2枚（なぜこの画面が要るか・IDEA-18 の集計の断り書き）は
+        毎回読むものではないので、開閉する欄に畳む。表と数字を先に見せる。
+        未計測の注文を0件と読ませないための件数は、開けば必ず読める。
       */}
-      <p className="bg-info-bg text-ink-secondary rounded-card mb-4 px-4 py-3 text-xs leading-relaxed">
-        LINEの「友だち追加」だけでは、その人がどこから来たのかは分かりません。
+      <Disclosure size="compact" title="数え方と経路の分かり方" hint="累計・はじめて来た経路に数えます">
+        <div className="text-ink-secondary space-y-2 text-xs leading-relaxed">
+          <p>        LINEの「友だち追加」だけでは、その人がどこから来たのかは分かりません。
         ここで発行したURLをいったん通ってもらうことで、はじめて経路が分かります。QRコードも同じURLから作れます。
       </p>
-      {/*
-        IDEA-18: 集計の期間・帰属ルール・計測できる範囲を断り書きする。
-        未計測の注文を0件と読ませないため、経路が分からない件数も出す。
-        orders は古い Worker では返らないので、届いたときだけ表示する。
-      */}
-      <p className="bg-info-bg text-ink-secondary rounded-card mb-4 px-4 py-3 text-xs leading-relaxed">
-        集計は累計（全期間）です。購入・返金は、LINEの友だちと結びついた注文だけを、
+          <p>        集計は累計（全期間）です。購入・返金は、LINEの友だちと結びついた注文だけを、
         その人がはじめて来た経路に数えます（同じ人・同じ注文は二重に数えません）。
         {summary?.orders
-          ? `いまの範囲では注文${summary.orders.total.toLocaleString('ja-JP')}件のうち、経路が分かるのは${summary.orders.attributed.toLocaleString('ja-JP')}件、経路が分からないのは${(summary.orders.total - summary.orders.attributed).toLocaleString('ja-JP')}件（うち友だち未連携${(summary.orders.total - summary.orders.linked).toLocaleString('ja-JP')}件）です。`
+          ? `いまの範囲では注文${formatNumber(summary.orders.total)}件のうち、経路が分かるのは${formatNumber(summary.orders.attributed)}件、経路が分からないのは${formatNumber((summary.orders.total - summary.orders.attributed))}件（うち友だち未連携${formatNumber((summary.orders.total - summary.orders.linked))}件）です。`
           : '注文の集計を取得できたら、経路が分かる件数と分からない件数をここに出します。'}
       </p>
+        </div>
+      </Disclosure>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクを作る</Button><div className="flex gap-2"><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
 
-      <div style={FOLDER_RAIL_STYLE} className="grid gap-5 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={`${accountFilteredRows.length}件`}
           activeId={selectedGenre}
@@ -807,99 +859,82 @@ function InflowLinksPageInner({
           ]}
         />
 
-        <section className="min-w-0">
-          <div className="mb-3 flex flex-col gap-3 rounded-xl border border-hairline bg-canvas p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <section className="flex min-w-0 flex-col gap-4">
+          <div className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4 shadow-card lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-medium text-ink-faint">選択中のフォルダ</p>
               <h2 className="mt-0.5 text-lg font-bold text-ink">{selectedGenreLabel || 'フォルダを選んでください'}</h2>
               <p className="text-xs text-ink-faint">{genreRows.length} リンク</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <SearchField
-                value={search}
-                onChange={(value) => {
-                  setSearch(value)
-                  setPage(1)
-                }}
-                onClear={() => {
-                  setSearch('')
-                  setPage(1)
-                }}
-                placeholder="流入元の名前・REFで検索"
-                aria-label="流入元の名前・REFで検索"
-                className="w-full sm:w-64"
-              />
-              <Select
-                aria-label="並び順"
-                label="並び順"
-                value={sort}
-                options={SORT_OPTIONS}
-                onChange={(value) => {
-                  setSort(value as RouteSort)
-                  setPage(1)
-                }}
-              />
-              <Select
-                aria-label="表示件数"
-                value={String(pageSize)}
-                options={PAGE_SIZE_OPTIONS}
-                onChange={(value) => {
-                  setPageSize(Number(value))
-                  setPage(1)
-                }}
-                size="page-size"
-              />
-              <Button
-                onClick={() => setEditing('new')}
-                variant="primary"
-                disabled={!selectedGenre || selectedGenre === UNCATEGORIZED}
-                title={!selectedGenre || selectedGenre === UNCATEGORIZED ? '先に左側でフォルダを選んでください' : undefined}
-              >
-                ＋ このフォルダに流入リンクをつくる
-              </Button>
-              {/*
-                **画面に出ている行をそのまま書き出す。** 絞り込みや並び替えを
-                無視して全件を出すと、画面と手元のファイルが食い違う。
-              */}
-              <Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>
-                CSVで書き出す
-              </Button>
-            </div>
           </div>
-
-          <div className="mb-3 flex flex-wrap items-center gap-2" aria-label="流入経路の絞り込み">
-            {([
-              ['all', `すべて ${genreRows.length}`],
-              ['has-friends', `友だち追加あり ${genreRows.filter((row) => (row.stats?.friendCount ?? 0) > 0).length}`],
-              ['no-friends', `友だち追加なし ${genreRows.filter((row) => (row.stats?.friendCount ?? 0) === 0).length}`],
-              ['unconfigured', `動きが未設定 ${genreRows.filter((row) => !row.scenarioId && !row.tagId && row.source === 'entry_route').length}`],
-            ] as Array<[RouteFilter, string]>).map(([value, label]) => (
-              <FilterChip
-                key={value}
-                selected={filter === value}
-                onChange={() => {
-                  setFilter(value)
-                  setPage(1)
-                }}
-              >
-                {label}
-              </FilterChip>
-            ))}
-          </div>
-
           {/*
-            **保存した条件は札を作らない。**
-            設計には「よく使う」「今月分」など4つの札が描いてあるが、
-            条件を保存する口が無い。作り物の札を押せない形で置くと、
-            「保存したのに効かない」と読める。無いことを言葉で出す。
+            ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+            右端に並び順と表示件数。
+            #734: 「このフォルダに流入リンクをつくる」「CSVで書き出す」の
+            2つ目は置かない。同じ意図の主操作は画面上部の1系統に揃える
+            （新規作成はフォルダ選択を持つ /inflow-links/new が正規口）。
           */}
-          <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
-            <Chip tone="neutral">—</Chip>
-            <span className="text-ink-faint text-xs">
-              まだ繋がっていません。条件の保存が接続されると表示されます。
-            </span>
-          </div>
+          <ListToolbar
+            search={{
+              placeholder: '流入元の名前・REFで検索',
+              value: search,
+              onChange: (value) => {
+                setSearch(value)
+                setPage(1)
+              },
+            }}
+            filters={
+              <div className="flex flex-wrap items-center gap-2" aria-label="流入経路の絞り込み">
+                {([
+                  ['all', 'すべて', genreRows.length],
+                  ['has-friends', '友だち追加あり', genreRows.filter((row) => (row.stats?.friendCount ?? 0) > 0).length],
+                  ['no-friends', '友だち追加なし', genreRows.filter((row) => (row.stats?.friendCount ?? 0) === 0).length],
+                  ['unconfigured', '動きが未設定', genreRows.filter((row) => !row.scenarioId && !row.tagId && row.source === 'entry_route').length],
+                ] as Array<[RouteFilter, string, number]>).map(([value, label, total]) => (
+                  <FilterChip
+                    key={value}
+                    selected={filter === value}
+                    onChange={() => {
+                      setFilter(value)
+                      setPage(1)
+                    }}
+                    count={total}
+                  >
+                    {label}
+                  </FilterChip>
+                ))}
+              </div>
+            }
+            trailing={
+              <>
+                {/* ★V7：「並び順：友だち追加が多い順」が標準幅では「友だち…」で切れるので、この欄だけ広げる。 */}
+                <div className="w-full sm:w-64">
+                  <Select
+                    aria-label="並び順"
+                    label="並び順"
+                    size="full"
+                    value={sort}
+                    options={SORT_OPTIONS}
+                    onChange={(value) => {
+                      setSort(value as RouteSort)
+                      setPage(1)
+                    }}
+                  />
+                </div>
+                <Select
+                  aria-label="表示件数"
+                  value={String(pageSize)}
+                  options={PAGE_SIZE_OPTIONS}
+                  onChange={(value) => {
+                    setPageSize(Number(value))
+                    setPage(1)
+                  }}
+                  size="page-size"
+                />
+              </>
+            }
+          />
+
 
       {/*
         設計 `BMmxU`（18-1-F 空・読込・エラー）。**3つを言い分ける。**
@@ -910,62 +945,92 @@ function InflowLinksPageInner({
       {loading ? (
         <ListState kind="loading" title="流入経路を読み込んでいます" />
       ) : loadFailed ? (
+        /*
+         * M029: 原因をそのまま渡す。403は権限の案内になり再試行の口は
+         * 出ない（押しても直らない）。429とそれ以外は同じ画面から
+         * 取り直せる（`onRetry` が再取得する）。
+         */
         <ListState
           kind="error"
-          title="流入経路を読み込めませんでした"
-          description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
-          action={
-            <Button variant="secondary" onClick={() => void load()}>
-              流入経路を再読み込み
-            </Button>
-          }
+          title={loadFailure?.title}
+          description={loadFailure?.description}
+          error={loadError ?? undefined}
+          onRetry={loadFailure?.retryable ? () => void load() : undefined}
         />
       ) : sortedRows.length === 0 ? (
-        <ListState
-          kind="empty"
-          title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
-          description={
-            selectedGenre
-              ? '「このフォルダに流入リンクをつくる」から作ると、ここに出ます。'
-              : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
-          }
-        />
+        /*
+         * R173: 絞り込み・検索で0件のときは「まだ無い」と言わない。
+         * 登録があるのに未登録向けの案内（最初のフォルダ作り）を出すと、
+         * あるはずの経路が消えたように見える。条件を変える案内にする。
+         */
+        accountFilteredRows.length > 0 && (normalizedSearch !== '' || filter !== 'all' || selectedGenre !== '') ? (
+          <ListState
+            kind="empty"
+            title="条件に合う流入経路がありません"
+            description="検索や絞り込みの条件を変えてください。"
+          />
+        ) : (
+          <ListState
+            kind="empty"
+            title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
+            description={
+              selectedGenre
+                ? '上の「＋ 流入リンクを作る」から作ると、ここに出ます。'
+                : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
+            }
+          />
+        )
       ) : (
-        <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
+        <div
+          className="overflow-hidden rounded-control border border-hairline bg-canvas"
+          data-scroll-x
+          style={{ '--scroll-min': '1060px' } as CSSProperties}
+        >
+          {/*
+            ★V8（夕21・STATES-ALL）：1152 幅で見出しと日付の列があふれる。
+            全列が要る表なので列は消さず、1366px 未満では横送りにする
+            （globals.css の [data-scroll-x]。最小幅は表ごとに --scroll-min
+            で渡す）。v7・広い幅では従来どおり。
+          */}
           <table className="w-full table-fixed text-xs">
             <colgroup>
-              <col className="w-10" />
-              <col className="w-[8%]" />
-              <col className="w-[8%]" />
+              {/* ★V7：REF は流入元名の下へ。名前が「Googl…」まで削られていたので列を1つ減らし、
+                  編集ボタンは割合でなく固定幅にして右端で切れないようにする。 */}
+              {/* 先頭・末尾の列は見出しの余白（20px）にそろえる。編集ボタンがはみ出さない幅にする。 */}
+              {/*
+                数字の列は中身に合わせる。友だち追加（72px）・クリック（60px）が
+                列幅（68px・53px）より広くはみ出していた。流入元名から回して
+                合計は変えない（86%）。名前は省略＋title で確認する。
+              */}
+              <col className="w-14" />
+              <col className="w-[13%]" />
               <col className="w-[8%]" />
               <col className="w-[12%]" />
-              <col className="w-[9%]" />
+              <col className="w-[8%]" />
+              <col className="w-[8%]" />
               <col className="w-[11%]" />
               <col className="w-[9%]" />
-              <col className="w-[7%]" />
               <col className="w-[8%]" />
               <col className="w-[9%]" />
-              <col className="w-[6%]" />
+              <col className="w-32" />
             </colgroup>
             <thead>
               <TableHeadRow>
-                <Th>
-                  <input
-                    type="checkbox"
+                {/* 先頭・末尾の見出しの余白を本文（px-2）にそろえる。 */}
+                <Th className="pl-5">
+                  <Checkbox
                     aria-label="表示中の登録済み経路をすべて選ぶ"
                     checked={allShownSelected}
+                    indeterminate={!allShownSelected && selectableIds.some((id) => selectedRouteIds.has(id))}
                     disabled={selectableIds.length === 0}
                     title={selectableIds.length === 0 ? 'まとめて操作できる登録済みの経路がありません' : undefined}
-                    onChange={(event) => {
-                      setSelectedRouteIds(event.target.checked ? new Set(selectableIds) : new Set())
+                    onCheckedChange={(checked) => {
+                      setSelectedRouteIds(checked ? new Set(selectableIds) : new Set())
                     }}
                   />
                 </Th>
                 <Th>
                   流入元名
-                </Th>
-                <Th>
-                  REF
                 </Th>
                 <Th>
                   追加先
@@ -977,7 +1042,7 @@ function InflowLinksPageInner({
                   自動付与
                 </Th>
                 <Th>
-                  同時に動く配信
+                  <span title="同時に動く配信">同時配信</span>
                 </Th>
                 <Th align="right">
                   友だち追加
@@ -991,7 +1056,7 @@ function InflowLinksPageInner({
                 <Th>
                   発行URL
                 </Th>
-                <Th align="right">編集</Th>
+                <Th align="right" className="pr-5">編集</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-hairline">
@@ -1015,29 +1080,23 @@ function InflowLinksPageInner({
                     accountId={selectedAccountId}
                     orderStats={r.stats}
                   >
-                    <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-3 pr-2 pl-5" onClick={(e) => e.stopPropagation()}>
                       {r.entryRouteId ? (
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           aria-label={`${r.name}をまとめて操作の対象にする`}
                           checked={selectedRouteIds.has(r.entryRouteId)}
-                          onChange={(event) => {
+                          onCheckedChange={(checked) => {
                             const id = r.entryRouteId!
                             setSelectedRouteIds((current) => {
                               const next = new Set(current)
-                              if (event.target.checked) next.add(id)
+                              if (checked) next.add(id)
                               else next.delete(id)
                               return next
                             })
                           }}
                         />
                       ) : (
-                        <span
-                          className="text-ink-faint"
-                          title="まとめて操作は登録済みの流入経路だけに使えます"
-                        >
-                          —
-                        </span>
+                        <span className="sr-only">まとめて操作は登録済みの流入経路だけに使えます</span>
                       )}
                     </td>
                     <td className="px-2 py-3 font-medium text-ink">
@@ -1054,7 +1113,7 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-[9px] text-accent-hover"
+                            className="shrink-0 rounded-mini border border-accent-border bg-accent-soft px-1 py-0.5 text-micro text-accent-deep"
                             title="クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。"
                           >
                             計測済
@@ -1064,16 +1123,16 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-[9px] text-status-warn-deep"
+                            className="shrink-0 rounded-mini border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-micro text-status-warn-deep"
                             title="外部で発行されたREFです。流入実績だけを集計しています。"
                           >
                             未登録
                           </span>
                         </span>
                       )}
-                    </td>
-                    <td className="px-2 py-3 font-mono text-action" title={r.refCode}>
-                      <span className="block truncate whitespace-nowrap">{r.refCode}</span>
+                      <span className="text-ink-faint mt-0.5 block truncate font-mono text-micro font-normal whitespace-nowrap" title={r.refCode}>
+                        {r.refCode}
+                      </span>
                     </td>
                     <td className="px-2 py-3 text-ink-secondary">
                       {pool ? (
@@ -1100,10 +1159,10 @@ function InflowLinksPageInner({
                     <td className="px-2 py-3 text-ink-secondary">
                       {tag ? (
                         <span
-                          className="block truncate whitespace-nowrap rounded-full px-2 py-0.5 text-center text-[11px] font-medium"
+                          className="block truncate whitespace-nowrap rounded-pill px-2 py-0.5 text-center text-[11px] font-medium"
                           style={{
                             backgroundColor: `${tag.color}22`,
-                            color: tag.color,
+                            color: tagTextColor(tag.color),
                           }}
                           title={tag.name}
                         >
@@ -1126,10 +1185,10 @@ function InflowLinksPageInner({
                           : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right font-semibold text-ink">
-                      {summaryAvailable ? (r.stats?.friendCount ?? 0) : '—'}
+                      {summaryAvailable ? formatNumber((r.stats?.friendCount ?? 0)) : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right text-ink-secondary">
-                      {summaryAvailable ? (r.stats?.clickCount ?? 0) : '—'}
+                      {summaryAvailable ? formatNumber((r.stats?.clickCount ?? 0)) : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-ink-faint">
                       {summaryAvailable ? formatDate(r.stats?.latestAt ?? null) : '—'}
@@ -1140,27 +1199,40 @@ function InflowLinksPageInner({
                           onClick={() => onCopy(r.refCode, r.refCode)}
                           className="text-[11px] font-medium text-action hover:underline"
                           aria-label={`${r.name}のURLをコピー`}
+                          title={r.isActive === false ? '停止中のため、このURLを開いても友だち追加できません' : undefined}
                         >
                           {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
                         </button>
-                        <button
-                          onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre })}
-                          className="text-[11px] font-medium text-accent-hover hover:underline"
-                          aria-label={`${r.name}のQRコードを表示`}
-                        >
-                          QR
-                        </button>
+                        {/*
+                          停止中の経路のQRは出さない。読み取っても友だち追加
+                          できないQRを配る事故を防ぐ。押せない飾りは置かず、
+                          理由（停止中）だけを同じ場所に出す。
+                        */}
+                        {r.isActive === false ? (
+                          <span className="text-[11px] text-ink-faint" title="停止中のためQRコードは表示できません">
+                            停止中
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre, isActive: r.isActive })}
+                            className="text-[11px] font-medium text-action hover:underline"
+                            aria-label={`${r.name}のQRコードを表示`}
+                          >
+                            QR
+                          </button>
+                        )}
                       </div>
                     </td>
-                    <td className="px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-3 pr-5 pl-2 text-right" onClick={(e) => e.stopPropagation()}>
                       {editTarget ? (
-                        <button
+                        /* #641: 編集は共通の枠つきボタン */
+                        <Button
+                          variant="secondary"
                           onClick={() => setEditing(editTarget)}
-                          className="whitespace-nowrap rounded-md border border-hairline bg-action-soft px-2 py-1 text-[11px] font-medium text-action hover:bg-surface-pearl"
                           aria-label={`${r.name}のリンクを編集`}
                         >
                           編集
-                        </button>
+                        </Button>
                       ) : r.source === 'tracked_link' ? (
                         // tracked_links は別管理 (Web app に編集 UI 未提供)。
                         // entry_routes への "昇格登録" は worker 優先順位的に
@@ -1169,13 +1241,14 @@ function InflowLinksPageInner({
                         // 編集導線 (MCP / API) に委ねる。
                         <span className="text-xs text-ink-faint">—</span>
                       ) : (
-                        <button
+                        /* #641: 登録も同じ枠つきボタン */
+                        <Button
+                          variant="secondary"
                           onClick={() => setEditing({ register: r.refCode })}
-                          className="text-xs text-action hover:underline"
                           title="未登録 ref を entry_routes に登録します。流入実績はそのまま引き継がれます。"
                         >
-                          登録
-                        </button>
+                          登録する
+                        </Button>
                       )}
                     </td>
                   </FragmentRow>
@@ -1213,11 +1286,12 @@ function InflowLinksPageInner({
           tags={tags}
           existingGenres={genreOptions}
           poolMemberNames={poolMemberNames}
+          accountId={selectedAccountId}
           onClose={() => setEditing(null)}
           onSaved={(savedRoute, created) => {
             setEditing(null)
             load()
-            if (created) setQrRoute({ refCode: savedRoute.refCode, name: savedRoute.name, genre: savedRoute.genre })
+            if (created) setQrRoute({ refCode: savedRoute.refCode, name: savedRoute.name, genre: savedRoute.genre, isActive: savedRoute.isActive })
           }}
         />
       )}
@@ -1307,18 +1381,14 @@ function FragmentRow({
                     <Link
                       key={f.id}
                       href={`/chats?friend=${f.id}`}
-                      className="flex items-center justify-between bg-canvas rounded-lg px-3 py-2 border border-hairline hover:border-action"
+                      className="flex items-center justify-between bg-canvas rounded-control px-3 py-2 border border-hairline hover:border-action"
                     >
                       <span className="text-sm text-ink font-medium truncate">
                         {f.displayName}
                       </span>
                       <span className="text-xs text-ink-faint ml-2 shrink-0">
                         {f.trackedAt
-                          ? new Date(f.trackedAt).toLocaleDateString('ja-JP', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit',
-                            })
+                          ? formatDay(f.trackedAt)
                           : '—'}
                       </span>
                     </Link>
@@ -1335,9 +1405,9 @@ function FragmentRow({
             <div className="mt-4 border-t border-hairline pt-3" onClick={(e) => e.stopPropagation()}>
               {orderStats?.orderCount !== undefined ? (
                 <p className="mb-2 text-xs text-ink-faint">
-                  集計では、この経路からの購入は {orderStats.orderCount.toLocaleString('ja-JP')}件
-                  （返金 {(orderStats.refundedOrderCount ?? 0).toLocaleString('ja-JP')}件・
-                  取消 {(orderStats.cancelledOrderCount ?? 0).toLocaleString('ja-JP')}件）です。
+                  集計では、この経路からの購入は {formatNumber(orderStats.orderCount)}件
+                  （返金 {formatNumber((orderStats.refundedOrderCount ?? 0))}件・
+                  取消 {formatNumber((orderStats.cancelledOrderCount ?? 0))}件）です。
                 </p>
               ) : null}
               <RefOrdersPanel refCode={refCode} accountId={accountId} pageSize={10} />
@@ -1346,51 +1416,6 @@ function FragmentRow({
         </tr>
       )}
     </Fragment>
-  )
-}
-
-function ReferralQrModal({
-  route,
-  onClose,
-}: {
-  route: { refCode: string; name: string; genre: string | null }
-  onClose: () => void
-}) {
-  const [copied, setCopied] = useState(false)
-  const url = referralUrl(route.refCode)
-  const qrBase = `${WORKER_BASE.replace(/\/$/, '')}/api/qr?size=320x320&data=${encodeURIComponent(url)}`
-  const downloadUrl = `${qrBase}&download=1&filename=${encodeURIComponent(`referral-${route.refCode}`)}`
-  const copy = async () => {
-    await navigator.clipboard.writeText(url)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
-  }
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium text-accent-hover">リファラルリンク・QRコード</p>
-            <h2 className="mt-1 text-lg font-bold text-ink">{route.name}</h2>
-            <p className="mt-1 text-sm text-ink-faint">{route.genre ?? '未分類'}</p>
-          </div>
-          <button onClick={onClose} className="text-2xl leading-none text-ink-faint" aria-label="閉じる">×</button>
-        </div>
-        <div className="mt-5 rounded-xl bg-canvas-sunken p-3">
-          <p className="break-all font-mono text-xs text-ink-secondary">{url}</p>
-          <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-action">
-            {copied ? 'コピーしました' : 'URLをコピー'}
-          </button>
-        </div>
-        <div className="mt-5 text-center">
-          {/* eslint-disable-next-line @next/next/no-img-element -- Workerが動的生成するQRコード */}
-          <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-xl border border-hairline bg-canvas p-2" />
-          <a href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-accent-deep px-4 py-2.5 text-sm font-semibold text-on-accent hover:brightness-92">
-            QRコードをダウンロード
-          </a>
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -1475,14 +1500,14 @@ function BulkRoutesDialog({
       description="選んだ経路に同じ操作をまとめて行います。実行前に、実際に変わる件数を確認できます。"
       busy={busy}
       onCancel={close}
-      footer={(
+      footer={result ? undefined : (
         <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
           <Button type="button" onClick={close} disabled={busy}>
-            {result ? '閉じる' : 'キャンセル'}
+            キャンセル
           </Button>
-          {!result && action && affected.length > 0 ? (
-            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }}>
-              {busy ? '実行中…' : `${affected.length.toLocaleString('ja-JP')}件に実行する`}
+          {action && affected.length > 0 ? (
+            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }} busy={busy} busyLabel="実行中…">
+              {`${formatNumber(affected.length)}件に実行する`}
             </Button>
           ) : null}
         </div>
@@ -1491,12 +1516,12 @@ function BulkRoutesDialog({
       {result ? (
         <div className="space-y-3">
           <p className="text-ink text-sm">
-            {result.succeeded.length.toLocaleString('ja-JP')}件に反映しました。
+            {formatNumber(result.succeeded.length)}件に反映しました。
           </p>
           {result.failed.length > 0 ? (
             <div className="space-y-2">
               <p className="text-danger text-sm font-semibold">
-                {result.failed.length.toLocaleString('ja-JP')}件は実行できませんでした。
+                {formatNumber(result.failed.length)}件は実行できませんでした。
               </p>
               <ul className="divide-hairline divide-y rounded-control border border-hairline text-sm">
                 {result.failed.map(({ route, error }) => (
@@ -1527,77 +1552,63 @@ function BulkRoutesDialog({
         <div className="space-y-4">
           <div>
             <p className="text-ink text-sm font-semibold">
-              対象 {remaining.length.toLocaleString('ja-JP')}件
+              対象 {formatNumber(remaining.length)}件
             </p>
             <p className="text-ink-faint mt-1 text-xs leading-5">
               {remaining.slice(0, 8).map((route) => route.name).join('、')}
-              {remaining.length > 8 ? ` ほか${(remaining.length - 8).toLocaleString('ja-JP')}件` : ''}
+              {remaining.length > 8 ? ` ほか${formatNumber((remaining.length - 8))}件` : ''}
             </p>
           </div>
-          <fieldset className="space-y-2">
-            <legend className="text-ink mb-1 text-sm font-bold">どの操作をしますか？</legend>
+          <RadioCardGroup legend="どの操作をしますか？">
             {([
               {
                 value: 'pause' as const,
                 label: 'まとめて停止する',
-                note: `選んだ中の稼働中 ${pauseTargets.length.toLocaleString('ja-JP')}件が対象です。`,
+                note: `選んだ中の受付中 ${formatNumber(pauseTargets.length)}件が対象です。`,
                 count: pauseTargets.length,
               },
               {
                 value: 'resume' as const,
                 label: 'まとめて再開する',
-                note: `選んだ中の停止中 ${resumeTargets.length.toLocaleString('ja-JP')}件が対象です。`,
+                note: `選んだ中の停止中 ${formatNumber(resumeTargets.length)}件が対象です。`,
                 count: resumeTargets.length,
               },
               {
                 value: 'move' as const,
                 label: 'フォルダをまとめて移動する',
-                note: `選んだ中の ${moveTargets.length.toLocaleString('ja-JP')}件が変わります。`,
+                note: `選んだ中の ${formatNumber(moveTargets.length)}件が変わります。`,
                 count: -1,
               },
             ]).map((option) => {
               const unavailable = option.count === 0
               return (
-                <label
+                <RadioCard
                   key={option.value}
-                  className={`block rounded-control border p-3 ${unavailable ? 'border-hairline bg-canvas-sunken' : action === option.value ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas cursor-pointer'}`}
-                >
-                  <span className="flex gap-3">
-                    <input
-                      type="radio"
-                      name="inflow-bulk-action"
-                      value={option.value}
-                      checked={action === option.value}
-                      disabled={unavailable}
-                      onChange={() => setAction(option.value)}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className={`block text-sm font-semibold ${unavailable ? 'text-ink-faint' : 'text-ink'}`}>
-                        {option.label}
-                      </span>
-                      <span className="text-ink-faint mt-0.5 block text-xs">
-                        {unavailable ? `${option.note} 今の選択には効きません。` : option.note}
-                      </span>
-                      {option.value === 'move' && action === 'move' ? (
-                        <span className="mt-2 block" onClick={(event) => event.stopPropagation()}>
-                          <Select
-                            aria-label="移動先のフォルダ"
-                            value={genre}
-                            size="full"
-                            onChange={setGenre}
-                            options={[
-                              { value: '', label: '未分類' },
-                              ...genreOptions.map((name) => ({ value: name, label: name })),
-                            ]}
-                          />
-                        </span>
-                      ) : null}
-                    </span>
-                  </span>
-                </label>
+                  name="inflow-bulk-action"
+                  value={option.value}
+                  checked={action === option.value}
+                  disabled={unavailable}
+                  disabledReason="今の選択には効きません"
+                  onChange={() => setAction(option.value)}
+                  title={option.label}
+                  note={option.note}
+                />
               )
             })}
-          </fieldset>
+          </RadioCardGroup>
+          {action === 'move' ? (
+            <Select
+              aria-label="移動先のフォルダ"
+              value={genre}
+              size="full"
+              onChange={setGenre}
+              options={[
+                { value: '', label: '未分類' },
+                ...genreOptions.map((name) => ({ value: name, label: name })),
+              ]}
+              className="mt-2"
+            />
+          ) : null}
         </div>
       )}
     </Dialog>

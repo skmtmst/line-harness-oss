@@ -27,6 +27,7 @@ import {
   getFriendAddScenarioIds,
   resolveLineCredential,
   findOrCreateGlobalTag,
+  isLineAccountTenantActive,
 } from '@line-crm/db';
 import {
   isStoppedEntryRouteRef,
@@ -63,6 +64,22 @@ function decodeState(encoded: string): string {
 }
 
 const liffRoutes = new Hono<Env>();
+
+const TENANT_UNAVAILABLE_RESPONSE = {
+  success: false,
+  code: 'TENANT_SUSPENDED',
+  error: '現在ご利用いただけません',
+} as const;
+
+async function stoppedLineAccountResponse(
+  c: Context<Env>,
+  lineAccountId: string | null | undefined,
+): Promise<Response | null> {
+  if (!lineAccountId) return null;
+  return await isLineAccountTenantActive(c.env.DB, lineAccountId)
+    ? null
+    : c.json(TENANT_UNAVAILABLE_RESPONSE, 503);
+}
 
 /**
  * 呼び出し側の見えるアカウントに絞る WHERE 断片を作る。
@@ -432,6 +449,8 @@ liffRoutes.get('/auth/line', async (c) => {
   if (!resolvedPool && accountParam) {
     // 2. ?account= explicit override
     const account = await getLineAccountByChannelId(c.env.DB, accountParam);
+    const stopped = await stoppedLineAccountResponse(c, account?.id);
+    if (stopped) return stopped;
     if (account?.login_channel_id) {
       channelId = account.login_channel_id;
     }
@@ -646,6 +665,8 @@ liffRoutes.get('/auth/oauth', async (c) => {
   let channelId = c.env.LINE_LOGIN_CHANNEL_ID;
   if (accountParam) {
     const account = await getLineAccountByChannelId(c.env.DB, accountParam);
+    const stopped = await stoppedLineAccountResponse(c, account?.id);
+    if (stopped) return stopped;
     if (account?.login_channel_id) channelId = account.login_channel_id;
   } else {
     const poolSlug = c.req.query('pool') || 'main';
@@ -754,6 +775,8 @@ liffRoutes.get('/auth/callback', async (c) => {
     let loginLineAccountId: string | null = null;
     if (accountParam) {
       const account = await getLineAccountByChannelId(c.env.DB, accountParam);
+      const stopped = await stoppedLineAccountResponse(c, account?.id);
+      if (stopped) return stopped;
       if (account?.login_channel_id && account?.login_channel_secret) {
         loginChannelId = account.login_channel_id;
         loginChannelSecret = account.login_channel_secret;
@@ -1233,6 +1256,9 @@ liffRoutes.get('/api/liff/config', async (c) => {
       .bind(liffId)
       .first<{ id: string; name: string; channel_access_token: string; channel_access_token_encrypted: string | null }>();
 
+    const stopped = await stoppedLineAccountResponse(c, account?.id);
+    if (stopped) return stopped;
+
     // Fallback to default env account if liff_id not found in DB
     const accessToken = account
       ? await resolveLineCredential(
@@ -1277,6 +1303,8 @@ liffRoutes.post('/api/liff/profile', async (c) => {
     if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
+    const stopped = await stoppedLineAccountResponse(c, identity.lineAccountId);
+    if (stopped) return stopped;
 
     const friend = await getFriendByLineUserIdForAccount(
       c.env.DB,
@@ -1307,6 +1335,8 @@ liffRoutes.post('/api/liff/friend-add-intent', async (c) => {
   try {
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
     if (!identity) return c.json({ success: false, error: 'Invalid ID token' }, 401);
+    const stopped = await stoppedLineAccountResponse(c, identity.lineAccountId);
+    if (stopped) return stopped;
     if (!identity.lineAccountId) {
       return c.json({ success: false, error: 'LINEアカウントを特定できません' }, 409);
     }
@@ -1429,6 +1459,8 @@ liffRoutes.post('/api/liff/link', async (c) => {
     const matchedAccount = matchedLoginChannelId
       ? dbAccounts.find((a) => a.login_channel_id === matchedLoginChannelId) ?? null
       : null;
+    const stopped = await stoppedLineAccountResponse(c, matchedAccount?.id);
+    if (stopped) return stopped;
     const friend = await getFriendByLineUserIdForAccount(
       db, lineUserId, matchedAccount?.id ?? null,
     );
@@ -2275,6 +2307,9 @@ liffRoutes.post('/api/liff/send-form-link', async (c) => {
         return c.json({ success: false, error: 'Invalid idToken' }, 401);
       }
     }
+
+    const stopped = await stoppedLineAccountResponse(c, verifiedLineAccountId);
+    if (stopped) return stopped;
 
     const db = c.env.DB;
     const friend = await getFriendByLineUserIdForAccount(

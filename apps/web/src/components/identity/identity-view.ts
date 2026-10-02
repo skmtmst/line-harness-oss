@@ -6,6 +6,7 @@ import type {
   IdentityEvidenceStrength,
   IdentityReprocessMode,
 } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 本人照合の候補（設計 `InCDe` 3-2-A ／ `ELayY` 23-1-A）が読む言い換え。
@@ -27,7 +28,7 @@ export const NOT_AVAILABLE = '—（未取得）'
  */
 export function impactText(metric: IdentityCandidateImpactMetric): string {
   if (metric.value === null) return NOT_AVAILABLE
-  return `${metric.value.toLocaleString('ja-JP')}${metric.unit}`
+  return `${formatNumber(metric.value)}${metric.unit}`
 }
 
 /** マスク済みの補足。無ければ「—（未取得）」。平文の値はここへ来ない。 */
@@ -140,10 +141,16 @@ type FailureInput = { status?: number; code?: string | null } | null | undefined
  */
 export function failureOf(input: FailureInput): IdentityFailure {
   if (input?.status === 403) {
+    /*
+     * M014：権限表（middleware/auth.ts）に担当者の鍵は無く、担当者は
+     * deny-by-default で一律 403（fail-closed）。付けられる鍵が無いのに
+     * 「追加を依頼」と言うと、頼んでも付けられず混乱する。権限を広げるかは
+     * 司令塔の判断待ちなので、ここでは開いてもらう案内に寄せる。
+     */
     return {
       kind: 'forbidden',
       title: 'この候補を見る権限がありません',
-      description: '見るには権限が要ります。オーナーか管理者に追加を依頼してください。',
+      description: '重複候補の確認はオーナーか管理者だけが開けます。オーナーか管理者の方に開いてもらってください。',
     }
   }
   /*

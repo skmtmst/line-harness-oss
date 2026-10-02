@@ -1,11 +1,16 @@
 'use client'
 
+import DateField from '@/components/shared/date-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import MenuPortal from '@/components/shared/menu-portal'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
+import LinePreview from '@/components/shared/line-preview'
 import {
   api,
   ApiError,
@@ -20,6 +25,8 @@ import {
   type ProxyBookingResult,
 } from '@/lib/api'
 import { canOperateBookings } from '../../lib/booking-permissions'
+import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
+import { formatDateTime, formatDay, formatTime } from '@/lib/format'
 
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
 
@@ -49,6 +56,35 @@ interface ProxyBookingDraft {
 
 const DRAFT_KEY_PREFIX = 'booking:new-draft:'
 
+/**
+ * R14: 下書きに「書きかけ」と呼べる中身があるか。全部が初期値なら
+ * 保存しない（破棄直後の空書き込みを残さない）。復元時も同じ物差しで、
+ * 空の下書きには復元バナーを出さない。
+ */
+function draftHasContent(value: {
+  phoneCustomer: boolean
+  customerName: string
+  customerPhone: string
+  petName: string
+  friend: { id: string } | null
+  customer: { id: string } | null
+  menuId: string
+  staffId: string
+  date: string
+  time: string
+  customerNote: string
+  notification: { send_line_confirmation: boolean; day_before: boolean; hours_before: boolean }
+}): boolean {
+  return (
+    value.phoneCustomer ||
+    value.customerName !== '' || value.customerPhone !== '' || value.petName !== '' ||
+    value.friend != null || value.customer != null ||
+    value.menuId !== '' || value.staffId !== '' || value.date !== '' || value.time !== '' ||
+    value.customerNote !== '' ||
+    !value.notification.send_line_confirmation || !value.notification.day_before || !value.notification.hours_before
+  )
+}
+
 const NODE_BY_STEP: Record<Step, string> = {
   input: 'cpdDi',
   confirm: 'GFDqW',
@@ -73,10 +109,7 @@ function slotInstant(slot?: { startUtc?: string | null } | null): string | null 
 
 function dateLabel(startUtc: string, timeZone = 'Asia/Tokyo'): string {
   if (!startUtc) return '—'
-  return new Date(startUtc).toLocaleString('ja-JP', {
-    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short',
-    hour: '2-digit', minute: '2-digit', timeZone,
-  })
+  return formatDateTime(startUtc, '—', undefined, timeZone)
 }
 
 function timeRangeLabel(
@@ -85,9 +118,7 @@ function timeRangeLabel(
   if (!startUtc) return '—'
   const startsAt = new Date(startUtc)
   const endsAt = endUtc ? new Date(endUtc) : new Date(startsAt.getTime() + minutes * 60_000)
-  return `${dateLabel(startUtc, timeZone)} 〜 ${endsAt.toLocaleTimeString('ja-JP', {
-    hour: '2-digit', minute: '2-digit', timeZone,
-  })}`
+  return `${dateLabel(startUtc, timeZone)} 〜 ${formatTime(endsAt, '—', timeZone)}`
 }
 
 // サーバ側 packages/db/src/booking-customers.ts の normalizeBookingCustomerPhone と
@@ -99,10 +130,7 @@ function phoneDigitsError(phone: string): string | null {
 }
 
 function scheduleLabel(value: string, timeZone = 'Asia/Tokyo'): string {
-  return new Date(value).toLocaleString('ja-JP', {
-    month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit',
-    timeZone,
-  })
+  return formatDateTime(value, '—', undefined, timeZone)
 }
 
 function operationStatusLabel(status: string): string {
@@ -123,8 +151,13 @@ export default function NewProxyBookingPage() {
   const [slotsReady, setSlotsReady] = useState(false)
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [friendQuery, setFriendQuery] = useState('')
+  const [friendSuggestOpen, setFriendSuggestOpen] = useState(false)
+  const friendInputRef = useRef<HTMLInputElement>(null)
   const [friend, setFriend] = useState<FriendListItem | null>(null)
   const [customer, setCustomer] = useState<BookingCustomerSummary | null>(null)
+  // R147: 台帳を作ったときの入力値。入力へ戻って直した値と違うときは、
+  // 保存済みの表示・使い回しをせず、確定時に作り直す。
+  const customerSavedInput = useRef<{ name: string; phone: string; pet: string } | null>(null)
   const [phoneCustomer, setPhoneCustomer] = useState(false)
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
@@ -135,6 +168,9 @@ export default function NewProxyBookingPage() {
   const [time, setTime] = useState('')
   const [customerNote, setCustomerNote] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState('')
+  // R559: 電話客の台帳作成のキー。予約本体のキーから派生させ、確定操作の
+  // 再送では同じ台帳が返るようにする（冪等表の主キーで予約とぶつけない）。
+  const customerIdempotencyKey = useRef('')
   const [result, setResult] = useState<ProxyBookingResult | null>(null)
   const [customerContext, setCustomerContext] = useState<BookingCustomerContext | null>(null)
   const [conflictAlternatives, setConflictAlternatives] = useState<BookingConflictAlternatives | null>(null)
@@ -174,7 +210,26 @@ export default function NewProxyBookingPage() {
 
   const menu = menus.find((item) => item.id === menuId) ?? null
   const selectedStaff = staff.find((item) => item.id === staffId) ?? null
-  const customerLabel = friend?.displayName ?? customer?.display_name ?? (customerName.trim() || 'お客様')
+  // R147: 保存後に入力を直したときは、保存済みの名前を見せない。
+  // 下書き復元などで保存時の値が分からないときは、保存済みを信じる。
+  const savedMatchesInput = customer == null
+    || customerSavedInput.current == null
+    || (customerSavedInput.current.name === customerName.trim()
+      && customerSavedInput.current.phone === customerPhone.trim()
+      && customerSavedInput.current.pet === petName.trim())
+  const customerLabel = friend?.displayName
+    ?? (customer && savedMatchesInput ? customer.display_name : (customerName.trim() || 'お客様'))
+  // 確認画面の電話・ペットも同じ約束。直した値は入力欄の値を出す。
+  const customerPhoneLast4 = friend
+    ? null
+    : customer && savedMatchesInput
+      ? customer.phone_last4
+      : (customerPhone.replace(/\D/g, '').slice(-4) || '—')
+  const customerPetLabel = friend
+    ? null
+    : customer && savedMatchesInput
+      ? (customer.pet_name ?? '未入力')
+      : (petName.trim() || '未入力')
   const selectedSlot = slots.find((item) => item.date === date && item.start === time) ?? null
   // 確認済みの枠があればそれを優先する。入力画面で見えた古い instant を
   // 確認・完了・競合の画面へ持ち越さない。
@@ -195,6 +250,7 @@ export default function NewProxyBookingPage() {
     setStep('input')
     setFriend(null)
     setCustomer(null)
+    customerSavedInput.current = null
     setPhoneCustomer(false)
     setCustomerName('')
     setCustomerPhone('')
@@ -204,12 +260,18 @@ export default function NewProxyBookingPage() {
     setStaffId('')
     setDate('')
     setTime('')
+    // R14: 「お客様からの要望」も破棄の対象。前の予約のメモを
+    // 次の予約へ持ち越さない（アカウント切替も同じ関数を通る）。
+    setCustomerNote('')
+    // 確認済みの枠も捨てる。古い instant が次の確定に乗らないようにする。
+    setConfirmedSlot(null)
     setResult(null)
     setCustomerContext(null)
     setConflictAlternatives(null)
     setReminderPreview([])
     setNotification({ send_line_confirmation: true, day_before: true, hours_before: true })
     setIdempotencyKey('')
+    customerIdempotencyKey.current = ''
     setLoading(false)
     setError('')
     pendingSelect.current = {}
@@ -228,29 +290,48 @@ export default function NewProxyBookingPage() {
       const raw = window.sessionStorage.getItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`)
       if (raw) {
         const draft = JSON.parse(raw) as Partial<ProxyBookingDraft>
-        if (draft.friend?.id) setFriend({ id: draft.friend.id, displayName: String(draft.friend.displayName ?? '') } as FriendListItem)
-        if (draft.customer?.id) setCustomer(draft.customer as BookingCustomerSummary)
-        setPhoneCustomer(draft.phoneCustomer === true)
-        setCustomerName(typeof draft.customerName === 'string' ? draft.customerName : '')
-        setCustomerPhone(typeof draft.customerPhone === 'string' ? draft.customerPhone : '')
-        setPetName(typeof draft.petName === 'string' ? draft.petName : '')
-        setMenuId(typeof draft.menuId === 'string' ? draft.menuId : '')
-        setDate(typeof draft.date === 'string' ? draft.date : '')
-        setCustomerNote(typeof draft.customerNote === 'string' ? draft.customerNote : '')
-        if (draft.notification && typeof draft.notification === 'object') {
-          setNotification({
+        const notification = draft.notification && typeof draft.notification === 'object'
+          ? {
             send_line_confirmation: draft.notification.send_line_confirmation !== false,
             day_before: draft.notification.day_before !== false,
             hours_before: draft.notification.hours_before !== false,
-          })
+          }
+          : { send_line_confirmation: true, day_before: true, hours_before: true }
+        if (draftHasContent({
+          phoneCustomer: draft.phoneCustomer === true,
+          customerName: typeof draft.customerName === 'string' ? draft.customerName : '',
+          customerPhone: typeof draft.customerPhone === 'string' ? draft.customerPhone : '',
+          petName: typeof draft.petName === 'string' ? draft.petName : '',
+          friend: draft.friend?.id ? { id: draft.friend.id } : null,
+          customer: draft.customer?.id ? { id: draft.customer.id } : null,
+          menuId: typeof draft.menuId === 'string' ? draft.menuId : '',
+          staffId: typeof draft.staffId === 'string' ? draft.staffId : '',
+          date: typeof draft.date === 'string' ? draft.date : '',
+          time: typeof draft.time === 'string' ? draft.time : '',
+          customerNote: typeof draft.customerNote === 'string' ? draft.customerNote : '',
+          notification,
+        })) {
+          if (draft.friend?.id) setFriend({ id: draft.friend.id, displayName: String(draft.friend.displayName ?? '') } as FriendListItem)
+          if (draft.customer?.id) setCustomer(draft.customer as BookingCustomerSummary)
+          setPhoneCustomer(draft.phoneCustomer === true)
+          setCustomerName(typeof draft.customerName === 'string' ? draft.customerName : '')
+          setCustomerPhone(typeof draft.customerPhone === 'string' ? draft.customerPhone : '')
+          setPetName(typeof draft.petName === 'string' ? draft.petName : '')
+          setMenuId(typeof draft.menuId === 'string' ? draft.menuId : '')
+          setDate(typeof draft.date === 'string' ? draft.date : '')
+          setCustomerNote(typeof draft.customerNote === 'string' ? draft.customerNote : '')
+          setNotification(notification)
+          // 担当・時刻は一覧の到着後に存在を確かめてから選ぶ。
+          pendingSelect.current = {
+            staffId: typeof draft.staffId === 'string' && draft.staffId ? draft.staffId : undefined,
+            date: typeof draft.date === 'string' ? draft.date : undefined,
+            time: typeof draft.time === 'string' ? draft.time : undefined,
+          }
+          setDraftRestored(true)
+        } else {
+          // 空の下書き（破棄直後の残りなど）は捨て、復元バナーは出さない。
+          try { window.sessionStorage.removeItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`) } catch { /* noop */ }
         }
-        // 担当・時刻は一覧の到着後に存在を確かめてから選ぶ。
-        pendingSelect.current = {
-          staffId: typeof draft.staffId === 'string' && draft.staffId ? draft.staffId : undefined,
-          date: typeof draft.date === 'string' ? draft.date : undefined,
-          time: typeof draft.time === 'string' ? draft.time : undefined,
-        }
-        setDraftRestored(true)
       }
     } catch {
       // 壊れた下書きは捨てる
@@ -306,6 +387,8 @@ export default function NewProxyBookingPage() {
 
   // N-400: 入力中の内容をアカウント別に sessionStorage へ書く。
   // 完了・破棄で消す。書き込みに失敗しても入力自体は止めない。
+  // R14: 全部が初期値のときは「書きかけ」が無いので書かず、残りを消す。
+  // 破棄直後の空書き込みが残ると、開き直したときに復元バナーが出てしまう。
   useEffect(() => {
     if (!selectedAccountId || step === 'done') return
     const draft: ProxyBookingDraft = {
@@ -323,7 +406,11 @@ export default function NewProxyBookingPage() {
       notification,
     }
     try {
-      window.sessionStorage.setItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`, JSON.stringify(draft))
+      if (draftHasContent(draft)) {
+        window.sessionStorage.setItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`, JSON.stringify(draft))
+      } else {
+        window.sessionStorage.removeItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`)
+      }
     } catch {
       // 容量超過などは無視する
     }
@@ -358,21 +445,27 @@ export default function NewProxyBookingPage() {
     return () => { active = false }
   }, [selectedAccountId, friend, customer])
 
-  useEffect(() => {
+  // R534: メニュー取得専用の失敗保持。403は権限案内で再試行なし、
+  // 429は混雑の待ち案内で再試行あり、それ以外は同じ条件で取り直せる。
+  const [menusLoadError, setMenusLoadError] = useState<unknown>(null)
+  const loadMenus = useCallback(async () => {
     if (!selectedAccountId) {
       setMenus([])
       return
     }
-    let active = true
-    void bookingApi.listMenus(selectedAccountId)
-      .then((response) => {
-        if (active) setMenus(response.menus.filter((item) => item.is_active === 1))
-      })
-      .catch(() => {
-        if (active) setError('予約メニューを読み込めませんでした')
-      })
-    return () => { active = false }
+    setMenusLoadError(null)
+    try {
+      const response = await bookingApi.listMenus(selectedAccountId)
+      setMenus(response.menus.filter((item) => item.is_active === 1))
+    } catch (caught) {
+      setMenusLoadError(caught)
+      setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, '予約メニュー') : '予約メニューを読み込めませんでした')
+    }
   }, [selectedAccountId])
+
+  useEffect(() => {
+    void loadMenus()
+  }, [loadMenus])
 
   useEffect(() => {
     setStaffId('')
@@ -439,7 +532,10 @@ export default function NewProxyBookingPage() {
     const timer = window.setTimeout(() => {
       void api.friends.list({ accountId: selectedAccountId, search: query, limit: 20 })
         .then((response) => {
-          if (active && response.success) setFriends(response.data.items)
+          if (active && response.success) {
+            setFriends(response.data.items)
+            setFriendSuggestOpen(response.data.items.length > 0)
+          }
         })
         .catch(() => {
           if (active) setError('友だちを検索できませんでした')
@@ -454,8 +550,10 @@ export default function NewProxyBookingPage() {
   const validation = useMemo(() => {
     if (!selectedAccountId) return 'LINEアカウントを選択してください'
     if (!friend && !customer && !phoneCustomer) return '予約するお客様を選択してください'
-    if (phoneCustomer && !customer && (!customerName.trim() || !customerPhone.trim())) return '電話客の名前と電話番号を入力してください'
-    if (phoneCustomer && !customer && customerPhone.trim()) {
+    // R147: 台帳は確定時に作るため、入力の要否は保存の有無で変えない。
+    // 保存後に直した値もここで確かめる。
+    if (phoneCustomer && (!customerName.trim() || !customerPhone.trim())) return '電話客の名前と電話番号を入力してください'
+    if (phoneCustomer && customerPhone.trim()) {
       const phoneError = phoneDigitsError(customerPhone)
       if (phoneError) return phoneError
     }
@@ -465,13 +563,26 @@ export default function NewProxyBookingPage() {
     return null
   }, [selectedAccountId, friend, customer, phoneCustomer, customerName, customerPhone, menu, selectedStaff, date, time])
 
-  async function ensureCustomer(): Promise<BookingCustomerSummary | null> {
+  // R147: 電話客の台帳保存は「登録を確定する」ときだけ行う。確認へ進む
+  // 時点で作ると、入力へ戻って直した名前・電話・ペット名が確認と予約へ
+  // 反映されない（保存済み顧客をそのまま使い続けるため）。確定直前に
+  // その時点の入力値で1件だけ作るので、二重作成も起きない。
+  async function ensureCustomerForBooking(): Promise<BookingCustomerSummary | null> {
     if (!phoneCustomer) return customer
-    if (customer) return customer
+    // 保存済みと入力が同じなら作り直さない（連打・続けてもう1件で二重にしない）。
+    if (customer && (
+      customerSavedInput.current == null
+      || (customerSavedInput.current.name === customerName.trim()
+        && customerSavedInput.current.phone === customerPhone.trim()
+        && customerSavedInput.current.pet === petName.trim())
+    )) return customer
     if (!selectedAccountId) return null
+    // R559: 応答消失後の再送で台帳を二重作成しないよう、確定操作ごとの
+    // キー（予約本体のキーから派生）で送る。
     const response = await bookingApi.createCustomer(selectedAccountId, {
       display_name: customerName.trim(), phone: customerPhone.trim(), pet_name: petName.trim() || undefined,
-    })
+    }, customerIdempotencyKey.current || undefined)
+    customerSavedInput.current = { name: customerName.trim(), phone: customerPhone.trim(), pet: petName.trim() }
     setCustomer(response.customer)
     return response.customer
   }
@@ -482,12 +593,11 @@ export default function NewProxyBookingPage() {
       return
     }
     if (!selectedAccountId || !menu || !selectedStaff || !date || !time) return
-    let selectedCustomer = customer
-    if (phoneCustomer) {
-      try { selectedCustomer = await ensureCustomer() } catch { setError('電話客の情報を保存できませんでした。名前と電話番号を確認してください。'); return }
-    }
-    if (!friend && !selectedCustomer) { setError('予約するお客様を選択してください'); return }
-    const requestKey = [selectedAccountId, friend?.id ?? selectedCustomer?.id ?? '', menuId, staffId, date, time].join('\u001f')
+    // R147: 確認へ進むときは台帳を作らない。入力へ戻って直した値が
+    // 次の確認にそのまま出る。台帳は確定時に作る。
+    if (!friend && !phoneCustomer) { setError('予約するお客様を選択してください'); return }
+    // R147: 台帳は確定時に作るため、ここでは友だち以外は空キーで束ねる。
+    const requestKey = [selectedAccountId, friend?.id ?? '', menuId, staffId, date, time].join('\u001f')
     latestSelectionKey.current = requestKey
     setLoading(true)
     setError('')
@@ -534,7 +644,10 @@ export default function NewProxyBookingPage() {
       if (latestSelectionKey.current !== requestKey) return
       setConfirmedSlot(available)
       setReminderPreview(preview.reminders)
-      setIdempotencyKey(crypto.randomUUID())
+      // R559: 確認ごとに予約と台帳のキーを1組だけ発行する。再送時は同じ組で送る。
+      const freshKey = crypto.randomUUID()
+      setIdempotencyKey(freshKey)
+      customerIdempotencyKey.current = `${freshKey}:customer`
       setStep('confirm')
     } catch {
       if (latestSelectionKey.current !== requestKey) return
@@ -544,9 +657,12 @@ export default function NewProxyBookingPage() {
     }
   }
 
+  // 二重押しで電話客の台帳が2件できないよう、確定処理の重なりを抑える。
+  const bookingBusy = useRef(false)
   async function createBooking() {
-    const customerPart = friend ? { friend_id: friend.id } : customer ? { booking_customer_id: customer.id } : null
-    if (!selectedAccountId || !customerPart || !menu || !selectedStaff || !date || !time) return
+    if (bookingBusy.current) return
+    if (!selectedAccountId || !menu || !selectedStaff || !date || !time) return
+    if (!friend && !phoneCustomer) return
     // 空キーで送ると400になる(点検#516軽5)。無ければここで作る。
     const key = idempotencyKey || crypto.randomUUID()
     if (!idempotencyKey) setIdempotencyKey(key)
@@ -556,10 +672,35 @@ export default function NewProxyBookingPage() {
       setError('確認した開始時刻が見つかりません。日時を選び直してください。')
       return
     }
-    const requestKey = selectionKey
+    bookingBusy.current = true
+    let requestKey = selectionKey
     setLoading(true)
     setError('')
     try {
+      // R147: 電話客の台帳はこの確定の直前に作る。確認→入力に戻る→直す→
+      // 再確認の往復では作らないので、直した名前・電話・ペット名がそのまま
+      // 台帳と予約へ入る。保存済みと同じ入力なら作り直さない。
+      let bookingCustomer: BookingCustomerSummary | null = null
+      if (phoneCustomer) {
+        try {
+          // R559: 台帳の作成はこの確定操作のキーで束ねる。再送時は同じ
+          // 顧客が返り、台帳は1件のまま予約はその顧客IDを使う。
+          // 確認を経ずに来たときだけ、ここで組を作る。
+          if (!customerIdempotencyKey.current) customerIdempotencyKey.current = `${key}:customer`
+          bookingCustomer = await ensureCustomerForBooking()
+        } catch {
+          setError('電話客の情報を保存できませんでした。名前と電話番号を確認してください。')
+          return
+        }
+      } else {
+        bookingCustomer = customer
+      }
+      const customerPart = friend ? { friend_id: friend.id } : bookingCustomer ? { booking_customer_id: bookingCustomer.id } : null
+      if (!customerPart) { setError('予約するお客様を選択してください'); return }
+      // 台帳を作った分だけ選び直しの鍵が変わる。この確定の返事だけを
+      // 受け付けるよう、ここで束ね直す。
+      requestKey = [selectedAccountId, friend?.id ?? bookingCustomer?.id ?? '', menuId, staffId, date, time].join('\u001f')
+      latestSelectionKey.current = requestKey
       const created = await bookingApi.createProxyBooking(selectedAccountId, {
         ...customerPart,
         menu_id: menu.id,
@@ -589,10 +730,13 @@ export default function NewProxyBookingPage() {
         setConflictAlternatives(cause.data as BookingConflictAlternatives | null)
         setStep('conflict')
         setError('選んだ時間は、ほかの予約で埋まりました')
+      } else if (cause instanceof ApiError) {
+        setError(describeApiFailure(cause, '予約の登録', { forbidden: '予約を入れられるのは、予約の操作権限を持つ人だけです。' }))
       } else {
         setError('予約を登録できませんでした。状態を確認して、もう一度お試しください。')
       }
     } finally {
+      bookingBusy.current = false
       if (latestSelectionKey.current === requestKey) setLoading(false)
     }
   }
@@ -608,29 +752,34 @@ export default function NewProxyBookingPage() {
   return (
     <div data-design-node={NODE_BY_STEP[step]} className="space-y-4 pb-24">
       <nav data-design="Crumb" aria-label="現在位置" className="text-ink-faint text-xs">
-        <Link href="/booking/bookings" className="text-accent">予約</Link>
+        <Link href="/booking/bookings" className="text-action underline">予約</Link>
         <span className="mx-2">›</span>
-        <Link href="/booking/bookings" className="text-accent">予約管理</Link>
+        <Link href="/booking/bookings" className="text-action underline">予約管理</Link>
         <span className="mx-2">›</span>
         <span>{step === 'confirm' ? '内容を確認' : step === 'done' ? '登録が終わりました' : step === 'conflict' ? '入れられません' : '電話の予約を入れる'}</span>
       </nav>
 
       {error && step !== 'conflict' && (
-        <div className="border-danger bg-danger-bg text-danger rounded-card border px-4 py-3 text-sm">
-          {error}
-        </div>
+        <Notice
+          tone="danger"
+          message={error}
+          onClose={() => setError('')}
+          action={menusLoadError && !isForbidden(menusLoadError) ? (
+            <Button type="button" onClick={() => { setError(''); void loadMenus() }}>
+              もう一度読み込む
+            </Button>
+          ) : undefined}
+        />
       )}
 
       {staffResolved && !canOperate ? (
-        <div className="border-warning bg-warning-bg text-warning rounded-card border px-4 py-3 text-sm">
-          予約を入れられるのは、予約の操作権限を持つ人だけです。閲覧のみの権限では操作ボタンは出ません。
-        </div>
+        <Notice tone="warn" message="予約を入れられるのは、予約の操作権限を持つ人だけです。閲覧のみの権限では操作ボタンは出ません。" />
       ) : null}
 
       {draftRestored && step === 'input' ? (
         <div className="border-hairline bg-canvas-sunken text-ink-secondary rounded-card flex flex-wrap items-center justify-between gap-2 border px-4 py-2 text-xs">
           <span>書きかけの入力を戻しました。</span>
-          <button type="button" onClick={discardDraft} className="text-accent font-semibold">
+          <button type="button" onClick={discardDraft} className="text-action font-semibold">
             破棄して最初から入れ直す
           </button>
         </div>
@@ -649,7 +798,7 @@ export default function NewProxyBookingPage() {
                   <input aria-label="電話客の名前" value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="お客様の名前" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
                   <input aria-label="電話客の電話番号" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="電話番号" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
                   <input aria-label="電話客のペット名" value={petName} onChange={(event) => setPetName(event.target.value)} placeholder="ペットの名前（任意）" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
-                  {customer ? <p className="text-success text-xs">顧客台帳に保存済み（電話末尾 {customer.phone_last4}）</p> : <p className="text-ink-faint text-xs">確認へ進むと顧客台帳へ保存します。</p>}
+                  {customer && savedMatchesInput ? <p className="text-success text-xs">顧客台帳に保存済み（電話末尾 {customer.phone_last4}）</p> : <p className="text-ink-faint text-xs">「この内容で予約を入れる」を押すと顧客台帳へ保存します。入力へ戻って直せます。</p>}
                 </div>
               ) : friend ? (
                 <div className="border-hairline bg-canvas-sunken flex items-center justify-between rounded-control border px-3 py-3">
@@ -657,7 +806,7 @@ export default function NewProxyBookingPage() {
                     <p className="text-ink text-sm font-medium">{friend.displayName}</p>
                     <p className="text-ink-faint mt-1 text-xs">LINE連携済み</p>
                   </div>
-                  <button type="button" className="text-accent text-sm" onClick={() => {
+                  <button type="button" className="text-action text-sm" onClick={() => {
                     setFriend(null)
                     setFriendQuery('')
                   }}>選び直す</button>
@@ -665,23 +814,38 @@ export default function NewProxyBookingPage() {
               ) : (
                 <div className="relative">
                   <input
+                    ref={friendInputRef}
                     value={friendQuery}
-                    onChange={(event) => setFriendQuery(event.target.value)}
+                    onChange={(event) => {
+                      setFriendQuery(event.target.value)
+                      setFriendSuggestOpen(true)
+                    }}
                     placeholder="名前・電話番号で探す"
                     className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                   />
-                  {friends.length > 0 && (
-                    <div className="border-hairline bg-canvas absolute z-20 mt-1 max-h-64 w-full divide-y overflow-y-auto rounded-control border shadow-lg">
+                  <MenuPortal
+                    open={friendSuggestOpen && friends.length > 0}
+                    align="start"
+                    matchWidth
+                    getAnchor={() => friendInputRef.current}
+                    onClose={() => setFriendSuggestOpen(false)}
+                  >
+                    <div
+                      className="border-hairline bg-canvas max-h-64 divide-y overflow-y-auto rounded-control border shadow-float"
+                      // 最上層では absolute 指定を無効にする（位置は器が決める）。
+                      style={{ position: 'static', width: '100%' }}
+                    >
                       {friends.map((item) => (
                         <button key={item.id} type="button" onClick={() => {
                           setFriend(item)
                           setFriendQuery(item.displayName)
+                          setFriendSuggestOpen(false)
                         }} className="hover:bg-canvas-sunken block w-full px-3 py-2 text-left text-sm">
                           {item.displayName}
                         </button>
                       ))}
                     </div>
-                  )}
+                  </MenuPortal>
                 </div>
               )}
               {!phoneCustomer ? <p className="text-ink-faint mt-2 text-xs">別の友だちへ推測で結び付けず、選んだ相手だけに予約を記録します。</p> : null}
@@ -710,7 +874,7 @@ export default function NewProxyBookingPage() {
                   />
                 </Field>
                 <Field label="日付">
-                  <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                  <DateField name="date" value={date} onChange={setDate} aria-label="日付" />
                 </Field>
                 <Field label="空いている時間">
                   <Select
@@ -727,14 +891,14 @@ export default function NewProxyBookingPage() {
                 </Field>
               </div>
               {date && time && selectedStaff && menu ? (
-                <div className="border-success bg-success-bg text-success mt-3 rounded-control border px-3 py-2 text-xs font-semibold">
+                <Notice tone="success" className="mt-3">
                   {dateLabel(slotStartIso, slotTimeZone)} は空いています。{selectedStaff.duration_minutes}分のメニューです。
-                </div>
+                </Notice>
               ) : null}
             </Card>
 
             <Card title="お客様からの要望">
-              <textarea value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} rows={4} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" placeholder="予約時に確認した内容を入力" />
+              <textarea aria-label="お客様からの要望" value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} rows={4} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" placeholder="予約時に確認した内容を入力" />
             </Card>
 
             <Card title="お客様に何を送りますか" note="LINEと結びついている方には、予約後の案内を送ります。送らない選択もできます。">
@@ -778,15 +942,14 @@ export default function NewProxyBookingPage() {
                   LINEと結びついていないため、LINEのお知らせは届きません。
                 </p>
               ) : (
-                <div className="rounded-card bg-action-soft p-3">
-                  <p className="text-action mb-2 text-center text-xs font-semibold">LINEプレビュー</p>
+                <LinePreview>
                   <div className="rounded-card bg-canvas p-4 text-sm leading-6">
                     <p>{friend?.displayName ?? 'お客様'}さま</p>
                     <p className="font-semibold">ご予約を承りました。</p>
                     <p className="mt-3">{slotStartIso ? dateLabel(slotStartIso, slotTimeZone) : '日時を選ぶと表示されます'}</p>
                     <p>{menu?.name ?? 'メニューを選ぶと表示されます'} ／ 担当 {selectedStaff?.display_name ?? '—'}</p>
                   </div>
-                </div>
+                </LinePreview>
               )}
             </Card>
             <Card title="この方について">
@@ -813,13 +976,13 @@ export default function NewProxyBookingPage() {
         </div>
       )}
 
-      {step === 'confirm' && (friend || customer) && menu && selectedStaff && (
+      {step === 'confirm' && (friend || customer || phoneCustomer) && menu && selectedStaff && (
         <div data-design="Body" className="grid gap-4 xl:grid-cols-4">
           <div data-design="Left" className="min-w-0 space-y-4 xl:col-span-3">
             <Card title="だれの予約か">
               <Summary label="お客様" value={customerLabel} />
-              <Summary label="電話番号" value={friend ? '友だち情報欄で確認' : `末尾 ${customer?.phone_last4 ?? '—'}`} />
-              <Summary label="ペットの名前" value={customer?.pet_name ?? '未入力'} />
+              <Summary label="電話番号" value={friend ? '友だち情報欄で確認' : `末尾 ${customerPhoneLast4 ?? '—'}`} />
+              <Summary label="ペットの名前" value={customerPetLabel ?? '未入力'} />
               <Summary label="LINEとの結びつき" value={friend ? '結びついています' : '未連携の電話客'} />
             </Card>
             <Card title="いつ・何を">
@@ -852,13 +1015,13 @@ export default function NewProxyBookingPage() {
                 </>
               )}
             </Card>
-            <p data-booking-slot-check="available" className="border-success bg-success-bg text-success rounded-card border px-4 py-3 text-xs">
+            <Notice tone="success" data-booking-slot-check="available">
               この日時は、確認画面を開く直前に空きを再確認しました。
-            </p>
+            </Notice>
           </div>
           <aside data-design="Right" className="space-y-4">
             <Card title={`${customerLabel}さんにはこう届きます`} note="送る前に、文面をそのまま確かめられます。">
-              <LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus={isLineLinked ? 'not_sent' : 'not_applicable'} />
+              <BookingConfirmPreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus={isLineLinked ? 'not_sent' : 'not_applicable'} />
             </Card>
             <WarningCard title="気をつけること" lines={['LINEと結びついていない方には、自動のお知らせは届きません', 'あとで時間を変えたときは、もう一度お知らせを送ってください']} />
             <RelatedLinks includeConversion={false} />
@@ -866,26 +1029,26 @@ export default function NewProxyBookingPage() {
         </div>
       )}
 
-      {step === 'conflict' && (friend || customer) && menu && selectedStaff && (
+      {step === 'conflict' && (friend || customer || phoneCustomer) && menu && selectedStaff && (
         <>
-          <section className="border-danger bg-danger-bg text-danger flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold">{dateLabel(slotStartIso, slotTimeZone)} は {selectedStaff.display_name} がふさがっています</p>
-              <p className="mt-1 text-xs">
-                {conflictAlternatives
-                  ? `${scheduleLabel(conflictAlternatives.conflict.from, slotTimeZone)}〜${scheduleLabel(conflictAlternatives.conflict.to, slotTimeZone)}に${conflictAlternatives.conflict.count}件重なっています（${conflictAlternatives.conflict.source === 'internal_booking' ? '店内予約' : conflictAlternatives.conflict.source === 'google_calendar' ? 'Google予定' : '受付時間外'}）。`
-                  : ''}
-                時間か担当を変えてください。
-              </p>
-            </div>
-            <Button onClick={() => void recoverConflict()}>空いている時間を選び直す</Button>
-          </section>
+          <Notice
+            tone="danger"
+            action={<Button onClick={() => void recoverConflict()}>空いている時間を選び直す</Button>}
+          >
+            <p className="text-sm font-semibold">{dateLabel(slotStartIso, slotTimeZone)} は {selectedStaff.display_name} がふさがっています</p>
+            <p className="mt-1 text-xs">
+              {conflictAlternatives
+                ? `${scheduleLabel(conflictAlternatives.conflict.from, slotTimeZone)}〜${scheduleLabel(conflictAlternatives.conflict.to, slotTimeZone)}に${conflictAlternatives.conflict.count}件重なっています（${conflictAlternatives.conflict.source === 'internal_booking' ? '店内予約' : conflictAlternatives.conflict.source === 'google_calendar' ? 'Google予定' : '受付時間外'}）。`
+                : ''}
+              時間か担当を変えてください。
+            </p>
+          </Notice>
           <div data-design="Body" className="grid gap-4 xl:grid-cols-4">
             <div data-design="Left" className="min-w-0 space-y-4 xl:col-span-3">
               <Card title="だれの予約か"><Summary label="お客様" value={customerLabel} /><Summary label="LINEとの結びつき" value={friend ? '結びついています' : '未連携の電話客'} /></Card>
               <Card title="いつ・何を" note="時間が重なっています。右の空いている時間から選べます。">
                 <Summary label="メニュー" value={`${menu.name}（${occupiedMinutes}分）`} />
-                <Summary label="日付" value={dateLabel(slotStartIso, slotTimeZone).split(' ')[0]} />
+                <Summary label="日付" value={formatDay(slotStartIso, '—', undefined, slotTimeZone)} />
                 <Summary label="時刻" value={time} />
                 <Summary label="担当" value={selectedStaff.display_name} />
                 <p className="text-danger mt-3 text-xs">選んだ時間は、ほかの予約で埋まりました。</p>
@@ -918,7 +1081,7 @@ export default function NewProxyBookingPage() {
         </>
       )}
 
-      {step === 'done' && result && (friend || customer) && menu && selectedStaff && (
+      {step === 'done' && result && (friend || customer || phoneCustomer) && menu && selectedStaff && (
         <>
           <section className="bg-action-soft text-action rounded-card px-4 py-3 text-xs font-semibold">
             {timeRangeLabel(slotStartIso, occupiedMinutes, slotTimeZone, slotEndIso)} の枠を押さえました。お知らせはリマインダから自動で届きます。
@@ -945,11 +1108,11 @@ export default function NewProxyBookingPage() {
                 <Summary label="予約台帳" value="1件追加（電話で受けた予約も同じ台帳へ記録します）" />
               </Card>
               <Card title="次にすること">
-                <div className="flex flex-wrap gap-2"><Button variant="primary" href="/booking/bookings">今日の台帳を見る</Button><Button href={`/booking/bookings/detail?id=${encodeURIComponent(result.booking_id)}`}>この予約の詳細を見る</Button><Button onClick={() => { setStep('input'); setResult(null); setTime(''); setIdempotencyKey('') }}>続けてもう1件入れる</Button></div>
+                <div className="flex flex-wrap gap-2"><Button variant="primary" href="/booking/bookings">今日の台帳を見る</Button><Button href={`/booking/bookings/detail?id=${encodeURIComponent(result.booking_id)}`}>この予約の詳細を見る</Button><Button onClick={() => { setStep('input'); setResult(null); setTime(''); setIdempotencyKey(''); customerIdempotencyKey.current = '' }}>続けてもう1件入れる</Button></div>
               </Card>
             </div>
             <aside data-design="Right" className="space-y-4">
-              <Card title="お客様に届くもの" note="案内処理の実績と同じ状態を表示しています。"><LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus={confirmationOperation?.status ?? result.line_notification} /></Card>
+              <Card title="お客様に届くもの" note="案内処理の実績と同じ状態を表示しています。"><BookingConfirmPreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus={confirmationOperation?.status ?? result.line_notification} /></Card>
               <RelatedLinks includeConversion />
             </aside>
           </div>
@@ -964,12 +1127,10 @@ export default function NewProxyBookingPage() {
             <>
               {(step === 'confirm' || step === 'conflict') && <Button onClick={() => { setStep('input'); setError('') }}>入力に戻る</Button>}
               {step === 'input' ? (
-                <Button variant="primary" disabled={loading} data-qa-open="GFDqW" onClick={() => void review()}>
-                  {loading ? '空きを再確認しています' : '予約内容を確認する'}
+                <Button variant="primary" disabled={loading} data-qa-open="GFDqW" onClick={() => void review()} busy={loading} busyLabel="空きを再確認しています">予約内容を確認する
                 </Button>
               ) : step === 'confirm' ? (
-                <Button variant="primary" disabled={loading} data-qa-open="GfceK" onClick={() => void createBooking()}>
-                  {loading ? '登録中です' : 'この内容で予約を入れる'}
+                <Button variant="primary" disabled={loading} data-qa-open="GfceK" onClick={() => void createBooking()} busy={loading} busyLabel="登録中です">この内容で予約を入れる
                 </Button>
               ) : <Button variant="primary" disabled>この内容で予約を入れる</Button>}
             </>
@@ -1009,22 +1170,15 @@ function NotificationToggle({ checked, onChange, title, detail }: {
   detail: string
 }) {
   return (
-    <label className="flex cursor-pointer gap-3">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="accent-accent-deep mt-1 h-4 w-4"
-      />
-      <div>
-        <p className="text-ink text-sm font-medium">{title}</p>
-        <p className="text-ink-faint mt-0.5 text-xs">{detail}</p>
-      </div>
-    </label>
+    <Checkbox
+      checked={checked}
+      onCheckedChange={onChange}
+      description={detail}
+    >{title}</Checkbox>
   )
 }
 
-function LinePreview({ friendName, menuName, staffName, timeZone, startUtc, deliveryStatus }: {
+function BookingConfirmPreview({ friendName, menuName, staffName, timeZone, startUtc, deliveryStatus }: {
   friendName: string
   menuName: string
   staffName: string
@@ -1039,16 +1193,18 @@ function LinePreview({ friendName, menuName, staffName, timeZone, startUtc, deli
           : deliveryStatus === 'not_applicable' ? 'LINE未連携のため送信しません'
             : '「予約を入れる」を押すと、すぐに届きます'
   return (
-    <div className="bg-action rounded-card p-4">
-      <p className="text-on-action text-center text-xs font-semibold">LINEプレビュー</p>
-      <p className="bg-ink/25 text-on-action mx-auto mt-3 w-fit rounded-pill px-3 py-1 text-xs">{deliveryLabel}</p>
-      <div className="bg-canvas rounded-card mt-3 p-4 text-sm leading-6">
+    <>
+    {/* 送信の状態は動く情報なので、枠の外に見えるまま残す（? には入れない）。 */}
+    <p className="text-ink-secondary mb-2 text-center text-xs">{deliveryLabel}</p>
+    <LinePreview>
+      <div className="bg-canvas rounded-card p-4 text-sm leading-6">
         <p>{friendName}さま</p>
         <p>{dateLabel(startUtc, timeZone)} から、{menuName}をお受けしました。</p>
         <p>担当は{staffName}です。ご来店をお待ちしています。</p>
         <Button href="/booking/bookings" variant="primary" className="mt-3 w-full">予約内容を確認する</Button>
       </div>
-    </div>
+    </LinePreview>
+    </>
   )
 }
 
@@ -1065,11 +1221,11 @@ function RelatedLinks({ includeConversion }: { includeConversion: boolean }) {
   return (
     <Card title="つながる先">
       <div className="text-ink-secondary space-y-2 text-xs">
-        <p><Link href="/booking/bookings" className="text-accent font-semibold">→ 予約管理</Link>　今日の台帳</p>
-        <p><Link href="/booking/menus" className="text-accent font-semibold">→ 予約設定</Link>　メニューと空き枠</p>
-        <p><Link href="/reminders" className="text-accent font-semibold">→ リマインダ</Link>　前日・開始前のお知らせ</p>
-        <p><Link href="/friends" className="text-accent font-semibold">→ 友だち</Link>　顧客カルテに残ります</p>
-        {includeConversion ? <p><Link href="/conversions" className="text-accent font-semibold">→ コンバージョン</Link>　予約の成果を確認</p> : null}
+        <p><Link href="/booking/bookings" className="text-action font-semibold underline">→ 予約管理</Link>　今日の台帳</p>
+        <p><Link href="/booking/menus" className="text-action font-semibold underline">→ 予約設定</Link>　メニューと空き枠</p>
+        <p><Link href="/reminders" className="text-action font-semibold underline">→ リマインダ</Link>　前日・開始前のお知らせ</p>
+        <p><Link href="/friends" className="text-action font-semibold underline">→ 友だち</Link>　顧客カルテに残ります</p>
+        {includeConversion ? <p><Link href="/conversions" className="text-action font-semibold underline">→ コンバージョン</Link>　予約の成果を確認</p> : null}
       </div>
     </Card>
   )

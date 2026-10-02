@@ -4,9 +4,16 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
-import SelectField from '@/components/shared/select-field'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import LinePreview from '@/components/shared/line-preview'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Notice from '@/components/shared/notice'
+import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
+import Select from '@/components/shared/select'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
@@ -16,6 +23,7 @@ import {
   toActionPayload,
   type InlineAction,
 } from '@/components/auto-replies/draft-fields'
+import Button from '@/components/shared/button'
 
 /**
  * カルーセルの編集。
@@ -109,6 +117,27 @@ function buildCarouselActions(panels: Panel[]): Record<string, Record<string, un
       })
   })
   return carouselActions
+}
+
+/**
+ * D009: 未保存の見分けに入れる中身。保存の口へ送る項目とそろえる。
+ * `createdId` は人の入力ではないので入れない。
+ */
+interface CarouselDirtyState {
+  name: string
+  panels: Panel[]
+  folderId: string | null
+  tapLimitMode: 'none' | 'once'
+  tapLimitText: string
+}
+
+/**
+ * D009: 保存ずみの正本と今の入力を同じ形の文字にする。1文字でも違えば
+ * 「保存していない変更がある」とする。比べるのは値だけで、順番も含める
+ * （パネルの並び替えも失われる作業のため）。
+ */
+function carouselSnapshot(state: CarouselDirtyState): string {
+  return JSON.stringify(state)
 }
 
 interface CarouselSaveInput {
@@ -210,7 +239,7 @@ async function saveCarousel(
     }
     return { ok: true }
   } catch (e) {
-    return fail(e instanceof Error ? e.message : '保存に失敗しました')
+    return fail(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
   }
 }
 
@@ -251,6 +280,33 @@ function CarouselEditorInner() {
   const [tapLimitMode, setTapLimitMode] = useState<'none' | 'once'>('none')
   const [tapLimitText, setTapLimitText] = useState('')
   /*
+   * D009: 保存ずみの正本。読み込みが終わった直後の1回だけ覚える。
+   * 新規は開いたときの空、編集は読み込んだ中身が正本になる。
+   * 読み込み中は欄が出ないので、その間に打たれることはない。
+   */
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
+  const [snapshotTaken, setSnapshotTaken] = useState(false)
+  useEffect(() => {
+    if (loading || snapshotTaken) return
+    setSavedSnapshot(carouselSnapshot({ name, panels, folderId, tapLimitMode, tapLimitText }))
+    setSnapshotTaken(true)
+  }, [loading, snapshotTaken, name, panels, folderId, tapLimitMode, tapLimitText])
+  const dirty = savedSnapshot !== null &&
+    savedSnapshot !== carouselSnapshot({ name, panels, folderId, tapLimitMode, tapLimitText })
+  /*
+   * D009: 未保存のまま画面の外へ出る操作を止める（/webinars/edit と同じ
+   * 共通の番兵・同じ確認の言葉）。一覧への「キャンセル」は素の Link の
+   * まま置き、止める役は番兵が受け持つ。保存して一覧へ戻るときは、
+   * 決まった移動として警告を外してから進む。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({
+    dirty,
+    busy: saving,
+  })
+  const leaveConfirmDialog = (
+    <UnsavedLeaveDialog open={leaveTarget !== null} subject="カルーセルの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
+  )
+  /*
    * N-144: カルーセルの作成・保存APIは owner/admin だけ。staff が
    * シナリオ画面の選択肢から辿って来ても、フォームは出さない。
    */
@@ -265,15 +321,18 @@ function CarouselEditorInner() {
     setFolders([])
     if (!folderAccountId) return
     let cancelled = false
+    // m23m: 置き場が取れなくてもカルーセルは作れる。取れない失敗で画面を落とさない。
     void api.folders.list('template', folderAccountId).then((res) => {
       if (!cancelled && res.success) setFolders(res.data)
-    })
+    }).catch(() => {})
     return () => { cancelled = true }
   }, [folderAccountId])
 
-  const markLoadFailed = () => {
+  // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+  // それ以外は画面の文のまま。生の `API error: NNN` は出さない。
+  const markLoadFailed = (caught?: unknown) => {
     setLoadFailed(true)
-    setError('読み込めませんでした。開き直してください。')
+    setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, 'カルーセル') : '読み込めませんでした。開き直してください。')
   }
 
   useEffect(() => {
@@ -330,7 +389,7 @@ function CarouselEditorInner() {
           setError('いまの中身を読み取れませんでした。保存すると上書きされます。')
         }
       })
-      .catch(markLoadFailed)
+      .catch((caught: unknown) => markLoadFailed(caught))
       .finally(() => setLoading(false))
   }, [id])
 
@@ -353,8 +412,13 @@ function CarouselEditorInner() {
       return next
     })
 
-  const anyImage = panels.some((p) => p.thumbnailImageUrl.trim())
-  const textMax = anyImage ? TEXT_MAX_WITH_IMAGE : TEXT_MAX_WITHOUT_IMAGE
+  /*
+   * パネルごとの本文上限。タイトルか画像があるパネルは60文字、両方無ければ
+   * 120文字（LINE の決まり）。画面全体で1つの上限にすると、タイトルありで
+   * 61文字が通って保存時に弾かれる。
+   */
+  const textMaxFor = (panel: Panel) =>
+    panel.title.trim() || panel.thumbnailImageUrl.trim() ? TEXT_MAX_WITH_IMAGE : TEXT_MAX_WITHOUT_IMAGE
 
   const save = async () => {
     /*
@@ -401,6 +465,8 @@ function CarouselEditorInner() {
         return
       }
       // 成功したときだけ完了（一覧へ戻る）。失敗では画面を動かさない。
+      // D009: 決まった移動なので警告を外してから進む。
+      disarm()
       router.push('/templates')
     } finally {
       savingRef.current = false
@@ -420,15 +486,17 @@ function CarouselEditorInner() {
         </nav>
         <div role="alert" className="bg-canvas rounded-card border-hairline border p-8 text-sm">
           <p className="font-bold text-ink">カルーセルの作成・変更はオーナーと管理者だけができます</p>
-          <Link href="/templates" className="text-accent hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
+          <Link href="/templates" className="text-action hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
         </div>
+        {leaveConfirmDialog}
       </div>
     )
   }
 
   return (
-    <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav data-design="Crumb" className="text-ink-faint text-xs">
         <Link href="/templates" className="hover:underline">
           テンプレート
         </Link>
@@ -441,19 +509,23 @@ function CarouselEditorInner() {
           読み込み中...
         </div>
       ) : (
-        <div className="relative max-w-none space-y-4 xl:pr-96">
-          <aside className="hidden xl:absolute xl:top-0 xl:right-0 xl:block xl:w-96">
-            <section className="rounded-card bg-line-preview p-4 text-on-accent">
-              <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
-              <p className="mx-auto mt-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">カルーセルの見え方（横にスクロールします）</p>
-              <div className="rounded-card mt-4 overflow-hidden bg-canvas text-ink">
+        <div className="flex flex-col gap-4 xl:flex-row">
+          {/*
+            ★V7: 本体＋右のプレビューの2列を、通常の横並びで組む。
+            以前は右列を絶対配置にしていた。1920px で本体が左に寄り、
+            右が大きく空いて見えた。読み上げ順は変えない（案内が先）。
+          */}
+          <aside className="hidden w-full shrink-0 xl:order-2 xl:block xl:w-96">
+            <LinePreview note="カルーセルの見え方（横にスクロールします）">
+              <div className="rounded-card overflow-hidden bg-canvas text-ink">
                 <div className="bg-canvas-sunken h-36" />
                 <div className="p-4">
                   <p className="font-bold">{panels[1]?.title || panels[0]?.title || '（タイトル）'}</p>
                   <p className="mt-2 text-sm leading-relaxed">{panels[1]?.text || panels[0]?.text}</p>
-                  {(panels[1]?.actions || panels[0]?.actions || []).map((action, index) => <p key={index} className="border-hairline mt-2 rounded-control border p-2 text-center text-sm text-accent">{action.label}</p>)}
+                  {(panels[1]?.actions || panels[0]?.actions || []).map((action, index) => <p key={index} className="border-hairline mt-2 rounded-control border p-2 text-center text-sm text-accent-deep">{action.label}</p>)}
                 </div>
               </div>
+            </LinePreview>
               {/*
                 NEXT-24: テンプレートのテスト送信口はまだ無い。押せる見た目の
                 まま置くと「送れた」と誤解するので、押せない形にして理由と
@@ -467,11 +539,15 @@ function CarouselEditorInner() {
               >
                 自分に送って確かめる
               </button>
-              <p className="text-on-accent/80 mt-2 text-xs leading-relaxed">
+              {/*
+                NEXT-24: 押せない形＋理由＋代替手順のまま残す（無反応に見せない）。
+                枠の外に置く。枠の中は届く見た目だけにする（B-6）。
+              */}
+              <p className="text-ink-faint mt-2 text-xs leading-relaxed">
                 この画面からのテスト送信にはまだ対応していません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。
               </p>
-            </section>
           </aside>
+          <div className="min-w-0 flex-1 space-y-4 xl:order-1">
           <div className="bg-canvas rounded-card border-hairline border p-5">
             <Field label="テンプレート名" htmlFor="cr-name" required>
               <input
@@ -485,10 +561,10 @@ function CarouselEditorInner() {
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
               <label className="text-ink-faint">
                 置き場：
-                <SelectField
+                <Select
                   aria-label="置き場"
                   value={folderId ?? ''}
-                  onChange={(e) => setFolderId(e.target.value || null)}
+                  onChange={(value) => setFolderId(value || null)}
                   options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                 />
               </label>
@@ -527,7 +603,7 @@ function CarouselEditorInner() {
                   disabled={i === 0}
                   aria-label={`パネル ${i + 1} を左へ移動`}
                   title={i === 0 ? 'いちばん左です' : '左へ移動'}
-                  className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40"
+                  className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40"
                 >
                   ←
                 </button>
@@ -536,7 +612,7 @@ function CarouselEditorInner() {
                   disabled={i === panels.length - 1}
                   aria-label={`パネル ${i + 1} を右へ移動`}
                   title={i === panels.length - 1 ? 'いちばん右です' : '右へ移動'}
-                  className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40"
+                  className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40"
                 >
                   →
                 </button>
@@ -550,16 +626,16 @@ function CarouselEditorInner() {
                   }
                   disabled={panels.length >= MAX_COLUMNS}
                   title={panels.length >= MAX_COLUMNS ? `パネルは${MAX_COLUMNS}枚までです` : undefined}
-                  className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40"
+                  className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40"
                 >
                   複製
                 </button>
                 {panels.length > 1 && (
                   <button
                     onClick={() => setPanels((prev) => prev.filter((_, j) => j !== i))}
-                    className="text-danger hover:bg-danger-bg rounded px-2 py-1 text-xs"
+                    className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs"
                   >
-                    削除
+                    削除する
                   </button>
                 )}
                 </div>
@@ -567,9 +643,11 @@ function CarouselEditorInner() {
 
               <Field
                 label="画像のURL"
+                htmlFor={`cr-panel-${i}-image`}
                 note="画像を入れるなら、全部の枚に入れてください。1枚だけ無いと、その枚だけ高さが変わって崩れます。"
               >
                 <input
+                  id={`cr-panel-${i}-image`}
                   type="url"
                   value={panel.thumbnailImageUrl}
                   onChange={(e) => update(i, { thumbnailImageUrl: e.target.value })}
@@ -578,8 +656,9 @@ function CarouselEditorInner() {
                 />
               </Field>
 
-              <Field label="パネルタイトル" note={`${TITLE_MAX}文字まで`}>
+              <Field label="パネルタイトル" htmlFor={`cr-panel-${i}-title`} note={`${TITLE_MAX}文字まで。タイトルは全部のパネルに入れるか、全部空にしてください。`}>
                 <input
+                  id={`cr-panel-${i}-title`}
                   type="text"
                   value={panel.title}
                   onChange={(e) => update(i, { title: e.target.value })}
@@ -594,14 +673,16 @@ function CarouselEditorInner() {
 
               <Field
                 label="パネル本文"
+                htmlFor={`cr-panel-${i}-text`}
                 required
                 note={
-                  anyImage
-                    ? `画像があるため${TEXT_MAX_WITH_IMAGE}文字までです。`
-                    : `${TEXT_MAX_WITHOUT_IMAGE}文字まで（画像を入れると${TEXT_MAX_WITH_IMAGE}文字になります）。`
+                  panel.title.trim() || panel.thumbnailImageUrl.trim()
+                    ? `タイトルか画像があるため${TEXT_MAX_WITH_IMAGE}文字までです。`
+                    : `${TEXT_MAX_WITHOUT_IMAGE}文字まで（タイトルか画像を入れると${TEXT_MAX_WITH_IMAGE}文字になります）。`
                 }
               >
                 <textarea
+                  id={`cr-panel-${i}-text`}
                   rows={3}
                   value={panel.text}
                   onChange={(e) => update(i, { text: e.target.value })}
@@ -609,19 +690,19 @@ function CarouselEditorInner() {
                 />
                 <p
                   className={`mt-1 text-xs tabular-nums ${
-                    [...panel.text].length > textMax ? 'text-danger' : 'text-ink-faint'
+                    [...panel.text].length > textMaxFor(panel) ? 'text-danger' : 'text-ink-faint'
                   }`}
                 >
-                  {[...panel.text].length} / {textMax}
+                  {[...panel.text].length} / {textMaxFor(panel)}
                 </p>
               </Field>
 
               <div>
                 <p className="text-ink-secondary mb-2 text-sm font-medium">
-                  このパネルの選択肢（最大{MAX_ACTIONS}つ）
+                  このパネルの選択肢（最大{MAX_ACTIONS}つ・数は全部のパネルでそろえてください）
                 </p>
                 {panel.actions.map((action, ai) => (
-                  <div key={ai} className="border-hairline mb-2 rounded-lg border p-3">
+                  <div key={ai} className="border-hairline mb-2 rounded-control border p-3">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <input
                         type="text"
@@ -634,6 +715,7 @@ function CarouselEditorInner() {
                           })
                         }
                         placeholder="ボタンの文字"
+                        aria-label={`パネル${i + 1}の選択肢${ai + 1}の文字`}
                         className={`${inputClass} w-40`}
                       />
                       <div className="flex gap-1.5">
@@ -643,20 +725,15 @@ function CarouselEditorInner() {
                             { value: 'action' as const, label: '押されたときに何かする' },
                           ]
                         ).map((o) => (
-                          <button
-                            key={o.value}
-                            type="button"
-                            onClick={() =>
+                          <Button variant="primary" className={(`rounded-control px-2.5 py-1 text-xs ${action.kind === o.value ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`) + ' border-0 h-auto whitespace-normal'} key={o.value} type="button" onClick={() =>
                               update(i, {
                                 actions: panel.actions.map((a, j) =>
                                   j === ai ? { ...a, kind: o.value } : a,
                                 ),
                               })
-                            }
-                            className={`rounded-control px-2.5 py-1 text-xs ${action.kind === o.value ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
-                          >
+                            }>
                             {o.label}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                       {panel.actions.length > 1 && (
@@ -664,7 +741,7 @@ function CarouselEditorInner() {
                           onClick={() =>
                             update(i, { actions: panel.actions.filter((_, j) => j !== ai) })
                           }
-                          className="text-danger hover:bg-danger-bg ml-auto rounded px-2 text-xs"
+                          className="text-danger hover:bg-danger-bg ml-auto rounded-mini px-2 text-xs"
                         >
                           外す
                         </button>
@@ -683,6 +760,7 @@ function CarouselEditorInner() {
                           })
                         }
                         placeholder="https://example.com"
+                        aria-label={`パネル${i + 1}の選択肢${ai + 1}のURL`}
                         className={`${inputClass} w-full`}
                       />
                     ) : (
@@ -712,14 +790,11 @@ function CarouselEditorInner() {
                   </div>
                 ))}
                 {panel.actions.length < MAX_ACTIONS && (
-                  <button
-                    onClick={() =>
+                  <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs h-auto whitespace-normal" onClick={() =>
                       update(i, { actions: [...panel.actions, emptyChoice()] })
-                    }
-                    className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs"
-                  >
-                    ＋ 選択肢を追加
-                  </button>
+                    }>
+                    ＋ 選択肢を追加する
+                  </Button>
                 )}
               </div>
             </div>
@@ -733,33 +808,23 @@ function CarouselEditorInner() {
                 出るので数えられません。
               </p>
             </div>
-            <div className="space-y-1">
-              <label className="flex cursor-pointer items-start gap-2">
-                <input
-                  type="radio"
-                  name="tap-limit"
-                  checked={tapLimitMode === 'none'}
-                  onChange={() => setTapLimitMode('none')}
-                  className="mt-0.5"
-                />
-                <span className="text-sm">何度でも押せる</span>
-              </label>
-              <label className="flex cursor-pointer items-start gap-2">
-                <input
-                  type="radio"
-                  name="tap-limit"
-                  checked={tapLimitMode === 'once'}
-                  onChange={() => setTapLimitMode('once')}
-                  className="mt-0.5"
-                />
-                <span className="text-sm">
-                  1人につき1回だけ
-                  <span className="text-ink-faint block text-[11px]">
-                    このカルーセル全体で1回です。どのボタンを押しても、次からは動きません。
-                  </span>
-                </span>
-              </label>
-            </div>
+            <RadioCardGroup legend="押せる回数">
+              <RadioCard
+                name="tap-limit"
+                value="none"
+                checked={tapLimitMode === 'none'}
+                onChange={() => setTapLimitMode('none')}
+                title="何度でも押せる"
+              />
+              <RadioCard
+                name="tap-limit"
+                value="once"
+                checked={tapLimitMode === 'once'}
+                onChange={() => setTapLimitMode('once')}
+                title="1人につき1回だけ"
+                note="このカルーセル全体で1回です。どのボタンを押しても、次からは動きません。"
+              />
+            </RadioCardGroup>
 
             {tapLimitMode === 'once' && (
               <Field
@@ -780,35 +845,33 @@ function CarouselEditorInner() {
           </section>
 
           {panels.length < MAX_COLUMNS && (
-            <button
-              onClick={() => setPanels((prev) => [...prev, emptyPanel()])}
-              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
-            >
-              パネルを追加（{panels.length} / {MAX_COLUMNS}）
-            </button>
+            <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => setPanels((prev) => [...prev, emptyPanel()])}>
+              パネルを追加する（{panels.length} / {MAX_COLUMNS}）
+            </Button>
           )}
 
           {error && (
-            <div role="alert" className="bg-danger-bg border-danger-bg text-danger rounded-lg border p-4 text-sm">
-              <p>{error}</p>
-              {saveFailed && (
+            <Notice
+              tone="danger"
+              message={error}
+              action={saveFailed ? (
                 /*
                  * N-149: 原因だけ出して止めると、人は「入力が消えたか」と
                  * 不安になる。残っていることと、やり直す口を一緒に出す。
                  */
-                <p className="mt-2">
-                  <span className="text-ink-secondary">入力した内容はそのまま残っています。</span>
+                <span className="text-xs">
+                  <span>入力した内容はそのまま残っています。</span>
                   <button
                     type="button"
                     onClick={save}
                     disabled={saving}
-                    className="text-accent hover:underline ml-2 font-medium disabled:opacity-40"
+                    className="text-action hover:underline ml-2 font-medium disabled:opacity-40"
                   >
                     もう一度保存する
                   </button>
-                </p>
-              )}
-            </div>
+                </span>
+              ) : undefined}
+            />
           )}
 
           <section className="bg-canvas rounded-card border-hairline border p-5">
@@ -817,7 +880,7 @@ function CarouselEditorInner() {
             <div className="bg-canvas-sunken rounded-card overflow-x-auto p-3">
               <div className="flex gap-2">
                 {panels.map((panel, i) => (
-                  <div key={i} className="w-56 shrink-0 overflow-hidden rounded-2xl bg-white">
+                  <div key={i} className="w-56 shrink-0 overflow-hidden rounded-card bg-canvas">
                     {typeof panel.thumbnailImageUrl === 'string' && /^https?:\/\//.test(panel.thumbnailImageUrl) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={panel.thumbnailImageUrl} alt="" className="h-28 w-full object-cover" />
@@ -835,7 +898,7 @@ function CarouselEditorInner() {
                         {panel.actions.map((a, j) => (
                           <p
                             key={j}
-                            className="border-hairline text-accent rounded-control border px-2 py-1 text-center text-xs"
+                            className="border-hairline text-accent-deep rounded-control border px-2 py-1 text-center text-xs"
                           >
                             {a.label || '（ボタン）'}
                           </p>
@@ -865,7 +928,7 @@ function CarouselEditorInner() {
             <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
               <li>・パネルは{MAX_COLUMNS}枚まで。多いと最後まで見てもらえません</li>
               <li>・ボタンは1パネルにつき{MAX_ACTIONS}つまでです（LINEの仕様）</li>
-              <li>・パネル本文は{TEXT_MAX_WITH_IMAGE}文字まで。超えると途中で切れて表示されます</li>
+              <li>・パネル本文はタイトルか画像があると{TEXT_MAX_WITH_IMAGE}文字まで、両方なければ{TEXT_MAX_WITHOUT_IMAGE}文字までです。超えると途中で切れて表示されます</li>
               <li>
                 ・画像は横1024 × 縦678pxを推奨。比率は 1.51:1 か 1:1 のどちらかに揃えてください
               </li>
@@ -877,26 +940,21 @@ function CarouselEditorInner() {
           </section>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={save}
-              disabled={saving || loadFailed}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
-              {saving ? '保存中...' : '保存'}
-            </button>
-            <button
-              disabled
-              title="下書き保存は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-            >
-              下書き保存
-            </button>
+            <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={save} disabled={saving || loadFailed}>
+              {saving ? '保存中...' : '保存する'}
+            </Button>
+            {/*
+              D009: 未保存のままの「キャンセル」は番兵が止めて確認窓を出す。
+              素の Link のまま置く（止める役は useUnsavedGuard が受け持つ）。
+            */}
             <Link
               href="/templates"
               className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control px-4 py-2 text-sm font-medium"
             >
               キャンセル
             </Link>
+          </div>
+          {leaveConfirmDialog}
           </div>
         </div>
       )}

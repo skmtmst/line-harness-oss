@@ -79,4 +79,16 @@ describe('D1 migration workflow safety', () => {
       );
     }
   });
+
+  it('does not use the runner context in job-level env (steps only)', () => {
+    // `runner.temp` などは step の中でだけ有効。job の env に書くと
+    // workflow 自体が「Unrecognized named-value: runner」で起動すらしない。
+    // job の env は4空白、step の env は8空白なので字下げで見分ける。
+    const jobEnvBlocks =
+      manualWorkflow.match(/^ {4}env:\n(?: {6}\S[^\n]*\n?)+/gm) ?? [];
+    expect(jobEnvBlocks.length).toBeGreaterThan(0);
+    for (const block of jobEnvBlocks) {
+      expect(block).not.toContain('${{ runner.');
+    }
+  });
 });

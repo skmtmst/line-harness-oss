@@ -5,10 +5,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import Card, { CardHeader } from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
-import Select from '@/components/shared/select'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
+import Notice from '@/components/shared/notice'
+import { formatTime } from '@/lib/format'
 
 /**
  * 対応が必要な受信（設計 `V2 1-1 ダッシュボード` の `card 対応が必要な受信`）。
@@ -80,7 +82,7 @@ function ChannelBadge({ channel }: { channel: InboxItem['channel'] }) {
       className={`mr-2 rounded-pill px-1.5 py-0.5 text-[10px] font-medium ${
         channel === 'email'
           ? 'bg-canvas-sunken text-ink-secondary'
-          : 'bg-accent-soft text-accent'
+          : 'bg-accent-soft text-accent-deep'
       }`}
     >
       {channel === 'email' ? 'メール' : 'LINE'}
@@ -124,8 +126,6 @@ export default function PendingInboxCard({
   const staffIdRef = useRef<string | null>(null)
   const total = summary?.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
-  const firstRow = total === 0 ? 0 : (page - 1) * pageSize + 1
-  const lastRow = Math.min(total, (page - 1) * pageSize + items.length)
 
   /*
    * 担当者ごとの表示件数を復元する（DASH-25）。
@@ -149,16 +149,6 @@ export default function PendingInboxCard({
       .catch(() => { /* 本人情報が取れなくても一覧は使える */ })
     return () => { cancelled = true }
   }, [])
-
-  const changePageSize = (next: number) => {
-    setPageSize(next)
-    setPage(1)
-    const staffId = staffIdRef.current
-    if (!staffId) return
-    try {
-      window.localStorage.setItem(PAGE_SIZE_STORAGE_PREFIX + staffId, String(next))
-    } catch { /* storage unavailable */ }
-  }
 
   const load = useCallback(async () => {
     const seq = ++loadSeq.current
@@ -212,40 +202,41 @@ export default function PendingInboxCard({
 
   return (
     <Card layout="vertical" overflow="hidden" className="h-fit min-w-0">
+      {/*
+        行き先リンクは見出しの行の右端に1つ（CardHeader の action）。
+        ほかのカード（「さらに詳しく →」「アクセス解析へ →」「すべて見る →」）
+        と同じ部品・同じ色・同じ大きさにする。独自の文字色・大きさや
+        矢印なしの書き方はしない。
+      */}
       <CardHeader
         size="roomy"
         /*
           この一覧は可視の全アカウントの合計。同じ画面の小カード
           「対応が必要な受信」(選択中のアカウントの数)とは範囲が違うため、
           範囲を題に書いて混同を防ぐ。
+          件数は小カードの1か所に集約し、見出しの横では繰り返さない（m22d）。
         */
         title="対応が必要な受信（全アカウント）"
-        meta={summary && summary.total > 0 ? `${summary.total}件` : undefined}
+        action={<Link href="/chats" className="hover:underline">受信箱をすべて見る →</Link>}
+        actionTone="info"
       />
 
       {/*
-        見出し行と「表示件数・全件リンク」を別行にする（DASH-26）。
-        320pxでは見出し・件数選択・リンクを1行に収まらないので、
-        操作は2行目へ下げて折り返せるようにする。
+        一覧がいつ時点のものか。30秒ごとの再取得で古い値を最新と誤認しない。
+        見出し行と別行にする（DASH-26）。320pxでは見出し・件数・リンクを
+        1行に収まらない。リンクと同じ行に押し込まない。
+        まだ一度も取れていないときは行ごと出さない（空の罫線を残さない）。
       */}
-      <div className="border-hairline flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b px-5 pb-2">
-        <span className="text-ink-secondary flex items-center gap-1.5 text-xs font-normal">
-          表示件数
-          <Select
-            aria-label="表示件数"
-            value={String(pageSize)}
-            onChange={(next) => changePageSize(Number(next))}
-            options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: `${n}件表示` }))}
-          />
-        </span>
-        <span className="flex items-center gap-3">
-          {/* 一覧がいつ時点のものか。30秒ごとの再取得で古い値を最新と誤認しない。 */}
-          {dashboardLocalUpdatedAt(lastSuccessAt) ? (
-            <span className="text-ink-faint text-xs">{dashboardLocalUpdatedAt(lastSuccessAt)}</span>
-          ) : null}
-          <Link href="/chats" className="text-info text-xs font-semibold hover:underline">受信箱をすべて見る</Link>
-        </span>
-      </div>
+      {dashboardLocalUpdatedAt(lastSuccessAt) ? (
+        <div className="border-hairline flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5 border-b px-5 pb-2">
+          {/*
+            ダッシュボードでは件数を変えさせない（★V7 ダッシュボードの見せ方、2026-09-24）。
+            ここは「いま対応が要る人」をひと目で見る場所で、全件は受信箱で見る。
+            以前あった「表示件数」のプルダウンは外した（保存済みの件数は読むだけ）。
+          */}
+          <span className="text-ink-faint text-xs">{dashboardLocalUpdatedAt(lastSuccessAt)}</span>
+        </div>
+      ) : null}
 
       {/*
         成功済みの数を残したまま、直近の更新に失敗したことを隠さない
@@ -253,13 +244,13 @@ export default function PendingInboxCard({
         最後に取れた時刻と読み直しを一覧の上に出す。
       */}
       {loadFailure && summary ? (
-        <div className="bg-warning-bg text-warning flex flex-wrap items-center justify-between gap-2 px-5 py-2 text-xs" role="status">
-          <span>
-            最新の状態に更新できませんでした。
-            {lastSuccessAt ? `最終更新 ${lastSuccessAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} の内容を表示しています。` : ''}
-          </span>
-          <button type="button" onClick={() => void load()} className="font-medium underline">もう一度読み込む</button>
-        </div>
+        <Notice
+          tone="warn"
+          action={<button type="button" onClick={() => void load()} className="font-medium underline">もう一度読み込む</button>}
+        >
+          最新の状態に更新できませんでした。
+          {lastSuccessAt ? `最終更新 ${formatTime(lastSuccessAt)} の内容を表示しています。` : ''}
+        </Notice>
       ) : null}
 
       {loadFailure === 'forbidden' && !summary ? (
@@ -287,19 +278,27 @@ export default function PendingInboxCard({
             状態を各行へ分ける。
           */}
           <div className="min-h-0 flex-1 overflow-hidden max-sm:hidden">
-            <table className="w-full table-fixed text-sm">
+            {/*
+              状態の列は札の幅に合わせた固定幅にする。割合（10%）にすると
+              狭い幅で札が右の余白へ食い込む。残りは内容の列で吸収する
+              （幅を指定しない列が伸びる）。右端の余白は見出しと同じ px-5。
+            */}
+            <DataTable className="rounded-none border-0">
               <thead>
-                <tr className="text-ink-faint border-hairline h-[34px] border-b text-left text-xs">
-                  <th className="w-[36%] px-5 font-medium">お名前</th>
-                  <th className="w-[40%] px-3 font-medium">内容</th>
-                  <th className="w-[14%] px-3 text-right font-medium whitespace-nowrap">待ち時間</th>
-                  <th className="w-[10%] px-5 font-medium whitespace-nowrap">状態</th>
-                </tr>
+                <TableHeadRow>
+                  <Th style={{ width: '36%' }}>お名前</Th>
+                  <Th>内容</Th>
+                  <Th style={{ width: '14%' }} align="right" className="whitespace-nowrap">待ち時間</Th>
+                  {/* 状態の札（約52px＋余白）に合わせた固定幅。96px では右に空く。 */}
+                  <Th style={{ width: 80 }} className="whitespace-nowrap">状態</Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-hairline divide-y">
+              <tbody>
                 {items.map((item) => (
-                  <tr key={item.id} className="h-[61px] hover:bg-canvas-sunken">
-                    <td className="overflow-hidden px-5 py-2.5 whitespace-nowrap">
+                  // 行の高さ 61px は設計のまま（共通 Tr の既定 58px ではない）。
+                  // Tailwind v4 は層（utilities）のため部品CSSに負ける。style で保つ。
+                  <Tr key={item.id} interactive className="h-[61px]" style={{ height: 61 }}>
+                    <Td className="overflow-hidden whitespace-nowrap">
                       <ChannelBadge channel={item.channel} />
                       <Link
                         href={inboxItemHref(item)}
@@ -308,20 +307,20 @@ export default function PendingInboxCard({
                       >
                         {item.customerName}
                       </Link>
-                    </td>
-                    <td className="text-ink-secondary truncate px-3 py-2.5" title={item.preview}>
+                    </Td>
+                    <Td className="text-ink-secondary truncate" title={item.preview}>
                       {item.preview}
-                    </td>
-                    <td className="text-ink-faint px-3 py-2.5 text-right text-xs whitespace-nowrap">
+                    </Td>
+                    <Td align="right" className="text-ink-faint text-xs whitespace-nowrap">
                       {elapsed(item.lastIncomingAt)}
-                    </td>
-                    <td className="px-5 py-2.5 whitespace-nowrap">
-                      <StatusBadge tone="success" size="compact">未確認</StatusBadge>
-                    </td>
-                  </tr>
+                    </Td>
+                    <Td className="whitespace-nowrap">
+                      <StatusBadge tone="warning" size="compact">未確認</StatusBadge>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
+            </DataTable>
           </div>
           <ul className="divide-hairline divide-y sm:hidden">
             {items.map((item) => (
@@ -336,7 +335,7 @@ export default function PendingInboxCard({
                       {item.customerName}
                     </Link>
                   </span>
-                  <StatusBadge tone="success" size="compact">未確認</StatusBadge>
+                  <StatusBadge tone="warning" size="compact">未確認</StatusBadge>
                 </div>
                 <p className="text-ink-secondary mt-1 truncate text-xs" title={item.preview}>
                   {item.preview}
@@ -347,14 +346,16 @@ export default function PendingInboxCard({
               </li>
             ))}
           </ul>
-          {total > 0 ? (
+          {/*
+            件数は小カードの1か所に集約し、一覧の下では繰り返さない（m22d）。
+            ページ送りだけ残す。1ページに収まるときは Pagination が null を
+            返すので、帯ごと出さない（押せない空の帯を残さない）。
+          */}
+          {total > 0 && pageCount > 1 ? (
             <nav
-              className="border-hairline flex h-[50px] shrink-0 items-center justify-between gap-3 border-t px-5"
+              className="border-hairline flex h-[50px] shrink-0 items-center justify-end gap-3 border-t px-5"
               aria-label="受信一覧のページ送り"
             >
-              <span className="text-ink-secondary text-xs tabular-nums">
-                {firstRow}〜{lastRow} / {total}件
-              </span>
               <Pagination
                 page={page}
                 pageCount={pageCount}

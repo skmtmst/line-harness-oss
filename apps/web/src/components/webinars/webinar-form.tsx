@@ -5,15 +5,20 @@ import { useRouter } from 'next/navigation'
 import { api, webinarApi, type Webinar, type WebinarInput, type WebinarScheduleRule } from '@/lib/api'
 import type { MediaItem } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
+import Checkbox from '@/components/shared/checkbox'
 import StickyBar from '@/components/shared/sticky-bar'
+import Select from '@/components/shared/select'
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
+import { CareCard } from '@/components/shared/side-cards'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { webinarErrorText } from './webinar-error-text'
+import Notice from '@/components/shared/notice'
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 const inputClass =
-  'w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15'
+  'w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15'
 const labelClass = 'block text-sm font-medium text-ink-secondary mb-1.5'
 
 function timeToMinutes(value: string): number {
@@ -208,6 +213,23 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
   const dailyOverview = inferDailySchedule(rules)
   const nonDailyCount = rules.length - dailyRules.length
 
+  /*
+    R95: 公開は公開専用口で行う。下書きの保存と公開を分け、どの入口からも
+    公開前検査と公開版の固定を通す。基本設定で公開中を選んだときは、
+    まず下書きとして保存し、そのあと公開専用口を呼ぶ。
+  */
+  const publishNow = async (webinarId: string): Promise<boolean> => {
+    try {
+      const editor = await webinarApi.editor(webinarId)
+      await webinarApi.publish(webinarId, editor.data.version)
+      router.push(`/webinars/published?id=${webinarId}`)
+      return true
+    } catch (err) {
+      setError(webinarErrorText(err, '公開できませんでした。確認ステップから公開してください。'))
+      return false
+    }
+  }
+
   /** 保存が完了したら true。失敗したら入力を残したまま false を返す。 */
   const save = async (): Promise<boolean> => {
     if (!initial && !selectedAccountId) {
@@ -229,13 +251,14 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
     }
     try {
       if (initial) {
-        const updated = await webinarApi.update(initial.id, input)
+        /* 公開中への切替は通常更新では送らない（サーバーも409で止める）。 */
+        const draftInput = isPublishing ? { ...input, status: baseline.status } : input
+        const updated = await webinarApi.update(initial.id, draftInput)
         /* 未保存判定の正本を送った内容へ進める。画面を畳まなくても印が消える。 */
-        setBaseline({ title, slug, status, durationMinutes, videoChoice, rules })
-        /* 公開したときは完了の面へ。**何が公開されたのかを最後に読ませる。** */
+        setBaseline({ title, slug, status: isPublishing ? baseline.status : status, durationMinutes, videoChoice, rules })
+        /* 公開するときは公開専用口へ。**何が公開されたのかを最後に読ませる。** */
         if (isPublishing) {
-          router.push(`/webinars/published?id=${updated.data.id}`)
-          return true
+          return publishNow(updated.data.id)
         }
         /* 編集画面の段の中では、一覧へ戻さず新しい中身を親へ返す。 */
         if (onSaved) {
@@ -245,9 +268,13 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
         router.push('/webinars')
         return true
       }
-      const created = await webinarApi.create(input)
-      /* 作ってすぐ公開したときも、完了の面へ。 */
-      router.push(isPublishing ? `/webinars/published?id=${created.data.id}` : `/webinars/edit?id=${created.data.id}`)
+      /* 作るときに公開中は送らない（サーバーも422で止める）。 */
+      const created = await webinarApi.create(isPublishing ? { ...input, status: 'draft' } : input)
+      /* 作ってすぐ公開するときも、公開専用口を通して完了の面へ。 */
+      if (isPublishing) {
+        return publishNow(created.data.id)
+      }
+      router.push(`/webinars/edit?id=${created.data.id}`)
       return true
     } catch (err) {
       setError(webinarErrorText(err, '保存できませんでした。入力を見直してください。'))
@@ -258,14 +285,17 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
   }
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className="space-y-5">
       {error && (
-        <div className="p-3 bg-danger-bg border border-danger/20 rounded-lg text-danger text-sm">
+        <Notice tone="danger">
           {error}
-        </div>
+        </Notice>
       )}
 
-      <section className="space-y-4 rounded-2xl border border-hairline bg-canvas p-5 shadow-sm sm:p-6">
+      {/* ★V7: 基本の段も共通の枠の幅で「本体＋右の案内」の2列にする。右の文は画面内の既存の文だけを使う。 */}
+      <div className="grid items-start gap-4 xl:grid-cols-3">
+        <div className="min-w-0 space-y-5 xl:col-span-2">
+      <section className="space-y-4 rounded-card border border-hairline bg-canvas p-5 shadow-card sm:p-6">
         <div><h2 className="font-bold text-ink">基本情報</h2><p className="mt-1 text-xs text-ink-faint">普段変更する項目だけを表示しています</p></div>
         <div>
           <label className={labelClass}>
@@ -281,15 +311,16 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
         </div>
         <div>
           <label className={labelClass}>公開状態</label>
-          <select
+          <Select
+            aria-label="公開状態"
             value={status}
-            onChange={(e) => setStatus(e.target.value as Webinar['status'])}
-            className={`${inputClass} w-auto`}
-          >
-            <option value="draft">下書き</option>
-            <option value="active">公開中</option>
-            <option value="archived">アーカイブ</option>
-          </select>
+            onChange={(value) => setStatus(value as Webinar['status'])}
+            options={[
+              { value: 'draft', label: '下書き' },
+              { value: 'active', label: '公開中' },
+              { value: 'archived', label: 'アーカイブ' },
+            ]}
+          />
         </div>
         <div>
           <label className={labelClass}>動画の長さ（分）</label>
@@ -301,7 +332,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
             className={`${inputClass} w-32`}
           />
         </div>
-        <details className="group rounded-xl border border-hairline bg-canvas-sunken/60">
+        <details className="group rounded-card border border-hairline bg-canvas-sunken/60">
           <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-ink-secondary">
             URL・動画ファイルの詳細設定
             <span className="text-xs text-ink-faint group-open:rotate-180">▾</span>
@@ -321,25 +352,24 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                   <button type="button" onClick={() => setMediaLoadKey((key) => key + 1)} className="ml-2 font-medium underline">もう一度読み込む</button>
                 </p>
               ) : (
-                <select
+                <Select
                   aria-label="配信動画"
+                  size="full"
                   value={videoChoice}
-                  onChange={(e) => setVideoChoice(e.target.value)}
+                  onChange={(value) => setVideoChoice(value)}
                   disabled={videoMedia === null}
-                  className={inputClass}
-                >
-                  <option value="">設定しない</option>
-                  {videoChoice === EXTERNAL_VIDEO && (
-                    <option value={EXTERNAL_VIDEO}>現在の設定を維持（ライブラリ外の動画）</option>
-                  )}
-                  {(videoMedia ?? []).map((item) => (
-                    <option key={item.id} value={item.id}>{item.filename}</option>
-                  ))}
-                  {videoMedia && videoChoice && videoChoice !== EXTERNAL_VIDEO &&
-                    !videoMedia.some((item) => item.id === videoChoice) && (
-                    <option value={videoChoice}>現在の動画（ライブラリで見つかりません）</option>
-                  )}
-                </select>
+                  options={[
+                    { value: '', label: '設定しない' },
+                    ...(videoChoice === EXTERNAL_VIDEO
+                      ? [{ value: EXTERNAL_VIDEO, label: '現在の設定を維持（ライブラリ外の動画）' }]
+                      : []),
+                    ...(videoMedia ?? []).map((item) => ({ value: item.id, label: item.filename })),
+                    ...(videoMedia && videoChoice && videoChoice !== EXTERNAL_VIDEO &&
+                    !videoMedia.some((item) => item.id === videoChoice)
+                      ? [{ value: videoChoice, label: '現在の動画（ライブラリで見つかりません）' }]
+                      : []),
+                  ]}
+                />
               )}
               {videoChoice === EXTERNAL_VIDEO && initial?.videoPrefix && (
                 <p className="mt-1 text-micro text-ink-faint">現在の設定: {initial.videoPrefix}</p>
@@ -349,26 +379,26 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
         </details>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-sm">
+      <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
         <div className="p-5 sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div><h2 className="font-bold text-ink">配信スケジュール</h2><p className="mt-1 text-xs text-ink-faint">日本時間。参加画面には直近の候補だけが表示されます。</p></div>
-            <span className="w-fit rounded-full bg-info-bg px-3 py-1 text-xs font-semibold text-info">{rules.length}枠</span>
+            <span className="w-fit rounded-pill bg-info-bg px-3 py-1 text-xs font-semibold text-info">{rules.length}枠</span>
           </div>
           {rules.length === 0 && (
             /* 枠が無いと、公開しても友だちの画面に「次の回」が出ない。
                作ったのに見られない状態になるので、その場で断る。 */
-            <p className="text-warning bg-warning-bg rounded-card mt-3 p-3 text-xs">
+            <Notice tone="warn" className="mt-3">
               配信枠が未設定です。このままでは友だちが視聴できません。
-            </p>
+            </Notice>
           )}
           {dailyRules.length > 0 ? (
-            <div className="mt-4 flex flex-col gap-1 rounded-xl border border-info/25 bg-info-bg p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-4 flex flex-col gap-1 rounded-card border border-info/25 bg-info-bg p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm font-bold text-ink">毎日 {dailyOverview.start}〜{dailyOverview.end}</div>
               <div className="text-xs font-medium text-ink-secondary">{dailyOverview.interval}分間隔 · {dailyRules.length}枠{nonDailyCount > 0 ? ` ＋ 個別${nonDailyCount}枠` : ''}</div>
             </div>
           ) : (
-            <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-700">毎日の配信枠は未設定です</div>
+            <div className="mt-4 rounded-card bg-status-warn-soft p-4 text-sm text-warning">毎日の配信枠は未設定です</div>
           )}
         </div>
 
@@ -378,23 +408,24 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
             <span className="text-xs text-ink-faint group-open:rotate-180">▾</span>
           </summary>
           <div className="space-y-4 border-t border-hairline bg-canvas-sunken/50 p-4 sm:p-6">
-            <div className="rounded-xl border border-hairline bg-canvas p-4">
-              <div className="mb-3 text-xs font-bold text-ink-secondary">毎日の枠をまとめて作成</div>
+            <div className="rounded-card border border-hairline bg-canvas p-4">
+              <div className="mb-3 text-xs font-medium text-ink-secondary">毎日の枠をまとめて作成</div>
               <div className="flex flex-wrap items-end gap-3">
-                <label className="text-xs text-ink-faint">開始<input type="time" value={bulkStart} onChange={(e) => setBulkStart(e.target.value)} className="mt-1 block rounded-lg border border-hairline px-2 py-2 text-sm" /></label>
-                <label className="text-xs text-ink-faint">終了<input type="time" value={bulkEnd} onChange={(e) => setBulkEnd(e.target.value)} className="mt-1 block rounded-lg border border-hairline px-2 py-2 text-sm" /></label>
-                <label className="text-xs text-ink-faint">間隔<select value={bulkInterval} onChange={(e) => setBulkInterval(Number(e.target.value))} className="mt-1 block rounded-lg border border-hairline px-2 py-2 text-sm"><option value={30}>30分</option><option value={60}>60分</option><option value={120}>120分</option></select></label>
-                <button type="button" onClick={applyDailySchedule} className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white hover:brightness-92">毎日の枠を置き換える</button>
+                <span className="text-xs text-ink-faint">開始<TimeField value={bulkStart} onChange={setBulkStart} aria-label="まとめて作る枠の開始" className="mt-1" /></span>
+                <span className="text-xs text-ink-faint">終了<TimeField value={bulkEnd} onChange={setBulkEnd} aria-label="まとめて作る枠の終了" className="mt-1" /></span>
+                <label className="text-xs text-ink-faint">間隔<Select aria-label="間隔" value={String(bulkInterval)} onChange={(value) => setBulkInterval(Number(value))} options={[{ value: '30', label: '30分' }, { value: '60', label: '60分' }, { value: '120', label: '120分' }]} /></label>
+                <button type="button" onClick={applyDailySchedule} className="rounded-control bg-ink px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-92">毎日の枠を置き換える</button>
               </div>
               <p className="mt-2 text-[11px] text-ink-faint">下の保存ボタンを押すまでは本番へ反映されません。</p>
             </div>
             <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
         {rules.map((r, i) => (
-          <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border border-hairline p-2 text-sm">
-            <select
+          <div key={i} className="flex flex-wrap items-center gap-2 rounded-control border border-hairline p-2 text-sm">
+            <Select
+              aria-label="繰り返しパターン"
               value={r.type}
-              onChange={(e) => {
-                const type = e.target.value as WebinarScheduleRule['type']
+              onChange={(value) => {
+                const type = value as WebinarScheduleRule['type']
                 updateRule(
                   i,
                   type === 'once'
@@ -402,68 +433,74 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                     : { type, time: r.time ?? '20:00', days: type === 'weekly' ? [] : undefined, at: undefined },
                 )
               }}
-              className="rounded-lg border border-hairline px-2 py-1"
-            >
-              <option value="daily">毎日</option>
-              <option value="weekly">毎週</option>
-              <option value="once">単発</option>
-            </select>
+              options={[
+                { value: 'daily', label: '毎日' },
+                { value: 'weekly', label: '毎週' },
+                { value: 'once', label: '単発' },
+              ]}
+            />
             {r.type === 'weekly' &&
               DAYS.map((d, di) => (
-                <label key={di} className="flex items-center gap-0.5">
-                  <input
-                    type="checkbox"
-                    checked={r.days?.includes(di) ?? false}
-                    onChange={(e) =>
-                      updateRule(i, {
-                        days: e.target.checked
-                          ? [...(r.days ?? []), di]
-                          : (r.days ?? []).filter((x) => x !== di),
-                      })
-                    }
-                  />
-                  {d}
-                </label>
+                <Checkbox
+                  key={di}
+                  checked={r.days?.includes(di) ?? false}
+                  onCheckedChange={(checked) =>
+                    updateRule(i, {
+                      days: checked
+                        ? [...(r.days ?? []), di]
+                        : (r.days ?? []).filter((x) => x !== di),
+                    })
+                  }
+                >{d}</Checkbox>
               ))}
             {r.type === 'once' ? (
-              <input
-                type="datetime-local"
+              <DateTimeField
                 value={(r.at ?? '').slice(0, 16)}
-                onChange={(e) => updateRule(i, { at: `${e.target.value}:00+09:00` })}
-                className="rounded-lg border border-hairline px-2 py-1"
+                onChange={(v) => updateRule(i, { at: `${v}:00+09:00` })}
+                aria-label="開催日時"
               />
             ) : (
-              <input
-                type="time"
+              <TimeField
                 value={r.time ?? '20:00'}
-                onChange={(e) => updateRule(i, { time: e.target.value })}
-                className="rounded-lg border border-hairline px-2 py-1"
+                onChange={(v) => updateRule(i, { time: v })}
+                aria-label="開催時刻"
               />
             )}
             <button
               onClick={() => setRules((prev) => prev.filter((_, j) => j !== i))}
               className="ml-auto text-danger hover:underline"
             >
-              削除
+              削除する
             </button>
           </div>
         ))}
             </div>
         <button
           onClick={() => setRules((prev) => [...prev, { type: 'daily', time: '20:00' }])}
-          className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-canvas-sunken"
+          className="rounded-control border px-3 py-1.5 text-sm font-medium hover:bg-canvas-sunken"
         >
-          ＋ ルール追加
+          ＋ ルールを追加する
         </button>
           </div>
         </details>
       </section>
+        </div>
+        <aside className="space-y-4" aria-label="基本設定の案内">
+          <CareCard
+            items={[
+              { head: '枠が無いまま公開すると、友だちの画面に「次の回」が出ません', note: '作ったのに見られない状態になるので、配信枠を先に作ります。' },
+              { head: '枠を変えても、下の保存を押すまでは本番へ反映されません' },
+              { head: '公開すると、友だちが申込・視聴できるようになります', note: '公開ページのURLもすぐに開けるようになります。' },
+            ]}
+          />
+        </aside>
+      </div>
 
       {/* 段画面の中では親の固定バーが保存を引き受ける。保存バーは1つにする。 */}
       {hideBar ? null : (
       <StickyBar
         status="変更内容を確認して本番へ反映します"
-        actions={<button onClick={() => void requestSave()} disabled={saving} className="rounded-xl bg-action px-6 py-2.5 text-sm font-bold text-on-action shadow-sm disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '変更を保存'}</button>}
+        actions={<button onClick={() => void requestSave()} disabled={saving} className="rounded-card bg-action px-6 py-2.5 text-sm font-bold text-on-action shadow-card disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '保存する'}</button>}
       />
       )}
 

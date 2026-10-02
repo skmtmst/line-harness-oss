@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Send, Users } from 'lucide-react'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import ActionScoreAdjustmentDialog from './action-score-adjustment-dialog'
 import ActionScoreHistoryDialog from './action-score-history-dialog'
@@ -37,15 +39,15 @@ const BAND_LABELS: Record<ActionScoreBand, string> = {
  * 取れていないものは `—` と書き、0 とも言い分ける。
  */
 function ScoreBand({ band }: { band: ActionScoreBand }) {
-  if (band === 'high') return <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-hover">{BAND_LABELS[band]}</span>
-  if (band === 'normal') return <span className="rounded-full bg-status-warn-soft px-2.5 py-1 text-xs font-semibold text-status-warn-deep">{BAND_LABELS[band]}</span>
-  return <span className="rounded-full bg-canvas-sunken px-2.5 py-1 text-xs font-semibold text-ink-secondary">{BAND_LABELS[band]}</span>
+  if (band === 'high') return <span className="whitespace-nowrap rounded-pill bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-deep">{BAND_LABELS[band]}</span>
+  if (band === 'normal') return <span className="whitespace-nowrap rounded-pill bg-status-warn-soft px-2.5 py-1 text-xs font-semibold text-status-warn-deep">{BAND_LABELS[band]}</span>
+  return <span className="whitespace-nowrap rounded-pill bg-canvas-sunken px-2.5 py-1 text-xs font-semibold text-ink-secondary">{BAND_LABELS[band]}</span>
 }
 
 function ScoreChange({ value }: { value: number | null | undefined }) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return <span className="font-semibold text-ink-faint">—</span>
   const label = `${value > 0 ? '+' : ''}${formatMileageNumber(value)}`
-  if (value > 0) return <span className="font-semibold text-accent-hover">{label}</span>
+  if (value > 0) return <span className="font-semibold text-accent-deep">{label}</span>
   if (value < 0) return <span className="font-semibold text-danger">{label}</span>
   return <span className="font-semibold text-ink-faint">{label}</span>
 }
@@ -65,6 +67,11 @@ function scoreRangeQuery(filter: ActionScoreFilter, summary: ActionScoreOverview
   const query = new URLSearchParams()
   if (range.min !== null) query.set('scoreMin', String(range.min))
   if (range.max !== null) query.set('scoreMax', String(range.max))
+  /*
+   * R300: 帯は「点数がついている人」だけを数えている。友だち検索と配信へも
+   * 同じ条件を引き継ぎ、未採点の0点まで拾わないようにする。
+   */
+  query.set('scoredOnly', '1')
   return query.toString()
 }
 
@@ -187,29 +194,30 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
 
   return (
     <section data-design-node="z3PB2" className="space-y-3.5">
-      <div className="rounded-control border border-status-warn-deep/25 bg-status-warn-soft px-4 py-3 text-xs text-ink-secondary">
+      <Notice tone="warn">
         {/*
           設計 `z3PB2` の文そのまま。**「顧客には表示されず」だけでは足りない。**
           「マイルが減るのでは」と聞かれたときに答えられる形にする——
           交換できないこと、残高が動かないことを先に言う。
         */}
-        <strong className="text-ink">スコアはマイルではありません。</strong>
+        <strong>スコアはマイルではありません。</strong>
         お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。
         反応の目安として、配信や対応の順番を決めるために使います。
-      </div>
+      </Notice>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard variant="v6" title="点数がついている人" value={summary?.scoredFriends ?? null} unit="人" detail="選択中のLINEアカウント" />
-        <SummaryCard variant="v6" title={`高い（${summary?.highMin ?? 70}点以上）`} value={summary?.high ?? null} unit="人" detail="よく反応している帯" />
-        <SummaryCard variant="v6" title={`ふつう（${summary?.normalMin ?? 30}〜${(summary?.highMin ?? 70) - 1}点）`} value={summary?.normal ?? null} unit="人" detail="反応が続いている帯" />
-        <SummaryCard variant="v6" title={`低い（${(summary?.normalMin ?? 30) - 1}点以下）`} value={summary?.low ?? null} unit="人" detail="直近の反応が少ない帯" />
+        <KpiCard variant="v6" title="点数がついている人" value={summary?.scoredFriends ?? null} unit="人" detail="" help="選択中のLINEアカウントの人数です" />
+        <KpiCard variant="v6" title={`高い（${summary?.highMin ?? 70}点以上）`} value={summary?.high ?? null} unit="人" detail="" help="よく反応している帯です" />
+        <KpiCard variant="v6" title={`ふつう（${summary?.normalMin ?? 30}〜${(summary?.highMin ?? 70) - 1}点）`} value={summary?.normal ?? null} unit="人" detail="" help="反応が続いている帯です" />
+        <KpiCard variant="v6" title={`低い（${(summary?.normalMin ?? 30) - 1}点以下）`} value={summary?.low ?? null} unit="人" detail="" help="直近の反応が少ない帯です" />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {friendsHref ? <Button href={friendsHref}><Users className="h-4 w-4" aria-hidden="true" />この帯の人を見る</Button> : null}
-          {broadcastHref ? <Button href={broadcastHref}><Send className="h-4 w-4" aria-hidden="true" />この帯に配信する</Button> : null}
+          {broadcastHref ? <Button href={broadcastHref}><Send className="h-4 w-4" aria-hidden="true" />この帯に送る</Button> : null}
           {filter === 'all' ? <span className="text-xs text-ink-faint">高い・ふつう・低いの帯を選ぶと、友だち検索と配信へ引き継げます。</span> : null}
+          {filter === 'high' || filter === 'normal' || filter === 'low' ? <span className="text-xs text-ink-faint">この帯の条件（点数がついている人のみ）を引き継ぎます。友だち名の検索は引き継ぎません。</span> : null}
           {filter === 'decreased' ? <span className="text-xs text-ink-faint">下がっている人は、この一覧で理由を確認できます。</span> : null}
         </div>
         <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
@@ -246,15 +254,14 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
 
         <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3">
           {filters.map((item) => (
-            <Button
+            <FilterChip
               key={item.key}
-              type="button"
-              aria-pressed={filter === item.key}
-              onClick={() => { setPage(1); setFilter(item.key) }}
-              variant={filter === item.key ? 'primary' : 'secondary'}
+              selected={filter === item.key}
+              onChange={() => { setPage(1); setFilter(item.key) }}
+              count={item.count === undefined ? '—' : formatMileageNumber(item.count)}
             >
-              {item.label} {item.count === undefined ? '—' : formatMileageNumber(item.count)}
-            </Button>
+              {item.label}
+            </FilterChip>
           ))}
           <Select
             aria-label="並び順"
@@ -294,7 +301,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
                   <Tr key={item.friendId}>
                     <Td>
                       <div className="flex min-w-0 items-center gap-2.5">
-                        {item.pictureUrl ? <img src={item.pictureUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent">{item.displayName.slice(0, 1)}</div>}
+                        {item.pictureUrl ? <img src={item.pictureUrl} alt="" className="h-8 w-8 shrink-0 rounded-pill object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-xs font-medium text-accent-deep">{item.displayName.slice(0, 1)}</div>}
                         <span className="truncate text-sm font-semibold text-ink" title={item.displayName}>{item.displayName}</span>
                       </div>
                     </Td>

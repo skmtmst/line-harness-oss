@@ -9,7 +9,7 @@ const NEW_PAGE = readFileSync(join(HERE, 'new/page.tsx'), 'utf8')
 
 describe('送信Webhookの作成経路', () => {
   it('一覧の追加導線を専用フォームへ集め、作成処理を重複させない', () => {
-    expect(PAGE).toContain('href="/webhooks/new">送り先を追加')
+    expect(PAGE).toContain('href="/webhooks/new">＋ 送り先を作る')
     expect(PAGE).not.toContain('api.webhooks.outgoing.create')
     expect(NEW_PAGE.match(/api\.webhooks\.outgoing\.create/g)).toHaveLength(1)
   })

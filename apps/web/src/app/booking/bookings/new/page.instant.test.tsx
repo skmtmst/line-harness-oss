@@ -116,7 +116,8 @@ async function mount() {
 }
 
 function all(tag: string): HTMLElement[] {
-  return Array.from(container.querySelectorAll(tag)) as HTMLElement[]
+  // 友だち候補・暦は最上層（MenuPortal→document.body）に出る。器の中にはいない。
+  return Array.from(document.querySelectorAll(tag)) as HTMLElement[]
 }
 
 function byText(tag: string, text: string): HTMLElement {
@@ -151,6 +152,24 @@ async function settle(ms = 300) {
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, ms)) })
 }
 
+/**
+ * ★V7 日付の選択（DateField）で日付を選ぶ。暦を開き、見出し（「2026年11月」）を見ながら
+ * 月を送って、その日を押す。今日の日付が変わっても同じ手順で届く。
+ */
+async function pickDate(value: string) {
+  const [y, m, d] = value.split('-').map(Number)
+  await click(all('button').find((element) => element.getAttribute('aria-label') === '日付')!)
+  for (let i = 0; i < 48; i += 1) {
+    const grid = document.querySelector('[role="grid"]')!
+    const [gy, gm] = (grid.getAttribute('aria-label') ?? '').match(/\d+/g)!.map(Number)
+    if (gy === y && gm === m) break
+    await act(async () => {
+      grid.dispatchEvent(new KeyboardEvent('keydown', { key: gy * 12 + gm < y * 12 + m ? 'PageDown' : 'PageUp', bubbles: true }))
+    })
+  }
+  await click(all('button').find((element) => element.getAttribute('aria-label')?.startsWith(`${y}年${m}月${d}日`))!)
+}
+
 /** 友だち・メニュー・担当・日付・時刻を選んで、確認へ進む手前まで進める。 */
 async function fillInput() {
   const search = all('input').find((element) => element.getAttribute('placeholder') === '名前・電話番号で探す')!
@@ -161,8 +180,7 @@ async function fillInput() {
   await act(async () => { await Promise.resolve() })
   await setValue(byLabel('担当者'), 'staff-ny')
   await act(async () => { await Promise.resolve() })
-  const dateInput = all('input').find((element) => element.getAttribute('type') === 'date')!
-  await setValue(dateInput, '2026-11-02')
+  await pickDate('2026-11-02')
   await act(async () => { await Promise.resolve() })
   await setValue(byLabel('空いている時間'), '10:00')
 }

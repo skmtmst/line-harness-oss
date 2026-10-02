@@ -1,4 +1,5 @@
 node_modules/
+.pnpm-store/
 dist/
 dist-mcp/
 *.tsbuildinfo
@@ -34,6 +35,7 @@ apps/worker/dist/
 # `pretypecheck` / `pretest` / `prebuild` / `predev` で毎回作り直すので、
 # 置いておく必要が無い。
 apps/web/src/generated/release-log.json
+apps/web/src/generated/release-log-summary.json
 
 # DBの完成形。schema.sqlとmigrationsからビルド・テスト前に毎回生成する。
 # PRには正本のschema/migrationだけを載せ、巨大な生成差分を載せない。
@@ -68,3 +70,4 @@ docs/design-reference/**/*.png
 # 画像比較の基準画像。**CIで使っていないので版から外す**（決定済み・2026-09-03）。
 # 手元で `capture.spec.mjs` を回すときは、その場で作り直す。
 scripts/visual-qa/capture.spec.mjs-snapshots/
+apps/liff/scripts/qa-shots-out/

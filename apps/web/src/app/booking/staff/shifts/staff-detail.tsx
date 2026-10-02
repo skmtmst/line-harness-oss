@@ -15,9 +15,14 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { canEditFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import DateField from '@/components/shared/date-field'
+import Notice from '@/components/shared/notice'
+import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
-import { shortDate } from '../../lib/format-time'
+import Select from '@/components/shared/select'
+import { formatDay } from '@/lib/format'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -31,8 +36,6 @@ const STAFF_DAYS = [
   { weekday: 0, label: '日曜日', short: '日' },
 ] as const
 
-const WEEKDAY_SHORT = ['日', '月', '火', '水', '木', '金', '土'] as const
-
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 
 /**
@@ -42,10 +45,6 @@ const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
  */
 function weekdayOf(date: string): number {
   return new Date(`${date}T00:00:00Z`).getUTCDay()
-}
-
-function weekdayLabel(date: string): string {
-  return WEEKDAY_SHORT[weekdayOf(date)] ?? ''
 }
 
 /** 店舗の時間帯での「今日」(YYYY-MM-DD)。枠の範囲決めだけに使う。 */
@@ -512,7 +511,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     if (!selectedAccountId) return
     for (const row of dateRows) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date) || !validRange(row.start, row.end)) {
-        setDateError(`${shortDate(row.date)}の日時を正しく入れてください。入力はそのまま残しています。`)
+        setDateError(`${formatDay(row.date)}の日時を正しく入れてください。入力はそのまま残しています。`)
         return
       }
     }
@@ -576,7 +575,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     if (!selectedAccountId) return
     const row = shiftRows[shift.id] ?? { start: shift.start_time, end: shift.end_time }
     if (!validRange(row.start, row.end)) {
-      setShiftError(`${shortDate(shift.work_date)}の時間を正しく入れてください（終わりは始まりより後にします）。入力はそのまま残しています。`)
+      setShiftError(`${formatDay(shift.work_date)}の時間を正しく入れてください（終わりは始まりより後にします）。入力はそのまま残しています。`)
       return
     }
     setSavingShift(true)
@@ -723,6 +722,13 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     return Array.from({ length: 14 }, (_, index) => addDays(from, index))
   }, [timeZone])
 
+  // R163: 14日は「今日から」並ぶため、月曜始まりの7列とそのままでは
+  // ずれる。初日の曜日（月=0…日=6）ぶん空きマスを置き、日付を正しい
+  // 曜日の列へ置く。どの曜日に開いても日付と曜日が一致する。
+  const previewLeadBlanks = previewDates.length === 0
+    ? 0
+    : (weekdayOf(previewDates[0]) + 6) % 7
+
   const previewMarks = useMemo(() => previewDates.map((date) => {
     const exception = storeExceptions.find((item) => item.dateFrom <= date && date <= item.dateTo)
     if (exception?.kind === 'closed') return { date, mark: '休' as const }
@@ -740,9 +746,9 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     return (
       <div data-design-node="tksPcStaff" className="space-y-4 pb-8">
         <nav aria-label="現在位置" className="text-ink-faint text-xs">
-          <Link href="/booking/bookings" className="text-accent hover:underline">予約</Link>
+          <Link href="/booking/bookings" className="text-action hover:underline">予約</Link>
           <span className="mx-2">›</span>
-          <Link href="/booking/staff" className="text-accent hover:underline">担当スタッフ</Link>
+          <Link href="/booking/staff" className="text-action hover:underline">担当スタッフ</Link>
           <span className="mx-2">›</span>
           <span>勤務とシフト</span>
         </nav>
@@ -793,9 +799,9 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     return (
       <div data-design-node="tksPcStaff" className="space-y-4 pb-8">
         <nav aria-label="現在位置" className="text-ink-faint text-xs">
-          <Link href="/booking/bookings" className="text-accent hover:underline">予約</Link>
+          <Link href="/booking/bookings" className="text-action hover:underline">予約</Link>
           <span className="mx-2">›</span>
-          <Link href="/booking/staff" className="text-accent hover:underline">担当スタッフ</Link>
+          <Link href="/booking/staff" className="text-action hover:underline">担当スタッフ</Link>
           <span className="mx-2">›</span>
           <span>勤務とシフト</span>
         </nav>
@@ -813,33 +819,29 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     <div data-design-node="tksPcStaff" className="space-y-4 pb-8">
       <div className="flex flex-wrap items-center gap-3">
         <nav aria-label="現在位置" className="text-ink-faint text-xs">
-          <Link href="/booking/bookings" className="text-accent hover:underline">予約</Link>
+          <Link href="/booking/bookings" className="text-action hover:underline">予約</Link>
           <span className="mx-2">›</span>
           {/* N-411: staff ロールは担当スタッフ一覧(要 /booking/bookings 権限)を開けない */}
           {isStaffRole ? <span>自分の勤務</span> : (
-            <Link href="/booking/staff" className="text-accent hover:underline">担当スタッフ</Link>
+            <Link href="/booking/staff" className="text-action hover:underline">担当スタッフ</Link>
           )}
           <span className="mx-2">›</span>
           <span>{staff.display_name}の勤務とシフト</span>
         </nav>
         <label className="text-ink-secondary ml-auto flex items-center gap-2 text-xs">
           担当者を切り替える
-          <select
+          <Select
             aria-label="担当者を切り替える"
             value={staffId}
-            onChange={(event) => router.push(`/booking/staff/shifts?staff_id=${event.target.value}`)}
-            className="border-hairline rounded-control border bg-canvas px-3 py-2 text-sm"
-          >
-            {staffList.map((item) => (
-              <option key={item.id} value={item.id}>{item.display_name}</option>
-            ))}
-          </select>
+            onChange={(value) => router.push(`/booking/staff/shifts?staff_id=${value}`)}
+            options={staffList.map((item) => ({ value: item.id, label: item.display_name }))}
+          />
         </label>
       </div>
 
-      <div className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
+      <Notice tone="info">
         {staff.display_name}の出る時間と外の予定です。下の予約枠にすぐ反映されます。時間は店舗の時間（{timeZone}）で入れます。
-      </div>
+      </Notice>
 
       {/* N-411: 本人勤務が閲覧のみのときは全編集部品をまとめて無効化する。
           fieldset disabled で配下の入力・ボタンを一括で止める（API 側も 403 で拒否）。 */}
@@ -857,38 +859,29 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 return (
                   <div className="flex min-h-10 flex-wrap items-center gap-3 px-4 py-2 text-sm" key={day.weekday}>
                     <strong className="w-24 shrink-0 whitespace-nowrap">{day.label}</strong>
-                    <label className="flex items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        aria-label={`${day.label}は出勤する`}
-                        checked={row.active}
-                        onChange={(event) => updateDraft(day.weekday, { active: event.target.checked })}
-                        className="rounded"
-                      />
-                      <span>出る</span>
-                    </label>
+                    <Checkbox
+                      checked={row.active}
+                      onCheckedChange={(checked) => updateDraft(day.weekday, { active: checked })}
+                      aria-label={`${day.label}は出勤する`}
+                    >出る</Checkbox>
                     {row.active ? (
                       <>
-                        <label className="flex items-center gap-1 text-xs">
+                        <span className="flex items-center gap-1 text-xs">
                           始め
-                          <input
-                            type="time"
+                          <TimeField
                             aria-label={`${day.label}の始まり`}
                             value={row.start}
-                            onChange={(event) => updateDraft(day.weekday, { start: event.target.value })}
-                            className="border-hairline rounded-control border bg-canvas px-2 py-1 text-sm tabular-nums"
+                            onChange={(v) => updateDraft(day.weekday, { start: v })}
                           />
-                        </label>
-                        <label className="flex items-center gap-1 text-xs">
+                        </span>
+                        <span className="flex items-center gap-1 text-xs">
                           終わり
-                          <input
-                            type="time"
+                          <TimeField
                             aria-label={`${day.label}の終わり`}
                             value={row.end}
-                            onChange={(event) => updateDraft(day.weekday, { end: event.target.value })}
-                            className="border-hairline rounded-control border bg-canvas px-2 py-1 text-sm tabular-nums"
+                            onChange={(v) => updateDraft(day.weekday, { end: v })}
                           />
-                        </label>
+                        </span>
                       </>
                     ) : (
                       <span className="text-ink-faint text-xs">休み</span>
@@ -898,8 +891,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
               })}
             </div>
             <div className="border-hairline flex flex-wrap items-center gap-3 border-t px-4 py-3">
-              <Button variant="primary" onClick={() => void saveRules()} disabled={savingRules}>
-                {savingRules ? '保存中…' : 'いつもの勤務時間を保存'}
+              <Button variant="primary" onClick={() => void saveRules()} disabled={savingRules} busy={savingRules}>いつもの勤務時間を保存する
               </Button>
               {rulesSavedAt ? <span className="text-success text-xs">保存しました。下の予約枠に反映されています。</span> : null}
               {ruleError ? <p className="text-danger w-full text-xs">{ruleError}</p> : null}
@@ -908,7 +900,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
 
           <section className="bg-canvas border-hairline rounded-card border p-4">
             <h2 className="text-ink font-semibold">休憩</h2>
-            <p className="text-ink-faint mt-1 text-xs">いつもの勤務時間の中での休み時間です。保存はできますが、まだ予約枠には反映されません。</p>
+            <p className="text-ink-faint mt-1 text-xs">いつもの勤務時間の中での休み時間です。休憩の時間は予約枠から除きます。</p>
             <div className="mt-4 space-y-2">
               {breakRows.length === 0 ? (
                 <p className="text-ink-faint text-sm">休憩はありません。</p>
@@ -916,42 +908,35 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 <div key={row.key} className="border-hairline flex flex-wrap items-center gap-3 rounded-control border p-3 text-sm">
                   <label className="flex items-center gap-1 text-xs">
                     曜日
-                    <select
+                    <Select
                       aria-label="休憩の曜日"
-                      value={row.weekday}
-                      onChange={(event) => updateBreakRow(row.key, { weekday: Number(event.target.value) })}
-                      className="border-hairline rounded-control border bg-canvas px-2 py-1 text-sm"
-                    >
-                      {STAFF_DAYS.map((day) => (
-                        <option key={day.weekday} value={day.weekday}>{day.short}</option>
-                      ))}
-                    </select>
+                      value={String(row.weekday)}
+                      onChange={(value) => updateBreakRow(row.key, { weekday: Number(value) })}
+                      options={STAFF_DAYS.map((day) => ({ value: String(day.weekday), label: day.short }))}
+                      size="page-size"
+                    />
                   </label>
-                  <label className="flex items-center gap-1 text-xs">
+                  <span className="flex items-center gap-1 text-xs">
                     始め
-                    <input
-                      type="time"
+                    <TimeField
                       aria-label="休憩の始まり"
                       value={row.start}
-                      onChange={(event) => updateBreakRow(row.key, { start: event.target.value })}
-                      className="border-hairline rounded-control border bg-canvas px-2 py-1 text-sm tabular-nums"
+                      onChange={(v) => updateBreakRow(row.key, { start: v })}
                     />
-                  </label>
-                  <label className="flex items-center gap-1 text-xs">
+                  </span>
+                  <span className="flex items-center gap-1 text-xs">
                     終わり
-                    <input
-                      type="time"
+                    <TimeField
                       aria-label="休憩の終わり"
                       value={row.end}
-                      onChange={(event) => updateBreakRow(row.key, { end: event.target.value })}
-                      className="border-hairline rounded-control border bg-canvas px-2 py-1 text-sm tabular-nums"
+                      onChange={(v) => updateBreakRow(row.key, { end: v })}
                     />
-                  </label>
+                  </span>
                   <button
                     onClick={() => setBreakRows((current) => current.filter((item) => item.key !== row.key))}
                     className="text-danger hover:underline text-xs"
                   >
-                    削除
+                    削除する
                   </button>
                 </div>
               ))}
@@ -959,34 +944,29 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             <div className="border-hairline bg-canvas-sunken mt-4 grid gap-3 rounded-control border p-3 sm:grid-cols-4">
               <label className="text-ink-secondary text-xs">
                 曜日
-                <select aria-label="足す休憩の曜日" value={newBreakWeekday} onChange={(event) => setNewBreakWeekday(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm">
-                  {STAFF_DAYS.map((day) => (
-                    <option key={day.weekday} value={day.weekday}>{day.label}</option>
-                  ))}
-                </select>
+                <Select size="full" aria-label="足す休憩の曜日" value={newBreakWeekday} onChange={(value) => setNewBreakWeekday(value)} options={STAFF_DAYS.map((day) => ({ value: String(day.weekday), label: day.label }))} className="mt-1" />
               </label>
-              <label className="text-ink-secondary text-xs">
+              <span className="text-ink-secondary text-xs">
                 始め
-                <input aria-label="足す休憩の始まり" type="time" value={newBreakStart} onChange={(event) => setNewBreakStart(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
-              </label>
-              <label className="text-ink-secondary text-xs">
+                <TimeField aria-label="足す休憩の始まり" value={newBreakStart} onChange={setNewBreakStart} className="mt-1" />
+              </span>
+              <span className="text-ink-secondary text-xs">
                 終わり
-                <input aria-label="足す休憩の終わり" type="time" value={newBreakEnd} onChange={(event) => setNewBreakEnd(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
-              </label>
+                <TimeField aria-label="足す休憩の終わり" value={newBreakEnd} onChange={setNewBreakEnd} className="mt-1" />
+              </span>
               <div className="flex items-end">
                 <Button onClick={addBreakRow}>休憩を足す</Button>
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="primary" onClick={() => void saveBreaks()} disabled={savingBreaks}>
-                {savingBreaks ? '保存中…' : '休憩を保存'}
+              <Button variant="primary" onClick={() => void saveBreaks()} disabled={savingBreaks} busy={savingBreaks}>休憩を保存する
               </Button>
               {breaksSavedAt ? <span className="text-success text-xs">保存しました。</span> : null}
               {breakError ? <p className="text-danger w-full text-xs">{breakError}</p> : null}
             </div>
 
             <h3 className="text-ink mt-6 text-sm font-semibold">この日だけの休憩</h3>
-            <p className="text-ink-faint mt-1 text-xs">その日だけ休むときに足します。その日の出る時間の中に入れてください。保存はできますが、まだ予約枠には反映されません。</p>
+            <p className="text-ink-faint mt-1 text-xs">その日だけ休むときに足します。その日の出る時間の中に入れてください。休憩の時間は予約枠から除きます。</p>
             <div className="mt-4 space-y-2">
               {dateRows.length === 0 ? (
                 <p className="text-ink-faint text-sm">この日だけの休憩はありません。</p>
@@ -994,56 +974,51 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.start < b.start ? -1 : 1))
                 .map((row) => (
                   <div key={row.key} className="border-hairline flex flex-wrap items-center gap-3 rounded-control border p-3 text-sm">
-                    <span className="font-semibold tabular-nums">{shortDate(row.date)}（{weekdayLabel(row.date)}）</span>
-                    <label className="flex items-center gap-1 text-xs">
+                    <span className="font-semibold tabular-nums">{formatDay(row.date)}</span>
+                    <span className="flex items-center gap-1 text-xs">
                       始め
-                      <input
-                        type="time"
-                        aria-label={`${shortDate(row.date)}の休憩の始まり`}
+                      <TimeField
+                        aria-label={`${formatDay(row.date)}の休憩の始まり`}
                         value={row.start}
-                        onChange={(event) => updateDateRow(row.key, { start: event.target.value })}
-                        className="border-hairline rounded-control border bg-canvas px-2 py-1 text-sm tabular-nums"
+                        onChange={(v) => updateDateRow(row.key, { start: v })}
                       />
-                    </label>
-                    <label className="flex items-center gap-1 text-xs">
+                    </span>
+                    <span className="flex items-center gap-1 text-xs">
                       終わり
-                      <input
-                        type="time"
-                        aria-label={`${shortDate(row.date)}の休憩の終わり`}
+                      <TimeField
+                        aria-label={`${formatDay(row.date)}の休憩の終わり`}
                         value={row.end}
-                        onChange={(event) => updateDateRow(row.key, { end: event.target.value })}
-                        className="border-hairline rounded-control border bg-canvas px-2 py-1 text-sm tabular-nums"
+                        onChange={(v) => updateDateRow(row.key, { end: v })}
                       />
-                    </label>
+                    </span>
                     <button
                       onClick={() => setDateRows((current) => current.filter((item) => item.key !== row.key))}
                       className="text-danger hover:underline text-xs"
                     >
-                      削除
+                      削除する
                     </button>
                   </div>
                 ))}
             </div>
             <div className="border-hairline bg-canvas-sunken mt-4 grid gap-3 rounded-control border p-3 sm:grid-cols-4">
-              <label className="text-ink-secondary text-xs">
+              <span className="text-ink-secondary text-xs">
                 日付
-                <input aria-label="足す休憩の日付" type="date" value={newDateBreak} onChange={(event) => setNewDateBreak(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
-              </label>
-              <label className="text-ink-secondary text-xs">
+                <DateField aria-label="足す休憩の日付" value={newDateBreak} onChange={setNewDateBreak} className="mt-1" />
+              </span>
+              <span className="text-ink-secondary text-xs">
                 始め
-                <input aria-label="足す休憩の始まり" type="time" value={newDateStart} onChange={(event) => setNewDateStart(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
-              </label>
-              <label className="text-ink-secondary text-xs">
+                <TimeField aria-label="足す休憩の始まり" value={newDateStart} onChange={setNewDateStart} className="mt-1" />
+              </span>
+              <span className="text-ink-secondary text-xs">
                 終わり
-                <input aria-label="足す休憩の終わり" type="time" value={newDateEnd} onChange={(event) => setNewDateEnd(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
-              </label>
+                <TimeField aria-label="足す休憩の終わり" value={newDateEnd} onChange={setNewDateEnd} className="mt-1" />
+              </span>
               <div className="flex items-end">
                 <Button onClick={addDateRow}>休憩を足す</Button>
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="primary" onClick={() => void saveBreakDates()} disabled={savingDates}>
-                {savingDates ? '保存中…' : 'この日だけの休憩を保存'}
+              <Button variant="primary" onClick={() => void saveBreakDates()} disabled={savingDates} busy={savingDates}>この日だけの休憩を保存する
               </Button>
               {datesSavedAt ? <span className="text-success text-xs">保存しました。</span> : null}
               {dateError ? <p className="text-danger w-full text-xs">{dateError}</p> : null}
@@ -1054,20 +1029,20 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             <h2 className="text-ink font-semibold">日ごとのシフト</h2>
             <p className="text-ink-faint mt-1 text-xs">この日だけ変えたいときに足します。ある日は、いつもの勤務時間よりこちらが優先されます。</p>
             <div className="border-hairline bg-canvas-sunken mt-4 grid gap-3 rounded-control border p-3 sm:grid-cols-4">
-              <label className="text-ink-secondary text-xs">
+              <span className="text-ink-secondary text-xs">
                 日付
-                <input aria-label="シフトの日付" type="date" value={newDate} onChange={(event) => setNewDate(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
-              </label>
-              <label className="text-ink-secondary text-xs">
+                <DateField aria-label="シフトの日付" value={newDate} onChange={setNewDate} className="mt-1" />
+              </span>
+              <span className="text-ink-secondary text-xs">
                 始め
-                <input aria-label="シフトの始まり" type="time" value={newStart} onChange={(event) => setNewStart(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
-              </label>
-              <label className="text-ink-secondary text-xs">
+                <TimeField aria-label="シフトの始まり" value={newStart} onChange={setNewStart} className="mt-1" />
+              </span>
+              <span className="text-ink-secondary text-xs">
                 終わり
-                <input aria-label="シフトの終わり" type="time" value={newEnd} onChange={(event) => setNewEnd(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
-              </label>
+                <TimeField aria-label="シフトの終わり" value={newEnd} onChange={setNewEnd} className="mt-1" />
+              </span>
               <div className="flex items-end">
-                <Button variant="primary" onClick={() => void addShift()} disabled={savingShift}>{savingShift ? '保存中…' : 'シフトを足す'}</Button>
+                <Button variant="primary" onClick={() => void addShift()} disabled={savingShift} busy={savingShift}>シフトを足す</Button>
               </div>
             </div>
             {shiftError ? <p className="text-danger mt-3 text-xs">{shiftError}</p> : null}
@@ -1078,48 +1053,44 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 const row = shiftRows[shift.id] ?? { start: shift.start_time, end: shift.end_time }
                 return (
                   <div key={shift.id} className="border-hairline flex flex-wrap items-center gap-3 rounded-control border p-3 text-sm">
-                    <span className="font-semibold tabular-nums">{shortDate(shift.work_date)}（{weekdayLabel(shift.work_date)}）</span>
-                    <label className="flex items-center gap-1 text-xs">
+                    <span className="font-semibold tabular-nums">{formatDay(shift.work_date)}</span>
+                    <span className="flex items-center gap-1 text-xs">
                       始め
-                      <input
-                        type="time"
-                        aria-label={`${shortDate(shift.work_date)}の始まり`}
+                      <TimeField
+                        aria-label={`${formatDay(shift.work_date)}の始まり`}
                         value={row.start}
-                        onChange={(event) => updateShiftRow(shift.id, { start: event.target.value })}
-                        className="border-hairline rounded-control border bg-canvas px-2 py-1 text-sm tabular-nums"
+                        onChange={(v) => updateShiftRow(shift.id, { start: v })}
                       />
-                    </label>
-                    <label className="flex items-center gap-1 text-xs">
+                    </span>
+                    <span className="flex items-center gap-1 text-xs">
                       終わり
-                      <input
-                        type="time"
-                        aria-label={`${shortDate(shift.work_date)}の終わり`}
+                      <TimeField
+                        aria-label={`${formatDay(shift.work_date)}の終わり`}
                         value={row.end}
-                        onChange={(event) => updateShiftRow(shift.id, { end: event.target.value })}
-                        className="border-hairline rounded-control border bg-canvas px-2 py-1 text-sm tabular-nums"
+                        onChange={(v) => updateShiftRow(shift.id, { end: v })}
                       />
-                    </label>
+                    </span>
                     <span className="inline-flex gap-2 text-xs">
-                      <button onClick={() => void saveShiftRow(shift)} disabled={savingShift} className="text-accent hover:underline disabled:opacity-50">更新</button>
-                      <button onClick={() => setRemoveTarget(shift)} className="text-danger hover:underline">削除</button>
+                      <button onClick={() => void saveShiftRow(shift)} disabled={savingShift} className="text-action hover:underline disabled:opacity-50">更新する</button>
+                      <button onClick={() => setRemoveTarget(shift)} className="text-danger hover:underline">削除する</button>
                     </span>
                   </div>
                 )
               })}
             </div>
             <details className="mt-4 text-sm">
-              <summary className="text-accent cursor-pointer text-sm font-semibold">いつもの勤務時間からまとめて作る</summary>
+              <summary className="text-action cursor-pointer text-sm font-semibold">いつもの勤務時間からまとめて作る</summary>
               <div className="border-hairline bg-canvas-sunken mt-3 grid gap-3 rounded-control border p-3 sm:grid-cols-3">
-                <label className="text-ink-secondary text-xs">
+                <span className="text-ink-secondary text-xs">
                   始める日
-                  <input aria-label="まとめて作り始める日" type="date" value={genFrom} onChange={(event) => setGenFrom(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
-                </label>
+                  <DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} className="mt-1" />
+                </span>
                 <label className="text-ink-secondary text-xs">
                   週の数（1〜12）
                   <input aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
                 </label>
                 <div className="flex items-end">
-                  <Button onClick={() => void generateFromRules()} disabled={generating}>{generating ? '作成中…' : 'まとめて作る'}</Button>
+                  <Button onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">まとめて作る</Button>
                 </div>
               </div>
               <p className="text-ink-faint mt-2 text-xs">すでにある日は残します（上書きしません）。</p>
@@ -1134,12 +1105,12 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             <h2 className="text-ink font-semibold">外の予定</h2>
             <p className="text-ink-faint mt-1 text-xs">Googleカレンダーの予定がある時間は、予約枠を閉じます。</p>
             {!serviceConfigured ? (
-              <p className="bg-warning-bg text-warning mt-3 rounded-control p-3 text-xs">Googleの接続設定がまだなのでつなげません。管理者に連絡してください。</p>
+              <Notice tone="warn" message="Googleの接続設定がまだなのでつなげません。管理者に連絡してください。" className="mt-3" />
             ) : null}
             {calendarId ? (
               <div className="mt-3 space-y-2 text-sm">
                 <p className="text-ink break-all tabular-nums">{calendarId}</p>
-                <p className="text-ink-faint text-xs">つながっています{calendarVerifiedAt ? `（最終確認 ${shortDate(calendarVerifiedAt.slice(0, 10))}）` : ''}</p>
+                <p className="text-ink-faint text-xs">つながっています{calendarVerifiedAt ? `（最終確認 ${formatDay(calendarVerifiedAt)}）` : ''}</p>
                 {calendarError ? <p className="text-danger text-xs">最新の確認で失敗しています：{calendarError}</p> : null}
                 <Button variant="secondary" onClick={() => setConfirmDisconnect(true)} disabled={disconnecting}>つながりを切る</Button>
               </div>
@@ -1155,8 +1126,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                     className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm"
                   />
                 </label>
-                <Button variant="primary" onClick={() => void connectCalendar()} disabled={savingCalendar || !serviceConfigured}>
-                  {savingCalendar ? '確認中…' : 'つなげる'}
+                <Button variant="primary" onClick={() => void connectCalendar()} disabled={savingCalendar || !serviceConfigured} busy={savingCalendar} busyLabel="確認中…">つなげる
                 </Button>
                 {calendarFormError ? <p className="text-danger text-xs">{calendarFormError}</p> : null}
               </div>
@@ -1171,12 +1141,23 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             ) : (
               <div className="text-ink-faint mt-3 grid grid-cols-7 gap-1 text-center text-xs">
                 {['月', '火', '水', '木', '金', '土', '日'].map((day) => <span key={day} className="font-medium">{day}</span>)}
-                {previewMarks.map((item) => (
-                  <span key={item.date} className="bg-canvas-sunken rounded-control py-1" title={item.date}>
-                    <span className="block tabular-nums">{Number(item.date.slice(8, 10))}</span>
-                    <span className={item.mark === '○' ? 'text-success' : item.mark === '休' ? 'text-ink-faint' : 'text-danger'}>{item.mark}</span>
-                  </span>
+                {Array.from({ length: previewLeadBlanks }).map((_, index) => (
+                  <span key={`blank-${index}`} aria-hidden="true" />
                 ))}
+                {previewMarks.map((item, index) => {
+                  // R163: 月をまたぐ位置が分かるよう、月の初めと先頭の日は
+                  // 「月/日」で出す（それ以外は日のみ）。枠の title には
+                  // 日付と曜日を添え、列の曜日と読み違えないようにする。
+                  const day = Number(item.date.slice(8, 10))
+                  const showMonth = index === 0 || day === 1
+                  const label = showMonth ? `${Number(item.date.slice(5, 7))}/${day}` : `${day}`
+                  return (
+                    <span key={item.date} className="bg-canvas-sunken rounded-control py-1" title={`${formatDay(item.date)}`}>
+                      <span className="block tabular-nums">{label}</span>
+                      <span className={item.mark === '○' ? 'text-success' : item.mark === '休' ? 'text-ink-faint' : 'text-danger'}>{item.mark}</span>
+                    </span>
+                  )
+                })}
               </div>
             )}
             {previewError ? <p className="text-danger mt-3 text-xs">予約枠だけ読み込めませんでした。</p> : null}
@@ -1187,9 +1168,9 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             <h2 className="text-ink font-semibold">つながる先</h2>
             <div className="mt-3 space-y-3 text-sm">
               {!isStaffRole ? (
-                <Link href="/booking/staff" className="text-accent flex justify-between gap-3"><span>→ 担当スタッフ</span><span className="text-ink-faint text-xs">人の追加と削除</span></Link>
+                <Link href="/booking/staff" className="text-action flex justify-between gap-3"><span>→ 担当スタッフ</span><span className="text-ink-faint text-xs">人の追加と削除</span></Link>
               ) : null}
-              <Link href="/booking/staff/shifts" className="text-accent flex justify-between gap-3"><span>→ 受付枠</span><span className="text-ink-faint text-xs">お店全体の時間と休業日</span></Link>
+              <Link href="/booking/staff/shifts" className="text-action flex justify-between gap-3"><span>→ 受付枠</span><span className="text-ink-faint text-xs">お店全体の時間と休業日</span></Link>
             </div>
           </section>
         </aside>
@@ -1198,7 +1179,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
 
       <ConfirmDialog
         open={removeTarget !== null}
-        title={`「${removeTarget ? shortDate(removeTarget.work_date) : ''}」のシフトを消しますか？`}
+        title={`「${removeTarget ? formatDay(removeTarget.work_date) : ''}」のシフトを消しますか？`}
         description="この日のシフトを消すと、いつもの勤務時間どおりに枠が出ます。この操作は取り消せません。"
         confirmLabel="削除する"
         destructive

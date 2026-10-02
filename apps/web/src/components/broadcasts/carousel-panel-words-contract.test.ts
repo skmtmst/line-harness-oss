@@ -17,7 +17,7 @@ describe('カルーセルの呼び方', () => {
   it('「カード」と呼ばない', () => {
     /* 設計・要件の言葉に寄せる。実装だけ違う言葉を使わない。 */
     expect(PART).toContain('パネル {index + 1}')
-    expect(PART).toContain('＋ パネルを追加（{cards.length}/{MAX_PANELS}）')
+    expect(PART).toContain('＋ パネルを追加する（{cards.length}/{MAX_PANELS}）')
     expect(PART).toContain('末尾に「もっと見る」パネルを表示')
     expect(PART, '「カード」が画面に残っている').not.toMatch(/>カード\s|カードを追加|カードを表示/)
   })
@@ -34,7 +34,13 @@ describe('パネルの上限', () => {
   it('要件どおり 10 枚まで作れる', () => {
     /* 要件 11 §156「最大10パネル」。9 で止めると 10 枚目が作れない。 */
     expect(PART).toContain('const MAX_PANELS = 10')
-    expect(PART).toContain('disabled={cards.length >= MAX_PANELS}')
+    expect(PART).toContain('disabled={cards.length >= maxCards}')
+  })
+
+  it('「もっと見る」のぶんを数え方に出す', () => {
+    /* 「もっと見る」も LINE の10列のうち1列を使う。付けるときは本文9枚まで。 */
+    expect(PART).toContain('MAX_PANELS - 1')
+    expect(PART).toContain('「もっと見る」で1枠使うため')
   })
 
   it('上限を直書きしない', () => {

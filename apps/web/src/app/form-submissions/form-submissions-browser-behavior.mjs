@@ -16,6 +16,82 @@ import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 import { chromium } from '@playwright/test'
 
+/*
+ * #1060: 一覧の絞り込み・並び替えは Worker が済ませて1ページ分だけ返す。
+ * この検査は実ブラウザに本物と同じ応答を返す必要があるため、APIスタブにも
+ * 同じ規則が要る。規則の正本は `packages/shared/src/form-list-summary.ts`
+ * （@line-crm/shared）。素の node からは同パッケージの dist が解決できない
+ * （拡張子なしimportのため）ので、ここに同じ規則を写している。
+ * 正本を変えたらここも同じPRで直すこと。
+ */
+const displayFormName = (name) => name.replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim()
+const compareDatesNewest = (a, b) => (a && b ? new Date(b) - new Date(a) : a ? -1 : b ? 1 : 0)
+const answerCount = (f) => f.submitCount ?? f.usedByAccounts.reduce((s, a) => s + a.count, 0)
+const inputBlocks = (layout) => [
+  ...(layout?.header ?? []),
+  ...(layout?.sections ?? []).flatMap((s) => s.blocks ?? []),
+].filter((b) => b.kind === 'input')
+const collectActionDestinations = (actions, fields, tags) => {
+  for (const action of actions ?? []) {
+    if (action.kind === 'friend_field' && action.fieldId) fields.add(action.fieldId)
+    if (action.kind === 'tag') for (const tagId of action.tagIds) { if (tagId) tags.add(tagId) }
+  }
+}
+const hasStoredDestination = (layout, onSubmitTagId) => {
+  const fields = new Set()
+  const tags = new Set()
+  for (const block of inputBlocks(layout)) {
+    for (const id of block.destinations?.friendFieldIds ?? []) { if (id) fields.add(id) }
+    if (block.destinations?.realName) fields.add('friends.real_name')
+    if (block.destinations?.displayName) fields.add('friends.display_name')
+    if (block.destinations?.note) fields.add('friends.note')
+    if (block.choiceMode === 'friendField' && block.choiceFriendFieldId) fields.add(block.choiceFriendFieldId)
+    for (const choice of block.choices ?? []) {
+      if (block.choiceMode === 'tag' && choice.tagId) tags.add(choice.tagId)
+      if (block.choiceMode === 'action') collectActionDestinations(choice.actions, fields, tags)
+    }
+  }
+  collectActionDestinations(layout?.options?.afterActions, fields, tags)
+  if (onSubmitTagId) tags.add(onSubmitTagId)
+  return fields.size + tags.size > 0
+}
+const formMatchesListFilter = (f, filter) => {
+  if (filter === 'published') return f.isActive
+  if (filter === 'draft') return !f.isActive
+  if (filter === 'stored') return hasStoredDestination(f.layout, f.onSubmitTagId)
+  return true
+}
+const formMatchesListQuery = (f, raw) => {
+  const q = raw.trim().toLocaleLowerCase('ja-JP')
+  if (!q) return true
+  return displayFormName(f.name).toLocaleLowerCase('ja-JP').includes(q)
+    || f.fields.some((field) => String(field.label ?? '').toLocaleLowerCase('ja-JP').includes(q))
+    || f.usedByAccounts.some((a) => a.name.toLocaleLowerCase('ja-JP').includes(q))
+}
+const sortFormListItems = (forms, sort) => {
+  if (sort === 'latest-answer') {
+    return [...forms].sort((a, b) => {
+      if (a.lastSubmittedAt && b.lastSubmittedAt) {
+        const diff = new Date(b.lastSubmittedAt) - new Date(a.lastSubmittedAt)
+        if (diff !== 0) return diff
+      } else if (a.lastSubmittedAt) return -1
+      else if (b.lastSubmittedAt) return 1
+      return new Date(b.createdAt) - new Date(a.createdAt)
+    })
+  }
+  return [...forms].sort((a, b) => {
+    if (sort === 'answers') {
+      const diff = answerCount(b) - answerCount(a)
+      if (diff !== 0) return diff
+      return compareDatesNewest(a.updatedAt, b.updatedAt) || a.id.localeCompare(b.id)
+    }
+    if (sort === 'updated') {
+      return compareDatesNewest(a.updatedAt, b.updatedAt) || a.id.localeCompare(b.id)
+    }
+    return displayFormName(a.name).localeCompare(displayFormName(b.name), 'ja-JP') || a.id.localeCompare(b.id)
+  })
+}
+
 const outDir = join(process.cwd(), 'apps/web/out')
 
 if (!existsSync(outDir)) {
@@ -83,9 +159,8 @@ const LAYOUT = {
 /**
  * 一覧が読む形は Worker の `serializeForm` に合わせる。
  *
- * **`folderId` は入れない。** forms 表に列が無く、API も返さないため、
- * ここで足すと画面が実在しない値で絞り込めているように見えてしまう。
- * フォルダへの所属は #688（migration 372）が入ってから試す。
+ * `folderId` は入れられる。forms 表に列があり（migration 395）、
+ * 一覧の API も返す。箱の絞りは `folder_id` で API 側が済ませる（R25）。
  */
 function form(index, overrides = {}) {
   const day = String(Math.min(index, 28)).padStart(2, '0')
@@ -100,7 +175,9 @@ function form(index, overrides = {}) {
     status: 'active',
     revision: 1,
     submitCount: index,
-    weeklySubmitCount: 0,
+    monthlySubmitCount: index,
+    monthlyOpenCount: index + 1,
+    monthlyCompletionRate: 50,
     destinationSummary: { friendFieldCount: 0, tagCount: 0 },
     createdAt: `2025-01-${day}T00:00:00.000Z`,
     updatedAt: `2026-09-${day}T00:00:00.000Z`,
@@ -112,10 +189,19 @@ function form(index, overrides = {}) {
 
 async function openHarness(browser, {
   role = 'admin', formsByAccount = {}, fail = false, listDelayMs = {},
-  detail = null, putResults = [],
+  detail = null, putResults = [], viewport = { width: 1440, height: 1000 },
 } = {}) {
-  const state = { listCalls: [], folderWrites: 0, formWrites: [], putBodies: [] }
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+  const state = {
+    listCalls: [], folderWrites: [], formWrites: [], putBodies: [],
+    formFolders: [
+      {
+        id: 'fol-a', kind: 'form', accountId: 'account-a', name: 'A箱',
+        parentId: null, displayOrder: 0, color: null,
+        createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+      },
+    ],
+  }
+  const context = await browser.newContext({ viewport })
   await context.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'account-a')
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
@@ -193,8 +279,32 @@ async function openHarness(browser, {
       state.listCalls.push(accountId)
       const delay = listDelayMs[accountId ?? ''] ?? 0
       if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
-      const items = formsByAccount[accountId] ?? []
-      return json({ success: true, data: { items, total: items.length, page: 1, limit: Math.max(items.length, 1) } })
+      const all = formsByAccount[accountId] ?? []
+      /*
+       * #1060: 本物のWorkerと同じく、絞り込み・並び替え・ページ切りを
+       * ここ（API側）で済ませて返す。`limit` 未指定なら全件（互換）。
+       */
+      const rawFilter = url.searchParams.get('filter')
+      const rawSort = url.searchParams.get('sort')
+      const filter = ['published', 'draft', 'stored'].includes(rawFilter) ? rawFilter : 'all'
+      const sort = ['answers', 'updated', 'name'].includes(rawSort) ? rawSort : 'latest-answer'
+      const search = url.searchParams.get('q') ?? ''
+      let list = filter === 'all' ? all : all.filter((f) => formMatchesListFilter(f, filter))
+      // R25: 本物の Worker と同じく、箱の絞りもここ（API 側）で済ませて返す。
+      const folderParam = url.searchParams.get('folder_id') ?? 'all'
+      if (folderParam === 'unfiled') list = list.filter((f) => (f.folderId ?? null) === null)
+      else if (folderParam && folderParam !== 'all') list = list.filter((f) => f.folderId === folderParam)
+      if (search.trim() !== '') list = list.filter((f) => formMatchesListQuery(f, search))
+      list = sortFormListItems(list, sort)
+      const total = list.length
+      const limitParam = url.searchParams.get('limit')
+      if (limitParam !== null && limitParam !== '') {
+        const limit = Math.max(1, Math.min(200, Number.parseInt(limitParam, 10) || 20))
+        const page = Math.max(1, Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1)
+        const items = list.slice((page - 1) * limit, (page - 1) * limit + limit)
+        return json({ success: true, data: { items, total, all_total: all.length, page, limit } })
+      }
+      return json({ success: true, data: { items: list, total, all_total: all.length, page: 1, limit: Math.max(list.length, 1) } })
     }
     /*
      * 編集画面は差し込み先の一覧も読む。`/api/scenarios` は
@@ -209,14 +319,53 @@ async function openHarness(browser, {
       state.formWrites.push(JSON.parse(request.postData() ?? '{}'))
       return json({ success: true, data: { id: path.split('/').pop() } })
     }
-    if (path === '/api/folders') {
-      if (request.method() !== 'GET') {
-        state.folderWrites += 1
-        return json({ success: false, error: 'Forbidden' }, 403)
+    /*
+     * R25: 箱の口の見本。作る・直す・消す・並べ替えを本物と同じ形で返す。
+     * 中身（フォーム）は消さず、未分類（`folderId: null`）に戻す。
+     */
+    if (path === '/api/folders' && request.method() === 'POST') {
+      const body = JSON.parse(request.postData() ?? '{}')
+      state.folderWrites.push({ method: 'POST', body })
+      const created = {
+        id: `fol-${state.formFolders.length + 1}`,
+        kind: 'form',
+        accountId: body.accountId ?? null,
+        name: body.name,
+        parentId: null,
+        displayOrder: state.formFolders.length,
+        color: body.color ?? null,
+        createdAt: '2026-09-27T00:00:00.000Z',
+        updatedAt: '2026-09-27T00:00:00.000Z',
       }
-      // `GET /api/folders?kind=form` は実際に空で返る。forms 表に
-      // `folder_id` が無く、どのフォームも分類へ入れられないため。
-      return json({ success: true, data: [] })
+      state.formFolders.push(created)
+      return json({ success: true, data: created }, 201)
+    }
+    if (path === '/api/folders' && request.method() === 'GET') {
+      return json({ success: true, data: state.formFolders })
+    }
+    {
+      const folderMatch = path.match(/^\/api\/folders\/([^/]+)(\/swap-order)?$/)
+      if (folderMatch && !folderMatch[2] && request.method() === 'PATCH') {
+        const body = JSON.parse(request.postData() ?? '{}')
+        state.folderWrites.push({ method: 'PATCH', id: folderMatch[1], body })
+        const target = state.formFolders.find((folder) => folder.id === folderMatch[1])
+        if (!target) return json({ success: false, error: 'Not found' }, 404)
+        Object.assign(target, {
+          ...(body.name !== undefined ? { name: body.name } : {}),
+          ...(body.color !== undefined ? { color: body.color } : {}),
+        })
+        return json({ success: true, data: target })
+      }
+      if (folderMatch && !folderMatch[2] && request.method() === 'DELETE') {
+        state.folderWrites.push({ method: 'DELETE', id: folderMatch[1] })
+        state.formFolders = state.formFolders.filter((folder) => folder.id !== folderMatch[1])
+        return json({ success: true, data: null })
+      }
+      if (folderMatch && folderMatch[2] === '/swap-order' && request.method() === 'POST') {
+        const body = JSON.parse(request.postData() ?? '{}')
+        state.folderWrites.push({ method: 'SWAP', id: folderMatch[1], body })
+        return json({ success: true, data: { swapped: [folderMatch[1], body.withId] } })
+      }
     }
     return json({ success: true, data: [] })
   })
@@ -333,37 +482,51 @@ try {
 
     const newRow = rows(page).filter({ has: newLink })
     const newRowText = await newRow.innerText()
-    assert.equal(newRowText.includes('09/08'), true, '更新列に updated_at が出る')
-    assert.equal(newRowText.includes('01/01'), false, '更新列に created_at を出さない')
+    assert.equal(newRowText.includes('9月8日'), true, '更新列に updated_at が出る')
+    assert.equal(newRowText.includes('1月1日'), false, '更新列に created_at を出さない')
     assert.equal(
       await rows(page).filter({ hasText: '古い営業フォーム' }).getByTitle('更新日時を取得できません').innerText(),
       '—',
       '更新日時が無い状態を0や作成日にすり替えない',
     )
+    // R27: 行の「編集」は名前変更の窓ではなく、質問の編集（編集画面）へ。
+    const editLink = rows(page).filter({ has: newLink }).getByRole('link', { name: '編集' })
+    assert.equal(
+      await editLink.getAttribute('href'),
+      '/form-submissions/edit?id=sales-new&tab=basic',
+      'R27: 行の編集は質問の編集へ',
+    )
     await context.close()
   }
 
-  // 3. 権限：staff には実行できないフォルダ追加を出さない。owner / admin には理由付きで止めて置く
+  /*
+   * 3. 箱の接続（R25）。staff には箱の操作を出さない。
+   *    owner / admin は選んだアカウントに付けて作る・直す・消す。
+   */
   {
     const { context, page, state } = await openHarness(browser, { role: 'staff', formsByAccount: { 'account-a': [form(1)] } })
     await openList(page)
-    await page.getByRole('button', { name: 'すべて' }).waitFor()
-    assert.equal(await page.getByRole('button', { name: 'フォルダを追加' }).count(), 0, 'staff にフォルダ追加を出さない')
-    assert.equal(await page.getByTitle('フォームのフォルダ保存先は未接続です').count(), 0, '押せない灰色の口も残さない')
-    assert.equal(state.folderWrites, 0, 'フォルダ作成の要求を出さない')
+    await page.getByRole('button', { name: /^すべて\s*\d/ }).waitFor()
+    assert.equal(await page.getByRole('button', { name: 'フォルダを追加する', exact: true }).count(), 0, 'staff にフォルダ追加を出さない')
+    assert.equal(state.folderWrites.length, 0, 'フォルダ作成の要求を出さない')
     await context.close()
   }
   for (const role of ['owner', 'admin']) {
     const { context, page, state } = await openHarness(browser, { role, formsByAccount: { 'account-a': [form(1)] } })
     await openList(page)
-    const addFolder = page.getByRole('button', { name: 'フォルダを追加' })
+    const addFolder = page.getByRole('button', { name: 'フォルダを追加する', exact: true })
     await addFolder.waitFor()
-    assert.equal(await addFolder.isDisabled(), true, `${role} でも保存先が無いので押せない`)
-    assert.equal(await addFolder.getAttribute('title'), 'フォームのフォルダ保存先は未接続です', '押せない理由を添える')
-    await addFolder.click({ force: true })
-    await page.waitForTimeout(300)
-    assert.equal(await page.getByRole('textbox', { name: 'フォルダ名' }).count(), 0, '押しても入力欄は開かない')
-    assert.equal(state.folderWrites, 0, '押してもフォルダ作成の要求は出ない')
+    assert.equal(await addFolder.isDisabled(), false, `${role} は箱を作れる`)
+    await addFolder.click()
+    await page.getByRole('textbox', { name: /フォルダ名/ }).fill('来店・予約')
+    await page.getByRole('button', { name: '追加する', exact: true }).click()
+    // 行ボタンだけを待つ。先頭一致にしないと「フォルダ「来店・予約」の操作」
+    // （…ボタン）にも当たって strict mode violation になる。
+    await page.getByRole('button', { name: /^来店・予約/ }).waitFor()
+    assert.equal(state.folderWrites.length, 1, '箱の作成を1回出す')
+    assert.equal(state.folderWrites[0].body.kind, 'form', '箱の種類を送る')
+    assert.equal(state.folderWrites[0].body.accountId, 'account-a', '選んだアカウントに付けて作る')
+    assert.equal(state.folderWrites[0].body.name, '来店・予約', '打った名前で作る')
     await context.close()
   }
 
@@ -412,7 +575,7 @@ try {
     const { context, page } = await openHarness(browser, { fail: true })
     await openList(page)
     await page.getByText('表示できませんでした', { exact: true }).waitFor()
-    assert.equal(await page.getByRole('button', { name: '再読み込み' }).count(), 1)
+    assert.equal(await page.getByRole('button', { name: 'もう一度読み込む' }).count(), 1)
     assert.equal(await page.getByText('まだフォームがありません', { exact: true }).count(), 0, '失敗を0件と言わない')
     await context.close()
   }
@@ -448,7 +611,7 @@ try {
     )
 
     await nameInput.fill('わたしが直した名前')
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
 
     const conflictButton = page.getByRole('button', { name: '最新の内容を読み込む（入力中の内容は消えます）' })
     await conflictButton.waitFor({ timeout: 15_000 })
@@ -497,11 +660,18 @@ try {
       () => document.querySelector('#fm-name')?.value === 'サーバ側の名前',
       undefined, { timeout: 15_000 },
     )
+    /*
+     * M003：送った中身と保存されている中身が同じだと自分の再送とみなして
+     * 競合を出さない。何も変えずに保存すると再送扱いになるため、ほかの人の
+     * 編集として競合を見るには覆いの中の1欄を変えておく。基本タブの名前欄を
+     * 先に変えると未保存ガードの確認が割り込み、覆いが開かない。
+     */
     await page.getByRole('link', { name: 'オプション設定' }).click()
     const dialog = page.locator('[aria-modal="true"]')
     await dialog.waitFor({ timeout: 15_000 })
+    await dialog.locator('input[aria-label="送信ボタンの文字"]').fill('わたしが直した送信文')
 
-    await page.getByRole('button', { name: '保存する' }).click()
+    await dialog.getByRole('button', { name: '保存する', exact: true }).click()
 
     const message = page.getByText(/ほかの人が.*に先に保存しました/)
     const reload = page.getByRole('button', { name: '最新の内容を読み込む（入力中の内容は消えます）' })
@@ -538,7 +708,9 @@ try {
       detail,
     })
     await openList(page)
-    await page.getByRole('button', { name: '停止するフォームを削除' }).click()
+    // 削除は行の「…」メニューの中の危ない操作へ移したので、 menu から開く。
+    await page.getByRole('button', { name: '停止するフォームのその他操作' }).click()
+    await page.getByRole('menuitem', { name: '削除する' }).click()
     const stop = page.getByRole('button', { name: '受付だけ止める' })
     await stop.waitFor({ timeout: 15_000 })
     await stop.click()
@@ -586,7 +758,7 @@ try {
     // 直接URLで開くと1件取得が走らずフォーム名が空のままなので、保存の
     // 前提条件だけ満たす（#725 の対象外。上の但し書きを参照）。
     await page.locator('#fm-name').fill('ごはんの相談')
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
     for (let i = 0; i < 100 && state.formWrites.length === 0; i += 1) await page.waitForTimeout(50)
     assert.equal(state.formWrites.length, 1, '保存が1回だけ飛ぶ')
     assert.equal(state.formWrites[0].ogTitle, 'ごはんの相談フォーム', '打った見出しが保存へ乗る')
@@ -604,6 +776,49 @@ try {
       '中身の無い押せないタブを出さない')
     assert.equal(await dialog.getByText('背景画像', { exact: true }).count(), 0,
       '背景画像の見出しごと消えている')
+    await context.close()
+  }
+
+  /*
+   * 10. スマホ幅（390px）でオプション設定の動作欄が画面に収まる（R26）。
+   *
+   * 窓を開き、「アクションを設定」から動作を1つ足す。種類・対象の選択と
+   * 削除が、初期表示の画面外へ出ないこと。窓の高さも画面に収めること。
+   */
+  {
+    const detail = {
+      ...form(1, { id: 'form-1', name: 'サーバ側の名前' }),
+      contentRevision: 4,
+    }
+    const { context, page } = await openHarness(browser, {
+      formsByAccount: { 'account-a': [detail] },
+      detail,
+      viewport: { width: 390, height: 844 },
+    })
+    await page.goto(`${baseUrl}/form-submissions/edit?id=form-1&tab=options`, { waitUntil: 'domcontentloaded' })
+    const dialog = page.locator('[aria-modal="true"]')
+    await dialog.waitFor({ timeout: 15_000 })
+    const dialogBox = await dialog.boundingBox()
+    assert.equal(dialogBox.height <= 844, true, 'R26: 窓の高さが画面に収まる')
+
+    // R26: 動作の欄は折りたたみの中。閉じたままだと足す口が見えないので、
+    // 見えているかで開閉を決める（開き直しの有無で裏返らないように）。
+    const actionFold = dialog.locator('details', { hasText: 'アクションを設定' })
+    if (!(await actionFold.getByRole('button', { name: '＋ 動作を追加' }).isVisible())) {
+      await page.getByText('アクションを設定', { exact: true }).click()
+    }
+    await actionFold.getByRole('button', { name: '＋ 動作を追加' }).click()
+    // 共通 Select は素の select を置かず操作子（button）で作ってあるため、
+    // 足した動作の種類の操作子を待つのが、開いて足せたことの印になる。
+    await actionFold.getByRole('button', { name: '動作の種類' }).waitFor()
+    const edges = await actionFold.locator('button').evaluateAll((nodes) =>
+      nodes.map((node) => node.getBoundingClientRect().right),
+    )
+    for (const right of edges) {
+      assert.equal(right <= 390, true, `R26: 動作の欄が画面に収まる（右端 ${Math.round(right)}px）`)
+    }
+    const removeBox = await page.getByRole('button', { name: 'この動作を削除' }).boundingBox()
+    assert.equal(removeBox.x + removeBox.width <= 390, true, 'R26: 動作の削除が画面に収まる')
     await context.close()
   }
 

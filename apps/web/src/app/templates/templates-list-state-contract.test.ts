@@ -33,7 +33,9 @@ describe('テンプレート一覧の状態と押し口', () => {
   })
 
   it('取得失敗は読み直せる形で出す', () => {
-    expect(PAGE).toContain('再読み込み')
+    // ★V7 `x63W5x`：古い個別ボタン（`action`）ではなく、共通の再読み込み口（`onRetry`）。
+    // ボタンの文言は共通部品（ListState）が持つ。ここでは口があることだけ見る。
+    expect(PAGE).toContain('onRetry={() => void load()}')
     expect(PAGE).toContain('title={failure?.title}')
   })
 

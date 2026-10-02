@@ -41,11 +41,12 @@ type Summary = {
   changed: number
   logins: number
   suspiciousLogins: number
+  attention: number
 }
 
 function summary(overrides: Partial<Summary> = {}): Summary {
   return {
-    periodDays: 30, total: 3, deleted: 0, sent: 0, changed: 0, logins: 3, suspiciousLogins: 0,
+    periodDays: 30, total: 3, deleted: 0, sent: 0, changed: 0, logins: 3, suspiciousLogins: 0, attention: 0,
     ...overrides,
   }
 }
@@ -99,10 +100,10 @@ async function render() {
 
 /** 期間の Select を開いて label の選択肢を押す。 */
 async function choosePeriod(label: string) {
-  const trigger = host.querySelector('button[aria-label="期間で絞り込む"]') as HTMLButtonElement
+  const trigger = document.querySelector('button[aria-label="期間で絞り込む"]') as HTMLButtonElement
   expect(trigger).toBeTruthy()
   await act(async () => { trigger.click() })
-  const option = [...host.querySelectorAll('ul[role="listbox"] button')]
+  const option = [...document.querySelectorAll('ul[role="listbox"] button')]
     .find((button) => button.textContent?.trim().endsWith(label)) as HTMLButtonElement | undefined
   expect(option, `期間の選択肢「${label}」`).toBeTruthy()
   await act(async () => { option!.click() })

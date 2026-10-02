@@ -5,21 +5,25 @@ import Link from 'next/link'
 import { Gift, MessageSquare, Newspaper, Package, RotateCw, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Disclosure from '@/components/shared/disclosure'
 import Drawer from '@/components/shared/drawer'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import PageHeader from '@/components/shared/page-header'
+import PageHeaderH2 from '@/components/layout/page-header-h2'
 import Pagination from '@/components/shared/pagination'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import ListRange from '@/components/ui/list-range'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import DateTimeField from '@/components/shared/date-time-field'
 import type {
   NenCampaignSetting,
   NenColumn,
@@ -32,6 +36,7 @@ import { campaignTriggerLabel, formatCampaignAudience, formatCampaignTiming, for
 import { isPastScheduledAt, publishedAtIso } from './columns/new/column-form'
 import { CampaignLinePreview, COLUMN_PET_NAME_FALLBACK, ColumnLinePreview } from './line-preview'
 import { jstLongDateTime, jstShortDate, jstShortDateTime } from './nen-period'
+import { formatNumber } from '@/lib/format'
 
 /*
  * NEN配信の一覧。★V6 37-6（`z4q1K`）自動配信／37-6-A（`u66A0`）コラム。
@@ -101,14 +106,16 @@ const skippedReasonLabel: Record<string, string> = {
   campaign_snapshot_missing: '予約時の配信内容を確認できません',
   campaign_disabled: '配信の決めごとが停止中です',
   campaign_form_already_submitted: 'すでに回答済みのため送りません',
+  campaign_form_unavailable: 'つなぐ回答フォームが使えなくなっているため送りません',
   frequency_suppressed: '近い時期に同じ配信があるため送りません',
   order_cancelled: '注文が取り消されたため送りません',
   order_refunded: '注文が返金になったため送りません',
   unknown: '理由を確認できません',
 }
 
-// #727: skipped のうち運用で直せる2理由。接続設定のやり直し・配信のオン戻しで解消する。
-const skippedFixableReasons = new Set(['line_account_unavailable', 'campaign_disabled'])
+// #727: skipped のうち運用で直せる理由。接続設定のやり直し・配信のオン戻し・
+// NEN-07: 回答フォームの選び直しで解消する。
+const skippedFixableReasons = new Set(['line_account_unavailable', 'campaign_disabled', 'campaign_form_unavailable'])
 
 // #733: 再送できるのは上限まで失敗した記録と、直せる理由で止まった記録だけ。
 // ボタンを出しても最終判断はサーバが行い、前提が直っていなければ409で止める。
@@ -143,7 +150,7 @@ function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined
 }
 
 function num(value: number | null | undefined): string {
-  return value == null ? '—' : value.toLocaleString('ja-JP')
+  return value == null ? '—' : formatNumber(value)
 }
 
 /** 自動配信の行に付ける印。実キーごと（★V6 37-6 の1列目）。 */
@@ -175,21 +182,24 @@ function TestRecipientPicker({ friends, value, onChange, accountId }: {
     return (
       <span className="flex items-center gap-2 text-caption text-ink-secondary">
         テスト送信先が未登録です
-        {accountId ? <Button href={`/accounts/detail?id=${encodeURIComponent(accountId)}`} size="field">テスト送信先を登録</Button> : null}
+        {accountId ? <Button href={`/accounts/detail?id=${encodeURIComponent(accountId)}`} size="field">テスト送信先を登録する</Button> : null}
       </span>
     )
   }
   return <Select aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))} />
 }
 
-function Kpis({ kpis, loading }: { kpis: NenKpis | null; loading: boolean }) {
+function Kpis({ kpis, loading, failed }: { kpis: NenKpis | null; loading: boolean; failed: boolean }) {
   const month = kpis?.monthLabel ?? '今月'
+  // ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
+  // 失敗は「読み込めませんでした」と言い分け、0 と混ぜない。
+  const missingDetail = failed ? '読み込めませんでした' : loading ? '読み込んでいます' : '—'
   return (
     <KpiCollapse data-design="KPIs" data-design-node="nen-kpis" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <SummaryCard variant="v6" title={`${month} 送った数`} value={kpis?.sentThisMonth ?? null} unit="通" detail={kpis ? `先月 ${num(kpis.sentLastMonth)}通` : '—'} loading={loading} />
-      <SummaryCard variant="v6" title="開封" value={null} unit="%" valueText={kpis?.openRate == null ? '—' : `${kpis.openRate}%`} detail="コラムを開いた割合（自動配信はLINEから個人開封を取得できません）" loading={loading} />
-      <SummaryCard variant="v6" title="配信からの注文" value={kpis?.orders ?? null} unit="件" detail={kpis?.orderAmount == null ? '送信後7日以内の注文' : `¥${num(kpis.orderAmount)}（送信後7日以内）`} loading={loading} />
-      <SummaryCard variant="v6" title="届かなかった" value={kpis?.undelivered ?? null} unit="通" detail={kpis ? `友だち解除 ${num(kpis.unfollowed)}・ブロック ${num(kpis.blocked)}` : '友だち解除・ブロック'} loading={loading} />
+      <KpiCard variant="v6" title={`${month} 送った数`} value={kpis?.sentThisMonth ?? null} unit="通" detail={kpis ? `先月 ${num(kpis.sentLastMonth)}通` : missingDetail} loading={loading} />
+      <KpiCard variant="v6" title="開封" value={null} unit="%" valueText={kpis?.openRate == null ? '—' : `${kpis.openRate}%`} detail={kpis ? 'コラムを開いた割合' : missingDetail} description="自動配信はLINEから個人開封を取得できません。" loading={loading} />
+      <KpiCard variant="v6" title="配信からの注文" value={kpis?.orders ?? null} unit="件" detail={kpis?.orderAmount == null ? (kpis ? '送信後7日以内の注文' : missingDetail) : `¥${num(kpis.orderAmount)}（送信後7日以内）`} loading={loading} />
+      <KpiCard variant="v6" title="届かなかった" value={kpis?.undelivered ?? null} unit="通" detail={kpis ? `友だち解除 ${num(kpis.unfollowed)}・ブロック ${num(kpis.blocked)}` : failed || loading ? missingDetail : '友だち解除・ブロック'} loading={loading} />
     </KpiCollapse>
   )
 }
@@ -213,6 +223,12 @@ export type NenOverviewProps = {
   /** 選択中の LINE アカウント。テスト送信先の登録画面へ案内するために使う。 */
   accountId: string | null
   loading: boolean
+  /** 今のタブの取得失敗（★V7 `x63W5x`：帯ではなく一覧の場所の1枚で出す）。 */
+  tabError?: string
+  /** 今のタブの取り直し。無いときは読み直す口を出さない。 */
+  onRetryTab?: () => void
+  /** 件数（KPI）も一緒に取れなかった。 */
+  kpisFailed?: boolean
   notice: { tone: 'success' | 'error'; text: string } | null
   // 自動配信・停止中
   saving: string | null
@@ -240,6 +256,8 @@ export type NenOverviewProps = {
   savingColumnId: string | null
   onDeliverColumn: (column: NenColumn, scheduledAt?: string) => void
   onDuplicateColumn: (column: NenColumn) => void
+  /** 複製中のコラムID。ボタンを押せなくする（M506）。 */
+  duplicatingColumnId?: string | null
   onTestColumn: (column: NenColumn) => void
   // 送った履歴
   onShowDelivery: (id: string) => void
@@ -264,6 +282,9 @@ export function NenOverview({
   onTestFriendChange,
   accountId,
   loading,
+  tabError = '',
+  onRetryTab,
+  kpisFailed = false,
   notice,
   saving,
   testing,
@@ -288,6 +309,7 @@ export function NenOverview({
   savingColumnId,
   onDeliverColumn,
   onDuplicateColumn,
+  duplicatingColumnId,
   onTestColumn,
   onShowDelivery,
   onRetryDelivery,
@@ -300,9 +322,10 @@ export function NenOverview({
   const columnSetting = settings.find((setting) => setting.category === 'column') ?? null
 
   return (
-    <main data-design-node={tab === 'columns' ? 'u66A0' : 'z4q1K'} className="mx-auto flex w-full flex-col gap-4 px-4 pb-8 sm:px-6" style={{ maxWidth: 1600 }}>
+    /* 横の余白は外の枠（AppShell）が持つ。ここで足すと他の画面より右へずれる。 */
+    <div data-design-node={tab === 'columns' ? 'u66A0' : 'z4q1K'} className="mx-auto flex w-full flex-col gap-4 pb-8" style={{ maxWidth: 1600 }}>
       <div data-design="Crumb" data-design-node="nen-header">
-        <PageHeader
+        <PageHeaderH2
           breadcrumb={[{ label: '専用機能' }, { label: 'NEN配信' }]}
           title="NEN配信"
           description=""
@@ -311,15 +334,16 @@ export function NenOverview({
       </div>
       <div data-design="Tabs" data-design-node="nen-tabs">
         <Tabs
+          // ★V7 `x63W5x`：取れていないタブの件数に 0 を出さない。
           items={[
-            { label: '自動配信', count: autoSettings.length, current: tab === 'auto', onClick: () => onTabChange('auto') },
-            { label: 'コラム', count: columns.length, current: tab === 'columns', onClick: () => onTabChange('columns') },
+            { label: '自動配信', count: tabError ? undefined : autoSettings.length, current: tab === 'auto', onClick: () => onTabChange('auto') },
+            { label: 'コラム', count: tabError ? undefined : columns.length, current: tab === 'columns', onClick: () => onTabChange('columns') },
             { label: '送った履歴', current: tab === 'history', onClick: () => onTabChange('history') },
-            { label: '停止中', count: pausedSettings.length, current: tab === 'paused', onClick: () => onTabChange('paused') },
+            { label: '停止中', count: tabError ? undefined : pausedSettings.length, current: tab === 'paused', onClick: () => onTabChange('paused') },
           ]}
         />
       </div>
-      <Kpis kpis={kpis} loading={loading && kpis === null} />
+      <Kpis kpis={kpis} loading={loading && kpis === null} failed={kpisFailed} />
       {notice && tab !== 'columns' ? <NoteBar tone={notice.tone === 'success' ? 'info' : 'danger'}>{notice.text}</NoteBar> : null}
       {tab === 'auto' || tab === 'paused' ? (
         <AutoPanel
@@ -334,6 +358,8 @@ export function NenOverview({
           onTestSend={onTestSend}
           onEditCoupon={() => onCouponOpenChange(true)}
           testFriendId={testFriendId}
+          tabError={tabError}
+          onRetryTab={onRetryTab}
         />
       ) : null}
       {tab === 'columns' ? (
@@ -353,6 +379,7 @@ export function NenOverview({
           savingColumnId={savingColumnId}
           onDeliver={onDeliverColumn}
           onDuplicate={onDuplicateColumn}
+          duplicatingColumnId={duplicatingColumnId}
           onTest={onTestColumn}
           columnEnabled={columnSetting?.isEnabled ?? true}
           columnSetting={columnSetting}
@@ -365,10 +392,12 @@ export function NenOverview({
           accountId={accountId}
           testing={testing}
           notice={notice}
+          tabError={tabError}
+          onRetryTab={onRetryTab}
         />
       ) : null}
       {tab === 'history' ? (
-        <HistoryPanel deliveryList={deliveryList} detail={deliveryDetail} loading={loading} onShowDetail={onShowDelivery} onRetry={onRetryDelivery} onChangeView={onChangeDeliveryView} />
+        <HistoryPanel deliveryList={deliveryList} detail={deliveryDetail} loading={loading} onShowDetail={onShowDelivery} onRetry={onRetryDelivery} onChangeView={onChangeDeliveryView} tabError={tabError} onRetryTab={onRetryTab} />
       ) : null}
 
       <Drawer
@@ -379,7 +408,7 @@ export function NenOverview({
         footer={previewSetting ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <TestRecipientPicker friends={friends} value={testFriendId} onChange={onTestFriendChange} accountId={accountId} />
-            <Button type="button" variant="primary" disabled={!testFriendId || testing === previewSetting.campaignKey} onClick={() => onTestSend(previewSetting)}>{testing === previewSetting.campaignKey ? '送信中…' : '自分にテスト送信'}</Button>
+            <Button type="button" variant="primary" disabled={!testFriendId || testing === previewSetting.campaignKey} onClick={() => onTestSend(previewSetting)} busy={testing === previewSetting.campaignKey} busyLabel="送信中…">自分にテストを送る</Button>
           </div>
         ) : undefined}
       >
@@ -393,7 +422,7 @@ export function NenOverview({
       </Drawer>
 
       <CouponDrawer open={couponOpen} coupon={coupon} saving={savingCoupon} onClose={() => onCouponOpenChange(false)} onChange={onCouponChange} onSave={onSaveCoupon} />
-    </main>
+    </div>
   )
 }
 
@@ -413,6 +442,8 @@ function AutoPanel({
   onTestSend,
   onEditCoupon,
   testFriendId,
+  tabError = '',
+  onRetryTab,
 }: {
   settings: NenCampaignSetting[]
   pausedOnly: boolean
@@ -425,6 +456,10 @@ function AutoPanel({
   onTestSend: (setting: NenCampaignSetting) => void
   onEditCoupon: () => void
   testFriendId: string
+  /** 自動配信の取得失敗（★V7 `x63W5x`：一覧の場所の1枚で出す）。 */
+  tabError?: string
+  /** 自動配信の取り直し。 */
+  onRetryTab?: () => void
 }) {
   const [search, setSearch] = useState('')
   const [trigger, setTrigger] = useState('')
@@ -443,18 +478,20 @@ function AutoPanel({
 
   return (
     <>
-      <div data-design="Note" data-design-node="nen-auto-note">
+      <div data-design="Note" data-design-node="nen-auto-note" className="flex flex-col gap-3">
         <NoteBar tone="info">
           {pausedOnly
             ? '止めている配信です。「動かす」を押すと、次のきっかけから自動で送ります。止めている間のきっかけは送りません。'
-            : (
-              <>
-                然の出来事（注文・発送・ペット登録・記録・誕生日）をきっかけに、決めた日数後に自動で送ります。文面にはペット名・クーポンを差し込めます。取引の通知（注文受付・発送）は「設定 › LINE通知」で管理します。注文が取り消し・返金になったあとの案内は自動で止まります。きっかけの記録と定期便の次の発送は{' '}
-                <Link href="/ec-commerce?tab=subscriptions" className="font-semibold underline">EC連携</Link>
-                {' '}で確認できます。
-              </>
-            )}
+            : '然の出来事（注文・発送・ペット登録・記録・誕生日）をきっかけに、決めた日数後に自動で送ります。'}
         </NoteBar>
+        {pausedOnly ? null : (
+          <Disclosure size="compact" title="送られる仕組み">
+            <p className="text-caption leading-6 text-ink-secondary">
+              文面にはペット名・クーポンを差し込めます。取引の通知（注文受付・発送）は「設定 › LINE通知」で管理します。注文が取り消し・返金になったあとの案内は自動で止まります。きっかけの記録と定期便の次の発送は{' '}
+              <Link href="/ec-commerce?tab=subscriptions" className="font-semibold underline">EC連携</Link> で確認できます。
+            </p>
+          </Disclosure>
+        )}
       </div>
 
       <div data-design="ListControls" data-design-node="nen-auto-controls" className="flex flex-wrap items-center gap-3">
@@ -475,18 +512,37 @@ function AutoPanel({
             options={[{ value: '', label: '状態：すべて' }, { value: 'on', label: '状態：配信中' }, { value: 'off', label: '状態：停止中' }]}
           />
         )}
-        <Select
-          aria-label="並び順"
-          value={sort}
-          onChange={(value) => setSort(value === 'name' ? 'name' : 'sent_desc')}
-          options={[{ value: 'sent_desc', label: `並び：${monthLabel}の送信が多い順` }, { value: 'name', label: '並び：名前順' }]}
-        />
+        {/*
+          選択肢の文が長いとトリガー内で省略される。共通部品は触れないため、
+          外側の title で全文を読めるようにする（第5パス D-3）。
+        */}
+        <div className="w-full sm:w-64" title={sort === 'name' ? '並び：名前順' : `並び：${monthLabel}の送信が多い順`}>
+          <Select
+            aria-label="並び順"
+            size="full"
+            value={sort}
+            onChange={(value) => setSort(value === 'name' ? 'name' : 'sent_desc')}
+            options={[{ value: 'sent_desc', label: `並び：${monthLabel}の送信が多い順` }, { value: 'name', label: '並び：名前順' }]}
+          />
+        </div>
         <span className="ml-auto text-caption font-semibold text-ink-faint">{shown.length}件</span>
       </div>
+
+      {/* 開封の列は「—」しか並ばないので置かず、理由だけここに残す。 */}
+      <p className="text-micro text-ink-faint">自動配信は開封を取得できません。</p>
 
       <section data-design="Table" data-design-node="nen-auto-table">
         {loading && settings.length === 0 ? (
           <ListState kind="loading" title="配信を読み込んでいます" />
+        ) : tabError ? (
+          // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
+          // 空の案内は出さず、一覧の場所の1枚だけ出す。
+          <ListState
+            kind="error"
+            title="配信を読み込めませんでした"
+            description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+            onRetry={onRetryTab}
+          />
         ) : settings.length === 0 ? (
           pausedOnly
             ? <ListState kind="empty" emptyPreset="readonly" title="止めている配信はありません" description="すべての自動配信が動いています。" />
@@ -501,10 +557,14 @@ function AutoPanel({
                 <Th className="w-56">きっかけ</Th>
                 <Th className="w-44">対象</Th>
                 <Th className="w-24" align="right">{monthLabel} 送信</Th>
-                <Th className="w-20" align="right">開封</Th>
                 <Th className="w-20" align="right">注文</Th>
                 <Th className="w-24">状態</Th>
-                <Th className="w-28" align="right"><span className="sr-only">操作</span></Th>
+                {/*
+                  #707: 390pxで表を横スクロールしたとき、操作列だけ右端に
+                  留める（PC幅では自然位置なので見た目は変わらない）。
+                  編集ボタン＋「…」が列からはみ出さない幅にする。
+                */}
+                <Th className="w-36 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -524,21 +584,30 @@ function AutoPanel({
                         <CampaignIcon campaignKey={setting.campaignKey} />
                         <span className="min-w-0">
                           <span className="block truncate text-label font-semibold text-ink" title={setting.label}>{setting.label}</span>
-                          <span className="block truncate text-micro text-ink-faint">{setting.title}</span>
+                          <span className="block truncate text-micro text-ink-faint" title={setting.title}>{setting.title}</span>
                         </span>
                       </span>
                     </Td>
                     <Td><span className="text-label text-ink-secondary">{formatCampaignTiming(setting)}</span></Td>
                     <Td><span className="text-label text-ink-secondary">{formatCampaignAudience(setting)}</span></Td>
                     <Td align="right"><span className="text-label font-semibold tabular-nums text-ink">{num(metric?.sent ?? null)}</span></Td>
-                    <Td align="right"><span className="text-label tabular-nums text-ink-faint" title={metric?.openRate.reason ?? 'LINEから個人開封を取得できません'}>—</span></Td>
                     <Td align="right">
                       {metric && metric.associatedConversions > 0
-                        ? <span className="text-label font-semibold tabular-nums text-accent-deep" title={`¥${num(metric.associatedConversionAmount)}（送信後7日以内）`}>{num(metric.associatedConversions)}件</span>
+                        ? <span className="text-label font-semibold tabular-nums text-ink" title={`¥${num(metric.associatedConversionAmount)}（送信後7日以内）`}>{num(metric.associatedConversions)}件</span>
                         : <span className="text-label tabular-nums text-ink-faint">—</span>}
                     </Td>
-                    <Td>{setting.isEnabled ? <StatusBadge tone="success" size="compact">配信中</StatusBadge> : <StatusBadge tone="warning" size="compact">停止中</StatusBadge>}</Td>
-                    <Td align="right">
+                    <Td>
+                      {/*
+                        NEN-07: つなぐ回答フォームが使えない配信は「設定不足」。
+                        この間は新しい配信jobが積まれない(履歴に理由が残る)。
+                      */}
+                      {setting.formIssue
+                        ? <StatusBadge tone="danger" size="compact" title="つなぐ回答フォームが使えなくなっています。編集画面で選び直してください">設定不足</StatusBadge>
+                        : setting.isEnabled
+                          ? <StatusBadge tone="success" size="compact">配信中</StatusBadge>
+                          : <StatusBadge tone="warning" size="compact">停止中</StatusBadge>}
+                    </Td>
+                    <Td align="right" className="sticky right-0 bg-canvas">
                       {/*
                         #985 LAY-18: 行の操作は共用の RowActions。
                         「編集」＋「⋯」（中身を見る・テスト送信・止める/動かす）の
@@ -578,18 +647,18 @@ function CouponDrawer({ open, coupon, saving, onClose, onChange, onSave }: {
       description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
       busy={saving}
       onClose={onClose}
-      footer={<Button type="button" variant="primary" disabled={saving} onClick={onSave}>{saving ? '保存中…' : '設定を保存'}</Button>}
+      footer={<Button type="button" variant="primary" disabled={saving} onClick={onSave} busy={saving}>設定を保存する</Button>}
     >
       <div className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-caption font-semibold text-ink">
+        <label className="flex flex-col gap-1 text-caption font-medium text-ink">
           割引の額（円）
           <TextField type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
         </label>
-        <label className="flex flex-col gap-1 text-caption font-semibold text-ink">
+        <label className="flex flex-col gap-1 text-caption font-medium text-ink">
           使える日数
           <TextField type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
         </label>
-        <label className="flex flex-col gap-1 text-caption font-semibold text-ink">
+        <label className="flex flex-col gap-1 text-caption font-medium text-ink">
           クーポンの頭の文字
           <TextField value={coupon.codePrefix} maxLength={10} onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} />
           <span className="text-micro font-normal text-ink-faint">半角大文字・数字・- で3〜10文字。発行されるクーポンは「{coupon.codePrefix || 'NENBDAY'}-1234」のようになります。</span>
@@ -645,6 +714,7 @@ function ColumnsPanel({
   savingColumnId,
   onDeliver,
   onDuplicate,
+  duplicatingColumnId,
   onTest,
   columnEnabled,
   columnSetting,
@@ -657,6 +727,8 @@ function ColumnsPanel({
   accountId,
   testing,
   notice,
+  tabError = '',
+  onRetryTab,
 }: {
   columns: NenColumn[]
   /** 口が返す全体件数。一覧より多いとき打ち切りを示す（#935 N-300）。 */
@@ -674,6 +746,7 @@ function ColumnsPanel({
   savingColumnId: string | null
   onDeliver: (column: NenColumn, scheduledAt?: string) => void
   onDuplicate: (column: NenColumn) => void
+  duplicatingColumnId?: string | null
   onTest: (column: NenColumn) => void
   columnEnabled: boolean
   /** コラム配信の決めごと（nen_campaign_settings の 'column' 行）。停止・再開の制御に使う。 */
@@ -687,6 +760,10 @@ function ColumnsPanel({
   accountId: string | null
   testing: string | null
   notice: { tone: 'success' | 'error'; text: string } | null
+  /** コラムの取得失敗（★V7 `x63W5x`：一覧の場所の1枚で出す）。 */
+  tabError?: string
+  /** コラムの取り直し。 */
+  onRetryTab?: () => void
 }) {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -767,6 +844,14 @@ function ColumnsPanel({
           <section data-design="Table" data-design-node="nen-columns-table">
             {loading && columns.length === 0 ? (
               <ListState kind="loading" title="コラムを読み込んでいます" />
+            ) : tabError ? (
+              // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
+              <ListState
+                kind="error"
+                title="コラムを読み込めませんでした"
+                description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+                onRetry={onRetryTab}
+              />
             ) : columns.length === 0 ? (
               <ListState kind="empty" title="まだコラムがありません" description="ECサイトでジャーナルを公開すると、ここに届きます。売らない配信です。ここで信用がたまると、売る配信が届きやすくなります。" action={<Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>} />
             ) : shown.length === 0 ? (
@@ -781,7 +866,8 @@ function ColumnsPanel({
                       <Th className="w-20">公開日</Th>
                       <Th className="w-40">LINE配信</Th>
                       <Th className="w-16" align="right">閲覧</Th>
-                      <Th className="w-28" align="right"><span className="sr-only">操作</span></Th>
+                      {/* #707: 390px横スクロール時に操作列を右端へ留める。「選ぶ」ボタンが列からはみ出さない幅にする。 */}
+                      <Th className="w-32 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
                     </TableHeadRow>
                   </thead>
                   <tbody>
@@ -807,11 +893,11 @@ function ColumnsPanel({
                           <Td><span className="text-label tabular-nums text-ink-secondary">{jstShortDate(column.publishedAt)}</span></Td>
                           <Td>{columnDeliveryBadge(column)}</Td>
                           <Td align="right"><span className="text-label tabular-nums text-ink" title={metric?.articleOpened.reason ?? undefined}>{num(metric?.articleOpened.value ?? null)}</span></Td>
-                          <Td align="right">
+                          <Td align="right" className="sticky right-0 bg-canvas">
                             {isSelected ? (
                               <span className="text-label font-semibold text-ink-faint">選択中</span>
                             ) : (
-                              <button type="button" onClick={() => onSelect(column.id)} className="text-label font-semibold text-accent-deep">
+                              <button type="button" onClick={() => onSelect(column.id)} className="text-label font-semibold text-action">
                                 {column.deliveryStatus === 'sent' ? 'もう一度送る' : column.deliveryStatus === 'draft' ? '選ぶ' : '予約を見る'}
                               </button>
                             )}
@@ -830,20 +916,20 @@ function ColumnsPanel({
         <aside data-design="Panel" data-design-node="nen-column-panel" className="flex flex-col gap-4">
           <section className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4">
             <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-label font-bold text-ink">LINEに届くカード</h2>
+              <h2 className="text-label font-semibold text-ink">LINEに届くカード</h2>
               <span className="text-micro text-ink-faint">選んだコラムから自動で作られます</span>
             </div>
             {selected ? (
               <>
                 <ColumnLinePreview column={selected} introText={introDraft} buttonLabel={buttonLabel} />
                 <p className="text-micro text-ink-faint">差し込み：{'{{pet_name}}'} → {COLUMN_PET_NAME_FALLBACK}（コラムは全員に同じ文面で届きます）</p>
-                <label className="flex flex-col gap-1 text-caption font-semibold text-ink">
+                <label className="flex flex-col gap-1 text-caption font-medium text-ink">
                   カードの前に送る紹介文
                   <TextArea rows={4} maxLength={1500} value={introDraft} onChange={(event) => onIntroChange(event.target.value)} />
                 </label>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-micro text-ink-faint">{introDraft.length}／1500文字</span>
-                  <Button type="button" size="field" disabled={!introDirty || savingColumnId === selected.id || !introDraft.trim()} onClick={() => onSaveIntro(selected)}>{savingColumnId === selected.id ? '保存中…' : '紹介文を保存'}</Button>
+                  <Button type="button" size="field" disabled={!introDirty || savingColumnId === selected.id || !introDraft.trim()} onClick={() => onSaveIntro(selected)} busy={savingColumnId === selected.id}>紹介文を保存する</Button>
                 </div>
               </>
             ) : (
@@ -852,7 +938,7 @@ function ColumnsPanel({
           </section>
 
           <section className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4">
-            <h2 className="text-label font-bold text-ink">誰に・いつ送るか</h2>
+            <h2 className="text-label font-semibold text-ink">誰に・いつ送るか</h2>
             {/* #934 N-295: コラム配信の停止・再開は自動配信タブに出ないため、ここに置く。 */}
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2">
@@ -876,13 +962,13 @@ function ColumnsPanel({
             </div>
             <div className="flex flex-col gap-2 text-caption font-semibold text-ink">
               送る時
-              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="送る時">
-                <Button type="button" role="radio" aria-checked={plan.when === 'now'} variant={plan.when === 'now' ? 'primary' : 'secondary'} onClick={() => onPlanChange({ ...plan, when: 'now' })}>今すぐ</Button>
-                <Button type="button" role="radio" aria-checked={plan.when === 'schedule'} variant={plan.when === 'schedule' ? 'primary' : 'secondary'} onClick={() => onPlanChange({ ...plan, when: 'schedule' })}>日時を予約</Button>
-              </div>
+              <RadioCardGroup legend="送る時" className="grid grid-cols-2 gap-2">
+                <RadioCard name="nen-deliver-when" value="now" checked={plan.when === 'now'} onChange={() => onPlanChange({ ...plan, when: 'now' })} title="今すぐ" note="すぐに配信待ちに入ります。" />
+                <RadioCard name="nen-deliver-when" value="schedule" checked={plan.when === 'schedule'} onChange={() => onPlanChange({ ...plan, when: 'schedule' })} title="日時を予約" note="決めた日時に送ります。" />
+              </RadioCardGroup>
               {plan.when === 'schedule' ? (
                 <>
-                  <TextField type="datetime-local" aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(event) => onPlanChange({ ...plan, scheduledAt: event.target.value })} />
+                  <DateTimeField aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(v) => onPlanChange({ ...plan, scheduledAt: v })} />
                   {schedulePast ? (
                     <span className="text-micro font-normal text-danger">予約日時が過去になっています。いまより先の日時を選んでください。</span>
                   ) : null}
@@ -895,7 +981,8 @@ function ColumnsPanel({
             </p>
             {selected ? (
               <div className="flex flex-wrap gap-2">
-                <Button type="button" size="field" onClick={() => onDuplicate(selected)}>同じ形で書く</Button>
+                {/* M506: 複製中は押せなくし、二重押しで2本作らせない。 */}
+                <Button type="button" size="field" disabled={duplicatingColumnId === selected.id} onClick={() => onDuplicate(selected)}>{duplicatingColumnId === selected.id ? '複製しています' : '同じ形で書く'}</Button>
                 <Button href="/nen-campaigns/columns/new" size="field">コラムを書く</Button>
               </div>
             ) : null}
@@ -910,7 +997,7 @@ function ColumnsPanel({
         actions={(
           <>
             <TestRecipientPicker friends={friends} value={testFriendId} onChange={onTestFriendChange} accountId={accountId} />
-            <Button type="button" disabled={!selected || !testFriendId || testing !== null} onClick={() => selected && onTest(selected)}>{selected && testing === selected.id ? '送信中…' : '自分にテスト送信'}</Button>
+            <Button type="button" disabled={!selected || !testFriendId || testing !== null} onClick={() => selected && onTest(selected)} busy={selected && testing === selected.id} busyLabel="送信中…">自分にテストを送る</Button>
             <Button type="button" variant="primary" disabled={!selected || !columnEnabled || scheduleInvalid} onClick={() => selected && setConfirmDeliver({ column: selected, scheduledAt: scheduledIso ?? undefined })}>
               {plan.when === 'now' ? 'この内容で送る' : 'この内容で予約する'}
             </Button>
@@ -938,13 +1025,17 @@ function ColumnsPanel({
 
 type HistoryFilter = 'all' | 'sent' | 'pending' | 'failed' | 'skipped'
 
-function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, onChangeView }: {
+function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, onChangeView, tabError = '', onRetryTab }: {
   deliveryList: NenDeliveryList | null
   detail: NenDeliveryDetail | null
   loading: boolean
   onShowDetail: (id: string) => void
   onRetry: (id: string, version: number, reason: string) => void
   onChangeView: (status?: string, cursor?: string, q?: string) => void
+  /** 履歴の取得失敗（★V7 `x63W5x`：一覧の場所の1枚で出す）。 */
+  tabError?: string
+  /** 履歴の取り直し。 */
+  onRetryTab?: () => void
 }) {
   const [draft, setDraft] = useState('')
   // 確定した検索語。絞り込みチップやページ送りにも引き継ぐ（入力途中の文字は渡さない）。
@@ -960,6 +1051,18 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
   const undeliveredDetail = summary
     ? [`ブロック ${summary.unmetReasons?.blocked ?? 0}・退会 ${summary.unmetReasons?.unfollowed ?? 0}・その他 ${summary.unmetReasons?.other ?? 0}`, skippedReasonsDetail(summary.skippedReasons as Record<string, number> | undefined)].filter(Boolean).join(' ／ ')
     : null
+
+  /*
+   * 絞り込みで0件と、まだ履歴そのものが無いのは別のこと（#635）。
+   * 「まだありません」のままだと、検索して0件でも「そもそも無い」と
+   * 読めてしまう。解除は検索語・状態チップ・ページをまとめて初期へ戻す。
+   */
+  const clearHistoryFilters = () => {
+    setDraft('')
+    setAppliedQuery('')
+    setFilter('all')
+    onChangeView(undefined, undefined, '')
+  }
 
   return (
     <>
@@ -995,8 +1098,26 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
       <section data-design="Table" data-design-node="nen-history-table">
         {loading && !deliveryList ? (
           <ListState kind="loading" title="送った履歴を読み込んでいます" />
+        ) : tabError ? (
+          // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
+          <ListState
+            kind="error"
+            title="送った履歴を読み込めませんでした"
+            description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+            onRetry={onRetryTab}
+          />
         ) : shown.length === 0 ? (
-          <ListState kind="empty" emptyPreset="readonly" title="送った履歴はまだありません" description="配信が予約されると、送信前からここに記録が並びます。" />
+          filter !== 'all' || appliedQuery ? (
+            <ListState
+              kind="empty"
+              emptyPreset="readonly"
+              title="条件に合う履歴はありません"
+              description="検索語や絞り込みを変えてください。"
+              action={<Button variant="secondary" onClick={clearHistoryFilters}>検索と絞り込みを解除</Button>}
+            />
+          ) : (
+            <ListState kind="empty" emptyPreset="readonly" title="送った履歴はまだありません" description="配信が予約されると、送信前からここに記録が並びます。" />
+          )
         ) : (
           <DataTable>
             <thead>
@@ -1006,7 +1127,8 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                 <Th className="w-48">状態</Th>
                 <Th className="w-36">きっかけ</Th>
                 <Th className="w-20" align="right">開封</Th>
-                <Th className="w-24" align="right"><span className="sr-only">操作</span></Th>
+                {/* #707: 390px横スクロール時に操作列を右端へ留める */}
+                <Th className="w-24 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -1015,7 +1137,7 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                   <Tr>
                     <Td>
                       <span className="block text-label font-semibold text-ink">{formatNenJobDateTime(delivery.sentAt || delivery.scheduledAt)}</span>
-                      <span className="block truncate text-micro text-ink-faint">{delivery.friendName || '名前未取得'}・{delivery.lineAccountName}</span>
+                      <span className="block truncate text-micro text-ink-faint" title={`${delivery.friendName || '名前未取得'}・${delivery.lineAccountName}`}>{delivery.friendName || '名前未取得'}・{delivery.lineAccountName}</span>
                     </Td>
                     <Td><span className="text-label text-ink">{delivery.label}</span></Td>
                     <Td>
@@ -1024,8 +1146,8 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                     </Td>
                     <Td><span className="text-label text-ink-secondary">{deliveryTriggerLabel(delivery.campaignKey)}</span></Td>
                     <Td align="right"><span className="text-label text-ink-faint" title={delivery.reaction.reason}>取得不可</span></Td>
-                    <Td align="right">
-                      <button type="button" onClick={() => onShowDetail(delivery.id)} className="text-label font-semibold text-accent-deep">{detail?.id === delivery.id ? '閉じる' : '中身を見る'}</button>
+                    <Td align="right" className="sticky right-0 bg-canvas">
+                      <button type="button" onClick={() => onShowDetail(delivery.id)} className="text-label font-semibold text-action">{detail?.id === delivery.id ? '閉じる' : '中身を見る'}</button>
                     </Td>
                   </Tr>
                   {detail?.id === delivery.id ? (
@@ -1033,20 +1155,20 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                       <td colSpan={6} className="border-t border-hairline bg-canvas-sunken p-4">
                         <div className="grid gap-4 lg:grid-cols-3">
                           <div className="lg:col-span-2">
-                            <p className="text-micro font-bold text-ink-faint">{detail.trigger}</p>
-                            <h3 className="mt-1 text-label font-bold text-ink">{detail.content.title || detail.label}</h3>
+                            <p className="text-micro font-medium text-ink-faint">{detail.trigger}</p>
+                            <h3 className="mt-1 text-label font-semibold text-ink">{detail.content.title || detail.label}</h3>
                             <p className="mt-2 whitespace-pre-wrap text-caption leading-6 text-ink-secondary">{detail.content.bodyText || detail.content.reason}</p>
-                            {detail.content.buttonLabel ? <p className="mt-2 text-caption font-bold text-accent-deep">{detail.content.buttonLabel}</p> : null}
+                            {detail.content.buttonLabel ? <p className="mt-2 text-caption font-medium text-accent-deep">{detail.content.buttonLabel}</p> : null}
                             {/* IDEA-21: 案内の送り先を友だち詳細へつなぐ。注文・定期便の状況はそこで追える。 */}
                             <p className="mt-2">
-                              <Link href={`/friends/detail?id=${encodeURIComponent(delivery.friendId)}`} className="text-micro font-semibold text-accent-deep hover:underline">
+                              <Link href={`/friends/detail?id=${encodeURIComponent(delivery.friendId)}`} className="text-micro font-semibold text-action hover:underline">
                                 {delivery.friendName || 'この友だち'}の記録を見る
                               </Link>
                             </p>
                           </div>
                           {canRetryDelivery(delivery) ? (
                             <div className="flex flex-col gap-2">
-                              <label className="flex flex-col gap-1 text-caption font-bold text-ink">
+                              <label className="flex flex-col gap-1 text-caption font-medium text-ink">
                                 再送する理由（500文字まで）
                                 <TextArea value={retryReasons[delivery.id] ?? ''} onChange={(event) => setRetryReasons((current) => ({ ...current, [delivery.id]: event.target.value }))} rows={3} maxLength={500} />
                               </label>
@@ -1068,7 +1190,7 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
         )}
       </section>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-caption text-ink-faint">記録 {deliveryList?.pagination.total ?? 0}件中 {shown.length === 0 ? 0 : cursor + 1}〜{cursor + shown.length}件を表示</p>
+        <ListRange label="記録" total={deliveryList?.pagination.total ?? 0} first={shown.length === 0 ? 0 : cursor + 1} last={shown.length === 0 ? 0 : cursor + shown.length} />
         {deliveryList && (cursor > 0 || deliveryList.pagination.nextCursor) ? (
           <div className="flex gap-2" aria-label="送った履歴のページ送り">
             <Button type="button" disabled={cursor === 0} onClick={() => onChangeView(deliveryViewStatus(filter), String(Math.max(0, cursor - limit)), appliedQuery)}>前へ</Button>

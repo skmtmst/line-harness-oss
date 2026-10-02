@@ -231,43 +231,52 @@ describe('N-252 計測時の控えは必ず入る（NULL の成果を生まな�
   });
 
   /*
-   * `valueMode` が none / source の地点は `conversion_points.value` が NULL になる。
-   * 控えに NULL を残すと、affiliate-settlements.ts の
-   * `value_snapshot ?? point_value` が**そのときの地点の値**へ落ちるため、
-   * 承認前に編集すると過去の成果の報酬額が動く。
+   * R42 で契約を変えた。`valueMode` が none / 申告なし source の地点は
+   * `conversion_points.value` が NULL になり、控えも NULL(金額なし)で残す。
+   * 0円と金額なしを混ぜると、注文金額を使う設定の成果が 0円に見える(R42)。
    *
-   * 「NULL の行を見つけられなかった」ではなく「NULL の行が生まれない」ことを見る。
+   * N-252 の意図(編集で過去の控えが動かない)は残す。fixed の控えは必ず
+   * 数値で、版上げで書き換わらないことを下で見る。精算側は
+   * `value_snapshot ?? point_value ?? 0` のままなので、none/source の
+   * 金額なし行の合計は 0 扱いで変わらない。
    */
-  for (const valueMode of ['none', 'source', 'fixed'] as const) {
-    it(`valueMode=${valueMode} でも value_snapshot は NULL にならない`, async () => {
-      const created = await makePoint({
-        valueMode, fixedValue: valueMode === 'fixed' ? 100 : null,
-      });
+  it('valueMode=fixed の控えは必ず数値で入る', async () => {
+    const created = await makePoint({ valueMode: 'fixed', fixedValue: 100 });
+    await trackConversion(db, { conversionPointId: created.id, friendId: 'fr-1' });
+    const ev = sqlite.prepare('SELECT affiliate_id, value_snapshot, point_version_snapshot FROM conversion_events WHERE conversion_point_id = ?')
+      .get(created.id) as Record<string, unknown>;
+    // 紹介者が付いた成果であること（精算の経路に乗る形）を先に確かめる。
+    expect(ev.affiliate_id).toBe('af-1');
+    expect(ev.value_snapshot).toBe(100);
+    expect(ev.point_version_snapshot).toBe(1);
+  });
+
+  for (const valueMode of ['none', 'source'] as const) {
+    it(`valueMode=${valueMode} の申告なしは金額なし(NULL)で残し、0円と区別する(R42)`, async () => {
+      const created = await makePoint({ valueMode, fixedValue: null });
       await trackConversion(db, { conversionPointId: created.id, friendId: 'fr-1' });
       const ev = sqlite.prepare('SELECT affiliate_id, value_snapshot, point_version_snapshot FROM conversion_events WHERE conversion_point_id = ?')
         .get(created.id) as Record<string, unknown>;
-      // 紹介者が付いた成果であること（精算の経路に乗る形）を先に確かめる。
       expect(ev.affiliate_id).toBe('af-1');
-      expect(ev.value_snapshot).not.toBeNull();
-      expect(ev.value_snapshot).toBe(valueMode === 'fixed' ? 100 : 0);
+      expect(ev.value_snapshot).toBeNull();
       expect(ev.point_version_snapshot).toBe(1);
     });
   }
 
-  it('一人一回だけ数える地点（claim経路）でも控えは入る', async () => {
+  it('一人一回だけ数える地点（claim経路）の金額なしも NULL で残る(R42)', async () => {
     const created = await makePoint({ deduplicationMode: 'once_per_friend', valueMode: 'none', fixedValue: null });
     await trackConversion(db, { conversionPointId: created.id, friendId: 'fr-1' });
     const ev = sqlite.prepare('SELECT value_snapshot, point_version_snapshot FROM conversion_events WHERE conversion_point_id = ?')
       .get(created.id) as Record<string, unknown>;
-    expect(ev.value_snapshot).toBe(0);
+    expect(ev.value_snapshot).toBeNull();
     expect(ev.point_version_snapshot).toBe(1);
   });
 
-  it('控えが入るので、編集しても過去の成果は現在の地点値を参照しない', async () => {
+  it('編集しても過去の成果の控えは書き換わらない', async () => {
     const created = await makePoint({ valueMode: 'none', fixedValue: null });
     await trackConversion(db, { conversionPointId: created.id, friendId: 'fr-1' });
     const before = sqlite.prepare('SELECT value_snapshot FROM conversion_events WHERE conversion_point_id = ?')
-      .get(created.id) as { value_snapshot: number };
+      .get(created.id) as { value_snapshot: number | null };
 
     await reviseConversionDefinition(db, {
       ...baseRevision(created.id, 1), valueMode: 'fixed', fixedValue: 9999,
@@ -275,8 +284,8 @@ describe('N-252 計測時の控えは必ず入る（NULL の成果を生まな�
 
     expect(pointRow(created.id).value).toBe(9999);
     const after = sqlite.prepare('SELECT value_snapshot FROM conversion_events WHERE conversion_point_id = ?')
-      .get(created.id) as { value_snapshot: number };
+      .get(created.id) as { value_snapshot: number | null };
     expect(after.value_snapshot).toBe(before.value_snapshot);
-    expect(after.value_snapshot).toBe(0);
+    expect(after.value_snapshot).toBeNull();
   });
 });

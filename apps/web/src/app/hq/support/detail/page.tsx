@@ -8,6 +8,7 @@ import type { StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import NoteBar from '@/components/shared/note-bar'
 import StickyBar from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
 import { TextArea } from '@/components/shared/text-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
@@ -20,6 +21,12 @@ import {
   type HqSupportDetail,
   type HqSupportRequest,
 } from '@/lib/hq-support'
+import {
+  supportReplyNote,
+  supportSenderNote,
+  supportSendStatus,
+  supportSentNotice,
+} from './reply-guidance'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -27,7 +34,7 @@ type Attachment = { name: string; mimeType: string; data: string; size: number; 
  * お問い合わせの続きを送る。★V6 36-3-A（`Nt0UH`）。
  *
  * 36-3 の「これまでの問い合わせ」から開く。左にやり取り（統括は左・運営は右）と「続きを送る」欄、
- * 右に送信者と一覧。送ると運営のチケットは対応中へ戻り、運営へ通知、控えが登録メールへ届く。
+ * 右に送信者と一覧。送ると運営のチケットは対応中へ戻り、運営へ通知、控えが登録メールへ届く（メール登録があるとき）。
  * 静的書き出しのため動的セグメントは使わず `?id=` で受ける。
  */
 export default function HqSupportDetailPage() {
@@ -43,6 +50,9 @@ export default function HqSupportDetailPage() {
   const [id, setId] = useState<string | null | undefined>(undefined)
   const [detail, setDetail] = useState<HqSupportDetail | null>(null)
   const [loadError, setLoadError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（loadError）とは分ける。 */
+  const [detailMissing, setDetailMissing] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(true)
   const [me, setMe] = useState<StaffMember | null>(null)
   const [tenantName, setTenantName] = useState('')
   const [history, setHistory] = useState<HqSupportRequest[] | null>(null)
@@ -58,14 +68,29 @@ export default function HqSupportDetailPage() {
 
   // U099: id が無いことが確定したら、取得には行かず案内へ進む。
   const idMissing = id === null
+  /*
+   * R609: メール到着の案内はメールがあるときだけ出す。
+   * `me` が null の読み込み中はメール無し側（画面での確認）にする。
+   * 画面での受け取りはメールの有無に関わらず成り立つので、誤案内にならない。
+   */
+  const hasSenderEmail = (me?.email ?? '').trim().length > 0
 
   const load = useCallback(async (requestId: string) => {
+    setLoadError('')
+    setDetailMissing(false)
+    setDetailLoading(true)
     try {
       const res = await api.hqSupport.detail(requestId)
       if (!res.success) { setLoadError(res.error || '読み込めませんでした'); return }
       setDetail(res.data)
     } catch (caught) {
-      setLoadError(caught instanceof ApiError && caught.status === 404 ? 'このお問い合わせは見つかりません' : '読み込めませんでした')
+      if (caught instanceof ApiError && caught.status === 404) {
+        setDetailMissing(true)
+      } else {
+        setLoadError('読み込めませんでした')
+      }
+    } finally {
+      setDetailLoading(false)
     }
   }, [])
 
@@ -119,7 +144,7 @@ export default function HqSupportDetailPage() {
       setBody('')
       attachments.forEach((a) => URL.revokeObjectURL(a.previewUrl))
       setAttachments([])
-      setNotice('続きを送りました。運営に届き、控えが登録メールアドレスにも届きます。')
+      setNotice(supportSentNotice(hasSenderEmail))
       await load(id)
     } catch (caught) {
       setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:') ? caught.message : '送信できませんでした。もう一度お試しください。')
@@ -130,8 +155,8 @@ export default function HqSupportDetailPage() {
 
   const statusChip = (status: HqSupportRequest['status']) => (
     <span className={status === 'open'
-      ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
-      : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'}>
+      ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
+      : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'}>
       {SUPPORT_STATUS_LABELS[status]}
     </span>
   )
@@ -139,25 +164,40 @@ export default function HqSupportDetailPage() {
   return (
     <div data-design-node="Nt0UH" className="flex flex-col gap-4">
       <div data-design-node="kcTeV">
-        <NoteBar tone="info">運営からの返信はここと登録メールアドレスに届きます。追加で伝えたいことは、下の欄から同じ件の続きとして送れます。</NoteBar>
+        <NoteBar tone="info">{supportReplyNote(hasSenderEmail)}</NoteBar>
       </div>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <section data-design-node="h0DgNn" className="flex min-w-0 flex-1 flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
           {idMissing ? (
-            <div role="alert">
-              <p className="text-label font-bold text-ink">開くお問い合わせが指定されていません</p>
-              <p className="text-caption text-ink-secondary mt-1">一覧から開くお問い合わせを選び直してください。</p>
-              <Link href="/hq/support" className="text-action mt-3 inline-block text-label font-semibold hover:underline">問い合わせの一覧へ戻る</Link>
-            </div>
-          ) : loadError ? (
-            <p className="text-label text-status-danger" role="alert">{loadError}</p>
-          ) : !detail ? (
+            <TargetMissing
+              kind="unspecified"
+              title="開くお問い合わせが指定されていません"
+              description="一覧から開くお問い合わせを選び直してください。"
+              backHref="/hq/support"
+              backLabel="問い合わせの一覧へ戻る"
+            />
+          ) : detailLoading || id === undefined ? (
             <p className="text-caption text-ink-faint">読み込んでいます…</p>
+          ) : detailMissing || (!loadError && !detail) ? (
+            <TargetMissing
+              kind="not-found"
+              title="このお問い合わせは見つかりません"
+              description="削除されたか、別の記録です。一覧から選び直してください。"
+              backHref="/hq/support"
+              backLabel="問い合わせの一覧へ戻る"
+            />
+          ) : loadError || !detail ? (
+            <TargetMissing
+              kind="error"
+              title="お問い合わせを読み込めませんでした"
+              description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+              onRetry={() => { if (id) void load(id) }}
+            />
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2.5">
-                <span className="text-label font-bold text-ink-secondary">{detail.ticketLabel}</span>
+                <span className="text-label font-medium text-ink-secondary">{detail.ticketLabel}</span>
                 <h2 className="text-body font-bold text-ink">{detail.subject}</h2>
                 {statusChip(detail.status)}
                 <span className="text-micro text-ink-faint">{shortDateTime(detail.createdAt)} に送信・{detail.kindLabel}</span>
@@ -165,7 +205,7 @@ export default function HqSupportDetailPage() {
 
               <ol className="flex flex-col gap-3" aria-label="やり取り">
                 <Message side="left" author={`${tenantName || '統括'} ／ ${detail.staffName || '—'}`} at={detail.createdAt} body={detail.body} attachments={detail.attachments} />
-                {detail.messages.map((m) => (
+                {(detail.messages ?? []).map((m) => (
                   <Message
                     key={m.id}
                     side={m.authorKind === 'ops' ? 'right' : 'left'}
@@ -179,7 +219,7 @@ export default function HqSupportDetailPage() {
 
               <div className="flex flex-col gap-1.5 border-t border-hairline pt-4">
                 <div className="flex items-center gap-2">
-                  <label htmlFor={`${uid}-body`} className="text-label font-bold text-ink">続きを送る</label>
+                  <label htmlFor={`${uid}-body`} className="text-label font-medium text-ink">続きを送る</label>
                   <span className="text-micro text-ink-faint">運営の返信への返事や、追加で分かったこと</span>
                 </div>
                 <TextArea
@@ -225,7 +265,7 @@ export default function HqSupportDetailPage() {
                   </button>
                 ) : null}
                 {notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null}
-                {error ? <p className="text-label text-status-danger" role="alert">{error}</p> : null}
+                {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
               </div>
             </>
           )}
@@ -239,7 +279,7 @@ export default function HqSupportDetailPage() {
               <Row label="名前" value={me?.name ?? '—'} />
               <Row label="メール" value={me?.email ?? '—'} />
             </dl>
-            <p className="text-micro text-ink-faint">この内容が続きに添えられます。返信はこのメールアドレスに届きます。</p>
+            <p className="text-micro text-ink-faint">{supportSenderNote(hasSenderEmail)}</p>
           </section>
 
           <section data-design-node="jeBCt" className="flex flex-col rounded-card border border-hairline bg-canvas">
@@ -247,6 +287,8 @@ export default function HqSupportDetailPage() {
             <div className="border-t border-hairline" />
             {history === null ? (
               <p className="px-4 py-4 text-caption text-ink-faint">読み込んでいます…</p>
+            ) : !Array.isArray(history) ? (
+              <p className="px-4 py-4 text-caption text-ink-faint">これまでの問い合わせを読み込めませんでした。</p>
             ) : history.length === 0 ? (
               <p className="px-4 py-4 text-caption text-ink-faint">まだ問い合わせはありません。</p>
             ) : (
@@ -270,16 +312,15 @@ export default function HqSupportDetailPage() {
 
       <div data-design-node="kgFxH" className="sticky bottom-0 z-10">
         <StickyBar
-          status={blocked && body ? <span className="text-status-warn-deep">{blocked}</span> : '送信すると運営に届き、控えが登録メールアドレスにも届きます'}
+          status={blocked && body ? <span className="text-status-warn-deep">{blocked}</span> : supportSendStatus(hasSenderEmail)}
           actions={
             <>
               <Button onClick={() => router.push('/hq/support')} disabled={sending}>
                 <ChevronLeft aria-hidden="true" className="h-4 w-4" />
                 一覧へ戻る
               </Button>
-              <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked) || !detail}>
-                <Send aria-hidden="true" className="h-4 w-4" />
-                {sending ? '送信中…' : '送信する'}
+              <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked) || !detail} busy={sending} busyLabel="送信中…">
+                <Send aria-hidden="true" className="h-4 w-4" />送る
               </Button>
             </>
           }
@@ -298,7 +339,8 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
-function Message({ side, author, at, body, attachments }: { side: 'left' | 'right'; author: string; at: string; body: string; attachments: Array<{ key: string; url: string }> }) {
+function Message({ side, author, at, body, attachments }: { side: 'left' | 'right'; author: string; at: string; body: string; attachments?: Array<{ key: string; url: string }> }) {
+  const files = attachments ?? []
   return (
     <li className={`flex max-w-3xl flex-col gap-1 ${side === 'right' ? 'items-end self-end' : 'items-start'}`}>
       <span className="flex items-baseline gap-2 text-micro text-ink-secondary">
@@ -306,12 +348,12 @@ function Message({ side, author, at, body, attachments }: { side: 'left' | 'righ
         <span className="text-ink-faint">{shortDateTime(at)}</span>
       </span>
       <p className={`whitespace-pre-wrap rounded-control px-3.5 py-3 text-left text-label text-ink ${side === 'right' ? 'bg-accent-soft' : 'bg-surface-pearl'}`}>{body}</p>
-      {attachments.length > 0 ? (
+      {files.length > 0 ? (
         <span className="flex flex-wrap gap-2">
-          {attachments.map((a) => (
-            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-micro text-accent-deep underline-offset-2 hover:underline">
+          {files.map((a) => (
+            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-micro text-action underline-offset-2 hover:underline">
               <Paperclip aria-hidden="true" className="h-3.5 w-3.5" />
-              {a.key.split('/').pop()}
+              {(a.key ?? '').split('/').pop()}
             </a>
           ))}
         </span>

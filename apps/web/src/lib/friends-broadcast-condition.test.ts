@@ -100,6 +100,18 @@ describe('上段の絞り込み', () => {
     ])
   })
 
+  it('R300: 帯の引き継ぎは scoredOnly を付けて未採点の0点を除く', () => {
+    expect(ready({ scoreMax: 29, scoredOnly: true }).rules).toEqual([
+      { type: 'score_range', value: { min: undefined, max: 29, scoredOnly: true } },
+    ])
+  })
+
+  it('R300: scoredOnly が無ければ従来どおり（点数範囲だけ）', () => {
+    expect(ready({ scoreMax: 29 }).rules).toEqual([
+      { type: 'score_range', value: { min: undefined, max: 29 } },
+    ])
+  })
+
   it('注目のみは注目フラグの友だち情報条件へ', () => {
     expect(ready({ attentionOnly: true }).rules).toContainEqual({
       type: 'metadata_equals',

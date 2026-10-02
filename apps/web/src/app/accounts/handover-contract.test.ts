@@ -25,7 +25,7 @@ describe('V6 33-4 乗り換えの本実行', () => {
   })
 
   it('決め残しがある間は押せない', () => {
-    expect(PAGE).toContain('disabled={(handover.unresolvedReviews ?? 1) > 0}')
+    expect(PAGE).toContain('disabled={(handover.unresolvedReviews ?? 1) > 0')
   })
 
   it('実行ずみの再実行は口側の409をそのまま見せる', () => {
@@ -33,8 +33,9 @@ describe('V6 33-4 乗り換えの本実行', () => {
   })
 
   it('実行の結果と失敗をはっきり言う', () => {
+    // 終わった知らせは Toast（右下・4秒）へ。失敗は危険の帯に残す（★V7 共通部品その2 §1・§2）。
     expect(PAGE).toContain('本実行が終わりました')
-    expect(PAGE).toContain('role="status"')
-    expect(PAGE).toContain('role="alert"')
+    expect(PAGE).toContain('notifyToast(')
+    expect(PAGE).toContain('<Notice tone="danger"')
   })
 })

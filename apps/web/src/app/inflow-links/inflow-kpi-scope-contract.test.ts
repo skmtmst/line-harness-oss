@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const NEW = fs.readFileSync(path.join(__dirname, 'new', 'page.tsx'), 'utf8')
 
 function kpiCard(title: string): string {
   const at = PAGE.indexOf(`title="${title}"`)
@@ -34,16 +35,39 @@ describe('流入と計測の帯は、選択中のフォルダだけを数えな�
     expect(card).toContain('routeCountAvailable ? accountRouteCount : null')
   })
 
-  it('稼働中も同じ数え方にそろえる', () => {
+  it('受付中・停止中も同じ数え方にそろえる（R273）', () => {
     expect(PAGE).toContain('const accountRouteCount = summary?.routeTotal ?? accountFilteredRows.length')
+    // 受付中は isActive が真の登録済み行だけ。停止中リンクを稼働中には数えない。
     expect(PAGE).toContain(
-      "const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan').length",
+      "const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan' && r.isActive === true).length",
     )
-    expect(PAGE, '稼働中がまだ絞り込み後の行から数えている')
+    expect(PAGE).toContain(
+      "const stoppedRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan' && r.isActive === false).length",
+    )
+    expect(PAGE, '受付中がまだ絞り込み後の行から数えている')
       .not.toContain("const activeRouteCount = sortedRows.filter((r) => r.source !== 'orphan').length")
+  })
+
+  it('帯に受付中と停止中の両方を出す（R273）', () => {
+    const card = kpiCard('流入元')
+    expect(card, '帯が見つからない').not.toBe('')
+    expect(card).toContain('受付中 ${activeRouteCount}・停止中 ${stoppedRouteCount}')
+  })
+
+  it('作成確認も公開オフなら停止中だと分かる（R273）', () => {
+    // 公開オフで作った直後に「すぐに使えます」と出すと停止中と矛盾する。
+    expect(NEW).toContain('公開オフのまま発行すると、URLを開いても友だち追加できません')
   })
 
   it('フォルダ列の件数は元のままで、意味が重ならない', () => {
     expect(PAGE).toContain("accountFilteredRows.filter((row) => row.genre === genre.name).length")
+  })
+
+  it('クリックと平均の追加率もフォルダと検索の前から数える', () => {
+    expect(PAGE).toContain('summary?.totalClicks ?? accountClicks')
+    expect(PAGE).toContain('accountFilteredRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)')
+    expect(PAGE).toContain('accountFilteredRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)')
+    expect(PAGE, 'クリック・平均の分子分母がまだ絞り込み後の行から数えている')
+      .not.toContain('sortedRows.reduce')
   })
 })

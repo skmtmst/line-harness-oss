@@ -19,10 +19,12 @@ import type {
   FormInputType,
   FormSection,
 } from '@line-crm/shared'
-import { newBlockId } from '@line-crm/shared'
+import { newBlockId, PREFECTURES } from '@line-crm/shared'
 import ChoiceTable from './choice-table'
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
 import { describeInputUpdates } from './form-update-summary'
-import { cellInput, fieldInput, fieldSelect, type FormRefs } from './form-refs'
+import { cellInput, fieldInput, type FormRefs } from './form-refs'
 
 export const BLOCK_MENU: { kind: string; type?: FormInputType; label: string; group: string }[] = [
   { kind: 'image', label: '画像', group: '飾り' },
@@ -126,7 +128,7 @@ export default function BlockEditor({
     >
       <div className="mb-3 flex items-start gap-3">
         <div className="shrink-0 text-center">
-          <span className="bg-accent-deep text-on-accent rounded-control inline-block px-2 py-0.5 text-xs font-bold tabular-nums">
+          <span className="bg-accent-deep text-on-accent rounded-control inline-block px-2 py-0.5 text-xs font-medium tabular-nums">
             {index + 1}
           </span>
           <span className="text-ink-faint mt-1 block text-[11px] leading-tight whitespace-nowrap">
@@ -149,17 +151,18 @@ export default function BlockEditor({
               </label>
               <label>
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">大きさ</span>
-                <select
-                  value={block.level ?? 2}
-                  onChange={(e) =>
-                    onChange({ level: Number(e.target.value) as 1 | 2 | 3 } as Partial<FormBlock>)
+                <Select
+                  aria-label="大きさ"
+                  value={String(block.level ?? 2)}
+                  onChange={(value) =>
+                    onChange({ level: Number(value) as 1 | 2 | 3 } as Partial<FormBlock>)
                   }
-                  className={fieldSelect}
-                >
-                  <option value={1}>見出し1</option>
-                  <option value={2}>見出し2</option>
-                  <option value={3}>見出し3</option>
-                </select>
+                  options={[
+                    { value: '1', label: '見出し1' },
+                    { value: '2', label: '見出し2' },
+                    { value: '3', label: '見出し3' },
+                  ]}
+                />
               </label>
             </div>
           )}
@@ -192,16 +195,17 @@ export default function BlockEditor({
               </label>
               <label>
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">幅</span>
-                <select
+                <Select
+                  aria-label="幅"
                   value={block.size ?? 'normal'}
-                  onChange={(e) =>
-                    onChange({ size: e.target.value as 'normal' | 'full' } as Partial<FormBlock>)
+                  onChange={(value) =>
+                    onChange({ size: value as 'normal' | 'full' } as Partial<FormBlock>)
                   }
-                  className={fieldSelect}
-                >
-                  <option value="normal">通常</option>
-                  <option value="full">画面いっぱい</option>
-                </select>
+                  options={[
+                    { value: 'normal', label: '通常' },
+                    { value: 'full', label: '画面いっぱい' },
+                  ]}
+                />
               </label>
               <label className="min-w-[14rem] flex-1">
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">
@@ -242,18 +246,19 @@ export default function BlockEditor({
               </label>
               <label>
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">見た目</span>
-                <select
+                <Select
+                  aria-label="見た目"
                   value={block.style ?? 'default'}
-                  onChange={(e) =>
+                  onChange={(value) =>
                     onChange({
-                      style: e.target.value as 'default' | 'outline',
+                      style: value as 'default' | 'outline',
                     } as Partial<FormBlock>)
                   }
-                  className={fieldSelect}
-                >
-                  <option value="default">塗り</option>
-                  <option value="outline">枠のみ</option>
-                </select>
+                  options={[
+                    { value: 'default', label: '塗り' },
+                    { value: 'outline', label: '枠のみ' },
+                  ]}
+                />
               </label>
             </div>
           )}
@@ -264,17 +269,15 @@ export default function BlockEditor({
               <div className="flex flex-wrap items-end gap-3">
                 <label>
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">タイプ</span>
-                  <select
+                  <Select
+                    aria-label="タイプ"
                     value={block.type}
-                    onChange={(e) => changeInputType(e.target.value as FormInputType)}
-                    className={fieldSelect}
-                  >
-                    {(Object.keys(INPUT_TYPE_LABEL) as FormInputType[]).map((t) => (
-                      <option key={t} value={t}>
-                        {INPUT_TYPE_LABEL[t]}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => changeInputType(value as FormInputType)}
+                    options={(Object.keys(INPUT_TYPE_LABEL) as FormInputType[]).map((t) => ({
+                      value: t,
+                      label: INPUT_TYPE_LABEL[t],
+                    }))}
+                  />
                 </label>
 
                 <label className="min-w-[16rem] flex-1">
@@ -295,16 +298,17 @@ export default function BlockEditor({
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">
                       入力の形
                     </span>
-                    <select
+                    <Select
+                      aria-label="入力の形"
                       value={block.dateStyle ?? 'calendar'}
-                      onChange={(e) =>
-                        patchInput({ dateStyle: e.target.value as 'calendar' | 'ymd' })
+                      onChange={(value) =>
+                        patchInput({ dateStyle: value as 'calendar' | 'ymd' })
                       }
-                      className={fieldSelect}
-                    >
-                      <option value="calendar">カレンダー</option>
-                      <option value="ymd">年月日を入力</option>
-                    </select>
+                      options={[
+                        { value: 'calendar', label: 'カレンダー' },
+                        { value: 'ymd', label: '年月日を入力' },
+                      ]}
+                    />
                   </label>
                 )}
 
@@ -313,9 +317,13 @@ export default function BlockEditor({
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">
                       受け取るもの
                     </span>
-                    <select value="image" disabled className={`${fieldSelect} opacity-60`}>
-                      <option value="image">画像</option>
-                    </select>
+                    <Select
+                      aria-label="受け取るもの"
+                      value="image"
+                      disabled
+                      onChange={() => {}}
+                      options={[{ value: 'image', label: '画像' }]}
+                    />
                   </label>
                 )}
               </div>
@@ -330,30 +338,29 @@ export default function BlockEditor({
                   テンプレートで差し込めます。
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
-                  <select
+                  <Select
                     value=""
-                    onChange={(e) => {
-                      if (!e.target.value) return
+                    onChange={(value) => {
+                      if (!value) return
                       const current = block.destinations?.friendFieldIds ?? []
-                      if (current.includes(e.target.value)) return
+                      if (current.includes(value)) return
                       patchInput({
                         destinations: {
                           ...block.destinations,
-                          friendFieldIds: [...current, e.target.value],
+                          friendFieldIds: [...current, value],
                         },
                       })
                     }}
-                    className={fieldSelect}
                     aria-label="友だち情報欄を足す"
-                  >
-                    <option value="">＋ 友だち情報欄</option>
-                    {refs.friendFields.map((f) => (
-                      <option key={f.id} value={f.id} disabled={f.ecIsMaster}>
-                        {f.name}
-                        {f.ecIsMaster ? '（EC側が正）' : ''}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: '', label: '＋ 友だち情報欄' },
+                      ...refs.friendFields.map((f) => ({
+                        value: f.id,
+                        label: f.ecIsMaster ? `${f.name}（EC側が正）` : f.name,
+                        disabled: f.ecIsMaster,
+                      })),
+                    ]}
+                  />
 
                   {(['realName', 'displayName', 'note'] as const)
                     .filter(
@@ -362,21 +369,17 @@ export default function BlockEditor({
                         block.type !== 'textarea' || key === 'note',
                     )
                     .map((key) => (
-                      <label
+                      <Checkbox
                         key={key}
-                        className="text-ink-secondary flex items-center gap-1.5 text-xs"
+                        checked={block.destinations?.[key] ?? false}
+                        onCheckedChange={(checked) =>
+                          patchInput({
+                            destinations: { ...block.destinations, [key]: checked },
+                          })
+                        }
                       >
-                        <input
-                          type="checkbox"
-                          checked={block.destinations?.[key] ?? false}
-                          onChange={(e) =>
-                            patchInput({
-                              destinations: { ...block.destinations, [key]: e.target.checked },
-                            })
-                          }
-                        />
                         {{ realName: '本名', displayName: 'システム表示名', note: '個別メモ' }[key]}
-                      </label>
+                      </Checkbox>
                     ))}
                 </div>
 
@@ -387,7 +390,7 @@ export default function BlockEditor({
                       return (
                         <span
                           key={id}
-                          className="bg-accent-soft text-accent rounded-pill inline-flex items-center gap-1 px-2 py-0.5 text-xs"
+                          className="bg-accent-soft text-accent-deep rounded-pill inline-flex items-center gap-1 px-2 py-0.5 text-xs"
                         >
                           {field?.name ?? '（消えた項目）'}
                           <button
@@ -455,16 +458,57 @@ export default function BlockEditor({
                   </label>
                 )}
 
-                <label className="block">
-                  <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
-                  <input
-                    type="text"
-                    value={block.defaultValue ?? ''}
-                    onChange={(e) => patchInput({ defaultValue: e.target.value })}
-                    placeholder="はじめから入れておく値"
-                    className={fieldInput}
-                  />
-                </label>
+                {/*
+                  R196: 初期値はその欄の形で入れる。単一行のまま入れると
+                  メール・日付・都道府県と矛盾する値が作れてしまい、
+                  公開前の検査で止まる（回答者が送信できなくなるため）。
+                */}
+                {block.type === 'textarea' ? (
+                  <label className="block">
+                    <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
+                    <textarea
+                      rows={2}
+                      value={block.defaultValue ?? ''}
+                      onChange={(e) => patchInput({ defaultValue: e.target.value })}
+                      placeholder="はじめから入れておく値"
+                      className={`${fieldInput} resize-y`}
+                    />
+                  </label>
+                ) : block.type === 'date' ? (
+                  <label className="block">
+                    <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
+                    <input
+                      type="date"
+                      value={block.defaultValue ?? ''}
+                      onChange={(e) => patchInput({ defaultValue: e.target.value })}
+                      className={fieldInput}
+                    />
+                  </label>
+                ) : block.type === 'prefecture' ? (
+                  <label className="block">
+                    <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
+                    <Select
+                      aria-label="初期値"
+                      value={block.defaultValue ?? ''}
+                      onChange={(value) => patchInput({ defaultValue: value })}
+                      options={[
+                        { value: '', label: '— 入れない —' },
+                        ...PREFECTURES.map((name) => ({ value: name, label: name })),
+                      ]}
+                    />
+                  </label>
+                ) : (
+                  <label className="block">
+                    <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
+                    <input
+                      type="text"
+                      value={block.defaultValue ?? ''}
+                      onChange={(e) => patchInput({ defaultValue: e.target.value })}
+                      placeholder="はじめから入れておく値"
+                      className={fieldInput}
+                    />
+                  </label>
+                )}
               </div>
 
               {/* 入力制限 */}
@@ -477,21 +521,16 @@ export default function BlockEditor({
                     {block.type === 'text' && (
                       <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
                         形式
-                        <select
+                        <Select
+                          aria-label="形式"
                           value={block.limit?.format ?? 'none'}
-                          onChange={(e) =>
+                          onChange={(value) =>
                             patchInput({
-                              limit: { ...block.limit, format: e.target.value as FormInputFormat },
+                              limit: { ...block.limit, format: value as FormInputFormat },
                             })
                           }
-                          className={fieldSelect}
-                        >
-                          {FORMATS.map((f) => (
-                            <option key={f.value} value={f.value}>
-                              {f.label}
-                            </option>
-                          ))}
-                        </select>
+                          options={FORMATS.map((f) => ({ value: f.value, label: f.label }))}
+                        />
                       </label>
                     )}
                     <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
@@ -528,16 +567,14 @@ export default function BlockEditor({
                       />
                       文字
                     </label>
-                    <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={block.limit?.hideCounter ?? false}
-                        onChange={(e) =>
-                          patchInput({ limit: { ...block.limit, hideCounter: e.target.checked } })
-                        }
-                      />
+                    <Checkbox
+                      checked={block.limit?.hideCounter ?? false}
+                      onCheckedChange={(checked) =>
+                        patchInput({ limit: { ...block.limit, hideCounter: checked } })
+                      }
+                    >
                       文字数を出さない
-                    </label>
+                    </Checkbox>
                   </div>
                 </div>
               )}
@@ -545,39 +582,34 @@ export default function BlockEditor({
               {/* 日付からリマインダ */}
               {block.type === 'date' && (
                 <div className="border-hairline rounded-control bg-canvas-sunken border p-3">
-                  <label className="text-ink-secondary flex items-center gap-2 text-xs font-medium">
-                    <input
-                      type="checkbox"
-                      checked={!!block.reminder}
-                      onChange={(e) =>
-                        patchInput({
-                          reminder: e.target.checked
-                            ? { reminderId: '', time: '09:00' }
-                            : null,
-                        })
-                      }
-                    />
+                  <Checkbox
+                    checked={!!block.reminder}
+                    onCheckedChange={(checked) =>
+                      patchInput({
+                        reminder: checked
+                          ? { reminderId: '', time: '09:00' }
+                          : null,
+                      })
+                    }
+                  >
                     この日付からリマインダを起動する
-                  </label>
+                  </Checkbox>
 
                   {block.reminder && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <select
+                      <Select
+                        aria-label="リマインダ"
                         value={block.reminder.reminderId}
-                        onChange={(e) =>
+                        onChange={(value) =>
                           patchInput({
-                            reminder: { ...block.reminder!, reminderId: e.target.value },
+                            reminder: { ...block.reminder!, reminderId: value },
                           })
                         }
-                        className={fieldSelect}
-                      >
-                        <option value="">— リマインダ —</option>
-                        {refs.reminders.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name}
-                          </option>
-                        ))}
-                      </select>
+                        options={[
+                          { value: '', label: '— リマインダ —' },
+                          ...refs.reminders.map((r) => ({ value: r.id, label: r.name })),
+                        ]}
+                      />
                       <span className="text-ink-faint text-xs">
                         友だちが入力した日付を起点にします
                       </span>
@@ -588,32 +620,26 @@ export default function BlockEditor({
 
               {/* 共通のチェック */}
               <div className="border-hairline flex flex-wrap gap-4 border-t pt-3">
-                <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={block.required ?? false}
-                    onChange={(e) => patchInput({ required: e.target.checked })}
-                  />
+                <Checkbox
+                  checked={block.required ?? false}
+                  onCheckedChange={(checked) => patchInput({ required: checked })}
+                >
                   必須
-                </label>
+                </Checkbox>
                 {(block.type === 'radio' || block.type === 'checkbox') && (
-                  <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={block.inline ?? false}
-                      onChange={(e) => patchInput({ inline: e.target.checked })}
-                    />
+                  <Checkbox
+                    checked={block.inline ?? false}
+                    onCheckedChange={(checked) => patchInput({ inline: checked })}
+                  >
                     横並び
-                  </label>
+                  </Checkbox>
                 )}
-                <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={block.hidden ?? false}
-                    onChange={(e) => patchInput({ hidden: e.target.checked })}
-                  />
+                <Checkbox
+                  checked={block.hidden ?? false}
+                  onCheckedChange={(checked) => patchInput({ hidden: checked })}
+                >
                   非表示
-                </label>
+                </Checkbox>
                 <span className="text-ink-faint ml-auto text-xs">
                   回答データの見出し：{block.name}
                 </span>

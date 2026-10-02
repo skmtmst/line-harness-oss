@@ -24,7 +24,11 @@ vi.mock('../services/availability.js', async (importOriginal) => {
 const notifierMocks = vi.hoisted(() => ({
   sendBookingNotification: vi.fn(async () => undefined),
 }));
-vi.mock('../services/booking-notifier.js', () => notifierMocks);
+// 送る側だけ差し替える。文面の組み立て（時刻・残り時間）は本物を使う。
+vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+  ...notifierMocks,
+}));
 
 const accountAccessMocks = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(async () => true),

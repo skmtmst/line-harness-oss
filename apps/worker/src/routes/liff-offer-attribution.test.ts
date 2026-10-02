@@ -29,6 +29,7 @@ const dbMocks = {
   recordFriendAddAttributionCandidate: vi.fn().mockResolvedValue({ status: 'pending' }),
   getLineAccountByChannelId: vi.fn().mockResolvedValue(null),
   getLineAccountById: vi.fn().mockResolvedValue(null),
+  isLineAccountTenantActive: vi.fn().mockResolvedValue(true),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 

@@ -1,17 +1,20 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import { MoreHorizontal } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import PageHeader from '@/components/shared/page-header'
+import PageHeaderH2 from '@/components/layout/page-header-h2'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import ListRange from '@/components/ui/list-range'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { useAccount } from '@/contexts/account-context'
@@ -33,6 +36,7 @@ import { EC_TABS } from './ec-tabs'
 import { FAILURE_KIND_TEXT } from './ec-failure'
 import { formatEcDateTime as dateTime } from './ec-datetime'
 import styles from './ec-commerce-v6.module.css'
+import { formatNumber } from '@/lib/format'
 
 const ACTION_STATUS: Record<EcActionExecutionStatus, { label: string; tone: string }> = {
   pending: { label: '処理中', tone: styles.statusWarn },
@@ -61,6 +65,24 @@ const ACTION_LABEL: Record<string, string> = {
   'ec.subscription.card_updated': 'カード変更の結果を送信',
   'ec.subscription.cancelled': '定期便の解約を反映・解約の案内を送信',
   'ec.customer.profile_updated': '会員情報を更新',
+}
+
+/*
+ * R166: LINEへ何も送らない処理（会員情報の更新・注文取り消し・返金の反映）が
+ * 成功しても「送信完了」と出すと、送っていない案内が送られたように見える。
+ * 送信しない出来事だけ、成功時の表示を処理内容に合わせる。
+ */
+const NON_SENDING_STATUS_LABEL: Record<string, string> = {
+  'ec.customer.profile_updated': '更新完了',
+  'ec.order.cancelled': '反映完了',
+  'ec.order.refunded': '反映完了',
+}
+
+function actionStatusLabel(action: { status: EcActionExecutionStatus; eventType: string }): string {
+  if (action.status === 'succeeded') {
+    return NON_SENDING_STATUS_LABEL[action.eventType] ?? ACTION_STATUS.succeeded.label
+  }
+  return ACTION_STATUS[action.status].label
 }
 
 const ACTION_PAGE_SIZE = 20
@@ -129,6 +151,8 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
    * 描画では不一致＝閉じる、に倒れるので別アカウントの注文が残らない。
    */
   const [detailSlot, setDetailSlot] = useState<{ accountId: string | null; orderId: string | null }>({ accountId, orderId: null })
+  // 行の「その他」メニューの開き先（#641）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const retryingId = retryingSlot.accountId === accountId ? retryingSlot.id : null
   const detailOrderId = detailSlot.accountId === accountId ? detailSlot.orderId : null
   /* 絞りとページを同時に変えたとき、古い読み込みの返事で上書きしない。 */
@@ -271,6 +295,29 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 
   const pageCount = Math.max(1, Math.ceil(actionTotal / ACTION_PAGE_SIZE))
 
+  /*
+   * R599: 一覧が取れていない間は、一覧由来の状態別件数を出さない。
+   * `(summary?.pending ?? 0) + (summary?.processing ?? 0)` の足し算は、
+   * 未取得を「0件」に見せる。一覧の取得に成功したとき（ready・empty）
+   * だけ数を渡し、それ以外は undefined（数を出さない）にする。
+   * これは「処理完了」「送信なし」や上段タブの失敗時と同じ見せ方で、
+   * 上段タブの契約（ec-commerce-v6-contract.test.ts）が守る約束でもある。
+   * 「すべて」の数は集計由来なので、集計が取れている間は残す。
+   */
+  const listedSummary = listState === 'ready' || listState === 'empty' ? actionSummary : null
+
+  /*
+   * 絞り込みで0件のときの「元に戻す」動線（#635）。検索語と状態タブを
+   * まとめて初期へ戻す。sort は「絞り込み」ではなく並びなので触らない。
+   */
+  const recordsNarrowing = searchQuery !== '' || status !== 'all'
+  const clearRecordFilters = () => {
+    setQuery('')
+    setSearchQuery('')
+    setStatus('all')
+    setPage(1)
+  }
+
   const retry = async (action: EcActionExecution) => {
     if (!accountId || !action.retryAvailable) return
     const retryAccountId = accountId
@@ -308,26 +355,31 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
     <>
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse gridClassName={styles.kpis}>
-        <SummaryCard variant="v6" title="今日 取り込んだ" value={overview?.last24h ?? null} unit="件" detail={overview?.byType.map((item) => `${item.label} ${item.count.toLocaleString('ja-JP')}`).join('・') ?? '内訳は未取得'} />
-        <SummaryCard variant="v6" title="つながっていない注文" value={overview?.identityPending ?? null} unit="件" detail="LINEの友だちが見つかりません" badge="つき合わせ" />
-        <SummaryCard variant="v6" title="取り込みに失敗" value={overview?.failed ?? null} unit="件" detail="3回やり直しても入りませんでした" badge="確認" badgeTone="danger" />
+        <KpiCard variant="v6" title="今日 取り込んだ" value={overview?.last24h ?? null} unit="件" detail={overview?.byType.map((item) => `${item.label} ${formatNumber(item.count)}`).join('・') ?? '内訳は未取得'} />
+        <KpiCard variant="v6" title="つながっていない注文" value={overview?.identityPending ?? null} unit="件" detail="LINEの友だちが見つかりません" badge="つき合わせ" badgeTone="neutral" />
+        <KpiCard variant="v6" title="取り込みに失敗" value={overview?.failed ?? null} unit="件" detail="3回やり直しても入りませんでした" badge="確認" badgeTone="neutral" />
         <div className="min-w-0 rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-faint">最後に届いた</p>
           <p className="mt-1 text-2xl font-bold text-ink tabular-nums">{dateTime(overview?.lastReceivedAt ?? null)}</p>
           <p className="mt-1 text-xs text-ink-faint">{overview?.averageDeliverySeconds == null
             ? '到着時間は測定できません'
-            : `直近24時間の平均 ${overview.averageDeliverySeconds.toLocaleString('ja-JP')}秒（${overview.latencySampleCount.toLocaleString('ja-JP')}件）`}</p>
+            : `直近24時間の平均 ${formatNumber(overview.averageDeliverySeconds)}秒（${formatNumber(overview.latencySampleCount)}件）`}</p>
         </div>
       </KpiCollapse>
+      {/*
+        ★V7 `x63W5x`：補助のデータ（集計）だけ取れないときは、その場所に
+        小さく1行だけ。ピンクの帯にしない。一覧は普通に出す。文言と読み直す口
+        は契約試験が守る。
+      */}
       {overviewState === 'error' || overviewState === 'forbidden' ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-control bg-danger-bg px-3 py-2.5 text-sm text-danger" role="status">
-          <span>{overviewState === 'forbidden'
+        <p className="text-ink-secondary mb-4 text-xs" role="status">
+          {overviewState === 'forbidden'
             ? '集計を表示する権限がありません。一覧は取得できた範囲で表示しています。'
-            : '集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。'}</span>
-          {overviewState === 'error' ? <Button type="button" variant="secondary" onClick={() => void loadOverview(false)}>集計をもう一度読む</Button> : null}
-        </div>
+            : '集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。'}
+          {overviewState === 'error' ? <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => void loadOverview(false)}>集計をもう一度読む</button> : null}
+        </p>
       ) : null}
-      <NoteBar>ECの注文には、LINEの友だちが誰なのかが書かれていません。メールアドレスか電話番号で結びつけています。どちらも一致しなかった注文は「会員のつき合わせ」に並びます。</NoteBar>
+      <NoteBar help="注文にはLINEの友だちが書かれていないため、メールアドレスか電話番号で結びつけます" helpLabel="つき合わせの仕方">ECの注文には、LINEの友だちが誰なのかが書かれていません。メールアドレスか電話番号で結びつけています。どちらも一致しなかった注文は「会員のつき合わせ」に並びます。</NoteBar>
       {notice ? <div className={notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError} role="status">{notice.text}</div> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <input
@@ -338,22 +390,25 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
           placeholder="注文番号・お名前・出来事で検索"
           aria-label="取り込みの記録を検索"
         />
-        <Select
-          aria-label="取り込みの並び順"
-          value={sort}
-          onChange={(value) => setSort(value as typeof sort)}
-          options={[
-            { value: 'newest', label: '取り込みが新しい順' },
-            { value: 'oldest', label: '取り込みが古い順' },
-          ]}
-        />
+        <div className="w-full sm:w-64">
+          <Select
+            aria-label="取り込みの並び順"
+            size="full"
+            value={sort}
+            onChange={(value) => setSort(value as typeof sort)}
+            options={[
+              { value: 'newest', label: '取り込みが新しい順' },
+              { value: 'oldest', label: '取り込みが古い順' },
+            ]}
+          />
+        </div>
       </div>
       <Tabs items={([
           ['all', 'すべて', overview?.total],
-          ['succeeded', '送信完了', actionSummary?.succeeded],
-          ['processing', '処理中', (actionSummary?.pending ?? 0) + (actionSummary?.processing ?? 0)],
-          ['skipped', '送信なし', actionSummary?.skipped],
-          ['failed', '失敗', (actionSummary?.retryable_failed ?? 0) + (actionSummary?.permanent_failed ?? 0)],
+          ['succeeded', '処理完了', listedSummary?.succeeded],
+          ['processing', '処理中', listedSummary ? listedSummary.pending + listedSummary.processing : undefined],
+          ['skipped', '送信なし', listedSummary?.skipped],
+          ['failed', '失敗', listedSummary ? listedSummary.retryable_failed + listedSummary.permanent_failed : undefined],
         ] as const).map(([value, label, count]) => ({
           label,
           count,
@@ -371,14 +426,21 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
             ? '取り込みの記録を読み込めませんでした'
             : listState === 'empty' && !accountId
               ? 'LINEアカウントを選択してください'
-              : listState === 'empty' && searchQuery
-                ? '検索条件に合う取り込みの記録はありません'
+              : listState === 'empty' && recordsNarrowing
+                ? '条件に合う取り込みの記録はありません'
                 : undefined}
-          description={listState === 'empty' && !accountId ? '左のメニュー上部で、確認するLINEアカウントを選びます。' : undefined}
+          description={listState === 'empty' && !accountId
+            ? '左のメニュー上部で、確認するLINEアカウントを選びます。'
+            : listState === 'empty' && recordsNarrowing
+              ? '検索語や表示条件を変えてください。'
+              : undefined}
+          action={listState === 'empty' && accountId && recordsNarrowing
+            ? <Button type="button" variant="secondary" onClick={clearRecordFilters}>検索と絞り込みを解除</Button>
+            : undefined}
           onRetry={listState === 'error' ? () => void loadRecords(false) : undefined}
         />
       ) : <DataTable>
-        <thead><TableHeadRow><Th>いつ・何が届いたか</Th><Th>お客様</Th><Th>中身</Th><Th>したこと</Th><Th>状態</Th><Th align="right">操作</Th></TableHeadRow></thead>
+        <thead><TableHeadRow><Th>いつ・何が届いたか</Th><Th>お客様</Th><Th>中身</Th><Th>したこと</Th><Th>状態</Th>{/* 操作列は中身の幅で固定し、残りは本文の列で吸収する。 */}<Th align="right" className="w-44">操作</Th></TableHeadRow></thead>
         <tbody>
           {actions.map((action) => {
             const order = action.order
@@ -386,10 +448,10 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
               ? order.orderLines.map((line) => `${line.productName} × ${line.quantity}`).join('・')
               : '商品明細は未取得'
             const amount = order?.status === 'refunded' && order.refundedAmount !== null
-              ? `−¥${order.refundedAmount.toLocaleString('ja-JP')}`
+              ? `−¥${formatNumber(order.refundedAmount)}`
               : order?.totalAmount === null || order?.totalAmount === undefined
                 ? null
-                : `¥${order.totalAmount.toLocaleString('ja-JP')}`
+                : `¥${formatNumber(order.totalAmount)}`
             const statusInfo = ACTION_STATUS[action.status]
             return <Tr key={action.id}>
               <Td><span className={styles.cellStack}><span className={styles.cellMain}>{dateTime(action.receivedAt)} ／ {action.eventLabel || ecEventLabel(action.eventType, action.eventType)}</span><span className={styles.cellSub}>{action.orderNumber ? `注文 ${action.orderNumber}${amount ? ` ／ ${amount}` : ''}` : '注文番号 —'}</span></span></Td>
@@ -411,7 +473,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                   : ACTION_LABEL[action.eventType] ?? `未対応の出来事（${action.eventType}）`}</Td>
               <Td>
                 <span className={styles.cellStack}>
-                  <span className={`${styles.status} ${statusInfo.tone}`}>{statusInfo.label}</span>
+                  <span className={`${styles.status} ${statusInfo.tone}`}>{actionStatusLabel(action)}</span>
                   {/* IDEA-23: 失敗・見送りの分類（未連携／権限・認証／通信の失敗など）を状態の下へ添える。 */}
                   {action.failureKind && action.status !== 'succeeded'
                     ? <span className={styles.cellSub}>{FAILURE_KIND_TEXT[action.failureKind].label}</span>
@@ -419,15 +481,45 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                 </span>
               </Td>
               <ActionCell>
-                {/* IDEA-23: 注文がある行は「この注文の状況」から出来事→通知→成果まで辿れる。 */}
-                {order
-                  ? <button type="button" className={styles.textLink} onClick={() => setDetailSlot({ accountId, orderId: order.id })}>注文の状況</button>
-                  : null}
+                {/* #641: 主操作は枠つきボタン、残りは「その他（…）」へ集約。 */}
                 {/* 友だち詳細は静的書き出しのため /friends/detail?id= 形。/friends/<id> は存在しない（IDEA-21 で修正）。 */}
                 {(action.friendId ?? order?.friendId)
-                  ? <Link className={styles.textLink} href={`/friends/detail?id=${encodeURIComponent(action.friendId ?? order?.friendId ?? '')}`}>中身を見る</Link>
-                  : <Link className={styles.textLink} href="/ec-commerce/identity-candidates">つき合わせる</Link>}
-                {action.retryAvailable ? <Button type="button" disabled={retryingId === action.id} onClick={() => void retry(action)}>{retryingId === action.id ? '戻しています…' : 'もう一度やる'}</Button> : null}
+                  ? <Button href={`/friends/detail?id=${encodeURIComponent(action.friendId ?? order?.friendId ?? '')}`} variant="secondary">中身を見る</Button>
+                  : <Button href="/ec-commerce/identity-candidates" variant="secondary">つき合わせる</Button>}
+                {order || action.retryAvailable ? (
+                  <>
+                    <IconButton
+                      aria-label="この行のその他操作"
+                      aria-expanded={openMenuId === action.id}
+                      onClick={() => setOpenMenuId((current) => (current === action.id ? null : action.id))}
+                    >
+                      <MoreHorizontal aria-hidden />
+                    </IconButton>
+                    <ActionMenu
+                      open={openMenuId === action.id}
+                      ariaLabel="この行の操作"
+                      onClose={() => setOpenMenuId(null)}
+                      items={[
+                        /*
+                         * IDEA-23: 注文がある行は「注文の状況を見る」から出来事→通知→成果まで辿れる。
+                         * #670 23: 隣の「中身を見る」と並んだときに「注文の状況中身を見る」と
+                         * 繋がって読めたため、動詞を付けて「〜を見る」同士の並びに直す。
+                         */
+                        ...(order
+                          ? [{ id: 'order', label: '注文の状況を見る', onSelect: () => setDetailSlot({ accountId, orderId: order.id }) }]
+                          : []),
+                        ...(action.retryAvailable
+                          ? [{
+                              id: 'retry',
+                              label: retryingId === action.id ? '戻しています…' : 'もう一度やる',
+                              disabled: retryingId === action.id,
+                              onSelect: () => void retry(action),
+                            }]
+                          : []),
+                      ]}
+                    />
+                  </>
+                ) : null}
               </ActionCell>
             </Tr>
           })}
@@ -435,7 +527,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
       </DataTable>}
       {listState === 'ready' ? (
         <div className={styles.footer}>
-          <p>取り込みの記録 {actionTotal.toLocaleString('ja-JP')}件中 {actions.length.toLocaleString('ja-JP')}件を表示しています。古い記録はページを進んで確認できます。</p>
+          <p><ListRange label="取り込みの記録" total={actionTotal} first={actions.length === 0 ? 0 : 1} last={actions.length} /> 古い記録はページを進んで確認できます。</p>
           <p>注文の本文や接続用の秘密値は表示しません。もう一度行うときも、成功済みの処理は重ねません。</p>
         </div>
       ) : null}
@@ -458,14 +550,15 @@ function EcCommercePageInner() {
   return (
     <div className={styles.root} data-design="Head">
       {/* マニュアルは共通トップバーに置く。本文に「ECの注文・定期便を取り込み、LINEの配信や成果へつなげます。」という重複説明は置かない。 */}
-      <PageHeader
-        breadcrumb={[{ label: '専用機能' }, { label: 'EC連携' }]}
+      <PageHeaderH2
+        /* 1段だけのパンくずは上の帯の画面名と重複するので出さない。 */
+        breadcrumb={[]}
         title="EC連携"
         description=""
         actions={tab === 'events'
           ? <Button href="/ec-commerce?tab=connector" variant="secondary">つなぎ先の設定</Button>
           : tab === 'subscriptions'
-            ? <Button href="/broadcasts/new" variant="primary">対象を選んで配信</Button>
+            ? <Button href="/broadcasts/new" variant="primary">対象を選んで送る</Button>
             : undefined}
       />
       <EcTabs accountId={selectedAccountId} active={tab as typeof EC_TABS[number]['key']} />

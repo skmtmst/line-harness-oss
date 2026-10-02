@@ -6,8 +6,20 @@ const dbMocks = {
   markWebinarRegistrationNotified: vi.fn(),
   getFriendById: vi.fn(),
   getLineAccountById: vi.fn(),
+  isLineAccountTenantActive: vi.fn(async () => true),
+  listLineAccountsWithTenantStatus: vi.fn(async () => [
+    { id: 'acc-1', tenant_status: 'active' },
+  ]),
   getVersionedAccountSetting: vi.fn(),
   getAccountSetting: vi.fn(),
+  getAccountSettings: vi.fn(async (_db: D1Database, _accountId: string, keys: readonly string[]) =>
+    Object.fromEntries(
+      (await Promise.all(
+        keys.map(async (key) => [key, await dbMocks.getAccountSetting(_db, _accountId, key)] as const),
+      )).filter(([, value]) => value != null),
+    )),
+  getTenantBilling: vi.fn(async () => null),
+  getTenantBillingByLineAccount: vi.fn(async () => null),
   recordAuditEvent: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
@@ -46,6 +58,19 @@ beforeEach(() => {
 });
 
 describe('processWebinarReminders', () => {
+  test('停止中の契約先は未送信を消化し、復帰後に自動送信しない', async () => {
+    dbMocks.getDueWebinarRegistrations.mockResolvedValue([REG]);
+    dbMocks.listLineAccountsWithTenantStatus.mockResolvedValueOnce([
+      { id: 'acc-1', tenant_status: 'suspended' },
+    ]);
+
+    const result = await processWebinarReminders({} as D1Database, OPTIONS);
+
+    expect(result).toEqual({ sent: 0, failed: 0 });
+    expect(dbMocks.markWebinarRegistrationNotified).toHaveBeenCalledWith(expect.anything(), 'reg-1');
+    expect(proxyFetch).not.toHaveBeenCalled();
+  });
+
   test('Harness proxy 経由で送信し、成功後に notified を刻む', async () => {
     dbMocks.getDueWebinarRegistrations.mockResolvedValue([REG]);
     const result = await processWebinarReminders({} as D1Database, OPTIONS);

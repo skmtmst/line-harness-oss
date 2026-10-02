@@ -2,14 +2,25 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useState } from 'react'
-import { AlertTriangle, ArrowRight, Building2, Users } from 'lucide-react'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { ArrowRight, Building2 } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { Field, TextInput } from '@/components/shared/form-controls'
-import SelectField from '@/components/shared/select-field'
+import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
+import {
+  describeApiFailure,
+  isForbidden,
+  isForbiddenOrRateLimited,
+  loadFailureNotice,
+} from '@/components/shared/api-error-message'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   DEFAULT_OPERATOR_EVENT_TYPE,
@@ -40,6 +51,13 @@ const DEDUPE_OPTIONS = [
   { value: '30', label: '30分のあいだは1回だけ' },
   { value: '60', label: '1時間のあいだは1回だけ' },
 ]
+
+/**
+ * M032追加残差: 宛先の取得失敗時に保存を止める案内。宛先が回復したら
+ * この文言だけを解消する目安にする（他の保存・検証文言は消さない）。
+ */
+const RECIPIENTS_SAVE_GUARD_MESSAGE =
+  '受け取る人を読み込めませんでした。上の「もう一度読み込む」で取り直してから保存してください。'
 
 /** NOTIFY-04: ?id= があれば保存ずみのお知らせを開き直して直す。 */
 function readConditions(rule: { conditions: Record<string, unknown> }) {
@@ -74,10 +92,21 @@ function NewOperatorNotificationInner() {
   // NOTIFY-04: id付きで開いたときは最初からそのIDを更新先にする。
   // 読み込み失敗のまま新規作成へ落ちると、同じお知らせが増える。
   const [savedRuleId, setSavedRuleId] = useState<string | null>(editId)
+  // 開いたときの版。保存のたびに読んだ版を送り、古い版からの上書きを止める。
+  const [ruleVersion, setRuleVersion] = useState<number | null>(null)
   const [ruleLoading, setRuleLoading] = useState(Boolean(editId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  // M032: 捕まえた宛先の読み込み失敗。読み込み中のままにせず理由と再試行を出す。
+  const [recipientsError, setRecipientsError] = useState<unknown>(null)
+  /*
+   * 未保存の基準。作成時は宛先の自動選択が終わってから掴む（開いた直後
+   * の全選択を「変更あり」と数えないため）。なおし時は読み直しの完了後。
+   */
+  const [baseline, setBaseline] = useState<string | null>(null)
+  const autoIdsRef = useRef<string[] | null>(null)
+  const sawLoadingRef = useRef(false)
 
   // 保存ずみのお知らせを全項目そのまま復元する。一部だけ戻すと、
   // 開いて保存した時点で戻らなかった項目が初期値へ上書きされる。
@@ -91,6 +120,7 @@ function NewOperatorNotificationInner() {
         if (!result.success) throw new Error(result.error)
         const rule = result.data
         const saved = readConditions(rule)
+        setRuleVersion(typeof rule.version === 'number' ? rule.version : null)
         setName(rule.name)
         setEventType(rule.eventType)
         setThreshold(saved.threshold)
@@ -116,26 +146,75 @@ function NewOperatorNotificationInner() {
     return () => { active = false }
   }, [editId, selectedAccountId])
 
-  useEffect(() => {
-    let active = true
-    if (!selectedAccountId) { setRecipients(null); setRecipientIds([]); return }
+  // M032: 宛先の取り直し。失敗しても読み込み中のままにせず、理由と再試行を出す。
+  // 世代で古い応答を捨てる（アカウント切替後の遅い応答で上書きしない）。
+  const recipientsGeneration = useRef(0)
+  const loadRecipients = () => {
+    const accountId = selectedAccountId
+    if (!accountId) { setRecipients(null); setRecipientIds([]); return }
+    const generation = ++recipientsGeneration.current
+    setRecipientsError(null)
     void api.lineNotifications.operatorRules.previewRecipients({
-      lineAccountId: selectedAccountId,
+      lineAccountId: accountId,
       channels: ['dashboard', 'line'],
     }).then((result) => {
-      if (!active) return
+      if (generation !== recipientsGeneration.current) return
       if (!result.success) throw new Error(result.error)
       setRecipients(result.data)
+      setRecipientsError(null)
+      // M032追加残差: 宛先が回復したら、保存ガード由来の古い文言だけを
+      // 解消する。他の保存・公開・テスト送信・検証文言は消さない。
+      setError((current) => (current === RECIPIENTS_SAVE_GUARD_MESSAGE ? '' : current))
       // NOTIFY-04: 再開したお知らせの宛先は保存ずみのもの。全選択で
       // 上書きすると、本人だけにしていた設定が全員へ広がる。
-      if (!editId) setRecipientIds(result.data.items.map((item) => item.id))
-    }).catch(() => {
-      if (!active) return
+      if (!editId) {
+        const autoIds = result.data.items.map((item) => item.id)
+        setRecipientIds(autoIds)
+        autoIdsRef.current = autoIds
+      }
+    }).catch((caught) => {
+      if (generation !== recipientsGeneration.current) return
       setRecipients(null)
-      setError('受け取る人を読み込めませんでした。')
+      // M032: 宛先の場所で理由と再試行を出す。下の帯には出さない。
+      // 生の `API error: NNN` は出さない。
+      setRecipientsError(caught)
     })
-    return () => { active = false }
+  }
+
+  useEffect(() => {
+    loadRecipients()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId, editId])
+
+  const signature = JSON.stringify([name, eventType, threshold, importance, recipientIds, schedule, dedupeMinutes, onlyAvailable, emailFallback])
+
+  useEffect(() => {
+    if (baseline !== null) return
+    if (ruleLoading) {
+      sawLoadingRef.current = true
+      return
+    }
+    // なおし時：読み直しを見る前の初期値は基準にしない。
+    if (editId && !sawLoadingRef.current) return
+    // 作成時：宛先の自動選択（または読み込み失敗の確定）を待つ。
+    if (!editId && recipients === null && !error && recipientsError === null) return
+    if (!editId && autoIdsRef.current !== null) {
+      // 読み込み前に触った分も未保存に数えるよう、初期値＋自動選択で基準を作る。
+      setBaseline(JSON.stringify(['新しい予約が入りました', DEFAULT_OPERATOR_EVENT_TYPE, 'one', 'normal', autoIdsRef.current, 'anytime', '10', false, true]))
+      return
+    }
+    setBaseline(signature)
+  }, [baseline, ruleLoading, editId, recipients, error, recipientsError, signature])
+
+  /*
+   * 作成・なおし途中の離脱確認。基準から1か所でも変わっていたら、
+   * やめる・左メニューで確認窓を出す。公開・保存が終わると一覧へ
+   * router.push するので、成功後に警告は出ない。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: baseline !== null && signature !== baseline,
+    busy: saving,
+  })
 
   const saveDraft = async (): Promise<string | null> => {
     // 読み込み中に保存すると、未復元の項目が初期値で上書きされる。
@@ -149,7 +228,19 @@ function NewOperatorNotificationInner() {
       return null
     }
     if (recipientIds.length === 0) {
-      setError('受け取るスタッフを1人以上選んでください。')
+      // R612: 候補0人では選ぶ操作自体ができない。準備と次の画面を案内する。
+      if (recipients !== null && recipients.items.length === 0) {
+        setError('受け取る人がいません。先にログインユーザーでスタッフ登録とLINE連携を済ませてください。')
+      } else {
+        /*
+         * M032残差: 受取人の取得に失敗したまま保存すると、選択要求の文が
+         * 取得失敗の文を置き換えていた。保存自体は止めたまま、取り直しへ
+         * 案内する文にする。
+         */
+        setError(recipientsError !== null
+          ? RECIPIENTS_SAVE_GUARD_MESSAGE
+          : '受け取るスタッフを1人以上選んでください。')
+      }
       return null
     }
     setSaving(true)
@@ -174,12 +265,20 @@ function NewOperatorNotificationInner() {
         },
         channels: emailFallback ? ['dashboard', 'line', 'email'] : ['dashboard', 'line'],
       }
+      // 開き直さずに版が分からないまま保存すると、ほかの人の編集を消す。
+      if (savedRuleId && ruleVersion === null) {
+        setError('お知らせの版が分かりません。一覧へ戻って開き直してください。')
+        return null
+      }
       // 2回目以降は作り直さず書き換える。作り直すと同じお知らせが増える。
       const result = savedRuleId
-        ? await api.lineNotifications.operatorRules.updateDraft(savedRuleId, selectedAccountId, payload)
+        ? await api.lineNotifications.operatorRules.updateDraft(savedRuleId, selectedAccountId, {
+          expectedVersion: ruleVersion ?? 1, ...payload,
+        })
         : await api.lineNotifications.operatorRules.create({ lineAccountId: selectedAccountId, ...payload })
       if (!result.success) throw new Error('save failed')
       setSavedRuleId(result.data.id)
+      if (typeof result.data.version === 'number') setRuleVersion(result.data.version)
       setError('')
       return result.data.id
     } catch (caught) {
@@ -189,6 +288,7 @@ function NewOperatorNotificationInner() {
         // 一覧から開いたあとに消された等。新規作成へ逃がすと別物が増える。
         setError('お知らせが見つかりません。一覧へ戻って開き直してください。')
       } else if (caught instanceof ApiError && caught.status === 409) {
+        // 版の競合はサーバーが開き直しを案内する文を返す。そのまま出す。
         setError(caught.message)
       } else if (caught instanceof ApiError && caught.status === 400) {
         setError(caught.message)
@@ -211,7 +311,10 @@ function NewOperatorNotificationInner() {
       await api.lineNotifications.operatorRules.publish(ruleId, selectedAccountId)
       router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(ruleId)}`)
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : '公開できませんでした。')
+      // M032: 生の `API error: NNN` を出さず、原因どおりに言い分ける。
+      setError(describeApiFailure(caught, '公開', {
+        forbidden: 'このLINEアカウントのお知らせを公開する権限がありません。',
+      }))
     } finally { setSaving(false) }
   }
 
@@ -226,34 +329,34 @@ function NewOperatorNotificationInner() {
       // 成功は緑の枠で出す。赤い失敗枠には入れない。
       setNotice(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'テスト送信できませんでした。')
+      // M032: 生の `API error: NNN` を出さず、原因どおりに言い分ける。
+      setError(describeApiFailure(caught, 'テスト送信', {
+        forbidden: 'このLINEアカウントのお知らせをテスト送信する権限がありません。',
+      }))
     } finally { setSaving(false) }
   }
 
   return (
     <div data-design-node="N2gAza" data-selects-wide className="space-y-4 pb-24">
       <div className="flex items-center justify-between gap-3"><nav className="text-ink-faint text-xs" aria-label="パンくず">
-        <Link href="/line-notifications" className="text-accent hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-accent hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>{editId ? 'なおす' : 'つくる'}</span>
-      </nav><Button onClick={() => void testSend()} disabled={saving || ruleLoading}>自分にテスト送信</Button></div>
+        <Link href="/line-notifications" className="text-action hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-action hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>{editId ? 'なおす' : 'つくる'}</span>
+      </nav><Button onClick={() => void testSend()} disabled={saving || ruleLoading}>自分にテストを送る</Button></div>
 
-      <div className="border-info bg-info-bg text-info flex items-start gap-2 rounded-control border px-4 py-3 text-sm">
-        <Users className="mt-0.5 shrink-0" aria-hidden="true" size={17} />
-        <p>宛先はお店の人です。あとから顧客向けへは変えられません。顧客へ送るものは別の画面で作ります。</p>
-      </div>
+      <div className="mb-4"><NoteBar>宛先はお店の人です。あとから顧客向けへは変えられません。顧客へ送るものは別の画面で作ります。</NoteBar></div>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <main className="space-y-4 xl:col-span-2">
+        <div className="space-y-4 xl:col-span-2">
           <section className="border-hairline bg-canvas rounded-card border p-5">
             <h2 className="mb-4 text-sm font-semibold text-ink">どんなときに知らせるか</h2>
             <div className="grid gap-4 lg:grid-cols-3">
               <Field label="きっかけ" htmlFor="operator-event" required>
-                <SelectField id="operator-event" value={eventType} onChange={(event) => setEventType(event.target.value)} options={[...OPERATOR_EVENT_OPTIONS]} />
+                <Select aria-label="きっかけ" id="operator-event" size="full" value={eventType} onChange={(value) => setEventType(value)} options={[...OPERATOR_EVENT_OPTIONS]} />
               </Field>
               <Field label="どれくらいたまったら" htmlFor="operator-threshold">
-                <SelectField id="operator-threshold" value={threshold} onChange={(event) => setThreshold(event.target.value)} options={THRESHOLD_OPTIONS} />
+                <Select aria-label="どれくらいたまったら" id="operator-threshold" size="full" value={threshold} onChange={(value) => setThreshold(value)} options={THRESHOLD_OPTIONS} />
               </Field>
               <Field label="重要度" htmlFor="operator-importance">
-                <SelectField id="operator-importance" value={importance} onChange={(event) => setImportance(event.target.value)} options={IMPORTANCE_OPTIONS} />
+                <Select aria-label="重要度" id="operator-importance" size="full" value={importance} onChange={(value) => setImportance(value)} options={IMPORTANCE_OPTIONS} />
               </Field>
             </div>
             <div className="mt-4 max-w-xl">
@@ -266,47 +369,76 @@ function NewOperatorNotificationInner() {
           <section className="border-hairline bg-canvas rounded-card border p-5">
             <h2 className="text-sm font-semibold text-ink">だれが受け取るか</h2>
             <p className="mt-1 text-xs text-ink-faint">LINEログイン済みの人にだけ届きます。担当が決まっていないと届きません。</p>
-            <div className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-2"><Field label="送り先" htmlFor="operator-recipient-kind"><SelectField id="operator-recipient-kind" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'スタッフ' }]} /></Field><Field label="チーム" htmlFor="operator-recipient-team"><SelectField id="operator-recipient-team" value="all" onChange={() => undefined} options={[{ value: 'all', label: `選択中のスタッフ（${recipientIds.length}人）` }]} /></Field></div>
+            <div className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-2"><Field label="送り先" htmlFor="operator-recipient-kind"><Select aria-label="送り先" id="operator-recipient-kind" size="full" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'スタッフ' }]} /></Field><Field label="チーム" htmlFor="operator-recipient-team"><Select aria-label="チーム" id="operator-recipient-team" size="full" value="all" onChange={() => undefined} options={[{ value: 'all', label: `選択中のスタッフ（${recipientIds.length}人）` }]} /></Field></div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {recipients ? recipients.items.map((recipient) => { const selected = recipientIds.includes(recipient.id); return <label key={recipient.id} className="cursor-pointer"><input type="checkbox" className="peer sr-only" checked={selected} onChange={(event) => setRecipientIds((current) => event.target.checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))} /><span className="inline-flex rounded-pill border border-hairline bg-canvas px-3 py-1 text-xs font-semibold text-ink-secondary peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent">{recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}</span></label> }) : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}
+              {recipients
+                // R612: 候補0人では選ぶ操作自体ができない。準備と次の画面を案内する。
+                ? (recipients.items.length === 0 ? (
+                  <div>
+                    <p className="text-sm font-semibold text-ink">受け取る人がいません</p>
+                    <p className="mt-1 text-xs text-ink-secondary">スタッフを登録し、LINE連携が済んだ人が宛先になります。</p>
+                    <Link href="/staff" className="mt-2 inline-block text-xs text-action hover:underline">ログインユーザーでスタッフを確認する</Link>
+                  </div>
+                ) : recipients.items.map((recipient) => { const selected = recipientIds.includes(recipient.id); return <Checkbox key={recipient.id} checked={selected} onCheckedChange={(checked) => setRecipientIds((current) => checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))}>{recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}</Checkbox> }))
+                : recipientsError !== null
+                  ? (
+                    <div className="space-y-2">
+                      <p className="text-sm text-ink-secondary" role="alert">
+                        {isForbiddenOrRateLimited(recipientsError)
+                          ? loadFailureNotice(recipientsError, '受け取る人')
+                          : '受け取る人を読み込めませんでした。時間をおいて、もう一度お試しください。'}
+                      </p>
+                      {isForbidden(recipientsError) ? null : (
+                        <Button variant="secondary" size="compact" onClick={() => loadRecipients()}>もう一度読み込む</Button>
+                      )}
+                    </div>
+                    )
+                  : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}
             </div>
-            {recipients ? <p className="mt-3 text-xs text-ink-secondary">選択 {recipientIds.length}人 ／ LINEで受け取れる {recipients.items.filter((item) => recipientIds.includes(item.id) && item.channels.line).length}人 ／ 管理画面で受け取れる {recipientIds.length}人</p> : null}
+            {recipients && recipients.items.length > 0 ? <p className="mt-3 text-xs text-ink-secondary">選択 {recipientIds.length}人 ／ LINEで受け取れる {recipients.items.filter((item) => recipientIds.includes(item.id) && item.channels.line).length}人 ／ 管理画面で受け取れる {recipientIds.length}人</p> : null}
           </section>
 
           <section className="border-hairline bg-canvas rounded-card border p-5">
             <h2 className="mb-4 text-sm font-semibold text-ink">いつ送るか・重ならないか</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="送る時間" htmlFor="operator-schedule">
-                <SelectField id="operator-schedule" value={schedule} onChange={(event) => setSchedule(event.target.value)} options={SCHEDULE_OPTIONS} />
+                <Select aria-label="送る時間" id="operator-schedule" size="full" value={schedule} onChange={(value) => setSchedule(value)} options={SCHEDULE_OPTIONS} />
               </Field>
               <Field label="同じ知らせを重ねない" htmlFor="operator-dedupe">
-                <SelectField id="operator-dedupe" value={dedupeMinutes} onChange={(event) => setDedupeMinutes(event.target.value)} options={DEDUPE_OPTIONS} />
+                <Select aria-label="同じ知らせを重ねない" id="operator-dedupe" size="full" value={dedupeMinutes} onChange={(value) => setDedupeMinutes(value)} options={DEDUPE_OPTIONS} />
               </Field>
             </div>
-            <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary">
-              <input type="checkbox" checked={onlyAvailable} onChange={(event) => setOnlyAvailable(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />
-              <span><strong className="block text-ink">手が空いている人だけに送る</strong><span className="text-xs text-ink-faint">対応中の人には送りません。</span></span>
-            </label>
-            <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary"><input type="checkbox" checked={emailFallback} onChange={(event) => setEmailFallback(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" /><span><strong className="block text-ink">だれも受け取れないときはメールでも送る</strong><span className="text-xs text-ink-faint">LINE未ログインの人がいるとき</span></span></label>
+            <Checkbox
+              checked={onlyAvailable}
+              onCheckedChange={setOnlyAvailable}
+              description="対応中の人には送りません。"
+              className="mt-4"
+            >手が空いている人だけに送る</Checkbox>
+            <Checkbox
+              checked={emailFallback}
+              onCheckedChange={setEmailFallback}
+              description="LINE未ログインの人がいるとき"
+              className="mt-4"
+            >だれも受け取れないときはメールでも送る</Checkbox>
           </section>
 
-          {error ? <p role="alert" className="border-danger bg-danger-bg text-danger rounded-control border px-4 py-3 text-sm">{error}</p> : null}
+          {error ? <Notice tone="danger" message={error} /> : null}
           {notice ? <p role="status" className="border-success bg-success-bg text-success rounded-control border px-4 py-3 text-sm">{notice}</p> : null}
-        </main>
+        </div>
 
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-4">
-            <div className="flex items-center gap-2"><Building2 aria-hidden="true" size={18} className="text-accent" /><h2 className="text-sm font-semibold text-ink">お店の人にはこう届きます</h2></div>
+            <div className="flex items-center gap-2"><Building2 aria-hidden="true" size={18} className="text-ink-faint" /><h2 className="text-sm font-semibold text-ink">お店の人にはこう届きます</h2></div>
             <p className="mt-2 whitespace-pre-wrap text-xs text-ink-faint">文面はここで確かめられます。<br />【運用者へのお知らせ】{name.trim() || 'お知らせ名'}</p>
           </section>
-          <section className="border-warning bg-warning-bg text-warning rounded-card border p-4">
-            <div className="flex items-center gap-2"><AlertTriangle aria-hidden="true" size={18} /><h2 className="text-sm font-semibold">気をつけること</h2></div>
+          <Notice tone="warn">
+            <h2 className="text-sm font-semibold">気をつけること</h2>
             <ul className="mt-3 space-y-3 text-xs leading-5">
               <li>受け取る人が0人だと公開できません。</li>
               <li>お客様の連絡先は宛先に入りません。</li>
               <li>下書きを保存しても通知は始まりません。</li>
             </ul>
-          </section>
+          </Notice>
           <section className="border-hairline bg-canvas rounded-card border p-4">
             <h2 className="text-sm font-semibold text-ink">つながる先</h2>
             <div className="mt-3 space-y-2 text-xs">
@@ -315,7 +447,7 @@ function NewOperatorNotificationInner() {
                 ['/line-notifications', '顧客へのお知らせ', 'お客様に送るもの'],
                 ['/health', '運用状態', '止まっているときの知らせ'],
                 ['/line-notifications?tab=history', '記録', '届いたかどうかの確認'],
-              ].map(([href, label, note]) => <Link key={href} href={href} className="flex items-center justify-between gap-2 text-accent hover:underline"><span className="inline-flex items-center gap-1"><ArrowRight aria-hidden="true" size={13} />{label}</span><span className="text-ink-faint">{note}</span></Link>)}
+              ].map(([href, label, note]) => <Link key={href} href={href} className="flex items-center justify-between gap-2 text-action hover:underline"><span className="inline-flex items-center gap-1"><ArrowRight aria-hidden="true" size={13} />{label}</span><span className="text-ink-faint">{note}</span></Link>)}
             </div>
           </section>
         </aside>
@@ -324,19 +456,13 @@ function NewOperatorNotificationInner() {
       <StickyBar
         status={ruleLoading ? '保存ずみのお知らせを読み込んでいます…' : savedRuleId ? '下書きを保存しました。テスト後に公開できます。' : '下書きです。保存しても通知は始まりません。'}
         actions={<>
-          <Button href="/line-notifications?tab=operator" variant="secondary">やめる</Button>
-          <Button onClick={() => void saveDraft()} disabled={saving || ruleLoading}>{saving ? '保存中…' : savedRuleId ? '保存し直す' : '下書きに保存'}</Button>
+          <Button href="/line-notifications?tab=operator" variant="secondary">キャンセル</Button>
+          <Button onClick={() => void saveDraft()} disabled={saving || ruleLoading} busy={saving}>{savedRuleId ? '保存し直す' : '下書きを保存する'}</Button>
           <Button onClick={() => void publish()} disabled={saving || ruleLoading} variant="primary">運用者へのお知らせを公開</Button>
         </>}
       />
-      {/*
-        U063: SelectField の既定幅176pxは部品側のCSS（レイヤなし）なので、
-        Tailwind の w-full では上書きできない。共有部品には触らず、
-        この画面の select へだけ届く属性スコープで欄いっぱいに広げる。
-      */}
-      <style jsx global>{`
-        [data-selects-wide] select { width: 100%; }
-      `}</style>
+      {/* U063: 選び欄は欄いっぱいに広げる（部品の size="full" を使う）。 */}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したお知らせ" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

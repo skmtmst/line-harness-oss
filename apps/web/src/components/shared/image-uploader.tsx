@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 import { api } from '@/lib/api'
+import FileDropzone from './file-drop'
 
 export type ImageUploaderMode = 'url' | 'line-image'
 
@@ -104,12 +105,12 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
 
   return (
     <div className="space-y-2">
-      {label && <div className="text-sm font-medium text-gray-700">{label}</div>}
+      {label && <div className="text-sm font-medium text-ink-secondary">{label}</div>}
       <div className="flex justify-end">
         <button
           type="button"
           onClick={() => setManualUrlMode((v) => !v)}
-          className="text-xs text-emerald-700 underline"
+          className="text-xs text-action underline"
         >
           {manualUrlMode ? '画像アップロードに戻す' : 'URL を直接入力'}
         </button>
@@ -137,50 +138,36 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
             }
           }}
           placeholder="https://... (外部 CDN / R2 URL)"
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          className="w-full rounded-mini border border-hairline px-3 py-2 text-sm"
         />
-      ) : (
+      ) : previewUrl ? (
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
           onPaste={onPaste}
           tabIndex={0}
-          className="rounded-lg border-2 border-dashed border-gray-300 bg-white p-4 transition-colors hover:border-gray-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
+          className="rounded-control border-2 border-dashed border-hairline bg-canvas p-4 transition-colors hover:border-ink-disabled focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
         >
-          {previewUrl ? (
-            <div className="flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={previewUrl} alt="" className="h-24 w-24 rounded object-cover ring-1 ring-gray-200" />
-              <div className="flex-1 space-y-2">
-                <button
-                  type="button"
-                  onClick={() => inputRef.current?.click()}
-                  className="text-xs font-medium text-gray-700 underline"
-                >
-                  差し替え
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onChange(null)}
-                  className="ml-3 text-xs font-medium text-rose-600 underline"
-                >
-                  取り消し
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 py-4 text-sm text-gray-500">
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={previewUrl} alt="" className="h-24 w-24 rounded-mini object-cover ring-1 ring-hairline" />
+            <div className="flex-1 space-y-2">
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
-                disabled={busy}
-                className="rounded-md bg-emerald-600 px-3 py-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
+                className="text-xs font-medium text-ink-secondary underline"
               >
-                {busy ? 'アップロード中…' : '画像を選択'}
+                差し替え
               </button>
-              <div className="text-xs text-gray-400">またはドラッグ&ドロップ / Cmd+V でペースト</div>
+              <button
+                type="button"
+                onClick={() => onChange(null)}
+                className="ml-3 text-xs font-medium text-status-danger underline"
+              >
+                取り消し
+              </button>
             </div>
-          )}
+          </div>
           <input
             ref={inputRef}
             type="file"
@@ -189,8 +176,25 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
             onChange={(e) => handleFiles(e.target.files)}
           />
         </div>
+      ) : (
+        // ★V7 `NQMnx` の落とす場所。押す・落とす・貼り付けの動きはそのまま。
+        <div onPaste={onPaste}>
+          <FileDropzone
+            title="ここに画像を落とす"
+            hint={mode === 'line-image' ? 'JPEG・PNG、10MB まで' : '画像ファイル、10MB まで'}
+            accept={mode === 'line-image' ? 'image/jpeg,image/png' : 'image/*'}
+            busy={busy}
+            busyTitle="取り込んでいます…"
+            rejectTitle="この画像は追加できません"
+            rejectHint={mode === 'line-image' ? 'JPEG・PNG だけ選んでください' : '画像ファイルを選んでください'}
+            onFiles={(files) => {
+              const first = files[0]
+              if (first) void upload(first)
+            }}
+          />
+        </div>
       )}
-      {error && <div className="text-xs text-rose-600">{error}</div>}
+      {error && <div className="text-xs text-status-danger">{error}</div>}
     </div>
   )
 }

@@ -15,6 +15,7 @@ import {
   getWebhookInteractionById,
   listFailedWebhookInteractionsForRetry,
   countFailedWebhookInteractionsForRetry,
+  countExcludedFailedWebhookInteractions,
   countUnverifiedWebhookInteractions,
   listWebhookInteractions,
   getOutgoingWebhookDeliverySummaries,
@@ -23,6 +24,8 @@ import {
   backfillWebhookSecrets,
   hasWebhookSecret,
   resolveWebhookSecret,
+  resolvePreviousWebhookSecret,
+  WEBHOOK_SECRET_PREVIOUS_GRACE_MS,
   isKnownOutgoingEventType,
   KNOWN_OUTGOING_EVENT_TYPES,
   WEBHOOK_SECRET_MIN_LENGTH as MIN_SECRET_LENGTH,
@@ -39,23 +42,42 @@ import {
   isOperationCapabilityStopped,
   type IntegrationApiTokenRow,
   type WebhookInteractionRow,
+  type WebhookInteractionListRow,
   type IncomingWebhookIdentityMatch,
   type IncomingWebhookActionRef,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
-import { reserveIncomingWebhook, type IncomingWebhookExecution } from '../services/incoming-webhook-receipts.js';
+import { stoppedTenantLineAccountSql } from '../services/tenant-runtime-status.js';
+import {
+  reserveIncomingWebhook,
+  readIncomingWebhookReceiptPlan,
+  saveIncomingWebhookReceiptPlan,
+  type IncomingWebhookExecution,
+  type IncomingWebhookReceiptPlan,
+} from '../services/incoming-webhook-receipts.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { auditLog } from '../lib/audit-log.js';
 import {
+  incomingTestIdempotencyKey,
   retryWebhookInteraction,
   webhookFailureLabel,
   webhookResponseLabel,
+  type IncomingTestOutcome,
 } from '../services/webhook-interactions.js';
-import { buildOutgoingWebhookBody, deliverWebhook } from '../services/outgoing-webhook-delivery.js';
-import { executeIncomingWebhookActions, maskedPayloadShape } from '../services/incoming-webhook-actions.js';
+import {
+  buildOutgoingWebhookBody,
+  deliverOnce,
+  failureReasonForDelivery,
+} from '../services/outgoing-webhook-delivery.js';
+import {
+  executeIncomingWebhookActions,
+  maskedPayloadShape,
+  previewIncomingWebhook,
+} from '../services/incoming-webhook-actions.js';
 
 const webhooks = new Hono<Env>();
 
@@ -68,6 +90,40 @@ const INCOMING_ACTION_KINDS = new Set([
   'reminder', 'conversion', 'mileage_rule', 'score_rule', 'outgoing_webhook',
   'operator_notification',
 ]);
+
+/*
+ * R404: 受信直後に直接動かせる種類。directAction（incoming-webhook-actions.ts）
+ * が組み立てられる5種類と、公開済み版を展開する共通アクションだけ。
+ * friend_field・reminder・conversion・mileage_rule・score_rule・
+ * operator_notification の直接指定は、保存できても試しも実実行も必ず失敗する
+ * ため、保存時点で理由つきで止める（接続済み表示もしない）。
+ */
+const INCOMING_DIRECTLY_EXECUTABLE_KINDS = new Set([
+  'common_action', 'tag', 'support_mark', 'template', 'scenario', 'outgoing_webhook',
+]);
+
+const INCOMING_ACTION_KIND_LABELS: Record<string, string> = {
+  common_action: '共通アクションを動かす',
+  tag: 'タグを付ける',
+  friend_field: '友だち情報を更新する',
+  support_mark: '対応マークを付ける',
+  template: 'テンプレートを送る',
+  scenario: 'シナリオを開始する',
+  reminder: 'リマインダを開始する',
+  conversion: '成果を記録する',
+  mileage_rule: 'マイルを付ける',
+  score_rule: 'スコアを更新する',
+  outgoing_webhook: '別のサービスへ知らせる',
+  operator_notification: '担当者へ知らせる',
+};
+
+function incomingUnexecutableReason(refKind: string): string | null {
+  if (INCOMING_DIRECTLY_EXECUTABLE_KINDS.has(refKind)) return null;
+  const label = INCOMING_ACTION_KIND_LABELS[refKind] ?? '保存済みの処理を動かす';
+  return `「${label}」は受信直後の処理として直接実行できないため、保存できません。`
+    + 'タグを付ける・対応マークを付ける・テンプレートを送る・シナリオを開始する・'
+    + '別のサービスへ知らせる・共通アクションを動かす、から選び直してください。';
+}
 
 function safeJson<T>(raw: string | null | undefined, fallback: T): T {
   try {
@@ -159,6 +215,9 @@ function readIncomingConfig(body: unknown):
       || (refVersionId !== null && (!refVersionId || refVersionId.length > 200))) {
       return { ok: false, error: '実行処理は許可された種類と構造化IDで指定してください' };
     }
+    // R404: 直接実行できない種類は保存200にしない。試しも実実行も必ず失敗するため。
+    const unexecutable = incomingUnexecutableReason(refKind);
+    if (unexecutable) return { ok: false, error: unexecutable };
     actions.push({ refKind, refId, refVersionId });
   }
   return {
@@ -194,6 +253,58 @@ const MAX_EVENT_TYPE_LENGTH = 100;
 const MAX_INCOMING_BODY_BYTES = 256 * 1024;
 const RECEIVE_RATE_LIMIT = 60;
 const RECEIVE_RATE_WINDOW_MS = 60_000;
+/*
+ * R430 (v6-26 §7-1): 署名時刻の受付窓。過去15分・未来5分（時計ずれ分）。
+ * 時刻を送ってきた受信だけを検査し、送らない古い送信元は壊さない。
+ */
+const RECEIVE_TIMESTAMP_PAST_MS = 15 * 60_000;
+const RECEIVE_TIMESTAMP_FUTURE_MS = 5 * 60_000;
+
+/*
+ * R428: 申告なし・申告不足の本文も上限を超えて読み続けない。
+ * 上限を超えたら null を返し、呼び出し側は413にする。
+ */
+async function readCappedBodyText(raw: Request, maxBytes: number): Promise<string | null> {
+  const reader = raw.body?.getReader();
+  if (!reader) return '';
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      try {
+        await reader.cancel();
+      } catch {
+        // 読み捨ての中断に失敗しても、413 にはできる。
+      }
+      return null;
+    }
+    chunks.push(value);
+  }
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(merged);
+}
+
+/** R430: X-Webhook-Timestamp の検査状態。送らない受信は checked:false。 */
+function receiveTimestampState(raw: string | null | undefined):
+  | { checked: false }
+  | { checked: true; timeMs: number | null } {
+  if (raw === null || raw === undefined || raw.trim() === '') return { checked: false };
+  const text = raw.trim();
+  const numeric = Number(text);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return { checked: true, timeMs: numeric >= 1e11 ? numeric : numeric * 1000 };
+  }
+  const parsed = Date.parse(text);
+  return { checked: true, timeMs: Number.isFinite(parsed) ? parsed : null };
+}
 
 /**
  * 名前と種別の上限。極端な値で一覧表示が崩れる・DBが膨らむのを防ぐ(#506 軽)。
@@ -270,6 +381,21 @@ function webhookKeysOf(c: Context<Env>): { current?: string; previous?: string }
   };
 }
 
+/**
+ * S (#939 機能26): 前の合言葉があといつまで受け付けるか。
+ * 併用期間(24時間)を過ぎた・前の値が無い行は null。
+ */
+function previousSecretUsableUntil(
+  row: { secret_previous_encrypted?: string | null; secret_rotated_at?: string | null },
+  now = Date.now(),
+): string | null {
+  if (!row.secret_previous_encrypted || !row.secret_rotated_at) return null;
+  const rotatedAt = Date.parse(row.secret_rotated_at);
+  if (!Number.isFinite(rotatedAt)) return null;
+  const until = rotatedAt + WEBHOOK_SECRET_PREVIOUS_GRACE_MS;
+  return until > now ? new Date(until).toISOString() : null;
+}
+
 
 
 // ========== 受信Webhook ==========
@@ -333,6 +459,10 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
     // N-367 (#939): 「未照合として確認する」「友だち候補を作る」を選んだ口が
     // 溜めている未確認の件数。箱の中身は /unmatched で見せる。
     const pendingUnmatched = await countIncomingWebhookUnmatched(c.env.DB, item.id, lineAccountId);
+    // R404: 既に保存済みの未対応種類は「接続済み」にしない。理由も添える。
+    const unexecutableReason = actions
+      .map((action) => incomingUnexecutableReason(action.refKind))
+      .find((reason): reason is string => reason !== null) ?? null;
     return c.json({
       success: true,
       data: {
@@ -340,15 +470,18 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
         name: item.name,
         sourceType: item.source_type,
         hasSecret: hasWebhookSecret(item),
+        // S: 入れ替え中なら「前の合言葉が使える期限」。併用期間外は null。
+        previousSecretUsableUntil: previousSecretUsableUntil(item),
         isActive: Boolean(item.is_active),
         version: Number(item.version ?? 1),
         identityMatching,
         actions: namedActions,
         pendingUnmatched,
-        actionExecution: {
-          state: actions.length > 0 ? 'connected' : 'not_configured',
-          reason: null,
-        },
+        actionExecution: actions.length === 0
+          ? { state: 'not_configured' as const, reason: null }
+          : unexecutableReason
+            ? { state: 'needs_attention' as const, reason: unexecutableReason }
+            : { state: 'connected' as const, reason: null },
         latestSample: sample && item.latest_received_at
           ? { receivedAt: item.latest_received_at, ...sample }
           : null,
@@ -408,6 +541,10 @@ webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner'), async 
 
 webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
   try {
+    // 受信フックの登録は秘密値を扱う大事な操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
+      return stepUpRequiredResponse(c, '秘密の値の登録には本人確認が必要です');
+    }
     const body = await c.req.json<{ name: string; sourceType?: string; secret?: string; lineAccountId: string }>();
     const nameError = validateWebhookName(body.name);
     if (nameError) {
@@ -465,6 +602,10 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
     const existing = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{ name?: string; sourceType?: string; secret?: string; isActive?: boolean }>();
+    // 秘密値の入れ替えを伴う更新は鍵・トークンの操作（V）。
+    if (body.secret !== undefined && !await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
+      return stepUpRequiredResponse(c, '秘密の値の変更には本人確認が必要です');
+    }
     if (body.name !== undefined) {
       const nameError = validateWebhookName(body.name);
       if (nameError) {
@@ -525,6 +666,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
         name: updated.name,
         sourceType: updated.source_type,
         hasSecret: hasWebhookSecret(updated),
+        previousSecretUsableUntil: previousSecretUsableUntil(updated),
         isActive: Boolean(updated.is_active),
       },
     });
@@ -576,27 +718,157 @@ webhooks.get('/api/webhooks/incoming/:id/unmatched', requireRole('owner', 'admin
     const webhook = await getIncomingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
     if (!webhook) return c.json({ success: false, error: 'Not found' }, 404);
     const status = c.req.query('status');
-    const items = await listIncomingWebhookUnmatched(
-      c.env.DB, webhook.id, lineAccountId,
-      status === 'resolved' || status === 'dismissed' ? status : 'pending',
-    );
+    const listStatus = status === 'resolved' || status === 'dismissed' ? status : 'pending';
+    // R401: 50件超えは limit/offset で辿る。空表示の判定に使う総数も返す。
+    const limit = Math.min(100, Math.max(1, Number(c.req.query('limit') ?? '') || 50));
+    const offset = Math.max(0, Number(c.req.query('offset') ?? '') || 0);
+    const [items, total] = await Promise.all([
+      listIncomingWebhookUnmatched(c.env.DB, webhook.id, lineAccountId, listStatus, limit, offset),
+      countIncomingWebhookUnmatched(c.env.DB, webhook.id, lineAccountId, listStatus),
+    ]);
+    /*
+     * S: 複数一致で保留した届物は、人が選べるよう候補の友だちを
+     * 名前つきで返す。候補に載っていない友だちが選ばれても構わない
+     * (運用者が別途確かめた場合を塞がない)。
+     */
+    const candidateIds = [...new Set(items.flatMap((item) =>
+      safeJson<string[]>(item.candidate_friend_ids_json, [])))];
+    const candidateNames = new Map<string, string | null>();
+    if (candidateIds.length > 0) {
+      const placeholders = candidateIds.map(() => '?').join(', ');
+      const rows = await c.env.DB.prepare(
+        `SELECT id, display_name FROM friends WHERE line_account_id = ? AND id IN (${placeholders})`,
+      ).bind(lineAccountId, ...candidateIds).all<{ id: string; display_name: string | null }>();
+      for (const row of rows.results ?? []) candidateNames.set(row.id, row.display_name);
+    }
     return c.json({
       success: true,
-      data: items.map((item) => ({
-        id: item.id,
-        kind: item.kind,
-        status: item.status,
-        identityAttempts: safeJson<Array<{ kind: string; path: string; value: string }>>(
-          item.identity_attempts_json, [],
-        ),
-        maskedShape: safeJson<unknown>(item.masked_shape_json, null),
-        resolvedFriendId: item.resolved_friend_id,
-        resolvedAt: item.resolved_at,
-        receivedAt: item.received_at,
-      })),
+      total,
+      data: items.map((item) => {
+        const friendIds = item.kind === 'ambiguous'
+          ? safeJson<string[]>(item.candidate_friend_ids_json, [])
+          : [];
+        return {
+          id: item.id,
+          kind: item.kind,
+          status: item.status,
+          identityAttempts: safeJson<Array<{ kind: string; path: string; value: string }>>(
+            item.identity_attempts_json, [],
+          ),
+          maskedShape: safeJson<unknown>(item.masked_shape_json, null),
+          candidates: friendIds.map((friendId) => ({
+            friendId,
+            displayName: candidateNames.get(friendId) ?? null,
+          })),
+          resolvedFriendId: item.resolved_friend_id,
+          resolvedAt: item.resolved_at,
+          receivedAt: item.received_at,
+        };
+      }),
     });
   } catch (err) {
     console.error('GET /api/webhooks/incoming/:id/unmatched error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * S (#939 機能26): 受け取りの試し。見本のJSONを照合と行動の組み立てまで
+ * 試して結果を返す。届物の受領・行動の実行・箱への記録は一切行わない。
+ * 結果だけはやり取り台帳へ「試し」として分けて残す(v6-26 §9)。
+ */
+webhooks.post('/api/webhooks/incoming/:id/test', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    const staff = c.get('staff');
+    if (staff?.role === 'staff' && !staff.permissionKeys?.includes('/webhooks')) {
+      return c.json({ success: false, error: 'この機能を表示する権限がありません' }, 403);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, staff, [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const declaredLength = Number(c.req.header('content-length') ?? '');
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_INCOMING_BODY_BYTES) {
+      return c.json({ success: false, error: 'Payload too large' }, 413);
+    }
+    const body = await c.req.json<{ payload?: unknown }>().catch(() => null);
+    if (!body || body.payload === undefined) {
+      return c.json({ success: false, error: '試すJSONを payload に入れてください' }, 400);
+    }
+    const webhook = await getIncomingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!webhook) return c.json({ success: false, error: 'Not found' }, 404);
+    const preview = await previewIncomingWebhook(c.env.DB, {
+      lineAccountId,
+      payload: body.payload,
+      identityMatching: safeJson<IncomingWebhookIdentityMatch>(webhook.identity_match_json, {
+        methods: [], onNotFound: 'do_nothing',
+      }),
+      actions: safeJson<IncomingWebhookActionRef[]>(webhook.action_refs_json, []),
+    });
+    // 試しの結果はやり取り台帳へ test 種別で分けて残す。本文は残さない。
+    // d23d R407: 「試しが終わった」と「照合できた」は別の話。試算の結果を
+    // 記録へ残し、一覧で実際の受信の「結びつきました」と見分けが付くようにする。
+    const outcome: IncomingTestOutcome = preview.actions.some((action) => !action.ok)
+      ? 'invalid'
+      : preview.match.status === 'matched'
+        ? 'matched'
+        : preview.match.status === 'ambiguous'
+          ? 'ambiguous'
+          : 'not_found';
+    const outcomeSummary = {
+      matched: '友だちと照合できた',
+      ambiguous: '照合候補が複数あった',
+      not_found: '照合相手がいなかった',
+      invalid: '行動の確認で不備があった',
+    }[outcome];
+    const started = Date.now();
+    try {
+      const interaction = await createWebhookInteraction(c.env.DB, {
+        lineAccountId,
+        direction: 'incoming',
+        webhookId: webhook.id,
+        webhookName: webhook.name,
+        eventType: 'incoming_webhook.test',
+        triggerSummary: `${webhook.name}の受け取りを試した・${outcomeSummary}`,
+        requestBodyJson: null,
+        // 試しは再送しないので冪等キーは使われない。結果の種類を印として残す。
+        idempotencyKey: incomingTestIdempotencyKey(outcome),
+      });
+      await finishWebhookInteraction(c.env.DB, interaction.id, lineAccountId, {
+        status: 'succeeded',
+        // 相手へ送信しない試しに「相手の応答番号」は存在しない。
+        responseStatus: null,
+        attemptCount: 1,
+        durationMs: Date.now() - started,
+      });
+    } catch (logError) {
+      // 台帳の一時障害で試し自体を止めない。
+      console.error('受け取りの試しの記録に失敗:', logError);
+    }
+    auditLog(c, 'webhook.incoming.test', { kind: 'incoming_webhook', id: webhook.id }, { lineAccountId });
+    return c.json({
+      success: true,
+      data: {
+        match: preview.match.status === 'matched'
+          ? { status: 'matched' as const, friendId: preview.match.friendId }
+          : preview.match.status === 'ambiguous'
+            ? { status: 'ambiguous' as const, friendIds: preview.match.friendIds }
+            : { status: 'not_found' as const },
+        identityAttempts: preview.identityAttempts,
+        actions: await Promise.all(preview.actions.map(async (action) => ({
+          refIndex: action.refIndex,
+          refKind: action.ref.refKind,
+          refId: action.ref.refId,
+          displayName: await incomingActionDisplayName(c.env.DB, action.ref),
+          ok: action.ok,
+          plan: action.ok ? action.plan : undefined,
+          error: action.ok ? undefined : action.error,
+        }))),
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/webhooks/incoming/:id/test error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -745,6 +1017,10 @@ webhooks.get('/api/webhooks/outgoing/:id', requireRole('owner', 'admin', 'staff'
 
 webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
   try {
+    // 送信フックの登録は署名用の秘密値を扱う大事な操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
+      return stepUpRequiredResponse(c, '秘密の値の登録には本人確認が必要です');
+    }
     const body = await c.req.json<{
       name: string;
       url: string;
@@ -835,6 +1111,10 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
       isActive?: boolean;
       maxRetries?: unknown;
     }>();
+    // 秘密値の入れ替えを伴う更新は鍵・トークンの操作（V）。
+    if (body.secret !== undefined && !await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
+      return stepUpRequiredResponse(c, '秘密の値の変更には本人確認が必要です');
+    }
     // 検証済みの値だけを別に持つ。body をそのまま書き換えると unknown のまま
     // 下流へ渡ることになる。
     let maxRetries: number | undefined;
@@ -989,9 +1269,11 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
       idempotencyKey: eventId,
     });
     const started = Date.now();
-    // 署名用の復号は deliverWebhook が行う。ここは早い段階で 503 を返すための
+    // d23b R419: 試し送信は1回だけ。画面の案内（届いたかを試す1回）と
+    // 自動の送り直しを混ぜないため、送り直しを0回に固定して送る。
+    // 署名用の復号は配送側が行う。ここは早い段階で 503 を返すための
     // 事前確認だけに使い、鍵はそのまま渡す(#650 再審査)。
-    const result = await deliverWebhook(webhook, body, {
+    const result = await deliverOnce(webhook, body, {
       idempotencyKey: eventId,
       credentialKeys: webhookKeysOf(c),
     });
@@ -1000,7 +1282,9 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
       responseStatus: result.lastStatus ?? null,
       attemptCount: result.attempts,
       durationMs: Date.now() - started,
-      failureReason: result.ok ? null : 'processing_failed',
+      // d23b R410/R415: 他経路と同じ理由を残す。届いたか分からない
+      // 失敗を「処理できなかった」と記録しない。
+      failureReason: result.ok ? null : failureReasonForDelivery(result),
     });
     auditLog(c, 'webhook.outgoing.test', { kind: 'outgoing_webhook', id: webhook.id }, { lineAccountId });
     return c.json({ success: true, data: { delivered: result.ok, responseStatus: result.lastStatus ?? null } });
@@ -1045,12 +1329,43 @@ function serializeInteraction(row: WebhookInteractionRow) {
     // 判定用の記号も返す(IDEA-26)。'unknown' は無条件に再送せず、
     // 相手先で確かめてからの1件ずつ復旧として画面が扱う。
     failureReasonCode: row.failure_reason,
-    // つなぎ先が消えたもの・送った内容が残っていないものは送り直せない。
-    canRetry: row.direction === 'outgoing' && row.status === 'failed'
-      && Boolean(row.webhook_id) && row.request_body_json != null,
     startedAt: row.started_at,
     completedAt: row.completed_at,
     retryOfId: row.retry_of_id,
+    ...retryBlockFields(row),
+  };
+}
+
+/**
+ * 送り直せるかの判定と、送り直せない理由（d23b R412/R414）。
+ * 一覧の行(listWebhookInteractions)には送り先と自動配送の現状が
+ * 付いてくる。個別取得の行では分からない分は付けない（隠さず不明のまま）。
+ */
+function retryBlockFields(row: WebhookInteractionRow) {
+  const list = row as Partial<WebhookInteractionListRow>;
+  const hasJoin = 'linked_webhook_active' in row;
+  const outgoingFailed = row.direction === 'outgoing' && row.status === 'failed';
+  // webhook_id が無い記録は連携先が消えたもの。一覧行で送り先が
+  // 見つからない（削除印あり含む）ものも同じ扱い。
+  const webhookDeleted = row.direction === 'outgoing'
+    && (row.webhook_id == null || (hasJoin && list.linked_webhook_active == null));
+  const webhookInactive = hasJoin && row.direction === 'outgoing' && list.linked_webhook_active === 0;
+  const deliveryStatus = hasJoin ? (list.delivery_status ?? null) : null;
+  const autoRetryOpen = deliveryStatus === 'pending' || deliveryStatus === 'sending' || deliveryStatus === 'retry_wait';
+  const autoDelivered = deliveryStatus === 'delivered';
+  const retryBlockReason =
+    webhookDeleted ? 'webhook_deleted'
+    : webhookInactive ? 'webhook_inactive'
+    : autoRetryOpen ? 'auto_retry_scheduled'
+    : autoDelivered ? 'already_delivered'
+    : null;
+  return {
+    // つなぎ先が消えたもの・止まったもの・送った内容が残っていないもの、
+    // 自動の送り直しが動いている・届き済みのものは送り直せない。
+    canRetry: outgoingFailed && Boolean(row.webhook_id) && row.request_body_json != null
+      && !webhookDeleted && !webhookInactive && !autoRetryOpen && !autoDelivered,
+    retryBlockReason,
+    autoRetryNextAt: autoRetryOpen ? (list.delivery_next_retry_at ?? null) : null,
   };
 }
 
@@ -1129,6 +1444,16 @@ webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admi
     if (code === 'not_retryable' || code === 'already_retried') {
       return c.json({ success: false, error: code }, 409);
     }
+    /*
+      d23b R412: 同じ通知が自動で届き済み・自動の送り直しが動いている
+      場合は手動のやり直しを重ねず、理由を画面へ返す。
+    */
+    if (code === 'already_delivered') {
+      return c.json({ success: false, error: code }, 409);
+    }
+    if (code === 'auto_retry_scheduled') {
+      return c.json({ success: false, error: code }, 409);
+    }
     if (code === 'webhook_secret_unavailable') {
       return c.json({ success: false, error: 'secret を確認できないため送り直しを止めました' }, 503);
     }
@@ -1150,6 +1475,10 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
     if ('error' in access) return access.error;
     // 1件につき最大6回の外部通信になる。1リクエストの外部通信上限を越えないよう5件まで。
     // 結果不明(届いたか分からない)の記録はここには含まれない(IDEA-26)。
+    //
+    // d23b R405: 選ぶ段階で、送り先が消えた・止まった・内容が残っていない
+    // 記録と、自動の送り直しが動いている記録は外す。先頭に固まった対象外の
+    // 記録で、後ろの送れる記録へ届かなくなることはなくなった。
     const failed = await listFailedWebhookInteractionsForRetry(c.env.DB, access.lineAccountId, 5);
     // N-387: 対象外に残る件数を先に数えて返す。まとめて操作で黙って残さない。
     const totalFailed = await countFailedWebhookInteractionsForRetry(c.env.DB, access.lineAccountId);
@@ -1157,6 +1486,10 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
     // IDEA-26: 結果不明の失敗は無条件に再送しない代わりに、件数を返して
     // 「相手先で確かめてから1件ずつやり直す」ことを画面へ伝える。
     const needsReview = await countUnverifiedWebhookInteractions(c.env.DB, access.lineAccountId);
+    // d23b R408: 対象外に残った件数（消えた・止まった送り先、内容が無い
+    // 記録、自動の送り直しが動いている記録）も返す。画面が「何件が今回の
+    // 対象外だったか」を説明できるようにする。
+    const excluded = await countExcludedFailedWebhookInteractions(c.env.DB, access.lineAccountId);
     let succeeded = 0;
     let failedAgain = 0;
     let skipped = 0;
@@ -1175,7 +1508,7 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
     }
     return c.json({
       success: true,
-      data: { requested: failed.length, succeeded, failed: failedAgain, skipped, remaining, needsReview },
+      data: { requested: failed.length, succeeded, failed: failedAgain, skipped, remaining, needsReview, excluded },
     });
   } catch (err) {
     console.error('POST /api/webhooks/interactions/retry-failed error:', err);
@@ -1195,6 +1528,10 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
  */
 webhooks.post('/api/webhooks/maintenance/secret-backfill', requireRole('owner'), async (c) => {
   try {
+    // 秘密値の一括補完は鍵・トークンの操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
+      return stepUpRequiredResponse(c, '秘密の値の補完には本人確認が必要です');
+    }
     const body = await c.req.json<{
       lineAccountId?: string; dryRun?: boolean; batchSize?: unknown;
     }>().catch(() => null);
@@ -1263,13 +1600,68 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       return c.json({ success: false, error: 'X-Webhook-Signature header is required' }, 401);
     }
 
-    const rawBody = await c.req.text();
-    if (new TextEncoder().encode(rawBody).byteLength > MAX_INCOMING_BODY_BYTES) {
+    // R428: 申告が無くても実バイト数で止める。上限超えは読まずに413。
+    const rawBody = await readCappedBodyText(c.req.raw, MAX_INCOMING_BODY_BYTES);
+    if (rawBody === null) {
       return c.json({ success: false, error: 'Payload too large' }, 413);
     }
-    const expected = await computeHmacSha256Hex(verifySecret, rawBody);
+    /*
+     * S (#939 機能26): 合言葉を入れ替えてから24時間は前の合言葉でも
+     * 署名が通る。相手のサービス側の切り替えに猶予を持たせるため。
+     * 前の合言葉で通した届物はログに残して追えるようにする。
+     */
+    let expected = await computeHmacSha256Hex(verifySecret, rawBody);
     if (!safeEqualHex(signatureHeader.toLowerCase(), expected)) {
-      return c.json({ success: false, error: 'Invalid signature' }, 401);
+      const previousSecret = await resolvePreviousWebhookSecret(wh, webhookKeysOf(c));
+      if (!previousSecret || previousSecret.length < MIN_SECRET_LENGTH) {
+        return c.json({ success: false, error: 'Invalid signature' }, 401);
+      }
+      const previousExpected = await computeHmacSha256Hex(previousSecret, rawBody);
+      if (!safeEqualHex(signatureHeader.toLowerCase(), previousExpected)) {
+        return c.json({ success: false, error: 'Invalid signature' }, 401);
+      }
+      expected = previousExpected;
+      console.log(JSON.stringify({
+        event: 'incoming_webhook_previous_secret_used',
+        webhookId: wh.id,
+      }));
+    }
+
+    /*
+     * R427: 署名が通った後、受領の前に契約先の状態を見る。停止・保管が
+     * 完了した契約先への新規受信からは外部POSTを1件も起こさない
+     * （即時送信と定期再送で同じ停止方針）。署名の前に弾くと停止の有無が
+     * 外部へ漏れるため、この順序にする。
+     */
+    if (wh.line_account_id) {
+      const stopped = await c.env.DB.prepare(
+        `SELECT 1 AS stopped FROM line_accounts
+          WHERE line_accounts.id = ? AND ${stoppedTenantLineAccountSql('line_accounts.id')}`,
+      ).bind(wh.line_account_id).first<{ stopped: number }>();
+      if (stopped) {
+        return c.json({
+          success: false,
+          error: '契約先が停止中のため受信できません',
+          code: 'TENANT_SUSPENDED',
+        }, 403);
+      }
+    }
+
+    /*
+     * R430 (v6-26 §7-1): 署名時刻の窓検査。受付期間外の初回受信と
+     * 許容幅を超える未来時刻は受領・後続処理なしで拒否する。
+     * 時刻を送らない古い送信元は受理する（署名対象への時刻組込みは
+     * 将来の送信側契約更新で行う）。
+     */
+    const timestampState = receiveTimestampState(c.req.header('X-Webhook-Timestamp'));
+    if (timestampState.checked) {
+      if (timestampState.timeMs === null) {
+        return c.json({ success: false, error: 'X-Webhook-Timestamp の形式が正しくありません' }, 400);
+      }
+      const skew = Date.now() - timestampState.timeMs;
+      if (skew > RECEIVE_TIMESTAMP_PAST_MS || skew < -RECEIVE_TIMESTAMP_FUTURE_MS) {
+        return c.json({ success: false, error: 'X-Webhook-Timestamp が受付期間外です' }, 401);
+      }
     }
 
     let payload: unknown;
@@ -1293,13 +1685,16 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
      * 入れるのは署名そのものではなく SHA-256(台帳に使い回せる値を残さない)。
      */
     const signatureHash = await sha256Hex(expected);
+    // R425: 本文のハッシュも残す。合言葉の入れ替え後に同じ通知を再署名しても
+    // 同じ受領へ結び付け、受領・未照合・後続通知を重ねない。
+    const bodyHash = await sha256Hex(rawBody);
     // N-384: 受領の予約に窓内件数の上限を載せて1文で判定する。
     // 上限超えの新規受信は受領記録を消費せず 429 で返し、
     // 窓が明けたあとの正規再送を残す。
     const reserved = await reserveIncomingWebhook(c.env.DB, wh.id, signatureHash, {
       limit: RECEIVE_RATE_LIMIT,
       windowMs: RECEIVE_RATE_WINDOW_MS,
-    });
+    }, bodyHash);
     if (reserved.kind === 'rate_limited') {
       c.header('Retry-After', String(Math.ceil(RECEIVE_RATE_WINDOW_MS / 1000)));
       return c.json({ success: false, error: 'Too many requests' }, 429);
@@ -1357,13 +1752,32 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
         console.error('受信Webhookの記録開始に失敗:', logError);
       }
     }
-    let actionResult: { matchedFriendId: string | null; executed: number; failed: number } =
-      { matchedFriendId: null, executed: 0, failed: 0 };
+    let actionResult: { matchedFriendId: string | null; executed: number; failed: number;
+      matchStatus: 'matched' | 'not_found' | 'ambiguous' | 'skipped' } =
+      { matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'skipped' };
     try {
-      const identityMatching = safeJson<IncomingWebhookIdentityMatch>(wh.identity_match_json, {
-        methods: [], onNotFound: 'do_nothing',
-      });
-      const configuredActions = safeJson<IncomingWebhookActionRef[]>(wh.action_refs_json, []);
+      /*
+       * R402: 受領時に照合方法・未一致時の扱い・処理配列全体・参照版を
+       * 一つの実行計画として保存する。再試行はその計画を最後まで使い、
+       * 後日の設定変更は新規受信へだけ適用する。既存受信を別計画へ変える
+       * 場合は差分と未処理分を明示する（現状は計画の固定のみ行う）。
+       */
+      let receiptPlan = await readIncomingWebhookReceiptPlan(c.env.DB, execution.sourceEventId);
+      if (!receiptPlan) {
+        const fresh: IncomingWebhookReceiptPlan = {
+          configVersion: typeof wh.version === 'number' ? wh.version : null,
+          identityMatching: safeJson<IncomingWebhookIdentityMatch>(wh.identity_match_json, {
+            methods: [], onNotFound: 'do_nothing',
+          }),
+          actions: safeJson<IncomingWebhookActionRef[]>(wh.action_refs_json, []),
+        };
+        /*
+         * 計画の確定は賃借柵の外で行う。内容は受領行の1行に先勝ちで書き、
+         * 同じ受領の並行・再試行が上書きしない。柵内の行動実行はこの後。
+         */
+        await saveIncomingWebhookReceiptPlan(c.env.DB, execution.sourceEventId, fresh);
+        receiptPlan = await readIncomingWebhookReceiptPlan(c.env.DB, execution.sourceEventId) ?? fresh;
+      }
       if (wh.line_account_id) {
         actionResult = await execution.step('actions', async () => {
           const result = await executeIncomingWebhookActions(execution!.db, {
@@ -1371,8 +1785,8 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
           webhookId: wh.id,
           sourceEventId: execution!.sourceEventId,
           payload,
-          identityMatching,
-          actions: configuredActions,
+          identityMatching: receiptPlan!.identityMatching,
+          actions: receiptPlan!.actions,
           dependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY },
           execution,
           });
@@ -1427,6 +1841,8 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
         // N-378: 「受理したが処理対象がいない」を送り主が判別できるよう、
         // 照合結果と実行件数を添える。received:true の契約はそのまま。
         matched: actionResult.matchedFriendId !== null,
+        // S: 複数一致で保留になった届物を送り主が判別できるよう照合結果も返す。
+        matchStatus: actionResult.matchStatus,
         executed: actionResult.executed,
         failed: actionResult.failed,
       },
@@ -1480,6 +1896,10 @@ webhooks.get('/api/webhooks/api-tokens', requireRole('owner', 'admin', 'staff'),
 
 webhooks.post('/api/webhooks/api-tokens', requireRole('owner'), async (c) => {
   try {
+    // 連携APIトークンの発行は鍵・トークンの操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.api_token')) {
+      return stepUpRequiredResponse(c, 'APIトークンの発行には本人確認が必要です');
+    }
     const body = await c.req.json<{ name?: unknown; scopes?: unknown; lineAccountId?: unknown }>()
       .catch(() => null);
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
@@ -1527,6 +1947,10 @@ webhooks.post('/api/webhooks/api-tokens/:id/revoke', requireRole('owner'), async
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
     const id = c.req.param('id');
+    // トークンの失効は鍵・トークンの操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.api_token')) {
+      return stepUpRequiredResponse(c, 'APIトークンの失効には本人確認が必要です');
+    }
     const revoked = await revokeIntegrationApiToken(c.env.DB, id, lineAccountId, c.get('staff')?.id);
     if (!revoked) return c.json({ success: false, error: 'Not found' }, 404);
     auditLog(c, 'webhook.api_token.revoke', { kind: 'integration_api_token', id }, { lineAccountId });
@@ -1545,8 +1969,25 @@ webhooks.post('/api/webhooks/api-tokens/:id/rotate', requireRole('owner'), async
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
     const id = c.req.param('id');
+    // トークンの回転は鍵・トークンの操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.api_token')) {
+      return stepUpRequiredResponse(c, 'APIトークンの再発行には本人確認が必要です');
+    }
     const rotated = await rotateIntegrationApiToken(c.env.DB, id, lineAccountId, c.get('staff')?.id);
-    if (!rotated) return c.json({ success: false, error: 'Not found' }, 404);
+    if (rotated.status === 'not_found') {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (rotated.status === 'conflict') {
+      // 同時再発行に負けた・古い読み取りのまま来た側（R431）。
+      // 新トークンは作っていない。一覧を読み直して今の状態から進める。
+      const current = await listIntegrationApiTokens(c.env.DB, lineAccountId);
+      return c.json({
+        success: false,
+        code: 'TOKEN_ROTATE_CONFLICT',
+        error: 'ほかの操作が先にこのトークンを更新しました。一覧を読み直して、最新の状態からもう一度お試しください',
+        tokens: current.map(serializeApiToken),
+      }, 409);
+    }
     auditLog(c, 'webhook.api_token.rotate', { kind: 'integration_api_token', id: rotated.row.id }, { lineAccountId });
     return c.json({
       success: true,

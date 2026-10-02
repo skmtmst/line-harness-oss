@@ -47,7 +47,11 @@ vi.mock('../services/availability.js', async (importOriginal) => {
 const notifierMocks = vi.hoisted(() => ({
   sendBookingNotification: vi.fn(async () => undefined),
 }));
-vi.mock('../services/booking-notifier.js', () => notifierMocks);
+// 送る側だけ差し替える。文面の組み立て（時刻・残り時間）は本物を使う。
+vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+  ...notifierMocks,
+}));
 
 const accountAccessMocks = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(async () => true),
@@ -513,7 +517,7 @@ describe('POST /api/booking/admin/bookings/:id/sync/retry (N-392)', () => {
     expect(audit?.action).toBe('sync_retried');
   });
 
-  test('取消ずみ予約は削除を再実行する (外部予定あり)', async () => {
+  test('取消ずみ予約は削除を再実行する (外部予定あり・接続なしは回復待ち)', async () => {
     insertBooking(sqlite, {
       id: 'B1',
       friend: 'f1',
@@ -527,8 +531,11 @@ describe('POST /api/booking/admin/bookings/:id/sync/retry (N-392)', () => {
     const { app, env } = makeApp(db);
     const res = await retry(app, env, 'B1');
     expect(res.status).toBe(200);
-    // 接続が無いので削除は no-op 扱いで成功に閉じる（外部予定は相手先で消えたものとして扱う）
-    await expect(res.json()).resolves.toEqual({ status: 'succeeded' });
+    // 消す対象があるのに接続が無い場合は成功にしない (R328)。
+    // retry_wait のまま残して、再接続後の再送・cron で削除を再試行できる。
+    await expect(res.json()).resolves.toEqual({ status: 'retry_wait' });
+    expect(sqlite.prepare(`SELECT status, error_code FROM booking_operation_runs WHERE id = 'op-d'`).get())
+      .toEqual({ status: 'retry_wait', error_code: 'calendar_connection_missing' });
   });
 
   test('他アカウントの予約は404', async () => {

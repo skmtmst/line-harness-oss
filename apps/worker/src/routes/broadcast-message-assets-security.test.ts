@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { Env } from '../index'
 import { broadcastMessageAssets, validateBroadcastMediaUpload } from './broadcast-message-assets'
+vi.mock('../services/file-scan.js', () => ({ checkKeyGate: async () => ({ allowed: true }) }));
 
 describe('一斉配信素材の実ファイル検査', () => {
   const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])

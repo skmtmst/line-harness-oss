@@ -16,6 +16,10 @@ import type { Env } from '../index.js';
  */
 
 export type AuditAction =
+  | 'line_account.deactivate'
+  | 'line_account.activate'
+  | 'line_account.pool_switch'
+  | 'account_handover.rollback'
   | 'mileage.rule.export'
   | 'mileage.rule.create'
   | 'mileage.rule.update'
@@ -23,7 +27,14 @@ export type AuditAction =
   | 'mileage.rule.publish'
   | 'mileage.event.create'
   | 'mileage.adjustment.create'
+  | 'mileage.adjustment.notification.retry'
   | 'mileage.adjustment.policy.update'
+  | 'mileage.adjustment.approval.request'
+  | 'mileage.adjustment.approval.approve'
+  | 'mileage.adjustment.approval.reject'
+  | 'mileage.adjustment.approval.cancel'
+  | 'mileage.entry.confirm'
+  | 'mileage.entry.void'
   | 'action_score.rules.draft.save'
   | 'action_score.rules.publish'
   | 'action_score.rules.stop'
@@ -48,6 +59,7 @@ export type AuditAction =
   | 'affiliate.statement.download'
   | 'affiliate.offer.create'
   | 'affiliate.offer.update'
+  | 'affiliate.offer.version.create'
   | 'dashboard.preference.update'
   | 'dashboard.preference.reset'
   | 'dashboard.preference.default.update'
@@ -70,6 +82,9 @@ export type AuditAction =
   | 'line_notification.definition.publish'
   | 'line_notification.definition.stop'
   | 'line_notification.delivery.retry'
+  | 'line_notification.delivery.resend'
+  | 'line_notification.definition.test'
+  | 'analytics.export'
   | 'nen.column.duplicate'
   | 'nen.column.import'
   | 'nen.delivery.pending_now'
@@ -86,12 +101,17 @@ export type AuditAction =
   | 'common_var_export.download'
   | 'photo.original.issue'
   | 'photo.original.download'
+  | 'photo.reward.policy.create'
+  | 'photo.reward.policy.revert'
   | 'webinar.archive'
   | 'webinar.publish'
   | 'webinar.pause'
   | 'webinar.duplicate'
   | 'webinar.participant.export'
+  | 'webinar.video_stage'
+  | 'webinar.session_capacity'
   | 'event.applicant.export'
+  | 'event.change.apply'
   // #939 N-379: 外部連携の操作履歴。作成・設定変更・動かす/止める・
   // 合言葉の入れ直し・削除・送り直し・公開APIトークンの発行系。
   | 'webhook.incoming.create'
@@ -102,6 +122,7 @@ export type AuditAction =
   | 'webhook.incoming.secret.rotate'
   | 'webhook.incoming.delete'
   | 'webhook.incoming.unmatched.resolve'
+  | 'webhook.incoming.test'
   | 'webhook.outgoing.create'
   | 'webhook.outgoing.update'
   | 'webhook.outgoing.activate'
@@ -113,7 +134,38 @@ export type AuditAction =
   | 'webhook.interaction.retry_failed'
   | 'webhook.api_token.create'
   | 'webhook.api_token.revoke'
-  | 'webhook.api_token.rotate';
+  | 'webhook.api_token.rotate'
+  // #838 第2段: Google Sheets 連携の接続・切断・出力先変更・手動同期。
+  | 'google.sheets.connect.start'
+  | 'google.sheets.connect'
+  | 'google.sheets.reconnect'
+  | 'google.sheets.disconnect'
+  | 'google.sheets.target.update'
+  | 'google.sheets.sync'
+  // TikTok利益計算シートの手動同期。
+  | 'tiktok_pnl.manual_sync'
+  | 'restaurant.google.store.bootstrap'
+  | 'restaurant.google.connect.start'
+  | 'restaurant.google.connect'
+  | 'restaurant.google.reconnect'
+  | 'restaurant.google.disconnect'
+  | 'restaurant.google.review.reply'
+  | 'restaurant.google.change.send'
+  | 'restaurant.google.post.publish'
+  | 'restaurant.google.post.remove'
+  // #818: 広告費の手入力と、管理画面からの取り直し
+  | 'ad_cost.manual_entry'
+  | 'ad_cost.import'
+  // R275: 手入力した費用の取り消し
+  | 'ad_cost.cancel'
+  // #819: 計測サイトの管理と成果の取り消し
+  | 'measurement_site.create'
+  | 'measurement_site.update'
+  // R275: 計測サイトの停止と再開
+  | 'measurement_site.stop'
+  | 'measurement_site.resume'
+  | 'conversion.event.reverse'
+  | 'conversion.event.restore';
 
 function commonAuditWriter(): typeof recordAuditEvent | null {
   try {

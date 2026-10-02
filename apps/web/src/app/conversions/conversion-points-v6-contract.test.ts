@@ -38,8 +38,8 @@ describe('V6 成果地点一覧の契約', () => {
 
   it('V6一覧APIの集計・状態・利用先をそのまま使う', () => {
     expect(PAGE).toContain('api.conversions.definitions({')
-    expect(PAGE).toContain('point.metrics.netCount.toLocaleString')
-    expect(PAGE).toContain('point.metrics.netValue.toLocaleString')
+    expect(PAGE).toContain('formatNumber(point.metrics.netCount')
+    expect(PAGE).toContain('formatNumber(point.metrics.netValue')
     expect(PAGE).toContain('point.usageCount === 0')
     expect(PAGE).toContain('definitions.stateCounts.active')
     expect(PAGE).not.toContain('利用先の取得は未接続')
@@ -53,7 +53,12 @@ describe('V6 成果地点一覧の契約', () => {
   })
 
   it('検索と並び順を共通部品にし、数えられる並びだけを載せる', () => {
-    expect(PAGE).toContain("import SearchField from '@/components/shared/search-field'")
+    // ★V7 `Xn1Mz`：検索は共通 ListToolbar の1行目へそろえた（SearchField は
+    // 部品の中にある）。素の input 検索に戻さない。
+    expect(PAGE).toContain("import ListToolbar from '@/components/shared/list-toolbar'")
+    expect(PAGE).toContain('<ListToolbar')
+    expect(PAGE).toContain('search={{')
+    expect(PAGE).not.toContain("import SearchField from '@/components/shared/search-field'")
     expect(PAGE).toContain("import Select from '@/components/shared/select'")
     expect(PAGE).toContain('const [sort, setSort] = useState<PointSort>')
     expect(PAGE).toContain('CV数が多い順')
@@ -107,7 +112,10 @@ describe('V6 成果地点一覧の契約', () => {
     expect(NEW_PAGE).toContain("eventType: 'webinar_completed'")
     expect(NEW_PAGE).toContain("eventType: 'tag_added'")
     expect(NEW_PAGE).toContain("setDeduplicationMode('window')")
-    expect(NEW_PAGE).toContain("value: 'source', label: '注文の金額をそのまま使う'")
+    // 金額の出し方の選択肢は対応表(origin-labels)の valueModes から作る。
+    // 注文の金額が無い起点では 'source' を出さないため、3択の直書きはしない。
+    expect(NEW_PAGE).toContain('origin.valueModes')
+    expect(NEW_PAGE).toContain("source: '注文の金額をそのまま使う'")
     expect(NEW_PAGE).toContain("value: 'source_cancelled', label: '返品されたら取り消す'")
     expect(NEW_PAGE).toContain('api.conversions.createDefinition({')
     // N-258: 送る利用先は実在するオブジェクトの実IDだけ。仮IDの固定一覧はない。

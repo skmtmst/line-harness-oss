@@ -54,9 +54,11 @@ interface Call { url: string; method: string; body: string | null }
 function stubFetch(options: {
   itemsByAccount: Record<string, Array<Record<string, unknown>>>
   onRetry?: (calls: number) => Promise<Response>
+  onList?: (calls: number) => Promise<Response> | null
 }) {
   const calls: Call[] = []
   let retryCalls = 0
+  let listCalls = 0
   globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
     const url = String(input)
     calls.push({
@@ -70,10 +72,17 @@ function stubFetch(options: {
       return new Response(JSON.stringify({ success: true, data: {} }), { status: 200 })
     }
     if (url.includes('/api/mileage/redemptions')) {
-      const accountId = new URL(url, 'https://example.test').searchParams.get('accountId') ?? ''
-      const items = options.itemsByAccount[accountId] ?? []
+      listCalls += 1
+      const override = options.onList?.(listCalls)
+      if (override) return override
+      const params = new URL(url, 'https://example.test').searchParams
+      const accountId = params.get('accountId') ?? ''
+      const limit = Number(params.get('limit') ?? 20) || 20
+      const offset = Number(params.get('offset') ?? 0) || 0
+      const all = options.itemsByAccount[accountId] ?? []
+      const items = all.slice(offset, offset + limit)
       return new Response(
-        JSON.stringify({ success: true, data: { items, pagination: { total: items.length, limit: 20, offset: 0 } } }),
+        JSON.stringify({ success: true, data: { items, pagination: { total: all.length, limit, offset } } }),
         { status: 200 },
       )
     }
@@ -144,7 +153,7 @@ async function render(accountId: string | null) {
 }
 
 function section(): HTMLElement | null {
-  return container.querySelector('section[aria-label="届かなかった交換"]')
+  return container.querySelector('section[aria-label="要対応の交換"]')
 }
 
 function retryButtons(): HTMLButtonElement[] {
@@ -161,7 +170,7 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     expect(text).toContain('特典を渡せませんでした')
     expect(text).toContain('3回')
     // 最終日時は日本時間で出す。UTCの01:02は10:02。
-    expect(text).toContain('2026/09/09 10:02')
+    expect(text).toContain('9月9日（水）10:02')
     expect(text).toContain('もう一度届ける')
   })
 
@@ -197,6 +206,24 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     expect(text).toContain('500円引き')
     expect(text).not.toContain('成功した交換')
     expect(text).not.toContain('返金済みの交換')
+  })
+
+  it('送ったか分からない交換は確認中として並べる', async () => {
+    stubFetch({
+      itemsByAccount: {
+        'account-1': [
+          failedRow(),
+          failedRow({ id: 'r-hold', rewardName: '結果待ちの交換', status: 'delivering' }),
+        ],
+      },
+    })
+    await render('account-1')
+
+    const text = section()?.textContent ?? ''
+    expect(text).toContain('500円引き')
+    expect(text).toContain('結果待ちの交換')
+    expect(text).toContain('確認中')
+    expect(text).toContain('届いていない')
   })
 
   it('1件も無いときは欄ごと出さない', async () => {
@@ -277,5 +304,89 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     await render(null)
     expect(section()).toBeNull()
     expect(net.lists()).toHaveLength(0)
+  })
+
+  it('25件あれば残りをページ送りで出せる', async () => {
+    const items = Array.from({ length: 25 }, (_, index) => failedRow({
+      id: `redemption-${index + 1}`,
+      rewardName: index === 0 ? '最初の交換' : `交換${index + 1}`,
+      updatedAt: '2026-09-09T01:02:03.000Z',
+    }))
+    items[20] = failedRow({ id: 'redemption-21', rewardName: '21件目の交換' })
+    stubFetch({ itemsByAccount: { 'account-1': items } })
+    await render('account-1')
+
+    // 1ページ目は20件まで。「すべて」とは言わない。
+    const first = section()?.textContent ?? ''
+    expect(first).toContain('最初の交換')
+    expect(first).not.toContain('21件目の交換')
+    expect(first).toContain('25つ中')
+    expect(first).not.toContain('すべて表示')
+
+    // 2ページ目へ進むと残りが出る。
+    const next = [...(section()?.querySelectorAll('button') ?? [])]
+      .find((button) => button.textContent?.includes('次へ'))
+    expect(next).toBeDefined()
+    await act(async () => { next?.click() })
+    await act(async () => { await Promise.resolve() })
+    const second = section()?.textContent ?? ''
+    expect(second).toContain('21件目の交換')
+    expect(second).toContain('25つ中')
+  })
+
+  it('読み込み失敗は0件と区別し、再読み込みできる', async () => {
+    let failLists = true
+    stubFetch({
+      itemsByAccount: { 'account-1': [failedRow()] },
+      onList: () => (failLists
+        ? new Response(JSON.stringify({ success: false, error: 'boom' }), { status: 200 })
+        : null),
+    })
+    await render('account-1')
+
+    // 欄ごと消えず、理由が見える。0件と誤認しない。
+    expect(section()).not.toBeNull()
+    const text = section()?.textContent ?? ''
+    expect(text).toContain('読み込めませんでした')
+    expect(text).not.toContain('500円引き')
+
+    // 直ったら再読み込みで正常に戻る。
+    failLists = false
+    const retry = [...(section()?.querySelectorAll('button') ?? [])]
+      .find((button) => button.textContent?.includes('もう一度読み込む'))
+    await act(async () => { retry?.click() })
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await Promise.resolve() })
+    expect(section()?.textContent ?? '').toContain('500円引き')
+  })
+
+  it('返却が完了したら返却どおりに案内し、古い行を外す', async () => {
+    const items = [failedRow()]
+    stubFetch({
+      itemsByAccount: { 'account-1': items },
+      onRetry: async () => {
+        items.length = 0
+        return new Response(JSON.stringify({
+          success: false,
+          data: {
+            message: '特典を渡せなかったため、交換したマイルを戻しました。',
+            redemption: { status: 'refunded' },
+          },
+        }), { status: 202 })
+      },
+    })
+    await render('account-1')
+    expect(section()?.textContent ?? '').toContain('500円引き')
+
+    await act(async () => { retryButtons()[0].click() })
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await Promise.resolve() })
+
+    // 「やり直せませんでした」と未返却の説明は残さない。
+    const body = container.textContent ?? ''
+    expect(body).toContain('マイルを戻しました')
+    expect(body).not.toContain('やり直せませんでした')
+    // 古い再試行の行は外れる。
+    expect(section()).toBeNull()
   })
 })

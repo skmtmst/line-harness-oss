@@ -45,14 +45,21 @@ describe('V6 37-6 NEN配信の画面契約', () => {
     expect(PAGE).toContain('jstMonthRange(now, -1)')
     expect(PAGE).toContain('from: thisMonth.from, to: thisMonth.to')
     // 自動配信の開封は LINE から取れない。取れない理由を隠さない。
+    // （自動配信の表の開封列を外したため、理由は数値カードの説明と表の注記に残す）
     expect(OVERVIEW).toContain('LINEから個人開封を取得できません')
-    expect(OVERVIEW).toContain('openRate.reason')
+    expect(OVERVIEW).toContain('自動配信は開封を取得できません')
   })
 
-  it('自動配信の表は 配信／きっかけ／対象／送信／開封／注文／状態／操作', () => {
-    for (const label of ['<Th>配信</Th>', 'きっかけ</Th>', '対象</Th>', '送信</Th>', '開封</Th>', '注文</Th>', '状態</Th>']) {
+  it('自動配信の表は 配信／きっかけ／対象／送信／注文／状態／操作（開封の列は置かない）', () => {
+    for (const label of ['<Th>配信</Th>', 'きっかけ</Th>', '対象</Th>', '送信</Th>', '注文</Th>', '状態</Th>']) {
       expect(OVERVIEW).toContain(label)
     }
+    // 開封の列は「—」しか並ばないので自動配信の表には置かない。
+    // （送った履歴の表には「取得不可」の列が残るので、自動配信のパネル内だけ見る）
+    const autoPanel = OVERVIEW.slice(OVERVIEW.indexOf('function AutoPanel('), OVERVIEW.indexOf('function CouponDrawer('))
+    expect(autoPanel).toContain('注文</Th>')
+    expect(autoPanel).not.toContain('開封</Th>')
+    expect(OVERVIEW).toContain('自動配信は開封を取得できません')
     expect(OVERVIEW).toContain('formatCampaignTiming(setting)')
     expect(OVERVIEW).toContain('formatCampaignAudience(setting)')
     expect(OVERVIEW).toContain('配信中</StatusBadge>')
@@ -65,8 +72,14 @@ describe('V6 37-6 NEN配信の画面契約', () => {
     expect(PAGE).toContain('api.nenCampaigns.setEnabled(')
   })
 
+  it('自動配信の案内帯は1文だけにし、残りは開閉する欄へ入れる', () => {
+    expect(OVERVIEW).toContain('をきっかけに、決めた日数後に自動で送ります。')
+    expect(OVERVIEW).toContain('<Disclosure size="compact" title="送られる仕組み">')
+    expect(OVERVIEW).toContain('で確認できます。')
+  })
+
   it('コラムは一覧と右パネル（LINEに届くカード／誰に・いつ送るか）と下部追従バー', () => {
-    for (const label of ['LINEに届くカード', '誰に・いつ送るか', '送る相手', '送る時', '今すぐ', '日時を予約', '自分にテスト送信', 'この内容で予約する', 'この内容で送る']) {
+    for (const label of ['LINEに届くカード', '誰に・いつ送るか', '送る相手', '送る時', '今すぐ', '日時を予約', '自分にテストを送る', 'この内容で予約する', 'この内容で送る']) {
       expect(OVERVIEW).toContain(label)
     }
     expect(OVERVIEW).toContain('<StickyBar')
@@ -87,15 +100,20 @@ describe('V6 37-6 NEN配信の画面契約', () => {
 
   it('読込失敗と空状態を共通状態部品で示す', () => {
     expect(PAGE).toContain('kind="loading"')
-    expect(PAGE).toContain('もう一度読み込む')
+    // ★V7 `x63W5x`：読み直す口は一覧の場所の1枚（`onRetryTab`）が持つ。帯は出さない。
+    expect(OVERVIEW).toContain('kind="error"')
+    expect(OVERVIEW).toContain('onRetryTab')
     expect(OVERVIEW).toContain('kind="empty"')
     expect(OVERVIEW).toContain('売らない配信です。ここで信用がたまると、売る配信が届きやすくなります。')
   })
 
-  it('タブごとに取り、失敗はそのタブだけの帯で示す(点検 #512 の中3)', () => {
+  it('タブごとに取り、失敗はそのタブの一覧の場所の1枚で示す(点検 #512 の中3)', () => {
     expect(PAGE).toContain('loadTab')
     expect(PAGE).toContain('tabErrors')
-    expect(PAGE).toContain('tone="danger"')
+    // ★V7 `x63W5x`：同じ失敗は1画面に1つ。ページ上の帯は出さない。
+    expect(PAGE).not.toContain('tone="danger"')
+    expect(OVERVIEW).toContain('tabError')
+    expect(OVERVIEW).toContain('onRetryTab')
     expect(PAGE).not.toContain('loadError')
     // 操作後は関係するタブだけ読み直す。
     expect(PAGE).toContain("await loadTab('columns')")

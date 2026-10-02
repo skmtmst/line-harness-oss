@@ -1,7 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Combobox from '@/components/shared/combobox'
 import ListState from '@/components/shared/list-state'
 import { ApiError, api } from '@/lib/api'
 import type { FriendListItem } from '@/lib/api'
@@ -17,6 +20,7 @@ import {
   failureOf, isRunComplete, itemStatusLabel, operationLabel, type Failure,
 } from './bulk-run-view'
 import styles from './bulk-run-dialog.module.css'
+import { formatNumber } from '@/lib/format'
 
 type Phase = 'operation' | 'confirm' | 'result'
 type ResultState = 'idle' | 'loading' | 'ready' | 'error'
@@ -326,9 +330,14 @@ export default function BulkRunDialog({
       <div className={styles.panel} data-design-node="IAf7j">
         <header className={styles.head}>
           <h2 className={styles.screenTitle}>友だちを一括操作</h2>
-          <button type="button" className={styles.backButton} onClick={close}>← 友だち一覧へ戻る</button>
+          <div className="flex items-center justify-between gap-3">
+            <button type="button" className={styles.backButton} onClick={close}>← 友だち一覧へ戻る</button>
+            <button type="button" className="inline-flex items-center justify-center rounded-mini p-1.5 text-ink-secondary hover:bg-canvas hover:text-ink" onClick={close} aria-label="閉じる">
+              <X aria-hidden="true" size={20} />
+            </button>
+          </div>
           <div className={styles.selectionBanner}>
-            <strong>✓　{friendIds.length.toLocaleString('ja-JP')}人を選択中</strong>
+            <strong>✓　{formatNumber(friendIds.length)}人を選択中</strong>
             <span>対象を確認してから操作を選んでください</span>
             <button type="button" onClick={close}>選択を解除</button>
           </div>
@@ -374,13 +383,16 @@ export default function BulkRunDialog({
                 <div><dt>操作</dt><dd>{operationLabel(operationKind)}</dd></div>
                 <div><dt>タグ</dt><dd>{tags.find((tag) => tag.id === tagId)?.name ?? '選択してください'}</dd></div>
               </dl>
-            <label className={styles.field}>
+            <div className={styles.field}>
               <span className={styles.label}>どのタグ</span>
-              <select aria-label="どのタグ" className={styles.input} value={tagId} onChange={(e) => setTagId(e.target.value)}>
-                <option value="">選んでください</option>
-                {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
-              </select>
-            </label>
+              <Combobox
+                aria-label="どのタグ"
+                placeholder="選んでください"
+                value={tagId}
+                onChange={setTagId}
+                options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+              />
+            </div>
             <p className={styles.executionHint}>ⓘ 実行前に対象と操作内容を確認できます。</p>
 
             {previewState === 'loading' ? <ListState kind="loading" title="対象を数えています" /> : null}
@@ -471,11 +483,10 @@ export default function BulkRunDialog({
             ) : null}
 
             {!reversible ? (
-              <label className={styles.confirm}>
-                <input type="checkbox" checked={irreversibleConfirmed} onChange={(e) => setIrreversibleConfirmed(e.target.checked)} />
+              <Checkbox checked={irreversibleConfirmed} onCheckedChange={setIrreversibleConfirmed}>
                 {/* 取り消せないことを窓の中に書く。 */}
                 この操作は取り消せません。{countText(preview.targetCount, '人')}に実行することを確認しました。
-              </label>
+              </Checkbox>
             ) : null}
 
             {blocked ? <p className={styles.hint}>{blocked}</p> : null}
@@ -485,9 +496,8 @@ export default function BulkRunDialog({
               <Button
                 variant="primary"
                 disabled={!canExecute({ preview, busy, irreversibleConfirmed, reversible })}
-                onClick={() => void execute()}
-              >
-                {busy ? '実行中…' : `${countText(preview.targetCount, '人')}に実行`}
+                onClick={() => void execute()} busy={busy} busyLabel="実行中…">
+                {`${countText(preview.targetCount, '人')}に実行`}
               </Button>
             </div>
           </div>
@@ -536,17 +546,18 @@ export default function BulkRunDialog({
               </>
             ) : null}
 
-            <div className={styles.actions}>
-              <Button onClick={close} disabled={busy}>閉じる</Button>
-              {resultState === 'ready' && canUndo(detail) ? (
-                <Button onClick={() => void undo()} disabled={busy}>取り消す</Button>
-              ) : null}
-              {resultState === 'ready' && canRetry(detail) ? (
-                <Button variant="primary" onClick={() => void retry()} disabled={busy}>
-                  失敗した{countText(detail?.temporaryFailureCount, '人')}だけやり直す
-                </Button>
-              ) : null}
-            </div>
+            {resultState === 'ready' && (canUndo(detail) || canRetry(detail)) ? (
+              <div className={styles.actions}>
+                {canUndo(detail) ? (
+                  <Button onClick={() => void undo()} disabled={busy}>取り消す</Button>
+                ) : null}
+                {canRetry(detail) ? (
+                  <Button variant="primary" onClick={() => void retry()} disabled={busy}>
+                    失敗した{countText(detail?.temporaryFailureCount, '人')}だけやり直す
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

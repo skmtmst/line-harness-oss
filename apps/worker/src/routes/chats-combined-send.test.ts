@@ -155,4 +155,38 @@ describe('結合送信(N-022)', () => {
     const [, messages] = pushMessage.mock.calls[0] as [string, Array<{ type: string }>, string];
     expect(messages.map((m) => m.type)).toEqual(['image']);
   });
+
+  /*
+   * G-4: テンプレートのパック送信。texts は選んだ順のまま1回のpushに
+   * まとまり、履歴も1通ごとに残る。6通以上はLINEのpush上限を超える
+   * のでLINE呼び出し0回で止める。
+   */
+  test('texts を選んだ順に1回のpushで送り、履歴が1通ごとに残る', async () => {
+    const res = await postCombined(
+      { texts: ['あいさつ', '案内', '締め'], revision: 0 }, KEY5);
+    expect(res.status).toBe(200);
+    expect(pushMessage).toHaveBeenCalledTimes(1);
+    const [, messages] = pushMessage.mock.calls[0] as [string, Array<{ type: string; text?: string }>, string];
+    expect(messages.map((m) => m.text)).toEqual(['あいさつ', '案内', '締め']);
+    expect(rows()).toHaveLength(3);
+    const body = (await res.json()) as { data: { messageIds: string[] } };
+    expect(body.data.messageIds).toHaveLength(3);
+  });
+
+  test('texts と画像を合わせても1回のpushで、画像が先頭に来る', async () => {
+    const res = await postCombined(
+      { image: IMAGE, texts: ['1通目', '2通目'], revision: 0 }, KEY5);
+    expect(res.status).toBe(200);
+    const [, messages] = pushMessage.mock.calls[0] as [string, Array<{ type: string }>, string];
+    expect(messages.map((m) => m.type)).toEqual(['image', 'text', 'text']);
+    expect(rows().map((r) => r.message_type)).toEqual(['image', 'text', 'text']);
+  });
+
+  test('合計6通以上は400で、LINE呼び出し0回・保存0件', async () => {
+    const res = await postCombined(
+      { texts: ['1', '2', '3', '4', '5', '6'], revision: 0 }, KEY5);
+    expect(res.status).toBe(400);
+    expect(pushMessage).not.toHaveBeenCalled();
+    expect(rows()).toEqual([]);
+  });
 });

@@ -5,7 +5,7 @@ import type { FriendListItem } from '@/lib/api'
 import FriendListRow from './friend-list-row'
 import type { FriendListColumn } from './friend-list-table'
 
-/* 画面のコードは行を押すと会話へ飛ぶ。描くだけなので遷移先は使わない。 */
+/* 画面のコードは行を押すと詳細へ飛ぶ。描くだけなので遷移先は使わない。 */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {} }),
 }))
@@ -36,7 +36,7 @@ const COLUMNS = new Set<FriendListColumn>(['support', 'scenario', 'latest', 'tag
 
 const render = (friend: FriendListItem) =>
   renderToStaticMarkup(
-    <FriendListRow friend={friend} visibleColumns={COLUMNS} gridTemplateColumns="36px" />,
+    <FriendListRow friend={friend} visibleColumns={COLUMNS} />,
   )
 
 describe('友だち行の担当者とアバター（描画）', () => {
@@ -63,12 +63,12 @@ describe('友だち行の担当者とアバター（描画）', () => {
     expect(unknown).toContain('>不明</p>')
   })
 
-  it('アバターは真円ではなく設計のr=18で描く', () => {
+  // ★V7「友だちの顔」（KXDhj）：画像があれば画像、無ければ頭文字。どちらも共通 Avatar。
+  it('顔は共通 Avatar で、画像の有無どちらでも描く', () => {
     const withPicture = render({ ...BASE, pictureUrl: 'https://example.test/a.png' })
-    expect(withPicture).toContain('rounded-large')
-    expect(withPicture).not.toContain('rounded-full bg-avatar-bg')
+    expect(withPicture).toContain('data-avatar="image"')
 
     const withoutPicture = render(BASE)
-    expect(withoutPicture).toContain('rounded-large')
+    expect(withoutPicture).toContain('data-avatar="initials"')
   })
 })

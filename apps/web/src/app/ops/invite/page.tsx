@@ -1,13 +1,16 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { adminSessionHandoffPath, storeAdminSession } from '@/lib/admin-session'
 import { authRequest, passwordError } from '@/lib/auth-email'
+import { ApiError } from '@/lib/api'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 /**
@@ -32,19 +35,30 @@ export default function OpsInvitePage() {
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // M039：確認で捕まえた失敗そのもの。通信断は読み直しの口を出し、
+  // 403・429 は共通の1枚（権限の案内・待ち案内）へ切り替える。
+  const [checkFailed, setCheckFailed] = useState<unknown>(null)
 
-  useEffect(() => {
+  // M039：通信断で確認に失敗しても、その場で確認をやり直せる。
+  const checkInvite = useCallback(async () => {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     const value = hash.get('invite') ?? ''
     setToken(value)
+    setState('loading')
+    setMessage('')
+    setCheckFailed(null)
     if (!value) { setState('invalid'); setMessage('この招待は見つかりません。招待した運営メンバーに確認してください'); return }
-    void authRequest<Check>(`/api/auth/ops-invite/check?token=${encodeURIComponent(value)}`).then((res) => {
-      if (!res.ok || !res.data) { setState('invalid'); setMessage(res.error || 'この招待は使えません'); return }
-      setCheck(res.data)
-      setName(res.data.needsPassword ? '' : res.data.name)
-      setState('ready')
-    })
+    const res = await authRequest<Check>(`/api/auth/ops-invite/check?token=${encodeURIComponent(value)}`)
+    if (!res.ok || !res.data) {
+      setCheckFailed(new ApiError(res.status, res.error))
+      setState('invalid'); setMessage(res.error || 'この招待は使えません'); return
+    }
+    setCheck(res.data)
+    setName(res.data.needsPassword ? '' : res.data.name)
+    setState('ready')
   }, [])
+
+  useEffect(() => { void checkInvite() }, [checkInvite])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -84,7 +98,7 @@ export default function OpsInvitePage() {
       title="運営メンバーの招待"
       description={
         <>
-          <span className="mb-1 block text-caption font-bold text-ink-faint">運営コンソール</span>
+          <span className="mb-1 block text-caption font-medium text-ink-faint">運営コンソール</span>
           {check?.needsPassword
             ? 'musubo 運営コンソールに招待されています。名前とパスワードを設定してください。設定のあと、2要素認証の登録に進みます。'
             : 'musubo 運営コンソールに招待されています。続けると 2要素認証の登録に進みます。'}
@@ -94,11 +108,17 @@ export default function OpsInvitePage() {
       {state === 'loading' ? (
         <ListState kind="loading" title="招待を確認しています" />
       ) : state === 'invalid' ? (
-        <ListState kind="error" title="この招待は使えません" description={message} />
+        <ListState
+          kind="error"
+          title="この招待は使えません"
+          description={isForbiddenOrRateLimited(checkFailed) ? undefined : message}
+          error={checkFailed ?? undefined}
+          onRetry={() => void checkInvite()}
+        />
       ) : (
         <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
           {error ? (
-            <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-status-danger">{error}</p>
+            <Notice tone="danger" message={error} />
           ) : null}
           <AuthField label="メールアドレス" htmlFor="ops-invite-email">
             <TextField id="ops-invite-email" type="email" value={check?.email ?? ''} readOnly />
@@ -116,8 +136,7 @@ export default function OpsInvitePage() {
               </AuthField>
             </>
           ) : null}
-          <Button type="submit" variant="primary" disabled={busy} className="w-full">
-            {busy ? '進めています…' : '設定して2要素認証へ進む'}
+          <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="進めています…">設定して2要素認証へ進む
           </Button>
           <p className="text-center text-caption text-ink-faint">
             招待の有効期限は24時間です。期限が切れたときは、招待した運営メンバーに送り直しを依頼してください

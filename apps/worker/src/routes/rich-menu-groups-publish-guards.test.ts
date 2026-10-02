@@ -217,7 +217,7 @@ describe('N-158: 公開中グループへの定義上書き拒否 (PATCH)', () =
     const { path, init } = authed('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pages: [{ name: 'p1', orderIndex: 0, areas: [VALID_AREA] }] }),
+      body: JSON.stringify({ expectedVersion: 1, pages: [{ name: 'p1', orderIndex: 0, areas: [VALID_AREA] }] }),
     });
     const res = await setupApp(db, r2).request(path, init);
 
@@ -233,7 +233,7 @@ describe('N-158: 公開中グループへの定義上書き拒否 (PATCH)', () =
     const { path, init } = authed('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chatBarText: 'かえたい' }),
+      body: JSON.stringify({ expectedVersion: 1, chatBarText: 'かえたい' }),
     });
     const res = await setupApp(db, r2).request(path, init);
 
@@ -249,7 +249,7 @@ describe('N-158: 公開中グループへの定義上書き拒否 (PATCH)', () =
     const { path, init } = authed('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isDefaultForAll: true }),
+      body: JSON.stringify({ expectedVersion: 1, isDefaultForAll: true }),
     });
     const res = await setupApp(db, r2).request(path, init);
 
@@ -263,7 +263,7 @@ describe('N-158: 公開中グループへの定義上書き拒否 (PATCH)', () =
     const { path, init } = authed('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: '新しい名前', targetingEnabled: true }),
+      body: JSON.stringify({ expectedVersion: 1, name: '新しい名前', targetingPriority: 5 }),
     });
     const res = await setupApp(db, r2).request(path, init);
 
@@ -279,7 +279,7 @@ describe('N-158: 公開中グループへの定義上書き拒否 (PATCH)', () =
     const { path, init } = authed('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pages: [{ name: 'p1', orderIndex: 0, areas: [VALID_AREA, { ...VALID_AREA, boundsY: 100 }] }] }),
+      body: JSON.stringify({ expectedVersion: 1, pages: [{ name: 'p1', orderIndex: 0, areas: [VALID_AREA, { ...VALID_AREA, boundsY: 100 }] }] }),
     });
     const res = await setupApp(db, r2).request(path, init);
 
@@ -400,10 +400,16 @@ describe('N-159: 有効な行き先ゼロの公開拒否', () => {
     });
     insertArea('p2', 'a2', { label: 'サイトを開く' });
 
+    // O: 実機で見た確認が無いと公開できない門番。先に押してから公開する。
+    const app = setupApp(db, r2);
+    const confirm = authed('/api/rich-menu-groups/g1/device-confirm', { method: 'POST' });
+    const confirmRes = await app.request(confirm.path, confirm.init);
+    expect(confirmRes.status).toBe(200);
+
     const { path, init } = authed('/api/rich-menu-groups/g1/publish', {
       method: 'POST', headers: { 'Idempotency-Key': 'label-boundary-20chars-0001' },
     });
-    const res = await setupApp(db, r2).request(path, init);
+    const res = await app.request(path, init);
 
     expect(res.status).toBe(200);
     expect(groupStatus('g1')).toBe('published');
@@ -474,10 +480,15 @@ describe('N-155: 読み上げラベルの必須化と20字上限', () => {
     insertPage('g1', 'p1', 0, true);
     insertArea('p1', 'a1', { label: 'あ'.repeat(20) });
 
+    // O: 実機で見た確認を先に済ませる。
+    const app = setupApp(db, r2);
+    const confirm = authed('/api/rich-menu-groups/g1/device-confirm', { method: 'POST' });
+    expect((await app.request(confirm.path, confirm.init)).status).toBe(200);
+
     const { path, init } = authed('/api/rich-menu-groups/g1/publish', {
       method: 'POST', headers: { 'Idempotency-Key': 'label-boundary-20chars-0001' },
     });
-    const res = await setupApp(db, r2).request(path, init);
+    const res = await app.request(path, init);
 
     expect(res.status).toBe(200);
     expect(groupStatus('g1')).toBe('published');

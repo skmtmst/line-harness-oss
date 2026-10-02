@@ -81,7 +81,7 @@ describe('オートメーション下書きAPI', () => {
       .request('/api/automation-templates/welcome-scenario/drafts?account_id=account-1', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+        body: JSON.stringify({ operationKey: 'op-staff-denied' }),
       });
     expect(denied.status).toBe(403);
 
@@ -89,7 +89,7 @@ describe('オートメーション下書きAPI', () => {
       .request('/api/automation-templates/welcome-scenario/drafts?account_id=account-1', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+        body: JSON.stringify({ operationKey: 'op-staff-allowed' }),
       });
     expect(allowed.status).toBe(201);
     await expect(allowed.json()).resolves.toMatchObject({ success: true });
@@ -123,7 +123,10 @@ describe('オートメーション下書きAPI', () => {
     const adminApp = app(testDb.db, admin);
     const created = await adminApp.request(
       '/api/automation-templates/welcome-scenario/drafts?account_id=account-1',
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationKey: 'op-admin-create' }),
+      },
     );
     expect(created.status).toBe(201);
     const createdBody = await created.json() as {
@@ -164,7 +167,10 @@ describe('オートメーション下書きAPI', () => {
     const adminApp = app(testDb.db, admin);
     const created = await adminApp.request(
       '/api/automation-templates/welcome-scenario/drafts?account_id=account-1',
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationKey: 'op-events-1' }),
+      },
     );
     const createdBody = await created.json() as { data: { id: string; draftVersionId: string } };
     const cases: Array<[string, Record<string, unknown>]> = [
@@ -225,7 +231,10 @@ describe('オートメーション下書きAPI', () => {
     const adminApp = app(testDb.db, admin);
     const created = await adminApp.request(
       '/api/automation-templates/received-message-tag/drafts?account_id=account-1',
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationKey: 'op-multi-actions' }),
+      },
     );
     const createdBody = await created.json() as { data: { id: string; draftVersionId: string } };
     const updated = await adminApp.request(
@@ -292,7 +301,10 @@ describe('オートメーション下書きAPI', () => {
     const adminApp = app(testDb.db, admin);
     const created = await adminApp.request(
       '/api/automation-templates/received-message-tag/drafts?account_id=account-1',
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationKey: 'op-broken-cond' }),
+      },
     );
     const createdBody = await created.json() as { data: { id: string; draftVersionId: string } };
 
@@ -352,7 +364,10 @@ describe('オートメーション下書きAPI', () => {
     const adminApp = app(testDb.db, admin);
     const created = await adminApp.request(
       '/api/automation-templates/received-message-tag/drafts?account_id=account-1',
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationKey: 'op-broken-publish' }),
+      },
     );
     const createdBody = await created.json() as { data: { id: string; draftVersionId: string } };
     const updated = await adminApp.request(
@@ -401,10 +416,135 @@ describe('オートメーション下書きAPI', () => {
       .request('/api/automation-templates/welcome-scenario/drafts?account_id=account-2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+        body: JSON.stringify({ operationKey: 'op-other-tenant' }),
       });
     expect(response.status).toBe(404);
     expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM automation_definitions').get())
       .toEqual({ count: 0 });
+  });
+
+  /*
+   * DETAIL-13: 新規作成の冪等鍵。
+   * 同じ操作の再試行だけが同じ下書きへ戻る。別の新規作成（＝別の鍵）は
+   * 別の下書きを作り、前の下書きへ戻って上書きしない。
+   * 鍵が無い呼び出しは「別の操作」と見分けられないので 422 で断る。
+   */
+  it('操作の鍵が無い・形が違う呼び出しは422で断り、下書きは作らない', async () => {
+    const adminApp = app(testDb.db, admin);
+    const missing = await adminApp.request(
+      '/api/automation-templates/welcome-scenario/drafts?account_id=account-1',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+    );
+    expect(missing.status).toBe(422);
+    await expect(missing.json()).resolves.toMatchObject({ code: 'operation_key_invalid' });
+
+    const bad = await adminApp.request(
+      '/api/automation-templates/welcome-scenario/drafts?account_id=account-1',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationKey: 'x' }),
+      },
+    );
+    expect(bad.status).toBe(422);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM automation_definitions').get())
+      .toEqual({ count: 0 });
+  });
+
+  it('同じ鍵の再試行は同じ下書きを返し、別の鍵は別の下書きを作る', async () => {
+    const adminApp = app(testDb.db, admin);
+    const post = (operationKey: string) => adminApp.request(
+      '/api/automation-templates/welcome-scenario/drafts?account_id=account-1',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationKey }),
+      },
+    );
+
+    const first = await post('op-retry-same');
+    expect(first.status).toBe(201);
+    const firstBody = await first.json() as { data: { id: string; draftVersionId: string } };
+
+    // ダブルクリック・通信やり直し（同じ操作）は1件に収まる。
+    const retry = await post('op-retry-same');
+    expect(retry.status).toBe(201);
+    const retryBody = await retry.json() as { data: { id: string; draftVersionId: string } };
+    expect(retryBody.data).toEqual(firstBody.data);
+
+    // 一覧からの「もう一度新規」（別の操作）は別の下書きを作る。
+    const second = await post('op-another-new');
+    expect(second.status).toBe(201);
+    const secondBody = await second.json() as { data: { id: string } };
+    expect(secondBody.data.id).not.toBe(firstBody.data.id);
+
+    expect(testDb.raw.prepare(
+      "SELECT COUNT(*) AS count FROM automation_definitions WHERE status = 'draft'",
+    ).get()).toEqual({ count: 2 });
+  });
+
+  /*
+   * R21: 毎週の曜日は0〜6の整数の重複なし配列だけを受け付ける。
+   * 以前は画面が "1,3," を [1,3,0]（Number("") === 0）へ変えて送り、
+   * 日曜にも動く下書きが保存できていた。保存側でも空・文字列・
+   * 小数・範囲外・重複をすべて断る。直しを戻すと赤くなる。
+   */
+  it('毎週の曜日は空・文字・範囲外・重複を断り正しい配列だけを通す', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '会員', 'account-1')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO friends
+         (id, line_user_id, display_name, line_account_id, metadata, created_at, updated_at)
+       VALUES ('friend-1', 'U-friend-1', '田中さん', 'account-1', '{}', datetime('now'), datetime('now'))`,
+    ).run();
+    const adminApp = app(testDb.db, admin);
+    const created = await adminApp.request(
+      '/api/automation-templates/received-message-tag/drafts?account_id=account-1',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationKey: 'op-weekday-strict' }),
+      },
+    );
+    expect(created.status).toBe(201);
+    const createdBody = await created.json() as { data: { id: string; draftVersionId: string } };
+    const revision = createdBody.data.draftVersionId;
+    const put = (weekdays: unknown) => adminApp.request(
+      `/api/automation-drafts/${createdBody.data.id}?account_id=account-1`,
+      {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedDraftVersionId: revision,
+          name: '毎週の曜日', eventType: 'weekly',
+          triggerConfig: { time: '09:00', weekdays, friendIds: ['friend-1'] },
+          conditions: {},
+          actions: [{ id: 'tag', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop' }],
+        }),
+      },
+    );
+    // 空の要素由来の0が混ざる前の形・あり得ない値はすべて断る。
+    const bad: Array<[string, unknown]> = [
+      ['空のままの文字列', ''],
+      ['余分なカンマ付きの文字列', '1,3,'],
+      ['空配列', []],
+      ['空文字の要素', ['1', '']],
+      ['文字列の要素', ['1', '3']],
+      ['小数の要素', [1, 3.5]],
+      ['範囲外（7）', [1, 7]],
+      ['範囲外（-1）', [-1, 3]],
+      ['範囲外の日曜の裏番号', [1, 3, 0, 8]],
+      ['重複', [1, 1, 3]],
+    ];
+    for (const [label, weekdays] of bad) {
+      const response = await put(weekdays);
+      expect(response.status, label).toBe(422);
+      await expect(response.json(), label).resolves.toMatchObject({ code: 'trigger_config_invalid' });
+    }
+    // 正しい配列は通り、小さい順に整えて保存する。
+    const saved = await put([3, 1]);
+    expect(saved.status).toBe(200);
+    const savedBody = await saved.json() as { data: { draftVersionId: string } };
+    const stored = testDb.raw.prepare(
+      `SELECT trigger_config AS config FROM automation_versions WHERE id = ?`,
+    ).get(versionRowId(savedBody.data.draftVersionId)) as { config: string };
+    expect(JSON.parse(stored.config)).toEqual({ time: '09:00', weekdays: [1, 3], friendIds: ['friend-1'] });
   });
 });

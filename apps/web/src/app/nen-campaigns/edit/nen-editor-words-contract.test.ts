@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const EDITOR = fs.readFileSync(path.join(__dirname, 'campaign-editor.tsx'), 'utf8')
+const DISPLAY = fs.readFileSync(path.join(__dirname, '..', 'campaign-display.ts'), 'utf8')
 
 describe('V6 NEN配信編集の運用者向け文言契約', () => {
   it('きっかけの内部値を画面へ出さない', () => {
@@ -15,12 +16,17 @@ describe('V6 NEN配信編集の運用者向け文言契約', () => {
   })
 
   it('誕生日配信で使われない日数・時刻入力を見せず、実際の固定日時を案内する', () => {
+    /*
+     * タイミング表示は campaign-display.ts の formatCampaignTiming に集約した
+     * （監査 R64）。発送起点の3キーは delayDays/deliveryTime から作り、
+     * 誕生日・コラムだけ実行処理で固定の文言を返す。
+     */
     expect(EDITOR).toContain("setting.campaignKey === 'birthday_coupon'")
-    expect(EDITOR).toContain('誕生日の3日前')
     expect(EDITOR).toContain('10:00（固定）')
     expect(EDITOR).toContain('この日時は誕生日配信の実行処理で固定されています。')
-    expect(EDITOR).toContain('const timing = isBirthday')
+    expect(EDITOR).toContain('const timing = `${formatCampaignTiming')
     expect(EDITOR).toContain('{timing}')
+    expect(DISPLAY).toContain("birthday_coupon: '誕生日の3日前 10:00'")
   })
 
   it('画面名をNEN配信にそろえ、内部エラーを表示しない', () => {
@@ -50,6 +56,6 @@ describe('V6 NEN配信編集の運用者向け文言契約', () => {
     expect(EDITOR).toContain('回答フォーム「{formAction.formName}」を開く')
     expect(EDITOR).toContain("{ kind: 'award_mileage', amount: 200, trigger: 'form_submitted' }")
     expect(EDITOR).toContain('afterActions: actions')
-    expect(EDITOR).toContain('配信内容を保存')
+    expect(EDITOR).toContain('配信内容を保存する')
   })
 })

@@ -262,6 +262,7 @@ export type SavedSearchConditionLabels = {
   scenarios?: Readonly<Record<string, string>>
   fields?: Readonly<Record<string, string>>
   assignees?: Readonly<Record<string, string>>
+  forms?: Readonly<Record<string, string>>
 }
 
 const CHAT_STATUS_LABELS: Readonly<Record<string, string>> = {
@@ -350,8 +351,21 @@ export function describeSavedCondition(
     return `個別メモに「${value || '未指定'}」を含む`
   }
   if (condition.kind === 'common_event') return NEGATED_OPS.has(condition.op) ? `その他のイベント「${value || '未指定'}」がない` : `その他のイベント「${value || '未指定'}」がある`
-  if (condition.kind === 'form') return '回答フォーム（未接続）'
-  if (condition.kind === 'purchase') return '購入履歴（未接続）'
+  /*
+   * R185: 回答フォーム・購入履歴は実行側が解釈できる（saved-search-filter）。
+   * 「未接続」として削除を迫らない。特定の指定があれば名前で読める形にする。
+   */
+  if (condition.kind === 'form') {
+    const formName = labels.forms?.[raw] ?? (raw ? '選択済みの回答フォーム' : '')
+    return NEGATED_OPS.has(condition.op)
+      ? `回答フォーム${formName ? `「${formName}」` : ''}の回答がない`
+      : `回答フォーム${formName ? `「${formName}」` : ''}の回答がある`
+  }
+  if (condition.kind === 'purchase') {
+    return NEGATED_OPS.has(condition.op)
+      ? `購入履歴${raw ? `「${raw}」` : ''}がない`
+      : `購入履歴${raw ? `「${raw}」` : ''}がある`
+  }
   return '条件を確認できません'
 }
 

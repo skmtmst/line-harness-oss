@@ -1,0 +1,130 @@
+'use client'
+
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+import { TextArea, TextInput } from '@/components/shared/form-controls'
+
+export type DefaultValueMode = 'text' | 'longtext' | 'single' | 'multi' | 'file'
+
+/**
+ * R139: 既定値の入力欄。種類に合う形で出す。
+ *
+ * 以前はどの種類も文字列の入力欄1つで、複数選択の既定値は保存時に
+ * 「選択肢IDの配列で指定してください」で弾かれ、画面からは指定でき
+ * なかった。登録済みの選択肢から選ぶ形にし、APIへは配列（複数選択）
+ * ・選択肢名（単一選択）で渡す。存在しない値は選べない作りのため、
+ * 保存前の突き合わせは呼び出し側の保存直前検査が担う。
+ */
+export default function DefaultValueInput({
+  mode,
+  options,
+  textValue,
+  onTextChange,
+  singleValue,
+  onSingleChange,
+  multiValue,
+  onMultiChange,
+  disabled,
+  inputId,
+}: {
+  mode: DefaultValueMode
+  /** 登録済みの選択肢名（1行1つで入れたもの）。 */
+  options: string[]
+  textValue: string
+  onTextChange: (value: string) => void
+  singleValue: string
+  onSingleChange: (value: string) => void
+  multiValue: string[]
+  onMultiChange: (value: string[]) => void
+  disabled?: boolean
+  inputId?: string
+}) {
+  if (mode === 'multi') {
+    if (options.length === 0) {
+      return (
+        <p className="text-xs leading-5 text-ink-faint">
+          先に選択肢を入力すると、ここから既定値を選べます。何も選ばなければ既定値なしになります。
+        </p>
+      )
+    }
+    return (
+      <fieldset>
+        <legend className="sr-only">既定値（複数選択可）</legend>
+        <div className="space-y-1">
+          {options.map((option) => {
+            const checked = multiValue.includes(option)
+            return (
+              <Checkbox
+                key={option}
+                checked={checked}
+                disabled={disabled}
+                onCheckedChange={(next) => {
+                  onMultiChange(
+                    next
+                      ? [...multiValue, option]
+                      : multiValue.filter((item) => item !== option),
+                  )
+                }}
+                className="py-1"
+              ><span className="min-w-0 flex-1 truncate" title={option}>{option}</span></Checkbox>
+            )
+          })}
+        </div>
+        <p className="mt-2 text-xs leading-5 text-ink-faint">
+          空欄のとき選んだ値が使われます。何も選ばなければ既定値なしになります。
+        </p>
+      </fieldset>
+    )
+  }
+  if (mode === 'single') {
+    return (
+      <>
+        <Select
+          id={inputId}
+          value={singleValue}
+          onChange={onSingleChange}
+          disabled={disabled}
+          aria-label="既定値"
+          size="full"
+          options={[{ value: '', label: '未設定' }, ...options.map((option) => ({ value: option, label: option }))]}
+        />
+        <p className="mt-2 text-xs leading-5 text-ink-faint">
+          空欄のとき選んだ値が使われます。選択肢を変えたら選び直してください。
+        </p>
+      </>
+    )
+  }
+  if (mode === 'file') {
+    return <TextInput id={inputId} value="" disabled placeholder="画像・PDFには設定できません" onChange={() => {}} />
+  }
+  /*
+   * R186: 複数行テキストの既定値は複数行で入れる。1行欄では改行が
+   * 入力時に消え、保存後の見え方と食い違っていた。
+   */
+  if (mode === 'longtext') {
+    return (
+      <>
+        <TextArea
+          id={inputId}
+          rows={4}
+          value={textValue}
+          onChange={(event) => onTextChange(event.target.value)}
+          disabled={disabled}
+          placeholder="未設定"
+        />
+        <p className="mt-2 text-xs leading-5 text-ink-faint">
+          空欄のとき、この文章がそのまま使われます。改行も残ります。
+        </p>
+      </>
+    )
+  }
+  return (
+    <TextInput
+      id={inputId}
+      value={textValue}
+      onChange={(event) => onTextChange(event.target.value)}
+      disabled={disabled}
+      placeholder="未設定"
+    />
+  )
+}

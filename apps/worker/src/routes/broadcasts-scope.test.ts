@@ -15,7 +15,10 @@ const mocks = vi.hoisted(() => ({
   dbRun: vi.fn(),
 }));
 
-vi.mock('@line-crm/db', () => ({
+vi.mock('@line-crm/db', async (importOriginal) => ({
+  // 台帳・記録・状態の純粋な部品と集計は本物を使う（#816）。
+  // 境界の判定対象（取得・作成・更新・削除）だけ差し替える。
+  ...(await importOriginal<typeof import('@line-crm/db')>()),
   getBroadcasts: mocks.getBroadcasts,
   getBroadcastById: mocks.getBroadcastById,
   createBroadcast: mocks.createBroadcast,
@@ -65,7 +68,12 @@ function app() {
   instance.use('*', async (c, next) => {
     const db = {
       prepare: vi.fn(() => ({
-        bind: vi.fn(() => ({ run: mocks.dbRun })),
+        // 二者承認のゲートも口の一部。人数0・境目既定で承認なしに通す。
+        bind: vi.fn(() => ({
+          run: mocks.dbRun,
+          first: vi.fn(async () => null),
+          all: vi.fn(async () => ({ results: [] })),
+        })),
       })),
     } as unknown as D1Database;
     c.env = { DB: db, LINE_CHANNEL_ACCESS_TOKEN: 'default', WORKER_URL: 'https://worker.test' };

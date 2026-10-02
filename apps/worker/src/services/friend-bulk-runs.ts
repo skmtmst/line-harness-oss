@@ -17,6 +17,7 @@ import {
   updateChat,
   updateFriendBulkRunItem,
   type FriendBulkSnapshotItem,
+  activeTenantLineAccountSql,
 } from '@line-crm/db';
 import {
   DEFAULT_TENANT_ID,
@@ -1056,6 +1057,19 @@ export async function processDueFriendBulkRuns(
   } = {},
 ): Promise<{ runs: number; items: number }> {
   const now = options.now ?? new Date().toISOString();
+  await db.prepare(
+    `UPDATE friend_bulk_runs
+        SET status = 'cancelled', completed_at = ?, updated_at = ?,
+            error_message = '契約先の利用停止中に実行時刻を過ぎたため実行しませんでした'
+      WHERE status IN ('queued', 'waiting')
+        AND (scheduled_at IS NULL OR scheduled_at <= ?)
+        AND tenant_id != ?
+        AND NOT EXISTS (
+          SELECT 1 FROM tenants
+           WHERE tenants.id = friend_bulk_runs.tenant_id
+             AND tenants.status = 'active'
+        )`,
+  ).bind(now, now, now, DEFAULT_TENANT_ID).run();
   const ids = await listDueFriendBulkRunIds(db, now, options.limit ?? 20);
   let items = 0;
   for (const id of ids) {

@@ -18,9 +18,17 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { canOperateBookings } from '../../lib/booking-permissions'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import HelpTip from '@/components/shared/help-tip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import SelectField from '@/components/shared/select-field'
+import DateField from '@/components/shared/date-field'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
+import Select from '@/components/shared/select'
+import TargetMissing from '@/components/shared/target-missing'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
 type BookingAction = 'approve' | 'reject' | 'cancel' | 'complete' | 'no_show'
 
@@ -151,34 +159,15 @@ function decideDescription(
 }
 
 function jpDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 function jpTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatTime(iso)
 }
 
 function jpStamp(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 function jstDate(iso: string): string {
@@ -255,9 +244,50 @@ function auditLine(log: BookingAuditLog): string {
       return `${actor}がGoogleカレンダーへの反映を再試行しました`
     case 'notification_retried':
       return `${actor}がLINE通知を再試行しました`
+    case 'v6_sync_failed':
+      return `${actor}が通知の同期に失敗しました（予約の変更は保存されています。次回の保存で直します）`
     default:
       return `${actor}が${log.action}しました`
   }
+}
+
+/**
+ * R318: 編集開始時の値の写し。保存の差分と、競合時に相手が変えた欄の
+ * 特定に使う。
+ */
+function snapshotEditBase(detail: BookingAdminDetail) {
+  return {
+    menuId: detail.menuId,
+    staffId: detail.staffId,
+    date: jstDate(detail.startsAt),
+    time: jstHHMM(detail.startsAt),
+    startsAt: detail.startsAt,
+    price: detail.price,
+    customerNote: detail.customerNote ?? '',
+    internalNote: detail.internalNote ?? '',
+    policy: { ...detail.notificationPolicy },
+  }
+}
+
+type EditBase = ReturnType<typeof snapshotEditBase>
+
+/**
+ * R318: 編集開始後に相手が変えた欄を運用者の言葉で列挙する。
+ * 合格条件の日時・担当・メニュー・料金・通知方針をここで拾う。
+ */
+function serverChangedLabels(base: EditBase, latest: BookingAdminDetail): string[] {
+  const changed: string[] = []
+  if (latest.menuId !== base.menuId) changed.push(AUDIT_FIELD_LABELS.menu_id)
+  if (latest.staffId !== base.staffId) changed.push(AUDIT_FIELD_LABELS.staff_id)
+  if (latest.startsAt !== base.startsAt) changed.push(AUDIT_FIELD_LABELS.starts_at)
+  if (latest.price !== base.price) changed.push(AUDIT_FIELD_LABELS.price)
+  if ((latest.customerNote ?? '') !== base.customerNote) changed.push(AUDIT_FIELD_LABELS.customer_note)
+  if ((latest.internalNote ?? '') !== base.internalNote) changed.push(AUDIT_FIELD_LABELS.internal_note)
+  if ((Object.keys(POLICY_FIELD_LABELS) as Array<keyof BookingNotificationPolicy>)
+    .some((key) => latest.notificationPolicy[key] !== base.policy[key])) {
+    changed.push(AUDIT_FIELD_LABELS.notification_policy)
+  }
+  return changed
 }
 
 export default function BookingDetailPage() {
@@ -286,7 +316,11 @@ function BookingDetailInner() {
   const [acting, setActing] = useState(false)
   const [decideTarget, setDecideTarget] = useState<BookingAction | null>(null)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  // R533: 捕まえた取得失敗そのもの。TargetMissingのerrorへ渡す
+  // （403は権限案内で再試行なし・429は待ち案内）。
+  const [loadError, setLoadError] = useState<unknown>(null)
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [bookingMissing, setBookingMissing] = useState(false)
   /**
    * 表示・操作に使うのは、URLの予約IDと選択中アカウントに一致する
    * 詳細だけ。鍵が合わない（切替直後・古い応答）ものは null として
@@ -298,6 +332,19 @@ function BookingDetailInner() {
     ? detailState.booking
     : null
   usePageTitle(detail ? `${detail.customer.displayName} ／ ${detail.menuName}` : '予約の詳細')
+  /**
+   * R322: 保存・再試行・承認を始めた対象を覚える。今見ている対象と
+   * 違う操作の完了では、現在の表示・編集中の内容を変えない。
+   * 世代番号（loadGeneration）と同じ考え方で、操作ごとに対象を照合する。
+   */
+  const targetRef = useRef({ accountId: selectedAccountId, bookingId: id })
+  targetRef.current = { accountId: selectedAccountId, bookingId: id }
+  const isCurrentTarget = useCallback(
+    (target: { accountId: string; bookingId: string }) =>
+      targetRef.current.accountId === target.accountId
+      && targetRef.current.bookingId === target.bookingId,
+    [],
+  )
 
   // ---- 変更モード (N-389) ----
   const [editing, setEditing] = useState(false)
@@ -319,6 +366,12 @@ function BookingDetailInner() {
   })
   const [editSendNotice, setEditSendNotice] = useState(true)
   const [editReason, setEditReason] = useState('')
+  /**
+   * R318: 編集を始めた時点の値を覚える。保存で送るのは「この値から
+   * 実際に変えた欄」だけ。競合で読み直した後も、触っていない欄を
+   * 古い値で上書きしないための基準。
+   */
+  const [editBase, setEditBase] = useState<EditBase | null>(null)
   const [saving, setSaving] = useState(false)
   const [retrying, setRetrying] = useState<string | null>(null)
   /**
@@ -347,7 +400,11 @@ function BookingDetailInner() {
     return () => { active = false }
   }, [])
 
-  const load = useCallback(async () => {
+  /**
+   * R318: 競合後の入力の戻し先に使うため、読み直した予約を返す。
+   * 古い応答・対象外の応答のときは null を返す。
+   */
+  const load = useCallback(async (): Promise<BookingAdminDetail | null> => {
     const generation = ++loadGeneration.current
     const accountId = selectedAccountId
     const bookingId = id
@@ -361,21 +418,30 @@ function BookingDetailInner() {
     )
     if (!bookingId || !accountId) {
       setLoading(false)
-      return
+      return null
     }
     setLoading(true)
     setError('')
+    setLoadError(null)
+    setBookingMissing(false)
     try {
       const res = await bookingApi.getBooking(accountId, bookingId)
       // あとから始めた取得が先に返っている場合、この応答は古い。
       // 遅い応答で今の対象を上書きしない（世代の確認）。
-      if (loadGeneration.current !== generation) return
+      if (loadGeneration.current !== generation) return null
       setDetailState({ key: { accountId, bookingId }, booking: res.booking })
-    } catch {
-      if (loadGeneration.current !== generation) return
+      return res.booking
+    } catch (caught) {
+      if (loadGeneration.current !== generation) return null
       // 失敗時は前の予約を「今の予約」として残さない。
       setDetailState(null)
-      setError('読み込みに失敗しました')
+      if (caught instanceof ApiError && caught.status === 404) {
+        setBookingMissing(true)
+      } else {
+        setLoadError(caught)
+        setError('読み込みに失敗しました。もう一度読み込んでください。')
+      }
+      return null
     } finally {
       if (loadGeneration.current === generation) setLoading(false)
     }
@@ -389,9 +455,10 @@ function BookingDetailInner() {
   // 確認窓・メッセージも前の対象のものを残さない。
   useEffect(() => {
     setEditing(false)
+    // R318: 前の予約の編集基準も残さない。
+    setEditBase(null)
     setDecideTarget(null)
     setError('')
-    setNotice('')
     // IDEA-27: 追加取得した履歴・開いた内訳も前の対象のものを残さない。
     setExtraAuditLogs(null)
     setAuditLoading(false)
@@ -520,13 +587,18 @@ function BookingDetailInner() {
 
   const decide = async (action: BookingAction) => {
     if (!selectedAccountId) return
+    const actionTarget = { accountId: selectedAccountId, bookingId: id }
     setActing(true)
     setError('')
     try {
       await bookingApi.decideRequest(selectedAccountId, id, action)
+      // R322: 承認中に別の予約へ移っていたら、今の画面を触らない。
+      if (!isCurrentTarget(actionTarget)) return
       void load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '変更に失敗しました')
+      // R322: 前の予約の失敗で今の画面を汚さない。
+      if (!isCurrentTarget(actionTarget)) return
+      setError(e instanceof Error ? e.message : '変更に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setActing(false)
     }
@@ -546,6 +618,8 @@ function BookingDetailInner() {
     setEditPolicy(detail.notificationPolicy)
     setEditSendNotice(true)
     setEditReason('')
+    // R318: この時点の値を差分の基準にする。
+    setEditBase(snapshotEditBase(detail))
     setError('')
     setEditing(true)
   }, [detail])
@@ -604,20 +678,24 @@ function BookingDetailInner() {
   }, [editing, selectedAccountId, editMenuId, editStaffId, editDate, id])
 
   const saveEdit = async () => {
-    if (!selectedAccountId || !detail) return
+    // R318: 差分は編集開始時の値（editBase）と比べる。読み直し後の
+    // 最新値と比べると、触っていない欄まで「変更あり」に見えてしまう。
+    if (!selectedAccountId || !detail || !editBase) return
+    const saveTarget = { accountId: selectedAccountId, bookingId: id }
+    const base = editBase
     const patch: Parameters<typeof bookingApi.updateBooking>[2] = {
       lock_version: detail.lockVersion,
     }
-    if (editMenuId !== detail.menuId) patch.menu_id = editMenuId
-    if (editStaffId !== detail.staffId) patch.staff_id = editStaffId
+    if (editMenuId !== base.menuId) patch.menu_id = editMenuId
+    if (editStaffId !== base.staffId) patch.staff_id = editStaffId
     const chosenSlot = editSlots.find((slot) => slot.date === editDate && slot.start === editTime)
     if (chosenSlot?.startUtc) {
       const iso = new Date(chosenSlot.startUtc).toISOString()
-      if (iso !== detail.startsAt) patch.starts_at = iso
+      if (iso !== base.startsAt) patch.starts_at = iso
     }
     // 日時を変えようとして枠が取れないまま保存すると、日時だけが
     // 静かに無変更になる。それを防ぐため、ここで止める。
-    const dateOrTimeChanged = editDate !== jstDate(detail.startsAt) || editTime !== jstHHMM(detail.startsAt)
+    const dateOrTimeChanged = editDate !== base.date || editTime !== base.time
     if (dateOrTimeChanged && !chosenSlot) {
       setError(editTime === '' ? '変更後の時間を選択してください' : '選んだ時間は空いていません。別の時間を選んでください。')
       return
@@ -627,14 +705,14 @@ function BookingDetailInner() {
       setError('料金は0以上の整数で入力してください')
       return
     }
-    if (editPrice.trim() !== '' && Number.isInteger(priceNum) && priceNum >= 0 && priceNum !== detail.price) {
+    if (editPrice.trim() !== '' && Number.isInteger(priceNum) && priceNum >= 0 && priceNum !== base.price) {
       patch.price = priceNum
     }
-    if (editCustomerNote !== (detail.customerNote ?? '')) patch.customer_note = editCustomerNote || null
-    if (editInternalNote !== (detail.internalNote ?? '')) patch.internal_note = editInternalNote || null
+    if (editCustomerNote !== base.customerNote) patch.customer_note = editCustomerNote || null
+    if (editInternalNote !== base.internalNote) patch.internal_note = editInternalNote || null
     const policyPatch: Partial<BookingNotificationPolicy> = {}
     for (const key of Object.keys(POLICY_FIELD_LABELS) as Array<keyof BookingNotificationPolicy>) {
-      if (editPolicy[key] !== detail.notificationPolicy[key]) policyPatch[key] = editPolicy[key]
+      if (editPolicy[key] !== base.policy[key]) policyPatch[key] = editPolicy[key]
     }
     if (Object.keys(policyPatch).length > 0) patch.notification_policy = policyPatch
     if (!editSendNotice) patch.send_change_notification = false
@@ -646,9 +724,10 @@ function BookingDetailInner() {
     }
     setSaving(true)
     setError('')
-    setNotice('')
     try {
       const updated = await bookingApi.updateBooking(selectedAccountId, id, patch)
+      // R322: 保存中に別の予約へ移っていたら、今の画面を触らない。
+      if (!isCurrentTarget(saveTarget)) return
       setEditing(false)
       /* IDEA-07: 変更と一緒に動いた通知も応答から言う。
          「組み直した/送る」が見えないと、古い通知が残ったままか、
@@ -660,12 +739,40 @@ function BookingDetailInner() {
       if (updated.reminders_created > 0) {
         effects.push('今後のお知らせを新しい日時で組み直しました')
       }
-      setNotice(`${['予約を変更しました', ...effects].join('。')}。`)
+      notifyToast(`${['予約を変更しました', ...effects].join('。')}。`)
       await load()
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'version_conflict') {
-        setError('ほかの人が先にこの予約を変更しました。最新の状態を読み直してから、もう一度変更してください。')
-        await load()
+        // R318: 競合時は読み直して警告を残す。触っていない欄は最新値に
+        // 戻し、自分が変えた欄は残す。再試行は差分だけを新しい版で送る。
+        const latest = await load()
+        // R322: 読み直しの間に別の予約へ移っていたら何もしない。
+        if (!isCurrentTarget(saveTarget)) return
+        if (latest) {
+          const changed = serverChangedLabels(base, latest)
+          if (editMenuId === base.menuId) setEditMenuId(latest.menuId)
+          if (editStaffId === base.staffId) setEditStaffId(latest.staffId)
+          if (editDate === base.date) setEditDate(jstDate(latest.startsAt))
+          if (editTime === base.time) setEditTime(jstHHMM(latest.startsAt))
+          if (editPrice === String(base.price)) setEditPrice(String(latest.price))
+          if (editCustomerNote === base.customerNote) setEditCustomerNote(latest.customerNote ?? '')
+          if (editInternalNote === base.internalNote) setEditInternalNote(latest.internalNote ?? '')
+          if ((Object.keys(POLICY_FIELD_LABELS) as Array<keyof BookingNotificationPolicy>)
+            .every((key) => editPolicy[key] === base.policy[key])) {
+            setEditPolicy({ ...latest.notificationPolicy })
+          }
+          // 差分の基準を最新に付け替える。変えた欄は最新と違うままなので、
+          // 再試行でも差分だけが送られる。
+          setEditBase(snapshotEditBase(latest))
+          setError(changed.length > 0
+            ? `ほかの人が先に${changed.join('・')}を変更しました。最新の内容を確認して、必要なら修正してからもう一度変更してください。`
+            : 'ほかの人が先にこの予約を変更しました。最新の内容を確認してから、もう一度変更してください。')
+        } else {
+          setError('ほかの人が先にこの予約を変更しました。最新の状態を読み直してから、もう一度変更してください。')
+        }
+      } else if (!isCurrentTarget(saveTarget)) {
+        // R322: 別の予約へ移っていたら、前の予約の失敗で今の画面を汚さない。
+        return
       } else if (cause instanceof ApiError && (cause.code === 'slot_conflict' || cause.code === 'slot_not_available')) {
         setError('選んだ時間はほかの予約で埋まっています。別の時間を選んでください。')
       } else if (cause instanceof ApiError && cause.code === 'line_notification_unavailable') {
@@ -682,18 +789,23 @@ function BookingDetailInner() {
 
   const retryCalendar = async () => {
     if (!selectedAccountId) return
+    const retryTarget = { accountId: selectedAccountId, bookingId: id }
     setRetrying('calendar')
     setError('')
-    setNotice('')
     try {
       const result = await bookingApi.retryCalendarSync(selectedAccountId, id)
-      setNotice(result.status === 'succeeded' ? 'Googleカレンダーへ反映しました' : '反映を再試行しました（まだ失敗している場合は時間をおいて再度お試しください）')
+      // R322: 再試行中に別の予約へ移っていたら、今の画面を触らない。
+      if (!isCurrentTarget(retryTarget)) return
+      notifyToast(result.status === 'succeeded' ? 'Googleカレンダーへ反映しました' : '反映を再試行しました（まだ失敗している場合は時間をおいて再度お試しください）', result.status === 'succeeded' ? undefined : { tone: 'error' })
       await load()
     } catch (cause) {
+      // R319: 再試行の失敗理由は読み直しで消さない。先に読み直してから
+      // 文を置く（load は文を空にするため）。R322: 対象外なら置かない。
+      await load()
+      if (!isCurrentTarget(retryTarget)) return
       setError(cause instanceof ApiError && cause.code === 'no_retryable_operation'
         ? '再試行できる失敗はありません'
         : '再試行できませんでした')
-      await load()
     } finally {
       setRetrying(null)
     }
@@ -701,16 +813,26 @@ function BookingDetailInner() {
 
   const retryNotification = async (runId: string) => {
     if (!selectedAccountId) return
+    const retryTarget = { accountId: selectedAccountId, bookingId: id }
     setRetrying(runId)
     setError('')
-    setNotice('')
     try {
       const result = await bookingApi.retryNotification(selectedAccountId, id, runId)
-      setNotice(result.status === 'succeeded' ? 'お知らせを送りました' : 'お知らせの送信に失敗しました')
+      // R322: 再試行中に別の予約へ移っていたら、今の画面を触らない。
+      if (!isCurrentTarget(retryTarget)) return
+      notifyToast(result.status === 'succeeded' ? 'お知らせを送りました' : 'お知らせの送信に失敗しました。通信を確かめて、もう一度お試しください。', result.status === 'succeeded' ? undefined : { tone: 'error' })
       await load()
-    } catch {
-      setError('お知らせを再送できませんでした')
+    } catch (cause) {
+      // R319: 再試行の失敗理由は読み直しで消さない。先に読み直してから文を置く（load は文を空にするため）。
+      // R322: 対象外なら置かない。R323/R324: 処理中と失効は理由を分けて出す。
       await load()
+      if (!isCurrentTarget(retryTarget)) return
+      const code = cause instanceof ApiError ? cause.code : ''
+      setError(code === 'notification_obsolete'
+        ? 'このお知らせは今の予約の状態に合わないため送れません'
+        : code === 'retry_in_progress'
+          ? 'ほかの担当者が再送中のため送れません。しばらくしてからお試しください'
+          : 'お知らせを再送できませんでした')
     } finally {
       setRetrying(null)
     }
@@ -718,20 +840,51 @@ function BookingDetailInner() {
 
   if (!id) {
     return (
-      <div>
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          予約が指定されていません。
-          <Link href="/booking/bookings" className="text-accent ml-1 hover:underline">
-            一覧へ戻る
-          </Link>
-        </p>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="見る予約が指定されていません"
+        description="一覧から、見たい予約を選び直してください。"
+        backHref="/booking/bookings"
+        backLabel="予約一覧へ戻る"
+      />
+    )
+  }
+
+  if (!loading && (bookingMissing || (!error && !detail))) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この予約は見つかりません"
+        description="取り消されたか、別の記録です。一覧から選び直してください。"
+        backHref="/booking/bookings"
+        backLabel="予約一覧へ戻る"
+      />
+    )
+  }
+
+  /*
+   * R533: 403・429だけ共通文へ切り替える（権限・混雑の案内。再試行の
+   * 有無は `loadFailureCopy` が決める）。それ以外は画面の文のまま
+   * （`isForbiddenOrRateLimited` の目安どおり。DEEP-18の画面固有見出しを保つ）。
+   */
+  const detailFailure = loadError ? loadFailureCopy(loadError, '予約') : null
+  const useCommonCopy = loadError ? isForbiddenOrRateLimited(loadError) : false
+  if (!loading && error && !detail) {
+    return (
+      <TargetMissing
+        kind="error"
+        title={useCommonCopy && detailFailure ? detailFailure.title : '予約を読み込めませんでした'}
+        description={useCommonCopy && detailFailure ? detailFailure.description : '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
+        error={loadError ?? undefined}
+        onRetry={() => void load()}
+      />
     )
   }
 
   return (
-    <div>
-      <nav className="text-ink-faint mb-2 text-xs" aria-label="パンくず">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav className="text-ink-faint text-xs" aria-label="パンくず">
         <Link href="/booking/bookings" className="hover:underline">
           予約管理
         </Link>
@@ -739,36 +892,14 @@ function BookingDetailInner() {
         <span>予約の詳細</span>
       </nav>
 
-      {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
-      )}
-      {notice && (
-        <div className="bg-success-bg text-success mb-4 rounded-lg border border-transparent p-4 text-sm">
-          {notice}
-        </div>
+      {error && detail && (
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
-      {loading ? (
+      {loading || !detail ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
-      ) : !detail ? (
-        // DEEP-18: 取得失敗を「存在しない予約」と混ぜない。失敗時は
-        // 前の予約も出さず、読み直す導線だけを置く。
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          {error ? '予約を読み込めませんでした。' : 'この予約は見つかりませんでした。'}
-          {error ? (
-            <button
-              type="button"
-              onClick={() => void load()}
-              className="text-accent ml-2 underline"
-            >
-              もう一度読み込む
-            </button>
-          ) : null}
-        </p>
       ) : (
         <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
           <div data-design="Left" className="min-w-0 flex-1 space-y-4">
@@ -790,7 +921,7 @@ function BookingDetailInner() {
               <Row label="担当">{detail.staffName}</Row>
               <Row label="料金">
                 <span className="tabular-nums">
-                  ¥{detail.price.toLocaleString()}（税込）
+                  ¥{formatNumber(detail.price)}（税込）
                 </span>
               </Row>
               <Row label="申込日時">{jpStamp(detail.requestedAt)}</Row>
@@ -804,7 +935,7 @@ function BookingDetailInner() {
                           type="button"
                           onClick={() => void retryCalendar()}
                           disabled={retrying !== null || queuedCalendar}
-                          className="text-accent ml-2 underline disabled:opacity-40"
+                          className="text-action ml-2 underline disabled:opacity-40"
                         >
                           {retrying === 'calendar' ? '再試行中...' : 'もう一度反映する'}
                         </button>
@@ -814,53 +945,62 @@ function BookingDetailInner() {
               </Row>
             </section>
 
+            {/* ---- 予約した時の内容の写し (T) ---- */}
+            {(() => {
+              const snapshot = detail.menuSnapshot ?? null
+              if (!snapshot) return null
+              const bookedMinutes = Math.round(
+                (new Date(detail.endsAt).getTime() - new Date(detail.startsAt).getTime()) / 60000,
+              )
+              // 写しがいまのメニューと同じなら、同じ数字を二度出さない。
+              if (
+                snapshot.name === detail.menuName
+                && snapshot.basePrice === detail.price
+                && snapshot.durationMinutes === bookedMinutes
+              ) return null
+              return (
+                <section className="bg-canvas rounded-card border-hairline border p-5">
+                  <h2 className="text-ink mb-3 text-sm font-semibold">
+                    予約した時の内容
+                    <HelpTip label="予約した時の内容の説明">
+                      予約した時点のメニューの写しです。あとでメニューを変えても、この予約の内容は変わりません。
+                    </HelpTip>
+                  </h2>
+                  <Row label="メニュー">{snapshot.name}（第{snapshot.version}版の内容）</Row>
+                  <Row label="時間">{snapshot.durationMinutes} 分</Row>
+                  <Row label="料金">
+                    <span className="tabular-nums">
+                      {snapshot.priceMode === 'free'
+                        ? '無料'
+                        : snapshot.priceMode === 'inquiry'
+                          ? 'お問い合わせ'
+                          : `¥${formatNumber(snapshot.basePrice)}（税込）`}
+                    </span>
+                  </Row>
+                </section>
+              )
+            })()}
+
             {/* ---- 予約内容の変更 (N-389) ---- */}
             {editing ? (
               <section className="bg-canvas rounded-card border-hairline border p-5">
                 <h2 className="text-ink mb-3 text-sm font-semibold">予約内容を変更する</h2>
                 <div className="grid gap-3 md:grid-cols-2">
                   <EditField label="予約メニュー">
-                    <SelectField
-                      value={editMenuId}
-                      onChange={(event) => { setEditMenuId(event.target.value); setEditTime('') }}
-                      className="w-full"
-                      options={editMenus.map((item) => ({ value: item.id, label: item.name }))}
-                    />
+                    <Select size="full" aria-label="予約メニュー" value={editMenuId} onChange={(value) => { setEditMenuId(value); setEditTime('') }} options={editMenus.map((item) => ({ value: item.id, label: item.name }))} />
                   </EditField>
                   <EditField label="担当者">
-                    <SelectField
-                      value={editStaffId}
-                      onChange={(event) => { setEditStaffId(event.target.value); setEditTime('') }}
-                      className="w-full"
-                      options={editStaff.map((item) => ({ value: item.id, label: item.display_name }))}
-                    />
+                    <Select size="full" aria-label="担当者" value={editStaffId} onChange={(value) => { setEditStaffId(value); setEditTime('') }} options={editStaff.map((item) => ({ value: item.id, label: item.display_name }))} />
                   </EditField>
                   <EditField label="日付">
-                    <input
-                      type="date"
+                    <DateField
+                      aria-label="予約の日付"
                       value={editDate}
-                      onChange={(event) => { setEditDate(event.target.value); setEditTime('') }}
-                      className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                      onChange={(v) => { setEditDate(v); setEditTime('') }}
                     />
                   </EditField>
                   <EditField label="時間">
-                    <SelectField
-                      value={editTime}
-                      onChange={(event) => setEditTime(event.target.value)}
-                      disabled={editSlotsLoading}
-                      className="w-full"
-                      options={[
-                        { value: '', label: editSlotsLoading ? '確認中です' : '選択してください' },
-                        ...editSlots.map((slot) => ({
-                          value: slot.start,
-                          label: `${slot.start}〜${slot.end}${
-                            slot.date === jstDate(detail.startsAt) && slot.start === jstHHMM(detail.startsAt)
-                              ? '（現在）'
-                              : ''
-                          }`,
-                        })),
-                      ]}
-                    />
+                    <Select size="full" aria-label="時間" value={editTime} onChange={(value) => setEditTime(value)} disabled={editSlotsLoading} options={[ { value: '', label: editSlotsLoading ? '確認中です' : '選択してください' }, ...editSlots.map((slot) => ({ value: slot.start, label: `${slot.start}〜${slot.end}${ slot.date === jstDate(detail.startsAt) && slot.start === jstHHMM(detail.startsAt) ? '（現在）' : '' }`, })), ]} />
                   </EditField>
                   <EditField label="料金（円・税込）">
                     <input
@@ -904,25 +1044,9 @@ function BookingDetailInner() {
                     <p className="text-ink mb-2 text-xs font-medium">お知らせの送り方（この予約だけの設定）</p>
                     <div className="space-y-2">
                       {(Object.keys(POLICY_FIELD_LABELS) as Array<keyof BookingNotificationPolicy>).map((key) => (
-                        <label key={key} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={editPolicy[key]}
-                            onChange={(event) => setEditPolicy((prev) => ({ ...prev, [key]: event.target.checked }))}
-                            className="accent-accent-deep h-4 w-4"
-                          />
-                          <span className="text-ink">{POLICY_FIELD_LABELS[key]}を送る</span>
-                        </label>
+                        <Checkbox key={key} checked={editPolicy[key]} onCheckedChange={(checked) => setEditPolicy((prev) => ({ ...prev, [key]: checked }))}>{POLICY_FIELD_LABELS[key]}を送る</Checkbox>
                       ))}
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={editSendNotice}
-                          onChange={(event) => setEditSendNotice(event.target.checked)}
-                          className="accent-accent-deep h-4 w-4"
-                        />
-                        <span className="text-ink">今回の変更をお客様のLINEに知らせる</span>
-                      </label>
+                      <Checkbox checked={editSendNotice} onCheckedChange={setEditSendNotice}>今回の変更をお客様のLINEに知らせる</Checkbox>
                     </div>
                   </div>
                 ) : (
@@ -935,16 +1059,14 @@ function BookingDetailInner() {
                     variant="primary"
                     type="button"
                     onClick={() => void saveEdit()}
-                    disabled={saving}
-                  >
-                    {saving ? '保存しています' : 'この内容で変更する'}
+                    disabled={saving} busy={saving} busyLabel="保存しています">この内容で変更する
                   </Button>
                   <Button
                     type="button"
                     onClick={() => { setEditing(false); setError('') }}
                     disabled={saving}
                   >
-                    やめる
+                    キャンセル
                   </Button>
                 </div>
               </section>
@@ -976,7 +1098,7 @@ function BookingDetailInner() {
                 {detail.customer.friendId ? (
                   <Link
                     href={`/friends/detail?id=${encodeURIComponent(detail.customer.friendId)}`}
-                    className="text-accent text-xs hover:underline"
+                    className="text-action text-xs hover:underline"
                   >
                     友だち詳細を見る
                   </Link>
@@ -1015,28 +1137,63 @@ function BookingDetailInner() {
               {detail.customer.mileageBalance !== null
               && detail.customer.mileageBalance !== undefined ? (
                 <Row label="マイル">
-                  <span className="tabular-nums">{detail.customer.mileageBalance.toLocaleString()}</span>
+                  <span className="tabular-nums">{formatNumber(detail.customer.mileageBalance)}</span>
                 </Row>
               ) : null}
               {detail.previousHandover?.trim() ? (
                 <Row label="前回の申し送り">
                   <span className="whitespace-pre-wrap">{detail.previousHandover}</span>
+                  {detail.previousHandoverBooking ? (
+                    <span className="text-ink-faint mt-1 block text-xs">
+                      {jpStamp(detail.previousHandoverBooking.startsAt)}の来店
+                      （{STATUS_LABELS[detail.previousHandoverBooking.status] ?? detail.previousHandoverBooking.status}）
+                      <Link
+                        href={`/booking/bookings/detail?id=${encodeURIComponent(detail.previousHandoverBooking.id)}`}
+                        className="text-action ml-1 underline"
+                      >
+                        その時の予約を見る
+                      </Link>
+                    </span>
+                  ) : null}
                 </Row>
               ) : null}
               <Row label="これまでの予約">
-                {detail.history.length === 0 ? (
+                {(detail.historyTotal ?? detail.history.length) === 0 ? (
                   <span className="text-ink-faint">この予約がはじめてです</span>
                 ) : (
                   <>
-                    {detail.history.length}件
+                    {detail.history.length < (detail.historyTotal ?? detail.history.length) ? (
+                      <span>
+                        最新{detail.history.length}件を表示（全{detail.historyTotal}件）
+                      </span>
+                    ) : (
+                      <span>{detail.historyTotal ?? detail.history.length}件</span>
+                    )}
                     <button
                       type="button"
                       onClick={() => setHistoryOpen((open) => !open)}
-                      className="text-accent ml-2 text-xs underline"
+                      className="text-action ml-2 text-xs underline"
                       aria-expanded={historyOpen}
                     >
                       {historyOpen ? '内訳を閉じる' : '内訳を見る'}
                     </button>
+                    {detail.history.length < (detail.historyTotal ?? detail.history.length) ? (
+                      detail.customer.friendId ? (
+                        <Link
+                          href={`/friends/detail?id=${encodeURIComponent(detail.customer.friendId)}`}
+                          className="text-action ml-2 text-xs underline"
+                        >
+                          顧客カルテで以前の予約を見る
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/booking/bookings?q=${encodeURIComponent(detail.customer.displayName)}`}
+                          className="text-action ml-2 text-xs underline"
+                        >
+                          予約一覧でこのお客様の予約を見る
+                        </Link>
+                      )
+                    ) : null}
                   </>
                 )}
               </Row>
@@ -1067,7 +1224,7 @@ function BookingDetailInner() {
                   {attentionItems.map((item) => (
                     <li key={item.key} className="text-ink-secondary text-xs">
                       {item.href ? (
-                        <a href={item.href} className="hover:text-accent hover:underline">
+                        <a href={item.href} className="hover:text-action hover:underline">
                           {item.text}
                         </a>
                       ) : (
@@ -1183,7 +1340,7 @@ function BookingDetailInner() {
                           type="button"
                           onClick={() => void retryNotification(op.id)}
                           disabled={retrying !== null}
-                          className="text-accent mt-1 text-xs underline disabled:opacity-40"
+                          className="text-action mt-1 text-xs underline disabled:opacity-40"
                         >
                           {retrying === op.id ? '再送中...' : 'もう一度送る'}
                         </button>
@@ -1203,7 +1360,7 @@ function BookingDetailInner() {
                           type="button"
                           onClick={() => void retryCalendar()}
                           disabled={retrying !== null || queuedCalendar}
-                          className="text-accent mt-1 text-xs underline disabled:opacity-40"
+                          className="text-action mt-1 text-xs underline disabled:opacity-40"
                         >
                           {retrying === 'calendar' ? '再試行中...' : 'もう一度反映する'}
                         </button>
@@ -1220,7 +1377,7 @@ function BookingDetailInner() {
                 <p className="text-ink-faint mb-3 text-xs">お客様に届く内容</p>
                 <div className="bg-canvas-sunken rounded-card p-3">
                   <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
-                  <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+                  <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
                     {approvedText({ menu_name: detail.menuName, staff_name: detail.staffName, starts_at: detail.startsAt })}
                   </p>
                 </div>
@@ -1301,7 +1458,7 @@ function BookingDetailInner() {
                       type="button"
                       onClick={() => void loadMoreAudit()}
                       disabled={auditLoading}
-                      className="text-accent mt-3 text-xs underline disabled:opacity-40"
+                      className="text-action mt-3 text-xs underline disabled:opacity-40"
                     >
                       {auditLoading ? '読み込み中...' : `あと${auditRemaining}件の記録を読み込む`}
                     </button>

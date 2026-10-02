@@ -14,14 +14,14 @@ import {
 export function FeatureDisabledScreen({ featureId }: { featureId?: string }) {
   return (
     <section
-      className="rounded-card border border-hairline bg-canvas p-6 shadow-sm"
+      className="rounded-card border border-hairline bg-canvas p-6 shadow-card"
       data-feature-disabled={featureId ?? 'unknown'}
     >
       <ListState
         kind="forbidden"
         title="この機能は設定でオフになっています"
         description="機能設定で有効にすると使えます。"
-        action={<Button href="/settings" variant="primary">機能設定を開く</Button>}
+        action={<Button href="/settings" variant="secondary">機能設定を開く</Button>}
       />
     </section>
   )

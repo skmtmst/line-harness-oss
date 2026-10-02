@@ -11,7 +11,10 @@ import {
   getOutgoingWebhookById,
   getWebhookSecretKeyStats,
   hasWebhookSecret,
+  recordIncomingWebhookUnmatched,
+  resolvePreviousWebhookSecret,
   resolveWebhookSecret,
+  updateIncomingWebhook,
   updateOutgoingWebhook,
   webhookKeyId,
 } from '../src/webhooks.js';
@@ -285,5 +288,92 @@ describe('migration 350 webhook secret の暗号化保存(#650 再審査)', () =
     expect(hasWebhookSecret({ secret: 'short', secret_encrypted: null })).toBe(false);
     expect(hasWebhookSecret({ secret: SECRET, secret_encrypted: null })).toBe(true);
     expect(hasWebhookSecret({ secret: null, secret_encrypted: 'k0123456789ab.v1.x.y' })).toBe(true);
+  });
+});
+
+/**
+ * S (#939 機能26): 合言葉の入れ替えに24時間の併用期間を持たせる。
+ * 前の合言葉は暗号文のまま残し、期限を過ぎたら受け付けない。
+ */
+describe('S: 合言葉入れ替えの24時間併用', () => {
+  const NEW_SECRET = `n3w-${'z'.repeat(34)}`;
+
+  it('入れ替えると前の暗号文と時刻が残り、併用期間内は前の値を読める', async () => {
+    insertAccount(sqlite, 'acc-rotate');
+    const created = await createIncomingWebhook(
+      db,
+      { name: '受信', secret: SECRET, lineAccountId: 'acc-rotate' },
+      { current: KEY_A },
+    );
+    await updateIncomingWebhook(db, created.id, 'acc-rotate', { secret: NEW_SECRET }, { current: KEY_A });
+    const row = (await getIncomingWebhookById(db, created.id, 'acc-rotate'))!;
+
+    // 現行は新しい値、前の値は暗号文のまま併用期間つきで残る。
+    expect(await resolveWebhookSecret(row, { current: KEY_A })).toBe(NEW_SECRET);
+    expect(row.secret_rotated_at).toBeTruthy();
+    expect(await resolvePreviousWebhookSecret(row, { current: KEY_A })).toBe(SECRET);
+    // 24時間を過ぎると前の値は読めない(期限切れは null)。
+    const afterGrace = Date.parse(row.secret_rotated_at!) + 25 * 60 * 60 * 1000;
+    expect(await resolvePreviousWebhookSecret(row, { current: KEY_A }, afterGrace)).toBeNull();
+  });
+
+  it('初回の設定では前の合言葉は残らない', async () => {
+    insertAccount(sqlite, 'acc-first');
+    const created = await createIncomingWebhook(
+      db,
+      { name: '受信', secret: SECRET, lineAccountId: 'acc-first' },
+      { current: KEY_A },
+    );
+    const row = (await getIncomingWebhookById(db, created.id, 'acc-first'))!;
+    expect(row.secret_previous_encrypted ?? null).toBeNull();
+    expect(await resolvePreviousWebhookSecret(row, { current: KEY_A })).toBeNull();
+  });
+
+  it('旧平文だけの行を入れ替えると、前の値は暗号化して併用へ移る', async () => {
+    insertAccount(sqlite, 'acc-legacy');
+    sqlite.prepare(
+      `INSERT INTO incoming_webhooks (id, name, secret, line_account_id, is_active, created_at, updated_at)
+       VALUES ('iwh-legacy', '旧式', ?, 'acc-legacy', 1, '2026-01-01', '2026-01-01')`,
+    ).run(SECRET);
+    await updateIncomingWebhook(db, 'iwh-legacy', 'acc-legacy', { secret: NEW_SECRET }, { current: KEY_A });
+    const row = (await getIncomingWebhookById(db, 'iwh-legacy', 'acc-legacy'))!;
+    // 前の平文はそのまま残さず、暗号文として併用期間に入る。
+    expect(row.secret_previous_encrypted).not.toBe(SECRET);
+    expect(await resolvePreviousWebhookSecret(row, { current: KEY_A })).toBe(SECRET);
+  });
+});
+
+/** S (#939 機能26): 複数一致の届物は候補の友だちIDつきで箱へ置く。 */
+describe('S: 複数一致の届物の保留', () => {
+  it('ambiguous の届物は候補の友だちIDを持つ', async () => {
+    insertAccount(sqlite, 'acc-ambig');
+    const created = await createIncomingWebhook(
+      db,
+      { name: '受信', secret: SECRET, lineAccountId: 'acc-ambig' },
+      { current: KEY_A },
+    );
+    const row = await recordIncomingWebhookUnmatched(db, {
+      webhookId: created.id,
+      lineAccountId: 'acc-ambig',
+      sourceEventId: 'evt-ambig-1',
+      kind: 'ambiguous',
+      identityAttempts: [{ kind: 'verified_email', path: '$.email', value: 'a@example.com' }],
+      candidateFriendIds: ['f-1', 'f-2'],
+    });
+    expect(row.kind).toBe('ambiguous');
+    expect(JSON.parse(row.candidate_friend_ids_json!)).toEqual(['f-1', 'f-2']);
+    // 同じ受信の再送は増えない。
+    await recordIncomingWebhookUnmatched(db, {
+      webhookId: created.id,
+      lineAccountId: 'acc-ambig',
+      sourceEventId: 'evt-ambig-1',
+      kind: 'ambiguous',
+      identityAttempts: [],
+      candidateFriendIds: ['f-1', 'f-2'],
+    });
+    const count = sqlite.prepare(
+      `SELECT COUNT(*) AS n FROM incoming_webhook_unmatched_events WHERE webhook_id = ?`,
+    ).get(created.id) as { n: number };
+    expect(count.n).toBe(1);
   });
 });

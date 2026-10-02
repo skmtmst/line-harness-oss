@@ -135,11 +135,19 @@ async function request<T>(path: string, method = 'GET', body?: unknown, headers?
 }
 const idPath = (id: string) => `/${encodeURIComponent(id)}`
 export const hqTemplatesApi = {
-  uploadImage: async (file: File, purpose: 'message' | 'rich_menu'): Promise<MessageTemplateDefinition['media'][number]> => {
+  uploadImage: async (file: File, purpose: 'message' | 'rich_menu', expected?: { width: number; height: number }): Promise<MessageTemplateDefinition['media'][number]> => {
     const max = purpose === 'rich_menu' ? 1024 * 1024 : 8 * 1024 * 1024
     if (!['image/png', 'image/jpeg'].includes(file.type) || file.size < 1 || file.size > max) throw new Error('PNG・JPEGの画像を、表示されたサイズ上限内で選んでください。')
-    const result = await fetchApi<{ success: boolean; data?: MessageTemplateDefinition['media'][number] }>(`/api/hq/templates/media?purpose=${purpose}&filename=${encodeURIComponent(file.name)}`, { method: 'POST', headers: { 'Content-Type': file.type }, body: file })
+    // R568: 採用できる寸法を宣言する。違う寸法の画像はサーバが登録せず422で返す。
+    const size = purpose === 'rich_menu' && expected ? `&width=${expected.width}&height=${expected.height}` : ''
+    const result = await fetchApi<{ success: boolean; data?: MessageTemplateDefinition['media'][number] }>(`/api/hq/templates/media?purpose=${purpose}&filename=${encodeURIComponent(file.name)}${size}`, { method: 'POST', headers: { 'Content-Type': file.type }, body: file })
     if (!result.success || !result.data) throw new Error('画像を登録できませんでした。もう一度選択してください。')
+    return result.data
+  },
+  deleteImage: async (r2Key: string): Promise<{ deleted: boolean }> => {
+    // R568: 保存されなかった画像の後片付け。所有確認はサーバが行う。
+    const result = await fetchApi<{ success: boolean; data?: { deleted: boolean } }>(`/api/hq/templates/media?r2Key=${encodeURIComponent(r2Key)}`, { method: 'DELETE' })
+    if (!result.success || !result.data) throw new Error('画像の後片付けができませんでした。')
     return result.data
   },
   context: async (): Promise<{ tenantId: string; actorId: string }> => {
@@ -150,7 +158,12 @@ export const hqTemplatesApi = {
     }
     return { tenantId, actorId: id }
   },
-  list: (type: TemplateType) => request<HqTemplate[]>(`?type=${type}`),
+  /**
+   * 種類を指定すればその種類だけ、省けば全部の種類を返す（R119）。
+   * リッチメニューや回答フォームの編集では、別種類のタグやテンプレートを
+   * 参照先に選ぶため、一覧表示とは別に全部入りの目録が要る。
+   */
+  list: (type?: TemplateType) => request<HqTemplate[]>(type ? `?type=${type}` : ''),
   accounts: () => request<HqAccount[]>('/accounts'),
   get: (id: string) => request<TemplateDetail>(idPath(id)),
   create: (input: TemplateInput, requestId: string) => request<TemplateDetail>(

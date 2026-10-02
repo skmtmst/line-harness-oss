@@ -12,7 +12,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Select from '@/components/shared/select'
 import { scenarioReferenceData } from './scenario-reference-data'
+import Button from '@/components/shared/button'
 
 interface SendableTemplateCandidate {
   accountId?: string | null
@@ -124,12 +126,9 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
         <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
           パネルを並べて作る画面が別にあります。そこで作ると、ここから選べるようになります。
         </p>
-        <Link
-          href="/templates/carousel"
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control mt-3 inline-flex h-10 items-center border px-4 text-sm"
-        >
+        <Button variant="secondary" className="text-ink-secondary mt-3 h-10 items-center px-4 whitespace-normal" href="/templates/carousel">
           カルーセルを作りに行く
-        </Link>
+        </Button>
       </div>
     )
   }
@@ -140,21 +139,22 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
         <span className="text-ink-secondary mb-1 block text-xs font-medium">
           カルーセル <span className="text-danger">*</span>
         </span>
-        <select
+        <Select
           value={value}
-          onChange={(e) => {
-            const picked = items.find((t) => t.id === e.target.value) ?? null
-            onChange(e.target.value, picked)
+          onChange={(next) => {
+            const picked = items.find((t) => t.id === next) ?? null
+            onChange(next, picked)
           }}
-          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-        >
-          <option value="">選んでください</option>
-          {items.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}（{t.panels}枚{t.firstTitle ? `／${t.firstTitle}` : ''}）
-            </option>
-          ))}
-        </select>
+          aria-label="カルーセル"
+          options={[
+            { value: '', label: '選んでください' },
+            ...items.map((t) => ({
+              value: t.id,
+              label: `${t.name}（${t.panels}枚${t.firstTitle ? `／${t.firstTitle}` : ''}）`,
+            })),
+          ]}
+          size="full"
+        />
       </label>
       <p className="text-ink-faint text-xs leading-relaxed">
         カルーセルを直すと、この通の中身も一緒に変わります。

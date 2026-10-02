@@ -2,17 +2,24 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import type { Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
+import type { ApiResponse, Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
 import { groupTagsByFolder } from '../tag-options'
 import { api } from '@/lib/api'
+import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import { qrToDataURL } from '@/lib/qr-image'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useAccount } from '@/contexts/account-context'
+import Checkbox from '@/components/shared/checkbox'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import Notice from '@/components/shared/notice'
 import CreatePage, {
   AsideCard,
   Field,
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
-import SelectField from '@/components/shared/select-field'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import Select from '@/components/shared/select'
 
 /** 流入元の情報と、友だち追加時の動きをまとめて設定する。 */
 
@@ -34,6 +41,8 @@ function suggestRef(name: string): string {
 }
 
 export default function NewInflowLinkPage() {
+  const { selectedAccountId, selectedAccount } = useAccount()
+  const [saving, setSaving] = useState(false)
   const [name, setName] = useState('')
   const [genre, setGenre] = useState('')
   const [refCode, setRefCode] = useState('')
@@ -57,16 +66,27 @@ export default function NewInflowLinkPage() {
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [qrDataUrl, setQrDataUrl] = useState('')
+  // R23横展開: アカウントを切り替えたら、前の候補にしかない選択を外して知らせる。
+  const [pruneNotice, setPruneNotice] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
+    // プールは補助データ。機能がオフでもリンク発行画面そのものは止めない。
+    // 403 の応答自体が console error になるため、有効と分からない限り
+    // 口を発行しない（#703）。
+    const poolsRequest: Promise<ApiResponse<TrafficPool[]>> = isPoolsFeatureAvailable().then((ok) =>
+      ok
+        ? api.pools.list({ suppressFeatureDisabledEvent: true })
+        : { success: false as const, error: 'feature_disabled' },
+    )
+    // R23横展開: 候補は今のアカウントだけ。別アカウントの同名タグ混入防止。
+    const accountParams = selectedAccountId ? { accountId: selectedAccountId } : undefined
     void Promise.allSettled([
-      api.tags.list(),
-      api.scenarios.list(),
-      // プールは補助データ。機能がオフでもリンク発行画面そのものは止めない。
-      api.pools.list({ suppressFeatureDisabledEvent: true }),
-      api.templates.list(),
-      api.tagGroups.list(),
+      api.tags.list(accountParams),
+      api.scenarios.list(accountParams),
+      poolsRequest,
+      api.templates.list(undefined, selectedAccountId ?? undefined),
+      api.tagGroups.list(selectedAccountId),
     ]).then(([t, s, p, tp, tg]) => {
       if (cancelled) return
       if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
@@ -84,7 +104,27 @@ export default function NewInflowLinkPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+    // R39: 候補（タグ・シナリオ・プール・テンプレート）はアカウントごとに
+    // 違う。切替後に古い候補のまま保存しないよう、取り直す。入力は残す。
+  }, [selectedAccountId])
+
+  /*
+   * R23横展開(m18hと同じ形): 新しい候補にない選択は外す。
+   * 外すものがなければ何もしない。選び直しが必要なときだけ帯で知らせる。
+   */
+  useEffect(() => {
+    const tagIds = new Set(tags.map((tag) => tag.id))
+    const scenarioIds = new Set(scenarios.map((scenario) => scenario.id))
+    const templateIds = new Set(templates.map((template) => template.id))
+    let removed = 0
+    if (tagId && !tagIds.has(tagId)) { setTagId(''); removed += 1 }
+    if (scenarioId && !scenarioIds.has(scenarioId)) { setScenarioId(''); removed += 1 }
+    if (introTemplateId && !templateIds.has(introTemplateId)) { setIntroTemplateId(''); removed += 1 }
+    if (removed > 0) {
+      setPruneNotice(`選んでいた候補のうち${removed}件は、今のアカウントにないため外しました。選び直してください。`)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tags, scenarios, templates])
 
   const validRef = REF_PATTERN.test(refCode)
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
@@ -115,7 +155,19 @@ export default function NewInflowLinkPage() {
     }
   }, [previewUrl])
 
+  /*
+   * R18: 入力の途中で一覧リンク・左メニュー・戻る・再読込へ出るときは、
+   * 入力が消える前に確認を出す。保存が終わって詳細へ進む動きは
+   * プログラムの移動なので、この確認は出ない。
+   */
+  const dirty = Boolean(
+    name || genre || refCode || tagId || scenarioId || introTemplateId
+    || poolId || redirectUrl || !isActive,
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+
   return (
+    <>
     <CreatePage
       title="流入リンクをつくる"
       description="流入経路ごとにURLを分けると、どこから友だちになったかが分かります。"
@@ -125,28 +177,46 @@ export default function NewInflowLinkPage() {
       successHref={(id) => `/inflow-links/detail?id=${id}`}
       designNode="TEVk8"
       variant="v6"
-      statusLabel="まだ発行されていません。発行すると、すぐにこのURLが使えます。"
+      statusLabel={isActive ? 'まだ発行されていません。発行すると、すぐにこのURLが使えます。' : 'まだ発行されていません。公開オフのまま発行すると、URLを開いても友だち追加できません。'}
       validate={() => {
+        if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
         if (!name.trim()) return 'リンク名を入力してください'
         if (!validRef) {
           return 'refコードは、半角英数字・_・ハイフンで1〜64文字にしてください'
         }
         return null
       }}
+      /*
+       * M030: 発行の失敗は原文のまま出さない。403は権限の案内、
+       * 400は入力の直し方つき、409は重複の立て直し文、429は待ち案内、
+       * 機械コードだけの失敗は再試行の案内にする。
+       */
+      describeError={(e) => describeApiFailure(e, '発行', {
+        forbidden: '発行するには権限が要ります。オーナーか管理者に依頼してください。',
+      })}
       onSave={async () => {
-        const res = await api.entryRoutes.create({
-          name: name.trim(),
-          genre: genre.trim() || null,
-          refCode: refCode.trim(),
-          tagId: tagId || null,
-          scenarioId: scenarioId || null,
-          introTemplateId: introTemplateId || null,
-          poolId: poolId || null,
-          redirectUrl: redirectUrl.trim() || null,
-          isActive,
-        })
-        if (!res.success) throw new Error(res.error)
-        return res.data.id
+        if (!selectedAccountId) {
+          throw new Error('LINEアカウントを選んでください（画面上部で選べます）')
+        }
+        setSaving(true)
+        try {
+          const res = await api.entryRoutes.create({
+            name: name.trim(),
+            genre: genre.trim() || null,
+            refCode: refCode.trim(),
+            tagId: tagId || null,
+            scenarioId: scenarioId || null,
+            introTemplateId: introTemplateId || null,
+            poolId: poolId || null,
+            redirectUrl: redirectUrl.trim() || null,
+            isActive,
+            lineAccountId: selectedAccountId,
+          })
+          if (!res.success) throw new Error(res.error)
+          return res.data.id
+        } finally {
+          setSaving(false)
+        }
       }}
       aside={
         <>
@@ -177,6 +247,7 @@ export default function NewInflowLinkPage() {
         </>
       }
     >
+      {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} className="mb-3" /> : null}
       <FormSection step={1} label="どこに置くリンクですか">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Field label="流入元の名前" htmlFor="ir-name" required note="管理画面で見分けるための名前です。">
@@ -215,7 +286,7 @@ export default function NewInflowLinkPage() {
         {previewUrl ? (
           <div className="mt-3">
             {/* #975 U065: 保存前は「未発行の見本」と明記する。 */}
-            <p className="inline-flex items-center rounded-pill border border-hairline bg-canvas-sunken px-3 py-1 text-xs font-bold text-ink-secondary">
+            <p className="inline-flex items-center rounded-pill border border-hairline bg-canvas-sunken px-3 py-1 text-xs font-medium text-ink-secondary">
               保存前の見本 — まだ発行されていません
             </p>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-4">
@@ -250,12 +321,12 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-tag"
           note="あとで配信の絞り込みに使えます。"
         >
-          <SelectField
+          <Select
             id="ir-tag"
             value={tagId}
-            onChange={(e) => setTagId(e.target.value)}
+            onChange={(value) => setTagId(value)}
             aria-label="自動で付けるタグ"
-            className={inputClass}
+            size="full"
             options={[
               { value: '', label: '（なし）' },
               ...tagOptionGroups.flatMap((group) =>
@@ -273,12 +344,12 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-scenario"
           note="経路ごとに違う案内を送れます。"
         >
-          <SelectField
+          <Select
             id="ir-scenario"
             value={scenarioId}
-            onChange={(e) => setScenarioId(e.target.value)}
+            onChange={(value) => setScenarioId(value)}
             aria-label="開始するシナリオ配信"
-            className={inputClass}
+            size="full"
             options={[
               { value: '', label: '（なし）' },
               ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name })),
@@ -291,12 +362,12 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-intro"
           note="シナリオとは別に、その場で1通だけ送ります。"
         >
-          <SelectField
+          <Select
             id="ir-intro"
             value={introTemplateId}
-            onChange={(e) => setIntroTemplateId(e.target.value)}
+            onChange={(value) => setIntroTemplateId(value)}
             aria-label="追加直後に送るメッセージ"
-            className={inputClass}
+            size="full"
             options={[
               { value: '', label: '送らない' },
               ...templates.map((template) => ({ value: template.id, label: template.name })),
@@ -316,25 +387,41 @@ export default function NewInflowLinkPage() {
               <input id="ir-redirect" type="url" value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} placeholder="https://example.com/lp" className={inputClass} />
             </Field>
           </div>
-          <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
-            <input type="checkbox" className="mt-0.5" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-            <span>発行したらすぐ使えるようにする<span className="block text-xs text-ink-faint">オフにすると、URLを開いても友だち追加できません。</span></span>
-          </label>
+          <Checkbox
+            checked={isActive}
+            onCheckedChange={setIsActive}
+            description="オフにすると、URLを開いても友だち追加できません。"
+            className="mt-3"
+          >発行したらすぐ使えるようにする</Checkbox>
         </details>
       </FormSection>
 
       <FormSection step={4} label="どのLINEアカウントに入れるか">
         <Field
+          label="所属するLINEアカウント"
+          note="発行したリンクはこのアカウントに所属します。一覧では選んだアカウントの分だけ表示されます。"
+        >
+          {selectedAccountId ? (
+            <p className="rounded-control bg-canvas-sunken px-3 py-2 text-sm font-semibold text-ink">
+              {selectedAccount?.name ?? selectedAccountId}
+            </p>
+          ) : (
+            <p className="rounded-control bg-canvas-sunken px-3 py-2 text-sm text-ink-faint">
+              画面上部でLINEアカウントを選んでください
+            </p>
+          )}
+        </Field>
+        <Field
           label="入れるアカウント"
           htmlFor="ir-pool"
           note="選ばないと、全体の既定の振り分けに従います。"
         >
-          <SelectField
+          <Select
             id="ir-pool"
             value={poolId}
-            onChange={(e) => setPoolId(e.target.value)}
+            onChange={(value) => setPoolId(value)}
             aria-label="友だちの追加先アカウント"
-            className={inputClass}
+            size="full"
             options={[
               { value: '', label: 'メインプールで自動振り分け' },
               ...pools.map((pool) => ({ value: pool.id, label: pool.name })),
@@ -347,13 +434,16 @@ export default function NewInflowLinkPage() {
       </FormSection>
 
     </CreatePage>
+
+    <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した流入リンク" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    </>
   )
 }
 
 function FlowStep({ step, title, description }: { step: string; title: string; description: string }) {
   return (
     <li className="flex gap-2">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-deep text-xs font-bold text-on-accent">{step}</span>
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-accent-deep text-xs font-medium text-on-accent">{step}</span>
       <span><strong className="block text-ink-secondary">{title}</strong>{description}</span>
     </li>
   )

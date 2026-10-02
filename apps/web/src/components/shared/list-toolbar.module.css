@@ -1,0 +1,139 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+  /*
+   * ★V7 `Xn1Mz`「一覧の上の道具の並び」。どの一覧も同じ2行。
+   *
+   * 1行目：検索（幅320・虫眼鏡つき・狭い時も240まで）→ 保存した検索 →
+   * この条件を保存。検索を横いっぱいに伸ばさない。検索を枠付きの箱
+   * （カード）で包まない。道具の行にそのまま置く。
+   *
+   * 2行目：左に絞り込み（札・日付）、右端に並び順と表示件数。
+   * 表示件数だけの行を作らない。入りきらない幅（1152px以下）では
+   * 右の2つが下へ折り返す（flex-wrap）。
+   */
+  .toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .row1 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /*
+   * 検索の幅は部品が持つ（画面ごとに手で書くとずれる）。
+   * search-field 側の `.search`（min-width: 0）より詳細度を上げて
+   * 320 / 240 を必ず効かせる。
+   */
+  .row1 > .search {
+    width: 320px;
+    max-width: 100%;
+    min-width: 240px;
+    flex: 0 1 320px;
+  }
+
+  .row2 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  /*
+   * 日付の範囲の入力（開始・終了）はこの幅にそろえる。
+   * 208px（w-52）では2つで416pxになり、1440pxで並び順と
+   * 表示件数が3行目へ落ちた。132pxは中の文字を「開始日」
+   * 「終了日」（3文字・14px＝約42px＋暦の絵16px＋余白＝約116px）
+   * に短くした最小。「日付を選ぶ」（約70px）のままでは欠ける。
+   * 選んだ日が長いときは DateField 側の省略＋titleで読める。
+   * 1152px以下での折り返しは .row2 の flex-wrap のまま。
+   * 印は呼び出し側が付ける：<div data-date-input><DateField … /></div>
+   */
+  .filters > [data-date-input] {
+    width: 132px;
+    flex: none;
+    max-width: 100%;
+  }
+
+  .trailing {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  /*
+   * 並び順・表示件数の選ぶ欄はこの幅にそろえる。
+   * 既定（176px・128px）のままでは一斉配信の2行目が1440px
+   * （中身の幅 ≈835px）で3行目へ落ちた。並び順150pxは
+   * 「新しい順」（4文字・14px＝約56px＋矢印の余白＝約105px）、
+   * 表示件数96pxは「100件表示」→「100件」（約41px＋余白＝約90px）
+   * に短くした最小。中の選ぶ欄は w-full で箱いっぱいに広げる
+   * （size の既定幅は utilities 層で上書きする決まり）。
+   * 1152px以下での折り返しは .row2/.trailing の flex-wrap のまま。
+   * 印は呼び出し側が付ける：
+   * <div data-sort-select><SelectField … /></div>
+   * <div data-per-page-select><SelectField … /></div>
+   */
+  .trailing > [data-sort-select] {
+    width: 150px;
+    flex: none;
+    max-width: 100%;
+  }
+
+  .trailing > [data-per-page-select] {
+    width: 96px;
+    flex: none;
+    max-width: 100%;
+  }
+
+  /*
+   * ★V8「道具の1段」（c4n9Kr）：帯は1段・高さ64。余白は上下14・
+   * 左右24、道具の間は 8。v7 の2段組みは変えない。
+   *
+   * v8 では row1/row2/filters の入れ子を display:contents で
+   * ほぐし、中身を帯の直接の子として1段に並べる。並びは
+   * Pencil の順：検索 → 絞り込み → 道具 → 右端に並び順・件数。
+   * 入りきらない幅では flex-wrap で下へ折り返す。
+   */
+  [data-theme='v8'] .toolbar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 24px;
+  }
+
+  [data-theme='v8'] .row1,
+  [data-theme='v8'] .row2,
+  [data-theme='v8'] .filters {
+    display: contents;
+  }
+
+  [data-theme='v8'] .filters > * {
+    order: 2;
+  }
+
+  [data-theme='v8'] .row1 > *:not(.search) {
+    order: 3;
+  }
+
+  [data-theme='v8'] .trailing {
+    order: 4;
+  }
+}

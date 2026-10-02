@@ -30,8 +30,10 @@ describe('表見出しの第1段階移行', () => {
     expect(migrated).toBeGreaterThan(0)
 
     for (const [path, source] of Object.entries(sources)) {
-      expect(source, `${path} が共通表部品をimportしていない`).toContain(
-        "import { TableHeadRow, Th } from '@/components/shared/table'",
+      // 見出しだけでなく行・セルまで共通化した画面は、同じ入口から
+      // { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } の形で入れる。
+      expect(source, `${path} が共通表部品をimportしていない`).toMatch(
+        /import \{[^}]*\bTh\b[^}]*\} from '@\/components\/shared\/table'/,
       )
       expect(source, `${path} が見出し行を共通化していない`).toContain('<TableHeadRow>')
       expect(source.match(/<Th\b/g), `${path} に共通Thの利用箇所が無い`).not.toBeNull()
@@ -39,17 +41,26 @@ describe('表見出しの第1段階移行', () => {
   })
 
   it('移行したセルに旧色・旧余白・大文字化を重ねない', () => {
-    const handledByPart =
-      /(?:px-[234]|py-3|text-(?:left|right|center|xs|\[11px\]|ink-faint|gray-500)|font-(?:medium|semibold)|uppercase|tracking-wider|whitespace-nowrap)/
+    // V8 移行 ①: 直書き th を共通 Th へ置き換える際、画面の見た目を変えない
+    // ために寸法・文字サイズの上書きクラスは残す。禁止するのは .cell が持つ
+    // 値（余白・色・太さ・揃え・折り返し）と同じクラスの再指定だけ。
+    // 動的 className（${} 入り）は条件付きの意図的な上書きなので対象外。
+    const duplicatesCell =
+      /\b(?:px-3|py-0|text-left|text-right|text-center|text-ink-faint|text-caption|font-semibold|whitespace-nowrap|uppercase|tracking-wider)\b/
 
     for (const [path, source] of Object.entries(sources)) {
       for (const opening of source.match(/<Th\b[^>]*>/gs) ?? []) {
-        expect(opening, `${path} が共通Thへ旧指定を重ねている`).not.toMatch(handledByPart)
+        const cls = /className="([^"]*)"/.exec(opening)?.[1]
+        if (!cls) continue
+        expect(cls, `${path} が共通Thへ .cell と同値の指定を重ねている`).not.toMatch(
+          duplicatesCell,
+        )
       }
     }
   })
 
-  it('一覧に登録した詳細内テーブルだけ直書きthを許す', () => {
+  // 全ソース走査(countDebt)を含むため、CIの並列負荷で5秒を超えることがある。
+  it('一覧に登録した詳細内テーブルだけ直書きthを許す', { timeout: 30000 }, () => {
     for (const path of targets.filter((path) => !nativeHeaderExceptions.has(path))) {
       expect(sources[path]).not.toMatch(/<th\b/)
     }

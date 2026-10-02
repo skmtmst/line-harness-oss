@@ -63,7 +63,8 @@ vi.mock('../services/account-access.js', () => ({
   })),
 }));
 
-vi.mock('../services/booking-notifier.js', () => ({
+vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
   notifyForBooking: vi.fn(async () => undefined),
 }));
@@ -378,6 +379,17 @@ describe('起点2の別の入口: 手動タグ付け・オートメーション�
 describe('起点3: 動画を見終えた (webinar_completed)', () => {
   const SESSION_START = Math.floor(Date.UTC(2026, 6, 29, 11, 0) / 1000);
 
+  // heartbeat は15秒ごとの実視聴を想定し、経過時間に見合わない跳びは
+  // 異常として数えない。同秒内の550秒跳びは異常扱いになるので、試験も
+  // 実視聴と同じく時刻を進めて送る（数える意図は変えない）。
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(SESSION_START * 1000));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   function setupWebinar() {
     sqlite
       .prepare(
@@ -390,7 +402,8 @@ describe('起点3: 動画を見終えた (webinar_completed)', () => {
       .run();
   }
 
-  async function heartbeat(positionSeconds: number): Promise<Response> {
+  async function heartbeat(positionSeconds: number, advanceSeconds: number): Promise<Response> {
+    vi.advanceTimersByTime(advanceSeconds * 1000);
     const app = new Hono<Env>();
     app.route('/', webinarRoutes);
     const exec = makeExecCtx();
@@ -411,16 +424,16 @@ describe('起点3: 動画を見終えた (webinar_completed)', () => {
     addPoint('webinar_completed');
     setupWebinar();
 
-    const half = await heartbeat(400);
+    const half = await heartbeat(400, 400);
     expect(half.status).toBe(200);
     // 90%に届かない位置では数えない。
     expect(countEvents('webinar_completed')).toBe(0);
 
-    const done = await heartbeat(950);
+    const done = await heartbeat(950, 300);
     expect(done.status).toBe(200);
     expect(countEvents('webinar_completed')).toBe(1);
 
-    await heartbeat(980);
+    await heartbeat(980, 60);
     expect(countEvents('webinar_completed')).toBe(1);
   });
 });
@@ -718,21 +731,21 @@ describe('地点の絞り込み(実DB・SQLを直接見る)', () => {
     `);
 
     const result = await record();
-    expect(result).toEqual({ matched: 2, recorded: 2, failed: 0, skipped: null });
+    expect(result).toEqual({ matched: 2, recorded: 2, failed: 0, excluded: 0, skipped: null });
   });
 
   test('停止中の地点は拾わない', async () => {
     point('p-stopped', { status: 'stopped' });
 
     const result = await record();
-    expect(result).toEqual({ matched: 0, recorded: 0, failed: 0, skipped: null });
+    expect(result).toEqual({ matched: 0, recorded: 0, failed: 0, excluded: 0, skipped: null });
   });
 
   test('起点が違う地点は拾わない', async () => {
     point('p-ec', { eventType: 'ec_order_confirmed' });
 
     const result = await record();
-    expect(result).toEqual({ matched: 0, recorded: 0, failed: 0, skipped: null });
+    expect(result).toEqual({ matched: 0, recorded: 0, failed: 0, excluded: 0, skipped: null });
   });
 
   test('別アカウントの友だちは、こちらのアカウントの地点を拾わない', async () => {
@@ -746,7 +759,7 @@ describe('地点の絞り込み(実DB・SQLを直接見る)', () => {
     `);
 
     const result = await record('friend-b');
-    expect(result).toEqual({ matched: 0, recorded: 0, failed: 0, skipped: null });
+    expect(result).toEqual({ matched: 0, recorded: 0, failed: 0, excluded: 0, skipped: null });
   });
 
   test('同じ元イベントの再送では2度目を記録しない', async () => {
@@ -765,62 +778,64 @@ describe('地点の絞り込み(実DB・SQLを直接見る)', () => {
 
 // ---- 6. 注文が確定した (ec_order_confirmed) -------------------------------
 
+async function signEcEvent(timestamp: string, body: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(ECCUBE_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const mac = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    new TextEncoder().encode(`${timestamp}.account-a.${body}`),
+  );
+  return [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function postEcOrder(eventId: string, order?: Record<string, unknown> | null) {
+  const body = JSON.stringify({
+    event_id: eventId,
+    event_type: 'ec.order.confirmed',
+    occurred_at: '2026-11-01T00:00:00+09:00',
+    customer_id: 'c-1',
+    line_user_id: LINE_USER_ID,
+    order: order === undefined
+      ? { number: 'ORD-1', total: 5400, items: [{ name: 'ごはん', quantity: 1 }] }
+      : order,
+  });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const app = new Hono<Env>();
+  app.route('/', ecIntegrations);
+  const exec = makeExecCtx();
+  const res = await app.fetch(
+    new Request('https://worker.example.test/api/integrations/eccube/events', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-line-account-id': 'account-a',
+        'x-nen-timestamp': timestamp,
+        'x-nen-signature': `sha256=${await signEcEvent(timestamp, body)}`,
+      },
+      body,
+    }),
+    env(),
+    exec.ctx,
+  );
+  await exec.drain();
+  return res;
+}
+
 describe('起点6: 注文が確定した (ec_order_confirmed)', () => {
-  async function sign(timestamp: string, body: string): Promise<string> {
-    const key = await crypto.subtle.importKey(
-      'raw',
-      new TextEncoder().encode(ECCUBE_SECRET),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign'],
-    );
-    const mac = await crypto.subtle.sign(
-      'HMAC',
-      key,
-      new TextEncoder().encode(`${timestamp}.account-a.${body}`),
-    );
-    return [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, '0')).join('');
-  }
-
-  async function post(eventId: string) {
-    const body = JSON.stringify({
-      event_id: eventId,
-      event_type: 'ec.order.confirmed',
-      occurred_at: '2026-11-01T00:00:00+09:00',
-      customer_id: 'c-1',
-      line_user_id: LINE_USER_ID,
-      order: { number: 'ORD-1', total: 5400, items: [{ name: 'ごはん', quantity: 1 }] },
-    });
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const app = new Hono<Env>();
-    app.route('/', ecIntegrations);
-    const exec = makeExecCtx();
-    const res = await app.fetch(
-      new Request('https://worker.example.test/api/integrations/eccube/events', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-line-account-id': 'account-a',
-          'x-nen-timestamp': timestamp,
-          'x-nen-signature': `sha256=${await sign(timestamp, body)}`,
-        },
-        body,
-      }),
-      env(),
-      exec.ctx,
-    );
-    await exec.drain();
-    return res;
-  }
-
   test('注文確定の受信で成果が1件数えられ、同じ注文の再送では増えない', async () => {
     addPoint('ec_order_confirmed');
 
-    const first = await post('ec-event-1');
+    const first = await postEcOrder('ec-event-1');
     expect(first.status).toBe(200);
     expect(countEvents('ec_order_confirmed')).toBe(1);
 
-    await post('ec-event-1');
+    await postEcOrder('ec-event-1');
     expect(countEvents('ec_order_confirmed')).toBe(1);
   });
 
@@ -835,9 +850,69 @@ describe('起点6: 注文が確定した (ec_order_confirmed)', () => {
       )
       .run();
 
-    const res = await post('ec-event-2');
+    const res = await postEcOrder('ec-event-2');
     expect(res.status).toBe(202);
     expect(await res.json()).toMatchObject({ status: 'skipped' });
     expect(countEvents('ec_order_confirmed')).toBe(1);
+  });
+});
+
+function addValuePoint(id: string, valueMode: 'source' | 'fixed' | 'none', value: number | null): void {
+  sqlite
+    .prepare(
+      `INSERT INTO conversion_points
+         (id, name, event_type, value, status, measure_method, target_url,
+          count_repeat, line_account_id, tenant_id, deduplication_mode, value_mode)
+       VALUES (?, ?, 'ec_order_confirmed', ?, 'active', 'webhook', NULL,
+          1, 'account-a', 'tenant-1', 'every', ?)`,
+    )
+    .run(id, id, value, valueMode);
+}
+
+function valueSnapshot(pointId: string): number | null | undefined {
+  const row = sqlite
+    .prepare(
+      `SELECT value_snapshot FROM conversion_events
+        WHERE conversion_point_id = ? AND friend_id = 'friend-1'`,
+    )
+    .get(pointId) as { value_snapshot: number | null } | undefined;
+  return row?.value_snapshot;
+}
+
+/*
+ * R42: 「注文金額を使う」設定で EC の自動計測が 0円になっていた。
+ * 受信から記録まで注文金額を渡し、無いときは 0円ではなく金額なしに
+ * する。固定額・注文金額・金額なしの3つを端から端で見る。
+ */
+describe('起点6の金額: 注文金額を使う・決まった額・金額なし(R42)', () => {
+  test('同じ注文が3方式の地点へ正しく分かれて記録される', async () => {
+    addValuePoint('point-source', 'source', null);
+    addValuePoint('point-fixed', 'fixed', 3000);
+    addValuePoint('point-none', 'none', null);
+
+    const res = await postEcOrder('ec-event-value-1');
+    expect(res.status).toBe(200);
+    // source は注文の合計、fixed は地点の決まった額(申告で上書きしない)、
+    // none は金額なし。
+    expect(valueSnapshot('point-source')).toBe(5400);
+    expect(valueSnapshot('point-fixed')).toBe(3000);
+    expect(valueSnapshot('point-none')).toBeNull();
+  });
+
+  test('注文に合計が無いときは0円ではなく金額なしで記録される', async () => {
+    addValuePoint('point-source', 'source', null);
+
+    const res = await postEcOrder('ec-event-value-2', { number: 'ORD-2' });
+    expect(res.status).toBe(200);
+    // 行はある(数えている)が金額はなし。undefined なら行自体が無い。
+    expect(valueSnapshot('point-source')).toBeNull();
+  });
+
+  test('合計が数値でないときも金額なしで記録される', async () => {
+    addValuePoint('point-source', 'source', null);
+
+    const res = await postEcOrder('ec-event-value-3', { number: 'ORD-3', total: '5400' });
+    expect(res.status).toBe(200);
+    expect(valueSnapshot('point-source')).toBeNull();
   });
 });

@@ -695,6 +695,195 @@ export async function publishWebinarEditorVersion(
   return getWebinarEditorSettings(db, webinarId);
 }
 
+export type WebinarHeartbeatPlayerState =
+  | 'playing'
+  | 'paused'
+  | 'hidden'
+  | 'buffering'
+  | 'seeking';
+
+export const WEBINAR_HEARTBEAT_PLAYER_STATES: readonly WebinarHeartbeatPlayerState[] = [
+  'playing', 'paused', 'hidden', 'buffering', 'seeking',
+];
+
+/** heartbeat の送信間隔（秒）。再生中だけ15秒ごとに送る（J #821）。 */
+export const WEBINAR_HEARTBEAT_WINDOW_SECONDS = 15;
+
+/** 有効な視聴区間の合計がこの秒数以上で「視聴開始」とする（J #821）。 */
+export const WEBINAR_VIEW_START_SECONDS = 30;
+
+/** 離脱・維持率の集計バケット（秒）。設計 J-1 の「いちばん離れた所 12〜15分」に合わせる。 */
+export const WEBINAR_RETENTION_BUCKET_SECONDS = 60;
+
+export type WebinarHeartbeatRejectReason =
+  | 'position_jump'
+  | 'negative_gap'
+  | 'invalid_rate';
+
+export interface WebinarHeartbeatInput {
+  webinarId: string;
+  friendId: string;
+  sessionStartAt: number;
+  positionSeconds: number;
+  playerState?: WebinarHeartbeatPlayerState | string | null;
+  playbackRate?: number | null;
+  clientAtMs?: number | null;
+  receivedAtEpoch?: number | null;
+}
+
+export type WebinarHeartbeatResult =
+  | { status: 'recorded' }
+  | { status: 'not_counted' }
+  | { status: 'moved' }
+  | { status: 'rejected'; reason: WebinarHeartbeatRejectReason };
+
+export function parseWebinarHeartbeatPlayerState(
+  value: unknown,
+): WebinarHeartbeatPlayerState | null {
+  if (value === undefined || value === null || value === '') return 'playing';
+  return (WEBINAR_HEARTBEAT_PLAYER_STATES as readonly string[]).includes(String(value))
+    ? (String(value) as WebinarHeartbeatPlayerState)
+    : null;
+}
+
+async function insertWebinarHeartbeatReject(
+  db: D1Database,
+  input: {
+    webinarId: string;
+    friendId: string;
+    sessionStartAt: number;
+    reason: WebinarHeartbeatRejectReason;
+    positionSeconds: number;
+  },
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO webinar_heartbeat_rejects
+       (id, webinar_id, friend_id, session_start_at, reason, position_seconds, received_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(), input.webinarId, input.friendId, input.sessionStartAt,
+    input.reason, input.positionSeconds, jstNow(),
+  ).run();
+}
+
+/**
+ * heartbeat を1件受け付ける（J #821）。
+ *
+ * - 基準はサーバー受信時刻。クライアント申告の時刻は記録だけで判定に使わない。
+ * - 再生中（playing）だけ有効な視聴区間を作る。一時停止・非表示・
+ *   読み込み待ちの時間は視聴に数えない。
+ * - 位置の移動中（seeking）は区間を作らず位置だけ進める（移動の跳びを異常にしない）。
+ * - 再生中の位置の進みが「経過時間の2倍」を超えたら異常として除外し、
+ *   理由を残す（速度再生は速度ぶんだけ上限を広げる）。
+ */
+export async function recordWebinarHeartbeat(
+  db: D1Database,
+  input: WebinarHeartbeatInput,
+): Promise<WebinarHeartbeatResult> {
+  const receivedAt = Math.floor(input.receivedAtEpoch ?? Date.now() / 1000);
+  const rate = input.playbackRate ?? 1;
+  if (!Number.isFinite(rate) || rate <= 0 || rate > 4) {
+    await insertWebinarHeartbeatReject(db, {
+      webinarId: input.webinarId,
+      friendId: input.friendId,
+      sessionStartAt: input.sessionStartAt,
+      reason: 'invalid_rate',
+      positionSeconds: input.positionSeconds,
+    });
+    return { status: 'rejected', reason: 'invalid_rate' };
+  }
+  const state = parseWebinarHeartbeatPlayerState(input.playerState) ?? 'playing';
+
+  let viewer = await db.prepare(
+    `SELECT last_position_seconds, last_heartbeat_at
+       FROM webinar_viewers
+      WHERE webinar_id = ? AND friend_id = ? AND session_start_at = ?`,
+  ).bind(input.webinarId, input.friendId, input.sessionStartAt)
+    .first<{ last_position_seconds: number; last_heartbeat_at: number | null }>();
+  if (!viewer) {
+    await db.prepare(
+      `INSERT OR IGNORE INTO webinar_viewers
+         (id, webinar_id, friend_id, session_start_at, joined_at, last_position_seconds, last_heartbeat_at)
+       VALUES (?, ?, ?, ?, ?, 0, NULL)`,
+    ).bind(
+      crypto.randomUUID(), input.webinarId, input.friendId,
+      input.sessionStartAt, jstNow(),
+    ).run();
+    viewer = { last_position_seconds: 0, last_heartbeat_at: null };
+  }
+
+  const touchHeartbeat = async (position: number | null) => {
+    if (position === null) {
+      await db.prepare(
+        `UPDATE webinar_viewers SET last_heartbeat_at = ?
+          WHERE webinar_id = ? AND friend_id = ? AND session_start_at = ?`,
+      ).bind(receivedAt, input.webinarId, input.friendId, input.sessionStartAt).run();
+    } else {
+      await db.prepare(
+        `UPDATE webinar_viewers
+            SET last_position_seconds = MAX(last_position_seconds, ?),
+                last_heartbeat_at = ?
+          WHERE webinar_id = ? AND friend_id = ? AND session_start_at = ?`,
+      ).bind(position, receivedAt, input.webinarId, input.friendId, input.sessionStartAt).run();
+    }
+  };
+
+  // 位置の移動中は跳びが当然なので、異常にせず位置だけ進める。
+  if (state === 'seeking') {
+    await touchHeartbeat(input.positionSeconds);
+    return { status: 'moved' };
+  }
+  // 一時停止・非表示・読み込み待ちは視聴に数えない。受信時刻だけ進める。
+  if (state !== 'playing') {
+    await touchHeartbeat(null);
+    return { status: 'not_counted' };
+  }
+
+  const elapsed = viewer.last_heartbeat_at === null
+    ? null
+    : Math.max(0, receivedAt - viewer.last_heartbeat_at);
+  const delta = input.positionSeconds - viewer.last_position_seconds;
+  if (elapsed !== null) {
+    const bound = 2 * elapsed * Math.max(1, rate);
+    if (delta > bound || delta < -bound) {
+      await insertWebinarHeartbeatReject(db, {
+        webinarId: input.webinarId,
+        friendId: input.friendId,
+        sessionStartAt: input.sessionStartAt,
+        reason: delta > bound ? 'position_jump' : 'negative_gap',
+        positionSeconds: input.positionSeconds,
+      });
+      // 時刻だけ進め、異常な位置を基準にしない。次回は長い経過で判定する。
+      await touchHeartbeat(null);
+      return { status: 'rejected', reason: delta > bound ? 'position_jump' : 'negative_gap' };
+    }
+  }
+  await recordWebinarViewSegment(db, input.webinarId, input.friendId, input.sessionStartAt, input.positionSeconds, {
+    playbackRate: rate,
+    clientAtMs: input.clientAtMs ?? null,
+    windowSeconds: WEBINAR_HEARTBEAT_WINDOW_SECONDS,
+  });
+  await touchHeartbeat(input.positionSeconds);
+  return { status: 'recorded' };
+}
+
+/** 異常として除外した heartbeat の件数。異常値警告の母数にする。 */
+export async function countWebinarHeartbeatRejects(
+  db: D1Database,
+  webinarId: string,
+): Promise<number> {
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS n FROM webinar_heartbeat_rejects WHERE webinar_id = ?`,
+  ).bind(webinarId).first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+export interface WebinarHeartbeatOptions {
+  playbackRate?: number | null;
+  clientAtMs?: number | null;
+  windowSeconds?: number | null;
+}
+
 export async function getWebinarViewSegmentCoverage(
   db: D1Database,
   webinarId: string,
@@ -709,26 +898,160 @@ export async function getWebinarViewSegmentCoverage(
   return result.results ?? [];
 }
 
-/** ハートビート間の実視聴区間を30秒単位で冪等に記録する。 */
+/**
+ * ハートビート間の実視聴区間を冪等に記録する。
+ * 既定の窓は heartbeat の送信間隔（15秒）。5引数の呼び出しは
+ * 従来どおり30秒窓で動く（後方互換）。
+ */
 export async function recordWebinarViewSegment(
   db: D1Database,
   webinarId: string,
   friendId: string,
   sessionStartAt: number,
   positionSeconds: number,
+  options?: WebinarHeartbeatOptions,
 ): Promise<void> {
+  const windowSeconds = Math.max(1, Math.floor(options?.windowSeconds ?? 30));
   const endSeconds = Math.max(1, Math.floor(positionSeconds));
-  const startSeconds = Math.max(0, endSeconds - 30);
+  const startSeconds = Math.max(0, endSeconds - windowSeconds);
   const idempotencyKey = `${webinarId}:${friendId}:${sessionStartAt}:${startSeconds}:${endSeconds}`;
-  await db.prepare(
-    `INSERT OR IGNORE INTO webinar_view_segments
-       (id, webinar_id, friend_id, session_start_at, start_seconds, end_seconds,
-        received_at, idempotency_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(
-    crypto.randomUUID(), webinarId, friendId, sessionStartAt,
-    startSeconds, endSeconds, jstNow(), idempotencyKey,
-  ).run();
+  const rate = options?.playbackRate ?? 1;
+  const clientAtMs = options?.clientAtMs ?? null;
+  try {
+    await db.prepare(
+      `INSERT OR IGNORE INTO webinar_view_segments
+         (id, webinar_id, friend_id, session_start_at, start_seconds, end_seconds,
+          received_at, idempotency_key, playback_rate, client_at_ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), webinarId, friendId, sessionStartAt,
+      startSeconds, endSeconds, jstNow(), idempotencyKey, rate, clientAtMs,
+    ).run();
+  } catch {
+    // 507 より前の DB（列が無い）では従来の8列で入れる。
+    await db.prepare(
+      `INSERT OR IGNORE INTO webinar_view_segments
+         (id, webinar_id, friend_id, session_start_at, start_seconds, end_seconds,
+          received_at, idempotency_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), webinarId, friendId, sessionStartAt,
+      startSeconds, endSeconds, jstNow(), idempotencyKey,
+    ).run();
+  }
+}
+
+/**
+ * 重なる区間を束ね、重複時間を足さない合計秒数を返す（J #821）。
+ * 同じ区間の再送は呼び出し前に冪等キーで1行になっている前提。
+ */
+export function mergeWebinarWatchedSeconds(
+  intervals: Array<{ start_seconds: number; end_seconds: number }>,
+): number {
+  const sorted = intervals
+    .filter((item) => item.end_seconds > item.start_seconds)
+    .sort((a, b) => a.start_seconds - b.start_seconds || a.end_seconds - b.end_seconds);
+  let total = 0;
+  let cursorStart: number | null = null;
+  let cursorEnd = 0;
+  for (const item of sorted) {
+    if (cursorStart === null || item.start_seconds > cursorEnd) {
+      if (cursorStart !== null) total += cursorEnd - cursorStart;
+      cursorStart = item.start_seconds;
+      cursorEnd = item.end_seconds;
+    } else if (item.end_seconds > cursorEnd) {
+      cursorEnd = item.end_seconds;
+    }
+  }
+  if (cursorStart !== null) total += cursorEnd - cursorStart;
+  return total;
+}
+
+/**
+ * 視聴開始した人（有効な区間の合計が閾値以上）の人数（J #821）。
+ * 一時停止・非表示の時間は区間が無いので数えない。
+ */
+export async function countWebinarStartedViewers(
+  db: D1Database,
+  webinarId: string,
+  thresholdSeconds = WEBINAR_VIEW_START_SECONDS,
+): Promise<number> {
+  const { results } = await db.prepare(
+    `SELECT friend_id, start_seconds, end_seconds
+       FROM webinar_view_segments
+      WHERE webinar_id = ?
+      ORDER BY friend_id, start_seconds, end_seconds`,
+  ).bind(webinarId).all<{ friend_id: string; start_seconds: number; end_seconds: number }>();
+  const byFriend = new Map<string, Array<{ start_seconds: number; end_seconds: number }>>();
+  for (const row of results ?? []) {
+    const list = byFriend.get(row.friend_id) ?? [];
+    list.push({ start_seconds: row.start_seconds, end_seconds: row.end_seconds });
+    byFriend.set(row.friend_id, list);
+  }
+  let started = 0;
+  for (const intervals of byFriend.values()) {
+    if (mergeWebinarWatchedSeconds(intervals) >= thresholdSeconds) started += 1;
+  }
+  return started;
+}
+
+export interface WebinarRetentionPoint {
+  at_seconds: number;
+  viewers: number;
+}
+
+/**
+ * 維持率の線の材料（J-1）。各バケットを見ていた人（区間が被る人）の数。
+ * 分母は視聴開始した人の数。割合の計算は画面側で行う。
+ */
+export async function getWebinarRetention(
+  db: D1Database,
+  webinarId: string,
+  bucketSeconds = WEBINAR_RETENTION_BUCKET_SECONDS,
+): Promise<{ bucketSeconds: number; started: number; points: WebinarRetentionPoint[] }> {
+  const { results } = await db.prepare(
+    `SELECT friend_id, start_seconds, end_seconds
+       FROM webinar_view_segments
+      WHERE webinar_id = ?`,
+  ).bind(webinarId).all<{ friend_id: string; start_seconds: number; end_seconds: number }>();
+  const rows = results ?? [];
+  const byFriend = new Map<string, Array<{ start_seconds: number; end_seconds: number }>>();
+  for (const row of rows) {
+    const list = byFriend.get(row.friend_id) ?? [];
+    list.push({ start_seconds: row.start_seconds, end_seconds: row.end_seconds });
+    byFriend.set(row.friend_id, list);
+  }
+  let started = 0;
+  const watching = new Map<number, Set<string>>();
+  let maxEnd = 0;
+  for (const [friendId, intervals] of byFriend) {
+    if (mergeWebinarWatchedSeconds(intervals) >= WEBINAR_VIEW_START_SECONDS) started += 1;
+    const merged: Array<{ start: number; end: number }> = [];
+    const sorted = intervals
+      .filter((item) => item.end_seconds > item.start_seconds)
+      .sort((a, b) => a.start_seconds - b.start_seconds);
+    for (const item of sorted) {
+      const last = merged[merged.length - 1];
+      if (!last || item.start_seconds > last.end) merged.push({ start: item.start_seconds, end: item.end_seconds });
+      else if (item.end_seconds > last.end) last.end = item.end_seconds;
+    }
+    for (const span of merged) {
+      maxEnd = Math.max(maxEnd, span.end);
+      const fromBucket = Math.floor(span.start / bucketSeconds);
+      const toBucket = Math.floor((span.end - 1) / bucketSeconds);
+      for (let bucket = fromBucket; bucket <= toBucket; bucket += 1) {
+        const set = watching.get(bucket) ?? new Set<string>();
+        set.add(friendId);
+        watching.set(bucket, set);
+      }
+    }
+  }
+  const bucketCount = maxEnd > 0 ? Math.floor((maxEnd - 1) / bucketSeconds) + 1 : 0;
+  const points: WebinarRetentionPoint[] = [];
+  for (let bucket = 0; bucket < bucketCount; bucket += 1) {
+    points.push({ at_seconds: bucket * bucketSeconds, viewers: watching.get(bucket)?.size ?? 0 });
+  }
+  return { bucketSeconds, started, points };
 }
 
 /**
@@ -1016,6 +1339,63 @@ async function webinarActionReferenceValid(
   }
 }
 
+export type WebinarActionExecutionStatus =
+  | 'queued' | 'claimed' | 'succeeded' | 'skipped'
+  | 'retry_wait' | 'permanent_failed' | 'cancelled';
+
+export interface WebinarActionExecutionInput {
+  webinarActionId: string;
+  webinarId: string;
+  friendId: string;
+  sessionStartAt: number | null;
+  trigger: WebinarActionTrigger;
+  status: WebinarActionExecutionStatus;
+  idempotencyKey: string;
+  lastError?: string | null;
+}
+
+/**
+ * 視聴後アクションの実行記録を冪等キーで1件だけ残す。
+ * 既に同じキーの記録がある再送は何も書かず false を返す。
+ */
+export async function insertWebinarActionExecutionIgnore(
+  db: D1Database,
+  input: WebinarActionExecutionInput,
+): Promise<boolean> {
+  const now = jstNow();
+  const result = await db
+    .prepare(
+      `INSERT OR IGNORE INTO webinar_action_executions
+         (id, webinar_action_id, webinar_id, friend_id, session_start_at,
+          trigger, status, attempt, idempotency_key, last_error, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+    )
+    .bind(
+      crypto.randomUUID(), input.webinarActionId, input.webinarId, input.friendId,
+      input.sessionStartAt, input.trigger, input.status, input.idempotencyKey,
+      input.lastError ?? null, now, now,
+    )
+    .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/** 実行記録の結末を残す。冪等キーで1件だけ更新する。 */
+export async function finishWebinarActionExecution(
+  db: D1Database,
+  idempotencyKey: string,
+  status: WebinarActionExecutionStatus,
+  lastError: string | null,
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE webinar_action_executions
+          SET status = ?, last_error = ?, updated_at = ?
+        WHERE idempotency_key = ?`,
+    )
+    .bind(status, lastError, jstNow(), idempotencyKey)
+    .run();
+}
+
 export async function getWebinarComments(
   db: D1Database,
   webinarId: string,
@@ -1282,20 +1662,35 @@ export async function getWebinarSessionStats(
   return results ?? [];
 }
 
-/** 離脱位置分布: last_position_seconds を10分(600秒)刻みでバケット集計 */
+/**
+ * 離脱位置分布（J #821）。
+ * 離脱の位置＝最後の有効な区間の終わり。最後に報告された位置
+ * （last_position_seconds）では決めつけない。区間が無い人
+ * （見ていない・異常だけの人）は数えない。
+ */
 export async function getWebinarDropoff(
   db: D1Database,
   webinarId: string,
+  bucketSeconds = WEBINAR_RETENTION_BUCKET_SECONDS,
 ): Promise<Array<{ bucket_start: number; viewers: number }>> {
   const { results } = await db
     .prepare(
-      `SELECT (last_position_seconds / 600) * 600 AS bucket_start, COUNT(*) AS viewers
-       FROM webinar_viewers WHERE webinar_id = ?
-       GROUP BY bucket_start ORDER BY bucket_start`,
+      `SELECT friend_id, MAX(end_seconds) AS last_end
+         FROM webinar_view_segments
+        WHERE webinar_id = ?
+        GROUP BY friend_id`,
     )
     .bind(webinarId)
-    .all<{ bucket_start: number; viewers: number }>();
-  return results ?? [];
+    .all<{ friend_id: string; last_end: number }>();
+  const buckets = new Map<number, number>();
+  for (const row of results ?? []) {
+    const end = Math.max(1, Math.floor(row.last_end));
+    const bucket = Math.floor((end - 1) / bucketSeconds) * bucketSeconds;
+    buckets.set(bucket, (buckets.get(bucket) ?? 0) + 1);
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([bucket_start, viewers]) => ({ bucket_start, viewers }));
 }
 
 /** 参加者を friend 単位にまとめる。再入場・複数セッションは1人として表示する。 */
@@ -1624,4 +2019,253 @@ export async function markWebinarRegistrationNotified(
     .bind(jstNow(), id)
     .run();
   return (res.meta.changes ?? 0) > 0;
+}
+
+// ---- N: 動画の準備・開催回の定員・見逃し配信・保管 ----
+
+export type WebinarVideoStage =
+  | 'uploaded'
+  | 'inspecting'
+  | 'converting'
+  | 'packaging'
+  | 'thumbnail'
+  | 'ready'
+  | 'failed';
+
+/** 動画の準備の段（N）。検査 → 変換 → 配信の形 → 表紙。 */
+export const WEBINAR_VIDEO_STAGES: readonly WebinarVideoStage[] = [
+  'uploaded', 'inspecting', 'converting', 'packaging', 'thumbnail', 'ready',
+];
+
+export interface WebinarVideoAsset {
+  id: string;
+  webinar_id: string;
+  stage: WebinarVideoStage;
+  provider: string;
+  duration_seconds: number;
+  checksum: string | null;
+  error_code: string | null;
+  expires_at: string | null;
+  purged_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 動画は終了から90日で消す。ただし使っている間は消さない（N）。 */
+export const WEBINAR_VIDEO_RETENTION_DAYS = 90;
+
+export async function getWebinarVideoAsset(
+  db: D1Database,
+  webinarId: string,
+): Promise<WebinarVideoAsset | null> {
+  return db.prepare(
+    `SELECT * FROM webinar_video_assets WHERE webinar_id = ? ORDER BY created_at DESC LIMIT 1`,
+  ).bind(webinarId).first<WebinarVideoAsset>();
+}
+
+/**
+ * 動画の段を進める。前の段に戻さない（failed はどの段からでも行ける）。
+ * 進められない段には null を返す。
+ */
+export async function advanceWebinarVideoAsset(
+  db: D1Database,
+  webinarId: string,
+  stage: WebinarVideoStage,
+  options?: { errorCode?: string | null; durationSeconds?: number | null; checksum?: string | null },
+): Promise<WebinarVideoAsset | null> {
+  const now = jstNow();
+  const current = await getWebinarVideoAsset(db, webinarId);
+  if (!current) {
+    if (stage !== 'uploaded') return null;
+    await db.prepare(
+      `INSERT INTO webinar_video_assets
+         (id, webinar_id, stage, provider, duration_seconds, checksum, error_code, created_at, updated_at)
+       VALUES (?, ?, 'uploaded', 'r2_hls', ?, ?, NULL, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), webinarId, options?.durationSeconds ?? 0,
+      options?.checksum ?? null, now, now,
+    ).run();
+    return getWebinarVideoAsset(db, webinarId);
+  }
+  const order = (s: string): number => {
+    if (s === 'failed') return -1;
+    return WEBINAR_VIDEO_STAGES.indexOf(s as WebinarVideoStage);
+  };
+  const next = order(stage);
+  // failed はどこからでも行ける。ready の後は変えない（作り直しは新規の資産）。
+  if (stage === 'failed' ? current.stage === 'failed' : (next !== order(current.stage) + 1)) {
+    return null;
+  }
+  await db.prepare(
+    `UPDATE webinar_video_assets
+        SET stage = ?, error_code = COALESCE(?, error_code),
+            duration_seconds = COALESCE(?, duration_seconds),
+            checksum = COALESCE(?, checksum), updated_at = ?
+      WHERE id = ?`,
+  ).bind(
+    stage, options?.errorCode ?? null, options?.durationSeconds ?? null,
+    options?.checksum ?? null, now, current.id,
+  ).run();
+  return getWebinarVideoAsset(db, webinarId);
+}
+
+/** 準備が済んだ（ready）動画だけ配信に選べる（N）。 */
+export async function isWebinarVideoReady(
+  db: D1Database,
+  webinarId: string,
+): Promise<boolean> {
+  const asset = await getWebinarVideoAsset(db, webinarId);
+  return asset?.stage === 'ready' && asset.purged_at === null;
+}
+
+export interface WebinarSessionRow {
+  id: string;
+  webinar_id: string;
+  session_start_at: number;
+  capacity: number | null;
+  reserved_count: number;
+  state: 'open' | 'full' | 'closed';
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getWebinarSession(
+  db: D1Database,
+  webinarId: string,
+  sessionStartAt: number,
+): Promise<WebinarSessionRow | null> {
+  return db.prepare(
+    `SELECT * FROM webinar_sessions WHERE webinar_id = ? AND session_start_at = ?`,
+  ).bind(webinarId, sessionStartAt).first<WebinarSessionRow>();
+}
+
+/** 開催回の定員を決める。行が無ければ作る。定員の取り消しは null。 */
+export async function setWebinarSessionCapacity(
+  db: D1Database,
+  webinarId: string,
+  sessionStartAt: number,
+  capacity: number | null,
+): Promise<WebinarSessionRow> {
+  const now = jstNow();
+  const existing = await getWebinarSession(db, webinarId, sessionStartAt);
+  if (!existing) {
+    await db.prepare(
+      `INSERT INTO webinar_sessions
+         (id, webinar_id, session_start_at, capacity, reserved_count, state, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 0, 'open', ?, ?)`,
+    ).bind(crypto.randomUUID(), webinarId, sessionStartAt, capacity, now, now).run();
+  } else {
+    await db.prepare(
+      `UPDATE webinar_sessions
+          SET capacity = ?,
+              state = CASE WHEN ? IS NOT NULL AND reserved_count >= ? THEN 'full' ELSE 'open' END,
+              updated_at = ?
+        WHERE id = ?`,
+    ).bind(capacity, capacity, capacity, now, existing.id).run();
+  }
+  return (await getWebinarSession(db, webinarId, sessionStartAt))!;
+}
+
+/**
+ * 開催回の席を1つ確保する（N）。定員は申込の時に条件付き更新で確保する。
+ * 行が無い開催回は従来どおり無制限（'unlimited'）。
+ * 二重実行でも定員を超えない（UPDATE の条件で守る）。
+ */
+export async function reserveWebinarSeat(
+  db: D1Database,
+  webinarId: string,
+  sessionStartAt: number,
+): Promise<'reserved' | 'full' | 'unlimited'> {
+  const session = await getWebinarSession(db, webinarId, sessionStartAt);
+  if (!session || session.capacity === null || session.state === 'closed') {
+    if (session?.state === 'closed') return 'full';
+    return 'unlimited';
+  }
+  const now = jstNow();
+  const result = await db.prepare(
+    `UPDATE webinar_sessions
+        SET reserved_count = reserved_count + 1,
+            state = CASE WHEN reserved_count + 1 >= capacity THEN 'full' ELSE 'open' END,
+            updated_at = ?
+      WHERE webinar_id = ? AND session_start_at = ?
+        AND (capacity IS NULL OR reserved_count < capacity)`,
+  ).bind(now, webinarId, sessionStartAt).run();
+  return (result.meta.changes ?? 0) > 0 ? 'reserved' : 'full';
+}
+
+/** 席の確保を取り消す（再予約・取消で空ける）。0を割らない。 */
+export async function releaseWebinarSeat(
+  db: D1Database,
+  webinarId: string,
+  sessionStartAt: number,
+): Promise<void> {
+  await db.prepare(
+    `UPDATE webinar_sessions
+        SET reserved_count = CASE WHEN reserved_count > 0 THEN reserved_count - 1 ELSE 0 END,
+            state = CASE WHEN state = 'closed' THEN 'closed' ELSE 'open' END,
+            updated_at = ?
+      WHERE webinar_id = ? AND session_start_at = ?`,
+  ).bind(jstNow(), webinarId, sessionStartAt).run();
+}
+
+/**
+ * 見逃し配信の期限内か（N）。「する」を選んだ開催回だけ、開催から
+ * 設定日数（既定7日）以内の視聴に使う。期限切れは送らない。
+ */
+export async function isWebinarMissedInWindow(
+  db: D1Database,
+  webinarId: string,
+  sessionStartAt: number,
+  nowEpochSeconds: number,
+): Promise<boolean> {
+  const row = await db.prepare(
+    `SELECT missed_enabled, missed_window_days
+       FROM webinar_notification_settings WHERE webinar_id = ?`,
+  ).bind(webinarId).first<{ missed_enabled: number; missed_window_days: number | null }>();
+  if (!row || row.missed_enabled !== 1) return false;
+  const windowDays = row.missed_window_days ?? 7;
+  return nowEpochSeconds <= sessionStartAt + windowDays * 86400;
+}
+
+/**
+ * 保管期限を過ぎた動画の資産（N）。終了から90日で消す対象。
+ * 消す操作自体は purgeWebinarVideoAsset で「使っている間は消さない」を守る。
+ */
+export async function findExpiredWebinarVideoAssets(
+  db: D1Database,
+  nowIso: string,
+): Promise<WebinarVideoAsset[]> {
+  const { results } = await db.prepare(
+    `SELECT * FROM webinar_video_assets
+      WHERE expires_at IS NOT NULL AND expires_at <= ?
+        AND purged_at IS NULL
+      ORDER BY expires_at ASC`,
+  ).bind(nowIso).all<WebinarVideoAsset>();
+  return results ?? [];
+}
+
+/** 使っている間（公開中のウェビナーが参照）は消さない。 */
+export async function canPurgeWebinarVideoAsset(
+  db: D1Database,
+  assetId: string,
+): Promise<boolean> {
+  const row = await db.prepare(
+    `SELECT a.id FROM webinar_video_assets a
+       JOIN webinars w ON w.video_asset_id = a.id
+      WHERE a.id = ? AND w.status = 'active'`,
+  ).bind(assetId).first<{ id: string }>();
+  return row === null;
+}
+
+/** 保管期限切れの動画を消す。使っている間は消さず false を返す。 */
+export async function purgeWebinarVideoAsset(
+  db: D1Database,
+  assetId: string,
+  nowIso?: string,
+): Promise<boolean> {
+  if (!await canPurgeWebinarVideoAsset(db, assetId)) return false;
+  const result = await db.prepare(
+    `UPDATE webinar_video_assets SET purged_at = ?, updated_at = ? WHERE id = ? AND purged_at IS NULL`,
+  ).bind(nowIso ?? jstNow(), nowIso ?? jstNow(), assetId).run();
+  return (result.meta.changes ?? 0) > 0;
 }

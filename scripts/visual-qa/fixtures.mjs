@@ -916,26 +916,33 @@ const FORM_BASE_LAYOUT = {
   },
 }
 
-const formRow = (id, name, description, folderId, isActive, submitCount, weeklySubmitCount, lastSubmittedAt, updatedAt, destinationSummary) => ({
+const formRow = (id, name, description, folderId, isActive, submitCount, monthly, lastSubmittedAt, updatedAt, destinationSummary) => ({
   id, lineAccountId: 'visual-qa-account', name, description, folderId,
   fields: [], layout: FORM_BASE_LAYOUT, onSubmitTagId: null, onSubmitScenarioId: null,
   onSubmitMessageType: null, onSubmitMessageContent: null, onSubmitWebhookUrl: null,
   onSubmitWebhookHeaders: null, onSubmitWebhookFailMessage: null,
   saveToMetadata: destinationSummary.friendFieldCount > 0, isActive, status: 'active', archivedAt: null,
-  revision: 1, submitCount, weeklySubmitCount, createdAt: updatedAt, updatedAt, lastSubmittedAt,
+  revision: 1, submitCount,
+  monthlySubmitCount: monthly.submitCount,
+  monthlyOpenCount: monthly.openCount,
+  monthlyCompletionRate: monthly.rate,
+  createdAt: updatedAt, updatedAt, lastSubmittedAt,
   usedByAccounts: [], accountScopeReviewRequired: false,
   destinationCount: destinationSummary.friendFieldCount + destinationSummary.tagCount,
   destinationSummary,
 })
 
-/** 回答フォーム一覧。設計 `EMBIK` に見えている6行。 */
+/** 回答フォーム一覧。設計 `EMBIK` に見えている6行。今月の数は日本時間の1日から。 */
 export const FORMS = [
-  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, 42, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 2 }),
-  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, 128, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', { friendFieldCount: 5, tagCount: 1 }),
-  formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, 4, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', { friendFieldCount: 1, tagCount: 0 }),
-  formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, 61, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
-  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, 0, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
-  { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, 0, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', { friendFieldCount: 2, tagCount: 0 }), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
+  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, { submitCount: 186, openCount: 248, rate: 75 }, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 2 }),
+  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, { submitCount: 402, openCount: 536, rate: 75 }, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', { friendFieldCount: 5, tagCount: 1 }),
+  formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, { submitCount: 12, openCount: 20, rate: 60 }, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', { friendFieldCount: 1, tagCount: 0 }),
+  formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, { submitCount: 88, openCount: 110, rate: 80 }, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
+  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, { submitCount: 0, openCount: 0, rate: null }, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
+  { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, { submitCount: 0, openCount: 5, rate: 0 }, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', { friendFieldCount: 2, tagCount: 0 }), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
+  /* NEN-07: NEN配信「口コミのお願い」がつなぐフォーム。編集画面の選択肢と
+   * 「つながる先」へ出る公開中フォームとして見本へ置く。 */
+  formRow('form-review', '口コミ', '星の評価とひとこと・2ブロック', null, true, 210, { submitCount: 24, openCount: 30, rate: 80 }, '2026-08-24T03:00:00.000Z', '2026-08-24T03:00:00.000Z', { friendFieldCount: 1, tagCount: 1 }),
 ]
 
 /** 機能13 `EMBIK`。一覧6行と、画面全体18件の集計を同じ応答で返す。 */
@@ -1090,6 +1097,8 @@ const nenCampaignSetting = (campaignKey, label, category, triggerEvent, delayDay
     { kind: 'open_form', formId: 'form-review', formName: '口コミ', buttonLabel: '感想を書く（30秒）' },
     { kind: 'award_mileage', amount: 200, trigger: 'form_submitted' },
   ] : [],
+  // 実口・型と揃える(NEN-07)。つなぐフォームが使えないときだけ理由コードが入る。
+  formIssue: null,
   updatedAt: '2026-08-25T10:00:00+09:00',
 })
 
@@ -1627,61 +1636,61 @@ export const MEDIA_ITEMS = [
     id: 'media-delete-target', lineAccountId: 'visual-qa-account', folderId: 'media-product',
     kind: 'image', filename: '夏の定番セット.jpg', mimeType: 'image/jpeg',
     sizeBytes: 348160, width: 1024, height: 678, durationMs: null,
-    url: mediaPreview('#e7f7ef'), uploadedBy: '川野 健太', createdAt: '2026-08-18T09:00:00.000Z', usageCount: 3,
+    url: mediaPreview('#e7f7ef'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-18T09:00:00.000Z', usageCount: 3,
   },
   {
     id: 'media-banner', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
     kind: 'image', filename: '会員証バナー.png', mimeType: 'image/png',
     sizeBytes: 839680, width: 2500, height: 1686, durationMs: null,
-    url: mediaPreview('#d9efe3'), uploadedBy: '川野 健太', createdAt: '2026-08-17T09:00:00.000Z', usageCount: 2,
+    url: mediaPreview('#d9efe3'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-17T09:00:00.000Z', usageCount: 2,
   },
   {
     id: 'media-store-video', lineAccountId: 'visual-qa-account', folderId: 'media-video',
     kind: 'video', filename: '店内のようす.mp4', mimeType: 'video/mp4',
     sizeBytes: 88080384, width: null, height: null, durationMs: 164000,
-    url: mediaPreview('#eef0f2'), uploadedBy: '佐々木', createdAt: '2026-08-16T09:00:00.000Z', usageCount: 1,
+    url: mediaPreview('#eef0f2'), uploadedBy: '佐々木', uploadedByName: '佐々木', createdAt: '2026-08-16T09:00:00.000Z', usageCount: 1,
   },
   {
     id: 'media-coupon', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
     kind: 'image', filename: '誕生月クーポン.png', mimeType: 'image/png',
     sizeBytes: 215040, width: 1029, height: 1029, durationMs: null,
-    url: mediaPreview('#f3ece1'), uploadedBy: '田中', createdAt: '2026-08-15T09:00:00.000Z', usageCount: 1,
+    url: mediaPreview('#f3ece1'), uploadedBy: '田中', uploadedByName: '田中', createdAt: '2026-08-15T09:00:00.000Z', usageCount: 1,
   },
   {
     id: 'media-delete-safe', lineAccountId: 'visual-qa-account', folderId: null,
     kind: 'file', filename: 'メニュー表.pdf', mimeType: 'application/pdf',
     sizeBytes: 1258291, width: null, height: null, durationMs: null,
-    url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '田中', createdAt: '2026-08-14T09:00:00.000Z', usageCount: 0,
+    url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '田中', uploadedByName: '田中', createdAt: '2026-08-14T09:00:00.000Z', usageCount: 0,
   },
   {
     id: 'media-pamphlet', lineAccountId: 'visual-qa-account', folderId: 'media-product',
     kind: 'image', filename: '定期便パンフ.jpg', mimeType: 'image/jpeg',
     sizeBytes: 491520, width: 1024, height: 678, durationMs: null,
-    url: mediaPreview('#e4eee8'), uploadedBy: '佐々木', createdAt: '2026-08-13T09:00:00.000Z', usageCount: 5,
+    url: mediaPreview('#e4eee8'), uploadedBy: '佐々木', uploadedByName: '佐々木', createdAt: '2026-08-13T09:00:00.000Z', usageCount: 5,
   },
   {
     id: 'media-staff', lineAccountId: 'visual-qa-account', folderId: 'media-product',
     kind: 'image', filename: 'スタッフ紹介.jpg', mimeType: 'image/jpeg',
     sizeBytes: 399360, width: 1024, height: 678, durationMs: null,
-    url: mediaPreview('#efe5dc'), uploadedBy: '佐々木', createdAt: '2026-08-12T09:00:00.000Z', usageCount: 0,
+    url: mediaPreview('#efe5dc'), uploadedBy: '佐々木', uploadedByName: '佐々木', createdAt: '2026-08-12T09:00:00.000Z', usageCount: 0,
   },
   {
     id: 'media-guide-video', lineAccountId: 'visual-qa-account', folderId: 'media-video',
     kind: 'video', filename: '使い方ガイド.mp4', mimeType: 'video/mp4',
     sizeBytes: 20761804, width: null, height: null, durationMs: 215000,
-    url: mediaPreview('#e8ebef'), uploadedBy: '川野 健太', createdAt: '2026-08-11T09:00:00.000Z', usageCount: 2,
+    url: mediaPreview('#e8ebef'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-11T09:00:00.000Z', usageCount: 2,
   },
   {
     id: 'media-replacement', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
     kind: 'image', filename: '休業のお知らせ.png', mimeType: 'image/png',
     sizeBytes: 122880, width: 1024, height: 678, durationMs: null,
-    url: mediaPreview('#f1e8e8'), uploadedBy: '田中', createdAt: '2026-08-10T09:00:00.000Z', usageCount: 0,
+    url: mediaPreview('#f1e8e8'), uploadedBy: '田中', uploadedByName: '田中', createdAt: '2026-08-10T09:00:00.000Z', usageCount: 0,
   },
   {
     id: 'media-price-list', lineAccountId: 'visual-qa-account', folderId: null,
     kind: 'file', filename: '価格表_2026.pdf', mimeType: 'application/pdf',
     sizeBytes: 655360, width: null, height: null, durationMs: null,
-    url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '川野 健太', createdAt: '2026-08-09T09:00:00.000Z', usageCount: 1,
+    url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-09T09:00:00.000Z', usageCount: 1,
   },
   ...Array.from({ length: 176 }, (_, index) => ({
     id: `media-archive-${index + 1}`,
@@ -1695,11 +1704,56 @@ export const MEDIA_ITEMS = [
     height: 678,
     durationMs: null,
     url: mediaPreview('#eef0f2'),
-    uploadedBy: '川野 健太',
+    uploadedBy: '川野 健太', uploadedByName: '川野 健太',
     createdAt: '2026-01-01T00:00:00.000Z',
     usageCount: 0,
   })),
 ]
+
+export const FILE_SCAN_ITEMS = [
+  {
+    id: 'scan-quarantine-1', lineAccountId: 'visual-qa-account',
+    subjectKind: 'media', subjectId: 'media-delete-target', mediaId: 'media-delete-target',
+    filename: '請求書.pdf', mimeType: 'application/pdf', sizeBytes: 225280,
+    status: 'quarantined', reasonCode: 'pdf_active_content',
+    reasonLabel: '危険な仕掛けが見つかりました', uploaderLabel: '川野',
+    attempts: 0, nextRetryAt: null,
+    scannedAt: '2026-09-25T10:00:00+09:00', quarantinedAt: '2026-09-25T10:00:00+09:00',
+    releasedAt: null, releaseReason: null,
+    createdAt: '2026-09-25T10:00:00+09:00', updatedAt: '2026-09-25T10:00:00+09:00',
+  },
+  {
+    id: 'scan-quarantine-2', lineAccountId: 'visual-qa-account',
+    subjectKind: 'photo', subjectId: 'photo-3', mediaId: null,
+    filename: 'photo_03.jpg', mimeType: 'image/jpeg', sizeBytes: 655360,
+    status: 'quarantined', reasonCode: 'trailing_data',
+    reasonLabel: '画像の後ろに別のデータがあります', uploaderLabel: 'お客さん',
+    attempts: 0, nextRetryAt: null,
+    scannedAt: '2026-09-25T09:30:00+09:00', quarantinedAt: '2026-09-25T09:30:00+09:00',
+    releasedAt: null, releaseReason: null,
+    createdAt: '2026-09-25T09:30:00+09:00', updatedAt: '2026-09-25T09:30:00+09:00',
+  },
+  {
+    id: 'scan-pending-1', lineAccountId: 'visual-qa-account',
+    subjectKind: 'media', subjectId: 'media-banner', mediaId: 'media-banner',
+    filename: '会員証バナー.png', mimeType: 'image/png', sizeBytes: 839680,
+    status: 'pending', reasonCode: null, reasonLabel: null, uploaderLabel: '川野',
+    attempts: 1, nextRetryAt: '2026-09-25T11:00:00+09:00',
+    scannedAt: null, quarantinedAt: null,
+    releasedAt: null, releaseReason: null,
+    createdAt: '2026-09-25T10:55:00+09:00', updatedAt: '2026-09-25T10:55:00+09:00',
+  },
+]
+
+export const FILE_SCAN_CONFIG = {
+  externalProvider: null,
+  externalEndpointUrl: null,
+  externalSecretRef: null,
+  externalTimeoutMs: 10000,
+  maxBytesOverride: null,
+  maxPixelsOverride: null,
+  updatedAt: '2026-09-25T10:00:00+09:00',
+}
 
 export const MEDIA_DELETE_IMPACT = {
   media: { id: 'media-delete-target', filename: '夏の定番セット.jpg', kind: 'image' },
@@ -1723,6 +1777,7 @@ export const MEDIA_DELETE_IMPACT = {
   ],
   checkedAt: '2026-08-31T10:00:00.000Z',
   lastScannedAt: '2026-08-31T10:00:00.000Z',
+  verified: true,
   canDelete: false,
   recommendedAction: 'review_references',
 }
@@ -1733,6 +1788,7 @@ export const MEDIA_DELETE_IMPACT_EMPTY = {
   references: [],
   checkedAt: '2026-08-31T10:00:00.000Z',
   lastScannedAt: null,
+  verified: true,
   canDelete: true,
   recommendedAction: 'delete',
 }
@@ -1914,6 +1970,7 @@ const RICH_MENU_BASE = {
   targetingEnabled: true,
   folderId: 'rich-menu-folder-members',
   displayOrder: 1,
+  version: 1,
   thumbnailR2Key: null,
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-20T00:00:00.000Z',
@@ -3121,7 +3178,51 @@ export const BROADCASTS = [
   afterActionVersionId: index === 1 ? 'common-action-version-broadcast-tagged' : null,
   version: 1,
   createdAt: '2026-08-16T00:00:00.000Z',
+  // 承認の絡み（#816 C）。0行目は依頼中、2行目は承認を通って送信済み。
+  // 記録の見本（BROADCAST_ACTIVITY）と合わせる。無い行は 'none'。
+  approvalStatus: index === 0 ? 'pending' : index === 2 ? 'approved' : 'none',
+  // 10の状態（#816）。承認待ちは承認の軸が先（deriveBroadcastDisplayStatus
+  // と同じ）。0行目は status が予約済みでも「承認待ち」で見せる。
+  displayStatus: index === 0 ? 'pending_approval' : String(status),
+  displayStatusLabel: { draft: '下書き', pending_approval: '承認待ち', scheduled: '予約済み', sent: '送信済み' }[index === 0 ? 'pending_approval' : status] ?? String(status),
+  ledger: status === 'sent'
+    ? {
+      sent: Number(successCount), failed: 0, failedTemporary: 0, failedPermanent: 0,
+      unknown: 0, inFlight: 0, retryableCount: 0,
+    }
+    : { sent: 0, failed: 0, failedTemporary: 0, failedPermanent: 0, unknown: 0, inFlight: 0, retryableCount: 0 },
 }))
+
+/**
+ * 一斉配信の宛先台帳の見本（#816 / C-2）。
+ *
+ * 行がある8人（届いた5・一時的1・届けられなかった1・送達不明1）と、
+ * まだ送っていない20人（名前の一覧は無い）。
+ */
+export const BROADCAST_RECIPIENTS = {
+  rows: [
+    { friendId: 'friend-1', displayName: '山田花子', lineAccountId: 'visual-qa-account', group: 'delivered', label: '届いた', detail: 'LINEが受け付けました', retryable: false, lineRequestId: 'req-9a1', errorCode: null, dispatchedAt: '2026-10-01T10:00:00+09:00', settledAt: '2026-10-01T10:00:05+09:00' },
+    { friendId: 'friend-2', displayName: '佐々木健', lineAccountId: 'visual-qa-account', group: 'failed_permanent', label: '失敗：届けられませんでした', detail: 'ブロック・友だち解除などで受け付けられませんでした。送り直しません', retryable: false, lineRequestId: null, errorCode: 'line_http_400', dispatchedAt: '2026-10-01T10:00:00+09:00', settledAt: '2026-10-01T10:00:06+09:00' },
+    { friendId: 'friend-3', displayName: '鈴木一郎', lineAccountId: 'visual-qa-account', group: 'failed_temporary', label: '失敗：一時的（あとで再送できます）', detail: '混み合いなどで送れませんでした。時間を置いて送り直せます', retryable: true, lineRequestId: null, errorCode: 'line_http_429', dispatchedAt: '2026-10-01T10:01:00+09:00', settledAt: '2026-10-01T10:01:07+09:00' },
+    { friendId: 'friend-4', displayName: '高橋美香', lineAccountId: 'visual-qa-account', group: 'delivered', label: '届いた', detail: 'LINEが受け付けました', retryable: false, lineRequestId: 'req-9a1', errorCode: null, dispatchedAt: '2026-10-01T10:00:00+09:00', settledAt: '2026-10-01T10:00:05+09:00' },
+    { friendId: 'friend-5', displayName: '田中太郎', lineAccountId: 'visual-qa-account', group: 'delivered', label: '届いた', detail: 'LINEが受け付けました', retryable: false, lineRequestId: 'req-9a2', errorCode: null, dispatchedAt: '2026-10-01T10:00:30+09:00', settledAt: '2026-10-01T10:00:35+09:00' },
+    { friendId: 'friend-6', displayName: '伊藤さくら', lineAccountId: 'visual-qa-account', group: 'delivered', label: '届いた', detail: 'LINEが受け付けました', retryable: false, lineRequestId: 'req-9a2', errorCode: null, dispatchedAt: '2026-10-01T10:00:30+09:00', settledAt: '2026-10-01T10:00:35+09:00' },
+    { friendId: 'friend-7', displayName: '渡辺大輔', lineAccountId: 'visual-qa-account', group: 'delivered', label: '届いた', detail: 'LINEが受け付けました', retryable: false, lineRequestId: 'req-9a2', errorCode: null, dispatchedAt: '2026-10-01T10:00:30+09:00', settledAt: '2026-10-01T10:00:35+09:00' },
+    { friendId: 'friend-8', displayName: '中村恵子', lineAccountId: 'visual-qa-account', group: 'unknown', label: '送達不明', detail: '外へ出たかもしれません。二重に届くのを避けるため送り直しません', retryable: false, lineRequestId: null, errorCode: 'line_no_response', dispatchedAt: '2026-10-01T10:00:30+09:00', settledAt: '2026-10-01T10:01:35+09:00' },
+  ],
+  summary: {
+    sent: 5, failedTemporary: 1, failedPermanent: 1, unknown: 1, inFlight: 0,
+    pending: 20, total: 28, retryableCount: 1,
+  },
+}
+
+/** 一斉配信の操作の記録の見本（#816 / C-3）。新しい順。消せない。 */
+export const BROADCAST_ACTIVITY = [
+  { kind: 'lifecycle', action: 'send_started', label: '送信を始めた', actorStaffId: null, actorName: '自動', reason: null, createdAt: '2026-10-01T10:00:00+09:00' },
+  { kind: 'approval', action: 'approved', label: '承認した', actorStaffId: 'staff-approver', actorName: '佐藤 美咲', reason: null, createdAt: '2026-09-25T21:02:00+09:00' },
+  { kind: 'approval', action: 'requested', label: '承認を依頼した', actorStaffId: 'staff-sender', actorName: '川野 健太', reason: null, createdAt: '2026-09-25T20:10:00+09:00' },
+  { kind: 'lifecycle', action: 'created', label: '下書きを作った', actorStaffId: 'staff-sender', actorName: '川野 健太', reason: null, createdAt: '2026-09-25T20:05:00+09:00' },
+]
 
 /** 機能6の一覧が本番口と同じく、行・KPI・ページ情報を一度に読むための固定値。 */
 export const BROADCAST_LIST_META = {
@@ -3142,6 +3243,46 @@ export const BROADCAST_NOTIFICATION_SETTINGS = {
   completed: true,
   failed: true,
   displayText: '配信開始・完了・エラーはSlackの同じスレッドへ通知します。',
+}
+
+/** 二者承認（m12a / 設計 A）。確認画面の出し分けに使う境目と運用者数。 */
+export const BROADCAST_APPROVAL_CONFIG = {
+  lineAccountId: 'visual-qa-account',
+  threshold: 1000,
+  operatorCount: 2,
+  singleOperator: false,
+}
+
+/** 二者承認（m12a）。承認を頼める相手。自分は除いてある。 */
+export const BROADCAST_APPROVAL_CANDIDATES = [
+  { id: 'staff-approver', name: '佐藤 美咲', role: 'admin', canApprove: true },
+]
+
+/** 二者承認（m12a）。承認待ちの配信の今の状態と判定。 */
+export const BROADCAST_APPROVAL_STATE = {
+  approval: {
+    status: 'pending',
+    requestedByStaffId: 'staff-sender',
+    requestedAt: '2026-09-25T20:10:00+09:00',
+    approverStaffId: 'staff-approver',
+    note: '秋の案内です。10時までに見てください',
+    decidedByStaffId: null,
+    decidedAt: null,
+    rejectReason: null,
+    confirmedCount: null,
+  },
+  gate: {
+    required: true,
+    recipientCount: 1248,
+    threshold: 1000,
+    singleOperator: false,
+    operatorCount: 2,
+  },
+  viewer: {
+    isApprover: true,
+    canApprove: true,
+    isRequester: false,
+  },
 }
 
 /** 機能6 `sqFXf`。検索条件を保存済みの状態と、新規保存の固定結果。 */
@@ -3353,6 +3494,7 @@ export const REMINDER_DRAFT = {
     triggerOffsetMinutes: null,
     sendAtTime: null,
     targetTagId: null,
+    targetCondition: null,
     folderId: 'rf-booking',
     stopConditions: {
       bookingCancelled: true,
@@ -3380,6 +3522,16 @@ export const REMINDER_VALIDATE = {
     { key: 'test_send', label: 'テスト送信', status: 'passed', message: '直近のテストは成功しています' },
   ],
   audience: { matched: 398, excluded: 28 },
+}
+
+/** 機能7の対象者数え直し（`POST /api/reminders/:id/audience` の固定の返事）。R15。 */
+export const REMINDER_AUDIENCE = {
+  matched: 5,
+  excluded: 2,
+  sample: [
+    { id: 'visual-friend-1', displayName: '山田花子' },
+    { id: 'visual-friend-2', displayName: '佐藤太郎' },
+  ],
 }
 
 /** 機能7の配信予定（`POST /api/reminders/:id/preview` の固定の返事）。 */
@@ -3923,12 +4075,12 @@ export const INCOMING_WEBHOOK_DETAILS = {
   出してはいけないのは列名のほう（`v6-no-internal-ids.test.ts` が見張っている）。
 */
 export const ENTRY_ROUTES = [
-  { id: 'er-1', refCode: 'summer-ig', genre: 'SNS', name: '夏のInstagram投稿', tagId: 'tag-vip', scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, createdAt: '2026-08-02T00:00:00.000Z', updatedAt: '2026-08-25T00:12:00.000Z' },
-  { id: 'er-2', refCode: 'tanaka01', genre: '紹介', name: '紹介リンク 田中 明', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
-  { id: 'er-3', refCode: 'shop-pop', genre: '店頭', name: '店頭POPのQRコード', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-25T02:30:00.000Z' },
-  { id: 'er-4', refCode: 'g-ads-summer', genre: '広告', name: 'Google広告 夏キャンペーン', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
-  { id: 'er-5', refCode: 'mail-sign', genre: 'メール', name: 'メール署名', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, createdAt: '2026-02-14T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z' },
-  { id: 'er-6', refCode: 'flyer-spring', genre: '紙', name: 'チラシ（2026春）', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
+  { id: 'er-1', refCode: 'summer-ig', genre: 'SNS', name: '夏のInstagram投稿', tagId: 'tag-vip', scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-02T00:00:00.000Z', updatedAt: '2026-08-25T00:12:00.000Z' },
+  { id: 'er-2', refCode: 'tanaka01', genre: '紹介', name: '紹介リンク 田中 明', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
+  { id: 'er-3', refCode: 'shop-pop', genre: '店頭', name: '店頭POPのQRコード', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-25T02:30:00.000Z' },
+  { id: 'er-4', refCode: 'g-ads-summer', genre: '広告', name: 'Google広告 夏キャンペーン', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
+  { id: 'er-5', refCode: 'mail-sign', genre: 'メール', name: 'メール署名', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-02-14T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z' },
+  { id: 'er-6', refCode: 'flyer-spring', genre: '紙', name: 'チラシ（2026春）', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, stoppedAt: '2026-06-30T00:00:00.000Z', stoppedReason: '春の配布が終わった', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
 ]
 
 /** 機能18。設計画像と同じ通常状態を、実データを使わずに撮るための固定値。 */
@@ -4138,6 +4290,42 @@ export const AFFILIATE_OFFERS = [
 ]
 
 /*
+ * #823 案件の決まりの版と上限の残り・成果の付け方の記録。
+ * 型どおりの名前（api.ts の OfferVersion・OfferCapStatus・AttributionDecisionView）で返す。
+ */
+export const OFFER_VERSIONS = [
+  { id: 'aov-2', offerId: 'ao-2', versionNumber: 2, rewardAmount: 5000, rewardMiles: 500, windowDays: 30, capTotal: 200, capMonthlyPerAffiliate: 10, receptionFrom: '2026-10-01T00:00:00.000+09:00', receptionTo: '2026-12-31T23:59:59.000+09:00', effectiveFrom: null, createdAt: '2026-09-27T00:00:00.000+09:00' },
+  { id: 'aov-1', offerId: 'ao-2', versionNumber: 1, rewardAmount: 5000, rewardMiles: 500, windowDays: 30, capTotal: null, capMonthlyPerAffiliate: null, receptionFrom: null, receptionTo: null, effectiveFrom: null, createdAt: '2026-02-10T00:00:00.000+09:00' },
+]
+
+export const OFFER_CAP_STATUS = {
+  version: OFFER_VERSIONS[0],
+  capped: false,
+  capTotal: 200,
+  totalUsed: 162,
+  totalRemaining: 38,
+  capMonthlyPerAffiliate: 10,
+  monthlyUsed: 3,
+  monthlyRemaining: 7,
+}
+
+export const ATTRIBUTION_DECISION = {
+  conversionEventId: 'ev-1',
+  affiliateId: 'af-1',
+  refCode: 'ref-1',
+  offerId: 'ao-2',
+  offerVersionId: 'aov-2',
+  reason: 'matched_last_touch',
+  windowDays: 30,
+  candidates: [
+    { affiliateId: 'af-1', affiliateName: 'はなこ', refCode: 'ref-1', touchedAt: '2026-09-20T10:02:00.000+09:00', offerId: 'ao-2', offerName: '定期便のお申し込み', chosen: true, skipReason: null, windowDays: 30 },
+    { affiliateId: 'af-2', affiliateName: 'けんた', refCode: 'ref-2', touchedAt: '2026-09-18T21:40:00.000+09:00', offerId: 'ao-2', offerName: '定期便のお申し込み', chosen: false, skipReason: 'out_of_window', windowDays: 30 },
+    { affiliateId: 'af-3', affiliateName: '本人', refCode: 'ref-3', touchedAt: '2026-09-20T09:58:00.000+09:00', offerId: 'ao-2', offerName: '定期便のお申し込み', chosen: false, skipReason: 'self_referral', windowDays: 30 },
+  ],
+  createdAt: '2026-09-27T12:00:00.000+09:00',
+}
+
+/*
   マイルの残高。設計 `s98Vfw` の並びそのまま。
 
   **`/api/mileage/overview` は器の形が要る。** 画面の `isMileageAdminOverview` は
@@ -4185,6 +4373,7 @@ export const MILEAGE_FRIENDS = {
     available: 486200,
     pending: 300,
     expiringMiles30d: 24600,
+    nextExpiringAt: '2026-09-20T00:00:00.000Z',
     monthChange: 960,
     rankCounts: [
       { rewardId: 'rank-bronze', rankName: 'ブロンズ', requiredMiles: 0, friendCount: 886 },
@@ -4441,6 +4630,8 @@ export const CONVERSION_DEFINITION_PREVIEW = {
   duplicateExcludedCount: 172,
   cancellationCount: 4,
   excludedReasons: [],
+  // R42: 金額のない過去の成果の件数。撮影用の見本は0件のまま。
+  missingValueCount: 0,
   dailyAverage: 7.1,
   deduplicationWindowDays: null,
 }
@@ -4855,17 +5046,17 @@ export const COMMON_ACTION_DETAIL = {
   id: 'ca-1', name: '体験申込を受けたとき', description: 'タグ・シナリオ・担当の3つ', status: 'published',
   currentDraftVersionId: null, currentPublishedVersionId: 'cav-4',
   versions: [
-    { id: 'cav-4', versionNumber: 4, status: 'published', actions: [caStep('s41', 'add_tag', { tagId: 'tag-trial' }), caStep('s42', 'wait', { minutes: 30 }), caStep('s43', 'send_message', { templateId: 'template-usage-1', templateName: '体験のご案内', templateVersion: 4 }, 'continue'), caStep('s44', 'start_scenario', { scenarioId: 'scenario-0' }), caStep('s45', 'set_metadata', { assignee: '佐々木' }, 'continue')], createdBy: '佐々木', createdAt: '2026-08-20T05:02:00.000Z', publishedAt: '2026-08-20T05:02:00.000Z' },
-    { id: 'cav-3', versionNumber: 3, status: 'published', actions: [caStep('s31', 'add_tag'), caStep('s32', 'wait', { minutes: 30 }), caStep('s33', 'send_message'), caStep('s34', 'start_scenario')], createdBy: '田中', createdAt: '2026-08-12T00:40:00.000Z', publishedAt: '2026-08-12T00:40:00.000Z' },
-    { id: 'cav-2', versionNumber: 2, status: 'published', actions: [caStep('s21', 'add_tag'), caStep('s22', 'wait', { minutes: 10 }), caStep('s23', 'start_scenario')], createdBy: '佐々木', createdAt: '2026-08-04T08:20:00.000Z', publishedAt: '2026-08-04T08:20:00.000Z' },
-    { id: 'cav-1', versionNumber: 1, status: 'published', actions: [caStep('s11', 'add_tag'), caStep('s12', 'send_message')], createdBy: '佐々木', createdAt: '2026-07-28T02:15:00.000Z', publishedAt: '2026-07-28T02:15:00.000Z' },
+    { id: 'cav-4', versionNumber: 4, status: 'published', draftRevision: 1, actions: [caStep('s41', 'add_tag', { tagId: 'tag-trial' }), caStep('s42', 'wait', { minutes: 30 }), caStep('s43', 'send_message', { templateId: 'template-usage-1', templateName: '体験のご案内', templateVersion: 4 }, 'continue'), caStep('s44', 'start_scenario', { scenarioId: 'scenario-0' }), caStep('s45', 'set_metadata', { assignee: '佐々木' }, 'continue')], createdBy: '佐々木', createdAt: '2026-08-20T05:02:00.000Z', publishedAt: '2026-08-20T05:02:00.000Z' },
+    { id: 'cav-3', versionNumber: 3, status: 'published', draftRevision: 1, actions: [caStep('s31', 'add_tag'), caStep('s32', 'wait', { minutes: 30 }), caStep('s33', 'send_message'), caStep('s34', 'start_scenario')], createdBy: '田中', createdAt: '2026-08-12T00:40:00.000Z', publishedAt: '2026-08-12T00:40:00.000Z' },
+    { id: 'cav-2', versionNumber: 2, status: 'published', draftRevision: 1, actions: [caStep('s21', 'add_tag'), caStep('s22', 'wait', { minutes: 10 }), caStep('s23', 'start_scenario')], createdBy: '佐々木', createdAt: '2026-08-04T08:20:00.000Z', publishedAt: '2026-08-04T08:20:00.000Z' },
+    { id: 'cav-1', versionNumber: 1, status: 'published', draftRevision: 1, actions: [caStep('s11', 'add_tag'), caStep('s12', 'send_message')], createdBy: '佐々木', createdAt: '2026-07-28T02:15:00.000Z', publishedAt: '2026-07-28T02:15:00.000Z' },
   ],
   bindings: [
-    { id: 'cab-1', consumerType: 'scenario', consumerId: 'scenario-0', consumerPath: '体験前フォロー・1通目のあと', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 8, waitingCount: 2, updatedAt: '2026-08-25T00:00:00.000Z' },
-    { id: 'cab-2', consumerType: 'form', consumerId: 'form-1', consumerPath: '体験のお申し込み・送信後', versionId: 'cav-3', versionNumber: 3, latestVersionNumber: 4, hasNewerVersion: true, runningCount: 4, waitingCount: 1, updatedAt: '2026-08-24T00:00:00.000Z' },
-    { id: 'cab-3', consumerType: 'auto_reply', consumerId: 'ar-1', consumerPath: '「体験」と送られたとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, updatedAt: '2026-08-23T00:00:00.000Z' },
-    { id: 'cab-4', consumerType: 'rich_menu', consumerId: 'rm-1', consumerPath: '体験を申し込む を押したとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, updatedAt: '2026-08-22T00:00:00.000Z' },
-    { id: 'cab-5', consumerType: 'automation', consumerId: 'au-3', consumerPath: 'タグ「体験申込」が付いたとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, updatedAt: '2026-08-21T00:00:00.000Z' },
+    { id: 'cab-1', consumerType: 'scenario', consumerId: 'scenario-0', consumerPath: '体験前フォロー・1通目のあと', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 8, waitingCount: 2, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '2026-08-25T00:00:00.000Z' },
+    { id: 'cab-2', consumerType: 'form', consumerId: 'form-1', consumerPath: '体験のお申し込み・送信後', versionId: 'cav-3', versionNumber: 3, latestVersionNumber: 4, hasNewerVersion: true, runningCount: 4, waitingCount: 1, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '2026-08-24T00:00:00.000Z' },
+    { id: 'cab-3', consumerType: 'auto_reply', consumerId: 'ar-1', consumerPath: '「体験」と送られたとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '2026-08-23T00:00:00.000Z' },
+    { id: 'cab-4', consumerType: 'rich_menu', consumerId: 'rm-1', consumerPath: '体験を申し込む を押したとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '2026-08-22T00:00:00.000Z' },
+    { id: 'cab-5', consumerType: 'automation', consumerId: 'au-3', consumerPath: 'タグ「体験申込」が付いたとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '2026-08-21T00:00:00.000Z' },
   ],
 }
 
@@ -4912,6 +5103,7 @@ export const BOOKING_SETTINGS = {
   organizationName: '然-NEN- 本店', version: 1, timeZone: 'Asia/Tokyo',
   bookingWindowDays: 60, cutoffMinutesBefore: 1440, cancelDeadlineMinutesBefore: 1440,
   maxActiveBookingsPerFriend: 2, approvalMode: 'manual', holdMinutes: 15, slotGranularityMinutes: 15,
+  liffDateView: 'list',
   menuCount: 8, activeMenuCount: 6, inactiveMenuCount: 2,
   businessHours: [
     { weekday: 0, intervals: [{ start: '10:00', end: '17:00', capacity: 2 }] },
@@ -4952,11 +5144,15 @@ export const BOOKING_SETTINGS = {
 export const BOOKING_RESOURCES = [
   {
     id: 'resource-room-a', name: 'トリミングルームA', type: 'room', capacity: 1, isActive: true,
+    version: 1,
     businessHours: BOOKING_SETTINGS.businessHours, exceptions: BOOKING_SETTINGS.exceptions,
+    usage: { menuCount: 2, bookingCount: 5, exceptionCount: 1, referenced: true },
   },
   {
     id: 'resource-room-b', name: 'トリミングルームB', type: 'room', capacity: 1, isActive: true,
+    version: 1,
     businessHours: BOOKING_SETTINGS.businessHours, exceptions: [],
+    usage: { menuCount: 0, bookingCount: 0, exceptionCount: 0, referenced: false },
   },
 ]
 
@@ -5042,6 +5238,8 @@ export const BOOKING_AVAILABILITY = {
       ],
     },
   ],
+  // LIFFカレンダーの「休」の印の見本（枠が無い日と区別する）。
+  closed_dates: ['2026-09-05', '2026-09-06'],
 }
 
 /* #414 の availability 契約。予約枠ごとの定員・残数・状態を固定する。 */
@@ -5138,6 +5336,7 @@ export const BOOKING_PROXY_CREATE = {
         phone: '090-1234-5678', petName: 'こむぎ',
         tags: [{ id: 'tag-nen', name: 'NEN会員' }, { id: 'tag-delivery', name: '定期便' }],
         mileageBalance: 1240, previousHandover: '前回は右耳を短めに整えました。',
+        previousHandoverBooking: { id: 'bk-kanno-1', startsAt: '2026-08-03T01:00:00.000Z', status: 'completed' },
         recentBookings: [
           { id: 'bk-kanno-1', startsAt: '2026-08-03T01:00:00.000Z', status: 'completed', customerNote: '顔まわりは丸く', handoverNote: '右耳を短めに整えました。', price: 8400, menuName: 'トリミング（小型犬）', staffName: '佐々木' },
           { id: 'bk-kanno-2', startsAt: '2026-07-04T01:00:00.000Z', status: 'completed', customerNote: null, handoverNote: null, price: 4200, menuName: 'シャンプーのみ', staffName: '高田' },
@@ -5190,10 +5389,12 @@ export const BOOKING_ADMIN_DETAIL = {
       phone: '090-4321-8765', petName: 'ももちゃん', tags: [{ id: 'tag-vip', name: 'VIP' }], mileageBalance: 2860,
     },
     previousHandover: '前回は足先を短めに整えました。',
+    previousHandoverBooking: { id: 'bk-history-1', startsAt: '2026-08-03T00:00:00.000Z', status: 'completed' },
     history: [
       { id: 'bk-history-1', startsAt: '2026-08-03T00:00:00.000Z', status: 'completed', customerNote: '足先は短め', handoverNote: '耳の赤みは落ち着いています。', price: 8400, menuName: 'トリミング（小型犬）', staffName: '佐々木' },
       { id: 'bk-history-2', startsAt: '2026-07-05T01:00:00.000Z', status: 'completed', customerNote: null, handoverNote: null, price: 4200, menuName: 'シャンプーのみ', staffName: '高田' },
     ],
+    historyTotal: 2,
     reminders: [
       { id: 'br-detail-day', kind: 'day_before', scheduledAt: '2026-09-02T00:00:00.000Z', sentAt: '2026-09-02T00:00:03.000Z', status: 'sent', retryCount: 0 },
       { id: 'br-detail-hour', kind: 'hours_before', scheduledAt: '2026-09-02T23:00:00.000Z', sentAt: null, status: 'pending', retryCount: 0 },
@@ -5204,6 +5405,36 @@ export const BOOKING_ADMIN_DETAIL = {
     ],
   },
 }
+
+/** T: 予約メニューの版の履歴。新しい順。いちばん新しい版だけ in_use。 */
+export const BOOKING_MENU_VERSIONS = [
+  {
+    version_number: 2, title: '第2版', status: 'in_use',
+    summary: '値段 7,800円→8,400円', author: '店長', at: '2026-09-27T10:00:00+09:00',
+    lines: [
+      '名前：トリミング（小型犬）',
+      '分類：トリミング',
+      '説明：小型犬の全身カットとシャンプー',
+      '時間：105分（後片付け15分）',
+      '値段：8,400円',
+      '受付：30日先まで・3時間前締切・取消期限なし',
+      '状態：公開中',
+    ],
+  },
+  {
+    version_number: 1, title: '第1版', status: 'past',
+    summary: '最初の版', author: null, at: '2026-09-02T10:00:00+09:00',
+    lines: [
+      '名前：トリミング（小型犬）',
+      '分類：トリミング',
+      '説明：小型犬の全身カットとシャンプー',
+      '時間：105分（後片付け15分）',
+      '値段：7,800円',
+      '受付：30日先まで・3時間前締切・取消期限なし',
+      '状態：公開中',
+    ],
+  },
+]
 
 /** 機能34。サーバ判定を画面側で作り直さず、そのまま描く固定応答。 */
 export const GETTING_STARTED = {
@@ -5356,6 +5587,18 @@ export const LINE_NOTIFICATION_METRICS = {
   coverage: { individualOpenAvailable: false, lineAggregateOnly: true, unavailableIsNull: true },
 }
 
+/** 機能24。送信履歴から数えたJSTの今日・この30日（`send-counts` の見本）。 */
+export const LINE_NOTIFICATION_SEND_COUNTS = {
+  sentToday: 34,
+  sentLast30d: 412,
+  byEventType: EC_NOTIFICATION_SETTINGS.map((setting, index) => ({
+    eventType: setting.eventType,
+    today: [12, 8, 6, 3, 2, 1, 1, 1, 0][index],
+    last30d: [148, 96, 74, 41, 23, 12, 9, 6, 3][index],
+  })),
+  period: { today: '2026-08-25', from30d: '2026-07-27', to: '2026-08-25' },
+}
+
 /** 機能24。LINE受付までの事実だけを持ち、届いた・既読は作らない。 */
 export const EC_NOTIFICATION_RUNS = {
   items: [
@@ -5466,7 +5709,7 @@ const adminEvent = (id, name, nextSlot, capacity, active, pending, published = 1
   description: 'はじめての方むけに、おうちでできるコツをお伝えします。',
   description_centered: 0, max_bookings_per_friend: 1, requires_approval: 1,
   cancel_deadline_hours_before: 24, reminder_day_before_enabled: 1, reminder_hours_before: 3,
-  is_published: published, sort_order: 1,
+  is_published: published, lifecycle_status: published === 1 ? 'published' : 'draft', sort_order: 1,
   created_at: '2026-09-01T01:00:00.000Z', updated_at: '2026-09-02T01:00:00.000Z',
   next_slot_starts_at: nextSlot,
   total_capacity: capacity, total_active: active, pending_count: pending,
@@ -5504,6 +5747,7 @@ export const EVENT_DETAIL = {
   reminder_day_before_enabled: 1,
   reminder_hours_before: 24,
   is_published: 1,
+  lifecycle_status: 'published',
   sort_order: 1,
   confirmation_message_extra: null,
   reminder_message_extra: null,
@@ -5533,6 +5777,61 @@ export const EVENT_WAITLIST = [
   { id: 'ew-1', slot_id: 'event-slot-1', friend_id: 'friend-4', status: 'waiting', notified_at: null, created_at: '2026-09-02T01:00:00.000Z', slot_starts_at: '2026-09-25T05:00:00.000Z', friend_name: '中村 彩' },
   { id: 'ew-2', slot_id: 'event-slot-1', friend_id: 'friend-5', status: 'waiting', notified_at: null, created_at: '2026-09-02T02:00:00.000Z', slot_starts_at: '2026-09-25T05:00:00.000Z', friend_name: '石田 未来' },
 ]
+
+/* U: 変更の確認・状態・待ちの手動操作・開催回の変更の見本（実APIと同じ器）。 */
+export const EVENT_CHANGE_PREVIEW = {
+  event_id: 'ev-1',
+  impacts: [
+    {
+      slot_id: 'event-slot-1',
+      starts_at: '2026-09-25T05:00:00.000Z',
+      ends_at: '2026-09-25T06:30:00.000Z',
+      capacity: 12,
+      confirmed_seats: 9,
+      waiting_seats: 2,
+      pending_reminders: 9,
+      errors: [],
+      notices: ['datetime_moved_with_bookings'],
+    },
+  ],
+  event_notices: [],
+  blocked: false,
+  total_confirmed: 9,
+  total_waiting: 2,
+  total_pending_reminders: 9,
+}
+
+export const EVENT_CHANGE_APPLY_RESULT = {
+  success: true,
+  version: 4,
+  log_id: 'ecl-1',
+  affected_confirmed: 9,
+  affected_waiting: 2,
+  notified: 9,
+}
+
+export const EVENT_LIFECYCLE_RESULT = {
+  success: true,
+  lifecycle_status: 'paused',
+  version: 4,
+  log_id: 'ecl-2',
+}
+
+export const EVENT_WAITLIST_REORDER_RESULT = {
+  success: true,
+  occurrence_version: 5,
+  order: ['ew-2', 'ew-1'],
+  log_id: 'ecl-3',
+}
+
+export const EVENT_WAITLIST_SKIP_RESULT = {
+  success: true,
+  occurrence_version: 6,
+  waitlist_id: 'ew-1',
+  log_id: 'ecl-4',
+}
+
+export const EVENT_LIFF_CHANGE_RESULT = { id: 'ev-booking-2', status: 'confirmed' }
 
 /*
   イベントの申込者。設計 `i5SN2j` の「申し込み12／キャンセル待ち3／取り消した2」。
@@ -5659,15 +5958,18 @@ export const ACCOUNT_HANDOVER_DECISIONS = [
 ]
 
 /*
-  写真審査。設計 `Qu6Vk` の格子。
+  写真審査。設計 `cqWo8` の格子。
 
-  **状態を4つとも混ぜる。** 設計の札は 審査待ち／通したもの／戻したもの／すべて。
+  **状態を4つとも混ぜる。** 設計の札は 審査待ち／採用／見送り／公式サイト掲載。
   全部が審査待ちだと、残り3つの札が撮れない。
   戻したものには**理由**を入れる（`N2J629`「写真を戻す理由をえらぶ」の元）。
   `image_url` は作り物の SVG。外の絵を読みに行かないので、撮るたびに同じになる。
 */
 const petPhoto = (id, owner, pet, caption, status, hours, reason = null, note = null) => ({
-  id, owner_name: owner, pet_name: pet, caption,
+  id, owner_name: owner, pet_name: pet,
+  pet_gender: ['そら', 'レオ'].includes(pet) ? 'male' : 'female',
+  pet_call_name: `${pet}${['そら', 'レオ'].includes(pet) ? 'くん' : 'ちゃん'}`,
+  caption,
   image_url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640"><rect width="640" height="640" fill="%23eef6f0"/></svg>',
   status,
   review_version: 1,
@@ -5678,13 +5980,7 @@ const petPhoto = (id, owner, pet, caption, status, hours, reason = null, note = 
   review_notification_status: status === 'rejected' ? 'sent' : null,
 })
 
-/*
-  **名前に「ちゃん」を入れない。** 画面が `{pet_name}ちゃん` と後ろに付けるので、
-  ここにも入れると「ももちゃんちゃん」になる。
-  なお設計 `Qu6Vk` は「そらくん」「レオくん」と**子によって呼び方を変えている**が、
-  実装は全員に「ちゃん」を付ける。呼び方は画面ではなく飼い主が決めるものなので、
-  そこは別に直す（板 #739 の判定に書いた）。
-*/
+/* Worker と同じ完成済みの呼び名を返し、男の子=くん／女の子=ちゃんを撮影でも固定する。 */
 export const NEN_PHOTOS = [
   petPhoto('ph-1', '高橋 直人', 'もも', '朝のおさんぽ', 'pending', 48),
   petPhoto('ph-2', '前田 さくら', 'そら', 'はじめてのトリミング', 'pending', 44),
@@ -5701,13 +5997,15 @@ export const NEN_PHOTO_DETAIL = {
   caption: 'はじめて海に行きました', image_width: 2048, image_height: 1536,
   image_byte_size: 1887437, captured_device: 'iPhone 15', animal_type: 'dog',
   breed: 'ラブラドール', birthday: '2025-08-24', submission_count: 3, returned_count: 0,
+  // #817: 重複なし・いま使っている報酬の決まり（第3版・10pt）。
+  duplicate: null, rewardPolicy: { versionNumber: 3, policyKey: 'v3', points: 10 },
   risks: [
     { flag: 'face', confidence: 0.78, note: 'うしろに人の顔', provider: 'visual-qa', model_version: 'fixture-1', assessed_at: '2026-08-25T08:10:00.000Z' },
     { flag: 'blur', confidence: 0.04, note: '明るさ・ぶれは問題ありません', provider: 'visual-qa', model_version: 'fixture-1', assessed_at: '2026-08-25T08:10:00.000Z' },
   ],
 }
 
-/** 機能22の実APIで返す一覧集計。設計 `Qu6Vk` の通常状態。 */
+/** 機能22の実APIで返す一覧集計。設計 `cqWo8` の通常状態。 */
 export const NEN_PHOTO_REVIEW_METRICS = {
   pendingCount: 18,
   reviewedCount: 142,
@@ -5758,6 +6056,25 @@ export const NEN_PHOTO_BULK_DECISION_RESULT = {
     { photoId: 'ph-3', decision: 'approve', reviewVersion: 2 },
   ],
 }
+
+/** #817: 報酬の決まりの版。新しい版から返す。status は in_use / reserved / past。 */
+export const NEN_PHOTO_REWARD_POLICY_VERSIONS = [
+  {
+    versionNumber: 4, policyKey: 'v4', points: 10, summary: '報酬を5pt→10ptに',
+    effectiveFrom: '2026-10-01T00:00:00+09:00', createdBy: 'visual-qa-owner',
+    createdAt: '2026-09-25T20:40:00+09:00', status: 'reserved',
+  },
+  {
+    versionNumber: 3, policyKey: 'v3', points: 10, summary: '審査の決まりに「顔が写る写真は不可」を追加',
+    effectiveFrom: null, createdBy: 'visual-qa-owner',
+    createdAt: '2026-09-10T11:02:00+09:00', status: 'in_use',
+  },
+  {
+    versionNumber: 2, policyKey: 'v2', points: 5, summary: '最初の報酬の決まり',
+    effectiveFrom: null, createdBy: 'visual-qa-owner',
+    createdAt: '2026-08-01T10:00:00+09:00', status: 'past',
+  },
+]
 
 const publicationPhoto = (id, photoId, petName, ownerName, count, label, type = 'column') => ({
   id, photo_id: photoId, status: 'published', show_owner_name: ownerName ? 1 : 0,
@@ -6427,13 +6744,23 @@ export const WEBINAR_NOTIFICATIONS = {
     webinarId: 'webinar-1', version: 3,
     registrationEnabled: true, dayBeforeEnabled: true, dayBeforeTime: '20:00',
     hourBeforeEnabled: true, hourBeforeMinutes: 60, startEnabled: true,
-    missedEnabled: true, missedTime: '10:00', completedEnabled: true,
+    missedEnabled: true, missedTime: '10:00', missedWindowDays: 7, completedEnabled: true,
     updatedAt: '2026-08-25T02:00:00.000Z',
   },
   overview: {
     total: 184, pending: 32, sent: 149, failed: 3, skipped: 0, cancelled: 0,
     audience: { people: 184, bookings: 184, definition: 'active_registrations' },
   },
+}
+
+/**
+ * N: 動画の準備の段の見本。「配信の形」まで進んだ状態。
+ * 準備が済むまで公開できないことの撮影に使う。
+ */
+export const WEBINAR_VIDEO_ASSET = {
+  id: 'video-asset-1', stage: 'packaging', stageLabel: '配信の形', provider: 'r2_hls',
+  durationSeconds: 2_538, errorCode: null, expiresAt: null, purgedAt: null,
+  createdAt: '2026-09-20T00:00:00+09:00', updatedAt: '2026-09-20T01:00:00+09:00',
 }
 
 export const WEBINAR_CTAS = [{
@@ -6529,6 +6856,22 @@ export const WEBINAR_ANALYTICS = {
     { startSeconds: 1_100, endSeconds: 1_800, viewers: 101 },
     { startSeconds: 1_800, endSeconds: 2_538, viewers: 98 },
   ],
+  // J-1「どこまで見られたか」の見本。申し込みボタンは25分（1_500秒）。
+  retention: {
+    bucketSeconds: 60,
+    started: 112,
+    points: [
+      { atSeconds: 0, viewers: 112 },
+      { atSeconds: 60, viewers: 108 },
+      { atSeconds: 720, viewers: 84 },
+      { atSeconds: 1_440, viewers: 61 },
+      { atSeconds: 1_500, viewers: 58 },
+      { atSeconds: 2_400, viewers: 41 },
+    ],
+  },
+  startedViewers: 112,
+  heartbeatRejects: 2,
+  ctaAtSeconds: 1_500,
   measurement: { state: 'available', reason: null },
   formFunnel: {
     ctaImpressions: 96, ctaClicks: 52, formOpens: 41, formStarts: 32,
@@ -6597,3 +6940,254 @@ export function commonVarChangeImpact(nextValue) {
     recommendedAction: 'fix_errors',
   }
 }
+
+/*
+ * 全ルート監査（2026-09-25）担当Aの欠け埋め。
+ * いずれも本物の Worker（`apps/worker/src/routes/`）が返す形。
+ * 画面側は変えず、偽APIの返しだけを実APIの形に直す。
+ */
+
+/** テスト送信先の候補（LINE連携済みのログインユーザー）。本物は配列。 */
+export const TEST_RECIPIENT_LOGIN_USERS = [
+  { id: 'friend-test-kenta', displayName: 'Kenta Kawano', pictureUrl: null, staffName: 'Kenta Kawano', sameAccount: true },
+  { id: 'friend-test-masato', displayName: 'Masato S.', pictureUrl: null, staffName: 'Masato S.', sameAccount: true },
+]
+
+/** 統括バナー生成のプリセット。本物は `BANNER_PRESETS` から `medium` を除いた形。 */
+export const HQ_BANNER_PRESETS = [
+  { key: 'line_rich_message', group: 'line', label: 'リッチメッセージ', note: '1040×1040。トークに大きく出る正方形の画像', apiSize: '1024x1024', targetWidth: 1040, targetHeight: 1040, aspectRatio: '1:1' },
+  { key: 'line_image_message', group: 'line', label: '画像メッセージ・クーポン', note: '1040×1040。画像だけを送るメッセージやクーポンの絵', apiSize: '1024x1024', targetWidth: 1040, targetHeight: 1040, aspectRatio: '1:1' },
+  { key: 'line_card', group: 'line', label: 'カードタイプ・カルーセル', note: '1200×795（1.51:1）。横にめくれるカードの画像', apiSize: '1536x1024', targetWidth: 1200, targetHeight: 795, aspectRatio: '1.51:1' },
+  { key: 'line_rich_menu_large', group: 'line', label: 'リッチメニュー（大）', note: '2500×1686。トーク画面の下に常時表示されるメニュー', apiSize: '1536x1024', targetWidth: 2500, targetHeight: 1686, aspectRatio: '3:2' },
+  { key: 'line_rich_menu_small', group: 'line', label: 'リッチメニュー（小）', note: '2500×843。高さが半分のメニュー', apiSize: '1536x1024', targetWidth: 2500, targetHeight: 843, aspectRatio: '3:1' },
+  { key: 'line_voom_square', group: 'line', label: 'LINE VOOM（正方形）', note: '1080×1080。VOOM の投稿画像', apiSize: '1024x1024', targetWidth: 1080, targetHeight: 1080, aspectRatio: '1:1' },
+  { key: 'line_voom_vertical', group: 'line', label: 'LINE VOOM（縦長）', note: '1080×1920。縦いっぱいの投稿', apiSize: '1024x1536', targetWidth: 1080, targetHeight: 1920, aspectRatio: '9:16' },
+  { key: 'sns_instagram_feed', group: 'sns', label: 'Instagram フィード（正方形）', note: '1080×1080', apiSize: '1024x1024', targetWidth: 1080, targetHeight: 1080, aspectRatio: '1:1' },
+  { key: 'sns_instagram_portrait', group: 'sns', label: 'Instagram フィード（縦長）', note: '1080×1350（4:5）', apiSize: '1024x1536', targetWidth: 1080, targetHeight: 1350, aspectRatio: '4:5' },
+  { key: 'sns_story', group: 'sns', label: 'ストーリー・リール・TikTok', note: '1080×1920（9:16）', apiSize: '1024x1536', targetWidth: 1080, targetHeight: 1920, aspectRatio: '9:16' },
+  { key: 'sns_x_post', group: 'sns', label: 'X（旧Twitter）投稿', note: '1200×675（16:9）', apiSize: '1536x1024', targetWidth: 1200, targetHeight: 675, aspectRatio: '16:9' },
+  { key: 'sns_ogp', group: 'sns', label: 'OGP・Facebook リンク画像', note: '1200×630（1.91:1）。リンクを共有したときに出る画像', apiSize: '1536x1024', targetWidth: 1200, targetHeight: 630, aspectRatio: '1.91:1' },
+  { key: 'sns_youtube_thumbnail', group: 'sns', label: 'YouTube サムネイル', note: '1280×720（16:9）', apiSize: '1536x1024', targetWidth: 1280, targetHeight: 720, aspectRatio: '16:9' },
+]
+
+/** 統括バナー生成の利用状況。本物は `usageSnapshot` の形。 */
+export const HQ_BANNER_USAGE = {
+  month: { used: 7, limit: 100, remaining: 93 },
+  today: { used: 1, limit: 4, remaining: 3 },
+  paused: false,
+  blocked: false,
+  blockedReason: null,
+  planState: 'active',
+  pausedReason: null,
+}
+
+/** 統括バナー生成の集計。本物は `getBannerStats` の形。 */
+export const HQ_BANNER_STATS = {
+  projects: { active: 2, archived: 1 },
+  deliveredImages: 18,
+  deliveredAccounts: 3,
+}
+
+/** 統括バナーのプロジェクト。本物は `serializeProject` の形。 */
+export const HQ_BANNER_PROJECTS = [
+  {
+    id: 'banner-project-qa-1', name: '秋のキャンペーン', description: '10月の友だち追加特典の案内',
+    isFavorite: true, archivedAt: null, imageCount: 2, runningCount: 0,
+    createdBy: '高橋 直人', createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-07T10:00:00+09:00',
+  },
+  {
+    id: 'banner-project-qa-2', name: 'リッチメニューの秋', description: null,
+    isFavorite: false, archivedAt: null, imageCount: 1, runningCount: 0,
+    createdBy: '佐々木 花', createdAt: '2026-09-03T09:00:00+09:00', updatedAt: '2026-09-06T10:00:00+09:00',
+  },
+]
+
+/** 統括バナーの画像。本物は `serializeImage` の形。 */
+export const HQ_BANNER_IMAGES = [
+  {
+    id: 'banner-image-qa-1', projectId: 'banner-project-qa-1', generationId: 'banner-generation-qa-1',
+    sequence: 1, source: 'generated', parentImageId: null, isFavorite: true,
+    createdBy: '高橋 直人', createdAt: '2026-09-07T10:00:00+09:00',
+    media: { id: 'banner-media-qa-1', filename: 'aki-campaign-1.png', mimeType: 'image/png', sizeBytes: 184320, width: 1040, height: 1040, url: 'https://example.invalid/banners/aki-campaign-1.png' },
+    generation: null,
+    deliveredAccountIds: ['visual-qa-account'],
+  },
+  {
+    id: 'banner-image-qa-2', projectId: 'banner-project-qa-1', generationId: 'banner-generation-qa-1',
+    sequence: 2, source: 'generated', parentImageId: null, isFavorite: false,
+    createdBy: '高橋 直人', createdAt: '2026-09-07T10:01:00+09:00',
+    media: { id: 'banner-media-qa-2', filename: 'aki-campaign-2.png', mimeType: 'image/png', sizeBytes: 172480, width: 1040, height: 1040, url: 'https://example.invalid/banners/aki-campaign-2.png' },
+    generation: null,
+    deliveredAccountIds: [],
+  },
+  {
+    id: 'banner-image-qa-3', projectId: 'banner-project-qa-2', generationId: null,
+    sequence: 1, source: 'uploaded', parentImageId: null, isFavorite: false,
+    createdBy: '佐々木 花', createdAt: '2026-09-06T10:00:00+09:00',
+    media: { id: 'banner-media-qa-3', filename: 'richmenu-aki.png', mimeType: 'image/png', sizeBytes: 512000, width: 2500, height: 1686, url: 'https://example.invalid/banners/richmenu-aki.png' },
+    generation: null,
+    deliveredAccountIds: [],
+  },
+]
+
+/** 然-NEN- 会員のランク設定。本物は `settingsResponse` の形。 */
+export const NEN_RANK_SETTINGS = {
+  ranks: [
+    { id: 'nen-rank-gold', key: 'gold', name: 'ゴールド', annualThresholdYen: 100000, mileRatePercent: 5, tagId: 'tag-nen-gold', tagName: 'NENゴールド', memberCount: 4 },
+    { id: 'nen-rank-silver', key: 'silver', name: 'シルバー', annualThresholdYen: 30000, mileRatePercent: 3, tagId: 'tag-nen-silver', tagName: 'NENシルバー', memberCount: 6 },
+    { id: 'nen-rank-bronze', key: 'bronze', name: 'ブロンズ', annualThresholdYen: 0, mileRatePercent: 1, tagId: 'tag-nen-bronze', tagName: 'NENブロンズ', memberCount: 2 },
+  ],
+  rules: {
+    yearStartMonth: 1, applyOnReach: 'immediate', keepUntil: 'next_year_end', countOrders: 'paid',
+    version: 3, syncStatus: 'synced', syncError: null, syncedAt: '2026-09-07T09:00:00+09:00', updatedAt: '2026-09-07T09:00:00+09:00',
+  },
+  milestones: [
+    { id: 'nen-milestone-1', thresholdYen: 100000, title: '10万円到達', benefitKind: null, benefitNote: null, notifyOnReach: true, reachedCount: 4 },
+  ],
+  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { gold: 4, silver: 6, bronze: 2 } },
+}
+
+/** 然-NEN- 会員の一覧。本物は `GET /api/nen/members` の形。 */
+export const NEN_MEMBER_LIST = {
+  items: [
+    {
+      friendId: 'friend-1', name: '高橋 直人', pictureUrl: null, customerId: 'customer-1',
+      rankKey: 'gold', rankName: 'ゴールド', mileRatePercent: 5,
+      annualMilesYen: 128000, lifetimeMilesYen: 486000, mileBalance: 8200,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-05T10:00:00+09:00', purchaseCount: 14,
+      petCount: 1, petNames: 'ももちゃん', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-2', name: '前田 さくら', pictureUrl: null, customerId: 'customer-2',
+      rankKey: 'silver', rankName: 'シルバー', mileRatePercent: 3,
+      annualMilesYen: 42000, lifetimeMilesYen: 96000, mileBalance: 3100,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-02T10:00:00+09:00', purchaseCount: 6,
+      petCount: 1, petNames: 'そらくん', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+  ],
+  total: 2,
+  page: 1,
+  pageSize: 20,
+  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { gold: 4, silver: 6, bronze: 2 } },
+  ranks: [
+    { key: 'gold', name: 'ゴールド', annualThresholdYen: 100000, mileRatePercent: 5 },
+    { key: 'silver', name: 'シルバー', annualThresholdYen: 30000, mileRatePercent: 3 },
+    { key: 'bronze', name: 'ブロンズ', annualThresholdYen: 0, mileRatePercent: 1 },
+  ],
+}
+
+/** 然-NEN- マイペットの一覧。本物は `GET /api/nen/pets` の形。 */
+export const NEN_PET_LIST = {
+  items: [
+    {
+      id: 'nen-pet-momo', name: 'もも', callName: 'ももちゃん', gender: 'female', animalType: 'dog',
+      breed: 'トイ・プードル', birthday: '2022-09-02', ageLabel: '4歳', weightKg: 3.2,
+      neutered: 'yes', activityLevel: 'normal', activityLabel: 'ふつう', productName: '鹿肉ミンチ',
+      feeding: { dailyKcal: 320, dailyGrams: 280, factorLabel: '避妊・去勢済み', stageLabel: '成犬', venisonGrams: 60, venisonKcal: 72, treatName: '鹿ジャーキー' },
+      imageUrl: null, updatedAt: '2026-09-06T10:00:00+09:00', weightStale: false,
+      owner: { friendId: 'friend-1', name: '高橋 直人', pictureUrl: null, customerId: 'customer-1' },
+    },
+    {
+      id: 'nen-pet-sora', name: 'そら', callName: 'そらくん', gender: 'male', animalType: 'cat',
+      breed: 'スコティッシュフォールド', birthday: '2024-08-28', ageLabel: '2歳', weightKg: 4.1,
+      neutered: 'unknown', activityLevel: 'low', activityLabel: 'おだやか', productName: null,
+      feeding: null,
+      imageUrl: null, updatedAt: '2026-08-20T10:00:00+09:00', weightStale: true,
+      owner: { friendId: 'friend-2', name: '前田 さくら', pictureUrl: null, customerId: 'customer-2' },
+    },
+  ],
+  total: 2,
+  page: 1,
+  pageSize: 20,
+  kpis: { total: 2, dogs: 1, cats: 1, newThisMonth: 0, computable: 1, staleWeight: 1 },
+  products: [{ id: 'feeding-product-1', name: '鹿肉ミンチ' }],
+  treatLimitPercent: 10,
+}
+
+/** 然-NEN- 健康日記の一覧。本物は `GET /api/nen/health` の形。 */
+export const NEN_HEALTH_LIST = {
+  items: [
+    {
+      pet: { id: 'nen-pet-momo', name: 'もも', callName: 'ももちゃん', animalType: 'dog', breed: 'トイ・プードル', ageLabel: '4歳', imageUrl: null },
+      owner: { friendId: 'friend-1', name: '高橋 直人', customerId: 'customer-1' },
+      lastLoggedOn: '2026-09-06', lastLoggedLabel: '昨日', daysSinceLast: 1,
+      count30d: 12, totalRecords: 48,
+      weightSeries: [3.1, 3.2, 3.2, 3.1, 3.2, 3.2, 3.3, 3.2],
+      latestWeightKg: 3.2, weightChangePercent: 3.2, latestStool: 'normal', latestAppetite: 'good',
+      changes: [], concerning: false,
+    },
+    {
+      pet: { id: 'nen-pet-sora', name: 'そら', callName: 'そらくん', animalType: 'cat', breed: 'スコティッシュフォールド', ageLabel: '2歳', imageUrl: null },
+      owner: { friendId: 'friend-2', name: '前田 さくら', customerId: 'customer-2' },
+      lastLoggedOn: null, lastLoggedLabel: '記録なし', daysSinceLast: null,
+      count30d: 0, totalRecords: 0,
+      weightSeries: [null, null, null, null, null, null, null, null],
+      latestWeightKg: null, weightChangePercent: null, latestStool: null, latestAppetite: null,
+      changes: [{ key: 'silent', label: '30日記録なし', tone: 'faint' }],
+      concerning: false,
+    },
+  ],
+  total: 2,
+  page: 1,
+  pageSize: 20,
+  kpis: { recordsThisWeek: 5, petsWithRecords: 1, petsTotal: 2, concerning: 0, silent30: 1 },
+}
+
+/** 友だち追加時配信の実行詳細。本物は `GET /api/friend-add-runs/:id` の形。 */
+export const FRIEND_ADD_RUN_DETAIL = {
+  id: 'friend-add-run-1', receivedAt: '2026-09-07T01:32:00.000Z', processedAt: '2026-09-07T01:32:00.800Z',
+  friend: { id: 'visual-friend-add-1', displayName: 'Kenta Kawano' }, friendKind: 'first_time',
+  attribution: { status: 'captured', routeId: 'route-shop', routeName: '店頭QR', reason: 'store-qr' },
+  rule: { id: 'rule-shop', name: '店頭QRの初回案内', versionId: 'rule-shop-v1', versionNumber: 1 },
+  configuredActions: [],
+  actionRuns: [
+    {
+      id: 'friend-add-action-run-1', stableId: 'action-welcome', type: 'send_message', status: 'completed',
+      attemptCount: 1, nextRetryAt: null, errorCode: null,
+      startedAt: '2026-09-07T01:32:00.100Z', completedAt: '2026-09-07T01:32:00.500Z', updatedAt: '2026-09-07T01:32:00.500Z',
+    },
+    {
+      id: 'friend-add-action-run-2', stableId: 'action-tag', type: 'add_tag', status: 'completed',
+      attemptCount: 1, nextRetryAt: null, errorCode: null,
+      startedAt: '2026-09-07T01:32:00.500Z', completedAt: '2026-09-07T01:32:00.800Z', updatedAt: '2026-09-07T01:32:00.800Z',
+    },
+  ],
+  status: 'completed',
+  errorCode: null,
+}
+
+/** 緊急停止の送信経路の台帳。本物は `GET /api/operations/send-paths` の形。 */
+export const OPERATION_SEND_PATHS = {
+  evaluatedAt: '2026-09-07T10:00:00+09:00',
+  capabilities: [
+    'broadcast_dispatch', 'scenario_dispatch', 'reminder_dispatch', 'automation_actions',
+    'auto_reply_dispatch', 'webhook_outgoing', 'ad_postback',
+  ],
+  problems: [],
+  paths: [
+    { id: 'broadcast-send', label: '一斉配信（予約・今すぐ送信・分割送信）', kind: 'scheduled', capability: 'broadcast_dispatch', state: 'running', excludedReason: null, note: '束と束のあいだで止まる。' },
+    { id: 'scenario-send', label: 'シナリオ配信', kind: 'scheduled', capability: 'scenario_dispatch', state: 'running', excludedReason: null, note: null },
+    { id: 'reminder-send', label: 'リマインダ配信', kind: 'scheduled', capability: 'reminder_dispatch', state: 'running', excludedReason: null, note: null },
+    { id: 'automation-actions', label: '自動化の処理', kind: 'auto', capability: 'automation_actions', state: 'running', excludedReason: null, note: null },
+    { id: 'auto-reply-send', label: '自動応答の送信', kind: 'auto', capability: 'auto_reply_dispatch', state: 'running', excludedReason: null, note: null },
+    { id: 'webhook-outgoing', label: 'Webhookの送信', kind: 'external', capability: 'webhook_outgoing', state: 'running', excludedReason: null, note: null },
+    { id: 'ad-postback', label: '広告の成果通知', kind: 'external', capability: 'ad_postback', state: 'running', excludedReason: null, note: null },
+    { id: 'manual-reply', label: '1対1の手動返信', kind: 'manual', capability: null, state: null, excludedReason: '担当者が手で送る1対1の返信は止めない', note: null },
+  ],
+}
+
+/** リマインダの登録者。本物は `GET /api/reminders/:id/registrants` の配列。 */
+export const REMINDER_REGISTRANTS = [
+  {
+    id: 'reminder-enrollment-1', friendId: 'friend-1', friendName: '高橋 直人', targetDate: '2026-09-10',
+    status: 'active', reminderVersionId: 'reminder-version-1', sourceKind: 'manual',
+    createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-01T09:00:00+09:00',
+    cancelledAt: null, lockVersion: 1,
+  },
+  {
+    id: 'reminder-enrollment-2', friendId: 'friend-2', friendName: '前田 さくら', targetDate: '2026-09-12',
+    status: 'active', reminderVersionId: 'reminder-version-1', sourceKind: 'form',
+    createdAt: '2026-09-02T09:00:00+09:00', updatedAt: '2026-09-02T09:00:00+09:00',
+    cancelledAt: null, lockVersion: 1,
+  },
+]

@@ -59,6 +59,23 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href, ...rest }, children),
 }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後のテンプレートの判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 /* ------------------------------------------------------------ 読み込む口 */
 
 let document: DomDocument
@@ -183,6 +200,13 @@ async function fakeApi(input: string, init?: RequestInit): Promise<Response> {
   }
   const templateId = /^\/api\/templates\/([^/]+)$/.exec(path)?.[1]
   if (templateId) {
+    /*
+     * D007: 存在しないIDへ success:true だが本文を含まない応答が返る。
+     * 一覧形 `{items:[]}` のまま詳細として返る場合の再現。
+     */
+    if (templateId === 'tmpl-broken') {
+      return jsonResponse({ success: true, data: { items: [] } })
+    }
     const template = TEMPLATES[templateId]
     if (!template) return jsonResponse({ success: false, error: 'not found' }, 404)
     return jsonResponse({ success: true, data: {
@@ -283,7 +307,7 @@ async function navigateTo(search: string) {
   await settle()
 }
 
-const saveButton = () => findByText(container, 'button', '保存')
+const saveButton = () => findByText(container, 'button', '保存する')
 /*
  * 見比べるのは値だけにする。DOM の節をそのまま `expect` へ渡すと、
  * 落ちたときに節の中身を延々と書き出そうとして、**どの条件で落ちたのかが
@@ -458,6 +482,16 @@ describe('同じ画面のまま編集するテンプレートを替える', () =
     expect(screenText()).toContain(Testing.TEMPLATE_LOAD_FAILED_MESSAGE)
     expect(isDisabled(saveButton())).toBe(true)
     await act(async () => { click(saveButton()!) })
+    expect(writes).toEqual([])
+  })
+
+  it('D007: 本文の無い詳細応答は落ちず「読み込めませんでした」で止まる', async () => {
+    await mountAt('?id=tmpl-broken')
+
+    expect(screenText()).toContain(Testing.TEMPLATE_LOAD_FAILED_MESSAGE)
+    expect(isDisabled(saveButton())).toBe(true)
+    await act(async () => { click(saveButton()!) })
+    await settle()
     expect(writes).toEqual([])
   })
 })

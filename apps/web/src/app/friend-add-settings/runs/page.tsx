@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   FriendAddEventAttributionStatus,
@@ -10,87 +10,30 @@ import type {
 } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunList } from '@/lib/api'
+import { describeFriendAddFailure } from '../friend-add-failure'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { csvCell } from './csv'
+import { formatJstDateTime, routingAction, routingLabel } from './run-status'
 import { useCursorStack } from '../use-cursor-stack'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import MenuPortal from '@/components/shared/menu-portal'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import StatusBadge from '@/components/shared/status-badge'
+import KpiCard from '@/components/shared/kpi-card'
 import StickyBar from '@/components/shared/sticky-bar'
+import ListRange from '@/components/ui/list-range'
+import { formatNumber } from '@/lib/format'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
 type RoutingFilter = 'all' | FriendAddEventRoutingStatus
 
-const ROUTING_LABELS: Record<FriendAddEventRoutingStatus, { label: string; tone: StatusBadgeTone }> = {
-  pending: { label: 'テスト待ち', tone: 'info' },
-  completed: { label: '成功', tone: 'success' },
-  failed: { label: 'エラー', tone: 'danger' },
-  suppressed: { label: '配信なし', tone: 'neutral' },
-  partial_failed: { label: '再送待ち', tone: 'warning' },
-}
-
-const ROUTING_ACTIONS: Record<FriendAddEventRoutingStatus, string> = {
-  pending: '配信・処理を確認中',
-  completed: '初回案内を実行',
-  failed: '配信・処理に失敗',
-  suppressed: '配信・処理なし',
-  partial_failed: '送れず再送待ち',
-}
-
-/** 将来の状態が来ても描画を落とさない受け皿。 */
-const UNKNOWN_ROUTING_LABEL = { label: '不明', tone: 'neutral' } as const
-const UNKNOWN_ROUTING_ACTION = '状態を確認中'
-
-/*
- * 送達不明。送信は試したが、届いたかどうか分からない実行。
- * **自動では送り直さない**（送り直すと二重に届く）。「再送待ち」と同じ
- * 見た目にすると、放っておけばそのうち届くと読めてしまう。分けて出す。
- */
-const DELIVERY_UNKNOWN_CODE = 'delivery_unknown'
-const DELIVERY_UNKNOWN_LABEL = { label: '送達不明', tone: 'danger' } as const
-const DELIVERY_UNKNOWN_ACTION = '送達不明・要確認（自動では送り直しません）'
-
-function routingLabel(
-  status: FriendAddEventRoutingStatus,
-  errorCode: string | null,
-): { label: string; tone: StatusBadgeTone } {
-  if (errorCode === DELIVERY_UNKNOWN_CODE) return DELIVERY_UNKNOWN_LABEL
-  return ROUTING_LABELS[status] ?? UNKNOWN_ROUTING_LABEL
-}
-
-function routingAction(status: FriendAddEventRoutingStatus, errorCode: string | null): string {
-  if (errorCode === DELIVERY_UNKNOWN_CODE) return DELIVERY_UNKNOWN_ACTION
-  return ROUTING_ACTIONS[status] ?? UNKNOWN_ROUTING_ACTION
-}
-
-/** DBにはJSTの時刻をオフセットなしで保存した古い行がある。UTCへ読み替えず、そのままJSTとして表示する。 */
-function formatJstDateTime(value: string | null): string {
-  if (!value) return '—'
-  const bare = value.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/)
-  if (bare && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(value)) {
-    return `${bare[1]}/${bare[2]}/${bare[3]} ${bare[4]}:${bare[5]}`
-  }
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(parsed)
-}
-
-function formatJstTime(value: string | null): string {
-  const dateTime = formatJstDateTime(value)
-  return dateTime === '—' ? dateTime : dateTime.slice(-5)
-}
+const RUN_STATUSES_PARAM = new Set<FriendAddEventRoutingStatus>([
+  'pending', 'completed', 'failed', 'suppressed', 'partial_failed',
+])
 
 const RULE_STATUS_LABELS: Record<string, string> = {
   published: '稼働中',
@@ -107,17 +50,36 @@ function FriendAddRunsInner() {
   usePageTitle('新規友だち初回案内・実行結果')
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const searchParams = useSearchParams()
+  const router = useRouter()
   // 一覧の「この設定の実行結果」から来たとき、その設定の記録だけを見せる。
   const ruleIdFilter = searchParams.get('rule_id')
-  const [kind, setKind] = useState<KindFilter>('all')
-  const [attribution, setAttribution] = useState<AttributionFilter>('all')
-  const [routing, setRouting] = useState<RoutingFilter>('all')
-  const { cursor, page: cursorPage, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
+  /*
+   * 絞り込みとページ位置は URL が持つ（R268）。詳細から戻ったときに
+   * 同じ条件・同じページへ戻れるよう、URLの値をそのまま使う。
+   */
+  const kindParam = searchParams.get('kind')
+  const kind: KindFilter = kindParam === 'first_time' || kindParam === 'returning' ? kindParam : 'all'
+  const attributionParam = searchParams.get('attribution')
+  const attribution: AttributionFilter = attributionParam === 'captured' || attributionParam === 'unavailable' ? attributionParam : 'all'
+  const routingParam = searchParams.get('status')
+  const routing: RoutingFilter = routingParam && RUN_STATUSES_PARAM.has(routingParam as FriendAddEventRoutingStatus) ? routingParam as RoutingFilter : 'all'
+  /*
+   * ページ位置はURLの `pages` が持つ。カーソルの束を丸ごと入れるので、
+   * 詳細から3ページ目へ戻っても表示中の記録とページ番号が一致し、
+   * 「前へ」も正しくたどれる（R268）。
+   */
+  const pagesParam = searchParams.get('pages')
+  const { stack: cursorStack, cursor, page: cursorPage, canPrev, reset: resetCursor, goPrev, goNext } =
+    useCursorStack(pagesParam ? [null, ...pagesParam.split(',').filter(Boolean)] : undefined)
   const [data, setData] = useState<FriendAddRunList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // M009: 403 は共通部品の forbidden で出す。HTTP の状態をそのまま渡す。
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [csvBusy, setCsvBusy] = useState(false)
   const [csvNote, setCsvNote] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const filterAnchorRef = useRef<HTMLSpanElement>(null)
   const [stopBusy, setStopBusy] = useState(false)
   const [stopDialogOpen, setStopDialogOpen] = useState(false)
   const [stopMessage, setStopMessage] = useState('')
@@ -134,6 +96,7 @@ function FriendAddRunsInner() {
     }
     setLoading(true)
     setError('')
+    setErrorStatus(null)
     try {
       // 種類・経路の絞り込みはサーバ側へ送る。取得済み20件への表示絞りでは
       // 2ページ目以降が漏れる。
@@ -148,14 +111,18 @@ function FriendAddRunsInner() {
       if (requestId !== requestSequence.current) return
       if (!response.success) {
         setData(null)
-        setError('実行結果を表示できませんでした。通信を確認して、もう一度お試しください。')
+        setError(response.error || '実行結果を表示できませんでした。もう一度お試しください。')
+        setErrorStatus(null)
         return
       }
       setData(response.data)
-    } catch {
+    } catch (caught) {
       if (requestId !== requestSequence.current) return
+      // M009: 403 は権限、404 は選び直し。「通信を確認」は通信断だけ。
+      const failure = describeFriendAddFailure(caught, '実行結果', 'load')
       setData(null)
-      setError('実行結果を表示できませんでした。通信を確認して、もう一度お試しください。')
+      setError(failure.message)
+      setErrorStatus(failure.status)
     } finally {
       if (requestId === requestSequence.current) setLoading(false)
     }
@@ -165,19 +132,57 @@ function FriendAddRunsInner() {
     if (!accountLoading) void load()
   }, [accountLoading, load])
 
-  // アカウントや設定の絞りを変えたら古いカーソルで読まないよう巻き戻す。
+  /*
+   * アカウントや設定の絞りを変えたら古いカーソルで読まないよう巻き戻す。
+   * 初回（URLのカーソルで復元した直後）は巻き戻さない。ここで消すと
+   * 詳細からの戻りが先頭ページへ飛んでしまう（R268）。
+   */
+  const lastScope = useRef<string | null>(null)
   useEffect(() => {
-    resetCursor()
+    const scope = `${selectedAccountId ?? ''}:${ruleIdFilter ?? ''}`
+    if (lastScope.current === null) {
+      lastScope.current = scope
+      return
+    }
+    if (lastScope.current !== scope) {
+      lastScope.current = scope
+      resetCursor()
+    }
   }, [selectedAccountId, ruleIdFilter, resetCursor])
+
+  /*
+   * 今のページ位置（カーソルの束）をURLへ写す。詳細へのリンクがこのURLを
+   * 引き継ぐので、戻ると同じページ・同じ絞り込みへ戻れる（R268）。
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    const trail = cursorStack.slice(1).join(',')
+    if (trail) params.set('pages', trail)
+    else params.delete('pages')
+    const next = params.toString()
+    if (next !== searchParams.toString()) router.replace(`?${next}`, { scroll: false })
+  }, [cursorStack, searchParams, router])
 
   /*
    * 絞りの変更はカーソルの巻き戻しと同時に1回だけ読み直す。巻き戻しと取得を
    * 別の effect に分けると、絞り変更のたびに無駄な再取得が起きる。
    */
   const applyFilter = (patch: { kind?: KindFilter; attribution?: AttributionFilter; routing?: RoutingFilter }) => {
-    if (patch.kind !== undefined) setKind(patch.kind)
-    if (patch.attribution !== undefined) setAttribution(patch.attribution)
-    if (patch.routing !== undefined) setRouting(patch.routing)
+    const params = new URLSearchParams(searchParams.toString())
+    if (patch.kind !== undefined) {
+      if (patch.kind === 'all') params.delete('kind')
+      else params.set('kind', patch.kind)
+    }
+    if (patch.attribution !== undefined) {
+      if (patch.attribution === 'all') params.delete('attribution')
+      else params.set('attribution', patch.attribution)
+    }
+    if (patch.routing !== undefined) {
+      if (patch.routing === 'all') params.delete('status')
+      else params.set('status', patch.routing)
+    }
+    params.delete('pages')
+    router.replace(`?${params.toString()}`, { scroll: false })
     resetCursor()
   }
 
@@ -193,7 +198,6 @@ function FriendAddRunsInner() {
     }
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1])
   }, [data])
-  const latestProcessedAt = data?.items.find((item) => item.processedAt)?.processedAt ?? null
   // 絞り込みはサーバ側で済んでいるため、ここでは表示絞りをしない。
   const visibleItems = useMemo(() => data?.items ?? [], [data])
   const activeRuleId = data?.items.find((item) => item.rule)?.rule?.id ?? null
@@ -253,6 +257,22 @@ function FriendAddRunsInner() {
     : null
 
   /*
+   * 詳細へのリンクは今の絞り込み・ページ位置を引き継ぐ。詳細側の
+   * 「実行結果へ戻る」がそのまま返すので、絞り込みが解除されない（R268）。
+   */
+  const detailHref = (id: string) => {
+    const params = new URLSearchParams()
+    params.set('id', id)
+    if (kind !== 'all') params.set('kind', kind)
+    if (attribution !== 'all') params.set('attribution', attribution)
+    if (routing !== 'all') params.set('status', routing)
+    if (ruleIdFilter) params.set('rule_id', ruleIdFilter)
+    const trail = cursorStack.slice(1).join(',')
+    if (trail) params.set('pages', trail)
+    return `/friend-add-settings/runs/detail?${params.toString()}`
+  }
+
+  /*
    * CSVは表示中の20件ではなく、今の絞り込み（種類・経路・結果・設定）に
    * 合う記録を新しい順にすべて書き出す。カーソルを辿って全頁を読み、
    * 安全弁（5,000件）で切れたときは画面に断る(#946 N-111)。
@@ -308,8 +328,8 @@ function FriendAddRunsInner() {
       anchor.click()
       URL.revokeObjectURL(url)
       setCsvNote(truncated
-        ? `新しい順に${items.length.toLocaleString('ja-JP')}件まで書き出しました。それより古い記録は含まれていません。`
-        : `${items.length.toLocaleString('ja-JP')}件を書き出しました。`)
+        ? `新しい順に${formatNumber(items.length)}件まで書き出しました。それより古い記録は含まれていません。`
+        : `${formatNumber(items.length)}件を書き出しました。`)
     } catch {
       setCsvNote('書き出す記録を取得できませんでした。通信を確認して、もう一度お試しください。')
     } finally {
@@ -320,11 +340,27 @@ function FriendAddRunsInner() {
   return (
     <div data-design-node="P2J0Te" className="space-y-4 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link className="text-sm font-bold text-accent hover:underline" href="/friend-add-settings">← 友だち追加時の配信</Link>
+        <Link className="text-sm font-bold text-action hover:underline" href="/friend-add-settings">← 友だち追加時の配信</Link>
         <div className="flex gap-2">
-          <details className="relative">
-            <summary className="cursor-pointer list-none rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-bold">絞り込み</summary>
-            <div className="absolute right-0 z-20 mt-2 flex w-screen max-w-3xl flex-wrap items-end gap-3 rounded-card border border-hairline bg-canvas p-4 shadow-panel">
+          <span ref={filterAnchorRef} className="relative inline-flex">
+            <Button
+              aria-expanded={filterOpen}
+              onClick={() => setFilterOpen((current) => !current)}
+            >
+              絞り込み
+            </Button>
+            <MenuPortal
+              open={filterOpen}
+              align="end"
+              getAnchor={() => filterAnchorRef.current}
+              onClose={() => setFilterOpen(false)}
+            >
+            <div
+              className="flex max-w-3xl flex-wrap items-end gap-3 rounded-card border border-hairline bg-canvas p-4 shadow-panel"
+              // 最上層では absolute 指定を無効にする（位置は器が決める）。
+              // 幅の上限は style へ（任意値記法の直書きにしない）。
+              style={{ position: 'static', width: 'min(48rem, calc(100vw - 16px))' }}
+            >
               <Select
                 aria-label="追加の種類"
                 label="追加の種類"
@@ -361,29 +397,41 @@ function FriendAddRunsInner() {
                   { value: 'partial_failed', label: '再送待ち' },
                 ]}
               />
-              <Button onClick={() => void load()} disabled={loading}>一覧を更新</Button>
+              <Button onClick={() => void load()} disabled={loading}>一覧を更新する</Button>
             </div>
-          </details>
-          <Button onClick={() => void exportCsv()} disabled={!data?.items.length || csvBusy}>{csvBusy ? '書き出し中…' : '実行結果をCSVで書き出す'}</Button>
+            </MenuPortal>
+          </span>
+          <Button onClick={() => void exportCsv()} disabled={!data?.items.length || csvBusy} busy={csvBusy} busyLabel="書き出し中…">実行結果をCSVで書き出す</Button>
         </div>
       </div>
 
       {ruleIdFilter ? (
         <p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">
           この設定の実行結果だけを表示しています。
-          <Link href="/friend-add-settings/runs" className="ml-2 font-bold text-accent hover:underline">すべての記録へ戻る</Link>
+          <Link href="/friend-add-settings/runs" className="ml-2 font-bold text-action hover:underline">すべての記録へ戻る</Link>
         </p>
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="直近28日の追加" value={summary?.totalRuns ?? null} unit="人" detail="友だち追加の合計" loading={loading} />
-        <SummaryCard variant="v6" title="累計配信" value={summary?.cumulativeDeliveries ?? null} unit="通" detail="実際に送った通数" loading={loading} />
-        <SummaryCard variant="v6" title="シナリオ開始" value={summary?.scenarioStarts ?? null} unit="件" detail="登録できた件数" loading={loading} />
-        <SummaryCard variant="v6" title="エラー" value={summary?.failed ?? null} unit="件" detail="処理できなかった記録" loading={loading} badge={summary && summary.failed > 0 ? '要確認' : undefined} badgeTone="danger" />
+        <KpiCard
+          variant="v6"
+          title="直近28日の追加"
+          value={summary?.recentFriends ?? null}
+          unit="人"
+          detail={summary ? `追加記録 ${summary.recentEvents}件` : ''}
+          help="直近28日に追加された人数です。同じ人の再追加は1人として数え、追加の回数は「追加記録」の件数で確認できます。"
+          loading={loading}
+        />
+        <KpiCard variant="v6" title="累計配信" value={summary?.cumulativeDeliveries ?? null} unit="通" detail="" help="実際に送った通数です" loading={loading} />
+        <KpiCard variant="v6" title="シナリオ開始" value={summary?.scenarioStarts ?? null} unit="件" detail="" help="登録できた件数です" loading={loading} />
+        <KpiCard variant="v6" title="エラー" value={summary?.failed ?? null} unit="件" detail="処理できなかった記録" loading={loading} badge={summary && summary.failed > 0 ? '要確認' : undefined} badgeTone="danger" />
       </div>
+      {kind !== 'all' || attribution !== 'all' || routing !== 'all' || ruleIdFilter ? (
+        <p className="mt-2 text-xs text-ink-faint">上の集計は、今の絞り込みに合う記録だけを対象にしています。</p>
+      ) : null}
 
       <div className="flex flex-col items-start gap-4 xl:flex-row">
-        <main className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1">
       {accountLoading || loading ? (
         <ListState kind="loading" title="実行結果を読み込んでいます" />
       ) : !selectedAccountExists ? (
@@ -394,7 +442,7 @@ function FriendAddRunsInner() {
         />
       ) : error ? (
         <ListState
-          kind="error"
+          kind={errorStatus === 403 ? 'forbidden' : 'error'}
           title="実行結果を表示できませんでした"
           description={error}
           action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
@@ -410,7 +458,7 @@ function FriendAddRunsInner() {
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
             <div className="border-b border-hairline px-4 py-3">
               <h2 className="font-bold">最近の友だち追加</h2>
-              <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。絞り込みはすべての記録に効き、CSVは絞り込みに合う記録を新しい順にすべて書き出します（上限{(CSV_EXPORT_MAX_PAGES * CSV_EXPORT_PAGE_SIZE).toLocaleString('ja-JP')}件）。</p>
+              <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。絞り込みはすべての記録に効き、CSVは絞り込みに合う記録を新しい順にすべて書き出します（上限{formatNumber((CSV_EXPORT_MAX_PAGES * CSV_EXPORT_PAGE_SIZE))}件）。</p>
               {csvNote ? <p className="mt-1 text-xs text-ink-faint">{csvNote}</p> : null}
             </div>
             <div className="divide-y divide-hairline px-4">
@@ -420,19 +468,26 @@ function FriendAddRunsInner() {
                   ? item.attribution.routeName || item.attribution.reason || '選択した経路'
                   : '経路は取得できません'
                 const displayName = item.friend.displayName || '名前は未取得'
-                const action = item.scenario?.started
-                  ? `シナリオ「${item.scenario.name ?? '名前は未取得'}」を開始`
-                  : item.deliveryCount > 0
-                    ? `初回案内を${item.deliveryCount}通送信`
-                    : item.actions.total > 0
-                      ? `${item.actions.total}件の処理を実行`
-                      : routingAction(item.status, item.errorCode)
+                /*
+                  m22d: 失敗した実行の行に「○件の処理を実行」と出すと、
+                  成功したように読める。失敗は理由の文にし、同じ「1件」が
+                  3回出るのもやめる（内訳の2行と合わせても2回まで）。
+                */
+                const action = item.status === 'failed'
+                  ? routingAction(item.status, item.errorCode)
+                  : item.scenario?.started
+                    ? `シナリオ「${item.scenario.name ?? '名前は未取得'}」を開始`
+                    : item.deliveryCount > 0
+                      ? `初回案内を${item.deliveryCount}通送信`
+                      : item.actions.total > 0
+                        ? `${item.actions.total}件の処理を実行`
+                        : routingAction(item.status, item.errorCode)
                 return (
                   // #973 U045: 1行目は名前と結果、2行目は時刻と詳細。1行に
                   // すべて並べると狭い幅で右端が切れる。
                   <div key={item.id} className="min-w-0 py-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-bold text-status-success-deep" aria-hidden="true">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-pill bg-status-success-soft text-xs font-medium text-status-success-deep" aria-hidden="true">
                         {displayName.slice(0, 1)}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -450,8 +505,8 @@ function FriendAddRunsInner() {
                     <div className="mt-1.5 flex items-center justify-between gap-3 pl-12">
                       <time className="min-w-0 text-xs text-ink-secondary" dateTime={item.receivedAt}>{formatJstDateTime(item.receivedAt)}</time>
                       <Link
-                        className="shrink-0 text-xs font-bold text-accent hover:underline"
-                        href={`/friend-add-settings/runs/detail?id=${encodeURIComponent(item.id)}`}
+                        className="shrink-0 text-xs font-medium text-action hover:underline"
+                        href={detailHref(item.id)}
                       >
                         詳細
                       </Link>
@@ -476,63 +531,65 @@ function FriendAddRunsInner() {
             <p className="mt-3 text-xs text-ink-faint">通常URLや公式QRから追加された記録は0件にせず「経路は取得できません」と表示します。</p>
           </section>
 
-          {(canPrev || Boolean(data.nextCursor)) && <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-ink-faint">{cursorPage}ページ目・このページは{data.items.length}件</p>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => goPrev()}
-                disabled={!canPrev || loading}
-              >
-                前へ
-              </Button>
-              <Button
-                onClick={() => goNext(data.nextCursor)}
-                disabled={!data.nextCursor || loading}
-              >
-                次へ
-              </Button>
-            </div>
-          </div>}
+          <div className="flex items-center justify-between gap-3">
+            <ListRange total={data.total} first={data.total === 0 ? 0 : (cursorPage - 1) * 20 + 1} last={(cursorPage - 1) * 20 + data.items.length} />
+            {(canPrev || Boolean(data.nextCursor)) && (
+              <div className="flex gap-2" aria-label="実行結果のページ送り">
+                <Button
+                  onClick={() => goPrev()}
+                  disabled={!canPrev || loading}
+                >
+                  前へ
+                </Button>
+                <Button
+                  onClick={() => goNext(data.nextCursor)}
+                  disabled={!data.nextCursor || loading}
+                >
+                  次へ
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       )}
-        </main>
+        </div>
 
         <aside className="grid w-full shrink-0 gap-4 xl:w-96">
           <section className="rounded-card border border-hairline bg-canvas p-4">
             <h2 className="font-bold">稼働状況</h2>
             <p className="mt-1 text-xs text-ink-faint">現在取得できる初回案内の状態です。</p>
             <dl className="mt-4 divide-y divide-hairline text-sm">
-              <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-bold">{ruleStatusLabel}</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-bold">{suppressionLabel}</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-bold">{formatJstTime(latestProcessedAt)}</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-bold">{summary?.averageSendTimeMs === null || summary?.averageSendTimeMs === undefined ? '未取得' : `${(summary.averageSendTimeMs / 1000).toFixed(1)}秒`}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-medium">{ruleStatusLabel}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-medium">{suppressionLabel}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-medium">{summary === null ? '—' : summary.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : 'まだありません'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-medium">{summary?.averageSendTimeMs === null || summary?.averageSendTimeMs === undefined ? '未取得' : `${(summary.averageSendTimeMs / 1000).toFixed(1)}秒`}</dd></div>
             </dl>
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-4">
             <h2 className="font-bold">要テスト</h2>
             <p className="mt-1 text-xs text-ink-faint">未処理の問題だけ表示します。</p>
-            <div className="mt-4 rounded-control bg-status-danger-soft p-3 text-sm text-status-danger-deep">
+            <Notice tone="danger" className="mt-4">
               <strong>未送信 {summary?.failed ?? '—'}件</strong>
               <p className="mt-1 text-xs">失敗した記録は使用ルール・版・処理結果と一緒に一覧で確認できます。</p>
-            </div>
+            </Notice>
             {(() => {
               const href = editHref('preview')
               return href
-                ? <Button className="mt-3 w-full" href={href}>友だち追加時配信をテスト</Button>
-                : <Button className="mt-3 w-full" disabled title="実行結果がまだありません">友だち追加時配信をテスト</Button>
+                ? <Button className="mt-3 w-full" href={href}>友だち追加時配信をテストする</Button>
+                : <Button className="mt-3 w-full" disabled title="実行結果がまだありません">友だち追加時配信をテストする</Button>
             })()}
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-4">
             <h2 className="font-bold">担当者シナリオ開始</h2>
             <p className="mt-1 text-xs text-ink-faint">{summary?.staffHandoffs.reason ?? '担当者への引き継ぎ結果を集計します。'}</p>
             <dl className="mt-4 divide-y divide-hairline text-sm">
-              <div className="flex justify-between gap-3 py-3"><dt>実行結果</dt><dd className="font-bold">{summary?.staffHandoffs.value ?? '未取得'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>実行結果</dt><dd className="font-medium">{summary?.staffHandoffs.value ?? '未取得'}</dd></div>
             </dl>
           </section>
         </aside>
       </div>
 
-      <StickyBar status={stopMessage || undefined} actions={<><Button disabled={!activeRuleId || stopBusy} onClick={() => setStopDialogOpen(true)}>{stopBusy ? '停止中…' : '配信を一時停止'}</Button>{(() => {
+      <StickyBar status={stopMessage || undefined} actions={<><Button disabled={!activeRuleId || stopBusy} onClick={() => setStopDialogOpen(true)} busy={stopBusy} busyLabel="停止中…">配信を一時停止</Button>{(() => {
         const href = editHref('basic')
         return href
           ? <Button href={href} variant="primary">友だち追加時の設定を編集</Button>

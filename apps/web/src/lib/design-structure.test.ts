@@ -91,8 +91,10 @@ function importedFiles(file: string, source: string): string[] {
   }
   // 画面の中身を同じフォルダのファイルに出していることがある
   // （scenarios/detail は page.tsx が薄く、実体は scenario-detail-client.tsx）。
-  for (const m of source.matchAll(/from '\.\/([^']+)'/g)) {
-    push(join(dirname(file), m[1]));
+  // 親フォルダの共有部品（conversions/new から ../origin-labels など）も辿る。
+  // 起点の説明・除外条件の読み取りは親に置き、作成・一覧・詳細・編集で共用する。
+  for (const m of source.matchAll(/from '(\.\/|\.\.\/)([^']+)'/g)) {
+    push(join(dirname(file), m[1], m[2]));
   }
   return files;
 }

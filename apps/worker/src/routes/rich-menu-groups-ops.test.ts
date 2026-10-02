@@ -14,8 +14,7 @@ const dbMocks = {
   clearRichMenuAssignmentsForGroup: vi.fn(),
   jstNow: vi.fn(() => '2026-09-16T00:00:00.000Z'),
   createRichMenuGroup: vi.fn(),
-  updateRichMenuGroupMeta: vi.fn(),
-  replaceRichMenuPages: vi.fn(),
+  saveRichMenuGroupDraft: vi.fn(async () => ({ ok: true, version: 2 })),
   deleteRichMenuGroup: vi.fn(),
   setRichMenuPageImage: vi.fn(),
   pageBelongsToGroup: vi.fn(),
@@ -58,6 +57,19 @@ const dbMocks = {
   markRichMenuTestApplyRevertFailed: vi.fn(),
   getStaffById: vi.fn(),
   getMediaById: vi.fn(),
+  ensureRichMenuVersion: vi.fn(),
+  markRichMenuVersionPublished: vi.fn(),
+  getLatestRichMenuVersion: vi.fn(),
+  recordRichMenuDeviceConfirmation: vi.fn(),
+  findRichMenuDeviceConfirmation: vi.fn(),
+  ensureRichMenuPublishRun: vi.fn(),
+  markRichMenuPublishRun: vi.fn(),
+  listRichMenuPublishRuns: vi.fn(),
+  getLatestRichMenuPublishRun: vi.fn(),
+  ensureRichMenuPublishRunPages: vi.fn(),
+  markRichMenuPublishRunPageStep: vi.fn(),
+  listRichMenuPublishRunPages: vi.fn(),
+  listAccountReferencedLineRichMenuIds: vi.fn(async () => []),
   recordAuditEvent: vi.fn(async () => undefined),
   maskAuditIp: vi.fn(() => null),
   auditDeviceFamily: vi.fn(() => 'unknown'),
@@ -137,6 +149,11 @@ beforeEach(() => {
   }
   dbMocks.listRichMenuGroupIdsByAreaLabel.mockImplementation(async () => new Set<string>());
   dbMocks.jstNow.mockImplementation(() => '2026-09-16T00:00:00.000Z');
+  dbMocks.listAccountReferencedLineRichMenuIds.mockImplementation(async () => []);
+  // K: 照合の修復は実行台帳へ残す。見るだけのdryRunでは呼ばない。
+  dbMocks.ensureRichMenuPublishRun.mockImplementation(
+    async (_db: unknown, input: { id: string }) => ({ id: input.id, status: 'running' }),
+  );
   dbMocks.recordAuditEvent.mockImplementation(async () => undefined);
   accountAccessMocks.canAccessAllLineAccounts.mockReset();
   accountAccessMocks.canAccessAllLineAccounts.mockImplementation(async (_db, staff) => Boolean(staff));

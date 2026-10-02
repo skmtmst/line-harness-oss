@@ -2,8 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import Checkbox from '@/components/shared/checkbox'
+import Combobox from '@/components/shared/combobox'
+import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Button from '@/components/shared/button'
 
 /**
  * 受信箱の「この条件を保存」（設計 Pencil `Ln4zS` 保存した検索名入力モーダル）。
@@ -146,7 +150,7 @@ export default function SavedViewDialog({
           フッターは固定し、条件の本文だけをスクロールさせる。
           1920×600でもタイトル・取消・保存へ届く。
         */
-        className="bg-canvas rounded-panel flex max-h-[calc(100dvh-2rem)] w-[560px] max-w-full flex-col overflow-hidden shadow-2xl"
+        className="bg-canvas rounded-panel flex max-h-[calc(100dvh-2rem)] w-[560px] max-w-full flex-col overflow-hidden shadow-overlay"
       >
         <header className="border-hairline flex items-start gap-4 border-b px-6 py-5">
           <div>
@@ -158,7 +162,7 @@ export default function SavedViewDialog({
 
         {done ? (
           <div className="px-6 py-8">
-            <p className="text-accent text-sm font-bold">保存しました</p>
+            <p className="text-accent-deep text-sm font-bold">保存しました</p>
             <p className="text-ink-secondary mt-1.5 text-xs">
               「保存した検索」から、いつでもこの条件を呼び出せます。
             </p>
@@ -197,75 +201,100 @@ export default function SavedViewDialog({
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">対応状況</dt>
                   <dd>
-                    <select aria-label="保存する対応状況" value={status} onChange={(event) => setStatus(event.target.value as SavedViewDraft['status'])} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
-                      <option value="all">すべて</option>
-                      <option value="unread">未対応</option>
-                      <option value="in_progress">対応中</option>
-                      <option value="on_hold">保留</option>
-                      <option value="resolved">対応済み</option>
-                    </select>
+                    <Select
+                      aria-label="保存する対応状況"
+                      value={status}
+                      onChange={(value) => setStatus(value as SavedViewDraft['status'])}
+                      options={[
+                        { value: 'all', label: 'すべて' },
+                        { value: 'unread', label: '未対応' },
+                        { value: 'in_progress', label: '対応中' },
+                        { value: 'on_hold', label: '保留' },
+                        { value: 'resolved', label: '対応済み' },
+                      ]}
+                      className="h-9 w-40 text-xs font-medium"
+                    />
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">絞り込み</dt>
                   <dd>
-                    <select aria-label="保存する絞り込み" value={quickFilter} onChange={(event) => setQuickFilter(event.target.value as SavedViewDraft['quickFilter'])} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
-                      <option value="all">すべて</option>
-                      <option value="reply">要返信</option>
-                      {/* INBOX-10: 対応期限ではなく「未対応のまま1時間」を数える。 */}
-                      <option value="overdue">1時間以上待ち</option>
-                    </select>
+                    <Select
+                      aria-label="保存する絞り込み"
+                      value={quickFilter}
+                      onChange={(value) => setQuickFilter(value as SavedViewDraft['quickFilter'])}
+                      options={[
+                        { value: 'all', label: 'すべて' },
+                        { value: 'reply', label: '要返信' },
+                        // INBOX-10: 対応期限ではなく「未対応のまま1時間」を数える。
+                        { value: 'overdue', label: '1時間以上待ち' },
+                      ]}
+                      className="h-9 w-40 text-xs font-medium"
+                    />
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">未読</dt>
                   <dd>
-                    <select aria-label="保存する未読条件" value={unreadOnly ? 'unread' : 'all'} onChange={(event) => setUnreadOnly(event.target.value === 'unread')} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
-                      <option value="all">すべて</option>
-                      <option value="unread">未読だけ</option>
-                    </select>
+                    <Select
+                      aria-label="保存する未読条件"
+                      value={unreadOnly ? 'unread' : 'all'}
+                      onChange={(value) => setUnreadOnly(value === 'unread')}
+                      options={[
+                        { value: 'all', label: 'すべて' },
+                        { value: 'unread', label: '未読だけ' },
+                      ]}
+                      className="h-9 w-40 text-xs font-medium"
+                    />
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">受信経路</dt>
                   <dd>
-                    <select aria-label="保存する受信経路" value={channel} onChange={(event) => setChannel(event.target.value as SavedViewDraft['channel'])} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
-                      <option value="all">LINE・MAIL</option>
-                      <option value="line">LINE</option>
-                      <option value="email">MAIL</option>
-                    </select>
+                    <Select
+                      aria-label="保存する受信経路"
+                      value={channel}
+                      onChange={(value) => setChannel(value as SavedViewDraft['channel'])}
+                      options={[
+                        { value: 'all', label: 'LINE・MAIL' },
+                        { value: 'line', label: 'LINE' },
+                        { value: 'email', label: 'MAIL' },
+                      ]}
+                      className="h-9 w-40 text-xs font-medium"
+                    />
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">担当者</dt>
-                  <dd>
-                    <select aria-label="保存する担当者" value={assignee} onChange={(event) => setAssignee(event.target.value)} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
-                      <option value="all">すべて</option>
-                      <option value="unassigned">未割り当て</option>
-                      {operators.map((operator) => <option key={operator.id} value={operator.id}>{operator.name}</option>)}
-                    </select>
+                  <dd className="w-40">
+                    <Combobox
+                      aria-label="保存する担当者"
+                      placeholder="すべて"
+                      value={assignee === 'all' ? '' : assignee}
+                      onChange={(next) => setAssignee(next || 'all')}
+                      options={[
+                        { value: 'unassigned', label: '未割り当て' },
+                        ...operators.map((operator) => ({ value: operator.id, label: operator.name })),
+                      ]}
+                      className="w-full"
+                    />
                   </dd>
                 </div>
               </dl>
             </div>
 
-            <label className="flex items-center justify-between gap-4">
-              <span>
-                <span className="text-ink block text-xs font-medium">よく使うに追加</span>
-                <span className="text-ink-faint text-micro mt-0.5 block">保存した検索一覧の上部に表示します</span>
-              </span>
-              <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
-                <input type="checkbox" checked={favorite} onChange={(event) => setFavorite(event.target.checked)} aria-label="よく使うに追加" className="peer sr-only" />
-                <span className="bg-canvas-sunken peer-checked:bg-accent-deep absolute inset-0 rounded-full transition-colors" />
-                <span className="bg-canvas absolute left-1 h-4 w-4 rounded-full shadow transition-transform peer-checked:translate-x-5" />
-              </span>
-            </label>
+            <Checkbox
+              checked={favorite}
+              onCheckedChange={setFavorite}
+              aria-label="よく使うに追加"
+              description="保存した検索一覧の上部に表示します"
+            >よく使うに追加</Checkbox>
 
             {/* 設計 `AuSDY` と同じく、直す場所を見たあとに理由を読む。 */}
             {error || showMissingError ? (
               <Notice
                 id={error ? 'saved-view-error' : 'saved-view-name-hint'}
-                tone="error"
+                tone="danger"
                 message={error || '検索名を入力してください。'}
               />
             ) : nameMissing ? (
@@ -275,12 +304,12 @@ export default function SavedViewDialog({
               */
               <Notice
                 id="saved-view-name-hint"
-                tone="validation"
+                tone="warn"
                 message="検索名は必須です。入力すると保存できるようになります。"
               />
             ) : (
               <Notice
-                tone="validation"
+                tone="warn"
                 message="保存されるのは検索条件です。受信件数は最新の状態に自動更新されます。"
               />
             )}
@@ -293,24 +322,17 @@ export default function SavedViewDialog({
         */}
         <footer className="border-hairline flex shrink-0 flex-wrap items-center justify-end gap-3 border-t px-6 py-4">
           {done ? (
-            <button type="button" onClick={onClose} className="rounded-control bg-accent-deep text-on-accent whitespace-nowrap px-5 py-2 text-sm font-bold">
+            <Button variant="primary" className="whitespace-nowrap px-5 py-2 font-bold border-0 h-auto" type="button" onClick={onClose}>
               閉じる
-            </button>
+            </Button>
           ) : (
             <>
-              <button type="button" onClick={onClose} className="border-hairline rounded-control text-ink-secondary whitespace-nowrap border px-4 py-2 text-sm">
+              <Button variant="secondary" className="text-ink-secondary whitespace-nowrap px-4 py-2 h-auto" type="button" onClick={onClose}>
                 キャンセル
-              </button>
-              <button
-                type="button"
-                onClick={() => void submit()}
-                disabled={saving || nameMissing}
-                title={nameMissing ? '検索名を入力してください' : undefined}
-                /* 主ボタンの緑は本流が `accent-deep` へそろえた（白文字の読みやすさ）。 */
-                className="rounded-control bg-accent-deep text-on-accent whitespace-nowrap px-5 py-2 text-sm font-bold disabled:opacity-40"
-              >
-                {saving ? '保存中' : '検索条件を保存'}
-              </button>
+              </Button>
+              <Button variant="primary" className="whitespace-nowrap px-5 py-2 font-bold border-0 h-auto" type="button" onClick={() => void submit()} disabled={saving || nameMissing} title={nameMissing ? '検索名を入力してください' : undefined}>
+                {saving ? '保存中' : '検索条件を保存する'}
+              </Button>
             </>
           )}
         </footer>

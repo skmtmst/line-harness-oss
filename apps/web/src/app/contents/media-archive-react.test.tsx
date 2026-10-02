@@ -126,14 +126,22 @@ async function waitForText(text: string) {
 }
 
 function buttonByLabel(label: string): HTMLButtonElement {
-  const button = [...host.querySelectorAll<HTMLButtonElement>('button')]
+  const button = [...document.querySelectorAll<HTMLButtonElement>('button')]
     .find((candidate) => candidate.getAttribute('aria-label') === label || candidate.textContent === label)
   if (!button) throw new Error(`ボタンがありません: ${label}`)
   return button
 }
 
+/*
+ * ★V7: 編集・取得・アーカイブは札の「…」の中。開く操作と選ぶ操作は
+ * 別の act に分ける（同じ act ではメニューの装着が間に合わない）。
+ */
+async function openCardMenu() {
+  await act(async () => { buttonByLabel(`${MEDIA.filename}のその他操作`).click(); await settle() })
+}
+
 async function clickChip(label: string) {
-  const chip = [...host.querySelectorAll<HTMLButtonElement>('button')]
+  const chip = [...document.querySelectorAll<HTMLButtonElement>('button')]
     .find((candidate) => candidate.textContent?.trim() === label)
   if (!chip) throw new Error(`絞り込みがありません: ${label}`)
   await act(async () => { chip.click(); await settle() })
@@ -183,7 +191,8 @@ describe('登録メディアの退避と復帰（N-201）', () => {
     await renderPage()
     await waitForText(MEDIA.filename)
 
-    await act(async () => { buttonByLabel(`${MEDIA.filename}をアーカイブ`).click(); await settle() })
+    await openCardMenu()
+    await act(async () => { buttonByLabel('アーカイブ').click(); await settle() })
     expect(document.body.textContent).toContain('理由必須（あとから履歴で確認できます）')
 
     const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('button')]
@@ -212,12 +221,13 @@ describe('登録メディアの退避と復帰（N-201）', () => {
     await waitForText(MEDIA.filename)
 
     expect(host.textContent).toContain('退避済み')
-    expect(host.querySelector(`button[aria-label="${MEDIA.filename}の名前を変える"]`)).toBeNull()
-    expect(host.querySelector(`button[aria-label="${MEDIA.filename}を削除"]`)).toBeNull()
-    const checkbox = host.querySelector<HTMLInputElement>(`input[aria-label="${MEDIA.filename}を選ぶ"]`)
+    expect(document.querySelector(`button[aria-label="${MEDIA.filename}の名前を変える"]`)).toBeNull()
+    expect(document.querySelector(`button[aria-label="${MEDIA.filename}を削除"]`)).toBeNull()
+    const checkbox = document.querySelector<HTMLInputElement>(`input[aria-label="${MEDIA.filename}を選ぶ"]`)
     expect(checkbox?.disabled).toBe(true)
 
-    await act(async () => { buttonByLabel(`${MEDIA.filename}を一覧へ戻す`).click(); await settle() })
+    await openCardMenu()
+    await act(async () => { buttonByLabel('一覧へ戻す').click(); await settle() })
     const input = document.body.querySelector<HTMLInputElement>('input[aria-label="理由"]')!
     await act(async () => {
       setNativeValue(input, '再び使うため')
@@ -237,8 +247,8 @@ describe('登録メディアの退避と復帰（N-201）', () => {
     fixture.role = 'staff'
     await renderPage()
     await waitForText(MEDIA.filename)
-    expect(host.querySelector(`button[aria-label="${MEDIA.filename}をアーカイブ"]`)).toBeNull()
-    expect(host.querySelector(`button[aria-label="${MEDIA.filename}を削除"]`)).toBeNull()
+    expect(document.querySelector(`button[aria-label="${MEDIA.filename}をアーカイブ"]`)).toBeNull()
+    expect(document.querySelector(`button[aria-label="${MEDIA.filename}を削除"]`)).toBeNull()
   })
 
   it('409（直前に退避済み）は失敗文を出しつつ一覧を読み直す', async () => {
@@ -248,7 +258,8 @@ describe('登録メディアの退避と復帰（N-201）', () => {
     await waitForText(MEDIA.filename)
     const callsBefore = fixture.listCalls.length
 
-    await act(async () => { buttonByLabel(`${MEDIA.filename}をアーカイブ`).click(); await settle() })
+    await openCardMenu()
+    await act(async () => { buttonByLabel('アーカイブ').click(); await settle() })
     const input = document.body.querySelector<HTMLInputElement>('input[aria-label="理由"]')!
     await act(async () => {
       setNativeValue(input, '整理')

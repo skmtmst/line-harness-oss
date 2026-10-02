@@ -1,13 +1,13 @@
 // @vitest-environment happy-dom
 /*
- * #708: すでに整理済みのタグで、archive の 409 already_archived を
+ * #708: 保管の確定直前にほかが保管したタグで、archive の 409 already_archived を
  * 「失敗」ではなく「もう着いている」として見せることを、実物の React で確かめる。
  *
  * ソース文字列の検査では次が固定できない。happy-dom へ実物のタグ一覧を
  * マウントし、一覧の取得と archive・依存確認を実物の Promise で返してから、
- * 削除の確認窓を開いて押す。
+ * 保管の確認窓を開いて押す。
  *
- *   - already_archived のとき、赤い失敗ではなく「すでに整理されています」が出る
+ *   - already_archived のとき、赤い失敗ではなく「すでに保管済みです」が出る
  *   - そのとき一覧を読み直す（load がもう一度走る）
  *   - ほかの 409（版が古い等）は今までどおり失敗として出る
  */
@@ -15,6 +15,7 @@ import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 const fixture = vi.hoisted(() => ({
   tagsList: null as null | ((...args: unknown[]) => Promise<unknown>),
@@ -81,7 +82,7 @@ const TAGS = [
     color: '#222222',
     createdAt: '2026-09-01T00:00:00Z',
     lineAccountId: 'account-a',
-    status: 'archived',
+    status: 'active',
   },
 ]
 
@@ -128,34 +129,40 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-/** 一覧を描き、削除の確認窓を開く。 */
+/** 一覧を描き、行の「…」から削除の確認窓を開く。 */
 async function openDeleteDialog() {
-  render(<TagsPageV4 accountId="account-a" />)
+  // 整理の結果は Toast（右下・4秒）で出す。置き場所も一緒に描く。
+  clearToastsForTest()
+  render(<><TagsPageV4 accountId="account-a" /><ToastHost /></>)
   // 表と狭幅カードの両方に同じ操作が出るため、見えている側として先頭を取る。
-  const rowButton = (await screen.findAllByRole('button', { name: '旧キャンペーン を削除' }))[0]
-  await act(async () => { fireEvent.click(rowButton) })
-  await screen.findByText('「旧キャンペーン」を削除しますか？')
+  // ★V7 `Xn1Mz`：削除は「…」メニューの中の危ない操作へ。赤いゴミ箱だけの
+  // ボタンは行に直に置かない。確認窓の動き（#708）はそのまま守る。
+  const moreButton = (await screen.findAllByRole('button', { name: '旧キャンペーンのその他操作' }))[0]
+  await act(async () => { fireEvent.click(moreButton) })
+  const deleteItem = await screen.findByRole('menuitem', { name: '保管する' })
+  await act(async () => { fireEvent.click(deleteItem) })
+  await screen.findByText('「旧キャンペーン」を保管しますか？')
   const input = screen.getByPlaceholderText('旧キャンペーン')
   await act(async () => { fireEvent.change(input, { target: { value: '旧キャンペーン' } }) })
 }
 
-describe('#708 整理済みタグの再 archive', () => {
+describe('#708 保管の確定直前にほかが保管したとき', () => {
   test('already_archived は赤い失敗ではなく「すでに整理されています」で出て、一覧を読み直す', async () => {
     const { ApiError } = await import('@/lib/api')
     fixture.archive = vi.fn(async () => {
-      throw new ApiError(409, 'このタグはすでに整理されています。', 'already_archived')
+      throw new ApiError(409, 'このタグはすでに保管済みです。', 'already_archived')
     })
     await openDeleteDialog()
 
     const before = (fixture.tagsList as ReturnType<typeof vi.fn>).mock.calls.length
-    const archiveButton = screen.getByRole('button', { name: 'このタグを削除する' })
+    const archiveButton = screen.getByRole('button', { name: 'このタグを保管する' })
     await act(async () => { fireEvent.click(archiveButton) })
 
     // 成功の通知として出る。赤い失敗（alertdialog の中の saveError）は出ない。
-    expect(await screen.findByText('このタグはすでに整理されています。')).toBeTruthy()
+    expect(await screen.findByText('このタグはすでに保管済みです。')).toBeTruthy()
     // 確認窓は閉じる。
     await waitFor(() => {
-      expect(screen.queryByText('「旧キャンペーン」を削除しますか？')).toBeNull()
+      expect(screen.queryByText('「旧キャンペーン」を保管しますか？')).toBeNull()
     })
     // 一覧を読み直す（望んだ状態にはもう着いているので、画面も最新にする）。
     await waitFor(() => {
@@ -170,12 +177,29 @@ describe('#708 整理済みタグの再 archive', () => {
     })
     await openDeleteDialog()
 
-    const archiveButton = screen.getByRole('button', { name: 'このタグを削除する' })
+    const archiveButton = screen.getByRole('button', { name: 'このタグを保管する' })
     await act(async () => { fireEvent.click(archiveButton) })
 
-    expect(await screen.findByText('アーカイブできませんでした。影響を読み直して、もう一度お試しください。')).toBeTruthy()
-    expect(screen.queryByText('このタグはすでに整理されています。')).toBeNull()
+    expect(await screen.findByText('保管できませんでした。影響を読み直して、もう一度お試しください。')).toBeTruthy()
+    expect(screen.queryByText('このタグはすでに保管済みです。')).toBeNull()
     // 失敗なので確認窓は開いたまま。
-    expect(screen.getByText('「旧キャンペーン」を削除しますか？')).toBeTruthy()
+    expect(screen.getByText('「旧キャンペーン」を保管しますか？')).toBeTruthy()
+  })
+})
+
+describe('R190 保管済みの行に同じ確認を繰り返さない', () => {
+  test('保管済みの行の「…」に保管メニューは無い', async () => {
+    clearToastsForTest()
+    fixture.tagsList = vi.fn(async () => ({
+      success: true,
+      data: [{ ...TAGS[0], status: 'archived' }],
+    }))
+    render(<><TagsPageV4 accountId="account-a" /><ToastHost /></>)
+    expect((await screen.findAllByText('旧キャンペーン')).length).toBeGreaterThan(0)
+    // 入れる操作が無いので「…」自体が出ない。開いても何も無い飾りにしない。
+    expect(screen.queryByRole('button', { name: '旧キャンペーンのその他操作' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: '保管する' })).toBeNull()
+    // 編集への道は残す。保管済みでも名前・説明の訂正はできる（#710）。
+    expect(screen.getAllByRole('link', { name: '編集' }).length).toBeGreaterThan(0)
   })
 })

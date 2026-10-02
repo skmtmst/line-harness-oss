@@ -11,8 +11,10 @@
  */
 
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
+import Button from '@/components/shared/button'
 
 /** フォルダの色。全画面で同じ8色を使う。 */
 export const FOLDER_COLORS = [
@@ -90,9 +92,14 @@ export default function FolderAddDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-xl">
-        <h2 className="text-ink text-base font-bold">{folder ? 'フォルダを直す' : 'フォルダを追加'}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
+      <div className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-float">
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-ink text-base font-bold">{folder ? 'フォルダを直す' : 'フォルダを追加'}</h2>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         {note && <p className="text-ink-faint mt-1 text-xs leading-relaxed">{note}</p>}
 
         <label className="mt-4 block">
@@ -108,7 +115,7 @@ export default function FolderAddDialog({
               if (e.key === 'Enter' && name.trim()) void add()
             }}
             placeholder={placeholder}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
           />
         </label>
 
@@ -137,16 +144,11 @@ export default function FolderAddDialog({
             onClick={onClose}
             className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm"
           >
-            やめる
+            キャンセル
           </button>
-          <button
-            type="button"
-            onClick={() => void add()}
-            disabled={saving || !name.trim()}
-            className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
-          >
-            {saving ? (folder ? '保存中…' : '追加中…') : (folder ? '変更を保存' : '追加する')}
-          </button>
+          <Button variant="primary" className="px-4 py-2 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void add()} disabled={saving || !name.trim()}>
+            {saving ? (folder ? '保存中…' : '追加中…') : (folder ? '保存する' : '追加する')}
+          </Button>
         </div>
       </div>
     </div>

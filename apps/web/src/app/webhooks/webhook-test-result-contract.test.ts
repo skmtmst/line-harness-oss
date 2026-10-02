@@ -25,9 +25,13 @@ describe('試し送信の結果表示(#506 中 W1)', () => {
     expect(OVERVIEWS).toContain('「やり取りの記録」タブで詳しく確認できます')
   })
 
-  it('結果は共通 Notice で出し、閉じられる', () => {
-    expect(OVERVIEWS).toContain("import Notice, { type NoticeTone } from '@/components/shared/notice'")
-    expect(OVERVIEWS).toContain('<Notice tone={testNotice.tone}')
+  it('結果は共通の知らせで出し、閉じられる', () => {
+    // うまくいった知らせは Toast（右下・4秒）へ。できなかった知らせは
+    // 共通 Notice の危険の帯に残し、閉じられる（★V7 共通部品その2 §1・§2）。
+    expect(OVERVIEWS).toContain("import Notice from '@/components/shared/notice'")
+    expect(OVERVIEWS).toContain("import { notifyToast } from '@/components/shared/toast'")
+    expect(OVERVIEWS).toContain('notifyToast(`「${item.name}」への試し送信が届きました')
+    expect(OVERVIEWS).toContain('<Notice tone="danger"')
     expect(OVERVIEWS).toContain('setTestNotice(null)')
   })
 })

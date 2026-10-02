@@ -21,7 +21,10 @@ vi.mock('../services/account-access.js', () => accountAccess);
 
 const webhook = {
   expectedWebhookUrl: vi.fn(() => 'https://worker.example.com/webhook'),
-  fetchWebhookEndpoint: vi.fn(async () => ({ status: 'matched' as const })),
+  fetchWebhookEndpoint: vi.fn(async (): Promise<{
+    expectedUrl: string; actualUrl: string | null; active: boolean | null;
+    status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown';
+  }> => ({ expectedUrl: '', actualUrl: null, active: null, status: 'matched' })),
 };
 vi.mock('../lib/webhook-endpoint.js', () => webhook);
 
@@ -31,6 +34,7 @@ const state = {
   anyRule: true,
   scenarios: 1,
   linkedScenario: true,
+  dismissedAt: null as string | null,
   rules: [{
     is_unknown_route_fallback: 1,
     definition_snapshot: JSON.stringify({ scenarioId: 'scenario-1', actions: [] }),
@@ -67,7 +71,16 @@ function database(): D1Database {
             expect(bindings[0]).toBe('account-1');
             return (state.linkedScenario ? { hit: 1 } : null) as T | null;
           }
+          if (sql.includes('FROM staff_members')) {
+            return { dismissed_at: state.dismissedAt } as T | null;
+          }
           return null;
+        },
+        async run() {
+          if (sql.includes('UPDATE staff_members') && sql.includes('getting_started_dismissed_at')) {
+            state.dismissedAt = '2026-09-28T12:00:00+09:00';
+          }
+          return { meta: { changes: 1 } } as D1Result;
         },
       });
       return make([]);
@@ -89,6 +102,7 @@ function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: st
 
 beforeEach(() => {
   state.tags = 1;
+  state.dismissedAt = null;
   state.fields = 0;
   state.anyRule = true;
   state.scenarios = 1;
@@ -98,7 +112,12 @@ beforeEach(() => {
     definition_snapshot: JSON.stringify({ scenarioId: 'scenario-1', actions: [] }),
   }];
   db.hasFirstDeliveredMessage.mockResolvedValue(true);
-  webhook.fetchWebhookEndpoint.mockResolvedValue({ status: 'matched' });
+  webhook.fetchWebhookEndpoint.mockResolvedValue({
+    expectedUrl: 'https://worker.example.com/webhook',
+    actualUrl: 'https://worker.example.com/webhook',
+    active: true,
+    status: 'matched',
+  });
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-1'],
     accounts: [{ id: 'account-1' }],
@@ -129,6 +148,60 @@ describe('GET /api/getting-started', () => {
     );
     const body = await response.json() as { data: { steps: Array<{ key: string; state: string }> } };
     expect(body.data.steps.find((step) => step.key === 'accounts')?.state).toBe('stalled');
+  });
+
+  it('R74: URL一致でもWebhook利用オフは完了にしない', async () => {
+    // 監査の再現: endpoint一致・active=false の実応答で usable=1 になっていた。
+    webhook.fetchWebhookEndpoint.mockResolvedValue({
+      expectedUrl: 'https://worker.example.com/webhook',
+      actualUrl: 'https://worker.example.com/webhook',
+      active: false,
+      status: 'matched',
+    });
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/getting-started?account_id=account-1'),
+      { DB: database() },
+    );
+    const body = await response.json() as {
+      data: {
+        steps: Array<{ key: string; state: string; reason: string | null; webhook: Array<{ id: string; active: boolean | null }> }>;
+      };
+    };
+    const accounts = body.data.steps.find((step) => step.key === 'accounts');
+    expect(accounts?.state).toBe('stalled');
+    expect(accounts?.reason).toContain('利用設定');
+    expect(accounts?.webhook).toEqual([{ id: 'account-1', status: 'matched', active: false }]);
+  });
+
+  it('R74: 利用の読み取りが空でも一致は完了のままにする', async () => {
+    // `active: null`（読めなかった）を利用オフと混ぜない。従来どおり完了に数える。
+    webhook.fetchWebhookEndpoint.mockResolvedValue({
+      expectedUrl: 'https://worker.example.com/webhook',
+      actualUrl: 'https://worker.example.com/webhook',
+      active: null,
+      status: 'matched',
+    });
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/getting-started?account_id=account-1'),
+      { DB: database() },
+    );
+    const body = await response.json() as { data: { steps: Array<{ key: string; state: string }> } };
+    expect(body.data.steps.find((step) => step.key === 'accounts')?.state).toBe('done');
+  });
+
+  it('R74: URL一致かつWebhook利用オンは完了になる', async () => {
+    webhook.fetchWebhookEndpoint.mockResolvedValue({
+      expectedUrl: 'https://worker.example.com/webhook',
+      actualUrl: 'https://worker.example.com/webhook',
+      active: true,
+      status: 'matched',
+    });
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/getting-started?account_id=account-1'),
+      { DB: database() },
+    );
+    const body = await response.json() as { data: { steps: Array<{ key: string; state: string }> } };
+    expect(body.data.steps.find((step) => step.key === 'accounts')?.state).toBe('done');
   });
 
   it('設定が空なら未完了と理由を返す', async () => {
@@ -175,5 +248,37 @@ describe('GET /api/getting-started', () => {
     );
     expect(response.status).toBe(404);
     expect(db.hasFirstDeliveredMessage).not.toHaveBeenCalledWith(expect.anything(), 'account-2');
+  });
+
+  it('閉じていなければ dismissed=false を返す', async () => {
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/getting-started?account_id=account-1'),
+      { DB: database() },
+    );
+    const body = await response.json() as { data: { dismissed: boolean } };
+    expect(body.data.dismissed).toBe(false);
+  });
+
+  it('閉じた本人には dismissed=true を返す', async () => {
+    state.dismissedAt = '2026-09-28T12:00:00+09:00';
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/getting-started?account_id=account-1'),
+      { DB: database() },
+    );
+    const body = await response.json() as { data: { dismissed: boolean } };
+    expect(body.data.dismissed).toBe(true);
+  });
+});
+
+describe('POST /api/getting-started/dismiss', () => {
+  it('本人の「閉じた」日時を記録する', async () => {
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/getting-started/dismiss', { method: 'POST' }),
+      { DB: database() },
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { dismissed: boolean } };
+    expect(body.data.dismissed).toBe(true);
+    expect(state.dismissedAt).not.toBeNull();
   });
 });

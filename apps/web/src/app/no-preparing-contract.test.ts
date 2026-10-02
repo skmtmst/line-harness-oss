@@ -22,10 +22,11 @@ const SRC = path.join(__dirname, '..')
  * 「まだ動きません」を吹き出しや注記で言い添えて、押せない操作を
  * 置いたままにする書き方がこれにあたる。
  *
- * **裸の `準備中` は禁じない。** イベントの状態（まだ公開していない）は
- * 設計そのものが `準備中` と呼んでいて、`src/lib/design-structure.json` の
- * `/events` にもその言葉が入っている。設計にある状態名まで消すと、
- * 実装が設計から離れる。ただし例外は `DESIGN_WORDS` に書いた場所だけで、
+ * **裸の `準備中` は禁じない。** 2026-09-28（U）より前は、イベントの状態
+ * （まだ公開していない）を設計そのものが `準備中` と呼んでいて、
+ * `src/lib/design-structure.json` の `/events` にもその言葉が入っていた。
+ * U で状態名を「下書き」に変えたので、今はどちらの言葉も設計にある状態名
+ * として扱う。ただし例外は `DESIGN_WORDS` に書いた場所だけで、
  * 数も固定する（言い回しを変えて言い訳を逃がさないため）。
  */
 
@@ -68,11 +69,11 @@ const ANY = /準備中/g
 /**
  * 設計そのものにある状態名。**言い訳ではないので直さない。**
  *
- * イベントの `is_published !== 1`（まだ公開していない）を、設計は `準備中` と呼ぶ。
+ * 2026-09-28（U）より前は、イベントの `is_published !== 1`（まだ公開して
+ * いない）を設計が `準備中` と呼んでいた。U で状態名を「下書き」に変えた
+ * ので、この表は空になった（0 になったら行ごと消す決まり）。
  */
-const DESIGN_WORDS: Record<string, number> = {
-  'app/events/page.tsx': 1,
-}
+const DESIGN_WORDS: Record<string, number> = {}
 
 /**
  * まだ残っている言い訳。**担当（S1〜S3）が機能ごとに消す。**
@@ -88,20 +89,17 @@ const DESIGN_WORDS: Record<string, number> = {
  *   絞り込みの「30日以上の絞り込みは準備中」と、行き先の決まっていない「マニュアル」。
  */
 const REMAINING: Record<string, number> = {
-  /* 2026-09-19 #932 で「時間や担当を変える」を実動作（詳細ページの変更フォーム）へ
-     接続し detail/page.tsx は 0 件になったので行を消した。
-     page.tsx は「日時変更は準備中です」を消して残り 2 件。 */
-  'app/booking/bookings/page.tsx': 2,
-  'app/booking/staff/new/page.tsx': 2,
+  /* #670 17 で押せない「保存した条件」(準備中です)を撤去し、
+     page.tsx は 0 件になったので行を消した。 */
+  /* 監査7 #810 で「画像を選ぶ」（準備中です）の飾りボタンを撤去し 0 件になったので行を消した。 */
   /* 2026-09-08 #605 で「同じ設定で作り直す」を実動作へ接続し 0 件になったので行を消した。 */
-  'app/restaurant-test/stores/new/page.tsx': 1,
-  'app/scenarios/detail/scenario-detail-client.tsx': 1,
-  'app/search-console/page.tsx': 3,
-  'app/templates/carousel/page.tsx': 2,
-  'app/templates/edit/page.tsx': 4,
-  'components/broadcasts/broadcast-form.tsx': 7,
-  'components/events/event-wizard.tsx': 2,
-  'components/friends/friend-timeline.tsx': 1,
+  /* ★V7 C6 で押せない「マニュアル」（準備中です）を撤去し 0 件になったので行を消した。 */
+  /* 2026-09-24 V7残り一覧の手直しで飾りボタン2件と接続見出しの言い回しを消し 0 件になったので行を消した。 */
+  /* 監査7 #810 で carousel の「下書き保存」と edit の「テスト送信」他の飾りボタンを撤去し 0 件になったので行を消した。 */
+  /* 監査8 で残り11件を消化し表が空になった。stores/new の押せないマニュアル札は
+     描かない形へ、broadcast-form は未対応の種別を「準備中」ではなく事実表記
+     （未対応）へ、event-wizard の押せないプルダウンとチェック、friend-timeline の
+     押せない「★のみ」を撤去した。 */
 }
 
 describe('画面に「準備中」を置かない', () => {
@@ -109,7 +107,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(184)  // 情報欄の編集画面と運営専用ナレッジ（37-11）を含む実測値。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(190)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。同日に付与ルールの下書き編集画面を追加（R296）。2026-10-01 に ★V8 新部品の見本画面（visual-qa/v8-parts）を追加。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {
@@ -150,13 +148,14 @@ describe('画面に「準備中」を置かない', () => {
     }
   })
 
-  it('設計にある状態名だけは残す（イベントの未公開）', () => {
+  it('設計にある状態名だけは残す（イベントの下書き）', () => {
     const events = FILES.find((f) => f.p === 'app/events/page.tsx')!
-    expect(count(events.s, ANY) - count(events.s, EXCUSE)).toBe(DESIGN_WORDS['app/events/page.tsx'])
+    // U で状態名を「下書き」に変えたので、「準備中」は0件のはず。
+    expect(count(events.s, ANY)).toBe(0)
     // 設計の書き出しにも同じ言葉がある（状態の列の値）。実装だけの言い訳ではない。
     const structure = JSON.parse(fs.readFileSync(path.join(SRC, 'lib', 'design-structure.json'), 'utf8'))
     const parts: string[] = structure.screens['/events'].parts
     expect(parts).toContain('状態')
-    expect(parts).toContain('準備中')
+    expect(parts).toContain('下書き')
   })
 })

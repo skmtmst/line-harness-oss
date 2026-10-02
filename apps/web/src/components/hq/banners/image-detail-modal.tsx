@@ -4,6 +4,7 @@ import { Download, ImagePlus, RefreshCw, Star, Store, Trash2, X } from 'lucide-r
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import type { AccountWithStats } from '@/contexts/account-context'
@@ -66,15 +67,23 @@ export default function ImageDetailModal({
   const toggle = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
+  /*
+   * R121: 背が高い中身は中央寄せのままでは上が画面外へ切れ、指では
+   * 先頭へ戻れない（flex の `items-center` と `overflow` の重ね置き）。
+   * 外はただの縦スクロール、内は `min-h-full`＋窓の `my-auto` にして、
+   * 余白があれば中央、無ければ上から読める「安全な中央寄せ」にする。
+   * 小画面では上の余白を無くして上端の紙にし、見出しを固定する。
+   */
   const overlay = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-scrim p-4"
+      className="fixed inset-0 z-50 overflow-y-auto bg-scrim"
       role="presentation"
       data-design-node="g4MyEA"
       onMouseDown={(event) => {
         if (!busy && event.target === event.currentTarget) onClose()
       }}
     >
+    <div className="flex min-h-full justify-center p-0 sm:p-4">
       <div
         ref={panelRef}
         role="dialog"
@@ -83,10 +92,15 @@ export default function ImageDetailModal({
         aria-busy={busy || undefined}
         tabIndex={-1}
         data-design-node="k0JKm"
-        className="flex w-full flex-col rounded-panel border border-hairline bg-canvas shadow-card"
+        className="my-auto flex w-full flex-col rounded-none border border-hairline bg-canvas shadow-card sm:rounded-panel"
         style={{ maxWidth: 1160 }}
       >
-        <div className="flex items-center gap-3 px-5 py-4">
+        {/*
+          R121: 見出しと閉じるボタンは上に固定したまま、本文だけ流す。
+          窓自体に `overflow` を付けると固定が効かなくなるため、角丸は
+          見出し側に `rounded-t-panel` で付ける。
+        */}
+        <div className="bg-canvas sticky top-0 z-10 flex items-center gap-3 rounded-t-none border-b border-hairline px-5 py-4 sm:rounded-t-panel">
           <h2 id="banner-image-detail-title" className="text-heading font-bold text-ink">画像の詳細</h2>
           <p className="text-caption text-ink-faint">
             {projectName}
@@ -103,7 +117,6 @@ export default function ImageDetailModal({
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
-        <div className="border-t border-hairline" />
 
         <div className="grid gap-5 p-5 lg:grid-cols-2">
           <div className="flex flex-col gap-3">
@@ -164,14 +177,13 @@ export default function ImageDetailModal({
                                 : 'flex h-11 cursor-pointer items-center gap-3 rounded-control px-2 text-ink hover:bg-canvas-sunken'
                           }
                         >
-                          <input
-                            type="checkbox"
-                            className="h-4.5 w-4.5 accent-accent-deep"
+                          <Checkbox
                             checked={already || checked}
                             disabled={already || busy}
-                            onChange={() => toggle(account.id)}
+                            onCheckedChange={() => toggle(account.id)}
+                            aria-label={`${account.displayName ?? account.name}へ配布`}
                           />
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-mini bg-accent-soft text-nano font-bold text-accent-deep">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-mini bg-accent-soft text-nano font-medium text-accent-deep">
                             {account.pictureUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={account.pictureUrl} alt="" className="h-full w-full object-cover" />
@@ -183,7 +195,7 @@ export default function ImageDetailModal({
                           <span className="text-micro text-ink-faint">{account.basicId ?? account.channelId}</span>
                           <span className="flex-1" />
                           {already ? (
-                            <span className="inline-flex h-5 items-center gap-1 rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep">
+                            <span className="inline-flex h-5 items-center gap-1 rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep">
                               <Store aria-hidden="true" className="h-3 w-3" />
                               渡し済み
                             </span>
@@ -198,7 +210,7 @@ export default function ImageDetailModal({
           </div>
         </div>
 
-        {error ? <p className="px-5 text-label text-status-danger" role="alert">{error}</p> : null}
+        {error ? <p className="px-5 text-label text-danger" role="alert">{error}</p> : null}
 
         <div className="border-t border-hairline" />
         <div data-design-node="V0mgAP" className="flex flex-wrap items-center gap-2 px-5 py-4">
@@ -206,7 +218,7 @@ export default function ImageDetailModal({
             type="button"
             onClick={() => setConfirmRemove(true)}
             disabled={busy}
-            className="inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-label font-semibold text-status-danger hover:bg-status-danger-soft disabled:opacity-50"
+            className="inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-label font-semibold text-danger hover:bg-status-danger-soft disabled:opacity-50"
           >
             <Trash2 aria-hidden="true" className="h-4 w-4" />
             一覧から外す
@@ -224,14 +236,12 @@ export default function ImageDetailModal({
               参照画像にする
             </Button>
           ) : null}
-          <Button onClick={onClose} disabled={busy}>閉じる</Button>
           <Button
             variant="primary"
             disabled={busy || selected.length === 0 || deliverable.length === 0}
-            onClick={() => void onDeliver(selected).then(() => setSelected([]))}
-          >
+            onClick={() => void onDeliver(selected).then(() => setSelected([]))} busy={busy} busyLabel="渡しています…">
             <Store aria-hidden="true" className="h-4 w-4" />
-            {busy ? '渡しています…' : `${selected.length}アカウントへ渡す`}
+            {`${selected.length}アカウントへ渡す`}
           </Button>
         </div>
       </div>
@@ -248,6 +258,7 @@ export default function ImageDetailModal({
           onCancel={() => setConfirmRemove(false)}
         />
       ) : null}
+      </div>
     </div>
   )
 

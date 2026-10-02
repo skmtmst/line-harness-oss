@@ -2,24 +2,26 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { FlaskConical, History, MoreHorizontal, Plus, Rocket, Trash2 } from 'lucide-react'
+import { FlaskConical, History, Rocket, Trash2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import IconButton from '@/components/shared/icon-button'
+import Notice from '@/components/shared/notice'
 import ListToolbar from '@/components/shared/list-toolbar'
+import { RowActions } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import StatusBadge from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { Tabs } from '@/components/shared/tabs'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData } from '@/lib/api'
 import { api } from '@/lib/api'
 import FriendAddRuleEditor from './friend-add-rule-editor'
+import { describeFriendAddFailure } from './friend-add-failure'
 import { useCursorStack } from './use-cursor-stack'
+import { formatNumber } from '@/lib/format'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -27,7 +29,7 @@ const KIND_LABELS: Record<FriendAddRuleKind, string> = {
 }
 
 function countText(value: number | null, unit: string) {
-  return value === null ? '—' : `${value.toLocaleString()}${unit}`
+  return value === null ? '—' : `${formatNumber(value)}${unit}`
 }
 
 function successRate(delivered: number | null, failed: number | null) {
@@ -36,12 +38,26 @@ function successRate(delivered: number | null, failed: number | null) {
 }
 
 function deliverySummary(rule: FriendAddRule) {
+  // 「何も配信しない」ではメッセージもシナリオも動かない（R261）。
+  if (rule.friendKind === 'returning' && rule.definition.returningMode === 'none') {
+    return '配信なし（アクションのみ）'
+  }
   const message = rule.definition.messageType === 'template'
     ? 'テンプレート'
     : rule.definition.messageType === 'form'
       ? '回答フォーム'
       : rule.definition.messageText ? 'テキスト' : null
   return [message, rule.scenarioName].filter(Boolean).join('＋') || '未取得'
+}
+
+/*
+ * 流入リンクを1件も選んでいない下書きは、実行側ではどの経路にも
+ * 当たらない（「すべての流入経路」ではない）。未完成のしるしとして
+ * 「未選択」と出す（R260）。
+ */
+function routeLabel(rule: FriendAddRule) {
+  if (rule.isFallback) return '経路が取れなかったとき'
+  return rule.routeNames.join('、') || '未選択'
 }
 
 export default function FriendAddSettingsPage() {
@@ -71,6 +87,8 @@ function FriendAddSettingsList() {
   const [data, setData] = useState<FriendAddRuleListData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // M006: 403 は共通部品の forbidden で出す。HTTP の状態をそのまま渡す。
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [deleting, setDeleting] = useState<FriendAddRule | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -78,7 +96,6 @@ function FriendAddSettingsList() {
   const [appliedSearch, setAppliedSearch] = useState('')
   const [folder, setFolder] = useState<string | null>(null)
   const { cursor, page: cursorPage, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -94,6 +111,7 @@ function FriendAddSettingsList() {
     }
     setLoading(true)
     setError('')
+    setErrorStatus(null)
     try {
       // 検索とフォルダ絞りはサーバ側へ送る。取得済みページ内だけに効かせると
       // 21件目以降が検索に出ない。
@@ -106,13 +124,17 @@ function FriendAddSettingsList() {
       if (requestId !== requestSequence.current) return
       if (!response.success) {
         setError(response.error)
+        setErrorStatus(null)
         setData(null)
         return
       }
       setData(response.data)
-    } catch {
+    } catch (caught) {
       if (requestId !== requestSequence.current) return
-      setError('友だち追加時の配信を読み込めませんでした。')
+      // M006: 権限・対象なし・重複を「通信を確認して」にまとめない。
+      const failure = describeFriendAddFailure(caught, '友だち追加時の配信', 'load')
+      setError(failure.message)
+      setErrorStatus(failure.status)
       setData(null)
     } finally {
       if (requestId === requestSequence.current) setLoading(false)
@@ -176,8 +198,9 @@ function FriendAddSettingsList() {
       setFolderName('')
       setFolderDialogOpen(false)
       await load()
-    } catch {
-      setError('フォルダを追加できませんでした。通信を確認して、もう一度お試しください。')
+    } catch (caught) {
+      // M006: 重複（409）は名前の変更、403 は権限の確認を案内する。
+      setError(describeFriendAddFailure(caught, 'フォルダ', 'create').message)
     } finally {
       setFolderBusy(false)
     }
@@ -204,8 +227,9 @@ function FriendAddSettingsList() {
       }
       closeDelete()
       await load()
-    } catch {
-      setDeleteError('削除できませんでした。通信を確認して、もう一度お試しください。')
+    } catch (caught) {
+      // M006: 権限・対象なしを「通信を確認して」にまとめない。
+      setDeleteError(describeFriendAddFailure(caught, '設定', 'delete').message)
     } finally {
       setDeleteBusy(false)
     }
@@ -215,49 +239,72 @@ function FriendAddSettingsList() {
   if (!selectedAccountId) {
     return <ListState kind="empty" title="LINE公式アカウントを選んでください" description={accounts.length ? '上のバーで対象を選ぶと設定を表示します。' : '先にLINE公式アカウントを登録してください。'} />
   }
-  if (error) return <ListState kind="error" title="友だち追加時の配信を表示できませんでした" description={error} onRetry={() => void load()} />
+  if (error) return <ListState kind={errorStatus === 403 ? 'forbidden' : 'error'} title="友だち追加時の配信を表示できませんでした" description={error} onRetry={() => void load()} />
 
   return (
-    <div data-design-node="uLQQc" className="text-ink min-w-0">
-      <div data-design="Head" className="mb-4 flex justify-end gap-2">
+    <div data-design-node="uLQQc" className="flex min-w-0 flex-col gap-4 text-ink">
+      {/*
+        作る操作は数字のカードの下・一覧のすぐ上の左。
+        たまに見る実行結果は見出しの行の右端に残す。
+      */}
+      <div data-design="Head" className="flex flex-wrap items-center justify-end gap-2">
         <Button href="/friend-add-settings/runs">実行結果を見る</Button>
-        <Button href="/friend-add-settings?view=new" variant="primary"><Plus size={16} />初回案内を作成</Button>
       </div>
 
-      <div data-design="Alert" className="rounded-card border-warning/40 bg-warning-bg text-warning mb-4 border px-4 py-3 text-sm font-semibold leading-relaxed">
-        経路を確定できるのは「流入と計測」で発行したリンクから来た人だけです。素のQR・検索から来た人は「経路が分からなかった人」の設定が動きます。
-      </div>
+      {/*
+        ★V7：仕組みの説明で、異常ではない。橙の太字の警告帯だと毎回「何か起きている」と読めるので、
+        情報の色の小さな帯にする。
+      */}
+      <Notice data-design="Alert" tone="info" message="経路を確定できるのは「流入と計測」で発行したリンクから来た人だけです。素のQR・検索から来た人は「経路が分からなかった人」の設定が動きます。" className="mb-4" />
 
-      <section data-design="Flow" className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="この7日の状況">
-        <span className="sr-only">どう振り分けられるか。友だち追加された。この1か月の実績。</span>
-        <SummaryCard title="初回案内" value={data?.summary.rules ?? 0} unit="件" detail={`有効 ${data?.summary.active ?? 0}件`} variant="v6" />
-        <SummaryCard title="直近7日の友だち追加" value={data?.summary.recentAdds ?? null} unit="人" detail={`経路が取れた ${countText(data?.summary.captured ?? null, '人')}`} variant="v6" />
-        <SummaryCard title="送信成功" value={data?.summary.delivered ?? null} unit="通" detail={successRate(data?.summary.delivered ?? null, data?.summary.failed ?? null)} variant="v6" />
-        <SummaryCard title="経路が分からなかった人" value={data?.summary.unknownRoute ?? null} unit="人" detail="共通の案内が動いた" badge={(data?.summary.unknownRoute ?? 0) > 0 ? '要確認' : undefined} badgeTone="danger" variant="v6" />
+      {/*
+        R31: まとめの数はすべて直近7日にそろえる。設定の数（初回案内）は
+        いまの数なので、期間の数と混ざらないよう「？」で補足する。
+      */}
+      <section data-design="Flow" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="直近7日の状況">
+        <span className="sr-only">どう振り分けられるか。友だち追加された。直近7日の実績。</span>
+        <KpiCard title="初回案内" value={data?.summary.rules ?? 0} unit="件" detail={`有効 ${data?.summary.active ?? 0}件`} help="いまある初回案内の設定数です。右の3つ（直近7日）とは期間がちがいます。" variant="v6" />
+        <KpiCard title="直近7日の友だち追加" value={data?.summary.recentAdds ?? null} unit="人" detail={`経路が取れた ${countText(data?.summary.captured ?? null, '人')}`} help="直近7日に友だち追加された人数と、そのうち流入リンクが分かった人数です。" variant="v6" />
+        <KpiCard title="直近7日の送信成功" value={data?.summary.delivered ?? null} unit="通" detail={successRate(data?.summary.delivered ?? null, data?.summary.failed ?? null)} help="直近7日に実際に送った通数です。送信履歴の累計配信と同じ数え方です。" variant="v6" />
+        <KpiCard title="直近7日の経路不明" value={data?.summary.unknownRoute ?? null} unit="人" detail="直近7日の人数です。共通の案内が動きます。" help="直近7日に追加され、流入リンクが分からなかった人数です。経路が分からなかった人へ共通の案内が動きます。" badge={(data?.summary.unknownRoute ?? 0) > 0 ? '要確認' : undefined} badgeTone="warning" variant="v6" />
       </section>
+
+      {/* 作る操作は数字のカードの下・一覧のすぐ上の左。 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button href="/friend-add-settings?view=new" variant="primary">＋ 初回案内を作る</Button>
+      </div>
 
       {/*
         #972: 390pxでは2つの切替タブが右へはみ出し、下の表の見出しも
         重なって読めなかった。共通部品の形は変えず、この画面だけ
         「収まらないときタブは折り返す・表は枠の内側で横へ動かす」にする。
         収まる幅では見た目は変わらない。
+        #636: 表の最小幅は 860→720px。1440pxではフォルダ欄を引いた
+        枠の実幅が834pxしかなく、860pxを指定すると26pxの横スクロールが
+        常時出ていた。720pxなら1440pxに収まり、狭い幅では従来どおり
+        枠の内側だけが横へ動く。
       */}
       <style>{`
         [data-tabs-row] nav:has(> span) { height: auto; flex-wrap: wrap; row-gap: 8px; }
         [data-tabs-row] nav:has(> span) > span { flex-wrap: wrap; row-gap: 0; }
         [data-scroll-table] > div { overflow-x: auto; }
-        [data-scroll-table] table { min-width: 860px; }
+        [data-scroll-table] table { min-width: 720px; }
       `}</style>
       <div data-design="FirstTime" data-tabs-row>
         <span className="sr-only">開始のタイミング。すぐに配信。あわせて実行すること。</span>
-        <Tabs items={(Object.keys(KIND_LABELS) as FriendAddRuleKind[]).map((tab) => ({ label: KIND_LABELS[tab], current: kind === tab, onClick: () => { resetCursor(); router.replace(`/friend-add-settings?kind=${tab}`) } }))} />
+        <Tabs label="配信の種類" items={(Object.keys(KIND_LABELS) as FriendAddRuleKind[]).map((tab) => ({ label: KIND_LABELS[tab], current: kind === tab, onClick: () => { resetCursor(); router.replace(`/friend-add-settings?kind=${tab}`) } }))} />
         <span data-design="Returning" className="sr-only">以前からの友だち・ブロックを解除した人。配信しない。別のシナリオを配信する。はじめての人と同じものを配信する。開始位置。前回読んだところから。</span>
       </div>
-      <p className="text-ink-faint my-2 text-xs">この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。</p>
+      <p className="text-ink-faint text-xs">この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。</p>
 
-      <div style={FOLDER_RAIL_STYLE} className="grid items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+      {/*
+        #636: lg未満の単列も明示トラックにする。暗黙列は中身の
+        max-content（表の最小幅）へ広がり、390/768pxでページ全体が
+        約880pxにはみ出していた。minmax(0,1fr)で枠幅に留める。
+      */}
+      <div style={FOLDER_RAIL_STYLE} className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
-          total={`${data?.total ?? data?.items.length ?? 0}件`}
+          /* 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。 */
           activeId={folder ?? ''}
           onSelect={(id) => selectFolder(id || null)}
           onAddFolder={() => setFolderDialogOpen(true)}
@@ -268,71 +315,82 @@ function FriendAddSettingsList() {
           ]}
         />
 
-        <section data-design="Rule" aria-label={`${KIND_LABELS[kind]}の設定`}>
+        {/*
+          #636: grid の子は min-w-0 が無いと中身（表の最小幅）まで縮まず、
+          lg未満の単列でページ全体が横へはみ出していた（390/768pxで
+          ページsw≈880）。縮めて、逃がす先を表の枠内スクロールに閉じる。
+        */}
+        <section data-design="Rule" aria-label={`${KIND_LABELS[kind]}の設定`} className="min-w-0">
           <span className="sr-only">判定の基準。はじめての人の判定。ブロック解除の判定。ブロック解除の回数が1回以上。</span>
-          <ListToolbar searchPlaceholder="設定名で検索" searchValue={search} onSearchChange={setSearch}>
-            <span className="text-ink-faint text-xs whitespace-nowrap">20件表示</span>
-          </ListToolbar>
+          {/* ★V7：件数は選べないので「20件表示」の文字だけを置かない。 */}
+          <ListToolbar search={{ placeholder: '設定名で検索', value: search, onChange: setSearch }} />
           {!data || data.items.length === 0 ? (
             appliedSearch.trim() || folder ? (
               <ListState kind="empty" title="条件に合う設定はありません" description="検索やフォルダの絞り込みを変えてください。" />
             ) : (
-              <ListState kind="empty" title="友だち追加時の配信がまだありません" description="最初の案内を作ると、ここに表示されます。" action={<Button href="/friend-add-settings?view=new" variant="primary">友だち追加時配信を作る</Button>} />
+              <ListState kind="empty" title="友だち追加時の配信がまだありません" description="最初の案内を作ると、ここに表示されます。" action={<Button href="/friend-add-settings?view=new" variant="primary">＋ 友だち追加時配信を作る</Button>} />
             )
           ) : (
             <>
               {/* #972 U039: 狭い幅では見出し同士が重なるため、枠の内側で横へ動かせるようにする。 */}
               <div data-scroll-table>
               <DataTable>
-                <thead><TableHeadRow><Th>設定名</Th><Th>状態</Th><Th>対象の流入リンク</Th><Th>最初に送るもの</Th><Th>直近7日</Th><Th>操作</Th></TableHeadRow></thead>
+                {/* 見出しは固定幅の表で切れることがあるため、重ねると全文が
+                    読める title を付ける（第5パス D-3）。 */}
+                {/*
+                  #636: 最小幅720pxでは均等6列だと各120pxしかなく、右端の
+                  操作（編集＋削除＋…）が枠から切れる。状態・直近7日・操作へ
+                  固定幅を当て、残りを文字列の3列へ回す。狭い列の文字は
+                  従来どおり1行省略＋titleで全文を確認できる。
+                */}
+                <thead><TableHeadRow><Th title="設定名">設定名</Th><Th title="状態" className="w-24">状態</Th><Th title="対象の流入リンク">対象の流入リンク</Th><Th title="最初に送るもの">最初に送るもの</Th><Th title="直近7日の友だち追加数" className="w-24">直近7日</Th><Th title="操作" className="w-40">操作</Th></TableHeadRow></thead>
                 <tbody>
                   {visibleItems.map((rule) => (
                     <Tr key={rule.id}>
-                      <NameCell name={<a href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} className="text-ink block truncate font-bold">{rule.name}</a>} sub={rule.isFallback ? 'いちばん最後に動く・消せない' : `優先順位 ${rule.priority}`} />
+                      <NameCell name={<a href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} className="text-ink block truncate font-bold" title={rule.name}>{rule.name}</a>} sub={rule.isFallback ? 'いちばん最後に動く・消せない' : `優先順位 ${rule.priority}`} />
                       <Td><StatusBadge tone={rule.status === 'published' || rule.isFallback ? 'success' : 'neutral'} size="compact">{rule.isFallback ? '常に有効' : rule.status === 'published' ? '有効' : rule.status === 'draft' ? '下書き' : rule.status === 'stopped' ? '停止中' : 'アーカイブ'}</StatusBadge></Td>
-                      <Td>{rule.isFallback ? '経路が取れなかったとき' : rule.routeNames.join('、') || 'すべての流入経路'}</Td>
-                      <Td>{deliverySummary(rule)}</Td>
+                      <Td><span className="block truncate" title={routeLabel(rule)}>{routeLabel(rule)}</span></Td>
+                      <Td><span className="block truncate" title={deliverySummary(rule)}>{deliverySummary(rule)}</span></Td>
                       <Td>{countText(rule.matchedLast7Days, '人')}</Td>
                       <ActionCell>
+                        {/*
+                          ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。
+                          削除はメニューの中の危ない操作へ。ゴミ箱のアイコン
+                          だけのボタンは行に直に置かない。消せない行（共通の
+                          あいさつ）は「…」を出さない。
+                          その他操作は実画面へつなぐメニューを開く。行き先のない
+                          ボタンを置くと、押しても何も起きない死に操作になる。
+                        */}
                         <div className="flex items-center gap-1">
-                          <Button href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} variant="secondary">編集</Button>
-                          {!rule.isFallback && <IconButton aria-label={`${rule.name}を削除`} onClick={() => setDeleting(rule)}><Trash2 size={16} /></IconButton>}
-                          {/*
-                            その他操作は実画面へつなぐメニューを開く。行き先のない
-                            ボタンを置くと、押しても何も起きない死に操作になる。
-                          */}
-                          <div className="relative inline-flex items-center justify-center">
-                            <IconButton
-                              aria-label={`${rule.name}のその他操作`}
-                              aria-expanded={openMenuId === rule.id}
-                              onClick={() => setOpenMenuId((current) => (current === rule.id ? null : rule.id))}
-                            ><MoreHorizontal size={18} /></IconButton>
-                            <ActionMenu
-                              open={openMenuId === rule.id}
-                              ariaLabel={`${rule.name}の操作`}
-                              onClose={() => setOpenMenuId(null)}
-                              items={[
-                                {
-                                  id: 'test',
-                                  label: 'テストを実行',
-                                  icon: <FlaskConical size={16} />,
-                                  onSelect: () => router.push(`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}&step=preview`),
-                                },
-                                ...(rule.status === 'draft' ? [{
-                                  id: 'publish',
-                                  label: '最終確認・有効化へ進む',
-                                  icon: <Rocket size={16} />,
-                                  onSelect: () => router.push(`/friend-add-settings/publish?id=${encodeURIComponent(rule.id)}`),
-                                }] : []),
-                                {
-                                  id: 'runs',
-                                  label: 'この設定の実行結果',
-                                  icon: <History size={16} />,
-                                  onSelect: () => router.push(`/friend-add-settings/runs?rule_id=${encodeURIComponent(rule.id)}`),
-                                },
-                              ]}
-                            />
-                          </div>
+                          <RowActions
+                            subjectName={rule.name}
+                            edit={{ href: `/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}` }}
+                            menuItems={[
+                              {
+                                id: 'test',
+                                label: 'テストを実行',
+                                icon: <FlaskConical size={16} />,
+                                onSelect: () => router.push(`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}&step=preview`),
+                              },
+                              ...(rule.status === 'draft' ? [{
+                                id: 'publish',
+                                label: '最終確認・有効化へ進む',
+                                icon: <Rocket size={16} />,
+                                onSelect: () => router.push(`/friend-add-settings/publish?id=${encodeURIComponent(rule.id)}`),
+                              }] : []),
+                              {
+                                id: 'runs',
+                                label: 'この設定の実行結果',
+                                icon: <History size={16} />,
+                                onSelect: () => router.push(`/friend-add-settings/runs?rule_id=${encodeURIComponent(rule.id)}`),
+                              },
+                            ]}
+                            destructiveItem={rule.isFallback ? undefined : {
+                              id: 'delete',
+                              label: '削除する',
+                              onSelect: () => setDeleting(rule),
+                            }}
+                          />
                         </div>
                       </ActionCell>
                     </Tr>
@@ -340,11 +398,18 @@ function FriendAddSettingsList() {
                 </tbody>
               </DataTable>
               </div>
-              <div className="mt-3 flex items-center justify-end gap-2" aria-label="ページ送り">
-                <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
-                <Button variant="primary" aria-current="page">{cursorPage}</Button>
-                <Button disabled={!data.nextCursor || loading} onClick={() => goNext(data.nextCursor)}>次へ</Button>
-              </div>
+              {/*
+                m22d: 件数は上の「初回案内」カードの1か所に集約し、一覧の
+                下では繰り返さない。ページ送りだけ残す。
+              */}
+              {(canPrev || data.nextCursor) ? (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2" aria-label="ページ送り">
+                    <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
+                    <Button disabled={!data.nextCursor || loading} onClick={() => goNext(data.nextCursor)}>次へ</Button>
+                  </div>
+                </div>
+              ) : null}
             </>
           )}
         </section>
@@ -363,7 +428,7 @@ function FriendAddSettingsList() {
         }}
         onConfirm={folderName.trim() ? () => void createFolder() : undefined}
       >
-        <label className="grid gap-2 text-sm font-bold">
+        <label className="grid gap-2 text-sm font-medium">
           フォルダ名
           <input
             autoFocus

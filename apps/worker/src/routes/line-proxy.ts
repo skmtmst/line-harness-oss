@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import {
-  getLineAccounts,
+  listLineAccountsWithTenantStatus,
   getFriendByLineUserIdForAccount,
   upsertFriend,
   getChatByFriendId,
@@ -137,8 +137,19 @@ function asMessages(value: unknown): Message[] {
  * or the env default token. Returns a Response on auth/validation failure.
  */
 async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCaller | Response> {
-  const accounts = await getLineAccounts(c.env.DB);
-  const active = accounts.filter((a) => a.is_active);
+  const accounts = await listLineAccountsWithTenantStatus(c.env.DB);
+  // This is the last server-side gate before api.line.me. Keeping stopped
+  // accounts out of token resolution protects every proxy-based dispatcher,
+  // even if a future job forgets its claim-time filter.
+  const active = accounts.filter((a) => a.is_active && a.tenant_status === 'active');
+
+  // A DB-registered channel token always keeps its tenant boundary. Without
+  // this check, a stopped tenant whose token also happens to be configured as
+  // the environment default could fall through to the legacy env-token path.
+  const registeredByToken = accounts.find((a) => a.channel_access_token === token);
+  if (registeredByToken && registeredByToken.tenant_status !== 'active') {
+    return c.json({ code: 'TENANT_SUSPENDED', message: '契約先の利用が停止されています' }, 403);
+  }
 
   const byChannelToken = active.find((a) => a.channel_access_token === token);
   if (byChannelToken) {
@@ -301,11 +312,26 @@ async function createFriendForRecipient(
   }
 }
 
+/**
+ * R381: 同じ送信キー（X-Line-Retry-Key）への再送で履歴を二重に書かないため、
+ * キーがある送信は内容から決まるIDを使う。初回の200で履歴を書けなかった
+ * 場合も、LINEが「受理済み」を返す409の再送で同じIDへ同じ行を補完できる。
+ */
+async function deterministicLogId(seed: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed));
+  const bytes = new Uint8Array(digest.slice(0, 16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'));
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10).join('')}`;
+}
+
 /** Multi-row INSERT keeps large broadcasts within the D1 subrequest budget. */
 async function insertLogRows(
   db: D1Database,
   rows: LogRow[],
   source: ProxyLogSource,
+  logKey?: string | null,
 ): Promise<void> {
   if (rows.length === 0) return;
   const now = jstNow();
@@ -315,20 +341,25 @@ async function insertLogRows(
     const values = chunk
       .map(() => `(?, ?, 'outgoing', ?, ?, NULL, NULL, ?, ?, ?, ?)`)
       .join(', ');
-    const params = chunk.flatMap((row) => [
-      crypto.randomUUID(),
-      row.friendId,
-      row.messageType,
-      row.content,
-      row.deliveryType,
-      source,
-      row.lineAccountId,
-      now,
-    ]);
+    const params: unknown[] = [];
+    for (const [index, row] of chunk.entries()) {
+      params.push(
+        logKey
+          ? await deterministicLogId(`line-proxy-send:${logKey}:${row.friendId}:${i + index}`)
+          : crypto.randomUUID(),
+        row.friendId,
+        row.messageType,
+        row.content,
+        row.deliveryType,
+        source,
+        row.lineAccountId,
+        now,
+      );
+    }
     statements.push(
       db
         .prepare(
-          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, line_account_id, created_at)
+          `INSERT OR IGNORE INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, line_account_id, created_at)
            VALUES ${values}`,
         )
         .bind(...params),
@@ -356,6 +387,7 @@ async function logProxySend(
   path: string,
   rawBody: string,
   source: ProxyLogSource,
+  logKey?: string | null,
 ): Promise<void> {
   try {
     const parsed = JSON.parse(rawBody) as ParsedSend;
@@ -382,7 +414,7 @@ async function logProxySend(
         (await getFriendByLineUserIdForAccount(db, parsed.to, lineAccountId)) ??
         (await createFriendForRecipient(db, lineClient, parsed.to, lineAccountId));
       if (!friend) return;
-      await insertLogRows(db, rowsFor(friend.id, 'push'), source);
+      await insertLogRows(db, rowsFor(friend.id, 'push'), source, logKey);
       await touchChat(db, friend.id);
       return;
     }
@@ -414,7 +446,7 @@ async function logProxySend(
           `[line-proxy] multicast: ${skipped} unknown recipients not logged (friend-creation cap ${MAX_FRIEND_CREATIONS})`,
         );
       }
-      await insertLogRows(db, rows, source);
+      await insertLogRows(db, rows, source, logKey);
       return;
     }
 
@@ -454,7 +486,7 @@ async function logProxySend(
         return;
       }
       const rows = friendIds.flatMap((friendId) => rowsFor(friendId, null));
-      await insertLogRows(db, rows, source);
+      await insertLogRows(db, rows, source, logKey);
       console.log(`[line-proxy] broadcast logged for ${friendIds.length} friends`);
       return;
     }
@@ -598,11 +630,21 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
       return c.json({ message: 'Upstream request failed' }, 502);
     }
 
-    if (isMessageSend && upstream.ok && rawBody) {
+    /*
+     * R381: LINE が同じ送信キーを受理済みとして返す409（応答消失後の再送
+     * など）でも履歴を書く。本文は一度だけ届いているが、初回の200で履歴の
+     * 保存が落ちたとき、再送の409へ追従して同じ決まったIDの行を補完する。
+     * insertLogRows は送信キーから決まるIDの INSERT OR IGNORE なので、
+     * 初回の保存が済んでいれば二重には書かない。
+     */
+    const dedupeAccepted = Boolean(
+      retryKey && upstream.status === 409 && upstream.headers.get('x-line-accepted-request-id'),
+    );
+    if (isMessageSend && rawBody && (upstream.ok || dedupeAccepted)) {
       // Log in the background where possible: a multicast to hundreds of
       // friends must not delay the client response (timeout → client retry →
       // double send). Falls back to inline await outside a Workers runtime.
-      const logging = logProxySend(c.env.DB, caller, path, rawBody, logSource);
+      const logging = logProxySend(c.env.DB, caller, path, rawBody, logSource, retryKey);
       try {
         c.executionCtx.waitUntil(logging);
       } catch {

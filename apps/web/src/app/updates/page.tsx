@@ -1,6 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatDateTime } from '@/lib/format'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
 // self-update を構成した環境 (create-line-harness セットアップ) でのみ設定される。
@@ -57,67 +64,58 @@ export default function UpdatesPage() {
   const rows = state.kind === 'ready' ? state.rows : []
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-4">アップデート履歴</h1>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <h1 className="text-ink text-xl font-semibold">アップデート履歴</h1>
       {state.kind === 'unconfigured' && (
-        <div className="text-gray-600 bg-gray-50 p-4 rounded mb-4 text-sm leading-relaxed">
-          この環境では自動アップデートが構成されていないため、履歴はありません。
-          <br />
-          自動アップデートは <code className="text-xs">create-line-harness</code>{' '}
-          でセットアップした環境で利用できます。自前でデプロイしている場合は{' '}
-          <a
-            className="underline"
-            href={MANUAL_UPDATE_GUIDE_URL}
-            target="_blank"
-            rel="noreferrer"
-          >
-            手動アップデートガイド
-          </a>{' '}
-          をご覧ください。
-        </div>
+        <>
+          <div><NoteBar>この環境では自動アップデートが構成されていないため、履歴はありません。</NoteBar></div>
+          <section className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              emptyPreset="readonly"
+              title="更新履歴はまだありません"
+              description="自動アップデートは create-line-harness でセットアップした環境で利用できます。自前でデプロイしている場合は手動アップデートガイドをご覧ください。"
+              action={<Button href={MANUAL_UPDATE_GUIDE_URL} target="_blank" rel="noreferrer">手動アップデートガイドを開く</Button>}
+            />
+          </section>
+        </>
       )}
       {state.kind === 'error' && (
-        <div className="text-amber-800 bg-amber-50 p-3 rounded mb-4 text-sm">
+        <Notice tone="warn" className="mb-4">
           履歴を取得できませんでした（{state.message}）。時間をおいて再読み込みしてください。
-        </div>
+        </Notice>
       )}
       {state.kind === 'ready' && rows.length === 0 && (
-        <p className="text-gray-500 text-sm">履歴はまだありません。</p>
+        <p className="text-ink-faint text-sm">履歴はまだありません。</p>
       )}
       {rows.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-gray-600 border-b">
-              <tr>
-                <th className="py-2 pr-4">開始</th>
-                <th className="py-2 pr-4">From → To</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2">Rollback</th>
-              </tr>
+        <DataTable>
+            <thead>
+              <TableHeadRow>
+                <Th style={{ width: '25%' }}>開始</Th>
+                <Th style={{ width: '30%' }}>From → To</Th>
+                <Th style={{ width: '20%' }}>Status</Th>
+                <Th style={{ width: '25%' }}>Rollback</Th>
+              </TableHeadRow>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b last:border-0">
-                  <td className="py-2 pr-4">
-                    {new Date(r.started_at).toLocaleString('ja-JP', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </td>
-                  <td className="py-2 pr-4 font-mono text-xs">
-                    {r.from_version} → {r.to_version}
-                  </td>
-                  <td className="py-2 pr-4">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded ${statusClass(r.status)}`}
-                    >
-                      {r.status}
+                <Tr key={r.id}>
+                  <Td className="text-ink-secondary whitespace-nowrap tabular-nums">
+                    {formatDateTime(r.started_at)}
+                  </Td>
+                  <Td className="font-mono text-xs">
+                    <span className="block truncate" title={`${r.from_version} → ${r.to_version}`}>
+                      {r.from_version} → {r.to_version}
                     </span>
-                  </td>
-                  <td className="py-2">
+                  </Td>
+                  <Td>
+                    <StatusBadge tone={statusTone(r.status)} size="compact">
+                      {r.status}
+                    </StatusBadge>
+                  </Td>
+                  <Td>
                     {r.status === 'success' &&
                     r.rollback_expires_at &&
                     Date.now() < r.rollback_expires_at ? (
@@ -131,23 +129,22 @@ export default function UpdatesPage() {
                         戻せる期間内ですが、この画面からは戻せません
                       </span>
                     ) : (
-                      <span className="text-gray-400 text-xs">—</span>
+                      <span className="text-ink-faint text-xs">—</span>
                     )}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </DataTable>
       )}
     </div>
   )
 }
 
-function statusClass(s: string): string {
-  if (s === 'success') return 'bg-green-100 text-green-800'
-  if (s === 'rolled_back') return 'bg-amber-100 text-amber-800'
-  if (s === 'failed') return 'bg-red-100 text-red-800'
-  if (s === 'running') return 'bg-blue-100 text-blue-800'
-  return 'bg-gray-100 text-gray-800'
+function statusTone(s: string): StatusBadgeTone {
+  if (s === 'success') return 'success'
+  if (s === 'rolled_back') return 'warning'
+  if (s === 'failed') return 'danger'
+  if (s === 'running') return 'info'
+  return 'neutral'
 }

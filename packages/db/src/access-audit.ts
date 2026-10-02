@@ -225,7 +225,12 @@ export async function listAccessUsers(db: D1Database, input: ListAccessUsersInpu
     if (input.status && item.status !== input.status) return false;
     if (input.roleBundle && item.roleBundle !== input.roleBundle) return false;
     if (!normalizedQuery) return true;
-    const values = [item.name, item.jobTitle, item.roleBundle];
+    /*
+     * #620: 検索欄は「人の名前・メールで検索」。照合は画面に出る項目だけに限る。
+     * roleBundle（administrator 等の内部enum ID）を対象に入れていたときは、
+     * "admin" や "view" のような見た目に無い語でも行が返っていた。
+     */
+    const values = [item.name, item.jobTitle];
     if (input.includeEmailInSearch) values.push(item.email);
     return values.some((value) => value?.toLocaleLowerCase('ja-JP').includes(normalizedQuery));
   });
@@ -399,6 +404,22 @@ type AuditEventRow = {
   created_at: string;
 };
 
+export type AuditEventGroup = 'deleted' | 'sent' | 'changed' | 'login' | 'attention';
+
+/*
+ * 監査 R69: 件数の集計・一覧の絞り込み・ページ分割に同じ分類を使う。
+ * 以前は集計が send/publish・update/change/patch/put を数えるのに
+ * 絞り込みは send・update だけだったため、数えたはずの操作が一覧から消えた。
+ * 「ログイン」は成功・失敗を問わず auth.login を数える（失敗は「気になるもの」にも出る）。
+ */
+export const AUDIT_GROUP_CONDITIONS: Record<AuditEventGroup, string> = {
+  deleted: `(lower(ae.action) LIKE '%delete%' OR lower(ae.action) LIKE 'api.delete.%')`,
+  sent: `(lower(ae.action) LIKE '%send%' OR lower(ae.action) LIKE '%publish%')`,
+  changed: `(ae.category = 'business' AND (lower(ae.action) LIKE '%update%' OR lower(ae.action) LIKE '%change%' OR lower(ae.action) LIKE 'api.patch.%' OR lower(ae.action) LIKE 'api.put.%'))`,
+  login: `(ae.category = 'auth' AND ae.action = 'auth.login')`,
+  attention: `(ae.result <> 'success' OR ae.risk_level <> 'normal')`,
+};
+
 export type ListAuditEventsInput = {
   tenantId?: string | null;
   allowedLineAccountIds: string[];
@@ -407,11 +428,15 @@ export type ListAuditEventsInput = {
   category?: AuditCategory;
   result?: AuditResult;
   attentionOnly?: boolean;
+  /** 集計タブと同じ分類での絞り込み。件数と一覧が同じ行を指す（監査 R69）。 */
+  group?: AuditEventGroup;
   actorId?: string;
   action?: string;
   query?: string;
   from?: string;
   to?: string;
+  /** ページ分割もこの順序で行う。既定は新しい順（監査 R68）。 */
+  sort?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
   now?: string;
@@ -439,8 +464,25 @@ function auditScopeSql(input: ListAuditEventsInput): { conditions: string[]; val
   const conditions = ['ae.tenant_id = ?'];
   const values: unknown[] = [input.tenantId ?? DEFAULT_TENANT_ID];
   if (input.lineAccountId) {
-    conditions.push('ae.line_account_id = ?');
-    values.push(input.lineAccountId);
+    /*
+     * 監査 R70: 認証イベント（ログイン・失敗）はLINEアカウント未所属で保存される。
+     * アカウントで絞ると業務記録だけになり、認証の記録が一覧と集計から消えていた。
+     * アカウントの業務記録に、組織全体の認証記録を添える。権限がアカウント限定の
+     * 人には、そのアカウントを担当する人の認証記録だけを添える。
+     */
+    if (input.includeTenantWide) {
+      conditions.push(`(ae.line_account_id = ? OR (ae.line_account_id IS NULL AND ae.category = 'auth'))`);
+      values.push(input.lineAccountId);
+    } else {
+      conditions.push(`(ae.line_account_id = ? OR (
+        ae.line_account_id IS NULL AND ae.category = 'auth' AND ae.actor_principal_id IS NOT NULL AND EXISTS (
+          SELECT 1 FROM staff_account_scopes audit_scope
+           WHERE audit_scope.staff_id = ae.actor_principal_id
+             AND audit_scope.line_account_id = ?
+        )
+      ))`);
+      values.push(input.lineAccountId, input.lineAccountId);
+    }
   } else if (input.includeTenantWide && input.allowedLineAccountIds.length > 0) {
     conditions.push(`(ae.line_account_id IS NULL OR ae.line_account_id IN (${input.allowedLineAccountIds.map(() => '?').join(', ')}))`);
     values.push(...input.allowedLineAccountIds);
@@ -474,13 +516,20 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
     conditions.push("(ae.result <> 'success' OR ae.risk_level <> 'normal')");
   }
   if (input.actorId) { conditions.push('ae.actor_principal_id = ?'); values.push(input.actorId); }
-  if (input.action) { conditions.push('ae.action LIKE ?'); values.push(`%${input.action}%`); }
+  /*
+   * #620: ユーザー語は LIKE ではなく instr で照合する。
+   * `%…%` の LIKE だと入力中の % や _ がワイルドカードとして効いて
+   * 意図しない行を返し、さらに D1 の LIKE パターンは 50 バイト上限のため
+   * 長文の検索がサーバーエラーになっていた。
+   */
+  if (input.action) { conditions.push('instr(lower(ae.action), lower(?)) > 0'); values.push(input.action); }
+  if (input.group) { conditions.push(AUDIT_GROUP_CONDITIONS[input.group]); }
   if (input.from) { conditions.push('ae.created_at >= ?'); values.push(input.from); }
   if (input.to) { conditions.push('ae.created_at <= ?'); values.push(input.to); }
   if (input.query?.trim()) {
-    const query = `%${input.query.trim()}%`;
-    conditions.push(`(ae.action LIKE ? OR COALESCE(sm.name, '') LIKE ?
-      OR COALESCE(ae.target_kind, '') LIKE ? OR COALESCE(ae.target_id, '') LIKE ?)`);
+    const query = input.query.trim();
+    conditions.push(`(instr(lower(ae.action), lower(?)) > 0 OR instr(lower(COALESCE(sm.name, '')), lower(?)) > 0
+      OR instr(lower(COALESCE(ae.target_kind, '')), lower(?)) > 0 OR instr(lower(COALESCE(ae.target_id, '')), lower(?)) > 0)`);
     values.push(query, query, query, query);
   }
   const where = `WHERE ${conditions.join(' AND ')}`;
@@ -488,12 +537,15 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
     `SELECT COUNT(*) AS count FROM audit_events ae
       LEFT JOIN staff_members sm ON sm.id = ae.actor_principal_id ${where}`,
   ).bind(...values).first<{ count: number }>();
+  // 監査 R68: 「古い順」もDB側の並び替えでページを分ける。取った1頁だけを
+  // 画面で並び替えると、頁またぎで新しい日付が先に出る逆転が起きていた。
+  const direction = input.sort === 'asc' ? 'ASC' : 'DESC';
   const rows = await db.prepare(
     `SELECT ae.*, sm.name AS actor_name
        FROM audit_events ae
        LEFT JOIN staff_members sm ON sm.id = ae.actor_principal_id
        ${where}
-      ORDER BY ae.created_at DESC, ae.id DESC LIMIT ? OFFSET ?`,
+      ORDER BY ae.created_at ${direction}, ae.id ${direction} LIMIT ? OFFSET ?`,
   ).bind(...values, limit, offset).all<AuditEventRow>();
 
   const summaryScope = auditScopeSql(input);
@@ -519,19 +571,19 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
     summaryConditions.push('ae.created_at <= ?');
     summaryValues.push(input.to);
   }
+  // 監査 R69: 各タブの件数は一覧の絞り込みと同じ分類（AUDIT_GROUP_CONDITIONS）で数える。
   const summary = await db.prepare(
     `SELECT COUNT(*) AS total,
-            SUM(CASE WHEN lower(action) LIKE '%delete%' OR lower(action) LIKE 'api.delete.%' THEN 1 ELSE 0 END) AS deleted,
-            SUM(CASE WHEN lower(action) LIKE '%send%' OR lower(action) LIKE '%publish%' THEN 1 ELSE 0 END) AS sent,
-            SUM(CASE WHEN category = 'business'
-                      AND (lower(action) LIKE '%update%' OR lower(action) LIKE '%change%'
-                        OR lower(action) LIKE 'api.patch.%' OR lower(action) LIKE 'api.put.%') THEN 1 ELSE 0 END) AS changed,
-            SUM(CASE WHEN category = 'auth' AND action = 'auth.login' AND result = 'success' THEN 1 ELSE 0 END) AS logins,
-            SUM(CASE WHEN category = 'auth' AND (risk_level <> 'normal' OR result <> 'success') THEN 1 ELSE 0 END) AS suspicious_logins
+            SUM(CASE WHEN ${AUDIT_GROUP_CONDITIONS.deleted} THEN 1 ELSE 0 END) AS deleted,
+            SUM(CASE WHEN ${AUDIT_GROUP_CONDITIONS.sent} THEN 1 ELSE 0 END) AS sent,
+            SUM(CASE WHEN ${AUDIT_GROUP_CONDITIONS.changed} THEN 1 ELSE 0 END) AS changed,
+            SUM(CASE WHEN ${AUDIT_GROUP_CONDITIONS.login} THEN 1 ELSE 0 END) AS logins,
+            SUM(CASE WHEN ae.category = 'auth' AND (ae.risk_level <> 'normal' OR ae.result <> 'success') THEN 1 ELSE 0 END) AS suspicious_logins,
+            SUM(CASE WHEN ${AUDIT_GROUP_CONDITIONS.attention} THEN 1 ELSE 0 END) AS attention
        FROM audit_events ae
       WHERE ${summaryConditions.join(' AND ')}`,
   ).bind(...summaryValues).first<{
-    total: number; deleted: number; sent: number; changed: number; logins: number; suspicious_logins: number;
+    total: number; deleted: number; sent: number; changed: number; logins: number; suspicious_logins: number; attention: number;
   }>();
 
   return {
@@ -562,6 +614,7 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
       changed: Number(summary?.changed ?? 0),
       logins: Number(summary?.logins ?? 0),
       suspiciousLogins: Number(summary?.suspicious_logins ?? 0),
+      attention: Number(summary?.attention ?? 0),
     },
     total: Number(totalRow?.count ?? 0),
     limit,

@@ -138,9 +138,10 @@ async function renderAt(url: string) {
   await act(async () => { await Promise.resolve() })
 }
 
-/** いま開いている札の見出し。aria-current が付いている1つだけ。 */
+/** いま開いている札の見出し。開いている印が付いている1つだけ。 */
 function currentTab(): string {
-  const current = Array.from(host.querySelectorAll('[aria-current="page"]'))
+  // ★V7: ボタン切り替えの札は aria-selected で開いているものを示すため、そちらで探す。
+  const current = Array.from(host.querySelectorAll('[aria-selected="true"]'))
     .map((node) => node.textContent?.trim() ?? '')
   expect(current).toHaveLength(1)
   return current[0]
@@ -156,16 +157,16 @@ describe('ダッシュボードからの深掘り(#666 N-004)', () => {
   it('status=pending_review で来たら審査待ちの札を開き、その写真だけを出す', async () => {
     net.handler = listHandler(MIXED)
     await renderAt('/nen-members?tab=photos&status=pending_review')
-    expect(currentTab()).toContain('見ていないもの')
+    expect(currentTab()).toContain('審査待ち')
     expect(host.textContent).toContain('ハナ')
     expect(host.textContent).not.toContain('モモ')
     expect(host.textContent).not.toContain('ソラ')
   })
 
-  it('status=adopted なら通したものの札、status=rejected なら戻したものの札を開く', async () => {
+  it('status=adopted なら採用の札、status=rejected なら見送りの札を開く', async () => {
     net.handler = listHandler(MIXED)
     await renderAt('/nen-members?tab=photos&status=adopted')
-    expect(currentTab()).toContain('通したもの')
+    expect(currentTab()).toContain('採用')
     expect(host.textContent).toContain('モモ')
     expect(host.textContent).not.toContain('ハナ')
 
@@ -175,14 +176,14 @@ describe('ダッシュボードからの深掘り(#666 N-004)', () => {
     document.body.appendChild(host)
     root = createRoot(host)
     await renderAt('/nen-members?tab=photos&status=rejected')
-    expect(currentTab()).toContain('戻したもの')
+    expect(currentTab()).toContain('見送り')
     expect(host.textContent).toContain('ソラ')
   })
 
   it('指定がない・知らない指定のときは今までどおり審査待ちの札', async () => {
     net.handler = listHandler(MIXED)
     await renderAt('/nen-members?tab=photos&status=%E5%A3%8A%E3%82%8C%E3%81%9F%E5%80%A4')
-    expect(currentTab()).toContain('見ていないもの')
+    expect(currentTab()).toContain('審査待ち')
     expect(host.textContent).toContain('ハナ')
   })
 
@@ -190,10 +191,10 @@ describe('ダッシュボードからの深掘り(#666 N-004)', () => {
     net.handler = listHandler(MIXED)
     await renderAt('/nen-members?tab=photos&status=pending_review')
     const adopted = Array.from(host.querySelectorAll('button')).find(
-      (item) => item.textContent?.includes('通したもの'),
+      (item) => item.textContent?.includes('採用'),
     ) as HTMLButtonElement
     await act(async () => { adopted.click() })
-    expect(currentTab()).toContain('通したもの')
+    expect(currentTab()).toContain('採用')
     expect(host.textContent).toContain('モモ')
   })
 })
@@ -344,7 +345,7 @@ describe('戻す約束の2チェック(#931 N-312)', () => {
   it('2つのチェックは押せる状態で、選んだ内容が審査APIへそのまま届く', async () => {
     net.handler = detailCapableHandler(MIXED)
     await renderAt('/nen-members?tab=photos')
-    const openReject = buttonByText('戻す', host)
+    const openReject = buttonByText('見送る', host)
     expect(openReject).toBeTruthy()
     await act(async () => { openReject!.click() })
     await act(async () => { await Promise.resolve() })
@@ -362,7 +363,7 @@ describe('戻す約束の2チェック(#931 N-312)', () => {
     expect(invite.checked).toBe(false)
     expect(watch.checked).toBe(true)
 
-    const confirm = buttonByText('戻して、この文章を送る')
+    const confirm = buttonByText('見送って、この文章を送る')
     expect(confirm).toBeTruthy()
     await act(async () => { confirm!.click() })
     await act(async () => { await Promise.resolve() })
@@ -422,13 +423,13 @@ describe('写真の向きの保存(#931 N-309)', () => {
     await act(async () => { await Promise.resolve() })
 
     const rotate = buttonByText('回す')
-    const save = buttonByText('向きを保存')
+    const save = buttonByText('向きを保存する')
     expect(rotate).toBeTruthy()
     expect(save).toBeTruthy()
     // 回す前は保存できない（向きに変更が無い）。
     expect(save!.disabled).toBe(true)
     await act(async () => { rotate!.click() })
-    const saveReady = buttonByText('向きを保存')!
+    const saveReady = buttonByText('向きを保存する')!
     expect(saveReady.disabled).toBe(false)
     await act(async () => { saveReady.click() })
     await act(async () => { await Promise.resolve() })
@@ -455,7 +456,7 @@ describe('戻る・再読込での復元(#931 N-314)', () => {
     await renderAt('/nen-members?tab=photos&status=pending&view=detail&photo=p-1')
     await act(async () => { await Promise.resolve() })
     // 詳細が開いている（一覧のカードではなく詳細の操作が出る）。
-    expect(buttonByText('向きを保存')).toBeTruthy()
+    expect(buttonByText('向きを保存する')).toBeTruthy()
     expect(document.body.textContent).toContain('送ってくれた人')
   })
 
@@ -464,19 +465,19 @@ describe('戻る・再読込での復元(#931 N-314)', () => {
     await renderAt('/nen-members?tab=photos')
     await act(async () => { buttonByText('⛶ 1枚ずつ大きく見る', host)!.click() })
     await act(async () => { await Promise.resolve() })
-    expect(buttonByText('向きを保存')).toBeTruthy()
+    expect(buttonByText('向きを保存する')).toBeTruthy()
     // ブラウザの戻る: URLが一覧へ変わったあと popstate が来る。
     window.history.pushState(null, '', '/nen-members?tab=photos&status=pending')
     await act(async () => { window.dispatchEvent(new Event('popstate')) })
     await act(async () => { await Promise.resolve() })
-    expect(buttonByText('向きを保存')).toBeUndefined()
+    expect(buttonByText('向きを保存する')).toBeUndefined()
     expect(host.textContent).toContain('ハナ')
     // 進む: 詳細のURLへ戻ると、同じ写真の詳細を取り直して開く。
     window.history.pushState(null, '', '/nen-members?tab=photos&status=pending&view=detail&photo=p-1')
     await act(async () => { window.dispatchEvent(new Event('popstate')) })
     await act(async () => { await Promise.resolve() })
     expect(net.calls.some((path) => path.startsWith('/api/nen-members/photos/p-1?'))).toBe(true)
-    expect(buttonByText('向きを保存')).toBeTruthy()
+    expect(buttonByText('向きを保存する')).toBeTruthy()
   })
 
   it('再読込のあとも、選んでいた写真がsessionStorageから戻る', async () => {

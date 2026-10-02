@@ -3,13 +3,17 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import Image from 'next/image'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
+import RadioCard from '@/components/shared/radio-card'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import PageHeader from '@/components/shared/page-header'
 import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge from '@/components/shared/status-badge'
+import Notice from '@/components/shared/notice'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import { CHECK_STATE_LABEL, canSave, stoppedAt, toSteps } from '../connection-check-view'
+import { isDuplicateChannelError, matchRegisteredAccountId } from './account-recovery'
 
 const WIZARD_STEPS = [
   { number: 1, label: '基本情報', designNode: 'a8qMXX' },
@@ -43,6 +47,9 @@ export default function NewLineAccountPage() {
   const [busyAction, setBusyAction] = useState<BusyAction>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [error, setError] = useState('')
+  // R523: 応答消失・重複で見つけた登録済みアカウント。詳細へ復帰するために持つ。
+  const [recoveredAccountId, setRecoveredAccountId] = useState('')
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const busyLock = useRef(false)
   const stepPanelRef = useRef<HTMLDivElement>(null)
 
@@ -93,6 +100,7 @@ export default function NewLineAccountPage() {
     })
     setConnection(null)
     setError('')
+    setRecoveredAccountId('')
   }
 
   const validateStep = (step: StepNumber) => {
@@ -149,7 +157,21 @@ export default function NewLineAccountPage() {
     }
   }
 
-  const save = async () => {
+  /*
+   * R523: 同じチャネルIDで作られた行が残っていないか照合する。
+   * 取れなければ null（未保存と断定しない）。一覧が読めない試験環境でも落ちない。
+   */
+  const findRegisteredAccountId = async (channelId: string): Promise<string | null> => {
+    try {
+      const list = await api.lineAccounts.list()
+      if (!list.success) return null
+      return matchRegisteredAccountId(list.data, channelId)
+    } catch {
+      return null
+    }
+  }
+
+  const save = async (stepUpToken?: string) => {
     if (!connectionPassed || busyLock.current) {
       setError('5段すべて通ってから保存してください。')
       return
@@ -157,17 +179,39 @@ export default function NewLineAccountPage() {
     busyLock.current = true
     setBusyAction('save')
     setError('')
+    setRecoveredAccountId('')
     try {
-      const response = await api.lineAccounts.connect(input())
+      const response = await api.lineAccounts.connect(input(), stepUpToken)
       if (!response.success) {
+        // R523: 重複（同じ情報での再試行で行き止まり）は登録済みの詳細へ案内する。
+        if (isDuplicateChannelError(response.error)) {
+          const recovered = await findRegisteredAccountId(form.channelId)
+          if (recovered) {
+            setRecoveredAccountId(recovered)
+            setError('このチャネルIDは登録済みです。登録済みのアカウントを開いて確認してください。')
+            return
+          }
+        }
         setError(response.error)
         return
       }
       setConnection(response.data)
       setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
       setCurrentStep(5)
-    } catch {
-      setError('登録できませんでした。DBには保存していません。時間をおいて、もう一度お試しください。')
+    } catch (caught) {
+      // LINEの接続は大事な操作。本人確認を求められたら窓を立ててやり直す（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'line_account.connect', action: 'LINEの接続を登録する', retry: save })
+        return
+      }
+      // R523: 応答が無い失敗は「未保存」と断定しない。作られた行が残っていることがある。
+      const recovered = await findRegisteredAccountId(form.channelId)
+      if (recovered) {
+        setRecoveredAccountId(recovered)
+        setError('保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。')
+        return
+      }
+      setError('登録できませんでした。時間をおいて、もう一度お試しください。')
     } finally {
       busyLock.current = false
       setBusyAction(null)
@@ -189,9 +233,10 @@ export default function NewLineAccountPage() {
   )
 
   return (
-    <div data-design-node="b2NGxk" className="mx-auto w-full max-w-6xl pb-24">
+    <div data-design-node="b2NGxk" className="flex w-full flex-col gap-4 pb-24">
+      {/* ★V7: 登録専用の枠の幅いっぱいに広げる。中央寄せの狭い列にしない。 */}
       <div data-design="Head">
-        <div className="mb-4 flex justify-end"><Button href="/hq">統括コンソールへ戻る</Button></div>
+        <div className="flex justify-end"><Button href="/hq">統括コンソールへ戻る</Button></div>
         <PageHeader
           breadcrumb={[{ label: 'LINEアカウント', href: '/accounts' }, { label: '登録' }]}
           title="LINEアカウントを登録"
@@ -204,14 +249,14 @@ export default function NewLineAccountPage() {
         長かった。狭い画面では「いまの手順＋位置」だけを出し、全手順は
         開いて確認する形にする。640px 以上ではこれまでどおり5段で出す。
       */}
-      <nav data-design="Steps" aria-label="登録の進捗" className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+      <nav data-design="Steps" aria-label="登録の進捗" className="bg-canvas rounded-card border-hairline border p-4">
         <ol className="hidden gap-2 sm:grid sm:grid-cols-5">
           {WIZARD_STEPS.map((step) => {
             const active = currentStep === step.number
             const complete = currentStep > step.number || Boolean(createdId)
             return <li key={step.number} aria-current={active ? 'step' : undefined} className={`rounded-control border px-3 py-2 ${active ? 'border-action bg-action-soft' : 'border-hairline'}`}>
               <span className="text-ink-faint block text-xs">手順 {step.number} / 5</span>
-              <span className="text-ink mt-0.5 block text-xs font-bold">{step.label}{complete ? '（完了）' : ''}</span>
+              <span className="text-ink mt-0.5 block text-xs font-medium">{step.label}{complete ? '（完了）' : ''}</span>
             </li>
           })}
         </ol>
@@ -229,7 +274,7 @@ export default function NewLineAccountPage() {
               const complete = currentStep > step.number || Boolean(createdId)
               return <li key={step.number} aria-current={active ? 'step' : undefined} className={`rounded-control border px-3 py-2 ${active ? 'border-action bg-action-soft' : 'border-hairline'}`}>
                 <span className="text-ink-faint block text-xs">手順 {step.number} / 5</span>
-                <span className="text-ink mt-0.5 block text-xs font-bold">{step.label}{complete ? '（完了）' : ''}</span>
+                <span className="text-ink mt-0.5 block text-xs font-medium">{step.label}{complete ? '（完了）' : ''}</span>
               </li>
             })}
           </ol>
@@ -249,8 +294,8 @@ export default function NewLineAccountPage() {
               <fieldset>
                 <legend className="text-ink-secondary mb-2 text-xs font-medium">アカウントの用意方法</legend>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Choice checked={accountMethod === 'existing'} onChange={() => setAccountMethod('existing')} label="既存の公式アカウントを使う" />
-                  <Choice checked={accountMethod === 'new'} onChange={() => setAccountMethod('new')} label="新しく公式アカウントを作成" />
+                  <Choice checked={accountMethod === 'existing'} onChange={() => setAccountMethod('existing')} label="既存の公式アカウントを使う" value="existing" />
+                  <Choice checked={accountMethod === 'new'} onChange={() => setAccountMethod('new')} label="新しく公式アカウントを作成" value="new" />
                 </div>
               </fieldset>
               {accountMethod === 'new' && <div className="rounded-control border-hairline border p-4 text-sm">
@@ -285,9 +330,9 @@ export default function NewLineAccountPage() {
                     <StatusBadge tone={item.state === 'passed' ? 'success' : item.state === 'failed' ? 'warning' : 'neutral'}>{CHECK_STATE_LABEL[item.state]}</StatusBadge>
                   </li>)}
                 </ol>
-                {stopped && <p role="alert" className="bg-warning-bg text-warning rounded-control p-3 text-xs leading-relaxed">{stopped.message}</p>}
-                {connectionPassed && <p role="status" className="bg-success-bg text-success rounded-control p-3 text-xs">5段すべて通りました。保存できます。</p>}
-                <Button type="button" variant="primary" disabled={Boolean(busyAction)} onClick={() => void checkConnection()}>{busyAction === 'check' ? '接続して設定しています…' : '接続して設定する'}</Button>
+                {stopped && <Notice tone="warn" message={stopped.message} />}
+                {connectionPassed && <Notice tone="success" message="5段すべて通りました。保存できます。" />}
+                <Button type="button" variant="primary" disabled={Boolean(busyAction)} onClick={() => void checkConnection()} busy={busyAction === 'check'} busyLabel="接続して設定しています…">接続して設定する</Button>
               </SetupSection>
             </div>
             <aside className="space-y-4" aria-label="設定時の補足">
@@ -299,7 +344,7 @@ export default function NewLineAccountPage() {
 
           {currentStep === 5 && connection && <div data-design-node={importingIds ? 'VPh1U' : 't3Mlu'}>
             <SetupSection title="登録が完了しました" description="LINEアカウントの接続設定を自動で完了しました。">
-              {importingIds ? <p role="status" className="bg-action-soft text-action rounded-control p-4 text-sm">認証済みアカウントのため、既存の友だちを取り込んでいます（{importState?.received ?? 0}人 / 確認中）。取り込みが終わるまで、この画面でお待ちください。</p> : <p role="status" className="bg-success-bg text-success rounded-control p-4 text-sm">登録が完了しました</p>}
+              {importingIds ? <Notice tone="info">認証済みアカウントのため、既存の友だちを取り込んでいます（{importState?.received ?? 0}人 / 確認中）。取り込みが終わるまで、この画面でお待ちください。</Notice> : <Notice tone="success" message="登録が完了しました" />}
               <ReviewGroup title="LINEアカウント">
                 <ReviewRow label="表示名" value={`${connection.displayName ?? form.name}（LINEから取得）`} />
                 <ReviewRow label="LINE ID" value={connection.basicId ?? '取得できませんでした'} />
@@ -307,24 +352,38 @@ export default function NewLineAccountPage() {
                 <ReviewRow label="LIFF ID" value={`${connection.liffId ?? '—'}（自動作成）`} />
                 <ReviewRow label="既存の友だちの取り込み" value={connection.followerImport.capability === 'available' ? `${importState?.imported ?? 0}人` : '未認証のため、友だちは操作があった順に登録されます'} />
               </ReviewGroup>
-              {connection.pictureUrl && <Image src={connection.pictureUrl} alt="LINE公式アカウントのアイコン" width={64} height={64} unoptimized className="h-16 w-16 rounded-full object-cover" />}
+              {connection.pictureUrl && <Image src={connection.pictureUrl} alt="LINE公式アカウントのアイコン" width={64} height={64} unoptimized className="h-16 w-16 rounded-pill object-cover" />}
               {connection.remainingActions.length > 0 && <InfoSection title="残りの手作業"><ul className="space-y-2">{connection.remainingActions.map((item) => <li key={item}>{item}</li>)}</ul></InfoSection>}
             </SetupSection>
           </div>}
         </div>
 
-        {error && <p role="alert" aria-live="assertive" className="bg-danger-bg text-danger rounded-control mt-4 p-3 text-sm">{error}</p>}
+        {/*
+          R523: 登録済みを見つけたときは赤の失敗にせず、詳細への復帰と一緒に
+          黄の注意で出す（失敗の1枚はここだけ）。
+        */}
+        {recoveredAccountId ? (
+          <Notice
+            tone="warn"
+            message={error || '保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。'}
+            action={<Button href={`/accounts/detail?id=${encodeURIComponent(recoveredAccountId)}`}>登録したアカウントを見る</Button>}
+            onClose={() => { setError(''); setRecoveredAccountId('') }}
+            className="mt-4"
+          />
+        ) : error ? (
+          <Notice tone="danger" message={error} onClose={() => setError('')} className="mt-4" />
+        ) : null}
         <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
+        {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
         <div data-design="Actions">
           <StickyBar
-            className="mt-4"
             status={createdId ? (importingIds ? '既存の友だちを取り込んでいます' : '登録が完了しました') : busyAction === 'save' ? '接続して保存しています' : `手順 ${currentStep} / 5`}
             actions={createdId ? <>
               {importingIds ? <><Button type="button" disabled>登録したアカウントを見る</Button><Button type="button" variant="primary" disabled>統括コンソールへ</Button></> : <><Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button><Button href="/hq" variant="primary">統括コンソールへ</Button></>}
             </> : <>
-              <Button href="/accounts">やめる</Button>
+              <Button href="/accounts">キャンセル</Button>
               {currentStep > 1 && <Button type="button" disabled={Boolean(busyAction)} onClick={() => { setError(''); setCurrentStep((currentStep - 1) as StepNumber) }}>戻る</Button>}
-              <Button type="submit" variant="primary" disabled={Boolean(busyAction) || (currentStep === 4 && !connectionPassed)}>{currentStep === 4 ? busyAction === 'save' ? '接続して保存しています…' : '接続して保存' : '次へ'}</Button>
+              <Button type="submit" variant="primary" disabled={Boolean(busyAction) || (currentStep === 4 && !connectionPassed)} busy={currentStep === 4 && busyAction === 'save'} busyLabel="接続して保存しています…">{currentStep === 4 ? '接続して保存する' : '次へ'}</Button>
             </>}
           />
         </div>
@@ -359,8 +418,8 @@ function ManualLink({ anchor, label }: { anchor: 'm1' | 'm2' | 'm3'; label: stri
   return <a href={`/manuals/line-connect/index.html#${anchor}`} target="_blank" rel="noreferrer" className="text-action shrink-0 text-xs font-semibold hover:underline">{label}</a>
 }
 
-function Choice({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
-  return <label className="rounded-control border-hairline flex cursor-pointer items-center gap-3 border p-4 text-sm text-ink"><input type="radio" name="account-method" checked={checked} onChange={onChange} />{label}</label>
+function Choice({ checked, onChange, label, value }: { checked: boolean; onChange: () => void; label: string; value: string }) {
+  return <RadioCard name="account-method" value={value} checked={checked} onChange={onChange} title={label} />
 }
 
 function Field({ id, label, value, onChange, placeholder, required = false, type = 'text', inputMode, error }: { id: string; label: string; value: string; onChange: (value: string) => void; placeholder?: string; required?: boolean; type?: 'text' | 'password'; inputMode?: 'text' | 'numeric'; error?: string }) {

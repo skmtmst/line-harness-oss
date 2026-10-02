@@ -12,7 +12,7 @@
  * 入れるのは、V5画面の作り替えと同じPRでやるべきことで、この画面の
  * 設計寄せに混ぜると、関係のない227枚が一緒に動く。
  *
- * `shared/select-field.tsx` も同じ理由で使っていない。あちらは ★V5 `rpot9`
+ * 共通の選び欄（`shared/select.tsx`、★V5 `rpot9`）も同じ理由で使っていない
  * の高さ42が正本で、`v6-parts-contract.test.ts` が42で固定している。
  */
 
@@ -24,7 +24,10 @@
   gap: 10px;
 }
 
-/* 番号バッジ。26×26・丸・12px・700。 */
+/*
+ * 番号バッジ。26×26・丸・12px・700。
+ * 白数字が乗るので accent-deep（白字 5.44:1）。accent(#06c755) は 2.26:1 で読めない。
+ */
 .stepBadge {
   display: inline-flex;
   width: 26px;
@@ -33,10 +36,10 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-pill);
-  background: var(--color-accent);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 /* まだ決めていない段は色を落とす。押せない印ではなく、進みぐあいの印。 */
@@ -48,7 +51,7 @@
 .stepTitle {
   color: var(--color-ink);
   font-size: var(--text-lead);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .stepNote {
@@ -94,7 +97,7 @@
 .summaryText small {
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .summaryText strong {
@@ -133,7 +136,7 @@
 .eventCardTitle {
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .eventCardNote {
@@ -172,7 +175,7 @@
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .conditionAdd:disabled {
@@ -183,7 +186,7 @@
   margin-top: 12px;
   color: var(--color-status-info);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* カードの中のまとまり。設計は r8。 */
@@ -198,7 +201,7 @@
   display: block;
   color: var(--color-ink);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .note {
@@ -251,7 +254,7 @@
   border-radius: var(--radius-control); /* 設計 r8 */
   padding: 0 14px; /* 設計 padding [0,14] */
   font-size: var(--text-label); /* 設計 13 */
-  font-weight: 700; /* 設計 700 */
+  font-weight: 600; /* 設計 700 → V7 ボタンは600 */
   white-space: nowrap;
   cursor: pointer;
 }
@@ -266,15 +269,19 @@
   opacity: 0.4;
 }
 
+/*
+ * 主要操作は accent-deep＋白字（5.44:1）。accent は 2.26:1、
+ * hover 先の accent-hover(#05b34c) は 2.78:1 で読めないので、
+ * 押したときは共通 Button と同じく明るさだけ落とす。
+ */
 .actionPrimary {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
 }
 
 .actionPrimary:hover:not(:disabled) {
-  border-color: var(--color-accent-hover);
-  background: var(--color-accent-hover);
+  filter: brightness(0.92);
 }
 
 .actionSecondary {
@@ -305,7 +312,7 @@
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -342,14 +349,14 @@
 .sideTitle {
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* 未接続の枠。値の場所には `—` を置き、理由を続けて書く。 */
 .sideMissingValue {
   margin-top: 8px;
   color: var(--color-ink-faint);
-  font-size: var(--text-display);
+  font-size: var(--text-hero);
   font-weight: 700;
 }
 
@@ -362,7 +369,7 @@
 }
 
 .error {
-  color: var(--color-status-danger);
+  color: var(--color-danger);
   font-size: var(--text-label);
   font-weight: 600;
 }
@@ -399,7 +406,7 @@
 .rowName {
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .field {

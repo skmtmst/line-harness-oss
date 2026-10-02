@@ -35,6 +35,24 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
 }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の集計の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 function installFetch() {
   vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : String(input)
@@ -387,7 +405,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
       .map((input) => input.value)
     expect(stepInputs).toContain('案内')
     expect(stepInputs).toContain('form-1')
-    expect(host.textContent).toContain('新版として保存')
+    expect(host.textContent).toContain('新版として保存する')
 
     await act(async () => { type('fn-name', '申込導線（改訂）'); await Promise.resolve() })
     net.handler = (async (path: string, init?: RequestInit) => {
@@ -401,7 +419,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
       }
       return funnelHandler([FUNNEL_ACTIVE])(path)
     }) as typeof net.handler
-    await click('新版として保存')
+    await click('新版として保存する')
     const request = net.calls.find((call) => call.path.includes('/versions?'))
     expect(request).toBeDefined()
     expect(request!.path).toContain('/api/analytics/funnels/funnel-1/versions')
@@ -491,7 +509,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
 
     await click('定義を編集')
     await act(async () => { await Promise.resolve() })
-    await click('新版として保存')
+    await click('新版として保存する')
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
     expect(host.textContent).toContain('他の人が先に変更しています')
   })
@@ -528,7 +546,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
       }
       return funnelHandler([FUNNEL_ACTIVE], detail)(path)
     }) as typeof net.handler
-    await click('新版として保存')
+    await click('新版として保存する')
 
     expect(sent).not.toBeNull()
     expect(sent!.segment).toEqual({ kind: 'tag', tagId: 'tag-vip' })

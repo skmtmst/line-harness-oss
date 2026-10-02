@@ -1,19 +1,26 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2, X } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
+import ListToolbar from '@/components/shared/list-toolbar'
+import MultiSelect from '@/components/shared/multi-select'
+import { RowActions } from '@/components/shared/row-actions'
+import Disclosure from '@/components/shared/disclosure'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import FriendFieldList from './field-list'
 import SupportMarkList from './mark-list'
@@ -25,6 +32,7 @@ import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import type { FeatureKey } from '@/lib/feature-settings'
 import { isCurrentTagListRequest, type TagListRequestKey } from './tag-list-state'
+import { formatDay, formatNumber } from '@/lib/format'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -43,7 +51,10 @@ const TAB_FEATURE: Partial<Record<TabKey, FeatureKey>> = {
   marks: 'support_marks',
   searches: 'saved_searches',
 }
-const UNGROUPED = '__ungrouped__'
+export const UNGROUPED = '__ungrouped__'
+
+/** 色未設定のフォルダに出す中性の点の色（V8側と共用するため1か所に置く）。 */
+export const FOLDER_FALLBACK_COLOR = '#8b938d'
 
 /**
  * 一覧に中身を出せるかどうか。
@@ -59,7 +70,7 @@ type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 /* ---- 4-1 の表のための小物。設計 `HrwyW` の値をそのまま持つ ---- */
 
 /** 並び替えのつまみ。設計 `DaXeY`（lucide grip-vertical・16px・hairline）。 */
-function GripIcon() {
+export function GripIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="inline-block">
       <circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" />
@@ -70,7 +81,7 @@ function GripIcon() {
 }
 
 /** 一覧表示の★。設計 `zMlMX`（lucide star・16px）。 */
-function StarIcon({ filled }: { filled: boolean }) {
+export function StarIcon({ filled }: { filled: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
       <path d="m12 3 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9z" />
@@ -89,42 +100,6 @@ function TrashIcon() {
   )
 }
 
-/**
- * フォルダの選び直し。設計 `SgpDb` は「色の丸 ＋ 名前 ＋ ▾」の小さな札で、
- * 素の `select` ではない。見た目は札が持ち、操作と読み上げは `select` が持つ。
- */
-function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; groups: TagGroup[]; onItemsChange: (update: (current: Tag[]) => Tag[]) => void; onError: (message: string) => void }) {
-  const group = groups.find((item) => item.id === tag.groupId)
-  return (
-    <span className="relative inline-flex h-7 items-center gap-1.5 rounded-mini border border-hairline bg-canvas px-2">
-      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#c3c8c4' }} />
-      <span className="truncate text-caption font-semibold text-ink">{group?.name ?? '未分類'}</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-ink-faint"><path d="m6 9 6 6 6-6" /></svg>
-      <select
-        aria-label={`${tag.name} のフォルダ`}
-        value={tag.groupId ?? ''}
-        onChange={async (event) => {
-          const groupId = event.target.value || null
-          try {
-            const result = await api.tags.setGroup(tag.id, groupId)
-            if (!result.success) throw new Error(result.error)
-            /* 成功は手元だけ直す。withCounts 付き全件の取り直しは要らない。 */
-            onItemsChange((current) => current.map((item) => item.id === tag.id ? { ...item, groupId } : item))
-          } catch (reason) {
-            /* 失敗は再読込で隠さず、理由を出す。 */
-            onError(reason instanceof ApiError ? reason.message : 'フォルダを変更できませんでした')
-          }
-        }}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-      >
-        <option value="">未分類</option>
-        {groups
-          .filter((item) => item.accountId === tag.lineAccountId)
-          .map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </select>
-    </span>
-  )
-}
 
 /**
  * 連動の札。設計 `B9QCB3`（緑）／`IoiWQ`（黄）／`Ws7fo`（灰）。
@@ -135,15 +110,15 @@ function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; group
  */
 function linkChips(tag: Tag): Array<{ label: string; tone: string }> {
   const chips: Array<{ label: string; tone: string }> = []
-  if (tag.mileageReward) chips.push({ label: `本人+${tag.mileageReward}`, tone: 'bg-accent-soft text-accent' })
-  if (tag.referralMileageReward) chips.push({ label: `紹介+${tag.referralMileageReward}`, tone: 'bg-accent-soft text-accent' })
+  if (tag.mileageReward) chips.push({ label: `本人+${tag.mileageReward}`, tone: 'bg-accent-soft text-accent-deep' })
+  if (tag.referralMileageReward) chips.push({ label: `紹介+${tag.referralMileageReward}`, tone: 'bg-accent-soft text-accent-deep' })
   if (tag.mileageMultiplierBps) chips.push({ label: `${tag.mileageMultiplierBps / 10000}倍`, tone: 'bg-status-warn-soft text-status-warn-deep' })
   if (tag.otherActionCount) chips.push({ label: `他${tag.otherActionCount}`, tone: 'bg-canvas-sunken text-ink-faint' })
   return chips
 }
 
 /** 設計 `tuisA` ほかの6種。サーバーの `assignSource` と1対1。 */
-const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
+export const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
   ec: 'EC連携',
   line_login: 'LINE Login',
   form: '回答フォーム',
@@ -160,7 +135,7 @@ const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
  * 残っていないため、一般のタグを manual と推測しない）。
  * ここで「手動」と埋めると、断定できなかったものを断定したことになる。
  */
-function sourceLabel(tag: Tag): string {
+export function sourceLabel(tag: Tag): string {
   return tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—'
 }
 
@@ -185,7 +160,7 @@ const USAGE_LABELS: Array<[keyof NonNullable<Tag['usedIn']>, string]> = [
  * 友だち200人・参照0件のタグをここで「未使用」と書くと、絞り込みやKPIの
  * 「未使用」と別の意味になる。同じ画面で1つの言葉に2つの意味を持たせない。
  */
-function usageLabel(tag: Tag): string {
+export function usageLabel(tag: Tag): string {
   if (!tag.usedIn) return 'なし'
   const parts = USAGE_LABELS
     .map(([key, label]) => (tag.usedIn?.[key] ? `${label}${tag.usedIn[key]}` : null))
@@ -211,7 +186,7 @@ function usageLabel(tag: Tag): string {
  * `cleanupReasons` は `withCounts=1` のとき**理由が無くても `[]` で必ず返す**
  * 約束（`docs/v6-4-1-handoff.md` §0-1）。省略＝未取得。
  */
-function cleanupKnown(items: Tag[], ready: boolean): boolean {
+export function cleanupKnown(items: Tag[], ready: boolean): boolean {
   // 読み込み中の空配列と、取得済みの0件を区別する。後者は `0件` と出せる。
   return ready && items.every((tag) => Array.isArray(tag.cleanupReasons))
 }
@@ -225,13 +200,13 @@ function cleanupKnown(items: Tag[], ready: boolean): boolean {
  * サーバーが `cleanupReasons` を返しているならそれに従う。**画面とサーバーで
  * 別々に数えない**（別々に数えると、同じ画面のKPIと絞り込みで数が食い違う）。
  */
-function isUnused(tag: Tag): boolean {
+export function isUnused(tag: Tag): boolean {
   if (Array.isArray(tag.cleanupReasons)) return tag.cleanupReasons.includes('unused')
   return !tag.usedIn && (tag.friendCount ?? 0) === 0
 }
 
 /** 連動が1つでもあるか。「連動あり」の絞り込みと削除の確認で使う。 */
-function hasLinkedActions(tag: Tag): boolean {
+export function hasLinkedActions(tag: Tag): boolean {
   return Boolean(tag.mileageReward || tag.referralMileageReward || tag.mileageMultiplierBps || tag.otherActionCount)
 }
 
@@ -241,17 +216,21 @@ function hasLinkedActions(tag: Tag): boolean {
  * サーバーは UTC の ISO で返す。日本時間で数えないと、月初と月末の
  * 9時間ぶんがずれる（8/1 の朝に作ったタグが7月扱いになる）。
  */
-function isThisMonth(value: string): boolean {
+export function isThisMonth(value: string): boolean {
   const month = (d: Date) =>
-    new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit' }).format(d)
+    formatDay(d)
   return month(new Date(value)) === month(new Date())
 }
 
-/** 登録日。設計は `2026/01/11`（0埋め）。 */
-function formatDate(value: string): string {
+/**
+ * 登録日。設計は `2026/01/11`（0埋め）。
+ * getFullYear 系は端末の地域で読むので、日本より遅い地域で開くと
+ * 登録日が前日にずれる。ほかの一覧と同じく JST 固定で出す（#640 D-3）。
+ */
+export function formatDate(value: string): string {
   const d = new Date(value)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())}`
+  if (Number.isNaN(d.getTime())) return value
+  return formatDay(d)
 }
 
 /**
@@ -260,7 +239,7 @@ function formatDate(value: string): string {
  * 2026-08-26 まで3つしか無く、しかも「今月増えた」は絞り込みの中に
  * 対応する枝が無くて**押しても何も起きなかった**。
  */
-const QUICK_FILTERS: Array<[string, string]> = [
+export const QUICK_FILTERS: Array<[string, string]> = [
   ['unused', '未使用のタグ'],
   ['recent', '今月増えたタグ'],
   ['auto', '自動付与あり'],
@@ -268,13 +247,13 @@ const QUICK_FILTERS: Array<[string, string]> = [
   ['starred', '★のみ表示'],
 ]
 
-const cardShadow = '[box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]'
+const cardShadow = 'shadow-card'
 
 export const FRIEND_ATTRIBUTES_QA_GROUPS: TagGroup[] = [
-  { id: 'qa-vip', accountId: null, name: 'VIP', sortOrder: 0, color: '#F59E0B', createdAt: '', updatedAt: '' },
-  { id: 'qa-pet', accountId: null, name: 'ペット', sortOrder: 1, color: '#EC4899', createdAt: '', updatedAt: '' },
-  { id: 'qa-member', accountId: null, name: '会員', sortOrder: 2, color: '#10B981', createdAt: '', updatedAt: '' },
-  { id: 'qa-purchase', accountId: null, name: '購入', sortOrder: 3, color: '#3B82F6', createdAt: '', updatedAt: '' },
+  { id: 'qa-vip', accountId: null, name: 'VIP', sortOrder: 0, color: 'var(--color-status-warn-deep)', createdAt: '', updatedAt: '' },
+  { id: 'qa-pet', accountId: null, name: 'ペット', sortOrder: 1, color: 'var(--color-status-danger)', createdAt: '', updatedAt: '' },
+  { id: 'qa-member', accountId: null, name: '会員', sortOrder: 2, color: 'var(--color-accent)', createdAt: '', updatedAt: '' },
+  { id: 'qa-purchase', accountId: null, name: '購入', sortOrder: 3, color: 'var(--color-status-info)', createdAt: '', updatedAt: '' },
 ]
 
 export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
@@ -287,7 +266,7 @@ export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
 ].map(([name, groupId, friendCount, mileageReward, referralMileageReward, mileageMultiplierBps], index) => ({
   id: `qa-${index}`,
   name: String(name),
-  color: '#8b938d',
+  color: 'var(--color-ink-faint)',
   groupId: String(groupId),
   friendCount: Number(friendCount),
   mileageReward: Number(mileageReward),
@@ -305,9 +284,14 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
   const [menuError, setMenuError] = useState('')
   const [deleteGroup, setDeleteGroup] = useState<TagGroup | null>(null)
   const rows = [
-    { id: '', name: 'すべて', count: items.length, color: '#06c755' },
-    ...groups.map((group) => ({ id: group.id, name: group.name, count: items.filter((tag) => tag.groupId === group.id).length, color: group.color ?? '#8b938d' })),
-    { id: UNGROUPED, name: '未分類', count: items.filter((tag) => !tag.groupId).length, color: '#c3c8c4' },
+    /*
+     * 「すべて」の中身は一覧の総数と同じ数。フォルダの内訳（各フォルダ・
+     * 未分類の数）だけを出し、総数は一覧の上の「1–20 / N件」だけにする
+     * （同じ数を重ねて出さない。#946 の「絞り込み後の件数は一覧の側」）。
+     */
+    { id: '', name: 'すべて', count: null, color: 'var(--color-accent)' },
+    ...groups.map((group) => ({ id: group.id, name: group.name, count: items.filter((tag) => tag.groupId === group.id).length as number | null, color: group.color ?? FOLDER_FALLBACK_COLOR })),
+    { id: UNGROUPED, name: '未分類', count: items.filter((tag) => !tag.groupId).length as number | null, color: 'var(--color-ink-disabled)' },
   ]
   const move = async (group: TagGroup, direction: -1 | 1) => {
     const index = groups.findIndex((item) => item.id === group.id)
@@ -345,11 +329,11 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
   }
   return (
     <aside className={`h-fit rounded-card border border-hairline bg-canvas ${cardShadow}`}>
-      <div className="flex items-center justify-between border-b border-hairline px-4 py-3"><h2 className="text-sm font-bold text-ink">フォルダ</h2><span className="text-xs text-ink-faint">{countsKnown ? `${items.length}件` : '—'}</span></div>
+      <div className="flex items-center justify-between border-b border-hairline px-4 py-3"><h2 className="text-sm font-bold text-ink">フォルダ</h2>{/* 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。 */}</div>
       <nav className="p-2">{rows.map((row) => {
         const group = groups.find((item) => item.id === row.id)
         const groupIndex = group ? groups.findIndex((item) => item.id === group.id) : -1
-        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate">{row.name}</span><span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span></button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
+        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-medium text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-pill" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span>{row.count !== null ? <span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span> : null}</button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible focus-visible:visible max-xl:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
           { id: 'rename', label: '名前を変更', icon: <Pencil size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'color', label: '色を変える', icon: <Palette size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'up', label: '並び順を上へ', icon: <ArrowUp size={15} />, disabled: busy || groupIndex === 0, onSelect: () => void move(group, -1) },
@@ -357,7 +341,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
           { id: 'delete', label: 'フォルダを削除', icon: <Trash2 size={15} />, tone: 'danger', dividerBefore: true, disabled: busy, onSelect: () => setDeleteGroup(group) },
         ]} /> : null}</div>
       })}</nav>
-      {menuError ? <Notice className="mx-2 mb-2" tone="error" message={menuError} onClose={() => setMenuError('')} /> : null}
+      {menuError ? <Notice className="mx-2 mb-2" tone="danger" message={menuError} onClose={() => setMenuError('')} /> : null}
       {/*
         母集団の説明（#981 A04-02）。件数は一覧と同じものを数える：
         選択中アカウントのタグで、保管済み（archived）も含む。
@@ -369,7 +353,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
         open={Boolean(deleteGroup)}
         title={deleteGroup ? `「${deleteGroup.name}」を削除しますか？` : 'フォルダを削除しますか？'}
         description="削除しても、中のタグは未分類に残ります。この操作は元に戻せません。"
-        confirmLabel="フォルダを削除"
+        confirmLabel="フォルダを削除する"
         destructive
         busy={busy}
         onCancel={() => setDeleteGroup(null)}
@@ -449,7 +433,7 @@ function deleteImpactRows(
     {
       name: '付与人数',
       // 人数はサーバーが数え直したものを使う。取れなければ一覧の値。
-      value: `${(impact?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人`,
+      value: `${formatNumber((impact?.friendCount ?? tag.friendCount ?? 0))}人`,
       result: 'タグが外れます',
     },
     { name: '参照先', value: refs ? manualRefSummary(refs) : '—', result: '絞り込み条件から外れます' },
@@ -471,7 +455,7 @@ function deleteImpactRows(
   return rows
 }
 
-function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; accountId: string | null; onCancel: () => void; onArchived: (notice?: string) => void }) {
+export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; accountId: string | null; onCancel: () => void; onArchived: (notice?: string) => void }) {
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -508,6 +492,8 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
     自前で組むと毎回どれかが抜ける。実際、背景が裏で動いていた。
   */
   const dialogRef = useOverlayFocus(true, onCancel, false)
+  /* R138: 確認窓の名前として見出しを読ませる（共通 Dialog と同じ作法）。 */
+  const titleId = useId()
 
   const blocked = impactStatus !== 'ready' || !impact || !accountId || saving
   const blockedReason = impactStatus === 'loading'
@@ -518,15 +504,19 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
 
   return (
     <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
-      <section className="w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+      <section className="relative w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-overlay" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
+        <button type="button" onClick={onCancel} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+          <X aria-hidden="true" className="h-5 w-5" />
+        </button>
         <div>
           {/* 設計 `iTwNX`/`lUbvQ`。赤いゴミ箱を22pxで見出しの左に置く。 */}
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-danger-bg text-danger">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill bg-danger-bg text-danger">
             <TrashIcon />
           </span>
           <div className="mt-5 min-w-0">
-            <h2 className="text-xl font-bold text-ink">「{tag.name}」を削除しますか？</h2>
-            <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。</p>
+            {/* R190: 実行するのは保管（アーカイブ）。削除と書くと消えたように読める。 */}
+            <h2 id={titleId} className="text-xl font-bold text-ink">「{tag.name}」を保管しますか？</h2>
+            <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。保管すると友だちから外れ、一覧には「保管済み」として残ります。元に戻せません。</p>
           </div>
         </div>
 
@@ -545,9 +535,9 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
         {impactStatus === 'ready' && impact && !impact.canDelete && (
           <div data-qa="tag-delete-blocked-warning" className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-2 text-sm text-danger">
             {impact.referenceCounts.affiliateOffers > 0 ? (
-              <><p className="font-bold">アフィリエイトのオファーで使用中のタグは削除できません</p><p className="mt-1">その場合は、先にオファー側の設定からこのタグを外してください。削除しても、過去のマイル履歴と配信ログは残ります。</p></>
+              <><p className="font-bold">アフィリエイトのオファーで使用中のタグは保管できません</p><p className="mt-1">その場合は、先にオファー側の設定からこのタグを外してください。保管しても、過去のマイル履歴と配信ログは残ります。</p></>
             ) : (
-              <><p className="font-bold">有効な参照があるタグは、完全に削除できません</p><p className="mt-1">参照中の設定を確認してから操作してください。過去のマイル履歴と配信ログは残ります。</p></>
+              <><p className="font-bold">有効な参照があるタグは保管できません</p><p className="mt-1">参照中の設定を確認してから操作してください。過去のマイル履歴と配信ログは残ります。</p></>
             )}
           </div>
         )}
@@ -555,17 +545,14 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
         {/* 設計 `seGRS`。 */}
         <label className="mt-4 block">
           <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため、タグ名を入力してください</span>
-          <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-danger disabled:bg-canvas-sunken" />
+          <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" />
         </label>
-        {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを削除する」。 */}
+        {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを保管する」。 */}
         <div className="mt-5 flex items-center justify-end gap-3">
           {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
-          <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
+          <Button variant="secondary" className="shrink-0 px-4 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onCancel}>キャンセル</Button>
           {saveError ? <p role="alert" className="min-w-0 flex-1 text-xs text-danger">{saveError}</p> : null}
-          <button
-            type="button"
-            disabled={blocked || text !== tag.name}
-            onClick={async () => {
+          <Button variant="danger" className="shrink-0 px-4 py-2.5 font-bold border-0 h-auto whitespace-normal" type="button" disabled={blocked || text !== tag.name} onClick={async () => {
               if (!impact || !accountId) return
               setSaving(true); setSaveError('')
               try {
@@ -582,15 +569,13 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
                  * 起きたか分からない」に見える（#708 の裁定）。
                  */
                 if (reason instanceof ApiError && reason.code === 'already_archived') {
-                  onArchived('このタグはすでに整理されています。')
+                  onArchived('このタグはすでに保管済みです。')
                   return
                 }
-                setSaveError('アーカイブできませんでした。影響を読み直して、もう一度お試しください。')
+                setSaveError('保管できませんでした。影響を読み直して、もう一度お試しください。')
                 setSaving(false)
               }
-            }}
-            className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40"
-          >{saving ? '削除中…' : 'このタグを削除する'}</button>
+            }}>{saving ? '保管中…' : 'このタグを保管する'}</Button>
         </div>
       </section>
     </div>
@@ -613,7 +598,8 @@ export default function TagsPageV4({
   const [items, setItems] = useState<Tag[]>(fixture?.items ?? [])
   const [groups, setGroups] = useState<TagGroup[]>(fixture?.groups ?? [])
   const [status, setStatus] = useState<LoadStatus>(fixture ? 'ready' : 'loading')
-  // 操作の失敗（並び替え・★・フォルダ）。**読み込みの失敗とは別物**なので混ぜない。
+  // 操作の失敗（並び替え・★）。**読み込みの失敗とは別物**なので混ぜない。
+  // フォルダの変更は一覧では行わない（編集画面の「所属フォルダ」で行う）。
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [folder, setFolder] = useState('')
@@ -628,8 +614,7 @@ export default function TagsPageV4({
   const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
-  /** 「すでに整理済み」など、失敗ではない結果を出すための通知。 */
-  const [notice, setNotice] = useState('')
+  /** 「すでに整理済み」など、失敗ではない結果は Toast（右下・4秒）へ送る。 */
   const [csvOpen, setCsvOpen] = useState(false)
   const loadRequestRef = useRef<TagListRequestKey>({ accountId, generation: 0 })
 
@@ -797,7 +782,7 @@ export default function TagsPageV4({
     } catch (reason) {
       /* 失敗は元に戻して理由を出し、取り直す。黙って上書きしない。 */
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))
-      setError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました')
+      setError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。')
       void load()
     }
   }
@@ -826,20 +811,17 @@ export default function TagsPageV4({
         }))}
         actions={currentTabBlocked ? undefined : tab === 'tags' && status !== 'forbidden' ? (
           /*
-            設計 `Sn86o` はここに CSV。「＋ タグを追加」は ATTR-22 で
-            他のタブと同じくタブ行の右端へ寄せた（`HWP5R` との2箇所を
-            やめ、主要作成はどのタブでも同じ位置・同じ見た目にする）。
+            設計 `Sn86o` はここに CSV。普段使う「＋ タグを作る」は
+            一覧のすぐ上の左の並び（「フォルダを追加」の横）へ移した。
+            タブ行の右端には、たまにしか使わない CSV だけを残す。
             `H374MR` から確認 `sfTEW`、完了 `op1rh`、一部失敗 `QzRsJ`
             まで同じ操作の中で進む。
           */
-          <span className="flex items-center gap-2">
-            <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
-            <Button href="/tags/new" variant="primary">＋ タグを追加</Button>
-          </span>
+          <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録する</Button>
         ) : tab === 'marks' ? (
-          <Button href="/tags/marks/new" variant="primary">＋ マークを追加</Button>
+          <Button href="/tags/marks/new" variant="primary">＋ マークを作る</Button>
         ) : tab === 'fields' ? (
-          <Button href="/tags/fields/new" variant="primary">＋ 項目を追加</Button>
+          <Button href="/tags/fields/new" variant="primary">＋ 項目を作る</Button>
         ) : tab === 'searches' ? (
           /* 検索の作成は友だち一覧の絞り込みから保存する（#1014 ATTR-23）。 */
           <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button>
@@ -886,20 +868,20 @@ export default function TagsPageV4({
           // #981 A04-02: 一覧・フォルダ帯と同じアカウント範囲で数える
           // （シナリオの NEXT-26 と同じ）。未選択＝全アカウント表示は未指定。
           accountId={accountId ?? undefined}
-          titles={['タグ数', '付与済み友だち', '今月の付与', '整理候補']}
+          titles={['未使用', '付与済み友だち', '今月の付与', '整理候補']}
           build={(stats) => [
             {
-              title: 'タグ数',
+              title: '未使用',
               /*
-               * `stats.tags.total` はテナント全体の件数で、選択中の
-               * アカウント範囲を見ない（/api/list-stats の tags.total は
-               * スコープ無しの COUNT(*)）。フォルダ帯の「すべて」と同じ
-               * 母集団にそろえるため、一覧そのものの件数を使う（#981）。
-               * 未取得は `—`、0件は `0件`。
+               * タグの総数は一覧の上の「1–20 / N件」だけに出す。ここに
+               * 「タグ数 101件」を並べると同じ数が1画面に重なっていた。
+               * 空いた枠は、総数の内訳として出していた「未使用」の数へ。
+               * （`stats.tags.unused` は使わない。絞り込み・使用先と同じ
+               * 数え方に寄せる。未取得は `—`、0件は `0件`。）
                */
-              value: ready ? items.length : null,
+              value: unusedCount,
               unit: '件',
-              detail: `未使用 ${unusedCount === null ? '—' : `${unusedCount}件`}`,
+              detail: '友だち0人・参照0件',
             },
             { title: '付与済み友だち', value: stats.tags.taggedFriends, unit: '人', detail: '1つ以上付与' },
             { title: '今月の付与', value: stats.tags.assignedThisMonth, unit: '回', detail: '手動・自動' },
@@ -914,13 +896,13 @@ export default function TagsPageV4({
           何が足りないのかが分からないまま拒まれることになる。
         */}
         {status === 'forbidden' ? null : (
-          <div className="mb-4 flex items-center gap-2">
-            <Button href="/tags/folders/new">フォルダを追加</Button>
-            {/* 「＋ タグを追加」はタブ行の右端へ移動した（#1014 ATTR-22）。 */}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <Button href="/tags/folders/new">フォルダを追加する</Button>
+            {/* 作る操作は一覧のすぐ上の左の並びにまとめる。右上には置かない。 */}
+            <Button href="/tags/new" variant="primary">＋ タグを作る</Button>
           </div>
         )}
-        {notice && <Notice className="mb-4" tone="success" message={notice} onClose={() => setNotice('')} />}
-        {error && <p className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
+        {error && <Notice className="mb-4" tone="danger" message={error} />}
         {/* 設計 `HrwyW` は gap 14、フォルダは 240 固定（`DgeL8`）。 */}
         <div className="grid min-w-0 gap-[14px] xl:grid-cols-[240px_minmax(0,1fr)]">
           {/*
@@ -928,52 +910,78 @@ export default function TagsPageV4({
             同じ絞り込みをセレクトで受け、帯は「開く」まで畳んでおく。
           */}
           <div className="xl:hidden">
-            <select
+            <Select
               aria-label="フォルダで絞る"
               value={folder}
-              onChange={(event) => setFolder(event.target.value)}
-              className="v6-select h-10 w-full rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"
-            >
-              <option value="">フォルダ：すべて（{ready ? items.length : '—'}件）</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>{group.name}</option>
-              ))}
-              <option value={UNGROUPED}>未分類</option>
-            </select>
+              onChange={setFolder}
+              options={[
+                // 「すべて」の後ろの総数は一覧の件数と同じもの。一覧の上の
+                // 「1–20 / N件」だけに出し、ここでは重ねない（#946）。
+                { value: '', label: 'フォルダ：すべて' },
+                ...groups.map((group) => ({ value: group.id, label: group.name })),
+                { value: UNGROUPED, label: '未分類' },
+              ]}
+              size="full"
+            />
+            {/*
+              R165: 1280px未満でもフォルダの名前変更・色・削除へ到達できる。
+              以前は操作のある帯が非表示で開く口も無く、作ったフォルダを
+              直せなかった。絞り込みは上のセレクトのまま、同じ管理操作を
+              開閉できる帯で出す（中身は PC と同じ `FolderList`）。
+            */}
+            <Disclosure title="フォルダを管理" hint={ready ? `${groups.length}件` : '—'} size="compact" className="mt-2">
+              <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
+            </Disclosure>
           </div>
           <div className="hidden xl:block">
             <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
           </div>
-          <main className="min-w-0">
+          <section className="min-w-0">
             {/*
-              検索・選択は最長の表示内容と矢印余白を確保し、残る幅は検索欄へ渡す。
-              狭いときだけ折り返し、文字と矢印を重ねない。
+              ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+              右端に表示件数。狭いときだけ折り返す。
             */}
-            <div className="mb-[10px] flex flex-wrap items-center gap-2">
-              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="h-10 min-w-45 flex-1 rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent" />
-              <select value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select>
-              <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select h-10 min-w-38 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">付与元：すべて</option>{Object.entries(SOURCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select ml-auto h-10 min-w-32 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select>
-              <span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
-            </div>
-            {/* 設計 `UOmne`。**5つ。押した数だけ重ねて絞る。** */}
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-ink-faint">よく使う</span>
-              {QUICK_FILTERS.map(([key, label]) => {
-                const on = quick.includes(key)
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => setQuick((current) => on ? current.filter((k) => k !== key) : [...current, key])}
-                    className={`rounded-pill border px-3 py-1.5 ${on ? 'border-accent bg-accent-soft text-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}
-                  >
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
+            <ListToolbar
+              search={{ placeholder: 'タグ名・用途で検索', value: query, onChange: setQuery }}
+              filters={
+                <>
+                  {/* 素の select は置かない（#640）。選び口は共通 Select。幅は部品の既定（176px）。 */}
+                  <Select aria-label="使用状態で絞り込む" value={usageFilter} onChange={setUsageFilter} options={[{ value: 'all', label: '使用状態：すべて' }, { value: 'linked', label: '連動あり' }, { value: 'unused', label: '未使用' }]} />
+                  <Select aria-label="付与元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={[{ value: 'all', label: '付与元：すべて' }, ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label }))]} />
+                  {/*
+                    設計 `UOmne` の「よく使う」5つ。**重ねて絞れるのは変えない。**
+                    札を6つ並べると1440pxでも絞り込みが2行になり、件数が
+                    3行目へ落ちていた。1つの選び口（共通 MultiSelect）にまとめ、
+                    2行目を1行に収める。開いたまま重ねて選べ、「N件選択中」と
+                    「すべて外す」は部品が持つ。
+                  */}
+                  <span className="w-44 shrink-0">
+                    <MultiSelect
+                      aria-label="よく使う絞り込み"
+                      className="w-full"
+                      maxChips={1}
+                      onChange={setQuick}
+                      options={QUICK_FILTERS.map(([value, label]) => ({ value, label }))}
+                      placeholder="よく使う"
+                      values={quick}
+                    />
+                  </span>
+                  {/*
+                    件数と表示件数は絞り込みと同じ折り返しの流れの末尾に置く
+                    （m21o）。`trailing` の別枠にすると、絞り込みがあふれた幅
+                    （1440px・1152px）で件数だけの行ができてしまう。末尾の
+                    `ml-auto` で行の右端へ寄せ、札と行を共にする。選ぶ欄は
+                    ほかの欄と同じく幅96・短い文字（`20件`）にそろえる。
+                  */}
+                  <span className="ml-auto flex shrink-0 items-center gap-2">
+                    <span className="w-24">
+                      <Select aria-label="表示件数" className="w-full" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={[20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件` }))} size="page-size" />
+                    </span>
+                    <span className="whitespace-nowrap text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
+                  </span>
+                </>
+              }
+            />
             {/*
               中身が詰まったら**表だけ**横スクロールさせる。
               画面ごと横に伸ばすと、共通ルール §1-8 の「1440でも横スクロールを
@@ -985,22 +993,40 @@ export default function TagsPageV4({
                 「登録日」はタグ名の下へ折り畳み、列を1つ減らす。
                 狭い画面では表だけが横に逃げる（情報を落とさないための例外）。
               */}
-              <div className="overflow-x-auto">
-              {/* 960px以上は表。それ未満は縦に重ねたカードへ（#1014 ATTR-20）。 */}
-              <table className="hidden w-full min-w-[880px] table-fixed text-sm md:table">
-                {/* 設計 `HrwyW` の見出し。「表示」は★、「操作」はゴミ箱だけ。 */}
-                <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
-                  <tr>
-                    <th className="w-9 px-2 py-3" />
-                    <th className="w-[22%] px-3 py-3 text-left">タグ</th>
-                    <th className="w-[11%] px-3 py-3 text-left">フォルダ</th>
-                    <th className="w-[7%] px-3 py-3 text-left">付与人数</th>
-                    <th className="w-[11%] px-3 py-3 text-left">自動付与のもと</th>
-                    <th className="w-[19%] px-3 py-3 text-left">連動（マイル・アクション）</th>
-                    <th className="px-3 py-3 text-left">使用先</th>
-                    <th className="w-[6%] px-3 py-3 text-left">表示</th>
-                    <th className="w-[6%] px-3 py-3 text-left">操作</th>
-                  </tr>
+              {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「付け方」を畳む。
+                  「付け方」は行の操作ではない補助情報で、編集画面で読める。 */}
+              <div className="hidden overflow-x-auto @container md:block">
+              {/*
+                960px以上は表。それ未満は縦に重ねたカードへ（#1014 ATTR-20）。
+                #636: 最小幅は 880→800px。1440pxではフォルダ欄を引いた表の
+                実幅が833pxしかなく、880pxを指定すると47pxの横スクロールが
+                常時出ていた。800pxなら1440pxに収まり、それより狭い幅では
+                従来どおり表の内側だけが横へ動く。
+              */}
+              <DataTable>
+                {/* 設計 `HrwyW` の見出し。「表示」は★。 */}
+                <thead>
+                  <TableHeadRow>
+                    {/*
+                      列幅の取り直し（m21o Second）。固定幅の合計 308px＋
+                      割合54%にし、残りは「使用先」が吸う（auto）。割合だけの
+                      取り方だと固定2列（44＋64）が枠に上乗せされ、1440pxで
+                      44pxの横送りが出ていた。操作列は中身（編集＋…）に合わせ
+                      128pxへ広げる（枠付きボタンのため64pxでは切れる）。
+                      短い列は固定にして詰め、使用先は狭めても title で読める。
+                    */}
+                    <Th style={{ width: 44 }}><span className="sr-only">並び替え</span></Th>
+                    <Th style={{ width: '20%' }}>タグ</Th>
+                    <Th style={{ width: '10%' }}>フォルダ</Th>
+                    <Th style={{ width: 80 }} className="whitespace-nowrap">人数</Th>
+                    <Th style={{ width: '11%' }} className="cq-hide-below-830 whitespace-nowrap">付け方</Th>
+                    <Th style={{ width: '13%' }} className="whitespace-nowrap" title="マイル・アクションとの連動">連動</Th>
+                    <Th>使用先</Th>
+                    <Th style={{ width: 56 }}>表示</Th>
+                    {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
+                    {/* 見出し「操作」は2文字で1行に収める（w-11 では「操／作」と折れる）。操作列は中身（編集＋…）に合わせ128px（m21o・m22bで64pxのはみ出しを解消）。 */}
+                    <Th style={{ width: 128 }} className="sticky right-0 whitespace-nowrap bg-canvas-sunken">操作</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-hairline">
                   {/*
@@ -1017,7 +1043,7 @@ export default function TagsPageV4({
                     <tr><td colSpan={9} className="p-0"><ListState kind="error" description="タグを読み込めませんでした。再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} /></td></tr>
                   ) : items.length === 0 ? (
                     // まだ1件も作っていない。「条件を変える」は言えない。
-                    <tr><td colSpan={9} className="p-0"><ListState kind="empty" title="まだタグがありません" description="「＋ タグを追加」から最初の1つを作ると、ここに並びます。" /></td></tr>
+                    <tr><td colSpan={9} className="p-0"><ListState kind="empty" title="まだタグがありません" description="「＋ タグを作る」から最初の1つを作ると、ここに並びます。" /></td></tr>
                   ) : visible.length === 0 ? (
                     // 作ってはあるが、いまの絞り込みに合うものが無い。
                     <tr><td colSpan={9} className="p-0"><ListState kind="empty" title="条件に合うタグはありません" description="検索語・フォルダ・絞り込みを変えてください。" /></td></tr>
@@ -1025,44 +1051,53 @@ export default function TagsPageV4({
                     const group = groups.find((item) => item.id === tag.groupId)
                     const chips = linkChips(tag)
                     return (
-                      <tr key={tag.id} className="hover:bg-canvas-sunken">
+                      <Tr key={tag.id} interactive className="group cursor-pointer" tabIndex={0} onClick={() => router.push(`/tags/edit?id=${tag.id}`)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter') { event.preventDefault(); router.push(`/tags/edit?id=${tag.id}`) } }}>
+                        {/*
+                          行を押したら編集へ（一覧の決まり）。名前は黒文字の太字。
+                          並び替え・フォルダ選択・星・削除は行の移動を起こさない。
+                        */}
                         {/*
                           並び替えのつまみ。設計 `i1Xb2V` は**常に出す**。
                           「並び替え」ボタンで出し入れしない。押す前は
                           並び替えられることに気づけないため。
                         */}
-                        <td
+                        <Td
                           draggable
+                          onClick={(event) => event.stopPropagation()}
                           onDragStart={() => setDragId(tag.id)}
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={() => void move(tag.id)}
-                          className="cursor-grab px-2 py-3 text-center text-hairline"
+                          className="cursor-grab text-center text-hairline"
                         >
                           <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}><GripIcon /></ReorderGrip>
-                        </td>
-                        <td className="px-3 py-3">
+                        </Td>
+                        <Td>
                           <div className="flex min-w-0 items-center gap-2">
-                            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
-                            {/* 設計 `VQykB` は青文字。押すと編集へ行く（編集ボタンは置かない）。 */}
-                            <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-semibold text-status-info hover:underline" title={tag.name}>{tag.name}</Link>
+                            <span className="h-2 w-2 shrink-0 rounded-pill" style={{ backgroundColor: group?.color ?? FOLDER_FALLBACK_COLOR }} />
+                            {/* 名前は黒文字の太字。押すと編集へ行く（編集ボタンは置かない）。 */}
+                            <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-medium text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
                             {/* 保管済みは一覧に出続けるが、開くと名前と説明しか直せない(#710)。 */}
-                            {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
+                            {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-medium text-ink-faint">保管済み</span>}
                             {/*
                               IDEA-04: 整理候補の「重複名」を行ごとに示す。
                               KPIの「整理候補」だけだと、どのタグが重複候補か分からない。
                               理由はサーバーの cleanupReasons だけを見る（画面で再判定しない）。
                             */}
-                            {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-bold text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
+                            {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-medium text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                           </div>
                           {/* ATTR-20: 登録日は名前の下へ畳む。独立した列にすると1024pxでつぶれる。 */}
                           <p className="mt-0.5 pl-4 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録</p>
-                        </td>
-                        <td className="px-3 py-3">
-                          <FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} />
-                        </td>
-                        <td className="px-3 py-3 text-label tabular-nums">{tag.friendCount ?? 0}人</td>
-                        <td className="truncate px-3 py-3 text-label text-ink" title={sourceLabel(tag)}>{sourceLabel(tag)}</td>
-                        <td className="px-3 py-3">
+                        </Td>
+                        {/*
+                          フォルダは文字だけ（m21o）。行ごとの選び直し欄は
+                          幅176pxで列（11%）に収まらず隣の「付け方」へ重なって
+                          いた。変更は行を押して開く編集画面の「所属フォルダ」で
+                          行う。長い名前は省略し、全文は重ねて読める。
+                        */}
+                        <Td className="truncate text-label text-ink" title={group?.name ?? '未分類'}>{group?.name ?? '未分類'}</Td>
+                        <Td className="text-label tabular-nums">{tag.friendCount ?? 0}人</Td>
+                        <Td className="cq-hide-below-830 truncate text-label text-ink" title={sourceLabel(tag)}>{sourceLabel(tag)}</Td>
+                        <Td>
                           <div className="flex flex-wrap gap-1.5">
                             {chips.length === 0
                               ? <span className="text-xs text-ink-faint">—</span>
@@ -1070,9 +1105,9 @@ export default function TagsPageV4({
                                   <span key={chip.label} className={`rounded-mini px-[7px] py-[2px] text-micro font-semibold ${chip.tone}`}>{chip.label}</span>
                                 ))}
                           </div>
-                        </td>
-                        <td className="truncate px-3 py-3 text-label text-ink">{usageLabel(tag)}</td>
-                        <td className="px-3 py-3">
+                        </Td>
+                        <Td className="truncate text-label text-ink" title={usageLabel(tag)}>{usageLabel(tag)}</Td>
+                        <Td onClick={(event) => event.stopPropagation()}>
                           {/* 設計 `zMlMX`。押すと友だち一覧への表示を切り替える。 */}
                           <button
                             type="button"
@@ -1083,18 +1118,32 @@ export default function TagsPageV4({
                           >
                             <StarIcon filled={Boolean(tag.isStarred)} />
                           </button>
-                        </td>
-                        <td className="px-3 py-3">
-                          {/* 設計 `E2NC4`。赤いゴミ箱だけ。文字の「削除」は置かない。 */}
-                          <button type="button" onClick={() => setDeleteTarget(tag)} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
-                            <TrashIcon />
-                          </button>
-                        </td>
-                      </tr>
+                        </Td>
+                        <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
+                          {/*
+                            ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。
+                            削除はメニューの中の危ない操作へ。赤いゴミ箱だけの
+                            ボタンは行に直に置かない（設計 `E2NC4` の見た目指定は
+                            使いやすさの直しのため外す。確認窓の動きは残す）。
+                          */}
+                          <span onClick={(event) => event.stopPropagation()}>
+                          <RowActions
+                            subjectName={tag.name}
+                            edit={{ href: `/tags/edit?id=${tag.id}` }}
+                            /* R190: 保管済みに戻す口は無いため、同じ確認を繰り返さない。 */
+                            destructiveItem={tag.status === 'archived' ? undefined : {
+                              id: 'archive',
+                              label: '保管する',
+                              onSelect: () => setDeleteTarget(tag),
+                            }}
+                          />
+                          </span>
+                        </ActionCell>
+                      </Tr>
                     )
                   })}
                 </tbody>
-              </table>
+              </DataTable>
               </div>
               {/*
                 960px未満は縦に重ねたカード（#1014 ATTR-20）。
@@ -1109,7 +1158,7 @@ export default function TagsPageV4({
                 ) : status === 'error' ? (
                   <ListState kind="error" description="タグを読み込めませんでした。再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} />
                 ) : items.length === 0 ? (
-                  <ListState kind="empty" title="まだタグがありません" description="「＋ タグを追加」から最初の1つを作ると、ここに並びます。" />
+                  <ListState kind="empty" title="まだタグがありません" description="「＋ タグを作る」から最初の1つを作ると、ここに並びます。" />
                 ) : visible.length === 0 ? (
                   <ListState kind="empty" title="条件に合うタグはありません" description="検索語・フォルダ・絞り込みを変えてください。" />
                 ) : (
@@ -1118,18 +1167,18 @@ export default function TagsPageV4({
                       const group = groups.find((item) => item.id === tag.groupId)
                       const chips = linkChips(tag)
                       return (
-                        <li key={tag.id} className="px-3 py-3">
+                        <li key={tag.id} className="cursor-pointer px-3 py-3" onClick={() => router.push(`/tags/edit?id=${tag.id}`)}>
                           <div className="flex items-start gap-2">
-                            <span className="pt-1 text-hairline">
+                            <span className="pt-1 text-hairline" onClick={(event) => event.stopPropagation()}>
                               <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}><GripIcon /></ReorderGrip>
                             </span>
                             <div className="min-w-0 flex-1">
                               <div className="flex min-w-0 items-center gap-2">
-                                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
-                                <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-semibold text-status-info hover:underline" title={tag.name}>{tag.name}</Link>
-                                {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
+                                <span className="h-2 w-2 shrink-0 rounded-pill" style={{ backgroundColor: group?.color ?? FOLDER_FALLBACK_COLOR }} />
+                                <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-medium text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
+                                {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-medium text-ink-faint">保管済み</span>}
                                 {/* IDEA-04: 重複名の整理候補はカード表示でも行ごとに示す。 */}
-                                {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-bold text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
+                                {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-medium text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                               </div>
                               <p className="mt-0.5 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録・{sourceLabel(tag)}</p>
                               {chips.length > 0 ? (
@@ -1138,21 +1187,30 @@ export default function TagsPageV4({
                                 </p>
                               ) : null}
                               <p className="mt-1 text-xs text-ink-secondary">{tag.friendCount ?? 0}人・{usageLabel(tag)}</p>
-                              <div className="mt-2"><FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} /></div>
+                              {/* フォルダは文字だけ（m21o）。表と同じく、変更は編集画面で行う。 */}
+                              <p className="mt-1 text-xs text-ink-secondary">フォルダ：{group?.name ?? '未分類'}</p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2 pt-1">
                               <button
                                 type="button"
                                 aria-pressed={Boolean(tag.isStarred)}
                                 aria-label={tag.isStarred ? '友だち一覧に表示しない' : '友だち一覧に表示する'}
-                                onClick={() => void toggleStar(tag)}
+                                onClick={(event) => { event.stopPropagation(); void toggleStar(tag) }}
                                 className={tag.isStarred ? 'text-status-warn-deep' : 'text-hairline hover:text-status-warn-deep'}
                               >
                                 <StarIcon filled={Boolean(tag.isStarred)} />
                               </button>
-                              <button type="button" onClick={() => setDeleteTarget(tag)} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
-                                <TrashIcon />
-                              </button>
+                              <span onClick={(event) => event.stopPropagation()}>
+                                <RowActions
+                                  subjectName={tag.name}
+                                  edit={{ href: `/tags/edit?id=${tag.id}` }}
+                                  destructiveItem={tag.status === 'archived' ? undefined : {
+                                    id: 'archive',
+                                    label: '保管する',
+                                    onSelect: () => setDeleteTarget(tag),
+                                  }}
+                                />
+                              </span>
                             </div>
                           </div>
                         </li>
@@ -1166,7 +1224,7 @@ export default function TagsPageV4({
                 高さ38・角丸・現在ページの緑がほかの一覧とずれる。
               */}
             </div>
-          </main>
+          </section>
         </div>
         {/*
           設計 `rvzSw タグ フッター`。**表の枠の外**、本体の幅いっぱいで右寄せ。
@@ -1180,7 +1238,7 @@ export default function TagsPageV4({
         ) : null}
       </> : tab === 'fields' ? <FriendFieldList accountId={accountId} /> : tab === 'marks' ? <SupportMarkList accountId={accountId} /> : <SavedSearchList accountId={accountId} />}
       </div>
-      {deleteTarget && <DeleteTagDialog tag={deleteTarget} accountId={accountId} onCancel={() => setDeleteTarget(null)} onArchived={(result) => { setDeleteTarget(null); setNotice(result ?? ''); void load() }} />}
+      {deleteTarget && <DeleteTagDialog tag={deleteTarget} accountId={accountId} onCancel={() => setDeleteTarget(null)} onArchived={(result) => { setDeleteTarget(null); if (result) notifyToast(result); void load() }} />}
     </div>
   )
 }

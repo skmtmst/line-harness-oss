@@ -166,6 +166,31 @@ export async function updateFolder(
 }
 
 /**
+ * 隣り合う2つのフォルダの並びを入れ替える（V6R-S2-c）。
+ *
+ * 以前は画面が2つのフォルダを別々に更新していたので、1回目だけ成功すると
+ * 同じ番号のフォルダが2つ残った。2つの更新を1回のまとめ書き（batch）にする。
+ *
+ * 一覧は display_order → name の順に並ぶ。番号が同じ2つは名前で並んでいるので、
+ * 番号を交換しても並びが変わらない。そのときは「後ろへ行くほう」を +1 する。
+ * 全部の兄弟を振り直さないのは、同時に触った人の並びを上書きしないため。
+ */
+export async function swapFolderOrder(db: D1Database, a: Folder, b: Folder): Promise<void> {
+  let aOrder = b.display_order;
+  let bOrder = a.display_order;
+  if (a.display_order === b.display_order) {
+    const aIsFirst = a.name <= b.name;
+    aOrder = aIsFirst ? a.display_order + 1 : a.display_order;
+    bOrder = aIsFirst ? b.display_order : b.display_order + 1;
+  }
+  const now = jstNow();
+  await db.batch([
+    db.prepare('UPDATE folders SET display_order = ?, updated_at = ? WHERE id = ?').bind(aOrder, now, a.id),
+    db.prepare('UPDATE folders SET display_order = ?, updated_at = ? WHERE id = ?').bind(bOrder, now, b.id),
+  ]);
+}
+
+/**
  * フォルダを消す。中身は消えず「未分類」に戻る。
  *
  * どの参照も ON DELETE SET NULL にしてある。フォルダは入れ物であって
@@ -208,16 +233,15 @@ export async function countFoldersByKind(db: D1Database): Promise<Record<string,
  * 数えると母集団を誤るため、意図して対応表に入れていない。**
  *
  * 対応表に無い理由:
- * - `event`: 正しい数え方は `account_ids` JSON 基準で確定しているが（#730 調査）、
- *   現時点では events 画面にフォルダ UI も `folders.list('event')` の利用先も無い。
- *   使われない集計は増やさない。将来フォルダ UI を接続する票で、B視点の数え漏らし
- *   試験と一緒に実装する（#730 裁定）。
  * - `friend_field`: scope 表（`friend_field_scopes`）基準が正しいことは確定しているが
  *   （#730 調査）、現時点では件数の利用先が無い。利用画面を作る時に接続する。
  *   テナント全体の無条件集計は採らない（他テナント混入のため）（#730 裁定）。
- * - `automation` / `entry_route` / `mileage_rule` / `form`: `folder_id` 列を
+ * - `automation` / `entry_route` / `mileage_rule`: `folder_id` 列を
  *   持つテーブルが存在せず、どの画面からも `kind` 指定で呼ばれていない
  *   （汎用フォルダ機構が未使用の種別）
+ * - `form`: `forms.folder_id` はある（migration 395）が、所属先は
+ *   `form_accounts` の結合で決まるため、この表の単一列の数え方では
+ *   母集団がずれる。件数が要るときは一覧と同じ結合で数える別口にする。
  *
  * `webinar` はここには含めない。`getWebinarFolderCounts`（`webinars.ts`）が
  * 既にアカウント境界込みで実装済みで、呼び出し側（`GET /api/folders`）が
@@ -276,6 +300,22 @@ export async function getFolderItemCounts(
   kind: FolderKind,
   scope: FolderItemCountScope,
 ): Promise<FolderItemCounts | undefined> {
+  if (kind === 'event') {
+    // 複数アカウント向けは sentinel ではなく account_ids を読む。EXISTS で重複を数えない。
+    const ids = scope.allowedAccountIds;
+    const slots = ids.map(() => '?').join(',');
+    const visible = ids.length ? `((target_type = 'single' AND line_account_id IN (${slots}))
+      OR (target_type = 'multi-account-dedup' AND EXISTS (
+        SELECT 1 FROM json_each(events.account_ids) WHERE value IN (${slots})
+      )))` : '0';
+    const { results } = await db.prepare(`SELECT folder_id, COUNT(*) AS item_count FROM events
+      WHERE deleted_at IS NULL AND ${visible} GROUP BY folder_id`).bind(...ids, ...ids)
+      .all<{ folder_id: string | null; item_count: number }>();
+    return {
+      byFolderId: Object.fromEntries(results.filter(row => row.folder_id !== null).map(row => [row.folder_id, Number(row.item_count)])),
+      unfiled: Number(results.find(row => row.folder_id === null)?.item_count ?? 0),
+    };
+  }
   const target = FOLDER_ITEM_COUNT_TABLES[kind];
   if (!target) return undefined;
   const { table, accountColumn, listFilter } = target;

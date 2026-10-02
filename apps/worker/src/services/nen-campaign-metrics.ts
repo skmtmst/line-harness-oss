@@ -1,6 +1,6 @@
 import { getLineAccountById, jstNow } from '@line-crm/db';
 
-import { getNenCampaign } from './nen-engagement.js';
+import { getNenCampaign, nenCampaignFormIssue } from './nen-engagement.js';
 
 const MAX_DELIVERY_ATTEMPTS = 5;
 const DAY_MS = 86_400_000;
@@ -445,6 +445,7 @@ export const NEN_SKIPPED_REASONS = [
   'campaign_snapshot_missing',
   'campaign_disabled',
   'campaign_form_already_submitted',
+  'campaign_form_unavailable',
   'frequency_suppressed',
   'order_cancelled',
   'order_refunded',
@@ -460,6 +461,8 @@ export type NenSkippedReason = (typeof NEN_SKIPPED_REASONS)[number];
 export const NEN_SKIPPED_FIXABLE_REASONS: ReadonlySet<string> = new Set([
   'line_account_unavailable',
   'campaign_disabled',
+  // NEN-07: つなぐ回答フォームを選び直せば再送できる。
+  'campaign_form_unavailable',
 ]);
 
 // #733: 画面の出し分け用に理由コードを返す。last_error は送信失敗時に
@@ -479,6 +482,7 @@ function safeFailureReason(status: string, error: string | null, attempts: numbe
     campaign_snapshot_missing: '予約時の配信内容を確認できません',
     campaign_disabled: '配信の決めごとが停止中です',
     campaign_form_already_submitted: 'すでに回答済みのため送りません',
+    campaign_form_unavailable: 'つなぐ回答フォームが使えなくなっているため送りません',
     frequency_suppressed: '近い時期に同じ配信があるため送りません',
     order_cancelled: '注文が取り消されたため送りません',
     order_refunded: '注文が返金になったため送りません',
@@ -771,6 +775,19 @@ async function isNenCampaignEnabled(
   return campaign?.is_enabled === 1;
 }
 
+// NEN-07: 「つなぐ回答フォームが使えない」で止まった記録は、編集画面で
+// フォームを選び直してから再送できる。判定は job 生成時と同じ見方で確かめる。
+async function isNenCampaignFormUsable(
+  db: D1Database,
+  campaignKey: string,
+  lineAccountId: string | null,
+): Promise<boolean> {
+  if (!lineAccountId) return false;
+  const campaign = await getNenCampaign(db, campaignKey, lineAccountId);
+  if (!campaign) return false;
+  return (await nenCampaignFormIssue(db, campaign, lineAccountId)) === null;
+}
+
 export async function retryNenDelivery(
   db: D1Database,
   input: {
@@ -811,13 +828,17 @@ export async function retryNenDelivery(
   if (skippedFixable) {
     const recovered = current.last_error === 'line_account_unavailable'
       ? await hasUsableLineAccountToken(db, current.line_account_id)
-      : await isNenCampaignEnabled(db, current.campaign_key, current.line_account_id);
+      : current.last_error === 'campaign_form_unavailable'
+        ? await isNenCampaignFormUsable(db, current.campaign_key, current.line_account_id)
+        : await isNenCampaignEnabled(db, current.campaign_key, current.line_account_id);
     if (!recovered) {
       throw new NenCampaignMetricsError(
         'retry_precondition_unmet',
         current.last_error === 'line_account_unavailable'
           ? 'LINE公式アカウントの送信設定を直してから再送してください'
-          : '配信の決めごとをオンに戻してから再送してください',
+          : current.last_error === 'campaign_form_unavailable'
+            ? 'つなぐ回答フォームを選び直してから再送してください'
+            : '配信の決めごとをオンに戻してから再送してください',
         409,
       );
     }
@@ -833,11 +854,12 @@ export async function retryNenDelivery(
             updated_at = ?
       WHERE id = ? AND line_account_id = ?
         AND ((status = 'failed' AND attempts >= ?)
-          OR (status = 'skipped' AND last_error IN (?, ?)))
+          OR (status = 'skipped' AND last_error IN (?, ?, ?)))
         AND version = ?`,
   ).bind(
     now, reason, input.staffId, now, now, input.id, input.lineAccountId,
-    MAX_DELIVERY_ATTEMPTS, 'line_account_unavailable', 'campaign_disabled', input.expectedVersion,
+    MAX_DELIVERY_ATTEMPTS, 'line_account_unavailable', 'campaign_disabled',
+    'campaign_form_unavailable', input.expectedVersion,
   ).run();
   if (Number(result.meta.changes ?? 0) === 0) {
     throw new NenCampaignMetricsError(

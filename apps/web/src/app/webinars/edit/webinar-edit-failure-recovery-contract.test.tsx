@@ -57,6 +57,7 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(navigationMocks.query),
+  usePathname: () => '/webinars/edit',
   useRouter: () => ({ push: vi.fn() }),
 }))
 vi.mock('@/components/shared/button', () => ({
@@ -66,9 +67,14 @@ vi.mock('@/components/shared/button', () => ({
 vi.mock('@/components/shared/sticky-bar', () => ({
   default: ({ actions }: { actions: React.ReactNode }) => <div>{actions}</div>,
 }))
-vi.mock('@/components/shared/select-field', () => ({
-  default: ({ options, ...props }: React.ComponentProps<'select'> & { options: Array<{ value: string; label: string }> }) => (
-    <select {...props}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+vi.mock('@/components/shared/select', () => ({
+  default: ({ value, onChange, options, size: _size, ...props }: {
+    value: string
+    onChange?: (value: string) => void
+    options: Array<{ value: string; label: string }>
+    size?: string
+  } & React.ComponentProps<'select'>) => (
+    <select value={value} onChange={(event) => onChange?.(event.target.value)} {...props}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
   ),
 }))
 vi.mock('@/components/webinars/webinar-form', () => ({ default: () => <div>基本設定</div> }))
@@ -507,15 +513,16 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
       : Promise.resolve({ data: { ...webinar, id, title: '後のウェビナーB' } })))
 
     const view = await mount(<EditWebinarPage />)
-    expect(view.container.textContent).toContain('見つかりませんでした。開き直してください。')
+    // 404 は ★V7 TargetMissing の not-found で出す。
+    expect(view.container.textContent).toContain('このウェビナーは見つかりません')
 
     navigationMocks.query = 'id=webinar-b&pane=review'
     const frame = await view.rerender(<EditWebinarPage />)
     /* 切替の一コマ目に前の失敗文を持ち越さない。 */
     expect(frame.text).toContain('読み込み中...')
-    expect(frame.text).not.toContain('見つかりませんでした')
+    expect(frame.text).not.toContain('このウェビナーは見つかりません')
     expect(view.container.textContent).toContain('後のウェビナーB')
-    expect(view.container.textContent).not.toContain('見つかりませんでした。開き直してください。')
+    expect(view.container.textContent).not.toContain('このウェビナーは見つかりません')
   })
 
   it('切替直後は前のウェビナーの候補とCTAを出さず、揃うまで保存も止める', async () => {
@@ -546,8 +553,8 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(optionLabels(view.container)).not.toContain('旧フォームA')
     expect(inputValues(view.container)).not.toContain('旧CTA・A')
     expect(view.container.textContent).toContain('回答フォームを読み込んでいます。')
-    expect(isDisabled(findButton(view.container, '申込フォームを保存'))).toBe(true)
-    expect(isDisabled(findExactButton(view.container, '保存'))).toBe(true)
+    expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(true)
+    expect(isDisabled(findExactButton(view.container, '保存する'))).toBe(true)
 
     formsB.resolve({ success: true, data: [{ id: 'form-b', name: '新フォームB', isActive: true }] })
     ctasB.resolve({ data: [ctaCard('新CTA・B', 60, 'form-b')] })
@@ -605,24 +612,35 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(optionLabels(view.container)).toContain('旧フォームA')
 
     await changeSelect(view.container, '申込に使う回答フォーム', 'form-a')
-    await clickButton(view.container, '申込フォームを保存')
+    await clickButton(view.container, '申込フォームを保存する')
 
     /* サーバーが拒否したので候補を取り直す。取り直しの間は前の候補を出さない。 */
     expect(apiMocks.fetchApi).toHaveBeenCalledTimes(2)
     expect(optionLabels(view.container)).not.toContain('旧フォームA')
     expect(view.container.textContent).toContain('回答フォームを読み込んでいます。')
-    expect(isDisabled(findButton(view.container, '申込フォームを保存'))).toBe(true)
+    expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(true)
 
     retry.resolve({ success: true, data: [{ id: 'form-c', name: '選び直し用フォームC', isActive: true }] })
     await flush()
     expect(optionLabels(view.container)).toContain('選び直し用フォームC')
-    expect(isDisabled(findButton(view.container, '申込フォームを保存'))).toBe(false)
+    expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(false)
   })
 
-  it('分析の見かけだけのタブを、実際の節へ移動するリンクとして描画する', async () => {
+  it('R98 分析の見出し移動は表示中の節だけを指し、指し先が実在する', async () => {
     navigationMocks.query = 'id=webinar-1&pane=analytics'
     const view = await mount(<EditWebinarPage />)
-    const hrefs = elements(view.container).filter((element) => element.tagName === 'A').map((element) => element.getAttribute('href'))
-    expect(hrefs).toEqual(expect.arrayContaining(['#webinar-overview', '#webinar-watch-funnel', '#webinar-dropoff', '#webinar-cta-funnel', '#webinar-recent']))
+    const nav = elements(view.container).find((element) => element.tagName === 'NAV' && element.getAttribute('aria-label') === 'この段の見出しへ移動')
+    expect(nav, '見出し移動の nav がありません').toBeTruthy()
+    const links = elements(nav!).filter((element) => element.tagName === 'A')
+    expect(links.length, '表示中の節への移動がありません').toBeGreaterThan(0)
+    const ids = new Set(elements(view.container).map((element) => element.getAttribute('id')).filter((id) => id))
+    for (const link of links) {
+      const href = link.getAttribute('href') ?? ''
+      expect(href.startsWith('#'), `節への移動ではありません: ${href}`).toBe(true)
+      expect(ids.has(href.slice(1)), `指し先の節がありません: ${href}`).toBe(true)
+    }
+    /* 出ない節（旧5節の離脱・CTA・申込）への入口は置かない。 */
+    const labels = links.map((link) => link.textContent)
+    expect(labels).not.toContain('離脱')
   })
 })

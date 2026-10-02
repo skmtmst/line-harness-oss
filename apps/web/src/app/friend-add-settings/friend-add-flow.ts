@@ -35,11 +35,15 @@ export function friendAddFlowSteps(input: {
   routeNames: string[]
   /** 選択した routeIds のうち、候補に無い（停止・削除済み）数。 */
   missingRouteCount: number
+  friendKind: FriendAddRuleKind
   definition: FriendAddRuleDefinition
   /** scenarioId に対応するシナリオ名。候補に無い（削除済み）なら null。 */
   scenarioName: string | null
 }): FriendAddFlowStep[] {
   const { definition } = input
+  // 再追加で「何も配信しない」は最初の案内を届けない（R261）。
+  // 案内後のアクション（タグ付けやシナリオ開始）は実行される。
+  const deliversNothing = input.friendKind === 'returning' && definition.returningMode === 'none'
 
   // ① 経路 —— どこから来た人か。基本URLと個別QRは同じ経路URLとして扱う。
   let routeTitle: string
@@ -60,14 +64,17 @@ export function friendAddFlowSteps(input: {
   }
 
   // ② 初回案内 —— 最初に届くもの
-  const sendsWelcome = definition.deliveryChoices?.sendWelcomeMessage !== false
+  const sendsWelcome = !deliversNothing
+    && definition.deliveryChoices?.sendWelcomeMessage !== false
     && definition.messageType !== 'scenario'
   const firstTitle = sendsWelcome
     ? `初回案内（${MESSAGE_TYPE_LABEL[definition.messageType]}）`
     : '初回案内'
-  const firstDetail = sendsWelcome
-    ? `${definition.timing === 'immediate' ? '登録直後に届きます。' : 'シナリオの時刻に従って届きます。'}${definition.messageText.trim() ? '' : '文面は未設定です。'}`
-    : '最初の1通は送らず、シナリオへの登録だけを行います。'
+  const firstDetail = deliversNothing
+    ? '「何も配信しない」の設定のため届きません。'
+    : sendsWelcome
+      ? `${definition.timing === 'immediate' ? '登録直後に届きます。' : 'シナリオの時刻に従って届きます。'}${definition.messageText.trim() ? '' : '文面は未設定です。'}`
+      : '最初の1通は送らず、シナリオへの登録だけを行います。'
 
   // ③ 付く属性 —— タグの追加・解除（start_scenario は次の配信へ回す）
   const tagActions = definition.actions.filter(
@@ -79,7 +86,11 @@ export function friendAddFlowSteps(input: {
 
   // ④ 次の配信 —— 登録するシナリオと、シナリオ開始アクション
   const nextParts: string[] = []
-  if (definition.scenarioId) {
+  if (deliversNothing) {
+    // 実行側と同じ区別：最初の案内は届けないが、案内後のアクションとして
+    // 設定したシナリオ開始は動く。動かないと断定すると下の文と矛盾する（R261）。
+    nextParts.push('「何も配信しない」の設定のため、最初の案内は届きません。')
+  } else if (definition.scenarioId) {
     nextParts.push(input.scenarioName
       ? `シナリオ「${input.scenarioName}」を開始します。`
       : '削除済みのシナリオを指しています。')
@@ -154,7 +165,10 @@ export function friendAddReaddLines(input: {
     // 未選択は実行側の既定（別のシナリオ扱い）に合わせる。
     const mode = input.definition.returningMode ?? 'other'
     if (mode === 'none') {
-      lines.push('再追加では初回案内とシナリオを動かしません。')
+      // 実行側と同じ区別：最初の案内は届けないが、案内後のアクション
+      // （シナリオ開始を含む）は実行される。「シナリオを動かさない」と
+      // 書くと、開始するよう設定した文と矛盾する（R261）。
+      lines.push('再追加では最初の案内は届きません。')
       lines.push(input.definition.actions.length > 0
         ? '設定したアクションは実行されます。'
         : 'アクションも実行されません。')
@@ -165,9 +179,13 @@ export function friendAddReaddLines(input: {
     }
   }
 
-  const hours = input.definition.resendSuppressionHours ?? 24
-  lines.push(hours > 0
-    ? `同じ人への再送は「${resendSuppressionText(hours)}」。期間内に届いている人には送りません。`
-    : '同じ人への再送は制限しません。')
+  // 送るものが無い設定（再追加で「何も配信しない」）に再送の説明は要らない。
+  const deliversNothing = input.friendKind === 'returning' && input.definition.returningMode === 'none'
+  if (!deliversNothing) {
+    const hours = input.definition.resendSuppressionHours ?? 24
+    lines.push(hours > 0
+      ? `同じ人への再送は「${resendSuppressionText(hours)}」。期間内に届いている人には送りません。`
+      : '同じ人への再送は制限しません。')
+  }
   return lines
 }

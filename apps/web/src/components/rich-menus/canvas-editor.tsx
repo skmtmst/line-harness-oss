@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { RICH_MENU_DIMENSIONS, type RichMenuAreaIntent } from '@line-crm/shared'
+import Notice from '@/components/shared/notice'
+import { intentLabelOf } from '@/components/rich-menus/area-properties'
 
 export type Area = {
   id: string
@@ -9,8 +11,12 @@ export type Area = {
   boundsY: number
   boundsWidth: number
   boundsHeight: number
-  /** LINE に登録するときの動きの種類。intent から決まる。 */
-  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'
+  /**
+   * LINE に登録するときの動きの種類。intent から決まる。
+   * datetimepicker・clipboard は新しい2種。DB へは postback に載るが、
+   * 画面が送る段階では intent から決めた本来の種類を載せる。
+   */
+  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch' | 'datetimepicker' | 'clipboard'
   actionData: Record<string, unknown>
   /** 運用者から見た「何をするボタンか」。 */
   intent?: RichMenuAreaIntent | null
@@ -65,6 +71,11 @@ function snap(value: number, others: number[]): number {
     if (Math.abs(value - o) < SNAP_PX) return o
   }
   return value
+}
+
+/** 読み上げと一覧で使う名前。未命名なら位置から通し番号を振る。 */
+export function areaDisplayName(area: Area, index: number): string {
+  return area.label?.trim() || `${index + 1}番目のボタン`
 }
 
 function isOverlapping(a: Area, others: Area[]): boolean {
@@ -302,42 +313,42 @@ export function CanvasEditor({
   return (
     <div className="space-y-2 select-none">
       {limitNotice && (
-        <p role="status" className="bg-status-warn-soft text-status-warn-deep rounded-control px-3 py-2 text-xs">
+        <Notice tone="warn">
           {limitNotice}
-        </p>
+        </Notice>
       )}
       <div className="flex items-center gap-2 text-sm">
-        <span className="text-gray-500 text-xs">ズーム</span>
+        <span className="text-ink-faint text-xs">ズーム</span>
         {[0.25, 0.3, 0.5, 0.75, 1].map((s) => (
           <button
             key={s}
             onClick={() => setScale(s)}
-            className={`px-2 py-0.5 text-xs rounded ${
+            className={`px-2 py-0.5 text-xs rounded-mini ${
               Math.abs(scale - s) < 0.01
-                ? 'bg-gray-800 text-white'
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                ? 'bg-ink text-on-accent'
+                : 'bg-shell hover:bg-shell-gray text-ink-secondary'
             }`}
           >
             {Math.round(s * 100)}%
           </button>
         ))}
-        <span className="ml-3 text-xs text-gray-400">
+        <span className="ml-3 text-xs text-ink-faint">
           {dims.width}×{dims.height}
         </span>
         {!preview && (
-          <span className="ml-auto text-xs text-gray-400">
-            空白でドラッグ → 新規矩形 / 矩形クリックで選択 / 矢印キーで微調整 / Delete で削除
+          <span className="ml-auto text-xs text-ink-faint">
+            空白でドラッグ → 新規矩形 / 矩形クリックか下の一覧で選択 / 矢印キーで微調整 / Delete で削除
           </span>
         )}
       </div>
       <div
-        className="overflow-auto border border-gray-300 bg-gray-100"
+        className="overflow-auto border border-hairline bg-shell"
         style={{ maxHeight: '70vh' }}
       >
         <div
           ref={canvasRef}
           onMouseDown={handleCanvasMouseDown}
-          className="relative bg-white"
+          className="relative bg-canvas"
           style={{
             width: dims.width * scale,
             height: dims.height * scale,
@@ -352,21 +363,45 @@ export function CanvasEditor({
               className="absolute inset-0 w-full h-full pointer-events-none object-cover"
             />
           )}
-          {areas.map((area) => {
+          {areas.map((area, index) => {
             const overlap = isOverlapping(area, areas)
             const selected = area.id === selectedAreaId
             const borderColor = preview
               ? 'transparent'
               : overlap
-                ? '#dc2626'
+                ? 'var(--color-danger)'
                 : selected
-                  ? '#2563eb'
-                  : '#3b82f6'
+                  ? 'var(--color-action)'
+                  : 'var(--color-status-info)'
             return (
               <div
                 key={area.id}
                 onMouseDown={(e) => handleAreaMouseDown(e, area)}
-                className="absolute"
+                /*
+                 * R233: 編集画面のエリアはキーボードだけでも選べるようにする。
+                 * focus した時点で選択扱いにすると、そのまま矢印キーで動かせる。
+                 * プレビューでは従来どおりクリック専用（訴求の試し押し用）。
+                 */
+                role={preview ? undefined : 'button'}
+                tabIndex={preview ? undefined : 0}
+                aria-pressed={preview ? undefined : selected}
+                aria-label={
+                  preview
+                    ? undefined
+                    : `${areaDisplayName(area, index)}、動きは${intentLabelOf(area)}`
+                }
+                onFocus={preview ? undefined : () => onSelectArea(area.id)}
+                onKeyDown={
+                  preview
+                    ? undefined
+                    : (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          onSelectArea(area.id)
+                        }
+                      }
+                }
+                className="absolute focus-visible:outline-2 focus-visible:outline-status-info"
                 style={{
                   left: area.boundsX * scale,
                   top: area.boundsY * scale,
@@ -376,8 +411,8 @@ export function CanvasEditor({
                   background: preview
                     ? 'transparent'
                     : selected
-                      ? 'rgba(37,99,235,0.18)'
-                      : 'rgba(59,130,246,0.10)',
+                      ? 'color-mix(in srgb, var(--color-action) 18%, transparent)'
+                      : 'color-mix(in srgb, var(--color-status-info) 10%, transparent)',
                   cursor: preview ? 'pointer' : 'move',
                   boxSizing: 'border-box',
                 }}
@@ -391,7 +426,7 @@ export function CanvasEditor({
                         position: 'absolute',
                         width: 8,
                         height: 8,
-                        background: '#2563eb',
+                        background: 'var(--color-action)',
                         ...handleStyle(h),
                       }}
                     />
@@ -407,13 +442,52 @@ export function CanvasEditor({
                 top: previewRect.y * scale,
                 width: previewRect.w * scale,
                 height: previewRect.h * scale,
-                border: '2px dashed #2563eb',
-                background: 'rgba(37,99,235,0.10)',
+                border: '2px dashed var(--color-action)',
+                background: 'color-mix(in srgb, var(--color-action) 10%, transparent)',
               }}
             />
           )}
         </div>
       </div>
+      {/*
+        R233: エリア一覧（要件19-64）。マウスで画像上の矩形を掴めなくても、
+        ここから Tab → Enter で選べ、選んだあとは右の設定欄・矢印キーが効く。
+        各ボタンの動きもここで読み上げられる。
+      */}
+      {!preview && areas.length > 0 && (
+        <div className="space-y-1">
+          <h3 className="text-ink-faint text-xs font-semibold">エリア一覧</h3>
+          <ul className="border-hairline divide-hairline divide-y rounded-mini border">
+            {areas.map((area, index) => {
+              const selected = area.id === selectedAreaId
+              const name = areaDisplayName(area, index)
+              return (
+                <li key={area.id} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-current={selected ? true : undefined}
+                    onClick={() => onSelectArea(area.id)}
+                    className={`flex-1 px-3 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-status-info ${
+                      selected ? 'bg-accent-soft text-ink font-semibold' : 'text-ink hover:bg-canvas-sunken'
+                    }`}
+                  >
+                    <span className="mr-2">{name}</span>
+                    <span className="text-ink-faint text-xs">動き: {intentLabelOf(area)}</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${name}を消す`}
+                    onClick={() => onDeleteArea(area.id)}
+                    className="text-status-danger mr-2 px-2 py-1 text-xs focus-visible:outline-2 focus-visible:outline-status-info"
+                  >
+                    消す
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

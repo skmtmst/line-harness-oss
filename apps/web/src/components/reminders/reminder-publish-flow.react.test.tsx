@@ -10,6 +10,16 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/lib/api', () => ({ api: { reminders: {} } }))
+/*
+ * R15: TargetStage に共通の条件部品を置いたため、描画にアカウントの
+ * 文脈が要る。条件なしの描画では数え直し口を叩かない。
+ */
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
+}))
+vi.mock('@/lib/use-feature-visibility', () => ({
+  useFeatureVisibility: () => ({ status: 'ready' as const, features: null, enabled: () => false }),
+}))
 
 import { ConfirmStage, DoneStage, PreviewStage, TargetStage, TestStage } from './reminder-publish-flow'
 
@@ -123,22 +133,39 @@ describe('リマインダ公開フローの実データ表示', () => {
   })
 
   it('TestStage は本文の実差し込みだけを並べ、実装に無い変数名を出さない', () => {
-    render(<TestStage draft={DRAFT} recipientName="山田 花子" recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '山田 花子', pictureUrl: null } }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    render(<TestStage draft={DRAFT} recipientName="山田 花子" recipientKind="registered" recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '山田 花子', pictureUrl: null }, recipientKind: 'registered' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
     expect(screen.getByText('{{name}}')).toBeTruthy()
     expect(screen.getAllByText('山田 花子').length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText(/meet_datetime/)).toBeNull()
     expect(screen.queryByText(/meet_url/)).toBeNull()
     expect(screen.queryByText(/meet\.google\.com/)).toBeNull()
     // フッターは下書きの実テスト記録を見る。
-    expect(screen.getByText(/テスト済み 2026\/09\/10/)).toBeTruthy()
+    expect(screen.getByText(/テスト済み 9月10日（木）/)).toBeTruthy()
     expect(screen.queryByText(/2026\/09\/06/)).toBeNull()
   })
 
   it('TestStage は送信前に設定済みの送信先を出す', () => {
-    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null }, recipientKind: 'registered' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
     // 送る前から実際の送信先が見える。「送ったあとに分かる」ではない。
-    expect(screen.getAllByText('田中 太郎').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText(/田中 太郎/).length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText('テスト送信後に表示')).toBeNull()
+  })
+
+  // REMINDER-12: 登録済みテスト宛先は「自分のLINE」と名乗らない。
+  it('TestStage は登録済みテスト宛先を自分のLINEと名乗らず、種別と実名を出す', () => {
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null }, recipientKind: 'registered' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    // 要約カード・送信先メトリクス・履歴のどれにも実名つきの種別が出る。
+    expect(screen.getAllByText(/登録済みテスト宛先（田中 太郎）/).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText(/登録済みのテスト送信先へ/).length).toBeGreaterThanOrEqual(1)
+    // 本人以外へ「自分のLINEへ」と案内しない。
+    expect(screen.queryByText(/自分のLINE/)).toBeNull()
+  })
+
+  it('TestStage は本人対応を確認できたときだけ「自分のLINE」と出す', () => {
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f2', displayName: '連携済みの本人', pictureUrl: null }, recipientKind: 'self' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    expect(screen.getAllByText(/自分のLINE（連携済みの本人）/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/自分のLINEへ確認用メッセージを送ります/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText(/登録済みテスト宛先/)).toBeNull()
   })
 
   it('TestStage は未設定のとき設定画面への導線と再確認を出す', () => {
@@ -178,7 +205,7 @@ describe('リマインダ公開フローの実データ表示', () => {
   // REMINDER-08: 取得失敗は「確認中」のままにせず、失敗表示と再試行を出す。
   it('TargetStage は事前チェックの失敗を確認中と分け、再試行できる', () => {
     const retry = vi.fn()
-    render(<TargetStage settings={SETTINGS} validation={null} validationFailed onRetryValidation={retry} onChange={() => {}} onNext={() => {}} busy={false} />)
+    render(<TargetStage reminderId="rem-1" settings={SETTINGS} validation={null} validationFailed onRetryValidation={retry} onChange={() => {}} onNext={() => {}} busy={false} />)
     expect(screen.getByText(/公開前チェックを実行できませんでした/)).toBeTruthy()
     expect(screen.queryByText(/公開前チェックを実行しています/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
@@ -186,7 +213,7 @@ describe('リマインダ公開フローの実データ表示', () => {
   })
 
   it('TargetStage は取得中のままでは人数を0と見せない', () => {
-    render(<TargetStage settings={SETTINGS} validation={null} onChange={() => {}} onNext={() => {}} busy={false} />)
+    render(<TargetStage reminderId="rem-1" settings={SETTINGS} validation={null} onChange={() => {}} onNext={() => {}} busy={false} />)
     expect(screen.getByText(/公開前チェックを実行しています/)).toBeTruthy()
     expect(screen.getAllByText('—人').length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText('0人')).toBeNull()
@@ -199,7 +226,8 @@ describe('リマインダ公開フローの実データ表示', () => {
     expect(screen.queryByText('配信予定を確認しています')).toBeNull()
     expect(screen.queryByText('送信予定はまだありません')).toBeNull()
     expect(screen.getAllByText('未取得').length).toBeGreaterThanOrEqual(1)
-    fireEvent.click(screen.getAllByRole('button', { name: '再読み込み' })[0])
+    // V7 x63W5x：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
+    fireEvent.click(screen.getAllByRole('button', { name: 'もう一度読み込む' })[0])
     expect(retry).toHaveBeenCalledTimes(1)
   })
 
@@ -218,7 +246,7 @@ describe('リマインダ公開フローの実データ表示', () => {
   // REMINDER-09: 対象設定の次は通知ステップ。保存後は編集画面へ戻る。
   it('TargetStage の主ボタンは通知ステップへ進む', () => {
     const next = vi.fn()
-    render(<TargetStage settings={SETTINGS} validation={VALIDATION} onChange={() => {}} onNext={next} busy={false} />)
+    render(<TargetStage reminderId="rem-1" settings={SETTINGS} validation={VALIDATION} onChange={() => {}} onNext={next} busy={false} />)
     fireEvent.click(screen.getByRole('button', { name: '通知ステップへ' }))
     expect(next).toHaveBeenCalledTimes(1)
   })
@@ -227,7 +255,8 @@ describe('リマインダ公開フローの実データ表示', () => {
     const retry = vi.fn()
     render(<ConfirmStage draft={DRAFT} settings={SETTINGS} validation={null} validationFailed onRetryValidation={retry} onPublish={() => {}} busy={false} />)
     expect(screen.getAllByText(/チェックを実行できませんでした/).length).toBeGreaterThanOrEqual(1)
-    fireEvent.click(screen.getAllByRole('button', { name: '再読み込み' })[0])
+    // V7 x63W5x：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
+    fireEvent.click(screen.getAllByRole('button', { name: 'もう一度読み込む' })[0])
     expect(retry).toHaveBeenCalledTimes(1)
   })
 

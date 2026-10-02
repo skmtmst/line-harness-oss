@@ -276,11 +276,14 @@ async function claimOperatorDelivery(
       INSERT INTO notification_deliveries
         (id, line_account_id, instance_id, audience_type, recipient_type, recipient_id,
          channel, idempotency_key, status, retryable, attempts, queued_at,
-         execution_mode, version, updated_at)
-      VALUES (?, ?, ?, 'operator', 'staff', ?, ?, ?, 'pending', 0, 0, ?, ?, ?, ?)
+         execution_mode, version, updated_at, source)
+      VALUES (?, ?, ?, 'operator', 'staff', ?, ?, ?, 'pending', 0, 0, ?, ?, ?, ?,
+              (SELECT i.source_event_type FROM notification_instances i
+                WHERE i.id = ? AND i.line_account_id = ?))
     `).bind(
       id, input.lineAccountId, input.instanceId, input.recipientId, input.channel,
       retryKey, now, input.executionMode, input.ruleVersion, now,
+      input.instanceId, input.lineAccountId,
     ).run();
     return { id, retryKey };
   } catch (error) {

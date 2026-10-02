@@ -29,7 +29,7 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
     expect(FRIENDS_BODY, '手書きの検索入力が残っている').not.toMatch(/<input\s+type="search"/)
     expect(FRIENDS_BODY, '手書きのプルダウンが残っている').not.toContain('<select')
     expect(FRIENDS_BODY, '手書きのプルダウン装飾が残っている').not.toContain('v6-select')
-    expect(FRIENDS_BODY, '保存条件の札が手書きのまま').not.toContain('rounded-full bg-canvas px-2.5')
+    expect(FRIENDS_BODY, '保存条件の札が手書きのまま').not.toContain('rounded-pill bg-canvas px-2.5')
     expect(FRIENDS_BODY).toContain('<Chip key={summary} tone="neutral">')
   })
 
@@ -58,24 +58,24 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
     expect(FRIENDS_BODY).not.toContain('h-10 whitespace-nowrap rounded-control')
   })
 
-  it('行のアバターは真円ではなく設計の40x40 r=18', () => {
-    expect(TOKENS).toContain('--radius-large: 18px;')
-    expect(ROW_BODY).toContain('h-10 w-10 shrink-0 rounded-large bg-avatar-bg object-cover')
-    expect(ROW_BODY, 'アバターが真円のまま').not.toContain('h-10 w-10 shrink-0 rounded-full')
+  // ★V7「友だちの顔」（KXDhj）：共通 Avatar の 40px の丸。画像が読めない時も頭文字（2026-09-24）。
+  it('行の顔は共通 Avatar（40px）', () => {
+    expect(ROW_BODY).toContain('<Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />')
+    expect(ROW_BODY, '画像を直接描いている').not.toMatch(/<img src=\{friend\.pictureUrl\}/)
   })
 
   it('行の担当者に丸アイコンを出し、未割り当ては全角ハイフンで埋める', () => {
     expect(ROW_BODY).toContain('data-operator-avatar={friend.operator ? \'assigned\' : \'unassigned\'}')
-    expect(ROW_BODY, '担当者アイコンが16pxでない').toContain('h-4 w-4 shrink-0 items-center justify-center rounded-full')
-    expect(ROW_BODY, '頭文字が10px/800でない').toContain('text-nano font-extrabold')
+    expect(ROW_BODY, '担当者アイコンが16pxでない').toContain('h-4 w-4 shrink-0 items-center justify-center rounded-pill')
+    expect(ROW_BODY, '頭文字が10px/500でない').toContain('text-nano font-medium')
     expect(ROW_BODY, '未割り当てが全角ハイフンでない').toContain("'－'")
     expect(ROW_BODY).toContain("担当：{friend.operator?.name ?? '未割り当て'}")
   })
 })
 
 describe('統合ユーザー(r7eSi)の指標カードを共通部品へ載せ替える契約', () => {
-  it('共通SummaryCardだけを描き、手書きの面と24pxの値を残さない', () => {
-    expect(SUMMARY).toContain("import SummaryCard from '@/components/shared/summary-card'")
+  it('共通KpiCardだけを描き、手書きの面と24pxの値を残さない', () => {
+    expect(SUMMARY).toContain("import KpiCard from '@/components/shared/kpi-card'")
     expect(SUMMARY_BODY, '値が24pxのまま').not.toContain('text-2xl')
     expect(SUMMARY_BODY, '手書きの角丸が残っている').not.toContain('rounded-[')
     expect(SUMMARY_BODY, '手書きの影が残っている').not.toContain('shadow-[')
@@ -114,7 +114,9 @@ describe('重複検出で取れない数を作らない契約', () => {
   it('読込中と取得失敗を状態の言葉でそろえる', () => {
     expect(DUPLICATES_BODY).toContain('読み込んでいます')
     expect(DUPLICATES_BODY).toContain('読み込めませんでした')
-    expect(DUPLICATES_BODY, '取得失敗にやり直す口が無い').toContain('再読み込み')
+    // ★V7 `x63W5x`：失敗の1枚は共通部品の error（副ボタン「もう一度読み込む」つき）。
+    // 文言は部品が持つ。ここでは口（`onRetry`）があることだけ見る。
+    expect(DUPLICATES_BODY, '取得失敗にやり直す口が無い').toContain('onRetry={() => void loadCandidates()}')
     expect(DUPLICATES_BODY).not.toContain('読み込み中…')
     expect(DUPLICATES_BODY).not.toContain('集計の取得に失敗しました')
   })

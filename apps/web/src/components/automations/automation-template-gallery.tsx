@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MessageCircle, Tags, UserPlus } from 'lucide-react'
 import { api, type AutomationTemplateSummary } from '@/lib/api'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 const ICONS = [UserPlus, MessageCircle, Tags] as const
 
@@ -23,6 +24,13 @@ export default function AutomationTemplateGallery({
   const [creating, setCreating] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [triggerFilter, setTriggerFilter] = useState('すべて')
+  /*
+   * DETAIL-13: 「これで作る」1回の操作を識別する冪等鍵（店・見本ごと）。
+   * 失敗してもう一度押す・通信がやり直されるときは同じ鍵——サーバーは
+   * 同じ下書きを返すので1件に収まる。作れたあと（＝操作が終わったあと）の
+   * 次の押下は別の操作なので、新しい鍵を振る。
+   */
+  const operationKeysRef = useRef<Record<string, string>>({})
 
   const triggerFilters = useMemo(
     () => ['すべて', ...Array.from(new Set(items.map((item) => item.triggerLabel)))],
@@ -61,9 +69,14 @@ export default function AutomationTemplateGallery({
     if (!accountId || creating) return
     setCreating(item.key)
     setActionError('')
+    const slot = `${accountId}:${item.key}`
+    const operationKey = operationKeysRef.current[slot]
+      ?? (operationKeysRef.current[slot] = crypto.randomUUID())
     try {
-      const response = await api.automations.createDraftFromTemplate(item.key, accountId)
+      const response = await api.automations.createDraftFromTemplate(item.key, accountId, operationKey)
       if (!response.success) throw new Error(response.error)
+      // 操作はここで完了。次の「これで作る」は別の新規作成なので鍵を捨てる。
+      delete operationKeysRef.current[slot]
       router.push(`/automations/drafts?id=${encodeURIComponent(response.data.id)}`)
     } catch {
       setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。')
@@ -103,13 +116,13 @@ export default function AutomationTemplateGallery({
 
   return (
     <section data-design-node="WjYAC" data-automation-template-gallery="v6">
-      <div className="mb-4 rounded-v6-control border border-info bg-info-bg px-4 py-3 text-sm text-v6-ink-secondary">
+      <Notice tone="info" className="mb-4">
         見本を選ぶと、公開されていない下書きを作ります。タグやシナリオは、次の画面でこのアカウントのものを選び直してください。
-      </div>
+      </Notice>
       {actionError ? (
-        <div className="mb-4 rounded-v6-control border border-v6-danger-border bg-v6-danger-bg px-4 py-3 text-sm text-v6-danger-text">
+        <Notice tone="danger" className="mb-4">
           {actionError}
-        </div>
+        </Notice>
       ) : null}
       <div className="mb-4 flex flex-wrap gap-2" aria-label="きっかけで絞り込む">
         {triggerFilters.map((filter) => (
@@ -133,24 +146,24 @@ export default function AutomationTemplateGallery({
         {visibleItems.map((item, index) => {
           const Icon = ICONS[index % ICONS.length]
           return (
-            <article key={item.key} className="rounded-v6-card border border-hairline bg-canvas p-5 shadow-v6-card">
+            <article key={item.key} className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
               <div className="mb-4 flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-v6-control bg-v6-action-soft text-v6-action">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-action-soft text-action">
                   <Icon aria-hidden="true" size={20} strokeWidth={1.8} />
                 </span>
                 <div className="min-w-0">
-                  <h2 className="text-base font-semibold text-v6-ink">{item.name}</h2>
-                  <p className="mt-1 text-sm leading-6 text-v6-ink-faint">{item.description}</p>
+                  <h2 className="text-base font-semibold text-ink">{item.name}</h2>
+                  <p className="mt-1 text-sm leading-6 text-ink-faint">{item.description}</p>
                 </div>
               </div>
               <dl className="mb-5 grid grid-cols-3 gap-x-3 gap-y-2 text-sm">
-                <dt className="text-v6-ink-faint">きっかけ</dt>
-                <dd className="col-span-2 font-medium text-v6-ink-secondary">{item.triggerLabel}</dd>
-                <dt className="text-v6-ink-faint">すること</dt>
-                <dd className="col-span-2 font-medium text-v6-ink-secondary">{item.actionLabel}</dd>
+                <dt className="text-ink-faint">きっかけ</dt>
+                <dd className="col-span-2 font-medium text-ink-secondary">{item.triggerLabel}</dd>
+                <dt className="text-ink-faint">すること</dt>
+                <dd className="col-span-2 font-medium text-ink-secondary">{item.actionLabel}</dd>
               </dl>
               <Button
-                variant="primary"
+                variant="secondary"
                 className="w-full justify-center"
                 disabled={creating !== null || canManage !== true}
                 onClick={() => void create(item)}

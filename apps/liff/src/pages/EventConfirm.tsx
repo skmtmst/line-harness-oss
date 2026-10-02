@@ -1,29 +1,46 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, type EventDetail, type EventSlot } from '../lib/api.js';
-
-function formatJp(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', weekday: 'short',
-  });
-}
+import { formatJstEventAt } from '../lib/datetime.js';
+import { logFailure } from '../lib/user-message.js';
+import LoadErrorView from '../components/LoadErrorView.js';
+import LoadingView from '../components/LoadingView.js';
+import Icon from '../components/ui/Icon.js';
+import Button from '../components/ui/Button.js';
+import BottomBar from '../components/ui/BottomBar.js';
+import PageHeader from '../components/ui/PageHeader.js';
 
 function nanoid(): string {
   return crypto.randomUUID();
 }
 
+/**
+ * 2-b 申し込みの確認。送る中身のカード＋案内の帯＋備考。
+ * 進む操作 (申し込む) は下の操作の帯にだけ置く。
+ * 質問・備考・冪等キー・送信の失敗の扱いはそのまま。見た目だけ ★V7。
+ *
+ * 満席で待ちに入ったとき Worker は 200 で {waitlisted: true} を返す。
+ * そのときは 2-d (キャンセル待ちに入りました) へ進む。
+ */
 export default function EventConfirm() {
   const { id } = useParams<{ id: string }>();
   const [search] = useSearchParams();
   const slotId = search.get('slotId') ?? '';
   const navigate = useNavigate();
+  // ?liffId=... を引き継ぐ (再読み込みで失わない)。
+  const { search: locationSearch } = useLocation();
 
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [slot, setSlot] = useState<EventSlot | null>(null);
   const [note, setNote] = useState('');
+  // カスタム質問への回答。質問id → 文字列、複数選択は文字列配列。
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 読み込みの失敗と送信の失敗は別に持つ。送信の失敗は入力を消さずその場に出す。
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [slotMissing, setSlotMissing] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Stable Idempotency-Key — regenerate would defeat the purpose if user
   // taps twice. One key per Confirm-screen mount.
@@ -33,119 +50,261 @@ export default function EventConfirm() {
     if (!id || !slotId) return;
     let cancelled = false;
     async function load() {
+      setLoadFailed(false);
+      setSubmitError(null);
+      setSlotMissing(false);
       try {
         const [e, s] = await Promise.all([api.getEvent(id!), api.getEventSlots(id!)]);
         if (cancelled) return;
         setEvent(e);
         const found = s.items.find((x) => x.id === slotId);
         if (!found) {
-          // 枠が消えた / 満員でフィルタアウト / 開始済 → 詳細画面に戻すべき。
+          // 枠が消えた / 満員でフィルタアウト / 開始済 → 詳細画面に戻す。
           // null のまま放置すると無限ローディングになる。
-          setError('選択した枠は受付終了しました。別の日時をお選びください。');
+          setSlotMissing(true);
           return;
         }
         setSlot(found);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (!cancelled) {
+          logFailure('event-confirm', err);
+          setLoadFailed(true);
+        }
       }
     }
     void load();
     return () => { cancelled = true; };
-  }, [id, slotId]);
+  }, [id, slotId, reloadKey]);
+
+  function goDone(query: string) {
+    const keep = new URLSearchParams(locationSearch);
+    const next = new URLSearchParams(query);
+    for (const [k, v] of keep) {
+      if (k !== 'slotId' && !next.has(k)) next.set(k, v);
+    }
+    navigate({ pathname: `/events/${id}/done`, search: next.toString() });
+  }
 
   async function submit() {
     if (!id || !slotId) return;
     if (note.length > 5000) {
-      setError('備考は5000字以内で入力してください');
+      setSubmitError('備考は5000字以内で入力してください');
+      return;
+    }
+    // 必須質問の未回答を送信前に止める。サーバ側でも同じ検査をしている。
+    const missing = (event?.questions ?? []).find((q) => {
+      if (!q.required) return false;
+      const a = answers[q.id];
+      return a == null || (typeof a === 'string' ? a.trim() === '' : a.length === 0);
+    });
+    if (missing) {
+      setSubmitError(`「${missing.label}」が未回答です`);
       return;
     }
     setSubmitting(true);
-    setError(null);
+    setSubmitError(null);
     try {
-      const res = await api.createEventBooking(id, { slot_id: slotId, customer_note: note || null }, idemKey);
-      navigate(`/events/${id}/done?bookingId=${res.id}&status=${res.status}`);
+      const hasAnswers = Object.keys(answers).length > 0;
+      const res = await api.createEventBooking(
+        id,
+        { slot_id: slotId, customer_note: note || null, ...(hasAnswers ? { answers } : {}) },
+        idemKey,
+      );
+      const startsAt = `startsAt=${encodeURIComponent(slot?.starts_at ?? '')}`;
+      if ('waitlisted' in res) {
+        goDone(`status=waitlisted&${startsAt}`);
+        return;
+      }
+      goDone(`bookingId=${res.id}&status=${res.status}&${startsAt}`);
     } catch (err) {
+      logFailure('create-event-booking', err);
       const e = err as { status?: number; body?: { error?: string } };
       const code = e.body?.error;
       const msg = (() => {
         switch (code) {
           case 'slot_full': return 'すでに満員になりました。別の日時をお選びください。';
           case 'over_friend_limit': return 'このイベントへの予約上限に達しています。';
+          case 'duplicate_friend_booking': return 'この時間はすでに申し込み済みです。自分のイベントで確認してください。';
+          case 'entry_closed': return '申込期限を過ぎています。別のイベントをお探しください。';
           case 'slot_started': return 'この枠は既に開始されています。';
           case 'slot_inactive': return 'この枠は受付を締め切りました。';
           case 'event_unpublished': return 'このイベントは現在受付を停止しています。';
           case 'unauthorized':
           case 'friend_not_found':
             return 'LINE 認証に失敗しました。一度 LINE のトークルームに戻り、友だち追加が完了していることを確認してから再度お試しください。';
+          case 'missing_required_answers': return '未回答の必須項目があります。入力してからもう一度お試しください。';
           case 'idempotent_in_progress': return '前回のリクエストを処理中です。少しお待ちください。';
-          default: return err instanceof Error ? err.message : String(err);
+          default: return '予約を送れませんでした。時間をおいて、もう一度お試しください。';
         }
       })();
-      setError(msg);
+      setSubmitError(msg);
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (error) {
+  function back() {
+    navigate(-1);
+  }
+
+  if (loadFailed || slotMissing || !event || !slot) {
     return (
-      <div className="p-8 text-center">
-        <div className="text-red-700 mb-4">{error}</div>
-        <button
-          onClick={() => navigate(`/events/${id}`)}
-          className="px-4 py-2 border rounded"
-        >
-          イベントページに戻る
-        </button>
+      <div className="min-h-screen bg-ground">
+        <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
+          <PageHeader title="申し込みの確認" onBack={back} />
+          {loadFailed ? (
+            <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />
+          ) : slotMissing ? (
+            <div className="space-y-4 text-center">
+              <p className="pt-8 text-sm leading-6 text-ink-secondary">
+                選択した枠は受付終了しました。別の日時をお選びください。
+              </p>
+              <Button variant="primary" onClick={() => navigate({ pathname: `/events/${id}`, search: locationSearch })}>
+                イベントページに戻る
+              </Button>
+            </div>
+          ) : (
+            <LoadingView />
+          )}
+        </div>
       </div>
     );
   }
-  if (!event || !slot) {
-    return <div className="p-8 text-center text-gray-500">読み込み中...</div>;
-  }
+
+  const infoText = event.requires_approval === 1
+    ? 'このイベントは承認制です。受付後、運営が承認するまでお待ちください。キャンセルは期限まで「自分のイベント」からできます（期限はイベントごとに違います）。'
+    : 'キャンセルは期限まで「自分のイベント」からできます（期限はイベントごとに違います）。';
 
   return (
-    <div className="p-4 pb-20">
-      <h1 className="text-lg font-bold mb-3">予約内容の確認</h1>
-      <div className="border rounded p-3 mb-4 space-y-1">
-        <div className="text-sm font-semibold">{event.name}</div>
-        <div className="text-sm text-gray-700">📅 {formatJp(slot.starts_at)}</div>
-        {event.venue_name && <div className="text-sm text-gray-700">📍 {event.venue_name}</div>}
-      </div>
+    <div className="min-h-screen bg-ground">
+      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-28">
+        <PageHeader title="申し込みの確認" onBack={back} />
+        <dl className="space-y-3 rounded-xl border border-hairline bg-canvas p-4 text-sm">
+          <Row label="イベント" value={event.name} />
+          <Row label="日時" value={formatJstEventAt(slot.starts_at)} />
+          {event.venue_name && <Row label="場所" value={event.venue_name} />}
+        </dl>
 
-      {event.requires_approval === 1 && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-900 text-xs rounded p-2 mb-3">
-          このイベントは承認制です。受付後、運営が承認するまでお待ちください。
+        <div className="flex gap-2 rounded-lg bg-info-bg p-3 text-xs leading-5 text-ink-secondary">
+          <Icon name="info" className="h-4 w-4 shrink-0" />
+          <p>{infoText}</p>
         </div>
-      )}
 
-      <label className="block text-sm font-medium mb-1">備考（任意）</label>
-      <textarea
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        rows={4}
-        maxLength={5000}
-        className="w-full border rounded p-2 text-sm"
-        placeholder="質問や伝えたいことがあれば..."
-      />
-      <div className="text-xs text-gray-500 text-right">{note.length} / 5000</div>
+        {(event.questions ?? []).length > 0 && (
+          <div className="space-y-4">
+            {(event.questions ?? []).map((q) => {
+              const value = answers[q.id];
+              return (
+                <div key={q.id}>
+                  <span className="mb-1 block text-sm text-ink" id={`eq-label-${q.id}`}>
+                    {q.label}
+                    {q.required ? (
+                      <span className="ml-1 text-danger" aria-label="必須">*</span>
+                    ) : (
+                      <span className="ml-1 text-xs text-ink-faint">任意</span>
+                    )}
+                  </span>
+                  {q.type === 'text' && (
+                    <input
+                      type="text"
+                      aria-labelledby={`eq-label-${q.id}`}
+                      value={typeof value === 'string' ? value : ''}
+                      onChange={(e) => setAnswers((cur) => ({ ...cur, [q.id]: e.target.value }))}
+                      className="w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-ink"
+                    />
+                  )}
+                  {q.type === 'textarea' && (
+                    <textarea
+                      aria-labelledby={`eq-label-${q.id}`}
+                      value={typeof value === 'string' ? value : ''}
+                      onChange={(e) => setAnswers((cur) => ({ ...cur, [q.id]: e.target.value }))}
+                      rows={3}
+                      className="w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-ink"
+                    />
+                  )}
+                  {q.type === 'radio' && (
+                    <div className="space-y-1" role="radiogroup" aria-labelledby={`eq-label-${q.id}`}>
+                      {(q.options ?? []).map((opt) => (
+                        <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-ink">
+                          <input
+                            type="radio"
+                            name={`eq-${q.id}`}
+                            checked={value === opt}
+                            onChange={() => setAnswers((cur) => ({ ...cur, [q.id]: opt }))}
+                            className="h-4 w-4 accent-accent-deep"
+                          />
+                          {opt}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {q.type === 'checkbox' && (
+                    <div className="space-y-1" role="group" aria-labelledby={`eq-label-${q.id}`}>
+                      {(q.options ?? []).map((opt) => {
+                        const chosen = Array.isArray(value) ? value : [];
+                        const checked = chosen.includes(opt);
+                        return (
+                          <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-ink">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setAnswers((cur) => ({
+                                  ...cur,
+                                  [q.id]: checked ? chosen.filter((x) => x !== opt) : [...chosen, opt],
+                                }))
+                              }
+                              className="h-4 w-4 accent-accent-deep"
+                            />
+                            {opt}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-      {error && <div className="bg-red-50 text-red-700 p-2 rounded mt-2 text-sm">{error}</div>}
+        <label className="block">
+          <span className="text-sm text-ink">
+            備考 <span className="text-xs text-ink-faint">任意</span>
+          </span>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={4}
+            maxLength={5000}
+            placeholder="質問や伝えたいことがあれば..."
+            className="mt-1 min-h-24 w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-ink placeholder:text-ink-faint focus-visible:outline-2 focus-visible:outline-ink"
+          />
+        </label>
+        <p className="text-right text-xs text-ink-faint">{note.length} / 5000</p>
 
-      <button
-        onClick={submit}
-        disabled={submitting}
-        className="mt-5 w-full py-3 bg-blue-600 text-white rounded font-medium disabled:opacity-50"
-      >
-        {submitting ? '送信中...' : '予約をリクエスト'}
-      </button>
-      <button
-        onClick={() => navigate(-1)}
-        disabled={submitting}
-        className="mt-2 w-full py-2 text-gray-600 text-sm"
-      >
-        戻る
-      </button>
+        {submitError && (
+          <p role="alert" className="text-sm leading-6 text-danger">
+            {submitError}
+          </p>
+        )}
+      </div>
+      <BottomBar>
+        <Button variant="primary" onClick={submit} disabled={submitting}>
+          {submitting ? '送信中...' : '申し込む'}
+        </Button>
+      </BottomBar>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className="shrink-0 text-ink-secondary">{label}</dt>
+      <dd className="min-w-0 truncate font-medium text-ink" title={value}>
+        {value}
+      </dd>
     </div>
   );
 }

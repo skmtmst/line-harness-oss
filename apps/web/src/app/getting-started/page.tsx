@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ListState from '@/components/shared/list-state'
@@ -34,48 +34,58 @@ export default function GettingStartedPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [steps, setSteps] = useState<StepResult[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  // M017：捕まえた失敗を共通部品へ渡すために持つ。
+  const [loadError, setLoadError] = useState<unknown>(null)
 
-  useEffect(() => {
+  /*
+   * M017：読み込み失敗面に再試行口を付ける。押すとここへ戻る。
+   * 読み直しを押した瞬間に読込面へ切り替わるので、二度押しはできない。
+   */
+  const load = useCallback(async () => {
     if (accountLoading) return
     const accountId = selectedAccountId
-    let alive = true
     setStatus('loading')
-
-    void api.gettingStarted.get(accountId ?? undefined).then((res) => {
-      if (!alive) return
-      if (!res.success) {
-        setStatus('error')
-        return
-      }
+    setLoadError(null)
+    try {
+      const res = await api.gettingStarted.get(accountId ?? undefined)
+      if (!res.success) throw new Error(res.error)
       setSteps(buildStepsFromApi(res.data.steps))
       setStatus('ready')
-    }).catch(() => {
-      if (alive) setStatus('error')
-    })
-
-    return () => {
-      alive = false
+    } catch (caught) {
+      setLoadError(caught)
+      setStatus('error')
     }
   }, [accountLoading, selectedAccountId])
 
+  useEffect(() => {
+    void load()
+  }, [load])
+
   const reasons = stoppedReasons(steps)
+  // 主役は「いまの手順」（終わっていない最初の段）だけ。他の段の行き先は枠にする。
+  const currentKey = steps.find((step) => step.state !== 'done')?.key ?? null
 
   return (
     <div className={styles.page}>
+      {/*
+        読込面（loading）では共通部品が onRetry を見ない。
+        失敗面にだけ再試行口が出る。
+      */}
       {status !== 'ready' ? (
-        <ListState kind={status === 'error' ? 'error' : 'loading'} />
+        <ListState
+          kind={status === 'error' ? 'error' : 'loading'}
+          error={status === 'error' ? loadError : undefined}
+          onRetry={() => void load()}
+        />
       ) : (
         <>
+          {/*
+            帯は進み具合の1行だけ。順番の飛ばし方・終わりの判断基準・
+            ダッシュボードの帯の扱いは右の「気をつけること」が持つため、
+            ここでは繰り返さない（★V7 帯は1本）。
+          */}
           <div className={styles.progress} role="note">
-            <div>
-              <strong>{progressHeadline(steps)}</strong>
-              <span>
-                順番はおすすめです。飛ばして進んでもかまいません。終わったかどうかは、画面を開いたかではなく、実際に作られたもので判断します。
-              </span>
-            </div>
-            <span className={styles.headlineNote}>
-              全部終わると、ダッシュボードの帯は出なくなります
-            </span>
+            <strong>{progressHeadline(steps)}</strong>
           </div>
 
           {/*
@@ -88,7 +98,7 @@ export default function GettingStartedPage() {
           <div className={styles.columns}>
             <ol className={styles.steps} aria-label="はじめの設定の順路">
               {steps.map((step) => (
-                <StepRow key={step.key} step={step} />
+                <StepRow key={step.key} step={step} current={step.key === currentKey} />
               ))}
             </ol>
 
@@ -113,10 +123,10 @@ export default function GettingStartedPage() {
   )
 }
 
-function StepRow({ step }: { step: StepResult }) {
+function StepRow({ step, current }: { step: StepResult; current: boolean }) {
   const done = step.state === 'done'
   return (
-    <li className={styles.step} data-step-state={step.state}>
+    <li className={styles.step} data-step-state={step.state} data-current={current ? 'true' : 'false'}>
       <span className={done ? [styles.mark, styles.markDone].join(' ') : styles.mark} aria-hidden>
         {done ? '✓' : step.ordinal}
       </span>

@@ -3,21 +3,44 @@ import type { MediaUploadSession } from '@/lib/api'
 
 const MEBIBYTE = 1024 * 1024
 
-export const MEDIA_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,video/mp4,audio/mpeg,audio/mp4,application/pdf'
+/*
+ * 新規登録で受け付ける形式。口（worker の DIRECT_ALLOWED）と同じ列挙。
+ * `image/*` のような前方一致にすると、口に無い形式（SVG・WAVなど）を
+ * 選んだ時点で弾けず、まとめて送った口の400で有効なファイルまで巻き込む。
+ * 口側へ形式を足したらここも足す。容量の上限も口と同じ値に揃える。
+ */
+const MEDIA_SPECS: Record<string, { ext: readonly string[]; maxBytes: number }> = {
+  'image/png': { ext: ['png'], maxBytes: 10 * MEBIBYTE },
+  'image/jpeg': { ext: ['jpg', 'jpeg'], maxBytes: 10 * MEBIBYTE },
+  'image/gif': { ext: ['gif'], maxBytes: 10 * MEBIBYTE },
+  'image/webp': { ext: ['webp'], maxBytes: 10 * MEBIBYTE },
+  'video/mp4': { ext: ['mp4'], maxBytes: 200 * MEBIBYTE },
+  'audio/mpeg': { ext: ['mp3'], maxBytes: 200 * MEBIBYTE },
+  'audio/mp4': { ext: ['m4a'], maxBytes: 200 * MEBIBYTE },
+  'application/pdf': { ext: ['pdf'], maxBytes: 20 * MEBIBYTE },
+}
+
+export const MEDIA_ACCEPT = Object.keys(MEDIA_SPECS).join(',')
 
 export function mediaFileLimitBytes(file: Pick<File, 'type'>): number | null {
-  if (file.type.startsWith('image/')) return 10 * MEBIBYTE
-  if (file.type.startsWith('audio/')) return 200 * MEBIBYTE
-  if (file.type === 'video/mp4') return 200 * MEBIBYTE
-  if (file.type === 'application/pdf') return 20 * MEBIBYTE
-  return null
+  return MEDIA_SPECS[file.type]?.maxBytes ?? null
+}
+
+function extensionOfFilename(name: string): string {
+  const dot = name.lastIndexOf('.')
+  return dot >= 0 ? name.slice(dot + 1).toLowerCase() : ''
 }
 
 export function validateMediaFile(file: Pick<File, 'name' | 'size' | 'type'>): string {
-  const limit = mediaFileLimitBytes(file)
-  if (limit == null) return 'この形式は登録できません'
+  const spec = MEDIA_SPECS[file.type]
+  if (!spec) return 'この形式は登録できません'
+  // 口は拡張子も見る（`spec.ext.includes(ext)`）。中身PNGに `.jpg` など
+  // 食い違う名前は選んだ時点で断り、有効なファイルの足を引っ張らせない。
+  if (!spec.ext.includes(extensionOfFilename(file.name))) {
+    return '拡張子が中身の形式と合っていません'
+  }
   if (file.size < 1) return '中身が空のファイルは登録できません'
-  if (file.size > limit) return `${Math.round(limit / MEBIBYTE)}MBを超えています`
+  if (file.size > spec.maxBytes) return `${Math.round(spec.maxBytes / MEBIBYTE)}MBを超えています`
   return ''
 }
 

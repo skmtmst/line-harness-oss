@@ -15,7 +15,10 @@
 import { useState } from 'react'
 import { newBlockId, type FormChoice, type FormInputBlock, type FormSection } from '@line-crm/shared'
 import ActionEditor from './action-editor'
-import { cellInput, fieldSelect, miniButton, type FormRefs } from './form-refs'
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+import { cellInput, miniButton, type FormRefs } from './form-refs'
+import Button from '@/components/shared/button'
 
 const MODES: { value: NonNullable<FormInputBlock['choiceMode']>; label: string }[] = [
   { value: 'tag', label: 'タグ追加' },
@@ -84,7 +87,7 @@ export default function ChoiceTable({
               onClick={() => onChange({ choiceMode: m.value })}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 mode === m.value
-                  ? 'bg-accent-soft text-accent'
+                  ? 'bg-accent-soft text-accent-deep'
                   : 'text-ink-secondary hover:bg-canvas-sunken'
               }`}
             >
@@ -94,20 +97,19 @@ export default function ChoiceTable({
         </div>
 
         {mode === 'friendField' && (
-          <select
+          <Select
             value={block.choiceFriendFieldId ?? ''}
-            onChange={(e) => onChange({ choiceFriendFieldId: e.target.value || null })}
-            className={fieldSelect}
+            onChange={(value) => onChange({ choiceFriendFieldId: value || null })}
             aria-label="登録する友だち情報欄"
-          >
-            <option value="">— 情報欄を選ぶ —</option>
-            {refs.friendFields.map((f) => (
-              <option key={f.id} value={f.id} disabled={f.ecIsMaster}>
-                {f.name}
-                {f.ecIsMaster ? '（EC側が正）' : ''}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: '— 情報欄を選ぶ —' },
+              ...refs.friendFields.map((f) => ({
+                value: f.id,
+                label: `${f.name}${f.ecIsMaster ? '（EC側が正）' : ''}`,
+                disabled: f.ecIsMaster,
+              })),
+            ]}
+          />
         )}
       </div>
 
@@ -133,19 +135,15 @@ export default function ChoiceTable({
                 />
 
                 {mode === 'tag' && (
-                  <select
+                  <Select
                     value={choice.tagId ?? ''}
-                    onChange={(e) => patchChoice(choice.id, { tagId: e.target.value || null })}
-                    className={cellInput}
+                    onChange={(value) => patchChoice(choice.id, { tagId: value || null })}
                     aria-label="付けるタグ"
-                  >
-                    <option value="">— 付けない —</option>
-                    {refs.tags.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: '', label: '— 付けない —' },
+                      ...refs.tags.map((t) => ({ value: t.id, label: t.name })),
+                    ]}
+                  />
                 )}
 
                 {mode === 'friendField' && (
@@ -159,16 +157,13 @@ export default function ChoiceTable({
                 )}
 
                 {mode === 'action' && (
-                  <button
-                    onClick={() =>
+                  <Button variant="secondary" className={(`${miniButton} border-hairline rounded-control border px-2 py-1.5 text-left`) + ' h-auto whitespace-normal'} onClick={() =>
                       setOpenChoiceId(openChoiceId === choice.id ? null : choice.id)
-                    }
-                    className={`${miniButton} border-hairline rounded-control border px-2 py-1.5 text-left`}
-                  >
+                    }>
                     {choice.actions?.length
                       ? `${choice.actions.length}件の動作`
                       : '動作を決める'}
-                  </button>
+                  </Button>
                 )}
 
                 <div className="flex items-center gap-1 whitespace-nowrap">
@@ -224,47 +219,39 @@ export default function ChoiceTable({
                   )}
 
                   <div className="flex flex-wrap items-center gap-4">
-                    <label className="text-ink-secondary flex items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={choice.defaultSelected ?? false}
-                        onChange={(e) => {
-                          // 単一選択（ラジオ・プルダウン）で初期選択は1つだけ。
-                          // 新しく付けた選択肢を残し、他の初期選択を外す。
-                          if (
-                            e.target.checked &&
-                            (block.type === 'radio' || block.type === 'select')
-                          ) {
-                            setChoices(
-                              choices.map((c) =>
-                                c.id === choice.id
-                                  ? { ...c, defaultSelected: true }
-                                  : { ...c, defaultSelected: false },
-                              ),
-                            )
-                            return
-                          }
-                          patchChoice(choice.id, { defaultSelected: e.target.checked })
-                        }}
-                      />
-                      はじめから選んでおく
-                    </label>
-
-                    <label className="text-ink-secondary flex items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={choice.capacity?.enabled ?? false}
-                        onChange={(e) =>
-                          patchChoice(choice.id, {
-                            capacity: {
-                              enabled: e.target.checked,
-                              limit: choice.capacity?.limit ?? 10,
-                            },
-                          })
+                    <Checkbox
+                      checked={choice.defaultSelected ?? false}
+                      onCheckedChange={(checked) => {
+                        // 単一選択（ラジオ・プルダウン）で初期選択は1つだけ。
+                        // 新しく付けた選択肢を残し、他の初期選択を外す。
+                        if (
+                          checked &&
+                          (block.type === 'radio' || block.type === 'select')
+                        ) {
+                          setChoices(
+                            choices.map((c) =>
+                              c.id === choice.id
+                                ? { ...c, defaultSelected: true }
+                                : { ...c, defaultSelected: false },
+                            ),
+                          )
+                          return
                         }
-                      />
-                      定員を決める
-                    </label>
+                        patchChoice(choice.id, { defaultSelected: checked })
+                      }}
+                    >はじめから選んでおく</Checkbox>
+
+                    <Checkbox
+                      checked={choice.capacity?.enabled ?? false}
+                      onCheckedChange={(checked) =>
+                        patchChoice(choice.id, {
+                          capacity: {
+                            enabled: checked,
+                            limit: choice.capacity?.limit ?? 10,
+                          },
+                        })
+                      }
+                    >定員を決める</Checkbox>
 
                     {choice.capacity?.enabled && (
                       <label className="text-ink-secondary flex items-center gap-1 text-xs">
@@ -309,7 +296,7 @@ export default function ChoiceTable({
                           <button
                             type="button"
                             onClick={() => patchChoice(choice.id, { jumpToSectionId: null })}
-                            className="text-accent ml-2 underline"
+                            className="text-action ml-2 underline"
                           >
                             分岐設定を外す
                           </button>
@@ -321,20 +308,17 @@ export default function ChoiceTable({
                       <span className="text-ink-secondary mb-1 block text-xs font-medium">
                         選んだ人を飛ばすページ
                       </span>
-                      <select
+                      <Select
                         value={choice.jumpToSectionId ?? ''}
-                        onChange={(e) =>
-                          patchChoice(choice.id, { jumpToSectionId: e.target.value || null })
+                        onChange={(value) =>
+                          patchChoice(choice.id, { jumpToSectionId: value || null })
                         }
-                        className={cellInput}
-                      >
-                        <option value="">— 次のページへ進む —</option>
-                        {sections.map((s, i) => (
-                          <option key={s.id} value={s.id}>
-                            {i + 1}. {s.name}
-                          </option>
-                        ))}
-                      </select>
+                        aria-label="選んだ人を飛ばすページ"
+                        options={[
+                          { value: '', label: '— 次のページへ進む —' },
+                          ...sections.map((s, i) => ({ value: s.id, label: `${i + 1}. ${s.name}` })),
+                        ]}
+                      />
                       <span className="text-ink-faint mt-1 block text-xs">
                         決めると、この選択肢を選んだ人だけ別のページへ進みます。
                       </span>
@@ -348,7 +332,7 @@ export default function ChoiceTable({
 
         <div className="border-hairline flex flex-wrap gap-2 border-t p-2">
           <button onClick={() => addChoice()} className={miniButton}>
-            ＋ 選択肢を追加
+            ＋ 選択肢を追加する
           </button>
           <button
             onClick={() => addChoice(choices[choices.length - 1])}
@@ -362,7 +346,7 @@ export default function ChoiceTable({
             disabled={choices.some((c) => c.isOther)}
             className={`${miniButton} disabled:opacity-40`}
           >
-            ＋「その他」を追加
+            ＋「その他」を追加する
           </button>
         </div>
       </div>

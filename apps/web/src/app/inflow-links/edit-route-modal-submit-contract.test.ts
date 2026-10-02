@@ -40,14 +40,15 @@ describe('リファラルリンク編集窓の保存 (#1058)', () => {
 
   it('新規と更新、どちらの口でも失敗を拾う', () => {
     const body = fnBody(MODAL, 'const doSave = async ()')
-    expect(body).toContain('api.entryRoutes.create(form)')
+    // R39: 新規は選択中アカウントの所属を付けて作る。
+    expect(body).toContain('api.entryRoutes.create({ ...form, lineAccountId: accountId ?? null })')
     expect(body).toContain('api.entryRoutes.update(route!.id, form)')
     expect(body).toContain('if (res.success) onSaved(res.data, isNew)')
-    expect(body).toContain("else setError(res.error ?? '保存に失敗しました')")
+    expect(body).toContain("else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')")
   })
 
-  it('失敗は窓の中の赤い帯に出る', () => {
-    expect(MODAL).toContain('{error && (')
-    expect(MODAL).toContain('bg-red-50')
+  it('失敗は窓の中に出る（★V7: 共通 Dialog のエラー表示へ）', () => {
+    expect(MODAL).toContain("import Dialog from '@/components/shared/dialog'")
+    expect(MODAL).toContain('error={error || undefined}')
   })
 })

@@ -26,6 +26,8 @@ vi.mock('@line-crm/db', async (importOriginal) => {
   countFailedWebhookInteractionsForRetry: vi.fn().mockResolvedValue(0),
   // IDEA-26: 結果不明の失敗件数(まとめて再送しない対象)。
   countUnverifiedWebhookInteractions: vi.fn().mockResolvedValue(0),
+  // d23b R408: まとめて再送の対象外に残った件数(消えた・止まった送り先等)。
+  countExcludedFailedWebhookInteractions: vi.fn().mockResolvedValue(0),
   listWebhookInteractions: vi.fn(),
   getOutgoingWebhookDeliverySummaries: vi.fn(),
   updateIncomingWebhookConfig: vi.fn(),
@@ -52,7 +54,14 @@ vi.mock('@line-crm/db', async (importOriginal) => {
     }
     return (row?.secret as string | null) ?? null;
   }),
+  // S: 前の合言葉の併用。個別の試験で立てる場合は mockResolvedValue で差し替える。
+  resolvePreviousWebhookSecret: vi.fn(async () => null),
+  WEBHOOK_SECRET_PREVIOUS_GRACE_MS: actual.WEBHOOK_SECRET_PREVIOUS_GRACE_MS,
   WEBHOOK_SECRET_MIN_LENGTH: 32,
+  // V: 秘密の値の登録・APIトークン操作は直前の再確認が必要。ここでは
+  // 入力検証を見たいので、再確認済みとして通す。
+  consumeStepUpGrant: vi.fn(async () => true),
+  getAdminSessionByTokenHash: vi.fn(async () => null),
   };
 });
 
@@ -60,6 +69,8 @@ vi.mock('../services/webhook-interactions.js', () => ({
   retryWebhookInteraction: vi.fn(),
   webhookFailureLabel: vi.fn((reason: string | null) => reason ? '安全な失敗理由' : null),
   webhookResponseLabel: vi.fn((row: { status: string }) => row.status === 'failed' ? '処理できませんでした' : '届きました'),
+  // d23d R407: 試しの結果印。実物と同じ形で返す（ラベル化はサービス側の試験で見る）。
+  incomingTestIdempotencyKey: vi.fn((outcome: string) => `incoming-test:${outcome}:uuid-1`),
 }));
 
 // Stub fireEvent to keep receive-endpoint tests focused on signature
@@ -74,8 +85,9 @@ vi.mock('../services/incoming-webhook-actions.js', async (importOriginal) => {
   return {
     ...actual,
     executeIncomingWebhookActions: vi.fn().mockResolvedValue({
-      matchedFriendId: null, executed: 0, failed: 0,
+      matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'not_found',
     }),
+    previewIncomingWebhook: vi.fn(),
   };
 });
 
@@ -86,6 +98,9 @@ vi.mock('../services/outgoing-webhook-delivery.js', async (importOriginal) => {
   return {
     ...actual,
     deliverWebhook: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 }),
+    // d23b R419: 試し送信は1回固定の配送経路を呼ぶ。deliverWebhook を
+    // 別途モックしても内部呼び出しは通らないので、deliverOnce も差し替える。
+    deliverOnce: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 }),
   };
 });
 
@@ -117,12 +132,14 @@ import {
   backfillWebhookSecrets,
   hasWebhookSecret,
   resolveWebhookSecret,
+  resolvePreviousWebhookSecret,
+  listIncomingWebhookUnmatched,
 } from '@line-crm/db';
 import { retryWebhookInteraction } from '../services/webhook-interactions.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { fireEvent } from '../services/event-bus.js';
-import { executeIncomingWebhookActions } from '../services/incoming-webhook-actions.js';
-import { deliverWebhook } from '../services/outgoing-webhook-delivery.js';
+import { executeIncomingWebhookActions, previewIncomingWebhook } from '../services/incoming-webhook-actions.js';
+import { deliverWebhook, deliverOnce } from '../services/outgoing-webhook-delivery.js';
 import type { Env } from '../index.js';
 import { webhooks } from './webhooks.js';
 
@@ -161,6 +178,8 @@ function setupApp(
     c.set('staff', {
       id: 'staff-1', name: 'Staff', role, readOnly: false, tenantId, permissionKeys,
     });
+    // V: 大事な操作の直前再確認。ここでは入力検証を見たいので確認済みとして通す。
+    c.req.raw.headers.set('x-step-up-token', 'test-step-up');
     return next();
   });
   app.route('/', webhooks);
@@ -181,7 +200,14 @@ const receiptPrepare = (sql: string) => ({ bind: () => ({
   first: async () => sql.includes('SELECT source_event_id,status,received_at')
     ? { source_event_id: 'receipt-event-1', status: 'processing', received_at: '2026-09-12T00:00:00.000Z' }
     : null,
+  // S: 複数一致の届物が候補の友だち名を引く口（/unmatched の一覧）。
+  all: async () => ({
+    results: sql.includes('display_name FROM friends')
+      ? friendNameRows
+      : [],
+  }),
 }) });
+let friendNameRows: Array<{ id: string; display_name: string | null }> = [];
 const baseEnv = {
   DB: {
     prepare: receiptPrepare,
@@ -214,15 +240,19 @@ beforeEach(() => {
   vi.mocked(finishWebhookInteraction).mockResolvedValue(undefined);
   vi.mocked(listWebhookInteractions).mockResolvedValue({
     items: [], total: 0, page: 1, limit: 20,
-    summary: { total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0, resultUnknown: 0, averageDurationMs: null },
+    summary: {
+      total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0,
+      resultUnknown: 0, outgoingFailed: 0, retryable: 0, averageDurationMs: null,
+    },
   });
   vi.mocked(listFailedWebhookInteractionsForRetry).mockResolvedValue([]);
   vi.mocked(getOutgoingWebhookDeliverySummaries).mockResolvedValue([]);
   vi.mocked(updateIncomingWebhookMaskedSample).mockResolvedValue(undefined);
   vi.mocked(executeIncomingWebhookActions).mockResolvedValue({
-    matchedFriendId: null, executed: 0, failed: 0,
+    matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'not_found',
   });
   vi.mocked(deliverWebhook).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 });
+  vi.mocked(deliverOnce).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 });
   vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow());
   vi.mocked(getOutgoingWebhookById).mockResolvedValue({
     id: 'wh-1', name: 'test', url: 'https://example.com/hook', event_types: '["*"]',
@@ -1102,7 +1132,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       action_refs_json: '[{"refKind":"tag","refId":"tag-a","refVersionId":null}]',
     }));
     vi.mocked(executeIncomingWebhookActions).mockResolvedValue({
-      matchedFriendId: 'friend-a', executed: 1, failed: 0,
+      matchedFriendId: 'friend-a', executed: 1, failed: 0, matchStatus: 'matched',
     });
     const body = JSON.stringify({ friendId: 'friend-a' });
     const res = await setupApp().request(
@@ -1156,6 +1186,192 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
   });
 });
 
+describe('S: 合言葉の併用期間・受け取りの試し・複数一致の保留', () => {
+  test('入れ替えから24時間は前の合言葉の署名も受け付ける', async () => {
+    // 現行の合言葉では合わないが、併用期間内の前の合言葉では通る。
+    vi.mocked(resolvePreviousWebhookSecret).mockResolvedValue('o'.repeat(32));
+    const body = JSON.stringify({ ping: true });
+    const res = await setupApp().request(
+      '/api/webhooks/incoming/iwh-1/receive',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Signature': await signedWith('o'.repeat(32), body),
+        },
+        body,
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(resolvePreviousWebhookSecret).toHaveBeenCalled();
+  });
+
+  test('併用期間を過ぎた前の合言葉は受け付けない', async () => {
+    // 期限切れ・無い前の合言葉は resolvePreviousWebhookSecret が null を返す。
+    vi.mocked(resolvePreviousWebhookSecret).mockResolvedValue(null);
+    const body = JSON.stringify({ ping: true });
+    const res = await setupApp().request(
+      '/api/webhooks/incoming/iwh-1/receive',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Signature': await signedWith('o'.repeat(32), body),
+        },
+        body,
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(401);
+  });
+
+  test('受け取りの試しは照合と行動の組み立てを返し、実行はしない', async () => {
+    vi.mocked(previewIncomingWebhook).mockResolvedValue({
+      match: { status: 'matched', friendId: 'friend-a' },
+      identityAttempts: [{ kind: 'harness_friend_id', path: '$.friendId', value: 'friend-a' }],
+      actions: [{
+        refIndex: 0,
+        ref: { refKind: 'tag', refId: 'tag-a', refVersionId: null },
+        ok: true,
+        plan: [{ type: 'add_tag' }],
+      }],
+    });
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1/test?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload: { friendId: 'friend-a' } }),
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json() as { data: { match: { status: string }; actions: Array<{ ok: boolean }> } };
+    expect(json.data.match.status).toBe('matched');
+    expect(json.data.actions[0]!.ok).toBe(true);
+    // 試しは実行しない。行動の実行と受領の予約は呼ばれない。
+    expect(executeIncomingWebhookActions).not.toHaveBeenCalled();
+    // 結果はやり取り台帳へ test 種別で分けて残る(v6-26 §9)。
+    // d23d R407: 試算の結果（照合できた）を記録へ残す。試しなので
+    // 相手への応答番号は残さない（実際の受信とは分ける）。
+    expect(createWebhookInteraction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: 'incoming_webhook.test',
+        direction: 'incoming',
+        triggerSummary: expect.stringContaining('友だちと照合できた'),
+        idempotencyKey: expect.stringMatching(/^incoming-test:matched:/),
+      }),
+    );
+    expect(finishWebhookInteraction).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), ACCOUNT_ID,
+      expect.objectContaining({ status: 'succeeded', responseStatus: null }),
+    );
+  });
+
+  // d23d R407: 照合相手がいない試しを「結びつきました」と記録しない。
+  test.each([
+    [
+      'not_found（照合相手なし）',
+      { match: { status: 'not_found' }, identityAttempts: [], actions: [] },
+      '照合相手がいなかった',
+      'incoming-test:not_found:',
+    ],
+    [
+      'ambiguous（候複数）',
+      { match: { status: 'ambiguous', friendIds: ['f-1', 'f-2'] }, identityAttempts: [], actions: [] },
+      '照合候補が複数あった',
+      'incoming-test:ambiguous:',
+    ],
+    [
+      '行動の確認に失敗',
+      {
+        match: { status: 'matched', friendId: 'friend-a' },
+        identityAttempts: [],
+        actions: [{
+          refIndex: 0,
+          ref: { refKind: 'tag', refId: 'tag-x', refVersionId: null },
+          ok: false,
+          error: '対応していない処理です',
+        }],
+      },
+      '行動の確認で不備があった',
+      'incoming-test:invalid:',
+    ],
+  ])('受け取りの試しの記録は試算の結果を残す: %s', async (_name, preview, summaryPart, keyPrefix) => {
+    vi.mocked(previewIncomingWebhook).mockResolvedValue(preview as never);
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1/test?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload: { friendId: 'missing' } }),
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(createWebhookInteraction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: 'incoming_webhook.test',
+        triggerSummary: expect.stringContaining(summaryPart as string),
+        idempotencyKey: expect.stringMatching(new RegExp(`^${keyPrefix}`)),
+      }),
+    );
+  });
+
+  test('受け取りの試しは payload が無ければ400', async () => {
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1/test?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(400);
+    expect(previewIncomingWebhook).not.toHaveBeenCalled();
+  });
+
+  test('複数一致で保留した届物は候補の友だちつきで一覧に出る', async () => {
+    vi.mocked(listIncomingWebhookUnmatched).mockResolvedValue([{
+      id: 'unmatched-1',
+      webhook_id: 'iwh-1',
+      line_account_id: ACCOUNT_ID,
+      source_event_id: 'evt-1',
+      kind: 'ambiguous',
+      status: 'pending',
+      identity_attempts_json: '[{"kind":"verified_email","path":"$.email","value":"a@example.com"}]',
+      masked_shape_json: null,
+      candidate_friend_ids_json: '["f-1","f-2"]',
+      resolved_friend_id: null,
+      resolved_by: null,
+      resolved_at: null,
+      received_at: '2026-09-27T00:00:00.000+09:00',
+      created_at: '2026-09-27T00:00:00.000+09:00',
+      updated_at: '2026-09-27T00:00:00.000+09:00',
+    }]);
+    friendNameRows = [
+      { id: 'f-1', display_name: '田中' },
+      { id: 'f-2', display_name: '佐藤' },
+    ];
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1/unmatched?lineAccountId=${ACCOUNT_ID}`,
+      {},
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json() as { data: Array<{ kind: string; candidates: Array<{ friendId: string; displayName: string | null }> }> };
+    expect(json.data[0]!.kind).toBe('ambiguous');
+    expect(json.data[0]!.candidates).toEqual([
+      { friendId: 'f-1', displayName: '田中' },
+      { friendId: 'f-2', displayName: '佐藤' },
+    ]);
+  });
+});
+
 describe('POST /api/webhooks/outgoing/:id/test', () => {
   test('アカウント内の有効な送り先へ1回試し送信して記録する', async () => {
     const res = await setupApp().request(
@@ -1166,7 +1382,8 @@ describe('POST /api/webhooks/outgoing/:id/test', () => {
     expect(res.status).toBe(200);
     // N-371: 試し送信も共通封筒 {id,type,occurred_at,account_id,data,attempt}
     // で送る。封筒の id と冪等キーは同じ値（再送しても同じ出来事）。
-    const call = vi.mocked(deliverWebhook).mock.calls[0];
+    // d23b R419: 試し送信は送り直し無しの1回固定経路(deliverOnce)を呼ぶ。
+    const call = vi.mocked(deliverOnce).mock.calls[0];
     expect(call?.[0]).toMatchObject({ id: 'wh-1' });
     const sentBody = JSON.parse(call?.[1] ?? '{}') as Record<string, unknown>;
     expect(sentBody).toMatchObject({
@@ -1196,6 +1413,8 @@ describe('Webhookやり取り記録', () => {
     request_body_json: '{"private":"本文"}', response_status: 500,
     attempt_count: 2, duration_ms: 820, failure_reason: 'response_5xx' as const,
     idempotency_key: 'delivery-a', retry_of_id: null,
+    linked_webhook_active: 1 as const, delivery_status: null,
+    delivery_next_retry_at: null,
     started_at: '2026-08-29T10:00:00.000+09:00', completed_at: '2026-08-29T10:00:00.820+09:00',
     created_at: '2026-08-29T10:00:00.000+09:00',
   };
@@ -1203,7 +1422,10 @@ describe('Webhookやり取り記録', () => {
   test('一覧はアカウントを検査し、本文・配送ID・Webhook IDを返さない', async () => {
     vi.mocked(listWebhookInteractions).mockResolvedValue({
       items: [failedRow], total: 1, page: 1, limit: 20,
-      summary: { total: 1, outgoing: 1, incoming: 0, succeeded: 0, failed: 1, resultUnknown: 0, averageDurationMs: 820 },
+      summary: {
+        total: 1, outgoing: 1, incoming: 0, succeeded: 0, failed: 1,
+        resultUnknown: 0, outgoingFailed: 1, retryable: 1, averageDurationMs: 820,
+      },
     });
     const res = await setupApp().request(
       `/api/webhooks/interactions?lineAccountId=${ACCOUNT_ID}`,
@@ -1530,6 +1752,8 @@ describe('N-383 送信eventTypesは実発火種別と照合する', () => {
   test.each([
     '*',                          // 全部送る明示規約
     'friend_add',                 // 実発火種別
+    'form_submitted',             // R150: フォーム回答の実発火種別
+    'booking_created',            // R150: 予約受付の実発火種別
     'ec.order.confirmed',         // EC連携の実発火種別
     'incoming_webhook.custom',    // 受信口ごとの実発火種別
   ])('有効な種別 %j は作成を通す', async (eventType) => {
@@ -1786,7 +2010,7 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
     );
     expect(res.status).toBe(503);
     expect(await res.text()).not.toContain('v1-broken-xyz');
-    expect(deliverWebhook).not.toHaveBeenCalled();
+    expect(deliverOnce).not.toHaveBeenCalled();
   });
 
   test('試し送信は復号した値で署名し、他アカウントは403にする', async () => {
@@ -1798,14 +2022,14 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
     );
     expect(res.status).toBe(200);
     expect(resolveWebhookSecret).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh-1' }), { current: TEST_KEY, previous: undefined });
-    // 署名用の復号は deliverWebhook が行う。ここでは鍵がそのまま渡ることを見る。
+    // 署名用の復号は配送側が行う。ここでは鍵がそのまま渡ることを見る。
     // 呼び出し元で復号した値を詰め替える形に戻すと、鍵を渡し忘れた経路が
     // 黙って署名なしで送るので、鍵の受け渡しの方を固定する(#650 再審査)。
     // N-371/N-372(#940): 本文は共通封筒で、冪等キーは封筒の id と同じ値。
-    const testCall = vi.mocked(deliverWebhook).mock.calls[0]!;
+    const testCall = vi.mocked(deliverOnce).mock.calls[0]!;
     const sentBody = testCall[1] as string;
     const sendOptions = testCall[2] as { idempotencyKey?: string };
-    expect(deliverWebhook).toHaveBeenCalledWith(
+    expect(deliverOnce).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'wh-1', secret_encrypted: 'v1-enc-abc' }),
       expect.stringContaining('webhook.test'),
       expect.objectContaining({ credentialKeys: { current: TEST_KEY, previous: undefined } }),

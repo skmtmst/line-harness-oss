@@ -8,9 +8,10 @@ import {
   type SegmentCondition,
 } from '@/lib/segment-condition'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import { NOT_AVAILABLE, NotConnected } from '@/components/shared/not-connected'
 import { conditionFromSegmentPreset } from './segment-preset'
 
@@ -56,7 +57,6 @@ export default function SegmentPresetControls({
   const [isShared, setIsShared] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const [notice, setNotice] = useState('')
   const currentAccountIdRef = useRef(accountId)
   const loadGenerationRef = useRef(0)
   const saveGenerationRef = useRef(0)
@@ -77,7 +77,6 @@ export default function SegmentPresetControls({
     setLoadError('')
     setSaving(false)
     setSaveError('')
-    setNotice('')
   }, [accountId])
 
   const loadPresets = useCallback(async () => {
@@ -158,7 +157,7 @@ export default function SegmentPresetControls({
       }
       setPresets((items) => [result.data, ...items.filter((item) => item.id !== result.data.id)])
       setSaveOpen(false)
-      setNotice(`「${result.data.name}」として保存しました。`)
+      notifyToast(`「${result.data.name}」として保存しました。`)
     } catch {
       if (currentAccountIdRef.current !== requestAccountId || saveGenerationRef.current !== generation) return
       setSaveError('条件を保存できませんでした。入力内容を確認して、もう一度お試しください。')
@@ -178,7 +177,7 @@ export default function SegmentPresetControls({
     }
     onApply(conditionFromSegmentPreset(preset))
     setChooserOpen(false)
-    setNotice(`「${preset.name}」の条件を読み込みました。`)
+    notifyToast(`「${preset.name}」の条件を読み込みました。`)
   }
 
   return (
@@ -196,7 +195,7 @@ export default function SegmentPresetControls({
               : undefined}
           className="min-h-0 px-3 py-1 text-xs"
         >
-          この条件を保存
+          この条件を保存する
         </Button>
         <Button
           type="button"
@@ -218,15 +217,6 @@ export default function SegmentPresetControls({
             ? '先にLINEアカウントを選ぶと、この条件を保存できます。'
             : '詳細条件を1つ以上入力すると、この条件を保存できます。'}
         </p>
-      ) : null}
-
-      {notice ? (
-        <Notice
-          tone="success"
-          message={notice}
-          onClose={() => setNotice('')}
-          className="mt-3"
-        />
       ) : null}
 
       <Dialog
@@ -251,18 +241,11 @@ export default function SegmentPresetControls({
               autoFocus
             />
           </label>
-          <label className="text-ink-secondary flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={isShared}
-              onChange={(event) => setIsShared(event.target.checked)}
-              className="mt-0.5"
-            />
-            <span>
-              同じLINEアカウントを扱う運用者と共有する
-              <span className="text-ink-faint mt-1 block text-xs">外すと、自分だけが呼び出せます。</span>
-            </span>
-          </label>
+          <Checkbox
+            checked={isShared}
+            onCheckedChange={setIsShared}
+            description="外すと、自分だけが呼び出せます。"
+          >同じLINEアカウントを扱う運用者と共有する</Checkbox>
         </div>
       </Dialog>
 
@@ -271,11 +254,6 @@ export default function SegmentPresetControls({
         title="保存した対象条件から選ぶ"
         description="選ぶと、この画面の詳細条件へ読み込みます。"
         onCancel={() => setChooserOpen(false)}
-        footer={(
-          <div className="flex justify-end">
-            <Button type="button" variant="secondary" onClick={() => setChooserOpen(false)}>閉じる</Button>
-          </div>
-        )}
       >
         <div className="space-y-3" data-design-node="sqFXf">
           {/*

@@ -11,7 +11,12 @@ import { LayoutGrid, List as ListIcon } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
 import FeatureGate from '@/components/feature-gate'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import ListToolbar from '@/components/shared/list-toolbar'
+import ActionMenu from '@/components/shared/action-menu'
+import { MoreAction } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
+import MediaPreviewOverlay from './media-preview-overlay'
 import Dialog from '@/components/shared/dialog'
 import {
   blockedReason,
@@ -24,15 +29,20 @@ import {
   usageText,
 } from './media-delete-impact'
 import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import { classifyApiFailure } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
-import SearchField from '@/components/shared/search-field'
+import { notifyToast } from '@/components/shared/toast'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
 import MediaDetailDialog from './media-detail-dialog'
+import FileScanStoppedBanner from './file-scan-stopped-banner'
 import { MediaQuotaGuidance } from './media-quota-guidance'
 import MediaReplacementDialog from './media-replacement-dialog'
 import MediaUploadDialog from './media-upload-dialog'
@@ -66,6 +76,13 @@ const PAGE_SIZE_OPTIONS = [
   { value: '50', label: '50件表示' },
 ]
 
+/*
+ * #670 15: 札の操作5個は同じ寸法で並べる。素の小ボタンと共通 Button が
+ * 混ざると高さ・枠・角丸がばらつき、折返しで積み方がずれる。札内では
+ * compact 1種(下の5個と同字)にそろえる。共通 Button の40pxは札の脚には
+ * 大きい。字面をそのまま書く(design-debt の unresolved-classname を増やさない)。
+ */
+
 /**
  * 絞り込みの種別。保存できる kind は image / video / audio / file の4つ。
  * file はいま PDF だけなので、そのまま「PDF」と呼ぶ。
@@ -76,11 +93,6 @@ const KINDS: Array<{ key: MediaItem['kind']; label: string }> = [
   { key: 'video', label: '動画' },
   { key: 'file', label: 'PDF' },
 ]
-
-function formatStorage(bytes: number): string {
-  if (bytes < 1024 * 1024 * 1024) return `${Math.round(bytes / 1024 / 1024)}MB`
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`
-}
 
 function formatMediaDetails(item: MediaItem): string {
   const format = item.mimeType.split('/').at(-1)?.replace('jpeg', 'jpg').toUpperCase() ?? ''
@@ -103,6 +115,11 @@ function isKnownUnused(item: MediaItem): boolean {
 type MediaView = 'grid' | 'list'
 type MediaManagementPermission = 'loading' | 'allowed' | 'denied' | 'error'
 type MediaDetailPhase = 'idle' | 'loading' | 'ready' | 'unavailable'
+/*
+ * R588: 詳細の取得失敗は理由で案内を分ける。404は対象なし、
+ * 403は権限案内、503などの通信失敗は同じIDの再試行。
+ */
+type MediaDetailFailure = 'missing' | 'denied' | 'retryable'
 
 function mediaDetailIdFromLocation(): string | null {
   if (typeof window === 'undefined') return null
@@ -126,21 +143,48 @@ function MediaLibraryInner() {
   latestAccountRef.current = selectedAccountId
   const [items, setItems] = useState<MediaItem[]>([])
   const [total, setTotal] = useState(0)
+  /*
+    R38: `total` は絞り込み後の件数。フォルダ欄の「すべて」には絞り込み前の
+    総数を出すため、同じ棚（アーカイブの扱い）で数えた総数を別に持つ。
+  */
+  const [overallTotal, setOverallTotal] = useState<number | null>(null)
+  /*
+    m26m: 一覧の総数が「分かっている」かどうか。初期値の total=0 や
+    失敗時の残留値をそのまま出すと、実在する件を0件と誤案内する。
+    成功したときだけ真にし、フォルダ欄の「すべて」と表の下の件数は
+    真のときだけ出す（vars 側の listFailed と同じ約束）。
+  */
+  const [listKnown, setListKnown] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [quota, setQuota] = useState<MediaQuota | null>(null)
   const [quotaFailed, setQuotaFailed] = useState(false)
   const [error, setError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
   // #721: 未分類の件数は GET /api/folders の unfiledCount をそのまま出す。
   // kind=media は件数未対応のため来ない。来ないときは null（「—」表示）。
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
+  /*
+    R587: フォルダの取得失敗は一覧・容量と切り分ける。フォルダだけ503でも
+    取得済みのメディアと容量は見せ、フォルダ欄だけ失敗と再試行を示す。
+  */
+  const [folderFailure, setFolderFailure] = useState<unknown>(null)
+  const [folderReloading, setFolderReloading] = useState(false)
   const [folderFilter, setFolderFilter] = useState('')
   const [addingFolder, setAddingFolder] = useState(false)
   const [folderName, setFolderName] = useState('')
   const [savingFolder, setSavingFolder] = useState(false)
+  /*
+    R37: フォルダの名前変更・削除を FolderPanel の「…」へ接続する。
+    追加だけあって直し・消しが無いと、整理し直す手段が無い。
+  */
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
   const [uploadOpen, setUploadOpen] = useState(false)
+  /* ★V7: 札の操作を並べない。「使用箇所＋ダウンロード＋…」の1行に収め、削除の印は残す。取得は読取権限でも使うので「…」に隠さない。 */
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
   const [kinds, setKinds] = useState<Set<MediaItem['kind']>>(
     () => new Set(KINDS.map((k) => k.key)),
@@ -183,6 +227,8 @@ function MediaLibraryInner() {
   const [detailsFor, setDetailsFor] = useState<MediaItem | null>(null)
   const [detailFolderName, setDetailFolderName] = useState<string | null>(null)
   const [detailPhase, setDetailPhase] = useState<MediaDetailPhase>('idle')
+  const [detailFailure, setDetailFailure] = useState<MediaDetailFailure | null>(null)
+  const [detailRetry, setDetailRetry] = useState(0)
   const detailRequestRef = useRef(0)
   const detailAccountRef = useRef<string | null | undefined>(undefined)
   const [replacementFor, setReplacementFor] = useState<MediaItem | null>(null)
@@ -276,12 +322,14 @@ function MediaLibraryInner() {
     detailRequestRef.current = request
     setDetailsFor(null)
     setDetailFolderName(null)
+    setDetailFailure(null)
     if (!detailId) {
       setDetailPhase('idle')
       return
     }
     if (!selectedAccountId) {
       setDetailPhase('unavailable')
+      setDetailFailure('missing')
       return
     }
     const accountAtRequest = selectedAccountId
@@ -290,20 +338,38 @@ function MediaLibraryInner() {
       if (detailRequestRef.current !== request || latestAccountRef.current !== accountAtRequest) return
       if (!response.success) {
         setDetailPhase('unavailable')
+        // R588: 原因不明の失敗を「存在しない」と断定しない。読み直せる側に倒す。
+        setDetailFailure('retryable')
         return
       }
       setDetailsFor(response.data.item)
       setDetailFolderName(response.data.folderName)
       setDetailPhase('ready')
-    }).catch(() => {
+    }).catch((caught) => {
       if (detailRequestRef.current === request && latestAccountRef.current === accountAtRequest) {
         setDetailPhase('unavailable')
+        // R588: 404は対象なし、403は権限案内、それ以外は通信失敗として再試行させる。
+        setDetailFailure(
+          caught instanceof ApiError && caught.status === 404
+            ? 'missing'
+            : caught instanceof ApiError && caught.status === 403
+              ? 'denied'
+              : 'retryable',
+        )
       }
     })
     return () => {
       if (detailRequestRef.current === request) detailRequestRef.current += 1
     }
-  }, [accountLoading, detailId, selectedAccountId, setDetailUrl, urlReady])
+  }, [accountLoading, detailId, detailRetry, selectedAccountId, setDetailUrl, urlReady])
+
+  /** R588: 通信失敗の詳細は同じIDで読み直す。URLは変えない。 */
+  const retryDetail = useCallback(() => {
+    if (!detailId) return
+    setDetailFailure(null)
+    setDetailPhase('loading')
+    setDetailRetry((count) => count + 1)
+  }, [detailId])
 
   const canManageMedia = mediaManagementPermission === 'allowed'
   const managementPermissionReason = mediaManagementPermission === 'loading'
@@ -336,6 +402,37 @@ function MediaLibraryInner() {
     setArchiveError('')
   }, [selectedAccountId])
 
+  /*
+    R587: フォルダは一覧・容量と独立して読む。フォルダだけ503でも
+    取得済みのメディアと容量は見せたままにする。
+  */
+  const loadFolders = useCallback(async () => {
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setFolders([])
+      setUnfiledCount(null)
+      setFolderFailure(null)
+      return
+    }
+    setFolderReloading(true)
+    setFolderFailure(null)
+    try {
+      // #730: 選択中の1件に閉じた母集団で数える。
+      const folderResponse = await api.folders.list('media', accountAtRequest)
+      if (accountAtRequest !== latestAccountRef.current) return
+      if (folderResponse.success) {
+        setFolders(folderResponse.data)
+        setUnfiledCount(folderResponse.unfiledCount ?? null)
+      } else {
+        setFolderFailure(new ApiError(500, folderResponse.error))
+      }
+    } catch (caught) {
+      if (accountAtRequest === latestAccountRef.current) setFolderFailure(caught)
+    } finally {
+      if (accountAtRequest === latestAccountRef.current) setFolderReloading(false)
+    }
+  }, [selectedAccountId])
+
   const load = useCallback(async () => {
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) {
@@ -349,7 +446,11 @@ function MediaLibraryInner() {
     setQuotaFailed(false)
     setError('')
     try {
-      const [res, folderResponse, quotaResponse] = await Promise.all([
+      /*
+        R587: 一覧の失敗で容量まで隠さない。一覧だけ捕まえてnull化し、
+        容量・総数はそれぞれの成否で決める（Promise.allの連鎖で消さない）。
+      */
+      const [res, quotaResponse, overallResponse] = await Promise.all([
         api.media.list(accountAtRequest, {
           kind: kinds.size === 1 ? [...kinds][0] : undefined,
           folderId: folderFilter || undefined,
@@ -360,27 +461,35 @@ function MediaLibraryInner() {
           sort,
           limit: pageSize,
           offset: (page - 1) * pageSize,
-        }),
-        // #730: 選択中の1件に閉じた母集団で数える。
-        api.folders.list('media', accountAtRequest),
+        }).catch(() => null),
         api.media.quota(accountAtRequest).catch(() => null),
+        // R38: フォルダ欄の「すべて」は絞り込み前の総数。1件だけ取って数を読む。
+        api.media.list(accountAtRequest, {
+          archived: showArchivedOnly ? 'only' : undefined,
+          limit: 1,
+          offset: 0,
+        }).catch(() => null),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
-      if (res.success) {
+      if (res?.success) {
         setItems(res.data.items)
         setTotal(res.data.total)
+        setListKnown(true)
+      } else {
+        setLoadFailed(true)
+        setListKnown(false)
       }
-      if (folderResponse.success) {
-        setFolders(folderResponse.data)
-        setUnfiledCount(folderResponse.unfiledCount ?? null)
-      }
+      if (overallResponse?.success) setOverallTotal(overallResponse.data.total)
       if (quotaResponse?.success) setQuota(quotaResponse.data)
       else {
         setQuota(null)
         setQuotaFailed(true)
       }
     } catch {
-      if (accountAtRequest === latestAccountRef.current) setLoadFailed(true)
+      if (accountAtRequest === latestAccountRef.current) {
+        setLoadFailed(true)
+        setListKnown(false)
+      }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
@@ -393,11 +502,18 @@ function MediaLibraryInner() {
     setReplacementFor(null)
     setPreview(null)
     setPage(1)
+    // m26m: 別アカウントの総数を残さない。読み直すまで「すべて」は未知。
+    setListKnown(false)
+    setOverallTotal(null)
   }, [accountLoading, selectedAccountId])
 
   useEffect(() => {
-    if (!accountLoading && urlReady && !detailId) void load()
-  }, [accountLoading, detailId, load, urlReady])
+    if (!accountLoading && urlReady && !detailId) {
+      void load()
+      // R587: フォルダの成否は一覧・容量と切り分ける。
+      void loadFolders()
+    }
+  }, [accountLoading, detailId, load, loadFolders, urlReady])
 
   const rename = async () => {
     if (!renaming || !selectedAccountId || renamingBusy) return
@@ -441,6 +557,27 @@ function MediaLibraryInner() {
     }
   }
 
+  /** R37: フォルダを消す。中身は消えず未分類に戻る。消した先を選んでいたら「すべて」へ戻す。 */
+  async function removeFolder() {
+    if (!deletingFolder || !selectedAccountId || folderBusy) return
+    const accountAtRequest = selectedAccountId
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const response = await api.folders.delete(deletingFolder.id, accountAtRequest)
+      if (!response.success) throw new Error(response.error)
+      if (accountAtRequest !== latestAccountRef.current) return
+      setDeletingFolder(null)
+      if (folderFilter === deletingFolder.id) setFolderFilter('')
+      void load()
+      void loadFolders()
+    } catch {
+      if (accountAtRequest === latestAccountRef.current) setFolderError('フォルダを削除できませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
   /** 選んだ札をまとめて消す。使用中はAPIでも必ず止める。 */
   const removeSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
@@ -466,7 +603,6 @@ function MediaLibraryInner() {
     setBulkBusy(true)
     setBulkProgress({ done: 0, total: ids.length })
     setError('')
-    setSuccessMessage('')
     let deleted = 0
     const failedNames: string[] = []
     for (const id of ids) {
@@ -500,7 +636,7 @@ function MediaLibraryInner() {
     setBulkConfirm(null)
     setBulkBusy(false)
     setBulkProgress(null)
-    if (result.tone === 'success') setSuccessMessage(result.message)
+    if (result.tone === 'success') notifyToast(result.message)
     else setError(result.message)
     void load()
   }
@@ -660,7 +796,7 @@ function MediaLibraryInner() {
         return
       }
       setArchiveTarget(null)
-      setSuccessMessage(mode === 'archive'
+      notifyToast(mode === 'archive'
         ? `「${item.filename}」をアーカイブしました。使っている場所はそのまま動き、一覧と新規選択からだけ外れます。`
         : `「${item.filename}」を一覧へ戻しました。`)
       void load()
@@ -686,6 +822,28 @@ function MediaLibraryInner() {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const current = items
 
+  /*
+    R38: 絞り込みが1つでも効いているか。「すべて」の選び方・0件表示・
+    フォルダ欄の件数を使い分ける。
+  */
+  const hasFilter = query.trim() !== ''
+    || folderFilter !== ''
+    || kinds.size !== KINDS.length
+    || showUnusedOnly
+    || showNearLimitOnly
+    || showArchivedOnly
+
+  /** R38: 「条件に合うものがありません」の次に置く、条件を外す口。 */
+  const clearFilters = () => {
+    setQuery('')
+    setFolderFilter('')
+    setKinds(new Set(KINDS.map((kind) => kind.key)))
+    setShowUnusedOnly(false)
+    setShowNearLimitOnly(false)
+    setShowArchivedOnly(false)
+    setPage(1)
+  }
+
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
@@ -693,12 +851,37 @@ function MediaLibraryInner() {
   // まとめて削除の候補は未使用かつ一覧にいるものだけ。退避済みは選ばない。
   const removable = items.filter((item) => isKnownUnused(item) && !item.archivedAt)
   const allSelected = removable.length > 0 && removable.every((item) => selected.has(item.id))
+  /** R587: フォルダ欄の失敗は403（権限）とそれ以外（通信）で案内を分ける。 */
+  const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
 
   if (!urlReady || (detailId && (detailPhase === 'idle' || detailPhase === 'loading'))) {
     return <ListState kind="loading" title="メディアの詳細を読み込んでいます" />
   }
 
   if (detailId && (detailPhase === 'unavailable' || !detailsFor)) {
+    // R588: 403は権限案内にする。押しても直らない再試行は出さない。
+    if (detailFailure === 'denied') {
+      return (
+        <ListState
+          kind="forbidden"
+          title="メディアの詳細を見る権限がありません"
+          description="見るには権限が要ります。オーナーか管理者に追加を依頼してください。"
+          action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
+        />
+      )
+    }
+    // R588: 503などの通信失敗は通信失敗と言い、同じIDで読み直せるようにする。
+    if (detailFailure === 'retryable') {
+      return (
+        <ListState
+          kind="error"
+          title="表示できませんでした"
+          description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+          onRetry={retryDetail}
+          action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
+        />
+      )
+    }
     return (
       <ListState
         kind="empty"
@@ -723,7 +906,7 @@ function MediaLibraryInner() {
         }}
         onVersionCreated={(message) => {
           setDetailUrl(null)
-          setSuccessMessage(message)
+          notifyToast(message)
           void load()
         }}
         onItemUpdated={(updated) => setDetailsFor(updated)}
@@ -732,26 +915,31 @@ function MediaLibraryInner() {
   }
 
   return (
-    <div data-design-node="g89Tc" data-media-design="v6">
+    <div data-design-node="g89Tc" data-media-design="v6" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
 
       {!selectedAccountId && !accountLoading && (
-        <ListState kind="empty" title="LINEアカウントを選択してください" description="登録メディアはLINEアカウントごとに管理します。" />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title="LINEアカウントを選択してください" description="登録メディアはLINEアカウントごとに管理します。" />
+        </div>
       )}
 
       {error && (
-        <Notice tone="error" message={error} onClose={() => setError('')} className="mb-4" />
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
-      {successMessage && (
-        <Notice tone="success" message={successMessage} onClose={() => setSuccessMessage('')} className="mb-4" />
-      )}
+      {!error && selectedAccountId ? (
+        <div className="mb-4">
+          <FileScanStoppedBanner accountId={selectedAccountId} />
+        </div>
+      ) : null}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="primary" onClick={() => setUploadOpen(true)}>ファイルを入れる</Button>
         </div>
         <div className="w-full max-w-xs text-right">
           <p className="text-ink-secondary text-nano font-semibold">
-            使っている容量 <span className="text-ink ml-1">{quota ? `${formatStorage(quota.usageBytes)} / ${formatStorage(quota.limitBytes)}` : '—（未取得）'}</span>
+            使っている容量 <span className="text-ink ml-1">{quota ? `${formatMediaSize(quota.usageBytes)} / ${formatMediaSize(quota.limitBytes)}` : '—（未取得）'}</span>
           </p>
           <MediaQuotaGuidance
             quota={quota}
@@ -769,7 +957,7 @@ function MediaLibraryInner() {
       <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <div className="min-w-0">
         <FolderPanel
-          total={`${folders.length + 1}`}
+          /* m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム #m18k と同じ形）。絞り込み後の件数は一覧側の ListRange に出す。 */
           activeId={folderFilter}
           onSelect={(id) => {
             setFolderFilter(id)
@@ -782,7 +970,11 @@ function MediaLibraryInner() {
             <p className="text-ink-faint text-xs">{managementPermissionReason}。</p>
           )}
           rows={[
-            { id: '', label: 'すべて', count: total },
+            // R38: 「すべて」は絞り込み前の総数。絞り込み後の件数を
+            // 入れると「すべて0・未分類2」のように母集団が混ざる。
+            // m26m: 一覧が読めていない（初回・失敗・別アカウント切替直後）の
+            // total=0 は偽ゼロなので数えない（null は数を出さない約束）。
+            { id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null },
             ...folders.map((folder) => ({
               id: folder.id,
               label: folder.name,
@@ -791,10 +983,30 @@ function MediaLibraryInner() {
               // 数える計算は、黙って別の母集団にすり替わるため廃止。
               count: folder.itemCount ?? null,
               color: folder.color,
+              // R37: 名前変更・削除を「…」へ接続する。権限の無い人には
+              // 押して失敗する口を見せない。
+              onEdit: canManageMedia ? () => setEditingFolder(folder) : undefined,
+              onDelete: canManageMedia ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
+              deleteNote: '削除しても、中のメディアは未分類に残ります。',
             })),
             { id: UNGROUPED, label: '未分類', count: unfiledCount },
           ]}
         >
+          {folderFailure ? (
+            <div role="alert" className="space-y-1.5">
+              <p className="text-ink-secondary text-xs">
+                {folderForbidden
+                  ? 'フォルダを見る権限がありません。オーナーか管理者に追加を依頼してください。'
+                  : 'フォルダを読み込めませんでした。登録したメディアは消えていません。'}
+              </p>
+              {folderForbidden ? null : (
+                <Button type="button" onClick={() => void loadFolders()} disabled={folderReloading}>
+                  {folderReloading ? '読み込んでいます' : 'もう一度読み込む'}
+                </Button>
+              )}
+            </div>
+          ) : null}
+          {folderError ? <p role="alert" className="text-ink-secondary text-xs">{folderError}</p> : null}
           {addingFolder ? (
             <div className="space-y-2">
               <input
@@ -824,147 +1036,140 @@ function MediaLibraryInner() {
         <div className="min-w-0">
 
       {/*
-        検索は独立した全幅の行にする（U016）。表示切替・並び順・件数と
-        同じ行に押し込むと、狭い幅で入力文が読めないほど潰れる。
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+        右端に表示切替・並び順・表示件数。U016 の潰れ対策の意図は
+        そのまま（検索は320・下限240で折り返す）。
       */}
-      <div data-search-row className="mb-3">
-        <SearchField
-          value={query}
-          onChange={(value) => {
+      <ListToolbar
+        search={{
+          placeholder: 'ファイル名で検索',
+          value: query,
+          onChange: (value) => {
             setQuery(value)
             setPage(1)
-          }}
-          onClear={() => {
-            setQuery('')
-            setPage(1)
-          }}
-          placeholder="ファイル名で検索"
-          aria-label="ファイル名で検索"
-          className="w-full"
-        />
-      </div>
-
-      {/* 種別と使用状態。選ぶと必ず1ページ目へ戻る。 */}
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <FilterChip
-          selected={kinds.size === KINDS.length && !showUnusedOnly && !showArchivedOnly}
-          onChange={() => {
-            setKinds(new Set(KINDS.map((kind) => kind.key)))
-            setShowUnusedOnly(false)
-            setShowNearLimitOnly(false)
-            setShowArchivedOnly(false)
-            setPage(1)
-          }}
-        >
-          すべて
-        </FilterChip>
-        {KINDS.map((kind) => (
-          <FilterChip
-            key={kind.key}
-            selected={kinds.size === 1 && kinds.has(kind.key) && !showArchivedOnly}
-            onChange={() => {
-              setKinds(new Set([kind.key]))
-              setShowUnusedOnly(false)
-              setShowNearLimitOnly(false)
-              setShowArchivedOnly(false)
-              setPage(1)
-            }}
-          >
-            {kind.label}
-          </FilterChip>
-        ))}
-        <FilterChip
-          selected={showUnusedOnly}
-          onChange={(selectedValue) => {
-            setShowUnusedOnly(selectedValue)
-            setShowNearLimitOnly(false)
-            setShowArchivedOnly(false)
-            if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
-            setPage(1)
-          }}
-        >
-          使っていない
-        </FilterChip>
-        <FilterChip
-          selected={showNearLimitOnly}
-          onChange={(selectedValue) => {
-            setShowNearLimitOnly(selectedValue)
-            setShowUnusedOnly(false)
-            setShowArchivedOnly(false)
-            if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
-            setPage(1)
-          }}
-        >
-          上限に近い
-        </FilterChip>
-        <FilterChip
-          selected={showArchivedOnly}
-          onChange={(selectedValue) => {
-            setShowArchivedOnly(selectedValue)
-            setShowUnusedOnly(false)
-            setShowNearLimitOnly(false)
-            if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
-            setPage(1)
-          }}
-        >
-          アーカイブ済み
-        </FilterChip>
-      </div>
-
-      {/*
-        表示の切り替え・並び順・件数は結果の見出し側へまとめる（U016）。
-        検索と同じ行にすると、狭い幅で検索欄が潰れる。
-      */}
-      <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
-        {/* 設計 `g89Tc` の表示切替: 枠 高さ40・角丸8、各44幅、アイコン16。 */}
-        <div
-          role="group"
-          aria-label="並べ方"
-          className="border-hairline rounded-control flex h-10 items-center overflow-hidden border"
-        >
-          {([
-            ['grid', '格子で並べる', LayoutGrid],
-            ['list', '一覧で並べる', ListIcon],
-          ] as Array<[MediaView, string, typeof LayoutGrid]>).map(([value, label, Icon]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setView(value)}
-              aria-pressed={view === value}
-              aria-label={label}
-              title={label}
-              className={`flex h-full w-11 items-center justify-center ${
-                view === value ? 'bg-accent-soft text-accent-deep' : 'text-ink-faint hover:bg-canvas-sunken'
-              }`}
+          },
+        }}
+        filters={
+          <>
+            {/* 種別と使用状態。選ぶと必ず1ページ目へ戻る。 */}
+            <FilterChip
+              selected={kinds.size === KINDS.length && !showUnusedOnly && !showNearLimitOnly && !showArchivedOnly}
+              onChange={() => {
+                setKinds(new Set(KINDS.map((kind) => kind.key)))
+                setShowUnusedOnly(false)
+                setShowNearLimitOnly(false)
+                setShowArchivedOnly(false)
+                setPage(1)
+              }}
             >
-              <Icon aria-hidden="true" size={16} />
-            </button>
-          ))}
-        </div>
-        <Select
-          aria-label="並び順"
-          value={sort}
-          options={SORT_OPTIONS}
-          onChange={(value) => {
-            setSort(value as MediaSort)
-            setPage(1)
-          }}
-        />
-        <Select
-          aria-label="表示件数"
-          value={String(pageSize)}
-          options={PAGE_SIZE_OPTIONS}
-          onChange={(value) => {
-            setPageSize(Number(value))
-            setPage(1)
-          }}
-          size="page-size"
-        />
-      </div>
+              すべて
+            </FilterChip>
+            {KINDS.map((kind) => (
+              <FilterChip
+                key={kind.key}
+                selected={kinds.size === 1 && kinds.has(kind.key) && !showArchivedOnly}
+                onChange={() => {
+                  setKinds(new Set([kind.key]))
+                  setShowUnusedOnly(false)
+                  setShowNearLimitOnly(false)
+                  setShowArchivedOnly(false)
+                  setPage(1)
+                }}
+              >
+                {kind.label}
+              </FilterChip>
+            ))}
+            <FilterChip
+              selected={showUnusedOnly}
+              onChange={(selectedValue) => {
+                setShowUnusedOnly(selectedValue)
+                setShowNearLimitOnly(false)
+                setShowArchivedOnly(false)
+                if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
+                setPage(1)
+              }}
+            >
+              使っていない
+            </FilterChip>
+            <FilterChip
+              selected={showNearLimitOnly}
+              onChange={(selectedValue) => {
+                setShowNearLimitOnly(selectedValue)
+                setShowUnusedOnly(false)
+                setShowArchivedOnly(false)
+                if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
+                setPage(1)
+              }}
+            >
+              上限に近い
+            </FilterChip>
+            <FilterChip
+              selected={showArchivedOnly}
+              onChange={(selectedValue) => {
+                setShowArchivedOnly(selectedValue)
+                setShowUnusedOnly(false)
+                setShowNearLimitOnly(false)
+                if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
+                setPage(1)
+              }}
+            >
+              アーカイブ済み
+            </FilterChip>
+          </>
+        }
+        trailing={
+          <>
+            {/* 設計 `g89Tc` の表示切替: 枠 高さ40・角丸8、各44幅、アイコン16。 */}
+            <div
+              role="group"
+              aria-label="並べ方"
+              className="border-hairline rounded-control flex h-10 items-center overflow-hidden border"
+            >
+              {([
+                ['grid', '格子で並べる', LayoutGrid],
+                ['list', '一覧で並べる', ListIcon],
+              ] as Array<[MediaView, string, typeof LayoutGrid]>).map(([value, label, Icon]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setView(value)}
+                  aria-pressed={view === value}
+                  aria-label={label}
+                  title={label}
+                  className={`flex h-full w-11 items-center justify-center ${
+                    view === value ? 'bg-accent-soft text-accent-deep' : 'text-ink-faint hover:bg-canvas-sunken'
+                  }`}
+                >
+                  <Icon aria-hidden="true" size={16} />
+                </button>
+              ))}
+            </div>
+            <Select
+              aria-label="並び順"
+              value={sort}
+              options={SORT_OPTIONS}
+              onChange={(value) => {
+                setSort(value as MediaSort)
+                setPage(1)
+              }}
+            />
+            <Select
+              aria-label="表示件数"
+              value={String(pageSize)}
+              options={PAGE_SIZE_OPTIONS}
+              onChange={(value) => {
+                setPageSize(Number(value))
+                setPage(1)
+              }}
+              size="page-size"
+            />
+          </>
+        }
+      />
 
-      <div data-design-node="h8pBZr">
-      {total > 200 ? (
-        <p className="text-ink-faint mb-3 text-xs">200件を超えるメディアも、ページを移動してすべて確認できます。</p>
+      <div data-design-node="h8pBZr" className="flex flex-col gap-4">
+      {listKnown && !loadFailed && total > 200 ? (
+        <p className="text-ink-faint text-xs">200件を超えるメディアも、ページを移動してすべて確認できます。</p>
       ) : null}
       {loading ? (
         <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
@@ -976,12 +1181,34 @@ function MediaLibraryInner() {
           action={<Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>}
         />
       ) : current.length === 0 ? (
-        <ListState
-          kind="empty"
-          title={total === 0 && !query && !folderFilter ? 'まだメディアがありません' : '条件に合うメディアはありません'}
-          description={total === 0 && !query && !folderFilter ? '配信で使う画像・動画・音声・ファイルの置き場です。' : '種類、フォルダ、または検索条件を変えてください。'}
-          action={total === 0 && !query && !folderFilter ? <Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button> : undefined}
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          {/*
+            R38: まだ1件も無いときと、絞り込みで0件のときを分ける。
+            `total` は絞り込み後の件数のため、絞り込みの有無も見る。
+            絞り込みの0件に作る口を出すと、保存済みが消えたと誤読される。
+            代わりに「条件を外す」を置く。
+          */}
+          {total === 0 && !hasFilter ? (
+            <ListState
+              kind="empty"
+              title="まだメディアがありません"
+              description="配信で使う画像・動画・音声・ファイルの置き場です。"
+              action={<Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録する</Button>}
+            />
+          ) : (
+            <ListState
+              kind="empty"
+              emptyPreset="filtered"
+              title="条件に合うメディアはありません"
+              description="種類、フォルダ、または検索条件を変えてください。"
+              action={(
+                <Button type="button" onClick={clearFilters}>
+                  条件を外す
+                </Button>
+              )}
+            />
+          )}
+        </div>
       ) : (
         <div
           className={
@@ -1000,15 +1227,13 @@ function MediaLibraryInner() {
               <button
                 onClick={() => setPreview(item)}
                 title="プレビューを見る"
+                aria-label={`${item.filename}のプレビューを見る`}
                 className={`bg-canvas-sunken flex items-center justify-center overflow-hidden ${
                   view === 'grid' ? 'h-28' : 'h-14 w-20 shrink-0'
                 }`}
               >
                 {item.kind === 'image' ? (
-                  // 静的書き出しのため next/image の最適化は使えない。
-                  // 一覧20件の同時取得を避けるため遅延読み込みにする。
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={displaySrc(item)} alt={item.filename} loading="lazy" decoding="async" className="h-full w-full object-contain" />
+                  <MediaThumb src={displaySrc(item)} alt={item.filename} />
                 ) : (
                   <span className="text-ink-faint text-xs">
                     {item.kind === 'video' ? '動画' : item.kind === 'audio' ? '音声' : 'ファイル'}
@@ -1035,31 +1260,22 @@ function MediaLibraryInner() {
                       <p className="text-danger text-xs" role="alert">{renameError}</p>
                     )}
                     <div className="flex justify-end gap-1">
-                      <button
-                        onClick={() => setRenaming(null)}
-                        disabled={renamingBusy}
-                        className="border-hairline text-ink-secondary rounded border px-2 py-1 text-[11px]"
-                      >
+                      <Button variant="secondary" className="text-ink-secondary rounded-mini px-2 py-1 text-[11px] h-auto whitespace-normal" onClick={() => setRenaming(null)} disabled={renamingBusy}>
                         キャンセル
-                      </button>
-                      <button
-                        onClick={() => void rename()}
-                        disabled={renamingBusy}
-                        className="bg-accent-deep text-on-accent rounded px-2 py-1 text-[11px] disabled:opacity-50"
-                      >
-                        {renamingBusy ? '保存中…' : '保存'}
-                      </button>
+                      </Button>
+                      <Button variant="primary" className="rounded-mini px-2 py-1 text-[11px] disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void rename()} disabled={renamingBusy}>
+                        {renamingBusy ? '保存中…' : '保存する'}
+                      </Button>
                     </div>
                   </div>
                 ) : (
                   <>
-                    <label className="flex items-start gap-1.5">
+                    <span className="flex items-start gap-1.5">
                       {canManageMedia ? (
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={selected.has(item.id)}
                           disabled={!isKnownUnused(item) || !!item.archivedAt}
-                          onChange={() =>
+                          onCheckedChange={() =>
                             setSelected((prev) => {
                               const next = new Set(prev)
                               if (next.has(item.id)) next.delete(item.id)
@@ -1077,29 +1293,28 @@ function MediaLibraryInner() {
                                   ? '使用先から外すまで削除できません'
                                   : undefined
                           }
-                          className="accent-green-500 mt-0.5"
                         />
                       ) : null}
-                      <span className="bg-ink-secondary text-on-accent rounded px-1 py-0.5 text-[10px] leading-none">
+                      <span className="bg-ink-secondary text-on-accent rounded-mini px-1 py-0.5 text-[10px] leading-none">
                         {KINDS.find((k) => k.key === item.kind)?.label ?? 'ファイル'}
                       </span>
                       {item.archivedAt ? (
                         <span
-                          className="bg-canvas-sunken text-ink-secondary rounded px-1 py-0.5 text-[10px] leading-none"
+                          className="bg-canvas-sunken text-ink-secondary rounded-mini px-1 py-0.5 text-[10px] leading-none"
                           title={item.archiveReason ? `退避の理由：${item.archiveReason}` : '退避済み'}
                         >
                           退避済み
                         </span>
                       ) : null}
-                      <span className="text-ink min-w-0 flex-1 truncate text-caption font-bold" title={item.filename}>
+                      <span className="text-ink min-w-0 flex-1 truncate text-caption font-medium" title={item.filename}>
                         {item.filename}
                       </span>
-                    </label>
+                    </span>
                     <p className="text-ink-faint text-nano font-semibold tabular-nums">
                       {formatMediaDetails(item)}
                     </p>
                     <p
-                      className={`text-nano font-bold tabular-nums ${
+                      className={`text-nano font-medium tabular-nums ${
                         item.usageCount === undefined
                           ? 'text-ink-faint'
                           : item.usageCount === 0
@@ -1117,63 +1332,50 @@ function MediaLibraryInner() {
                   </>
                 )}
 
-                <div className="mt-auto flex flex-wrap items-center justify-end gap-1 pt-1">
-                  <button
-                    onClick={() => setDetailUrl(item.id)}
-                    disabled={!canManageMedia}
-                    title={canManageMedia ? '使用箇所を見る' : managementPermissionReason}
-                    aria-label={`${item.filename}の使用箇所`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
+                {/*
+                  ★V7：札の操作は「使用箇所」＋「…」の1行にそろえる。
+                  ダウンロード・アーカイブ・削除は「…」の中へ集める。
+                  ゴミ箱の印だけのボタンは札に直に置かない。
+                  退避は消去ではない。使用中でも止めないが、理由を必ず聞く。
+                  退避済みは編集・削除の押し口を出さず、戻す口だけを残す。
+                  読み取り専用の人にも「…」でダウンロードを渡す。
+                */}
+                <div className="mt-auto flex items-center justify-end gap-1 pt-1">
+                  <Button variant="secondary" className="text-ink-secondary shrink-0 px-2.5 py-1 text-xs whitespace-nowrap disabled:opacity-50 h-auto" onClick={() => setDetailUrl(item.id)} disabled={!canManageMedia} title={canManageMedia ? '使用箇所を見る' : managementPermissionReason} aria-label={`${item.filename}の使用箇所`}>
                     使用箇所
-                  </button>
-                  {canManageMedia && !item.archivedAt ? (
-                  <button
-                    onClick={() => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) }}
-                    title="名前を変える"
-                    aria-label={`${item.filename}の名前を変える`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px]"
-                  >
-                    編集
-                  </button>
-                  ) : null}
-                  <button
-                    onClick={() => void downloadItem(item)}
-                    disabled={downloadingIds.has(item.id)}
-                    title="ダウンロード"
-                    aria-label={`${item.filename}をダウンロード`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] disabled:opacity-50"
-                  >
-                    {downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード'}
-                  </button>
-                  {/*
-                    退避は消去ではない。使用中でも止めないが、理由を必ず聞く。
-                    退避済みは編集・削除の押し口を出さず、戻す口だけを残す。
-                  */}
-                  {canManageMedia ? (
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setArchiveError('')
-                      setArchiveReason('')
-                      setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' })
-                    }}
-                    title={item.archivedAt ? '一覧へ戻す' : '一覧と新規選択から外す'}
-                    aria-label={item.archivedAt ? `${item.filename}を一覧へ戻す` : `${item.filename}をアーカイブ`}
-                  >
-                    {item.archivedAt ? '一覧へ戻す' : 'アーカイブ'}
                   </Button>
-                  ) : null}
-                  {canManageMedia && !item.archivedAt ? (
-                  <Button
-                    type="button"
-                    onClick={() => void openDelete(item)}
-                    data-qa-open="YfTfJ"
-                    aria-label={`${item.filename}を削除`}
-                  >
-                    削除
-                  </Button>
-                  ) : null}
+                  <span className="relative inline-flex shrink-0 items-center">
+                    <MoreAction
+                      label={`${item.filename}のその他操作`}
+                      aria-expanded={openMenuId === item.id}
+                      data-qa-open="YfTfJ"
+                      onClick={() => setOpenMenuId((current) => (current === item.id ? null : item.id))}
+                    />
+                    <ActionMenu
+                      open={openMenuId === item.id}
+                      ariaLabel={`${item.filename}の操作`}
+                      onClose={() => setOpenMenuId(null)}
+                      items={[
+                        {
+                          id: 'download',
+                          label: downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード',
+                          disabled: downloadingIds.has(item.id),
+                          disabledReason: downloadingIds.has(item.id) ? 'ファイルを取り出しています' : undefined,
+                          onSelect: () => { void downloadItem(item) },
+                        },
+                        ...(canManageMedia && !item.archivedAt
+                          ? [{ id: 'rename', label: '編集', onSelect: () => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) } }]
+                          : []),
+                        ...(canManageMedia
+                          ? [{ id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: () => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) } }]
+                          : []),
+                        // 削除確認の窓の撮影は「…」→この項目の2手で開ける。
+                        ...(canManageMedia && !item.archivedAt
+                          ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, dividerBefore: true, qaOpen: 'YfTfJ', onSelect: () => { void openDelete(item) } }]
+                          : []),
+                      ]}
+                    />
+                  </span>
                 </div>
 
               </div>
@@ -1224,8 +1426,7 @@ function MediaLibraryInner() {
               ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteMedia({ impact, busy: deleteBusy }) ? (
-                <Button type="button" variant="primary" onClick={() => void confirmDeleteOne()}>
-                  {deleteBusy ? '処理中…' : '削除する'}
+                <Button type="button" variant="primary" onClick={() => void confirmDeleteOne()} busy={deleteBusy} busyLabel="処理中…">削除する
                 </Button>
               ) : null}
             </div>
@@ -1236,19 +1437,28 @@ function MediaLibraryInner() {
         {impactPhase === 'loading' ? (
           <p className="text-ink-faint text-xs">使われている場所を確認しています…</p>
         ) : impactPhase === 'error' ? (
-          <p className="text-danger text-xs font-semibold" role="alert">
-            使われている場所を確認できませんでした。読み直してから、もう一度お試しください。
-          </p>
+          <div className="space-y-2">
+            <p className="text-danger text-xs font-semibold" role="alert">
+              使われている場所を確認できませんでした。読み直してから、もう一度お試しください。
+            </p>
+            {/* R34: 詳細と同じように、確認時刻と読み直しを一覧でも出す。 */}
+            <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>読み直す</Button>
+          </div>
         ) : impact ? (
           <div className="space-y-3">
             <p className={impact.canDelete ? 'text-ink-secondary text-sm' : 'text-danger text-sm font-semibold'}>
               {usageText(impact)}
               {blockedReason(impact) ? ` ${blockedReason(impact)}` : ''}
             </p>
+            {impact.verified === false ? (
+              <div>
+                <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>読み直す</Button>
+              </div>
+            ) : null}
 
             {impact.references.length > 0 ? (
               <div>
-                <p className="text-ink text-xs font-bold">使われている場所</p>
+                <p className="text-ink text-xs font-medium">使われている場所</p>
                 <ul className="mt-1.5 space-y-1.5">
                   {impact.references.map((ref: MediaDeleteImpactReference, index: number) => (
                     <li
@@ -1294,15 +1504,13 @@ function MediaLibraryInner() {
         footer={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button type="button" onClick={() => setBulkConfirm(null)} disabled={bulkBusy}>
-              やめる
+              キャンセル
             </Button>
             <Button
               type="button"
               variant="primary"
               disabled={bulkBusy}
-              onClick={() => void runBulkDelete(bulkConfirm ?? [])}
-            >
-              {bulkBusy ? '処理中…' : '削除する'}
+              onClick={() => void runBulkDelete(bulkConfirm ?? [])} busy={bulkBusy} busyLabel="処理中…">削除する
             </Button>
           </div>
         }
@@ -1338,23 +1546,20 @@ function MediaLibraryInner() {
         footer={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button type="button" onClick={() => setArchiveTarget(null)} disabled={archiveBusy}>
-              やめる
+              キャンセル
             </Button>
             <Button
               type="button"
               variant="primary"
               disabled={archiveBusy || !archiveReason.trim()}
-              onClick={() => void confirmArchiveChange()}
-            >
-              {archiveBusy
-                ? '処理中…'
-                : archiveTarget?.mode === 'archive' ? 'アーカイブする' : '一覧へ戻す'}
+              onClick={() => void confirmArchiveChange()} busy={archiveBusy} busyLabel="処理中…">
+              {archiveTarget?.mode === 'archive' ? 'アーカイブする' : '一覧へ戻す'}
             </Button>
           </div>
         }
       >
         <label className="block space-y-1.5">
-          <span className="text-ink text-xs font-bold">理由<RequiredBadge /><span className="font-normal text-ink-faint">（あとから履歴で確認できます）</span></span>
+          <span className="text-ink text-xs font-medium">理由<RequiredBadge /><span className="font-normal text-ink-faint">（あとから履歴で確認できます）</span></span>
           <input
             type="text"
             autoFocus
@@ -1367,32 +1572,31 @@ function MediaLibraryInner() {
         </label>
       </Dialog>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      {/*
+        m26m: 一覧が読めていない間の表の下の「0件」は偽ゼロなので出さない。
+        失敗の1枚（再試行）が件数の置き場所になる。復旧後は実件数を戻す。
+        vars 側と同じ約束。フォルダだけ503の側は listKnown が真なので残る。
+      */}
+      {listKnown && !loadFailed ? (
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-ink-faint text-xs">
-            全{total}件中 {total === 0 ? 0 : (page - 1) * pageSize + 1}〜{Math.min(page * pageSize, total)}件
-          </span>
+          <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           {canManageMedia ? (
-            <label className="text-ink-secondary flex items-center gap-1.5 text-sm">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={() =>
-                  setSelected((prev) => {
-                    if (allSelected) return new Set<string>()
-                    const next = new Set(prev)
-                    for (const item of removable) next.add(item.id)
-                    return next
-                  })
-                }
-                className="accent-green-500"
-              />
-              すべてのメディアを選択
-            </label>
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={() =>
+                setSelected((prev) => {
+                  if (allSelected) return new Set<string>()
+                  const next = new Set(prev)
+                  for (const item of removable) next.add(item.id)
+                  return next
+                })
+              }
+            >すべてのメディアを選択</Checkbox>
           ) : null}
           {canManageMedia ? (
             <button
@@ -1408,6 +1612,7 @@ function MediaLibraryInner() {
           )}
         </div>
       </div>
+      ) : null}
         </div>
       </div>
 
@@ -1418,7 +1623,7 @@ function MediaLibraryInner() {
         initialFolderId={folderFilter}
         onClose={() => setUploadOpen(false)}
         onComplete={() => {
-          setSuccessMessage('登録できたメディアを一覧へ反映しました。')
+          notifyToast('登録できたメディアを一覧へ反映しました。')
           void load()
         }}
       />
@@ -1429,49 +1634,62 @@ function MediaLibraryInner() {
         onClose={() => setReplacementFor(null)}
         onComplete={(message) => {
           setReplacementFor(null)
-          setSuccessMessage(message)
+          notifyToast(message)
           void load()
         }}
       />
 
+      {editingFolder && (
+        <FolderAddDialog
+          kind="media"
+          folder={editingFolder}
+          accountId={selectedAccountId}
+          note="メディアを分けてしまう箱です。削除しても、中のメディアは未分類に残ります。"
+          placeholder="例: 01_商品写真"
+          onClose={() => setEditingFolder(null)}
+          onAdded={() => { setEditingFolder(null); void load() }}
+        />
+      )}
+
+      {/*
+        R37: 消す前に、中身がどうなるかを本文で読ませる。
+        「中身は未分類に戻ります」の確認を ConfirmDialog で行う。
+      */}
+      <ConfirmDialog
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={deletingFolder?.itemCount != null
+          ? `削除しても、中のメディアは未分類に残ります。いまこのフォルダに入っているのは${deletingFolder.itemCount}件です。`
+          : '削除しても、中のメディアは未分類に残ります。'}
+        confirmLabel="削除する"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
+        onConfirm={() => void removeFolder()}
+      />
+
       {preview && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-6"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${preview.filename}のプレビュー`}
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setPreview(null)
-          }}
-        >
-          <button
-            onClick={() => setPreview(null)}
-            aria-label="プレビューを閉じる"
-            className="text-on-accent absolute top-4 right-6 text-2xl leading-none"
-          >
-            ×
-          </button>
-          {preview.kind === 'image' ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={displaySrc(preview)}
-              alt={preview.filename}
-              className="max-h-full max-w-full object-contain"
-            />
-          ) : preview.kind === 'video' ? (
-            <video src={displaySrc(preview)} controls className="max-h-full max-w-full" />
-          ) : preview.kind === 'audio' ? (
-            <audio src={displaySrc(preview)} controls />
-          ) : (
-            <div className="rounded-card bg-canvas p-6 text-center text-sm">
-              <p className="text-ink font-medium">{preview.filename}</p>
-              <a href={displaySrc(preview)} target="_blank" rel="noreferrer" className="text-info mt-2 inline-block hover:underline">
-                別のタブで開く
-              </a>
-            </div>
-          )}
-        </div>
+        <MediaPreviewOverlay
+          filename={preview.filename}
+          kind={preview.kind}
+          src={displaySrc(preview)}
+          onClose={() => setPreview(null)}
+        />
       )}
     </div>
   )
+}
+
+/**
+ * 一覧の縮小画像。★V7：読み込めないとき、ブラウザの壊れた画像の印と
+ * ファイル名（代替文字）が枠からはみ出していた。種類の文字に切り替える。
+ */
+function MediaThumb({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <span className="text-ink-faint text-xs">画像を表示できません</span>
+  // 静的書き出しのため next/image の最適化は使えない。
+  // 一覧20件の同時取得を避けるため遅延読み込みにする。
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} className="h-full w-full object-contain" />
 }

@@ -17,9 +17,9 @@ describe('V6 流入リンク詳細の数字の契約', () => {
     expect(PAGE).not.toContain('1人あたり ¥1,493')
     expect(PAGE).not.toContain('体験前フォロー')
     expect(PAGE).not.toContain("'Instagram'")
-    // 「マイルを 100 付ける」は設計正本にある文言のため残す。
-    // 消すなら Pencil を先に直す（司令塔へ判断依頼 #531）。
-    expect(PAGE).toContain('マイルを 100 付ける')
+    // R269: 口にマイル付与の欄は無い。設計見本の固定値（#531 で残していた）を
+    // 実動作として出さない。V6 の文言固定より使いやすさが勝つ（2026-09-25）。
+    expect(PAGE).not.toContain('マイルを 100 付ける')
     expect(PAGE).not.toContain('18人います')
     expect(PAGE).not.toContain('ブロック率 9.3%')
   })
@@ -29,6 +29,9 @@ describe('V6 流入リンク詳細の数字の契約', () => {
     expect(PAGE).toContain('反応・ブロックの集計は未接続のため表示できません')
     expect(PAGE).toContain('シナリオは始めない')
     expect(PAGE).toContain('タグは付けない')
+    // R269: 追加直後のメッセージも実際の設定から組み立てる。
+    expect(PAGE).toContain('追加直後に送るメッセージはない')
+    expect(PAGE).toContain("追加直後に「${introTemplateName ?? '取得できません'}」を送る")
   })
 
   it('記号入り ref でも URL を壊さない', () => {

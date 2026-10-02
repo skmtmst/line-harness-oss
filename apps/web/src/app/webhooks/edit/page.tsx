@@ -1,9 +1,12 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
+import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
 
 /**
@@ -15,6 +18,8 @@ import { useAccount } from '@/contexts/account-context'
  */
 function EditWebhookPageInner() {
   const { selectedAccountId } = useAccount()
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
 
@@ -22,7 +27,24 @@ function EditWebhookPageInner() {
   const [url, setUrl] = useState('')
   const [eventTypes, setEventTypes] = useState('')
   const [maxRetries, setMaxRetries] = useState('0')
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error' | 'not-found'>('loading')
+  /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
+  const [reloadKey, setReloadKey] = useState(0)
+  /*
+   * 送り先の変更は統括だけ（R32）。口側が `requireRole('owner')` で守っている。
+   * 直接URLで開いた管理者には作らず、統括への依頼を案内する。
+   */
+  const [staffRole, setStaffRole] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void api.staff.me()
+      .then((response) => {
+        if (cancelled || !response.success) return
+        setStaffRole(response.data.role)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -44,24 +66,57 @@ function EditWebhookPageInner() {
         setMaxRetries(String(res.data.maxRetries ?? 0))
         setLoadState('ready')
       })
-      .catch(() => {
-        if (!cancelled) setLoadState('error')
+      .catch((caught: unknown) => {
+        if (cancelled) return
+        if (caught instanceof ApiError && caught.status === 404) setLoadState('not-found')
+        else setLoadState('error')
       })
     return () => { cancelled = true }
-  }, [id, selectedAccountId])
+  }, [id, reloadKey, selectedAccountId])
 
   if (!id) {
     return (
-      <p className="text-ink-secondary p-6 text-sm">
-        直したい送り先が選ばれていません。外部連携の一覧から「設定 → 直す」で開いてください。
-      </p>
+      <TargetMissing
+        kind="unspecified"
+        title="直す送り先が指定されていません"
+        description="外部連携の一覧から「設定 → 直す」で開いてください。"
+        backHref="/webhooks"
+        backLabel="外部連携の一覧へ戻る"
+      />
+    )
+  }
+  if (loadState === 'not-found') {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この送り先は見つかりません"
+        description="消えているか、別のLINEアカウントのものかもしれません。一覧から選び直してください。"
+        backHref="/webhooks"
+        backLabel="外部連携の一覧へ戻る"
+      />
     )
   }
   if (loadState === 'error') {
     return (
-      <p className="text-ink-secondary p-6 text-sm">
-        送り先の現在の設定を読めませんでした。消えているか、別のLINEアカウントのものかもしれません。
-      </p>
+      <TargetMissing
+        kind="error"
+        title="送り先の設定を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
+    )
+  }
+
+  if (staffRole !== null && staffRole !== 'owner') {
+    return (
+      <div className="flex flex-col gap-4">
+        <Notice tone="info">
+          送り先の変更は統括だけができます。必要なときは統括に頼んでください。
+        </Notice>
+        <div>
+          <Button variant="secondary" href="/webhooks">外部連携の一覧へ戻る</Button>
+        </div>
+      </div>
     )
   }
 
@@ -76,24 +131,43 @@ function EditWebhookPageInner() {
         if (!selectedAccountId) return 'LINEアカウントを選択してください'
         if (!name.trim()) return '名前を入力してください'
         if (!/^https:\/\//.test(url.trim())) return 'URLは https:// で始めてください'
+        // d23b R416: 口側と登録画面は0〜7を受け付ける。編集画面だけ狭いと、
+        // 7で登録したものが他の項目の変更ごと弾かれてしまう。
         const retries = Number(maxRetries)
-        if (!Number.isInteger(retries) || retries < 0 || retries > 5) {
-          return '送り直しは0から5の整数にしてください'
+        if (!Number.isInteger(retries) || retries < 0 || retries > 7) {
+          return '送り直しは0から7の整数にしてください'
         }
         return null
       }}
       onSave={async () => {
-        if (!selectedAccountId) throw new Error('LINEアカウントを選択してください')
-        const res = await api.webhooks.outgoing.update(id, selectedAccountId, {
-          name: name.trim(),
-          url: url.trim(),
-          eventTypes: eventTypes
-            .split(',')
-            .map((value) => value.trim())
-            .filter(Boolean),
-          maxRetries: Number(maxRetries) || 0,
-        })
-        if (!res.success) throw new Error(res.error)
+        const requestAccountId = selectedAccountId
+        if (!requestAccountId) throw new Error('LINEアカウントを選択してください')
+        try {
+          const res = await api.webhooks.outgoing.update(id, requestAccountId, {
+            name: name.trim(),
+            url: url.trim(),
+            eventTypes: eventTypes
+              .split(',')
+              .map((value) => value.trim())
+              .filter(Boolean),
+            maxRetries: Number(maxRetries) || 0,
+          })
+          if (!res.success) throw new Error(res.error)
+        } catch (caught) {
+          // 変更は統括だけ。権限不足は生の `API error: 403` ではなく依頼の案内にする（R32）。
+          if (caught instanceof ApiError && caught.status === 403) {
+            throw new Error('送り先の変更は統括だけができます。必要なときは統括に頼んでください。')
+          }
+          throw caught
+        }
+        /*
+          d23b R422: 保存が返る前にアカウントが切り替わっていたら、切り替え
+          先の画面を一覧へ飛ばさない。保存そのものは済んでいるので、完了と
+          場所を確かめる案内だけ残す（例外にすると画面遷移を止められる）。
+        */
+        if (selectedAccountIdRef.current !== requestAccountId) {
+          throw new Error('LINEアカウントが切り替わりました。保存は済んでいます。一覧から内容を確かめてください。')
+        }
       }}
     >
       {loadState === 'loading' ? (
@@ -135,14 +209,14 @@ function EditWebhookPageInner() {
           <Field
             label="失敗したときの送り直し"
             htmlFor="wh-edit-retries"
-            note="相手が 5xx を返したときや、つながらなかったときに送り直します。上限は5回です。"
+            note="相手が 5xx を返したときや、つながらなかったときに送り直します。1分・5分・30分…と間隔を空け、上限は7回です。相手が 4xx を返した場合は送り直しません。"
           >
             <div className="flex items-center gap-1.5">
               <input
                 id="wh-edit-retries"
                 type="number"
                 min={0}
-                max={5}
+                max={7}
                 value={maxRetries}
                 onChange={(event) => setMaxRetries(event.target.value)}
                 className={`${inputClass} w-24 tabular-nums`}

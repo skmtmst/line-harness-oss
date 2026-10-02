@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * SCENARIO-15: 対象条件・同時購読などの設定を保存し直したあと、
- * 「新規開始予定」などの試算表示が取り直されるかを、実画面を描いて確かめる。
+ * 「予約中」などの試算表示が取り直されるかを、実画面を描いて確かめる。
  *
  * ここではソースの文字列ではなく挙動を見る：
  *   - 設定を保存 → 試算を取り直し、新しい人数が出る
@@ -96,7 +96,11 @@ vi.mock('@/components/scenarios/trigger-editor', () => ({ default: () => null })
 vi.mock('@/components/scenarios/action-editor', () => ({ default: () => null }))
 vi.mock('@/components/scenarios/carousel-picker', () => ({ default: () => null }))
 vi.mock('@/components/scenarios/insert-toolbar', () => ({ default: () => null }))
-vi.mock('@/components/scenarios/step-preview', () => ({ default: () => null }))
+vi.mock('@/components/scenarios/step-preview', () => ({
+  default: () => null,
+  /* 本試験はプレビューを見ない。詳細画面が使う変換だけ形を返す。 */
+  previewOffsets: () => ({ offsetDays: 0, offsetHours: 0, offsetMinutes: 0 }),
+}))
 vi.mock('@/components/scenarios/message-kind-fields', () => ({
   default: () => null,
   emptyMessageKindState: () => ({}),
@@ -110,7 +114,7 @@ vi.mock('@/components/scenarios/question-editor', () => ({
   deadAnswerSettings: () => [],
 }))
 vi.mock('@/components/scenarios/scenario-dialogs', () => ({
-  /* 「対象を保存」を押すと条件を保存して閉じる、だけの窓。 */
+  /* 「対象を保存する」を押すと条件を保存して閉じる、だけの窓。 */
   ConditionDialog: ({
     onSave,
     onClose,
@@ -126,9 +130,10 @@ vi.mock('@/components/scenarios/scenario-dialogs', () => ({
         )
       }}
     >
-      対象を保存
+      対象を保存する
     </button>
   ),
+  MoveReferrersNotice: () => null,
   OnCompleteDialog: () => null,
   TestSendDialog: () => null,
   ON_COMPLETE_LABEL: { pause: '一時停止', resume_previous: '前へ戻す', move: '別のシナリオへ' },
@@ -273,26 +278,26 @@ afterEach(() => {
 describe('SCENARIO-15: 設定を保存し直すと試算を取り直す', () => {
   it('対象条件の保存で新しい人数へ更新される', async () => {
     await flush()
-    expect(host.textContent).toContain('新規開始予定 10人')
+    expect(host.textContent).toContain('予約中 10人')
     const before = network.simulateCalls
     expect(before).toBeGreaterThan(0)
 
     network.plannedNow = 42
     // 「対象の絞り込み」の窓を開いて保存する。
     await clickText('対象：全員')
-    await clickText('対象を保存')
+    await clickText('対象を保存する')
     await flush()
 
     expect(network.updateBodies.length).toBe(1)
     expect(network.updateBodies[0]).toHaveProperty('audienceCondition')
     expect(network.simulateCalls).toBeGreaterThan(before)
-    expect(host.textContent).toContain('新規開始予定 42人')
-    expect(host.textContent).not.toContain('新規開始予定 10人')
+    expect(host.textContent).toContain('予約中 42人')
+    expect(host.textContent).not.toContain('予約中 10人')
   })
 
   it('同時購読の切替保存でも取り直す', async () => {
     await flush()
-    expect(host.textContent).toContain('新規開始予定 10人')
+    expect(host.textContent).toContain('予約中 10人')
     const before = network.simulateCalls
 
     network.plannedNow = 7
@@ -300,12 +305,12 @@ describe('SCENARIO-15: 設定を保存し直すと試算を取り直す', () => 
     await flush()
 
     expect(network.simulateCalls).toBeGreaterThan(before)
-    expect(host.textContent).toContain('新規開始予定 7人')
+    expect(host.textContent).toContain('予約中 7人')
   })
 
   it('取り直し中は古い人数を出さず、遅い旧試算は新しい版を上書きしない', async () => {
     await flush()
-    expect(host.textContent).toContain('新規開始予定 10人')
+    expect(host.textContent).toContain('予約中 10人')
 
     network.simulateMode = 'manual'
     // 1回目の保存 → 取り直しが走る（新しい呼び出しが pending に乗る）
@@ -314,7 +319,7 @@ describe('SCENARIO-15: 設定を保存し直すと試算を取り直す', () => 
     await flush(3)
     // 古い「10人」は確定値として残らず、計算中と分かる。
     expect(host.textContent).toContain('計算しています')
-    expect(host.textContent).not.toContain('新規開始予定 10人')
+    expect(host.textContent).not.toContain('予約中 10人')
 
     // 2回目の保存（同時購読を元に戻す）→ さらに新しい世代の取り直し。
     await clickText('同時に購読できるシナリオは 1つ')
@@ -325,12 +330,12 @@ describe('SCENARIO-15: 設定を保存し直すと試算を取り直す', () => 
     // 新しい世代が先に届く → その値を出す。
     await resolveSimulate(latestIndex, 42)
     await flush(2)
-    expect(host.textContent).toContain('新規開始予定 42人')
+    expect(host.textContent).toContain('予約中 42人')
 
     // 遅れて届いた旧世代（pending の先頭）を解決しても上書きされない。
     await resolveSimulate(pendingBefore, 999)
     await flush(2)
-    expect(host.textContent).toContain('新規開始予定 42人')
+    expect(host.textContent).toContain('予約中 42人')
     expect(host.textContent).not.toContain('999人')
   })
 })

@@ -6,6 +6,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
 import { authRequest, emailError } from '@/lib/auth-email'
@@ -18,6 +20,9 @@ const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_profile_missing',
   'line_login_failed',
 ])
+
+/** 空パスワードで送信したときだけ出す入力前の案内。入力が始まったら消す。 */
+const EMPTY_PASSWORD_MESSAGE = 'パスワードを入力してください'
 
 /**
  * ログイン。★V6 0-1（`UufG8`、カード `m3tWJ`）。
@@ -33,6 +38,13 @@ export default function LoginPage() {
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState<'password' | 'line' | null>(null)
   const [error, setError] = useState('')
+
+  // R613: 空パスワードの案内は入力が始まったら消す。
+  // 認証失敗・通信失敗・権限エラーなど別の原因の表示は次の送信まで残す。
+  const handlePasswordChange = (value: string) => {
+    setPassword(value)
+    if (value && error === EMPTY_PASSWORD_MESSAGE) setError('')
+  }
 
   useEffect(() => {
     const errorCode = new URLSearchParams(window.location.search).get('error')
@@ -51,7 +63,7 @@ export default function LoginPage() {
     setEmailMessage(emailProblem)
     if (emailProblem) return
     if (!password) {
-      setError('パスワードを入力してください')
+      setError(EMPTY_PASSWORD_MESSAGE)
       return
     }
     setBusy('password')
@@ -74,7 +86,8 @@ export default function LoginPage() {
       return
     }
     if (res.data.twoFactor && res.data.challengeToken) {
-      window.location.assign(`/login/two-factor#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      // R507: 二段階認証の画面で実際のログイン方法を出せるよう、経路の印を付ける。
+      window.location.assign(`/login/two-factor#${new URLSearchParams({ lh_2fa: res.data.challengeToken, lh_method: 'password' }).toString()}`)
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
@@ -100,9 +113,7 @@ export default function LoginPage() {
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
-          <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-status-danger">
-            {error}
-          </p>
+          <Notice tone="danger" message={error} />
         ) : null}
         <AuthField label="メールアドレス" htmlFor="login-email" error={emailMessage}>
           <TextField
@@ -118,24 +129,18 @@ export default function LoginPage() {
           />
         </AuthField>
         <AuthField label="パスワード" htmlFor="login-password">
-          <PasswordField id="login-password" value={password} onChange={setPassword} autoComplete="current-password" />
+          <PasswordField id="login-password" value={password} onChange={handlePasswordChange} autoComplete="current-password" />
         </AuthField>
-        <label className="flex items-center gap-2 text-caption text-ink-secondary">
-          <input
-            type="checkbox"
-            checked={remember}
-            onChange={(event) => setRemember(event.target.checked)}
-            className="h-4 w-4 accent-accent-deep"
-          />
-          この端末では7日間ログインを保持する
-        </label>
+        <Checkbox
+          checked={remember}
+          onCheckedChange={setRemember}
+        >この端末では7日間ログインを保持する</Checkbox>
         <div className="flex justify-end">
-          <Link href="/password/forgot" className="text-caption font-semibold text-accent-deep hover:underline">
+          <Link href="/password/forgot" className="text-caption font-semibold text-action hover:underline">
             パスワードを忘れた方はこちら
           </Link>
         </div>
-        <Button type="submit" variant="primary" disabled={busy !== null} className="w-full">
-          {busy === 'password' ? 'ログインしています…' : 'ログイン'}
+        <Button type="submit" variant="primary" disabled={busy !== null} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
         </Button>
       </form>
 
@@ -145,14 +150,13 @@ export default function LoginPage() {
         <span className="h-px flex-1 bg-hairline" />
       </div>
 
-      <Button onClick={lineLogin} disabled={busy !== null} className="w-full">
-        <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />
-        {busy === 'line' ? 'LINEへ移動中…' : 'LINE でログイン'}
+      <Button onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
+        <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />LINE でログイン
       </Button>
 
       <p className="text-caption text-ink-faint">
         はじめての方は{' '}
-        <Link href="/register" className="font-semibold text-accent-deep hover:underline">
+        <Link href="/register" className="font-semibold text-action hover:underline">
           無料で始める
         </Link>
       </p>

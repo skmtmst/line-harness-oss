@@ -9,7 +9,8 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
  */
 describe('コンバージョンの種類選択（#975 U062）', () => {
   it('390pxで2列の短い選択群にする', () => {
-    expect(PAGE).toContain('role="radiogroup" aria-label="数えるきっかけ"')
+    // m21u: 素の選択群を共通の RadioCardGroup へ置き換えた。群の名前は legend で保つ。
+    expect(PAGE).toContain('legend="数えるきっかけ"')
     expect(PAGE).toContain('grid grid-cols-2 gap-2 sm:grid-cols-3')
     // 大カードの3段構成（アイコン＋題名＋説明）は使わない。
     expect(PAGE).not.toContain('md:grid-cols-3 xl:grid-cols-6')

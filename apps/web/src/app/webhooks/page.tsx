@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { api, type OutgoingWebhookOverview } from '@/lib/api'
+import { X } from 'lucide-react'
+import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -9,11 +11,16 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import SelectField from '@/components/shared/select-field'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
 import WebhookInteractions from './webhook-interactions'
-import { IncomingOverview, OutgoingOverview } from './webhook-overviews'
+import GoogleSheetsPanel from './google-sheets-panel'
+import ApiTokensPanel from './api-tokens-panel'
+import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-overviews'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 
 type Tab = 'incoming' | 'outgoing'
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -21,6 +28,33 @@ type ToggleKind = 'incoming' | 'outgoing'
 type ToggleFailure = { kind: ToggleKind; id: string; name: string; message: string }
 /* 送信中にもう一度押されたことの記録(#707)。押下を黙って落とさず、待っている旨を返す。 */
 type ToggleBusyNotice = { kind: ToggleKind; id: string; name: string }
+
+/*
+ * 受け取り口のURLはAPIの側の住所で組み立てる（C33）。
+ *
+ * 以前は開いている管理画面の住所を使っていたが、
+ * 検証環境では管理画面（pages.dev）とAPI（workers.dev）が別住所のため、
+ * 写したURLが受け付け口を指さなかった。受け口は Worker の口なので、
+ * 画面が叩いているのと同じAPI基底を使う。末尾の `/` は落とす。
+ */
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
+
+/*
+ * 受け取り口の作成の入力ミスを、欄の下に出す言葉へ写す（R32）。
+ *
+ * 口の検証文は英語（`name is required` など）で、そのまま出すと直し方が
+ * 分からない。どの欄かをここで決め、日本語の直し方を返す。
+ * 日本語の本文（LINEアカウントの選択など）はそのまま上に載せる。
+ */
+function mapIncomingCreateFieldError(raw: string): { field: 'name' | 'secret'; text: string } | null {
+  if (/secret/i.test(raw)) return { field: 'secret', text: 'シークレットは32文字以上にしてください' }
+  if (/name/i.test(raw)) {
+    return /120/.test(raw)
+      ? { field: 'name', text: '名前は120文字以内にしてください' }
+      : { field: 'name', text: '名前を入力してください' }
+  }
+  return null
+}
 
 function toggleKey(kind: ToggleKind, id: string): string {
   return `${kind}:${id}`
@@ -59,11 +93,16 @@ const SOURCE_OTHER = '__other__'
   送る側の見本（いつ送るか・何を送るか）。一覧の表示文言とそろえている。
   送り先の作成は /webhooks/new で行うので、ここでは行き先の案内だけ持つ。
 */
+/*
+ * R150: event は送信Webhookが実際に購読できる種類ID
+ * (packages/db KNOWN_OUTGOING_EVENT_TYPES)。作られない出来事を
+ * 見本に書くと「全イベント送信」の設定が意図せず作られる。
+ */
 const OUTGOING_SAMPLES = [
-  { event: 'friend.added', when: '友だちが追加されたとき', payload: '名前・追加日・流入元' },
-  { event: 'form.submitted', when: 'フォームが送られたとき', payload: '回答のすべて' },
-  { event: 'booking.created', when: '予約が入ったとき', payload: '予約日時・メニュー・担当' },
-  { event: 'conversion.confirmed', when: '注文が確定したとき', payload: '注文番号・金額・お客様名' },
+  { event: 'friend_add', when: '友だちが追加されたとき', payload: '名前・追加日・流入元' },
+  { event: 'form_submitted', when: 'フォームが送られたとき', payload: 'フォーム名・回答ID' },
+  { event: 'booking_created', when: '予約が入ったとき', payload: '予約ID・メニュー・担当' },
+  { event: 'ec.order.confirmed', when: '注文が確定したとき', payload: '注文番号・金額・お客様名' },
 ] as const
 
 /*
@@ -83,6 +122,10 @@ const MERGED_TABS = [
   { key: 'outgoing', label: 'こちらから送る' },
   { key: 'incoming', label: 'こちらで受け取る' },
   { key: 'interactions', label: 'やり取りの記録' },
+  // #838 第2段: Sheets連携のOAuth戻り先もこのタブ（?tab=sheets&sheets=…）。
+  { key: 'sheets', label: 'Google Sheets' },
+  // R434: 公開APIの鍵の発行・棚卸し・停止。口は前からあり、画面が無かった。
+  { key: 'api-tokens', label: 'API接続' },
   { key: 'notify', label: `見本 ${SOURCE_PRESETS.length + OUTGOING_SAMPLES.length}` },
 ]
 
@@ -92,45 +135,70 @@ const MERGED_TABS = [
   それぞれ作成の入口へつなげる。通知機能への導線は置かない。
 */
 function WebhookSamples() {
+  /*
+   * 見本からの作成も受け取り口・送り先の作成（R32）。口側が
+   * `requireRole('owner')` で守っているので、統括でなければ
+   * 作成ボタンは出さず、統括への依頼だけ出す。
+   */
+  const [staffRole, setStaffRole] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void api.staff.me()
+      .then((response) => {
+        if (cancelled || !response.success) return
+        setStaffRole(response.data.role)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+  const canCreateSamples = staffRole === null || staffRole === 'owner'
   return (
     <div>
-      <p className="bg-accent-soft text-ink-secondary rounded-card mb-4 px-4 py-3 text-sm leading-6">
+      <Notice tone="info" className="mb-4">
         よくあるつなぎ方の見本です。使いたい見本を選ぶと、作成画面がその内容で開きます。
-      </p>
+      </Notice>
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
         <section className="bg-canvas border-hairline rounded-card border p-5" aria-label="受け取る見本">
           <h2 className="text-ink mb-1 text-lg font-bold">受け取る見本</h2>
           <p className="text-ink-secondary mb-4 text-sm">相手のサービスで起きたことをうちに取り込みます。</p>
-          <ul className="space-y-3">
-            {SOURCE_PRESETS.map((preset) => (
-              <li key={preset.value} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 p-4">
-                <div className="min-w-0">
-                  <strong className="text-ink block text-sm">{preset.label}</strong>
-                  <span className="text-ink-secondary mt-1 block text-xs">{preset.hint}</span>
-                </div>
-                <Button variant="secondary" href={`/webhooks?tab=incoming&source=${preset.value}`}>
-                  この見本で作る
-                </Button>
-              </li>
-            ))}
-          </ul>
+          {canCreateSamples ? (
+            <ul className="space-y-3">
+              {SOURCE_PRESETS.map((preset) => (
+                <li key={preset.value} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div className="min-w-0">
+                    <strong className="text-ink block text-sm">{preset.label}</strong>
+                    <span className="text-ink-secondary mt-1 block text-xs">{preset.hint}</span>
+                  </div>
+                  <Button variant="secondary" href={`/webhooks?tab=incoming&source=${preset.value}`}>
+                    この見本で作る
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-ink-secondary text-sm">受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。</p>
+          )}
         </section>
         <section className="bg-canvas border-hairline rounded-card border p-5" aria-label="送る見本">
           <h2 className="text-ink mb-1 text-lg font-bold">送る見本</h2>
           <p className="text-ink-secondary mb-4 text-sm">うちで起きたことを相手のサービスに知らせます。</p>
-          <ul className="space-y-3">
-            {OUTGOING_SAMPLES.map((sample) => (
-              <li key={sample.event} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 p-4">
-                <div className="min-w-0">
-                  <strong className="text-ink block text-sm">{sample.when}</strong>
-                  <span className="text-ink-secondary mt-1 block text-xs">送るもの：{sample.payload}</span>
-                </div>
-                <Button variant="secondary" href="/webhooks/new">
-                  送り先を作る
-                </Button>
-              </li>
-            ))}
-          </ul>
+          {canCreateSamples ? (
+            <ul className="space-y-3">
+              {OUTGOING_SAMPLES.map((sample) => (
+                <li key={sample.event} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div className="min-w-0">
+                    <strong className="text-ink block text-sm">{sample.when}</strong>
+                    <span className="text-ink-secondary mt-1 block text-xs">送るもの：{sample.payload}</span>
+                  </div>
+                  <Button variant="secondary" href={`/webhooks/new?event=${sample.event}`}>
+                    送り先を作る
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-ink-secondary text-sm">送り先の作成は統括だけができます。必要なときは統括に頼んでください。</p>
+          )}
         </section>
       </div>
     </div>
@@ -179,6 +247,18 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     ? requestedSource
     : ''
   const [showCreate, setShowCreate] = useState(initialSource !== '')
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
+  /*
+   * 受け取り口・送り先の作成は統括だけ（R32）。口側が `requireRole('owner')`
+   * で守っているので、画面も権限に合わせて操作を出す。
+   *
+   * できるかは入り直した本人の役割（`api.staff.me()`）で決める。手元の保存値
+   * （`localStorage`）は書き換え可能なので判定に使わない（#506 軽と同じ考え）。
+   * 確認が終わるまでは今までどおり操作を出し、終わって統括でなければ
+   * ボタンを出さず「統括に頼んでください」の案内に替える。
+   */
+  const [staffRole, setStaffRole] = useState<string | null>(null)
+  const [createFieldError, setCreateFieldError] = useState<{ name?: string; secret?: string }>({})
 
   const [inForm, setInForm] = useState({ name: '', sourceType: initialSource, secret: '' })
   // 見本に無いものを選んだときだけ、自由入力に切り替える。
@@ -194,11 +274,27 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
   // Rotate-secret modal state. Used to recover legacy webhooks deactivated
   // by migration 034, or to rotate a leaked secret in place.
+  /*
+   * d23b R420: 押した時点のLINEアカウントを一緒に持つ。
+   * 本人確認の窓をまたいで切り替えられると、別アカウントの設定へ
+   * 間違った合言葉を書き込んでしまう。
+   */
   const [rotateTarget, setRotateTarget] = useState<
-    | { kind: 'incoming' | 'outgoing'; id: string; name: string; activate: boolean }
+    | { kind: 'incoming' | 'outgoing'; id: string; name: string; activate: boolean; accountId: string }
     | null
   >(null)
   const [rotateSecretValue, setRotateSecretValue] = useState('')
+
+  // 2つの窓も共通の約束に揃える: Escapeで閉じる・Tabは窓の中・
+  // 閉じたら起点へ戻す・背面はスクロールしない。
+  const rotateModalRef = useOverlayFocus(!!rotateTarget, () => {
+    setRotateTarget(null)
+    setRotateSecretValue('')
+  })
+  const secretModalRef = useOverlayFocus(!!createdSecret, () => {
+    setCreatedSecret(null)
+    setSecretCopied(false)
+  })
 
   /**
    * 削除の確認。ブラウザの `confirm()` は「この受信Webhookを削除しますか？」
@@ -282,9 +378,13 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     setSecretCopied(false)
     setRotateTarget(null)
     setRotateSecretValue('')
+    // d23b R420: アカウントを切り替えたら、前のアカウントへ紐付いた
+    // 本人確認の窓も閉じる。通った許可を別アカウントの操作へ回さない。
+    setStepUp(null)
     if (accountChanged) {
       setShowCreate(false)
       setInForm({ name: '', sourceType: '', secret: '' })
+      setCreateFieldError({})
       setSourceIsOther(false)
       setToggleFailures({})
       setToggleBusyNotices({})
@@ -292,6 +392,22 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     if (selectedAccountId !== null) lastLoadedAccountIdRef.current = selectedAccountId
     void load()
   }, [load, selectedAccountId])
+
+  useEffect(() => {
+    let cancelled = false
+    void api.staff.me()
+      .then((response) => {
+        if (cancelled || !response.success) return
+        setStaffRole(response.data.role)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  // 統括でないことが分かったら、開きかけの作成欄を閉じる。
+  useEffect(() => {
+    if (staffRole !== null && staffRole !== 'owner') setShowCreate(false)
+  }, [staffRole])
 
   /* 見張り(ref)と見え方(state)を、送信の開始と終了で必ず一緒に動かす(#707)。 */
   const beginToggle = (key: string) => {
@@ -352,14 +468,18 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
         return
       }
       if (selectedAccountIdRef.current === requestAccountId) await load()
-    } catch {
+    } catch (caught) {
       if (selectedAccountIdRef.current !== requestAccountId) return
       const name = incoming.find((item) => item.id === id)?.name ?? 'この受け取り口'
+      // 切り替えは統括だけの操作。権限不足は通信の失敗と分けて案内する（R32）。
+      const forbidden = caught instanceof ApiError && caught.status === 403
       setToggleFailures((current) => ({
         ...current,
         [key]: {
           kind: 'incoming', id, name,
-          message: '切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。',
+          message: forbidden
+            ? '統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。'
+            : '切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。',
         },
       }))
     } finally {
@@ -399,14 +519,26 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
         return
       }
       if (selectedAccountIdRef.current === requestAccountId) await load()
-    } catch {
+    } catch (caught) {
       if (selectedAccountIdRef.current !== requestAccountId) return
       const name = outgoing.find((item) => item.id === id)?.name ?? 'この送り先'
+      // 切り替えは統括だけの操作。権限不足は通信の失敗と分けて案内する（R32）。
+      const forbidden = caught instanceof ApiError && caught.status === 403
+      if (!forbidden) {
+        /*
+          d23b R418: 応答が消えても、口側では止める処理が通っていることがある。
+          「変わっていません」と断言せず、一覧を読み直して実際の状態へ寄せ、
+          結果を確かめる案内だけを残す。
+        */
+        await load().catch(() => {})
+      }
       setToggleFailures((current) => ({
         ...current,
         [key]: {
           kind: 'outgoing', id, name,
-          message: '切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。',
+          message: forbidden
+            ? '統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。'
+            : '切り替えの応答を受け取れませんでした。一覧の表示を確かめてください。変わっている可能性があります。',
         },
       }))
     } finally {
@@ -447,23 +579,31 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       if (selectedAccountIdRef.current !== requestAccountId) return
       setDeleteTarget(null)
       await load()
-    } catch {
+    } catch (caught) {
       if (selectedAccountIdRef.current !== requestAccountId) return
       // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
-      setDeleteError(`この${label}を削除できませんでした。状態を読み直してから、もう一度お試しください。`)
+      // 削除は統括だけの操作。権限不足は通信の失敗と分けて案内する（R32）。
+      const forbidden = caught instanceof ApiError && caught.status === 403
+      setDeleteError(forbidden
+        ? `この${label}の削除は統括だけができます。必要なときは統括に頼んでください。`
+        : `この${label}を削除できませんでした。状態を読み直してから、もう一度お試しください。`)
     } finally {
       setDeleting(false)
     }
   }
 
-  const handleCreateIncoming = async (e: React.FormEvent) => {
+  const handleCreateIncoming = async (e: React.FormEvent, stepUpToken?: string) => {
     e.preventDefault()
     setError('')
+    setCreateFieldError({})
     const requestAccountId = selectedAccountId
     if (!requestAccountId) return setError('LINEアカウントを選択してください')
-    if (!inForm.name) return
+    if (!inForm.name) {
+      setCreateFieldError({ name: '名前を入力してください' })
+      return
+    }
     if (inForm.secret.length < MIN_SECRET_LENGTH) {
-      setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
+      setCreateFieldError({ secret: `シークレットは最低${MIN_SECRET_LENGTH}文字必要です` })
       return
     }
     try {
@@ -472,7 +612,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
         name: inForm.name,
         sourceType: inForm.sourceType || undefined,
         secret: inForm.secret,
-      })
+      }, stepUpToken)
       if (!res.success) {
         if (selectedAccountIdRef.current !== requestAccountId) return
         setError(res.error)
@@ -485,9 +625,25 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       setSourceIsOther(false)
       setShowCreate(false)
       await load()
-    } catch {
+    } catch (caught) {
+      // 秘密の値の登録は大事な操作。本人確認を求められたら窓を立てる（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'webhook.secret', action: '受け取り口を登録する', retry: (token) => handleCreateIncoming(e, token) })
+        return
+      }
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('作成に失敗しました')
+      /*
+       * 失敗は原因どおりに（R32）。権限がない（403）は統括への依頼、
+       * 入力の直し（400/422）は欄の下に直し方を出す。通信・サーバーの
+       * 失敗だけが「もう一度」になる。
+       */
+      if (caught instanceof ApiError && (caught.status === 400 || caught.status === 422)) {
+        const mapped = mapIncomingCreateFieldError(caught.message)
+        if (mapped) setCreateFieldError({ [mapped.field]: mapped.text })
+      }
+      setError(describeApiFailure(caught, '作成', {
+        forbidden: '受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。',
+      }))
     }
   }
 
@@ -500,7 +656,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     }
   }
 
-  const handleRotateSubmit = async (e: React.FormEvent) => {
+  const handleRotateSubmit = async (e: React.FormEvent, stepUpToken?: string) => {
     e.preventDefault()
     setError('')
     const requestAccountId = selectedAccountId
@@ -508,6 +664,17 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       return setError('LINEアカウントの一覧を読み直してください')
     }
     if (!rotateTarget) return
+    /*
+      d23b R420: 本人確認の窓をまたいだり開けたままにしているあいだに
+      切り替えられたら、開いた時点のアカウントのものではない。書き込みを
+      止めて選び直させる（本人確認の許可は開いたときのアカウントに紐付く）。
+    */
+    if (rotateTarget.accountId !== requestAccountId) {
+      setRotateTarget(null)
+      setRotateSecretValue('')
+      setError('LINEアカウントが切り替わりました。対象を選び直してください。')
+      return
+    }
     if (rotateSecretValue.length < MIN_SECRET_LENGTH) {
       setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
       return
@@ -516,8 +683,8 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       const payload = { secret: rotateSecretValue, isActive: rotateTarget.activate || undefined }
       const res =
         rotateTarget.kind === 'incoming'
-          ? await api.webhooks.incoming.update(rotateTarget.id, requestAccountId, payload)
-          : await api.webhooks.outgoing.update(rotateTarget.id, requestAccountId, payload)
+          ? await api.webhooks.incoming.update(rotateTarget.id, requestAccountId, payload, stepUpToken)
+          : await api.webhooks.outgoing.update(rotateTarget.id, requestAccountId, payload, stepUpToken)
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
         setError(res.error)
@@ -526,21 +693,36 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       setRotateTarget(null)
       setRotateSecretValue('')
       load()
-    } catch {
+    } catch (caught) {
+      // シークレットの差し替えは大事な操作。本人確認を求められたら窓を立てる（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: (token) => handleRotateSubmit(e, token) })
+        return
+      }
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('シークレットの更新に失敗しました')
+      setError(describeApiFailure(caught, 'シークレットの更新', {
+        forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
+      }))
     }
   }
 
-  const endpointUrl = (id: string) =>
-    `${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhooks/incoming/${id}/receive`
+  const endpointUrl = (id: string) => `${API_BASE}/api/webhooks/incoming/${id}/receive`
   const activeStatus = tab === 'incoming' ? incomingStatus : outgoingStatus
+  /*
+   * 作成の操作は統括だけに出す（R32）。役割の確認が終わるまでは
+   * 今までどおり出し、統括でないと分かったら案内に替える。
+   */
+  const canCreate = staffRole === null || staffRole === 'owner'
+  const createGuidance = tab === 'incoming'
+    ? '受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。'
+    : '送り先の作成は統括だけができます。必要なときは統括に頼んでください。'
 
   /*
     #980: タブの件数は、そのタブの一覧と同じ取得から数える。
     `incoming` / `outgoing` はこの画面が選択中アカウントで絞って取った配列で、
-    下の一覧（IncomingOverview / OutgoingOverview）とKPI帯がそのまま描く
-    同じ集合。読み込み中・取得失敗・まだ取っていない間は数字を付けない
+    下の一覧（IncomingOverview / OutgoingOverview）とKPI帯（OutgoingKpis、
+    タブの下にこの画面が描く）がそのまま描く同じ集合。読み込み中・
+    取得失敗・まだ取っていない間は数字を付けない
     （一覧側も「読み込んでいます」「表示できませんでした」と数を分けている）。
   */
   const countedTabs = MERGED_TABS.map((item) => {
@@ -554,43 +736,83 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   })
 
   return (
-    <div>
-      <div data-design="Crumb" className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Crumb" className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" aria-label="パンくず">
           <span className="text-action font-semibold">自動化</span>
           <span className="mx-2">›</span>
           <span>外部連携</span>
         </nav>
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
-          {tab === 'incoming' ? (
-            <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
-              {showCreate ? 'キャンセル' : '受け取り口を追加'}
-            </Button>
-          ) : (
-            <Button variant="primary" href="/webhooks/new">送り先を追加</Button>
-          )}
-        </div>
       </div>
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={countedTabs} active={tab} />
+      {/*
+        作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。
+        「見本から作る」も作る操作なので同じ並びの副ボタンへ、
+        統括だけに出す（R32）。管理者には統括への依頼だけ出す。
+        数字のカード（こちらから送るタブの KPI 帯）の下に置く。
+      */}
+      {tab === 'outgoing' ? (
+        <div className="mt-4">
+          <OutgoingKpis
+            items={outgoing}
+            status={outgoingStatus}
+            incomingCount={incoming.length}
+            summary={interactionSummary}
+            summaryStatus={summaryStatus}
+          />
+        </div>
+      ) : null}
+      <div className="mb-4 mt-4 flex flex-wrap items-center gap-2">
+        {tab === 'incoming' ? (
+          canCreate ? (
+            <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
+              {showCreate ? 'キャンセル' : '＋ 受け取り口を作る'}
+            </Button>
+          ) : (
+            <p className="text-ink-secondary text-sm">{createGuidance}</p>
+          )
+        ) : canCreate ? (
+          <Button variant="primary" href="/webhooks/new">＋ 送り先を作る</Button>
+        ) : (
+          <p className="text-ink-secondary text-sm">{createGuidance}</p>
+        )}
+        {canCreate ? (
+          <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
+        ) : null}
+      </div>
 
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <form onSubmit={handleRotateSubmit} className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
-            <h2 className="text-lg font-semibold text-ink mb-2">
-              「{rotateTarget.name}」のシークレットを{rotateTarget.activate ? '設定して有効化' : '更新'}
-            </h2>
+        <div ref={rotateModalRef} className="fixed inset-0 bg-scrim flex items-center justify-center z-50 p-4">
+          <form onSubmit={handleRotateSubmit} role="dialog" aria-modal="true" aria-labelledby="rotate-secret-title" className="bg-canvas rounded-control shadow-float max-w-lg w-full p-6">
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <h2 id="rotate-secret-title" className="text-lg font-semibold text-ink">
+                「{rotateTarget.name}」のシークレットを{rotateTarget.activate ? '設定して有効化' : '更新'}
+              </h2>
+              <button
+                type="button"
+                aria-label="閉じる"
+                className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"
+                onClick={() => {
+                  setRotateTarget(null)
+                  setRotateSecretValue('')
+                }}
+              >
+                <X aria-hidden="true" className="h-5 w-5" />
+              </button>
+            </div>
             <p className="text-sm text-ink-secondary mb-4">
               新しいシークレットを設定します。
               <strong className="text-danger">設定後は今回限り画面に表示されません。</strong>
               控えておいてから「保存」を押してください。
+              保存後も前の合言葉は24時間だけ使えるので、相手側の切り替え中も届物は止まりません。
             </p>
             <div className="flex gap-2 mb-4">
               <input
                 value={rotateSecretValue}
                 onChange={(e) => setRotateSecretValue(e.target.value)}
-                className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm font-mono"
+                className="flex-1 border border-hairline rounded-control px-3 py-2 text-sm font-mono"
                 placeholder="ランダムな英数字32文字以上"
                 required
                 minLength={MIN_SECRET_LENGTH}
@@ -613,13 +835,12 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               >
                 キャンセル
               </Button>
-              <button
+              <Button
                 type="submit"
-                className="px-4 py-2 text-sm rounded-lg text-white font-medium"
-                style={{ backgroundColor: 'var(--color-accent)' }}
+                variant="primary"
               >
-                保存
-              </button>
+                保存する
+              </Button>
             </div>
           </form>
         </div>
@@ -627,17 +848,30 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Created-secret modal — shown ONCE after a successful create. */}
       {createdSecret && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
-            <h2 className="text-lg font-semibold text-ink mb-2">
-              シークレットを保存してください
-            </h2>
+        <div className="fixed inset-0 bg-scrim flex items-center justify-center z-50 p-4">
+          <div ref={secretModalRef} role="dialog" aria-modal="true" aria-labelledby="created-secret-title" className="bg-canvas rounded-control shadow-float max-w-lg w-full p-6">
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <h2 id="created-secret-title" className="text-lg font-semibold text-ink">
+                シークレットを保存してください
+              </h2>
+              <button
+                type="button"
+                aria-label="閉じる"
+                className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"
+                onClick={() => {
+                  setCreatedSecret(null)
+                  setSecretCopied(false)
+                }}
+              >
+                <X aria-hidden="true" className="h-5 w-5" />
+              </button>
+            </div>
             <p className="text-sm text-ink-secondary mb-4">
               「{createdSecret.name}」を作成しました。
               <strong className="text-danger">このシークレットは今後二度と表示されません。</strong>
               閉じる前に必ず安全な場所に保存してください。
             </p>
-            <div className="bg-canvas-sunken border border-hairline rounded p-3 mb-4">
+            <div className="bg-canvas-sunken border border-hairline rounded-mini p-3 mb-4">
               <code className="text-sm break-all">{createdSecret.secret}</code>
             </div>
             <div className="flex gap-2 justify-end">
@@ -651,7 +885,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
                   setCreatedSecret(null)
                   setSecretCopied(false)
                 }}
-                className="px-4 py-2 text-sm rounded-lg text-white font-medium"
+                className="px-4 py-2 text-sm rounded-control text-on-accent font-medium"
                 style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 保存しました
@@ -663,19 +897,19 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
+        <Notice tone="danger" className="mb-4">
           {error}
-        </div>
+        </Notice>
       )}
       {Object.entries(toggleFailures).map(([key, failure]) => (
-        <div
+        <Notice
           key={key}
-          role="alert"
+          tone="danger"
+          className="mb-4"
           data-webhook-toggle-error={key}
-          className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
         >
           「{failure.name}」を{failure.kind === 'incoming' ? '受け取る設定' : '送る設定'}：{failure.message}
-        </div>
+        </Notice>
       ))}
       {/*
         送信中の再押下に返す案内(#707)。`disabled` で押せなくすると、二重押しが
@@ -684,43 +918,49 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
         黙って落とさずここへ出す。失敗案内と同じ場所へ置いて、見る所を増やさない。
       */}
       {Object.entries(toggleBusyNotices).map(([key, busy]) => (
-        <div
+        <Notice
           key={key}
-          role="status"
+          tone="warn"
+          className="mb-4"
           data-webhook-toggle-busy={key}
-          className="bg-status-warning-soft text-status-warning rounded-control mb-4 px-4 py-3 text-sm"
         >
           「{busy.name}」を{busy.kind === 'incoming' ? '受け取る設定' : '送る設定'}：いま切り替えを送っています。返事が来るまでお待ちください。
-        </div>
+        </Notice>
       ))}
 
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
-        <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-lg border border-hairline p-6 mb-6">
+        <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-control border border-hairline p-6">
           <h3 className="text-sm font-semibold text-ink mb-4">受け取る設定を追加</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-ink-secondary mb-1">名前</label>
               <input
                 value={inForm.name}
-                onChange={(e) => setInForm({ ...inForm, name: e.target.value })}
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
+                onChange={(e) => {
+                  setInForm({ ...inForm, name: e.target.value })
+                  if (createFieldError.name) setCreateFieldError((current) => ({ ...current, name: undefined }))
+                }}
+                className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
                 placeholder="LINE公式アカウント"
                 required
               />
+              {createFieldError.name ? (
+                <p className="text-danger mt-1 text-xs" role="alert">{createFieldError.name}</p>
+              ) : null}
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-secondary mb-1">どこから来るか</label>
-              <SelectField
+              <Select
                 value={sourceIsOther ? SOURCE_OTHER : inForm.sourceType}
-                onChange={(e) => {
-                  const next = e.target.value
+                onChange={(value) => {
+                  const next = value
                   if (next === SOURCE_OTHER) { setSourceIsOther(true); setInForm({ ...inForm, sourceType: '' }); return }
                   setSourceIsOther(false)
                   setInForm({ ...inForm, sourceType: next })
                 }}
                 aria-label="受信元の種類"
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
+                size="full"
                 options={[
                   { value: '', label: '選んでください' },
                   ...SOURCE_PRESETS.map((preset) => ({ value: preset.value, label: preset.label })),
@@ -748,8 +988,11 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               <div className="flex gap-2">
                 <input
                   value={inForm.secret}
-                  onChange={(e) => setInForm({ ...inForm, secret: e.target.value })}
-                  className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm font-mono"
+                  onChange={(e) => {
+                    setInForm({ ...inForm, secret: e.target.value })
+                    if (createFieldError.secret) setCreateFieldError((current) => ({ ...current, secret: undefined }))
+                  }}
+                  className="flex-1 border border-hairline rounded-control px-3 py-2 text-sm font-mono"
                   placeholder="ランダムな英数字32文字以上"
                   required
                   minLength={MIN_SECRET_LENGTH}
@@ -761,18 +1004,21 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
                   自動生成
                 </Button>
               </div>
+              {createFieldError.secret ? (
+                <p className="text-danger mt-1 text-xs" role="alert">{createFieldError.secret}</p>
+              ) : null}
               <p className="text-xs text-ink-faint mt-1">
                 外部システムが Webhook 受信時に X-Webhook-Signature ヘッダで HMAC-SHA256 署名する際に使用します。
               </p>
             </div>
           </div>
-          <button
+          <Button
             type="submit"
-            className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: 'var(--color-accent)' }}
+            variant="primary"
+            className="mt-4"
           >
-            作成
-          </button>
+            作る
+          </Button>
         </form>
       )}
 
@@ -783,11 +1029,14 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           showCreate={showCreate}
           lineAccountId={selectedAccountId}
           endpointUrl={endpointUrl}
+          canManage={canCreate}
+          canResolveUnmatched={staffRole === null || staffRole === 'owner' || staffRole === 'admin'}
           onReload={() => void load()}
           onToggle={handleToggleIncoming}
           togglingIds={togglingIdsOf('incoming')}
           onRotate={(wh) => {
-            setRotateTarget({ kind: 'incoming', id: wh.id, name: wh.name, activate: !wh.hasSecret })
+            // 開いた時点のアカウントを固定する（d23b R420）。
+            setRotateTarget({ kind: 'incoming', id: wh.id, name: wh.name, activate: !wh.hasSecret, accountId: selectedAccountId ?? '' })
             setRotateSecretValue('')
           }}
           onDelete={(wh) => askDelete('incoming', wh.id, wh.name)}
@@ -797,6 +1046,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           items={outgoing}
           status={activeStatus}
           showCreate={showCreate}
+          canManage={canCreate}
           summary={interactionSummary}
           summaryStatus={summaryStatus}
           incomingCount={incoming.length}
@@ -805,11 +1055,13 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           onToggle={handleToggleOutgoing}
           togglingIds={togglingIdsOf('outgoing')}
           onRotate={(wh) => {
+            // 開いた時点のアカウントを固定する（d23b R420）。
             setRotateTarget({
               kind: 'outgoing',
               id: wh.id,
               name: wh.name,
               activate: isHttpsUrl(wh.url) && !wh.hasSecret,
+              accountId: selectedAccountId ?? '',
             })
             setRotateSecretValue('')
           }}
@@ -836,6 +1088,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           setDeleteError('')
         }}
       />
+      {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </div>
   )
 }
@@ -845,9 +1098,11 @@ function WebhooksPageHost() {
   usePageTitle('外部連携')
   if (tab === 'incoming' || tab === 'outgoing') return <WebhooksPageInner key={tab} tab={tab} />
   return (
-    <div>
+    <div className="flex flex-col gap-4">
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
       {tab === 'interactions' && <WebhookInteractions />}
+      {tab === 'sheets' && <GoogleSheetsPanel />}
+      {tab === 'api-tokens' && <ApiTokensPanel />}
       {tab === 'notify' && <WebhookSamples />}
     </div>
   )

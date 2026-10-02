@@ -1,5 +1,5 @@
 /*
- * 写真審査一覧（Pencil ★V6 `Qu6Vk`）の、この画面だけの寸法。
+ * 然・投稿（Pencil ★V6 `cqWo8`）の、この画面だけの寸法。
  *
  * 設計は本体と右カラム390pxの2列。共通部品には「390pxの列」を持つ受け皿が
  * 無い（`side-cards.tsx` は列の中に置く1枚で、列そのものは画面が持つ）。
@@ -33,7 +33,7 @@
 .sideTitle {
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* 未接続の枠。値の場所には `—` を置き、理由を続けて書く。 */
@@ -41,7 +41,7 @@
   margin-top: 8px;
   color: var(--color-ink-faint);
   font-size: var(--text-display);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .sideNote {
@@ -69,7 +69,7 @@
 .reasonCount {
   color: var(--color-ink);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 

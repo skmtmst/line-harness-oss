@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { api } from './api'
+import { loadFeatureVisibility } from './feature-visibility-cache'
 import type { FeatureKey } from './feature-settings'
 
 export type FeatureVisibilityStatus = 'idle' | 'loading' | 'ready' | 'error'
@@ -31,8 +31,8 @@ export function useFeatureVisibility(accountId: string | null | undefined): {
     }
     let cancelled = false
     setState({ status: 'loading', features: null })
-    void api.featureSettings
-      .visibility(accountId)
+    // サイドバーと同じ答えを共有する（V6R-S0-b）。
+    void loadFeatureVisibility(accountId)
       .then((res) => {
         const features = res.success ? res.data?.features : undefined
         if (cancelled) return

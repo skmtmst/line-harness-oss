@@ -1,31 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import Button from '@/components/shared/button'
+import { RowActions } from '@/components/shared/row-actions'
+import StatusBadge from '@/components/shared/status-badge'
 import { mergedPersonIdOf } from '@/components/merged-person/merged-person-view'
+import { formatDateTime, formatDay } from '@/lib/format'
 
-const fmt = new Intl.DateTimeFormat('ja-JP', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-})
 
-const dateTimeFmt = new Intl.DateTimeFormat('ja-JP', {
-  month: 'numeric',
-  day: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
-
-const ACCOUNT_BADGE_COLORS = [
-  'bg-emerald-100 text-emerald-700',
-  'bg-sky-100 text-sky-700',
-  'bg-violet-100 text-violet-700',
-  'bg-amber-100 text-amber-700',
-  'bg-rose-100 text-rose-700',
-  'bg-slate-100 text-slate-700',
-]
 
 export interface UserRowData {
   identityKey: string
@@ -49,15 +30,10 @@ export interface UserRowData {
 
 interface Props {
   row: UserRowData
-  accountColorMap: Map<string, string>
   /** 統合ユーザー詳細（設計 `w8W4Eh`）を開く。開ける行だけに渡る。 */
   onOpenMergedPerson?: (personId: string) => void
 }
 
-function formatDateTime(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : dateTimeFmt.format(date)
-}
 
 const UID_STATUS = {
   url_token: {
@@ -74,7 +50,7 @@ const UID_STATUS = {
   },
 } as const
 
-export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Props) {
+export default function UserRow({ row, onOpenMergedPerson }: Props) {
   const [expanded, setExpanded] = useState(false)
   /*
    * 統合ユーザー詳細を開けるのは、UIDを根拠にまとめた行だけ。
@@ -88,8 +64,23 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
   return (
     <>
       <tr className="border-b border-divider-soft hover:bg-surface-pearl">
-        <td className="overflow-hidden px-3 py-3 text-sm font-semibold text-ink" title={row.displayName ?? undefined}>
-          <span className="block truncate">{row.displayName || <span className="text-ink-faint">—</span>}</span>
+        <td className="overflow-hidden py-3 pr-3 pl-5 text-sm font-semibold text-ink" title={row.displayName ?? undefined}>
+          {/*
+            ★V7（#748）：統合ユーザー詳細（設計 `w8W4Eh`）は名前から開く。
+            「…」の中に同じ行き先を1つだけ置くより、名前を押すほうが早い。
+          */}
+          {mergedPersonId && onOpenMergedPerson ? (
+            <button
+              type="button"
+              data-qa-open="w8W4Eh"
+              onClick={() => onOpenMergedPerson(mergedPersonId)}
+              className="block max-w-full truncate text-left underline min-h-6"
+            >
+              {row.displayName || '名前なし'}
+            </button>
+          ) : (
+            <span className="block truncate">{row.displayName || <span className="text-ink-faint">—</span>}</span>
+          )}
         </td>
         <td className="min-w-0 px-3 py-3 text-xs text-ink-secondary">
           <span className="block truncate" title={row.emails.join(', ') || undefined}>
@@ -101,33 +92,31 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
         </td>
         <td className="px-3 py-3">
           <div className="flex flex-wrap gap-1">
-            {row.accounts.map((a) => {
-              const color = accountColorMap.get(a.accountId) ?? ACCOUNT_BADGE_COLORS[0]
-              return (
-                <span
-                  key={a.accountId}
-                  title={a.accountName}
-                  className={`max-w-full truncate rounded-full px-2 py-0.5 text-xs font-medium ${color}`}
-                >
-                  {a.accountName}
-                </span>
-              )
-            })}
+            {row.accounts.map((a) => (
+              <span
+                key={a.accountId}
+                title={a.accountName}
+                className="max-w-full truncate rounded-pill bg-canvas-sunken px-2 py-0.5 text-xs font-medium text-ink-secondary"
+              >
+                {a.accountName}
+              </span>
+            ))}
           </div>
         </td>
         <td className="min-w-0 px-3 py-3">
-          <span
-            className={`inline-flex max-w-full truncate rounded-full px-2 py-0.5 text-xs font-semibold ${
+          <StatusBadge
+            tone={
               row.identityKeyKind === 'url_token'
-                ? 'bg-status-warn-soft text-status-warn-deep'
+                ? 'warning'
                 : row.identityKeyKind === 'uid'
-                  ? 'bg-accent-soft text-accent-hover'
-                  : 'bg-canvas-sunken text-ink-secondary'
-            }`}
+                  ? 'success'
+                  : 'neutral'
+            }
+            size="compact"
             title={uidStatus.description}
           >
             {uidStatus.label}
-          </span>
+          </StatusBadge>
           {/*
             **LINEユーザーIDを画面に出さない。**
 
@@ -143,37 +132,35 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
           </span>
         </td>
         <td className="px-3 py-3 text-xs font-semibold">
-          <span
-            className={row.isDuplicate ? 'text-status-warn-deep' : 'text-ink-faint'}
-            title={
-              row.isDuplicate
-                ? `${duplicateCount}つのアカウントに登録されています。送信前に配信先の確認が必要です。`
-                : '複数アカウントへの登録はありません。'
-            }
-          >
-            {row.isDuplicate ? '要確認' : '対象外'}
-          </span>
-        </td>
-        <td className="px-3 py-3 text-right">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {mergedPersonId && onOpenMergedPerson ? (
-              <Button
-                type="button"
-                data-qa-open="w8W4Eh"
-                onClick={() => onOpenMergedPerson(mergedPersonId)}
-              >
-                統合ユーザーを開く
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="primary"
-              aria-expanded={expanded}
-              onClick={() => setExpanded((value) => !value)}
+          {row.isDuplicate ? (
+            <StatusBadge
+              tone="warning"
+              size="compact"
+              title={`${duplicateCount}つのアカウントに登録されています。送信前に配信先の確認が必要です。`}
             >
-              {expanded ? '閉じる' : '詳細を見る'}
-            </Button>
-          </div>
+              要確認
+            </StatusBadge>
+          ) : (
+            <span
+              className="text-ink-faint"
+              title="複数アカウントへの登録はありません。"
+            >
+              対象外
+            </span>
+          )}
+        </td>
+        <td className="py-3 pr-5 pl-3 text-right">
+          {/*
+            行の操作は枠つきボタン1つ（詳細の開閉）。統合ユーザー詳細は名前から開く。
+            緑の塗りは行ごとに置かない。
+          */}
+          <RowActions
+            detail={{
+              label: expanded ? '閉じる' : '詳細を見る',
+              onClick: () => setExpanded((value) => !value),
+            }}
+            subjectName={row.displayName ?? undefined}
+          />
         </td>
       </tr>
       {expanded && (
@@ -181,19 +168,19 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
           <td colSpan={7} className="px-6 py-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <p className="mb-2 text-xs font-semibold text-[#565F59]">登録アカウント詳細</p>
+                <p className="mb-2 text-xs font-semibold text-ink-secondary">登録アカウント詳細</p>
                 <ul className="space-y-1 text-sm">
                   {row.accounts.map((a) => (
                     <li key={a.friendId} className="flex flex-wrap items-center gap-2 text-ink-secondary">
                       <span
-                        className={`h-2 w-2 rounded-full ${a.isFollowing ? 'bg-accent' : 'bg-ink-disabled'}`}
+                        className={`h-2 w-2 rounded-pill ${a.isFollowing ? 'bg-accent' : 'bg-ink-disabled'}`}
                       />
                       <span className="font-medium">{a.accountName}</span>
                       <span className="text-xs text-ink-faint">
                         {a.isFollowing ? '友だち' : 'ブロック・削除'}
                       </span>
                       <span className="text-xs text-ink-faint">
-                        登録: {fmt.format(new Date(a.joinedAt))}
+                        登録: {formatDay(new Date(a.joinedAt))}
                       </span>
                     </li>
                   ))}

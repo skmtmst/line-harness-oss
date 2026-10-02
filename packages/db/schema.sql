@@ -210,6 +210,7 @@ CREATE TABLE IF NOT EXISTS messages_log (
   source           TEXT,
   line_account_id  TEXT,
   sent_by_staff_id TEXT,
+  line_event_at    TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
@@ -219,6 +220,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_log_broadcast_friend_direction
 
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_id ON messages_log (friend_id);
 CREATE INDEX IF NOT EXISTS idx_messages_log_created_at ON messages_log (created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_log_line_event_at ON messages_log (line_event_at);
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_source ON messages_log (friend_id, source);
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_direction_created ON messages_log (friend_id, direction, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_account_direction_created ON messages_log(line_account_id, direction, created_at);

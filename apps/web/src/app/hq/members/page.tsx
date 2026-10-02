@@ -5,17 +5,18 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import MemberDialog, { type MemberDialogValue } from '@/components/hq/members/member-dialog'
-import StepUpDialog from '@/components/shared/step-up-dialog'
+import StepUpPrompt from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import StickyBar from '@/components/shared/sticky-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ScrollableTabs from '@/components/layout/scrollable-tabs'
 import { TextField } from '@/components/shared/text-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api, ApiError } from '@/lib/api'
 import {
   ROLE_LABELS,
@@ -62,25 +63,30 @@ function MembersInner() {
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
   const [resendingId, setResendingId] = useState<string | null>(null)
-  /* 権限変更が 428 で止まったときの本人確認。通ったら grant を付けて同じ保存をやり直す。 */
+  /* 権限変更が STEP_UP_REQUIRED で止まったときの本人確認。通ったら grant を付けて同じ保存をやり直す。 */
   const [stepUp, setStepUp] = useState<null | { retry: (token: string) => Promise<void> }>(null)
-  const [stepUpBusy, setStepUpBusy] = useState(false)
-  const [stepUpError, setStepUpError] = useState('')
 
   const load = useCallback(async () => {
     setStatus('loading')
     setActionError('')
     try {
-      const [staffRes, accountRes, meRes, loginRes] = await Promise.all([
+      // M025: 範囲限定の担当者に一覧は出さない（口も403で断る）。
+      // 先に自分を読んで理由の分かる面を出し、通らない一覧は呼ばない。
+      const meRes = await api.staff.me()
+      if (!meRes.success) throw new Error(meRes.error)
+      setMe(meRes.data)
+      if (meRes.data.accountScope === 'accounts') {
+        setStatus('ready')
+        return
+      }
+      const [staffRes, accountRes, loginRes] = await Promise.all([
         api.staff.list(),
         api.lineAccounts.list(),
-        api.staff.me(),
         api.staff.lastLogins().catch(() => null),
       ])
       if (!staffRes.success) throw new Error(staffRes.error)
       setMembers(staffRes.data)
       if (accountRes.success) setAccounts(accountRes.data)
-      if (meRes.success) setMe(meRes.data)
       if (loginRes?.success) setLastLogins(loginRes.data)
       setStatus('ready')
     } catch (caught) {
@@ -132,25 +138,12 @@ function MembersInner() {
         setStepUp({ retry: (token) => submitDialog(value, token) })
         return
       }
-      setDialogError(caught instanceof Error && caught.message ? caught.message : '保存できませんでした。もう一度お試しください。')
+      // M026：原文のまま出さず、共通の状態別案内へ渡す（本人確認の分岐は先に残す）。
+      setDialogError(japaneseDetailOf(caught) || describeApiFailure(caught, '保存', {
+        forbidden: '権限者の招待・変更はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+      }))
     } finally {
       setDialogBusy(false)
-    }
-  }
-
-  const submitStepUp = async (code: string) => {
-    if (!stepUp || stepUpBusy) return
-    setStepUpBusy(true)
-    setStepUpError('')
-    try {
-      const grant = await api.staff.stepUp(code, 'staff.permissions.change')
-      if (!grant.success) throw new Error(grant.error)
-      await stepUp.retry(grant.data.token)
-      setStepUp(null)
-    } catch (caught) {
-      setStepUpError(caught instanceof Error && caught.message ? caught.message : '本人確認できませんでした。')
-    } finally {
-      setStepUpBusy(false)
     }
   }
 
@@ -163,7 +156,10 @@ function MembersInner() {
       if (!res.success) throw new Error(res.error)
       setNotice(`${member.email} へ招待メールを送り直しました。`)
     } catch (caught) {
-      setActionError(caught instanceof Error && caught.message ? caught.message : '招待メールを送り直せませんでした。')
+      // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
+      setActionError(japaneseDetailOf(caught) || describeApiFailure(caught, '招待メールの再送', {
+        forbidden: '招待メールの再送はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+      }))
     } finally {
       setResendingId(null)
     }
@@ -197,20 +193,20 @@ function MembersInner() {
         <>
           {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
           <KpiCollapse data-design="KPIs" data-design-node="kCaRU" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard variant="v6" title="権限者" value={status === 'ready' ? kpis.total : null} unit="人" detail={status === 'ready' ? `有効 ${kpis.active}人` : '—'} loading={status === 'loading'} />
-            <SummaryCard variant="v6" title="招待中" value={status === 'ready' ? kpis.invited : null} unit="人" detail="未承諾の招待" loading={status === 'loading'} />
-            <SummaryCard variant="v6" title="閲覧のみ" value={status === 'ready' ? kpis.viewers : null} unit="人" detail="編集できない権限者" loading={status === 'loading'} />
-            <SummaryCard variant="v6" title="担当アカウントの割り当て" value={status === 'ready' ? kpis.scopedAccounts : null} unit="アカウント" detail={status === 'ready' ? `全アカウントを担当 ${kpis.allScope}人` : '—'} loading={status === 'loading'} />
+            <KpiCard variant="v6" title="権限者" value={status === 'ready' ? kpis.total : null} unit="人" detail={status === 'ready' ? `有効 ${kpis.active}人` : '—'} loading={status === 'loading'} />
+            <KpiCard variant="v6" title="招待中" value={status === 'ready' ? kpis.invited : null} unit="人" detail="" help="まだ承諾していない招待です" loading={status === 'loading'} />
+            <KpiCard variant="v6" title="閲覧のみ" value={status === 'ready' ? kpis.viewers : null} unit="人" detail="" help="編集できない権限者です" loading={status === 'loading'} />
+            <KpiCard variant="v6" title="担当アカウントの割り当て" value={status === 'ready' ? kpis.scopedAccounts : null} unit="アカウント" detail={status === 'ready' ? `全アカウントを担当 ${kpis.allScope}人` : '—'} loading={status === 'loading'} />
           </KpiCollapse>
 
           <div data-design="Note" data-design-node="Y1EarL">
-            <NoteBar tone="info">
+            <NoteBar tone="info" help="権限者は統括の管理画面に入れる人です" helpLabel="権限者の意味">
               権限者は統括の管理画面に入れる人です。担当アカウントを限定すると、そのアカウントの管理画面だけが見えます。招待メールの有効期限は48時間です。
             </NoteBar>
           </div>
 
           {notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null}
-          {actionError ? <p className="text-label text-status-danger" role="alert">{actionError}</p> : null}
+          {actionError ? <p className="text-label text-danger" role="alert">{actionError}</p> : null}
 
           <section data-design="Table" data-design-node="nLVwc">
             {status === 'loading' ? (
@@ -239,8 +235,8 @@ function MembersInner() {
                           aria-hidden="true"
                           className={
                             isSelf
-                              ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-bold text-on-accent'
-                              : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep'
+                              ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-medium text-on-accent'
+                              : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep'
                           }
                         >
                           {(member.name || '?').slice(0, 1).toUpperCase()}
@@ -254,8 +250,8 @@ function MembersInner() {
                         <span
                           className={
                             member.role === 'owner' || member.role === 'admin'
-                              ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
-                              : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-bold text-ink-secondary'
+                              ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
+                              : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-medium text-ink-secondary'
                           }
                         >
                           {ROLE_LABELS[member.role]}
@@ -263,12 +259,12 @@ function MembersInner() {
                         <span
                           className={
                             state === 'active'
-                              ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
+                              ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
                               : state === 'invited'
-                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
+                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-medium text-status-warn-deep'
                                 : state === 'expired'
-                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-status-danger'
-                                  : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-bold text-ink-secondary'
+                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-medium text-danger'
+                                  : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-medium text-ink-secondary'
                           }
                         >
                           {STATUS_LABELS[state]}
@@ -281,7 +277,7 @@ function MembersInner() {
                               type="button"
                               disabled={resendingId === member.id}
                               onClick={() => void resend(member)}
-                              className="text-label font-semibold text-accent-deep hover:underline disabled:opacity-50"
+                              className="text-label font-semibold text-action hover:underline disabled:opacity-50"
                             >
                               {resendingId === member.id ? '送信中…' : '招待メールを再送'}
                             </button>
@@ -290,7 +286,7 @@ function MembersInner() {
                             type="button"
                             onClick={() => { setDialogError(''); setDialog({ open: true, member }) }}
                             aria-label={`${member.name}さんの権限を変更`}
-                            className="text-label font-semibold text-accent-deep hover:underline"
+                            className="text-label font-semibold text-action hover:underline"
                           >
                             権限を変更
                           </button>
@@ -334,8 +330,8 @@ function MembersInner() {
                               aria-hidden="true"
                               className={
                                 isSelf
-                                  ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-bold text-on-accent'
-                                  : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep'
+                                  ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-medium text-on-accent'
+                                  : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-medium text-accent-deep'
                               }
                             >
                               {(member.name || '?').slice(0, 1).toUpperCase()}
@@ -351,8 +347,8 @@ function MembersInner() {
                           <span
                             className={
                               member.role === 'owner' || member.role === 'admin'
-                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
-                                : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-bold text-ink-secondary'
+                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
+                                : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-medium text-ink-secondary'
                             }
                           >
                             {ROLE_LABELS[member.role]}
@@ -363,12 +359,12 @@ function MembersInner() {
                           <span
                             className={
                               state === 'active'
-                                ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
+                                ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
                                 : state === 'invited'
-                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
+                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-medium text-status-warn-deep'
                                   : state === 'expired'
-                                    ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-status-danger'
-                                    : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-bold text-ink-secondary'
+                                    ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-medium text-danger'
+                                    : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-medium text-ink-secondary'
                             }
                           >
                             {STATUS_LABELS[state]}
@@ -383,7 +379,7 @@ function MembersInner() {
                                   type="button"
                                   disabled={resendingId === member.id}
                                   onClick={() => void resend(member)}
-                                  className="text-label font-semibold text-accent-deep hover:underline disabled:opacity-50"
+                                  className="text-label font-semibold text-action hover:underline disabled:opacity-50"
                                 >
                                   {resendingId === member.id ? '送信中…' : '再送'}
                                 </button>
@@ -392,7 +388,7 @@ function MembersInner() {
                                 type="button"
                                 onClick={() => { setDialogError(''); setDialog({ open: true, member }) }}
                                 aria-label={`${member.name}さんの権限を変更`}
-                                className="text-label font-semibold text-accent-deep hover:underline"
+                                className="text-label font-semibold text-action hover:underline"
                               >
                                 変更
                               </button>
@@ -422,14 +418,13 @@ function MembersInner() {
               setDialog({ open: false, member: null })
             }}
           />
-          <StepUpDialog
-            open={stepUp !== null}
-            action="メンバーの権限を変更する"
-            busy={stepUpBusy}
-            error={stepUpError}
-            onSubmit={(code) => void submitStepUp(code)}
-            onCancel={() => { if (stepUpBusy) return; setStepUp(null); setStepUpError('') }}
-          />
+          {stepUp ? (
+            <StepUpPrompt
+              request={{ purpose: 'staff.permissions.change', action: 'メンバーの権限を変更する', retry: stepUp.retry }}
+              onDone={() => setStepUp(null)}
+              onClose={() => setStepUp(null)}
+            />
+          ) : null}
         </>
       )}
     </div>
@@ -448,7 +443,7 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
     let cancelled = false
     void api.tenants.me()
       .then((response) => {
-        if (!cancelled && response.success) setName(response.data.name)
+        if (!cancelled && response.success) setName(response.data.name ?? '')
       })
       .catch(() => {
         if (!cancelled) setError('統括名を読み込めませんでした。時間をおいてもう一度お試しください。')
@@ -470,10 +465,13 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
     try {
       const response = await api.tenants.updateName(trimmed)
       if (!response.success) throw new Error(response.error)
-      setName(response.data.name)
+      setName(response.data.name ?? trimmed)
       setSaved(true)
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '統括名を保存できませんでした。')
+      // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
+      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '統括名の保存', {
+        forbidden: '統括名の変更は管理者だけができます。必要なときは管理者の方に操作してもらってください。',
+      }))
     } finally {
       setSaving(false)
     }
@@ -481,10 +479,10 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
 
   return (
     <>
-      <NoteBar tone="info">統括名は、統括コンソールとメールの差出人に使われます。アカウントの名前はそれぞれのアカウントの設定で変えます。</NoteBar>
+      <NoteBar tone="info" help="統括名は統括コンソールとメールの差出人に使われます" helpLabel="統括名の意味">統括名は、統括コンソールとメールの差出人に使われます。アカウントの名前はそれぞれのアカウントの設定で変えます。</NoteBar>
       <form onSubmit={save} className="flex max-w-2xl flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="tenant-name" className="text-label font-bold text-ink">統括名</label>
+          <label htmlFor="tenant-name" className="text-label font-medium text-ink">統括名</label>
           <p className="text-micro text-ink-faint">100文字以内で入力してください。</p>
           <TextField
             id="tenant-name"
@@ -495,15 +493,14 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
             className="w-full"
           />
         </div>
-        {error ? <p className="text-label text-status-danger" role="alert">{error}</p> : null}
+        {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
         {saved ? <p className="text-label text-accent-deep" role="status">保存しました。</p> : null}
       </form>
       <div className="sticky bottom-0 z-10">
         <StickyBar
           status={canEdit ? undefined : '統括名の変更は管理者だけができます'}
           actions={
-            <Button variant="primary" onClick={() => void save()} disabled={loading || saving || !canEdit}>
-              {saving ? '保存中…' : '統括名を保存'}
+            <Button variant="primary" onClick={() => void save()} disabled={loading || saving || !canEdit} busy={saving}>統括名を保存する
             </Button>
           }
         />

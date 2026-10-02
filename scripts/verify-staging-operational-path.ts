@@ -150,7 +150,12 @@ export function readVerificationTarget(config: string): VerificationTarget {
 
   const workerUrl = configValue(config, 'WORKER_PUBLIC_URL');
   const worker = new URL(workerUrl);
-  if (worker.protocol !== 'https:' || !/^nen-line-stg\.[a-z0-9-]+\.workers\.dev$/.test(worker.hostname)) {
+  // 検証対象は staging Worker の workers.dev か、staging 専用カスタムドメインのみ。
+  // 本番の api.musubo.jp / nen-line.*.workers.dev はここで拒否する。
+  const allowedStagingHost =
+    /^nen-line-stg\.[a-z0-9-]+\.workers\.dev$/.test(worker.hostname) ||
+    worker.hostname === 'stg-api.musubo.jp';
+  if (worker.protocol !== 'https:' || !allowedStagingHost) {
     throw new Error('Unexpected staging Worker URL');
   }
   return {

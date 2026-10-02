@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
-import { api, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
+import { api, ApiError, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import CreatePage from '@/components/shared/create-page'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import { useCanManageAutomations } from './use-automation-permission'
+import Notice from '@/components/shared/notice'
+import { isoToJstDatetimeLocal } from './automation-datetime'
 
 // #734: きっかけ・処理の選択肢は共有の正本から描画する。新規作成と同じ一覧。
 const EVENTS: Array<{ value: AutomationDraftDetail['eventType']; label: string }> = AUTOMATION_DRAFT_TRIGGER_OPTIONS.map(
@@ -25,15 +29,6 @@ function stringParam(value: unknown): string {
 
 function stringListParam(value: unknown): string {
   return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean).join(',') : stringParam(value)
-}
-
-/** ISO日時を datetime-local 入力の形へ直す。 */
-function isoToLocalInput(value: string): string {
-  const time = Date.parse(value)
-  if (!Number.isFinite(time)) return ''
-  const date = new Date(time)
-  const pad = (part: number) => String(part).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 // #734: この画面で欄を持たない設定は、読み込んだ値をそのまま残す。
@@ -67,6 +62,10 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
   const [preserved, setPreserved] = useState<Record<string, unknown>>({})
   const [preservedFor, setPreservedFor] = useState('')
   const [actionType, setActionType] = useState<AutomationDraftAction['type']>('add_tag')
+  /** 先頭の処理の番号。読み込んだIDを保つ（R481）。 */
+  const [actionId, setActionId] = useState('step-1')
+  /** 2件目以降の処理。この画面では欄を持たないので読み込んだまま返す（R481）。 */
+  const [extraActions, setExtraActions] = useState<AutomationDraftAction[]>([])
   const [actionTagId, setActionTagId] = useState('')
   const [actionScenarioId, setActionScenarioId] = useState('')
   const [actionMessage, setActionMessage] = useState('')
@@ -74,7 +73,9 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
   const [commonActions, setCommonActions] = useState<Array<{ id: string; name: string }>>([])
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error' | 'not-found'>('loading')
+  /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (accountLoading || canManage !== true || !selectedAccountId) return
@@ -100,7 +101,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       setTriggerTagId(stringParam(draft.triggerConfig.tagId))
       setTriggerTagAction(draft.triggerConfig.action === 'remove' ? 'remove' : 'add')
       setTriggerKeyword(stringParam(draft.triggerConfig.keyword))
-      setTriggerAt(isoToLocalInput(stringParam(draft.triggerConfig.at)))
+      setTriggerAt(isoToJstDatetimeLocal(stringParam(draft.triggerConfig.at)))
       setTriggerTime(stringParam(draft.triggerConfig.time))
       setTriggerWeekdays(stringListParam(draft.triggerConfig.weekdays))
       setTriggerFriendIds(stringListParam(draft.triggerConfig.friendIds))
@@ -108,17 +109,21 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       setPreservedFor(draft.eventType)
       if (action) {
         setActionType(action.type)
+        setActionId(typeof action.id === 'string' && action.id ? action.id : 'step-1')
+        setExtraActions(draft.actions.slice(1))
         setActionTagId(stringParam(action.params.tagId))
         setActionScenarioId(stringParam(action.params.scenarioId))
         setActionMessage(stringParam(action.params.content))
         setActionCommonActionId(stringParam(action.params.commonActionId))
       }
       setLoadState('ready')
-    }).catch(() => {
-      if (!cancelled) setLoadState('error')
+    }).catch((caught: unknown) => {
+      if (cancelled) return
+      if (caught instanceof ApiError && caught.status === 404) setLoadState('not-found')
+      else setLoadState('error')
     })
     return () => { cancelled = true }
-  }, [accountLoading, canManage, draftId, selectedAccountId])
+  }, [accountLoading, canManage, draftId, reloadKey, selectedAccountId])
 
   if (accountLoading || canManage === null) {
     return <ListState kind="loading" title="下書きを読み込んでいます" />
@@ -132,18 +137,30 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
   if (loadState === 'loading') {
     return <ListState kind="loading" title="下書きを読み込んでいます" />
   }
+  if (loadState === 'not-found') {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この下書きは見つかりません"
+        description="削除されたか、別の記録です。見本の一覧から選び直してください。"
+        backHref="/automations?tab=templates"
+        backLabel="見本の一覧へ戻る"
+      />
+    )
+  }
   if (loadState === 'error') {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
         title="下書きを表示できませんでした"
-        description="下書きは消えていません。前の画面へ戻り、もう一度開いてください。"
+        description="下書きは消えていません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => setReloadKey((key) => key + 1)}
       />
     )
   }
 
   const action: AutomationDraftAction = {
-    id: 'step-1',
+    id: actionId,
     type: actionType,
     params: actionType === 'add_tag'
       ? { tagId: actionTagId }
@@ -191,7 +208,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       title="下書きを仕上げる"
       description="見本に実データは入っていません。このアカウントで使うタグやシナリオを選び、下書きとして保存します。"
       parent={['オートメーション', '/automations?tab=templates']}
-      saveLabel="下書きを保存"
+      saveLabel="下書きを保存する"
       validate={() => {
         if (!name.trim()) return 'ルール名を入力してください'
         if (eventType === 'tag_change' && !triggerTagId) return 'きっかけのタグを選んでください'
@@ -213,7 +230,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
             name: name.trim(),
             eventType,
             triggerConfig: buildTriggerConfig(),
-            actions: [action],
+            actions: [action, ...extraActions],
           })
           if (!response.success) throw new Error(response.error)
           return draftId
@@ -290,13 +307,12 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       ) : null}
       {eventType === 'datetime' ? (
         <>
-          <Field label="実行日時" htmlFor="au-trigger-at" required>
-            <TextInput
+          <Field label="実行日時" htmlFor="au-trigger-at" required help="日本時間で入力します。表示も保存も日本時間です。">
+            <DateTimeField
               id="au-trigger-at"
               aria-label="実行日時"
-              type="datetime-local"
               value={triggerAt}
-              onChange={(event) => setTriggerAt(event.target.value)}
+              onChange={setTriggerAt}
             />
           </Field>
           <Field label="対象の友だち" htmlFor="au-trigger-friend-ids" required note="友だちIDをカンマ区切りで入力します（最大100人）。">
@@ -313,12 +329,11 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       {eventType === 'daily' ? (
         <>
           <Field label="実行時刻" htmlFor="au-trigger-time" required>
-            <TextInput
+            <TimeField
               id="au-trigger-time"
               aria-label="実行時刻"
-              type="time"
               value={triggerTime}
-              onChange={(event) => setTriggerTime(event.target.value)}
+              onChange={setTriggerTime}
             />
           </Field>
           <Field label="対象の友だち" htmlFor="au-trigger-daily-friend-ids" required note="友だちIDをカンマ区切りで入力します（最大100人）。">
@@ -335,12 +350,11 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       {eventType === 'weekly' ? (
         <>
           <Field label="実行時刻" htmlFor="au-trigger-weekly-time" required>
-            <TextInput
+            <TimeField
               id="au-trigger-weekly-time"
               aria-label="実行時刻"
-              type="time"
               value={triggerTime}
-              onChange={(event) => setTriggerTime(event.target.value)}
+              onChange={setTriggerTime}
             />
           </Field>
           <Field label="曜日" htmlFor="au-trigger-weekdays" required note="曜日番号をカンマ区切りで入力します（例: 1,3 は月・水）。">
@@ -365,6 +379,9 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       ) : null}
 
       <p className="text-ink mt-2 text-sm font-semibold">3. 何をするか</p>
+      {extraActions.length > 0 ? (
+        <p className="text-xs text-ink-secondary">ほかに{extraActions.length}件の処理があります。この画面では変えられませんが、保存しても残ります。</p>
+      ) : null}
       <Field label="すること" htmlFor="au-action" required>
         <Select
           id="au-action"
@@ -421,9 +438,9 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
           <TextArea id="au-message" rows={4} value={actionMessage} onChange={(event) => setActionMessage(event.target.value)} />
         </Field>
       )}
-      <p className="rounded-v6-control bg-v6-warning-bg px-3 py-2 text-xs leading-5 text-v6-warning">
+      <Notice tone="warn">
         保存しても自動では動きません。公開するまでは下書きのままです。
-      </p>
+      </Notice>
     </CreatePage>
   )
 }

@@ -52,6 +52,19 @@ async function requireAutomationPermission(c: Context<Env>, next: () => Promise<
   await next();
 }
 
+// 実行記録の「見るだけ」の入口。設定画面で閲覧だけを許可した担当者でも
+// 履歴の一覧・詳細を読めるよう、共通の閲覧判定（viewPermissionKeys）を使う。
+// 再試行・取消・CSV書き出しはこの後の個別権限が引き続き守る。
+async function requireAutomationViewPermission(c: Context<Env>, next: () => Promise<void>) {
+  const staff = c.get('staff');
+  if (!staff || (staff.role === 'staff'
+    && !staff.permissionKeys?.includes('/automations')
+    && !staff.viewPermissionKeys?.includes('/automations'))) {
+    return c.json({ success: false, error: 'この機能を閲覧する権限がありません' }, 403);
+  }
+  await next();
+}
+
 async function requireAutomationTestPermission(c: Context<Env>, next: () => Promise<void>) {
   const staff = c.get('staff');
   if (!staff || (staff.role === 'staff'
@@ -494,9 +507,18 @@ automations.post(
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
+    /*
+     * DETAIL-13: 新規作成の操作ごとの冪等鍵。画面は1回の作成操作に1つだけ
+     * 鍵を振り、同じ操作の再試行（ダブルクリック・通信やり直し）だけが
+     * 同じ鍵を使う。鍵が無い呼び出しは「別の操作」と見分けられず、
+     * 前の下書きへ戻って上書きする道が残るので、service 側で断る。
+     */
+    const body = await c.req.json<{ operationKey?: unknown }>()
+      .catch((): { operationKey?: unknown } => ({}));
     return draftEndpoint(c, () => createAutomationDraftFromTemplate(c.env.DB, {
       templateKey: c.req.param('key'),
       lineAccountId: accountId,
+      operationKey: body.operationKey,
       createdBy: c.get('staff')?.id,
     }), 201);
   },
@@ -556,13 +578,14 @@ automations.post(
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
-    const body = await c.req.json<{ expectedDraftVersionId?: unknown; activate?: unknown }>()
-      .catch((): { expectedDraftVersionId?: unknown; activate?: unknown } => ({}));
+    const body = await c.req.json<{ expectedDraftVersionId?: unknown; activate?: unknown; expectedStatus?: unknown }>()
+      .catch((): { expectedDraftVersionId?: unknown; activate?: unknown; expectedStatus?: unknown } => ({}));
     return draftEndpoint(c, () => publishAutomationDraft(c.env.DB, {
       id: c.req.param('id'),
       lineAccountId: accountId,
       expectedDraftVersionId: body.expectedDraftVersionId,
       activate: body.activate,
+      expectedStatus: body.expectedStatus,
     }));
   },
 );
@@ -636,14 +659,22 @@ automations.post(
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
-    const body = await c.req.json<{ versionId?: unknown; friendId?: unknown }>()
-      .catch((): { versionId?: unknown; friendId?: unknown } => ({}));
+    const body = await c.req.json<{
+      versionId?: unknown; friendId?: unknown; operationKey?: unknown;
+      expectedCommonActions?: unknown;
+    }>().catch((): {
+      versionId?: unknown; friendId?: unknown; operationKey?: unknown;
+      expectedCommonActions?: unknown;
+    } => ({}));
     return definitionEndpoint(c, () => runAutomationTest(c.env.DB, {
       automationId: c.req.param('id'),
       versionId: body.versionId,
       friendId: body.friendId,
       lineAccountId: accountId,
       credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+      operationKey: body.operationKey,
+      // R487: 確認時に見せた共通アクションの版の一式。食い違えば409で送らない。
+      expectedCommonActions: body.expectedCommonActions,
     }));
   },
 );
@@ -651,7 +682,7 @@ automations.post(
 /** V6 25-1-B: 既存automation_runsを、共通実行記録契約で読む。 */
 automations.get(
   '/api/automation-runs',
-  requireAutomationPermission,
+  requireAutomationViewPermission,
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
   try {
@@ -708,10 +739,17 @@ automations.get(
       (row) => mapExecutionRun(row, holdReasons.get(row.line_account_id) ?? null),
     );
     if (wantsCsv) {
+      /*
+       * R495: 上限5,000件で切れたことを黙らせない。総件数と出力件数を
+       * 応答の頭に載せ、切れたかどうかを使い手へ知らせる（画面が読む）。
+       */
       return new Response(executionRunsCsv(items), {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': 'attachment; filename="automation-runs.csv"',
+          'X-Csv-Total-Count': String(result.total),
+          'X-Csv-Returned-Count': String(items.length),
+          'X-Csv-Truncated': result.total > items.length ? '1' : '0',
         },
       });
     }
@@ -779,7 +817,7 @@ automations.post(
  */
 automations.get(
   '/api/automation-runs/:id',
-  requireAutomationPermission,
+  requireAutomationViewPermission,
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
     try {

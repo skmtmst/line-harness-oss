@@ -7,8 +7,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'page.tsx'), 'utf8')
 const TABLE = readFileSync(join(HERE, 'friend-list-table.tsx'), 'utf8')
 const ROW = readFileSync(join(HERE, 'friend-list-row.tsx'), 'utf8')
+const TABLE_CSS = readFileSync(join(HERE, 'friend-list-table.css'), 'utf8')
 const KPIS = readFileSync(join(HERE, 'friend-kpis.tsx'), 'utf8')
-const SUMMARY_CARD_CSS = readFileSync(join(HERE, '..', 'shared', 'summary-card.module.css'), 'utf8')
+const SUMMARY_CARD_CSS = readFileSync(join(HERE, '..', 'shared', 'kpi-card.module.css'), 'utf8')
 const PAGINATION = readFileSync(join(HERE, '..', 'shared', 'pagination.tsx'), 'utf8')
 const ADVANCED = readFileSync(join(HERE, 'advanced-search-dialog.tsx'), 'utf8')
 /* N-039: 保存検索・通知の窓は overlay 規約へ乗せるため部品へ切り出した。 */
@@ -68,15 +69,21 @@ describe('友だちV6の画面契約', () => {
   it('1440pxと1920pxで横スクロールを前提にしない', () => {
     expect(TABLE).not.toContain('overflow-x-auto')
     expect(TABLE).toContain('gridTemplateColumns')
-    expect(ROW).toContain('style={{ gridTemplateColumns }}')
+    expect(TABLE).toContain("'--friend-cols'")
+    expect(ROW).toContain('data-friend-cols')
     expect(TABLE).toContain('truncate')
+    /* 夕14: v8 の 1366px 未満では流入元列を隠す（横送りより先に大事でない列を隠す）。 */
+    expect(TABLE_CSS).toContain("data-theme='v8'")
+    expect(TABLE_CSS).toContain('--friend-cols-narrow')
+    expect(TABLE_CSS).toContain("data-column='source'")
+    expect(ROW).toContain('data-column="source"')
   })
 
   it('V6のカード影と操作色を守る', () => {
     for (const source of [PAGE, TABLE]) {
       expect(source).toContain('shadow-card')
     }
-    expect(KPIS).toContain("import SummaryCard from '@/components/shared/summary-card'")
+    expect(KPIS).toContain("import KpiCard from '@/components/shared/kpi-card'")
     expect(SUMMARY_CARD_CSS).toContain('box-shadow: var(--shadow-card)')
     expect(PAGE).toContain('text-action')
     expect(PAGE).toContain('bg-accent')
@@ -87,7 +94,8 @@ describe('友だちV6の画面契約', () => {
     expect(TABLE).not.toContain('>操作<')
     expect(ROW).not.toContain('>開く<')
     expect(TABLE).toContain('表示項目を編集')
-    expect(TABLE).toContain('件表示')
+    // #668: 件数の選び口は共通部品 PageSizeSelect（「表示件数 N件」）。
+    expect(TABLE).toContain('PageSizeSelect')
     expect(TABLE).toContain('truncate text-center')
     expect(ROW).toContain('items-center')
     expect(ROW).toContain('text-center')
@@ -121,9 +129,9 @@ describe('友だちV6の画面契約', () => {
   })
 
   it('未対応・注目・表示列の選択状態を目と再読み込み後の両方で確認できる', () => {
-    expect(PAGE).toContain("responseFilter === 'unhandled' ? 'border-status-danger-border bg-status-danger-selected")
-    expect(PAGE).toContain("responseFilter === 'unhandled'\n              ? <Check")
-    expect(PAGE).toContain('aria-pressed={attentionOnly}')
+    // m13i: 札の形は共通 FilterChip 1つにそろえた。目の選択表示は部品が持つ。
+    expect(PAGE).toContain("selected={responseFilter === 'unhandled'}")
+    expect(PAGE).toContain('selected={attentionOnly}')
     expect(TABLE).toContain("localStorage.getItem('friends.visibleColumns')")
     expect(TABLE).toContain("localStorage.setItem('friends.visibleColumns'")
     expect(API).toContain('JSON.stringify(metadata)')
@@ -145,8 +153,8 @@ describe('友だちV6の画面契約', () => {
   })
 
   it('重複画面の密度を保ち、統合ユーザーはV6の実Nodeへ結び付ける', () => {
-    expect(DUPLICATES).toContain('rounded-[14px]')
-    expect(DUPLICATES).toContain('#DADDE2')
+    expect(DUPLICATES).toContain('rounded-card')
+    expect(DUPLICATES).toContain('border-hairline')
     expect(USERS_PAGE).toContain('data-design-node="r7eSi"')
     expect(USERS_TABLE).toContain('rounded-card')
     expect(USER_ROW).toContain('border-divider-soft')

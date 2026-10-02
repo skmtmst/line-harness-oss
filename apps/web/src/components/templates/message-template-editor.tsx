@@ -2,11 +2,14 @@
 
 import Link from 'next/link'
 import { useRef, type ReactNode } from 'react'
-import { listInterpolations, type CommonVar, type FriendField } from '@line-crm/shared'
+import { listInterpolations, validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
+import FlexPreviewComponent from '@/components/flex-preview'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import Button from '@/components/shared/button'
+import LinePreview from '@/components/shared/line-preview'
 import { Field, TextArea } from '@/components/shared/form-controls'
-import SelectField from '@/components/shared/select-field'
+import DateField from '@/components/shared/date-field'
+import Select from '@/components/shared/select'
 
 export const MESSAGE_TEMPLATE_TYPES = [
   { value: 'text', label: 'テキスト' },
@@ -101,6 +104,12 @@ export function buildTemplatePreview(
   references: TemplateReferences,
   deliveredAt = new Date(),
 ): TemplatePreviewResult {
+  /*
+   * D007: 本文が無い応答でも落ちない。**形の違う詳細応答が来ると
+   * 文字列でない中身がここへ届く。** `content.replace` の前に確かめ、
+   * 違えば空の見本を返す（「本文がまだありません」の表示になる）。
+   */
+  if (typeof content !== 'string') return { content: '', unresolved: [] }
   const fields = new Map(references.friendFields.map((field) => [field.fieldKey, field]))
   const commonVars = new Map(references.commonVars.map((item) => [item.varKey, item]))
   const unresolved = new Set<string>()
@@ -144,6 +153,7 @@ export function buildTemplatePreview(
 }
 
 export function extractMessageUrls(content: string): string[] {
+  if (typeof content !== 'string') return []
   return [...new Set(content.match(/https?:\/\/[^\s<>"'）)]+/g) ?? [])]
 }
 
@@ -182,17 +192,17 @@ export function TemplateInsertControls({
       <div className="flex flex-wrap gap-2">
         <Button size="field" disabled={disabled} onClick={() => onInsert('{{name}}')}>名前</Button>
         {fieldsEnabled && (
-          <SelectField aria-label="友だち情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || friendFields.length === 0} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' }, ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name }))]} />
+          <Select aria-label="友だち情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || friendFields.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' }, ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name }))]} />
         )}
         {varsEnabled && (
-          <SelectField aria-label="共通情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || commonVars.length === 0} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' }, ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name }))]} />
+          <Select aria-label="共通情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || commonVars.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' }, ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name }))]} />
         )}
-        <SelectField aria-label="配信日を差し込む" value="" disabled={disabled} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: '配信日を選ぶ' }, ...DATE_OPTIONS]} />
-        <SelectField aria-label="その他の差し込みを選ぶ" value="" disabled={disabled} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: 'その他を選ぶ' }, ...OTHER_OPTIONS]} />
-        <label className="flex items-center gap-2 text-xs text-ink-secondary">
+        <Select aria-label="配信日を差し込む" value="" disabled={disabled} onChange={(value) => choose(value)} options={[{ value: '', label: '配信日を選ぶ' }, ...DATE_OPTIONS]} />
+        <Select aria-label="その他の差し込みを選ぶ" value="" disabled={disabled} onChange={(value) => choose(value)} options={[{ value: '', label: 'その他を選ぶ' }, ...OTHER_OPTIONS]} />
+        <span className="flex items-center gap-2 text-xs text-ink-secondary">
           目標日
-          <input aria-label="日数を数える目標日" type="date" value={targetDate} disabled={disabled} onChange={(event) => onTargetDateChange(event.target.value)} className="border-hairline rounded-control border bg-canvas px-2 py-1 text-xs text-ink disabled:opacity-40" />
-        </label>
+          <DateField aria-label="日数を数える目標日" value={targetDate} disabled={disabled} onChange={onTargetDateChange} className="w-48" />
+        </span>
         <Button size="field" disabled={disabled || !targetDate} onClick={() => onInsert(`{{days_until:${targetDate}}`)}>目標日までの日数</Button>
       </div>
       <p className="text-ink-faint text-xs">フォーム回答は直接差し込めません。回答を保存した友だち情報を選んでください。</p>
@@ -206,7 +216,7 @@ export function TemplateInsertControls({
 export function TemplatePreviewMessage({ preview }: { preview: TemplatePreviewResult }) {
   return (
     <>
-      <p className="text-ink rounded-2xl bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">{preview.content || '（本文がまだありません）'}</p>
+      <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">{preview.content || '（本文がまだありません）'}</p>
       {preview.unresolved.length > 0 && (
         <div role="alert" className="mt-2 rounded-control bg-canvas px-3 py-2 text-xs text-danger">
           <p className="font-semibold">値を確認できない差し込みがあります</p>
@@ -262,20 +272,33 @@ export function MessageTemplateEditor({
   footer?: ReactNode
 }) {
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
+  /*
+   * D007: 形の違う詳細応答が来ると、文字列でない中身がここへ届く。
+   * 描画の途中で落ちないよう、文字列以外は空として扱う。
+   */
+  const messageContent = typeof value.messageContent === 'string' ? value.messageContent : ''
   const insert = (token: string) => {
     const element = contentRef.current
-    const start = element?.selectionStart ?? value.messageContent.length
+    const start = element?.selectionStart ?? messageContent.length
     const end = element?.selectionEnd ?? start
-    const messageContent = value.messageContent.slice(0, start) + token + value.messageContent.slice(end)
-    onChange({ ...value, messageContent })
+    const nextContent = messageContent.slice(0, start) + token + messageContent.slice(end)
+    onChange({ ...value, messageContent: nextContent })
     if (element) requestAnimationFrame(() => {
       element.focus()
       element.setSelectionRange(start + token.length, start + token.length)
     })
   }
   const splitAt = 4500
-  const preview = buildTemplatePreview(value.messageContent, references)
-  const messageUrls = extractMessageUrls(value.messageContent)
+  const preview = buildTemplatePreview(messageContent, references)
+  const messageUrls = extractMessageUrls(messageContent)
+  /*
+   * R249: カード型は通常文のまま保存できない。入力の最中に
+   * 形式の誤りをその場で知らせる（保存口も同じ判定で断る）。
+   * 空のときはここでは何も言わない（必須チェックが受け持つ）。
+   */
+  const flexError = value.messageType === 'flex'
+    ? validateFlexContent('flex', messageContent)
+    : null
   const contentLabel = bodyLabel ?? (value.messageType === 'text' ? '本文' : 'メッセージ内容')
 
   return (
@@ -283,7 +306,7 @@ export function MessageTemplateEditor({
       <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
         {beforeType}
         <Field label="種類" htmlFor="tp-type" note={typeNote}>
-          <SelectField id="tp-type" aria-label="メッセージ形式" value={value.messageType} disabled={disabled} onChange={(event) => onChange({ ...value, messageType: event.target.value })} options={[...typeOptions]} />
+          <Select id="tp-type" aria-label="メッセージ形式" value={value.messageType} disabled={disabled} onChange={(messageType) => onChange({ ...value, messageType })} options={[...typeOptions]} />
         </Field>
         {afterType}
         {/*
@@ -298,22 +321,29 @@ export function MessageTemplateEditor({
           required
           note={<>
             差し込みは下の選択肢から入れられます。名前と友だち情報は受け取る人ごと、共通情報と配信日は送る時点の値に置き換わります。
-            {carouselHref && <><br />カルーセルを作るときは <Link href={carouselHref} className="text-accent hover:underline">カルーセルの編集</Link> を使ってください。</>}
+            {carouselHref && <><br />カルーセルを作るときは <Link href={carouselHref} className="text-action underline">カルーセルの編集</Link> を使ってください。</>}
           </>}
         >
           {value.messageType === 'flex' ? (
-            <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={14} value={value.messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y font-mono text-xs" />
+            <>
+              <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={14} value={messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y font-mono text-xs" />
+              {flexError ? (
+                <p role="alert" className="text-danger mt-1 text-xs">{flexError}このままでは保存できません。</p>
+              ) : !messageContent.trim() ? (
+                <p className="text-ink-faint mt-1 text-xs">バブルかカルーセルの形のJSONで書きます（例：{'{"type":"bubble", …}'}）。通常文のままでは保存できません。</p>
+              ) : null}
+            </>
           ) : (
-            <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={6} value={value.messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y" />
+            <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={6} value={messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y" />
           )}
-          <p className="text-ink-faint mt-1 text-xs tabular-nums">{value.messageContent.length} 文字{value.messageContent.length > splitAt ? ` ・ 約${splitAt}文字を超えると複数のメッセージに分割されます` : ' ・ 分割なし'}</p>
+          <p className="text-ink-faint mt-1 text-xs tabular-nums">{messageContent.length} 文字{messageContent.length > splitAt ? ` ・ 約${splitAt}文字を超えると複数のメッセージに分割されます` : ' ・ 分割なし'}</p>
         </Field>
         <div>
           <p className="text-ink-secondary mb-1 text-sm font-medium">差し込む</p>
           <TemplateInsertControls accountId={referenceAccountId} state={referenceState} accountLabel={referenceAccountLabel} targetDate={targetDate} disabled={disabled} unavailableHint={referenceUnavailableHint} onTargetDateChange={onTargetDateChange} friendFields={references.friendFields} commonVars={references.commonVars} onInsert={insert} />
         </div>
         <section aria-label="本文内のURL" className="border-hairline rounded-card border p-4">
-          <div className="flex items-center justify-between gap-3"><p className="text-ink text-sm font-semibold">本文に入れたURLの扱い</p><span className="text-accent-deep text-xs font-semibold">短縮して、クリックを数える</span></div>
+          <div className="flex items-center justify-between gap-3"><p className="text-ink text-sm font-semibold">本文に入れたURLの扱い</p><span className="text-ink-faint text-xs font-semibold">短縮して、クリックを数える</span></div>
           <div className="border-hairline mt-3 overflow-hidden rounded-control border text-xs">
             <div className="bg-canvas-sunken grid grid-cols-3 gap-3 px-3 py-2 font-semibold text-ink-secondary"><span>本文の中のURL</span><span>リンク名（計測に出る名前）</span><span>流入リンクにする</span></div>
             {messageUrls.length === 0 ? <p className="text-ink-faint px-3 py-3">本文にURLはありません。</p> : messageUrls.map((url) => <div key={url} className="grid grid-cols-3 gap-3 px-3 py-3 text-ink"><span className="truncate" title={url}>{url}</span><span className="text-ink-faint">配信時に自動作成</span><span className="text-ink-faint">配信時に自動発行</span></div>)}
@@ -323,13 +353,36 @@ export function MessageTemplateEditor({
         {footer}
       </div>
       <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-96">
-        <section className="bg-line-preview rounded-card border-hairline border p-4">
-          <p className="text-on-accent text-center text-sm font-semibold">LINEプレビュー</p>
-          <p className="text-on-accent mx-auto mt-2 mb-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">差し込み後の見え方（山田 太郎さんの場合）</p>
-          <div className="bg-canvas-sunken rounded-card mt-3 p-3"><p className="text-ink-faint mb-1 text-xs">然-NEN-</p><TemplatePreviewMessage preview={preview} /></div>
-          <p className="text-on-accent mt-2 text-xs leading-relaxed">名前は山田 太郎さん、友だち情報は項目の既定値、共通情報は現在値で表示しています。</p>
-          <p className="text-on-accent mt-1 text-xs">URLは短縮され、クリックが計測されます</p>
-        </section>
+        <LinePreview
+          note={value.messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（山田 太郎さんの場合）'}
+          accountName="然-NEN-"
+        >
+          {/*
+            R249: カード型は詳細と同じカード表示にする。通常文の
+            生表示では「作れた」と誤認する。形式が壊れている間は
+            何が悪いかをここでも知らせる。
+          */}
+          {value.messageType === 'flex' ? (
+            flexError ? (
+              <div role="alert" className="bg-canvas-sunken rounded-card p-3">
+                <p className="text-danger text-xs font-semibold">{flexError}</p>
+                <p className="text-ink-secondary mt-1 text-xs">直すとここにカードが表示されます。このままでは保存できません。</p>
+              </div>
+            ) : !messageContent.trim() ? (
+              <div className="bg-canvas-sunken rounded-card p-3">
+                <p className="text-ink-faint text-xs">カードの内容を入力すると、ここに表示されます。</p>
+              </div>
+            ) : (
+              <div className="bg-canvas-sunken rounded-card p-3"><FlexPreviewComponent content={messageContent} /></div>
+            )
+          ) : (
+            <>
+              <div className="bg-canvas-sunken rounded-card p-3"><TemplatePreviewMessage preview={preview} /></div>
+              <p className="text-ink mt-2 text-xs leading-relaxed">名前は山田 太郎さん、友だち情報は項目の既定値、共通情報は現在値で表示しています。</p>
+              <p className="text-ink mt-1 text-xs">URLは短縮され、クリックが計測されます</p>
+            </>
+          )}
+        </LinePreview>
       </div>
     </div>
   )

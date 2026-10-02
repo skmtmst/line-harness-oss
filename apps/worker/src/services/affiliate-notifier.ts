@@ -62,6 +62,8 @@ export async function notifyAffiliate(
     let accountId: string | null = friend.line_account_id ?? null;
     if (friend.line_account_id) {
       const account = await getLineAccountById(db, friend.line_account_id);
+      // 止めているアカウント宛の通知は送らない（X-1）。
+      if (account && !account.is_active) return;
       accountToken = account?.channel_access_token ?? null;
       accountId = account?.id ?? friend.line_account_id;
     }

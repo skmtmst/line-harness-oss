@@ -27,6 +27,8 @@ const WEB = join(dirname(fileURLToPath(import.meta.url)), '..')
 const PARTS = join(WEB, 'design', 'design-parts.json')
 const INVENTORY = join(WEB, 'design', 'pencil-component-inventory.json')
 const BUILT_CSS_DIR = join(WEB, '.next', 'static', 'css')
+const V8_VALUES = join(WEB, 'design', 'v8-part-values.json')
+const GLOBALS = join(WEB, 'src', 'app', 'globals.css')
 
 /* ---------- 値の正規化 ---------------------------------------------------
  * ビルドは `#ffffff` を `#fff`、`0.5rem` を `.5rem` に縮める。
@@ -83,6 +85,9 @@ function stripConditionalBlocks(css) {
 /** `.card{...}` の中身を取り出す。クラス名は完全一致。 */
 function ruleBody(css, selector) {
   css = stripConditionalBlocks(css)
+  // `[data-theme="v8"] ...` の規定は別テーマの上書きで、既定（V7）の
+  // 契約値とは別物。照合対象から除く（V8 側は v8-*-contract.test.ts が守る）。
+  css = css.replace(/[^{}]*data-theme[^{}]*\{[^}]*\}/g, '')
   const re = new RegExp(`\\.${selector}\\s*\\{([^}]*)\\}`, 'g')
   const bodies = []
   let m
@@ -323,6 +328,226 @@ export function checkInventoryShape(data, inventory) {
   return problems
 }
 
+/* ---------- V8 部品の実寸（★V8 移行④） ------------------------------------
+ *
+ * `design/v8-part-values.json` は Pencil ★V8 の部品の実寸（変数を解いた
+ * 値。司令塔が execute で書き出したものを写したスナップショット）。
+ * 台帳の「v8対応済み」は値の一致の証拠ではないので、ここで
+ * `[data-theme="v8"]` の下で効く実効値（素の規定＋v8上書き、var() 解決済み）
+ * を Pencil の値と突き合わせる。
+ *
+ * 比べるもの：外枠の pad/gap/r/h/w/sw と、最初の文字ノードの fs/fw。
+ * （行の高さ lh は v8 の行の高さそろえ PR で比較に加える）
+ * CSS が宣言していない項目はここでは比べない。実画面での計測は
+ * lh-work の tools/part-values-check.mjs が行う。
+ *
+ * 部品を V8 の実寸に合わせたとき V8_MEASURE に1行足す。
+ */
+
+/*
+ * Pencil のノードID → モジュール CSS と、外枠/文字のクラス。
+ *   file     src/components/ からの相対パス
+ *   cls      外枠のクラス
+ *   textCls  最初の文字ノードが載るクラス（省略時は cls）
+ *   node     外枠（d=0）ではなくこの名前のノードを測る（OTP の桁の並びなど）
+ *   skipText 文字ノードを比べない（部品内に見える文字が無い場合）
+ *
+ * まだ Pencil の実寸とずれている部品は、ずれを直す PR でここに足す。
+ * （ずれを直すまで入れると、この段が毎回落ちて意味を失うため）
+ */
+const V8_MEASURE = [
+  { id: 'g5Db8', file: 'shared/text-link.module.css', cls: 'root', textCls: 'label' },
+  { id: 'C6DGX', file: 'shared/delta-chip.module.css', cls: 'root' },
+  { id: 'C9CaMS', file: 'shared/icon-tile.module.css', cls: ['root', 'sm'] },
+  { id: 'E7USZ9', file: 'shared/icon-tile.module.css', cls: ['root', 'md'] },
+  { id: 'A2mryd', file: 'shared/icon-tile.module.css', cls: ['root', 'lg'] },
+  { id: 'x4FeKG', file: 'shared/activity-item.module.css', cls: 'marker', skipText: true },
+  { id: 'EsjP2', file: 'shared/activity-item.module.css', cls: 'row', textCls: 'title' },
+  { id: 'CugIm', file: 'shared/section-header.module.css', cls: 'root', textCls: 'title' },
+  { id: 'w6uYMd', file: 'shared/check-card.module.css', cls: 'card', textCls: 'title' },
+  { id: 'dtJVi', file: 'shared/segmented.module.css', cls: 'root', textCls: ['item', 'selected'] },
+  { id: 'RfHCo', file: 'shared/otp-input.module.css', cls: 'group', node: '桁の並び', skipText: true },
+  { id: 'cfVyj', file: 'shared/line-preview.module.css', cls: 'phone', skipText: true },
+  { id: 'clV5c', file: 'shared/tabs.module.css', cls: 'list', textCls: ['tab', 'current'] },
+  { id: 'KjC1z', file: 'shared/help-tip.module.css', cls: 'button', textCls: 'mark' },
+  { id: 'mpVfY', file: 'shared/status-badge.module.css', cls: 'badge' },
+]
+
+/** `[data-theme="v8"] .cls { … }` の中身だけを取り出す（引用符の違いを吸収）。 */
+function v8ScopedBody(css, cls) {
+  css = stripConditionalBlocks(css)
+  const re = new RegExp(
+    `\\[data-theme=["']?v8["']?\\]\\s+\\.${cls}\\s*\\{([^}]*)\\}`,
+    'g',
+  )
+  const bodies = []
+  let m
+  while ((m = re.exec(css))) bodies.push(m[1])
+  return bodies.join(';')
+}
+
+/** `.a, .b:hover { X }` を `.a { X } .b:hover { X }` に分解し、単独表記の規則として読める形にする。 */
+function splitSelectorGroups(css) {
+  return css.replace(/([^{}\n][^{}]*?)\{([^}]*)\}/g, (m, sel, body) => {
+    if (!sel.includes(',')) return m
+    return sel
+      .split(',')
+      .map((s) => `${s.trim()} {${body}}`)
+      .join('\n')
+  })
+}
+
+/** v8 での実効値：素の規定（base）＋ v8 上書き（後勝ち）。cls は合成可（同じ要素に付く複数クラス）。 */
+function v8EffectiveBody(css, cls) {
+  const flat = splitSelectorGroups(css)
+  return (Array.isArray(cls) ? cls : [cls])
+    .flatMap((c) => [ruleBody(flat, c), v8ScopedBody(flat, c)])
+    .filter(Boolean)
+    .join(';')
+}
+
+/** globals.css の :root 変数に [data-theme="v8"] の上書きを重ねた変数表。 */
+function v8Vars() {
+  const css = readFileSync(GLOBALS, 'utf8')
+  const vars = {}
+  const rootBlock = css.slice(0, css.indexOf('[data-theme'))
+  Object.assign(vars, collectVariables(rootBlock))
+  const v8re = /\[data-theme=["']?v8["']?\]\s*\{([^}]*)\}/g
+  let m
+  while ((m = v8re.exec(css))) Object.assign(vars, collectVariables(m[1]))
+  return vars
+}
+
+const toNum = (v) => {
+  if (v === null || v === undefined) return null
+  const m = String(v).match(/-?\d+(\.\d+)?/)
+  return m ? parseFloat(m[0]) : null
+}
+
+/** padding の略記を [上,右,下,左] の数値に展開する。 */
+function expandPad(body) {
+  const raw = declaration(body, 'padding')
+  if (raw === null) return null
+  const parts = resolveVars(raw, v8VarsCache).split(/\s+/).map(toNum)
+  if (parts.some((n) => n === null)) return null
+  if (parts.length === 1) return [parts[0], parts[0], parts[0], parts[0]]
+  if (parts.length === 2) return [parts[0], parts[1], parts[0], parts[1]]
+  if (parts.length === 3) return [parts[0], parts[1], parts[2], parts[1]]
+  return parts.slice(0, 4)
+}
+
+const numEqual = (a, b) => a !== null && b !== null && Math.abs(a - b) <= 0.05
+
+let v8VarsCache = null
+
+/**
+ * V8_MEASURE の各部品について、モジュール CSS の v8 実効値と
+ * Pencil 実寸（v8-part-values.json）を照合する。failures/lines に追記する。
+ */
+function verifyV8Parts(lines, failures) {
+  if (!existsSync(V8_VALUES)) {
+    failures.push('design/v8-part-values.json がありません（design/v8/check/ から写してください）')
+    return { checked: 0, matched: 0 }
+  }
+  const values = JSON.parse(readFileSync(V8_VALUES, 'utf8')).parts ?? {}
+  v8VarsCache = v8Vars()
+
+  let checked = 0
+  let matched = 0
+  const uncovered = []
+
+  for (const spec of V8_MEASURE) {
+    const entry = values[spec.id]
+    const head = `  ${entry?.name ?? spec.id}（${spec.id} → ${spec.file} .${spec.cls}）`
+    if (!entry) {
+      failures.push(`V8実寸表に ${spec.id} がありません`)
+      continue
+    }
+    const file = join(WEB, 'src', 'components', spec.file)
+    if (!existsSync(file)) {
+      failures.push(`V8部品 ${entry.name}: ${spec.file} がありません`)
+      lines.push(`${head} ★ファイルなし`)
+      continue
+    }
+    const css = stripComments(readFileSync(file, 'utf8'))
+    const outer = spec.node
+      ? entry.nodes.find((n) => n.n === spec.node)
+      : entry.nodes.find((n) => n.d === 0 && n.t === 'frame')
+    const textNode = spec.skipText ? null : entry.nodes.find((n) => n.t === 'text')
+
+    lines.push(head)
+    const rows = []
+    const check = (label, propValues) => {
+      for (const { want, got } of propValues) {
+        if (want === null || want === undefined) continue
+        if (got === null || got === undefined) {
+          rows.push(`    ${pad(label, 12)}${pad(String(want), 10)}― 宣言なし（比較せず）`)
+          continue
+        }
+        checked++
+        const ok = numEqual(want, got)
+        if (ok) matched++
+        else failures.push(`V8不一致: ${entry.name} の ${label}\n    設計 Pencil ${spec.id} = ${want}\n    実際 ${got}`)
+        rows.push(`    ${pad(label, 12)}${pad(String(want), 10)}${got} ${ok ? '一致' : '★不一致'}`)
+      }
+    }
+
+    if (outer) {
+      const body = v8EffectiveBody(css, spec.cls)
+      const gotPad = expandPad(body)
+      const wantPad = Array.isArray(outer.pad)
+        ? outer.pad.length === 2
+          ? [outer.pad[0], outer.pad[1], outer.pad[0], outer.pad[1]]
+          : outer.pad
+        : outer.pad !== undefined
+          ? [outer.pad, outer.pad, outer.pad, outer.pad]
+          : null
+      check('pad', wantPad ? wantPad.map((w, i) => ({ want: toNum(w), got: gotPad ? gotPad[i] : null })) : [])
+      check('gap', [{ want: toNum(outer.gap), got: toNum(resolveVars(declaration(body, 'gap') ?? '', v8VarsCache)) }])
+      // Pencil の 999 は「完全な丸」。実装は pill（9999）で書くので同じ意味として扱う
+      const wantR = toNum(outer.r)
+      const gotR = toNum(resolveVars(declaration(body, 'border-radius') ?? '', v8VarsCache))
+      check('r', [{ want: wantR, got: wantR !== null && wantR >= 999 && gotR !== null && gotR >= 999 ? wantR : gotR }])
+      check('h', [{
+        want: toNum(outer.h ?? outer.bh),
+        got: toNum(resolveVars(declaration(body, 'height') ?? declaration(body, 'min-height') ?? '', v8VarsCache)),
+      }])
+      check('w', [{
+        want: toNum(outer.w ?? outer.bw),
+        got: toNum(resolveVars(declaration(body, 'width') ?? declaration(body, 'min-width') ?? '', v8VarsCache)),
+      }])
+      if (outer.sw !== undefined) {
+        if (typeof outer.sw === 'object') {
+          for (const [side, sw] of Object.entries(outer.sw)) {
+            check(`sw-${side}`, [{
+              want: toNum(sw),
+              got: toNum(resolveVars(declaration(body, `border-${side}-width`) ?? '', v8VarsCache)),
+            }])
+          }
+        } else {
+          const bw = declaration(body, 'border-width')
+          const short = declaration(body, 'border')
+          check('sw', [{
+            want: toNum(outer.sw),
+            got: toNum(resolveVars(bw ?? (short ?? '').split(/\s+/)[0] ?? '', v8VarsCache)),
+          }])
+        }
+      }
+    }
+
+    if (textNode) {
+      const body = v8EffectiveBody(css, spec.textCls ?? spec.cls)
+      check('fs', [{ want: toNum(textNode.fs), got: toNum(resolveVars(declaration(body, 'font-size') ?? '', v8VarsCache)) }])
+      check('fw', [{ want: toNum(textNode.fw), got: toNum(resolveVars(declaration(body, 'font-weight') ?? '', v8VarsCache)) }])
+      check('lh', [{ want: toNum(textNode.lh), got: toNum(resolveVars(declaration(body, 'line-height') ?? '', v8VarsCache)) }])
+    }
+
+    if (rows.length === 0) uncovered.push(`${entry.name}（${spec.id}）：比べられる宣言がありません`)
+    lines.push(...rows)
+  }
+  return { checked, matched, uncovered }
+}
+
 /* ---------- 本体 -------------------------------------------------------- */
 
 const pad = (s, n) => String(s).padEnd(n)
@@ -440,6 +665,16 @@ export function verify() {
       lines.push(`    ${pad(d.pencil, 34)}${pad(d.prop, 15)}${pad(want, 26)}${ok ? '一致' : '★不一致'}`)
     }
   }
+
+  /* --- V8 部品の実寸 --- */
+  lines.push('', 'V8 部品の実寸（design/v8-part-values.json）')
+  const v8 = verifyV8Parts(lines, failures)
+  if (v8.uncovered?.length) {
+    lines.push('', '  宣言の無い項目（比較できず。別PRで足す）:')
+    for (const u of v8.uncovered) lines.push(`    ${u}`)
+  }
+  checked += v8.checked
+  matched += v8.matched
 
   return {
     lines,

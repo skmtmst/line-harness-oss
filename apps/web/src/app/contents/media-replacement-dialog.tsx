@@ -6,6 +6,9 @@ import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
+import ListState from '@/components/shared/list-state'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
 
 export default function MediaReplacementDialog({
@@ -151,14 +154,12 @@ export default function MediaReplacementDialog({
       onCancel={onClose}
       footer={(
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button type="button" onClick={onClose} disabled={busy}>閉じる</Button>
           {impact?.canPartiallyReplace && !impact.canReplace ? (
-            <Button type="button" variant="primary" onClick={() => void replace('partial')} disabled={busy}>
-              {busy ? '差し替えています…' : `差し替え可能な${impact.replaceableCount}か所だけ差し替える`}
+            <Button type="button" variant="primary" onClick={() => void replace('partial')} disabled={busy} busy={busy} busyLabel="差し替えています…">
+              {`差し替え可能な${impact.replaceableCount}か所だけ差し替える`}
             </Button>
           ) : (
-            <Button type="button" variant="primary" onClick={() => void replace('all')} disabled={busy || !impact?.canReplace}>
-              {busy ? '差し替えています…' : '使用先を差し替える'}
+            <Button type="button" variant="primary" onClick={() => void replace('all')} disabled={busy || !impact?.canReplace} busy={busy} busyLabel="差し替えています…">使用先を差し替える
             </Button>
           )}
         </div>
@@ -190,15 +191,27 @@ export default function MediaReplacementDialog({
             <Button type="submit">検索</Button>
           </form>
           {candidatePhase === 'loading' ? (
-            <p className="text-ink-faint mt-2 text-xs" role="status">差し替え候補を読み込んでいます…</p>
+            <ListState kind="loading" title="差し替え候補を読み込んでいます" />
           ) : candidatePhase === 'error' ? (
-            <p className="text-danger mt-2 text-xs" role="alert">差し替え候補を読み込めませんでした。読み直してから、もう一度お試しください。</p>
+            <ListState
+              kind="error"
+              title="差し替え候補を読み込めませんでした"
+              description="読み直してから、もう一度お試しください。"
+            />
           ) : candidatePhase === 'empty' ? (
-            <p className="text-ink-faint mt-2 text-xs">
-              {candidateQuery
-                ? `「${candidateQuery}」に合う候補が見つかりませんでした。`
-                : '同じ種類の別メディアがありません。先に差し替え先を登録してください。'}
-            </p>
+            <ListState
+              kind="empty"
+              title={
+                candidateQuery
+                  ? `「${candidateQuery}」に合う候補が見つかりませんでした`
+                  : '同じ種類の別メディアがありません'
+              }
+              description={
+                candidateQuery
+                  ? '検索語を変えてください。'
+                  : '先に差し替え先を登録してください。'
+              }
+            />
           ) : (
             <>
               <Select
@@ -208,12 +221,12 @@ export default function MediaReplacementDialog({
                 onChange={(value) => void selectReplacement(value)}
               />
               {candidateTotal > 50 ? (
-                <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="text-ink-faint">候補 {candidateTotal}件{candidateQuery ? `（「${candidateQuery}」で絞り込み中）` : ''}</span>
-                  <div className="flex gap-2">
-                    <Button type="button" disabled={candidatePage <= 1} onClick={() => setCandidatePage((page) => page - 1)}>前へ</Button>
-                    <Button type="button" disabled={candidatePage * 50 >= candidateTotal} onClick={() => setCandidatePage((page) => page + 1)}>次へ</Button>
-                  </div>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="text-ink-faint">
+                    <ListRange label="候補" total={candidateTotal} first={(candidatePage - 1) * 50 + 1} last={Math.min(candidatePage * 50, candidateTotal)} />
+                    {candidateQuery ? `（「${candidateQuery}」で絞り込み中）` : ''}
+                  </span>
+                  <Pagination page={candidatePage} pageCount={Math.ceil(candidateTotal / 50)} onPageChange={setCandidatePage} />
                 </div>
               ) : candidateQuery ? (
                 <p className="text-ink-faint mt-2 text-xs">「{candidateQuery}」で絞り込み中（{candidateTotal}件）</p>

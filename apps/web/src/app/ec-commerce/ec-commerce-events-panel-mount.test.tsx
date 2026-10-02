@@ -46,7 +46,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-import { api, fetchApi } from '@/lib/api'
+import { ApiError, api, fetchApi } from '@/lib/api'
 import EcCommercePage from './page'
 
 const mockFetchApi = fetchApi as unknown as ReturnType<typeof vi.fn>
@@ -137,12 +137,12 @@ function action(id: string, overrides: Record<string, unknown> = {}) {
   }
 }
 
-function recordsList(items: ReturnType<typeof action>[], total = items.length) {
-  return {
-    items,
-    total,
-    summary: { pending: 0, processing: 0, succeeded: items.length, skipped: 0, retryable_failed: 0, permanent_failed: 0 },
-  }
+function recordsList(
+  items: ReturnType<typeof action>[],
+  total = items.length,
+  summary = { pending: 0, processing: 0, succeeded: items.length, skipped: 0, retryable_failed: 0, permanent_failed: 0 },
+) {
+  return { items, total, summary }
 }
 
 let container: HTMLDivElement | null = null
@@ -226,8 +226,13 @@ function waitForCommit(el: HTMLDivElement): Promise<void> {
   })
 }
 
-function retryButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'もう一度やる')
+async function retryButton(el: HTMLDivElement): Promise<HTMLButtonElement> {
+  const trigger = Array.from(el.querySelectorAll('button')).find((node) => node.getAttribute('aria-label') === 'この行のその他操作')
+  if (!trigger) throw new Error('「その他」メニューが見つかりません')
+  trigger.click()
+  await drainMicrotasks()
+  // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+  const button = Array.from(document.querySelectorAll('button[role="menuitem"]')).find((node) => node.textContent === 'もう一度やる')
   if (!button) throw new Error('「もう一度やる」ボタンが見つかりません')
   return button as HTMLButtonElement
 }
@@ -282,7 +287,7 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
 
     const retryDeferred = deferred<unknown>()
     mockRetry.mockReturnValueOnce(retryDeferred.promise)
-    await act(async () => { retryButton(el).click() })
+    await act(async () => { (await retryButton(el)).click() })
     expect(mockRetry).toHaveBeenCalledTimes(1)
     expect(eventsCalls).toHaveLength(1)
 
@@ -400,5 +405,220 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
     expect(eventsCalls).toHaveLength(2)
     expect(el.textContent).toContain('商品2')
     expect(el.textContent).not.toContain('商品1 ×')
+  })
+})
+
+/*
+ * #635: 存在しない言葉で検索して0件になったとき、件数が減るだけでなく
+ * 「条件に合う取り込みの記録はありません」と次にやること（解除）を出す。
+ * 監査5b_23: 不存在語を入れても明示の空メッセージが特定できなかった。
+ */
+describe('EC取込一覧の絞り込み0件 (#635)', () => {
+  it('存在しない言葉で検索すると、0件の言い方と解除導線を出す', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(1)))
+      eventsDeferreds[0].resolve(ok(recordsList([action('1')])))
+      await drainMicrotasks()
+    })
+    expect(el.textContent).toContain('商品1')
+
+    const input = searchInput(el)
+    await act(async () => {
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+      nativeSetter.call(input, '存在しない言葉xyz')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
+    await act(async () => { await drainMicrotasks() })
+    expect(eventsCalls).toHaveLength(2)
+    expect(eventsCalls[1]).toContain('query=')
+
+    await act(async () => {
+      eventsDeferreds[1].resolve(ok(recordsList([], 0)))
+      await drainMicrotasks()
+    })
+
+    // 「0件」と分かる表示＋次の行動提案（別の言葉・絞り込み解除）。
+    expect(el.textContent).toContain('条件に合う取り込みの記録はありません')
+    expect(el.textContent).toContain('検索語や表示条件を変えてください。')
+    const clear = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '検索と絞り込みを解除')
+    expect(clear).toBeTruthy()
+
+    // 解除すると検索語を外して取り直す。
+    await act(async () => { clear!.click() })
+    await act(async () => { await drainMicrotasks() })
+    expect(eventsCalls.at(-1)).not.toContain('query=')
+    expect(searchInput(el).value).toBe('')
+  })
+})
+
+/*
+ * R599: `/api/ec-commerce/events` だけが 503・403・404 で落ち、
+ * 集計が 200 のとき、状態タブが「処理中0」「失敗0」と未取得を 0件に
+ * 見せていた。一覧由来の状態別件数は取れるまで出さず、失敗理由と
+ * やり直しを出し、再試行の成功で実数へ戻る、を実mountで見張る。
+ * 「すべて」の数は集計由来なので、取れている間は残る。
+ * 空の一覧（取れたうえでの 0件）は実数の 0 を出す。失敗と区別する。
+ */
+describe('R599 一覧未取得の状態別件数', () => {
+  function statusTabText(el: HTMLDivElement, label: string): string | null {
+    const tab = Array.from(el.querySelectorAll('[role="tab"]'))
+      .find((node) => (node.textContent ?? '').startsWith(label))
+    return tab ? tab.textContent : null
+  }
+
+  function retryListButton(el: HTMLDivElement): HTMLButtonElement {
+    const button = Array.from(el.querySelectorAll('button'))
+      .find((node) => node.textContent === 'もう一度読み込む')
+    if (!button) throw new Error('「もう一度読み込む」ボタンが見つかりません')
+    return button as HTMLButtonElement
+  }
+
+  async function failEventsOnly(el: HTMLDivElement, r: Root, status: number) {
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(111)))
+      eventsDeferreds[0].reject(new ApiError(status, `EC events ${status}`))
+      await drainMicrotasks()
+    })
+  }
+
+  it('一覧503＋集計200では「処理中」「失敗」に0を出さず、理由とやり直しを出す', async () => {
+    const { container: el, root: r } = mount()
+    await failEventsOnly(el, r, 503)
+
+    expect(el.textContent).toContain('取り込みの記録を読み込めませんでした')
+    expect(retryListButton(el)).toBeTruthy()
+    // 一覧由来の状態別件数は未取得（数を出さない）。
+    expect(statusTabText(el, '処理中')).toBe('処理中')
+    expect(statusTabText(el, '失敗')).toBe('失敗')
+    expect(statusTabText(el, '処理完了')).toBe('処理完了')
+    expect(statusTabText(el, '送信なし')).toBe('送信なし')
+    // 集計由来の「すべて」は取れているので残る。
+    expect(statusTabText(el, 'すべて')).toBe('すべて111')
+  })
+
+  it('一覧403では権限不足を出し、状態別件数に0を出さない', async () => {
+    const { container: el, root: r } = mount()
+    await failEventsOnly(el, r, 403)
+
+    expect(el.textContent).toContain('表示する権限がありません')
+    expect(statusTabText(el, '処理中')).toBe('処理中')
+    expect(statusTabText(el, '失敗')).toBe('失敗')
+    expect(statusTabText(el, 'すべて')).toBe('すべて111')
+  })
+
+  it('一覧404では読み込み失敗を出し、状態別件数に0を出さない', async () => {
+    const { container: el, root: r } = mount()
+    await failEventsOnly(el, r, 404)
+
+    expect(el.textContent).toContain('取り込みの記録を読み込めませんでした')
+    expect(statusTabText(el, '処理中')).toBe('処理中')
+    expect(statusTabText(el, '失敗')).toBe('失敗')
+  })
+
+  it('やり直しの成功で状態別件数が実数に戻る', async () => {
+    const { container: el, root: r } = mount()
+    await failEventsOnly(el, r, 503)
+    expect(statusTabText(el, '処理中')).toBe('処理中')
+
+    await act(async () => { retryListButton(el).click() })
+    await act(async () => { await drainMicrotasks() })
+    expect(eventsCalls).toHaveLength(2)
+
+    await act(async () => {
+      eventsDeferreds[1].resolve(ok(recordsList(
+        [action('1')],
+        1,
+        { pending: 1, processing: 2, succeeded: 5, skipped: 1, retryable_failed: 3, permanent_failed: 1 },
+      )))
+      await drainMicrotasks()
+    })
+
+    expect(el.textContent).not.toContain('取り込みの記録を読み込めませんでした')
+    expect(statusTabText(el, '処理中')).toBe('処理中3')
+    expect(statusTabText(el, '失敗')).toBe('失敗4')
+    expect(statusTabText(el, '処理完了')).toBe('処理完了5')
+    expect(statusTabText(el, '送信なし')).toBe('送信なし1')
+  })
+
+  it('正常時は実数を出す', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(111)))
+      eventsDeferreds[0].resolve(ok(recordsList(
+        [action('1')],
+        1,
+        { pending: 1, processing: 2, succeeded: 5, skipped: 1, retryable_failed: 3, permanent_failed: 1 },
+      )))
+      await drainMicrotasks()
+    })
+
+    expect(statusTabText(el, '処理中')).toBe('処理中3')
+    expect(statusTabText(el, '失敗')).toBe('失敗4')
+  })
+
+  it('空の一覧は「記録はありません」と実数の0を出す', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(0)))
+      eventsDeferreds[0].resolve(ok(recordsList([], 0)))
+      await drainMicrotasks()
+    })
+
+    expect(el.textContent).toContain('記録はありません')
+    // 取れたうえでの 0件なので、実数の 0 を出す（隠さない）。
+    expect(statusTabText(el, '処理中')).toBe('処理中0')
+    expect(statusTabText(el, '失敗')).toBe('失敗0')
+  })
+})
+
+describe('取り込みの記録の器（監査A2）', () => {
+  it('出来事の配列のままでは「読み込めませんでした」になる', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(6)))
+      // 修正前の偽APIの形（data が配列）。本物は {items,total,summary}。
+      eventsDeferreds[0].resolve(ok([{ id: 'ece-1' }]))
+      await drainMicrotasks()
+    })
+    expect(el.textContent).toContain('取り込みの記録を読み込めませんでした')
+  })
+
+  it('処理1件ずつの器（orderなし）でも行が出る', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(6)))
+      // 修正後の偽APIと同じ形（EC_ACTION_EXECUTIONS 由来・order なし）。
+      eventsDeferreds[0].resolve(ok({
+        items: [{
+          id: 'ec-action-1', eventId: 'ece-1', eventType: 'ec.order.confirmed', eventLabel: '',
+          actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded',
+          attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null,
+          lastAttemptedAt: null, nextRetryAt: null, version: 1,
+          receivedAt: '2026-08-25T08:48:00.000Z', orderNumber: 'NEN-12492', customerName: '高橋 直人',
+          friendId: null, retryAvailable: false, failureKind: null, order: null,
+        }],
+        total: 1,
+        summary: { pending: 0, processing: 0, succeeded: 1, skipped: 0, retryable_failed: 0, permanent_failed: 0 },
+      }))
+      await drainMicrotasks()
+    })
+    expect(el.textContent).toContain('NEN-12492')
+    expect(el.textContent).not.toContain('取り込みの記録を読み込めませんでした')
   })
 })

@@ -1,4 +1,12 @@
-import { accountFeatureOffExclusionSql, getFriendById, getLineAccountById, isOperationCapabilityStopped, jstNow } from '@line-crm/db';
+import {
+  accountFeatureOffExclusionSql,
+  activeTenantLineAccountSql,
+  getFriendById,
+  getLineAccountById,
+  isOperationCapabilityStopped,
+  jstNow,
+} from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH, effectiveAnniversaryMonthDay, type LeapYearPolicy } from '@line-crm/shared';
 import type { Message } from '@line-crm/line-sdk';
 import type { EcEvent } from '../routes/ec-integrations.js';
@@ -17,6 +25,40 @@ const MAX_JOBS_PER_TICK = 30;
 // 送信に失敗した job を何回まで試すか。これを超えた job は拾われなくなり、
 // status='failed' のまま残る（last_error に理由が入る）。
 const MAX_DELIVERY_ATTEMPTS = 5;
+// 要件 v6-21 §8: 1アカウントが1回の実行で送る上限。一斉配信の batch と同じく、
+// 1つのアカウントが上限ぶん先頭を占めて他のアカウントを止めないようにする。
+const MAX_JOBS_PER_ACCOUNT_PER_TICK = 10;
+// 要件 v6-21 §5・§8: 深夜に送らない時間帯（JST）。この時間帯の予約は claim せず
+// pending のまま残し、朝8時を過ぎた tick が送る。時刻の既定は司令塔の確認待ち。
+export const NEN_QUIET_HOURS_START_JST = 21;
+export const NEN_QUIET_HOURS_END_JST = 8;
+
+function nenJstHour(now: Date): number {
+  const hour = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tokyo', hour: '2-digit', hourCycle: 'h23',
+  }).formatToParts(now).find((item) => item.type === 'hour')?.value;
+  return Number(hour ?? 0);
+}
+
+/** 深夜帯（21:00〜翌8:00 JST）なら真。 */
+export function isNenQuietHours(now: Date = new Date()): boolean {
+  const hour = nenJstHour(now);
+  return hour >= NEN_QUIET_HOURS_START_JST || hour < NEN_QUIET_HOURS_END_JST;
+}
+
+/** 深夜帯の終わり（その日か翌日の朝8時 JST）を ISO で返す。 */
+export function nenQuietHoursResumeAt(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const get = (type: string) => Number(parts.find((item) => item.type === type)?.value ?? 0);
+  // 実行環境の時刻帯に左右されないよう、JST日付のままUTC日付として1日進める。
+  const base = new Date(Date.UTC(
+    get('year'), get('month') - 1, get('day') + (nenJstHour(now) >= NEN_QUIET_HOURS_START_JST ? 1 : 0),
+  ));
+  const day = base.toISOString().slice(0, 10);
+  return `${day}T08:00:00+09:00`;
+}
 // コラム配信予約の1回のまとめ書き件数。D1 の batch は文が多すぎると
 // 1 回の呼び出しが重くなるため、100件ずつに区切る。
 const COLUMN_QUEUE_BATCH_SIZE = 100;
@@ -39,6 +81,12 @@ export type CampaignRow = {
   /** When an open_form action is connected, skip friends who already submitted that form. */
   exclude_form_respondents?: number;
   after_actions?: NenCampaignAfterAction[];
+  /*
+   * 保存済みJSONに open_form があったが必須項目欠落で parse に落ちた=1。
+   * 「回答フォームを開く」つもりなのにフォーム未選択の旧設定を検出するための
+   * 手掛かりで、送信内容の組み立てには使わない。
+   */
+  form_action_dropped?: number;
   updated_at?: string;
 };
 
@@ -130,6 +178,12 @@ export type NenDeliveryOptions = {
   proxyBaseUrl: string;
   defaultAccessToken: string;
   proxyDispatch?: HarnessProxyDispatch;
+  /** 判定時刻。渡さないときは現在時刻。試験で昼夜を固定するためにある。 */
+  now?: Date;
+  /** 1回の実行で送る上限。渡さないときは MAX_JOBS_PER_TICK。 */
+  maxJobsPerTick?: number;
+  /** 1アカウントが1回の実行で送る上限。渡さないときは MAX_JOBS_PER_ACCOUNT_PER_TICK。 */
+  maxJobsPerAccountPerTick?: number;
 };
 
 function sqliteDate(date: Date): string {
@@ -189,6 +243,93 @@ function campaignResponseFormId(campaign: CampaignRow): string | null {
   return campaign.after_actions?.find(
     (action): action is Extract<NenCampaignAfterAction, { kind: 'open_form' }> => action.kind === 'open_form',
   )?.formId ?? null;
+}
+
+/*
+ * NEN-07 (#1078): 「回答フォームを開く」配信は、つなぐフォームが使える状態に
+ * あるかを保存・稼働開始・job生成の各入口で確かめる。フォームが消えた・公開を
+ * 止めた・別アカウント専用になった既存の稼働中設定は「設定不足」として扱い、
+ * 新しい送信jobを積まずに理由を配信履歴へ残す。
+ */
+export type NenCampaignFormIssue = 'form_unselected' | 'form_missing' | 'form_inactive' | 'form_other_account';
+
+export const NEN_CAMPAIGN_FORM_ISSUE_LABELS: Record<NenCampaignFormIssue, string> = {
+  form_unselected: 'つなぐ回答フォームが選ばれていません',
+  form_missing: 'つなぐ回答フォームが見つかりません（削除された可能性があります）',
+  form_inactive: 'つなぐ回答フォームは公開されていません',
+  form_other_account: 'つなぐ回答フォームは別のLINEアカウント専用です',
+};
+
+/*
+ * ボタンのURLがフォームを指しているか。LIFFの公開形 `?page=form&id=` のときだけ
+ * id を取り出す。押されたあとの設定を外したあとにURLだけ残る形がありうるため、
+ * 設定不足の判定はアクションとURLの両方を見る。
+ */
+export function campaignButtonFormId(campaign: CampaignRow): string | null {
+  const url = campaign.button_url;
+  if (!url || !url.includes('page=form')) return null;
+  const match = /[?&]id=([^&#]+)/.exec(url);
+  // `page=form` で id が取れない=「開くつもりなのに未選択」と同じ扱い。
+  // 空文字を返して照合に落ちるようにし、form_missing として検出する。
+  if (!match) return '';
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
+export async function nenCampaignFormIssue(
+  db: D1Database,
+  campaign: CampaignRow,
+  lineAccountId: string,
+): Promise<NenCampaignFormIssue | null> {
+  /*
+   * 「フォームに関わるつもり」を示す手掛かりは4つ:
+   *   押されたあとの設定(open_form)・ボタンのURL(page=form)・
+   *   parseに落ちた旧open_form・口コミ回答者の除外ON。
+   * どれかがあって指す先のフォームが使えないなら設定不足とする。
+   * 除外ONだけ残った状態も、選んだはずの除外が黙って効かない
+   * 設定不足なので同じ扱いにする。
+   */
+  const actionFormId = campaignResponseFormId(campaign);
+  const buttonFormId = campaignButtonFormId(campaign);
+  const intendsForm = actionFormId !== null
+    || buttonFormId !== null
+    || campaign.form_action_dropped === 1
+    || campaign.exclude_form_respondents === 1;
+  if (!intendsForm) return null;
+  for (const formId of new Set(
+    [actionFormId, buttonFormId].filter((id): id is string => id !== null),
+  )) {
+    if (formId === '') return 'form_unselected';
+    const issue = await formIssueForId(db, formId, lineAccountId);
+    if (issue) return issue;
+  }
+  if (actionFormId === null) return 'form_unselected';
+  return null;
+}
+
+async function formIssueForId(
+  db: D1Database,
+  formId: string,
+  lineAccountId: string,
+): Promise<NenCampaignFormIssue | null> {
+  const form = await db.prepare(
+    `SELECT is_active, status FROM forms WHERE id = ?`,
+  ).bind(formId).first<{ is_active: number; status: string | null }>();
+  if (!form || form.status === 'archived') return 'form_missing';
+  if (form.is_active !== 1) return 'form_inactive';
+  // 割当のあるフォームはそのアカウント専用。未割当(どのアカウントにも
+  // 属さない)のフォームは従来どおりどのアカウントからも使える。
+  const assigned = await db.prepare(
+    `SELECT line_account_id FROM form_accounts WHERE form_id = ?`,
+  ).bind(formId).all<{ line_account_id: string }>();
+  if (assigned.results.length > 0
+      && !assigned.results.some((row) => row.line_account_id === lineAccountId)) {
+    return 'form_other_account';
+  }
+  return null;
 }
 
 async function alreadyRespondedToCampaignForm(
@@ -333,6 +474,7 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
       || dedupWindowDays > 365
       || ![0, 1].includes(excludeFormRespondents)
     ) return null;
+    const afterActions = parseNenCampaignAfterActions(parsed.after_actions);
     return {
       campaign_key: parsed.campaign_key,
       label: parsed.label,
@@ -348,7 +490,21 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
       image_url: typeof parsed.image_url === 'string' ? parsed.image_url : null,
       dedup_window_days: dedupWindowDays,
       exclude_form_respondents: excludeFormRespondents,
-      after_actions: parseNenCampaignAfterActions(parsed.after_actions),
+      after_actions: afterActions,
+      /*
+       * 「回答フォームを開く」が保存JSONにはあるのに必須項目欠落で parse に
+       * 落ちた=旧仕様の未選択設定。黙って捨てると設定不足が検出できないので
+       * 手掛かりだけ残す(NEN-07)。
+       */
+      form_action_dropped: (
+        Array.isArray(parsed.after_actions)
+        && parsed.after_actions.some(
+          (item) => item !== null
+            && typeof item === 'object'
+            && (item as Record<string, unknown>).kind === 'open_form',
+        )
+        && !afterActions.some((action) => action.kind === 'open_form')
+      ) ? 1 : 0,
       updated_at: typeof parsed.updated_at === 'string' ? parsed.updated_at : '',
     };
   } catch {
@@ -604,6 +760,36 @@ export async function enqueuePostShippingFollowUps(
     const formId = campaignResponseFormId(campaign);
     const dedupWindowDays = campaign.dedup_window_days ?? 30;
     const excludeFormRespondents = campaign.exclude_form_respondents ?? 0;
+    /*
+     * NEN-07: 稼働中でも「つなぐ回答フォーム」が使えない配信は新しい送信jobを
+     * 積まない。本来予約されるはずだった分だけ「対象外」の記録を配信履歴へ
+     * 残し、理由コードを last_error へ入れる(重複防止で積まれない分は従来
+     * どおり記録もしない)。すでに予約済みの job はここでは触らない
+     * (復旧の選び方は運用者が履歴から決める)。
+     */
+    if (await nenCampaignFormIssue(db, campaign, lineAccountId) !== null) {
+      await db.prepare(
+        `INSERT OR IGNORE INTO nen_delivery_jobs
+          (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
+           scheduled_at, status, attempts, last_error, created_at, updated_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'skipped', 0, 'campaign_form_unavailable', ?, ?
+          WHERE (? = 0 OR NOT EXISTS (
+            SELECT 1 FROM nen_delivery_jobs previous
+             WHERE previous.line_account_id = ?
+               AND previous.campaign_key = ?
+               AND previous.friend_id = ?
+               AND previous.status IN ('pending', 'processing', 'sent', 'failed')
+               AND ABS(julianday(previous.scheduled_at) - julianday(?)) < ?
+          ))`,
+      ).bind(
+        crypto.randomUUID(), campaign.campaign_key, friendId, lineAccountId,
+        event.event_id, JSON.stringify({ event }), campaignSnapshot(campaign),
+        scheduledAt, now, now,
+        dedupWindowDays, lineAccountId, campaign.campaign_key, friendId, scheduledAt, dedupWindowDays,
+      ).run();
+      // 戻り値は「新しく予約した送信job」の件数だけを数える。
+      continue;
+    }
     const result = await db.prepare(
       `INSERT OR IGNORE INTO nen_delivery_jobs
         (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
@@ -920,9 +1106,19 @@ export async function syncNenPetProfiles(
 export async function processNenDeliveries(
   db: D1Database,
   options: NenDeliveryOptions,
-): Promise<{ sent: number; failed: number; skipped: number }> {
+): Promise<{ sent: number; failed: number; skipped: number; deferred: number }> {
+  const now = options.now ?? new Date();
+  const maxJobsPerTick = options.maxJobsPerTick ?? MAX_JOBS_PER_TICK;
+  const maxJobsPerAccountPerTick = options.maxJobsPerAccountPerTick ?? MAX_JOBS_PER_ACCOUNT_PER_TICK;
   const dueWhere = `status IN ('pending', 'failed') AND datetime(scheduled_at) <= datetime('now')
         AND attempts < ?`;
+  await db.prepare(
+    `UPDATE nen_delivery_jobs
+        SET status='skipped', last_error='tenant_suspended', updated_at=?
+      WHERE ${dueWhere}
+        AND line_account_id IS NOT NULL
+        AND ${stoppedTenantLineAccountSql('nen_delivery_jobs.line_account_id')}`,
+  ).bind(jstNow(), MAX_DELIVERY_ATTEMPTS).run();
   const campaignsOff = accountFeatureOffExclusionSql('nen_delivery_jobs.line_account_id', 'nen_campaigns');
   // オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、オフの行が
   // 上限ぶん先頭を占めたまま、後ろに並ぶ動作中アカウントの配信が進まない。
@@ -932,8 +1128,9 @@ export async function processNenDeliveries(
        FROM nen_delivery_jobs
       WHERE ${dueWhere}
         AND NOT ${campaignsOff}
+        AND (line_account_id IS NULL OR ${activeTenantLineAccountSql('nen_delivery_jobs.line_account_id')})
       ORDER BY scheduled_at ASC LIMIT ?`,
-  ).bind(MAX_DELIVERY_ATTEMPTS, MAX_JOBS_PER_TICK).all<DeliveryJob>();
+  ).bind(MAX_DELIVERY_ATTEMPTS, maxJobsPerTick).all<DeliveryJob>();
   // 止めた行も同じ上限ぶんだけ読み、skipped に数えて監査を残す。
   // 読むだけで status も attempts も動かさない。
   const offJobs = await db.prepare(
@@ -946,12 +1143,28 @@ export async function processNenDeliveries(
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+  let deferred = 0;
+  // 深夜帯は1件も送らない。claim せず pending のまま残し、朝の tick が送る。
+  const quiet = isNenQuietHours(now);
+  const perAccountSent = new Map<string, number>();
   const offGate = createFeatureJobGate();
   for (const off of offJobs.results) {
     await offGate.canRun(db, off.line_account_id, 'nen_campaigns', 'NEN campaign deliveries');
     skipped += 1;
   }
   for (const job of jobs.results) {
+    if (quiet) {
+      deferred += 1;
+      continue;
+    }
+    // 1アカウントが上限ぶん先頭を占めないよう、超えた分は次回へ回す。
+    // claim せず pending のまま残す。skipped には数えない（失敗ではない）。
+    // 送れた分だけ数える（弾かれた分は枠を食わない）。
+    if (job.line_account_id
+        && (perAccountSent.get(job.line_account_id) ?? 0) >= maxJobsPerAccountPerTick) {
+      deferred += 1;
+      continue;
+    }
     // 機能オフ中はclaimせずpendingのまま残す。再オンで再開する。
     if (job.line_account_id && !await featureJobCanRun(db, { accountId: job.line_account_id, featureId: 'nen_campaigns', job: 'NEN campaign deliveries' })) {
       skipped += 1;
@@ -1072,6 +1285,9 @@ export async function processNenDeliveries(
         `UPDATE nen_delivery_jobs SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ?`,
       ).bind(jstNow(), jstNow(), job.id).run();
       sent++;
+      if (job.line_account_id) {
+        perAccountSent.set(job.line_account_id, (perAccountSent.get(job.line_account_id) ?? 0) + 1);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 500) : 'Unknown error';
       await db.prepare(
@@ -1081,7 +1297,7 @@ export async function processNenDeliveries(
       failed++;
     }
   }
-  return { sent, failed, skipped };
+  return { sent, failed, skipped, deferred };
 }
 
 export { flexMessage as buildNenFlexMessage };

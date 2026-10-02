@@ -285,7 +285,8 @@ async function openCsvImport(page, width, rows) {
   await expect(page.locator('[data-design-node="H374MR"]')).toBeVisible()
   if (rows) {
     const csv = ['タグ名,フォルダ', ...rows.map((row) => `"${row.name}","${row.folderName}"`)].join('\r\n')
-    await page.getByLabel('登録するCSV').setInputFiles({
+    // FileDropzone の中の input は aria-hidden なので、ラベルではなく accept で直接拾う
+    await page.locator('[role="dialog"] input[type="file"][accept*=".csv"]').setInputFiles({
       name: 'tags.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from(`\uFEFF${csv}`),

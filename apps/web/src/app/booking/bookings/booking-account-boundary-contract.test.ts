@@ -58,7 +58,9 @@ describe('予約管理のアカウント境界(#963)', () => {
   })
 
   it('カレンダーのページまたぎ取得もアカウントが変わったら止める', () => {
-    expect(PAGE).toContain('while (alive && listAccountRef.current === requestedAccountId)')
+    // V6R-S3-c: ページまたぎは fetchAllPages に任せ、「まだ要るか」にアカウント一致を渡す。
+    expect(PAGE).toContain("bookingApi.listRequests(requestedAccountId, 'all', { limit: 100, offset, ...range })")
+    expect(PAGE).toContain('() => alive && listAccountRef.current === requestedAccountId,')
     expect(PAGE).toContain('if (alive && listAccountRef.current === requestedAccountId) setCalendarItems(collected)')
   })
 

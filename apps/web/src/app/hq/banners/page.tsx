@@ -40,12 +40,21 @@ function HqBannersInner() {
   const [uploadOpen, setUploadOpen] = useState(false)
 
   const loadSummary = useCallback(async () => {
+    /*
+     * 形の違う応答は置かない。そのまま置くと `stats.projects.active` で
+     * 画面ごと落ちる（全ルート監査 A1、2026-09-25）。数値は「—」になる。
+     */
     const [presetRes, statsRes] = await Promise.allSettled([api.hqBanners.presets(), api.hqBanners.stats()])
     if (presetRes.status === 'fulfilled' && presetRes.value.success) {
-      setPresets(presetRes.value.data.presets)
-      setUsage(presetRes.value.data.usage)
+      const data = presetRes.value.data as { presets?: unknown; usage?: BannerUsage | null }
+      if (Array.isArray(data?.presets)) setPresets(data.presets as BannerPreset[])
+      const usage = data?.usage
+      setUsage(usage && typeof usage.month?.used === 'number' ? usage : null)
     }
-    if (statsRes.status === 'fulfilled' && statsRes.value.success) setStats(statsRes.value.data)
+    if (statsRes.status === 'fulfilled' && statsRes.value.success) {
+      const data = statsRes.value.data as { projects?: { active?: unknown; archived?: unknown } } | null
+      if (data && typeof data.projects?.active === 'number') setStats(statsRes.value.data)
+    }
     setSummaryLoading(false)
   }, [])
 

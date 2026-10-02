@@ -18,7 +18,20 @@ const db = vi.hoisted(() => ({
 
 const access = vi.hoisted(() => ({ getVisibleLineAccountScope: vi.fn() }));
 
-vi.mock('@line-crm/db', () => db);
+vi.mock('@line-crm/db', async (importOriginal) => {
+  // segment-conditions は純粋関数。実体は packages/db にあり、
+  // services/segment-query.js から再公開される。ここで潰すと条件の
+  // 検証・評価が undefined になるため、5つだけ実物を使う。
+  const real = await importOriginal<typeof import('@line-crm/db')>();
+  return {
+    buildPublicSegmentQuery: real.buildPublicSegmentQuery,
+    buildSegmentQuery: real.buildSegmentQuery,
+    buildSegmentWhere: real.buildSegmentWhere,
+    matchesCondition: real.matchesCondition,
+    parseCondition: real.parseCondition,
+    ...db,
+  };
+});
 vi.mock('../services/account-access.js', () => access);
 
 const { friendAddRules } = await import('./friend-add-rules.js');
@@ -244,6 +257,137 @@ describe('friend add rules API', () => {
     expect(response.status).toBe(201);
   });
 
+  test('R30: シナリオ未選択の未完成でも下書きは作れる', async () => {
+    const response = await app.request('/api/friend-add-rules/drafts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'friend-rule-create-r30' },
+      body: JSON.stringify({
+        accountId: 'account-1', friendKind: 'first_time', name: '仮の案内', priority: 1,
+        definition: { ...definition, routeIds: [], scenarioId: null },
+      }),
+    }, makeEnv());
+    expect(response.status).toBe(201);
+    expect(db.createFriendAddRuleDraft).toHaveBeenCalled();
+  });
+
+  test('R30: シナリオ未選択の未完成でも下書きへ上書き保存できる', async () => {
+    db.saveFriendAddRuleDraft.mockResolvedValue(rule);
+    const response = await app.request('/api/friend-add-rules/rule-1/draft?account_id=account-1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'friend-rule-save-r30' },
+      body: JSON.stringify({
+        accountId: 'account-1', friendKind: 'first_time', name: '仮の案内', priority: 1, version: 1,
+        definition: { ...definition, routeIds: [], scenarioId: null },
+      }),
+    }, makeEnv());
+    expect(response.status).toBe(200);
+    expect(db.saveFriendAddRuleDraft).toHaveBeenCalled();
+  });
+
+  test('R30: 使えない参照先を入れた下書きは作らせない', async () => {
+    const prepare = vi.fn(() => ({
+      bind: vi.fn(() => ({
+        all: vi.fn().mockResolvedValue({ results: [] }),
+        first: vi.fn().mockResolvedValue(null),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      })),
+    }));
+    const env = { DB: { prepare } } as unknown as Env['Bindings'];
+    const response = await app.request('/api/friend-add-rules/drafts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'friend-rule-create-r30-foreign' },
+      body: JSON.stringify({
+        accountId: 'account-1', friendKind: 'first_time', name: 'よその持ち物', priority: 1,
+        definition,
+      }),
+    }, env);
+    expect(response.status).toBe(400);
+    expect(db.createFriendAddRuleDraft).not.toHaveBeenCalled();
+  });
+
+  test('R30: 未完成の下書きはテストで理由付きで失敗する（公開ゲート）', async () => {
+    db.getFriendAddRule.mockResolvedValueOnce({
+      ...rule,
+      definition_snapshot: JSON.stringify({ ...definition, routeIds: [], scenarioId: null }),
+    });
+    const response = await app.request('/api/friend-add-rules/test', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-1', ruleId: 'rule-1' }),
+    }, makeEnv());
+    expect(response.status).toBe(200);
+    const body = await response.json() as { success: boolean; data: { matched: boolean; reasons: string[] } };
+    expect(body.success).toBe(false);
+    expect(body.data.matched).toBe(false);
+    expect(body.data.reasons.join('\n')).toContain('シナリオ');
+    expect(db.recordFriendAddRuleTest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      ruleId: 'rule-1', succeeded: false,
+    }));
+  });
+
+  /*
+   * R262(監査・2026-09-27): テストは参照先の整合だけで「選ばれる」と断定しない。
+   * 経路未選択・期限切れは設定の欠陥として止め、曜日・時間帯・経路の不一致は
+   * 理由つきで「選ばれない」と返す。曜日を待たずに公開できるよう、
+   * 時間の不一致だけではテスト失敗には記録しない。
+   */
+  test('R262: 流入リンク未選択・期限切れはテストで止まる', async () => {
+    db.getFriendAddRule.mockResolvedValueOnce({
+      ...rule,
+      definition_snapshot: JSON.stringify({ ...definition, routeIds: [], activeUntil: '2020-01-01T00:00' }),
+    });
+    const response = await app.request('/api/friend-add-rules/test', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-1', ruleId: 'rule-1' }),
+    }, makeEnv());
+    const body = await response.json() as { success: boolean; data: { matched: boolean; reasons: string[] } };
+    expect(body.success).toBe(false);
+    expect(body.data.matched).toBe(false);
+    expect(body.data.reasons).toEqual(expect.arrayContaining([
+      '対象の流入リンクが選ばれていません。流入条件で1つ以上選んでください。',
+      '有効期間の終了時刻が過ぎています。終了を延ばすか、この設定を消してください。',
+    ]));
+  });
+
+  test('R262: 対象外の曜日・経路では「選ばれない」と理由を返す', async () => {
+    db.getFriendAddRule.mockResolvedValueOnce({
+      ...rule,
+      definition_snapshot: JSON.stringify({ ...definition, weekdays: [0] }),
+    });
+    // 2026-09-28（月）10:00 JST は weekdays:[0]（日曜のみ）の外側。
+    const response = await app.request('/api/friend-add-rules/test', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'account-1', ruleId: 'rule-1',
+        routeId: 'route-9', expectedAt: '2026-09-28T10:00',
+      }),
+    }, makeEnv());
+    const body = await response.json() as { success: boolean; data: { matched: boolean; reasons: string[] } };
+    expect(body.success).toBe(true);
+    expect(body.data.matched).toBe(false);
+    expect(body.data.reasons).toEqual(expect.arrayContaining([
+      'この曜日は配信対象ではありません。',
+      '試した流入リンクはこの設定の対象ではありません。',
+    ]));
+    // 曜日の不一致は設定の欠陥ではないため、テスト成功（公開の鍵）は残す。
+    expect(db.recordFriendAddRuleTest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      ruleId: 'rule-1', succeeded: true,
+    }));
+  });
+
+  test('R31: 一覧のまとめは直近7日にそろえ、送信は実際に送った数で数える', async () => {
+    const env = makeEnv();
+    const response = await app.request('/api/friend-add-rules?account_id=account-1&kind=first_time', {}, env);
+    expect(response.status).toBe(200);
+    const statements = (env.DB.prepare as unknown as { mock: { calls: Array<[string]> } })
+      .mock.calls.map((args) => String(args[0]));
+    const summarySql = statements.find((sql) => sql.includes('recent_adds'));
+    expect(summarySql).toBeDefined();
+    const weekly = summarySql!.match(/occurred_at >= strftime\('%Y-%m-%dT%H:%M:%f', 'now', '\+9 hours', '-7 days'\)/g) ?? [];
+    expect(weekly.length).toBeGreaterThanOrEqual(5);
+    expect(summarySql).toContain('delivery_count');
+    expect(summarySql).toContain('partial_failed');
+  });
+
   test('公開は冪等キーをDB処理へ渡す', async () => {
     const response = await app.request('/api/friend-add-rules/rule-1/publish?account_id=account-1', {
       method: 'POST', headers: { 'Idempotency-Key': 'friend-rule-publish-0001' },
@@ -252,5 +396,63 @@ describe('friend add rules API', () => {
     expect(db.publishFriendAddRule).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       idempotencyKey: 'friend-rule-publish-0001',
     }));
+  });
+
+  describe('M007/M008 存在しない設定の削除・公開', () => {
+    test('M007: 存在しない設定の削除は404（受け皿の409と混ぜない）', async () => {
+      db.getFriendAddRule.mockResolvedValue(null);
+      const response = await app.request('/api/friend-add-rules/gone?account_id=account-1', {
+        method: 'DELETE',
+      }, makeEnv());
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({
+        success: false, error: '見つかりません（一覧を読み直してください）',
+      });
+      expect(db.archiveFriendAddRule).not.toHaveBeenCalled();
+    });
+
+    test('M007: 共通あいさつ（受け皿）の削除は409のまま', async () => {
+      db.getFriendAddRule.mockResolvedValue({ ...rule, is_unknown_route_fallback: 1 });
+      const response = await app.request('/api/friend-add-rules/rule-1?account_id=account-1', {
+        method: 'DELETE',
+      }, makeEnv());
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        success: false, error: '経路が分からなかった人の設定は削除できません',
+      });
+      expect(db.archiveFriendAddRule).not.toHaveBeenCalled();
+    });
+
+    test('M007: ある設定の削除は成功する', async () => {
+      db.archiveFriendAddRule.mockResolvedValue(undefined);
+      const response = await app.request('/api/friend-add-rules/rule-1?account_id=account-1', {
+        method: 'DELETE',
+      }, makeEnv());
+      expect(response.status).toBe(200);
+      expect(db.archiveFriendAddRule).toHaveBeenCalled();
+    });
+
+    test('M008: 存在しない設定の公開は404（500にしない）', async () => {
+      db.getFriendAddRule.mockResolvedValue(null);
+      db.publishFriendAddRule.mockRejectedValue(new Error('FRIEND_ADD_RULE_DRAFT_NOT_FOUND'));
+      const response = await app.request('/api/friend-add-rules/gone/publish?account_id=account-1', {
+        method: 'POST', headers: { 'Idempotency-Key': 'friend-rule-publish-0002' },
+      }, makeEnv());
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({
+        success: false, error: '見つかりません（一覧を読み直してください）',
+      });
+    });
+
+    test('M008: 下書きの無い既存設定の公開は409', async () => {
+      db.publishFriendAddRule.mockRejectedValue(new Error('FRIEND_ADD_RULE_DRAFT_NOT_FOUND'));
+      const response = await app.request('/api/friend-add-rules/rule-1/publish?account_id=account-1', {
+        method: 'POST', headers: { 'Idempotency-Key': 'friend-rule-publish-0003' },
+      }, makeEnv());
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        success: false, error: '公開できる下書きがありません。最新の状態を読み直してください',
+      });
+    });
   });
 });

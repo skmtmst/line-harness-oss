@@ -11,11 +11,17 @@
 // 最後に isDefaultForAll なら 1 ページ目を全友だち default に。
 
 import { buildTapPostbackData } from './rich-menu-tap.js';
-import { RICH_MENU_DIMENSIONS } from '@line-crm/shared';
+import { RICH_MENU_DIMENSIONS, RICH_MENU_MAX_PAGES, richMenuUriError } from '@line-crm/shared';
 
 export type Bounds = { x: number; y: number; width: number; height: number };
 
-export type ActionType = 'uri' | 'message' | 'postback' | 'richmenuswitch';
+export type ActionType =
+  | 'uri'
+  | 'message'
+  | 'postback'
+  | 'richmenuswitch'
+  | 'datetimepicker'
+  | 'clipboard';
 
 /**
  * 運用者から見た「何をするボタンか」。
@@ -25,7 +31,16 @@ export type ActionType = 'uri' | 'message' | 'postback' | 'richmenuswitch';
  * 未設定 (null) の area は、この仕組みが入る前に作られたもの。今までどおり
  * actionType と actionData をそのまま LINE に渡す。
  */
-export type AreaIntent = 'url' | 'tel' | 'text' | 'template' | 'form' | 'switch' | 'postback';
+export type AreaIntent =
+  | 'url'
+  | 'tel'
+  | 'text'
+  | 'template'
+  | 'form'
+  | 'switch'
+  | 'postback'
+  | 'datetime'
+  | 'clipboard';
 
 export type AreaInput = {
   id?: string;
@@ -96,6 +111,11 @@ export class RichMenuValidationError extends Error {
 
 export interface LineRichMenuClient {
   createRichMenu(payload: unknown): Promise<{ richMenuId: string }>;
+  /**
+   * O(公開前の確認): LINE の Validate rich menu object API。
+   * 作らずに形だけ見てもらう。自前検査では気づけない不備を止める。
+   */
+  validateRichMenu(payload: unknown): Promise<void>;
   /** 手動公開の途中でWorkerが止まっても、決定的なnameから作成済みshellを回収する。 */
   listRichMenus(): Promise<Array<{ richMenuId: string; name: string | null }>>;
   uploadRichMenuImage(richMenuId: string, image: Uint8Array, contentType: string): Promise<void>;
@@ -123,6 +143,132 @@ export interface LineRichMenuClient {
 
 export interface R2Like {
   get(key: string): Promise<{ body: Uint8Array | ReadableStream } | null>;
+}
+
+/**
+ * LINE Messaging API を直接叩く client。route の createLineClient と
+ * 予約実行の createScheduleLineClient と同じ口・同じ形。
+ * 毎日の自動照合など、group を持たない経路が使う。
+ */
+export function createLineApiClient(channelAccessToken: string): LineRichMenuClient {
+  const auth = `Bearer ${channelAccessToken}`;
+  const check = async (res: Response, name: string) => {
+    if (res.ok) return res;
+    const detail = `LINE ${name} failed: ${res.status} ${await res.text()}`;
+    if (name === 'validateRichMenu' && res.status === 400) throw new RichMenuValidationError(detail);
+    throw new Error(detail);
+  };
+  return {
+    async createRichMenu(payload) {
+      const res = await check(await fetch('https://api.line.me/v2/bot/richmenu', {
+        method: 'POST',
+        headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }), 'createRichMenu');
+      return res.json() as Promise<{ richMenuId: string }>;
+    },
+    async validateRichMenu(payload) {
+      await check(await fetch('https://api.line.me/v2/bot/richmenu/validate', {
+        method: 'POST',
+        headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }), 'validateRichMenu');
+    },
+    async listRichMenus() {
+      const res = await check(await fetch('https://api.line.me/v2/bot/richmenu/list', {
+        headers: { Authorization: auth },
+      }), 'listRichMenus');
+      const body = await res.json() as { richmenus?: Array<{ richMenuId?: string; name?: string }> };
+      return (body.richmenus ?? []).flatMap((menu) => (
+        typeof menu.richMenuId === 'string'
+          ? [{ richMenuId: menu.richMenuId, name: typeof menu.name === 'string' ? menu.name : null }]
+          : []
+      ));
+    },
+    async uploadRichMenuImage(richMenuId, image, contentType) {
+      await check(await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
+        method: 'POST',
+        headers: { Authorization: auth, 'Content-Type': contentType },
+        body: image,
+      }), 'uploadRichMenuImage');
+    },
+    async deleteRichMenuAlias(aliasId) {
+      const res = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
+        method: 'DELETE',
+        headers: { Authorization: auth },
+      });
+      if (!res.ok && res.status !== 404) {
+        throw new Error(`LINE deleteRichMenuAlias failed: ${res.status} ${await res.text()}`);
+      }
+    },
+    async createRichMenuAlias(aliasId, richMenuId) {
+      await check(await fetch('https://api.line.me/v2/bot/richmenu/alias', {
+        method: 'POST',
+        headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
+      }), 'createRichMenuAlias');
+    },
+    async upsertRichMenuAlias(aliasId, richMenuId) {
+      const res = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
+        method: 'POST',
+        headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ richMenuId }),
+      });
+      if (res.ok) return;
+      if (res.status === 404) {
+        await check(await fetch('https://api.line.me/v2/bot/richmenu/alias', {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
+        }), 'createRichMenuAlias');
+        return;
+      }
+      throw new Error(`LINE updateRichMenuAlias failed: ${res.status} ${await res.text()}`);
+    },
+    async deleteRichMenu(richMenuId) {
+      const res = await fetch(`https://api.line.me/v2/bot/richmenu/${richMenuId}`, {
+        method: 'DELETE',
+        headers: { Authorization: auth },
+      });
+      if (!res.ok && res.status !== 404) {
+        throw new Error(`LINE deleteRichMenu failed: ${res.status} ${await res.text()}`);
+      }
+    },
+    async setDefaultRichMenu(richMenuId) {
+      await check(await fetch(`https://api.line.me/v2/bot/user/all/richmenu/${richMenuId}`, {
+        method: 'POST',
+        headers: { Authorization: auth },
+      }), 'setDefaultRichMenu');
+    },
+    async clearDefaultRichMenu() {
+      const res = await fetch('https://api.line.me/v2/bot/user/all/richmenu', {
+        method: 'DELETE',
+        headers: { Authorization: auth },
+      });
+      if (!res.ok && res.status !== 404) {
+        throw new Error(`LINE clearDefaultRichMenu failed: ${res.status} ${await res.text()}`);
+      }
+    },
+    async getCurrentDefaultRichMenuId() {
+      const res = await fetch('https://api.line.me/v2/bot/user/all/richmenu', {
+        method: 'GET',
+        headers: { Authorization: auth },
+      });
+      if (res.status === 404) return null;
+      if (!res.ok) {
+        throw new Error(`LINE getCurrentDefaultRichMenu failed: ${res.status} ${await res.text()}`);
+      }
+      const body = (await res.json()) as { richMenuId?: string };
+      return body.richMenuId ?? null;
+    },
+    async linkRichMenuBulk(richMenuId, userIds) {
+      await check(await fetch('https://api.line.me/v2/bot/richmenu/bulk/link', {
+        method: 'POST',
+        headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ richMenuId, userIds }),
+      }), 'linkRichMenuBulk');
+    },
+  };
 }
 
 export function buildAliasId(groupId: string, orderIndex: number): string {
@@ -174,6 +320,15 @@ function limited(value: string, max: number): boolean {
   return [...value].length <= max;
 }
 
+/** 日時を選ぶボタンの種類と、LINE が受け付ける値の形。 */
+const DATETIME_MODE_LABEL = { date: '日付', time: '時刻', datetime: '日時' } as const;
+
+function isDatetimepickerValue(mode: keyof typeof DATETIME_MODE_LABEL, value: string): boolean {
+  if (mode === 'date') return /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (mode === 'time') return /^\d{2}:\d{2}$/.test(value);
+  return /^\d{4}-\d{2}-\d{2}t\d{2}:\d{2}$/.test(value);
+}
+
 /**
  * intent が設定された area の検証。運用者が画面で直せる言葉で返す。
  */
@@ -216,6 +371,14 @@ function validateAreaByIntent(area: AreaInput, prefix: string, group: GroupInput
       if (!limited(uri, 1000)) {
         throw new RichMenuValidationError(`${prefix}: URLは1000文字以内にしてください`);
       }
+      // R203: 計測リンクはこちらが生成したURLなので飛ばす。手入力の飛び先は
+      // URIの形と許可schemeを確かめ、LINEへ届いて初めて失敗する事故を防ぐ。
+      if (!area.trackedLinkUrl) {
+        const uriError = richMenuUriError(uri);
+        if (uriError) {
+          throw new RichMenuValidationError(`${prefix}: ${uriError}`);
+        }
+      }
       return;
     }
     case 'text': {
@@ -249,6 +412,36 @@ function validateAreaByIntent(area: AreaInput, prefix: string, group: GroupInput
       }
       return;
     }
+    case 'datetime': {
+      const mode = String(data.mode ?? '');
+      if (mode !== 'date' && mode !== 'time' && mode !== 'datetime') {
+        throw new RichMenuValidationError(`${prefix}: 日時の種類（日付・時刻・日時）を選んでください`);
+      }
+      const initial = String(data.initial ?? '');
+      const max = String(data.max ?? '');
+      const min = String(data.min ?? '');
+      for (const [name, value, label] of [
+        ['initial', initial, 'はじめの値'],
+        ['max', max, 'いちばん後の値'],
+        ['min', min, 'いちばん前の値'],
+      ] as const) {
+        if (value !== '' && !isDatetimepickerValue(mode, value)) {
+          throw new RichMenuValidationError(`${prefix}: ${label}が「${DATETIME_MODE_LABEL[mode]}」の形ではありません`);
+        }
+        void name;
+      }
+      return;
+    }
+    case 'clipboard': {
+      const text = String(data.text ?? '');
+      if (!requiredString(text)) {
+        throw new RichMenuValidationError(`${prefix}: コピーする文字を入力してください`);
+      }
+      if (!limited(text, 1000)) {
+        throw new RichMenuValidationError(`${prefix}: コピーする文字は1000文字以内にしてください`);
+      }
+      return;
+    }
     default:
       // intent は DB の TEXT 列で、保存時の型とずれた値が残ることがある。
       // 知らない種類は action を組み立てられないので LINE を呼ぶ前に止める。
@@ -257,6 +450,13 @@ function validateAreaByIntent(area: AreaInput, prefix: string, group: GroupInput
 }
 
 export function validateRichMenuGroupForPublish(group: GroupInput): void {
+  // O(公開前の確認): ページは10まで。11以上は保存口でも止めるが、
+  // 予約スナップショットの復元値にも掛かるよう公開前にも見る。
+  if (group.pages.length > RICH_MENU_MAX_PAGES) {
+    throw new RichMenuValidationError(
+      `ページは${RICH_MENU_MAX_PAGES}までです（今は${group.pages.length}ページあります）。まとめられるページを1つにしてください`,
+    );
+  }
   // #827 (N-159): 「ページを切り替える」だけのボタンは、押しても別ページが
   // 出るだけで、押すと何か起きる行き先にはならない。到達可能な行き先として数えない。
   let destinationCount = 0;
@@ -296,6 +496,11 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
         if ([...uri].length > 1000) {
           throw new RichMenuValidationError(`${prefix}: URLは1000文字以内にしてください`);
         }
+        // R203: intent なしの古いボタンにも同じ検査を掛ける。
+        const uriError = richMenuUriError(String(uri));
+        if (uriError) {
+          throw new RichMenuValidationError(`${prefix}: ${uriError}`);
+        }
       } else if (area.actionType === 'postback') {
         const data = area.actionData.data;
         if (!requiredString(data)) {
@@ -326,6 +531,49 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
     throw new RichMenuValidationError(
       '公開するには、ページ切替以外の行き先（URLを開く・テキストを送るなど）を持つボタンを1つ以上設定してください',
     );
+  }
+}
+
+/**
+ * O(公開前の確認): 公開する形のまま、全ページを LINE の検査 API に通す。
+ * 自前の検査（必須・文字数・領域数）を通っていても、LINE 側の決まりに
+ * 触れる形はここで止める。作らずに見るだけなので、下書きもLINEも変えない。
+ */
+export function buildLineRichMenuPayload(
+  group: GroupInput,
+  page: PageInput,
+): Record<string, unknown> {
+  const dimensions = RICH_MENU_DIMENSIONS[group.size];
+  return {
+    size: dimensions,
+    selected: false,
+    name: page.name,
+    chatBarText: group.chatBarText,
+    areas: page.areas.map((a) => ({
+      bounds: a.bounds,
+      action: toLineAction(a, group),
+    })),
+  };
+}
+
+export async function validateRichMenuPagesWithLine(
+  group: GroupInput,
+  line: LineRichMenuClient,
+): Promise<void> {
+  const resolvedPages = resolveSwitcherActions(group.pages, group.id);
+  const ordered = [...resolvedPages].sort((a, b) => a.orderIndex - b.orderIndex);
+  for (const page of ordered) {
+    try {
+      await line.validateRichMenu(buildLineRichMenuPayload({ ...group, pages: resolvedPages }, page));
+    } catch (error) {
+      // 下書きの不備（LINE の 400）だけ日本語の直し文にする。
+      // 通信障害などはそのまま投げて、呼び出し側で 500 にする。
+      if (!(error instanceof RichMenuValidationError)) throw error;
+      const detail = error.message;
+      throw new RichMenuValidationError(
+        `ページ「${page.name}」がLINEの検査を通りませんでした。領域の位置やボタンの内容を見直してください（${detail}）`,
+      );
+    }
   }
 }
 
@@ -421,6 +669,26 @@ function toLineAction(area: AreaInput, group: GroupInput): Record<string, unknow
       }
       return action;
     }
+
+    case 'datetime': {
+      // 選んだ日時は postback で届く。ボタンの目印を data に載せると、
+      // 押されたことがこちらに届き、タグ付けや集計の対象になる。
+      const action: Record<string, unknown> = {
+        type: 'datetimepicker',
+        data: areaId ? buildTapPostbackData(areaId) : '',
+        mode: String(data.mode ?? 'datetime'),
+      };
+      for (const key of ['initial', 'max', 'min'] as const) {
+        const value = data[key];
+        if (typeof value === 'string' && value !== '') action[key] = value;
+      }
+      return action;
+    }
+
+    case 'clipboard': {
+      // コピーは端末の中で完結し、押されたことはこちらに届かない。
+      return { type: 'clipboard', text: String(data.text ?? '') };
+    }
   }
 }
 
@@ -481,7 +749,6 @@ export async function createRichMenuShells(
   resolvedPages.sort((a, b) => a.orderIndex - b.orderIndex);
   validateRichMenuGroupForPublish({ ...group, pages: resolvedPages });
 
-  const dimensions = RICH_MENU_DIMENSIONS[group.size];
   const existingByPage = new Map((options?.existingShells ?? []).map((shell) => [shell.pageId, shell]));
   if (existingByPage.size !== (options?.existingShells ?? []).length) {
     throw new Error('rich menu shell journal has duplicate pages');
@@ -516,15 +783,11 @@ export async function createRichMenuShells(
         );
         continue;
       }
+      // 検査（validateRichMenuPagesWithLine）と同じ組み立てで作る。
+      // 検査を通った形と作る形がずれないようにする。
       const created = await line.createRichMenu({
-        size: dimensions,
-        selected: false,
+        ...buildLineRichMenuPayload(group, page),
         name: options?.shellName?.(page) ?? `${group.id.slice(0, 8)} - ${page.name}`,
-        chatBarText: group.chatBarText,
-        areas: page.areas.map((a) => ({
-          bounds: a.bounds,
-          action: toLineAction(a, group),
-        })),
       });
       const shell = { pageId: page.id, orderIndex: page.orderIndex, newRichMenuId: created.richMenuId };
       shells.push(shell);
@@ -802,9 +1065,12 @@ export type UnpublishResult = {
  *   2. 各 page の richmenu を delete (404 無視)
  *   3. 現 default が own group の richmenu なら default unlink
  *
- * 削除は 404 を許容することで複数回呼ばれても安全 (idempotent)。alias / richmenu の
- * 削除そのものが失敗 (5xx 等) した場合は warnings に記録するが処理を続行する。
- * 完全失敗時は最後に throw。
+ * 削除は 404 を許容することで複数回呼ばれても安全 (idempotent)。
+ * M953: alias / richmenu の削除が1件でも失敗 (5xx 等) したら、処理を
+ * 続けたうえで最後に throw する。失敗を warnings に退避して成功扱いに
+ * すると、DB は draft 確定なのに LINE 上にメニューが残り、画面は
+ * 「取り下げ済み」に見えてしまう。route 側は throw を受けて 500・run 失敗・
+ * lease 解放にし、group は published のまま残して再試行できるようにする。
  */
 export async function unpublishRichMenuGroup(
   group: GroupInput,
@@ -813,6 +1079,7 @@ export async function unpublishRichMenuGroup(
 ): Promise<UnpublishResult> {
   const warnings: string[] = [];
   const pages: UnpublishResult['pages'] = [];
+  const failures: string[] = [];
 
   for (const page of group.pages) {
     // 外部呼び出しの前に担当を確かめる。失権していたら投げて止める
@@ -823,16 +1090,18 @@ export async function unpublishRichMenuGroup(
     try {
       await line.deleteRichMenuAlias(aliasId);
     } catch (e) {
-      warnings.push(`delete alias ${aliasId} failed: ${e instanceof Error ? e.message : String(e)}`);
+      const detail = `delete alias ${aliasId} failed: ${e instanceof Error ? e.message : String(e)}`;
+      warnings.push(detail);
+      failures.push(detail);
     }
     // richmenu 削除
     if (page.lineRichMenuId) {
       try {
         await line.deleteRichMenu(page.lineRichMenuId);
       } catch (e) {
-        warnings.push(
-          `delete richmenu ${page.lineRichMenuId} failed: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        const detail = `delete richmenu ${page.lineRichMenuId} failed: ${e instanceof Error ? e.message : String(e)}`;
+        warnings.push(detail);
+        failures.push(detail);
       }
     }
     pages.push({ pageId: page.id, clearedRichMenuId: page.lineRichMenuId });
@@ -857,5 +1126,11 @@ export async function unpublishRichMenuGroup(
     );
   }
 
+  if (failures.length > 0) {
+    throw new Error(
+      'LINE上のメニューの削除に失敗しました。メニューがLINE上に残っています。'
+      + '最新の状態を確認して、もう一度取り下げてください。',
+    );
+  }
   return { pages, warnings };
 }

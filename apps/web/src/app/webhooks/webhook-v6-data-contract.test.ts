@@ -18,7 +18,7 @@ describe('V6 外部連携の接続別集計と受信口詳細', () => {
   })
 
   it('送信回数・失敗・再送可否を画面へ反映する', () => {
-    expect(OVERVIEWS).toContain('item.deliverySummary.total.toLocaleString')
+    expect(OVERVIEWS).toContain('formatNumber(item.deliverySummary.total)')
     expect(OVERVIEWS).toContain('item.deliverySummary.failed > 0')
     expect(OVERVIEWS).toContain('item.deliverySummary.canRetry')
     expect(OVERVIEWS).toContain("item.deliverySummary.lastResult?.status === 'pending'")
@@ -30,7 +30,9 @@ describe('V6 外部連携の接続別集計と受信口詳細', () => {
 
   it('送信先へテスト送信できる', () => {
     expect(API).toContain('/api/webhooks/outgoing/${encodeURIComponent(id)}/test')
-    expect(OVERVIEWS).toContain('api.webhooks.outgoing.test(item.id, lineAccountId)')
+    // d23b R421: 開始時点のアカウントを固定して送る（切替後の誤送信防止）。
+    expect(OVERVIEWS).toContain('api.webhooks.outgoing.test(item.id, requestAccountId)')
+    expect(OVERVIEWS).toContain('lineAccountIdRef.current !== requestAccountId')
     expect(OVERVIEWS).toContain('1回 試してみる')
     expect(OVERVIEWS).toContain("item.deliverySummary.canRetry ? '失敗をやり直す' : '中身を見る'")
     expect(OVERVIEWS).toContain('aria-expanded={settingsId === item.id}')

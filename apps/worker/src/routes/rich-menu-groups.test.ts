@@ -13,8 +13,11 @@ const dbMocks = {
   clearRichMenuAssignmentsForGroup: vi.fn(),
   jstNow: vi.fn(),
   createRichMenuGroup: vi.fn(),
-  updateRichMenuGroupMeta: vi.fn(),
-  replaceRichMenuPages: vi.fn(),
+  saveRichMenuGroupDraft: vi.fn(
+    async (): Promise<
+      { ok: true; version: number } | { ok: false; reason: string; currentVersion: number | null }
+    > => ({ ok: true, version: 2 }),
+  ),
   deleteRichMenuGroup: vi.fn(),
   setRichMenuPageImage: vi.fn(),
   pageBelongsToGroup: vi.fn(),
@@ -58,11 +61,37 @@ const dbMocks = {
   markRichMenuTestApplyRevertFailed: vi.fn(),
   getStaffById: vi.fn(),
   getMediaById: vi.fn(),
+  ensureRichMenuVersion: vi.fn(),
+  markRichMenuVersionPublished: vi.fn(),
+  getLatestRichMenuVersion: vi.fn(),
+  recordRichMenuDeviceConfirmation: vi.fn(),
+  findRichMenuDeviceConfirmation: vi.fn(),
+  ensureRichMenuPublishRun: vi.fn(),
+  markRichMenuPublishRun: vi.fn(),
+  listRichMenuPublishRuns: vi.fn(),
+  getLatestRichMenuPublishRun: vi.fn(),
+  ensureRichMenuPublishRunPages: vi.fn(),
+  markRichMenuPublishRunPageStep: vi.fn(),
+  listRichMenuPublishRunPages: vi.fn(),
+  listAccountReferencedLineRichMenuIds: vi.fn(async () => []),
   recordAuditEvent: vi.fn(),
   maskAuditIp: vi.fn(() => null),
   auditDeviceFamily: vi.fn(() => 'unknown'),
 };
-vi.mock('@line-crm/db', () => dbMocks);
+vi.mock('@line-crm/db', async (importOriginal) => {
+  // segment-conditions は純粋関数。実体は packages/db にあり、
+  // services/segment-query.js から再公開される。ここで潰すと条件の
+  // 検証・評価が undefined になるため、5つだけ実物を使う。
+  const real = await importOriginal<typeof import('@line-crm/db')>();
+  return {
+    buildPublicSegmentQuery: real.buildPublicSegmentQuery,
+    buildSegmentQuery: real.buildSegmentQuery,
+    buildSegmentWhere: real.buildSegmentWhere,
+    matchesCondition: real.matchesCondition,
+    parseCondition: real.parseCondition,
+    ...dbMocks,
+  };
+});
 
 const accountAccessMocks = {
   canAccessAllLineAccounts: vi.fn(),
@@ -171,6 +200,14 @@ beforeEach(() => {
   dbMocks.getRichMenuManualPublishRequest.mockResolvedValue({ id: 'manual-1', status: 'running' });
   dbMocks.claimRichMenuManualPublishRequest.mockResolvedValue(true);
   dbMocks.renewPublishLease.mockResolvedValue(true);
+  // K・O: 版の凍結と実機確認は公開の前提。門番（自前検査400）を確かめる試験では通しておく。
+  dbMocks.ensureRichMenuVersion.mockImplementation(
+    async (_db: unknown, input: { id: string }) => ({ id: input.id, version_number: 1, status: 'draft' }),
+  );
+  dbMocks.findRichMenuDeviceConfirmation.mockResolvedValue({ id: 'dc1', confirmed_at: '2026-09-07T12:00:00.000' });
+  dbMocks.ensureRichMenuPublishRun.mockImplementation(
+    async (_db: unknown, input: { id: string }) => ({ id: input.id, status: 'running', last_error_code: null }),
+  );
 });
 
 // ----- GET /api/rich-menu-groups -----
@@ -782,7 +819,10 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
   });
 
   test('updates meta fields', async () => {
-    dbMocks.getRichMenuGroupById.mockResolvedValue({ id: 'g1' });
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', targeting_enabled: 0, targeting_condition: null,
+    });
+    dbMocks.saveRichMenuGroupDraft.mockResolvedValue({ ok: true, version: 2 });
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
       id: 'g1', account_id: 'a', name: 'new', chat_bar_text: 'バー', size: 'large',
       default_page_id: null, is_default_for_all: 1, status: 'draft', publishing_at: null,
@@ -792,17 +832,22 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
     const res = await app.request('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'new', isDefaultForAll: true }),
+      body: JSON.stringify({ expectedVersion: 1, name: 'new', isDefaultForAll: true }),
     });
     expect(res.status).toBe(200);
-    expect(dbMocks.updateRichMenuGroupMeta).toHaveBeenCalledWith(expect.anything(), 'g1', {
-      name: 'new', isDefaultForAll: true,
+    // M950/M951: meta も pages も saveRichMenuGroupDraft の1件で確定する。
+    expect(dbMocks.saveRichMenuGroupDraft).toHaveBeenCalledWith(expect.anything(), 'g1', {
+      meta: { name: 'new', isDefaultForAll: true },
+      pages: undefined,
+      expectedVersion: 1,
     });
-    expect(dbMocks.replaceRichMenuPages).not.toHaveBeenCalled();
   });
 
   test('replaces pages when pages key present', async () => {
-    dbMocks.getRichMenuGroupById.mockResolvedValue({ id: 'g1' });
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', targeting_enabled: 0, targeting_condition: null,
+    });
+    dbMocks.saveRichMenuGroupDraft.mockResolvedValue({ ok: true, version: 2 });
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
       id: 'g1', account_id: 'a', name: 'x', chat_bar_text: 'x', size: 'large',
       default_page_id: null, is_default_for_all: 0, status: 'draft', publishing_at: null,
@@ -813,6 +858,7 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        expectedVersion: 1,
         pages: [
           { name: 'p1', orderIndex: 0, areas: [] },
           { name: 'p2', orderIndex: 1, areas: [] },
@@ -820,14 +866,63 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
       }),
     });
     expect(res.status).toBe(200);
-    expect(dbMocks.replaceRichMenuPages).toHaveBeenCalledWith(
+    expect(dbMocks.saveRichMenuGroupDraft).toHaveBeenCalledWith(
       expect.anything(),
       'g1',
-      expect.arrayContaining([
-        expect.objectContaining({ name: 'p1' }),
-        expect.objectContaining({ name: 'p2' }),
-      ]),
+      expect.objectContaining({
+        expectedVersion: 1,
+        pages: expect.arrayContaining([
+          expect.objectContaining({ name: 'p1' }),
+          expect.objectContaining({ name: 'p2' }),
+        ]),
+      }),
     );
+  });
+
+  test('版なしの保存は 400 で書かない', async () => {
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', targeting_enabled: 0, targeting_condition: null,
+    });
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'new' }),
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.saveRichMenuGroupDraft).not.toHaveBeenCalled();
+  });
+
+  test('古い版の保存は 409 で書かない', async () => {
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', targeting_enabled: 0, targeting_condition: null,
+    });
+    dbMocks.saveRichMenuGroupDraft.mockResolvedValueOnce({
+      ok: false, reason: 'version_conflict', currentVersion: 3,
+    });
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: 1, name: 'new' }),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  test('保存先が消えていたら 404（版の不一致ではなく不在）', async () => {
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', targeting_enabled: 0, targeting_condition: null,
+    });
+    dbMocks.saveRichMenuGroupDraft.mockResolvedValueOnce({
+      ok: false, reason: 'version_conflict', currentVersion: null,
+    });
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: 1, name: 'new' }),
+    });
+    expect(res.status).toBe(404);
   });
 });
 
@@ -1299,17 +1394,24 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
     dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
     dbMocks.isPublishLeaseHeld.mockResolvedValue(false);
     dbMocks.acquirePublishLease.mockResolvedValue(1);
+    // LINE への到達は環境で変わる（遮断なら投げる・通れば 401 が返る）ため、
+    // 「fetch が投げる」前提はここで固定し、実網に触れず決定論的に落とす。
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('LINE fetch failed'));
 
     const app = setupApp();
-    const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', {
-      method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-3' },
-    });
-    expect(res.status).toBe(500);
-    expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(
-      expect.anything(),
-      'gid12345-aaaa',
-      { owner: expect.stringMatching(/^manual-/), generation: 1 },
-    );
+    try {
+      const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', {
+        method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-3' },
+      });
+      expect(res.status).toBe(500);
+      expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(
+        expect.anything(),
+        'gid12345-aaaa',
+        { owner: expect.stringMatching(/^manual-/), generation: 1 },
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });
 
@@ -1327,7 +1429,7 @@ describe('POST /api/rich-menu-groups/reorder-priorities (#502中)', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true, data: { updated: 3 } });
     // 個別PATCHは使わない。1 batch で3件そろえる。
-    expect(dbMocks.updateRichMenuGroupMeta).not.toHaveBeenCalled();
+    expect(dbMocks.saveRichMenuGroupDraft).not.toHaveBeenCalled();
   });
 
   test('足りない・余分・重複のidは400で何も書かない', async () => {

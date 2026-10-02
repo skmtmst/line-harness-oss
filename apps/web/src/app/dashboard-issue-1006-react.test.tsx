@@ -58,6 +58,30 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn(async () => 'data:image/png;base64,x') } }))
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後のリンクの判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => (
+    <select
+      aria-label={label}
+      value={value}
+      onChange={(e: { target: { value: string } }) => onChange(e.target.value)}
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  ),
+}))
 
 const jsonResponse = ({ status, body }: Json) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -274,7 +298,13 @@ describe('DASH-03 新アカウントの読込中に前の予約・運用状態�
     net.bookings = () => new Promise<Json>(() => {})
     await switchAccount('account-b')
     const card = todayCard('今日の予約')
-    expect(card.textContent).toContain('—')
+    /*
+     * #673 で読込中の件数は「—」ではなく骨組み（スケルトン）に替わった。
+     * ★V7 仕上げ §3 で骨組みは 0.3 秒待ってから出るので、待ってから確かめる。
+     */
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
+    expect(card.querySelector('[data-skeleton]')).not.toBeNull()
+    expect(card.querySelector('[aria-busy="true"]')).not.toBeNull()
     expect(card.textContent).not.toContain('1件')
   })
 })
@@ -399,7 +429,7 @@ describe('A01-02 初期状態に戻すは確認なしに実行しない', () => 
     await act(async () => { button('初期状態に戻す').click() })
     expect(net.deletes).toBe(0)
     expect(dialog().textContent).toContain('削除して初期状態へ戻します')
-    await act(async () => { button('やめる').click() })
+    await act(async () => { button('キャンセル').click() })
     expect(net.deletes).toBe(0)
     expect(dialog().textContent).not.toContain('削除して初期状態へ戻します')
   })

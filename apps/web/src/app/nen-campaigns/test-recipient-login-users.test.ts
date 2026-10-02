@@ -57,10 +57,12 @@ describe('NEN配信のテスト送信先', () => {
   });
 
   test('一覧の読込失敗を0件や空状態として表示しない', () => {
-    // 1件の失敗で画面全体をエラーにしない(点検 #512 の中3)。失敗はそのタブの帯で示す。
+    // 1件の失敗で画面全体をエラーにしない(点検 #512 の中3)。
+    // ★V7 `x63W5x`：失敗はそのタブの一覧の場所の1枚で示す（帯は出さない）。
     expect(page).toContain('tabErrors');
-    expect(page).toContain('tone="danger"');
-    expect(page).toContain('もう一度読み込む');
+    expect(page).not.toContain('tone="danger"');
+    expect(overview).toContain('tabError');
+    expect(overview).toContain('onRetryTab');
     expect(page).not.toContain('loadError');
   });
 });

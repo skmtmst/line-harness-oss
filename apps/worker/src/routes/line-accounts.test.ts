@@ -21,6 +21,9 @@ const dbMocks = {
   setDefaultLineAccount: vi.fn(),
   archiveLineAccount: vi.fn(),
   restoreLineAccount: vi.fn(),
+  deactivateLineAccount: vi.fn(),
+  activateLineAccount: vi.fn(),
+  listSkippedDeliveries: vi.fn(),
   getLineAccountConnectionChecksByIdempotencyKey: vi.fn(),
   saveLineAccountConnectionChecks: vi.fn(),
   getAccountSetting: vi.fn(),
@@ -29,6 +32,12 @@ const dbMocks = {
   getStaffAccountScopeIds: vi.fn(),
   CredentialEncryptionKeyError: class CredentialEncryptionKeyError extends Error {},
   LineAccountRevisionConflictError: class LineAccountRevisionConflictError extends Error {},
+  LineAccountLifecycleError: class LineAccountLifecycleError extends Error {
+    constructor(public readonly code: string) { super(code); this.name = 'LineAccountLifecycleError'; }
+  },
+  // V: 接続・鍵・停止の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
+  consumeStepUpGrant: vi.fn(async () => true),
+  getAdminSessionByTokenHash: vi.fn(async () => null),
   jstNow: vi.fn(() => '2026-08-10T12:00:00.000+09:00'),
 };
 vi.mock('@line-crm/db', () => dbMocks);
@@ -71,6 +80,8 @@ function setupApp(
   app.use('*', async (c, next) => {
     c.set('staff', { id: 'test-staff', name: 'Test', role, readOnly: false, ...staffOverride });
     c.env = { DB: dbStub };
+    // V: 大事な操作の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
+    c.req.raw.headers.set('x-step-up-token', 'test-step-up');
     await next();
   });
   app.route('/', lineAccounts);
@@ -270,6 +281,166 @@ describe('LINE account default and archive lifecycle', () => {
     expect(res.status).toBe(200);
     expect(dbMocks.restoreLineAccount).toHaveBeenCalledWith(expect.anything(), 'acc-1');
     await expect(res.json()).resolves.toMatchObject({ data: { isActive: false, archivedAt: null } });
+  });
+});
+
+// X-1: 送受信の停止・再開。理由は必須、再開は接続を確かめてから。
+describe('POST /api/line-accounts/:id/deactivate', () => {
+  const activeAccount = { ...fakeAccount, is_active: 1 };
+
+  test('理由つきで止められる', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(activeAccount);
+    dbMocks.deactivateLineAccount.mockResolvedValue({
+      ...activeAccount,
+      is_active: 0,
+      inactive_reason: 'manual',
+      inactive_reason_detail: 'LINE側の不具合調査のため',
+      inactivated_at: '2026-08-10T12:00:00.000+09:00',
+    });
+    const res = await setupApp('owner').request('/api/line-accounts/acc-1/deactivate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'LINE側の不具合調査のため' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.deactivateLineAccount).toHaveBeenCalledWith(expect.anything(), 'acc-1', {
+      reason: 'manual',
+      detail: 'LINE側の不具合調査のため',
+    });
+    await expect(res.json()).resolves.toMatchObject({
+      data: { isActive: false, inactiveReason: 'manual', inactiveReasonDetail: 'LINE側の不具合調査のため' },
+    });
+  });
+
+  test('理由が無いと422で止まる', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(activeAccount);
+    const res = await setupApp('owner').request('/api/line-accounts/acc-1/deactivate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: '' }),
+    });
+    expect(res.status).toBe(422);
+    expect(dbMocks.deactivateLineAccount).not.toHaveBeenCalled();
+  });
+
+  test('既定アカウントは止められない（409 ACCOUNT_DEFAULT）', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ ...activeAccount, is_default: 1 });
+    dbMocks.deactivateLineAccount.mockRejectedValue(
+      new dbMocks.LineAccountLifecycleError('ACCOUNT_DEFAULT'),
+    );
+    const res = await setupApp('owner').request('/api/line-accounts/acc-1/deactivate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'テスト' }),
+    });
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ error: 'ACCOUNT_DEFAULT' });
+  });
+
+  test('アーカイブ済みは409 ACCOUNT_ARCHIVED', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({
+      ...activeAccount, archived_at: '2026-08-10T12:00:00.000+09:00',
+    });
+    const res = await setupApp('owner').request('/api/line-accounts/acc-1/deactivate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'テスト' }),
+    });
+    expect(res.status).toBe(409);
+    expect(dbMocks.deactivateLineAccount).not.toHaveBeenCalled();
+  });
+
+  test('adminも止められる（確認は別途）', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(activeAccount);
+    dbMocks.deactivateLineAccount.mockResolvedValue({ ...activeAccount, is_active: 0 });
+    const res = await setupApp('admin').request('/api/line-accounts/acc-1/deactivate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'テスト' }),
+    });
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('POST /api/line-accounts/:id/activate', () => {
+  const stoppedAccount = {
+    ...fakeAccount,
+    is_active: 0,
+    inactive_reason: 'manual',
+    inactive_reason_detail: '調査',
+    inactivated_at: '2026-08-09T12:00:00.000+09:00',
+  };
+
+  test('接続が通れば理由つきで再開できる', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(stoppedAccount);
+    dbMocks.activateLineAccount.mockResolvedValue({ ...stoppedAccount, is_active: 1 });
+    const res = await setupApp('owner').request('/api/line-accounts/acc-1/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: '接続を直した' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.activateLineAccount).toHaveBeenCalledWith(expect.anything(), 'acc-1');
+    // 接続確認の記録も残す（checks台帳へ書いている）。
+    expect(dbMocks.saveLineAccountConnectionChecks).toHaveBeenCalled();
+  });
+
+  test('接続が通らないときは再開しない（422）', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(stoppedAccount);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 401 })));
+    const res = await setupApp('owner').request('/api/line-accounts/acc-1/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: '接続を直したつもり' }),
+    });
+    expect(res.status).toBe(422);
+    expect(dbMocks.activateLineAccount).not.toHaveBeenCalled();
+    const body = await res.json() as { checks?: Array<{ kind: string }> };
+    expect(body.checks?.some((check) => check.kind === 'bot_info')).toBe(true);
+  });
+
+  test('理由が無いと422（接続確認もしない）', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(stoppedAccount);
+    const res = await setupApp('owner').request('/api/line-accounts/acc-1/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(422);
+    expect(dbMocks.activateLineAccount).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/line-accounts/:id/skipped-deliveries', () => {
+  test('止めている間に送らなかった配信の一覧を返す', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ ...fakeAccount, is_active: 0 });
+    dbMocks.listSkippedDeliveries.mockResolvedValue([
+      {
+        id: 'skip-1', line_account_id: 'acc-1', kind: 'broadcast', ref_id: 'bc-1',
+        title: 'おはよう配信', reason: 'account_inactive', skipped_at: '2026-08-10T12:00:00.000+09:00',
+      },
+    ]);
+    const res = await setupApp('owner').request('/api/line-accounts/acc-1/skipped-deliveries');
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      data: [{ kind: 'broadcast', refId: 'bc-1', title: 'おはよう配信', reason: 'account_inactive' }],
+    });
+  });
+});
+
+describe('PATCH/PUT の isActive 窓口（X-1）', () => {
+  test('PATCH で isActive を変えることは422で断る（理由が必須のため別窓口へ）', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ ...fakeAccount, is_active: 1 });
+    const res = await setupApp('owner').request('/api/line-accounts/acc-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: false }),
+    });
+    expect(res.status).toBe(422);
+    expect(dbMocks.updateLineAccountFields).not.toHaveBeenCalled();
   });
 });
 
@@ -525,6 +696,37 @@ describe('POST /api/line-accounts/connect', () => {
     });
     expect(res.status).toBe(502);
     expect(dbMocks.deleteUncommittedLineAccount).toHaveBeenCalledWith(expect.anything(), 'rollback-account');
+  });
+
+  test('同時登録の負け側は重複したLoginチャネルIDを409で案内する', async () => {
+    installAutoConnectFetch();
+    // 事前検査は通ったがINSERTで一意制約に当たった競争の負け側。
+    dbMocks.createLineAccount.mockRejectedValue(
+      new Error('UNIQUE constraint failed: line_accounts.login_channel_id'),
+    );
+    const res = await setupApp('owner').request('/api/line-accounts/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toMatch(/loginChannelId.*already assigned/);
+  });
+
+  test('同時登録の負け側は重複したLIFF IDを409で案内する', async () => {
+    installAutoConnectFetch();
+    dbMocks.createLineAccount.mockRejectedValue(
+      new Error('UNIQUE constraint failed: line_accounts.liff_id'),
+    );
+    const res = await setupApp('owner').request('/api/line-accounts/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toMatch(/liffId.*already assigned/);
   });
 });
 
@@ -1269,6 +1471,31 @@ describe('Login pair / uniqueness validation', () => {
     expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
     const body = (await res.json()) as { success: boolean; error: string };
     expect(body.error).toMatch(/already assigned/);
+  });
+
+  test('POST: 同時登録の負け側は重複したLoginチャネルIDを409で案内する', async () => {
+    dbMocks.createLineAccount.mockRejectedValue(
+      new Error('UNIQUE constraint failed: line_accounts.login_channel_id'),
+    );
+    const res = await setupApp('owner', makeDbStub(), { tenantId: 'tenant-line-owner' }).request(
+      '/api/line-accounts',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelId: '123456789',
+          name: 'メイン',
+          channelAccessToken: 'token',
+          channelSecret: 'secret',
+          loginChannelId: '2009624792',
+          loginChannelSecret: 'login-secret',
+          liffId: '2009624792-XXXX',
+        }),
+      },
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toMatch(/loginChannelId.*already assigned/);
   });
 
   test('PATCH: LIFF-only edit succeeds against half-configured Login (id-only) account', async () => {

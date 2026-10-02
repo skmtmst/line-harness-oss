@@ -83,6 +83,10 @@ function setupApp(db: D1Database, staff?: Partial<AuthenticatedStaff>) {
 
 const STAFF_WITHOUT_KEY = { role: 'staff', permissionKeys: [] } as Partial<AuthenticatedStaff>;
 const STAFF_WITH_KEY = { role: 'staff', permissionKeys: ['/automations'] } as Partial<AuthenticatedStaff>;
+// R496: 設定画面で「閲覧だけ」を許可した担当者。変更のキーは持たない。
+const STAFF_WITH_VIEW_KEY = {
+  role: 'staff', permissionKeys: [], viewPermissionKeys: ['/automations'],
+} as Partial<AuthenticatedStaff>;
 const STAFF_WITH_EXPORT_KEY = {
   role: 'staff', permissionKeys: ['/automations', 'automation.run.export'],
 } as Partial<AuthenticatedStaff>;
@@ -337,6 +341,45 @@ describe('権限キー検査（#554 点検#519中4・中5）', () => {
     expect(res.status).toBe(200);
   });
 
+  // R496: 「閲覧だけ」の権限で保存した担当者が履歴を読めなかった不具合。
+  // 一覧・詳細は読めるが、書き出し・再試行・取消は従来どおり拒否する。
+  test('閲覧だけの権限のstaffは一覧・詳細を読め、変更系は拒否される', async () => {
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [],
+      total: 0,
+      summary: { total: 0, executed: 0, skipped: 0, failed: 0, most_run_name: null, most_run_count: null },
+    });
+    const list = await setupApp(fakeD1(), STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1');
+    expect(list.status).toBe(200);
+
+    dbMocks.getAutomationExecutionRun.mockResolvedValue(runRow({
+      id: 'run-1', status: 'success', version_number: 2,
+      completed_at: '2026-08-28T01:00:01.000Z', duration_ms: 1000,
+    }));
+    dbMocks.getAutomationExecutionRunSteps.mockResolvedValue([]);
+    const detail = await setupApp(fakeD1(), STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs/run-1');
+    expect(detail.status).toBe(200);
+
+    // CSV書き出しは automation.run.export が別途要る。
+    const csv = await setupApp(fakeD1(), STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(csv.status).toBe(403);
+  });
+
+  test('閲覧だけの権限のstaffは再試行・取消を実行できない', async () => {
+    const testDb = realAutomationDb();
+    addRun(testDb.raw, { id: 'run-1', status: 'failed' });
+    addRun(testDb.raw, { id: 'run-2', status: 'waiting' });
+    const retry = await setupApp(testDb.db, STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs/run-1/retry', { method: 'POST' });
+    expect(retry.status).toBe(403);
+    const cancel = await setupApp(testDb.db, STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs/run-2/cancel', { method: 'POST' });
+    expect(cancel.status).toBe(403);
+  });
+
   test('詳細は権限キーのないstaffに403を返す（アカウント範囲内でも）', async () => {
     dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: 'acc-1' });
     const res = await setupApp(fakeD1(), STAFF_WITHOUT_KEY)
@@ -538,6 +581,35 @@ describe('CSV書き出し（#942 N-353）', () => {
       .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
     expect(allowed.status).toBe(200);
     expect(allowed.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
+  });
+
+  test('R495: 上限で切れたら総件数・出力件数・切れた印を頭に載せる', async () => {
+    // 総件数5,001件・出力5,000件の境界を、行の数ではなく頭の数で見る。
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [runRow({ id: 'run-1' }), runRow({ id: 'run-2' })],
+      total: 5001,
+      summary: { total: 5001, executed: 5001, skipped: 0, failed: 0, most_run_name: '予約案内', most_run_count: 5001 },
+    });
+    const res = await setupApp(fakeD1(), STAFF_WITH_EXPORT_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Csv-Total-Count')).toBe('5001');
+    expect(res.headers.get('X-Csv-Returned-Count')).toBe('2');
+    expect(res.headers.get('X-Csv-Truncated')).toBe('1');
+  });
+
+  test('R495: 切れていないときは切れた印を立てない', async () => {
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [runRow({ id: 'run-1' })],
+      total: 1,
+      summary: { total: 1, executed: 1, skipped: 0, failed: 0, most_run_name: '予約案内', most_run_count: 1 },
+    });
+    const res = await setupApp(fakeD1(), STAFF_WITH_EXPORT_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Csv-Total-Count')).toBe('1');
+    expect(res.headers.get('X-Csv-Returned-Count')).toBe('1');
+    expect(res.headers.get('X-Csv-Truncated')).toBe('0');
   });
 });
 
@@ -746,5 +818,92 @@ describe('POST /api/automations/:id/draft・duplicate・status（#942 N-352）',
         body: JSON.stringify({ status: 'stopped' }),
       });
     expect(deniedStatus.status).toBe(403);
+  });
+
+  /*
+   * AUTOMATION-05: 一覧の「編集」は、止めている・下書き・動いているの
+   * どの状態でも同じidで編集面へ進めなければならない。以前は下書きの
+   * 指し先が壊れた定義で「編集用の下書きを作れませんでした」が出た。
+   */
+  test('止めているルールの「編集」も同じidの下書きを返し、状態は止めたまま', async () => {
+    const testDb = realAutomationDb();
+    testDb.raw.prepare(
+      `UPDATE automation_definitions SET status = 'stopped' WHERE id = 'auto-1'`,
+    ).run();
+    const app = setupApp(testDb.db);
+
+    const res = await app.request('/api/automations/auto-1/draft', { method: 'POST' });
+    expect(res.status).toBe(201);
+    const body = await res.json() as { data: { id: string; draftVersionId: string } };
+    expect(body.data.id).toBe('auto-1');
+
+    // そのまま下書きの編集面が開ける（同じidで読める）。
+    const draft = await app.request('/api/automation-drafts/auto-1?account_id=acc-1');
+    expect(draft.status).toBe(200);
+    await expect(draft.json()).resolves.toMatchObject({
+      success: true,
+      data: { id: 'auto-1', draftVersionId: body.data.draftVersionId },
+    });
+    // 稼働状態・公開版・実行記録は変わっていない。
+    expect(testDb.raw.prepare(
+      `SELECT status, current_published_version_id FROM automation_definitions WHERE id = 'auto-1'`,
+    ).get()).toEqual({ status: 'stopped', current_published_version_id: 'ver-1' });
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS count FROM automation_runs`,
+    ).get()).toEqual({ count: 0 });
+  });
+
+  test('下書きの指し先が壊れたルールも、公開版から作り直して編集できる', async () => {
+    const testDb = realAutomationDb();
+    testDb.raw.prepare(
+      `UPDATE automation_definitions
+          SET status = 'stopped', current_draft_version_id = 'ver-1' WHERE id = 'auto-1'`,
+    ).run();
+    const app = setupApp(testDb.db);
+
+    const res = await app.request('/api/automations/auto-1/draft', { method: 'POST' });
+    expect(res.status).toBe(201);
+    const body = await res.json() as { data: { id: string } };
+    expect(body.data.id).toBe('auto-1');
+
+    // 指し先は公開版を写した新しい下書き版へ治っている。
+    const definition = testDb.raw.prepare(
+      `SELECT status, current_draft_version_id, current_published_version_id
+         FROM automation_definitions WHERE id = 'auto-1'`,
+    ).get() as {
+      status: string;
+      current_draft_version_id: string;
+      current_published_version_id: string;
+    };
+    expect(definition.status).toBe('stopped');
+    expect(definition.current_published_version_id).toBe('ver-1');
+    expect(definition.current_draft_version_id).not.toBe('ver-1');
+
+    const draft = await app.request('/api/automation-drafts/auto-1?account_id=acc-1');
+    expect(draft.status).toBe(200);
+  });
+
+  test('下書きのルールの「編集」は、ぶら下がっている下書きをそのまま返す', async () => {
+    const testDb = realAutomationDb();
+    testDb.raw.prepare(
+      `INSERT INTO automation_definitions
+         (id, line_account_id, name, status, current_draft_version_id)
+       VALUES ('draft-1', 'acc-1', '作りかけ', 'draft', 'dv-1')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO automation_versions
+         (id, automation_id, version_number, status, trigger_type, trigger_config,
+          condition_config, action_config)
+       VALUES ('dv-1', 'draft-1', 1, 'draft', 'friend_add', '{}', '{}', '[]')`,
+    ).run();
+    const app = setupApp(testDb.db);
+
+    const res = await app.request('/api/automations/draft-1/draft', { method: 'POST' });
+    expect(res.status).toBe(201);
+    const body = await res.json() as { data: { id: string } };
+    expect(body.data.id).toBe('draft-1');
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS count FROM automation_versions WHERE automation_id = 'draft-1'`,
+    ).get()).toEqual({ count: 1 });
   });
 });

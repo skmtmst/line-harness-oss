@@ -17,6 +17,8 @@ import {
   getAdPlatformById,
   getPinnedAdConversionAccount,
   isOperationCapabilityStopped,
+  readPublicAdPlatformConfig,
+  resolveAdPlatformConfig,
   selectAdClickForPlatform,
   takeAdConversionOutboxRow,
   type AdConversionOutboxRow,
@@ -39,15 +41,10 @@ function configuredClickValidityDays(config: AdPlatformConfig): number | null {
 
 async function clickSnapshotForPlatform(
   db: D1Database,
-  input: { platform: AdPlatform; friendId: string; lineAccountId: string; now?: Date },
+  input: { platform: AdPlatform; config: AdPlatformConfig; friendId: string; lineAccountId: string; now?: Date },
 ): Promise<NonNullable<Parameters<typeof enqueueAdConversionOutbox>[1]['clickSnapshot']>> {
-  let config: AdPlatformConfig;
-  try {
-    config = JSON.parse(input.platform.config) as AdPlatformConfig;
-  } catch {
-    return { reason: 'validity_not_configured' };
-  }
-  const validityDays = configuredClickValidityDays(config);
+  // 計測の有効日数は秘密ではない。暗号化された行も鍵なしで読める。
+  const validityDays = configuredClickValidityDays(input.config);
   if (!isSupportedAdPlatform(input.platform.name)) return { reason: 'unsupported_platform' };
   if (validityDays === null) return { reason: 'validity_not_configured' };
 
@@ -148,6 +145,11 @@ export async function sendAdConversions(
     amountInMinorUnit?: boolean;
     /** 期限境界を同じ時計で判定する内部用入力。 */
     now?: Date;
+    /**
+     * 秘密の復号鍵。無いときは暗号化された行の即時送信を見送り、
+     * 待ち行列に残して定期 drain に任せる（旧行の平文はそのまま送る）。
+     */
+    credentialKey?: string;
   },
 ): Promise<void> {
   // 呼び出しをまたいだ重複送信を止める安定キー。無いときは今回限りの鍵にする。
@@ -168,17 +170,21 @@ export async function sendAdConversions(
   if (!lineAccountId) return;
 
   // テスト送信など指定があるときはその媒体だけ送る(全媒体に広げない)。
+  // 疎通確認のために止まっている行も指名できなければならない。
   const platforms = opts?.platformId
-    ? (await getActiveAdPlatforms(db, lineAccountId)).filter((p) => p.id === opts.platformId)
+    ? await getAdPlatformById(db, opts.platformId).then((found) => (found ? [found] : []))
     : await getActiveAdPlatforms(db, lineAccountId);
 
   for (const platform of platforms) {
     // 二重防御: 帰属が違う設定は送らない(DB側でも claim が弾く)。
     if (platform.line_account_id !== lineAccountId) continue;
+    // 秘密ではない値は鍵なしで読める。壊れた行は送らない。
+    const publicConfig = readPublicAdPlatformConfig(platform);
+    if (!publicConfig) continue;
     // 媒体側の重複排除ID。初回確保時に決めて行に残し、再送・付け替え後も同じ値を使う。
     const providerEventId = hasStableKey ? `${idempotencyKey}:${platform.id}` : crypto.randomUUID();
     const clickSnapshot = await clickSnapshotForPlatform(db, {
-      platform, friendId, lineAccountId, now: opts?.now,
+      platform, config: publicConfig, friendId, lineAccountId, now: opts?.now,
     });
     // 要求を先に残す。落ちても取り出し側が送る。同じ鍵は初回の1行。
     const outboxId = await enqueueAdConversionOutbox(db, {
@@ -190,12 +196,16 @@ export async function sendAdConversions(
     // だけにして外部への送信試行をしない。pending の行は復旧後に
     // drainAdConversionOutbox が届ける。
     if (await isOperationCapabilityStopped(db, lineAccountId, 'ad_postback')) continue;
+    // 秘密を復号できない行の即時送信は定期 drain に任せる。
+    // 旧行の平文は鍵なしでそのまま送る。
+    const fullConfig = await resolveAdPlatformConfig(platform, opts?.credentialKey);
+    if (!fullConfig) continue;
     const outboxLease = await takeAdConversionOutboxRow(db, outboxId);
     if (!outboxLease) continue; // 他が送り中・送り済み
     const outboxRow = await getAdConversionOutboxById(db, outboxId);
     if (!outboxRow) continue;
     await attemptPlatformSend(db, {
-      platform, friendId, lineAccountId, eventName,
+      platform, config: fullConfig, friendId, lineAccountId, eventName,
       eventValue, currency: opts?.currency, amountInMinorUnit: opts?.amountInMinorUnit,
       idempotencyKey, providerEventId,
     }, { row: outboxRow, lease: outboxLease });
@@ -206,7 +216,7 @@ export async function sendAdConversions(
 async function attemptPlatformSend(
   db: D1Database,
   args: {
-    platform: AdPlatform; friendId: string; lineAccountId: string; eventName: string;
+    platform: AdPlatform; config: AdPlatformConfig; friendId: string; lineAccountId: string; eventName: string;
     eventValue?: number; currency?: string | null; amountInMinorUnit?: boolean;
     idempotencyKey: string; providerEventId: string;
   },
@@ -234,7 +244,8 @@ async function attemptPlatformSend(
     return 'failed';
   }
   const click = { clickId: outbox.row.click_id!, clickIdType: outbox.row.click_id_type! };
-  const config: AdPlatformConfig = JSON.parse(args.platform.config);
+  // 秘密まで含んだ設定は呼び出し側が組み立てる。ここでは送るだけ。
+  const config = args.config;
   // 金額は主単位・通貨付きに正規化してから確保・送信する。通貨が変われば別内容。
   const currency = toCurrencyCode(args.currency);
   const majorValue = args.eventValue != null ? toMajorAmount(args.eventValue, args.currency, args.amountInMinorUnit) : null;
@@ -305,7 +316,7 @@ async function attemptPlatformSend(
  */
 export async function drainAdConversionOutbox(
   db: D1Database,
-  opts?: { limit?: number },
+  opts?: { limit?: number; credentialKey?: string },
 ): Promise<{ claimed: number; sent: number; failed: number }> {
   const rows = await claimAdConversionOutboxDue(db, { limit: opts?.limit });
   let sent = 0;
@@ -328,8 +339,13 @@ export async function drainAdConversionOutbox(
         });
         continue;
       }
+      // 秘密を復号できない行は送らない。鍵があるのに読めないのは壊れた行。
+      const config = await resolveAdPlatformConfig(platform, opts?.credentialKey);
+      if (!config) {
+        throw new Error(`platform secrets unavailable: ${row.ad_platform_id}`);
+      }
       const result = await attemptPlatformSend(db, {
-        platform, friendId: row.friend_id, lineAccountId: row.line_account_id,
+        platform, config, friendId: row.friend_id, lineAccountId: row.line_account_id,
         eventName: row.event_name, eventValue: row.event_value ?? undefined,
         currency: row.currency, amountInMinorUnit: row.amount_in_minor_unit === 1,
         idempotencyKey: row.idempotency_key,

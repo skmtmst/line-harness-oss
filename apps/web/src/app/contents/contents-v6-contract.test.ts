@@ -85,16 +85,18 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(UPLOAD).toContain('data-design-node="eXAJP"')
     expect(UPLOAD).toContain('ここにファイルをドラッグ、または押して選ぶ')
     expect(UPLOAD).toContain('LINEで送れる大きさ（超えると入れられません）')
-    // 検索: 独立した全幅の行（U014系の一括修正）。表示切替: 枠40・各44。
-    expect(PAGE).toContain('data-search-row')
-    expect(PAGE).toContain('className="w-full"')
+    // 検索: ★V7 `Xn1Mz` で共通 ListToolbar の1行目へそろえた（幅320・下限240は
+    // 部品が持つ）。独立した全幅の直書き行に戻さない。表示切替: 枠40・各44。
+    expect(PAGE).toContain('<ListToolbar')
+    expect(PAGE).toContain('search={{')
+    expect(PAGE).not.toContain('data-search-row')
     expect(PAGE).toContain('rounded-control flex h-10 items-center overflow-hidden border')
     expect(PAGE).toContain('flex h-full w-11 items-center justify-center')
     // カード: サムネイル112、ファイル名12/700、形式・容量10/600、使用状況10/700。
     expect(PAGE).toContain("view === 'grid' ? 'h-28' : 'h-14 w-20 shrink-0'")
-    expect(PAGE).toContain('truncate text-caption font-bold')
+    expect(PAGE).toContain('truncate text-caption font-medium')
     expect(PAGE).toContain('text-ink-faint text-nano font-semibold tabular-nums')
-    expect(PAGE).toContain('text-nano font-bold tabular-nums')
+    expect(PAGE).toContain('text-nano font-medium tabular-nums')
   })
 
   it('フォルダを取得し、未分類と分けて一覧を絞り込む', () => {
@@ -136,7 +138,10 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(UPLOAD).toContain('api.media.completeUpload')
     expect(UPLOAD).toContain('保存先へ直接送ります')
     expect(UPLOAD).toContain('aria-live="polite"')
-    expect(UPLOAD).toContain('この1件を再試行')
+    // 再試行は AttachmentRow の「選び直す」（onRetry）で行う。
+    // 失敗した1件だけを登録待ちに戻す。
+    expect(UPLOAD).toContain('onRetry')
+    expect(UPLOAD).toContain("state: 'ready'")
     expect(UPLOAD).toContain("entry.state === 'uploading'")
   })
 
@@ -164,7 +169,8 @@ describe('V6 登録メディア一覧の契約', () => {
   it('差し替え候補も一覧の200件上限に依存しない', () => {
     expect(REPLACEMENT).toContain('excludeId: source.id')
     expect(REPLACEMENT).toContain('limit: 50')
-    expect(REPLACEMENT).toContain('candidatePage * 50 >= candidateTotal')
+    // 次へ・前へ・番号は共通の Pagination が担い、候補の総件数から頁数を数える。
+    expect(REPLACEMENT).toContain('Math.ceil(candidateTotal / 50)')
   })
 
   it('使用中メディアの強制削除口を持たない', () => {

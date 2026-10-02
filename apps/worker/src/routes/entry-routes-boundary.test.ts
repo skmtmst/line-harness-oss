@@ -70,3 +70,54 @@ describe('N-011 流入経路一覧のアカウント境界', () => {
     expect(body.data.map((item) => item.id).sort()).toEqual(['route-1', 'route-2', 'route-free']);
   });
 });
+
+describe('R39 選択中アカウントでの流入リンク作成', () => {
+  function post(testDb: SqliteD1, body: unknown) {
+    return app(testDb, owner(DEFAULT_TENANT_ID)).request('/api/entry-routes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('選んだアカウントで作る→保存→一覧に出る', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const created = await post(testDb, { name: '夏の投稿', refCode: 'r39-summer', lineAccountId: 'acc-1' });
+    expect(created.status).toBe(201);
+    const createdBody = await created.json() as {
+      success: boolean; data: { id: string; lineAccountId: string | null };
+    };
+    expect(createdBody.data.lineAccountId).toBe('acc-1');
+
+    const listed = await app(testDb, owner(DEFAULT_TENANT_ID)).request('/api/entry-routes?account_id=acc-1');
+    const listedBody = await listed.json() as { success: boolean; data: Array<{ id: string }> };
+    expect(listedBody.data.map((item) => item.id)).toContain(createdBody.data.id);
+
+    const other = await app(testDb, owner(DEFAULT_TENANT_ID)).request('/api/entry-routes?account_id=acc-2');
+    const otherBody = await other.json() as { success: boolean; data: Array<{ id: string }> };
+    expect(otherBody.data.map((item) => item.id)).not.toContain(createdBody.data.id);
+  });
+
+  it('アカウントなしの作成は400で保存しない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const res = await post(testDb, { name: '所属なし', refCode: 'r39-no-account' });
+    expect(res.status).toBe(400);
+    const body = await res.json() as { success: boolean; code?: string };
+    expect(body.code).toBe('LINE_ACCOUNT_REQUIRED');
+    const listed = await app(testDb, owner(DEFAULT_TENANT_ID)).request('/api/entry-routes');
+    const listedBody = await listed.json() as { success: boolean; data: Array<{ refCode: string }> };
+    expect(listedBody.data.map((item) => item.refCode)).not.toContain('r39-no-account');
+  });
+
+  it('範囲外アカウントでの作成は404で保存しない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const res = await post(testDb, { name: '他統括', refCode: 'r39-foreign', lineAccountId: 'acc-b' });
+    expect(res.status).toBe(404);
+    const listed = await app(testDb, owner(DEFAULT_TENANT_ID)).request('/api/entry-routes');
+    const listedBody = await listed.json() as { success: boolean; data: Array<{ refCode: string }> };
+    expect(listedBody.data.map((item) => item.refCode)).not.toContain('r39-foreign');
+  });
+});

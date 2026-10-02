@@ -5,9 +5,15 @@ import { useEffect, useState } from 'react'
 import type { MediaItem } from '@line-crm/shared'
 import { api, type BroadcastAssetKind } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import LinePreview from '@/components/shared/line-preview'
+import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
+import DateTimeField from '@/components/shared/date-time-field'
+import Select from '@/components/shared/select'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
@@ -392,16 +398,16 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
   return (
     <div className="pb-24" data-design-node={kind === 'rich_message' ? 'j9ixI' : kind === 'coupon' ? 'hsBtl' : 'J3GxEZ'}>
       <nav className="text-caption mb-4 text-ink-faint" aria-label="現在地">
-        <Link href="/templates" className="text-accent hover:underline">テンプレート</Link>
-        <span className="mx-2">›</span><span className="text-accent">{meta.title}</span>
+        <Link href="/templates" className="text-action hover:underline">テンプレート</Link>
+        <span className="mx-2">›</span><span className="text-ink">{meta.title}</span>
         <span className="mx-2">›</span><span>新しく作る</span>
       </nav>
 
-      {error ? <p role="alert" className="bg-danger-bg text-danger rounded-control mb-4 px-4 py-3 text-sm">{error}</p> : null}
-      {saved ? <p role="status" className="bg-success-bg text-success rounded-control mb-4 px-4 py-3 text-sm">保存しました。<Link href="/templates" className="font-semibold underline">一覧へ戻る</Link></p> : null}
+      {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
+      {saved ? <Notice tone="success" message="保存しました。" className="mb-4" action={<Link href="/templates" className="font-semibold underline">一覧へ戻る</Link>} /> : null}
 
       <div className="flex min-w-0 flex-col gap-4 xl:flex-row">
-        <main className="min-w-0 flex-1 space-y-4">
+        <div className="min-w-0 flex-1 space-y-4">
           <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3">
             <div className="md:col-span-2"><Field label={`${meta.title}名`} required><TextField className="mt-2" value={name} onChange={(event) => setName(event.target.value)} /></Field></div>
             <Field label="フォルダ"><TextField className="mt-2" value={folder} onChange={(event) => setFolder(event.target.value)} /></Field>
@@ -438,16 +444,17 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                     return (
                       <div key={area.label} className="border-hairline rounded-control border p-3 text-sm">
                         <p className="font-bold">面 {area.label}</p>
-                        <select
-                          className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                        <Select
                           value={draft.kind}
-                          onChange={(event) => updateArea(area.label, { kind: event.target.value as AreaActionKind })}
+                          onChange={(value) => updateArea(area.label, { kind: value as AreaActionKind })}
                           aria-label={`面 ${area.label} の動き`}
-                        >
-                          <option value="none">未設定（押しても何も起きません）</option>
-                          <option value="uri">URLを開く</option>
-                          <option value="actions">動きを実行する</option>
-                        </select>
+                          options={[
+                            { value: 'none', label: '未設定（押しても何も起きません）' },
+                            { value: 'uri', label: 'URLを開く' },
+                            { value: 'actions', label: '動きを実行する' },
+                          ]}
+                          size="full"
+                        />
                         {draft.kind === 'uri' ? (
                           <input
                             type="url"
@@ -490,35 +497,28 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   {pickedMedia ? <span className="text-success mt-1 block text-xs">選択中: {pickedMedia.filename}</span> : null}
                   <span className="text-caption mt-1 block font-normal text-ink-faint">1029 × 1029px 推奨</span>
                 </Field>
-                <Field label="使える期間" required note="この管理画面の時刻（日本時間）で入ります。">
+                <div className="text-label block font-semibold text-ink-secondary">
+                  <span>使える期間<RequiredBadge /></span>
                   <div className="mt-2 flex items-center gap-2">
-                    <input type="datetime-local" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={couponStartsAt} onChange={(event) => setCouponStartsAt(event.target.value)} aria-label="使える期間の開始" />
+                    <DateTimeField value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" className="min-w-0 flex-1" />
                     <span>から</span>
-                    <input type="datetime-local" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={couponEndsAt} onChange={(event) => setCouponEndsAt(event.target.value)} aria-label="使える期間の終了" />
+                    <DateTimeField value={couponEndsAt} onChange={setCouponEndsAt} aria-label="使える期間の終了" className="min-w-0 flex-1" />
                   </div>
-                </Field>
+                  <span className="text-caption mt-1 block font-normal text-ink-faint">この管理画面の時刻（日本時間）で入ります。</span>
+                </div>
                 <Field label="使い方のご案内（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
                 <div className="grid gap-3 text-sm">
                   <Field label="使える回数">
-                    <select aria-label="使える回数" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={couponOnce} onChange={(event) => setCouponOnce(event.target.value as 'once' | 'unlimited')}>
-                      <option value="once">1人1回だけ</option>
-                      <option value="unlimited">期間中なら何回でも</option>
-                    </select>
+                    <Select aria-label="使える回数" value={couponOnce} onChange={(value) => setCouponOnce(value as 'once' | 'unlimited')} options={[{ value: 'once', label: '1人1回だけ' }, { value: 'unlimited', label: '期間中なら何回でも' }]} size="full" />
                   </Field>
                   <Field label="だれに見えるか">
-                    <select aria-label="だれに見えるか" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={couponVisibility} onChange={(event) => setCouponVisibility(event.target.value as 'friends' | 'link')}>
-                      <option value="friends">友だちだけ</option>
-                      <option value="link">リンクを知っている人</option>
-                    </select>
+                    <Select aria-label="だれに見えるか" value={couponVisibility} onChange={(value) => setCouponVisibility(value as 'friends' | 'link')} options={[{ value: 'friends', label: '友だちだけ' }, { value: 'link', label: 'リンクを知っている人' }]} size="full" />
                   </Field>
                 </div>
               </section>
               <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3">
                 <Field label="抽選にする">
-                  <select aria-label="抽選にする" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={lottery} onChange={(event) => setLottery(event.target.value as 'on' | 'off')}>
-                    <option value="on">する</option>
-                    <option value="off">しない</option>
-                  </select>
+                  <Select aria-label="抽選にする" value={lottery} onChange={(value) => setLottery(value as 'on' | 'off')} options={[{ value: 'on', label: 'する' }, { value: 'off', label: 'しない' }]} size="full" />
                 </Field>
                 {lottery === 'on' ? (
                   <>
@@ -557,13 +557,23 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
           ) : (
             <>
               <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3">
-                <Field label="受付の開始"><input type="datetime-local" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={researchStartsAt} onChange={(event) => setResearchStartsAt(event.target.value)} /></Field>
-                <Field label="受付の終了"><input type="datetime-local" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={researchEndsAt} onChange={(event) => setResearchEndsAt(event.target.value)} /></Field>
+                <div className="text-label block font-semibold text-ink-secondary">
+                  <span>受付の開始</span>
+                  <DateTimeField aria-label="受付の開始" value={researchStartsAt} onChange={setResearchStartsAt} className="mt-2" />
+                </div>
+                <div className="text-label block font-semibold text-ink-secondary">
+                  <span>受付の終了</span>
+                  <DateTimeField aria-label="受付の終了" value={researchEndsAt} onChange={setResearchEndsAt} className="mt-2" />
+                </div>
                 <Field label="答えてもらう人" note="タグで絞れます。選ばなければ全員が対象です。">
-                  <select aria-label="答えてもらう人" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={targetTagId} onChange={(event) => setTargetTagId(event.target.value)}>
-                    <option value="">友だち全員</option>
-                    {actionOptions.tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
-                  </select>
+                  <Combobox
+                    aria-label="答えてもらう人"
+                    placeholder="友だち全員"
+                    value={targetTagId}
+                    onChange={setTargetTagId}
+                    options={actionOptions.tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+                    className="mt-2 w-full"
+                  />
                 </Field>
                 <div className="md:col-span-3">
                   <Field label="説明（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={2} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
@@ -571,9 +581,9 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
               </section>
               <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
                 <div className="flex items-center justify-between">
-                  <div><h2 className="font-bold">質問（上から順に出ます）</h2><p className="text-caption mt-1 text-ink-faint">{questions.length} / {MAX_QUESTIONS} 問</p></div>
+                  <div><h2 className="font-semibold">質問（上から順に出ます）</h2><p className="text-caption mt-1 text-ink-faint">{questions.length} / {MAX_QUESTIONS} 問</p></div>
                   <Button type="button" disabled={questions.length >= MAX_QUESTIONS} title={questions.length >= MAX_QUESTIONS ? `質問は${MAX_QUESTIONS}問までです` : undefined} onClick={addQuestion}>
-                    質問を追加（あと{MAX_QUESTIONS - questions.length}問）
+                    質問を追加する（あと{MAX_QUESTIONS - questions.length}問）
                   </Button>
                 </div>
                 <div className="mt-3 grid gap-2">
@@ -582,9 +592,9 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                       <Button type="button" variant={index === selectedQuestion ? 'primary' : 'secondary'} className="min-w-0 flex-1 justify-start truncate" onClick={() => setSelectedQuestion(index)}>
                         {index + 1}　{FORMAT_LABEL[question.format]}　{question.text || '（未入力）'}
                       </Button>
-                      <button type="button" aria-label={`質問 ${index + 1} を上へ`} title="上へ" disabled={index === 0} onClick={() => moveQuestion(index, -1)} className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40">↑</button>
-                      <button type="button" aria-label={`質問 ${index + 1} を下へ`} title="下へ" disabled={index === questions.length - 1} onClick={() => moveQuestion(index, 1)} className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40">↓</button>
-                      <button type="button" aria-label={`質問 ${index + 1} を消す`} title={questions.length <= 1 ? '質問は1つ必要です' : 'この質問を消す'} disabled={questions.length <= 1} onClick={() => removeQuestion(index)} className="text-danger hover:bg-danger-bg rounded px-2 py-1 text-xs disabled:opacity-40">消す</button>
+                      <button type="button" aria-label={`質問 ${index + 1} を上へ`} title="上へ" disabled={index === 0} onClick={() => moveQuestion(index, -1)} className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40">↑</button>
+                      <button type="button" aria-label={`質問 ${index + 1} を下へ`} title="下へ" disabled={index === questions.length - 1} onClick={() => moveQuestion(index, 1)} className="text-ink-secondary hover:bg-canvas-sunken rounded-mini px-2 py-1 text-xs disabled:opacity-40">↓</button>
+                      <button type="button" aria-label={`質問 ${index + 1} を削除する`} title={questions.length <= 1 ? '質問は1つ必要です' : 'この質問を削除する'} disabled={questions.length <= 1} onClick={() => removeQuestion(index)} className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs disabled:opacity-40">削除する</button>
                     </div>
                   ))}
                 </div>
@@ -597,16 +607,15 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   </Field>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <Field label="答え方">
-                      <select aria-label="答え方" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={previewQuestion.format} onChange={(event) => updateQuestion(previewQuestionIndex, { format: event.target.value as ResearchFormat })}>
-                        <option value="single">1つだけ選ぶ</option>
-                        <option value="multiple">いくつでも選ぶ</option>
-                        <option value="free">自由に書く</option>
-                      </select>
+                      <Select aria-label="答え方" value={previewQuestion.format} onChange={(value) => updateQuestion(previewQuestionIndex, { format: value as ResearchFormat })} options={[{ value: 'single', label: '1つだけ選ぶ' }, { value: 'multiple', label: 'いくつでも選ぶ' }, { value: 'free', label: '自由に書く' }]} size="full" />
                     </Field>
-                    <label className="mt-2 flex items-start gap-2 text-sm font-normal md:mt-8">
-                      <input type="checkbox" aria-label="必ず答えてもらう" checked={previewQuestion.required} onChange={(event) => updateQuestion(previewQuestionIndex, { required: event.target.checked })} className="accent-accent mt-0.5" />
-                      <span><strong className="block">必ず答えてもらう</strong><span className="text-ink-faint text-xs">外すと、この質問は飛ばせます。</span></span>
-                    </label>
+                    <Checkbox
+                      checked={previewQuestion.required}
+                      onCheckedChange={(checked) => updateQuestion(previewQuestionIndex, { required: checked })}
+                      aria-label="必ず答えてもらう"
+                      description="外すと、この質問は飛ばせます。"
+                      className="mt-2 md:mt-8"
+                    >必ず答えてもらう</Checkbox>
                   </div>
                   {previewQuestion.format !== 'free' ? (
                     <div className="mt-3">
@@ -622,17 +631,17 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                             />
                             <button
                               type="button"
-                              aria-label={`選択肢 ${choiceIndex + 1} を消す`}
+                              aria-label={`選択肢 ${choiceIndex + 1} を削除する`}
                               disabled={previewQuestion.choices.length <= 1}
-                              title={previewQuestion.choices.length <= 1 ? '選択肢は1つ必要です' : 'この選択肢を消す'}
+                              title={previewQuestion.choices.length <= 1 ? '選択肢は1つ必要です' : 'この選択肢を削除する'}
                               onClick={() => updateQuestion(previewQuestionIndex, { choices: previewQuestion.choices.filter((_, i) => i !== choiceIndex) })}
-                              className="text-danger hover:bg-danger-bg shrink-0 rounded px-2 py-1 text-xs disabled:opacity-40"
-                            >消す</button>
+                              className="text-danger hover:bg-danger-bg shrink-0 rounded-mini px-2 py-1 text-xs disabled:opacity-40"
+                            >削除する</button>
                           </div>
                         ))}
                       </div>
                       {previewQuestion.choices.length < MAX_CHOICES ? (
-                        <Button type="button" className="mt-2" onClick={() => updateQuestion(previewQuestionIndex, { choices: [...previewQuestion.choices, ''] })}>＋ 選択肢を追加</Button>
+                        <Button type="button" className="mt-2" onClick={() => updateQuestion(previewQuestionIndex, { choices: [...previewQuestion.choices, ''] })}>＋ 選択肢を追加する</Button>
                       ) : (
                         <p className="text-caption mt-2 text-ink-faint">選択肢は{MAX_CHOICES}つまでです（LINEの決まり）。</p>
                       )}
@@ -658,16 +667,14 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
               </section>
             </>
           )}
-        </main>
+        </div>
 
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-4 xl:w-96 xl:shrink-0 xl:self-start">
-          <section className="rounded-card bg-line-preview p-4 text-on-accent">
-            <h2 className="text-center font-bold">LINEプレビュー</h2>
-            <p className="mx-auto mt-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">{meta.title}の見え方</p>
-            <div className="rounded-card mt-4 bg-canvas p-4 text-ink">
+          <LinePreview note={`${meta.title}の見え方`}>
+            <div className="rounded-card bg-canvas p-4 text-ink">
               <p className="font-bold">{name || `${meta.title}名`}</p>
               {kind === 'rich_message' ? (
-                <div className="bg-canvas-sunken relative mt-3 aspect-square w-full overflow-hidden rounded-lg">
+                <div className="bg-canvas-sunken relative mt-3 aspect-square w-full overflow-hidden rounded-control">
                   {/^https?:\/\//.test(imageUrl.trim()) ? (
                     <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${imageUrl.trim()})` }} />
                   ) : null}
@@ -704,9 +711,9 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                 </>
               ) : null}
             </div>
-            <Button type="button" className="mt-4 w-full" disabled title={TEST_SEND_UNAVAILABLE_NOTE}>自分に送って確かめる</Button>
-            <p className="text-on-accent/80 mt-2 text-xs leading-relaxed">{TEST_SEND_UNAVAILABLE_NOTE}</p>
-          </section>
+          </LinePreview>
+          <Button type="button" className="mt-4 w-full" disabled title={TEST_SEND_UNAVAILABLE_NOTE}>自分に送って確かめる</Button>
+          <p className="text-ink-faint mt-2 text-xs leading-relaxed">{TEST_SEND_UNAVAILABLE_NOTE}</p>
           <section className="bg-canvas border-hairline rounded-card shadow-card border p-4 text-sm">
             <h2 className="font-bold">{kind === 'rich_message' ? 'リッチメニューとの違い' : kind === 'coupon' ? '公開したあとに見られる数' : '回答フォームとの使い分け'}</h2>
             <p className="mt-2 leading-relaxed text-ink-secondary">{kind === 'rich_message' ? 'リッチメッセージはトークに1回流れて、過去のやり取りに残ります。リッチメニューは画面の下に常に出ます。' : kind === 'coupon' ? '配った数 ／ 開いた数 ／ 使われた数 ／ 当選した数。使われた数は成果とアフィリエイトにも送れます。' : 'リサーチはLINEの中で完結する短い質問向けです。住所や画像も聞く場合は回答フォームを使います。'}</p>
@@ -714,7 +721,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         </aside>
       </div>
 
-      <StickyBar status={saved ? '保存しました。一覧へ戻れます。' : '下書き（まだ誰にも送られません）'} actions={<><Button href="/templates" variant="secondary">キャンセル</Button><Button type="button" variant="secondary" disabled={saving || saved} onClick={() => void save()}>下書きに保存</Button><Button type="button" variant="primary" disabled={saving || saved} onClick={() => void save()}>{saving ? '保存中…' : saved ? '保存しました' : 'テンプレートを保存'}</Button></>} />
+      <StickyBar status={saved ? '保存しました。一覧へ戻れます。' : '下書き（まだ誰にも送られません）'} actions={<><Button href="/templates" variant="secondary">キャンセル</Button><Button type="button" variant="secondary" disabled={saving || saved} onClick={() => void save()}>下書きを保存する</Button><Button type="button" variant="primary" disabled={saving || saved} onClick={() => void save()} busy={saving} done={saved}>テンプレートを保存する</Button></>} />
 
       <ConfirmDialog
         open={pendingShape !== null}

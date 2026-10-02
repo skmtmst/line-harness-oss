@@ -265,3 +265,21 @@ describe('DEEP-15 open=true で初回マウントする Dialog', () => {
     expect(onCancel).toHaveBeenCalled()
   })
 })
+
+describe('読みにくい色の警告（P・実マウント）', () => {
+  it('文字と背景の差が4.5:1未満なら赤字で止め、決まりは「？」に入れる', async () => {
+    await render({
+      value: { ...FORM_THEME_DEFAULT, text: '#999999', sub: '#ffffff' },
+    })
+    const alert = host.querySelector('[role="alert"]')
+    expect(alert?.textContent).toContain('保存できません')
+    const help = host.querySelector('button[aria-label="文字と背景の色の決まりの説明"]')
+    expect(help).toBeTruthy()
+  })
+
+  it('既定の組み合わせでは警告を出さない', async () => {
+    await render({ value: { ...FORM_THEME_DEFAULT } })
+    const alerts = [...host.querySelectorAll('[role="alert"]')]
+    expect(alerts.some((node) => node.textContent?.includes('保存できません'))).toBe(false)
+  })
+})

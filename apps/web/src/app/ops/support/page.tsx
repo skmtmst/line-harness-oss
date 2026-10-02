@@ -15,17 +15,18 @@ import {
 } from '@/lib/api'
 import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
 import knowledgeStyles from '@/components/ops/knowledge.module.css'
-import { useOpsPageTitle } from '@/components/ops/ops-shell'
+import OpsPageHeader from '@/components/ops/ops-page-header'
 import { formatDateTime, planLabel, PLAN_STATUS_LABEL, ROLE_LABEL, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
-import SelectField from '@/components/shared/select-field'
-import SummaryCard from '@/components/shared/summary-card'
+import Select from '@/components/shared/select'
+import KpiCard from '@/components/shared/kpi-card'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { compareLabel, durationLabel, elapsedLabel } from './format'
+import ListRange from '@/components/ui/list-range'
 
 /**
  * お問い合わせ（チケット）★V6 37-6 `IjIFa`／37-6-A `b2uv3`（AIの下書き）／37-6-B `XlTAd`（作成中）。
@@ -116,13 +117,18 @@ export default function OpsSupportPage() {
     if (res.success) setSummary(res.data)
   }, [])
 
+  // ★V7：一覧と詳細の失敗は場所ごとに1つずつ出す。操作の失敗の知らせと混ぜない。
+  const [listFailed, setListFailed] = useState(false)
+  const [detailFailed, setDetailFailed] = useState(false)
+
   const loadList = useCallback(async () => {
     const sequence = ++listRequest.current
     setLoading(true)
+    setListFailed(false)
     const res = await opsCall(api.ops.support.tickets({ stage, priority: priority || undefined, q: q.trim() || undefined, sort, limit: 50 }))
     if (sequence !== listRequest.current) return
     setLoading(false)
-    if (!res.success) { setError(res.error || '読み込めませんでした'); return }
+    if (!res.success) { setError(res.error || '読み込めませんでした'); setListFailed(true); return }
     setTickets(res.data)
     setTotal(res.total)
     setSelectedId((current) => deepLink.current || (current && res.data.some((t) => t.id === current) ? current : res.data[0]?.id ?? null))
@@ -131,10 +137,11 @@ export default function OpsSupportPage() {
   const loadDetail = useCallback(async (id: string) => {
     const sequence = ++detailRequest.current
     setDetailLoading(true)
+    setDetailFailed(false)
     const res = await opsCall(api.ops.support.ticket(id))
     if (sequence !== detailRequest.current) return
     setDetailLoading(false)
-    if (!res.success) { setError(res.error || '内容を読み込めませんでした'); return }
+    if (!res.success) { setError(res.error || '内容を読み込めませんでした'); setDetailFailed(true); return }
     setDetail(res.data)
     setReply(res.data.draft?.body ?? '')
     setReplyFromAi(res.data.draft?.aiGenerated ? { generatedAt: res.data.draft.generatedAt } : null)
@@ -292,10 +299,10 @@ export default function OpsSupportPage() {
   const kpis = summary?.kpis ?? null
   const ticket = detail?.ticket ?? null
   const closed = ticket?.stage === 'closed'
-  useOpsPageTitle(replyFromAi ? 'お問い合わせ ／ AIの下書き' : 'お問い合わせ')
 
   return (
     <div className={knowledgeStyles.supportPage} data-design-node={replyFromAi && references.length > 0 && !aiBusy ? 'F3zoq' : 'IjIFa'}>
+      <OpsPageHeader title={replyFromAi ? 'お問い合わせ ／ AIの下書き' : 'お問い合わせ'} />
 
       <div className="mb-4">
         <Tabs
@@ -311,29 +318,48 @@ export default function OpsSupportPage() {
               <span className="w-64">
                 <SearchField value={q} onChange={setQ} onClear={() => setQ('')} placeholder="チケット番号・契約先・件名" aria-label="チケットを探す" />
               </span>
-              <SelectField size="compact" aria-label="優先度で絞る" options={PRIORITY_OPTIONS} value={priority} onChange={(e) => setPriority(e.target.value as '' | OpsSupportPriority)} />
-              <SelectField aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} />
-              <Button variant="primary" onClick={() => setCreating((v) => !v)}>
-                <Plus aria-hidden="true" className="h-4 w-4" />
-                チケットを作る
-              </Button>
+              <Select size="page-size" aria-label="優先度で絞る" options={PRIORITY_OPTIONS} value={priority} onChange={(value) => setPriority(value as '' | OpsSupportPriority)} />
+              <Select aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={(value) => setSort(value as typeof sort)} />
             </span>
           }
         />
+      </div>
+
+      <div className={knowledgeStyles.supportMetrics} data-design-node="beOJV">
+        <div className={knowledgeStyles.supportMetric}><Inbox aria-hidden="true" className="text-danger" />
+        <KpiCard variant="v6" title="未対応のチケット" value={kpis ? kpis.untouched : null} unit="" detail={kpis ? `LINEから受付 ${kpis.untouchedFromLine}件` : '—'} loading={!summary} />
+        </div>
+        <div className={knowledgeStyles.supportMetric}><Timer aria-hidden="true" className="text-status-info" />
+        <KpiCard variant="v6" title="平均の初回返信" value={null} unit="" detail={kpis ? compareLabel(kpis.avgFirstReplyMinutes, kpis.prevAvgFirstReplyMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgFirstReplyMinutes) : undefined} />
+        </div>
+        <div className={knowledgeStyles.supportMetric}><CheckCircle2 aria-hidden="true" className="text-accent-deep" />
+        <KpiCard variant="v6" title="解決率" value={null} unit="" detail={kpis ? compareLabel(kpis.resolutionRate, kpis.prevResolutionRate, 'rate') : '—'} loading={!summary} valueText={kpis ? (kpis.resolutionRate === null ? '—' : `${kpis.resolutionRate.toFixed(1)}%`) : undefined} />
+        </div>
+        <div className={knowledgeStyles.supportMetric}><Hourglass aria-hidden="true" className="text-chip-alt" />
+        <KpiCard variant="v6" title="平均の解決時間" value={null} unit="" detail={kpis ? compareLabel(kpis.avgResolutionMinutes, kpis.prevAvgResolutionMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgResolutionMinutes) : undefined} />
+        </div>
+      </div>
+
+      {/* 作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。 */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Button variant="primary" onClick={() => setCreating((v) => !v)}>
+          <Plus aria-hidden="true" className="h-4 w-4" />
+          チケットを作る
+        </Button>
       </div>
 
       {creating ? (
         <form onSubmit={(event) => void create(event)} className="mb-4 grid gap-3 rounded-card border border-hairline bg-canvas px-4 py-4 md:grid-cols-2">
           <label className="grid gap-1 text-caption text-ink-secondary">
             契約先
-            <SelectField className="w-full" aria-label="契約先" required value={form.tenantId} onChange={(e) => setForm((f) => ({ ...f, tenantId: e.target.value }))}
+            <Select size="full" aria-label="契約先" value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))}
               options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ value: t.id, label: t.name }))]} />
           </label>
           <label className="grid gap-1 text-caption text-ink-secondary">
             種類・優先度
             <span className="flex gap-2">
-              <SelectField className="w-full" aria-label="種類" value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value }))} options={KIND_OPTIONS} />
-              <SelectField size="compact" aria-label="優先度" value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value as OpsSupportPriority }))} options={PRIORITY_OPTIONS.slice(1)} />
+              <Select size="full" aria-label="種類" value={form.kind} onChange={(value) => setForm((f) => ({ ...f, kind: value }))} options={KIND_OPTIONS} />
+              <Select size="page-size" aria-label="優先度" value={form.priority} onChange={(value) => setForm((f) => ({ ...f, priority: value as OpsSupportPriority }))} options={PRIORITY_OPTIONS.slice(1)} />
             </span>
           </label>
           <label className="grid gap-1 text-caption text-ink-secondary md:col-span-2">
@@ -345,40 +371,37 @@ export default function OpsSupportPage() {
             <TextArea rows={4} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} required />
           </label>
           <div className="flex items-center gap-2 md:col-span-2">
+            <Button onClick={() => setCreating(false)}>キャンセル</Button>
             <Button type="submit" variant="primary" disabled={busy}>作る</Button>
-            <Button onClick={() => setCreating(false)}>やめる</Button>
             <span className="text-micro text-ink-faint">電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。</span>
           </div>
         </form>
       ) : null}
 
-      <div className={knowledgeStyles.supportMetrics} data-design-node="beOJV">
-        <div className={knowledgeStyles.supportMetric}><Inbox aria-hidden="true" className="text-status-danger" />
-        <SummaryCard variant="v6" title="未対応のチケット" value={kpis ? kpis.untouched : null} unit="" detail={kpis ? `LINEから受付 ${kpis.untouchedFromLine}件` : '—'} loading={!summary} />
-        </div>
-        <div className={knowledgeStyles.supportMetric}><Timer aria-hidden="true" className="text-status-info" />
-        <SummaryCard variant="v6" title="平均の初回返信" value={null} unit="" detail={kpis ? compareLabel(kpis.avgFirstReplyMinutes, kpis.prevAvgFirstReplyMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgFirstReplyMinutes) : undefined} />
-        </div>
-        <div className={knowledgeStyles.supportMetric}><CheckCircle2 aria-hidden="true" className="text-accent-deep" />
-        <SummaryCard variant="v6" title="解決率" value={null} unit="" detail={kpis ? compareLabel(kpis.resolutionRate, kpis.prevResolutionRate, 'rate') : '—'} loading={!summary} valueText={kpis ? (kpis.resolutionRate === null ? '—' : `${kpis.resolutionRate.toFixed(1)}%`) : undefined} />
-        </div>
-        <div className={knowledgeStyles.supportMetric}><Hourglass aria-hidden="true" className="text-chip-alt" />
-        <SummaryCard variant="v6" title="平均の解決時間" value={null} unit="" detail={kpis ? compareLabel(kpis.avgResolutionMinutes, kpis.prevAvgResolutionMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgResolutionMinutes) : undefined} />
-        </div>
-      </div>
-
       {notice ? <p role="status" className="mb-3 text-caption text-accent-deep">{notice}</p> : null}
-      {error ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
+      {/*
+        ★V7：一覧・詳細の失敗はその場所の1枚で出すので、ここでは操作の失敗の
+        知らせだけ出す（同じ失敗を2回出さない）。
+      */}
+      {error && !listFailed && !detailFailed ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
       <div className={knowledgeStyles.supportColumns} data-design-node="WmMDh">
         {/* 左：チケット一覧 */}
         <section aria-label={listTitle} className={knowledgeStyles.supportList}>
           <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
-            <h2 className="text-label font-bold text-ink">{listTitle}</h2>
-            <span className="text-micro text-ink-faint">{total}件中 {tickets.length === 0 ? 0 : 1}〜{tickets.length}件</span>
+            <h2 className="text-label font-semibold text-ink">{listTitle}</h2>
+            <ListRange total={total} first={tickets.length === 0 ? 0 : 1} last={tickets.length} />
           </header>
           {loading && tickets.length === 0 ? (
             <ListState kind="loading" title="チケットを読み込んでいます" />
+          ) : listFailed && tickets.length === 0 ? (
+            // ★V7：失敗を「ありません」と言わない。一覧の場所の1枚だけ出す。
+            <ListState
+              kind="error"
+              title="チケットを読み込めませんでした"
+              description="通信が切れたか、サーバが応えませんでした。"
+              onRetry={() => void loadList()}
+            />
           ) : tickets.length === 0 ? (
             <ListState kind="empty" title="チケットがありません" description="統括の管理画面「お問い合わせ」から送られると、ここに新規として並びます。" />
           ) : (
@@ -399,7 +422,7 @@ export default function OpsSupportPage() {
                         <span className="truncate">{t.staffName || '—'}</span>
                         <span className="ml-auto shrink-0 text-ink-faint">{elapsedLabel(t.lastMessageAt)}</span>
                       </span>
-                      <span className="mt-1 block truncate text-label font-bold text-ink">{t.subject}</span>
+                      <span className="mt-1 block truncate text-label font-medium text-ink">{t.subject}</span>
                       <span className="mt-1.5 flex items-center gap-1.5">
                         {stageChip(t.stage, t.stageLabel)}
                         {priorityChip(t.priority, t.priorityLabel)}
@@ -416,18 +439,26 @@ export default function OpsSupportPage() {
         {/* 右：内容と返信 */}
         <section aria-label="内容と返信" className={knowledgeStyles.supportDetail} data-design-node="UcEaZ">
           {!ticket ? (
-            detailLoading ? <ListState kind="loading" title="内容を読み込んでいます" /> : <ListState kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
+            detailLoading ? <ListState kind="loading" title="内容を読み込んでいます" /> : detailFailed ? (
+              // ★V7：詳細だけ落ちても外枠は落とさない。その場所の1枚だけ出す。
+              <ListState
+                kind="error"
+                title="内容を読み込めませんでした"
+                description="通信が切れたか、サーバが応えませんでした。"
+                onRetry={selectedId ? () => void loadDetail(selectedId) : undefined}
+              />
+            ) : <ListState kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
           ) : (
             <div className="grid gap-3">
               {/* 見出し行 */}
               <div className={knowledgeStyles.supportSubject}>
-                <span className="text-label font-bold text-ink-secondary">{ticket.ticketLabel}</span>
+                <span className="text-label font-medium text-ink-secondary">{ticket.ticketLabel}</span>
                 <h2 className="text-body font-bold text-ink">{ticket.subject}</h2>
                 {ticket.subjectAuto ? <Chip tone="neutral">自動で付けた件名</Chip> : null}
                 {priorityChip(ticket.priority, ticket.priorityLabel)}
                 {stageChip(ticket.stage, ticket.stageLabel)}
                 <span className="ml-auto flex items-center gap-2">
-                  <SelectField size="compact" aria-label="優先度を変える" value={ticket.priority} onChange={(e) => void changePriority(e.target.value as OpsSupportPriority)} options={PRIORITY_OPTIONS.slice(1)} />
+                  <Select size="page-size" aria-label="優先度を変える" value={ticket.priority} onChange={(value) => void changePriority(value as OpsSupportPriority)} options={PRIORITY_OPTIONS.slice(1)} />
                   {ticket.stage === 'resolved' || ticket.stage === 'closed' ? (
                     <Button size="field" disabled={busy} onClick={() => void changeStage('in_progress')}>対応中に戻す</Button>
                   ) : (
@@ -439,14 +470,15 @@ export default function OpsSupportPage() {
 
               {/* 問い合わせ元 */}
               <div className={knowledgeStyles.supportMeta}>
-                <Meta label="契約先"><Link href={tenantDetailHref(ticket.tenantId)} className="text-accent-deep underline-offset-2 hover:underline">{ticket.tenantName}</Link></Meta>
+                <Meta label="契約先"><Link href={tenantDetailHref(ticket.tenantId)} className="text-action underline-offset-2 hover:underline">{ticket.tenantName}</Link></Meta>
                 <Meta label="起票者">{ticket.staffName || '—'}{ticket.staffRole ? `（${ROLE_LABEL[ticket.staffRole] ?? ticket.staffRole}）` : ''}</Meta>
                 <Meta label="受付">{ticket.channel === 'admin' ? '管理画面のお問い合わせ' : ticket.channelLabel}</Meta>
                 <Meta label="プラン">{planLabel(ticket.tenantPlanKey)}・{PLAN_STATUS_LABEL[ticket.tenantPlanStatus] ?? ticket.tenantPlanStatus}</Meta>
                 <Meta label="店舗">{detail?.tenant.accountCount ?? 0}</Meta>
                 <Meta label="LINE登録">{detail ? `${detail.tenant.staffCount}人中${detail.tenant.staffWithLine}人` : '—'}</Meta>
-                <Meta label="過去のチケット">{detail ? `${detail.tenant.pastTickets}件（未解決 ${detail.tenant.pastOpen}）` : '—'}</Meta>
-                <span className="ml-auto flex items-center gap-2 self-center">
+                {/* m22d: 一覧の件数と重なる「○件」は出さない。未解決を先に言う。 */}
+                <Meta label="過去のチケット">{detail ? `これまで${detail.tenant.pastTickets}のうち未解決${detail.tenant.pastOpen}件` : '—'}</Meta>
+                <span className="col-span-full flex items-center justify-end gap-2">
                   <Button size="field" href={tenantDetailHref(ticket.tenantId)}>契約先を開く</Button>
                   <Button size="field" disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)}>代理ログイン</Button>
                 </span>
@@ -471,13 +503,13 @@ export default function OpsSupportPage() {
               {/* 返信 */}
               <div className={knowledgeStyles.supportReply} data-design-node={aiBusy ? 'XlTAd' : replyFromAi ? references.length > 0 ? 'RPjQ6' : 'b2uv3' : undefined}>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-label font-bold text-ink">返信</h3>
+                  <h3 className="text-label font-semibold text-ink">返信</h3>
                   {aiBusy ? (
                     <Chip tone="info">作成中…</Chip>
                   ) : replyFromAi ? (
                     <>
                       <Button size="field" onClick={() => void generateAi()} disabled={busy || !detail?.ai.available}>作り直す</Button>
-                      <Button size="field" onClick={() => void discardAi()} disabled={busy}>下書きを消す</Button>
+                      <Button size="field" onClick={() => void discardAi()} disabled={busy}>下書きを削除する</Button>
                     </>
                   ) : (
                     <Button size="field" onClick={() => void generateAi()} disabled={busy || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'}>
@@ -520,7 +552,7 @@ export default function OpsSupportPage() {
                     {ticket.staffEmailRegistered ? '' : '（起票者のメールが未登録のため、今回は履歴だけに載ります）'}
                   </p>
                   <span className="ml-auto flex items-center gap-2">
-                    <Button size="field" onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy}>{draftSaving ? '保存中…' : '下書き保存'}</Button>
+                    <Button size="field" onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
                     <Button size="field" variant="primary" onClick={() => void send()} disabled={busy || closed || aiBusy || !reply.trim()}>返信する</Button>
                   </span>
                 </div>
@@ -561,7 +593,7 @@ function Message({ side, author, at, body, attachments }: { side: 'left' | 'righ
       {attachments.length > 0 ? (
         <span className="flex flex-wrap gap-2">
           {attachments.map((a) => (
-            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-micro text-accent-deep underline-offset-2 hover:underline">
+            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-micro text-action underline-offset-2 hover:underline">
               <Paperclip aria-hidden="true" className="h-3.5 w-3.5" />
               {a.name}（{side === 'right' ? '運営から' : '契約先から'}）
             </a>

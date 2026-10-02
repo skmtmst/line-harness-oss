@@ -31,12 +31,27 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined
 vi.mock('@/components/shared/sticky-bar', () => ({
   default: ({ actions }: { actions: React.ReactNode }) => <div>{actions}</div>,
 }))
-vi.mock('@/lib/api', () => ({
-  webinarApi: {
-    folders: async () => ({ success: true, data: [] }),
-    create: fixture.create,
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ...actual,
+    webinarApi: {
+      folders: async () => ({ success: true, data: [] }),
+      create: fixture.create,
+    },
+  }
+})
+
+/* happy-dom に localStorage は無い。booking 配下と同じ memory stub を置く。 */
+const localStorageValues = new Map<string, string>()
+Object.defineProperty(window, 'localStorage', {
+  value: {
+    getItem: (key: string) => localStorageValues.get(key) ?? null,
+    setItem: (key: string, value: string) => { localStorageValues.set(key, String(value)) },
+    removeItem: (key: string) => { localStorageValues.delete(key) },
+    clear: () => { localStorageValues.clear() },
   },
-}))
+})
 
 let host: HTMLDivElement
 let root: Root
@@ -45,6 +60,8 @@ beforeEach(() => {
   fixture.push.mockClear()
   fixture.create.mockReset()
   fixture.create.mockResolvedValue({ success: true, data: { id: 'new-webinar' } })
+  /* 保存できる担当者として描く（D001 の権限出し分けの対象外）。 */
+  window.localStorage.setItem('lh_staff_role', 'owner')
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -86,7 +103,7 @@ describe('ウェビナー作成からの段遷移 (#1002 DETAIL-03)', () => {
   })
 
   it('作成に失敗したら遷移せず、入力した名前を残す', async () => {
-    fixture.create.mockRejectedValue(new Error('作成に失敗しました'))
+    fixture.create.mockRejectedValue(new Error('作成に失敗しました。通信を確かめて、もう一度お試しください。'))
     await render()
     await flush()
 

@@ -2,11 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { ChoiceCard } from '@/components/shared/create-page'
 import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
+import DateField from '@/components/shared/date-field'
 import Select from '@/components/shared/select'
 import { ApiError, api, type MileageAdjustmentPolicy } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 type Direction = 'increase' | 'decrease'
 type ReasonCategory = 'customer_support' | 'order_correction' | 'grant_correction' | 'campaign' | 'other'
@@ -61,7 +65,15 @@ export default function MileageAdjustmentDialog({
   const [policy, setPolicy] = useState<MileageAdjustmentPolicy | null>(null)
   const [policyLoading, setPolicyLoading] = useState(false)
   const [policyThresholdText, setPolicyThresholdText] = useState('')
-  const [step, setStep] = useState<'input' | 'confirm'>('input')
+  const [step, setStep] = useState<'input' | 'confirm' | 'requested' | 'completed'>('input')
+  /** R380: 残高は反映済みだが通知が失敗したときの結果。閉じずに知らせて再送へ進める。 */
+  const [completedResult, setCompletedResult] = useState<{
+    entryId: string
+    balanceAfter: number
+    notificationStatus: string | null
+    notificationErrorCode: string | null
+  } | null>(null)
+  const [retrying, setRetrying] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const idempotencyKey = useRef('')
@@ -82,6 +94,8 @@ export default function MileageAdjustmentDialog({
     setStep('input')
     setError('')
     setBusy(false)
+    setCompletedResult(null)
+    setRetrying(false)
     setPolicy(null)
     setPolicyThresholdText('')
     idempotencyKey.current = crypto.randomUUID()
@@ -108,9 +122,8 @@ export default function MileageAdjustmentDialog({
         ? '高額調整の承認境界が未設定です。下の欄で承認境界を設定してください。'
         : '高額調整の承認境界が未設定です。オーナーへ設定を依頼してください。'
     }
-    if (highValue) return `${policy?.approvalThreshold?.toLocaleString('ja-JP')} マイル以上は別のオーナー承認が必要です。`
     return null
-  }, [amount, canConfigurePolicy, currentBalance, direction, expiresOn, highValue, policy, policyLoading, reason, sourceReferenceId])
+  }, [amount, canConfigurePolicy, currentBalance, direction, expiresOn, policy, policyLoading, reason, sourceReferenceId])
 
   const submit = async () => {
     if (step === 'input') {
@@ -135,12 +148,58 @@ export default function MileageAdjustmentDialog({
         notifyFriend,
       }, idempotencyKey.current)
       if (!response.success) throw new Error(response.error)
+      // R: 境界以上はこの場では実行されず、別のオーナーへの承認依頼として残る。
+      if ('approvalRequired' in response.data) {
+        setStep('requested')
+        return
+      }
+      const notification = 'notification' in response.data ? response.data.notification : null
+      /*
+       * R380: 残高の反映と通知は別の結果。通知が失敗したときは警告なしに
+       * 閉じず、「反映済み・通知は未完了」と結果を分けて見せ、通知だけ
+       * 再送できる導線をこの場と履歴の両方へ残す。
+       */
+      if (notification && notification.status === 'failed') {
+        setCompletedResult({
+          entryId: response.data.entryId,
+          balanceAfter: response.data.balanceAfter,
+          notificationStatus: notification.status,
+          notificationErrorCode: notification.errorCode,
+        })
+        setStep('completed')
+        await onCompleted()
+        return
+      }
       await onCompleted()
       onCancel()
     } catch (caught) {
       setError(mileageAdjustmentErrorMessage(caught))
     } finally {
       setBusy(false)
+    }
+  }
+
+  /*
+   * R380/R381: 残高は動かさず、失敗した通知だけを再送する。
+   * 記録が作れなかった調整でも、サーバ側が依頼印を見て組み立て直す。
+   */
+  const retryNotification = async () => {
+    if (!completedResult) return
+    setRetrying(true)
+    setError('')
+    try {
+      const response = await api.mileage.retryMileageNotification(completedResult.entryId, { accountId })
+      if (!response.success) throw new Error(response.error)
+      const status = response.data.notification?.status ?? null
+      setCompletedResult({
+        ...completedResult,
+        notificationStatus: status,
+        notificationErrorCode: response.data.notification?.errorCode ?? null,
+      })
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : '通知を再送できませんでした。時間をおいてもう一度お試しください。')
+    } finally {
+      setRetrying(false)
     }
   }
 
@@ -172,7 +231,11 @@ export default function MileageAdjustmentDialog({
         description="記録に残ります。あとから理由をたどれるようにしてください。"
         busy={busy || policyLoading}
         error={error}
-        confirmLabel={step === 'input' ? '変更内容を確認' : `この内容で${direction === 'increase' ? '増やす' : '減らす'}`}
+        confirmLabel={step === 'input'
+          ? '変更内容を確認'
+          : highValue
+            ? 'この内容で承認を依頼する'
+            : `この内容で${direction === 'increase' ? '増やす' : '減らす'}`}
         cancelLabel={step === 'confirm' ? '入力に戻る' : 'キャンセル'}
         onConfirm={() => void submit()}
         onCancel={() => {
@@ -183,15 +246,62 @@ export default function MileageAdjustmentDialog({
             onCancel()
           }
         }}
+        footer={step === 'requested' ? (
+          <div className="flex justify-end">
+            <Button onClick={onCancel}>閉じる</Button>
+          </div>
+        ) : step === 'completed' ? (
+          <div className="flex justify-end gap-2">
+            {completedResult?.notificationStatus === 'failed' ? (
+              <Button variant="secondary" disabled={retrying} onClick={() => void retryNotification()} busy={retrying} busyLabel="通知を送り直しています…">通知をもう一度送る
+              </Button>
+            ) : null}
+            <Button onClick={onCancel}>閉じる</Button>
+          </div>
+        ) : undefined}
       >
         <div className="space-y-5">
           <section className="rounded-control bg-canvas-sunken p-4">
             <p className="text-xs font-semibold text-ink-faint">だれのマイルを動かしますか</p>
             <p className="mt-2 font-bold text-ink">{friendName}</p>
-            <p className="mt-1 text-sm text-ink-secondary">いまの残高 {currentBalance.toLocaleString('ja-JP')} マイル</p>
+            <p className="mt-1 text-sm text-ink-secondary">いまの残高 {formatNumber(currentBalance)} マイル</p>
           </section>
 
-          {step === 'input' ? (
+          {step === 'completed' ? (
+            <section aria-label="変更結果" className="space-y-3">
+              {completedResult?.notificationStatus === 'failed' ? (
+                <Notice tone="warn">
+                  {direction === 'increase' ? '増やした' : '減らした'}マイルは残高に反映済みです。
+                  友だちへのLINE通知は送れませんでした
+                  {completedResult.notificationErrorCode === 'delivery_unknown'
+                    ? '（送信したか確認できませんでした）'
+                    : ''}
+                  。残高をもう一度動かさずに、通知だけを送り直せます。
+                </Notice>
+              ) : (
+                <Notice tone="success">友だちへの通知を送り直しました。</Notice>
+              )}
+              <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
+                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">内容</dt><dd className="col-span-2 text-ink">{direction === 'increase' ? '増やす' : '減らす'} {formatNumber(amount)} マイル</dd></div>
+                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">変更後の残高</dt><dd className="col-span-2 font-semibold text-ink">{formatNumber(completedResult?.balanceAfter)} マイル</dd></div>
+                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">LINE通知</dt><dd className="col-span-2 text-ink">{completedResult?.notificationStatus === 'sent' ? '送信済み' : completedResult?.notificationStatus === 'pending' ? '送信中' : '未送信'}</dd></div>
+              </dl>
+              {completedResult?.notificationStatus === 'failed' ? (
+                <p className="text-xs text-ink-faint">閉じたあとも、履歴の行から通知だけを送り直せます。</p>
+              ) : null}
+            </section>
+          ) : step === 'requested' ? (
+            <section aria-label="承認の依頼が完了しました" className="space-y-3">
+              <Notice tone="info">
+                別のオーナーへの承認を依頼しました。この変更はまだ残高へ反映されていません。
+                承認されると記録され、依頼の内容は取り下げるまで残ります。
+              </Notice>
+              <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
+                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">内容</dt><dd className="col-span-2 text-ink">{direction === 'increase' ? '増やす' : '減らす'} {formatNumber(amount)} マイル</dd></div>
+                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">理由</dt><dd className="col-span-2 whitespace-pre-wrap text-ink">{reason.trim()}</dd></div>
+              </dl>
+            </section>
+          ) : step === 'input' ? (
             <>
               <div className="grid grid-cols-2 gap-3" aria-label="増やすか減らすか">
                 {(['increase', 'decrease'] as const).map((value) => (
@@ -205,9 +315,9 @@ export default function MileageAdjustmentDialog({
                 ))}
               </div>
               {direction === 'decrease' ? (
-                <p className="rounded-control bg-warning-bg p-3 text-xs leading-5 text-warning">
+                <Notice tone="warn">
                   残高より多くは減らせません。変更後の残高が0未満になる操作は実行しません。
-                </p>
+                </Notice>
               ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="マイル数" htmlFor="mileage-adjustment-amount" required>
@@ -225,21 +335,19 @@ export default function MileageAdjustmentDialog({
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="この分の有効期限" htmlFor="mileage-adjustment-expiration" note={direction === 'increase' ? '空欄なら期限なしです。' : '減らすときは指定できません。'}>
-                  <TextInput
+                  <DateField
                     id="mileage-adjustment-expiration"
-                    type="date"
                     value={expiresOn}
                     disabled={direction === 'decrease'}
-                    onChange={(event) => setExpiresOn(event.target.value)}
+                    onChange={setExpiresOn}
                   />
                 </Field>
-                <label className="flex items-start gap-2 rounded-control border border-hairline p-3 text-sm text-ink-secondary">
-                  <input type="checkbox" checked={notifyFriend} onChange={(event) => setNotifyFriend(event.target.checked)} className="mt-0.5" />
-                  <span>
-                    友だちに知らせる
-                    <span className="mt-1 block text-xs text-ink-faint">増減したマイルと変更後の残高をLINEで知らせます。</span>
-                  </span>
-                </label>
+                <Checkbox
+                  checked={notifyFriend}
+                  onCheckedChange={setNotifyFriend}
+                  description="増減したマイルと変更後の残高をLINEで知らせます。"
+                  className="rounded-control border border-hairline p-3"
+                >友だちに知らせる</Checkbox>
               </div>
               {!policyLoading && !policy?.configured && canConfigurePolicy ? (
                 <section className="rounded-control border border-warning bg-warning-bg p-3" aria-label="高額調整の承認境界を設定">
@@ -249,21 +357,21 @@ export default function MileageAdjustmentDialog({
                     <Field label="別のオーナー承認が必要になるマイル数" htmlFor="mileage-adjustment-threshold" required>
                       <TextInput id="mileage-adjustment-threshold" inputMode="numeric" value={policyThresholdText} onChange={(event) => setPolicyThresholdText(event.target.value.replace(/[^0-9]/g, ''))} />
                     </Field>
-                    <Button onClick={() => void configurePolicy()} disabled={busy}>承認境界を保存</Button>
+                    <Button onClick={() => void configurePolicy()} disabled={busy}>承認境界を保存する</Button>
                   </div>
                 </section>
               ) : null}
-              <p className="rounded-control bg-info-bg p-3 text-xs leading-5 text-ink-secondary">
+              <Notice tone="info">
                 通知の成否と有効期限は記録に残ります。自動通知なので、担当者からの個別返信としては扱いません。
-              </p>
+              </Notice>
             </>
           ) : (
             <section aria-label="変更内容の確認" className="space-y-3">
               <h3 className="text-sm font-bold text-ink">この変更で起きること</h3>
               <dl className="overflow-hidden rounded-panel border border-hairline text-sm">
-                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{currentBalance.toLocaleString('ja-JP')} マイル</dd></div>
-                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{delta > 0 ? '+' : ''}{delta.toLocaleString('ja-JP')} マイル</dd></div>
-                <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-bold text-ink">{balanceAfter.toLocaleString('ja-JP')} マイル</dd></div>
+                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{formatNumber(currentBalance)} マイル</dd></div>
+                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-medium text-danger' : 'font-medium text-accent-deep'}>{delta > 0 ? '+' : ''}{formatNumber(delta)} マイル</dd></div>
+                <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-medium text-ink">{formatNumber(balanceAfter)} マイル</dd></div>
               </dl>
               <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">理由区分</dt><dd className="col-span-2 text-ink">{reasonLabel}</dd></div>
@@ -272,9 +380,15 @@ export default function MileageAdjustmentDialog({
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">有効期限</dt><dd className="col-span-2 text-ink">{expiresOn || '期限なし'}</dd></div>
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">LINE通知</dt><dd className="col-span-2 text-ink">{notifyFriend ? '変更後に自動で知らせる' : '知らせない'}</dd></div>
               </dl>
-              <div className="rounded-control bg-warning-bg p-3 text-xs leading-5 text-warning">
+              {highValue ? (
+                <Notice tone="warn">
+                  {formatNumber(policy?.approvalThreshold)} マイル以上の変更は、この画面では実行されません。
+                  依頼した人とは別のオーナーが承認した時点で、残高へ反映されます。
+                </Notice>
+              ) : null}
+              <Notice tone="warn">
                 既存の履歴は書き換えず、理由と実行者を持つ新しい調整行を追加します。同じ操作を再送しても二重反映しません。
-              </div>
+              </Notice>
             </section>
           )}
         </div>

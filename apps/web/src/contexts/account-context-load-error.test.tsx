@@ -154,7 +154,7 @@ describe('アカウント一覧の取得失敗（Issue #978）', () => {
     // 「店舗が選ばれていません」ではなく、失敗と再読み込みが出る。
     expect(host.textContent).not.toContain('店舗が選ばれていません')
     expect(host.textContent).toContain('アカウント一覧を読み込めませんでした')
-    expect(byExactText('button', '再読み込み')).toBeTruthy()
+    expect(byExactText('button', 'もう一度読み込む')).toBeTruthy()
     expect(host.querySelector('[data-probe="children"]')).toBeNull()
   })
 
@@ -178,7 +178,7 @@ describe('アカウント一覧の取得失敗（Issue #978）', () => {
     storage.setItem('lh_selected_account', ACCOUNT.id)
     api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT] })
 
-    const retry = byExactText('button', '再読み込み')
+    const retry = byExactText('button', 'もう一度読み込む')
     expect(retry).toBeTruthy()
     await act(async () => { retry!.click() })
 
@@ -228,7 +228,7 @@ describe('アカウント一覧の取得失敗（Issue #978）', () => {
 
     await eventually(() => {
       expect(probe('error').textContent).toBe('server error')
-      expect(byExactText('button', '再読み込み')).toBeTruthy()
+      expect(byExactText('button', 'もう一度読み込む')).toBeTruthy()
     })
   })
 
@@ -248,14 +248,14 @@ describe('アカウント一覧の取得失敗（Issue #978）', () => {
 
     await eventually(() => {
       expect(host.textContent).toContain('アカウント一覧を読み込めませんでした')
-      expect(byExactText('button', '再読み込み')).toBeTruthy()
+      expect(byExactText('button', 'もう一度読み込む')).toBeTruthy()
     })
     // 失敗を「アカウントなし」と読み違えて /hq へ飛ばさない。
     expect(router.replace).not.toHaveBeenCalled()
 
     // 再読み込みで1件取れたら、その店舗が選ばれてダッシュボードが出る。
     api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT] })
-    await act(async () => { byExactText('button', '再読み込み')!.click() })
+    await act(async () => { byExactText('button', 'もう一度読み込む')!.click() })
     await eventually(() => {
       expect(host.querySelector('[data-probe="children"]')).toBeTruthy()
     })

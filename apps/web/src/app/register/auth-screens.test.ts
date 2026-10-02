@@ -78,4 +78,25 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
     expect(lib).toContain('NEXT_PUBLIC_PRIVACY_URL')
     expect(read('components/auth/auth-card.tsx')).toContain('if (!href) return <span>')
   })
+
+  it('文書の公開先が未設定のときは、説明なしに同意だけを求めない（R169）', () => {
+    const page = read('app/register/page.tsx')
+    // 開けない文書への同意を求める代わりに、まだ公開されていないことと
+    // ログイン不要の確認口（お問い合わせ）を添える。
+    expect(page).toContain('!LEGAL_LINKS.terms || !LEGAL_LINKS.privacy')
+    expect(page).toContain('文書のページはまだ公開されていません')
+    expect(page).toContain('href={CONTACT_URL}')
+  })
+
+  it('ログイン前のお問い合わせはサービスサイトの /contact/ へ（監査 m18e）', () => {
+    // /hq/support はログインが要り、未ログインではログイン画面へ戻される。
+    // 新しい公開フォームは作らない。URL は環境変数で変えられる。
+    const lib = read('lib/auth-email.ts')
+    expect(lib).toContain('NEXT_PUBLIC_CONTACT_URL')
+    expect(lib).toContain('/contact/')
+    const card = read('components/auth/auth-card.tsx')
+    expect(card).toContain('CONTACT_URL')
+    expect(card).toContain('target="_blank"')
+    expect(card).not.toContain('href="/hq/support"')
+  })
 })

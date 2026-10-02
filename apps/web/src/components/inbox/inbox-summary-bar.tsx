@@ -1,8 +1,8 @@
 'use client'
 
 import { formatDurationMinutes } from '@/lib/format-duration'
+import { formatNumber } from '@/lib/format'
 
-const fmt = new Intl.NumberFormat('ja-JP')
 
 function formatOldest(min: number | null): string {
   if (min == null) return '—'
@@ -18,18 +18,18 @@ interface Props {
 export default function InboxSummaryBar({ total, byAccount, oldestWaitMinutes }: Props) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <Card label="未対応" value={fmt.format(total)} hint="人間の返事待ち" />
+      <Card label="未対応" value={formatNumber(total)} hint="人間の返事待ち" />
       <Card label="最古の待ち時間" value={formatOldest(oldestWaitMinutes)} hint="最も古い incoming" />
-      <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200">
-        <div className="text-xs font-medium text-gray-500">アカウント別</div>
+      <div className="rounded-control bg-canvas p-4 shadow-card ring-1 ring-hairline">
+        <div className="text-xs font-medium text-ink-faint">アカウント別</div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {byAccount.length === 0 ? (
-            <span className="text-xs text-gray-400">—</span>
+            <span className="text-xs text-ink-faint">—</span>
           ) : (
             byAccount.map((a) => (
               <span
                 key={a.accountId}
-                className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"
+                className="rounded-pill bg-accent-soft px-2 py-0.5 text-xs font-medium text-success"
               >
                 {a.accountName} {a.count}
               </span>
@@ -43,10 +43,10 @@ export default function InboxSummaryBar({ total, byAccount, oldestWaitMinutes }:
 
 function Card({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200">
-      <div className="text-xs font-medium text-gray-500">{label}</div>
-      <div className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{value}</div>
-      {hint ? <div className="mt-1 text-xs text-gray-400">{hint}</div> : null}
+    <div className="rounded-control bg-canvas p-4 shadow-card ring-1 ring-hairline">
+      <div className="text-xs font-medium text-ink-faint">{label}</div>
+      <div className="mt-1 text-2xl font-bold tabular-nums text-ink">{value}</div>
+      {hint ? <div className="mt-1 text-xs text-ink-faint">{hint}</div> : null}
     </div>
   )
 }

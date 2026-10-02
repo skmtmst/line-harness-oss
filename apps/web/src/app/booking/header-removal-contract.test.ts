@@ -21,8 +21,8 @@ describe('Issue #450 本文上部の旧Headerを外す', () => {
 
   it('設計にある操作はパンくずの近くへ残す', () => {
     expect(targets[0][1]).toContain('電話の予約を入れる')
-    expect(targets[2][1]).toContain('変更を保存')
-    expect(targets[3][1]).toContain('+ 新規スタッフ')
+    expect(targets[2][1]).toContain('保存する')
+    expect(targets[3][1]).toContain('＋ スタッフを作る')
     expect(targets[4][1]).toContain('申込の一覧を見る')
   })
 })

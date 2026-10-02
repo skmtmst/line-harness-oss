@@ -21,11 +21,11 @@ describe('V6共通トップバー', () => {
 
   it('高さ・地色・下線をV6の値に固定する', () => {
     expect(css).toContain('height: 56px;')
-    expect(css).toContain('background: var(--color-surface-chrome);')
+    expect(css).toContain('background: var(--color-shell-gray);')
     expect(css).toContain('border-bottom: 1px solid var(--color-hairline);')
     // 画面名は $size-title(20)。素の 20px ではなくトークンで書く。
     expect(css).toContain('font-size: var(--text-title);')
-    expect(css).toContain('font-weight: 700;')
+    expect(css).toContain('font-weight: 600;')
   })
 
   it('押せる要素のキーボードフォーカスを消さない', () => {

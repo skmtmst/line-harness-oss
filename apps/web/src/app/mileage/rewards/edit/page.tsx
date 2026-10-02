@@ -3,18 +3,22 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Card, { CardHeader } from '@/components/shared/card'
 import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
+import DateTimeField from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { localDateTime, utcDateTime } from '@/lib/presentation'
-import { validateReward, type FormState } from './reward-form'
+import { LIMIT_FIELD_ERRORS, normalizeDigits, optionalInteger, validateReward, type FormState } from './reward-form'
 import {
   api,
   ApiError,
@@ -24,6 +28,7 @@ import {
   type MileageRewardSummary,
   type MileageRewardTestResult,
 } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 type CommonActionOption = { id: string; label: string }
 
@@ -107,12 +112,15 @@ function isMileageRewardSummary(value: unknown): value is MileageRewardSummary {
     && (candidate.currentVersion === null || typeof candidate.currentVersion === 'object')
 }
 
-/** 空文字は `null`（限りなし・決めない）。**0 を null に潰さない。** */
+/*
+ * R298: 空欄だけが `null`（限りなし・決めない）。0 は潰さない。
+ * 数にならない入力は検証で止まるはずだが、万一ここへ来ても
+ * 「無制限」へ黙って潰さず失敗にする。
+ */
 function numberOrNull(value: string): number | null {
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  const parsed = Number(trimmed)
-  return Number.isFinite(parsed) ? parsed : null
+  const parsed = optionalInteger(value)
+  if (parsed === undefined) throw new Error('数の限り・上限・日数の入力を確認してください')
+  return parsed
 }
 
 function draftOf(form: FormState): MileageRewardDraftInput {
@@ -149,6 +157,11 @@ function MileageRewardEditorInner() {
   const [commonActions, setCommonActions] = useState<CommonActionOption[]>([])
   const [commonActionsFailed, setCommonActionsFailed] = useState(false)
   const [touched, setTouched] = useState(false)
+  /*
+   * 未保存の基準。作るときは空欄、なおすときは読み直した値。
+   * 下書き・交換テストの保存が通るたびに今の入力へ進める。
+   */
+  const [baseline, setBaseline] = useState(() => JSON.stringify(EMPTY))
   usePageTitle(editing ? '使い道を編集' : '使い道をつくる')
 
   const load = useCallback(async () => {
@@ -165,7 +178,9 @@ function MileageRewardEditorInner() {
       const found = detail?.success && isMileageRewardSummary(detail.data) ? detail.data : fallback
       if (!found) throw new Error('failed')
       setReward(found)
-      setForm(formOf(found))
+      const loaded = formOf(found)
+      setForm(loaded)
+      setBaseline(JSON.stringify(loaded))
       setState('ready')
     } catch (err) {
       /* 権限不足は取得失敗と別。次にすることが違う。 */
@@ -210,15 +225,19 @@ function MileageRewardEditorInner() {
     let saved
     if (rewardId) {
       let expectedVersionId = reward?.currentDraftVersionId
-      if (!expectedVersionId) {
+      let expectedRevision = reward?.currentVersion?.revision
+      if (!expectedVersionId || expectedRevision == null) {
         const createdDraft = await api.mileage.createRewardDraft(rewardId, selectedAccountId)
         if (!createdDraft.success || !createdDraft.data.currentDraftVersionId) throw new Error('failed')
         expectedVersionId = createdDraft.data.currentDraftVersionId
+        expectedRevision = createdDraft.data.currentVersion?.revision
       }
+      if (expectedRevision == null) throw new Error('failed')
       saved = await api.mileage.saveRewardDraft(
         rewardId,
         selectedAccountId,
         expectedVersionId,
+        expectedRevision,
         draft,
       )
     } else {
@@ -226,6 +245,7 @@ function MileageRewardEditorInner() {
     }
     if (!saved.success) throw new Error('failed')
     setReward(saved.data)
+    setBaseline(JSON.stringify(form))
     if (!rewardId) router.replace(`/mileage/rewards/edit?id=${encodeURIComponent(saved.data.id)}`)
     return saved.data
   }
@@ -238,7 +258,13 @@ function MileageRewardEditorInner() {
     try {
       const saved = await persistDraft()
       if (thenPublish) {
-        const published = await api.mileage.publishReward(saved.id, selectedAccountId)
+        /* 保存したての版と更新番号を添えて、途中の別保存とすれ違わない。 */
+        const published = await api.mileage.publishReward(
+          saved.id,
+          selectedAccountId,
+          saved.currentDraftVersionId ?? saved.currentVersion?.id,
+          saved.currentVersion?.revision,
+        )
         if (!published.success) throw new Error('failed')
       }
       setPublishOpen(false)
@@ -282,6 +308,16 @@ function MileageRewardEditorInner() {
     }
   }
 
+  /*
+   * つくる・なおし途中の離脱確認。基準（空欄または読み直した値・保存ずみ）
+   * から変わっていたら、キャンセルや左メニューで確認窓を出す。
+   * 保存・公開が終わると一覧へ router.push するので、成功後に警告は出ない。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: JSON.stringify(form) !== baseline,
+    busy: saving || testing,
+  })
+
   if (state === 'loading') return <ListState kind="loading" title="使い道を読み込んでいます" />
   if (state === 'forbidden') {
     return <ListState kind="forbidden" title="使い道を編集する権限がありません" description="このLINEアカウントの使い道は、オーナーか管理者だけが扱えます。" />
@@ -311,7 +347,7 @@ function MileageRewardEditorInner() {
           className={`rounded-control px-4 py-3 text-sm ${testResult.canDeliver ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}
         >
           {testResult.canDeliver
-            ? `交換テストに合格しました。${testResult.requiredMiles.toLocaleString('ja-JP')}マイルで受け渡せます。残高と在庫は動かしていません。`
+            ? `交換テストに合格しました。${formatNumber(testResult.requiredMiles)}マイルで受け渡せます。残高と在庫は動かしていません。`
             : `交換テストで確認が必要です。${testResult.warning ?? '受け渡す内容を確認してください'}。残高と在庫は動かしていません。`}
         </div>
       ) : null}
@@ -347,29 +383,21 @@ function MileageRewardEditorInner() {
             **並べたタイルで選ぶ**（設計 `p9CcEB`）。選び口に畳むと、
             何が渡るのかを1つずつ開いて確かめることになる。
           */}
-          <div role="radiogroup" aria-label="渡すもの" className="grid gap-2 sm:grid-cols-2">
+          <RadioCardGroup legend="渡すもの" className="grid gap-2 sm:grid-cols-2">
             {KINDS.map((kind) => {
               return (
-                <label
+                <RadioCard
                   key={kind.value}
-                  className="block cursor-pointer"
-                >
-                  <input
-                    type="radio"
-                    name="reward-kind"
-                    value={kind.value}
-                    checked={form.rewardKind === kind.value}
-                    onChange={() => set('rewardKind', kind.value)}
-                    className="peer sr-only"
-                  />
-                  <span className="rounded-control border-hairline bg-canvas block border p-3 text-left hover:bg-canvas-sunken peer-checked:border-accent peer-checked:bg-accent-soft peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent-deep">
-                    <span className="text-ink block text-sm font-bold">{kind.label}</span>
-                    <span className="text-ink-faint mt-0.5 block text-xs">{kind.note}</span>
-                  </span>
-                </label>
+                  name="reward-kind"
+                  value={kind.value}
+                  checked={form.rewardKind === kind.value}
+                  onChange={() => set('rewardKind', kind.value)}
+                  title={kind.label}
+                  note={kind.note}
+                />
               )
             })}
-          </div>
+          </RadioCardGroup>
           <div className="mt-4">
             <Field
               label="交換後に渡すもの"
@@ -406,21 +434,21 @@ function MileageRewardEditorInner() {
             **「限りなし」と「品切れ」を混ぜない。** 空欄は限りなし、0 は品切れ。
             同じ見た目にすると、出したつもりのものが誰にも交換できない。
           */}
-          <Field label="数の限り" htmlFor="reward-stock" note="空欄なら限りなし。0 と書くと品切れ（交換できません）">
-            <TextInput id="reward-stock" inputMode="numeric" value={form.stockLimit} onChange={(e) => set('stockLimit', e.target.value)} placeholder="限りなし" />
+          <Field label="数の限り" htmlFor="reward-stock" note="空欄なら限りなし。0 と書くと品切れ（交換できません）" error={touched && errors.includes(LIMIT_FIELD_ERRORS.stockLimit) ? LIMIT_FIELD_ERRORS.stockLimit : undefined}>
+            <TextInput id="reward-stock" inputMode="numeric" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="限りなし" />
           </Field>
-          <Field label="1人あたりの上限" htmlFor="reward-per-friend" note="空欄なら何回でも">
-            <TextInput id="reward-per-friend" inputMode="numeric" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', e.target.value)} placeholder="制限なし" />
+          <Field label="1人あたりの上限" htmlFor="reward-per-friend" note="空欄なら何回でも" error={touched && errors.includes(LIMIT_FIELD_ERRORS.perFriendLimit) ? LIMIT_FIELD_ERRORS.perFriendLimit : undefined}>
+            <TextInput id="reward-per-friend" inputMode="numeric" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', normalizeDigits(e.target.value))} placeholder="制限なし" />
           </Field>
           <Field label="交換できる期間" htmlFor="reward-starts" note="空欄ならいつでも" error={touched && errors.includes('交換終了は交換開始より後にしてください') ? '交換終了は交換開始より後にしてください' : undefined}>
             <div className="flex flex-wrap items-center gap-2">
-              <TextInput id="reward-starts" type="datetime-local" value={form.startsAt} onChange={(e) => set('startsAt', e.target.value)} />
+              <DateTimeField id="reward-starts" value={form.startsAt} onChange={(v) => set('startsAt', v)} />
               <span className="text-ink-faint text-xs">から</span>
-              <TextInput aria-label="交換終了" type="datetime-local" value={form.endsAt} onChange={(e) => set('endsAt', e.target.value)} />
+              <DateTimeField aria-label="交換終了" value={form.endsAt} onChange={(v) => set('endsAt', v)} />
             </div>
           </Field>
-          <Field label="交換後に使える日数" htmlFor="reward-expires" note="空欄なら期限なし">
-            <TextInput id="reward-expires" inputMode="numeric" value={form.benefitExpiresDays} onChange={(e) => set('benefitExpiresDays', e.target.value)} placeholder="期限なし" />
+          <Field label="交換後に使える日数" htmlFor="reward-expires" note="空欄なら期限なし" error={touched && errors.includes(LIMIT_FIELD_ERRORS.benefitExpiresDays) ? LIMIT_FIELD_ERRORS.benefitExpiresDays : undefined}>
+            <TextInput id="reward-expires" inputMode="numeric" value={form.benefitExpiresDays} onChange={(e) => set('benefitExpiresDays', normalizeDigits(e.target.value))} placeholder="期限なし" />
           </Field>
         </Card>
 
@@ -466,11 +494,9 @@ function MileageRewardEditorInner() {
         actions={(
           <>
             <Button href="/mileage?tab=rewards">キャンセル</Button>
-            <Button onClick={() => void testExchange()} disabled={saving || testing}>
-              {testing ? '交換テスト中' : '自分で交換をテスト'}
+            <Button onClick={() => void testExchange()} disabled={saving || testing} busy={testing} busyLabel="交換テスト中">自分で交換をテスト
             </Button>
-            <Button onClick={() => void save(false)} disabled={saving || testing}>
-              {saving ? '保存中' : '下書きを保存'}
+            <Button onClick={() => void save(false)} disabled={saving || testing} busy={saving} busyLabel="保存中">下書きを保存する
             </Button>
             <Button variant="primary" onClick={requestPublish} disabled={saving || testing}>
               保存して出す
@@ -488,6 +514,7 @@ function MileageRewardEditorInner() {
         onCancel={() => setPublishOpen(false)}
         onConfirm={() => void save(true)}
       />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した使い道" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

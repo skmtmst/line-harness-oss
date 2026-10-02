@@ -99,7 +99,8 @@ describe('運用異常alertのライフサイクル', () => {
 
     await observe('normal', 'run-resolved', '2026-09-16T00:15:00.000Z');
     expect(await listOperationAlerts(db, { lineAccountId: 'account-1' })).toEqual([]);
-    await observe('warning', 'run-reopened', '2026-09-16T00:20:00.000Z');
+    // 解消の直後（30分以内）の再発は通知をまとめるので、各actionの積み増しを見るこの試験では窓の外に置く。
+    await observe('warning', 'run-reopened', '2026-09-16T00:55:00.000Z');
 
     [alert] = await listOperationAlerts(db, { lineAccountId: 'account-1', includeResolved: true });
     expect(alert).toMatchObject({
@@ -122,10 +123,10 @@ describe('運用異常alertのライフサイクル', () => {
        VALUES ('owner-1', 'Owner', 'owner@example.test', 'owner', 'key-owner', 'tenant-1')`,
     ).run();
     await enqueuePendingOperationAlertNotifications(db, {
-      lineAccountId: 'account-1', now: '2026-09-16T00:21:00.000Z',
+      lineAccountId: 'account-1', now: '2026-09-16T00:56:00.000Z',
     });
     await enqueuePendingOperationAlertNotifications(db, {
-      lineAccountId: 'account-1', now: '2026-09-16T00:22:00.000Z',
+      lineAccountId: 'account-1', now: '2026-09-16T00:57:00.000Z',
     });
     expect(sqlite.prepare(
       `SELECT e.action, COUNT(*) AS count

@@ -104,6 +104,10 @@ describe('NEN account settings', () => {
     const { db, jobs } = database();
     const base = await getNenCampaign(db, 'arrival_check', 'account-a');
     await saveNenCampaignAccountSetting(db, 'account-a', { ...base!, title: 'A店の予約時見出し' });
+    // NEN-07: 既定の review_request は「回答者を除く」ONだがフォーム未選択の
+    // ため設定不足=jobを積まない。除外を外した通常状態にして件数をそろえる。
+    const review = await getNenCampaign(db, 'review_request', 'account-a');
+    await saveNenCampaignAccountSetting(db, 'account-a', { ...review!, exclude_form_respondents: 0 });
 
     const created = await enqueuePostShippingFollowUps(db, {
       event_id: 'event-1', event_type: 'ec.order.shipped', occurred_at: '2026-08-28T01:00:00Z',

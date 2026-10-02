@@ -1,4 +1,4 @@
-import type { AutoReply } from './auto-replies.js';
+import type { AutoReply, CreateAutoReplyInput } from './auto-replies.js';
 import { jstNow } from './utils.js';
 
 export type AutoReplyEvaluationStatus =
@@ -257,15 +257,292 @@ export async function getAutoReplyPublishedVersion(
   ).bind(autoReplyId).first<AutoReplyVersionRow>();
 }
 
+/**
+ * 一覧・詳細の応答に載せる社内メモ。編集画面と同じ版（下書きを優先し、
+ * 無ければ公開版）のスナップショットから読む。版が無い・壊れている
+ * ルールはメモ無しとして扱う。
+ */
+export async function getAutoReplyInternalMemos(
+  db: D1Database,
+  autoReplyIds: string[],
+): Promise<Map<string, string | null>> {
+  const memos = new Map<string, string | null>();
+  if (autoReplyIds.length === 0) return memos;
+  const rows = await db.prepare(
+    `SELECT arv.auto_reply_id AS auto_reply_id, arv.definition_snapshot AS definition_snapshot
+       FROM auto_replies ar
+       JOIN auto_reply_versions arv
+         ON arv.id = COALESCE(ar.current_draft_version_id, ar.current_published_version_id)
+      WHERE ar.id IN (${autoReplyIds.map(() => '?').join(',')})`,
+  ).bind(...autoReplyIds).all<{ auto_reply_id: string; definition_snapshot: string }>();
+  for (const row of rows.results ?? []) {
+    try {
+      const parsed = JSON.parse(row.definition_snapshot) as { internalMemo?: unknown };
+      memos.set(
+        row.auto_reply_id,
+        typeof parsed.internalMemo === 'string' && parsed.internalMemo !== ''
+          ? parsed.internalMemo
+          : null,
+      );
+    } catch {
+      memos.set(row.auto_reply_id, null);
+    }
+  }
+  return memos;
+}
+
+/**
+ * 社内メモは auto_replies に列を持たず、版のスナップショット
+ * （definition_snapshot）にだけ置く。編集画面が読む版（下書きを優先し、
+ * 無ければ公開版）へ書き込み、版がまだ無いルールには公開版を1つ作る。
+ * 停止中に作られたルールは実行されず ensureAutoReplyPublishedVersion が
+ * 走らないため、ここで版を確保しないとメモの置き場が無い（AUTOREPLY-09）。
+ *
+ * 公開済みの版は実行記録から参照されるため definition_snapshot は不変
+ * （trg_auto_reply_versions_immutable_update）。公開版のメモを変えるときは
+ * 旧版を retired へ進め、実行中の定義＋新しいメモを持つ新版へ張り替える。
+ * 下書きは未公開の作業中なので、そのまま書き換えてよい。
+ */
+/**
+ * m26c R569/R570: 社内メモの書込文だけを組み立てて返す。呼び出し側が
+ * ルール行・参照表と1回の batch に束ね、途中失敗で食い違わないようにする。
+ */
+export async function planAutoReplyInternalMemoStatements(
+  db: D1Database,
+  rule: AutoReply,
+  internalMemo: string | null,
+): Promise<{ statements: D1PreparedStatement[]; draftUpdated: boolean; versionId: string | null }> {
+  const now = jstNow();
+  const draft = await getAutoReplyDraftVersion(db, rule.id);
+  if (draft) {
+    const snapshot = JSON.parse(draft.definition_snapshot) as Record<string, unknown>;
+    snapshot.internalMemo = internalMemo;
+    return {
+      statements: [
+        db.prepare(
+          `UPDATE auto_reply_versions
+              SET definition_snapshot = ?, updated_at = ?
+            WHERE id = ?`,
+        ).bind(JSON.stringify(snapshot), now, draft.id),
+      ],
+      draftUpdated: true,
+      versionId: draft.id,
+    };
+  }
+
+  const published = await getAutoReplyPublishedVersion(db, rule.id);
+  // 実行中の定義は auto_replies の現行値。版にしか無い設定
+  // （受信経路・遅延・未一致時の別動作）は、消えないよう直前の版から引き継ぐ。
+  const previous = published ? parseAutoReplyVersionSettings(published) : null;
+  const snapshot = JSON.stringify({
+    ...autoReplyDraftSettingsFromRow(rule),
+    receiveSources: previous?.receiveSources ?? ['line'],
+    internalMemo,
+    replyDelaySeconds: previous?.replyDelaySeconds ?? null,
+    unmatchedAction: previous?.unmatchedAction ?? null,
+  });
+  const next = await db.prepare(
+    `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
+       FROM auto_reply_versions WHERE auto_reply_id = ?`,
+  ).bind(rule.id).first<{ version_number: number }>();
+  const versionId = crypto.randomUUID();
+  return {
+    versionId,
+    statements: [
+      db.prepare(
+        `UPDATE auto_reply_versions SET status = 'retired', updated_at = ?
+          WHERE auto_reply_id = ? AND status = 'published'`,
+      ).bind(now, rule.id),
+      db.prepare(
+        `INSERT INTO auto_reply_versions
+           (id, auto_reply_id, version_number, line_account_id, definition_snapshot,
+            status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'published', ?, ?)`,
+      ).bind(
+        versionId,
+        rule.id,
+        Number(next?.version_number ?? 1),
+        rule.line_account_id,
+        snapshot,
+        now,
+        now,
+      ),
+      db.prepare(
+        `UPDATE auto_replies SET current_published_version_id = ? WHERE id = ?`,
+      ).bind(versionId, rule.id),
+    ],
+    draftUpdated: false,
+  };
+}
+
+export async function saveAutoReplyInternalMemo(
+  db: D1Database,
+  rule: AutoReply,
+  internalMemo: string | null,
+): Promise<void> {
+  const planned = await planAutoReplyInternalMemoStatements(db, rule, internalMemo);
+  await db.batch(planned.statements);
+}
+
+/**
+ * m26c R556/R570: 作成・複製の要求キー台帳（migration 543）。
+ * 直接作成（'rule'）と下書き付き作成（'draft'）を同じ表で受け、同じ
+ * Idempotency-Key の再送は保存済みを返し、異なる内容・別操作の使い回しは
+ * 作らず止める。共通ルールの所属は NULL でも重複を防げるよう、
+ * キーは表全体で一意にする。
+ */
+export type AutoReplyCreateOperation = 'rule' | 'draft';
+
+export interface AutoReplyCreateIdempotency {
+  key: string;
+  fingerprint: string;
+}
+
+interface AutoReplyCreateClaim {
+  operation: string;
+  request_fingerprint: string;
+  auto_reply_id: string;
+  version_id: string | null;
+}
+
+/** auto-replies.ts との循環参照を避けるための最小取得。 */
+async function getClaimRuleById(db: D1Database, id: string): Promise<AutoReply | null> {
+  return db.prepare(`SELECT * FROM auto_replies WHERE id = ? AND deleted_at IS NULL`)
+    .bind(id)
+    .first<AutoReply>();
+}
+
+export async function findAutoReplyCreateClaim(
+  db: D1Database,
+  key: string,
+): Promise<AutoReplyCreateClaim | null> {
+  return db.prepare(
+    `SELECT operation, request_fingerprint, auto_reply_id, version_id
+       FROM auto_reply_create_requests WHERE idempotency_key = ?`,
+  ).bind(key).first<AutoReplyCreateClaim>();
+}
+
+/** 保存済みの要求と突き合わせる。作り直すときは古い予約を消して null を返す。 */
+export async function resolveAutoReplyCreateClaim(
+  db: D1Database,
+  key: string,
+  previous: AutoReplyCreateClaim,
+  operation: AutoReplyCreateOperation,
+  fingerprint: string,
+): Promise<AutoReply | null> {
+  if (previous.operation !== operation) throw new Error('AUTO_REPLY_IDEMPOTENCY_OPERATION_CONFLICT');
+  if (previous.request_fingerprint !== fingerprint) throw new Error('AUTO_REPLY_IDEMPOTENCY_CONFLICT');
+  const rule = await getClaimRuleById(db, previous.auto_reply_id);
+  if (rule) return rule;
+  await db.prepare(`DELETE FROM auto_reply_create_requests WHERE idempotency_key = ?`)
+    .bind(key).run();
+  return null;
+}
+
+export function autoReplyCreateClaimStatement(
+  db: D1Database,
+  operation: AutoReplyCreateOperation,
+  lineAccountId: string | null,
+  idempotency: AutoReplyCreateIdempotency,
+  autoReplyId: string,
+  versionId: string | null,
+  now: string,
+): D1PreparedStatement {
+  return db.prepare(
+    `INSERT INTO auto_reply_create_requests
+       (id, line_account_id, operation, idempotency_key, request_fingerprint,
+        auto_reply_id, version_id, response_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(),
+    lineAccountId,
+    operation,
+    idempotency.key,
+    idempotency.fingerprint,
+    autoReplyId,
+    versionId,
+    JSON.stringify({ autoReplyId, versionId }),
+    now,
+  );
+}
+
+/**
+ * 直接作成の内容指紋。1文字でも違えば別の要求とみなし、作らず止める。
+ * 呼び出し側（Worker）がテンプレート解決後の値を渡すため、再送の突き合わせは
+ * 解決後の内容で行う。
+ */
+export function autoReplyRuleCreateFingerprint(input: CreateAutoReplyInput): string {
+  return JSON.stringify({
+    keyword: input.keyword,
+    matchType: input.matchType ?? 'exact',
+    responseType: input.responseType ?? 'text',
+    responseContent: input.responseContent,
+    templateId: input.templateId ?? null,
+    lineAccountId: input.lineAccountId ?? null,
+    isActive: input.isActive === true,
+    activeFrom: input.activeFrom ?? null,
+    activeUntil: input.activeUntil ?? null,
+    cooldownMinutes: input.cooldownMinutes ?? null,
+    skipWhenOperatorActive: input.skipWhenOperatorActive === true,
+    priority: input.priority ?? 0,
+    messageKinds: input.messageKinds ?? null,
+    actions: input.actions ?? null,
+    responseWeekdays: input.responseWeekdays ?? null,
+    responseHolidayRule: input.responseHolidayRule ?? null,
+    oncePerFriend: input.oncePerFriend === true,
+    keywords: input.keywords ?? null,
+    friendConditions: input.friendConditions ?? null,
+    respondToAll: input.respondToAll === true,
+    name: input.name ?? null,
+    keywordMatchMode: input.keywordMatchMode ?? 'any',
+    folderId: input.folderId ?? null,
+    internalMemo: input.internalMemo ?? null,
+  });
+}
+
 /** 新規定義と下書き版を1回のbatchで作る。作成時点では評価対象にしない。 */
 export async function createAutoReplyWithDraftVersion(
   db: D1Database,
   settings: AutoReplyDraftSettings,
-): Promise<{ rule: AutoReply; version: AutoReplyVersionRow }> {
+  idempotency?: AutoReplyCreateIdempotency,
+): Promise<{ rule: AutoReply; version: AutoReplyVersionRow; replayed: boolean }> {
+  if (idempotency) {
+    const previous = await findAutoReplyCreateClaim(db, idempotency.key);
+    if (previous) {
+      const matched = await resolveAutoReplyCreateClaim(
+        db,
+        idempotency.key,
+        previous,
+        'draft',
+        idempotency.fingerprint,
+      );
+      if (matched) {
+        const version = await getAutoReplyDraftVersion(db, matched.id)
+          ?? await getAutoReplyPublishedVersion(db, matched.id);
+        if (version) return { rule: matched, version, replayed: true };
+        await db.prepare(`DELETE FROM auto_reply_create_requests WHERE idempotency_key = ?`)
+          .bind(idempotency.key).run();
+      }
+    }
+  }
   const autoReplyId = crypto.randomUUID();
   const versionId = crypto.randomUUID();
   const now = jstNow();
-  await db.batch([
+  const claimStatements = idempotency
+    ? [
+      autoReplyCreateClaimStatement(
+        db,
+        'draft',
+        settings.lineAccountId,
+        idempotency,
+        autoReplyId,
+        versionId,
+        now,
+      ),
+    ]
+    : [];
+  try {
+    await db.batch([
     db.prepare(
       `INSERT INTO auto_replies
          (id, keyword, match_type, response_type, response_content,
@@ -317,20 +594,45 @@ export async function createAutoReplyWithDraftVersion(
       now,
       now,
     ),
-  ]);
+    ...claimStatements,
+    ]);
+  } catch (err) {
+    // 同時に同じキーが確定した可能性がある。勝った側の結果に従い、
+    // 勝者がいなければ元の失敗をそのまま返す（握りつぶさない）。
+    if (idempotency) {
+      const raced = await findAutoReplyCreateClaim(db, idempotency.key).catch(() => null);
+      if (raced?.operation === 'draft' && raced.request_fingerprint === idempotency.fingerprint) {
+        const winnerRule = await getClaimRuleById(db, raced.auto_reply_id).catch(() => null);
+        const winnerVersion = winnerRule
+          ? await getAutoReplyDraftVersion(db, winnerRule.id).catch(() => null)
+          : null;
+        if (winnerRule && winnerVersion) return { rule: winnerRule, version: winnerVersion, replayed: true };
+      }
+    }
+    throw err;
+  }
   const [rule, version] = await Promise.all([
     db.prepare(`SELECT * FROM auto_replies WHERE id = ?`).bind(autoReplyId).first<AutoReply>(),
     getAutoReplyVersionById(db, versionId),
   ]);
   if (!rule || !version) throw new Error('AUTO_REPLY_DRAFT_NOT_CREATED');
-  return { rule, version };
+  return { rule, version, replayed: false };
 }
 
-/** 公開中の定義は触らず、編集用の版だけを作る／更新する。 */
+/**
+ * 公開中の定義は触らず、編集用の版だけを作る／更新する。
+ *
+ * m26c R551: 下書きの更新は版を1つ進め、呼び出し元が読んだ版番号を
+ * 更新条件に含める。同じ版からの後続保存は 1 件しか通らず、負けた側は
+ * AUTO_REPLY_VERSION_CONFLICT になる（先行内容は保たれる）。
+ * expectedVersion を渡さない旧来の呼び出しは、従来どおり条件なしで
+ * 上書きする。
+ */
 export async function saveAutoReplyDraftVersion(
   db: D1Database,
   autoReplyId: string,
   settings: AutoReplyDraftSettings,
+  expectedVersion?: number,
 ): Promise<AutoReplyVersionRow> {
   const rule = await db.prepare(`SELECT * FROM auto_replies WHERE id = ? AND deleted_at IS NULL`)
     .bind(autoReplyId)
@@ -339,6 +641,15 @@ export async function saveAutoReplyDraftVersion(
   const now = jstNow();
   let draft = await getAutoReplyDraftVersion(db, autoReplyId);
   if (!draft) {
+    if (expectedVersion !== undefined) {
+      const current = await db.prepare(
+        `SELECT version_number FROM auto_reply_versions
+          WHERE auto_reply_id = ? ORDER BY version_number DESC LIMIT 1`,
+      ).bind(autoReplyId).first<{ version_number: number }>();
+      if (Number(current?.version_number ?? 0) !== Number(expectedVersion)) {
+        throw new Error('AUTO_REPLY_VERSION_CONFLICT');
+      }
+    }
     const next = await db.prepare(
       `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
          FROM auto_reply_versions WHERE auto_reply_id = ?`,
@@ -366,7 +677,18 @@ export async function saveAutoReplyDraftVersion(
       ).bind(versionId, autoReplyId),
     ]);
     draft = await getAutoReplyVersionById(db, versionId);
-  } else {
+    if (draft) {
+      // 同時作成の負け側は札だけが残る。指し示されていない版は消して競合にする。
+      const pointer = await db.prepare(
+        `SELECT current_draft_version_id FROM auto_replies WHERE id = ?`,
+      ).bind(autoReplyId).first<{ current_draft_version_id: string | null }>();
+      if (pointer?.current_draft_version_id !== versionId) {
+        await db.prepare(`DELETE FROM auto_reply_versions WHERE id = ? AND status = 'draft'`)
+          .bind(versionId).run();
+        throw new Error('AUTO_REPLY_VERSION_CONFLICT');
+      }
+    }
+  } else if (expectedVersion === undefined) {
     await db.prepare(
       `UPDATE auto_reply_versions
           SET line_account_id = ?, definition_snapshot = ?,
@@ -374,29 +696,85 @@ export async function saveAutoReplyDraftVersion(
               last_tested_by_staff_id = NULL, updated_at = ?
         WHERE id = ? AND status = 'draft'`,
     ).bind(settings.lineAccountId, JSON.stringify(settings), now, draft.id).run();
+  } else {
+    // 版番号の条件を含めた1文の更新。読取と書込のあいだの割込みは
+    // 反映行数 0 になり、競合として検出する。
+    const applied = await db.prepare(
+      `UPDATE auto_reply_versions
+          SET version_number = version_number + 1,
+              line_account_id = ?, definition_snapshot = ?,
+              last_test_status = NULL, last_tested_at = NULL,
+              last_tested_by_staff_id = NULL, updated_at = ?
+        WHERE id = ? AND status = 'draft' AND version_number = ?`,
+    ).bind(
+      settings.lineAccountId,
+      JSON.stringify(settings),
+      now,
+      draft.id,
+      Number(expectedVersion),
+    ).run();
+    if ((applied.meta?.changes ?? 0) !== 1) {
+      throw new Error('AUTO_REPLY_VERSION_CONFLICT');
+    }
   }
   if (!draft) throw new Error('AUTO_REPLY_DRAFT_NOT_SAVED');
   return (await getAutoReplyVersionById(db, draft.id))!;
 }
 
+/**
+ * m26c R552: 試験の記録は、試験を始めたときの内容と同じ版にだけ付ける。
+ * expectedSnapshot（試験開始時に読んだ definition_snapshot）を渡すと、
+ * 記録時に内容が変わっていないか1文で照合する。試験中に編集が入った
+ * 場合は反映行数 0 になり、applied: false を返す。古い成功が新内容の
+ * 公開条件になるのを防ぐ。渡さない旧来の呼び出しは従来どおり記録する。
+ */
 export async function recordAutoReplyDraftTest(
   db: D1Database,
   versionId: string,
   input: { succeeded: boolean; staffId: string | null },
-): Promise<void> {
+  expectedSnapshot?: string,
+): Promise<{ applied: boolean }> {
   const now = jstNow();
-  await db.prepare(
-    `UPDATE auto_reply_versions
-        SET last_test_status = ?, last_tested_at = ?, last_tested_by_staff_id = ?, updated_at = ?
-      WHERE id = ? AND status = 'draft'`,
-  ).bind(input.succeeded ? 'succeeded' : 'failed', now, input.staffId, now, versionId).run();
+  const applied = expectedSnapshot === undefined
+    ? await db.prepare(
+      `UPDATE auto_reply_versions
+          SET last_test_status = ?, last_tested_at = ?, last_tested_by_staff_id = ?, updated_at = ?
+        WHERE id = ? AND status = 'draft'`,
+    ).bind(input.succeeded ? 'succeeded' : 'failed', now, input.staffId, now, versionId).run()
+    : await db.prepare(
+      `UPDATE auto_reply_versions
+          SET last_test_status = ?, last_tested_at = ?, last_tested_by_staff_id = ?, updated_at = ?
+        WHERE id = ? AND status = 'draft' AND definition_snapshot = ?`,
+    ).bind(
+      input.succeeded ? 'succeeded' : 'failed',
+      now,
+      input.staffId,
+      now,
+      versionId,
+      expectedSnapshot,
+    ).run();
+  return { applied: (applied.meta?.changes ?? 0) === 1 };
 }
 
-/** 下書きを公開版へ進め、実行中の定義を同じbatchで差し替える。 */
+/**
+ * 下書きを公開版へ進め、実行中の定義を同じbatchで差し替える。
+ *
+ * m26c R553/R554: 公開の読取と書込のあいだに編集・停止が割り込んだら、
+ * 公開を止めて競合にする。expectedSnapshot（公開前チェック時の内容）、
+ * expectedStoppedAt / expectedIsActive（読取時の停止状態）を渡すと、
+ * batch 内の3文すべてに割込み条件を付け、成功した公開版と稼働設定が
+ * 同じ内容になることを保証する。条件を付けない旧来の呼び出しは従来動作。
+ */
 export async function publishAutoReplyDraftVersion(
   db: D1Database,
   autoReplyId: string,
-  input: { staffId: string | null; idempotencyKey: string },
+  input: {
+    staffId: string | null;
+    idempotencyKey: string;
+    expectedSnapshot?: string;
+    expectedStoppedAt?: string | null;
+    expectedIsActive?: number;
+  },
 ): Promise<AutoReplyVersionRow> {
   const replay = await db.prepare(
     `SELECT * FROM auto_reply_versions WHERE publish_idempotency_key = ?`,
@@ -408,19 +786,61 @@ export async function publishAutoReplyDraftVersion(
   const draft = await getAutoReplyDraftVersion(db, autoReplyId);
   if (!draft) throw new Error('AUTO_REPLY_DRAFT_NOT_FOUND');
   if (draft.last_test_status !== 'succeeded') throw new Error('AUTO_REPLY_DRAFT_NOT_TESTED');
+  // 公開前チェックから batch までのあいだの編集は、ここで止める。
+  if (input.expectedSnapshot !== undefined && draft.definition_snapshot !== input.expectedSnapshot) {
+    throw new Error('AUTO_REPLY_DRAFT_CHANGED');
+  }
+  const rule = await db.prepare(`SELECT * FROM auto_replies WHERE id = ? AND deleted_at IS NULL`)
+    .bind(autoReplyId)
+    .first<AutoReply>();
+  if (!rule) throw new Error('AUTO_REPLY_DRAFT_NOT_FOUND');
+  // 読取後の停止は、ここで止める（停止成功後の旧公開要求は再有効化しない）。
+  if (input.expectedStoppedAt !== undefined
+    && (rule.stopped_at ?? null) !== (input.expectedStoppedAt ?? null)) {
+    throw new Error('AUTO_REPLY_STOPPED_AFTER_READ');
+  }
+  if (input.expectedIsActive !== undefined && rule.is_active !== input.expectedIsActive) {
+    throw new Error('AUTO_REPLY_STOPPED_AFTER_READ');
+  }
   const settings = parseAutoReplyVersionSettings(draft);
   const now = jstNow();
+  /*
+   * batch 直前の割込みは、3文の更新条件で止める。batch は原子的なので、
+   * 条件を外した文だけが通る半端な公開は起きない。条件に使う停止状態は
+   * 副問合せで読み、停止の割込みでは3文とも反映行数 0 になる。
+   */
+  const stopGuardSql = [
+    input.expectedStoppedAt !== undefined
+      ? `AND (SELECT stopped_at FROM auto_replies WHERE id = ?) IS ?`
+      : '',
+    input.expectedIsActive !== undefined
+      ? `AND (SELECT is_active FROM auto_replies WHERE id = ?) = ?`
+      : '',
+  ].filter(Boolean).join(' ');
+  const stopGuardBinds: unknown[] = [];
+  if (input.expectedStoppedAt !== undefined) {
+    stopGuardBinds.push(autoReplyId, input.expectedStoppedAt ?? null);
+  }
+  if (input.expectedIsActive !== undefined) {
+    stopGuardBinds.push(autoReplyId, input.expectedIsActive);
+  }
+  const snapshotGuardSql = input.expectedSnapshot !== undefined
+    ? `AND (SELECT definition_snapshot FROM auto_reply_versions WHERE id = ?) = ?`
+    : '';
+  const snapshotGuardBinds: unknown[] = input.expectedSnapshot !== undefined
+    ? [draft.id, input.expectedSnapshot]
+    : [];
   await db.batch([
     db.prepare(
       `UPDATE auto_reply_versions SET status = 'retired', updated_at = ?
-        WHERE auto_reply_id = ? AND status = 'published'`,
-    ).bind(now, autoReplyId),
+        WHERE auto_reply_id = ? AND status = 'published' ${stopGuardSql}`,
+    ).bind(now, autoReplyId, ...stopGuardBinds),
     db.prepare(
       `UPDATE auto_reply_versions
           SET status = 'published', published_at = ?, published_by_staff_id = ?,
               publish_idempotency_key = ?, updated_at = ?
-        WHERE id = ? AND status = 'draft'`,
-    ).bind(now, input.staffId, input.idempotencyKey, now, draft.id),
+        WHERE id = ? AND status = 'draft' AND definition_snapshot = ? ${stopGuardSql}`,
+    ).bind(now, input.staffId, input.idempotencyKey, now, draft.id, draft.definition_snapshot, ...stopGuardBinds),
     db.prepare(
       `UPDATE auto_replies
           SET keyword = ?, match_type = ?, response_type = ?, response_content = ?,
@@ -432,7 +852,7 @@ export async function publishAutoReplyDraftVersion(
               keywords_json = ?, respond_to_all = ?, name = ?, keyword_match_mode = ?,
               lifecycle_status = 'published', current_published_version_id = ?,
               current_draft_version_id = NULL
-        WHERE id = ?`,
+        WHERE id = ? ${snapshotGuardSql} ${stopGuardSql}`,
     ).bind(
       settings.keyword,
       settings.matchType,
@@ -458,14 +878,33 @@ export async function publishAutoReplyDraftVersion(
       settings.keywordMatchMode,
       draft.id,
       autoReplyId,
+      ...snapshotGuardBinds,
+      ...stopGuardBinds,
     ),
   ]);
   const published = await getAutoReplyVersionById(db, draft.id);
-  if (!published || published.status !== 'published') throw new Error('AUTO_REPLY_DRAFT_NOT_PUBLISHED');
-  if (published.publish_idempotency_key !== input.idempotencyKey) {
-    throw new Error('AUTO_REPLY_DRAFT_ALREADY_PUBLISHED');
+  const ruleAfter = await db.prepare(`SELECT * FROM auto_replies WHERE id = ?`)
+    .bind(autoReplyId)
+    .first<AutoReply & { current_published_version_id?: string | null }>();
+  const versionOk = published?.status === 'published'
+    && published.publish_idempotency_key === input.idempotencyKey;
+  const ruleOk = (ruleAfter?.current_published_version_id ?? null) === draft.id;
+  if (versionOk && ruleOk) return published!;
+  const guarded = input.expectedSnapshot !== undefined
+    || input.expectedStoppedAt !== undefined
+    || input.expectedIsActive !== undefined;
+  if (!guarded) {
+    if (!versionOk) throw new Error('AUTO_REPLY_DRAFT_NOT_PUBLISHED');
+    if (published!.publish_idempotency_key !== input.idempotencyKey) {
+      throw new Error('AUTO_REPLY_DRAFT_ALREADY_PUBLISHED');
+    }
+    throw new Error('AUTO_REPLY_DRAFT_NOT_PUBLISHED');
   }
-  return published;
+  // batch 直前の割込みの切り分け。停止記録が動いていれば停止の割込み。
+  const stopMoved = (ruleAfter?.stopped_at ?? null) !== (rule.stopped_at ?? null)
+    || (ruleAfter?.is_active ?? rule.is_active) !== rule.is_active;
+  if (stopMoved) throw new Error('AUTO_REPLY_STOPPED_AFTER_READ');
+  throw new Error('AUTO_REPLY_DRAFT_CHANGED');
 }
 
 /** 実行時の定義を不変の版として確保する。既存UIの保存形式は変えない。 */
@@ -500,6 +939,27 @@ export async function ensureAutoReplyPublishedVersion(
   const versionNumber = Number(latest?.version_number ?? 0) + 1;
   const now = jstNow();
   const id = crypto.randomUUID();
+  /*
+   * 実行の同一判定に混ぜない運用項目は、実行版を張り替えても引き継ぐ。
+   * 引き継がないと、従来の更新口（PUT /api/auto-replies/:id）で定義を
+   * 直したあとの初回評価で、新版に社内メモが載らず編集画面から消える
+   * （AUTOREPLY-09）。
+   */
+  const previous = current ?? (latest?.status === 'published' ? latest : null);
+  let snapshotToSave = snapshot;
+  if (previous) {
+    try {
+      const carried = JSON.parse(previous.definition_snapshot) as Partial<AutoReplyDraftSettings>;
+      snapshotToSave = JSON.stringify({
+        ...(JSON.parse(snapshot) as Record<string, unknown>),
+        internalMemo: carried.internalMemo ?? null,
+        replyDelaySeconds: carried.replyDelaySeconds ?? null,
+        unmatchedAction: carried.unmatchedAction ?? null,
+      });
+    } catch {
+      /* 読めない旧版は引き継がない */
+    }
+  }
   await db.batch([
     db.prepare(
       `UPDATE auto_reply_versions SET status = 'retired', updated_at = ?
@@ -510,7 +970,7 @@ export async function ensureAutoReplyPublishedVersion(
          (id, auto_reply_id, version_number, line_account_id, definition_snapshot,
           status, published_at, published_by_staff_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, 'published', ?, NULL, ?, ?)`,
-    ).bind(id, rule.id, versionNumber, rule.line_account_id, snapshot, now, now, now),
+    ).bind(id, rule.id, versionNumber, rule.line_account_id, snapshotToSave, now, now, now),
     db.prepare(
       `UPDATE auto_replies SET current_published_version_id = ?, lifecycle_status = 'published'
         WHERE id = ?`,

@@ -4,6 +4,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
+  archiveCommonAction,
   CommonActionValidationError,
   createCommonAction,
   createCommonActionDraft,
@@ -13,6 +14,7 @@ import {
   listCommonActionResources,
   listCommonActions,
   publishCommonActionDraft,
+  unarchiveCommonAction,
   updateCommonActionBindingVersion,
   updateCommonActionDraft,
 } from '../services/common-actions.js';
@@ -34,7 +36,8 @@ async function requireAccount(c: Context<Env>): Promise<string | Response> {
 }
 
 function validationResponse(c: Context<Env>, error: CommonActionValidationError): Response {
-  const conflict = new Set(['version_conflict', 'draft_exists']);
+  // 監査 R473・R477・R467・R479: 改訂・利用版・参照先の競合は409で再確認へ導く。
+  const conflict = new Set(['version_conflict', 'draft_exists', 'draft_revision_conflict', 'reference_updated']);
   const notFound = new Set([
     'not_found', 'draft_not_found', 'base_version_not_found', 'version_not_found', 'binding_not_found',
   ]);
@@ -154,10 +157,12 @@ commonActions.post('/api/common-actions', requireRole('owner', 'admin'), async (
     name?: unknown;
     description?: unknown;
     actions?: unknown;
+    clientRequestKey?: unknown;
   }>().catch(() => ({} as {
     name?: unknown;
     description?: unknown;
     actions?: unknown;
+    clientRequestKey?: unknown;
   }));
   return endpoint(c, () => createCommonAction(c.env.DB, {
     lineAccountId: id,
@@ -165,6 +170,8 @@ commonActions.post('/api/common-actions', requireRole('owner', 'admin'), async (
     description: body.description,
     actions: body.actions,
     createdBy: c.get('staff')?.id,
+    // 監査 R475: 応答消失からの再試行で二重作成にしない鍵。
+    clientRequestKey: body.clientRequestKey,
   }), 201);
 });
 
@@ -195,6 +202,31 @@ commonActions.get('/api/common-actions/:id', requireRole('owner', 'admin', 'staf
   }));
 });
 
+// 監査 R480: 未使用の共通アクションを保管する。利用中は422で利用先を示す。
+commonActions.post('/api/common-actions/:id/archive', requireRole('owner', 'admin'), async (c) => {
+  const id = await requireAccount(c);
+  if (typeof id !== 'string') return id;
+  return endpoint(c, async () => {
+    await archiveCommonAction(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: id,
+    });
+    return { archived: true };
+  });
+});
+
+commonActions.post('/api/common-actions/:id/unarchive', requireRole('owner', 'admin'), async (c) => {
+  const id = await requireAccount(c);
+  if (typeof id !== 'string') return id;
+  return endpoint(c, async () => {
+    await unarchiveCommonAction(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: id,
+    });
+    return { unarchived: true };
+  });
+});
+
 commonActions.post('/api/common-actions/:id/duplicate', requireRole('owner', 'admin'), async (c) => {
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
@@ -210,11 +242,13 @@ commonActions.put('/api/common-actions/:id/draft', requireRole('owner', 'admin')
   if (typeof id !== 'string') return id;
   const body = await c.req.json<{
     expectedDraftVersionId?: unknown;
+    expectedDraftRevision?: unknown;
     name?: unknown;
     description?: unknown;
     actions?: unknown;
   }>().catch(() => ({} as {
     expectedDraftVersionId?: unknown;
+    expectedDraftRevision?: unknown;
     name?: unknown;
     description?: unknown;
     actions?: unknown;
@@ -224,6 +258,7 @@ commonActions.put('/api/common-actions/:id/draft', requireRole('owner', 'admin')
       id: c.req.param('id'),
       lineAccountId: id,
       expectedDraftVersionId: body.expectedDraftVersionId,
+      expectedDraftRevision: body.expectedDraftRevision,
       name: body.name,
       description: body.description,
       actions: body.actions,
@@ -251,10 +286,14 @@ commonActions.post(
   async (c) => {
     const id = await requireAccount(c);
     if (typeof id !== 'string') return id;
+    // 監査 R477: 公開確認に使った下書きの改訂番号を照合する。
+    const body = await c.req.json<{ expectedDraftRevision?: unknown }>()
+      .catch(() => ({} as { expectedDraftRevision?: unknown }));
     return endpoint(c, () => publishCommonActionDraft(c.env.DB, {
       id: c.req.param('id'),
       lineAccountId: id,
       draftVersionId: c.req.param('versionId'),
+      expectedDraftRevision: body.expectedDraftRevision,
     }));
   },
 );

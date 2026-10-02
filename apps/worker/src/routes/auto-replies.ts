@@ -12,9 +12,12 @@ import {
   getFriendById,
   getTemplateById,
   autoReplyRowFromDraftSettings,
+  autoReplyDraftSettingsFromRow,
+  autoReplyRuleCreateFingerprint,
   createAutoReplyWithDraftVersion,
   getAutoReplyDraftVersion,
   getAutoReplyPublishedVersion,
+  getAutoReplyInternalMemos,
   parseAutoReplyVersionSettings,
   publishAutoReplyDraftVersion,
   recordAutoReplyDraftTest,
@@ -28,6 +31,7 @@ import type {
   AutoReplyVersionRow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { currentMonthRange } from '../lib/jst-range.js';
@@ -42,8 +46,16 @@ import {
   type AutoReplyCandidateReasonCode,
 } from '../services/auto-reply.js';
 import { isOperatorHandling } from '../services/auto-reply-conditions.js';
+import { validateFlexContent } from '@line-crm/shared';
 
 const autoReplies = new Hono<Env>();
+
+/*
+ * R200: 「連投を防ぐ」の範囲外は、対象欄の名前と許容範囲が分かる日本語で断る。
+ * 英語の内部項目名（cooldownMinutes ...）をそのまま出さない。
+ * 下書き・直接作成・更新の3つの口で同じ文言を使う。
+ */
+const COOLDOWN_RANGE_ERROR = '「連投を防ぐ」は0〜10080の整数（分）で入力してください';
 
 async function validateAutoReplyFolder(
   db: D1Database,
@@ -54,6 +66,32 @@ async function validateAutoReplyFolder(
   const folder = await getFolderById(db, folderId);
   if (!folder) return 'フォルダが見つかりません';
   if (folder.kind !== 'auto_reply') return '自動応答用ではないフォルダは選べません';
+  return null;
+}
+
+/*
+ * m26c R562: 全アカウント共通（lineAccountId が null）の作成・共通化は
+ * owner だけ。要件 v6-08 §7「全アカウント共通ルールはownerだけが作成・変更」。
+ * m26c R563: テンプレートは所属アカウントが見える人だけが使える。
+ * 所属なし（共通）のテンプレートは共有物として扱う。
+ */
+function requireCommonRuleOwner(
+  staff: AuthenticatedStaff | undefined,
+): { ok: true } | { ok: false; error: string } {
+  if (staff?.role === 'owner') return { ok: true };
+  return { ok: false, error: '全アカウント共通の自動応答は統括だけが作成・変更できます' };
+}
+
+async function assertTemplateVisible(
+  db: D1Database,
+  staff: AuthenticatedStaff | undefined,
+  templateId: string | null,
+  templateLineAccountId: string | null,
+): Promise<string | null> {
+  if (!templateId || templateLineAccountId === null) return null;
+  if (!await canAccessAllLineAccounts(db, staff, [templateLineAccountId])) {
+    return '選んだテンプレートを確認できません';
+  }
   return null;
 }
 
@@ -148,6 +186,8 @@ interface SerializedAutoReply {
   keywordMatchMode: string;
   /** フォルダ。分けていなければ null。 */
   folderId: string | null;
+  /** 運用者だけが読むメモ。版スナップショットに保存し、友だちへは出さない。 */
+  internalMemo: string | null;
   /** 273: 'draft'（未公開）| 'published' | 'stopped'。一覧が再開の可否を分けるのに使う。 */
   lifecycleStatus: string;
   /** 機能08 点検 E-01: 最後に停止した日時・担当者・理由。止めたことが無ければ null。 */
@@ -515,7 +555,8 @@ function draftVersionResponse(version: AutoReplyVersionRow): AutoReplyDraftVersi
 }
 
 type DraftReadResult =
-  | { ok: true; value: AutoReplyDraftSettings }
+  // m26c R563: テンプレートの所属も返す。呼び出し側が閲覧権限を検査する。
+  | { ok: true; value: AutoReplyDraftSettings; templateLineAccountId: string | null }
   | { ok: false; error: string };
 
 /** 既存の作成・更新と同じ制約で、公開前の定義だけを読む。 */
@@ -544,7 +585,7 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
     return { ok: false, error: '応答する時間を24時間表記で入力してください' };
   }
   const cooldown = parseCooldown(body.cooldownMinutes);
-  if (!cooldown.ok) return { ok: false, error: '連続応答を止める時間が正しくありません' };
+  if (!cooldown.ok) return { ok: false, error: COOLDOWN_RANGE_ERROR };
   const priority = readPriority(body.priority ?? 0);
   if (!priority.ok) return { ok: false, error: '優先順位が正しくありません' };
   const messageKinds = readMessageKinds(body.messageKinds);
@@ -572,14 +613,25 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
     if (parsedActions.length !== extras.value.actions.length) {
       return { ok: false, error: '応答したあとにすることの設定を確認してください' };
     }
+    // 失敗したら止めるか続けるかは stop/continue のどちらかだけ受け付ける。
+    // 読めない値は実行側が続けるに倒すが、保存時には書き直しを促す。
+    for (const [index, item] of (extras.value.actions as unknown[]).entries()) {
+      const raw = (item as Record<string, unknown> | null)?.onFailure
+        ?? (item as Record<string, unknown> | null)?.on_failure;
+      if (raw !== undefined && raw !== 'stop' && raw !== 'continue') {
+        return { ok: false, error: `${index + 1}つ目の失敗したときの設定を確認してください` };
+      }
+    }
   }
 
   const templateId = typeof body.templateId === 'string' && body.templateId ? body.templateId : null;
   let responseType = typeof body.responseType === 'string' && body.responseType ? body.responseType : 'text';
   let responseContent = typeof body.responseContent === 'string' ? body.responseContent : '';
+  let templateLineAccountId: string | null = null;
   if (templateId) {
     const template = await getTemplateById(db, templateId);
     if (!template) return { ok: false, error: '選んだテンプレートを確認できません' };
+    templateLineAccountId = template.line_account_id ?? null;
     if (!responseType) responseType = template.message_type;
     if (!responseContent) responseContent = template.message_content;
   }
@@ -590,9 +642,19 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   if ([...responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
     return { ok: false, error: `返信する内容は${AUTO_REPLY_RESPONSE_MAX.toLocaleString('ja-JP')}文字までです` };
   }
+  /*
+   * R201: カードはJSONとして読めるだけでは足りない。`{}` のような構造のない
+   * 内容は送信時に落ちるだけなので、保存の側で止める。テンプレートから
+   * 写した中身はテンプレート側の検査に任せ、直接入力だけここで見る。
+   */
+  if (!templateId) {
+    const flexError = validateFlexContent(responseType, responseContent);
+    if (flexError) return { ok: false, error: flexError };
+  }
 
   return {
     ok: true,
+    templateLineAccountId,
     value: {
       keyword,
       matchType: body.matchType,
@@ -823,7 +885,36 @@ function validIdempotencyKey(value: string | undefined): value is string {
   return Boolean(value && value.length >= 8 && value.length <= 200 && /^[A-Za-z0-9._:-]+$/.test(value));
 }
 
-function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
+/*
+ * m26c R556/R570: 作成・複製の確認キー。ヘッダで受け、形が正しいときだけ
+ * 重複防止に使う。無い・壊れているときは従来どおり作る（後方互換）。
+ */
+function readIdempotencyKey(c: Context<Env>): string | undefined {
+  const raw = c.req.header('Idempotency-Key');
+  return validIdempotencyKey(raw) ? raw : undefined;
+}
+
+/** 要求キー台帳の失敗を応答へ寄せる。該当なしは null。 */
+function idempotencyErrorResponse(err: unknown): { status: 409; error: string } | null {
+  const code = err instanceof Error ? err.message : '';
+  if (code === 'AUTO_REPLY_IDEMPOTENCY_CONFLICT'
+    || code === 'AUTO_REPLY_IDEMPOTENCY_OPERATION_CONFLICT') {
+    return {
+      status: 409,
+      error: '同じ確認キーに異なる内容が送られました。一覧を確認してください',
+    };
+  }
+  // 同時実行の負け側で勝者がまだ確定していない。作り直しは起きないので再送を求める。
+  if (code.includes('auto_reply_create_requests') && /unique constraint/i.test(code)) {
+    return { status: 409, error: '処理中です。もう一度お試しください' };
+  }
+  return null;
+}
+
+function serializeAutoReply(
+  row: DbAutoReply,
+  internalMemo: string | null = null,
+): SerializedAutoReply {
   return {
     id: row.id,
     keyword: row.keyword,
@@ -852,6 +943,7 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     name: row.name,
     keywordMatchMode: row.keyword_match_mode ?? 'any',
     folderId: row.folder_id,
+    internalMemo,
     lifecycleStatus: row.lifecycle_status ?? 'published',
     stoppedAt: row.stopped_at ?? null,
     stoppedByStaffId: row.stopped_by_staff_id ?? null,
@@ -859,6 +951,22 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     stopReason: row.stop_reason ?? null,
     createdAt: row.created_at,
   };
+}
+
+/**
+ * 社内メモを編集画面と同じ版（下書き優先、無ければ公開版）から引く。
+ * 読めなくても一覧・詳細そのものは落とさない——付随情報なので。
+ */
+async function internalMemosOf(
+  db: D1Database,
+  autoReplyIds: string[],
+): Promise<Map<string, string | null>> {
+  try {
+    return await getAutoReplyInternalMemos(db, autoReplyIds);
+  } catch (err) {
+    console.error('failed to load auto reply internal memos', err);
+    return new Map();
+  }
 }
 
 /** 停止した担当者の表示名を引く。止めた記録が無い一覧では1問も投げない。 */
@@ -1003,10 +1111,12 @@ autoReplies.get('/api/auto-replies', requireRole('owner', 'admin', 'staff'), asy
       console.error('GET /api/auto-replies — failed to count action executions', err);
     }
 
+    const memos = await internalMemosOf(c.env.DB, items.map((item) => item.id));
+
     const data: SerializedAutoReply[] = await Promise.all(
       items.map(async (row) => {
         const base: SerializedAutoReply = {
-          ...serializeAutoReply(row),
+          ...serializeAutoReply(row, memos.get(row.id) ?? null),
           ...(hitsById ? { hits: hitsById.get(row.id) ?? { period: 0, total: 0 } } : {}),
           actionExecutionCount: actionsById?.get(row.id) ?? (actionsById ? 0 : null),
           conflictAttentionCount: row.is_active === 1 ? conflictsById.get(row.id) ?? 0 : 0,
@@ -1087,8 +1197,27 @@ autoReplies.post('/api/auto-replies/drafts', requireRole('owner', 'admin'), asyn
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
-    const created = await createAutoReplyWithDraftVersion(c.env.DB, parsed.value);
-    return c.json({ success: true, data: draftVersionResponse(created.version) }, 201);
+    const templateError = await assertTemplateVisible(
+      c.env.DB,
+      c.get('staff'),
+      parsed.value.templateId,
+      parsed.templateLineAccountId,
+    );
+    if (templateError) return c.json({ success: false, error: templateError }, 403);
+    // m26c R556: 確認キーがあれば再送を同じ下書きへ復帰させる。
+    const draftKey = readIdempotencyKey(c);
+    try {
+      const created = await createAutoReplyWithDraftVersion(
+        c.env.DB,
+        parsed.value,
+        draftKey ? { key: draftKey, fingerprint: JSON.stringify(parsed.value) } : undefined,
+      );
+      return c.json({ success: true, data: draftVersionResponse(created.version) }, 201);
+    } catch (err) {
+      const mapped = idempotencyErrorResponse(err);
+      if (mapped) return c.json({ success: false, error: mapped.error }, mapped.status);
+      throw err;
+    }
   } catch (err) {
     console.error('POST /api/auto-replies/drafts error:', err);
     return c.json({ success: false, error: '自動応答の下書きを作成できませんでした' }, 500);
@@ -1105,7 +1234,8 @@ autoReplies.get('/api/auto-replies/:id', async (c) => {
     if (!item) {
       return c.json({ success: false, error: 'Auto-reply not found' }, 404);
     }
-    const data = serializeAutoReply(item);
+    const memos = await internalMemosOf(c.env.DB, [id]);
+    const data = serializeAutoReply(item, memos.get(id) ?? null);
     await resolveStoppedByNames(c.env.DB, [data]);
     return c.json({ success: true, data });
   } catch (err) {
@@ -1162,12 +1292,47 @@ autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), as
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
-    const version = await saveAutoReplyDraftVersion(c.env.DB, c.req.param('id'), parsed.value);
+    const templateError = await assertTemplateVisible(
+      c.env.DB,
+      c.get('staff'),
+      parsed.value.templateId,
+      parsed.templateLineAccountId,
+    );
+    if (templateError) return c.json({ success: false, error: templateError }, 403);
+    // m26c R551: 読んだ版番号を更新条件に含め、同じ版からの後続保存を競合にする。
+    const version = await saveAutoReplyDraftVersion(
+      c.env.DB,
+      c.req.param('id'),
+      parsed.value,
+      Number(body.expectedVersion),
+    );
     return c.json({ success: true, data: draftVersionResponse(version) });
   } catch (err) {
     const code = err instanceof Error ? err.message : '';
     if (code === 'AUTO_REPLY_NOT_FOUND') {
       return c.json({ success: false, error: '自動応答が見つかりません' }, 404);
+    }
+    // 同時作成の負け側は一意制約で落ちる。版の競合として同じ 409 に寄せる。
+    if (code === 'AUTO_REPLY_VERSION_CONFLICT' || /unique constraint/i.test(code)) {
+      // m26c R551: 先行内容を保ったまま、比較と読み直しの手がかりを返す。
+      const current = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'))
+        ?? await getAutoReplyPublishedVersion(c.env.DB, c.req.param('id'));
+      const currentSettings = current ? parseAutoReplyVersionSettings(current) : null;
+      return c.json({
+        success: false,
+        code: 'VERSION_CONFLICT',
+        error: 'ほかの変更が先に保存されました。最新の状態を読み直してください',
+        data: {
+          currentVersion: current ? Number(current.version_number) : null,
+          current: currentSettings
+            ? {
+              keyword: currentSettings.keyword,
+              responseContent: currentSettings.responseContent,
+              updatedAt: current?.updated_at ?? null,
+            }
+            : null,
+        },
+      }, 409);
     }
     console.error('PUT /api/auto-replies/:id/draft error:', err);
     return c.json({ success: false, error: '自動応答の下書きを保存できませんでした' }, 500);
@@ -1190,12 +1355,19 @@ autoReplies.post('/api/auto-replies/:id/validate', requireRole('owner', 'admin')
 
 autoReplies.get('/api/auto-replies/:id/conflicts', requireRole('owner', 'admin'), async (c) => {
   try {
+    // m26c R558: 公開後は下書きが無い。下書き取得と同じく公開版へ読み替え、
+    // 404 で完了 URL を壊さない。読み替えたことは source で区別する。
     const version = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'));
-    if (!version) return c.json({ success: false, error: '確認する下書きがありません' }, 404);
-    const settings = parseAutoReplyVersionSettings(version);
+    const published = version ? null : await getAutoReplyPublishedVersion(c.env.DB, c.req.param('id'));
+    const target = version ?? published;
+    if (!target) return c.json({ success: false, error: '確認する下書きがありません' }, 404);
+    const settings = parseAutoReplyVersionSettings(target);
     return c.json({
       success: true,
-      data: { conflicts: await conflictsForDraft(c.env.DB, version.auto_reply_id, settings) },
+      data: {
+        conflicts: await conflictsForDraft(c.env.DB, target.auto_reply_id, settings),
+        source: version ? 'draft' : 'published',
+      },
     });
   } catch (err) {
     console.error('GET /api/auto-replies/:id/conflicts error:', err);
@@ -1262,6 +1434,9 @@ autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin', 'st
       : winner
         ? { messageType: 'silent', content: '返信せず、設定した処理だけを実行します' }
         : null;
+    // m26c R552: 試験を始めたときの内容を掴む。記録時に変わっていたら
+    // 古い成功を新内容に付けず、再試験を求める。
+    const startedSnapshot = version.definition_snapshot;
     const result: AutoReplyDryRunResult = {
       matched: winner !== null,
       draftWon,
@@ -1285,10 +1460,13 @@ autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin', 'st
       actions: winner ? parseAutoReplyActions(winner.actions_json).map((action) => ({ kind: action.action_type })) : [],
       stateChanged: false,
     };
-    await recordAutoReplyDraftTest(c.env.DB, version.id, {
+    const recorded = await recordAutoReplyDraftTest(c.env.DB, version.id, {
       succeeded: draftWon,
       staffId: c.get('staff')?.id ?? null,
-    });
+    }, startedSnapshot);
+    if (!recorded.applied) {
+      return c.json({ success: true, data: { ...result, staleTest: true } });
+    }
     return c.json({ success: true, data: result });
   } catch (err) {
     if (version) {
@@ -1310,6 +1488,9 @@ autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'),
       return c.json({ success: false, error: '公開操作の確認キーが必要です' }, 400);
     }
     const version = await getAutoReplyDraftVersion(c.env.DB, id);
+    // m26c R553/R554: 公開前チェック時の内容と、読取時の停止状態を掴む。
+    // 公開 batch までの割込みは DB helper が競合として止める。
+    const ruleBefore = await getAutoReplyById(c.env.DB, id);
     if (!version) {
       // 同じキーの再実行はDB helperが公開済みの結果を返す。
       const replay = await publishAutoReplyDraftVersion(c.env.DB, id, {
@@ -1353,6 +1534,9 @@ autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'),
     const published = await publishAutoReplyDraftVersion(c.env.DB, id, {
       staffId: c.get('staff')?.id ?? null,
       idempotencyKey: requestKey,
+      expectedSnapshot: version.definition_snapshot,
+      expectedStoppedAt: ruleBefore?.stopped_at ?? null,
+      expectedIsActive: ruleBefore?.is_active ?? 0,
     });
     return c.json({
       success: true,
@@ -1368,6 +1552,18 @@ autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'),
     const code = err instanceof Error ? err.message : '';
     if (code === 'AUTO_REPLY_PUBLISH_KEY_CONFLICT') {
       return c.json({ success: false, error: '同じ確認キーが別の公開操作で使われています' }, 409);
+    }
+    if (code === 'AUTO_REPLY_DRAFT_CHANGED') {
+      return c.json({
+        success: false,
+        error: '公開する直前に内容が変わりました。最新の状態を読み直し、確認・試験からやり直してください',
+      }, 409);
+    }
+    if (code === 'AUTO_REPLY_STOPPED_AFTER_READ') {
+      return c.json({
+        success: false,
+        error: '公開する直前に停止されました。停止のままにするか、最新の状態を読み直してください',
+      }, 409);
     }
     if (code === 'AUTO_REPLY_DRAFT_NOT_FOUND' || code === 'AUTO_REPLY_DRAFT_ALREADY_PUBLISHED') {
       return c.json({ success: false, error: 'この下書きはすでに公開されています' }, 409);
@@ -1432,6 +1628,13 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
         || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
+    // m26c R562: 全アカウント共通の作成は統括だけ。本文が null でも検査を飛ばさない。
+    if (body.lineAccountId === null || body.lineAccountId === undefined) {
+      const ownerCheck = requireCommonRuleOwner(c.get('staff'));
+      if (!ownerCheck.ok) {
+        return c.json({ success: false, error: ownerCheck.error }, 403);
+      }
+    }
     // template_id があれば content は空でも OK (template から resolve される)。
     // silent も content 不要。それ以外は inline content 必須。
     if (!body.templateId && !body.responseContent && body.responseType !== 'silent') {
@@ -1445,10 +1648,7 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       return c.json({ success: false, error: 'activeFrom/activeUntil must be HH:MM' }, 400);
     }
     if (!cooldown.ok) {
-      return c.json(
-        { success: false, error: 'cooldownMinutes must be an integer between 0 and 10080' },
-        400,
-      );
+      return c.json({ success: false, error: COOLDOWN_RANGE_ERROR }, 400);
     }
     const priority = body.priority === undefined ? { ok: true as const, value: 0 } : readPriority(body.priority);
     if (!priority.ok) {
@@ -1467,12 +1667,23 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     // クリアされた時に webhook resolve が空メッセージにフォールバックしてしまう。
     let resolvedResponseType = body.responseType ?? 'text';
     let resolvedResponseContent = body.responseContent ?? '';
-    if (body.templateId && (!body.responseContent || !body.responseType)) {
+    // m26c R563: テンプレートの本文を取り込む前に所属の閲覧権限を見る。
+    // 内容を送らず ID だけ送った場合も、ID を指定した場合は必ず検査する。
+    if (body.templateId) {
       const { getTemplateById } = await import('@line-crm/db');
       const tpl = await getTemplateById(c.env.DB, body.templateId);
-      if (tpl) {
-        if (!body.responseType) resolvedResponseType = tpl.message_type;
-        if (!body.responseContent) resolvedResponseContent = tpl.message_content;
+      const templateError = await assertTemplateVisible(
+        c.env.DB,
+        c.get('staff'),
+        body.templateId,
+        tpl ? (tpl.line_account_id ?? null) : null,
+      );
+      if (templateError) return c.json({ success: false, error: templateError }, 403);
+      if (!body.responseContent || !body.responseType) {
+        if (tpl) {
+          if (!body.responseType) resolvedResponseType = tpl.message_type;
+          if (!body.responseContent) resolvedResponseContent = tpl.message_content;
+        }
       }
     }
 
@@ -1480,8 +1691,18 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     if (!extras.ok) return c.json({ success: false, error: extras.error }, 400);
     const folderError = await validateAutoReplyFolder(c.env.DB, extras.value.folderId);
     if (folderError) return c.json({ success: false, error: folderError }, 422);
+    /*
+     * R201: 直接入力のカードは構造まで見る。テンプレートから写した中身
+     * （content を送らず templateId だけ送った場合）は対象外にする。
+     */
+    if (body.responseContent) {
+      const flexError = validateFlexContent(resolvedResponseType, resolvedResponseContent);
+      if (flexError) return c.json({ success: false, error: flexError }, 400);
+    }
 
-    const item = await createAutoReply(c.env.DB, {
+    // m26c R570: 確認キーがあれば再送を同じ行へ復帰させる。
+    const ruleKey = readIdempotencyKey(c);
+    const createInput = {
       ...extras.value,
       keyword: body.keyword ?? '',
       matchType: body.matchType,
@@ -1496,9 +1717,25 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       skipWhenOperatorActive: body.skipWhenOperatorActive === true,
       priority: priority.value,
       messageKinds: messageKinds.value,
-    });
+    };
+    let item: DbAutoReply;
+    try {
+      const created = await createAutoReply(
+        c.env.DB,
+        createInput,
+        ruleKey
+          ? { key: ruleKey, fingerprint: autoReplyRuleCreateFingerprint(createInput) }
+          : undefined,
+      );
+      item = created.rule;
+    } catch (err) {
+      const mapped = idempotencyErrorResponse(err);
+      if (mapped) return c.json({ success: false, error: mapped.error }, mapped.status);
+      throw err;
+    }
 
-    return c.json({ success: true, data: serializeAutoReply(item) }, 201);
+    const memos = await internalMemosOf(c.env.DB, [item.id]);
+    return c.json({ success: true, data: serializeAutoReply(item, memos.get(item.id) ?? null) }, 201);
   } catch (err) {
     console.error('POST /api/auto-replies error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1538,6 +1775,15 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
       if (typeof body.responseContent === 'string' && [...body.responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
         return c.json({ success: false, error: `responseContent must be ${AUTO_REPLY_RESPONSE_MAX} characters or fewer` }, 400);
       }
+      /*
+       * R201: カード種別を名指しで送ってきた中身は構造まで見る。
+       * 種別を送らず中身だけの更新は、既存の種別が読めないため
+       * 下書き保存口の検査に任せる。
+       */
+      if (typeof body.responseContent === 'string' && body.responseType === 'flex') {
+        const flexError = validateFlexContent(body.responseType, body.responseContent);
+        if (flexError) return c.json({ success: false, error: flexError }, 400);
+      }
       input.responseContent = body.responseContent;
     }
     if ('templateId' in body) input.templateId = body.templateId;
@@ -1564,10 +1810,7 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     if ('cooldownMinutes' in body) {
       const parsed = parseCooldown(body.cooldownMinutes);
       if (!parsed.ok) {
-        return c.json(
-          { success: false, error: 'cooldownMinutes must be an integer between 0 and 10080' },
-          400,
-        );
+        return c.json({ success: false, error: COOLDOWN_RANGE_ERROR }, 400);
       }
       input.cooldownMinutes = parsed.value;
     }
@@ -1609,13 +1852,97 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     if (folderError) return c.json({ success: false, error: folderError }, 422);
     Object.assign(input, extras.value);
 
+    // m26c R562/R569: 分岐のために既存行を読む。可視性は middleware が見ている。
+    const existing = await getAutoReplyById(c.env.DB, id);
+    if (!existing) {
+      return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+    }
+    // isActive の素の切替以外の入力は、内容の変更として扱う。
+    const contentChanged = Object.keys(input).some((key) => key !== 'isActive');
+    const wantsCommon = 'lineAccountId' in input
+      && (input.lineAccountId === null || input.lineAccountId === undefined);
+    // m26c R562: 共通化・共通ルールの内容変更は統括だけ。
+    if (wantsCommon || (existing.line_account_id === null && contentChanged)) {
+      const ownerCheck = requireCommonRuleOwner(c.get('staff'));
+      if (!ownerCheck.ok) {
+        return c.json({ success: false, error: ownerCheck.error }, 403);
+      }
+    }
+    // m26c R563: テンプレート ID の指定は所属の閲覧権限を見る。
+    if (body.templateId) {
+      const { getTemplateById } = await import('@line-crm/db');
+      const tpl = await getTemplateById(c.env.DB, body.templateId);
+      const templateError = await assertTemplateVisible(
+        c.env.DB,
+        c.get('staff'),
+        body.templateId,
+        tpl ? (tpl.line_account_id ?? null) : null,
+      );
+      if (templateError) return c.json({ success: false, error: templateError }, 403);
+    }
+    /*
+     * m26c R569: 公開中ルールの内容変更は、稼働定義を直接書き換えない。
+     * 下書き版へ保存し、検査・試し応答・競合確認を経た公開だけが版を
+     * 切り替える。共通ルールの共通化は統括の直接操作のままにする。
+     */
+    const live = existing.is_active === 1 || existing.lifecycle_status === 'published';
+    if (live && contentChanged && existing.line_account_id !== null && !wantsCommon) {
+      const baseVersion = await getAutoReplyDraftVersion(c.env.DB, id)
+        ?? await getAutoReplyPublishedVersion(c.env.DB, id);
+      const base = baseVersion
+        ? parseAutoReplyVersionSettings(baseVersion)
+        : autoReplyDraftSettingsFromRow(existing);
+      const reparsed = await readDraftSettings(c.env.DB, {
+        ...draftInputFromSettings(base),
+        ...input,
+      });
+      if (!reparsed.ok) return c.json({ success: false, error: reparsed.error }, 400);
+      const templateRedirectError = await assertTemplateVisible(
+        c.env.DB,
+        c.get('staff'),
+        reparsed.value.templateId,
+        reparsed.templateLineAccountId,
+      );
+      if (templateRedirectError) {
+        return c.json({ success: false, error: templateRedirectError }, 403);
+      }
+      try {
+        const draftVersion = await saveAutoReplyDraftVersion(
+          c.env.DB,
+          id,
+          reparsed.value,
+          baseVersion ? Number(baseVersion.version_number) : 0,
+        );
+        const memos = await internalMemosOf(c.env.DB, [id]);
+        return c.json({
+          success: true,
+          data: {
+            ...serializeAutoReply(existing, memos.get(id) ?? null),
+            draftSaved: true,
+            draftVersionNumber: Number(draftVersion.version_number),
+          },
+          message: '稼働中の定義は変えていません。下書きに保存しました。競合の確認・テストを経て公開してください。',
+        });
+      } catch (redirectErr) {
+        if (redirectErr instanceof Error && redirectErr.message === 'AUTO_REPLY_VERSION_CONFLICT') {
+          return c.json({
+            success: false,
+            code: 'VERSION_CONFLICT',
+            error: 'ほかの変更が先に保存されました。最新の状態を読み直してください',
+          }, 409);
+        }
+        throw redirectErr;
+      }
+    }
+
     const updated = await updateAutoReply(c.env.DB, id, input as Parameters<typeof updateAutoReply>[2]);
 
     if (!updated) {
       return c.json({ success: false, error: 'Auto-reply not found' }, 404);
     }
 
-    return c.json({ success: true, data: serializeAutoReply(updated) });
+    const memos = await internalMemosOf(c.env.DB, [updated.id]);
+    return c.json({ success: true, data: serializeAutoReply(updated, memos.get(updated.id) ?? null) });
   } catch (err) {
     console.error('PUT /api/auto-replies/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1664,7 +1991,8 @@ autoReplies.post('/api/auto-replies/:id/stop', requireRole('owner', 'admin'), as
     if (!stopped) {
       return c.json({ success: false, error: 'Auto-reply not found' }, 404);
     }
-    const data = serializeAutoReply(stopped);
+    const memos = await internalMemosOf(c.env.DB, [stopped.id]);
+    const data = serializeAutoReply(stopped, memos.get(stopped.id) ?? null);
     await resolveStoppedByNames(c.env.DB, [data]);
     return c.json({ success: true, data });
   } catch (err) {

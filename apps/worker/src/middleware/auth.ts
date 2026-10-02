@@ -5,6 +5,10 @@ import { isForbiddenWhileImpersonating, resolveImpersonation } from './impersona
 
 import type { AdminSameSite } from './admin-auth-config.js';
 
+export type TenantStatus = 'active' | 'suspended' | 'archived';
+export const TENANT_SUSPENDED_CODE = 'TENANT_SUSPENDED';
+export const TENANT_SUSPENDED_ERROR = '現在ご利用いただけません。お問い合わせは「お問い合わせ」画面からお送りください';
+
 export const ADMIN_AUTH_COOKIE = 'lh_admin_session';
 export const ADMIN_SESSION_BEARER_PREFIX = 'lh_session:';
 export const CSRF_COOKIE = 'lh_csrf';
@@ -136,6 +140,8 @@ export type AuthenticatedStaff = {
   canAccessDescendantAccounts?: boolean;
   /** 所属する統括。認可への実適用は後続工程で行う。 */
   tenantId?: string | null;
+  /** 所属統括の実効状態。既定の運営会社と env-owner は active。 */
+  tenantStatus?: TenantStatus;
   /** 機能オフ middleware が一覧処理へ渡す、このリクエストだけの追加絞り込み。 */
   featureEnabledLineAccountIds?: string[];
 };
@@ -151,6 +157,7 @@ function toAuthenticatedStaff(staff: {
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
   tenant_id?: string | null;
+  tenant_status?: TenantStatus;
 }): AuthenticatedStaff {
   let permissionKeys: string[] = [];
   try { permissionKeys = staff.permission_keys ? JSON.parse(staff.permission_keys) as string[] : []; } catch { permissionKeys = []; }
@@ -170,7 +177,27 @@ function toAuthenticatedStaff(staff: {
     assignedLineAccountId: staff.assigned_line_account_id ?? null,
     canAccessDescendantAccounts: Boolean(staff.can_access_descendant_accounts),
     tenantId: staff.tenant_id ?? null,
+    tenantStatus: staff.tenant_status ?? 'active',
   };
+}
+
+export function isTenantUnavailable(status: TenantStatus | null | undefined): boolean {
+  return status === 'suspended' || status === 'archived';
+}
+
+/** 停止中でも契約先が自分で確認・問い合わせできる最小経路。 */
+export function isTenantSuspensionExemptPath(method: string, path: string): boolean {
+  const upper = method.toUpperCase();
+  const supportPath = path === '/api/hq/support' || path.startsWith('/api/hq/support/');
+  const noticePath = path === '/api/hq/notices' || path.startsWith('/api/hq/notices/');
+  return (upper === 'GET' && path === '/api/auth/session')
+    || (upper === 'POST' && path === '/api/auth/logout')
+    || supportPath
+    || (upper === 'GET' && noticePath)
+    || (upper === 'POST' && /^\/api\/hq\/notices\/[^/]+\/read$/.test(path))
+    // 運営会社の統括と運営マスターは契約先停止の対象外。実際の許可は
+    // 各 route の requirePlatformAdmin が引き続き担う。
+    || path.startsWith('/api/ops/');
 }
 
 const STAFF_API_PERMISSIONS: Array<[string, string]> = [
@@ -185,18 +212,23 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/rich-menus', '/rich-menus'],
   ['/api/rich-menu-groups', '/rich-menus'], ['/api/rich-menu-images', '/rich-menus'],
   ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'], ['/api/media', '/contents'],
+  // 危険なファイルの検査は登録メディアと同じ contents の鍵で守る。
+  // 一覧・設定・戻し・消去は route 側で owner/admin に絞っている。
+  ['/api/file-scans', '/contents'],
   // 共通情報は登録メディアと同じ contents.ts 配下。メニューの href と同じ鍵を使う。
   ['/api/common-vars', '/contents/vars'],
   // 流入計測の入口経路と文面は /inflow-links 画面が呼ぶ。
   ['/api/entry-routes', '/inflow-links'], ['/api/entry-route-genres', '/inflow-links'],
   ['/api/message-templates', '/inflow-links'],
+  // 広告費の台帳(#818)も流入画面の一部。書き込みは route 側で owner/admin に絞る。
+  ['/api/ad-costs', '/inflow-links'],
   ['/api/funnels', '/analytics'],
   // ダッシュボード(ホーム)の数字と表示設定。'/' 鍵はメニューの href と同じ。
   // /api/list-stats は複数画面の集計で帰属を決められないため登録しない
   // (fail-closed。N-423 の残課題として司令塔へ報告する)。
   ['/api/dashboard', '/'],
   ['/api/getting-started', '/getting-started'],
-  ['/api/conversions', '/conversions'], ['/api/scoring', '/scoring'], ['/api/scoring-rules', '/scoring'],
+  ['/api/conversions', '/conversions'], ['/api/measurement-sites', '/conversions'], ['/api/scoring', '/scoring'], ['/api/scoring-rules', '/scoring'],
   ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
   ['/api/mileage', '/mileage'], ['/api/action-scores', '/mileage'],
   ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
@@ -244,6 +276,8 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/nen-members\/photos\/decisions\/bulk(?:\/|$)/, 'photo.submission.bulk_review'],
   [/^\/api\/nen-members\/photos\/(?:original-download\/[^/]+|[^/]+\/original-download)(?:\/|$)/, 'photo.original.download'],
   [/^\/api\/nen-members\/photos\/[^/]+\/(?:assessments\/re-evaluate|assets\/process|review|notification\/retry)(?:\/|$)/, 'photo.submission.review'],
+  // ポイント付与の復旧（再試行・照合）は審査権限とは別の専用鍵（PHOTO-06）。
+  [/^\/api\/nen-members\/photos\/[^/]+\/(?:point-retry|point-reconcile)(?:\/|$)/, 'photo.reward.reconcile'],
   // 公開の撤回・掲載先の変更は審査権限ではなく掲載管理の上位権限（#931 N-311）。
   // 一覧の表示（GET publications）は審査と同じ閲覧権限のままにする。
   [/^\/api\/nen-members\/photos\/publications\/[^/]+\/(?:withdraw|placements)(?:\/|$)/, 'photo.publication.manage'],
@@ -291,6 +325,9 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   // 共通アップローダ。受信箱の 1 対 1 返信など staff の付与機能から使う。
   // 読み取りは公開の /images/* 経由で、鍵は機能 API の応答で渡る。
   ['POST', '/api/images'],
+  // 失敗文面の対応表。エラー表示は役割を問わず全スタッフに必要な
+  // シェル機能で、内容は文言の対応表だけ（秘密値・個人情報を含まない）。
+  ['GET', '/api/error-messages'],
 ];
 
 /**
@@ -359,7 +396,28 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/terms-agreement'],
   ['POST', '/api/restaurant-test/stores/selection/clear'],
   ['GET', '/api/restaurant-test/snapshot'],
+  ['GET', '/api/restaurant-test/channels'],
   ['POST', '/api/restaurant-test/reservations/manual'],
+  // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
+  ['GET', '/api/restaurant-test/google/connection'],
+  ['GET', '/api/restaurant-test/google/reviews'],
+  ['POST', '/api/restaurant-test/google/reviews/sync'],
+  // Googleビジネス第2段（GB-10〜GB-19）：担当者もプロフィールを読み、変更案を作れる。Googleへの送信は店舗管理者以上。
+  ['GET', '/api/restaurant-test/google/profile'],
+  ['POST', '/api/restaurant-test/google/profile/sync'],
+  ['GET', '/api/restaurant-test/google/holidays'],
+  ['GET', '/api/restaurant-test/google/photos'],
+  ['POST', '/api/restaurant-test/google/hours/propose'],
+  ['POST', '/api/restaurant-test/google/profile/propose'],
+  ['GET', '/api/restaurant-test/google/changes'],
+  // Googleビジネス第3段（GB-4〜GB-14）：担当者も投稿を読み、下書きを作れる。Googleへの送信・削除は店舗管理者以上。
+  ['GET', '/api/restaurant-test/google/posts'],
+  ['POST', '/api/restaurant-test/google/posts'],
+  ['POST', '/api/restaurant-test/google/posts/sync'],
+  // Googleビジネス第4段（GB-9）：パフォーマンスは読み取りのみ。担当者も見られる。
+  // performance/sync は口コミ・投稿・プロフィールのsyncと同じくGoogleから読んで自DBに書くだけ（Googleへの書き込みは無い）ため、担当者にも許可する。
+  ['GET', '/api/restaurant-test/google/performance'],
+  ['POST', '/api/restaurant-test/google/performance/sync'],
   // 運営からのお知らせ（★V6 37-7）は本人宛て。担当者でも読んで既読にできる。
   ['GET', '/api/hq/notices'],
   ['GET', '/api/hq/notices/line-registration'],
@@ -367,6 +425,15 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
 
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
+  ['PATCH', /^\/api\/restaurant-test\/reservations\/[^/]+$/],
+  ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
+  ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],
+  ['GET', /^\/api\/restaurant-test\/google\/changes\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/google\/changes\/[^/]+\/cancel$/],
+  ['GET', /^\/api\/restaurant-test\/google\/posts\/[^/]+$/],
+  ['PUT', /^\/api\/restaurant-test\/google\/posts\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/google\/posts\/[^/]+\/cancel$/],
   ['POST', /^\/api\/hq\/notices\/[^/]+\/read$/],
 ];
 
@@ -403,6 +470,9 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path === '/api/public/nen/gallery-preview' ||
     path === '/api/site/collect' ||
     path === '/api/site/script.js' ||
+    // #819: 計測タグからの成果受信。サイトIDと許可ドメインで検証する
+    // 公開口で、管理画面の認証は通さない(OPTIONSの事前確認も含む)。
+    path === '/api/public/web-conversions' ||
     path.startsWith('/t/') ||
     path.startsWith('/r/') ||
     path.startsWith('/pool/') ||
@@ -502,7 +572,7 @@ export async function authenticateApiToken(
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
   if (token === c.env.API_KEY) {
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active' };
   }
 
   // Legacy fallback: LEGACY_API_KEY accepted during rotation grace period.
@@ -516,7 +586,7 @@ export async function authenticateApiToken(
     token === c.env.LEGACY_API_KEY
   ) {
     console.log('[auth] accept_via=LEGACY_API_KEY');
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active' };
   }
 
   return null;
@@ -587,6 +657,14 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     if (isForbiddenWhileImpersonating(method, path)) {
       return c.json({ success: false, error: '代理ログイン中はこの操作はできません（解約・権限者の削除・LINEアカウントの削除）' }, 403);
     }
+  }
+
+  // 契約先の停止・保管は画面非表示ではなく、すべての管理APIの共通境界で
+  // 強制する。運営マスターによる有効な代理ログインだけは閲覧を継続できる。
+  if (!impersonated
+      && isTenantUnavailable(staff.tenantStatus)
+      && !isTenantSuspensionExemptPath(method, path)) {
+    return c.json({ success: false, code: TENANT_SUSPENDED_CODE, error: TENANT_SUSPENDED_ERROR }, 403);
   }
 
   if (staff.readOnly && !SAFE_METHODS.has(method)) {

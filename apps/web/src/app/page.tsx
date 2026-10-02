@@ -8,16 +8,20 @@ import { ApiError, api, bookingApi, type BookingRequest, type DashboardOverview 
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { formatDurationMinutes, formatWaitRough } from '@/lib/format-duration'
+import MetricValue from '@/components/ui/metric-value'
 import PendingInboxCard, { type PendingInboxSummary } from '@/components/support/pending-inbox-card'
 import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/shipment-panel'
 import QrDialog from '@/components/dashboard/qr-dialog'
 import FriendTrendTable from '@/components/dashboard/friend-trend-table'
 import DashboardFreshness, { dashboardLocalUpdatedAt, dashboardPeriodLabel } from '@/components/dashboard/freshness'
+import GettingStartedBand from '@/components/dashboard/getting-started-band'
 import {
   FriendStatusCard,
   SupportMarkStatusCard,
+  DeliveryFailuresCard,
   MonthlyDeliveryCard,
   RecentResultsCard,
+  SideCard,
   UpcomingCard,
   activeUpcomingBookings,
   inactiveBookingStatuses,
@@ -33,7 +37,10 @@ import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import NotificationPanel from '@/components/shared/notification-panel'
 import KpiCollapse from '@/components/ui/kpi-collapse'
-import SelectField from '@/components/shared/select-field'
+import HelpTip from '@/components/shared/help-tip'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import {
   hasInboundSupportMark,
@@ -48,6 +55,7 @@ import {
   markDashboardNotificationRead,
   type DashboardNotificationFilter,
 } from '@/components/dashboard/notification-summary'
+import { formatNumber, formatTime } from '@/lib/format'
 
 /** 共通トップバーの通知ベル。件数と一覧は選択中アカウントの通知センターから読む。 */
 function BellIcon() {
@@ -94,9 +102,7 @@ function monthKey(offset: number): string {
  * 時刻だけだと、深夜に見たとき「次回 09:00」が今日なのか明日なのか読めない。
  */
 function nextBookingLabel(iso: string, today: string): string {
-  const time = new Date(iso).toLocaleTimeString('ja-JP', {
-    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
-  })
+  const time = formatTime(iso)
   const day = jstDay(iso)
   if (day === today) return `次回 ${time}`
   if (day === jstDay(Date.now() + 86_400_000)) return `次回 明日 ${time}`
@@ -122,6 +128,7 @@ function TodayTaskCard({
   detail,
   status,
   statusTone = 'success',
+  loading = false,
 }: {
   title: string
   /*
@@ -139,21 +146,47 @@ function TodayTaskCard({
    * ときだけ使う。権限不足・取得失敗・読込中に緑を出すと、できる状態と
    * 見間違うため（A01-01）。
    */
-  statusTone?: 'success' | 'muted'
+  statusTone?: 'success' | 'muted' | 'danger'
+  /* true の間は件数の場所に骨組みを出す。失敗・未取得は「—」のまま（#673）。 */
+  loading?: boolean
 }) {
   return (
+    /*
+     * ★V7「ダッシュボードの見せ方」（V7 文書 fyR7V）。数字をいちばん大きく、状態は数字の横、
+     * 操作は右下に1つ（→付き）。以前は右上の操作・数字・補足2つの3段で、目が上下に散っていた。
+     */
     <Card layout="vertical" padding="default" className="h-[116px] min-w-0">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-ink min-w-0 text-sm font-semibold">{title}</h3>
-        {period ? <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal">{period}</span> : null}
-        <Link href={href} className="text-action shrink-0 text-xs font-medium hover:underline">{action}</Link>
+      <div className="flex min-w-0 items-baseline gap-2">
+        <h3 className="text-ink-secondary min-w-0 truncate text-sm font-semibold" title={title}>{title}</h3>
+        {period ? <span className="text-ink-faint whitespace-nowrap text-xs font-normal">{period}</span> : null}
       </div>
-      <p className="text-ink mt-2 text-[28px] leading-none font-bold tabular-nums">
-        {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-0.5 text-lg">件</span>
-      </p>
-      <div className="mt-2 flex items-end justify-between gap-3">
-        <span className="text-ink-faint truncate text-xs" title={detail}>{detail}</span>
-        <span className={`${statusTone === 'muted' ? 'text-ink-faint' : 'text-success'} shrink-0 text-xs font-medium`}>{status}</span>
+      <div className="mt-2 flex min-w-0 items-baseline gap-2">
+        <p className="text-ink text-[28px] leading-none font-bold tabular-nums" aria-busy={loading || undefined}>
+          {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
+          <DelayedSkeleton
+            loading={loading}
+            skeleton={
+              <>
+                <Skeleton className="h-7 w-16" />
+                <span className="sr-only">{STATE_TEXT.loading}</span>
+              </>
+            }
+          >
+            {value === null ? '—' : formatNumber(value)}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
+          </DelayedSkeleton>
+        </p>
+        <span className={`${statusTone === 'muted' ? 'text-ink-faint' : statusTone === 'danger' ? 'text-danger' : 'text-success'} shrink-0 whitespace-nowrap text-xs font-semibold`}>{status}</span>
+      </div>
+      {/*
+        配置は右下のまま（★V7「ダッシュボードの見せ方」fyR7V）。
+        見た目だけ CardHeader の action（actionTone="info"）にそろえる。
+      */}
+      <div className="mt-auto flex items-center justify-between gap-3">
+        <span className="text-ink-faint min-w-0 truncate text-xs" title={detail}>{detail}</span>
+        <Link href={href} className="text-status-info inline-flex min-h-6 shrink-0 items-center gap-1 text-label font-semibold hover:underline">
+          {action}
+          <span aria-hidden="true">→</span>
+        </Link>
       </div>
     </Card>
   )
@@ -251,18 +284,18 @@ function FriendAddLinkCard({
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex min-w-[220px] items-center gap-2">
             <span className="text-ink-faint shrink-0 text-[10px] font-medium">発行中</span>
-            <SelectField
+            <Select
               value={routeId}
-              onChange={(event) => setRouteId(event.target.value)}
+              onChange={(value) => setRouteId(value)}
               aria-label="発行中の追加URL"
-              className="text-ink min-w-0 flex-1 bg-transparent text-xs font-medium focus:outline-none"
+              className="min-w-0 flex-1"
               options={[
                 { value: '', label: '基本の追加URL' },
                 ...(routes ?? []).map((entry) => ({ value: entry.id, label: entry.name })),
               ]}
             />
           </label>
-          <Link href="/inflow-links" className="border-hairline text-action hover:bg-action-soft rounded-control border px-3 py-2 text-xs font-medium">経路を分けて発行</Link>
+          <Button variant="secondary" className="text-action hover:bg-action-soft px-3 py-2 text-xs h-auto whitespace-normal" href="/inflow-links">経路を分けて発行</Button>
         </div>
       </div>
 
@@ -274,10 +307,10 @@ function FriendAddLinkCard({
           aria-label="友だち追加リンク"
           className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 truncate border px-3 py-2.5 font-mono text-xs"
         />
-        <button type="button" onClick={onCopy} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control shrink-0 px-5 py-2.5 text-xs font-medium">
+        <Button variant="primary" className="shrink-0 px-5 py-2.5 text-xs border-0 h-auto whitespace-normal" type="button" onClick={onCopy}>
           {copyState === 'copied' ? 'コピーしました ✓' : 'コピー'}
-        </button>
-        <button type="button" onClick={() => writeQr(routeId || 'base')} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-5 py-2.5 text-xs font-medium">QRを表示</button>
+        </Button>
+        <Button variant="secondary" className="text-ink-secondary shrink-0 px-5 py-2.5 text-xs h-auto whitespace-normal" type="button" onClick={() => writeQr(routeId || 'base')}>QRを表示</Button>
       </div>
       {copyState === 'failed' ? (
         <p role="alert" className="text-danger mt-2 text-xs">
@@ -342,8 +375,15 @@ function LoadingDataCard({ title, href, linkLabel }: { title: string; href: stri
         actionTone="info"
       />
       <div className="space-y-2 px-5 py-8" aria-label={`${title}を${STATE_TEXT.loading}`}>
-        <div className="bg-canvas-sunken h-5 animate-pulse rounded" />
-        <div className="bg-canvas-sunken h-5 w-2/3 animate-pulse rounded" />
+        <DelayedSkeleton
+          loading
+          skeleton={
+            <div className="space-y-2">
+              <Skeleton className="block h-5 w-full" />
+              <Skeleton className="block h-5 w-2/3" />
+            </div>
+          }
+        />
       </div>
     </Card>
   )
@@ -370,23 +410,50 @@ function UnavailableDataCard({ title, onRetry, section }: {
 }
 
 function LiveDataCard({
-  title, period, href, linkLabel, value, unit = '件', detail, freshness,
+  title, period, href, linkLabel, value, unit = '件', detail, help, freshness, loading = false,
 }: {
   title: string
   /* 数字の対象期間（「現在」・選択中の期間など）。見出しの脇へ小さく出す（IDEA-01）。 */
   period?: string
   href: string; linkLabel: string; value: number | null; unit?: string; detail: string
+  /* 定義・分母・計算のしかた。見出しのすぐ右の「？」へ入れる（★V7・§2-1b）。 */
+  help?: string
   freshness?: NonNullable<DashboardOverview['sections']>[keyof NonNullable<DashboardOverview['sections']>]
+  /* true の間は数値の場所に骨組みを出す。失敗・未取得は「—」のまま（#673）。 */
+  loading?: boolean
 }) {
   return (
     <Card padding="roomy">
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-ink min-w-0 text-sm font-semibold">{title}</h2>
-        {period ? <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal">{period}</span> : null}
-        <Link href={href} className="text-action shrink-0 text-xs hover:underline">{linkLabel} →</Link>
+        {/*
+          題と「？」・期間はひとかたまりにし、文字の縦の中央でそろえる
+          （★V7・2026-09-27）。ばらばらに置くと「？」だけ右端へ飛ぶ。
+        */}
+        <div className="flex min-w-0 items-center gap-1">
+          <h2 className="text-ink min-w-0 truncate text-sm font-semibold" title={title}>{title}</h2>
+          {help ? <HelpTip label={`${title}の説明`}>{help}</HelpTip> : null}
+          {period ? <span className="text-ink-faint shrink-0 text-[11px] font-normal whitespace-nowrap">{period}</span> : null}
+        </div>
+        {/*
+          行き先リンクは CardHeader の action（actionTone="info"）と
+          同じ色・大きさにする。配置はもとから見出しの行の右端なので変えない。
+        */}
+        <Link href={href} className="text-status-info shrink-0 text-label font-semibold hover:underline">{linkLabel} →</Link>
       </div>
-      <p className="text-ink mt-4 text-2xl font-bold tabular-nums">
-        {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-1 text-sm font-medium">{unit}</span>
+      <p className="text-ink mt-4 text-2xl font-bold tabular-nums" aria-busy={loading || undefined}>
+        {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
+        <DelayedSkeleton
+          loading={loading}
+          skeleton={
+            <>
+              <Skeleton className="h-7 w-20" />
+              <span className="sr-only">{STATE_TEXT.loading}</span>
+            </>
+          }
+        >
+          {/* 監査6 #674: 数字の見せ方は MetricValue に寄せる。値が無いときは「—」だけで単位を付けない。 */}
+          <MetricValue value={value} unit={unit} />
+        </DelayedSkeleton>
       </p>
       <div className="mt-2 flex items-end justify-between gap-3">
         <p className="text-ink-faint min-w-0 truncate text-xs" title={detail}>{detail}</p>
@@ -422,17 +489,23 @@ function SendQuotaCard({
   const remainingRate = remaining !== null && limit ? Math.max(0, Math.min(100, remaining / limit * 100)) : null
   /* 残りわずか・0件を緑のままにしない。10%を切ったら危険色にする。 */
   const low = remainingRate !== null && remainingRate <= 10
-  return <Card padding="roomy" className="min-h-[128px]">
-    <div className="flex items-start justify-between gap-3">
-      <h2 className="text-ink text-base font-bold">今月の送信枠</h2>
-      <span className="text-ink-faint text-xs">毎月1日リセット</span>
-    </div>
+  /*
+   * 行き先リンクは見出しの行の右端に1つ（SideCard の action）、
+   * 更新時刻は右下にそろえる。「毎月1日リセット」は題の脇に置くと
+   * 題が2行に折れるため、「？」（HelpTip：いつ元に戻るか）へ移す。
+   */
+  return <SideCard
+    title="今月の送信枠"
+    helpTip="送信枠は毎月1日にリセットされます。使い切ると翌月1日まで送れません。"
+    action={{ label: '配信設定へ →', href: '/accounts' }}
+    freshness={freshness}
+  >
     {/*
       設計（`vUXKb`）は数の前に「LINE公式」と置く。送信枠はLINE公式アカウント
       の枠で、メールには効かない。どちらの枠かが書いていないと、メールが
       止まったときにここを見てしまう。
     */}
-    <p className="text-ink mt-3 flex items-baseline gap-2 whitespace-nowrap">
+    <p className="text-ink flex items-baseline gap-2 whitespace-nowrap">
       <span className="text-ink-secondary text-sm font-semibold">LINE公式</span>
       <span className="text-metric leading-none font-bold tabular-nums">
         {/*
@@ -441,11 +514,21 @@ function SendQuotaCard({
           この値は `limit - used` なので残り。言葉を付けて向きを固定する。
         */}
         <span className="text-base leading-tight">
-          {unlimited
-            ? `使用 ${used === null ? '—' : used.toLocaleString('ja-JP')}通（上限なし）`
-            : remaining === null || limit === null
-              ? '—'
-              : `残り ${remaining.toLocaleString('ja-JP')} / 上限 ${limit.toLocaleString('ja-JP')}通`}
+          <DelayedSkeleton
+            loading={loading}
+            skeleton={
+              <>
+                <Skeleton className="h-6 w-44" />
+                <span className="sr-only">{STATE_TEXT.loading}</span>
+              </>
+            }
+          >
+            {unlimited
+              ? `使用 ${used === null ? '—' : formatNumber(used)}通（上限なし）`
+              : remaining === null || limit === null
+                ? '—'
+                : `残り ${formatNumber(remaining)} / 上限 ${formatNumber(limit)}通`}
+          </DelayedSkeleton>
         </span>
       </span>
     </p>
@@ -454,28 +537,29 @@ function SendQuotaCard({
     ) : (
       <div className="bg-hairline mt-3 h-1.5 overflow-hidden rounded-pill"><div className={`${low ? 'bg-danger' : 'bg-accent'} h-full rounded-pill`} style={{ width: `${remainingRate ?? 0}%` }} /></div>
     )}
-    <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+    <div className="mt-2 text-xs">
       {notConnected ? (
         <span className="text-ink-faint">LINEアカウントが未接続です</span>
       ) : failed ? (
         <button type="button" onClick={onRetry} className="text-danger font-medium hover:underline">
           {`送信枠を${STATE_TEXT.error}。もう一度読み込む`}
         </button>
-      ) : loading ? (
-        <span className="text-ink-faint">{STATE_TEXT.loading}…</span>
-      ) : unlimited ? (
-        <span className="text-ink-faint">契約種別：無制限</span>
       ) : (
-        <span className={low ? 'text-danger' : 'text-success'}>
-          {remainingRate === null ? '残りを確認中' : `残り ${remainingRate.toFixed(1)}%`}
-        </span>
+        <DelayedSkeleton
+          loading={loading}
+          skeleton={<Skeleton className="h-4 w-24" />}
+        >
+          {unlimited ? (
+            <span className="text-ink-faint">契約種別：無制限</span>
+          ) : (
+            <span className={low ? 'text-danger' : 'text-success'}>
+              {remainingRate === null ? '残りを確認中' : `残り ${remainingRate.toFixed(1)}%`}
+            </span>
+          )}
+        </DelayedSkeleton>
       )}
-      <span className="flex shrink-0 items-center gap-3">
-        {freshness}
-        <Link href="/accounts" className="text-action font-medium hover:underline">配信設定へ →</Link>
-      </span>
     </div>
-  </Card>
+  </SideCard>
 }
 
 function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFactor, referenceCount, failed, updatedAt }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null; twoFactor: { enabled: number; total: number } | null; referenceCount?: number; failed?: boolean; updatedAt?: Date | null }) {
@@ -483,20 +567,27 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
   // 未対応の長さは受信カードで管理する。ここへ重ねて警告扱いすると、
   // 接続も自動処理も正常なのに赤い「1件」が出てしまう。
   const count = referenceCount ?? (risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0)
-  return <Card padding="roomy" className="min-h-[128px]">
-    <div className="flex items-start justify-between gap-3">
-      <h2 className="text-ink text-base font-bold">運用アラート</h2>
-      {/* 現在時点の状態。数の対象期間が分かるよう見出し脇へ書く（IDEA-01）。 */}
-      <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal">現在</span>
-      {/*
-        #631: 件数の母集団は変えない（health issue だけを数える）。
-        「最も古い未対応」と別のものを数えていることが、件数の脇の文言
-        だけで分かるようにする。0件のときに「未対応が長引いている」の
-        隣で緑の「0件」が出ても、別の指標だと読めるようにするのが狙い。
-        取れていないときは 0件 ではなく「未取得」とする（IDEA-01）。
-      */}
-      <span className={failed || count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{failed ? '未取得' : count === null ? '—' : `接続・自動処理 ${count}件`}</span>
-    </div>
+  /*
+   * 行き先リンクは見出しの行の右端に1つ（SideCard の action）、
+   * 更新時刻は右下にそろえる。見出しの脇の「現在」はそのまま残す。
+   * 件数と札は見出し行から本文の先頭へ移す（見出しを切らない★V7）。
+   */
+  return <SideCard
+    title="運用アラート"
+    period="現在"
+    action={{ label: '運用状態を見る →', href: '/emergency' }}
+    freshness={dashboardLocalUpdatedAt(updatedAt) ? (
+      <span className="text-ink-faint shrink-0 text-xs font-medium">{dashboardLocalUpdatedAt(updatedAt)}</span>
+    ) : undefined}
+  >
+    {/*
+      #631: 件数の母集団は変えない（health issue だけを数える）。
+      「最も古い未対応」と別のものを数えていることが、件数の脇の文言
+      だけで分かるようにする。0件のときに「未対応が長引いている」の
+      隣で緑の「0件」が出ても、別の指標だと読めるようにするのが狙い。
+      取れていないときは 0件 ではなく「未取得」とする（IDEA-01）。
+    */}
+    <p className="flex flex-wrap items-center gap-2"><span className={failed || count === null ? 'text-ink-faint text-sm font-bold' : 'text-ink text-sm font-bold'}>{failed ? '未取得' : count === null ? '—' : `接続・自動処理 ${count}件`}</span>{!failed && count !== null ? <StatusBadge tone={count > 0 ? 'danger' : 'success'} size="compact">{count > 0 ? '要確認' : '正常'}</StatusBadge> : null}</p>
     {/*
       設計（`vUXKb`）は「最も古い未対応」と「二段階認証」の2行。
       二段階認証は既存のログインユーザー一覧から、有効な人だけを数える。
@@ -510,13 +601,7 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
       <p>・最も古い未対応：{oldestWaitMinutes === null ? '—' : formatWaitRough(oldestWaitMinutes)}</p>
       <p>・組織全体の二段階認証：{twoFactor === null ? '—' : `${twoFactor.enabled} / ${twoFactor.total}人`}</p>
     </div>
-    <div className="mt-3 flex items-center justify-between gap-3">
-      <Link href="/emergency" className="text-action inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
-      {dashboardLocalUpdatedAt(updatedAt) ? (
-        <span className="text-ink-faint shrink-0 text-xs font-medium">{dashboardLocalUpdatedAt(updatedAt)}</span>
-      ) : null}
-    </div>
-  </Card>
+  </SideCard>
 }
 
 function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, updatedAt }: { account: ReturnType<typeof useAccount>['selectedAccount']; risk: HealthRisk; activeFriends: number | null; healthFailed?: boolean; updatedAt?: Date | null }) {
@@ -524,9 +609,9 @@ function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, upda
   const webhookLabel = webhook === 'matched' ? '正常' : webhook === 'mismatched' || webhook === 'unconfigured' ? '要確認' : '確認中'
   return <Card padding="roomy" className="min-h-[128px]">
     <div className="flex items-baseline justify-between gap-3">
-      <h2 className="text-ink text-base font-bold">接続状態</h2>
+      <h2 className="text-ink min-w-0 truncate text-base font-bold" title="接続状態">接続状態</h2>
       {/* 現在時点の状態（IDEA-01）。 */}
-      <span className="text-ink-faint flex-1 text-[11px] font-normal">現在</span>
+      <span className="text-ink-faint flex-1 whitespace-nowrap text-[11px] font-normal">現在</span>
       {dashboardLocalUpdatedAt(updatedAt) ? (
         <span className="text-ink-faint shrink-0 text-xs font-medium">{dashboardLocalUpdatedAt(updatedAt)}</span>
       ) : null}
@@ -535,7 +620,7 @@ function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, upda
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">LINE Webhook</dt><dd className={webhookLabel === '正常' ? 'text-success font-semibold' : webhookLabel === '要確認' ? 'text-danger font-semibold' : 'text-ink-faint'}>{webhookLabel}</dd></div>
       {/* 稼働チェックの取得に失敗したときは「確認中」ではなく「未取得」にする（IDEA-01）。 */}
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">自動処理</dt><dd className={healthFailed ? 'text-ink-faint' : risk === 'normal' ? 'text-success font-semibold' : risk ? 'text-danger font-semibold' : 'text-ink-faint'}>{healthFailed ? '未取得' : risk === 'normal' ? '稼働中' : risk ? '要確認' : '確認中'}</dd></div>
-      <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-success font-semibold">{activeFriends === null ? '—' : `${activeFriends.toLocaleString('ja-JP')}人`}</dd></div>
+      <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-ink font-semibold tabular-nums">{activeFriends === null ? '—' : `${formatNumber(activeFriends)}人`}</dd></div>
     </dl>
   </Card>
 }
@@ -629,6 +714,7 @@ function DashboardPageInner() {
   const [twoFactorSummary, setTwoFactorSummary] = useState<TwoFactorSummary | null>(null)
   const [supportMarkAutoOnInbound, setSupportMarkAutoOnInbound] = useState<boolean | null>(null)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notificationBellRef = useRef<HTMLDivElement>(null)
   const [notificationFilter, setNotificationFilter] = useState<DashboardNotificationFilter>('all')
   const [notificationData, setNotificationData] = useState<NotificationCenterData | null>(null)
   const [notificationAccountId, setNotificationAccountId] = useState<string | null>(null)
@@ -933,40 +1019,71 @@ function DashboardPageInner() {
     }
   }
 
+  /*
+    V6R-S1-a: 補足データはカードごとに別の effect で取る。
+
+    以前は5系統を1つの effect で取っていたため、どれか1つの「要る／要らない」が
+    後から変わると全部を取り直していた。検証環境の実測では、対応マーク機能の
+    有効が表示可否の到着で判明した瞬間に、写真・予約・予約集計・健全性・職員一覧まで
+    2回目を取りに行っていた（ダッシュボードで28本中7種が2回）。
+
+    - アカウントを切り替えたら、前のアカウントの値はすべて同じタイミングで消す（DASH-03）
+    - 届いた順にカードへ反映する（PERF-01）。「最後に終えた時刻」はそれぞれの完了で刻む
+  */
+  const markSupplementLoaded = useCallback((isCancelled: () => boolean) => {
+    if (!isCancelled()) setSupplementLoadedAt(new Date())
+  }, [])
+
   useEffect(() => {
-    if (!selectedAccountId) {
-      setBookings(null)
-      setPendingPhotos(null)
-      setPendingPhotosState('loading')
-      setHealthRisk(null)
-      setHealthIssueCount(null)
-      setTwoFactorSummary(null)
-      setSupportMarkAutoOnInbound(null)
-      setTodayActiveBookings(null)
-      setBookingsFailed(false)
-      setHealthFailed(false)
-      setSupplementLoadedAt(null)
+    // アカウントが替わったら、補足データの「最後に終えた時刻」を消す。各カードの値は各 effect が消す。
+    setSupplementLoadedAt(null)
+    setSupplementLoading(Boolean(selectedAccountId))
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    setPendingPhotos(null)
+    setPendingPhotosState('loading')
+    if (!selectedAccountId) return
+    if (!needsPhotos) {
+      setPendingPhotosState('ready')
+      return
+    }
+    let cancelled = false
+    const isCancelled = () => cancelled
+    void api.nenMembers.photoReviewMetrics(selectedAccountId).then(
+      (result) => {
+        if (cancelled) return
+        const photoCount = result?.success ? result.data.pendingCount : null
+        setPendingPhotos(photoCount)
+        setPendingPhotosState(photoCount !== null ? 'ready' : 'error')
+        markSupplementLoaded(isCancelled)
+      },
+      /*
+        取れなかった理由で出し分ける。403 は権限、それ以外は取得失敗。
+        どちらも「読み込み中」のままにしない（#666 差し戻し）。
+      */
+      (reason) => {
+        if (cancelled) return
+        setPendingPhotos(null)
+        setPendingPhotosState(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
+        markSupplementLoaded(isCancelled)
+      },
+    )
+    return () => { cancelled = true }
+  }, [markSupplementLoaded, needsPhotos, selectedAccountId])
+
+  useEffect(() => {
+    setBookings(null)
+    setTodayActiveBookings(null)
+    setBookingsFailed(false)
+    if (!selectedAccountId) return
+    if (!needsBookings) {
       setSupplementLoading(false)
       return
     }
     let cancelled = false
+    const isCancelled = () => cancelled
     setSupplementLoading(true)
-    /*
-     * 勘定を切り替えたら前の勘定の件数を消す。新しい件数が来るまで古い数を
-     * 出さない。写真だけでなく予約・健全性・二段階認証・対応マークの設定も
-     * すべて前のアカウントの値なので、同じタイミングで失効させる（DASH-03）。
-     */
-    setPendingPhotos(null)
-    setPendingPhotosState('loading')
-    setBookings(null)
-    setTodayActiveBookings(null)
-    setBookingsFailed(false)
-    setHealthRisk(null)
-    setHealthIssueCount(null)
-    setHealthFailed(false)
-    setTwoFactorSummary(null)
-    setSupportMarkAutoOnInbound(null)
-    setSupplementLoadedAt(null)
     /*
       予約の明細は今日以降だけ100件に区切って取る。終わった予約まで
       全部取ると、件数が増えたときに遅くなる。今日の数と直近の予定は
@@ -977,51 +1094,18 @@ function DashboardPageInner() {
     const jstMidnightUtc = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate()) - 9 * 60 * 60 * 1000
     const todayStartIso = new Date(jstMidnightUtc).toISOString()
     const todayJst = jstDay(now)
-    /*
-      PERF-01: 補足データはカードごとに届いた順で反映する。以前は
-      Promise.allSettled が全部そろうのを待ってからまとめて書いていたため、
-      遅い予約や健全性の応答が、先に届いた写真・二段階認証・対応マークの
-      カードまで待たせていた。各取得に届いた時点の反映を付け、
-      「最後に終えた時刻」はそれぞれの完了で刻む。
-    */
-    const markLoaded = () => {
-      if (!cancelled) setSupplementLoadedAt(new Date())
-    }
-    const photoPromise = needsPhotos ? api.nenMembers.photoReviewMetrics(selectedAccountId) : Promise.resolve(null)
-    const bookingPromise = needsBookings ? bookingApi.listRequests(selectedAccountId, 'all', { from: todayStartIso, limit: 100 }) : Promise.resolve(null)
-    const healthPromise = needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null)
-    const staffPromise = needsTwoFactor ? api.staff.list() : Promise.resolve(null)
-    const supportMarkPromise = needsSupportMarks ? api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }) : Promise.resolve(null)
+    const bookingPromise = bookingApi.listRequests(selectedAccountId, 'all', { from: todayStartIso, limit: 100 })
     /*
       「今日の予約」の件数は明細とは別に集計APIから取る（A01-04）。
       明細は100件までしか来ないため、件数だけは上限に引っ張られない
       口を使う。
     */
-    const bookingSummaryPromise = needsBookings ? bookingApi.requestsSummary(selectedAccountId, {
+    const bookingSummaryPromise = bookingApi.requestsSummary(selectedAccountId, {
       month: monthKey(0),
       lastMonth: monthKey(-1),
       today: todayJst,
       weekTo: jstDay(Date.now() + 6 * 86_400_000),
-    }) : Promise.resolve(null)
-    void photoPromise.then(
-      (result) => {
-        if (cancelled) return
-        const photoCount = result?.success ? result.data.pendingCount : null
-        setPendingPhotos(photoCount)
-        setPendingPhotosState(!needsPhotos || photoCount !== null ? 'ready' : 'error')
-        markLoaded()
-      },
-      /*
-        取れなかった理由で出し分ける。403 は権限、それ以外は取得失敗。
-        どちらも「読み込み中」のままにしない（#666 差し戻し）。
-      */
-      (reason) => {
-        if (cancelled) return
-        setPendingPhotos(null)
-        setPendingPhotosState(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
-        markLoaded()
-      },
-    )
+    })
     void bookingPromise.then(
       (result) => {
         if (cancelled) return
@@ -1031,14 +1115,14 @@ function DashboardPageInner() {
         */
         const bookingList = result && Array.isArray(result.requests) ? result.requests : null
         setBookings(bookingList)
-        setBookingsFailed(needsBookings && bookingList === null)
-        markLoaded()
+        setBookingsFailed(bookingList === null)
+        markSupplementLoaded(isCancelled)
       },
       () => {
         if (cancelled) return
         setBookings(null)
-        setBookingsFailed(needsBookings)
-        markLoaded()
+        setBookingsFailed(true)
+        markSupplementLoaded(isCancelled)
       },
     )
     void bookingSummaryPromise.then(
@@ -1049,57 +1133,12 @@ function DashboardPageInner() {
           表示側で明細からの件数へ戻す。取りこぼした数字を本物に見せない。
         */
         setTodayActiveBookings(result && typeof result.todayActiveTotal === 'number' ? result.todayActiveTotal : null)
-        markLoaded()
+        markSupplementLoaded(isCancelled)
       },
       () => {
         if (cancelled) return
         setTodayActiveBookings(null)
-        markLoaded()
-      },
-    )
-    void healthPromise.then(
-      (result) => {
-        if (cancelled) return
-        const healthData = result?.success === true ? result.data : null
-        setHealthRisk(healthData ? (healthData.riskLevel as HealthRisk) : null)
-        setHealthIssueCount(
-          healthData
-            ? healthData.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
-            : null,
-        )
-        setHealthFailed(needsHealth && healthData === null)
-        markLoaded()
-      },
-      () => {
-        if (cancelled) return
-        setHealthRisk(null)
-        setHealthIssueCount(null)
-        setHealthFailed(needsHealth)
-        markLoaded()
-      },
-    )
-    void staffPromise.then(
-      (result) => {
-        if (cancelled) return
-        setTwoFactorSummary(result?.success ? summarizeTwoFactor(result.data) : null)
-        markLoaded()
-      },
-      () => {
-        if (cancelled) return
-        setTwoFactorSummary(null)
-        markLoaded()
-      },
-    )
-    void supportMarkPromise.then(
-      (result) => {
-        if (cancelled) return
-        setSupportMarkAutoOnInbound(result?.success ? hasInboundSupportMark(result.data) : null)
-        markLoaded()
-      },
-      () => {
-        if (cancelled) return
-        setSupportMarkAutoOnInbound(null)
-        markLoaded()
+        markSupplementLoaded(isCancelled)
       },
     )
     /*
@@ -1111,7 +1150,78 @@ function DashboardPageInner() {
       if (!cancelled) setSupplementLoading(false)
     })
     return () => { cancelled = true }
-  }, [needsBookings, needsHealth, needsPhotos, needsSupportMarks, needsTwoFactor, selectedAccountId])
+  }, [markSupplementLoaded, needsBookings, selectedAccountId])
+
+  useEffect(() => {
+    setHealthRisk(null)
+    setHealthIssueCount(null)
+    setHealthFailed(false)
+    if (!selectedAccountId || !needsHealth) return
+    let cancelled = false
+    const isCancelled = () => cancelled
+    void api.health.getHealth(selectedAccountId).then(
+      (result) => {
+        if (cancelled) return
+        const healthData = result?.success === true ? result.data : null
+        setHealthRisk(healthData ? (healthData.riskLevel as HealthRisk) : null)
+        setHealthIssueCount(
+          healthData
+            ? healthData.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
+            : null,
+        )
+        setHealthFailed(healthData === null)
+        markSupplementLoaded(isCancelled)
+      },
+      () => {
+        if (cancelled) return
+        setHealthRisk(null)
+        setHealthIssueCount(null)
+        setHealthFailed(true)
+        markSupplementLoaded(isCancelled)
+      },
+    )
+    return () => { cancelled = true }
+  }, [markSupplementLoaded, needsHealth, selectedAccountId])
+
+  useEffect(() => {
+    setTwoFactorSummary(null)
+    if (!selectedAccountId || !needsTwoFactor) return
+    let cancelled = false
+    const isCancelled = () => cancelled
+    void api.staff.list().then(
+      (result) => {
+        if (cancelled) return
+        setTwoFactorSummary(result?.success ? summarizeTwoFactor(result.data) : null)
+        markSupplementLoaded(isCancelled)
+      },
+      () => {
+        if (cancelled) return
+        setTwoFactorSummary(null)
+        markSupplementLoaded(isCancelled)
+      },
+    )
+    return () => { cancelled = true }
+  }, [markSupplementLoaded, needsTwoFactor, selectedAccountId])
+
+  useEffect(() => {
+    setSupportMarkAutoOnInbound(null)
+    if (!selectedAccountId || !needsSupportMarks) return
+    let cancelled = false
+    const isCancelled = () => cancelled
+    void api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }).then(
+      (result) => {
+        if (cancelled) return
+        setSupportMarkAutoOnInbound(result?.success ? hasInboundSupportMark(result.data) : null)
+        markSupplementLoaded(isCancelled)
+      },
+      () => {
+        if (cancelled) return
+        setSupportMarkAutoOnInbound(null)
+        markSupplementLoaded(isCancelled)
+      },
+    )
+    return () => { cancelled = true }
+  }, [markSupplementLoaded, needsSupportMarks, selectedAccountId])
 
   const activeBookings = useMemo(
     () => bookings?.filter((booking) => !inactiveBookingStatuses.has(booking.status)) ?? [],
@@ -1132,16 +1242,22 @@ function DashboardPageInner() {
     : data.metrics.activeFriends.value
   /*
    * 「対応が必要な受信」小カードの件数は、遷移先 `/chats?status=unread` と
-   * 同じ口で数える（IDEA-01）:
-   *   LINE … 選択中アカウントの未対応（overview.inbox.unanswered）
+   * 同じ口で数える（IDEA-01）。右の「現在の対応状況」と同じ
+   * `overview.inbox`（受信箱の正本 `getInboxStatusCounts`）から取るので、
+   * 2つのカードで数がずれない:
+   *   LINE … 選択中アカウントの未対応（overview.inbox.line.unanswered）
    *   MAIL … メールはアカウントを持たない。受信箱に同じ一覧で混ざる
-   *          未対応メール（support/inbox の emailUnread、権限のある範囲）
+   *          未対応メール（overview.inbox.email.unanswered）
+   * 段階配備中の旧Workerは内訳を返さない。その間は従来どおり LINE を概要、
+   * MAIL を受信箱カードの取得結果（support/inbox の emailUnread）から取る。
    * 片方でも取れていない間は合計を出さず「—」にする。取れたぶんだけを
    * 足すと実際より少ない件数を本物の数字に見せてしまう。
    */
   const inboxSectionOk = data !== null && sectionAvailable('inbox')
-  const lineUnread = inboxSectionOk ? data.inbox.unanswered : null
-  const mailUnread = inboxSummary?.emailUnread ?? null
+  const lineUnread = inboxSectionOk ? (data.inbox.line?.unanswered ?? data.inbox.unanswered) : null
+  const mailUnread = inboxSectionOk && data.inbox.email
+    ? data.inbox.email.unanswered
+    : (inboxSummary?.emailUnread ?? null)
   const pendingTotal = lineUnread === null || mailUnread === null ? null : lineUnread + mailUnread
   const pendingDetail = lineUnread === null && mailUnread === null
     ? (data !== null || inboxFailed || error ? STATE_TEXT.error : STATE_TEXT.loading)
@@ -1165,7 +1281,7 @@ function DashboardPageInner() {
     />
     if (id === 'scenario-status') {
       const scenarios = sectionAvailable('operations') ? data?.operations?.scenarios : undefined
-      return <LiveDataCard title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} loading={loading} />
     }
     if (id === 'uid-migration') {
       const migrations = sectionAvailable('operations') ? data?.operations?.migrations : undefined
@@ -1173,7 +1289,7 @@ function DashboardPageInner() {
        * 行き先は移行の画面そのもの（DASH-07）。/health は稼働状況の画面で、
        * 移行の進行は見られない。
        */
-      return <LiveDataCard title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} loading={loading} />
     }
     return null
   }
@@ -1187,10 +1303,12 @@ function DashboardPageInner() {
       action="受信箱を開く"
       value={pendingTotal}
       detail={pendingDetail}
+      loading={pendingDetail === STATE_TEXT.loading}
       status={pendingTotal === null
         ? '未取得'
         : pendingOldest !== null ? `最長 ${formatWaitRough(pendingOldest)}` : '—'}
-      statusTone={pendingTotal === null ? 'muted' : 'success'}
+      /* 待っている人がいる時の「最長 ○日前」は注意の色。緑は「問題なし」に読める（★V7）。 */
+      statusTone={pendingTotal === null ? 'muted' : pendingTotal > 0 ? 'danger' : 'success'}
     />
     if (id === 'today-photo-review') {
       const override = reference?.pendingPhotos
@@ -1214,6 +1332,7 @@ function DashboardPageInner() {
         action={forbidden ? '権限を確認する' : '審査する'}
         value={forbidden ? null : value}
         detail={detail}
+        loading={state === 'loading'}
         status={forbidden ? '権限なし' : state === 'ready' ? 'ポイント付与あり' : '確認待ち'}
         statusTone={state === 'ready' ? 'success' : 'muted'}
       />
@@ -1236,6 +1355,7 @@ function DashboardPageInner() {
         action="予約を見る"
         value={bookingsValue}
         detail={bookingsFailed && todayActiveBookings === null ? STATE_TEXT.error : '取消・完了を除く今日の予約'}
+        loading={bookingsValue === null && !bookingsFailed}
         /*
          * 明細が取れていないのに「次回予定なし」と出すと、失敗を 0件 と
          * 見せることになる（IDEA-01）。失敗は「未取得」、読込中は「確認中」。
@@ -1252,6 +1372,7 @@ function DashboardPageInner() {
       href="/ec-commerce"
       action="ECを見る"
       value={shipmentState === 'ready' ? (shipmentSummary?.today ?? null) : null}
+      loading={shipmentState === 'loading'}
       detail={shipmentState === 'error'
         ? STATE_TEXT.error
         : shipmentState === 'ready'
@@ -1276,7 +1397,8 @@ function DashboardPageInner() {
     />
     if (id === 'operational-alerts') return <OperationalAlertsCard risk={displayedHealthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={pendingOldest} twoFactor={displayedTwoFactor} referenceCount={reference?.operationalAlerts} failed={healthFailed} updatedAt={supplementLoadedAt} />
     if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={displayedHealthRisk} activeFriends={activeFriends} healthFailed={healthFailed} updatedAt={supplementLoadedAt} />
-    if (id === 'upcoming') return <UpcomingCard bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} />
+    if (id === 'upcoming') return <UpcomingCard accountId={selectedAccountId} bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} />
+    if (id === 'delivery-failures') return <DeliveryFailuresCard accountId={selectedAccountId} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
       ? <UnavailableDataCard title="今月の配信" section={data.sections?.delivery} onRetry={() => void load()} />
       : data ? <MonthlyDeliveryCard delivery={data.delivery} freshness={<DashboardFreshness freshness={data.sections?.delivery?.freshness} asOf={data.sections?.delivery?.asOf} reason={data.sections?.delivery?.reason} />} />
@@ -1304,15 +1426,15 @@ function DashboardPageInner() {
        * 同じ母集団を出すので、カードと一覧の件数が一致する（IDEA-01）。
        * 「今後の予約」は補足として併記する。
        */
-      return <LiveDataCard title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約を見る" value={bookingsStatus?.pending ?? null} detail={bookingsStatus ? `今後の予約 ${bookingsStatus.upcoming}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約を見る" value={bookingsStatus?.pending ?? null} detail={bookingsStatus ? `今後の予約 ${bookingsStatus.upcoming}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} loading={loading} />
     }
     if (id === 'inflow-top') {
       const inflowTop = sectionAvailable('operations') ? data?.operations?.inflowTop : undefined
       /* 「経路と成果」タブが期間内の経路別の登録・成果を見る画面（IDEA-01）。 */
-      return <LiveDataCard title="流入経路TOP3" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name ?? '—'} ${item.count}`).join('、') || '期間内の追加なし' : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="流入経路TOP3" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name ?? '—'} ${item.count}`).join('、') || '期間内の追加なし' : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} loading={loading} />
     }
-    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルを見る" value={sectionAvailable('operations') ? data?.operations?.funnelAlerts ?? null : null} detail="3人以上追加・成果0件の経路" freshness={data?.sections?.operations} />
-    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" period={dashboardPeriodLabel(period) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="期間内の失敗・一部失敗" freshness={data?.sections?.operations} />
+    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルを見る" value={sectionAvailable('operations') ? data?.operations?.funnelAlerts ?? null : null} detail="" help="3人以上追加され、成果が0件の経路です" freshness={data?.sections?.operations} loading={loading} />
+    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" period={dashboardPeriodLabel(period) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="" help="期間内の失敗と一部失敗の合計です" freshness={data?.sections?.operations} loading={loading} />
     return null
   }
 
@@ -1327,28 +1449,32 @@ function DashboardPageInner() {
   const healthClass = displayedHealthRisk === 'danger' ? 'text-danger' : displayedHealthRisk === 'warning' ? 'text-warning' : displayedHealthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
 
   return (
-    <div>
+    /*
+     * ★V7 仕上げ `z97zZN` §1: 最初に開いたときだけ、段ごとに下から8px・
+     * 200ms・40ms ずつずらして出す。`.v7-stagger` は globals.css の共通規定。
+     */
+    <div className="v7-stagger flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/* V6 `vUXKb/vwcM6`: 画面名は共通トップバーだけ。本文には操作だけを置く。 */}
-      <div data-design="Head" className="mb-4.5 flex min-h-10 flex-wrap items-center justify-between gap-3">
+      {/*
+        設計 ★V6 34-1：終わっていない段があるあいだだけ進みの帯を出す。
+        閉じた・全部終わった・取れなかったときは何も描かない。
+      */}
+      <GettingStartedBand accountId={selectedAccountId} />
+      <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         <Button onClick={openEditor}>
           <EditIcon />ダッシュボード編集
         </Button>
         <div className="flex flex-wrap items-center justify-end gap-2.5">
           <DashboardFreshness freshness={data?.freshness} asOf={data?.asOf} />
-          <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-full bg-current" />{healthLabel}</span>
+          <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-pill bg-current" />{healthLabel}</span>
           <div className="flex gap-2">
             {PERIODS.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => selectPeriod(item.key)}
-                aria-pressed={period === item.key}
-                className={`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent bg-accent text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`}
-              >{item.label}</button>
+              <Button variant="primary" className={(`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`) + ' h-auto whitespace-normal'} key={item.key} type="button" onClick={() => selectPeriod(item.key)} aria-pressed={period === item.key}>{item.label}</Button>
             ))}
           </div>
           {/* 選択中のLINEアカウントの通知だけを表示し、未取得を0件に見せない。 */}
-          <div className="relative">
+          <div className="relative" ref={notificationBellRef}>
             <IconButton
               aria-label={unreadNotificationCount > 0 ? `通知、未読${unreadNotificationCount}件` : '通知'}
               aria-expanded={notificationsOpen}
@@ -1362,7 +1488,7 @@ function DashboardPageInner() {
             {unreadNotificationCount > 0 ? (
               <span
                 aria-hidden="true"
-                className="bg-danger text-on-accent pointer-events-none absolute -top-1.5 -right-1.5 min-w-5 rounded-full px-1 text-center text-xs leading-5 font-bold tabular-nums"
+                className="bg-danger text-on-accent pointer-events-none absolute -top-1.5 -right-1.5 min-w-5 rounded-pill px-1 text-center text-xs leading-5 font-medium tabular-nums"
               >{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>
             ) : null}
             <NotificationPanel
@@ -1387,40 +1513,44 @@ function DashboardPageInner() {
                 setNotificationsOpen(false)
                 router.push('/line-notifications')
               }}
+              getAnchor={() => notificationBellRef.current}
             />
           </div>
         </div>
       </div>
 
+      {/*
+        ★V7 `x63W5x`：ページ全体の失敗はピンクの箱ではなく、中立のカードで出す。
+        赤は使わない（利用者の失敗ではないため）。読み直す口は残す。
+      */}
       {error && (
-        <div className="bg-danger-bg text-danger rounded-card mb-5 flex flex-wrap items-center gap-3 p-4 text-sm" role="alert">
-          <span className="min-w-0 flex-1">{error}</span>
-          <button type="button" onClick={() => void load()} className="shrink-0 font-medium underline">もう一度読み込む</button>
+        <div className="bg-canvas border-hairline rounded-card mb-5 flex flex-wrap items-center gap-3 border p-4 text-sm" role="alert">
+          <span className="text-ink min-w-0 flex-1">{error}</span>
+          <Button type="button" variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>
         </div>
       )}
+      {/*
+        ★V7 `x63W5x`：一部のデータだけ取れないときは、その場所に小さく1行だけ。
+        黄色の帯にしない。
+      */}
       {data?.partialFailures?.length ? (
-        <div className="bg-warning-bg text-warning rounded-card mb-5 p-4 text-sm" role="status">
+        <p className="text-ink-secondary text-xs" role="status">
           一部のデータを{STATE_TEXT.error}（{data.partialFailures.join('、')}）。0件としては表示していません。
-        </div>
+        </p>
       ) : null}
 
-      {visibleToday.length > 0 ? <section data-design="TodayTasks" className="mb-6">
-        <div className="mb-2.5 flex items-center justify-between gap-3">
-          <h2 className="text-ink text-lg font-bold">今日やること</h2>
-          {/*
-            並びは編集パネルで本人が決めた順（A01-05）。「優先度が高い順」と
-            書くと、システムが重要度で並べ替えたように読めてしまう。
-          */}
-          <span className="text-ink-faint text-xs">自分で並べた順</span>
-        </div>
+      {visibleToday.length > 0 ? <section data-design="TodayTasks">
+        {/* 見出しは置かない（オーナー指示）。4枚の小カードだけ出す。 */}
         {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-        <KpiCollapse gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* 同じ段の数のカードは 1 つずつ 40ms ずらして出す（★V7 `z97zZN` §1）。 */}
+        <KpiCollapse gridClassName="v7-stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {visibleToday.map((item) => <div key={item.id}>{renderTodayCard(item.id)}</div>)}
         </KpiCollapse>
       </section> : null}
 
-      <div data-design="Middle" className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]">
-        <div data-design="Body" className="min-w-0 space-y-[18px]">
+      {/* 主なカードと右の列も同じ段として順に出す（★V7 `z97zZN` §1）。 */}
+      <div data-design="Middle" className="v7-stagger grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]">
+        <div data-design="Body" className="flex min-w-0 flex-col gap-4">
           {/*
             出荷予定を含め、メインのカードは編集パネルで決めた順番どおりに出す
             （DASH-06）。以前は出荷だけがメインの外へ固定され、並べ替えても
@@ -1436,6 +1566,11 @@ function DashboardPageInner() {
              */
             if (item.id === 'shipment') {
               return (
+                /*
+                 * 表示ONなら0件でもカードを出す。空のときは
+                 * パネル側が1行の空表示を出す。件数は取り続けるので、
+                 * OFFのときは隠すだけでマウントは保つ（受信箱と同じ形）。
+                 */
                 <div key={item.id} data-design="Shipment" className={item.visible ? '' : 'hidden'} aria-hidden={!item.visible}>
                   {/*
                     選択中アカウントの出荷だけを数える（IDEA-01）。

@@ -2,15 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { MoreHorizontal } from 'lucide-react'
+import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import Pagination from '@/components/shared/pagination'
 import { Tabs } from '@/components/shared/tabs'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { ApiError, api, type EcSubscription, type EcSubscriptionList } from '@/lib/api'
 import { formatEcShortDate as shortDate } from './ec-datetime'
+import ListRange from '@/components/ui/list-range'
 import styles from './ec-commerce-v6.module.css'
+import { formatNumber } from '@/lib/format'
 
 const FILTERS = [
   { key: 'all', label: 'すべて' },
@@ -35,6 +41,8 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
   const [data, setData] = useState<EcSubscriptionList | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
   const [filter, setFilter] = useState<Filter>('all')
+  // 行の「その他」メニューの開き先（#641）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   /** 絞り込みに合う総数。サーバが数える(#731)。 */
@@ -94,18 +102,18 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
   return (
     <>
       <div className={styles.kpis}>
-        <SummaryCard variant="v6" title="続いている定期便" value={summary?.active ?? null} unit="件" detail={summary?.monthlyAmount === null ? '今月の金額は未取得' : `今月 ¥${summary?.monthlyAmount.toLocaleString('ja-JP')}`} />
-        <SummaryCard variant="v6" title="今月 はじまった" value={summary?.startedThisMonth ?? null} unit="件" detail="定期便の開始日から集計" badge={summary?.startedThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
-        <SummaryCard variant="v6" title="今月 止まった" value={summary?.cancelledThisMonth ?? null} unit="件" detail={summary?.cancellationTopReason ? `多い理由「${summary.cancellationTopReason}」` : '解約理由の記録なし'} badge={summary?.cancelledThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
-        <SummaryCard variant="v6" title="支払いを確認" value={summary?.atRisk ?? null} unit="人" detail="ECの決済状態から確認" />
+        <KpiCard variant="v6" title="続いている定期便" value={summary?.active ?? null} unit="件" detail={summary?.monthlyAmount === null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary?.monthlyAmount)}`} />
+        <KpiCard variant="v6" title="今月 はじまった" value={summary?.startedThisMonth ?? null} unit="件" detail="" help="定期便の開始日から集計しています" badge={summary?.startedThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
+        <KpiCard variant="v6" title="今月 止まった" value={summary?.cancelledThisMonth ?? null} unit="件" detail={summary?.cancellationTopReason ? `多い理由「${summary.cancellationTopReason}」` : '解約理由の記録なし'} badge={summary?.cancelledThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
+        <KpiCard variant="v6" title="支払いを確認" value={summary?.atRisk ?? null} unit="人" detail="" help="ECの決済状態から確認する人数です" />
       </div>
       {/*
        * IDEA-21: 「次の発送」はECの定期便に登録された確定の予定日。推定ではない。
        * 購入後の案内（発送後の到着確認・口コミ・次の商品）はNEN配信が担う。
        * 定期便の変更・休止そのものはEC側（管理画面・お客様のマイページ）で行う。
        */}
-      <NoteBar>「支払いを確認」はECから届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」はECに登録された確定の予定日で、EC側で変わると次の同期で更新されます。購入後の案内は <Link href="/nen-campaigns" className="font-semibold underline">NEN配信</Link> で管理します。</NoteBar>
-      {(summary?.monthlyStats ?? []).length > 0 ? <div className="my-4 rounded-card border border-hairline bg-canvas p-4"><p className="text-sm font-semibold text-ink">月別の定期便</p><div className="mt-3 grid gap-2 sm:grid-cols-3">{summary?.monthlyStats.slice(-6).map((item) => <div key={item.month} className="rounded-control bg-canvas-sunken px-3 py-2"><p className="text-xs text-ink-faint">{item.month}</p><p className="mt-1 text-sm font-semibold text-ink">{item.count.toLocaleString('ja-JP')}件</p><p className="text-xs text-ink-secondary">¥{item.amount.toLocaleString('ja-JP')}</p></div>)}</div></div> : null}
+      <NoteBar help="支払いを確認はECから届いた決済状態です" helpLabel="支払いを確認の意味">「支払いを確認」はECから届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」はECに登録された確定の予定日で、EC側で変わると次の同期で更新されます。購入後の案内は <Link href="/nen-campaigns" className="font-semibold underline">NEN配信</Link> で管理します。</NoteBar>
+      {(summary?.monthlyStats ?? []).length > 0 ? <div className="my-4 rounded-card border border-hairline bg-canvas p-4"><p className="text-sm font-semibold text-ink">月別の定期便</p><div className="mt-3 grid gap-2 sm:grid-cols-3">{summary?.monthlyStats.slice(-6).map((item) => <div key={item.month} className="rounded-control bg-canvas-sunken px-3 py-2"><p className="text-xs text-ink-faint">{item.month}</p><p className="mt-1 text-sm font-semibold text-ink">{formatNumber(item.count)}件</p><p className="text-xs text-ink-secondary">¥{formatNumber(item.amount)}</p></div>)}</div></div> : null}
       <div className={styles.toolbar}>
         {/*
          * #948 N-325: placeholder は実際に検索する項目(ownerName・petName・
@@ -128,14 +136,33 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
                 <Td><span className={styles.cellStack}><span className={styles.cellMain} title={item.ownerName ?? undefined}>{item.ownerName ?? 'お客様名 —'}{item.cycle ? ` ／ ${item.cycle}` : ''}</span><span className={styles.cellSub} title={item.items ?? undefined}>{item.petName ? `${item.petName}用` : 'ペット名 —'} ／ {item.items ?? '中身 未取得'}</span></span></Td>
                 <Td>{item.status === 'cancelled' ? '止まりました' : shortDate(item.nextShippingAt)}</Td>
                 <Td>{item.continuedCount === null ? '—' : `${item.continuedCount}回目`}</Td>
-                <Td align="right">{item.amount === null ? '—' : `¥${item.amount.toLocaleString('ja-JP')}`}</Td>
+                <Td align="right">{item.amount === null ? '—' : `¥${formatNumber(item.amount)}`}</Td>
                 <Td><span className={styles.cellStack}><span className={`${styles.status} ${STATUS_TONE[item.status]}`}>{item.statusLabel}</span>{item.riskReason || item.cancellationReason ? <span className={styles.cellSub}>{item.riskReason ?? `理由「${item.cancellationReason}」`}</span> : null}</span></Td>
                 <ActionCell>
+                  {/* #641: 主操作は枠つきボタン、残りは「その他（…）」へ集約。 */}
                   {/* 友だち詳細は静的書き出しのため /friends/detail?id= 形（IDEA-21 で修正）。 */}
-                  <Link className={styles.textLink} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>中身を見る</Link>
+                  <Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} variant="secondary">中身を見る</Button>
                   {/* 定期便の変更先。ECが契約の変更ページを渡しているときだけ出す。 */}
                   {item.manageUrl ? (
-                    <a className="whitespace-nowrap text-label font-bold text-accent-deep hover:underline" href={item.manageUrl} target="_blank" rel="noreferrer">ECで変更</a>
+                    <>
+                      <IconButton
+                        aria-label={`${item.ownerName ?? 'お客様'}のその他操作`}
+                        aria-expanded={openMenuId === item.id}
+                        onClick={() => setOpenMenuId((current) => (current === item.id ? null : item.id))}
+                      >
+                        <MoreHorizontal aria-hidden />
+                      </IconButton>
+                      <ActionMenu
+                        open={openMenuId === item.id}
+                        ariaLabel={`${item.ownerName ?? 'お客様'}の操作`}
+                        onClose={() => setOpenMenuId(null)}
+                        items={[{
+                          id: 'manage',
+                          label: 'ECで変更',
+                          onSelect: () => window.open(item.manageUrl!, '_blank', 'noopener,noreferrer'),
+                        }]}
+                      />
+                    </>
                   ) : (
                     <span className="text-micro text-ink-faint" title="ECがこの契約の変更ページを渡していないため、ここからは開けません。ECの管理画面で確認してください。">変更先なし</span>
                   )}
@@ -152,12 +179,15 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
       */}
       <p className={styles.footer}>
         {search.trim()
-          ? `このページの ${shown.length.toLocaleString('ja-JP')}件を表示（検索はページの中だけに効きます）`
-          : `${filter === 'all' ? '定期便' : '表示条件に合う定期便'} ${total.toLocaleString('ja-JP')}件中 ${
-            total === 0 ? 0 : ((page - 1) * PAGE_SIZE + 1).toLocaleString('ja-JP')
-          }〜${((page - 1) * PAGE_SIZE + shown.length).toLocaleString('ja-JP')}件を表示`}
+          ? `このページの ${formatNumber(shown.length)}件を表示（検索はページの中だけに効きます）`
+          : <ListRange
+              label={filter === 'all' ? '定期便' : '表示条件に合う定期便'}
+              total={total}
+              first={total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}
+              last={(page - 1) * PAGE_SIZE + shown.length}
+            />}
         {data && data.skipped.malformedSnapshots > 0
-          ? `／ 形が読めなかったお客様のぶん ${data.skipped.malformedSnapshots.toLocaleString('ja-JP')}件は数えていません`
+          ? `／ 形が読めなかったお客様のぶん ${formatNumber(data.skipped.malformedSnapshots)}件は数えていません`
           : ''}
       </p>
       <Pagination

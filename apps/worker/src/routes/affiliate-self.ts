@@ -7,9 +7,11 @@ import {
   listAffiliateLinks,
   countAffiliateLinks,
   generateRefSlug,
-  getLineAccounts,
+  listLineAccountsWithTenantStatus,
   getAffiliateLinkStats,
   listAffiliateOffers,
+  getCurrentOfferVersion,
+  getOfferCapStatus,
   enrollAffiliateInOffer,
   getMileageSummaryForFriend,
   getMileageHistoryForFriend,
@@ -75,6 +77,7 @@ async function resolveFriendFromLineToken(
 ): Promise<
   | { status: 'invalid_token' }
   | { status: 'no_friend' }
+  | { status: 'tenant_suspended' }
   | { status: 'ok'; friend: ResolvedFriend; lineAccountId: string | null; tenantId: string }
 > {
   const db = env.DB;
@@ -98,7 +101,7 @@ async function resolveFriendFromLineToken(
 
   const allowedChannelIds = new Set<string>();
   if (env.LINE_LOGIN_CHANNEL_ID) allowedChannelIds.add(env.LINE_LOGIN_CHANNEL_ID);
-  const dbAccounts = await getLineAccounts(db);
+  const dbAccounts = await listLineAccountsWithTenantStatus(db);
   for (const acct of dbAccounts) {
     if (acct.login_channel_id) allowedChannelIds.add(acct.login_channel_id);
   }
@@ -115,6 +118,9 @@ async function resolveFriendFromLineToken(
   const lineAccount = dbAccounts.find(
     (account) => account.login_channel_id === tokenClientId,
   );
+  if (lineAccount && lineAccount.tenant_status !== 'active') {
+    return { status: 'tenant_suspended' };
+  }
   const lineAccountId = lineAccount?.id ?? null;
   const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
   if (!friend) return { status: 'no_friend' };
@@ -129,8 +135,18 @@ async function resolveFriendFromLineToken(
 /** Map a non-ok resolution to its JSON error response. */
 function unresolvedResponse(
   c: Context<Env>,
-  result: { status: 'invalid_token' } | { status: 'no_friend' },
+  result:
+    | { status: 'invalid_token' }
+    | { status: 'no_friend' }
+    | { status: 'tenant_suspended' },
 ) {
+  if (result.status === 'tenant_suspended') {
+    return c.json({
+      success: false,
+      code: 'TENANT_SUSPENDED',
+      error: '現在ご利用いただけません',
+    }, 503);
+  }
   if (result.status === 'invalid_token') {
     return c.json({ success: false, error: 'Invalid LINE access token' }, 401);
   }
@@ -749,19 +765,30 @@ affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
       if (l.offer_id) linkByOffer.set(l.offer_id, l);
     }
 
-    const data = offers.map((o) => {
+    // 案件の決まり(今の版)と上限の残りを添える(#823)。上限に達した受付の
+    // 自動停止は、紹介した人の画面にも出す。
+    const data = [];
+    for (const o of offers) {
       const link = linkByOffer.get(o.id);
-      return {
+      const version = await getCurrentOfferVersion(db, o.id);
+      const status = await getOfferCapStatus(db, o.id, { affiliateId: affiliate.id });
+      data.push({
         id: o.id,
         name: o.name,
         description: o.description,
-        rewardAmount: o.reward_amount,
-        rewardMiles: o.reward_miles ?? 0,
+        rewardAmount: version?.reward_amount ?? o.reward_amount,
+        rewardMiles: version?.reward_miles ?? o.reward_miles ?? 0,
+        windowDays: version?.window_days ?? 30,
+        receptionFrom: version?.reception_from ?? null,
+        receptionTo: version?.reception_to ?? null,
+        halted: status.capped,
+        totalRemaining: status.totalRemaining,
+        monthlyRemaining: status.monthlyRemaining,
         enrolled: Boolean(link),
         refCode: link ? link.ref_code : null,
         url: link ? `${baseUrl}/${link.ref_code}` : null,
-      };
-    });
+      });
+    }
 
     return c.json({ offers: data });
   } catch (err) {
@@ -811,6 +838,13 @@ affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', async (c) => {
     const offer = activeOffers.find((o) => o.id === c.req.param('id'));
     if (!offer) {
       return c.json({ success: false, error: 'Offer not found' }, 404);
+    }
+
+    // 上限に達した案件の受付は自動で止める(#823)。参加済みの人の紹介リンクは
+    // 残るが、新しい参加と成果の付与は止まる。
+    const capStatus = await getOfferCapStatus(db, offer.id, { affiliateId: affiliate.id });
+    if (capStatus.capped) {
+      return c.json({ success: false, error: 'この案件の受付は上限に達したため終了しました' }, 409);
     }
 
     const { link } = await enrollAffiliateInOffer(db, {

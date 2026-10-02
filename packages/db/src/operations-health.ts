@@ -7,6 +7,9 @@ export const OPERATION_HEALTH_CHECK_KEYS = [
   'webhook',
   'dispatch_jobs',
   'friend_change',
+  'monitoring_heartbeat',
+  'infra_canary',
+  'credential_expiry',
 ] as const;
 
 export type OperationHealthCheckKey = (typeof OPERATION_HEALTH_CHECK_KEYS)[number];
@@ -382,6 +385,26 @@ export async function failOperationHealthRun(
   ).bind(errorMessage.slice(0, 500), completedAt, runId).run();
 }
 
+/**
+ * R571: 結果保存の失敗で failed になった実行枠を、同じ5分枠の押し直しで再実行する。
+ *
+ * failed の行が枠を塞いだままだと、再送は failed 行を重複扱いで返すだけで
+ * 確認処理が走らない。running に戻して呼び出し側が確認・保存をやり直せる
+ * ようにする。completed・running の行には触らない。並列の押し直しで
+ * 先に誰かが開け直したときは false を返し、呼び出し側は重複として返す。
+ */
+export async function reopenFailedOperationHealthRun(
+  db: D1Database,
+  runId: string,
+): Promise<boolean> {
+  const result = await db.prepare(
+    `UPDATE operation_health_runs
+        SET status = 'running', overall_status = 'unknown', error_message = NULL, completed_at = NULL
+      WHERE id = ? AND status = 'failed'`,
+  ).bind(runId).run();
+  return Number(result.meta?.changes ?? 0) === 1;
+}
+
 export async function getLatestOperationHealthRun(
   db: D1Database,
   lineAccountId: string,
@@ -673,10 +696,77 @@ export async function acknowledgeOperationAlert(
       && row.version === input.expectedVersion
       && row.acknowledged_by_id === input.actorId
       && row.acknowledgement_note === note;
-    return { status: duplicate ? 'duplicate' : 'conflict', alert: await getOperationAlert(db, row.id) };
+    if (duplicate) return { status: 'duplicate', alert: await getOperationAlert(db, row.id) };
+    /*
+     * R572: 受領の状態更新までは成功し、受領イベントの保存だけ失敗したときの
+     * 再送を補う。行は acknowledged・版が1つ進んだまま、イベントが無い状態で
+     * 同じ版の再送は版競合になる。同じ担当者・同じ内容で版がちょうど1つ
+     * 進んでおり、対応する受領イベントが無いときだけ、欠けたイベントを足して
+     * 通知準備まで揃え、再送として返す。イベントがある通常の再送は従来どおり
+     * 競合にし、別人の更新の競合判定は弱めない。
+     */
+    const orphaned = row.status === 'acknowledged'
+      && row.version === input.expectedVersion + 1
+      && row.acknowledged_by_id === input.actorId
+      && row.acknowledgement_note === note
+      && await operationAlertAcknowledgedEventMissing(db, row.id, row.version);
+    if (orphaned) {
+      await recordOperationAlertEvent(db, { alert: row, action: 'acknowledged', actorId: input.actorId, note, now });
+      await enqueuePendingOperationAlertNotifications(db, { lineAccountId: input.lineAccountId });
+      return { status: 'duplicate', alert: await getOperationAlert(db, row.id) };
+    }
+    return { status: 'conflict', alert: await getOperationAlert(db, row.id) };
   }
   await recordOperationAlertEvent(db, { alert: row, action: 'acknowledged', actorId: input.actorId, note, now });
   return { status: 'changed', alert: await getOperationAlert(db, row.id) };
+}
+
+/** R572: 版に対応する受領イベントが無いときだけ true。 repair の二重書きを防ぐ。 */
+async function operationAlertAcknowledgedEventMissing(
+  db: D1Database,
+  alertId: string,
+  alertVersion: number,
+): Promise<boolean> {
+  const hit = await db.prepare(
+    `SELECT 1 FROM operation_alert_events
+      WHERE alert_id = ? AND action = 'acknowledged' AND alert_version = ?
+      LIMIT 1`,
+  ).bind(alertId, alertVersion).first();
+  return hit === null;
+}
+
+/**
+ * 未enqueueのeventだけに、同一tenant・対象accountを見られるowner/adminの通知行を積む。
+ * 同じalertの同じactionを同じ担当者・同じ経路へ一定時間内に重ねて送らない。
+ * 解消の直後の再発（ばたつき）もまとめて1通にする。表の追加は要らない。
+ */
+export const OPERATION_ALERT_NOTIFICATION_DEDUP_MS = 30 * 60_000;
+
+async function operationAlertNotifiedRecently(
+  db: D1Database,
+  input: { alertId: string; action: string; staffId: string; channel: 'line' | 'email'; since: string },
+): Promise<boolean> {
+  const hit = await db.prepare(
+    `SELECT 1 FROM operation_alert_notification_outbox o
+       JOIN operation_alert_events e ON e.id = o.event_id
+      WHERE e.alert_id = ? AND e.action = ? AND o.staff_id = ? AND o.channel = ?
+        AND o.created_at >= ? AND o.status IN ('queued', 'sending', 'sent')
+      LIMIT 1`,
+  ).bind(input.alertId, input.action, input.staffId, input.channel, input.since).first();
+  return hit !== null;
+}
+
+async function operationAlertResolvedRecently(
+  db: D1Database,
+  input: { alertId: string; eventId: string; createdAt: string; since: string },
+): Promise<boolean> {
+  const hit = await db.prepare(
+    `SELECT 1 FROM operation_alert_events
+      WHERE alert_id = ? AND action = 'resolved' AND id != ?
+        AND created_at >= ? AND created_at <= ?
+      LIMIT 1`,
+  ).bind(input.alertId, input.eventId, input.since, input.createdAt).first();
+  return hit !== null;
 }
 
 /** 未enqueueのeventだけに、同一tenant・対象accountを見られるowner/adminの通知行を積む。 */
@@ -685,13 +775,16 @@ export async function enqueuePendingOperationAlertNotifications(
   input: { lineAccountId?: string; now?: string },
 ): Promise<void> {
   const now = input.now ?? new Date().toISOString();
+  const since = new Date(Date.parse(now) - OPERATION_ALERT_NOTIFICATION_DEDUP_MS).toISOString();
   const events = await db.prepare(
-    `SELECT e.id, e.line_account_id
+    `SELECT e.id, e.line_account_id, e.alert_id, e.action, e.created_at
        FROM operation_alert_events e
       WHERE e.notification_enqueued_at IS NULL
         AND (? IS NULL OR e.line_account_id = ?)
       ORDER BY e.created_at, e.id LIMIT 100`,
-  ).bind(input.lineAccountId ?? null, input.lineAccountId ?? null).all<{ id: string; line_account_id: string }>();
+  ).bind(input.lineAccountId ?? null, input.lineAccountId ?? null).all<{
+    id: string; line_account_id: string; alert_id: string; action: string; created_at: string;
+  }>();
   for (const event of events.results ?? []) {
     const recipients = await db.prepare(
       `SELECT sm.id, sm.email, sm.line_user_id
@@ -710,17 +803,28 @@ export async function enqueuePendingOperationAlertNotifications(
     ).bind(
       event.line_account_id, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, event.line_account_id,
     ).all<{ id: string; email: string | null; line_user_id: string | null }>();
+    // 解消の直後の再発は、解消の知らせとまとめて1通にする。
+    const flapSuppressed = event.action === 'reopened'
+      && await operationAlertResolvedRecently(db, {
+        alertId: event.alert_id, eventId: event.id, createdAt: event.created_at, since,
+      });
     const statements: D1PreparedStatement[] = [];
     let missingContactCount = 0;
     for (const recipient of recipients.results ?? []) {
       if (!recipient.line_user_id && !recipient.email) missingContactCount += 1;
-      if (recipient.line_user_id) statements.push(db.prepare(
+      if (recipient.line_user_id && !flapSuppressed
+        && !(await operationAlertNotifiedRecently(db, {
+          alertId: event.alert_id, action: event.action, staffId: recipient.id, channel: 'line', since,
+        }))) statements.push(db.prepare(
         `INSERT OR IGNORE INTO operation_alert_notification_outbox
            (id, event_id, line_account_id, staff_id, channel, status, attempt_count,
             next_attempt_at, created_at, updated_at)
          VALUES (?, ?, ?, ?, 'line', 'queued', 0, ?, ?, ?)`,
       ).bind(crypto.randomUUID(), event.id, event.line_account_id, recipient.id, now, now, now));
-      if (recipient.email) statements.push(db.prepare(
+      if (recipient.email && !flapSuppressed
+        && !(await operationAlertNotifiedRecently(db, {
+          alertId: event.alert_id, action: event.action, staffId: recipient.id, channel: 'email', since,
+        }))) statements.push(db.prepare(
         `INSERT OR IGNORE INTO operation_alert_notification_outbox
            (id, event_id, line_account_id, staff_id, channel, status, attempt_count,
             next_attempt_at, created_at, updated_at)
@@ -770,14 +874,21 @@ export async function createStepUpGrant(
     expiresAt: string;
     now?: string;
     totpStep?: number;
+    /** 発行したセッションの指紋。無いとき（APIキー経路）は結び付けない。 */
+    sessionTokenHash?: string | null;
+    /** 発行時の権限の版。権限の更新で進むと確認票は使えない。 */
+    issuedPolicyVersion?: number | null;
   },
 ): Promise<boolean> {
   const now = input.now ?? new Date().toISOString();
+  const sessionTokenHash = input.sessionTokenHash ?? null;
+  const issuedPolicyVersion = input.issuedPolicyVersion ?? null;
   if (input.totpStep === undefined) {
     await db.prepare(
       `INSERT INTO auth_step_up_grants
-         (token_hash, staff_id, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`,
-    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now).run();
+         (token_hash, staff_id, purpose, expires_at, created_at, session_token_hash, issued_policy_version)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now, sessionTokenHash, issuedPolicyVersion).run();
     return true;
   }
 
@@ -791,9 +902,9 @@ export async function createStepUpGrant(
     // claim成功を示すときだけgrantを保存し、並列の同一コードを増殖させない。
     db.prepare(
       `INSERT INTO auth_step_up_grants
-         (token_hash, staff_id, purpose, expires_at, created_at)
-       SELECT ?, ?, ?, ?, ? WHERE changes() = 1`,
-    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now),
+         (token_hash, staff_id, purpose, expires_at, created_at, session_token_hash, issued_policy_version)
+       SELECT ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1`,
+    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now, sessionTokenHash, issuedPolicyVersion),
     db.prepare(
       `DELETE FROM auth_step_up_attempts
         WHERE staff_id = ?
@@ -852,6 +963,30 @@ export async function reserveStepUpAttempt(
   } : null;
 }
 
+/**
+ * R503: 入力上限で止めたとき、次に試せるまでの秒数。
+ *
+ * 10分窓の開始から数える。行が無い・読めないときは窓全体（10分）を返す。
+ * 画面は「約N分待ってからやり直してください」と出す。
+ */
+export async function stepUpAttemptRetryAfterSeconds(
+  db: D1Database,
+  staffId: string,
+  now = new Date().toISOString(),
+): Promise<number> {
+  const windowSeconds = Math.round(STEP_UP_ATTEMPT_WINDOW_MS / 1000);
+  try {
+    const row = await db.prepare(
+      'SELECT window_started_at FROM auth_step_up_attempts WHERE staff_id = ?',
+    ).bind(staffId).first<{ window_started_at: string }>();
+    if (!row) return windowSeconds;
+    const resetAt = Date.parse(row.window_started_at) + STEP_UP_ATTEMPT_WINDOW_MS;
+    return Math.max(1, Math.ceil((resetAt - Date.parse(now)) / 1000));
+  } catch {
+    return windowSeconds;
+  }
+}
+
 /** 二段階認証の初回設定確認について、10分間に5回までの試行枠を確保する。 */
 export async function reserveTwoFactorSetupAttempt(
   db: D1Database,
@@ -897,16 +1032,38 @@ export async function clearTwoFactorSetupAttempts(
   ).bind(staffId).run();
 }
 
+/** 再確認（step-up）に成功したとき、失敗を含む試行枠を解放する。 */
+export async function clearStepUpAttempts(db: D1Database, staffId: string): Promise<void> {
+  await db.prepare(
+    `DELETE FROM auth_step_up_attempts WHERE staff_id = ?`,
+  ).bind(staffId).run();
+}
+
 export async function consumeStepUpGrant(
   db: D1Database,
-  input: { tokenHash: string; staffId: string; purpose: string; now?: string },
+  input: {
+    tokenHash: string; staffId: string; purpose: string; now?: string;
+    /**
+     * 使おうとしている要求のセッション指紋（無いときは null）。
+     * 確認票の発行セッションと違う・発行セッションが消えていたら使えない。
+     * 確認票側の結び付けが無い（移行前）は従来どおり通す。
+     */
+    sessionTokenHash?: string | null;
+  },
 ): Promise<boolean> {
   const now = input.now ?? new Date().toISOString();
   const result = await db.prepare(
     `UPDATE auth_step_up_grants SET consumed_at = ?
       WHERE token_hash = ? AND staff_id = ? AND purpose = ?
-        AND consumed_at IS NULL AND expires_at > ?`,
-  ).bind(now, input.tokenHash, input.staffId, input.purpose, now).run();
+        AND consumed_at IS NULL AND expires_at > ?
+        AND (session_token_hash IS NULL OR session_token_hash = ?)
+        AND (session_token_hash IS NULL OR EXISTS (
+          SELECT 1 FROM admin_sessions
+          WHERE token_hash = auth_step_up_grants.session_token_hash
+            AND staff_id = auth_step_up_grants.staff_id))
+        AND (issued_policy_version IS NULL OR issued_policy_version = (
+          SELECT policy_version FROM staff_members WHERE id = auth_step_up_grants.staff_id))`,
+  ).bind(now, input.tokenHash, input.staffId, input.purpose, now, input.sessionTokenHash ?? null).run();
   return Number(result.meta?.changes ?? 0) === 1;
 }
 
@@ -955,6 +1112,27 @@ export async function saveOperationRequestReceipt(
   ).bind(input.action, input.actorId, input.idempotencyKey, input.requestHash,
     input.resourceId, input.createdAt ?? new Date().toISOString()).run();
   return Number(result.meta?.changes ?? 0) === 1;
+}
+
+/**
+ * R573: 対象に結び付いた再実行記録があるか。
+ *
+ * 停止・復旧は状態確定のあとで receipt を保存する。receipt の保存だけ失敗すると
+ * 状態だけ残り、同じキー・版の再送は版競合になる。再送の修復では「誰かの完了した
+ * 要求がこの対象を持っているか」で、他人の確定済み要求の横取りか、置き去りの
+ * 部分実行かを見分ける。記録がある対象は他人の確定済みとして競合のままにする。
+ */
+export async function hasOperationRequestReceiptForResource(
+  db: D1Database,
+  action: string,
+  resourceId: string,
+): Promise<boolean> {
+  const hit = await db.prepare(
+    `SELECT 1 FROM operation_request_receipts
+      WHERE action = ? AND resource_id = ?
+      LIMIT 1`,
+  ).bind(action, resourceId).first();
+  return hit !== null;
 }
 
 export type OperationDeploymentEventInput = {

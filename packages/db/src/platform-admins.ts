@@ -222,6 +222,7 @@ export const PLATFORM_AUDIT_ACTIONS = [
   'announcement.send',
   'announcement.delete',
   'notice_line_account.change',
+  'billing.sync',
   'member.invite',
   'member.deactivate',
   'member.activate',

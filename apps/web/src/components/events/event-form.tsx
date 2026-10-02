@@ -1,5 +1,6 @@
 'use client'
 
+import { X } from 'lucide-react'
 import StickyBar from '@/components/shared/sticky-bar'
 
 import { useEffect, useState } from 'react'
@@ -9,10 +10,22 @@ import ImageUploader from '@/components/shared/image-uploader'
 import OgEditor from '@/components/shared/og-editor'
 import { useAccount } from '@/contexts/account-context'
 import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
-import { jstHHMMToUtcIso } from './jst'
+import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
-import { Field } from '@/components/shared/form-controls'
+import Checkbox from '@/components/shared/checkbox'
+import { Field, TextInput } from '@/components/shared/form-controls'
+import HelpTip from '@/components/shared/help-tip'
+import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
+import DateField from '@/components/shared/date-field'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { TimeField } from '@/components/shared/date-time-field'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 import {
   EVENT_CANCEL_DEADLINE_OPTIONS,
@@ -24,13 +37,14 @@ import {
   deadlineSelectValue,
   parseDeadlineSelect,
 } from './event-draft-shared'
+import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
 
 type Tab = 'overview' | 'slots' | 'publish'
 
 const TABS: Array<{ key: Tab; label: string; saveLabel: string; sub: string }> = [
-  { key: 'overview', label: '1. 概要', saveLabel: '概要を保存', sub: 'イベント名・場所・詳細を入力' },
+  { key: 'overview', label: '1. 概要', saveLabel: '概要を保存する', sub: 'イベント名・場所・詳細を入力' },
   { key: 'slots', label: '2. 予約枠', saveLabel: '', sub: '友だちが選べる日時を追加' },
-  { key: 'publish', label: '3. 公開設定', saveLabel: '公開設定を保存', sub: '承認制・リマインダ・公開' },
+  { key: 'publish', label: '3. 公開設定', saveLabel: '公開設定を保存する', sub: '承認制・リマインダ・公開' },
 ]
 
 const DEFAULT_DRAFT: EventDetail = EVENT_DEFAULT_DRAFT
@@ -56,10 +70,7 @@ export function formatJpDateTime(iso: string): string {
     ここが端末の時間帯に依存すると、同じ開催回が一覧と編集で
     時差分ずれて見える。保存値(UTC)は変えず、表示だけ日本時間に固定する。
   */
-  return d.toLocaleString('ja-JP', {
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(d)
 }
 
 /**
@@ -71,8 +82,19 @@ export function formatJpDateTime(iso: string): string {
 export function formatJpSlotRange(startsAt: string, endsAt: string): string {
   const start = formatJpDateTime(startsAt)
   const end = formatJpDateTime(endsAt)
-  const sameDay = start.slice(0, 10) === end.slice(0, 10)
-  return `${start} 〜 ${sameDay ? end.slice(-5) : end}`
+  const sameDay = formatDay(startsAt) === formatDay(endsAt)
+  return `${start} 〜 ${sameDay ? formatTime(endsAt) : end}`
+}
+
+/**
+ * 保存・読込の応答を draft の形へ戻す（R82）。
+ *
+ * Worker は質問の定義を questions_json の文字列で返す。ほぐさず
+ * `setDraft` すると questions が消え、次の保存で questions:null を送って
+ * 定義ごと消してしまう。読み込み時と同じほぐし方を保存後にも使う。
+ */
+export function toEventDraft(row: EventDetail): EventDetail {
+  return { ...row, questions: parseEventQuestions(row.questions_json) }
 }
 
 export default function EventForm({ accountId, eventId }: EventFormProps) {
@@ -84,7 +106,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState<string | null>(null)
+
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
 
@@ -110,10 +132,11 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
 
   // 公開対象のプルダウンに出すタグ。新規作成のときも要るので、
   // イベントの読み込みとは分けて取る。
+  // R23横展開: 候補はこのイベントのアカウントだけ。切替で取り直す。
   useEffect(() => {
     let cancelled = false
     void api.tags
-      .list()
+      .list(accountId ? { accountId } : undefined)
       .then((res) => {
         if (!cancelled && res.success) setTags(res.data.map((t) => ({ id: t.id, name: t.name })))
       })
@@ -123,7 +146,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [accountId])
 
   useEffect(() => {
     let cancelled = false
@@ -138,10 +161,17 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           eventsApi.listSlots(accountId, eventId),
         ])
         if (cancelled) return
-        setDraft(ev)
+        // Worker は質問定義を questions_json の文字列で返す。フォームは
+        // 配列で触るので、ここでほぐしてから draft に載せる。
+        setDraft(toEventDraft(ev))
         setSlots(slotsRes.items)
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        // 生の `API error: 404` を主文にしない。消えたものと通信の失敗を言い分ける。
+        if (!cancelled) {
+          setError(e instanceof ApiError && e.status === 404
+            ? 'このイベントは見つかりません。削除されたか、リンクが古くなっています。一覧から選び直してください。'
+            : 'イベントを読み込めませんでした。通信の状態を確認して、もう一度読み込んでください。')
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -154,11 +184,6 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
 
   function update<K extends keyof EventDetail>(key: K, value: EventDetail[K]) {
     setDraft((d) => ({ ...d, [key]: value }))
-  }
-
-  function flashToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 2200)
   }
 
   async function save(nextTab?: Tab) {
@@ -214,15 +239,20 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         account_ids: targetType === 'multi-account-dedup'
           ? (accountIdsArr as unknown as EventDetail['account_ids'])
           : null,
+        // 申込時の質問 (#841)。配列のまま送り、Worker が questions_json に
+        // 正規化して保存する。null を送ると定義ごと消える。
+        questions: draft.questions ?? null,
       }
       if (eventId) {
         const updated = await eventsApi.updateEvent(accountId, eventId, payload, draft.version ?? 1)
-        setDraft(updated)
-        flashToast('保存しました')
+        // 応答は questions_json の文字列で返る。ほぐさず載せると次の保存で
+        // questions:null を送り、質問を消してしまう（R82）。
+        setDraft(toEventDraft(updated))
+        notifyToast('保存しました')
         if (nextTab) setTab(nextTab)
       } else {
         const created = await eventsApi.createEvent(accountId, payload)
-        flashToast('イベントを作成しました。続けて予約枠を追加してください。')
+        notifyToast('イベントを作成しました。続けて予約枠を追加してください。')
         router.replace(`/events/edit?id=${created.id}`)
       }
     } catch (e) {
@@ -238,8 +268,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-gray-500">
+      <div>
+        <div className="border-hairline rounded-card border bg-canvas p-12 text-center text-sm text-ink-faint">
           読み込み中...
         </div>
       </div>
@@ -247,44 +277,42 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div>
       {/* breadcrumb */}
-      <div className="mb-4 flex items-center gap-2 text-sm">
-        <a href="/events" className="text-blue-600 hover:underline">イベント一覧</a>
-        <span className="text-gray-400">/</span>
-        <span className="text-gray-700">{eventId ? draft.name || 'イベント編集' : '新規イベント'}</span>
+      <div className="text-ink-faint mb-4 flex items-center gap-2 text-sm">
+        <a href="/events" className="text-action hover:underline">イベント一覧</a>
+        <span>/</span>
+        <span className="text-ink-secondary">{eventId ? draft.name || 'イベント編集' : '新規イベント'}</span>
       </div>
 
-      {/* page header */}
-      <div className="mb-4 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+      {/*
+        ★V7 C7: 画面名の h1 はトップバーが持つ。本文は記録名を h2 で出す
+        （編集画面の正規の形）。幅・余白は共通の枠に任せ、画面側で
+        max-w・mx-auto・p-6 を足さない。
+      */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-ink truncate text-xl font-bold">
             {eventId ? draft.name || 'イベント編集' : '新規イベント作成'}
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          </h2>
+          <p className="text-ink-faint mt-0.5 text-sm">
             {eventId ? 'タブで各項目を編集できます' : 'まず「概要」を保存するとイベントが作成されます'}
           </p>
         </div>
         {eventId && (
-          <a
+          <Button
             href={`/events/bookings?id=${eventId}`}
-            className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="shrink-0"
           >
             予約を確認
-          </a>
+          </Button>
         )}
       </div>
 
-      {/* toast */}
-      {toast && (
-        <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
-          ✓ {toast}
-        </div>
-      )}
       {error && (
-        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <Notice tone="danger" className="mb-3">
           {error}
-        </div>
+        </Notice>
       )}
 
       {/* LIFF URL box(es) */}
@@ -300,40 +328,38 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           const templateUrl = `https://liff.line.me/{{liff_id}}/?page=event&id=${eventId}&liffId={{liff_id}}`
           const targetAccounts = accounts.filter((a) => accountIdsArr.includes(a.id))
           return (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 space-y-4">
+            <div className="bg-canvas rounded-control border-hairline mb-4 space-y-4 border p-4">
               <div>
-                <div className="text-sm font-medium text-blue-900 mb-2">broadcast 用テンプレ URL</div>
-                <div className="flex gap-2 items-center">
+                <div className="text-ink mb-2 flex items-center gap-1 text-sm font-medium">broadcast 用テンプレ URL<HelpTip label="broadcast 用テンプレ URLの説明">{'{{liff_id}} は配信時に各友だちのアカウントに対応した値に置換されます。'}</HelpTip></div>
+                <div className="flex items-center gap-2">
                   <input
                     readOnly
                     value={templateUrl}
                     onFocus={(e) => e.currentTarget.select()}
-                    className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-xs bg-white font-mono"
+                    className="border-hairline bg-canvas text-ink rounded-control flex-1 border px-3 py-2 font-mono text-xs"
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => copyValue(templateUrl)}
-                    className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
                     {copiedValue === templateUrl ? 'コピー済' : 'コピー'}
-                  </button>
+                  </Button>
                 </div>
-                <p className="text-xs text-blue-700 mt-2">
+                <p className="text-ink-secondary mt-2 text-xs">
                   broadcast 編集で「リンクするイベント」から選ぶと自動挿入。
-                  {'{{liff_id}}'} は配信時に各友だちのアカウントに対応した値に置換されます。
                 </p>
               </div>
               <div>
-                <div className="text-sm font-medium text-blue-900 mb-2">アカウントごとの固定 URL (QR・LP 直貼り用)</div>
+                <div className="text-ink mb-2 text-sm font-medium">アカウントごとの固定 URL (QR・LP 直貼り用)</div>
                 <div className="space-y-1.5">
                   {targetAccounts.length === 0 && (
-                    <div className="text-xs text-amber-700">対象アカウントが選ばれていません</div>
+                    <div className="text-warning text-xs">対象アカウントが選ばれていません</div>
                   )}
                   {targetAccounts.map((a) => {
                     const acct = a as unknown as { liffId?: string | null; name: string; country: string | null }
                     if (!acct.liffId) {
                       return (
-                        <div key={a.id} className="text-xs text-amber-700">
+                        <div key={a.id} className="text-warning text-xs">
                           {acct.country ? acct.country + ' ' : ''}{acct.name}: LIFF ID 未設定
                         </div>
                       )
@@ -341,21 +367,20 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
                     const url = `https://liff.line.me/${acct.liffId}/?page=event&id=${eventId}&liffId=${acct.liffId}`
                     return (
                       <div key={a.id} className="flex items-center gap-2">
-                        <span className="text-xs text-gray-600 min-w-[80px] truncate">
+                        <span className="text-ink-secondary min-w-[80px] truncate text-xs">
                           {acct.country ? acct.country + ' ' : ''}{acct.name}
                         </span>
                         <input
                           readOnly
                           value={url}
                           onFocus={(e) => e.currentTarget.select()}
-                          className="flex-1 border border-blue-200 rounded-lg px-2 py-1 text-xs bg-white font-mono"
+                          className="border-hairline bg-canvas text-ink rounded-control flex-1 border px-2 py-1 font-mono text-xs"
                         />
-                        <button
+                        <Button
                           onClick={() => copyValue(url)}
-                          className="px-2 py-1 text-xs bg-blue-600 text-white rounded"
                         >
-                          {copiedValue === url ? '✓' : 'コピー'}
-                        </button>
+                          {copiedValue === url ? 'コピー済' : 'コピー'}
+                        </Button>
                       </div>
                     )
                   })}
@@ -368,45 +393,44 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         // single 用 (既存と同じ表示)
         if (liffUrl) {
           return (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <div className="text-sm font-medium text-blue-900 mb-2">予約 URL（友だちに案内する）</div>
-              <div className="flex gap-2 items-center">
+            <div className="bg-canvas rounded-control border-hairline mb-4 border p-4">
+              <div className="text-ink mb-2 text-sm font-medium">予約 URL（友だちに案内する）</div>
+              <div className="flex items-center gap-2">
                 <input
                   readOnly
                   value={liffUrl}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-xs bg-white font-mono"
+                  className="border-hairline bg-canvas text-ink rounded-control flex-1 border px-3 py-2 font-mono text-xs"
                 />
-                <button
+                <Button
                   type="button"
                   onClick={() => copyValue(liffUrl)}
-                  className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
                   {copiedValue === liffUrl ? 'コピー済' : 'コピー'}
-                </button>
+                </Button>
               </div>
-              <p className="text-xs text-blue-700 mt-2">
+              <p className="text-ink-secondary mt-2 text-xs">
                 LINE / OpenChat / IG DM どこでも貼れます。受信者がタップすると LINE で予約画面が開きます。
               </p>
             </div>
           )
         }
         return (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-xs text-amber-900">
+          <div className="bg-status-warn-soft border border-status-warn rounded-control p-3 mb-4 text-xs text-status-warn-deep">
             LIFF ID が未設定のため予約 URL を生成できません。LINE アカウント設定で LIFF ID を登録してください。
           </div>
         )
       })()}
       {eventId && draft.is_published === 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-xs text-amber-900">
+        <div className="bg-status-warn-soft border border-status-warn rounded-control p-3 mb-4 text-xs text-status-warn-deep">
           現在「下書き」状態です。公開設定タブで「公開する」を ON にすると友だち向けの予約 URL が表示されます。
         </div>
       )}
 
       {/* main card */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-canvas rounded-control shadow-card border border-hairline overflow-hidden">
         {/* tab nav */}
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-hairline">
           {TABS.map((t) => {
             const active = tab === t.key
             const disabled = t.key !== 'overview' && !eventId
@@ -418,10 +442,10 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
                 title={disabled ? 'まず「概要」を保存してください' : undefined}
                 className={`flex-1 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
                   active
-                    ? 'border-blue-600 text-blue-600 bg-blue-50'
+                    ? 'border-action text-action bg-status-info-soft'
                     : disabled
-                    ? 'border-transparent text-gray-300 cursor-not-allowed'
-                    : 'border-transparent text-gray-600 hover:bg-gray-50'
+                    ? 'border-transparent text-ink-disabled cursor-not-allowed'
+                    : 'border-transparent text-ink-secondary hover:bg-surface-pearl'
                 }`}
               >
                 <div>{t.label}</div>
@@ -449,30 +473,29 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         {tab !== 'slots' && (
           <StickyBar
             status={(
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-ink-faint">
               {tab === 'overview' && !eventId && '保存するとイベントが作成され、予約枠タブに進みます'}
-              {tab === 'overview' && eventId && '変更を「概要を保存」で確定します'}
+              {tab === 'overview' && eventId && '変更を「概要を保存する」で確定します'}
               {tab === 'publish' && '「公開する」ON で友だちに予約 URL を案内できます'}
               </span>
             )}
             actions={(
               <>
               {tab === 'overview' && eventId && (
-                <button
+                <Button
+                  variant="secondary"
                   onClick={() => save('slots')}
                   disabled={saving}
-                  className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-white disabled:opacity-50"
                 >
                   保存して次へ →
-                </button>
+                </Button>
               )}
-              <button
+              <Button
+                variant="primary"
                 onClick={() => save()}
-                disabled={saving}
-                className="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving ? '保存中...' : tab === 'overview' && !eventId ? 'イベントを作成' : TABS.find((x) => x.key === tab)?.saveLabel ?? '保存'}
-              </button>
+                disabled={saving} busy={saving} busyLabel="保存中...">
+                {tab === 'overview' && !eventId ? 'イベントを作る' : TABS.find((x) => x.key === tab)?.saveLabel ?? '保存する'}
+              </Button>
               </>
             )}
           />
@@ -508,8 +531,8 @@ function OverviewTab({
   return (
     <div className="space-y-5">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          イベント名 <span className="text-red-500">*</span>
+        <label className="block text-sm font-medium text-ink-secondary mb-1.5">
+          イベント名 <span className="text-status-danger">*</span>
         </label>
         <input
           type="text"
@@ -517,28 +540,28 @@ function OverviewTab({
           onChange={(e) => update('name', e.target.value)}
           maxLength={EVENT_NAME_MAX_LENGTH}
           placeholder="例: 第1回 AAA 説明会"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
         />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">開催場所</label>
+          <label className="block text-sm font-medium text-ink-secondary mb-1.5">開催場所</label>
           <input
             type="text"
             value={draft.venue_name ?? ''}
             onChange={(e) => update('venue_name', e.target.value || null)}
             placeholder="例: 渋谷ベース 3F"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">会場 URL</label>
+          <label className="block text-sm font-medium text-ink-secondary mb-1.5">会場 URL</label>
           <input
             type="url"
             value={draft.venue_url ?? ''}
             onChange={(e) => update('venue_url', e.target.value || null)}
             placeholder="https://..."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -551,10 +574,10 @@ function OverviewTab({
         />
       </div>
       <div>
-        <label className="flex justify-between items-center text-sm font-medium text-gray-700 mb-1.5">
+        <label className="flex justify-between items-center text-sm font-medium text-ink-secondary mb-1.5">
           <span>イベント詳細</span>
-          <span className={`text-xs ${descLen > 20000 ? 'text-red-600' : 'text-gray-500'}`}>
-            {descLen.toLocaleString()} / 20,000
+          <span className={`text-xs ${descLen > 20000 ? 'text-danger' : 'text-ink-faint'}`}>
+            {formatNumber(descLen)} / 20,000
           </span>
         </label>
         <textarea
@@ -562,53 +585,63 @@ function OverviewTab({
           onChange={(e) => update('description', e.target.value || null)}
           rows={8}
           placeholder="開催趣旨、注意事項、持ち物などを記載..."
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
         />
-        <label className="flex items-center gap-2 mt-2 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={draft.description_centered === 1}
-            onChange={(e) => update('description_centered', e.target.checked ? 1 : 0)}
-            className="rounded border-gray-300"
-          />
+        <Checkbox
+          className="mt-2"
+          checked={draft.description_centered === 1}
+          onCheckedChange={(checked) => update('description_centered', checked ? 1 : 0)}
+        >
           詳細を中央揃えで表示
-        </label>
+        </Checkbox>
       </div>
+      <div className="border-t border-hairline pt-5">
+        <div className="text-sm font-medium text-ink mb-1">申し込みのときに聞くこと</div>
+        <p className="text-xs text-ink-secondary mb-3">
+          予約フォームに質問を追加できます。回答は申込の一覧で確認できます。
+        </p>
+        <EventQuestionsEditor
+          questions={draft.questions ?? []}
+          onChange={(next) => update('questions', next)}
+        />
+      </div>
+
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label className="block text-sm font-medium text-ink-secondary mb-1.5">
           1 人あたり予約回数
         </label>
-        <select
-          value={draft.max_bookings_per_friend ?? 'unlimited'}
-          onChange={(e) =>
+        <Select
+          aria-label="1 人あたり予約回数"
+          value={draft.max_bookings_per_friend == null ? 'unlimited' : String(draft.max_bookings_per_friend)}
+          onChange={(value) =>
             update(
               'max_bookings_per_friend',
-              e.target.value === 'unlimited' ? null : Number(e.target.value),
+              value === 'unlimited' ? null : Number(value),
             )
           }
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="unlimited">制限なし</option>
-          <option value="1">1 回まで</option>
-          <option value="2">2 回まで</option>
-          <option value="3">3 回まで</option>
-          <option value="5">5 回まで</option>
-        </select>
+          options={[
+            { value: 'unlimited', label: '制限なし' },
+            { value: '1', label: '1 回まで' },
+            { value: '2', label: '2 回まで' },
+            { value: '3', label: '3 回まで' },
+            { value: '5', label: '5 回まで' },
+          ]}
+        />
       </div>
 
       {/* 公開対象 */}
-      <div className="border-t border-gray-200 pt-5">
-        <div className="text-sm font-medium text-gray-700 mb-2">公開対象</div>
+      <div className="border-t border-hairline pt-5">
+        <div className="text-sm font-medium text-ink-secondary mb-2">公開対象</div>
         <div className="grid grid-cols-2 gap-2 mb-3">
           <button
             type="button"
             onClick={() => update('target_type', 'single')}
-            className={`p-3 border-2 rounded-lg text-left ${
-              targetType === 'single' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+            className={`p-3 border-2 rounded-control text-left ${
+              targetType === 'single' ? 'border-action bg-status-info-soft' : 'border-hairline hover:border-hairline'
             }`}
           >
             <div className="text-sm font-bold">単一アカウント</div>
-            <div className="text-xs text-gray-600">1 つの LINE アカウントで運用</div>
+            <div className="text-xs text-ink-secondary">1 つの LINE アカウントで運用</div>
           </button>
           <button
             type="button"
@@ -625,20 +658,20 @@ function OverviewTab({
                 }
               }
             }}
-            className={`p-3 border-2 rounded-lg text-left ${
-              targetType === 'multi-account-dedup' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+            className={`p-3 border-2 rounded-control text-left ${
+              targetType === 'multi-account-dedup' ? 'border-action bg-status-info-soft' : 'border-hairline hover:border-hairline'
             }`}
           >
             <div className="text-sm font-bold">複数アカウント横断</div>
-            <div className="text-xs text-gray-600">重複なし配信に対応</div>
+            <div className="text-xs text-ink-secondary">重複なし配信に対応</div>
           </button>
         </div>
 
         {targetType === 'multi-account-dedup' && (
           <div className="space-y-1.5">
-            <div className="text-xs text-gray-600">対象アカウント（重複なし配信）</div>
+            <div className="text-xs text-ink-secondary">対象アカウント（重複なし配信）</div>
             {activeAccounts.length === 0 && (
-              <div className="text-sm text-gray-500 italic p-2">アクティブなアカウントがありません</div>
+              <div className="text-sm text-ink-faint italic p-2">アクティブなアカウントがありません</div>
             )}
             {activeAccounts.map((a) => {
               // 現在ログイン中のアカウントは外せない (外すと保存後 redirect が
@@ -647,32 +680,26 @@ function OverviewTab({
               const isCurrent = a.id === currentAccountId
               const checked = accountIds.includes(a.id) || isCurrent
               return (
-                <label
+                <Checkbox
                   key={a.id}
-                  className={`flex items-center gap-2 p-2 border border-gray-200 rounded-lg ${isCurrent ? 'opacity-90 bg-gray-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}
-                  title={isCurrent ? '現在ログイン中のアカウントは必須です' : undefined}
+                  className={`flex w-full gap-2 rounded-control border border-hairline p-2 ${isCurrent ? 'opacity-90 bg-canvas-sunken cursor-not-allowed' : 'cursor-pointer hover:bg-canvas-sunken'}`}
+                  checked={checked}
+                  disabled={isCurrent}
+                  onCheckedChange={(next) => {
+                    if (isCurrent) return
+                    update('account_ids', (next
+                      ? [...accountIds, a.id]
+                      : accountIds.filter((x) => x !== a.id)) as unknown as EventDetail['account_ids'])
+                  }}
+                  description={isCurrent ? '今のアカウント・必須' : undefined}
                 >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={isCurrent}
-                    onChange={(e) => {
-                      if (isCurrent) return
-                      const next = e.target.checked
-                        ? [...accountIds, a.id]
-                        : accountIds.filter((x) => x !== a.id)
-                      update('account_ids', next as unknown as EventDetail['account_ids'])
-                    }}
-                    className="rounded border-gray-300"
-                  />
-                  <span className="text-sm">
+                  <span title={isCurrent ? '現在ログイン中のアカウントは必須です' : undefined}>
                     {a.country ? a.country + ' ' : ''}{a.name}
-                    {isCurrent && <span className="ml-1 text-[10px] text-gray-500">（今のアカウント・必須）</span>}
                   </span>
-                </label>
+                </Checkbox>
               )
             })}
-            <div className="text-xs text-gray-500 mt-1">{accountIds.length} 件選択中</div>
+            <div className="text-ink-faint mt-1 text-xs">{accountIds.length} 件選択中</div>
           </div>
         )}
       </div>
@@ -707,6 +734,12 @@ function SlotsTab({
   const [deletingSlot, setDeletingSlot] = useState(false)
   const [deleteSlotError, setDeleteSlotError] = useState('')
   /*
+    入口29: 既存の枠の日時・定員を直す窓。口（PUT /slots/:slotId）は
+    もうあるので、画面には入口と入力窓だけを足す。予約が入っている枠は
+    定員を今の予約数より下げられない（口側の409と同じ決めごと）。
+  */
+  const [editSlotTarget, setEditSlotTarget] = useState<EventSlot | null>(null)
+  /*
     まとめて作る枠の下見。作る前に件数と最初・最後を読ませる。
     #1000 DETAIL-11: 下見の時点で操作IDと枠ごとの再送防止キー
     (client_key)を確定し、失敗後は残りだけを同じキーで再送する。
@@ -721,7 +754,7 @@ function SlotsTab({
 
   if (!eventId) {
     return (
-      <div className="text-center py-8 text-gray-500 text-sm">
+      <div className="text-center py-8 text-ink-faint text-sm">
         まず「概要」タブで保存してから予約枠を追加してください。
       </div>
     )
@@ -795,12 +828,43 @@ function SlotsTab({
     }
   }
 
+  /*
+    m26g R577: 枠の切替・編集は期待版つきで送る。古い画面からの操作は
+    409 になり、敗者側は一覧を読み直して最新の差分を見せる。
+  */
+  function slotConflictMessage(e: ApiError): string {
+    const current = (e.data as { current?: EventSlot } | undefined)?.current
+    const detail = current
+      ? `最新の枠は定員${current.capacity ?? '無制限'}・${current.is_active === 1 ? '有効' : '停止'}です。`
+      : ''
+    return `ほかの画面でこの枠が更新されました。一覧を読み直しました。${detail}最新の内容を確認してから、もう一度お試しください。`
+  }
+
+  async function updateSlotWithConflictRefresh(
+    slot: EventSlot,
+    body: Partial<EventSlot>,
+  ): Promise<void> {
+    if (!eventId) return
+    try {
+      await eventsApi.updateSlot(accountId, eventId, slot.id, body, slot.version ?? 1)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && e.code === 'version_conflict') {
+        await refresh()
+        throw new Error(slotConflictMessage(e))
+      }
+      throw e
+    }
+  }
+
   async function toggleActive(s: EventSlot) {
     if (!eventId) return
     setBusy(true)
+    setErr(null)
     try {
-      await eventsApi.updateSlot(accountId, eventId, s.id, { is_active: s.is_active === 1 ? 0 : 1 })
+      await updateSlotWithConflictRefresh(s, { is_active: s.is_active === 1 ? 0 : 1 })
       await refresh()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
     }
@@ -809,73 +873,74 @@ function SlotsTab({
   return (
     <div>
       <div className="flex flex-wrap gap-2 mb-4 items-center justify-between">
-        <div className="text-sm text-gray-600">{slots.length} 件の予約枠</div>
+        <div className="text-sm text-ink-secondary">{slots.length} 件の予約枠</div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowAdd(true)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            ＋ 枠を追加
-          </button>
-          <button
-            onClick={() => setShowBulk(true)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            一括追加
-          </button>
+          <Button onClick={() => setShowAdd(true)}>
+            ＋ 枠を追加する
+          </Button>
+          <Button onClick={() => setShowBulk(true)}>
+            一括追加する
+          </Button>
         </div>
       </div>
-      {err && <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg mb-3 text-sm">{err}</div>}
+      {err && <div className="bg-danger-bg border border-status-danger-border text-danger p-3 rounded-control mb-3 text-sm">{err}</div>}
       {slots.length === 0 ? (
-        <div className="text-center py-12 text-gray-500 text-sm border border-dashed border-gray-300 rounded-lg">
+        <div className="text-center py-12 text-ink-faint text-sm border border-dashed border-hairline rounded-control">
           予約枠がありません。「＋ 枠を追加」または「一括追加」から作成してください。
         </div>
       ) : (
-        <div className="overflow-x-auto border border-gray-200 rounded-lg">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="text-left px-3 py-2 font-medium">日時</th>
-                <th className="text-left px-3 py-2 font-medium">定員</th>
-                <th className="text-left px-3 py-2 font-medium">予約数</th>
-                <th className="text-left px-3 py-2 font-medium">状態</th>
-                <th className="text-right px-3 py-2 font-medium">操作</th>
-              </tr>
+        <DataTable>
+            <thead>
+              <TableHeadRow>
+                <Th style={{ width: '30%' }}>日時</Th>
+                <Th style={{ width: '14%' }}>定員</Th>
+                <Th style={{ width: '14%' }}>予約数</Th>
+                <Th style={{ width: '16%' }}>状態</Th>
+                <Th style={{ width: '26%' }} align="right">操作</Th>
+              </TableHeadRow>
             </thead>
             <tbody>
               {slots.map((s) => (
-                <tr key={s.id} className="border-t border-gray-200">
-                  <td className="px-3 py-2 text-gray-800">
+                <Tr key={s.id}>
+                  <Td>
                     {formatJpSlotRange(s.starts_at, s.ends_at)}
-                  </td>
-                  <td className="px-3 py-2 text-gray-700">{s.capacity ?? '無制限'}</td>
-                  <td className="px-3 py-2 text-gray-700">{s.active_count ?? 0}</td>
-                  <td className="px-3 py-2">
+                  </Td>
+                  <Td>{s.capacity ?? '無制限'}</Td>
+                  <Td>{s.active_count ?? 0}</Td>
+                  <Td>
                     <button
                       onClick={() => toggleActive(s)}
                       disabled={busy}
-                      className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        s.is_active === 1 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                      className={`text-xs px-2 py-1 rounded-pill font-medium ${
+                        s.is_active === 1 ? 'bg-accent-soft text-success' : 'bg-shell text-ink-secondary'
                       }`}
                     >
                       {s.is_active === 1 ? '有効' : '停止'}
                     </button>
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      onClick={() => { setDeleteSlotError(''); setDeleteSlotTarget(s) }}
-                      disabled={busy || (s.active_count ?? 0) > 0}
-                      title={(s.active_count ?? 0) > 0 ? '既存予約があるため削除できません' : '削除'}
-                      className="text-xs text-red-600 hover:underline disabled:opacity-30 disabled:no-underline"
-                    >
-                      削除
-                    </button>
-                  </td>
-                </tr>
+                  </Td>
+                  <ActionCell>
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => setEditSlotTarget(s)}
+                        disabled={busy}
+                        className="text-action text-xs hover:underline disabled:opacity-30 disabled:no-underline"
+                      >
+                        編集
+                      </button>
+                      <button
+                        onClick={() => { setDeleteSlotError(''); setDeleteSlotTarget(s) }}
+                        disabled={busy || (s.active_count ?? 0) > 0}
+                        title={(s.active_count ?? 0) > 0 ? '既存予約があるため削除できません' : '削除'}
+                        className="text-xs text-danger hover:underline disabled:opacity-30 disabled:no-underline"
+                      >
+                        削除する
+                      </button>
+                    </div>
+                  </ActionCell>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </DataTable>
       )}
 
       {showAdd && (
@@ -885,6 +950,17 @@ function SlotsTab({
             await eventsApi.createSlots(accountId, eventId, [s])
             await refresh()
             setShowAdd(false)
+          }}
+        />
+      )}
+      {editSlotTarget && (
+        <EditSlotDialog
+          slot={editSlotTarget}
+          onClose={() => setEditSlotTarget(null)}
+          onSubmit={async (next) => {
+            await updateSlotWithConflictRefresh(editSlotTarget, next)
+            await refresh()
+            setEditSlotTarget(null)
           }}
         />
       )}
@@ -972,6 +1048,8 @@ function AddSlotDialog({
   const [capacity, setCapacity] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // 保存中はEscapeで窓だけ消えないようにする（共通の窓の約束）。
+  const panelRef = useOverlayFocus(true, onClose, busy)
 
   async function submit() {
     setBusy(true)
@@ -991,61 +1069,66 @@ function AddSlotDialog({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-        <h3 className="text-lg font-bold mb-4 text-gray-900">予約枠を追加</h3>
-        {err && <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded-lg mb-3 text-sm">{err}</div>}
+    <div className="fixed inset-0 bg-scrim flex items-center justify-center z-50">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="予約枠を追加" className="bg-canvas rounded-control shadow-float p-6 w-full max-w-md mx-4">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h3 className="text-lg font-bold text-ink">予約枠を追加</h3>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
+        {err && <div className="bg-danger-bg border border-status-danger-border text-danger p-2 rounded-control mb-3 text-sm">{err}</div>}
         <div className="space-y-3">
           <label className="block">
-            <span className="text-sm font-medium text-gray-700">日付（JST）</span>
-            <input
-              type="date"
+            <span className="text-sm font-medium text-ink-secondary">日付（JST）</span>
+            <DateField
               value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              onChange={setDate}
+              aria-label="日付（JST）"
+              className="mt-1"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <span className="text-sm font-medium text-gray-700">開始</span>
-              <input
-                type="time"
+              <span className="text-sm font-medium text-ink-secondary">開始</span>
+              <TimeField
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                onChange={setStartTime}
+                aria-label="開始"
+                className="mt-1"
               />
             </label>
             <label>
-              <span className="text-sm font-medium text-gray-700">終了</span>
-              <input
-                type="time"
+              <span className="text-sm font-medium text-ink-secondary">終了</span>
+              <TimeField
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                onChange={setEndTime}
+                aria-label="終了"
+                className="mt-1"
               />
             </label>
           </div>
           <label className="block">
-            <span className="text-sm font-medium text-gray-700">定員（空欄=無制限）</span>
+            <span className="text-sm font-medium text-ink-secondary">定員（空欄=無制限）</span>
             <input
               type="number"
               min={1}
               value={capacity}
               onChange={(e) => setCapacity(e.target.value)}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="mt-1 w-full border border-hairline rounded-control px-3 py-2 text-sm"
             />
           </label>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
+          <Button onClick={onClose}>
             キャンセル
-          </button>
+          </Button>
           <button
             onClick={submit}
             disabled={busy}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 text-sm bg-action text-on-accent rounded-control hover:bg-action-hover disabled:opacity-50"
           >
-            追加
+            追加する
           </button>
         </div>
       </div>
@@ -1053,7 +1136,138 @@ function AddSlotDialog({
   )
 }
 
-function BulkSlotDialog({
+/*
+ * 入口29: 既存の予約枠の日時・定員を直す窓。
+ *
+ * 追加と同じ入力（日付・開始・終了・定員）を、保存値で埋めた状態で開く。
+ * 口側の決めごとと同じ検査をここでも先に行う:
+ * - 開始 < 終了
+ * - 定員は1以上の整数（空欄=無制限）
+ * - 予約が入っている枠は、定員をいまの予約数より下げられない
+ *
+ * 日時を動かしたとき、確定している予約のリマインド予定は口側が
+ * 新しい日時へ合わせて動かす。予約者へ「変わった」ことが伝わるよう、
+ * 予約のある枠ではそのことを窓の中へ書く。
+ */
+function EditSlotDialog({
+  slot,
+  onClose,
+  onSubmit,
+}: {
+  slot: EventSlot
+  onClose: () => void
+  onSubmit: (s: { starts_at: string; ends_at: string; capacity: number | null }) => Promise<void>
+}) {
+  const booked = slot.active_count ?? 0
+  const [date, setDate] = useState(() => utcIsoToJstDate(slot.starts_at))
+  const [startTime, setStartTime] = useState(() => utcIsoToJstHHMM(slot.starts_at))
+  const [endTime, setEndTime] = useState(() => utcIsoToJstHHMM(slot.ends_at))
+  const [capacity, setCapacity] = useState<string>(slot.capacity == null ? '' : String(slot.capacity))
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function submit() {
+    setBusy(true)
+    setErr(null)
+    try {
+      const s = jstHHMMToUtcIso(date, startTime)
+      const e = jstHHMMToUtcIso(date, endTime)
+      if (s >= e) throw new Error('開始時刻 < 終了時刻')
+      const cap = capacity === '' ? null : Number(capacity)
+      if (cap != null && (!Number.isInteger(cap) || cap < 1)) throw new Error('定員は1以上の整数')
+      if (cap != null && cap < booked) {
+        throw new Error(`この枠には${booked}件の予約が入っています。定員は${booked}以上にしてください`)
+      }
+      await onSubmit({ starts_at: s, ends_at: e, capacity: cap })
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // 保存中はEscapeで窓だけ消えないようにする（共通の窓の約束）。
+  const panelRef = useOverlayFocus(true, onClose, busy)
+
+  // 新しい部品はデザイントークンで書く（このファイルの古い生色クラスを増やさない）。
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}
+    >
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="予約枠を編集" className="bg-canvas rounded-card mx-4 w-full max-w-md p-6 shadow-float">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h3 className="text-ink text-lg font-bold">予約枠を編集</h3>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
+        {err && <Notice tone="danger" className="mb-3">{err}</Notice>}
+        {booked > 0 && (
+          <Notice tone="warn" className="mb-3">
+            この枠には{booked}件の予約が入っています。日時を変えると、確定している予約のリマインド予定も新しい日時へ合わせて動きます。定員は{booked}以上にしてください。
+          </Notice>
+        )}
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-ink-secondary text-sm font-medium">日付（JST）</span>
+            <DateField
+              value={date}
+              onChange={setDate}
+              aria-label="日付（JST）"
+              className="mt-1"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label>
+              <span className="text-ink-secondary text-sm font-medium">開始</span>
+              <TimeField
+                value={startTime}
+                onChange={setStartTime}
+                aria-label="開始"
+                className="mt-1"
+              />
+            </label>
+            <label>
+              <span className="text-ink-secondary text-sm font-medium">終了</span>
+              <TimeField
+                value={endTime}
+                onChange={setEndTime}
+                aria-label="終了"
+                className="mt-1"
+              />
+            </label>
+          </div>
+          <label className="block">
+            <span className="text-ink-secondary text-sm font-medium">定員（空欄=無制限）</span>
+            <TextInput
+              type="number"
+              min={1}
+              value={capacity}
+              onChange={(e) => setCapacity(e.target.value)}
+              className="mt-1"
+            />
+          </label>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            キャンセル
+          </Button>
+          <Button variant="primary" onClick={submit} disabled={busy} busy={busy} busyLabel="保存中...">保存する
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/*
+ * R84: 予約枠の一括追加の窓は共通 Dialog を使う。
+ * 以前は手作りの fixed  overlay で、入力欄が増えると窓が画面より高くなり、
+ * 閉じる・生成・キャンセルが画面外へ出た。Escape でも閉じなかった。
+ * 共通 Dialog は overlay のスクロール・Escape・フォーカス閉じ込めを持つ。
+ */
+export function BulkSlotDialog({
   onClose,
   onSubmit,
 }: {
@@ -1094,62 +1308,64 @@ function BulkSlotDialog({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
-        <h3 className="text-lg font-bold mb-4 text-gray-900">予約枠の一括追加</h3>
-        {err && <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded-lg mb-3 text-sm">{err}</div>}
+    <Dialog
+      open
+      title="予約枠の一括追加"
+      onCancel={onClose}
+      onConfirm={() => void submit()}
+      confirmLabel="生成"
+      cancelLabel="キャンセル"
+      busy={busy}
+      error={err ?? undefined}
+    >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <span className="text-sm font-medium text-gray-700">開始日</span>
-              <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              <span className="text-sm font-medium text-ink-secondary">開始日</span>
+              <DateField value={start} onChange={setStart} aria-label="開始日" className="mt-1" />
             </label>
             <label>
-              <span className="text-sm font-medium text-gray-700">終了日</span>
-              <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              <span className="text-sm font-medium text-ink-secondary">終了日</span>
+              <DateField value={end} onChange={setEnd} aria-label="終了日" className="mt-1" />
             </label>
           </div>
           <div>
-            <span className="text-sm font-medium text-gray-700 block mb-1.5">曜日</span>
-            <div className="flex gap-1.5">
+            <span className="text-sm font-medium text-ink-secondary block mb-1.5">曜日</span>
+            {/* R218: 色だけでなく aria-pressed で選択状態を読み上げに伝える。 */}
+            <div className="flex gap-1.5" role="group" aria-label="枠を作る曜日">
               {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => toggleWeekday(i)}
-                  className={`flex-1 px-2 py-2 text-sm border rounded-lg ${
+                <Button variant="secondary" className={(`flex-1 px-2 py-2 text-sm border rounded-control ${
                     weekdays.includes(i)
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
+                      ? 'bg-action text-on-accent border-action'
+                      : 'border-hairline text-ink-secondary hover:bg-surface-pearl'
+                  }`) + ' h-auto whitespace-normal'} key={i} type="button" aria-pressed={weekdays.includes(i)} onClick={() => toggleWeekday(i)}>
                   {d}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
           <div>
-            <span className="text-sm font-medium text-gray-700 block mb-1.5">時刻パターン</span>
+            <span className="text-sm font-medium text-ink-secondary block mb-1.5">時刻パターン</span>
             {patterns.map((p, i) => (
               <div key={i} className="flex gap-2 mb-1.5 items-center">
-                <input
-                  type="time"
+                <TimeField
                   value={p.start}
-                  onChange={(e) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  onChange={(v) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, start: v } : x)))}
+                  aria-label={`${i + 1}件目の開始`}
+                  className="flex-1"
                 />
-                <span className="text-gray-500">〜</span>
-                <input
-                  type="time"
+                <span className="text-ink-faint">〜</span>
+                <TimeField
                   value={p.end}
-                  onChange={(e) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)))}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  onChange={(v) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, end: v } : x)))}
+                  aria-label={`${i + 1}件目の終了`}
+                  className="flex-1"
                 />
                 {patterns.length > 1 && (
                   <button
                     type="button"
                     onClick={() => setPatterns((ps) => ps.filter((_, j) => j !== i))}
-                    className="text-red-600 px-2"
+                    className="text-danger px-2"
                   >
                     ×
                   </button>
@@ -1159,36 +1375,23 @@ function BulkSlotDialog({
             <button
               type="button"
               onClick={() => setPatterns((ps) => [...ps, { start: '14:00', end: '15:00' }])}
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-action hover:underline"
             >
-              ＋ パターン追加
+              ＋ パターンを追加する
             </button>
           </div>
           <label className="block">
-            <span className="text-sm font-medium text-gray-700">定員（各枠共通・空欄=無制限）</span>
+            <span className="text-sm font-medium text-ink-secondary">定員（各枠共通・空欄=無制限）</span>
             <input
               type="number"
               min={1}
               value={capacity}
               onChange={(e) => setCapacity(e.target.value)}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="mt-1 w-full border border-hairline rounded-control px-3 py-2 text-sm"
             />
           </label>
         </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
-            キャンセル
-          </button>
-          <button
-            onClick={submit}
-            disabled={busy}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            生成
-          </button>
-        </div>
-      </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -1205,23 +1408,26 @@ function PublishTab({
   update: <K extends keyof EventDetail>(k: K, v: EventDetail[K]) => void
   tags: Array<{ id: string; name: string }>
 }) {
+  // R23横展開(m18hと同じ形): 新しい候補にない公開対象タグは外して知らせる。
+  const [tagPruned, setTagPruned] = useState(false)
+  useEffect(() => {
+    if (tags.length === 0 || draft.visible_tag_id == null) return
+    if (!tags.some((t) => t.id === draft.visible_tag_id)) {
+      update('visible_tag_id', null)
+      setTagPruned(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tags])
   return (
     <div className="space-y-5">
-      <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-        <input
-          type="checkbox"
-          checked={draft.requires_approval === 1}
-          onChange={(e) => update('requires_approval', e.target.checked ? 1 : 0)}
-          className="mt-0.5 rounded border-gray-300"
-        />
-        <div>
-          <div className="text-sm font-medium text-gray-900">承認制</div>
-          <div className="text-xs text-gray-500 mt-0.5">
-            ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />
-            OFF: 定員空きがあれば即時確定
-          </div>
-        </div>
-      </label>
+      <Checkbox
+        className="flex w-full gap-3 rounded-control border border-hairline p-3 cursor-pointer hover:bg-canvas-sunken"
+        checked={draft.requires_approval === 1}
+        onCheckedChange={(checked) => update('requires_approval', checked ? 1 : 0)}
+        description={<>ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />OFF: 定員空きがあれば即時確定</>}
+      >
+        承認制
+      </Checkbox>
 
       <Field
         label="承認の期限"
@@ -1239,49 +1445,42 @@ function PublishTab({
         />
       </Field>
 
-      <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-        <input
-          type="checkbox"
-          checked={draft.waitlist_enabled === 1}
-          onChange={(e) => update('waitlist_enabled', e.target.checked ? 1 : 0)}
-          className="mt-0.5 rounded border-gray-300"
-        />
-        <div>
-          <div className="text-sm font-medium text-gray-900">キャンセル待ちを受ける</div>
-          <div className="text-xs text-gray-500 mt-0.5">
-            ON: 定員に達したあとも申込を受け、待ちとして記録する<br />
-            OFF: 定員に達したら締め切る<br />
-            待ちの人は予約の件数に入りません。空きが出ても自動では繰り上げず、
-            誰を通すかは一覧から運営が決めます。
-          </div>
-        </div>
-      </label>
+      <Checkbox
+        className="flex w-full gap-3 rounded-control border border-hairline p-3 cursor-pointer hover:bg-canvas-sunken"
+        checked={draft.waitlist_enabled === 1}
+        onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
+        description={<>ON: 定員に達したあとも申込を受け、待ちとして記録する<br />OFF: 定員に達したら締め切る<br />待ちの人は予約の件数に入りません。空きが出たら待ちの先頭へ自動で案内が送られ、本人が期限内に承諾すると確定します。申込者の画面から手動で次の方へ案内することもできます。</>}
+      >
+        キャンセル待ちを受ける
+      </Checkbox>
 
       <div>
-        <label htmlFor="ev-visible-tag" className="mb-1.5 block text-sm font-medium text-gray-700">
+        {tagPruned ? (
+          <Notice
+            tone="warn"
+            message="選んでいたタグは、今のアカウントにないため外しました。選び直してください。"
+            onClose={() => setTagPruned(false)}
+            className="mb-2"
+          />
+        ) : null}
+        <label htmlFor="ev-visible-tag" className="mb-1.5 block text-sm font-medium text-ink-secondary">
           公開対象
         </label>
-        <select
+        <Select
+          aria-label="公開対象"
           id="ev-visible-tag"
           value={draft.visible_tag_id ?? ''}
-          onChange={(e) => update('visible_tag_id', e.target.value === '' ? null : e.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">友だち全員</option>
-          {tags.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name} を持つ人だけ
-            </option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-gray-500">
+          onChange={(value) => update('visible_tag_id', value === '' ? null : value)}
+          options={[{ value: '', label: '友だち全員' }, ...tags.map((t) => ({ value: t.id, label: `${t.name} を持つ人だけ` }))]}
+        />
+        <p className="mt-1 text-xs text-ink-faint">
           絞ると、タグを持たない人にはイベントが存在しないものとして扱われます。
           URL を直接開いても表示されません。
         </p>
       </div>
 
       <div>
-        <label htmlFor="ev-entry-cutoff" className="mb-1.5 block text-sm font-medium text-gray-700">
+        <label htmlFor="ev-entry-cutoff" className="mb-1.5 block text-sm font-medium text-ink-secondary">
           申込の締め切り
         </label>
         {/*
@@ -1289,97 +1488,84 @@ function PublishTab({
           保存値が選択肢に無いときは「保存済み：…」として出し、
           先頭項目を選んだように見せない・別値へ無断変換しない。
         */}
-        <select
+        <Select
+          aria-label="申込の締め切り"
           id="ev-entry-cutoff"
           value={deadlineSelectValue(draft.entry_cutoff_hours_before)}
-          onChange={(e) =>
-            update('entry_cutoff_hours_before', parseDeadlineSelect(e.target.value))
+          onChange={(value) =>
+            update('entry_cutoff_hours_before', parseDeadlineSelect(value))
           }
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {deadlineOptionsWithSaved(
+          options={deadlineOptionsWithSaved(
             EVENT_ENTRY_CUTOFF_OPTIONS,
             draft.entry_cutoff_hours_before,
-          ).map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          )}
+        />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label className="block text-sm font-medium text-ink-secondary mb-1.5">
           キャンセル期限（友だち側）
         </label>
         {/*
           EVENT-03: 保存値の意味は作成画面・Worker と同じ。
           null=不可、0=開始直前まで、正数=開始N時間前。
         */}
-        <select
+        <Select
+          aria-label="キャンセル期限（友だち側）"
           value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
-          onChange={(e) =>
-            update('cancel_deadline_hours_before', parseDeadlineSelect(e.target.value))
+          onChange={(value) =>
+            update('cancel_deadline_hours_before', parseDeadlineSelect(value))
           }
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {deadlineOptionsWithSaved(
+          options={deadlineOptionsWithSaved(
             EVENT_CANCEL_DEADLINE_OPTIONS,
             draft.cancel_deadline_hours_before,
-          ).map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          )}
+        />
       </div>
 
-      <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-        <input
-          type="checkbox"
-          checked={draft.reminder_day_before_enabled === 1}
-          onChange={(e) => update('reminder_day_before_enabled', e.target.checked ? 1 : 0)}
-          className="mt-0.5 rounded border-gray-300"
-        />
-        <div>
-          <div className="text-sm font-medium text-gray-900">前日リマインダ</div>
-          <div className="text-xs text-gray-500 mt-0.5">前日 18:00 JST に LINE で通知</div>
-        </div>
-      </label>
+      <Checkbox
+        className="flex w-full gap-3 rounded-control border border-hairline p-3 cursor-pointer hover:bg-canvas-sunken"
+        checked={draft.reminder_day_before_enabled === 1}
+        onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
+        description="前日 18:00 JST に LINE で通知"
+      >
+        前日リマインダ
+      </Checkbox>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label className="text-ink mb-1.5 block text-sm font-medium">
           開始 N 時間前リマインダ
         </label>
-        <select
-          value={draft.reminder_hours_before ?? 'off'}
-          onChange={(e) =>
-            update('reminder_hours_before', e.target.value === 'off' ? null : Number(e.target.value))
+        <Select
+          aria-label="開始 N 時間前リマインダ"
+          value={draft.reminder_hours_before == null ? 'off' : String(draft.reminder_hours_before)}
+          onChange={(value) =>
+            update('reminder_hours_before', value === 'off' ? null : Number(value))
           }
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="off">送信しない</option>
-          <option value="1">1 時間前</option>
-          <option value="2">2 時間前</option>
-          <option value="3">3 時間前</option>
-          <option value="6">6 時間前</option>
-          <option value="24">24 時間前</option>
-        </select>
+          options={[
+            { value: 'off', label: '送信しない' },
+            { value: '1', label: '1 時間前' },
+            { value: '2', label: '2 時間前' },
+            { value: '3', label: '3 時間前' },
+            { value: '6', label: '6 時間前' },
+            { value: '24', label: '24 時間前' },
+          ]}
+        />
       </div>
 
       {/* 予約者向けカスタムメッセージ追記 */}
-      <div className="border-t border-gray-200 pt-5 space-y-4">
+      <div className="border-t border-hairline pt-5 space-y-4">
         <div>
-          <div className="text-sm font-medium text-gray-900 mb-1">予約者向けカスタムメッセージ</div>
-          <p className="text-xs text-gray-500">
+          <div className="text-sm font-medium text-ink mb-1">予約者向けカスタムメッセージ</div>
+          <p className="text-xs text-ink-faint">
             予約者だけに届く LINE 通知の末尾に追加されます（Zoom URL など）。空欄ならデフォルト文言のみ。
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label className="block text-sm font-medium text-ink-secondary mb-1.5">
             ✉️ 予約確定メッセージへの追記
-            <span className="ml-2 text-xs text-gray-400">
+            <span className="ml-2 text-xs text-ink-faint">
               {(draft.confirmation_message_extra ?? '').length} / 2,000
             </span>
           </label>
@@ -1389,15 +1575,15 @@ function PublishTab({
             rows={3}
             maxLength={2000}
             placeholder="例: 当日の Zoom URL: https://us02web.zoom.us/j/..."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
           />
-          <p className="text-xs text-gray-500 mt-1">確定通知（即時 / 後追い承認）の末尾に追加</p>
+          <p className="text-xs text-ink-faint mt-1">確定通知（即時 / 後追い承認）の末尾に追加</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label className="block text-sm font-medium text-ink-secondary mb-1.5">
             リマインドメッセージへの追記
-            <span className="ml-2 text-xs text-gray-400">
+            <span className="ml-2 text-xs text-ink-faint">
               {(draft.reminder_message_extra ?? '').length} / 2,000
             </span>
           </label>
@@ -1407,43 +1593,40 @@ function PublishTab({
             rows={3}
             maxLength={2000}
             placeholder="例: 開始 10 分前に同じ URL からご入室ください"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
           />
-          <p className="text-xs text-gray-500 mt-1">前日 / N 時間前のリマインド末尾に追加</p>
+          <p className="text-xs text-ink-faint mt-1">前日 / N 時間前のリマインド末尾に追加</p>
         </div>
       </div>
 
-      <hr className="border-gray-200" />
+      <hr className="border-hairline" />
 
       <div>
-        <div className="text-sm font-medium text-gray-700 mb-2">公開状態</div>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => update('is_published', 0)}
-            className={`p-3 border-2 rounded-lg text-left transition-colors ${
-              draft.is_published === 0
-                ? 'border-gray-700 bg-gray-50'
-                : 'border-gray-200 bg-white hover:border-gray-300'
-            }`}
-          >
-            <div className="text-sm font-bold text-gray-900">下書き</div>
-            <div className="text-xs text-gray-600 mt-0.5">友だちには見えない</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => update('is_published', 1)}
-            className={`p-3 border-2 rounded-lg text-left transition-colors ${
-              draft.is_published === 1
-                ? 'border-green-500 bg-green-50'
-                : 'border-gray-200 bg-white hover:border-green-300'
-            }`}
-          >
-            <div className="text-sm font-bold text-gray-900">公開する</div>
-            <div className="text-xs text-gray-600 mt-0.5">予約 URL が有効になる</div>
-          </button>
-        </div>
-        <p className="text-xs text-gray-500 mt-2">
+        <div className="text-sm font-medium text-ink-secondary mb-2">公開状態</div>
+        {/*
+          R218: 下書き/公開は二者択一なので、素のボタンではなく
+          共通の RadioCard（本物の input[type=radio]）にする。
+          読み上げとキーボードで選択状態が伝わる。
+        */}
+        <RadioCardGroup legend="公開状態" className="grid grid-cols-2 gap-2">
+          <RadioCard
+            name="event-publish-state"
+            value="draft"
+            checked={draft.is_published === 0}
+            onChange={() => update('is_published', 0)}
+            title="下書き"
+            note="友だちには見えない"
+          />
+          <RadioCard
+            name="event-publish-state"
+            value="published"
+            checked={draft.is_published === 1}
+            onChange={() => update('is_published', 1)}
+            title="公開する"
+            note="予約 URL が有効になる"
+          />
+        </RadioCardGroup>
+        <p className="text-xs text-ink-faint mt-2">
           {draft.is_published === 1
             ? '✓ 保存後、友だちに「予約 URL」を案内できます。'
             : '保存しても友だちには表示されません。'}

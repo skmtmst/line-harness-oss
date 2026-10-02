@@ -22,6 +22,11 @@ export async function recordIncomingLineMessage(
     lineMessageAccountKey: string;
     lineMessageId: string;
     createdAt: string;
+    /**
+     * LINEイベントの timestamp (JST文字列)。受信の並びは起こった順
+     * (こちら) を正とする。無いときは保存時刻へ倒す。
+     */
+    lineEventAt?: string | null;
     /** LINEが受信メッセージに付ける引用用トークン。引用返信の送信時にそのまま使う。 */
     quoteToken?: string | null;
   },
@@ -31,10 +36,11 @@ export async function recordIncomingLineMessage(
       `INSERT OR IGNORE INTO messages_log
          (id, friend_id, direction, message_type, content, broadcast_id,
           scenario_step_id, source, line_account_id, created_at,
+          line_event_at,
           line_message_id, line_message_account_key, quote_token, unsent_at)
        SELECT ?, ?, 'incoming', ?,
               CASE WHEN u.line_message_id IS NULL THEN ? ELSE '' END,
-              NULL, NULL, 'user', ?, ?, ?, ?, ?, u.unsent_at
+              NULL, NULL, 'user', ?, ?, ?, ?, ?, ?, u.unsent_at
          FROM (SELECT 1) AS seed
          LEFT JOIN line_message_unsends u
            ON u.line_message_account_key = ? AND u.line_message_id = ?`,
@@ -46,6 +52,7 @@ export async function recordIncomingLineMessage(
       input.content,
       input.lineAccountId,
       input.createdAt,
+      input.lineEventAt ?? input.createdAt,
       input.lineMessageId,
       input.lineMessageAccountKey,
       input.quoteToken ?? null,

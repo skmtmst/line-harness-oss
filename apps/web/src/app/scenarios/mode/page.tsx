@@ -1,12 +1,16 @@
 'use client'
 
-import StepTrail from '@/components/shared/step-trail'
+import Stepper from '@/components/shared/stepper'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
+import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
@@ -42,9 +46,23 @@ function ScenarioModeContent() {
   const [scenarioState, setScenarioState] = useState<'loading' | 'ready' | 'error'>(
     id ? 'loading' : 'ready',
   )
+  /*
+   * D023: id ありの読み込み失敗は決まった文だけで読み直し口が無い。
+   * 捕まえた失敗を共通部品へ渡し、その場で読み直せるようにする
+   * （403 は再試行を出さない、429 は待ち案内）。
+   */
+  const [scenarioError, setScenarioError] = useState<unknown>(null)
+  const [scenarioReloadKey, setScenarioReloadKey] = useState(0)
   const [saving, setSaving] = useState<DeliveryMode | null>(null)
+  /*
+   * ★V7: 2択はカードごとの緑ボタンで即確定させない。カード全体を選ぶ
+   * ラジオ選択にし、確定は画面1つの主ボタンにまとめる。
+   */
+  const [selectedMode, setSelectedMode] = useState<DeliveryMode | null>(null)
   const [error, setError] = useState('')
   const [name, setName] = useState('')
+  const [nameError, setNameError] = useState('')
+  const nameInputRef = useRef<HTMLInputElement>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderId, setFolderId] = useState('')
   const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -102,6 +120,7 @@ function ScenarioModeContent() {
     // id があるときだけ既存の行を読む。新規（id なし）は読む行が無い。
     if (id) {
     setScenarioState('loading')
+    setScenarioError(null)
     void scenarioReferenceData.scenario(id)
       .then((res) => {
         if (!active) return
@@ -111,19 +130,19 @@ function ScenarioModeContent() {
           setFolderId(res.data.folderId ?? '')
           setScenarioState('ready')
         } else {
-          setError('シナリオを読み込めませんでした。時間をおいてもう一度お試しください。')
+          setScenarioError(null)
           setScenarioState('error')
         }
       })
-      .catch(() => {
+      .catch((caught) => {
         if (active) {
-          setError('シナリオを読み込めませんでした。時間をおいてもう一度お試しください。')
+          setScenarioError(caught)
           setScenarioState('error')
         }
       })
     }
     return () => { active = false }
-  }, [id])
+  }, [id, scenarioReloadKey])
 
   /*
    * SCENARIO-20: フォルダはアカウント単位。無指定で全権限範囲を取ると、
@@ -152,13 +171,31 @@ function ScenarioModeContent() {
   }, [folderAccountId])
 
   /**
+   * R172: 名前空欄の必須エラーは画面上方の帯だけに出すと、スマホでは
+   * 画面外（約844px上）になり押した理由が見えない。該当欄の下にも
+   * 短い案内を出し、入力欄へフォーカスとスクロールを移す。
+   * 戻り値は「空欄で止めたか」。止めたとき真。
+   */
+  const rejectEmptyName = (): boolean => {
+    if (name.trim()) return false
+    setError('シナリオ名を入力してください')
+    setNameError('シナリオ名を入力してください')
+    const input = nameInputRef.current
+    if (input) {
+      input.focus()
+      input.scrollIntoView({ block: 'center' })
+    }
+    return true
+  }
+
+  /**
    * 行をまだ作っていない（id なし）ときの作成。方式を確定したこの瞬間に
    * 初めて作るので、途中で閉じても空の行は残らない（#949 N-055）。
    */
   const createNew = async (mode: DeliveryMode): Promise<string | null> => {
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('シナリオ名を入力してください')
+      rejectEmptyName()
       return null
     }
     const res = await api.scenarios.create({
@@ -188,9 +225,10 @@ function ScenarioModeContent() {
     }
     setSaving(mode)
     setError('')
+    setNameError('')
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('シナリオ名を入力してください')
+      rejectEmptyName()
       setSaving(null)
       return
     }
@@ -233,6 +271,7 @@ function ScenarioModeContent() {
       // 「時刻で指定」（設計でおすすめの方。通が0のあいだは変えられる）。
       setDetailsSaving(true)
       setError('')
+      setNameError('')
       try {
         const createdId = await createNew('absolute_time')
         if (createdId) router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
@@ -242,7 +281,12 @@ function ScenarioModeContent() {
       return
     }
     const saved = await saveDetails()
-    if (saved) router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
+    if (saved) {
+      router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
+    } else if (!name.trim()) {
+      // R172: 名前を消して下書き保存を押しても何も起きないままにしない。
+      rejectEmptyName()
+    }
   }
 
   const selectedFolderName = folderState === 'loading'
@@ -254,8 +298,9 @@ function ScenarioModeContent() {
   const selectedFolderMissing = Boolean(folderId && !folders.some((folder) => folder.id === folderId))
 
   return (
-    <div data-design-node="cCB7r" data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
-      <div data-design="Head" className="mb-7 flex items-center justify-between">
+    <div data-design-node="cCB7r" data-list-state={scenarioState} aria-busy={scenarioState === 'loading'} className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Head" className="flex items-center justify-between">
         <nav data-design="Crumb" className="text-ink-faint text-xs">
           <Link href="/scenarios" className="hover:underline">
             シナリオ配信
@@ -263,17 +308,13 @@ function ScenarioModeContent() {
           <span className="mx-1.5">/</span>
           <span>新規作成</span>
         </nav>
-        <Link
-          href="/scenarios"
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
-        >
-          ✕ キャンセル
-        </Link>
+        {/* 見た目を手書きしない。共通ボタンで高さをそろえる。 */}
+        <Button href="/scenarios">キャンセル</Button>
       </div>
 
-      <StepTrail
+      <Stepper
         label="シナリオ作成の進み方"
-        items={[
+        steps={[
           // id なしは「これから作る」。名前と方式をこの画面でまとめて決める。
           { label: 'シナリオ情報', state: id ? 'done' : 'current' },
           { label: '配信方式', state: 'current' },
@@ -281,27 +322,47 @@ function ScenarioModeContent() {
         ]}
       />
 
-      <div data-design="Notice" className="mt-4 space-y-2">
+      <div data-design="Notice" className="space-y-2">
         {scenarioState === 'loading' && (
-          <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
+          <Notice tone="info">
             シナリオを読み込んでいます。
-          </p>
+          </Notice>
         )}
         {scenarioState === 'ready' && scenario && (
-          <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
+          <Notice tone="success">
             「{scenario.name}」の下書きを作成しました。続けて配信方式を選んでください。
-          </p>
+          </Notice>
         )}
         {/* id なしはまだ作っていない。確定するまで行は作らない（#949 N-055）。 */}
         {!id && (
-          <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
+          <Notice tone="info">
             シナリオ名と配信方式を決めると作成されます。途中で閉じても一覧には残りません。
-          </p>
+          </Notice>
         )}
-        {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
+        {/* D023: id ありの読み込み失敗は読み直し口つきの1枚にする。
+            403・429だけ共通理由へ切り替える（保存不可文は残し両立。再試行の
+            有無は `loadFailureCopy` が決める）。それ以外は画面の文のまま。 */}
+        {(() => {
+          const scenarioFailure = scenarioError ? loadFailureCopy(scenarioError, 'シナリオ') : null
+          const useCommonReason = scenarioError ? isForbiddenOrRateLimited(scenarioError) : false
+          return id && scenarioState === 'error' ? (
+            <TargetMissing
+              kind="error"
+              title={useCommonReason && scenarioFailure ? scenarioFailure.title : 'シナリオを読み込めませんでした'}
+              description={
+                useCommonReason && scenarioFailure
+                  ? `配信方式の選択・保存はできません。${scenarioFailure.description}`
+                  : '配信方式の選択・保存はできません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'
+              }
+              error={scenarioError ?? undefined}
+              onRetry={() => setScenarioReloadKey((key) => key + 1)}
+            />
+          ) : null
+        })()}
+        {error && <Notice tone="danger" message={error} />}
       </div>
 
-      <div data-design="Name" className="bg-canvas rounded-card border-hairline mt-4 mb-4 border p-4">
+      <div data-design="Name" className="bg-canvas rounded-card border-hairline border p-4">
         <h2 className="text-ink text-sm font-bold">シナリオ情報</h2>
         <div className="mt-2 grid max-w-4xl gap-4 md:grid-cols-2">
           <label className="block">
@@ -309,36 +370,45 @@ function ScenarioModeContent() {
               シナリオ名 <span className="text-danger">*</span>
             </span>
             <input
+              ref={nameInputRef}
               type="text"
               value={name}
               disabled={(Boolean(id) && !scenario) || detailsSaving || saving !== null}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); if (nameError) setNameError('') }}
               onBlur={() => void saveDetails()}
               placeholder="例: 友だち追加ウェルカム"
+              aria-invalid={nameError ? true : undefined}
+              aria-describedby={nameError ? 'scenario-name-error' : undefined}
               className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
+            {nameError ? (
+              <span id="scenario-name-error" className="mt-1 block text-xs font-semibold text-danger">
+                {nameError}
+              </span>
+            ) : null}
           </label>
 
           <label className="block">
             <span className="text-ink-secondary mb-1 block text-xs font-medium">フォルダ：</span>
-            <SelectField
+            <span title={selectedFolderName} className="block">
+            <Select
               value={folderId}
-              title={selectedFolderName}
               disabled={(Boolean(id) && !scenario) || folderState !== 'ready' || detailsSaving || saving !== null}
-              onChange={(event) => {
-                const nextFolderId = event.target.value
+              onChange={(value) => {
+                const nextFolderId = value
                 setFolderId(nextFolderId)
                 void saveDetails(nextFolderId)
               }}
               aria-label="シナリオのフォルダ"
-              className="v6-select border-hairline rounded-control bg-canvas text-ink focus:ring-accent disabled:bg-canvas-sunken disabled:text-ink-faint w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              size="full"
               options={[
                 { value: '', label: '未分類' },
                 ...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : []),
                 ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
               ]}
             />
-            {folderState !== 'ready' || detailsSaving ? (
+
+            </span>            {folderState !== 'ready' || detailsSaving ? (
               <span className="text-ink-faint mt-1 block text-xs">
                 {folderState === 'loading'
                   ? 'フォルダを読み込んでいます。'
@@ -361,9 +431,13 @@ function ScenarioModeContent() {
         </div>
       </div>
 
-      <div data-design="Choices" className="grid gap-4 xl:grid-cols-2">
+      <fieldset data-design="Choices">
+        <legend className="sr-only">配信方式</legend>
+        <div className="grid gap-4 xl:grid-cols-2">
         <ModeCard
           mode="absolute_time"
+          selected={selectedMode === 'absolute_time'}
+          onSelect={setSelectedMode}
           title="時刻で指定"
           lead="配信時刻がそろうため、開封されやすい時間帯に寄せられます。"
           body="配信のタイミングを「購読開始から〇日後の〇時」と指定できます。メルマガのような決まった時間の定期配信ができます。"
@@ -375,10 +449,7 @@ function ScenarioModeContent() {
             { who: '友だち B', start: '4/1 14:00 に購読開始', first: '4/1 15:00', second: '4/2 20:00' },
           ]}
           heads={['当日 15:00', '翌日 20:00']}
-          saving={saving}
           disabled={(Boolean(id) && !scenario) || detailsSaving}
-          onChoose={choose}
-          cta="時刻で作成"
         />
         <ModeCard
           mode="elapsed"
@@ -392,26 +463,33 @@ function ScenarioModeContent() {
             { who: '友だち A', start: '4/1 12:00 に購読開始', first: '4/1 15:00', second: '4/2 20:00', gaps: ['+3時間', '+1日と8時間'] },
             { who: '友だち B', start: '4/1 14:00 に購読開始', first: '4/1 17:00', second: '4/2 22:00', gaps: ['+3時間', '+1日と8時間'] },
           ]}
-          saving={saving}
+          selected={selectedMode === 'elapsed'}
+          onSelect={setSelectedMode}
           disabled={(Boolean(id) && !scenario) || detailsSaving}
-          onChoose={choose}
-          cta="経過時間で作成"
         />
-      </div>
+        </div>
+      </fieldset>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <p className="text-ink-faint text-xs">
-          ⓘ どちらを選んでも、作成後にステップの追加・並べ替えができます。
+          どちらを選んでも、作成後にステップの追加・並べ替えができます。
           {/* 1通だけ試しに送る受け口が無いので、テスト送信とは書かない。 */}
         </p>
-        <button
-          type="button"
-          disabled={(Boolean(id) && !scenario) || saving !== null || detailsSaving}
-          onClick={() => void continueAsDraft()}
-          className="text-accent ml-auto text-sm font-medium hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          あとで決める（下書きとして保存）
-        </button>
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          <Button
+            variant="secondary"
+            disabled={(Boolean(id) && !scenario) || saving !== null || detailsSaving}
+            onClick={() => void continueAsDraft()}
+          >
+            あとで決める（下書きとして保存）
+          </Button>
+          <Button
+            variant="primary"
+            disabled={!selectedMode || (Boolean(id) && !scenario) || saving !== null || detailsSaving}
+            onClick={() => { if (selectedMode) void choose(selectedMode) }} busy={saving !== null} busyLabel="作成中…">
+            {id ? 'この方式で保存する' : 'この方式で作る'}
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -439,6 +517,8 @@ function scenarioModeError(cause: unknown): string {
 
 function ModeCard({
   mode,
+  selected,
+  onSelect,
   title,
   recommended,
   lead,
@@ -448,12 +528,11 @@ function ModeCard({
   heads,
   result,
   note,
-  cta,
-  saving,
   disabled,
-  onChoose,
 }: {
   mode: DeliveryMode
+  selected: boolean
+  onSelect: (mode: DeliveryMode) => void
   title: string
   recommended?: boolean
   lead: string
@@ -463,19 +542,25 @@ function ModeCard({
   heads?: string[]
   result: string
   note: string
-  cta: string
-  saving: DeliveryMode | null
   disabled: boolean
-  onChoose: (mode: DeliveryMode) => void
 }) {
   return (
-    // カードの高さはそろえるが、操作は説明の直後に置く。Pencilでは内容の短い
-    // 「時刻で指定」の操作を下端まで押し下げず、読んだ流れで選べる。
-    <section className="bg-canvas rounded-card border-hairline flex h-full flex-col border p-5">
+    // ★V7: カード全体を選ぶラジオ選択。本物の input[type=radio] を使い、
+    // 選択中は枠と淡い面で示す（色だけに頼らない）。確定は画面下の主ボタン。
+    <label className={`rounded-card flex h-full cursor-pointer flex-col border bg-canvas p-5 ${selected ? 'border-accent bg-accent-soft' : 'border-hairline'} ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}>
+      <input
+        type="radio"
+        name="delivery-mode"
+        value={mode}
+        checked={selected}
+        disabled={disabled}
+        onChange={() => onSelect(mode)}
+        className="sr-only"
+      />
       <div className="flex items-start gap-3">
         {/* 絵文字は使わない。端末やフォントで見た目が変わるうえ、
             色が乗って見出しより目立つ。線の記号にする。 */}
-        <span className="bg-accent-soft text-accent rounded-card flex h-9 w-9 shrink-0 items-center justify-center">
+        <span className="bg-accent-soft text-accent-deep rounded-card flex h-9 w-9 shrink-0 items-center justify-center">
           <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="9" />
             {mode === 'absolute_time' ? (
@@ -489,7 +574,7 @@ function ModeCard({
           <h2 className="text-ink flex flex-wrap items-center gap-2 text-lg font-bold">
             {title}
             {recommended && (
-              <span className="bg-accent-soft text-accent rounded-pill px-2 py-0.5 text-xs font-bold">
+              <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-0.5 text-xs font-medium">
                 おすすめ
               </span>
             )}
@@ -519,7 +604,7 @@ function ModeCard({
             {heads.map(h => (
               <span
                 key={h}
-                className="bg-accent-deep text-on-accent rounded-control flex-1 px-2 py-1 text-center text-xs font-bold"
+                className="bg-accent-deep text-on-accent rounded-control flex-1 px-2 py-1 text-center text-xs font-medium"
               >
                 {h}
               </span>
@@ -530,7 +615,7 @@ function ModeCard({
           {rows.map(r => (
             <div key={r.who} className="flex items-center gap-2">
               <div className="w-36 shrink-0">
-                <p className="text-ink text-xs font-bold">{r.who}</p>
+                <p className="text-ink text-xs font-medium">{r.who}</p>
                 <p className="text-ink-faint text-[11px]">{r.start}</p>
               </div>
               <Slot order="1通目" at={r.first} gap={r.gaps?.[0]} />
@@ -544,15 +629,7 @@ function ModeCard({
         <p className={`text-ink-faint text-[11px] leading-relaxed ${mode === 'absolute_time' ? 'mt-0' : 'mt-1'}`}>※ {note}</p>
       </div>
 
-      <button
-        type="button"
-        onClick={() => onChoose(mode)}
-        disabled={disabled || saving !== null}
-        className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control mt-0 w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-50"
-      >
-        {saving === mode ? '作成中…' : `${cta} →`}
-      </button>
-    </section>
+    </label>
   )
 }
 
@@ -566,7 +643,7 @@ function Slot({ order, at, gap }: { order: string; at: string; gap?: string }) {
       )}
       <div className="border-hairline rounded-control bg-canvas border px-2 py-1.5 text-center">
         <p className="text-ink-faint text-[10px]">{order}</p>
-        <p className="text-ink text-xs font-bold">{at}</p>
+        <p className="text-ink text-xs font-medium">{at}</p>
       </div>
     </div>
   )

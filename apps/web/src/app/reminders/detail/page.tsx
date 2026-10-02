@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   api,
+  ApiError,
   type ReminderDeliveryRun,
   type ReminderDeliveryRunsResponse,
   type ReminderDeliveryRunStatus,
@@ -14,6 +15,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import Card, { CardHeader } from '@/components/shared/card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -22,6 +24,7 @@ import { reminderStopSummary } from '@/components/reminders/reminder-labels'
 import styles from './reminder-runs.module.css'
 import { csvCell } from '@/lib/presentation'
 import { ReminderRegistrantsPanel } from './registrants-panel'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 const PAGE_SIZE = 20
 
@@ -36,20 +39,11 @@ const STATUS_VIEW: Record<ReminderDeliveryRunStatus, { label: string; tone: Stat
 }
 
 /** 呼ぶたびに作ると行数分だけ重いため、外で1回作って使い回す (#489-19)。 */
-const jstFormat = new Intl.DateTimeFormat('ja-JP', {
-  timeZone: 'Asia/Tokyo',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
 function formatJst(value: string | null): string {
   if (!value) return '—'
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return '—'
-  return jstFormat.format(parsed)
+  return formatDateTime(parsed)
 }
 
 function timingLabel(offsetMinutes: number): string {
@@ -85,14 +79,9 @@ function csvFor(items: ReminderDeliveryRun[]): string {
   return `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\n')}`
 }
 
-function MetricCard({ label, value, tone }: { label: string; value: string; tone: 'success' | 'info' | 'warning' | 'danger' }) {
-  const toneClass = {
-    success: styles.metricSuccess,
-    info: styles.metricInfo,
-    warning: styles.metricWarning,
-    danger: styles.metricDanger,
-  }[tone]
-  return <Card padding="default" className={styles.metric}><p>{label}</p><strong className={toneClass}>{value}</strong></Card>
+/* ★V7: 数字は本文色（ink）。状態は見出しの言葉で言い、数字を色で塗らない。 */
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return <Card padding="default" className={styles.metric}><p>{label}</p><strong className={styles.metricValue}>{value}</strong></Card>
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
@@ -107,6 +96,8 @@ function ReminderRunsInner() {
   const [data, setData] = useState<ReminderDeliveryRunsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [runsMissing, setRunsMissing] = useState(false)
   const [status, setStatus] = useState<'' | ReminderDeliveryRunStatus>(isPlannedView ? 'planned' : '')
   const [page, setPage] = useState(1)
   const [retryingId, setRetryingId] = useState<string | null>(null)
@@ -124,11 +115,13 @@ function ReminderRunsInner() {
     // idなしで帰ると「読み込んでいます」が永遠に出る。先に止めて文面を出す。
     if (!reminderId) {
       setLoading(false)
-      setError('リマインダが指定されていません。一覧から選び直してください。')
+      setError('')
+      setRunsMissing(false)
       return
     }
     setLoading(true)
     setError('')
+    setRunsMissing(false)
     // 読み直しに失敗したとき、前に取れた数字を現在値として残さない。
     setData(null)
     try {
@@ -139,8 +132,12 @@ function ReminderRunsInner() {
       })
       if (!response.success) throw new Error(response.error)
       setData(response.data)
-    } catch {
-      setError(`${isPlannedView ? '配信予定' : '実行結果'}を読み込めませんでした。時間を置いてもう一度お試しください。`)
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) {
+        setRunsMissing(true)
+      } else {
+        setError(`${isPlannedView ? '配信予定' : '実行結果'}を読み込めませんでした。時間を置いてもう一度お試しください。`)
+      }
     } finally {
       setLoading(false)
     }
@@ -200,7 +197,7 @@ function ReminderRunsInner() {
         if (all.length >= EXPORT_LIMIT || offset >= total || response.data.items.length === 0) break
       }
       if (total > EXPORT_LIMIT) {
-        setActionMessage(`件数が多いため、全${total.toLocaleString('ja-JP')}件のうち${EXPORT_LIMIT.toLocaleString('ja-JP')}件まで書き出しました。`)
+        setActionMessage(`件数が多いため、全${formatNumber(total)}件のうち${formatNumber(EXPORT_LIMIT)}件まで書き出しました。`)
       }
       const url = URL.createObjectURL(new Blob([csvFor(all)], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
@@ -215,6 +212,10 @@ function ReminderRunsInner() {
     }
   }
 
+  // R146 監査：公開版の無い下書きは「停止中」ではなく「下書き」。再開は
+  // 公開の経路に統一し、この画面からは出さない。
+  const isUnpublishedDraft = data ? !data.reminder.hasPublishedVersion : false
+
   const setReminderActive = async (isActive: boolean) => {
     if (!data || data.reminder.isActive === isActive) return
     setActionMessage('')
@@ -226,10 +227,13 @@ function ReminderRunsInner() {
         reminder: { ...current.reminder, isActive },
       } : current)
       setActionMessage(isActive ? 'リマインダを再開しました。' : 'リマインダを一時停止しました。')
-    } catch {
-      setActionMessage(isActive
-        ? '再開できませんでした。状態を読み直してからお試しください。'
-        : '一時停止できませんでした。状態を読み直してからお試しください。')
+    } catch (caught) {
+      // R146 監査：API も未公開の再開を 409 で止める。その文面をそのまま出す。
+      setActionMessage(caught instanceof ApiError && caught.status === 409
+        ? caught.message
+        : isActive
+          ? '再開できませんでした。状態を読み直してからお試しください。'
+          : '一時停止できませんでした。状態を読み直してからお試しください。')
     }
   }
 
@@ -239,37 +243,70 @@ function ReminderRunsInner() {
     requestAnimationFrame(() => document.querySelector('#recent-runs')?.scrollIntoView({ behavior: 'smooth' }))
   }
 
+  /*
+    対象が無いときは、KPI・タブ・右の案内・下の操作列のどれも出さない。
+    代わりに ★V7 TargetMissing を出す（設計 `x5cgUH`）。
+  */
+  if (!reminderId) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="見るリマインダが指定されていません"
+        description="一覧から、見たいリマインダを選び直してください。"
+        backHref="/reminders"
+        backLabel="リマインダ一覧へ戻る"
+      />
+    )
+  }
+  if (!loading && (runsMissing || (!error && !data))) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このリマインダは見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/reminders"
+        backLabel="リマインダ一覧へ戻る"
+      />
+    )
+  }
+  if (!loading && (error || !data)) {
+    return (
+      <TargetMissing
+        kind="error"
+        title={`${isPlannedView ? '配信予定' : '実行結果'}を読み込めませんでした`}
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
+      />
+    )
+  }
+
   return (
     <div className={styles.page} data-design-node="GC4St">
       <div className={styles.topActions}>
         <Breadcrumb items={[{ label: 'リマインダ一覧', href: '/reminders' }, { label: isPlannedView ? '配信予定' : '実行結果' }]} />
         <div className="flex gap-2">
           <Button href={`/reminders/detail?id=${encodeURIComponent(reminderId)}`}>登録者を管理</Button>
-          <Button onClick={() => void exportCsv()} disabled={exporting || loading}>
-            {exporting ? 'CSVを準備しています' : 'CSVで書き出す'}
+          <Button onClick={() => void exportCsv()} disabled={exporting || loading} busy={exporting} busyLabel="CSVを準備しています">CSVで書き出す
           </Button>
         </div>
       </div>
 
       <div className={styles.summary}>
-        <MetricCard label="送信済み" value={data ? `${data.summary.sent.toLocaleString('ja-JP')}通` : '—'} tone="success" />
-        <MetricCard label="送信予定" value={data ? `${data.summary.scheduled.toLocaleString('ja-JP')}通` : '—'} tone="info" />
-        <MetricCard label="停止" value={data ? `${data.summary.stopped.toLocaleString('ja-JP')}人` : '—'} tone="warning" />
-        <MetricCard label="エラー" value={data ? `${data.summary.errors.toLocaleString('ja-JP')}件` : '—'} tone="danger" />
+        <MetricCard label="送信済み" value={data ? `${formatNumber(data.summary.sent)}通` : '—'} />
+        <MetricCard label="送信予定" value={data ? `${formatNumber(data.summary.scheduled)}通` : '—'} />
+        <MetricCard label="停止" value={data ? `${formatNumber(data.summary.stopped)}人` : '—'} />
+        <MetricCard label="エラー" value={data ? `${formatNumber(data.summary.errors)}件` : '—'} />
       </div>
 
       {actionMessage ? <NoteBar tone={actionMessage.includes('ません') ? 'danger' : 'info'}>{actionMessage}</NoteBar> : null}
 
       <div className={styles.columns}>
-        <main className={styles.main}>
+        <div className={styles.main}>
           <ReminderRegistrantsPanel reminderId={reminderId} />
           <Card overflow="hidden">
             <CardHeader title="通知実績" />
             <p className={styles.sectionNote}>ステップごとの送信状況を確認できます。</p>
             {loading ? <ListState kind="loading" title="通知実績を読み込んでいます" /> : null}
-            {!loading && error ? (
-              <ListState kind="error" title="通知実績を表示できませんでした" description="実行結果を再読み込みしてください。" />
-            ) : null}
             {!loading && !error && (data?.steps.length ?? 0) > 0 ? (
               <div className={styles.tableWrap}>
                 <DataTable>
@@ -289,8 +326,8 @@ function ReminderRunsInner() {
                         <span className={styles.cellSub}>{step.stepNumber}通目</span>
                       </Td>
                       <Td>{timingLabel(step.offsetMinutes)}</Td>
-                      <Td align="right">{step.sent.toLocaleString('ja-JP')}通</Td>
-                      <Td align="right">{step.errors === 0 ? 'なし' : `${step.errors.toLocaleString('ja-JP')}件`}</Td>
+                      <Td align="right">{formatNumber(step.sent)}通</Td>
+                      <Td align="right">{step.errors === 0 ? 'なし' : `${formatNumber(step.errors)}件`}</Td>
                     </Tr>
                   ))}
                 </tbody>
@@ -315,9 +352,6 @@ function ReminderRunsInner() {
             <p className={styles.sectionNote}>{isPlannedView ? 'これから送る予定を友だちごとに確認できます。' : '対象者ごとの履歴を確認できます。'}</p>
 
             {loading ? <ListState kind="loading" /> : null}
-            {!loading && error ? (
-              <ListState kind="error" description={error} action={<Button onClick={() => void load()}>{isPlannedView ? '配信予定' : '実行結果'}を再読み込み</Button>} />
-            ) : null}
             {!loading && !error && (data?.items.length ?? 0) === 0 ? (
               <ListState
                 kind="empty"
@@ -362,8 +396,7 @@ function ReminderRunsInner() {
                               ? <span className={styles.requestId} title={item.lineRequestId}>LINE要求ID {item.lineRequestId}</span>
                               : null}
                             {canRetry ? (
-                              <Button onClick={() => void retry(item.id)} disabled={retryingId === item.id}>
-                                {retryingId === item.id ? '受付中' : 'この通知を再試行'}
+                              <Button onClick={() => void retry(item.id)} disabled={retryingId === item.id} busy={retryingId === item.id} busyLabel="受付中">この通知を再試行
                               </Button>
                             ) : null}
                           </Td>
@@ -380,21 +413,21 @@ function ReminderRunsInner() {
                   <span>
                     {data!.pagination.total === 0 ? 0 : data!.pagination.offset + 1}〜
                     {Math.min(data!.pagination.offset + data!.items.length, data!.pagination.total)}件 / 全
-                    {data!.pagination.total.toLocaleString('ja-JP')}件
+                    {formatNumber(data!.pagination.total)}件
                   </span>
                   <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
                 </div>
               </div>
             ) : null}
           </Card>
-        </main>
+        </div>
 
         <aside className={styles.side}>
           <Card overflow="hidden">
             <CardHeader title="稼働状況" />
             <dl className={styles.sideBody}>
-              <Fact label="状態" value={data ? (data.reminder.isActive ? '稼働中' : '停止中') : '—'} />
-              <Fact label="対象者" value={data ? `${data.summary.targetCount.toLocaleString('ja-JP')}人` : '—'} />
+              <Fact label="状態" value={data ? (isUnpublishedDraft ? '下書き' : data.reminder.isActive ? '稼働中' : '停止中') : '—'} />
+              <Fact label="対象者" value={data ? `${formatNumber(data.summary.targetCount)}人` : '—'} />
               <Fact label="次回送信" value={data ? formatJst(data.summary.nextScheduledAt) : '—'} />
               <Fact label="停止予定" value={data ? (data.reminder.lifecycleStatus === 'stopped' ? '停止済み' : data.reminder.stopConditions === null ? '未設定' : reminderStopSummary(data.reminder.stopConditions)) : '—'} />
             </dl>
@@ -419,10 +452,14 @@ function ReminderRunsInner() {
       </div>
 
       <ReminderFooter
-        status={loading ? '読み込み中' : error ? '状態を取得できません' : data?.reminder.isActive ? '稼働中' : '停止中'}
+        status={loading ? '読み込み中' : error ? '状態を取得できません' : !data ? '—' : isUnpublishedDraft ? '下書き' : data.reminder.isActive ? '稼働中' : '停止中'}
         secondary={data ? data.reminder.isActive
           ? { label: 'リマインダを一時停止', onClick: () => void setReminderActive(false) }
-          : { label: 'リマインダを再開', onClick: () => void setReminderActive(true) } : undefined}
+          // R146 監査：未公開の下書きには再開を出さない。有効化は公開の
+          // 経路（設定の編集→公開）に統一する。
+          : isUnpublishedDraft
+            ? undefined
+            : { label: 'リマインダを再開', onClick: () => void setReminderActive(true) } : undefined}
         primary="リマインダの設定を編集"
         onPrimary={() => { router.push(`/reminders/edit?id=${reminderId}`) }}
       />

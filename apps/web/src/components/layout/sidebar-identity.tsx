@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useBrand } from '@/lib/use-brand'
+import { loadAdminVersion } from '@/lib/admin-version-cache'
+import { isRealVersion } from '@/lib/deploy-info'
 import styles from './sidebar-identity.module.css'
 
 /**
@@ -20,14 +22,11 @@ export default function SidebarIdentity() {
 
   useEffect(() => {
     let cancelled = false
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL
-    if (!apiUrl) return
+    // 更新案内の帯と同じ版番号を共有する（2回取らない）。
     ;(async () => {
       try {
-        const res = await fetch(`${apiUrl}/admin/version`)
-        if (!res.ok) return
-        const body = (await res.json()) as { version?: string }
-        if (!cancelled && body?.version) setVersion(body.version)
+        const { version } = await loadAdminVersion()
+        if (!cancelled && version) setVersion(version)
       } catch {
         // 取れなければ出さない。「Ver. -」のような穴埋めはしない。
       }
@@ -43,7 +42,10 @@ export default function SidebarIdentity() {
       <span className={styles.mark} aria-hidden="true">{initial}</span>
       <span className={styles.text}>
         <span className={styles.name} title={name}>{name}</span>
-        {version && <span className={styles.version}>Ver. {version}</span>}
+        {/* V8 では社名の下に製品名を出す（版の情報はメニューの一番下にある）。
+            v7 では今までどおり版を出す。 */}
+        <span className={`${styles.version} v8-only`}>LINE Harness</span>
+        {isRealVersion(version) && <span className={`${styles.version} v7-only`}>Ver. {version.trim()}</span>}
       </span>
     </div>
   )

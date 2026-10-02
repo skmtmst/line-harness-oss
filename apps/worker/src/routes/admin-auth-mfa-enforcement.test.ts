@@ -6,7 +6,7 @@ import { hashPassword } from '../services/password-hash.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
 import { adminAuth } from './admin-auth.js';
 import { authEmail } from './auth-email.js';
-import { sha256Hex } from '../middleware/auth.js';
+import { authMiddleware, sha256Hex } from '../middleware/auth.js';
 
 /**
  * N-426/N-434: 管理者のMFA必須とセッション期限（既定8時間・記憶時7日）。
@@ -36,6 +36,7 @@ function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
 
 function app() {
   const instance = new Hono<Env>();
+  instance.use('*', authMiddleware);
   instance.route('/', adminAuth);
   instance.route('/', authEmail);
   return instance;
@@ -56,7 +57,7 @@ async function call(
 
 function seedStaff(id: string, overrides: Record<string, unknown> = {}) {
   testDb.raw
-    .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, access_level) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, access_level, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       id,
       (overrides.name as string) ?? '権限者',
@@ -65,6 +66,7 @@ function seedStaff(id: string, overrides: Record<string, unknown> = {}) {
       (overrides.api_key as string) ?? `key-${id}`,
       (overrides.is_active as number) ?? 1,
       (overrides.access_level as string) ?? 'full',
+      (overrides.tenant_id as string | null) ?? null,
     );
 }
 
@@ -120,6 +122,28 @@ describe('N-426: 管理者のTOTP未登録では通常セッションを発行�
     expect(sessionRows()).toEqual([]);
     expect(challengeRows()).toMatchObject([{ staff_id: 's1', purpose: 'setup', remember: 0 }]);
   });
+
+  it.each(['suspended', 'archived'] as const)(
+    'メール+パスワード: %s のオーナーも2要素認証後に状態付きセッションへ入れる',
+    async (status) => {
+      testDb.raw.prepare(`INSERT INTO tenants (id, name, status) VALUES ('tenant-unavailable', '停止中契約先', ?)`).run(status);
+      await seedOwnerWithPassword();
+      testDb.raw.prepare(`UPDATE staff_members SET tenant_id = 'tenant-unavailable' WHERE id = 's1'`).run();
+      await enableTotp('s1');
+
+      const login = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' });
+      expect(login.status).toBe(200);
+      const challengeToken = (await login.json() as { data: { challengeToken: string } }).data.challengeToken;
+      const verify = await call('POST', '/api/auth/two-factor/verify', { challengeToken, code: await currentCode() });
+      expect(verify.status).toBe(200);
+      expect(sessionRows().map((row) => row.staff_id)).toEqual(['s1']);
+
+      const sessionCookie = (cookieFor(verify, 'lh_admin_session') ?? '').split(';')[0];
+      const session = await call('GET', '/api/auth/session', undefined, { headers: { Cookie: sessionCookie } });
+      expect(session.status).toBe(200);
+      expect(await session.json()).toMatchObject({ success: true, data: { tenantStatus: status } });
+    },
+  );
 
   it('staff 役割は必須対象外のため、未登録でもそのままセッションが出る', async () => {
     const hash = await hashPassword('Abcdefg1');
@@ -298,6 +322,56 @@ describe('N-426: 初回設定（setup合言葉 → 確認 → セッション）
     expect(other.totp_enabled_at).toBeNull();
     // セッションは s1 のもの
     expect(sessionRows().map((row) => row.staff_id)).toEqual(['s1']);
+  });
+
+  it('R509: 同じ合言葉で2回取っても同じQRを返し、保存は最初のまま', async () => {
+    await seedOwnerWithPassword();
+    const token = await setupTokenFor('s1');
+
+    const first = await call('POST', '/api/auth/two-factor/setup', { challengeToken: token });
+    expect(first.status).toBe(200);
+    const uri1 = (await first.json() as { data: { provisioningUri: string } }).data.provisioningUri;
+    const pending1 = (testDb.raw.prepare('SELECT totp_pending_secret_enc FROM staff_members WHERE id = ?').get('s1') as { totp_pending_secret_enc: string }).totp_pending_secret_enc;
+
+    const second = await call('POST', '/api/auth/two-factor/setup', { challengeToken: token });
+    expect(second.status).toBe(200);
+    const uri2 = (await second.json() as { data: { provisioningUri: string } }).data.provisioningUri;
+    // 2回目は新しい秘密を作らず、最初のQRをそのまま返す。
+    expect(uri2).toBe(uri1);
+    const pending2 = (testDb.raw.prepare('SELECT totp_pending_secret_enc FROM staff_members WHERE id = ?').get('s1') as { totp_pending_secret_enc: string }).totp_pending_secret_enc;
+    expect(pending2).toBe(pending1);
+
+    // 最終応答のQRから作るコードで登録できる。
+    const secret = new URL(uri2).searchParams.get('secret')!;
+    const confirm = await call('POST', '/api/auth/two-factor/setup/confirm', { challengeToken: token, code: await currentCode(secret) });
+    expect(confirm.status).toBe(200);
+  });
+
+  it('R509: 先に置かれた仮秘密があるとそれを返し、そのQRで登録できる', async () => {
+    await seedOwnerWithPassword();
+    const token = await setupTokenFor('s1');
+    // 同時要求のBが先に置いたことにする。
+    const secretB = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+    testDb.raw.prepare('UPDATE staff_members SET totp_pending_secret_enc = ? WHERE id = ?')
+      .run(await encryptTotpSecret(secretB, MASTER_KEY), 's1');
+
+    const res = await call('POST', '/api/auth/two-factor/setup', { challengeToken: token });
+    expect(res.status).toBe(200);
+    const uri = (await res.json() as { data: { provisioningUri: string } }).data.provisioningUri;
+    // 負けた側（後から来た要求）は置かれた側のQRを返す。保存と一致する。
+    expect(new URL(uri).searchParams.get('secret')).toBe(secretB);
+
+    const confirm = await call('POST', '/api/auth/two-factor/setup/confirm', { challengeToken: token, code: await currentCode(secretB) });
+    expect(confirm.status).toBe(200);
+  });
+
+  it('R509: 仮秘密の条件付き確保は空のときだけ置く', async () => {
+    const { claimTotpPendingSecret } = await import('@line-crm/db');
+    await seedOwnerWithPassword();
+    expect(await claimTotpPendingSecret(testDb.db, 's1', 'enc-a')).toBe(true);
+    expect(await claimTotpPendingSecret(testDb.db, 's1', 'enc-b')).toBe(false);
+    const row = testDb.raw.prepare('SELECT totp_pending_secret_enc FROM staff_members WHERE id = ?').get('s1') as { totp_pending_secret_enc: string };
+    expect(row.totp_pending_secret_enc).toBe('enc-a');
   });
 });
 
@@ -483,6 +557,34 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(sessionRows()).toEqual([]);
   });
 
+  /*
+   * 招待の扱いはメール＋パスワードのログイン（auth-email.ts）とそろえる。
+   * 自分の招待が保留中なら、互換判定で入れる立場でも止めて登録を完了させる。
+   */
+  it('自分の招待が保留中なら、既定の統括のオーナーでもnext=opsで止める', async () => {
+    seedStaff('invited-owner', { role: 'owner' });
+    seedPlatformAdmin('invited-owner', 'invited');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-invited' WHERE id = 'invited-owner'`).run();
+    lineFetchMock('U-invited');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    expect(res.headers.get('Location')).toBe('https://admin.example.com/ops/login?error=not_authorized');
+    expect(sessionRows()).toEqual([]);
+  });
+
+  /*
+   * 他人の招待が保留中なだけで互換判定まで閉じると、運営マスターが0人のまま
+   * 誰も入れなくなる（画面から復旧できない）。
+   */
+  it('他人の招待が保留中でも、既定の統括のオーナーはnext=opsで進める', async () => {
+    seedStaff('compat-owner', { role: 'owner' });
+    seedStaff('someone-else', { role: 'staff' });
+    seedPlatformAdmin('someone-else', 'invited');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-compat' WHERE id = 'compat-owner'`).run();
+    lineFetchMock('U-compat');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    expect(res.headers.get('Location')).not.toBe('https://admin.example.com/ops/login?error=not_authorized');
+  });
+
   it('invite Cookie無しでは既存staffのLINE連携を変更しない', async () => {
     seedStaff('existing', { role: 'staff' });
     seedPlatformAdmin('existing');
@@ -560,11 +662,44 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(location.search).toBe('');
   });
 
+  it('停止中契約先のLINEログインは2要素認証後に停止中セッションを発行する', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO tenants (id, name, status) VALUES ('tenant-stopped', '停止中契約先', 'suspended')`,
+    ).run();
+    seedStaff('stopped-owner', { role: 'owner', tenant_id: 'tenant-stopped' });
+    testDb.raw.prepare(
+      `UPDATE staff_members SET line_user_id = 'U-stopped-owner' WHERE id = 'stopped-owner'`,
+    ).run();
+    await enableTotp('stopped-owner');
+    lineFetchMock('U-stopped-owner');
+
+    const callbackResponse = await callback(callbackCookies());
+    const location = new URL(callbackResponse.headers.get('Location')!);
+    expect(location.pathname).toBe('/login/two-factor');
+    const challengeToken = new URLSearchParams(location.hash.slice(1)).get('lh_2fa')!;
+    expect(challengeRows()).toMatchObject([{ staff_id: 'stopped-owner', purpose: 'verify' }]);
+
+    const verify = await call('POST', '/api/auth/two-factor/verify', {
+      challengeToken,
+      code: await currentCode(),
+    });
+    expect(verify.status).toBe(200);
+    expect(sessionRows().map((row) => row.staff_id)).toEqual(['stopped-owner']);
+    const sessionCookie = (cookieFor(verify, 'lh_admin_session') ?? '').split(';')[0];
+    const session = await call('GET', '/api/auth/session', undefined, { headers: { Cookie: sessionCookie } });
+    expect(session.status).toBe(200);
+    expect(await session.json()).toMatchObject({ success: true, data: { tenantStatus: 'suspended' } });
+  });
+
   it('セッションDBが古い場合はLINE callbackを安全に失敗させ、Cookieを出さない', async () => {
     seedStaff('legacy-schema', { role: 'staff' });
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-legacy-schema' WHERE id = 'legacy-schema'`).run();
-    testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN user_agent`).run();
-    testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN ip_prefix`).run();
+    // V の列（494・495）が載る前の古い形を再現する。列を参照する索引から先に落とす。
+    testDb.raw.prepare(`DROP INDEX IF EXISTS idx_admin_sessions_staff_device`).run();
+    testDb.raw.prepare(`DROP INDEX IF EXISTS idx_admin_sessions_staff_ip_prefix`).run();
+    for (const column of ['user_agent', 'ip_prefix', 'step_up_at', 'device_hash', 'unfamiliar_at']) {
+      testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN ${column}`).run();
+    }
     lineFetchMock('U-legacy-schema');
     const res = await callback(callbackCookies());
     expect(res.headers.get('Location')).toBe('https://admin.example.com/login?error=line_login_failed');
@@ -579,8 +714,11 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     lineFetchMock('U-session-failure');
     const callbackResponse = await callback(callbackCookies({ next: 'ops' }));
     const challengeToken = new URLSearchParams(new URL(callbackResponse.headers.get('Location')!).hash.slice(1)).get('lh_2fa')!;
-    testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN user_agent`).run();
-    testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN ip_prefix`).run();
+    testDb.raw.prepare(`DROP INDEX IF EXISTS idx_admin_sessions_staff_device`).run();
+    testDb.raw.prepare(`DROP INDEX IF EXISTS idx_admin_sessions_staff_ip_prefix`).run();
+    for (const column of ['user_agent', 'ip_prefix', 'step_up_at', 'device_hash', 'unfamiliar_at']) {
+      testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN ${column}`).run();
+    }
 
     const verify = await call('POST', '/api/auth/two-factor/verify', {
       challengeToken,
