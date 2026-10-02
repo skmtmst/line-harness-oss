@@ -65,7 +65,7 @@
   font-size: 10px;
   color: var(--color-ink-faint);
   border: 1px solid var(--color-hairline);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 6px;
 }
 
@@ -282,7 +282,7 @@
   font-weight: 700;
   color: var(--color-ink-secondary);
   background: var(--color-canvas-sunken);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 8px;
   white-space: nowrap;
 }
@@ -292,7 +292,7 @@
   font-weight: 700;
   color: var(--color-ink-faint);
   background: var(--color-canvas-sunken);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 7px;
   white-space: nowrap;
 }
@@ -307,7 +307,7 @@
   font-size: 10px;
   color: var(--color-ink-faint);
   border: 1px solid var(--color-hairline);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 6px;
   white-space: nowrap;
 }
@@ -317,7 +317,7 @@
   font-weight: 700;
   color: var(--color-accent-deep);
   background: var(--color-accent-soft);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 7px;
   white-space: nowrap;
 }
@@ -377,7 +377,7 @@
   display: inline-flex;
   margin-top: 10px;
   border: 1px solid var(--color-hairline);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   overflow: hidden;
 }
 
@@ -404,7 +404,7 @@
 .dialogOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--color-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -477,7 +477,7 @@
 .moveBtn {
   border: 1px solid var(--color-hairline);
   background: var(--color-canvas);
-  border-radius: 6px;
+  border-radius: var(--radius-mini);
   width: 26px;
   height: 26px;
   font-size: 11px;
@@ -558,7 +558,7 @@
   display: inline-block;
   font-size: 10.5px;
   font-weight: 700;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 9px;
   white-space: nowrap;
 }
@@ -626,7 +626,7 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--color-hairline);
-  border-radius: 6px;
+  border-radius: var(--radius-mini);
   padding: 6px 8px;
   font-size: 12.5px;
 }
