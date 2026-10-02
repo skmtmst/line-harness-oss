@@ -191,10 +191,12 @@ shared-button-importer app/tags/tags-tab-v8.tsx
 shared-button-importer app/tags/fields-tab-v8.tsx
 shared-button-importer app/tags/marks-v8.tsx
 shared-button-importer app/tags/searches-v8.tsx
+shared-button-importer app/templates/asset-editor-v8.tsx
 shared-button-importer app/templates/carousel/page.tsx
 shared-button-importer app/templates/detail/detail-v8.tsx
 shared-button-importer app/templates/detail/page.tsx
 shared-button-importer app/templates/edit/page.tsx
+shared-button-importer app/templates/editor-v8.tsx
 shared-button-importer app/templates/list-v8.tsx
 shared-button-importer app/templates/page.tsx
 shared-button-importer app/templates/questions/new/page.tsx

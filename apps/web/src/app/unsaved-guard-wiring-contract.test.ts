@@ -61,6 +61,7 @@ const GUARDED = [
   'app/tags/fields/new/page.tsx',
   'app/tags/searches/edit/page.tsx',
   'app/templates/carousel/page.tsx',
+  'app/templates/editor-v8.tsx',
   'app/templates/questions/new/page.tsx',
   'app/webhooks/new/page.tsx',
   'app/webinars/edit/page.tsx',
@@ -77,6 +78,10 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string> = {
+  'app/templates/edit-v8.tsx': 'app/templates/editor-v8.tsx',
+  'app/templates/asset-editor-v8.tsx': 'app/templates/editor-v8.tsx',
+  'app/templates/carousel/carousel-v8.tsx': 'app/templates/editor-v8.tsx',
+  'app/templates/questions/question-v8.tsx': 'app/templates/editor-v8.tsx',
   'components/webinars/webinar-form.tsx': 'app/webinars/edit/page.tsx',
   'components/webinars/webinar-notifications.tsx': 'app/webinars/edit/page.tsx',
 }
