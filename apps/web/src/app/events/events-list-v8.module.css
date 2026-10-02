@@ -1,0 +1,217 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8-B イベント予約の一覧（板 `e2ekFu`）。
+ *
+ * v7 の一覧（`page.tsx` 内の EventsListPageV7）とは別の部品として持つ。
+ * データの口（取得・絞り込み・並び・ページ送り・削除）は同じ。
+ * 違いは置き場と見せ方だけ——「イベントを作る」は左のフォルダの列の上、
+ * 数の帯は白い板いっぱいの帯、行の右端は「…」1つ
+ * （中身を見る・申込者を見る・プレビュー・削除）。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ *
+ * 板との差（API が無い所は今の作りのまま。司令塔へ報告済み）：
+ * - 「CSVで書き出す」は一覧口の CSV が無いので置かない
+ * - 「複製」は複製口が無いので「…」に入れない
+ * - 「ほか N 回」は回数の口が無いので次の開催日時だけ出す
+ */
+
+/* 板全体。外側の白い板の中で縦に積む。 */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+/* 見出し：左に題＋説明1行。 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 数の帯：白い板の左右いっぱい・縦線区切り（V8 の決まり）。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 16px;
+}
+
+.kpi + .kpi {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.kpiTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.kpiIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: var(--color-surface-pearl);
+  border: 1px solid var(--color-hairline);
+  border-radius: 7px;
+  color: var(--color-ink-secondary);
+}
+
+.kpiIcon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.kpiLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.kpiValue {
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.kpiDetail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+/* 本体：左にフォルダの列、右に道具段＋表。 */
+.body {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: var(--folder-rail-width, 15.75rem) minmax(0, 1fr);
+  align-items: start;
+}
+
+.railCreate {
+  margin-bottom: 12px;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 表の枠。 */
+.tableWrap {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  overflow: hidden;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+/* 行末の注意書き。 */
+.footNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 件数とページ送り。 */
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.footerCount {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+/* イベント名の 2 行目（場所）。 */
+.venue {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* 板が 1100px を切ったらフォルダの列を畳む（V8 の決まり）。 */
+@container (max-width: 1099px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .railCreate {
+    margin-bottom: 0;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi:nth-child(3) {
+    border-left: none;
+  }
+
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--color-hairline);
+  }
+}
