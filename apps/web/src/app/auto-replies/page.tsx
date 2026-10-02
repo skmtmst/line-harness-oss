@@ -25,6 +25,8 @@ import ActionMenu from '@/components/shared/action-menu'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import AutoRepliesListV8 from './list-v8'
 import {
   EFFECTIVE_LEGEND,
   LOAD_STATE_WORDS,
@@ -179,7 +181,7 @@ function ruleSubtitle(r: AutoReply, templateName: string | null): string {
  */
 const NO_MANAGE_NOTE = '自動応答の作成・変更・停止・削除はオーナーと管理者だけができます。必要なときはオーナーか管理者に頼んでください。'
 
-export default function AutoRepliesPage() {
+function AutoRepliesPageV7() {
   usePageTitle('自動応答')
   const { selectedAccountId, accounts } = useAccount()
   const staffRole = useStaffRole()
@@ -1147,4 +1149,13 @@ export default function AutoRepliesPage() {
       </div>
     </div>
   )
+}
+
+/*
+ * ★V8: data-theme="v8" のときだけ新しい一覧（`uE9gf`）を出す。
+ * v7 では従来どおり上の AutoRepliesPageV7（見た目は1画素も変えない）。
+ */
+export default function AutoRepliesPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <AutoRepliesListV8 /> : <AutoRepliesPageV7 />
 }

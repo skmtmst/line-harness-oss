@@ -107,7 +107,7 @@ export function displayFormName(name: string): string {
   return name.replace(/\\n/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export type FormListFilter = "all" | "published" | "draft" | "stored";
+export type FormListFilter = "all" | "published" | "draft" | "stored" | "pending";
 export type FormListSort = "latest-answer" | "answers" | "updated" | "name";
 
 /**
@@ -126,6 +126,11 @@ export interface FormListItemLike {
   lastSubmittedAt: string | null;
   submitCount?: number;
   usedByAccounts: Array<{ name: string; count: number }>;
+  /**
+   * 後処理が失敗したか途中で止まった回答の数（★V8 一覧の未完の札・
+   * 「後処理未完」絞り込み）。古い応答・未取得では undefined/null。
+   */
+  pendingPostActionCount?: number | null;
 }
 
 /** Answered forms come first, newest answer first. Unanswered forms stay at the bottom. */
@@ -158,11 +163,14 @@ function compareDatesNewest(first: string | null | undefined, second: string | n
   return 0;
 }
 
-/** 保存した検索（公開中 / 下書き / 情報欄に保存している）の判定。 */
+/** 保存した検索（公開中 / 下書き / 情報欄に保存している / 後処理未完）の判定。 */
 export function formMatchesListFilter(form: FormListItemLike, filter: FormListFilter): boolean {
   if (filter === "published") return form.isActive;
   if (filter === "draft") return !form.isActive;
   if (filter === "stored") return hasStoredDestination(form.layout, form.onSubmitTagId);
+  // 「後処理未完」: 数が付いていない応答（古いAPI・未取得）は残さない。
+  // 0 でも残さない（未完が無いのに出すと札と矛盾する）。
+  if (filter === "pending") return (form.pendingPostActionCount ?? 0) > 0;
   return true;
 }
 

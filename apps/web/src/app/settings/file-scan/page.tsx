@@ -1,10 +1,7 @@
 'use client'
 
-import { useCallback, useDeferredValue, useEffect, useState } from 'react'
-import { ApiError, api, type FileScanConfig, type FileScanItem } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -18,8 +15,8 @@ import ListRange from '@/components/ui/list-range'
 import { RowActions } from '@/components/shared/row-actions'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { TextField, TextArea } from '@/components/shared/text-field'
-/** 一覧の1ページの件数。先頭50件固定だった監査 R132 の名残を残さない。 */
-const PAGE_SIZE = 50
+import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
+import { FileScanV8 } from './file-scan-v8'
 
 /**
  * 設定の中の「ファイルの検査」（B-2）。
@@ -27,200 +24,62 @@ const PAGE_SIZE = 50
  * しまったファイルの一覧・消す・誤りなので戻す（理由を記録）は
  * owner / admin だけ。それ以外は入れない。
  */
-
-type Phase = 'loading' | 'ready' | 'error' | 'forbidden'
-
 export default function FileScanSettingsPage() {
   usePageTitle('ファイルの検査')
-  const { selectedAccountId } = useAccount()
-  const [phase, setPhase] = useState<Phase>('loading')
-  const [items, setItems] = useState<FileScanItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [statusFilter, setStatusFilter] = useState('quarantined')
-  const [query, setQuery] = useState('')
-  const deferredQuery = useDeferredValue(query)
-  const [page, setPage] = useState(1)
-  const [actionError, setActionError] = useState('')
-  const [actionDone, setActionDone] = useState('')
-  const [releaseTarget, setReleaseTarget] = useState<FileScanItem | null>(null)
-  const [releaseReason, setReleaseReason] = useState('')
-  const [releaseBusy, setReleaseBusy] = useState(false)
-  /* 監査 D017: 確認窓の中で起きた失敗は窓の中に出す。ページ最上部の帯は
-   * 暗転の後ろに隠れて読めないため、ConfirmDialog の error へ渡す。 */
-  const [releaseError, setReleaseError] = useState('')
-  const [deleteTarget, setDeleteTarget] = useState<FileScanItem | null>(null)
-  const [deleteBusy, setDeleteBusy] = useState(false)
-  const [deleteError, setDeleteError] = useState('')
-  const [config, setConfig] = useState<FileScanConfig | null>(null)
-  const [configOpen, setConfigOpen] = useState(false)
-  const [provider, setProvider] = useState('')
-  const [endpoint, setEndpoint] = useState('')
-  const [secretRef, setSecretRef] = useState('')
-  const [configBusy, setConfigBusy] = useState(false)
-  const [stopExternal, setStopExternal] = useState(false)
-  const [stopError, setStopError] = useState('')
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <FileScanV8 />
+  return <FileScanPageV7 />
+}
 
-  // 外の検査の設定が保存前なら離脱の番兵を出す。
-  const configDirty = configOpen && (
-    (provider.trim() || null) !== (config?.externalProvider ?? null)
-    || (endpoint.trim() || null) !== (config?.externalEndpointUrl ?? null)
-    || (secretRef.trim() || null) !== (config?.externalSecretRef ?? null)
-  )
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: configDirty, busy: configBusy })
-
-  const load = useCallback(async () => {
-    if (!selectedAccountId) {
-      setPhase('ready')
-      setItems([])
-      setTotal(0)
-      return
-    }
-    setPhase('loading')
-    setActionError('')
-    try {
-      const [me, list, configRes] = await Promise.all([
-        api.staff.me(),
-        api.fileScan.list(selectedAccountId, {
-          status: statusFilter,
-          q: deferredQuery.trim() || undefined,
-          limit: PAGE_SIZE,
-          offset: (page - 1) * PAGE_SIZE,
-        }),
-        api.fileScan.getConfig(selectedAccountId),
-      ])
-      if (!me.success || !list.success || !configRes.success) {
-        setPhase('error')
-        return
-      }
-      if (me.data.role !== 'owner' && me.data.role !== 'admin') {
-        setPhase('forbidden')
-        return
-      }
-      setItems(list.data.items)
-      setTotal(list.data.total)
-      /* 消す・戻すで今のページが空になったら1ページ目へ戻す（監査 R132）。 */
-      if (list.data.items.length === 0 && page > 1) setPage(1)
-      setConfig(configRes.data.config)
-      setProvider(configRes.data.config?.externalProvider ?? '')
-      setEndpoint(configRes.data.config?.externalEndpointUrl ?? '')
-      setSecretRef(configRes.data.config?.externalSecretRef ?? '')
-      setPhase('ready')
-    } catch {
-      setPhase('error')
-    }
-  }, [selectedAccountId, statusFilter, deferredQuery, page])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  async function release() {
-    if (!selectedAccountId || !releaseTarget) return
-    /* 監査 D018: 必須の理由が空なら送らず、窓の中で理由を促す。 */
-    if (!releaseReason.trim()) {
-      setReleaseError('理由を入力してください')
-      return
-    }
-    setReleaseBusy(true)
-    setReleaseError('')
-    try {
-      const res = await api.fileScan.release(releaseTarget.id, selectedAccountId, releaseReason.trim())
-      if (!res.success) {
-        setReleaseError('戻せませんでした。通信状態を確認して、もう一度お試しください。')
-        return
-      }
-      setReleaseTarget(null)
-      setReleaseReason('')
-      setReleaseError('')
-      setActionDone(`${releaseTarget.filename} を使えるように戻しました。`)
-      await load()
-    } catch (caught) {
-      setReleaseError(caught instanceof ApiError && caught.status === 409
-        ? 'しまったファイルだけ戻せます。一覧を読み直してください。'
-        : '戻せませんでした。通信状態を確認して、もう一度お試しください。')
-    } finally {
-      setReleaseBusy(false)
-    }
-  }
-
-  async function remove() {
-    if (!selectedAccountId || !deleteTarget) return
-    setDeleteBusy(true)
-    setDeleteError('')
-    try {
-      const res = await api.fileScan.remove(deleteTarget.id, selectedAccountId)
-      if (!res.success) {
-        setDeleteError('消せませんでした。通信状態を確認して、もう一度お試しください。')
-        return
-      }
-      setDeleteTarget(null)
-      setDeleteError('')
-      setActionDone(`${deleteTarget.filename} を消しました。`)
-      await load()
-    } catch (caught) {
-      setDeleteError(caught instanceof ApiError && caught.status === 409
-        ? 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
-        : '消せませんでした。通信状態を確認して、もう一度お試しください。')
-    } finally {
-      setDeleteBusy(false)
-    }
-  }
-
-  async function saveConfig() {
-    if (!selectedAccountId) return
-    setConfigBusy(true)
-    setActionError('')
-    try {
-      const res = await api.fileScan.saveConfig(selectedAccountId, {
-        externalProvider: provider.trim() || null,
-        externalEndpointUrl: endpoint.trim() || null,
-        externalSecretRef: secretRef.trim() || null,
-      })
-      if (!res.success) {
-        setActionError('設定を保存できませんでした。')
-        return
-      }
-      setConfigOpen(false)
-      setActionDone('外の検査の設定を保存しました。')
-      await load()
-    } catch (caught) {
-      setActionError(caught instanceof ApiError && caught.status === 400
-        ? '宛先は https にし、提供元と宛先の両方を入れてください。'
-        : '設定を保存できませんでした。通信状態を確認して、もう一度お試しください。')
-    } finally {
-      setConfigBusy(false)
-    }
-  }
-
-  /*
-   * 監査 R133: 「止める」は表示を畳むのではなく、保存済みの設定を
-   * 実際に消す。空に保存すると送信は止まる（部分だけの空はAPIが弾く）。
-   */
-  async function stopExternalConfig() {
-    if (!selectedAccountId) return
-    setConfigBusy(true)
-    setStopError('')
-    try {
-      const res = await api.fileScan.saveConfig(selectedAccountId, {
-        externalProvider: null,
-        externalEndpointUrl: null,
-        externalSecretRef: null,
-      })
-      if (!res.success) {
-        setStopError('設定を消せませんでした。')
-        return
-      }
-      setStopExternal(false)
-      setStopError('')
-      setConfigOpen(false)
-      setActionDone('外の検査サービスへの送信を止めました。内蔵の簡易検査は続きます。')
-      await load()
-    } catch {
-      setStopError('設定を消せませんでした。通信状態を確認して、もう一度お試しください。')
-    } finally {
-      setConfigBusy(false)
-    }
-  }
+function FileScanPageV7() {
+  const {
+    selectedAccountId,
+    phase,
+    items,
+    total,
+    statusFilter,
+    query,
+    page,
+    setPage,
+    actionError,
+    actionDone,
+    releaseTarget,
+    setReleaseTarget,
+    releaseReason,
+    setReleaseReason,
+    releaseBusy,
+    releaseError,
+    setReleaseError,
+    deleteTarget,
+    setDeleteTarget,
+    deleteBusy,
+    deleteError,
+    setDeleteError,
+    config,
+    configOpen,
+    provider,
+    setProvider,
+    endpoint,
+    setEndpoint,
+    secretRef,
+    setSecretRef,
+    configBusy,
+    stopExternal,
+    setStopExternal,
+    stopError,
+    setStopError,
+    leaveTarget,
+    confirmLeave,
+    cancelLeave,
+    load,
+    release,
+    remove,
+    saveConfig,
+    stopExternalConfig,
+    toggleConfigOpen,
+    changeQuery,
+    changeStatusFilter,
+  } = useFileScan()
 
   if (phase === 'loading') {
     return <ListState kind="loading" />
@@ -281,12 +140,12 @@ export default function FileScanSettingsPage() {
             aria-label="ファイル名で探す"
             placeholder="ファイル名で探す"
             value={query}
-            onChange={(event) => { setQuery(event.target.value); setPage(1) }}
+            onChange={(event) => changeQuery(event.target.value)}
           />
           <Select
             aria-label="検査の状態"
             value={statusFilter}
-            onChange={(value) => { setStatusFilter(value); setPage(1) }}
+            onChange={(value) => changeStatusFilter(value)}
             options={[
               { value: 'quarantined', label: '状態：しまったもの' },
               { value: 'pending', label: '状態：確かめています' },
@@ -355,16 +214,16 @@ export default function FileScanSettingsPage() {
             </tbody>
           </DataTable>
           {/* 監査 R132: 件数と表示範囲を示し、51件目以降もページで辿れる。 */}
-          {total > PAGE_SIZE ? (
+          {total > FILE_SCAN_PAGE_SIZE ? (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <ListRange
                 total={total}
-                first={(page - 1) * PAGE_SIZE + 1}
-                last={Math.min(page * PAGE_SIZE, total)}
+                first={(page - 1) * FILE_SCAN_PAGE_SIZE + 1}
+                last={Math.min(page * FILE_SCAN_PAGE_SIZE, total)}
               />
               <Pagination
                 page={page}
-                pageCount={Math.ceil(total / PAGE_SIZE)}
+                pageCount={Math.ceil(total / FILE_SCAN_PAGE_SIZE)}
                 onPageChange={setPage}
               />
             </div>
@@ -389,15 +248,7 @@ export default function FileScanSettingsPage() {
         <HelpTip label="外の検査サービスの意味">
           内蔵の簡易検査に加えて、外の検査サービスにも送る設定です。設定がある時だけ送ります。鍵そのものはここに置かず、秘密値の仕組みにある名前だけを指します。
         </HelpTip>
-        <Button type="button" onClick={() => {
-          /* 開き直す時は保存済みの値へ戻す。編集中の置き去りを残さない。 */
-          if (!configOpen) {
-            setProvider(config?.externalProvider ?? '')
-            setEndpoint(config?.externalEndpointUrl ?? '')
-            setSecretRef(config?.externalSecretRef ?? '')
-          }
-          setConfigOpen(!configOpen)
-        }}>
+        <Button type="button" onClick={toggleConfigOpen}>
           {configOpen ? '設定を閉じる' : '設定を編集'}
         </Button>
         {config?.externalProvider && config?.externalEndpointUrl ? (

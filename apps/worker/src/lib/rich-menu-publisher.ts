@@ -75,6 +75,12 @@ export type GroupInput = {
   size: 'large' | 'compact';
   chatBarText: string;
   isDefaultForAll: boolean;
+  /**
+   * V8「トークを開いたとき メニューを開いておく」。LINE の rich menu payload
+   * の `selected` にそのまま出る。未指定（古い呼び出し・既存行）は false、
+   * つまり従来どおり「閉じておく」。
+   */
+  defaultOpen?: boolean;
   pages: PageInput[];
   /**
    * 「回答フォームを開く」ボタンの飛び先。アカウントの LIFF URL を渡す。
@@ -546,7 +552,7 @@ export function buildLineRichMenuPayload(
   const dimensions = RICH_MENU_DIMENSIONS[group.size];
   return {
     size: dimensions,
-    selected: false,
+    selected: group.defaultOpen === true,
     name: page.name,
     chatBarText: group.chatBarText,
     areas: page.areas.map((a) => ({

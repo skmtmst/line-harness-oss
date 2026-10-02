@@ -38,6 +38,8 @@ import { savedSearchSummary, type SavedSearchConditionLabels } from '@/component
 import MetricValue from '@/components/ui/metric-value'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { formatDateTime } from '@/lib/format'
+import SearchEditorV8 from '@/app/tags/search-editor-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -984,5 +986,6 @@ function SavedSearchEditInner() {
 }
 
 export default function SavedSearchEditPage() {
-  return <FeatureGate feature="saved_searches"><Suspense fallback={<p className="text-sm text-ink-faint">読み込んでいます</p>}><SavedSearchEditInner /></Suspense></FeatureGate>
+  const theme = useAdminTheme()
+  return <FeatureGate feature="saved_searches"><Suspense fallback={<p className="text-sm text-ink-faint">読み込んでいます</p>}>{theme === 'v8' ? <SearchEditorV8 /> : <SavedSearchEditInner />}</Suspense></FeatureGate>
 }

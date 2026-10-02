@@ -153,7 +153,7 @@ describe('V6 案件一覧（GH8VL）の画面', () => {
     expect(TABS).toContain("import NoteBar from '@/components/shared/note-bar'")
     const offersTab = TABS.slice(
       TABS.indexOf('export function OffersTab() {'),
-      TABS.indexOf('\nfunction SettlementEditor'),
+      TABS.indexOf('\nexport function SettlementEditor'),
     )
     expect(offersTab.match(/<NoteBar/g) ?? []).toHaveLength(1)
   })
