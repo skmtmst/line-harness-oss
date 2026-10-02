@@ -210,6 +210,8 @@ const UNTRIAGED: Record<string, string> = {
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/templates/page.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/templates/list-v8.tsx':
+    '★V8 のテンプレート一覧（v19Ivv）。一覧上の操作（フォルダ移動・複製・削除・まとめて操作）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。種類を選ぶ窓は行き先を選ぶだけ',
   'app/templates/template-asset-editor.tsx':
     's2: テンプレート編集の本体（app/templates/edit から載る）。V6R-S2-a（board#1066）で付ける',
   'app/webhooks/edit/page.tsx':
