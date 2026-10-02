@@ -271,4 +271,3 @@ export default function BookingStaffPage() {
     </div>
   )
 }
-
