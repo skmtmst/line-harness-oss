@@ -173,6 +173,11 @@ const REBUILD_MARKER = /--\s*migration-policy:\s*table-rebuild\b/i;
  * ここに無い `*_backup` の DROP は今までどおり止まる。
  */
 const SIDECAR_BACKUP_TABLES: Record<string, ReadonlySet<string>> = {
+  // 予約媒体のCHECK制約拡張で、既存予約と日次件数の参照を退避・復元する。
+  '545_restaurant_channels.sql': new Set([
+    'migration_545_media_links_backup',
+    'migration_545_digests_backup',
+  ]),
   '382_tags_account_name_scope.sql': new Set([
     'migration_382_tag_refs_backup',
     'migration_382_friend_tags_backup',
