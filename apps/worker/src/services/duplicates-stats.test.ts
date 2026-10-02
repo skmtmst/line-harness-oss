@@ -99,7 +99,7 @@ describe('computeDuplicatesStats', () => {
     await computeDuplicatesStats(db, { accountIds: ['account-a'] });
 
     // 3本の問い合わせすべてに絞りが入る。
-    expect(seen).toHaveLength(3);
+    expect(seen).toHaveLength(4);
     for (const query of seen) {
       expect(query.sql).toContain('IN (?)');
       expect(query.sql).not.toContain('1 = 0');

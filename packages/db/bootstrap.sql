@@ -2769,6 +2769,26 @@ CREATE TABLE friend_add_send_claims (
   PRIMARY KEY (line_account_id, friend_id)
 );
 
+CREATE TABLE friend_bulk_message_approval_events (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES friend_bulk_runs(id),
+  actor_staff_id TEXT NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('requested', 'approved', 'confirmed', 'expired')),
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE friend_bulk_message_approvals (
+  run_id TEXT PRIMARY KEY REFERENCES friend_bulk_runs(id),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'confirmed', 'expired')),
+  recipient_count INTEGER NOT NULL,
+  threshold INTEGER NOT NULL,
+  requested_by TEXT NOT NULL,
+  requested_at TEXT NOT NULL,
+  decided_by TEXT,
+  decided_at TEXT,
+  confirmed_count INTEGER
+);
+
 CREATE TABLE friend_bulk_run_items (
   id                TEXT PRIMARY KEY,
   run_id            TEXT NOT NULL REFERENCES friend_bulk_runs(id) ON DELETE CASCADE,
@@ -4460,6 +4480,27 @@ CREATE TABLE nen_lifetime_milestones (
   updated_at      TEXT NOT NULL
 );
 
+CREATE TABLE nen_member_rank_sync (
+  id TEXT PRIMARY KEY,
+  operation_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  friend_id TEXT NOT NULL,
+  customer_id TEXT,
+  rank_key TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  expected_version INTEGER CHECK (expected_version IS NULL OR expected_version >= 0),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'failed', 'synced')),
+  error_code TEXT,
+  error_reason TEXT,
+  result_version INTEGER,
+  duplicate INTEGER NOT NULL DEFAULT 0,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (operation_id, friend_id)
+);
+
 CREATE TABLE nen_pet_profiles (
   id TEXT PRIMARY KEY,
   external_id TEXT UNIQUE,
@@ -6027,7 +6068,7 @@ CREATE TABLE rt_inventory_slots (
   line_capacity INTEGER NOT NULL DEFAULT 0 CHECK (line_capacity >= 0),
   walk_in_capacity INTEGER NOT NULL DEFAULT 0 CHECK (walk_in_capacity >= 0),
   reserved_count INTEGER NOT NULL DEFAULT 0 CHECK (reserved_count >= 0),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), updated_by TEXT,
   UNIQUE(store_id, starts_at)
 );
 
@@ -6097,6 +6138,14 @@ CREATE TABLE rt_menu_items (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 , published_once INTEGER NOT NULL DEFAULT 0 CHECK (published_once IN (0, 1)), publication_history_unknown INTEGER NOT NULL DEFAULT 0 CHECK (publication_history_unknown IN (0, 1)));
+
+CREATE TABLE rt_opening_hours_settings (
+  store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,
+  hours_json TEXT NOT NULL CHECK (json_valid(hours_json)),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+  updated_by TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 CREATE TABLE rt_organization_agreements (
   id TEXT PRIMARY KEY,
@@ -8588,6 +8637,9 @@ CREATE INDEX idx_nen_lifetime_milestones_account
 
 CREATE INDEX idx_nen_member_rank ON nen_ec_member_snapshots(member_rank, purchase_amount DESC);
 
+CREATE INDEX idx_nen_member_rank_sync_operation
+  ON nen_member_rank_sync(line_account_id, operation_id, status);
+
 CREATE INDEX idx_nen_pet_profiles_birthday
   ON nen_pet_profiles(substr(birthday, 6, 2), friend_id);
 
@@ -9469,6 +9521,14 @@ WHEN NOT EXISTS (
     AND archived_at IS NULL
 )
 BEGIN SELECT RAISE(ABORT, 'ACCOUNT_TAG_SCOPE_INVALID'); END;
+
+CREATE TRIGGER rt_inventory_slot_insert AFTER INSERT ON rt_inventory_slots BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = NEW.store_id AND is_active = 1), 0) WHERE id = NEW.id; END;
+
+CREATE TRIGGER rt_inventory_table_delete AFTER DELETE ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = OLD.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id = OLD.store_id; END;
+
+CREATE TRIGGER rt_inventory_table_insert AFTER INSERT ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = NEW.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id = NEW.store_id; END;
+
+CREATE TRIGGER rt_inventory_table_update AFTER UPDATE OF max_capacity, is_active, store_id ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = rt_inventory_slots.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id IN (OLD.store_id, NEW.store_id); END;
 
 CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_requests WHEN OLD.status = 'pending' AND NEW.status = 'approved' BEGIN UPDATE rt_menu_items SET price = NEW.after_price, updated_at = datetime('now') WHERE id = NEW.menu_id AND store_id = NEW.store_id AND price = NEW.before_price; UPDATE rt_menu_change_requests SET status = CASE WHEN changes() = 1 THEN 'applied' ELSE 'failed' END, failure_reason = CASE WHEN changes() = 1 THEN NULL ELSE 'メニューが変更または削除されています。再申請してください' END, updated_at = datetime('now') WHERE id = NEW.id; END;
 

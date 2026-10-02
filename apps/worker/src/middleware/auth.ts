@@ -396,6 +396,7 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/terms-agreement'],
   ['POST', '/api/restaurant-test/stores/selection/clear'],
   ['GET', '/api/restaurant-test/snapshot'],
+  ['GET', '/api/restaurant-test/opening-hours'],
   ['GET', '/api/restaurant-test/menus'],
   ['GET', '/api/restaurant-test/channels'],
   ['POST', '/api/restaurant-test/reservations/manual'],

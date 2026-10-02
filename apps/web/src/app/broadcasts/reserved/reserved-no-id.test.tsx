@@ -25,7 +25,7 @@ vi.mock('next/link', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'visual-qa-account', loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/lib/api', () => ({
   api: {
     broadcasts: {
@@ -38,6 +38,7 @@ vi.mock('@/lib/api', () => ({
     },
     tags: { list: async () => ({ success: true, data: [] }) },
     scenarios: { list: async () => ({ success: true, data: [] }) },
+    staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
   },
 }))
 

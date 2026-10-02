@@ -275,11 +275,12 @@ friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole(
       return c.json({ success: false, error: '新旧の友だちが両方見つからないため結び付けられません' }, 422);
     }
     /*
-      **一致先のない行に「新規作成」を選ばせない。** 選べても本移行で
-      失敗に数えるだけなので、ここで止めて除外か取り込みへ案内する。
+      F-3: 一致先のない行の「新規作成」は、本移行で移行先UIDの友だちを
+      作る。移行先UIDがなければ作るものがなく、移行元の友だちがなければ
+      引き継ぐ名前がないので、ここで止めて対応表の修正か除外へ案内する。
     */
-    if (body.decision === 'create' && !item.new_friend_id) {
-      return c.json({ success: false, error: '一致先がない行は新規作成できません。除外するか、取り込み画面で作ってください' }, 422);
+    if (body.decision === 'create' && (!item.old_friend_id || !item.new_uid)) {
+      return c.json({ success: false, error: '移行元の友だちと移行先のUIDがそろわない行は新規作成できません。対応表を直すか、除外してください' }, 422);
     }
     const now = new Date().toISOString();
     await c.env.DB.prepare(`UPDATE uid_migration_items
@@ -343,6 +344,15 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
         SET result = 'failed', error_message = ?, updated_at = ? WHERE id = ?`)
         .bind(message, now, itemId).run();
     };
+    /*
+      F-3: create 経路で確定した結び付け先。成功記録と対にし、外側の例外
+      でも副作用を残さないための台帳。link 判断の行は従来どおり触らない。
+    */
+    const createdThisRun: Array<{
+      itemId: string; oldFriendId: string; newFriendId: string;
+      oldBefore: string | null; newBefore: string | null; created: boolean;
+      pointerPreexisting: boolean; assigned: string | null;
+    }> = [];
     try {
       for (const item of items) {
         /*
@@ -358,7 +368,110 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
             .bind(now, item.id).run();
           continue;
         }
-        if (item.decision !== 'link' || !item.old_friend_id || !item.new_friend_id) {
+        /*
+          F-3: 判断 create は対応表の移行先UIDで友だちを新しく作り、名前は
+          移行元の友だちから引き継ぐ。同じUIDが対象アカウントにあれば新規
+          の重複は作らず採用し、並行作成・再送は一人に収束させる。対象外の
+          アカウントにあるUIDは越境させず、書込みなしで失敗に記録する。
+        */
+        let createdFriendId: string | null = null;
+        /*
+          F-3: 今作った行の後始末。項目の参照を外し、未連携のままの行だけ
+          消す。採用した既存行・別操作で結び付いた行は残す。
+        */
+        const compensateCreated = async () => {
+          if (!createdFriendId) return;
+          const freshId = createdFriendId;
+          createdFriendId = null;
+          item.new_friend_id = null;
+          await c.env.DB.prepare(`UPDATE uid_migration_items SET new_friend_id = NULL, updated_at = ?
+            WHERE id = ? AND new_friend_id = ?`).bind(now, item.id, freshId).run();
+          await c.env.DB.prepare(`DELETE FROM friends WHERE id = ? AND user_id IS NULL`)
+            .bind(freshId).run();
+        };
+        if (item.decision === 'create') {
+          if (!item.old_friend_id || !item.new_uid) {
+            await failItem(item.id, 'この判断は自動反映できません。新しい友だちを確認してください');
+            continue;
+          }
+          const oldFriendId: string = item.old_friend_id;
+          const source = await c.env.DB.prepare(`SELECT id, line_account_id, user_id,
+              display_name, real_name, system_display_name FROM friends WHERE id = ?`)
+            .bind(item.old_friend_id)
+            .first<{
+              id: string; line_account_id: string | null; user_id: string | null;
+              display_name: string | null; real_name: string | null; system_display_name: string | null;
+            }>();
+          if (!source || source.line_account_id !== run.from_account_id) {
+            await failItem(item.id, '本移行前に結び付きが変わりました。確認してからもう一度実行してください');
+            continue;
+          }
+          const selectTarget = () => c.env.DB.prepare(`SELECT id, user_id FROM friends
+            WHERE line_account_id = ? AND line_user_id = ? LIMIT 1`)
+            .bind(run.to_account_id, item.new_uid)
+            .first<{ id: string; user_id: string | null }>();
+          /*
+            対象アカウントの行を読む。見つかった行は作らず採用する。
+            参照の確定より先に追跡へ載せ、後続の失敗でも把握漏れを出さない。
+          */
+          const trackTarget = (
+            targetId: string, oldBefore: string | null, newBefore: string | null, created: boolean,
+          ) => {
+            createdThisRun.push({
+              itemId: item.id, oldFriendId, newFriendId: targetId,
+              oldBefore, newBefore, created,
+              pointerPreexisting: item.new_friend_id !== null,
+              assigned: null,
+            });
+          };
+          let target = await selectTarget();
+          if (!target) {
+            const elsewhere = await c.env.DB.prepare(`SELECT id FROM friends
+              WHERE line_user_id = ? LIMIT 1`).bind(item.new_uid).first<{ id: string }>();
+            if (elsewhere) {
+              await failItem(item.id, '別のLINEアカウントに同じUIDがあります');
+              continue;
+            }
+            const freshId = crypto.randomUUID();
+            let inserted = false;
+            try {
+              await c.env.DB.prepare(`INSERT INTO friends (
+                id, line_user_id, line_account_id, display_name, real_name, system_display_name,
+                is_following, metadata, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, 0, '{}', ?, ?)`).bind(
+                freshId, item.new_uid, run.to_account_id,
+                source.display_name, source.real_name, source.system_display_name, now, now,
+              ).run();
+              inserted = true;
+            } catch {
+              inserted = false;
+            }
+            if (inserted) {
+              target = { id: freshId, user_id: null };
+              createdFriendId = freshId;
+              trackTarget(freshId, source.user_id, null, true);
+            } else {
+              /*
+                並行作成の競合は作り直さず、対象アカウントの行を採用して
+                一人に収束させる。見つからない場合は原因が確定しないため、
+                越境と断定せず再確認へ案内する（再送時は対象確認から入る）。
+              */
+              target = await selectTarget();
+              if (!target) {
+                await failItem(item.id, '本移行前に結び付きが変わりました。確認してからもう一度実行してください');
+                continue;
+              }
+              trackTarget(target.id, source.user_id, target.user_id, false);
+            }
+          } else {
+            trackTarget(target.id, source.user_id, target.user_id, false);
+          }
+          item.new_friend_id = target.id;
+          await c.env.DB.prepare(`UPDATE uid_migration_items SET new_friend_id = ?, updated_at = ?
+            WHERE id = ? AND (new_friend_id IS NULL OR new_friend_id = ?)`)
+            .bind(target.id, now, item.id, target.id).run();
+        }
+        if ((item.decision !== 'link' && item.decision !== 'create') || !item.old_friend_id || !item.new_friend_id) {
           await failItem(item.id, 'この判断は自動反映できません。新しい友だちを確認してください');
           continue;
         }
@@ -368,10 +481,17 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
         const oldFriend = pair.results.find((friend) => friend.id === item.old_friend_id);
         const newFriend = pair.results.find((friend) => friend.id === item.new_friend_id);
         if (!oldFriend || !newFriend || (oldFriend.user_id && newFriend.user_id && oldFriend.user_id !== newFriend.user_id)) {
+          await compensateCreated();
           await failItem(item.id, '本移行前に結び付きが変わりました。確認してからもう一度実行してください');
           continue;
         }
         const userId = oldFriend.user_id ?? newFriend.user_id ?? crypto.randomUUID();
+        /*
+          F-3: この実行が割り当てた結び付きを控える。外側補償は現在値が
+          この割当てと一致するときだけ戻し、他処理の結び付きを巻戻さない。
+        */
+        const tracked = createdThisRun.find((entry) => entry.itemId === item.id);
+        if (tracked) tracked.assigned = userId;
         /*
          * R395: 2件の付け替えは1文で同時に行う。確認時と現在値が両方一致
          * したときだけ2件更新になり、確認後の再連携は上書きしない。
@@ -406,6 +526,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
               `UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`,
             ).bind(newFriend.user_id, now, newFriend.id, userId),
           ]);
+          await compensateCreated();
           await failItem(item.id, '本移行前に結び付きが変わりました。確認してからもう一度実行してください');
           continue;
         }
@@ -437,6 +558,56 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
         await c.env.DB.batch(recordWrites);
       }
     } catch (error) {
+      /*
+        F-3: create 経路は成功記録と対で戻す。pair まで進んで記録 batch が
+        落ちると、結び付きだけ残って再試行・切り戻しのどちらからも見えなく
+        なる。反映済みの行は触らず、未反映の行だけ実行前の状態へ寄せる。
+        link 判断の行は従来どおり残す。
+      */
+      const compensatedAt = new Date().toISOString();
+      try {
+        for (const created of createdThisRun) {
+          const state = await c.env.DB.prepare(`SELECT result FROM uid_migration_items WHERE id = ?`)
+            .bind(created.itemId).first<{ result: string }>();
+          if (!state || state.result === 'applied') continue;
+          const pair = await c.env.DB.prepare(`SELECT id, user_id FROM friends WHERE id IN (?, ?)`)
+            .bind(created.oldFriendId, created.newFriendId)
+            .all<{ id: string; user_id: string | null }>();
+          const currentOld = pair.results.find((friend) => friend.id === created.oldFriendId);
+          const currentNew = pair.results.find((friend) => friend.id === created.newFriendId);
+          /*
+            片側ずつ、この実行の割当てと一致する側だけ戻す。一致しない側は
+            他処理が結び付け直したものとして保持する。両側一致だけ戻す形だと、
+            片側 relink 後に本操作が設定したままの側が成功記録なしで残る。
+          */
+          if (created.assigned !== null) {
+            const restores: D1PreparedStatement[] = [];
+            if (currentOld && currentOld.user_id === created.assigned) {
+              restores.push(c.env.DB.prepare(`UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`)
+                .bind(created.oldBefore, compensatedAt, created.oldFriendId, created.assigned));
+            }
+            if (currentNew && currentNew.user_id === created.assigned) {
+              restores.push(c.env.DB.prepare(`UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`)
+                .bind(created.newBefore, compensatedAt, created.newFriendId, created.assigned));
+            }
+            if (restores.length > 0) await c.env.DB.batch(restores);
+          }
+          /*
+            参照は自分が付けた分だけ外す。元からあった参照は残し、再送が
+            辿れるようにする。作った行は未連携のままなら消す。
+          */
+          if (created.created || !created.pointerPreexisting) {
+            await c.env.DB.prepare(`UPDATE uid_migration_items SET new_friend_id = NULL, updated_at = ?
+              WHERE id = ? AND new_friend_id = ?`).bind(compensatedAt, created.itemId, created.newFriendId).run();
+          }
+          if (created.created) {
+            await c.env.DB.prepare(`DELETE FROM friends WHERE id = ? AND user_id IS NULL`)
+              .bind(created.newFriendId).run();
+          }
+        }
+      } catch (compensationError) {
+        console.error(JSON.stringify({ event: 'friend_migration_create_compensation_failed', error: String(compensationError) }));
+      }
       /*
         途中例外でも executing のまま放置しない。ここまでに反映・失敗した
         件数を履歴へ残し、反映済みの分だけ切り戻せる状態にする。
