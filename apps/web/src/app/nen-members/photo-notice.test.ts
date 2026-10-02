@@ -32,4 +32,11 @@ describe('写真審査の失敗文面', () => {
     expect(photoNoticeFor(new Error('API error: 503'), FALLBACK)).toBe(FALLBACK)
     expect(photoNoticeFor('壊れた値', FALLBACK)).toBe(FALLBACK)
   })
+
+  it('M508: 保存の失敗（500）は競合の文面にならない', () => {
+    // 409 だけが「ほかの担当者」。500 は呼び出し側の保存失敗の文面になる。
+    expect(photoNoticeFor(new ApiError(500, 'API error: 500', 'REVIEW_SAVE_FAILED'), FALLBACK)).toBe(FALLBACK)
+    expect(photoNoticeFor(new ApiError(409, 'Already reviewed', 'VERSION_CONFLICT'), FALLBACK))
+      .toBe('ほかの担当者が先に審査しました。一覧を読み直してから、もう一度お試しください。')
+  })
 })

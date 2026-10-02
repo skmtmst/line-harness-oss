@@ -899,7 +899,7 @@ const spec = {
     },
     '/api/ops/announcements': {
       get: { tags: ['Ops Console'], summary: 'お知らせの一覧（下書き・予約・配信済み）', responses: { '200': { description: 'Announcements' } } },
-      post: { tags: ['Ops Console'], summary: 'お知らせを作る（下書き／予約／今すぐ送る）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['subject', 'body', 'channels'], properties: { subject: { type: 'string' }, body: { type: 'string' }, audienceKind: { type: 'string', enum: ['all', 'plan', 'tenants'] }, audiencePlans: { type: 'array', items: { type: 'string' } }, audienceTenantIds: { type: 'array', items: { type: 'string' } }, channels: { type: 'array', items: { type: 'string', enum: ['line', 'screen', 'email'] } }, publishAt: { type: 'string' }, mode: { type: 'string', enum: ['draft', 'schedule', 'send'] } } } } } }, responses: { '201': { description: 'Created' }, '400': { description: 'Validation error' }, '409': { description: 'Notice LINE account missing' } } },
+      post: { tags: ['Ops Console'], summary: 'お知らせを作る（下書き／予約／今すぐ送る）', parameters: [{ name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string' }, description: '二重押し止めの再実行キー（UUID）。同じキー・同じ内容の再送は保存済みを返し、別内容は409。' }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['subject', 'body', 'channels'], properties: { subject: { type: 'string' }, body: { type: 'string' }, audienceKind: { type: 'string', enum: ['all', 'plan', 'tenants'] }, audiencePlans: { type: 'array', items: { type: 'string' } }, audienceTenantIds: { type: 'array', items: { type: 'string' } }, channels: { type: 'array', items: { type: 'string', enum: ['line', 'screen', 'email'] } }, publishAt: { type: 'string' }, mode: { type: 'string', enum: ['draft', 'schedule', 'send'] } } } } } }, responses: { '200': { description: 'Idempotent replay of the saved announcement' }, '201': { description: 'Created' }, '400': { description: 'Validation error' }, '409': { description: 'Notice LINE account missing or idempotency-key reuse with different content' } } },
     },
     '/api/ops/knowledge': {
       get: { tags: ['Ops Console'], summary: '運営専用ナレッジ一覧（検索・種別・承認状態・ページ送り）', responses: { '200': { description: 'Articles and total' }, '403': { description: 'Platform admin required' } } },
@@ -929,7 +929,7 @@ const spec = {
       post: { tags: ['Ops Console'], summary: '宛先の見積もり（契約先数・権限者数・LINE登録済み数）', responses: { '200': { description: 'Audience preview' } } },
     },
     '/api/ops/announcements/{id}': {
-      put: { tags: ['Ops Console'], summary: '下書き・予約のお知らせを変える（今すぐ送るも可）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Updated' }, '404': { description: 'Not found' }, '409': { description: 'Already sent' } } },
+      put: { tags: ['Ops Console'], summary: '下書き・予約のお知らせを変える（今すぐ送るも可）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { expectedUpdatedAt: { type: 'string', description: '一覧で見た版。違う版からの保存は最新の内容つきで409。' } } } } } }, responses: { '200': { description: 'Updated' }, '404': { description: 'Not found' }, '409': { description: 'Already sent or version conflict with the latest content' } } },
       delete: { tags: ['Ops Console'], summary: '下書き・予約のお知らせを消す', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' }, '404': { description: 'Not found' }, '409': { description: 'Already sent' } } },
     },
     // ── Ops Console: ダッシュボード（★V6 37-2） ────────────────────────────
@@ -2416,6 +2416,38 @@ const spec = {
         },
       },
     },
+    '/api/friend-add-rules/reorder': {
+      patch: {
+        tags: ['Webhook'],
+        summary: '友だち追加時の配信の優先順位を一括更新（一覧のつまみ並び替え）',
+        description:
+          '動かせる行（受け皿以外）の新しい順を ids で受け取り、1回のバッチで書く。そのアカウント・区分の受け皿以外の全件をちょうど含む並びだけを受け付け、足りなければ 409 で読み直しを促す。',
+        parameters: [{ name: 'account_id', in: 'query', required: false, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['friendKind', 'ids'],
+                properties: {
+                  accountId: { type: 'string', description: '対象のLINEアカウント（query の account_id でも可）' },
+                  friendKind: { type: 'string', enum: ['first_time', 'returning'] },
+                  ids: { type: 'array', items: { type: 'string' }, maxItems: 500, description: '受け皿以外の全設定の新しい順' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Order updated' },
+          '400': { description: 'account_id / friendKind / ids missing or invalid' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Account not in visible scope' },
+          '409': { description: 'ORDER_CHANGED: list changed elsewhere; reload and retry' },
+        },
+      },
+    },
     '/api/mileage/rules': {
       get: {
         tags: ['Mileage'], summary: 'LINEアカウント範囲内のマイル付与ルールを取得',
@@ -3325,7 +3357,10 @@ const spec = {
         tags: ['NEN delivery'],
         summary: 'ペットの登録（管理画面）',
         description: '誕生日は YYYY-MM-DD か MM-DD（月日だけ）。生まれた年が分からない子も誕生日配信の対象にする。',
-        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string' }, description: '二重押し止めの再実行キー（UUID）。同じキー・同じ内容の再送は保存済みを返し、別内容は409。' },
+        ],
         requestBody: { required: true, content: { 'application/json': { schema: {
           type: 'object',
           required: ['friendId', 'name'],
@@ -3341,10 +3376,12 @@ const spec = {
           },
         } } } },
         responses: {
+          '200': { description: 'Idempotent replay of the saved pet' },
           '201': { description: 'Created' },
           '400': { description: 'Invalid input' },
           '403': { description: 'Owner or admin role required' },
           '404': { description: 'Friend not found in account scope' },
+          '409': { description: 'Idempotency-key reuse with different content' },
         },
       },
     },
@@ -3367,6 +3404,7 @@ const spec = {
             birthday: { type: 'string', description: 'YYYY-MM-DD または MM-DD' },
             breed: { type: 'string', maxLength: 80 },
             weightKg: { type: 'number', minimum: 0.1, maximum: 200, nullable: true },
+            expectedUpdatedAt: { type: 'string', description: '一覧で見た版。違う版からの保存は最新の内容つきで409。' },
           },
         } } } },
         responses: {
@@ -3374,6 +3412,7 @@ const spec = {
           '400': { description: 'Invalid input' },
           '403': { description: 'Owner or admin role required' },
           '404': { description: 'Pet not found in account scope' },
+          '409': { description: 'Version conflict with the latest content' },
         },
       },
     },

@@ -8,8 +8,11 @@ import {
   createFriendAddRuleDraft,
   getFriendAddRule,
   listFriendAddRules,
+  listFriendAddRuleOrderIds,
+  listFriendAddRulesPage,
   publishFriendAddRule,
   recordFriendAddRuleTest,
+  reorderFriendAddRulePriorities,
   saveFriendAddRuleDraft,
   stopFriendAddRule,
   type FriendAddRuleDefinition,
@@ -244,5 +247,89 @@ describe('friend add V6 rules', () => {
       { id: 'fallback', status: 'published' },
       { id: 'target', status: 'stopped' },
     ]);
+  });
+
+  /*
+   * ★V8 MRhef の並び替え。一覧のつまみで動かした順を優先順位として
+   * まとめて書く口（PATCH /api/friend-add-rules/reorder が使う）。
+   */
+  test('並び順のid一覧は受け皿とアーカイブ済みを外し、優先順位順に返す', async () => {
+    insertPublishedRule(sqlite, { id: 'rule-b' });
+    insertPublishedRule(sqlite, { id: 'rule-a' });
+    insertPublishedRule(sqlite, { id: 'fallback', fallback: true });
+    sqlite.prepare(`UPDATE friend_add_rules SET priority = 1 WHERE id = 'rule-b'`).run();
+    sqlite.prepare(`UPDATE friend_add_rules SET priority = 2 WHERE id = 'rule-a'`).run();
+
+    const ids = await listFriendAddRuleOrderIds(db, {
+      lineAccountId: 'account-1', friendKind: 'first_time',
+    });
+    expect(ids).toEqual(['rule-b', 'rule-a']);
+  });
+
+  test('並び替えは priority を渡された順で書き、受け皿は動かさない', async () => {
+    insertPublishedRule(sqlite, { id: 'rule-a' });
+    insertPublishedRule(sqlite, { id: 'rule-b' });
+    insertPublishedRule(sqlite, { id: 'fallback', fallback: true });
+
+    await reorderFriendAddRulePriorities(db, {
+      lineAccountId: 'account-1', friendKind: 'first_time',
+      ids: ['rule-b', 'rule-a'],
+    });
+
+    expect(sqlite.prepare(
+      `SELECT id, priority FROM friend_add_rules
+        WHERE line_account_id = 'account-1' AND friend_kind = 'first_time'
+        ORDER BY priority`,
+    ).all()).toEqual([
+      { id: 'rule-b', priority: 1 },
+      { id: 'rule-a', priority: 2 },
+      { id: 'fallback', priority: 9999 },
+    ]);
+    // 別区分・別アカウントは触らない
+    const kindRows = sqlite.prepare(
+      `SELECT COUNT(*) AS count FROM friend_add_rules
+        WHERE line_account_id = 'account-1' AND friend_kind = 'returning'`,
+    ).get<{ count: number }>();
+    expect(kindRows?.count).toBe(0);
+  });
+
+  test('並び替えは他アカウントの同名設定を動かさない', async () => {
+    insertPublishedRule(sqlite, { id: 'rule-a' });
+    insertPublishedRule(sqlite, { id: 'rule-b', accountId: 'account-2' });
+
+    await reorderFriendAddRulePriorities(db, {
+      lineAccountId: 'account-1', friendKind: 'first_time', ids: ['rule-a'],
+    });
+
+    expect(sqlite.prepare(
+      `SELECT priority FROM friend_add_rules WHERE id = 'rule-b'`,
+    ).get()).toEqual({ priority: 1 });
+  });
+
+  /*
+   * 「設定名・流入リンクで探す」。設定名に当たらなくても、一覧が参照する
+   * 版に選ばれた流入リンクの名前で当たること。
+   */
+  test('検索は流入リンクの名前にも当たる', async () => {
+    sqlite.prepare(
+      `INSERT INTO entry_routes (id, ref_code, name) VALUES ('route-1', 'ref-shop', '店頭QRコード')`,
+    ).run();
+    insertPublishedRule(sqlite, { id: 'rule-shop' });
+    insertPublishedRule(sqlite, { id: 'rule-other' });
+
+    const byRuleName = await listFriendAddRulesPage(db, {
+      lineAccountId: 'account-1', friendKind: 'first_time', search: 'rule-other',
+    });
+    expect(byRuleName.total).toBe(1);
+
+    const byRouteName = await listFriendAddRulesPage(db, {
+      lineAccountId: 'account-1', friendKind: 'first_time', search: '店頭',
+    });
+    expect(byRouteName.total).toBe(2);
+
+    const noHit = await listFriendAddRulesPage(db, {
+      lineAccountId: 'account-1', friendKind: 'first_time', search: '存在しない名前',
+    });
+    expect(noHit.total).toBe(0);
   });
 });
