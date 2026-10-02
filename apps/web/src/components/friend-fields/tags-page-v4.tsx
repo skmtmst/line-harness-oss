@@ -51,7 +51,10 @@ const TAB_FEATURE: Partial<Record<TabKey, FeatureKey>> = {
   marks: 'support_marks',
   searches: 'saved_searches',
 }
-const UNGROUPED = '__ungrouped__'
+export const UNGROUPED = '__ungrouped__'
+
+/** 色未設定のフォルダに出す中性の点の色（V8側と共用するため1か所に置く）。 */
+export const FOLDER_FALLBACK_COLOR = '#8b938d'
 
 /**
  * 一覧に中身を出せるかどうか。
@@ -67,7 +70,7 @@ type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 /* ---- 4-1 の表のための小物。設計 `HrwyW` の値をそのまま持つ ---- */
 
 /** 並び替えのつまみ。設計 `DaXeY`（lucide grip-vertical・16px・hairline）。 */
-function GripIcon() {
+export function GripIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="inline-block">
       <circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" />
@@ -78,7 +81,7 @@ function GripIcon() {
 }
 
 /** 一覧表示の★。設計 `zMlMX`（lucide star・16px）。 */
-function StarIcon({ filled }: { filled: boolean }) {
+export function StarIcon({ filled }: { filled: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
       <path d="m12 3 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9z" />
@@ -115,7 +118,7 @@ function linkChips(tag: Tag): Array<{ label: string; tone: string }> {
 }
 
 /** 設計 `tuisA` ほかの6種。サーバーの `assignSource` と1対1。 */
-const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
+export const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
   ec: 'EC連携',
   line_login: 'LINE Login',
   form: '回答フォーム',
@@ -132,7 +135,7 @@ const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
  * 残っていないため、一般のタグを manual と推測しない）。
  * ここで「手動」と埋めると、断定できなかったものを断定したことになる。
  */
-function sourceLabel(tag: Tag): string {
+export function sourceLabel(tag: Tag): string {
   return tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—'
 }
 
@@ -157,7 +160,7 @@ const USAGE_LABELS: Array<[keyof NonNullable<Tag['usedIn']>, string]> = [
  * 友だち200人・参照0件のタグをここで「未使用」と書くと、絞り込みやKPIの
  * 「未使用」と別の意味になる。同じ画面で1つの言葉に2つの意味を持たせない。
  */
-function usageLabel(tag: Tag): string {
+export function usageLabel(tag: Tag): string {
   if (!tag.usedIn) return 'なし'
   const parts = USAGE_LABELS
     .map(([key, label]) => (tag.usedIn?.[key] ? `${label}${tag.usedIn[key]}` : null))
@@ -183,7 +186,7 @@ function usageLabel(tag: Tag): string {
  * `cleanupReasons` は `withCounts=1` のとき**理由が無くても `[]` で必ず返す**
  * 約束（`docs/v6-4-1-handoff.md` §0-1）。省略＝未取得。
  */
-function cleanupKnown(items: Tag[], ready: boolean): boolean {
+export function cleanupKnown(items: Tag[], ready: boolean): boolean {
   // 読み込み中の空配列と、取得済みの0件を区別する。後者は `0件` と出せる。
   return ready && items.every((tag) => Array.isArray(tag.cleanupReasons))
 }
@@ -197,13 +200,13 @@ function cleanupKnown(items: Tag[], ready: boolean): boolean {
  * サーバーが `cleanupReasons` を返しているならそれに従う。**画面とサーバーで
  * 別々に数えない**（別々に数えると、同じ画面のKPIと絞り込みで数が食い違う）。
  */
-function isUnused(tag: Tag): boolean {
+export function isUnused(tag: Tag): boolean {
   if (Array.isArray(tag.cleanupReasons)) return tag.cleanupReasons.includes('unused')
   return !tag.usedIn && (tag.friendCount ?? 0) === 0
 }
 
 /** 連動が1つでもあるか。「連動あり」の絞り込みと削除の確認で使う。 */
-function hasLinkedActions(tag: Tag): boolean {
+export function hasLinkedActions(tag: Tag): boolean {
   return Boolean(tag.mileageReward || tag.referralMileageReward || tag.mileageMultiplierBps || tag.otherActionCount)
 }
 
@@ -213,7 +216,7 @@ function hasLinkedActions(tag: Tag): boolean {
  * サーバーは UTC の ISO で返す。日本時間で数えないと、月初と月末の
  * 9時間ぶんがずれる（8/1 の朝に作ったタグが7月扱いになる）。
  */
-function isThisMonth(value: string): boolean {
+export function isThisMonth(value: string): boolean {
   const month = (d: Date) =>
     formatDay(d)
   return month(new Date(value)) === month(new Date())
@@ -224,7 +227,7 @@ function isThisMonth(value: string): boolean {
  * getFullYear 系は端末の地域で読むので、日本より遅い地域で開くと
  * 登録日が前日にずれる。ほかの一覧と同じく JST 固定で出す（#640 D-3）。
  */
-function formatDate(value: string): string {
+export function formatDate(value: string): string {
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return value
   return formatDay(d)
@@ -236,7 +239,7 @@ function formatDate(value: string): string {
  * 2026-08-26 まで3つしか無く、しかも「今月増えた」は絞り込みの中に
  * 対応する枝が無くて**押しても何も起きなかった**。
  */
-const QUICK_FILTERS: Array<[string, string]> = [
+export const QUICK_FILTERS: Array<[string, string]> = [
   ['unused', '未使用のタグ'],
   ['recent', '今月増えたタグ'],
   ['auto', '自動付与あり'],
@@ -287,7 +290,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
      * （同じ数を重ねて出さない。#946 の「絞り込み後の件数は一覧の側」）。
      */
     { id: '', name: 'すべて', count: null, color: 'var(--color-accent)' },
-    ...groups.map((group) => ({ id: group.id, name: group.name, count: items.filter((tag) => tag.groupId === group.id).length as number | null, color: group.color ?? '#8b938d' })),
+    ...groups.map((group) => ({ id: group.id, name: group.name, count: items.filter((tag) => tag.groupId === group.id).length as number | null, color: group.color ?? FOLDER_FALLBACK_COLOR })),
     { id: UNGROUPED, name: '未分類', count: items.filter((tag) => !tag.groupId).length as number | null, color: 'var(--color-ink-disabled)' },
   ]
   const move = async (group: TagGroup, direction: -1 | 1) => {
@@ -452,7 +455,7 @@ function deleteImpactRows(
   return rows
 }
 
-function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; accountId: string | null; onCancel: () => void; onArchived: (notice?: string) => void }) {
+export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; accountId: string | null; onCancel: () => void; onArchived: (notice?: string) => void }) {
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -1070,7 +1073,7 @@ export default function TagsPageV4({
                         </Td>
                         <Td>
                           <div className="flex min-w-0 items-center gap-2">
-                            <span className="h-2 w-2 shrink-0 rounded-pill" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
+                            <span className="h-2 w-2 shrink-0 rounded-pill" style={{ backgroundColor: group?.color ?? FOLDER_FALLBACK_COLOR }} />
                             {/* 名前は黒文字の太字。押すと編集へ行く（編集ボタンは置かない）。 */}
                             <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-medium text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
                             {/* 保管済みは一覧に出続けるが、開くと名前と説明しか直せない(#710)。 */}
@@ -1171,7 +1174,7 @@ export default function TagsPageV4({
                             </span>
                             <div className="min-w-0 flex-1">
                               <div className="flex min-w-0 items-center gap-2">
-                                <span className="h-2 w-2 shrink-0 rounded-pill" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
+                                <span className="h-2 w-2 shrink-0 rounded-pill" style={{ backgroundColor: group?.color ?? FOLDER_FALLBACK_COLOR }} />
                                 <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-medium text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
                                 {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-medium text-ink-faint">保管済み</span>}
                                 {/* IDEA-04: 重複名の整理候補はカード表示でも行ごとに示す。 */}

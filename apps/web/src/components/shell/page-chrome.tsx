@@ -14,16 +14,31 @@ import type { ReactNode } from 'react'
  *
  * 詳しくは `docs/v6-common-rules.md` §1。
  */
+/**
+ * 上の帯のパンくずの手前の段（★V8）。
+ *
+ * `ホーム › 一斉配信`・`一斉配信 › 新商品発売のお知らせ` のように、
+ * 画面名の前に「どこから来たか」を1段だけ置く。渡さない画面は
+ * 従来どおり選んでいるアカウント名が出る。v7 では描かない。
+ */
+export interface PageCrumb {
+  label: string
+  href?: string
+}
+
 export interface PageChrome {
   /** トップバーに出す画面名。null なら既定（menu.ts のラベル）を出す。 */
   title: string | null
   /** true のとき、本文の max-width を外す。受信箱のような全画面レイアウト用。 */
   fullWidth: boolean
+  /** ★V8 パンくずの手前の段。null なら既定（選んでいるアカウント名）。 */
+  crumbs: PageCrumb[] | null
 }
 
 interface PageChromeStore extends PageChrome {
   setTitle: (title: string | null) => void
   setFullWidth: (full: boolean) => void
+  setCrumbs: (crumbs: PageCrumb[] | null) => void
 }
 
 const PageChromeContext = createContext<PageChromeStore | null>(null)
@@ -31,10 +46,11 @@ const PageChromeContext = createContext<PageChromeStore | null>(null)
 export function PageChromeProvider({ children }: { children: ReactNode }) {
   const [title, setTitle] = useState<string | null>(null)
   const [fullWidth, setFullWidth] = useState(false)
+  const [crumbs, setCrumbs] = useState<PageCrumb[] | null>(null)
 
   const value = useMemo<PageChromeStore>(
-    () => ({ title, fullWidth, setTitle, setFullWidth }),
-    [title, fullWidth],
+    () => ({ title, fullWidth, crumbs, setTitle, setFullWidth, setCrumbs }),
+    [title, fullWidth, crumbs],
   )
 
   return <PageChromeContext.Provider value={value}>{children}</PageChromeContext.Provider>
@@ -43,7 +59,7 @@ export function PageChromeProvider({ children }: { children: ReactNode }) {
 /** 枠の側（app-shell）が読む。 */
 export function usePageChrome(): PageChrome {
   const store = useContext(PageChromeContext)
-  return { title: store?.title ?? null, fullWidth: store?.fullWidth ?? false }
+  return { title: store?.title ?? null, fullWidth: store?.fullWidth ?? false, crumbs: store?.crumbs ?? null }
 }
 
 /**
@@ -92,4 +108,30 @@ export function useFullWidthPage(enabled = true) {
     set(enabled)
     return () => set(false)
   }, [enabled, set])
+}
+
+/**
+ * ページがパンくずの手前の段を渡す（★V8）。
+ *
+ * ```tsx
+ * usePageCrumbs([{ label: '一斉配信', href: '/broadcasts' }])
+ * ```
+ *
+ * 一覧からの詳細画面で「一斉配信 › 配信名」と出すためのもの。
+ * v7 では描かれないので、渡しても v7 の見た目は変わらない。
+ * 画面を離れたら既定（アカウント名）へ戻す。
+ */
+export function usePageCrumbs(crumbs: PageCrumb[] | null) {
+  const store = useContext(PageChromeContext)
+  const setCrumbs = store?.setCrumbs
+  // 呼び出し側は描き出すたびに新しい配列を作る。中身が同じなら
+  // 設定し直さないよう、中身で比べる（setCrumbs のたびの再描画を防ぐ）。
+  const serialized = JSON.stringify(crumbs)
+
+  useEffect(() => {
+    if (!setCrumbs) return
+    setCrumbs(crumbs)
+    return () => setCrumbs(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serialized, setCrumbs])
 }
