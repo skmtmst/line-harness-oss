@@ -6,6 +6,7 @@ import { useAccount } from '@/contexts/account-context'
 import MenuPortal from '@/components/shared/menu-portal'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
+import { brandInitial } from '@/components/layout/brand-initial'
 
 export interface AccountSwitchTarget {
   id: string
@@ -28,7 +29,7 @@ function AccountMark({ account, compact = false }: { account: AccountSwitchTarge
   }
   // 画像が無いときの頭文字は、そのアカウント名から出す。特定の利用者の
   // 名前を固定で書くと、別の利用者のアカウントにもその頭文字が出てしまう。
-  return <span className={`flex ${size} shrink-0 items-center justify-center bg-accent-soft font-bold text-success`}>{accountLabel(account).slice(0, 1) || 'm'}</span>
+  return <span className={`flex ${size} shrink-0 items-center justify-center bg-accent-soft font-bold text-success`}>{brandInitial(accountLabel(account)) || 'm'}</span>
 }
 
 export function AccountSwitchDialog({

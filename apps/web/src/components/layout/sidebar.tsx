@@ -13,6 +13,7 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import SidebarIdentity from './sidebar-identity'
+import { brandInitial } from './brand-initial'
 import SidebarVersion from './sidebar-version'
 import Notice from '@/components/shared/notice'
 import HqAccountMenu from '@/components/hq/account-menu'
@@ -630,7 +631,7 @@ export default function Sidebar({
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-card object-cover" />
           ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>{brand.name?.slice(0, 1) ?? 'm'}</div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
           )}
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-ink">{brand.name ?? 'musubo LINE管理システム'}</p>
@@ -852,7 +853,7 @@ export default function Sidebar({
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-control object-cover" />
           ) : (
-            <div className="w-7 h-7 rounded-control flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>{brand.name?.slice(0, 1) ?? 'm'}</div>
+            <div className="w-7 h-7 rounded-control flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
           )}
         </div>
       </div>
