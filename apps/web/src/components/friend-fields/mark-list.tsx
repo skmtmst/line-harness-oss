@@ -110,7 +110,7 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
   const canConfirm = !loading && !saving && Boolean(impact?.canArchive) && (!needsReplacement || Boolean(replacementMarkId))
   return (
     <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/45 p-4">
-      <section data-design-node="zGZMA" data-design-part="archive-position" className={`flex max-h-[calc(100dvh-2rem)] w-full ${v8 ? 'max-w-[560px]' : 'max-w-[680px]'} flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay`} role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
+      <section data-design-node="zGZMA" data-design-part="archive-position" className={`flex max-h-[calc(100dvh-2rem)] w-full ${v8 ? 'max-w-xl' : 'max-w-[680px]'} flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay`} role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="flex items-start justify-between gap-3 p-4 pb-0">
           <div>
             <h2 id={titleId} className="text-lg font-bold text-ink">{v8 ? `「${mark.name}」を保管しますか` : `対応マーク「${mark.name}」を保管しますか？`}</h2>
