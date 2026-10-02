@@ -3032,15 +3032,17 @@
       ]
     },
     "/friend-add-settings": {
-      "node": "u1P0gG",
-      "name": "V2 4-6 友だち追加時の配信",
+      "node": "u1P0gG MRhef",
+      "name": "V2 4-6 友だち追加時の配信（一覧は★V8 MRhef）",
       "sections": [
         "Head",
         "Alert",
         "FirstTime",
         "Returning",
         "Rule",
-        "Flow"
+        "Flow",
+        "KPIs",
+        "KindTabs"
       ],
       "parts": [
         "友だち追加時の配信",
