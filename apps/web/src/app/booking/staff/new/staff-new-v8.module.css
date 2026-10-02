@@ -41,9 +41,9 @@
 }
 
 .input:focus-visible {
-  outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent-soft);
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
 }
 
 .input:disabled {
@@ -102,7 +102,7 @@ textarea.input {
   width: 16px;
   height: 16px;
   border: 1px solid var(--color-hairline);
-  border-radius: 4px;
+  border-radius: var(--radius-icon);
   background: var(--color-canvas);
   color: transparent;
   flex-shrink: 0;
@@ -172,7 +172,7 @@ textarea.input {
 .colorSwatch {
   width: 20px;
   height: 14px;
-  border-radius: 4px;
+  border-radius: var(--radius-icon);
   background: var(--color-accent);
 }
 
