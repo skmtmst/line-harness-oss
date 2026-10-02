@@ -52,10 +52,15 @@ export interface LinePreviewProps {
 
 /** 設定画面でその場でテーマを切り替えたときの合図を受ける。 */
 const subscribeTheme = (onChange: () => void) => {
+  /*
+   * 出来事を張れる窓が無い最小 DOM の試験環境では、切り替えの合図を
+   * 受けられないので v7 のまま描く（書き出しと同じ扱い）。
+   */
+  if (typeof window.addEventListener !== 'function') return () => {}
   window.addEventListener(ADMIN_THEME_CHANGED_EVENT, onChange)
   return () => window.removeEventListener(ADMIN_THEME_CHANGED_EVENT, onChange)
 }
-const readIsV8 = () => document.documentElement.dataset.theme === 'v8'
+const readIsV8 = () => document.documentElement?.getAttribute('data-theme') === 'v8'
 /* 書き出し（SSR/書き出した静的HTML）は常に v7。ブラウザ側で v8 を読み直す。 */
 const readIsV8OnServer = () => false
 
