@@ -4924,12 +4924,12 @@ const spec = {
       get: {
         tags: ['Forms'],
         summary: '郵便番号から住所の候補を返す（F11・外部通信なし）',
-        description: '日本郵便の公開データを取り込んだ表を読む。候補が複数ある番号は1つに潰さず全部返す。手入力の住所は残る。全量未取り込みの環境では readiness.fullDataset が false。',
+        description: '日本郵便の公開データを取り込んだ表を読む。候補が複数ある番号は1つに潰さず全部返し、total に全件数を載せる（件数での打ち切りはしない）。手入力の住所は残る。全量未取り込みの環境では readiness.fullDataset が false。',
         parameters: [
           { name: 'code', in: 'query', schema: { type: 'string' }, description: '郵便番号（123-4567 または 1234567）。先頭0を保つ。' },
         ],
         responses: {
-          '200': { description: '候補 { normalized・status・candidates・readiness }。status は matched・multiple・none・invalid。' },
+          '200': { description: '候補 { normalized・status・candidates・total・readiness }。status は matched・multiple・none・invalid。total は候補の全件数。' },
         },
       },
     },

@@ -28,10 +28,10 @@ beforeEach(() => {
   dbMocks.getPostalReadiness.mockResolvedValue({
     fullDataset: false, rowCount: 0, importedAt: null, source: null,
   });
-  dbMocks.searchPostalCodes.mockImplementation(async (_db: unknown, digits: string, fallback: Array<{ postalCode: string }>) => ({
-    candidates: fallback.filter((row) => row.postalCode === digits),
-    fromDb: false,
-  }));
+  dbMocks.searchPostalCodes.mockImplementation(async (_db: unknown, digits: string, fallback: Array<{ postalCode: string }>) => {
+    const candidates = fallback.filter((row) => row.postalCode === digits);
+    return { candidates, fromDb: false, total: candidates.length };
+  });
 });
 
 describe('F11 郵便番号検索', () => {
@@ -51,6 +51,18 @@ describe('F11 郵便番号検索', () => {
     const invalidBody = await invalid.json() as { data: { status: string; manualEntry: { preserved: boolean } } };
     expect(invalidBody.data.status).toBe('invalid');
     expect(invalidBody.data.manualEntry.preserved).toBe(true);
+  });
+
+  it('20件を超える候補を打ち切らず、totalに全件数を載せる', async () => {
+    const many = Array.from({ length: 25 }, (_, i) => ({
+      postalCode: '4520961', prefecture: '愛知県', city: '名古屋市千種区', town: `町${i}`,
+    }));
+    dbMocks.searchPostalCodes.mockResolvedValueOnce({ candidates: many, fromDb: true, total: many.length });
+    const res = await app().request('/api/postal-code/search?code=452-0961', {}, bindings);
+    const body = await res.json() as { data: { status: string; candidates: unknown[]; total: number } };
+    expect(body.data.status).toBe('multiple');
+    expect(body.data.candidates.length).toBe(25);
+    expect(body.data.total).toBe(25);
   });
 
   it('未反映の環境を利用可能と偽らない', async () => {

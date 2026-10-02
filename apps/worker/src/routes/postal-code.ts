@@ -43,7 +43,7 @@ postalCode.get('/api/postal-code/search', async (c) => {
       },
     });
   }
-  const { candidates, fromDb } = await searchPostalCodes(c.env.DB, normalized, SAMPLE);
+  const { candidates, fromDb, total } = await searchPostalCodes(c.env.DB, normalized, SAMPLE);
   return c.json({
     success: true,
     data: {
@@ -51,6 +51,7 @@ postalCode.get('/api/postal-code/search', async (c) => {
       normalized,
       status: candidates.length === 0 ? 'none' : candidates.length === 1 ? 'matched' : 'multiple',
       candidates,
+      total,
       fromDb,
       manualEntry: {
         preserved: true,

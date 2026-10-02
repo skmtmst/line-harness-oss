@@ -54,6 +54,19 @@ describe('F11 rating', () => {
     expect(normalizeRatingValue(0)).toBeNull();
     expect(normalizeRatingValue(Number.NaN)).toBeNull();
   });
+
+  it('ASCII空白だけ許し、全角空白・タブ・改行は平均から外れるため止める', () => {
+    expect(validateAnswer(block(), ' 3 ')).toBeNull();
+    expect(normalizeRatingValue(' 3 ')).toBe(3);
+    expect(validateAnswer(block(), '　3　')).toContain('1〜5');
+    expect(validateAnswer(block(), '\t3')).toContain('1〜5');
+    expect(validateAnswer(block(), '3\n')).toContain('1〜5');
+    expect(normalizeRatingValue('　3　')).toBeNull();
+    expect(normalizeRatingValue('\t3')).toBeNull();
+    // ASCII空白だけは未入力扱い。全角空白だけは未入力にせず止める。
+    expect(validateAnswer(block(), ' ')).toBeNull();
+    expect(validateAnswer(block(), '　　')).toContain('1〜5');
+  });
 });
 
 describe('F11 address', () => {
@@ -90,6 +103,20 @@ describe('F11 address', () => {
     expect(validateAnswer(addr(), {
       postalCode: '100-0001', prefecture: '東京', city: '千代田区', addressLine1: '1-1',
     })).toContain('都道府県');
+  });
+
+  it('空配列の指定は空扱いで型検査を迂回させない', () => {
+    expect(validateAnswer(addr(), { city: [] as unknown as string })).toContain('文字');
+    expect(validateAnswer(
+      block({ type: 'address', name: 'a', label: '住所', required: true }),
+      { city: [] as unknown as string },
+    )).not.toBeNull();
+    // 未指定・空文字・空白文字列は空のまま通す。
+    expect(validateAnswer(addr(), {})).toBeNull();
+    expect(validateAnswer(addr(), { city: '' })).toBeNull();
+    expect(validateAnswer(addr(), { city: '   ' })).toBeNull();
+    expect(validateAnswer(addr(), { city: undefined })).toBeNull();
+    expect(validateAnswer(addr(), { city: null as unknown as string })).toBeNull();
   });
 
   it('空は必須だけ止め、手入力の残りは通す', () => {

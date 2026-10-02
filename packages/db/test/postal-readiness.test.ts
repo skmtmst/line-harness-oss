@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { getPostalReadiness } from '../src/postal-codes.js';
+import { getPostalReadiness, searchPostalCodes } from '../src/postal-codes.js';
 
 function asD1(sqlite: Database.Database): D1Database {
   return {
@@ -70,5 +70,49 @@ describe('郵便番号readinessは完了記録と突き合わせる', () => {
     sqlite.prepare(`INSERT INTO postal_codes VALUES ('1000001','東京都','千代田区','千代田',NULL,NULL)`).run();
     const readiness = await getPostalReadiness(db);
     expect(readiness).toMatchObject({ fullDataset: false, complete: true, limited: true });
+  });
+});
+
+describe('郵便番号検索は同じ番号の候補を欠落させない', () => {
+  let sqlite: Database.Database;
+  let db: D1Database;
+
+  beforeEach(() => {
+    sqlite = new Database(':memory:');
+    sqlite.exec(`
+      CREATE TABLE postal_codes (
+        postal_code TEXT NOT NULL, prefecture TEXT NOT NULL, city TEXT NOT NULL,
+        town TEXT NOT NULL DEFAULT '', source_name TEXT, imported_at TEXT,
+        PRIMARY KEY (postal_code, prefecture, city, town));
+      CREATE TABLE postal_import_manifest (
+        id TEXT PRIMARY KEY, source_url TEXT NOT NULL, input_sha256 TEXT NOT NULL,
+        input_bytes INTEGER NOT NULL, row_count INTEGER NOT NULL, imported_at TEXT NOT NULL);
+    `);
+    db = asD1(sqlite);
+    // 4520961は66行（公式全量）。20件打ち切りがあると46行欠落する。
+    const values = Array.from(
+      { length: 66 },
+      (_, i) => `('4520961','愛知県','名古屋市千種区','町${i}',NULL,NULL)`,
+    ).join(',');
+    sqlite.prepare(`INSERT INTO postal_codes VALUES ${values}`).run();
+  });
+
+  test('66行を全部返し、totalに全件数を載せる', async () => {
+    const found = await searchPostalCodes(db, '4520961', []);
+    expect(found.fromDb).toBe(true);
+    expect(found.candidates).toHaveLength(66);
+    expect(found.total).toBe(66);
+  });
+
+  test('表が無い環境は見本へ倒し、totalは見本の件数', async () => {
+    const empty = new Database(':memory:');
+    const fallback = [
+      { postalCode: '1000001', prefecture: '東京都', city: '千代田区', town: '千代田' },
+      { postalCode: '1000001', prefecture: '東京都', city: '千代田区', town: '皇居外苑' },
+    ];
+    const found = await searchPostalCodes(asD1(empty), '1000001', fallback);
+    expect(found.fromDb).toBe(false);
+    expect(found.candidates).toHaveLength(2);
+    expect(found.total).toBe(2);
   });
 });

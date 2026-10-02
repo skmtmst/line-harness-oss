@@ -838,7 +838,25 @@ export function isAddressValueEmpty(value: unknown): boolean {
   if (typeof value !== "object" || Array.isArray(value)) return false;
   const v = value as Partial<FormAddressValue>;
   const parts = [v.postalCode, v.prefecture, v.city, v.addressLine1, v.addressLine2];
-  return parts.every((part) => part === undefined || part === null || String(part).trim() === "");
+  // 指定済みの非文字列（数・配列・物）は空にしない。後の型検査へ回す。
+  return parts.every((part) => part === undefined || part === null || part === "" ||
+    (typeof part === "string" && part.trim() === ""));
+}
+
+/**
+ * ASCII空白（0x20）だけを落とす。SQLiteのTRIMと範囲を合わせる。
+ *
+ * JSのtrimは全角空白・タブ・改行も落とすが、平均集計のSQLite TRIMは
+ * ASCII空白だけを落とす。受入と平均を一致させるため、ratingの前後空白は
+ * ASCII空白だけを許す（「　3　」・タブ付きは受け入れない）。
+ */
+export function trimAsciiSpaces(value: string): string {
+  return value.replace(/^ +| +$/g, "");
+}
+
+/** ASCII空白だけからなる文字列か（ratingの未入力判定用）。 */
+export function isAsciiBlank(value: string): boolean {
+  return /^ *$/.test(value);
 }
 
 /**
@@ -846,13 +864,15 @@ export function isAddressValueEmpty(value: unknown): boolean {
  *
  * "3.0" や "3e0" は数としては3だが、保存・平均の数え方（文字列1〜5・
  * SQLite整数）と合わせるため認めない。真偽値は数に混ぜない。
+ * 前後の空白はASCII空白だけを許す。全角空白・タブ・改行付きは
+ * SQLiteのTRIMと範囲が合わず平均から外れるため受け入れない。
  */
 export function normalizeRatingValue(value: unknown): number | null {
   if (typeof value === "number") {
     return Number.isInteger(value) && value >= 1 && value <= 5 ? value : null;
   }
   if (typeof value === "string") {
-    const trimmed = value.trim();
+    const trimmed = trimAsciiSpaces(value);
     return /^(1|2|3|4|5)$/.test(trimmed) ? Number(trimmed) : null;
   }
   return null;
@@ -869,7 +889,7 @@ export function validateAnswer(
 ): string | null {
   if (block.type === "rating") {
     const empty = value === undefined || value === null
-      || (typeof value === "string" && value.trim() === "");
+      || (typeof value === "string" && isAsciiBlank(value));
     if (block.required && empty) return `${block.label} は必須項目です`;
     if (empty) return null;
     if (normalizeRatingValue(value) === null) {

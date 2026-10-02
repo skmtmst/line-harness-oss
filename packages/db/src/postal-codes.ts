@@ -96,18 +96,20 @@ export async function searchPostalCodes(
   db: D1Database,
   digits7: string,
   fallback: PostalCodeCandidate[],
-): Promise<{ candidates: PostalCodeCandidate[]; fromDb: boolean }> {
+): Promise<{ candidates: PostalCodeCandidate[]; fromDb: boolean; total: number }> {
   try {
+    // 同じ番号の候補は全部返す。件数での打ち切り（LIMIT）はしない。
+    // 打ち切ると総数なしに欠落し、「潰さない」契約と矛盾するため。
     const result = await db.prepare(
       `SELECT postal_code AS postalCode, prefecture, city, town
-         FROM postal_codes WHERE postal_code = ? ORDER BY prefecture, city, town LIMIT 20`,
+         FROM postal_codes WHERE postal_code = ? ORDER BY prefecture, city, town`,
     ).bind(digits7).all<PostalCodeCandidate>();
     const rows = result.results ?? [];
-    if (rows.length > 0) return { candidates: rows, fromDb: true };
+    if (rows.length > 0) return { candidates: rows, fromDb: true, total: rows.length };
   } catch {
     // 表が無い環境（migration未反映）は下のfixtureへ倒す。
   }
   const hyphen = formatPostalHyphen(digits7);
   const hits = fallback.filter((row) => row.postalCode === digits7 || row.postalCode === hyphen);
-  return { candidates: hits, fromDb: false };
+  return { candidates: hits, fromDb: false, total: hits.length };
 }
