@@ -28,6 +28,7 @@ import {
 } from '../services/token-refresh.js';
 import { fetchBotProfile } from '../lib/bot-profile.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
+import { restaurantTableCapacity, validateRestaurantOpeningHours } from '../services/restaurant-inventory.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import {
@@ -417,7 +418,7 @@ restaurantTest.get('/api/restaurant-test/terms-agreement', requireRole('owner', 
 
 /** Record one idempotent organization/version agreement without IP or other personal data. */
 restaurantTest.post('/api/restaurant-test/terms-agreement', requireRole('owner', 'admin'), async (c) => {
-  const body: { documentKey?: unknown; version?: unknown } = await c.req.json().catch(() => ({}));
+  const body: { documentKey?: unknown; version?: unknown } = (await c.req.json().catch(() => null)) || {};
   if (
     body.documentKey !== RESTAURANT_TERMS_DOCUMENT_KEY
     || body.version !== RESTAURANT_TERMS_DOCUMENT_VERSION
@@ -617,7 +618,9 @@ restaurantTest.get('/api/restaurant-test/snapshot', requireRole('owner', 'admin'
       reservations: reservations.results,
       reservationTotal: reservationTotal?.total ?? 0,
       tables: tables.results,
-      inventory: inventory.results,
+      inventory: inventory.results.map((slot) => ({ ...slot, total_capacity: tables.results
+        .filter((table) => table.store_id === slot.store_id && table.is_active === 1)
+        .reduce((total, table) => total + Number(table.max_capacity), 0) })),
       menuItems: menuItems.results,
       connectors: connectors.results,
       reviews: reviews.results,
@@ -638,7 +641,7 @@ restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 
     alias?: unknown;
     channelId?: unknown;
     channelSecret?: unknown;
-  } = await c.req.json().catch(() => ({}));
+  } = (await c.req.json().catch(() => null)) || {};
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const alias = typeof body.alias === 'string' ? body.alias.trim() : '';
   const channelId = typeof body.channelId === 'string' ? body.channelId.trim() : '';
@@ -737,7 +740,7 @@ restaurantTest.post('/api/restaurant-test/stores', requireRole('owner', 'admin')
     capacity?: unknown;
     timezone?: unknown;
     lineAccountId?: unknown;
-  } = await c.req.json().catch(() => ({}));
+  } = (await c.req.json().catch(() => null)) || {};
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const code = typeof body.code === 'string' ? body.code.trim() : '';
   const area = typeof body.area === 'string' ? body.area.trim() || null : null;
@@ -790,7 +793,7 @@ restaurantTest.patch('/api/restaurant-test/stores/:id', requireRole('owner', 'ad
   const current = await dbFor(c.env, storeId).prepare(
     'SELECT line_account_id FROM rt_stores WHERE id = ? LIMIT 1',
   ).bind(storeId).first<{ line_account_id: string | null }>();
-  const body: Record<string, unknown> = await c.req.json().catch(() => ({}));
+  const body: Record<string, unknown> = (await c.req.json().catch(() => null)) || {};
   const fields: string[] = [];
   const values: unknown[] = [];
   const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
@@ -1086,7 +1089,7 @@ restaurantTest.patch('/api/restaurant-test/reservations/:id', requireRole('owner
       course_id: string | null; status: string; allergy_note: string | null; note: string | null;
     }>();
   if (!current) return c.json({ success: false, error: '予約が見つかりません' }, 404);
-  const body: Record<string, unknown> = await c.req.json().catch(() => ({}));
+  const body: Record<string, unknown> = (await c.req.json().catch(() => null)) || {};
   const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
 
   const next = {
@@ -1416,21 +1419,62 @@ restaurantTest.put('/api/restaurant-test/inventory/:id', requireRole('owner', 'a
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
-  const body = await c.req.json<{ totalCapacity?: number; otaCapacity?: number; lineCapacity?: number; walkInCapacity?: number }>();
-  const values = [body.totalCapacity, body.otaCapacity, body.lineCapacity, body.walkInCapacity].map(Number);
-  if (values.some((value) => !Number.isInteger(value) || value < 0) || values.slice(1).reduce((a, b) => a + b, 0) > values[0]) {
-    return c.json({ success: false, error: '媒体別枠の合計は総受入枠以下にしてください' }, 400);
+  const db = dbFor(c.env);
+  const slot = await db.prepare(`SELECT i.store_id, i.version FROM rt_inventory_slots i JOIN rt_stores s ON s.id = i.store_id
+    WHERE i.id = ? AND s.organization_id = ? AND (? IS NULL OR s.id = ?)`)
+    .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
+    .first<{ store_id: string; version: number }>();
+  if (!slot) return c.json({ success: false, error: '対象がありません' }, 404);
+  const body: { totalCapacity?: number; otaCapacity?: number; lineCapacity?: number; walkInCapacity?: number; expectedVersion?: number } = (await c.req.json().catch(() => null)) || {};
+  if (!Number.isSafeInteger(body.expectedVersion) || (body.expectedVersion ?? 0) < 1) return c.json({ success: false, error: 'expectedVersion に読み込んだ版を指定してください' }, 400);
+  if (body.expectedVersion !== slot.version) return c.json({ success: false, error: 'ほかの担当者が先に保存しました。読み直してください', currentVersion: slot.version }, 409);
+  const values = [body.otaCapacity, body.lineCapacity, body.walkInCapacity];
+  const totalCapacity = await restaurantTableCapacity(db, slot.store_id);
+  if (values.some((value) => typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
+    || values.reduce<number>((sum, value) => sum + Number(value), 0) > totalCapacity) {
+    return c.json({ success: false, error: '媒体別枠の合計は稼働中の卓の総席数以下にしてください', totalCapacity }, 400);
   }
-  const result = await dbFor(c.env).prepare(`UPDATE rt_inventory_slots SET
-    total_capacity = ?, ota_capacity = ?, line_capacity = ?, walk_in_capacity = ?, updated_at = datetime('now')
-    WHERE id = ? AND store_id IN (
-      SELECT id FROM rt_stores WHERE organization_id = ? AND (? IS NULL OR id = ?)
-    )`).bind(
-      ...values, c.req.param('id'), organization.id,
-      organization.scopedStoreId, organization.scopedStoreId,
-    ).run();
-  if (!result.meta.changes) return c.json({ success: false, error: '対象がありません' }, 404);
-  return c.json({ success: true, data: { id: c.req.param('id') } });
+  const result = await db.prepare(`UPDATE rt_inventory_slots SET
+    total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = rt_inventory_slots.store_id AND is_active = 1), 0),
+    ota_capacity = ?, line_capacity = ?, walk_in_capacity = ?, version = version + 1, updated_by = ?, updated_at = datetime('now')
+    WHERE id = ? AND version = ?
+      AND ? <= COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = rt_inventory_slots.store_id AND is_active = 1), 0)`)
+    .bind(...values, c.get('staff')?.id || '管理者', c.req.param('id'), body.expectedVersion,
+      values.reduce<number>((sum, value) => sum + Number(value), 0)).run();
+  if (!result.meta.changes) return c.json({ success: false, error: '卓または予約枠が変更されました。読み直してください' }, 409);
+  return c.json({ success: true, data: { id: c.req.param('id'), totalCapacity, version: body.expectedVersion! + 1 } });
+});
+
+restaurantTest.get('/api/restaurant-test/opening-hours', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const storeId = c.req.query('storeId') || organization.scopedStoreId;
+  if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  const row = await dbFor(c.env, storeId).prepare('SELECT hours_json, version, updated_by, updated_at FROM rt_opening_hours_settings WHERE store_id = ?')
+    .bind(storeId).first<{ hours_json: string; version: number; updated_by: string; updated_at: string }>();
+  return c.json({ success: true, data: { storeId, hours: row ? JSON.parse(row.hours_json) : null, version: row?.version ?? 0, updatedBy: row?.updated_by ?? null, updatedAt: row?.updated_at ?? null } });
+});
+
+restaurantTest.put('/api/restaurant-test/opening-hours', requireRole('owner', 'admin'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const body: { storeId?: string; hours?: unknown; expectedVersion?: number } = (await c.req.json().catch(() => null)) || {};
+  const storeId = typeof body.storeId === 'string' ? body.storeId : body.storeId === undefined ? organization.scopedStoreId : null;
+  if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  const hours = validateRestaurantOpeningHours(body.hours);
+  if (!hours || !Number.isSafeInteger(body.expectedVersion) || (body.expectedVersion ?? -1) < 0) {
+    return c.json({ success: false, error: '曜日0〜6の営業時間とexpectedVersionを指定してください。重なる営業時間は保存できません' }, 400);
+  }
+  const db = dbFor(c.env, storeId);
+  const result = body.expectedVersion === 0
+    ? await db.prepare(`INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by) VALUES (?, ?, ?) ON CONFLICT(store_id) DO NOTHING`)
+      .bind(storeId, JSON.stringify(hours), c.get('staff')?.id || '管理者').run()
+    : await db.prepare(`UPDATE rt_opening_hours_settings SET hours_json = ?, version = version + 1, updated_by = ?, updated_at = datetime('now')
+      WHERE store_id = ? AND version = ?`).bind(JSON.stringify(hours), c.get('staff')?.id || '管理者', storeId, body.expectedVersion).run();
+  if (!result.meta.changes) return c.json({ success: false, error: 'ほかの担当者が先に保存しました。読み直してください' }, 409);
+  return c.json({ success: true, data: { storeId, hours, version: body.expectedVersion! + 1 } });
 });
 
 restaurantTest.post('/api/restaurant-test/menu', requireRole('owner', 'admin'), async (c) => {

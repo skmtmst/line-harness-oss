@@ -6007,7 +6007,7 @@ CREATE TABLE rt_inventory_slots (
   line_capacity INTEGER NOT NULL DEFAULT 0 CHECK (line_capacity >= 0),
   walk_in_capacity INTEGER NOT NULL DEFAULT 0 CHECK (walk_in_capacity >= 0),
   reserved_count INTEGER NOT NULL DEFAULT 0 CHECK (reserved_count >= 0),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), updated_by TEXT,
   UNIQUE(store_id, starts_at)
 );
 
@@ -6060,6 +6060,14 @@ CREATE TABLE rt_menu_items (
   duration_minutes INTEGER,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active', 'archived')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE rt_opening_hours_settings (
+  store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,
+  hours_json TEXT NOT NULL CHECK (json_valid(hours_json)),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+  updated_by TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -9417,6 +9425,14 @@ WHEN NEW.id != OLD.id
   OR NEW.tenant_id != OLD.tenant_id
   OR NEW.version != OLD.version
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_VERSION_BINDING_IMMUTABLE'); END;
+
+CREATE TRIGGER rt_inventory_slot_insert AFTER INSERT ON rt_inventory_slots BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = NEW.store_id AND is_active = 1), 0) WHERE id = NEW.id; END;
+
+CREATE TRIGGER rt_inventory_table_delete AFTER DELETE ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = OLD.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id = OLD.store_id; END;
+
+CREATE TRIGGER rt_inventory_table_insert AFTER INSERT ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = NEW.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id = NEW.store_id; END;
+
+CREATE TRIGGER rt_inventory_table_update AFTER UPDATE OF max_capacity, is_active, store_id ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = rt_inventory_slots.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id IN (OLD.store_id, NEW.store_id); END;
 
 CREATE TRIGGER trg_action_score_published_version_immutable
 BEFORE UPDATE ON action_score_rule_versions

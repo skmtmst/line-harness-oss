@@ -1070,3 +1070,63 @@ describe('飲食店向けテストAPI', () => {
     expect(row.guest_count).toBe(4);
   });
 });
+
+
+describe('V8-B 卓から出す予約枠と週の営業時間', () => {
+  const slotPath = '/api/restaurant-test/inventory/inventory-test?account_id=account-1';
+  function seedCapacity() {
+    seedRestaurantFixture();
+    testDb.raw.prepare("UPDATE rt_tables SET is_active = 0 WHERE id = 'table-ginza'").run();
+    for (const [i, capacity] of [2, 2, 4, 4, 1, 1, 8, 4].entries()) {
+      testDb.raw.prepare('INSERT INTO rt_tables (id, store_id, code, label, seat_type, min_capacity, max_capacity) VALUES (?, ?, ?, ?, ?, 1, ?)')
+        .run(`v8-${i}`, 'store-ginza', `V8-${i}`, `卓${i}`, 'table', capacity);
+    }
+    testDb.raw.prepare("INSERT INTO rt_inventory_slots (id, store_id, starts_at, total_capacity) VALUES ('inventory-test', 'store-ginza', '2026-10-20T09:00:00Z', 999)").run();
+  }
+  const capacities = (expectedVersion = 1) => ({ otaCapacity: 10, lineCapacity: 10, walkInCapacity: 6, expectedVersion });
+  const hours = () => Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: weekday === 0 ? [] : [{ opensAt: '17:00', closesAt: '23:00' }] }));
+  it('停止中の卓を除いた合計26席を返し、任意の総数で増やせない', async () => {
+    seedCapacity();
+    const snapshot = await request('/api/restaurant-test/snapshot?account_id=account-1');
+    expect((await snapshot.json() as any).data.inventory.find((row: any) => row.id === 'inventory-test')).toMatchObject({ total_capacity: 26, version: 1 });
+    const saved = await requestWithMethod(slotPath, 'PUT', { ...capacities(), totalCapacity: 999 });
+    expect(saved.status).toBe(200);
+    expect((await saved.json() as any).data).toMatchObject({ totalCapacity: 26, version: 2 });
+    expect(testDb.raw.prepare("SELECT total_capacity, updated_by FROM rt_inventory_slots WHERE id = 'inventory-test'").get()).toMatchObject({ total_capacity: 26 });
+  });
+  it('26席を超える配分と版なしを400、同じ版の再保存を409にする', async () => {
+    seedCapacity();
+    expect((await requestWithMethod(slotPath, 'PUT', { ...capacities(), walkInCapacity: 7 })).status).toBe(400);
+    expect((await requestWithMethod(slotPath, 'PUT', { otaCapacity: 1, lineCapacity: 1, walkInCapacity: 1 })).status).toBe(400);
+    expect((await requestWithMethod(slotPath, 'PUT', capacities())).status).toBe(200);
+    expect((await requestWithMethod(slotPath, 'PUT', capacities())).status).toBe(409);
+  });
+  it('卓を止めると総席数と版が変わり、古い配分の保存を拒否する', async () => {
+    seedCapacity();
+    await requestWithMethod('/api/restaurant-test/tables/v8-6?account_id=account-1', 'PATCH', { isActive: false });
+    expect(testDb.raw.prepare("SELECT total_capacity, version FROM rt_inventory_slots WHERE id = 'inventory-test'").get()).toEqual({ total_capacity: 18, version: 2 });
+    expect((await requestWithMethod(slotPath, 'PUT', capacities())).status).toBe(409);
+    expect((await requestWithMethod(slotPath, 'PUT', capacities(2))).status).toBe(400);
+  });
+  it('7曜日まとめて保存し、同じ版の保存を409にする', async () => {
+    seedCapacity();
+    const path = '/api/restaurant-test/opening-hours?account_id=account-1&storeId=store-ginza';
+    expect((await (await request(path)).json() as any).data).toMatchObject({ hours: null, version: 0 });
+    const body = { storeId: 'store-ginza', hours: hours(), expectedVersion: 0 };
+    expect((await requestWithMethod(path, 'PUT', body)).status).toBe(200);
+    expect((await requestWithMethod(path, 'PUT', body)).status).toBe(409);
+    const get = await request(path);
+    expect((await get.json() as any).data).toMatchObject({ hours: hours(), version: 1 });
+    expect((await requestWithMethod(path, 'PUT', { ...body, expectedVersion: 1 })).status).toBe(200);
+    expect((await requestWithMethod(path, 'PUT', { ...body, expectedVersion: 1 })).status).toBe(409);
+    expect((await requestWithMethod(path, 'PUT', { ...body, hours: hours().slice(0, 6), expectedVersion: 2 })).status).toBe(400);
+  });
+  it('選択中の店舗以外の予約枠と営業時間は変えられない', async () => {
+    seedCapacity();
+    expect((await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-2', 'PUT', { storeId: 'store-yokohama', hours: hours(), expectedVersion: 0 })).status).toBe(400);
+    const token = await createAdminSession();
+    await requestAs('/api/restaurant-test/stores/store-yokohama/select?account_id=account-1', token, {});
+    expect((await requestWithMethod(slotPath, 'PUT', capacities(), token)).status).toBe(404);
+    expect((await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-1', 'PUT', { storeId: 'store-ginza', hours: hours(), expectedVersion: 0 }, token)).status).toBe(400);
+  });
+});
