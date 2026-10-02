@@ -102,6 +102,8 @@ function FriendsPageInner({
   const scoredOnly = searchParams.get('scoredOnly') === '1'
   const audienceId = searchParams.get('audienceId')?.trim() || ''
   const directSavedSearchId = searchParams.get('savedSearch')
+  /* タグ一覧の人数リンクからの受け口（/friends?tag=…）。 */
+  const directTagId = (searchParams.get('tag') ?? '').trim()
   /*
    * ★V8：上の帯の探す欄からの受け口（`/friends?q=…`）。URL に語が
    * あれば最初からその言葉で絞る。保存してある一覧の状態では
@@ -119,7 +121,7 @@ function FriendsPageInner({
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(20)
-  const [selectedTagId, setSelectedTagId] = useState('')
+  const [selectedTagId, setSelectedTagId] = useState(directTagId)
   const [searchInput, setSearchInput] = useState(directQuery)
   const [searchSubmitted, setSearchSubmitted] = useState(directQuery)
   const [sortMode, setSortMode] = useState<SortMode>('recent')
@@ -152,12 +154,12 @@ function FriendsPageInner({
    * IDEA-03「3ページ以上の移動と戻る操作で条件・位置を保持」。
    * 一覧 → 詳細 → 戻る で React 状態は消えるので、絞り込みとページを
    * sessionStorage へ写し、戻ってきた mount で復元する。
-   * URL 直指定の絞り込み（?scoreMin= ?audienceId= ?savedSearch=）が
+   * URL 直指定の絞り込み（?scoreMin= ?audienceId= ?savedSearch= ?tag=）が
    * あるときはそちらを優先し、保存値で上書きしない。
    */
   const restoredRef = useRef(false)
   const [restored, setRestored] = useState(false)
-  const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directQuery !== ''
+  const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directTagId !== '' || directQuery !== ''
   useEffect(() => {
     if (restoredRef.current || accountLoading) return
     restoredRef.current = true
