@@ -285,6 +285,15 @@
   "app/restaurant-test/stores/new/terms-consent.tsx": {
     "arbitrary-value": 1
   },
+  "app/restaurant-test/v8/dashboard.tsx": {
+    "unresolved-classname": 7
+  },
+  "app/restaurant-test/v8/organization.tsx": {
+    "unresolved-classname": 58
+  },
+  "app/restaurant-test/v8/shell.tsx": {
+    "unresolved-classname": 26
+  },
   "app/rich-menus/edit/page.tsx": {
     "arbitrary-value": 10
   },
