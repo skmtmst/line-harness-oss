@@ -3,7 +3,13 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
+// 描画は page.tsx、動き（読み込み・保存・競合）は use-feature-settings.ts にある。
+// 両方を合わせて1つの画面として見る。
+const dir = dirname(fileURLToPath(import.meta.url))
+const source = [
+  readFileSync(join(dir, 'page.tsx'), 'utf8'),
+  readFileSync(join(dir, 'use-feature-settings.ts'), 'utf8'),
+].join('\n')
 
 describe('機能設定の添付デザイン', () => {
   it('見出し操作と必須・通常スイッチの表示を保つ', () => {
