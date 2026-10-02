@@ -49,15 +49,13 @@ import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
-import { inEvaluationOrder, movePriorityUpdates } from './auto-reply-order'
+import { movePriorityUpdates } from './auto-reply-order'
 import {
   LOAD_STATE_WORDS,
   NO_WRITE_PERMISSION,
   actionWord,
   autoReplyMatchesQuery,
   conditionChips,
-  matchTypeWord,
-  metricWord,
   responseTypeWord,
   stopNote,
   templateWord,
@@ -346,7 +344,6 @@ export default function AutoRepliesListV8() {
         // 評価順は「実際に見る順」。一覧の並びと動く順を合わせる。
         return a.priority - b.priority || a.createdAt.localeCompare(b.createdAt)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [inChips, sortKey])
 
   const filterActive = Boolean(
@@ -371,7 +368,6 @@ export default function AutoRepliesListV8() {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
 
-  const evaluationOrdered = useMemo(() => inEvaluationOrder(items), [items])
   const nextPriority = items.length === 0
     ? 0
     : Math.min(9999, Math.max(...items.map((item) => item.priority)) + 1)
