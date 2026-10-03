@@ -21,6 +21,7 @@ import RetentionSection from './retention-section'
 import SessionCapacityCell from './session-capacity-cell'
 import VideoStages from './video-stages'
 import WebinarEditConflictBand from './webinar-edit-conflict-band'
+import WebinarEditCompareDialog, { type CompareMine } from './webinar-edit-compare-dialog'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -2126,8 +2127,12 @@ function EditWebinarInner() {
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
   /** 同時編集の帯（`pvimJ`）。409 で止まったら最新を読み込めるようにする。 */
-  const [conflict, setConflict] = useState<{ latest: WebinarEditor | null } | null>(null)
+  const [conflict, setConflict] = useState<{ latest: WebinarEditor | null; compare: { mine: CompareMine; theirsFormName: string } | null } | null>(null)
   const [conflictReloading, setConflictReloading] = useState(false)
+  /** 見比べの窓。自分のまま保存するときの処理中にも使う。 */
+  const [compareOpen, setCompareOpen] = useState(false)
+  const [compareWorking, setCompareWorking] = useState(false)
+  const [compareError, setCompareError] = useState('')
 
   const reloadLatest = useCallback(async () => {
     const latest = conflict?.latest
@@ -2140,6 +2145,11 @@ function EditWebinarInner() {
       setConflictReloading(false)
     }
   }, [conflict])
+
+  const useTheirs = useCallback(() => {
+    setCompareOpen(false)
+    void reloadLatest()
+  }, [reloadLatest])
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [analyticsState, setAnalyticsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [analyticsId, setAnalyticsId] = useState<string | null>(null)
@@ -2155,6 +2165,32 @@ function EditWebinarInner() {
   const setEditor = useCallback((next: WebinarEditor) => {
     setLoadedWebinar((prev) => (prev && prev.id === id ? { ...prev, editor: next } : prev))
   }, [id])
+  /*
+   * 見比べで「自分のまま保存する」。相手の最新の版を見たうえで送り直すので
+   * 相手の変更は上書きされる。カードは版が無いのでそのまま全置換する。
+   */
+  const keepMine = useCallback(async () => {
+    const snapshot = conflict?.compare
+    const latest = conflict?.latest
+    if (!snapshot || !latest || !webinar) return
+    setCompareWorking(true)
+    setCompareError('')
+    try {
+      const response = await webinarApi.saveEditor(webinar.id, {
+        expectedVersion: latest.version,
+        registrationFormId: snapshot.mine.formId,
+      })
+      await webinarApi.saveCtas(webinar.id, snapshot.mine.cards)
+      setEditor(response.data)
+      setConflict(null)
+      setCompareOpen(false)
+      setReloadKey((key) => key + 1)
+    } catch {
+      setCompareError('自分のまま保存できませんでした。開き直して試してください。')
+    } finally {
+      setCompareWorking(false)
+    }
+  }, [conflict, webinar, setEditor])
   /*
     **編集画面なので、開いた直後は設定の1段目**。前は「概要・分析」を先頭に
     置いていたので、直しに来た人が結果の画面から始めることになっていた。
@@ -2527,7 +2563,21 @@ function EditWebinarInner() {
           message="ほかの人が先に保存しました。このまま保存すると、その変更が消えます。"
           reloading={conflictReloading}
           onReload={() => void reloadLatest()}
+          onCompare={conflict.latest && conflict.compare ? () => setCompareOpen(true) : undefined}
           onClose={() => setConflict(null)}
+        />
+      ) : null}
+      {conflict?.compare ? (
+        <WebinarEditCompareDialog
+          open={compareOpen}
+          webinarId={webinar.id}
+          mine={conflict.compare.mine}
+          theirsFormName={conflict.compare.theirsFormName}
+          onKeepMine={() => void keepMine()}
+          onUseTheirs={useTheirs}
+          onClose={() => setCompareOpen(false)}
+          working={compareWorking}
+          error={compareError || undefined}
         />
       ) : null}
 
@@ -2638,7 +2688,7 @@ function EditWebinarInner() {
             data-theme="v8" が付くまで 1画素も変えない。
           */}
           {adminTheme === 'v8' ? (
-            <CtaV8 webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} onEditorChange={setEditor} onCtasReport={handleCtasReport} onEditConflict={(latest) => setConflict({ latest })} />
+            <CtaV8 webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} onEditorChange={setEditor} onCtasReport={handleCtasReport} onEditConflict={(latest, compare) => setConflict({ latest, compare })} />
           ) : (
             <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} registrations={registrations} onEditorChange={setEditor} onCtasReport={handleCtasReport} />
           )}

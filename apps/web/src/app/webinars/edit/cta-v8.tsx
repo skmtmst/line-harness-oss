@@ -16,6 +16,7 @@ import Notice from '@/components/shared/notice'
 import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor } from '@/lib/api'
 import { ctaCardProblems } from './cta-card-validation'
 import { extractEditConflict } from './webinar-edit-conflict-band'
+import type { CompareMine } from './webinar-edit-compare-dialog'
 
 /* 申込フォームの候補（編集画面の CtaDesignStep と同じ形）。 */
 type FormCandidates = {
@@ -64,8 +65,8 @@ export default function CtaV8({
   editor: WebinarEditor
   onEditorChange: (editor: WebinarEditor) => void
   onCtasReport?: (ctas: WebinarCtaCard[] | null) => void
-  /** 同時編集で 409 になったとき、帯を出すために最新を親へ渡す。 */
-  onEditConflict?: (latest: WebinarEditor | null) => void
+  /** 同時編集で 409 になったとき、帯を出すために最新と見比べ材料を親へ渡す。 */
+  onEditConflict?: (latest: WebinarEditor | null, compare: { mine: CompareMine; theirsFormName: string } | null) => void
 }) {
   const [ctas, setCtas] = useState<WebinarCtaCard[] | null>(null)
   const [times, setTimes] = useState<string[]>([])
@@ -190,7 +191,21 @@ export default function CtaV8({
     } catch (cause) {
       const conflict = extractEditConflict(cause)
       if (conflict) {
-        onEditConflict?.(conflict.latest)
+        /* 見比べ用に自分の下書き（選んだフォーム名・編集中のカード）と相手のフォーム名も渡す。 */
+        const parsed = times.map((t) => parseMinSec(t))
+        const mineCards = (ctas ?? []).map((c, i) => ({ ...c, atSeconds: parsed[i] ?? c.atSeconds }))
+        const formNameOf = (id: string | null) => {
+          if (!id) return '未選択'
+          return formCandidates.items.find((form) => form.id === id)?.name ?? id
+        }
+        onEditConflict?.(conflict.latest, {
+          mine: {
+            formId: selectedRegistrationFormId || null,
+            formName: formNameOf(selectedRegistrationFormId || null),
+            cards: mineCards,
+          },
+          theirsFormName: formNameOf(conflict.latest?.registrationFormId ?? null),
+        })
         return
       }
       setRegistrationError(

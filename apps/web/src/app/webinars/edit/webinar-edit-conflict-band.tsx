@@ -30,11 +30,13 @@ export default function WebinarEditConflictBand({
   message,
   reloading,
   onReload,
+  onCompare,
   onClose,
 }: {
   message: string
   reloading: boolean
   onReload: () => void
+  onCompare?: () => void
   onClose: () => void
 }) {
   return (
@@ -43,9 +45,16 @@ export default function WebinarEditConflictBand({
         tone="warn"
         onClose={onClose}
         action={(
-          <Button type="button" onClick={onReload} disabled={reloading}>
-            {reloading ? '読み込んでいます…' : '最新を読み込む'}
-          </Button>
+          <>
+            {onCompare ? (
+              <Button type="button" onClick={onCompare} disabled={reloading}>
+                比べてから保存
+              </Button>
+            ) : null}
+            <Button type="button" onClick={onReload} disabled={reloading}>
+              {reloading ? '読み込んでいます…' : '最新を読み込む'}
+            </Button>
+          </>
         )}
       >
         {message}
