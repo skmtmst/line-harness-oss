@@ -1444,11 +1444,12 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(((await sent2[1].json()) as { to: string }).to).toBe('U-other-1');
   });
 
-  test('相談と予約が両方新版へ進むと旧候補は送らず、新版の行を残す', async () => {
+  test('実再登録で両新版へ進むと旧sent確定は新版子を壊さない', async () => {
     const { registerMeetConsultation, processDueMeetConsultationReminders } = await import(
       '../services/meet-consultation-reminders.js'
     );
     const MEET = 'https://meet.google.com/aaa-bbbb-ccc';
+    const T4 = '2026-11-02T18:00:00.000Z';
     mockSlots([D12]);
     const r3 = await adminCreate('menu-ok', T2, 'due-push-both');
     sqlite.prepare('UPDATE bookings SET external_event_id = ? WHERE id = ?')
@@ -1461,14 +1462,24 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       `UPDATE meet_consultation_reminders SET scheduled_at = ?
         WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
     ).run('2026-10-20T10:00:00.000Z', 'evt-push-both');
+    const before = sqlite.prepare(
+      `SELECT id, kind FROM meet_consultation_reminders
+        WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
+    ).all('evt-push-both') as Array<{ id: string; kind: string }>;
+    expect(before).toHaveLength(2);
     const sent: Request[] = [];
-    // 最初の push の最中に相談と予約が両方新版へ進む (日時は同じ)。
-    // 現在同士は一致するため、候補写しとの照合だけが旧行を止める。
+    // 最初の push の最中に実再登録で同eventが新版＋新日時へ進む。
+    // 再登録は子の行IDを新版へ再利用するため、旧sent確定が新版子に
+    // 当たらないことが候補写し結合の証明になる。
     const dispatch = vi.fn(async (request: Request) => {
       sent.push(request);
-      sqlite.prepare('UPDATE meet_consultations SET booking_version = 1 WHERE external_event_id = ?')
-        .run('evt-push-both');
-      sqlite.prepare('UPDATE bookings SET lock_version = 1 WHERE id = ?').run(r3);
+      sqlite.prepare('UPDATE bookings SET lock_version = 1, starts_at = ? WHERE id = ?')
+        .run(T3, r3);
+      const renewed = await registerMeetConsultation(db, {
+        externalEventId: 'evt-push-both', friendId: 'friend-self', title: '個別相談',
+        startsAt: T3, endsAt: T4, meetUrl: MEET, bookingId: r3, bookingVersion: 1,
+      });
+      expect(renewed.updated).toBe(true);
       return new Response('{}', { status: 200 });
     });
     const run = await processDueMeetConsultationReminders(db, {
@@ -1476,27 +1487,83 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       proxyBaseUrl: 'https://proxy.example.com',
       proxyDispatch: dispatch,
     });
-    // 更新後の旧候補は送らない。更新前に送った1通だけが残る。
+    // 更新前に送った1通だけが残り、更新後の旧候補は送らない。
     expect(run.sent).toBe(1);
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(((await sent[0].json()) as { to: string }).to).toBe('U-self-1');
-    const rows = sqlite.prepare(
-      `SELECT status FROM meet_consultation_reminders
+    // 旧sent確定は新版へ再利用ずみの行に当たらず、子ID・新日時・pendingが不変。
+    const after = sqlite.prepare(
+      `SELECT id, kind, status, scheduled_at FROM meet_consultation_reminders
         WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
         ORDER BY kind`,
-    ).all('evt-push-both') as Array<{ status: string }>;
-    expect(rows.map((r) => r.status).sort()).toEqual(['cancelled', 'sent']);
-    // 勝者の新版 (相談版1・予約版1・同日時) は残り、予約本体も生きている。
+    ).all('evt-push-both') as Array<{ id: string; kind: string; status: string; scheduled_at: string }>;
+    expect(after.map((r) => r.id).sort()).toEqual(before.map((r) => r.id).sort());
+    expect(after).toEqual([
+      { id: after[0].id, kind: 'day_before', status: 'pending', scheduled_at: '2026-11-01T17:00:00.000Z' },
+      { id: after[1].id, kind: 'hour_before', status: 'pending', scheduled_at: '2026-11-02T16:00:00.000Z' },
+    ]);
     const consult = sqlite.prepare(
       'SELECT booking_version, starts_at, status FROM meet_consultations WHERE external_event_id = ?',
     ).get('evt-push-both') as { booking_version: number; starts_at: string; status: string };
-    expect(consult).toEqual({ booking_version: 1, starts_at: T2, status: 'confirmed' });
-    const booking = sqlite.prepare(
-      'SELECT lock_version, starts_at, status FROM bookings WHERE id = ?',
-    ).get(r3) as { lock_version: number; starts_at: string; status: string };
-    expect(booking.lock_version).toBe(1);
-    expect(booking.starts_at).toBe(T2);
-    expect(['requested', 'confirmed']).toContain(booking.status);
+    expect(consult).toEqual({ booking_version: 1, starts_at: T3, status: 'confirmed' });
+  });
+
+  test('実再登録で両新版へ進むと旧failed確定も新版子を壊さない', async () => {
+    const { registerMeetConsultation, processDueMeetConsultationReminders } = await import(
+      '../services/meet-consultation-reminders.js'
+    );
+    const MEET = 'https://meet.google.com/aaa-bbbb-ccc';
+    const T4 = '2026-11-02T18:00:00.000Z';
+    mockSlots([D12]);
+    const r4 = await adminCreate('menu-ok', T2, 'due-push-both-fail');
+    sqlite.prepare('UPDATE bookings SET external_event_id = ? WHERE id = ?')
+      .run('evt-push-both-fail', r4);
+    await registerMeetConsultation(db, {
+      externalEventId: 'evt-push-both-fail', friendId: 'friend-self', title: '個別相談',
+      startsAt: T2, endsAt: T3, meetUrl: MEET, bookingId: r4, bookingVersion: 0,
+    });
+    sqlite.prepare(
+      `UPDATE meet_consultation_reminders SET scheduled_at = ?
+        WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
+    ).run('2026-10-20T10:00:00.000Z', 'evt-push-both-fail');
+    const before = sqlite.prepare(
+      `SELECT id FROM meet_consultation_reminders
+        WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
+    ).all('evt-push-both-fail') as Array<{ id: string }>;
+    // push が落ちる前に実再登録で新版へ進める。旧catchのfailed確定は
+    // 新版へ再利用ずみの行に当たらず、勝者の pending を残す。
+    const dispatch = vi.fn(async () => {
+      sqlite.prepare('UPDATE bookings SET lock_version = 1, starts_at = ? WHERE id = ?')
+        .run(T3, r4);
+      const renewed = await registerMeetConsultation(db, {
+        externalEventId: 'evt-push-both-fail', friendId: 'friend-self', title: '個別相談',
+        startsAt: T3, endsAt: T4, meetUrl: MEET, bookingId: r4, bookingVersion: 1,
+      });
+      expect(renewed.updated).toBe(true);
+      throw new Error('proxy down');
+    });
+    const run = await processDueMeetConsultationReminders(db, {
+      now: new Date('2026-10-20T12:00:00.000Z'),
+      proxyBaseUrl: 'https://proxy.example.com',
+      proxyDispatch: dispatch,
+    });
+    expect(run.sent).toBe(0);
+    expect(run.failed).toBe(1);
+    const after = sqlite.prepare(
+      `SELECT id, kind, status, scheduled_at, retry_count FROM meet_consultation_reminders
+        WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
+        ORDER BY kind`,
+    ).all('evt-push-both-fail') as Array<{ id: string; kind: string; status: string; scheduled_at: string; retry_count: number }>;
+    // 旧dueの2行のうち、落ちた行は新版pendingのまま (failedにしない)。
+    // もう1行は旧候補のまま整理されるが、新版へ再利用ずみなら残る。
+    expect(after.map((r) => r.id).sort()).toEqual(before.map((r) => r.id).sort());
+    const failedRows = after.filter((r) => r.status === 'failed');
+    expect(failedRows).toHaveLength(0);
+    expect(after.every((r) => r.status === 'pending')).toBe(true);
+    expect(after).toEqual([
+      { id: after[0].id, kind: 'day_before', status: 'pending', scheduled_at: '2026-11-01T17:00:00.000Z', retry_count: 0 },
+      { id: after[1].id, kind: 'hour_before', status: 'pending', scheduled_at: '2026-11-02T16:00:00.000Z', retry_count: 0 },
+    ]);
   });
 
   test('旧確認→新版登録→旧共有呼出しは版ガードで止まる', async () => {
