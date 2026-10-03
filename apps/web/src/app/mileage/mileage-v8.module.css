@@ -1,0 +1,703 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B マイルの一覧系（Pencil「★V8-B 画面の地図」の行：
+ * たまる決めごと `OC0gy`・使い道 `S35pO`・友だちの残高 `CJlf4`・
+ * 履歴 `oRbJi`・行動スコア `IRPw8`・状態 `zaqP9`・1152 `ZJIyl`・
+ * 閲覧のみ `E2Any`）。
+ *
+ * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
+ * 板が 1100px を切ったらフォルダの列を道具の段へ畳む（1152 の板 `ZJIyl`）。
+ * 色・角丸・影は直接書かず、globals.css の名前だけを使う。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+  min-width: 0;
+}
+
+/* 板の頭：題＋説明＋右に操作。 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 5つのタブ：文字だけ、選んだものに下線、件数を横に。 */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.tab {
+  padding: 8px 2px 10px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--color-ink);
+}
+
+.tabActive {
+  color: var(--color-ink);
+  font-weight: 600;
+  border-bottom-color: var(--color-ink);
+}
+
+/* 帯：閲覧のみ（E2Any）・競合（BnrQp）はタブの段の下に12のすき間。 */
+.band {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.bandWarn {
+  background: var(--color-status-warn-soft);
+}
+
+/* 数の帯：白い板の左右いっぱい・縦線区切り（カードを離して並べない）。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  overflow: hidden;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 16px;
+}
+
+.kpi + .kpi {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.kpiTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.kpiIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: var(--radius-mini);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+}
+
+.kpiIcon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.kpiLabel {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.kpiValue {
+  margin: 2px 0 0;
+  color: var(--color-ink);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.4px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpiUnit {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-ink-secondary);
+  letter-spacing: 0;
+}
+
+.kpiSub {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+/* 本文の2列：左にフォルダの列、右に道具＋表。 */
+.columns {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 216px;
+  flex: none;
+}
+
+.railTitle {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.railNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* 道具の1段：左に検索・札、右によく使う絞り込み・表示件数。高さ36。 */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* 表の器。1列目は伸び縮み、ほかは中身に合わせた幅。狭いときは省略＋title。 */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table thead th {
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  padding: 13px 20px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.table tbody td {
+  padding: 9px 20px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.cellMain {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-accent-deep);
+  font-weight: 600;
+}
+
+.cellSub {
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.cellSubDark {
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 状態の札：丸い札（点＋文字）。 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  flex: none;
+}
+
+.pillActive {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+.pillStopped {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+.pillWarn {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+
+/* 行末の操作：ボタンは1つまで、2つ目以降は「…」の中へ。 */
+.rowActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ページ送りの段：件数は左、前へ・次へは右。 */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.footerCount {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.footnote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 承認待ちの黄の板（CJlf4）。 */
+.approval {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-status-warn-soft);
+  padding: 12px 16px;
+}
+
+.approvalTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.approvalRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 8px;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  padding: 10px 12px;
+}
+
+.approvalText {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.approvalNote {
+  margin: 8px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+/* 状態の板（zaqP9）：まだ無い・絞り込み0件・読み込み中・読み込めなかった。
+   4つとも同じ枠・同じ高さ。タブ・数の帯・道具はそのまま。 */
+.stateWrap {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: 40px 24px;
+}
+
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+}
+
+.stateTitle {
+  margin: 8px 0 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.stateActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.skelRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.skelRow:last-child {
+  border-bottom: none;
+}
+
+.skelDot {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+
+.skelBar {
+  height: 12px;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+}
+
+.errorBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-control);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 12px;
+}
+
+.errorRetry {
+  margin-left: auto;
+  flex: none;
+}
+
+.errorNote {
+  margin: 12px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* 小窓の中（M8zhjL・Nv7An・R8NNi）。枠は共通の Dialog。 */
+.dlgPerson {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  padding: 12px 16px;
+}
+
+.dlgAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-status-info-soft);
+  color: var(--color-status-info);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dlgPersonName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dlgPersonSub {
+  margin: 2px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.dlgLabel {
+  margin: 16px 0 6px;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.seg {
+  display: inline-flex;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  padding: 2px;
+  gap: 2px;
+}
+
+.segButton {
+  border: none;
+  border-radius: var(--radius-mini);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+.segButton[aria-pressed="true"] {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-card);
+}
+
+.dlgInput,
+.dlgTextarea {
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  padding: 8px 12px;
+}
+
+.dlgTextarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.dlgError {
+  margin: 6px 0 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.delta3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.deltaCell {
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.deltaCell + .deltaCell {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.deltaLabel {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.deltaValue {
+  margin: 4px 0 0;
+  color: var(--color-ink);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.miniTable {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.miniTable th {
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  white-space: nowrap;
+}
+
+.miniTable td {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.miniTable tr:last-child td {
+  border-bottom: none;
+}
+
+/* 1152：白い板が1100未満でフォルダの列を畳む（ZJIyl）。 */
+.railCollapsedBar {
+  display: none;
+}
+
+@container (max-width: 1100px) {
+  .columns {
+    flex-direction: column;
+  }
+
+  .rail {
+    display: none;
+  }
+
+  .railCollapsedBar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi:nth-child(3) {
+    border-left: none;
+  }
+
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--color-hairline);
+  }
+}

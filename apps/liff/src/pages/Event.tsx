@@ -14,7 +14,7 @@ import LoadingView from '../components/LoadingView.js';
 import Icon from '../components/ui/Icon.js';
 import Button from '../components/ui/Button.js';
 import BottomBar from '../components/ui/BottomBar.js';
-import PageHeader from '../components/ui/PageHeader.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
 
 /**
  * 表示してよいURLか。保存時に弾き切れない古い行もあるため、表示側でも
@@ -107,8 +107,8 @@ export default function Event() {
   if (loading || failed || !event) {
     return (
       <div className="min-h-screen bg-ground">
+        <LiffHeader title="イベント" />
         <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
-          <PageHeader title="イベント" />
           {failed ? (
             <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />
           ) : (
@@ -144,6 +144,8 @@ export default function Event() {
       : rems.length === 0
         ? `定員 ${caps.reduce((a, b) => a + b, 0)} 席`
         : `残り ${rems.reduce((a, b) => a + b, 0)} 席（定員 ${caps.reduce((a, b) => a + b, 0)}）`;
+  /** 残席があるときだけ、残りの行を黄土色で出す (gVjiC)。 */
+  const hasSeats = rems.reduce((a, b) => a + b, 0) > 0;
 
   function goConfirm() {
     if (!selectedId || overLimit) return;
@@ -153,9 +155,9 @@ export default function Event() {
   }
 
   return (
-    <div className="min-h-screen bg-ground">
-      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-28">
-        <PageHeader title="イベント" />
+    <div className="min-h-screen bg-ground" data-design-node="gVjiC">
+      <LiffHeader title="イベント" />
+      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-28">
         {isHttpsUrl(event.image_url) ? (
           <img
             src={event.image_url}
@@ -171,7 +173,7 @@ export default function Event() {
           </div>
         )}
         <div className="space-y-2">
-          <h2 className="text-lg font-bold text-ink">{event.name}</h2>
+          <h2 className="text-xl font-bold text-ink">{event.name}</h2>
           {span && (
             <p className="flex items-start gap-2 text-sm text-ink">
               <Icon name="calendar" className="mt-0.5 h-4 w-4 shrink-0 text-ink-secondary" />
@@ -186,9 +188,9 @@ export default function Event() {
               </span>
             </p>
           )}
-          <p className="flex items-start gap-2 text-sm text-ink">
+          <p className="flex items-start gap-2 text-sm">
             <Icon name="users" className="mt-0.5 h-4 w-4 shrink-0 text-ink-secondary" />
-            <span>{seats}</span>
+            <span className={hasSeats ? 'font-bold text-liff-wait-ink' : 'text-ink'}>{seats}</span>
           </p>
           {isHttpsUrl(event.venue_url) && (
             <a
@@ -220,14 +222,20 @@ export default function Event() {
                 const full = isFull(s);
                 const disabled = overLimit || (full && !waitlistOpen);
                 const selected = selectedId === s.id;
+                // 選んだ時間は濃い緑の地＋白文字 (gVjiC・予約の日時選びと同じ形)。
                 // 満席は押せない灰色の箱。白 (bg-canvas) と重ねると白く見えるので
                 // 押せない時は地を1つ (bg-shell-gray) だけにする。
+                // 待ちに入る満席の枠は白のまま、黄土色の札で分かるようにする。
                 const tone = disabled
                   ? 'border-hairline bg-shell-gray'
-                  : selected
-                    ? 'border-accent-deep bg-ok-bg'
-                    : 'border-hairline bg-canvas';
+                  : selected && !full
+                    ? 'border-liff-primary bg-liff-primary'
+                    : selected
+                      ? 'border-liff-wait-ink bg-liff-wait-bg'
+                      : 'border-hairline bg-canvas';
                 const timeText = `${utcToJstMd(s.starts_at)}(${utcToJstWeekday(s.starts_at)}) ${utcToJstHm(s.starts_at)}〜${utcToJstHm(s.ends_at)}`;
+                // 満席で待ちに入る枠の札。数は数えられる分だけ (seatLabel と同じ)。
+                const fullLabel = full && !disabled ? '満席・キャンセル待ち' : seatLabel(s);
                 return (
                   <li key={s.id}>
                     <button
@@ -240,21 +248,26 @@ export default function Event() {
                       className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${tone}`}
                     >
                       <span
-                        className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-ok-ink' : 'text-ink'}`}
+                        className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-white' : 'text-ink'}`}
                       >
                         {utcToJstMd(s.starts_at)}({utcToJstWeekday(s.starts_at)}) {utcToJstHm(s.starts_at)}〜
                         {utcToJstHm(s.ends_at)}
                       </span>
                       <span
-                        className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-ok-ink' : 'text-ink-secondary'}`}
+                        className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-white' : full && !disabled ? 'font-bold text-liff-wait-ink' : 'text-ink-secondary'}`}
                       >
-                        {seatLabel(s)}
+                        {fullLabel}
                       </span>
                     </button>
                   </li>
                 );
               })}
             </ul>
+          )}
+          {selectedFull && waitlistOpen && (
+            <p role="status" className="mt-2 text-xs leading-5 text-ink-secondary">
+              {`${utcToJstMd(selectedSlot.starts_at)} ${utcToJstHm(selectedSlot.starts_at)}〜${utcToJstHm(selectedSlot.ends_at)} は満席です。キャンセル待ちで申し込むと、空きが出たらLINEでお知らせします。`}
+            </p>
           )}
           {overLimit && (
             <div

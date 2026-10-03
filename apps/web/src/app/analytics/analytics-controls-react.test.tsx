@@ -375,7 +375,8 @@ function funnelHandler(funnels: unknown[], detail: unknown = FUNNEL_DETAIL) {
 }
 
 function type(id: string, value: string) {
-  const input = host.querySelector(`#${id}`) as HTMLInputElement | null
+  // 板 `VDPz5`：作る・直すは小窓（document.body の portal）で出す。
+  const input = document.body.querySelector(`#${id}`) as HTMLInputElement | null
   if (!input) throw new Error(`input #${id} が見つかりません`)
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
   setter.call(input, value)
@@ -399,13 +400,13 @@ describe('ファネルの編集・停止・保管(#841)', () => {
 
     await click('定義を編集')
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
-    const nameInput = host.querySelector('#fn-name') as HTMLInputElement | null
+    const nameInput = document.body.querySelector('#fn-name') as HTMLInputElement | null
     expect(nameInput?.value).toBe('申込導線')
-    const stepInputs = Array.from(host.querySelectorAll('input'))
-      .map((input) => input.value)
+    const stepInputs = Array.from(document.body.querySelectorAll('input'))
+      .map((input) => (input as HTMLInputElement).value)
     expect(stepInputs).toContain('案内')
     expect(stepInputs).toContain('form-1')
-    expect(host.textContent).toContain('新版として保存する')
+    expect(document.body.textContent).toContain('新版として保存する')
 
     await act(async () => { type('fn-name', '申込導線（改訂）'); await Promise.resolve() })
     net.handler = (async (path: string, init?: RequestInit) => {
@@ -419,7 +420,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
       }
       return funnelHandler([FUNNEL_ACTIVE])(path)
     }) as typeof net.handler
-    await click('新版として保存する')
+    await clickInDocument('新版として保存する')
     const request = net.calls.find((call) => call.path.includes('/versions?'))
     expect(request).toBeDefined()
     expect(request!.path).toContain('/api/analytics/funnels/funnel-1/versions')
@@ -509,9 +510,9 @@ describe('ファネルの編集・停止・保管(#841)', () => {
 
     await click('定義を編集')
     await act(async () => { await Promise.resolve() })
-    await click('新版として保存する')
+    await clickInDocument('新版として保存する')
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
-    expect(host.textContent).toContain('他の人が先に変更しています')
+    expect(document.body.textContent).toContain('他の人が先に変更しています')
   })
 
   it('編集の新版保存はフォームに出せない条件（絞り込み・比較・段の副条件）を落とさない', async () => {
@@ -536,7 +537,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
     await click('定義を編集')
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
     // 7/30/90以外の日数（14日）も選択肢として残る
-    expect(host.textContent).toContain('14日以内')
+    expect(document.body.textContent).toContain('14日以内')
 
     let sent: Record<string, unknown> | null = null
     net.handler = (async (path: string, init?: RequestInit) => {
@@ -546,7 +547,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
       }
       return funnelHandler([FUNNEL_ACTIVE], detail)(path)
     }) as typeof net.handler
-    await click('新版として保存する')
+    await clickInDocument('新版として保存する')
 
     expect(sent).not.toBeNull()
     expect(sent!.segment).toEqual({ kind: 'tag', tagId: 'tag-vip' })

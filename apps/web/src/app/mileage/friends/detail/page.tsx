@@ -11,6 +11,8 @@ import TargetMissing from '@/components/shared/target-missing'
 import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, Td, Th, Tr } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import V8FriendDetail from './v8-friend-detail'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   api,
@@ -488,6 +490,8 @@ function FriendMileageInner() {
 
 /** Static export cannot enumerate friend ids, so the id stays in the query. */
 export default function FriendMileagePage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <V8FriendDetail />
   return (
     <Suspense fallback={<div data-design-node="HIU5O"><ListState kind="loading" title="マイル明細を読み込んでいます" /></div>}>
       <FriendMileageInner />

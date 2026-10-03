@@ -173,7 +173,7 @@ function qaForm() {
         restorePrevious: false,
         pageTitle: 'QA アンケート',
         submitLabel: '送信',
-        prevLabel: '前へ',
+        prevLabel: '前のページへ',
         nextLabel: '次へ',
         sectionHeader: 'pageNumber',
         confirmDialog: { enabled: false },

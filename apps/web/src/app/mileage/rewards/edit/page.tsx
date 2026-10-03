@@ -15,6 +15,8 @@ import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import V8RewardEdit from './v8-reward-edit'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { localDateTime, utcDateTime } from '@/lib/presentation'
@@ -520,6 +522,8 @@ function MileageRewardEditorInner() {
 }
 
 export default function MileageRewardEditorPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <V8RewardEdit />
   return (
     <Suspense fallback={<ListState kind="loading" />}>
       <MileageRewardEditorInner />
