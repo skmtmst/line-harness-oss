@@ -22,6 +22,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import OutgoingV8Page from './outgoing-v8'
 import InteractionsV8Page from './interactions-v8'
+import IncomingV8Page from './incoming-v8'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 
@@ -1106,6 +1107,7 @@ function WebhooksPageHost() {
    */
   if (theme === 'v8' && tab === 'outgoing') return <OutgoingV8Page />
   if (theme === 'v8' && tab === 'interactions') return <InteractionsV8Page />
+  if (theme === 'v8' && tab === 'incoming') return <IncomingV8Page />
   if (tab === 'incoming' || tab === 'outgoing') return <WebhooksPageInner key={tab} tab={tab} />
   return (
     <div className="flex flex-col gap-4">
