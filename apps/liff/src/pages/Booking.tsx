@@ -65,6 +65,8 @@ export default function Booking() {
       <LiffHeader title="ご予約" />
       {step !== 'done' && <Stepper steps={STEPS} current={stepIndex} />}
       <div className="mx-auto w-full max-w-md px-4 pt-3 pb-40">
+        {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
+        <div key={step} className="liff-step">
         {step === 'menu' && (
           <div data-design-node="IruGD">
             <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} onLoadState={setStepReady} />
@@ -106,6 +108,7 @@ export default function Booking() {
         {step === 'done' && menu && staff && slot && (
           <Done menuName={menu.name} slot={slot} durationMinutes={staff.duration_minutes} />
         )}
+        </div>
       </div>
       {step === 'menu' && stepReady && (
         <BottomBar>
