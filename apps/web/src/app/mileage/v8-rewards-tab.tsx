@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { AlertCircle, ArrowLeftRight, Gift, Info, Plus, Star } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
@@ -141,6 +142,12 @@ export default function V8RewardsTab({
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryError, setRetryError] = useState('')
   const [retryNotice, setRetryNotice] = useState('')
+  /*
+   * 出す・止める・届け直しは押した直後に動かさない。確認の窓で
+   * 中身を読み合わせてから動かす（間違えない・怖くない）。
+   */
+  const [stateTarget, setStateTarget] = useState<MileageRewardSummary | null>(null)
+  const [retryTarget, setRetryTarget] = useState<FailedRedemption | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [folder, setFolder] = useState<Folder>('すべて')
@@ -245,6 +252,7 @@ export default function V8RewardsTab({
     setRetryingId(item.id)
     setRetryError('')
     setRetryNotice('')
+    setRetryTarget(null)
     try {
       const response = await fetchApi<{ success: boolean; data?: { message?: string | null; redemption?: { status?: string } }; error?: string }>(
         `/api/mileage/redemptions/${encodeURIComponent(item.id)}/retry-fulfillment`,
@@ -276,6 +284,7 @@ export default function V8RewardsTab({
       || (reward.status !== 'published' && reward.status !== 'draft' && reward.status !== 'stopped')) return
     setBusyId(reward.id)
     setActionError('')
+    setStateTarget(null)
     try {
       const response = reward.status === 'published'
         ? await api.mileage.stopReward(reward.id, accountId)
@@ -612,7 +621,7 @@ export default function V8RewardsTab({
                             {operable ? (
                               <Button
                                 disabled={busyId === reward.id}
-                                onClick={() => void changeState(reward)}
+                                onClick={() => setStateTarget(reward)}
                                 busy={busyId === reward.id}
                                 busyLabel="反映しています"
                               >
@@ -694,7 +703,7 @@ export default function V8RewardsTab({
                             {!readonly ? (
                               <Button
                                 disabled={retryingId !== null}
-                                onClick={() => void retryRedemption(item)}
+                                onClick={() => setRetryTarget(item)}
                                 busy={retryingId === item.id}
                                 busyLabel="やり直しています"
                               >
@@ -725,6 +734,33 @@ export default function V8RewardsTab({
           ) : null}
         </div>
       </div>
+      {stateTarget ? (
+        <ConfirmDialog
+          open
+          title={`「${stateTarget.name}」を${stateTarget.status === 'published' ? '止めますか' : stateTarget.status === 'stopped' ? 'また出しますか' : '出しますか'}？`}
+          description={
+            stateTarget.status === 'published'
+              ? '止めると友だちはこの使い道と交換できなくなります。交換した分はそのまま残ります。'
+              : '出すと友だちがこの使い道と交換できるようになります。'
+          }
+          confirmLabel={stateTarget.status === 'published' ? '止める' : stateTarget.status === 'stopped' ? 'また出す' : '出す'}
+          destructive={stateTarget.status === 'published'}
+          busy={busyId === stateTarget.id}
+          onConfirm={() => void changeState(stateTarget)}
+          onCancel={() => setStateTarget(null)}
+        />
+      ) : null}
+      {retryTarget ? (
+        <ConfirmDialog
+          open
+          title={`「${retryTarget.rewardName}」をもう一度届けますか？`}
+          description="届かなかった交換をもう一度送ります。相手には新しく届きます。"
+          confirmLabel="届ける"
+          busy={retryingId === retryTarget.id}
+          onConfirm={() => void retryRedemption(retryTarget)}
+          onCancel={() => setRetryTarget(null)}
+        />
+      ) : null}
     </>
   )
 }
