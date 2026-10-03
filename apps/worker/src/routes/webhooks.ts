@@ -37,6 +37,7 @@ import {
   getIntegrationApiTokenById,
   createIntegrationApiToken,
   revokeIntegrationApiToken,
+  reactivateIntegrationApiToken,
   rotateIntegrationApiToken,
   INTEGRATION_API_SCOPES,
   isOperationCapabilityStopped,
@@ -61,6 +62,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { auditLog } from '../lib/audit-log.js';
+import { maskInteractionPayload } from '../lib/mask-payload.js';
 import {
   incomingTestIdempotencyKey,
   retryWebhookInteraction,
@@ -1411,6 +1413,24 @@ webhooks.get('/api/webhooks/interactions', requireRole('owner', 'admin', 'staff'
   }
 });
 
+webhooks.get('/api/webhooks/interactions/:id/payload', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const access = await requireInteractionAccount(c);
+    if ('error' in access) return access.error;
+    const original = await getWebhookInteractionById(c.env.DB, c.req.param('id'), access.lineAccountId);
+    if (!original) return c.json({ success: false, error: 'Not found' }, 404);
+    // 本文は伏せて返す（F-18）。元やDBは変えない。
+    const masked = maskInteractionPayload(original.request_body_json);
+    return c.json({
+      success: true,
+      data: { id: original.id, body: masked.body, available: masked.available },
+    });
+  } catch (err) {
+    console.error('GET /api/webhooks/interactions/:id/payload error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admin'), async (c) => {
   try {
     const access = await requireInteractionAccount(c);
@@ -1957,6 +1977,34 @@ webhooks.post('/api/webhooks/api-tokens/:id/revoke', requireRole('owner'), async
     return c.json({ success: true, data: { id } });
   } catch (err) {
     console.error('POST /api/webhooks/api-tokens/:id/revoke error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webhooks.post('/api/webhooks/api-tokens/:id/reactivate', requireRole('owner'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const id = c.req.param('id');
+    // 止めた鍵を動かし直すのも鍵・トークンの操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.api_token')) {
+      return stepUpRequiredResponse(c, 'APIトークンの再開には本人確認が必要です');
+    }
+    const current = await getIntegrationApiTokenById(c.env.DB, id, lineAccountId);
+    if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+    if (current.revoked_at === null) {
+      return c.json({ success: false, error: 'このトークンは止められていません' }, 409);
+    }
+    const reactivated = await reactivateIntegrationApiToken(c.env.DB, id, lineAccountId);
+    if (!reactivated) return c.json({ success: false, error: 'Not found' }, 404);
+    auditLog(c, 'webhook.api_token.reactivate', { kind: 'integration_api_token', id }, { lineAccountId });
+    const row = await getIntegrationApiTokenById(c.env.DB, id, lineAccountId);
+    return c.json({ success: true, data: serializeApiToken(row!) });
+  } catch (err) {
+    console.error('POST /api/webhooks/api-tokens/:id/reactivate error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
