@@ -133,7 +133,14 @@ export default function KpiCard({
       {...cardProps}
     >
       <div className={styles.head}>
-        <p className={[styles.label, labelVariantClass].filter(Boolean).join(' ')}>
+        {/*
+          ★V8 G3：狭いマスで題がはみ出すときは CSS の「…」で受け、
+          全文は title で読めるようにする（読み上げは変わらない）。
+        */}
+        <p
+          className={[styles.label, labelVariantClass].filter(Boolean).join(' ')}
+          title={title || undefined}
+        >
           {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
           {hasTip ? (
             <HelpTip label={descriptionLabel ?? `${helpLabel ?? title}の説明`}>

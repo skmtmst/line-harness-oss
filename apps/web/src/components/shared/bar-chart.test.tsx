@@ -171,3 +171,23 @@ describe('読み上げ用の表は箱を作らない', () => {
     expect(css).toMatch(/\.srOnly\s*\{[^}]*overflow:\s*hidden/s)
   })
 })
+
+/*
+ * G3 はみ出し直し（parity 1004-0513：目盛り 58＞24 など 104 件）。
+ * 狭い列で中央寄せの字が隣の列へはみ出すと、隣の列の棒の下に隠れる。
+ * V8 では字を前に出して曜日まで読めるようにする（位置・大きさ不変）。
+ * v7 の .axisLabel は触らない。
+ */
+describe('横軸の日付は棒の下に隠れない（G3）', () => {
+  it("V8 の .axisLabel は relative＋手前＋地あり", () => {
+    expect(css).toMatch(/\[data-theme='v8'\] \.axisLabel \{[^}]*position:\s*relative/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.axisLabel \{[^}]*z-index:\s*1/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.axisLabel \{[^}]*background:\s*var\(--color-canvas\)/s)
+  })
+
+  it('v7 の .axisLabel は位置も地も付けない', () => {
+    const base = css.match(/\.axisLabel \{[^}]*\}/s)?.[0] ?? ''
+    expect(base).not.toMatch(/position:/)
+    expect(base).not.toMatch(/background:/)
+  })
+})
