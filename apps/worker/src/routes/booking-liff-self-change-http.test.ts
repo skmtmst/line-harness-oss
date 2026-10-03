@@ -63,16 +63,28 @@ vi.mock('../services/reminder-trigger.js', async (importOriginal) => {
   };
 });
 
-const meetState: { realRegister?: (...args: never[]) => Promise<unknown> } = {};
+const meetState: {
+  realRegister?: (...args: never[]) => Promise<unknown>;
+  realCancel?: (...args: never[]) => Promise<unknown>;
+} = {};
 const meetGate: { hook: (() => Promise<void>) | null } = { hook: null };
+const meetCtl: { failCancelOnce: boolean } = { failCancelOnce: false };
 vi.mock('../services/meet-consultation-reminders.js', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../services/meet-consultation-reminders.js')>();
   meetState.realRegister = orig.registerMeetConsultation as unknown as typeof meetState.realRegister;
+  meetState.realCancel = orig.cancelMeetConsultation as unknown as typeof meetState.realCancel;
   return {
     ...orig,
     registerMeetConsultation: async (...args: Parameters<typeof orig.registerMeetConsultation>) => {
       if (meetGate.hook) await meetGate.hook();
       return (meetState.realRegister as (...a: unknown[]) => Promise<unknown>)(...args);
+    },
+    cancelMeetConsultation: async (...args: Parameters<typeof orig.cancelMeetConsultation>) => {
+      if (meetCtl.failCancelOnce) {
+        meetCtl.failCancelOnce = false;
+        throw new Error('COMPENSATION_INJECTED_FAILURE');
+      }
+      return (meetState.realCancel as (...a: unknown[]) => Promise<unknown>)(...args);
     },
   };
 });
@@ -80,6 +92,10 @@ vi.mock('../services/meet-consultation-reminders.js', async (importOriginal) => 
 vi.mock('../services/booking-channels.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../services/booking-channels.js')>()),
   bookingAutomaticNotificationAllowed: vi.fn(async () => true),
+}));
+vi.mock('../services/feature-enforcement.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/feature-enforcement.js')>()),
+  featureJobCanRun: vi.fn(async () => true),
 }));
 
 const { default: booking } = await import('./booking.js');
@@ -240,6 +256,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     meetGate.hook = null;
     notifierMocks.sendBookingNotification.mockResolvedValue(undefined);
     calendarSyncMocks.runBookingGoogleSync.mockImplementation(async () => 'skipped');
+    meetCtl.failCancelOnce = false;
 
     sqlite = new Database(':memory:');
     sqlite.pragma('foreign_keys = ON');
@@ -348,7 +365,8 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(notice).toBeDefined();
     expect(notice!.result_json).toContain('changed');
     expect(notice!.result_json).not.toContain('manual');
-    // waitUntil を回収し、実 mock 受信側で自動送信に manual 印が無いことを見る。
+    // waitUntil を回収し、mock 受信と stub 記録の範囲で自動送信に manual 印が
+    // 無いことを見る（実LINE推送の確認ではない）。
     await drainWaits();
     expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1);
     const sent = notifierMocks.sendBookingNotification.mock.calls[0][0] as Record<string, unknown>;
@@ -801,8 +819,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       await new Promise((r) => setTimeout(r, 10));
       if (i === 199) throw new Error('cancelByTrigger に到達しませんでした');
     }
-    // 後発が先に成功する。時刻を進めて decided_at を区別する。
-    vi.setSystemTime(new Date('2026-10-20T12:00:01.000Z'));
+    // 後発が先に成功する。時刻は Frozen のまま（同msでも所有権で区別する）。
     const b = await Promise.race([
       selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 }),
       timeout,
@@ -815,6 +832,94 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(a.status).toBe(409);
     expect(bookingRow(id).status).toBe('cancelled');
     expect((bookingRow(id) as Record<string, unknown>).decided_at).toBe(decidedAfterB);
+  });
+
+  test('補償の失敗は隠さず、取消再送で回収できる', async () => {
+    mockSlots([D11, D12]);
+    const id = await adminCreate('menu-ok', T1, 'race-comp-fail');
+    linkMeet(id);
+    // register 直前で取消を完走させ、直後の補償だけ失敗させる。
+    meetGate.hook = async () => {
+      meetGate.hook = null;
+      const cancelRes = await selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 1 });
+      expect(cancelRes.status).toBe(200);
+      meetCtl.failCancelOnce = true;
+    };
+    const res = await selfPost(`/api/liff/booking/${id}/reschedule`, {
+      starts_at: T2, lock_version: 0,
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json<Record<string, unknown>>()).meet_sync).toBe('failed');
+    // 失敗は正直に残る（復活したまま）。監査に記録される。
+    const consult = sqlite.prepare(
+      'SELECT status FROM meet_consultations WHERE id = ?',
+    ).get('consult-1') as { status: string };
+    expect(consult.status).toBe('confirmed');
+    const audit = sqlite.prepare(
+      "SELECT COUNT(*) AS n FROM booking_audit_logs WHERE booking_id = ? AND action = 'meet_sync_failed'",
+    ).get(id) as { n: number };
+    expect(audit.n).toBe(1);
+    // 取消再送が回収口になる。
+    const retry = await selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 1 });
+    expect(retry.status).toBe(200);
+    const healed = sqlite.prepare(
+      'SELECT status FROM meet_consultations WHERE id = ?',
+    ).get('consult-1') as { status: string };
+    expect(healed.status).toBe('cancelled');
+    await drainWaits();
+  });
+
+  test('取消ずみ予約の相談はdue送信の対象外（可視フェンス＋spy send0）', async () => {
+    const { processDueMeetConsultationReminders } = await import(
+      '../services/meet-consultation-reminders.js'
+    );
+    mockSlots([D11, D12]);
+    const deadId = await adminCreate('menu-ok', T1, 'due-dead');
+    linkMeet(deadId, 'evt-dead');
+    // 復活 window を再現：予約だけ取消ずみ、相談は confirmed のまま。
+    sqlite.prepare("UPDATE bookings SET status = 'cancelled' WHERE id = ?").run(deadId);
+    sqlite.prepare(
+      `UPDATE meet_consultations SET starts_at = ?, ends_at = ? WHERE external_event_id = ?`,
+    ).run('2026-10-21T00:00:00.000Z', '2026-10-21T01:00:00.000Z', 'evt-dead');
+    sqlite.prepare(
+      `UPDATE meet_consultation_reminders SET scheduled_at = ? WHERE consultation_id = ?`,
+    ).run('2026-10-20T11:00:00.000Z', 'consult-1');
+    // 対照：有効な予約の相談は送られる。
+    const liveId = await adminCreate('menu-ok', T1, 'due-live');
+    sqlite.prepare('UPDATE bookings SET external_event_id = ? WHERE id = ?').run('evt-live', liveId);
+    sqlite.prepare(
+      `INSERT INTO meet_consultations
+         (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed')`,
+    ).run(
+      'consult-2', 'evt-live', 'friend-other', '対照相談',
+      '2026-10-21T00:00:00.000Z', '2026-10-21T01:00:00.000Z', 'https://meet.google.com/aaa-bbbb-ccc',
+    );
+    sqlite.prepare(
+      `INSERT INTO meet_consultation_reminders
+         (id, consultation_id, kind, scheduled_at, status)
+       VALUES (?, ?, ?, ?, 'pending')`,
+    ).run('mr-live', 'consult-2', 'hour_before', '2026-10-20T11:00:00.000Z');
+    const sent: Request[] = [];
+    const dispatch = vi.fn(async (request: Request) => {
+      sent.push(request);
+      return new Response('{}', { status: 200 });
+    });
+    const result = await processDueMeetConsultationReminders(db, {
+      now: new Date('2026-10-20T12:00:00.000Z'),
+      proxyBaseUrl: 'https://proxy.example.com',
+      proxyDispatch: dispatch,
+    });
+    expect(result.sent).toBe(1);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const body = await sent[0].json() as { to: string };
+    expect(body.to).toBe('U-other-1');
+    expect(sent[0].headers.get('x-line-harness-source')).toBeNull();
+    // 取消ずみ側は送られず、pending のまま残る（回収は取消再送の役目）。
+    const dead = sqlite.prepare(
+      "SELECT COUNT(*) AS n FROM meet_consultation_reminders WHERE consultation_id = ? AND status IN ('pending','failed')",
+    ).get('consult-1') as { n: number };
+    expect(dead.n).toBe(2);
   });
 
   test('変更対取消の交差は片方だけ通り、敗者は副作用を残さない', async () => {

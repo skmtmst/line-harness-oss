@@ -370,6 +370,12 @@ export async function processDueMeetConsultationReminders(
           AND f.is_following = 1
           AND la.is_active = 1
           AND ${activeTenantLineAccountSql('f.line_account_id')}
+          AND NOT EXISTS (
+            SELECT 1 FROM bookings dead_booking
+            WHERE dead_booking.external_event_id = c.external_event_id
+              AND dead_booking.line_account_id = f.line_account_id
+              AND dead_booking.status IN ('cancelled','expired')
+          )
         ORDER BY r.scheduled_at ASC
         LIMIT 100`,
     )
@@ -389,8 +395,17 @@ export async function processDueMeetConsultationReminders(
       continue;
     }
     // 取消と配信の競合対策: 送る直前に相談の状態を確かめ、取消済みなら送らない。
+    // 結び付く予約が取消ずみでも送らない (可視フェンスの二重化)。
     const live = await db
-      .prepare(`SELECT status FROM meet_consultations WHERE id = ?`)
+      .prepare(
+        `SELECT c.status AS status FROM meet_consultations c
+          WHERE c.id = ?
+            AND NOT EXISTS (
+              SELECT 1 FROM bookings dead_booking
+              WHERE dead_booking.external_event_id = c.external_event_id
+                AND dead_booking.status IN ('cancelled','expired')
+            )`,
+      )
       .bind(row.consultation_id)
       .first<{ status: string }>();
     if (!live || live.status !== 'confirmed') {
@@ -413,8 +428,17 @@ export async function processDueMeetConsultationReminders(
       );
       // 取消と送信の競合対策: push の直前にもう一度だけ確かめる。
       // この後 push まで待たない (間に取消が入る余地を残さない)。
+      // 予約側の取消もここで見る。
       const liveBeforePush = await db
-        .prepare(`SELECT status FROM meet_consultations WHERE id = ?`)
+        .prepare(
+          `SELECT c.status AS status FROM meet_consultations c
+            WHERE c.id = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM bookings dead_booking
+                WHERE dead_booking.external_event_id = c.external_event_id
+                  AND dead_booking.status IN ('cancelled','expired')
+              )`,
+        )
         .bind(row.consultation_id)
         .first<{ status: string }>();
       if (!liveBeforePush || liveBeforePush.status !== 'confirmed') {

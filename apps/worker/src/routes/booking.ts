@@ -1141,6 +1141,7 @@ async function syncSelfBookingMeet(
     });
     // 書込み後の再確認。register との間に取消・別変更が勝っていたら、
     // 今書いた相談を取り消して戻す（敗者が復活を残さない）。
+    // 補償の失敗は隠さず failed と監査に残す。取消再送が回収口になる。
     const after = await c.env.DB
       .prepare(
         `SELECT status, friend_id, lock_version FROM bookings
@@ -1154,7 +1155,23 @@ async function syncSelfBookingMeet(
       (after.status !== 'requested' && after.status !== 'confirmed') ||
       Number(after.lock_version) !== expectedVersion
     ) {
-      await cancelMeetConsultation(c.env.DB, newEventId, new Date()).catch(() => undefined);
+      try {
+        await cancelMeetConsultation(c.env.DB, newEventId, new Date(), { failOnSendInFlight: true });
+      } catch (error) {
+        await recordBookingAudit(c.env.DB, {
+          bookingId,
+          lineAccountId: self.accountId,
+          action: 'meet_sync_failed',
+          before: { external_event_id: newEventId },
+          after: { external_event_id: newEventId },
+          reason: error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200),
+          actorType: 'customer',
+          actorId: self.friendId,
+          actorName: null,
+          occurredAt: new Date().toISOString(),
+        });
+        return 'failed';
+      }
       return 'superseded';
     }
     return newEventId !== oldEventId ? 'recreated' : 'updated';
@@ -1242,8 +1259,7 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
   };
   const cancelReason = `booking_cancelled:${bookingId}:by:self:${caller.lineUserId}`;
   // 取消ずみの再送: 版が合えば副作用をそろえて 200 (冪等再送)。
-  // 先に再送の所有権を decided_at で取り直す。先行失敗の rollback が
-  // 後発の成功を巻き戻さない (rollback は古い decided_at に合わない)。
+  // 所有権は decided_at 取直し＋監査の単調 rowid で主張する。時計の同msでも区別できる。
   if (row.status === 'cancelled' || row.status === 'expired') {
     if (Number(row.lock_version) !== expectedVersion) {
       return c.json({ error: 'version_conflict' }, 409);
@@ -1267,6 +1283,19 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
       if (!current) return c.json({ error: 'booking_not_found' }, 404);
       return c.json({ error: 'version_conflict' }, 409);
     }
+    // 主張の証跡を先に残す。後続の rollback はこの行より新しい監査を見て止まる。
+    await recordBookingAudit(c.env.DB, {
+      bookingId,
+      lineAccountId: accountId,
+      action: 'cancel_retry_claimed',
+      before: { status: row.status },
+      after: { status: row.status, decided_at: claimAt },
+      reason: 'self_cancel_retry',
+      actorType: 'customer',
+      actorId: caller.friendId,
+      actorName: null,
+      occurredAt: new Date().toISOString(),
+    });
     // 送信中は 409 で再試行させる。未実施の副作用を適用対象外にしない。
     try {
       const retry = await runSelfBookingCancelSideEffects(c, self, row);
@@ -1294,6 +1323,13 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
     return c.json({ error: 'self_deadline_passed' }, 403);
   }
   // 条件付き確定: 同時取消の race では片方だけが通る。副作用は通った方だけ走る。
+  // 所有権の基準は監査の単調 rowid。確定より前に読み、rollback は
+  // この後の監査行が無いときだけ戻す (時計の同msでも区別できる)。
+  const auditBaseline = await c.env.DB
+    .prepare(`SELECT COALESCE(MAX(rowid), 0) AS m FROM booking_audit_logs WHERE booking_id = ?`)
+    .bind(bookingId)
+    .first<{ m: number }>()
+    .then((r) => Number(r?.m ?? 0));
   const decidedAt = new Date().toISOString();
   const updateResult = await c.env.DB
     .prepare(
@@ -1326,16 +1362,20 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
   } catch (error) {
     if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
       // 送信中の 409 では確定を取り消して再試行させる (取消確定後の送信を起こさない)。
-      // 後発の成功取消を巻き戻さないよう、自分が書いた decided_at・版・所有に絞る。
+      // 後発の成功を取り込んだ監査行があれば戻さない。decided_at・版・所有も合わせる。
       await c.env.DB
         .prepare(
           `UPDATE bookings SET status = ?, decided_at = ?,
                                 updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
             WHERE id = ? AND line_account_id = ? AND status = ?
-              AND decided_at = ? AND lock_version = ? AND friend_id = ?`,
+              AND decided_at = ? AND lock_version = ? AND friend_id = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM booking_audit_logs
+                WHERE booking_id = ? AND rowid > ?
+              )`,
         )
         .bind(row.status, row.decided_at, bookingId, accountId, 'cancelled',
-          decidedAt, expectedVersion, caller.friendId)
+          decidedAt, expectedVersion, caller.friendId, bookingId, auditBaseline)
         .run();
       return c.json({ error: 'send_in_flight_retry' }, 409);
     }
