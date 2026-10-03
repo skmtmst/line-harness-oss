@@ -1310,6 +1310,28 @@ const spec = {
         responses: { '200': { description: 'Imported (or skipped when already fetched)' }, '404': { description: 'Not found' }, '502': { description: '媒体から取り込めなかった' } },
       },
     },
+    '/api/ad-platforms/event-mappings': {
+      get: {
+        tags: ['Ads'], summary: '成果と広告イベントの対応表を読む（F-21）',
+        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Mappings' }, '400': { description: 'Validation error' } },
+      },
+      put: {
+        tags: ['Ads'], summary: '成果と広告イベントの対応表を保存する（F-21）',
+        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Saved' }, '400': { description: 'Validation error' }, '404': { description: '成果地点・広告が見つからない' } },
+      },
+    },
+    '/api/ad-platforms/logs/{id}/resend': {
+      post: {
+        tags: ['Ads'], summary: '広告への送信を同じ目印でやり直す（F-22。90日を過ぎたら拒む）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '202': { description: 'Resend accepted' }, '404': { description: 'Not found' }, '409': { description: '期限切れ' } },
+      },
+    },
     // ── Friends ─────────────────────────────────────────────────────────────
     '/api/friends': {
       get: {

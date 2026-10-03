@@ -160,6 +160,17 @@ CREATE TABLE action_score_rule_versions (
   CHECK (high_min < max_score)
 );
 
+CREATE TABLE ad_conversion_event_mappings (
+  id                  TEXT PRIMARY KEY,
+  line_account_id     TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id) ON DELETE CASCADE,
+  ad_platform_id      TEXT NOT NULL REFERENCES ad_platforms(id) ON DELETE CASCADE,
+  event_name          TEXT NOT NULL CHECK (length(trim(event_name, ' ')) > 0 AND length(event_name) <= 64),
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (line_account_id, conversion_point_id, ad_platform_id)
+);
+
 CREATE TABLE ad_conversion_logs (
   id                  TEXT PRIMARY KEY,
   ad_platform_id      TEXT NOT NULL,
@@ -7480,6 +7491,12 @@ CREATE INDEX idx_action_score_rule_sets_account_status
 
 CREATE INDEX idx_action_score_rule_versions_set_status
   ON action_score_rule_versions(rule_set_id, status, version_number DESC);
+
+CREATE INDEX idx_ad_conversion_event_mappings_account
+  ON ad_conversion_event_mappings (line_account_id);
+
+CREATE INDEX idx_ad_conversion_event_mappings_point
+  ON ad_conversion_event_mappings (conversion_point_id);
 
 CREATE INDEX idx_ad_conversion_logs_account ON ad_conversion_logs(line_account_id);
 
