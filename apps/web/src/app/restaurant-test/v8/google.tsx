@@ -1,12 +1,20 @@
 'use client'
 
 /*
- * ★V8-B Googleビジネス（板 `j0Wcg`）。
+ * ★V8-B Googleビジネス（板 `j0Wcg`＋子板6枚）。
  *
  * 口コミタブだけをV8の板に積み替える。データの口（一覧・絞り込み・並び順・
  * 同期・下書き画面への行き先）は v7（google-business.tsx）と同じ。
- * 投稿・パフォーマンス・プロフィール・設定タブと下書きの画面は今の作りのまま
- * v7 を出す（V8 完成までの二重管理）。
+ * 投稿・パフォーマンス・プロフィール・設定タブと返信作成の画面は今の作りのまま
+ * v7 を出す（V8 完成までの二重管理）。子板の印は V8 の外枠に付ける：
+ * - `SrmVs` パフォーマンス：?tab=performance
+ * - `JUTGz` プロフィール：?tab=profile（営業時間・変更履歴の状態を含む）
+ * - `Cfed0` 投稿：?tab=posts（view なしの一覧）
+ * - `T1j2Sw` 投稿を作る：?tab=posts&view=new|edit|confirm
+ * - `CuHXG` 設定：?tab=settings（未接続のときも設定タブなので同じ印）
+ * - `x9HIR` 返信を作る：?tab=reviews&view=draft
+ * 見た目の V8 化（タブの中身の積み替え）は別段でやる。共通部品そのものは
+ * 仕上げ係 M10 だけが変える。
  *
  * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
  * - 「Google経由の予約」の数：結ぶ口が無いので「—」にする。
@@ -263,6 +271,20 @@ function GoogleReviewsBoard({ data, stores }: { data: GoogleConnectionData; stor
   )
 }
 
+/**
+ * フォールバック（v7 のまま出す画面）の子板の印。
+ * 未接続のとき v7 は設定タブを出すので `CuHXG`。
+ */
+function googleFallbackNode(tab: string | null, view: string | null, connected: boolean): string {
+  if (!connected) return 'CuHXG'
+  if (tab === 'performance') return 'SrmVs'
+  if (tab === 'profile') return 'JUTGz'
+  if (tab === 'posts') return view === 'new' || view === 'edit' || view === 'confirm' ? 'T1j2Sw' : 'Cfed0'
+  if (tab === 'settings') return 'CuHXG'
+  if (view === 'draft') return 'x9HIR'
+  return 'j0Wcg'
+}
+
 function GoogleV8Inner() {
   usePageTitle('Googleビジネス')
   const searchParams = useSearchParams()
@@ -303,7 +325,14 @@ function GoogleV8Inner() {
   }
   if (error || !data) return <ListState kind="error" title="Googleビジネスを表示できませんでした" description={error} onRetry={() => void load()} />
   // 口コミタブ以外・下書きの画面・未接続は今の作り（v7）のまま出す。
-  if ((tab && tab !== 'reviews') || view || !connected) return <GoogleBusinessPage />
+  // 外枠に子板の印を付ける（中身の V8 化は別段）。
+  if ((tab && tab !== 'reviews') || view || !connected) {
+    return (
+      <div data-design-node={googleFallbackNode(tab, view, connected)}>
+        <GoogleBusinessPage />
+      </div>
+    )
+  }
   return <GoogleReviewsBoard data={data} stores={stores} />
 }
 

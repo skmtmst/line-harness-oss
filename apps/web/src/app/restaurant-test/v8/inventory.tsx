@@ -13,13 +13,18 @@
  * - 開ける時間の曜日ごとの編集：週単位で保存する口が無いので出さない。
  *   時間帯ごとの席数は表と箱で直せる。
  * - 下の固定帯の文言：開ける時間が出せないので「配分を保存」にする。
+ * - 板 `Yyw6i`（媒体を閉じる知らせ）：残りが少ない時間帯の検知と閉じた記録は
+ *   この画面だけで持ち、外部媒体への書き戻しはしない（検証環境は受信専用）。
+ *   媒体ごとの受信状態の口が無いので、閉じる対象の媒体は利用者が選ぶ。
  * v7 を直す必要が出たら向こうも同じ判断を入れる（V8 完成までの二重管理）。
  */
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
@@ -107,6 +112,16 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const [slotAlloc, setSlotAlloc] = useState<Alloc | null>(null)
   const [conflict, setConflict] = useState<{ rowId: string | null; attempted: Alloc; scope: string } | null>(null)
   const [diffOpen, setDiffOpen] = useState(false)
+  // 板 `Yyw6i`（媒体を閉じる知らせ）：残りが少ない時間帯への知らせと、閉じた記録。
+  // 記録はこの画面だけで持ち、外部媒体への書き戻しはしない。
+  const [closeNoteOpen, setCloseNoteOpen] = useState(false)
+  const [closedSlots, setClosedSlots] = useState<string[]>([])
+  const [closedChannels, setClosedChannels] = useState<string[]>([])
+  const lowSlots = useMemo(
+    () => slots.filter((slot) => slot.free >= 0 && slot.free / Math.max(totalSeats, 1) < 0.2 && !closedSlots.includes(slot.row.id)),
+    [closedSlots, slots, totalSeats],
+  )
+  const closeTarget = lowSlots.slice().sort((a, b) => a.free - b.free)[0] ?? null
   // 競合後の最新値は、読み直した今の行から出す（閉じ込めた古い写しは使わない）。
   const conflictLatest: Alloc | null = conflict
     ? conflict.rowId === null
@@ -200,6 +215,44 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
           </div>
         </div>
       ) : null}
+      {closeTarget && !conflict ? (
+        <Notice tone="warn">
+          {closeTarget.time}が残り{closeTarget.free}席になりました。媒体の受付を閉じたら記録してください。
+          <Button size="compact" onClick={() => { setClosedChannels([]); setCloseNoteOpen(true) }}>閉じる知らせを確認する</Button>
+        </Notice>
+      ) : null}
+      <Dialog
+        open={closeNoteOpen}
+        onCancel={() => setCloseNoteOpen(false)}
+        title={closeTarget ? `${closeTarget.time}が残り${closeTarget.free}席になりました` : '残りが少ない時間帯があります'}
+        designNode="Yyw6i"
+        footer={(
+          <>
+            <Button onClick={() => setCloseNoteOpen(false)}>あとで</Button>
+            <Button
+              variant="primary"
+              disabled={closedChannels.length === 0}
+              onClick={() => {
+                if (closeTarget) setClosedSlots((current) => [...current, closeTarget.row.id])
+                setCloseNoteOpen(false)
+              }}
+            >
+              閉じたものを記録する
+            </Button>
+          </>
+        )}
+      >
+        <p>閉じた媒体に印を付けてください。媒体への書き戻しはしていません（検証環境は受信専用）。閉じた記録はこの画面だけで残します。</p>
+        {['Hot Pepper', '食べログ', 'ぐるなび'].map((channel) => (
+          <Checkbox
+            key={channel}
+            checked={closedChannels.includes(channel)}
+            onCheckedChange={(checked) => setClosedChannels((current) => (checked ? [...current, channel] : current.filter((item) => item !== channel)))}
+          >
+            {channel}を閉じた
+          </Checkbox>
+        ))}
+      </Dialog>
       <Dialog
         open={diffOpen}
         onCancel={() => setDiffOpen(false)}

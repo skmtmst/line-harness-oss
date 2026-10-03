@@ -16,6 +16,7 @@ import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
+import { AccountArchiveDialog, AccountRestoreDialog, AccountSettingsDialog } from './account-settings-dialogs'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import OperatorHistory from '@/components/hq/operator-history'
@@ -32,6 +33,9 @@ export default function HqPage() {
   // M021：捕まえた失敗を持ち、共通部品へ渡す（403 は権限の案内になる）。
   const [loadError, setLoadError] = useState<unknown>(null)
   const [editingAccount, setEditingAccount] = useState<AccountWithStats | null>(null)
+  /* 板 `HMpVx`・`D6ljr`・`HFsO9`：カードの「設定」から開く3つの窓。 */
+  const [settingsAccount, setSettingsAccount] = useState<AccountWithStats | null>(null)
+  const [archiveTarget, setArchiveTarget] = useState<{ account: AccountWithStats; mode: 'archive' | 'restore' } | null>(null)
   const [checkingConnections, setCheckingConnections] = useState(false)
   const [connectionProgress, setConnectionProgress] = useState('')
   const [connectionResult, setConnectionResult] = useState('')
@@ -184,11 +188,54 @@ export default function HqPage() {
       ) : null}
 
       {!loadError && !loading && accounts.length > 0 ? (
-        theme === 'v8' ? <AccountBrowser accounts={accounts} onSelect={login} onSettings={setEditingAccount} /> : <HqAccountList accounts={accounts} onSelect={login} onSettings={setEditingAccount} />
+        theme === 'v8' ? <AccountBrowser accounts={accounts} onSelect={login} onSettings={setSettingsAccount} /> : <HqAccountList accounts={accounts} onSelect={login} onSettings={setSettingsAccount} />
       ) : null}
 
       {/* 運営が書き込みを伴う操作をしたときだけ出る（★V6 37-5）。 */}
       <OperatorHistory />
+
+      {settingsAccount ? (
+        <AccountSettingsDialog
+          account={settingsAccount}
+          accounts={accounts}
+          archived={Boolean((settingsAccount as { archivedAt?: string | null }).archivedAt)}
+          onClose={() => setSettingsAccount(null)}
+          onSaved={() => {
+            setSettingsAccount(null)
+            void reloadAfterSave()
+          }}
+          onArchive={() => {
+            setArchiveTarget({ account: settingsAccount, mode: (settingsAccount as { archivedAt?: string | null }).archivedAt ? 'restore' : 'archive' })
+            setSettingsAccount(null)
+          }}
+          onShowDetails={() => {
+            setEditingAccount(settingsAccount)
+            setSettingsAccount(null)
+          }}
+        />
+      ) : null}
+
+      {archiveTarget?.mode === 'archive' ? (
+        <AccountArchiveDialog
+          account={archiveTarget.account}
+          onClose={() => setArchiveTarget(null)}
+          onDone={() => {
+            setArchiveTarget(null)
+            void reloadAfterSave()
+          }}
+        />
+      ) : null}
+
+      {archiveTarget?.mode === 'restore' ? (
+        <AccountRestoreDialog
+          account={archiveTarget.account}
+          onClose={() => setArchiveTarget(null)}
+          onDone={() => {
+            setArchiveTarget(null)
+            void reloadAfterSave()
+          }}
+        />
+      ) : null}
 
       {editingAccount ? (
         <AccountEditModal

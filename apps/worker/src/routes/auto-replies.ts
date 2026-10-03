@@ -776,6 +776,34 @@ async function conflictsForDraft(
     .filter((item): item is AutoReplyConflict => item !== null);
 }
 
+/*
+ * F7: 作成する前の仮の行と、現在有効なルールを当てる。
+ * まだ行が無いので ID は仮。競合の有無だけを見て、有効化の可否を決める。
+ * 共通（lineAccountId null）は全部のアカウントに届くので、有効な全件と当てる。
+ */
+async function conflictsForCreate(
+  db: D1Database,
+  settings: AutoReplyDraftSettings,
+): Promise<AutoReplyConflict[]> {
+  const active = settings.lineAccountId == null
+    ? await db.prepare(
+      `SELECT * FROM auto_replies
+         WHERE is_active = 1 AND deleted_at IS NULL
+         ORDER BY priority ASC, respond_to_all ASC, created_at ASC`,
+    ).all<DbAutoReply>()
+    : await db.prepare(
+      `SELECT * FROM auto_replies
+         WHERE is_active = 1 AND deleted_at IS NULL
+           AND (line_account_id IS NULL OR line_account_id = ?)
+         ORDER BY priority ASC, respond_to_all ASC, created_at ASC`,
+    ).bind(settings.lineAccountId).all<DbAutoReply>();
+  const candidate = autoReplyRowFromDraftSettings('__create_pending__', settings, jstNow());
+  candidate.is_active = 1;
+  return (active.results ?? [])
+    .map((item) => conflictBetween(candidate, item))
+    .filter((item): item is AutoReplyConflict => item !== null);
+}
+
 function conflictPairs(rules: DbAutoReply[]): AutoReplyConflictPair[] {
   const pairs: AutoReplyConflictPair[] = [];
   for (let leftIndex = 0; leftIndex < rules.length; leftIndex += 1) {
@@ -1587,6 +1615,9 @@ autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'),
 // 前は入力を無視して常に有効で作っていたため、オフで保存したルールが
 // 届いたメッセージへ応答していた。動かすのは isActive: true の明示指定か、
 // 保存後の再開・公開操作だけにする。
+// F7: isActive: true の指定があっても、作る前に既存の有効ルールと当てる。
+// 当たれば有効化せず停止中で作り、理由を社内メモへ残す（応答にも返す）。
+// 当たらなければ要求どおりすぐ有効にする。
 autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
@@ -1700,6 +1731,12 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       if (flexError) return c.json({ success: false, error: flexError }, 400);
     }
 
+    // F7: 有効で作る要求があれば、作る前に既存の有効ルールと当てる。
+    // 当たれば有効化せず停止中で作り、理由を社内メモへ残す。
+    // 当たらなければ要求どおりすぐ有効にする。
+    // 停止指定・省略は従来どおり停止のまま（AUTOREPLY-08）。
+    let activationBlocked = false;
+    let activationBlockedReason: string | null = null;
     // m26c R570: 確認キーがあれば再送を同じ行へ復帰させる。
     const ruleKey = readIdempotencyKey(c);
     const createInput = {
@@ -1718,6 +1755,48 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       priority: priority.value,
       messageKinds: messageKinds.value,
     };
+    if (createInput.isActive) {
+      const createSettings: AutoReplyDraftSettings = {
+        keyword: createInput.keyword,
+        matchType: createInput.matchType ?? 'exact',
+        responseType: createInput.responseType ?? 'text',
+        responseContent: createInput.responseContent,
+        templateId: createInput.templateId ?? null,
+        lineAccountId: createInput.lineAccountId ?? null,
+        activeFrom: createInput.activeFrom ?? null,
+        activeUntil: createInput.activeUntil ?? null,
+        cooldownMinutes: createInput.cooldownMinutes ?? null,
+        skipWhenOperatorActive: createInput.skipWhenOperatorActive === true,
+        priority: createInput.priority ?? 0,
+        messageKinds: jsonText(createInput.messageKinds),
+        receiveSources: ['line'],
+        friendConditions: jsonText(createInput.friendConditions),
+        actions: jsonText(createInput.actions),
+        responseWeekdays: jsonText(createInput.responseWeekdays),
+        responseHolidayRule: createInput.responseHolidayRule ?? null,
+        oncePerFriend: createInput.oncePerFriend === true,
+        keywords: jsonText(createInput.keywords),
+        respondToAll: createInput.respondToAll === true,
+        name: createInput.name ?? null,
+        keywordMatchMode: createInput.keywordMatchMode ?? 'any',
+        folderId: createInput.folderId ?? null,
+        internalMemo: createInput.internalMemo ?? null,
+      };
+      const preConflicts = await conflictsForCreate(c.env.DB, createSettings);
+      if (preConflicts.length > 0) {
+        activationBlocked = true;
+        activationBlockedReason = preConflicts.map((item) => item.reason).join(' ');
+        createInput.isActive = false;
+        const names = [...new Set(preConflicts.map((item) => item.name))].join('／');
+        const reasonHead = `競合のため停止中で作成（${names}と重なります）。有効にする前に競合を確認してください。`;
+        const userMemo = createInput.internalMemo ?? null;
+        const merged = userMemo ? `${reasonHead}\n${userMemo}` : reasonHead;
+        // 社内メモは1000文字まで。理由を優先して残す。
+        createInput.internalMemo = [...merged].length > 1000
+          ? [...merged].slice(0, 1000).join('')
+          : merged;
+      }
+    }
     let item: DbAutoReply;
     try {
       const created = await createAutoReply(
@@ -1735,7 +1814,19 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     }
 
     const memos = await internalMemosOf(c.env.DB, [item.id]);
-    return c.json({ success: true, data: serializeAutoReply(item, memos.get(item.id) ?? null) }, 201);
+    // F7: 作成直後の競合一覧も返す。止めて作った理由は社内メモに残してある。
+    const createdSettings = autoReplyDraftSettingsFromRow(item);
+    const createConflicts = await conflictsForDraft(c.env.DB, item.id, createdSettings);
+    return c.json({
+      success: true,
+      data: {
+        ...serializeAutoReply(item, memos.get(item.id) ?? null),
+        conflicts: createConflicts,
+        conflictDetected: createConflicts.length > 0,
+        activationBlocked,
+        activationBlockedReason,
+      },
+    }, 201);
   } catch (err) {
     console.error('POST /api/auto-replies error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

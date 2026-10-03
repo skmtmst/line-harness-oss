@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 予約したあと（絵 `cdZBf`）。
+ * ★V8 予約したあと（絵 `cdZBf`。再撮の板 `CRtK8` を外枠に付ける）。
  *
  * 予約の読み込み・取消・複製・テスト送信の中身は reserved/page.tsx が持ち、
  * ここは見せ方だけを受け取る。並びは 戻り口 → 題＋札＋1行説明 →
@@ -85,7 +85,7 @@ export default function ReservedV8({
       : ''
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node="CRtK8">
       <Link href="/broadcasts" className="text-action inline-flex text-sm font-semibold hover:underline">
         ← 一斉配信の一覧へ
       </Link>

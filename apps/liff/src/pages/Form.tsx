@@ -20,6 +20,7 @@ import {
   FORM_SUBMIT_INCOMPLETE_MESSAGE,
 } from '../lib/form-submit-flow.js';
 import { logFailure } from '../lib/user-message.js';
+import { useWideViewport } from '../lib/use-wide-viewport.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import Button from '../components/ui/Button.js';
@@ -191,6 +192,8 @@ export default function Form() {
    */
   const testToken = search.get('test_token');
 
+  // 414 幅の板（`wPfqW`）は板 ID だけを替える。中身は同じ。
+  const wide = useWideViewport();
   const [form, setForm] = useState<PublicForm | null>(null);
   const [answers, setAnswers] = useState<Answers>({});
   const [sectionIndex, setSectionIndex] = useState(0);
@@ -514,7 +517,7 @@ export default function Form() {
   const pageTitle = options.pageTitle || form.name;
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node="B8rCt">
+    <div className="min-h-screen bg-ground" data-design-node={wide ? 'wPfqW' : 'B8rCt'}>
       <LiffHeader title={pageTitle} />
       <div
         className="mx-auto min-h-screen w-full max-w-md px-4 pt-3 pb-28"
