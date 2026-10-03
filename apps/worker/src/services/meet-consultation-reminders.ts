@@ -212,9 +212,27 @@ export async function registerMeetConsultation(
     )
     .run();
   // SELECT 後に勝者が書いていたら WHERE が止めて 0 件になる。敗者は何も触らない。
-  if (existing != null && (upsert.meta?.changes ?? 0) === 0) {
+  // existing が null でも 0 件は敗者 (両者 null 読取の競合)。無条件で止める。
+  if ((upsert.meta?.changes ?? 0) === 0) {
     return { id: consultationId, reminders: schedules, updated: false };
   }
+
+  // 子の書込みは1文ごとに親の版と結び付ける。親が動いていたらその文だけ
+  // 0 件になり、勝者の子を壊さない。書いた値は登録時の版で固定する。
+  const writtenBookingId = input.bookingId ?? null;
+  const versionGuard = `EXISTS (
+    SELECT 1 FROM meet_consultations guard
+     WHERE guard.id = ?
+       AND (guard.booking_id = ? OR (guard.booking_id IS NULL AND ? IS NULL))
+       AND (guard.booking_version = ? OR (guard.booking_version IS NULL AND ? IS NULL))
+  )`;
+  const guardBinds = [
+    consultationId,
+    writtenBookingId,
+    writtenBookingId,
+    incomingVersion,
+    incomingVersion,
+  ] as unknown[];
 
   const expectedKinds = new Set(schedules.map((item) => item.kind));
   for (const item of schedules) {
@@ -229,9 +247,12 @@ export async function registerMeetConsultation(
         .prepare(
           `INSERT INTO meet_consultation_reminders
             (id, consultation_id, kind, scheduled_at, status, retry_count, created_at, updated_at)
-           VALUES (?, ?, ?, ?, 'pending', 0, ?, ?)`,
+           SELECT ?, ?, ?, ?, 'pending', 0, ?, ? WHERE ${versionGuard}`,
         )
-        .bind(crypto.randomUUID(), consultationId, item.kind, item.scheduledAt, nowIso, nowIso)
+        .bind(
+          crypto.randomUUID(), consultationId, item.kind, item.scheduledAt, nowIso, nowIso,
+          ...guardBinds,
+        )
         .run();
     } else if (scheduleChanged || reminder.status === 'cancelled') {
       // 送信ずみは履歴として残し、未来分だけ再設定する。sent を pending に
@@ -241,9 +262,10 @@ export async function registerMeetConsultation(
           `UPDATE meet_consultation_reminders
               SET scheduled_at=?, status='pending', retry_count=0,
                   last_error=NULL, updated_at=?
-            WHERE id=? AND status IN ('pending','failed','cancelled')`,
+            WHERE id=? AND status IN ('pending','failed','cancelled')
+              AND ${versionGuard}`,
         )
-        .bind(item.scheduledAt, nowIso, reminder.id)
+        .bind(item.scheduledAt, nowIso, reminder.id, ...guardBinds)
         .run();
     }
   }
@@ -255,10 +277,26 @@ export async function registerMeetConsultation(
       .prepare(
         `UPDATE meet_consultation_reminders
             SET status='cancelled', updated_at=?
-          WHERE consultation_id=? AND kind=? AND status IN ('pending','failed')`,
+          WHERE consultation_id=? AND kind=? AND status IN ('pending','failed')
+            AND ${versionGuard}`,
       )
-      .bind(nowIso, consultationId, kind)
+      .bind(nowIso, consultationId, kind, ...guardBinds)
       .run();
+  }
+
+  // V6 phase の前の版の再確認。子の書込み中に勝者が上書きしていたら
+  // V6 (共有層に版条件を持てない) には触らず、stale で終える。行と子は
+  // 勝者の full pass がそろえるため、敗者は何も直さない。
+  const beforeV6 = await db
+    .prepare('SELECT booking_id, booking_version FROM meet_consultations WHERE id = ?')
+    .bind(consultationId)
+    .first<{ booking_id: string | null; booking_version: number | null }>();
+  if (
+    !beforeV6 ||
+    beforeV6.booking_id !== writtenBookingId ||
+    beforeV6.booking_version !== incomingVersion
+  ) {
+    return { id: consultationId, reminders: schedules, updated: false };
   }
 
   // N-065: 個別相談の日程変更・再送を V6 へ連動する。
@@ -382,6 +420,19 @@ export async function cancelMeetConsultation(
     )
     .run();
   if ((claimed.meta?.changes ?? 0) === 0) return false;
+  // V6 の前の版の再確認。claim から V6 の間に勝者が上書きしていたら、
+  // V6・子には触らず false (敗者は何も壊さない)。行は勝者のものが残る。
+  const beforeV6 = await db
+    .prepare('SELECT booking_id, booking_version FROM meet_consultations WHERE id = ?')
+    .bind(consultation.id)
+    .first<{ booking_id: string | null; booking_version: number | null }>();
+  if (
+    !beforeV6 ||
+    beforeV6.booking_id !== consultation.booking_id ||
+    beforeV6.booking_version !== consultation.booking_version
+  ) {
+    return false;
+  }
   // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
   // 再送は active が無いため 0 件で返す。移行前の行は探さない。
   try {
@@ -421,13 +472,29 @@ export async function cancelMeetConsultation(
     }
     throw error;
   }
+  // 子の取消も親の版と結び付ける。V6 の間に勝者が来ていたら 0 件になり、
+  // 勝者の未来通知を残す。
   await db
     .prepare(
       `UPDATE meet_consultation_reminders
           SET status='cancelled', updated_at=?
-        WHERE consultation_id=? AND status IN ('pending','failed')`,
+        WHERE consultation_id=? AND status IN ('pending','failed')
+          AND EXISTS (
+            SELECT 1 FROM meet_consultations guard
+             WHERE guard.id = ?
+               AND (guard.booking_id = ? OR (guard.booking_id IS NULL AND ? IS NULL))
+               AND (guard.booking_version = ? OR (guard.booking_version IS NULL AND ? IS NULL))
+          )`,
     )
-    .bind(nowIso, consultation.id)
+    .bind(
+      nowIso,
+      consultation.id,
+      consultation.id,
+      consultation.booking_id,
+      consultation.booking_id,
+      consultation.booking_version,
+      consultation.booking_version,
+    )
     .run();
   return true;
 }
@@ -473,6 +540,18 @@ export async function processDueMeetConsultationReminders(
             WHERE dead_booking.external_event_id = c.external_event_id
               AND dead_booking.line_account_id = f.line_account_id
               AND dead_booking.status IN ('cancelled','expired')
+          )
+          AND (
+            c.booking_id IS NULL
+            OR EXISTS (
+              SELECT 1 FROM bookings live_booking
+              WHERE live_booking.id = c.booking_id
+                AND live_booking.line_account_id = f.line_account_id
+                AND live_booking.friend_id = c.friend_id
+                AND live_booking.status IN ('requested','confirmed')
+                AND live_booking.lock_version = c.booking_version
+                AND datetime(live_booking.starts_at) = datetime(c.starts_at)
+            )
           )
         ORDER BY r.scheduled_at ASC
         LIMIT 100`,
