@@ -22,6 +22,8 @@ import ConditionBuilder, {
   type SegmentCondition,
 } from '@/components/shared/condition-builder'
 import { api, ApiError, type MileageEarningRuleV6 } from '@/lib/api'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import V8EarningRuleEdit from './v8-earning-rule-edit'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -387,6 +389,8 @@ function EditMileageRuleInner() {
 }
 
 export default function EditMileageRulePage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <V8EarningRuleEdit />
   return (
     <Suspense fallback={<ListState kind="loading" title="たまる決めごとを読み込んでいます" />}>
       <EditMileageRuleInner />

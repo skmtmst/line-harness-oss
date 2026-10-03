@@ -169,7 +169,7 @@ export default function ConnectorPanel({ accountId, canEdit = true }: { accountI
   const readonlyReason = '見るだけの権限では設定を変えられません。変えるにはオーナーか管理者に頼んでください。'
 
   return (
-    <>
+    <div data-design-node="iLJmw">
       {!canEdit ? (
         <NoteBar tone="info">
           {readonlyReason}いまの設定はこのまま見られます。
@@ -292,6 +292,6 @@ export default function ConnectorPanel({ accountId, canEdit = true }: { accountI
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
-    </>
+    </div>
   )
 }

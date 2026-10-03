@@ -24,7 +24,7 @@ export default function EcConnectorV8() {
   const canEdit = staffRole === null || canManageRole(staffRole)
 
   return (
-    <div className={styles.board} data-design-node="iLJmw">
+    <div className={styles.board}>
       <div className={styles.head}>
         <div>
           <h2 className={styles.headTitle}>EC連携</h2>

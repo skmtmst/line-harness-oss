@@ -3,6 +3,8 @@
  * ★V8-B EC連携の「つなぎ先」（板 `iLJmw`）。
  * V8 の枠（題・説明・設定の中の案内・入口のタブ）で今の板を包み、
  * 見るだけの担当者には保存の入口を出さないこと。
+ * 板の目印（data-design-node）は板側（connector-panel）が持つため、
+ * 枠側で二重に持たない。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -142,11 +144,14 @@ describe('V8-B つなぎ先（iLJmw）', () => {
     expect(document.body.textContent).toContain('見るだけの権限では設定を変えられません')
   })
 
-  it('V8 の決まり（layer・色直書きなし・準備中なし）を守る', () => {
+  it('V8 の決まり（layer・色直書きなし・準備中なし）を守る', async () => {
+    await renderV8()
     expect(v8css.split('\n')[0]).toContain('@layer properties, theme, base, components, utilities;')
     expect(v8css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
     expect(v8css).not.toMatch(/box-shadow\s*:/)
-    expect(v8tsx).toContain('data-design-node="iLJmw"')
+    expect(v8tsx).not.toContain('data-design-node=')
+    expect(document.querySelector('[data-design-node="iLJmw"]'), '板側の目印が1つある').toBeTruthy()
+    expect(document.querySelectorAll('[data-design-node="iLJmw"]').length, '目印は二重にしない').toBe(1)
     expect(v8tsx).not.toContain('準備中')
   })
 })

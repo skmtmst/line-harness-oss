@@ -25,7 +25,7 @@ import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
-import { TextArea, TextField } from '@/components/shared/text-field'
+import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { formatNumber } from '@/lib/format'
@@ -338,7 +338,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
       title={`${tenantName} を${label}`}
       description={
         target === 'suspended'
-          ? '停止すると、この契約先の権限者はログインできなくなります。'
+          ? '停止すると、この契約先の権限者はログインできなくなります。配信も止まります。'
           : target === 'archived'
             ? 'アーカイブすると一覧から外れます。データは消えません。'
             : '再開すると、権限者がまたログインできるようになります。'
@@ -347,6 +347,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
       destructive={needsName}
       busy={busy}
       error={error}
+      designNode={target === 'suspended' ? 'okXoi' : undefined}
       onConfirm={ready ? () => void submit() : undefined}
       onCancel={onClose}
     >
@@ -359,7 +360,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
         ) : null}
         <label className="block">
           <span className="mb-1.5 block text-caption font-medium text-ink">理由<RequiredBadge /><span className="font-normal text-ink-faint">（4文字以上）</span></span>
-          <TextArea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} />
+          <TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" />
         </label>
       </div>
     </ConfirmDialog>
