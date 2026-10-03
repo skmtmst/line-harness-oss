@@ -1856,6 +1856,20 @@ async function runSixHourlyHeavyJobs(
         }
       },
     },
+    {
+      // ★V6 36-2: 退会・無料体験切れから保存期限が過ぎた統括の顧客データを消す。
+      // 1回の行数に上限があり、途中で止まっても次の回が続きから消す。
+      name: 'tenant data retention purge',
+      run: async () => {
+        const { processTenantDataPurge } = await import('./services/tenant-data-purge.js');
+        const result = await processTenantDataPurge(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.anchoredTrials + result.tenants + result.deletedRows > 0) {
+          console.log(JSON.stringify({ event: 'tenant_data_retention_purge', ...result }));
+        }
+      },
+    },
   ];
 
   if (restaurantTestEnabled(env)) {
