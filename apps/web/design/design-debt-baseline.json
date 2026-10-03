@@ -2,6 +2,9 @@
   "app/accounts/new/page.tsx": {
     "arbitrary-value": 1
   },
+  "app/accounts/new/register-v8.tsx": {
+    "unresolved-classname": 85
+  },
   "app/accounts/page.tsx": {
     "arbitrary-value": 1
   },

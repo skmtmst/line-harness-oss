@@ -132,6 +132,8 @@ const EXEMPTIONS: Record<string, string> = {
     'サーバーへ下書き保存する多段ウィザード。段またぎ・店ごとの退避があり離脱の扱いは別途検討',
   'app/accounts/new/page.tsx':
     '登録ウィザードでdirty管理なし（コメント中の「未保存」記述のみ。R523の復帰案内の文言）',
+  'app/accounts/new/register-v8.tsx':
+    'V8登録ウィザード。入力は端末の下書きへ随時保存（秘密値は除く）し、閉じる確認は手順内の戻る・あとで続きからで済ませる設計',
   'app/booking/bookings/new/page.tsx':
     'dirty管理なし（コメント中の「未保存」記述のみ）',
   'app/hq/templates/template-console.tsx':
