@@ -255,6 +255,7 @@ shared-button-importer app/templates/carousel/page.tsx
 shared-button-importer app/templates/detail/detail-v8.tsx
 shared-button-importer app/templates/detail/page.tsx
 shared-button-importer app/templates/edit/page.tsx
+shared-button-importer app/templates/edit-v8.tsx
 shared-button-importer app/templates/editor-v8.tsx
 shared-button-importer app/templates/list-v8.tsx
 shared-button-importer app/templates/page.tsx
