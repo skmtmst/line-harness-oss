@@ -5,6 +5,7 @@ import { useBrand } from '@/lib/use-brand'
 import { loadAdminVersion } from '@/lib/admin-version-cache'
 import { isRealVersion } from '@/lib/deploy-info'
 import styles from './sidebar-identity.module.css'
+import { brandInitial } from './brand-initial'
 
 /**
  * 共通メニューのいちばん上。**アイコン ＋ 会社名 ＋ バージョン**だけ。
@@ -35,7 +36,7 @@ export default function SidebarIdentity() {
   }, [])
 
   const name = brand.name || '管理画面'
-  const initial = name === '株式会社 然' ? '然' : name.slice(0, 1)
+  const initial = brandInitial(name)
 
   return (
     <div className={styles.root} data-design-node="J33xq/V2WbXF">
@@ -44,7 +45,7 @@ export default function SidebarIdentity() {
         <span className={styles.name} title={name}>{name}</span>
         {/* V8 では社名の下に製品名を出す（版の情報はメニューの一番下にある）。
             v7 では今までどおり版を出す。 */}
-        <span className={`${styles.version} v8-only`}>LINE Harness</span>
+        <span className={`${styles.version} v8-only`}>musubo</span>
         {isRealVersion(version) && <span className={`${styles.version} v7-only`}>Ver. {version.trim()}</span>}
       </span>
     </div>

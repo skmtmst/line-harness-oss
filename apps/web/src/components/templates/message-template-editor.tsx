@@ -355,7 +355,7 @@ export function MessageTemplateEditor({
       <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-96">
         <LinePreview
           note={value.messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（山田 太郎さんの場合）'}
-          accountName="然-NEN-"
+          accountName="LINE公式アカウント"
         >
           {/*
             R249: カード型は詳細と同じカード表示にする。通常文の
