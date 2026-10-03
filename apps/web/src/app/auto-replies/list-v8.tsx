@@ -48,6 +48,9 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { movePriorityUpdates } from './auto-reply-order'
@@ -209,6 +212,8 @@ export default function AutoRepliesListV8() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -652,13 +657,16 @@ export default function AutoRepliesListV8() {
         label: '編集する',
         disabled: readonly,
         disabledReason: readonly ? NO_MANAGE_NOTE : undefined,
-        onSelect: () => router.push(`/auto-replies/edit?id=${r.id}`),
+        onSelect: () => goEdit(r.id),
       },
       {
         id: 'runs',
         label: '実行結果を見る',
         external: true,
-        onSelect: () => router.push(`/auto-replies/runs?id=${r.id}`),
+        onSelect: () =>
+          withViewTransition(() => {
+            router.push(`/auto-replies/runs?id=${r.id}`)
+          }),
       },
       {
         id: 'duplicate',
@@ -722,6 +730,42 @@ export default function AutoRepliesListV8() {
       },
     })
     return items
+  }
+
+  /* ===== 行の詳細パネル（V8「サクサク感」C①・D・E） ===== */
+
+  /** 一覧の行→詳細はつながる移り変わりで開く。 */
+  const goEdit = (id: string) => {
+    withViewTransition(() => {
+      router.push(`/auto-replies/edit?id=${id}`)
+    })
+  }
+
+  /** 右クリックは「…」と同じ項目をマウスの位置に出す。 */
+  const rowContextItems = (r: AutoReply): ContextMenuItem[] =>
+    rowMenuItems(r).map((item) => ({
+      id: item.id,
+      label: item.label,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      onSelect: () => item.onSelect(),
+    }))
+
+  const panelIndex = panelId === null ? -1 : items.findIndex((r) => r.id === panelId)
+  const panelRow = panelIndex >= 0 ? items[panelIndex] : null
+
+  /** パネルから止める・再開する。窓の流れは「…」と同じ。 */
+  const toggleFromPanel = (r: AutoReply) => {
+    const name = displayName(r)
+    setToggleError('')
+    setToggleReason('')
+    setPendingToggle({
+      ids: [r.id],
+      names: [name],
+      kind: r.isActive ? 'stop' : 'resume',
+      accountId: selectedAccountId,
+    })
+    setPanelId(null)
   }
 
   /* ===== フォルダの列 ===== */
@@ -928,12 +972,12 @@ export default function AutoRepliesListV8() {
                   key={r.id}
                   className={styles.rowClick}
                   tabIndex={0}
-                  onClick={() => router.push(`/auto-replies/edit?id=${r.id}`)}
+                  onClick={() => setPanelId(r.id)}
                   onKeyDown={(event) => {
                     if (event.target !== event.currentTarget) return
                     if (event.key === 'Enter') {
                       event.preventDefault()
-                      router.push(`/auto-replies/edit?id=${r.id}`)
+                      setPanelId(r.id)
                     }
                   }}
                 >
@@ -973,7 +1017,12 @@ export default function AutoRepliesListV8() {
                         href={`/auto-replies/edit?id=${r.id}`}
                         title={name}
                         className={styles.cellTitle}
-                        onClick={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                          event.preventDefault()
+                          goEdit(r.id)
+                        }}
                       >
                         {name}
                       </Link>
@@ -1041,15 +1090,20 @@ export default function AutoRepliesListV8() {
                     )}
                   </td>
                   <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
-                    <button
-                      type="button"
-                      className={styles.menuButton}
-                      title={`自動応答「${name}」の操作`}
-                      aria-expanded={openMenuId === r.id}
-                      onClick={() => setOpenMenuId((current) => (current === r.id ? null : r.id))}
+                    <ContextMenu
+                      label={`自動応答「${name}」の操作`}
+                      items={rowContextItems(r)}
                     >
-                      <MoreHorizontal size={16} aria-hidden="true" />
-                    </button>
+                      <button
+                        type="button"
+                        className={styles.menuButton}
+                        title={`自動応答「${name}」の操作`}
+                        aria-expanded={openMenuId === r.id}
+                        onClick={() => setOpenMenuId((current) => (current === r.id ? null : r.id))}
+                      >
+                        <MoreHorizontal size={16} aria-hidden="true" />
+                      </button>
+                    </ContextMenu>
                     <ActionMenu
                       open={openMenuId === r.id}
                       onClose={() => setOpenMenuId(null)}
@@ -1063,6 +1117,81 @@ export default function AutoRepliesListV8() {
           </tbody>
         </table>
       </div>
+
+      {/* 行の詳細パネル（V8「サクサク感」C①・E）。一覧は左に見えたまま。 */}
+      {panelRow &&
+        (() => {
+          const name = displayName(panelRow)
+          const trigger = triggerSummary(panelRow)
+          const canToggle = panelRow.isActive || panelRow.lifecycleStatus !== 'draft'
+          return (
+            <DetailPanel
+              open
+              title={name}
+              description={trigger.text}
+              onClose={() => setPanelId(null)}
+              onPrev={panelIndex > 0 ? () => setPanelId(items[panelIndex - 1].id) : undefined}
+              onNext={
+                panelIndex < items.length - 1 ? () => setPanelId(items[panelIndex + 1].id) : undefined
+              }
+              hasPrev={panelIndex > 0}
+              hasNext={panelIndex < items.length - 1}
+              footer={
+                <>
+                  <Button variant="primary" onClick={() => goEdit(panelRow.id)}>
+                    開く
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      withViewTransition(() => {
+                        router.push(`/auto-replies/runs?id=${panelRow.id}`)
+                      })
+                    }
+                  >
+                    実行結果を見る
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={!canEdit}
+                    onClick={() => {
+                      setDuplicateError('')
+                      setDuplicateTarget(panelRow)
+                      setPanelId(null)
+                    }}
+                  >
+                    複製する
+                  </Button>
+                  {canToggle && (
+                    <Button
+                      variant="secondary"
+                      disabled={!canEdit}
+                      onClick={() => toggleFromPanel(panelRow)}
+                    >
+                      {panelRow.isActive ? '止める' : '再開する'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    disabled={!canEdit}
+                    onClick={() => {
+                      setDeleteError('')
+                      setPendingDelete({ item: panelRow, accountId: selectedAccountId })
+                      setPanelId(null)
+                    }}
+                  >
+                    削除する
+                  </Button>
+                </>
+              }
+            >
+              <p>
+                {panelRow.isActive ? '有効' : '停止中'} ／ 今月 {panelRow.hits?.period ?? '—'}回 ／
+                累計 {panelRow.hits?.total ?? '—'}回
+              </p>
+            </DetailPanel>
+          )
+        })()}
 
       {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
       {selectedCount > 0 ? (
