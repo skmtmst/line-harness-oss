@@ -923,6 +923,7 @@ function InflowLinksPageInner({
                 name: savedRoute.name,
                 genre: savedRoute.genre,
                 isActive: savedRoute.isActive,
+                id: savedRoute.id,
               })
             }
           },

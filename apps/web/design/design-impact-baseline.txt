@@ -117,6 +117,8 @@ shared-button-importer app/hq/templates/template-console.tsx
 shared-button-importer app/inflow-links/_components/bulk-routes-dialog.tsx
 shared-button-importer app/inflow-links/_components/edit-route-modal.tsx
 shared-button-importer app/inflow-links/ad-integration.tsx
+shared-button-importer app/inflow-links/_components/inflow-delete-dialog.tsx
+shared-button-importer app/inflow-links/detail/inflow-detail-v8.tsx
 shared-button-importer app/inflow-links/detail/page.tsx
 shared-button-importer app/inflow-links/inflow-list-v8.tsx
 shared-button-importer app/inflow-links/new/inflow-create-v8.tsx

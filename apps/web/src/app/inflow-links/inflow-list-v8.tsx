@@ -839,6 +839,7 @@ export default function InflowListV8({ model }: { model: InflowListV8Model }) {
                                     name: row.name,
                                     genre: row.genre,
                                     isActive: row.isActive,
+                                    id: row.entryRouteId ?? undefined,
                                   })
                                 }
                                 onCopy={() => model.onCopy(row.refCode, row.refCode)}
