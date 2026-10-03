@@ -30,6 +30,7 @@ shared-button-importer app/automations/new/page.tsx
 shared-button-importer app/automations/page.tsx
 shared-button-importer app/automations/runs/page.tsx
 shared-button-importer app/booking/bookings/booking-calendar.tsx
+shared-button-importer app/booking/bookings/booking-detail-v8.tsx
 shared-button-importer app/booking/bookings/detail/page.tsx
 shared-button-importer app/booking/bookings/new/page.tsx
 shared-button-importer app/booking/bookings/page.tsx
@@ -363,6 +364,7 @@ shared-button-importer components/merged-person/merged-person-detail-v8.tsx
 shared-button-importer components/merged-person/merged-person-detail.tsx
 shared-button-importer components/merged-person/merged-person-sections.tsx
 shared-button-importer components/merged-person/merged-profile-dialog.tsx
+shared-button-importer components/ops/impersonation-bar.tsx
 shared-button-importer components/ops/knowledge-editor.tsx
 shared-button-importer components/ops/knowledge-list.tsx
 shared-button-importer components/ops/knowledge-ticket.tsx
@@ -430,3 +432,11 @@ table-header-migration-target app/webhooks/webhook-interactions.tsx
 # 詳細内テーブルのため、直書きthを残す既知の例外。
 native-table-header-exception app/affiliates/tabs.tsx
 shared-button-importer app/analytics/conversion-report-v8.tsx
+# ★V8-B 緊急コントロール（OHwbU）。確認の窓・本人確認・記録の操作に共通Buttonを使う。
+shared-button-importer app/emergency/control-v8.tsx
+# ★V8-B 運用者へのお知らせを作る（gjUz3）。届き方の見本・公開前の確認の操作に共通Buttonを使う。
+shared-button-importer app/line-notifications/operator/new/operator-new-v8.tsx
+# ★V8 共通情報の一覧（FM94M）。表の下にページ送りは共通Pagination、操作は共通Button。
+shared-button-importer app/contents/vars/list-v8.tsx
+shared-button-importer app/contents/vars/new/new-v8.tsx
+shared-button-importer app/contents/vars/edit/edit-v8.tsx
