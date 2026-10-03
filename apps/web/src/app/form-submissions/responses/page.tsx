@@ -3,16 +3,20 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import type { FormLayout } from '@line-crm/shared'
+import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
+import { postActionStepLabel } from './response-summary'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { TextInput } from '@/components/shared/form-controls'
+import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { fetchApi, ApiError } from '@/lib/api'
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
 import { csvCell } from '@/lib/presentation'
@@ -115,6 +119,7 @@ function FormResponsesInner() {
   const searchParams = useSearchParams()
   const formId = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const theme = useAdminTheme()
   const [form, setForm] = useState<FormDetail | null>(null)
   const [items, setItems] = useState<Submission[]>([])
   const [summary, setSummary] = useState<FormSubmissionSummary | null>(null)
@@ -128,7 +133,12 @@ function FormResponsesInner() {
   /** 403で権限不足のとき。再試行は出さない（M005）。 */
   const [formForbidden, setFormForbidden] = useState(false)
   const [query, setQuery] = useState('')
-  const [view, setView] = useState<'rows' | 'summary'>('rows')
+  // V8の板は「まとめて見る」が先頭。v7は1件ずつのまま。
+  // テーマは描画後にV8へ替わることがあるので、替わったときも先頭へ寄せる。
+  const [view, setView] = useState<'rows' | 'summary'>(theme === 'v8' ? 'summary' : 'rows')
+  useEffect(() => {
+    if (theme === 'v8') setView('summary')
+  }, [theme])
   const [selected, setSelected] = useState<Submission | null>(null)
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState('')
@@ -366,6 +376,223 @@ function FormResponsesInner() {
     )
   }
 
+  if (theme === 'v8') {
+    return renderV8Responses()
+  }
+
+  function renderV8Responses() {
+    if (!form) return null
+    const node = view === 'summary' ? 'v0SbYR' : 'MKQyJ'
+    const rate = summary?.completionRate
+    const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
+    const firstKey = fieldKeys[0]
+    const inputBlocks = [...form.layout.header, ...form.layout.sections.flatMap((s) => s.blocks)]
+      .filter((b): b is Extract<FormBlock, { kind: 'input' }> => b.kind === 'input')
+    const blockByKey = (key: string) =>
+      inputBlocks.find((b) => b.name === key || b.id === key)
+    const typeLabel = (type: FormInputType): string | null => {
+      switch (type) {
+        case 'radio': return 'ラジオ'
+        case 'checkbox': return 'チェック'
+        case 'select': return 'プルダウン'
+        case 'rating': return '5段階'
+        case 'textarea': return '複数行'
+        case 'date': return '日付'
+        default: return null
+      }
+    }
+    return (
+      <div className="flex flex-col gap-4" data-design-node={node}>
+        <div>
+          <Link href="/form-submissions" className="text-action text-sm">
+            ←回答フォームへ
+          </Link>
+          <h1 className="text-ink mt-1 text-xl font-bold">集まった回答：{form.name}</h1>
+          <p className="text-ink-secondary mt-1 text-xs">
+            {total === null ? '—' : `${formatNumber(total)}件`}
+            {rate != null ? `・答え終えた割合${formatNumber(rate)}%` : ''}
+          </p>
+        </div>
+
+        <div role="tablist" aria-label="回答の見方" className="border-hairline flex gap-4 border-b text-sm">
+          {(
+            [
+              { key: 'summary', label: 'まとめて見る' },
+              { key: 'rows', label: '1件ずつ見る' },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={view === tab.key}
+              onClick={() => setView(tab.key)}
+              className={view === tab.key ? 'text-ink border-ink border-b-2 pb-2 font-bold' : 'text-ink-secondary pb-2'}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {total === 0 && !query.trim() ? (
+          <ListState kind="empty" title="まだ回答がありません" description="フォームが回答されると、ここに1件ずつ並びます。" />
+        ) : (
+          <div className="grid items-start gap-4 xl:grid-cols-3">
+            <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
+              {view === 'summary' ? (
+                <>
+                  {summaries.map((fieldSummary) => {
+                    const block = blockByKey(fieldSummary.key)
+                    const answered = fieldSummary.values.reduce((acc, [, count]) => acc + count, 0)
+                    if (block?.type === 'textarea') return null
+                    const kindLabel = block ? typeLabel(block.type) : null
+                    const top = fieldSummary.values.slice(0, 6)
+                    const max = top[0]?.[1] ?? 0
+                    return (
+                      <section key={fieldSummary.key} className="bg-canvas rounded-card border-hairline border p-4">
+                        <h2 className="text-ink text-sm font-bold">{labels[fieldSummary.key] ?? fieldSummary.key}</h2>
+                        <p className="text-ink-faint mt-1 text-xs">
+                          {kindLabel ? `${kindLabel}・` : ''}{answered === 0 ? 'まだ答えがありません' : `${formatNumber(answered)}件が答えた`}
+                        </p>
+                        {answered > 0 && (
+                          <dl className="mt-3 space-y-2.5">
+                            {top.map(([value, count]) => (
+                              <div key={value}>
+                                <div className="flex items-baseline justify-between gap-3">
+                                  <dt className="text-ink min-w-0 flex-1 truncate text-sm" title={value}>{value}</dt>
+                                  <dd className="shrink-0 text-sm tabular-nums">
+                                    <span className="text-ink">{formatNumber(count)}件</span>
+                                    <span className="text-ink-faint ml-1 text-xs">({formatNumber(Math.round((count / answered) * 100))}%)</span>
+                                  </dd>
+                                </div>
+                                <div className="bg-canvas-sunken mt-1 h-2 overflow-hidden rounded-pill" aria-hidden>
+                                  <div className="bg-accent-deep h-2 rounded-pill" style={{ width: `${max === 0 ? 0 : Math.round((count / max) * 100)}%` }} />
+                                </div>
+                              </div>
+                            ))}
+                          </dl>
+                        )}
+                      </section>
+                    )
+                  })}
+                  <FreeTextCard
+                    fieldKeys={fieldKeys}
+                    labels={labels}
+                    blocks={inputBlocks}
+                    items={shown}
+                    onSeeRows={() => setView('rows')}
+                  />
+                  <div className="text-right">
+                    <button type="button" onClick={() => setView('rows')} className="text-action text-sm">
+                      → 1件ずつ見る
+                    </button>
+                  </div>
+                </>
+              ) : shown.length === 0 ? (
+                <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
+                  <p className="text-ink text-sm font-bold">条件に合う回答はありません</p>
+                  <p className="text-ink-secondary mt-1 text-xs">検索語を変えてください。</p>
+                  <Button variant="secondary" className="mt-3" onClick={() => setQuery('')}>
+                    × 条件を外す
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <section className="bg-canvas rounded-card border-hairline overflow-hidden border">
+                    <table className="w-full table-fixed">
+                      <thead>
+                        <TableHeadRow>
+                          <Th style={{ width: '22%' }}>答えた日時</Th>
+                          <Th style={{ width: '24%' }}>答えた人</Th>
+                          <Th>{firstKey ? (labels[firstKey] ?? firstKey) : '回答'}</Th>
+                          <Th style={{ width: '18%' }}>後処理</Th>
+                        </TableHeadRow>
+                      </thead>
+                      <tbody className="divide-hairline divide-y">
+                        {shown.map((item) => {
+                          const actions = item.postActions
+                          const incomplete = actions == null || actions.state === 'untracked'
+                            ? null
+                            : actions.state === 'completed' ? false : true
+                          return (
+                            <tr
+                              key={item.id}
+                              onClick={() => setSelected(item)}
+                              className={selected?.id === item.id ? 'bg-accent-soft cursor-pointer hover:bg-canvas-sunken' : 'cursor-pointer hover:bg-canvas-sunken'}
+                            >
+                              <td className="text-ink-secondary px-3 py-3 text-xs whitespace-nowrap">{formatDateTime(item.createdAt)}</td>
+                              <td className="text-action truncate px-3 py-3 text-sm font-medium" title={item.friendName ?? '不明'}>{item.friendName ?? '不明'}</td>
+                              <td className="text-ink truncate px-3 py-3 text-sm" title={firstKey ? valueText((item.data as Record<string, unknown>)[firstKey]) : '—'}>
+                                {firstKey ? valueText((item.data as Record<string, unknown>)[firstKey]) : '—'}
+                              </td>
+                              <td className="px-3 py-3">
+                                {incomplete === null ? (
+                                  <span className="text-ink-faint text-xs">—</span>
+                                ) : incomplete ? (
+                                  <StatusBadge tone="danger">未完</StatusBadge>
+                                ) : (
+                                  <StatusBadge tone="success">済み</StatusBadge>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </section>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-ink-secondary text-xs">
+                      {total === null ? '—' : <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />}
+                    </p>
+                    <Pagination page={page} pageCount={pageCount} disabled={loading} ariaLabel="回答一覧のページ送り" onPageChange={(next) => void load(next, pageSize)} />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-4">
+              <div className="flex flex-wrap gap-2">
+                <Button href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} variant="secondary">
+                  フォームを編集
+                </Button>
+                <Button variant="secondary" onClick={() => void exportAll()} disabled={exporting || total === 0} busy={exporting} busyLabel={(exportProgress || 'CSVを準備しています')}>
+                  CSVで書き出す
+                </Button>
+              </div>
+              {exportError && <p className="text-danger text-sm">{exportError}</p>}
+              {exporting && exportProgress && (
+                <p className="text-ink-secondary text-sm" role="status">{exportProgress}</p>
+              )}
+              <section className="bg-canvas rounded-card border-hairline border p-4">
+                <h2 className="text-ink text-sm font-bold">絞り込み</h2>
+                <label className="text-ink-secondary mt-3 mb-1 block text-xs" htmlFor="v8-response-filter">
+                  名前・答えで探す（全件から）
+                </label>
+                <TextInput
+                  id="v8-response-filter"
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="名前・答えで探す（全件から）"
+                />
+              </section>
+              {view === 'rows' && selected && (
+                <ResponseRail
+                  item={selected}
+                  fieldKeys={fieldKeys}
+                  labels={labels}
+                  retrying={retrying}
+                  retryError={retryError}
+                  onRetryPostActions={() => void retryPostActions(selected)}
+                />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
   const destinationWriteCount = completedDestinationWrites(summary)
   const failedDestinationWrites = summary?.destinationWrites.failed ?? null
@@ -487,6 +714,130 @@ export default function FormResponsesPage() {
     <Suspense fallback={<ListState kind="loading" title="集まった回答を読み込んでいます" />}>
       <FormResponsesInner />
     </Suspense>
+  )
+}
+
+type InputBlock = Extract<FormBlock, { kind: 'input' }>
+
+/** V8まとめて見る：自由に書く欄の新しい答えを2件だけ出す。無い欄は出さない。 */
+function FreeTextCard({
+  fieldKeys,
+  labels,
+  blocks,
+  items,
+  onSeeRows,
+}: {
+  fieldKeys: string[]
+  labels: Record<string, string>
+  blocks: InputBlock[]
+  items: Submission[]
+  onSeeRows: () => void
+}) {
+  const longKeys = fieldKeys.filter(
+    (key) => blocks.find((b) => b.name === key || b.id === key)?.type === 'textarea',
+  )
+  const targetKey = longKeys.find((key) =>
+    items.some((item) => String((item.data as Record<string, unknown>)[key] ?? '').trim() !== ''),
+  )
+  if (!targetKey) return null
+  const recents = items
+    .filter((item) => String((item.data as Record<string, unknown>)[targetKey] ?? '').trim() !== '')
+    .slice(0, 2)
+  return (
+    <section className="bg-canvas rounded-card border-hairline border p-4">
+      <h2 className="text-ink text-sm font-bold">{labels[targetKey] ?? targetKey}</h2>
+      <p className="text-ink-faint mt-1 text-xs">複数行</p>
+      <ul className="mt-3 space-y-2">
+        {recents.map((item) => (
+          <li key={item.id} className="border-hairline flex items-baseline justify-between gap-3 border-b pb-2 text-sm">
+            <span className="text-ink min-w-0 flex-1 truncate" title={String((item.data as Record<string, unknown>)[targetKey])}>
+              「{String((item.data as Record<string, unknown>)[targetKey])}」
+            </span>
+            <span className="text-ink-secondary shrink-0 text-xs">
+              {formatDateTime(item.createdAt).slice(5)} {item.friendName ?? '不明'}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2 text-right">
+        <button type="button" onClick={onSeeRows} className="text-action text-sm">
+          → 1件ずつ見る
+        </button>
+      </div>
+    </section>
+  )
+}
+
+/** V8の1件ずつ見る：右の欄に出す回答の詳細。後処理のやり直しもここから。 */
+function ResponseRail({
+  item,
+  fieldKeys,
+  labels,
+  retrying,
+  retryError,
+  onRetryPostActions,
+}: {
+  item: Submission
+  fieldKeys: string[]
+  labels: Record<string, string>
+  retrying: boolean
+  retryError: string
+  onRetryPostActions: () => void
+}) {
+  const actions = item.postActions
+  const incomplete = actions != null && actions.state !== 'untracked' && actions.state !== 'completed'
+  const data = item.data as Record<string, unknown>
+  return (
+    <section className="bg-canvas rounded-card border-hairline border p-4" aria-label={`回答の詳細：${item.friendName ?? '不明'}`}>
+      <h2 className="text-ink text-sm font-bold">回答の詳細：{item.friendName ?? '不明'}</h2>
+      <dl className="mt-3 space-y-2.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-ink-faint text-xs">答えた日時</dt>
+          <dd className="text-ink text-sm">{formatDateTime(item.createdAt)}</dd>
+        </div>
+        {fieldKeys.map((key) => (
+          <div key={key} className="flex items-baseline justify-between gap-3">
+            <dt className="text-ink-faint min-w-0 flex-1 truncate text-xs" title={labels[key] ?? key}>{labels[key] ?? key}</dt>
+            <dd className="text-ink min-w-0 flex-1 truncate text-right text-sm" title={valueText(data[key])}>{valueText(data[key])}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="border-hairline mt-3 border-t pt-3">
+        <p className="text-ink text-xs font-bold">後処理</p>
+        {actions == null || actions.state === 'untracked' ? (
+          <p className="text-ink-faint mt-1 text-xs">この回答には後処理の記録がありません</p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {actions.pending.length === 0 ? (
+              <li className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-ink">すべての工程</span>
+                <StatusBadge tone="success">済み</StatusBadge>
+              </li>
+            ) : (
+              actions.pending.map((step) => (
+                <li key={step} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-ink">{postActionStepLabel(step)}</span>
+                  <StatusBadge tone="danger">未完</StatusBadge>
+                </li>
+              ))
+            )}
+          </ul>
+        )}
+        {incomplete && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="primary" onClick={onRetryPostActions} disabled={retrying} busy={retrying} busyLabel="再実行しています">
+              後処理をやり直す
+            </Button>
+          </div>
+        )}
+        {retryError && <p className="text-danger mt-2 text-xs">{retryError}</p>}
+      </div>
+      {item.friendId && (
+        <Button className="mt-3" variant="secondary" href={`/chats?friend=${encodeURIComponent(item.friendId)}`}>
+          友だちを開く
+        </Button>
+      )}
+    </section>
   )
 }
 
