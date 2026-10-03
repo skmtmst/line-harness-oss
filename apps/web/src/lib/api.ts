@@ -9716,7 +9716,10 @@ export const api = {
           | 'payoutCycle'
           | 'notifyOnConversion'
         >
-      >,
+      > & {
+        /** 同時編集の見分け用。読んだときの更新日時。違えば409になる */
+        expectedUpdatedAt?: string | null
+      },
     ) =>
       fetchApi<ApiResponse<Affiliate>>(`/api/affiliates/${id}`, {
         method: 'PUT',

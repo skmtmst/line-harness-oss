@@ -502,7 +502,8 @@
     "552_self_cancel_claim.sql",
     "553_meet_consultation_booking_link.sql",
     "554_meet_cancel_claim.sql",
-    "555_tenant_data_retention.sql"
+    "555_tenant_data_retention.sql",
+    "557_affiliates_updated_at.sql"
   ],
-  "migrationCount": 503
+  "migrationCount": 504
 }

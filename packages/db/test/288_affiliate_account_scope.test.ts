@@ -28,6 +28,9 @@ function setupBefore288(): Database.Database {
   }).sort()) {
     execSafe(db, readFileSync(join(MIGRATIONS, file), 'utf8'));
   }
+  // 557 より前の形に、同時編集の見分け柱だけ足す。今の updateAffiliate は
+  // 書き換えで updated_at を進める。無いと列なしで落ちる。
+  execSafe(db, 'ALTER TABLE affiliates ADD COLUMN updated_at TEXT;');
   return db;
 }
 

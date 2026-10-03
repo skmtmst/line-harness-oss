@@ -14,6 +14,8 @@ export interface Affiliate {
   commission_rate: number;
   is_active: number;
   created_at: string;
+  /** 同時編集の見分け用。最終更新日時。未書換えの行は NULL */
+  updated_at: string | null;
   friend_id: string | null;
   /** 連絡先。報酬の連絡に使う。NULL なら未登録 */
   email: string | null;
@@ -157,8 +159,8 @@ export async function createAffiliate(
     await db
       .prepare(
         `INSERT INTO affiliates
-           (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, updated_at, friend_id, operation_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -169,6 +171,7 @@ export async function createAffiliate(
         input.commissionRate ?? 0,
         // R525: 計測オフの登録は最初から停止で作る（省略時は稼働）。
         input.isActive === false ? 0 : 1,
+        now,
         now,
         input.friendId ?? null,
         input.operationId ?? null,
@@ -235,8 +238,8 @@ export async function createAffiliateWithRandomCode(
       await db
         .prepare(
           `INSERT INTO affiliates
-             (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, updated_at, friend_id, operation_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -247,6 +250,7 @@ export async function createAffiliateWithRandomCode(
           input.commissionRate ?? 0,
           // R525: 計測オフの登録は最初から停止で作る（省略時は稼働）。
           input.isActive === false ? 0 : 1,
+          now,
           now,
           input.friendId ?? null,
           input.operationId ?? null,
@@ -330,6 +334,9 @@ export async function updateAffiliate(
 
   if (fields.length === 0) return getAffiliateById(db, id, scope);
 
+  // 同時編集の見分け用。実際に書き換えたときだけ日時を進める。
+  fields.push('updated_at = ?');
+  values.push(jstNow());
   const scoped = scope ? affiliateScopeSql(scope) : null;
   values.push(id, ...(scoped?.binds ?? []));
   await db
