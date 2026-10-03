@@ -1055,7 +1055,8 @@ export default function TemplatesListV8() {
             <col style={{ width: 120 }} />
             <col style={{ width: 96 }} />
             <col style={{ width: 96 }} />
-            <col style={{ width: 84 }} />
+            {/* 更新（`10月2日（木）`で約95px＋余白。parity 1003-2106 のはみ出し対策）。 */}
+            <col style={{ width: 120 }} />
             <col style={{ width: 44 }} />
           </colgroup>
           <thead>
