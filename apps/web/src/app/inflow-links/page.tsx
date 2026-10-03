@@ -24,6 +24,7 @@ import AdIntegration from './ad-integration'
 import RefOrdersPanel from './_components/ref-orders'
 import ReferralQrModal, { type ReferralQrRoute } from './referral-qr-modal'
 import SiteScript from '@/components/inflow-links/site-script'
+import SiteScriptV8 from '@/components/inflow-links/site-script-v8'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -1591,11 +1592,10 @@ function InflowLinksPageHost() {
   const { selectedAccountId } = useAccount()
   const visibility = useFeatureVisibility(selectedAccountId)
   const tab = useMergedTab(MERGED_TABS)
-  // ★V8-B：一覧・広告連携・つなぎ・送信履歴を積み替える
-  // （板 `xbHxg`・`qSTVR`・`FDBsG`・`p0kA3`）。サイトスクリプトは
-  // 板 `XjOte` へ積み替えるまでタブのまま残す。
+  // ★V8-B：一覧・広告連携・つなぎ・送信履歴・サイトスクリプトを積み替える
+  // （板 `xbHxg`・`qSTVR`・`FDBsG`・`p0kA3`・`XjOte`）。
   const theme = useAdminTheme()
-  const v8NoTabs = theme === 'v8' && tab !== 'script'
+  const v8NoTabs = theme === 'v8'
   const params = useSearchParams()
   const adView = params.get('view') === 'history' ? 'history' : 'connections'
   /*
@@ -1654,7 +1654,8 @@ function InflowLinksPageHost() {
           {/* 機能状態が確定するまで SiteScript を載せない。読み込み中の
               一瞬に計測APIを呼ぶと、offのaccountで403が画面全体のゲートを
               起こしてしまう。 */}
-          {tab === 'script' && visibility.status === 'ready' && <SiteScript />}
+          {tab === 'script' && visibility.status === 'ready' && theme === 'v8' && <SiteScriptV8 />}
+          {tab === 'script' && visibility.status === 'ready' && theme !== 'v8' && <SiteScript />}
           {tab === 'ads' && theme === 'v8' && <AdMetricsV8 />}
           {tab === 'ads' && theme !== 'v8' && <AdIntegration view="metrics" onPlatformCountsChange={handleAdCounts} />}
           {tab === 'connections' && theme === 'v8' && adView === 'history' && <AdHistoryV8 />}

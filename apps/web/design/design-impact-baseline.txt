@@ -324,6 +324,7 @@ shared-button-importer components/hq/banners/upload-target-dialog.tsx
 shared-button-importer components/hq/notice-line-register-dialog.tsx
 shared-button-importer components/hq/platform-notices.tsx
 shared-button-importer components/identity/identity-decision-dialog.tsx
+shared-button-importer components/inflow-links/site-script-v8.tsx
 shared-button-importer components/inflow-links/site-script.tsx
 shared-button-importer components/layout/scrollable-tabs.tsx
 shared-button-importer components/line-notifications/notification-run-list.tsx
