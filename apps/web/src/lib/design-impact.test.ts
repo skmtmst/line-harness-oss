@@ -108,6 +108,8 @@ describe('共通部品の影響範囲', () => {
       // 2026-09-04: イベント一覧も自前のページ送りをやめて共通へ寄せた。
       // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
       'app/events/bookings/page.tsx',
+      // ★V8-B イベント一覧（Ih3xS）。表の下にページ送りを置く。
+      'app/events/events-list-v8.tsx',
       'app/events/page.tsx',
       // 2026-09-24(★V7 #701): 回答フォーム一覧の自前の「前へ／次へ」を共通へ寄せた。1ページだけのときは出さない。
       // ★V8 回答フォーム一覧（I3L41O）。表の下にページ送りを置く。
@@ -161,6 +163,8 @@ describe('共通部品の影響範囲', () => {
       'app/restaurant-test/google/google-profile.tsx',
       // #919: 予約台帳が増えても消えないよう、期間・状態の絞り込みと20件ずつのページ送りに寄せた。
       'app/restaurant-test/restaurant-console.tsx',
+      // ★V8-B Googleビジネス（j0Wcg）。口コミ一覧の表の下にページ送りを置く。
+      'app/restaurant-test/v8/google.tsx',
       // ★V8 リッチメニュー一覧（rZEGN）。表の下にページ送りを置く。
       'app/rich-menus/list-v8.tsx',
       'app/rich-menus/page.tsx',

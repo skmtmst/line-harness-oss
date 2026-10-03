@@ -192,8 +192,22 @@
     "unresolved-classname": 4,
     "arbitrary-value": 6
   },
+  "app/events/bookings/bookings-v8.tsx": {
+    "unresolved-classname": 45
+  },
   "app/events/bookings/page.tsx": {
     "direct-th": 6
+  },
+  "app/events/change-review/change-review-v8.tsx": {
+    "unresolved-classname": 31
+  },
+  "app/events/events-list-v8.tsx": {
+    "unresolved-classname": 48,
+    "arbitrary-value": 6,
+    "direct-th": 6
+  },
+  "app/events/new/events-new-v8.tsx": {
+    "unresolved-classname": 4
   },
   "app/events/page.tsx": {
     "direct-primary-button": 1
@@ -400,8 +414,20 @@
   "app/restaurant-test/v8/dashboard.tsx": {
     "unresolved-classname": 7
   },
+  "app/restaurant-test/v8/google.tsx": {
+    "unresolved-classname": 23
+  },
+  "app/restaurant-test/v8/inventory.tsx": {
+    "unresolved-classname": 46
+  },
+  "app/restaurant-test/v8/menu.tsx": {
+    "unresolved-classname": 24
+  },
   "app/restaurant-test/v8/organization.tsx": {
     "unresolved-classname": 58
+  },
+  "app/restaurant-test/v8/tables.tsx": {
+    "unresolved-classname": 37
   },
   "app/restaurant-test/v8/shell.tsx": {
     "unresolved-classname": 26
