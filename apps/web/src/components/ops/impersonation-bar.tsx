@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import { useState, type ReactNode } from 'react'
 import { api, type OpsImpersonation } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
+import Button from '@/components/shared/button'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { formatDateTime } from '@/lib/format'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import { TextArea } from '@/components/shared/text-field'
@@ -74,9 +77,39 @@ export default function ImpersonationBar({
 
   const writing = state.mode === 'write'
   const name = state.tenantName ?? '契約先'
+  const theme = useAdminTheme()
+
+  /*
+   * V8-B `VtJQ6`「代理ログイン中（閲覧のみ）」。閲覧のみの帯だけ V8 の形にし、
+   * 書き込み中・理由の窓・止め方は今のまま。押す先・API は変えない。
+   */
+  const v8ReadBanner = theme === 'v8' && !writing ? (
+    <div
+      data-design-node="VtJQ6"
+      role="status"
+      className="bg-warning-bg text-ink flex min-h-12 flex-wrap items-center justify-between gap-2 px-5 py-2"
+    >
+      <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
+        <Eye aria-hidden="true" className="h-4 w-4 shrink-0" />
+        <span className="truncate">
+          代理ログイン中：{name}（閲覧のみ）
+          {state.piiRevealed ? '・個人情報を表示中' : ''}
+        </span>
+        <span className="text-ink-secondary shrink-0 text-xs font-normal">{formatDateTime(state.startedAt)}開始</span>
+      </span>
+      <span className="flex shrink-0 items-center gap-2">
+        {!state.piiRevealed ? (
+          <Button size="field" variant="secondary" onClick={() => setDialog('pii')} disabled={busy}>個人情報を表示する</Button>
+        ) : null}
+        <Button size="field" variant="secondary" onClick={() => setDialog('write')} disabled={busy}>書き込みに切り替える</Button>
+        <Button size="field" variant="danger" onClick={() => void end()} disabled={busy}>代理ログインを終える</Button>
+      </span>
+    </div>
+  ) : null
 
   return (
     <>
+      {v8ReadBanner ?? (
       <div
         data-design-node="WXp5T"
         role="status"
@@ -103,6 +136,7 @@ export default function ImpersonationBar({
           <BarButton onClick={() => void end()} disabled={busy} solid>代理ログインを終える</BarButton>
         </span>
       </div>
+      )}
       {dialog ? (
         <ReasonDialog
           kind={dialog}

@@ -107,6 +107,12 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'app/templates/questions/question-v8.tsx': 'app/templates/editor-v8.tsx',
   'components/webinars/webinar-form.tsx': 'app/webinars/edit/page.tsx',
   'components/webinars/webinar-notifications.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/comments-v8.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/video-v8.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/cta-v8.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/notifications-v8.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/participants-v8.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/review-v8.tsx': 'app/webinars/edit/page.tsx',
   // ★V8 版の描画。番兵（useUnsavedGuard）は同じ画面の page.tsx が
   // 共有フック経由で持つ。どちらのテーマでも同じ番兵が効く。
   'app/settings/feature-settings-v8.tsx': 'app/settings/page.tsx',
@@ -130,6 +136,8 @@ const EXEMPTIONS: Record<string, string> = {
     'dirty管理なし（コメント中の「未保存」記述のみ）',
   'app/hq/templates/template-console.tsx':
     '多段ウィザード＋sessionStorage下書き。段の途中離脱の扱いは別途検討',
+  'app/hq/account-settings-dialogs.tsx':
+    '統括の3つの窓（HMpVx・D6ljr・HFsO9）。窓内の入力は閉じると戻る仕様で、画面に残る下書きを持たないため画面離脱ガードの対象外',
   'app/line-notifications/page.tsx':
     '入力を端末の下書きへ随時保存し、閉じる確認はエディタ内で済ませる設計。画面離脱への警告は要検討',
   'app/nen-campaigns/nen-overview.tsx':
