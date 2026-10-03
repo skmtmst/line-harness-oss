@@ -132,6 +132,14 @@
   line-height: 1.6;
 }
 
+/* 板 `gW0F2`「段 どこから受け取るか」の題。 */
+.urlTitle {
+  margin: 12px 0 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .urlBox {
   display: flex;
   flex-wrap: wrap;

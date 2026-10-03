@@ -793,6 +793,8 @@ export default function WebhooksV8Incoming({ onCounts }: { onCounts?: (total: nu
                   {selected.isActive ? '動いています' : '止めています'}
                 </StatusBadge>
               </div>
+              {/* 板 `gW0F2`「段 どこから受け取るか」。 */}
+              <h3 className={styles.urlTitle}>どこから受け取るか</h3>
               <div className={styles.urlBox}>
                 <code className={styles.urlValue}>{endpointUrl(selected.id)}</code>
                 <Button variant="secondary" onClick={() => void copyUrl()}>

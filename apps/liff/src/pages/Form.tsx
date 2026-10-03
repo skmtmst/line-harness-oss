@@ -20,6 +20,7 @@ import {
   FORM_SUBMIT_INCOMPLETE_MESSAGE,
 } from '../lib/form-submit-flow.js';
 import { logFailure } from '../lib/user-message.js';
+import { useWideViewport } from '../lib/use-wide-viewport.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import Button from '../components/ui/Button.js';
@@ -66,7 +67,7 @@ function initialAnswers(layout: FormLayout): Answers {
  */
 function RequiredMark() {
   return (
-    <span className="ml-1 rounded bg-liff-required-bg px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-liff-sun">
+    <span className="ml-1.5 rounded bg-liff-required-bg px-1.5 py-px text-[10px] font-bold whitespace-nowrap text-liff-sun">
       必須
     </span>
   );
@@ -191,6 +192,8 @@ export default function Form() {
    */
   const testToken = search.get('test_token');
 
+  // 414 幅の板（`wPfqW`）は板 ID だけを替える。中身は同じ。
+  const wide = useWideViewport();
   const [form, setForm] = useState<PublicForm | null>(null);
   const [answers, setAnswers] = useState<Answers>({});
   const [sectionIndex, setSectionIndex] = useState(0);
@@ -514,7 +517,7 @@ export default function Form() {
   const pageTitle = options.pageTitle || form.name;
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node="B8rCt">
+    <div className="min-h-screen bg-ground" data-design-node={wide ? 'wPfqW' : 'B8rCt'}>
       <LiffHeader title={pageTitle} />
       <div
         className="mx-auto min-h-screen w-full max-w-md px-4 pt-3 pb-28"
@@ -537,7 +540,7 @@ export default function Form() {
                 />
               ))}
             </div>
-            <p className="mt-1.5 text-xs text-ink-faint tabular-nums">
+            <p className="mt-1.5 text-[10px] text-liff-sub tabular-nums">
               {options.sectionHeader === 'name'
                 ? layout.sections[sectionIndex]?.name
                 : `${sectionIndex + 1} / ${layout.sections.length}ページ`}
@@ -552,7 +555,7 @@ export default function Form() {
         <div>
           <h1 className="text-xl font-bold text-ink">{pageTitle}</h1>
           {form.description && (
-            <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap text-ink-secondary">
+            <p className="mt-1 text-xs leading-relaxed whitespace-pre-wrap text-liff-sub">
               {form.description}
             </p>
           )}
@@ -603,7 +606,7 @@ export default function Form() {
           <button
             type="button"
             onClick={goBack}
-            className="self-center px-4 py-1 text-xs text-ink-secondary focus-visible:outline-2 focus-visible:outline-ink"
+            className="self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
           >
             ← {options.prevLabel || '前のページへ'}
           </button>
@@ -713,13 +716,13 @@ function BlockView({
   const text = typeof value === 'string' ? value : '';
   const checked = Array.isArray(value) ? (value as string[]) : [];
   const inputClass =
-    'w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm text-ink focus:border-liff-primary focus:outline-none';
+    'w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3 py-2 text-sm text-ink placeholder:text-liff-idle focus:border-liff-primary focus:outline-none';
   /** 直しがある欄は枠を直しの色にする (お店のテーマの error)。 */
   const invalidStyle = error ? { borderColor: errorColor } : undefined;
 
   return (
     <div>
-      <label className="block text-sm font-medium text-ink">
+      <label className="block text-sm font-bold text-ink">
         {block.label}
         {block.required && <RequiredMark />}
       </label>
@@ -827,10 +830,10 @@ function BlockView({
               return (
                 <div key={choice.id}>
                   <label
-                    className={`flex min-h-12 items-center gap-2.5 rounded-xl border px-4 py-3 text-sm ${
+                    className={`flex min-h-12 items-center gap-2.5 rounded-[10px] border px-3.5 py-3 text-sm ${
                       checkedRadio
                         ? 'border-liff-primary bg-liff-soft font-semibold text-ink'
-                        : 'border-hairline bg-canvas text-ink'
+                        : 'border-liff-line-strong bg-canvas text-ink'
                     }`}
                   >
                     <input
@@ -838,7 +841,7 @@ function BlockView({
                       name={block.name}
                       checked={checkedRadio}
                       onChange={() => onChange(block.name, choice.label)}
-                      className="h-5 w-5 shrink-0 accent-liff-primary"
+                      className="h-[18px] w-[18px] shrink-0 accent-liff-primary"
                     />
                     {choice.label}
                   </label>
@@ -865,16 +868,16 @@ function BlockView({
               return (
                 <div key={choice.id}>
                   <label
-                    className={`flex min-h-12 items-center gap-2.5 rounded-xl border px-4 py-3 text-sm ${
+                    className={`flex min-h-12 items-center gap-2.5 rounded-[10px] border px-3.5 py-3 text-sm ${
                       isChecked
                         ? 'border-liff-primary bg-liff-soft font-semibold text-ink'
-                        : 'border-hairline bg-canvas text-ink'
+                        : 'border-liff-line-strong bg-canvas text-ink'
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      className="h-5 w-5 shrink-0 accent-liff-primary"
+                      className="h-[18px] w-[18px] shrink-0 accent-liff-primary"
                       onChange={() => {
                         if (!choice.isOther) {
                           onToggle(block.name, choice.label);

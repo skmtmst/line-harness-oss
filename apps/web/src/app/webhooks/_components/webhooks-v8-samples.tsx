@@ -64,8 +64,9 @@ export default function WebhooksV8Samples() {
         よくあるつなぎ方の見本です。使いたい見本を選ぶと、作成画面がその内容で開きます。
       </Notice>
       <div className={styles.grid}>
-        <section className={styles.card} aria-label="受け取る見本">
-          <h2 className={styles.cardTitle}>受け取る見本</h2>
+        {/* 板 `SAUCs` の節名（タブ名とそろえる）。 */}
+        <section className={styles.card} aria-label="こちらで受け取る（どこから来るか）">
+          <h2 className={styles.cardTitle}>こちらで受け取る（どこから来るか）</h2>
           <p className={styles.cardLead}>相手のサービスで起きたことをうちに取り込みます。</p>
           {canCreate ? (
             <ul className={styles.list}>
@@ -85,23 +86,28 @@ export default function WebhooksV8Samples() {
             <p className={styles.cardLead}>受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。</p>
           )}
         </section>
-        <section className={styles.card} aria-label="送る見本">
-          <h2 className={styles.cardTitle}>送る見本</h2>
+        <section className={styles.card} aria-label="こちらから送る（いつ・何を送るか）">
+          <h2 className={styles.cardTitle}>こちらから送る（いつ・何を送るか）</h2>
           <p className={styles.cardLead}>うちで起きたことを相手のサービスに知らせます。</p>
           {canCreate ? (
-            <ul className={styles.list}>
-              {OUTGOING_SAMPLES.map((sample) => (
-                <li key={sample.event} className={styles.item}>
-                  <div className={styles.itemText}>
-                    <strong className={styles.itemName}>{sample.when}</strong>
-                    <span className={styles.itemHint}>送るもの：{sample.payload}</span>
-                  </div>
-                  <Button variant="secondary" href={`/webhooks/new?event=${sample.event}`}>
-                    送り先を作る
-                  </Button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className={styles.list}>
+                {OUTGOING_SAMPLES.map((sample) => (
+                  <li key={sample.event} className={styles.item}>
+                    <div className={styles.itemText}>
+                      <strong className={styles.itemName}>{sample.when}</strong>
+                      <span className={styles.itemHint}>送るもの：{sample.payload}</span>
+                      {/* 板 `SAUCs` の見本の名前（出来事の合言葉）。 */}
+                      <span className={styles.itemHint}>名前：{sample.event}</span>
+                    </div>
+                    <Button variant="secondary" href={`/webhooks/new?event=${sample.event}`}>
+                      送り先を作る
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              <p className={styles.cardLead}>見本に書いたことだけを送ります。</p>
+            </>
           ) : (
             <p className={styles.cardLead}>送り先の作成は統括だけができます。必要なときは統括に頼んでください。</p>
           )}

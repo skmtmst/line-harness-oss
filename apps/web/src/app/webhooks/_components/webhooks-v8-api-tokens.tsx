@@ -18,6 +18,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import { inputClass } from '@/components/shared/form-controls'
@@ -307,7 +308,7 @@ export default function WebhooksV8ApiTokens() {
         <>
           <div>
             <Button variant="primary" onClick={() => setShowCreate((v) => !v)}>
-              ＋ 接続を作る
+              ＋ 鍵を発行する
             </Button>
           </div>
 
@@ -369,12 +370,12 @@ export default function WebhooksV8ApiTokens() {
             <ListState
               kind="empty"
               title="まだ接続がありません"
-              description="「接続を作る」から最初の鍵を発行してください。"
+              description="「鍵を発行する」から最初の鍵を発行してください。"
             />
           ) : (
             <div className={styles.tableWrap}>
               <DataTable className={styles.table}>
-                <colgroup><col /><col /><col /><col /><col /></colgroup>
+                <colgroup><col /><col /><col /><col /><col /><col /></colgroup>
                 <thead>
                   <TableHeadRow>
                     <Th>名前</Th>
@@ -383,6 +384,8 @@ export default function WebhooksV8ApiTokens() {
                     </Th>
                     <Th>最後に使った</Th>
                     <Th>作った日</Th>
+                    {/* 板 `ralAc` の状態の札。一覧に出る鍵は使えるものだけ。 */}
+                    <Th>状態</Th>
                     <Th><span className="sr-only">操作</span></Th>
                   </TableHeadRow>
                 </thead>
@@ -399,6 +402,9 @@ export default function WebhooksV8ApiTokens() {
                       <Td title={formatDateTime(token.createdAt)}>
                         {formatDateTime(token.createdAt)}
                       </Td>
+                      <Td>
+                        <StatusBadge tone="success">使っている</StatusBadge>
+                      </Td>
                       <ActionCell>
                         <span className={styles.rowActions}>
                           <Button
@@ -409,7 +415,7 @@ export default function WebhooksV8ApiTokens() {
                               setRotateTarget(token)
                             }}
                           >
-                            入れ替え
+                            入れ替える
                           </Button>
                           <Button
                             variant="secondary"

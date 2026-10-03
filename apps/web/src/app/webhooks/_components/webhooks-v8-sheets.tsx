@@ -423,8 +423,9 @@ export default function WebhooksV8Sheets() {
                 </p>
               </div>
               {connStatus === 'connected' && (
+                /* 板 `DxAAA` の札。 */
                 <span className={`${styles.badge} ${styles.badgeOk}`}>
-                  接続中
+                  接続しています
                 </span>
               )}
               {connStatus === 'expired' && (

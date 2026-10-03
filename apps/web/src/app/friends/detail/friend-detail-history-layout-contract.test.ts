@@ -42,6 +42,9 @@ describe('CHK-04 友だち詳細「最近の履歴」の狭幅表示', () => {
     expect(PAGE).toContain('overflow-x-auto')
     expect(PAGE).toContain('tabsOverflowing')
     expect(PAGE).toContain('bg-gradient-to-l')
+    // あとから本文フォントが届いて中のタブ名だけが広がる場合、ResizeObserver
+    // は動かずフェードが出ないまま残る。読み込み完了時にもう一度測る。
+    expect(PAGE).toContain('document.fonts?.ready')
   })
 
   it('「すべてを見る」は実際の履歴タブへつながる', () => {

@@ -379,54 +379,6 @@
   line-height: 1.6;
 }
 
-/* 見本の札の1枚（c7dxp）。高さをそろえ、長い文は切る。 */
-.templateGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.templateCard {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  padding: 16px;
-}
-
-.templateTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 14px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.templateRow {
-  display: flex;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.templateKey {
-  flex: none;
-  color: var(--color-ink-faint);
-}
-
-.templateValue {
-  min-width: 0;
-  flex: 1 1 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--color-ink-secondary);
-}
-
 /* 状態の板（S3pdQ）：まだ無い・絞り込み0件・読み込み中・読み込めなかった。
    4つとも同じ枠・同じ高さ。タブ・数の帯・道具はそのまま。 */
 .stateWrap {
@@ -550,78 +502,6 @@
   .kpi:nth-child(n + 3) {
     border-top: 1px solid var(--color-hairline);
   }
-
-  .templateGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .ruleGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-/* ルールの札の一覧（LWQXd）。4列の札、高さをそろえる。 */
-.ruleGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.ruleCard {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  padding: 16px;
-  position: relative;
-}
-
-.ruleHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.ruleTitle {
-  margin: 0;
-  min-width: 0;
-  flex: 1 1 0;
-  color: var(--color-ink);
-  font-size: 14px;
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.ruleFlow {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-
-.ruleMeta {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.ruleActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: auto;
-  padding-top: 8px;
-  position: relative;
 }
 
 /* 道具の段の検索欄：幅320で1行に収める（★V7 `Xn1Mz` と同じ）。 */

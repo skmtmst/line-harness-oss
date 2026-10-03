@@ -460,7 +460,8 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
             </div>
           ) : items.length === 0 ? (
             <div className={styles.stateBox}>
-              <p className={styles.stateBoxTitle}>まだ送り先がありません</p>
+              {/* 板 `wWrpY` の空の文言。 */}
+              <p className={styles.stateBoxTitle}>まだ、送り先はありません</p>
               <p className={styles.stateBoxNote}>うちで起きたことを、ほかのシステムに知らせられます</p>
               <div className={styles.stateBoxAction}>
                 {readonly ? (
@@ -532,8 +533,21 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
                           ) : null}
                         </td>
                         <td>
+                          {/*
+                            板 `ZSbFY` のようす欄：数は「失敗 N回・送信中 N回」、
+                            札は「動いている・失敗あり・止めている」。
+                          */}
+                          {!toggling && failed ? (
+                            <span className={styles.cellSub}>失敗 {formatNumber(item.deliverySummary.failed)}回</span>
+                          ) : !toggling && item.isActive ? (
+                            <span className={styles.cellSub}>送信中 {formatNumber(item.deliverySummary.pending)}回</span>
+                          ) : !toggling && !item.isActive ? (
+                            <span className={styles.cellSub}>
+                              止めた日 {Number(item.updatedAt.slice(5, 7))}/{Number(item.updatedAt.slice(8, 10))}
+                            </span>
+                          ) : null}
                           <StatusBadge tone={toggling ? 'info' : failed ? 'danger' : pending ? 'neutral' : item.isActive ? 'success' : 'neutral'} size="compact">
-                            {toggling ? '切り替え中' : failed ? '返事がありません' : pending ? '送信中' : item.isActive ? 'うまくいっています' : '止めています'}
+                            {toggling ? '切り替え中' : failed ? '失敗あり' : pending ? '送信中' : item.isActive ? '動いている' : '止めている'}
                           </StatusBadge>
                           {failed && item.deliverySummary.lastResult?.completedAt ? (
                             <span className={styles.cellSub}>最終 {item.deliverySummary.lastResult.completedAt.slice(5, 16).replace('T', ' ')}</span>
@@ -549,6 +563,10 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
                               中身を見る
                             </Button>
                           )}{' '}
+                          {/* 板 `ZSbFY` 全行の操作欄2つ目。小窓を開く。 */}
+                          <Button variant="secondary" size="compact" onClick={() => setPanelId(item.id)}>
+                            設定
+                          </Button>{' '}
                           <RowActions
                             menuItems={[
                               { id: 'detail', label: '中身を見る', onSelect: () => setPanelId(item.id) },

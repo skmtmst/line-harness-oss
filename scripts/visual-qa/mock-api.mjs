@@ -1670,6 +1670,18 @@ const RAW = {
   '/api/booking/admin/resources': { success: true, data: { resources: BOOKING_RESOURCES } },
   '/api/booking/admin/menus': { menus: BOOKING_MENUS },
   '/api/booking/admin/staff': { staff: BOOKING_STAFF },
+  /*
+    担当×メニューの一括表。実口（`booking.ts`）と同じ
+    `{staff: [{staff_id, matrix}]}` の形。`success` で包む・`staff` を
+    付けないと、設定画面の担当タブ・メニュー作成画面が
+    `c.value.staff is not iterable` で落ちる（2026-10-03 点検）。
+  */
+  '/api/booking/admin/staff-menus': {
+    staff: BOOKING_STAFF.map((staff) => ({
+      staff_id: staff.id,
+      matrix: BOOKING_STAFF_MENUS[staff.id] ?? [],
+    })),
+  },
   '/api/booking/admin/customer-context': { customer: BOOKING_CUSTOMER_CONTEXT },
   '/api/booking/admin/reminder-preview': BOOKING_REMINDER_PREVIEW,
   '/api/booking/admin/alternatives': BOOKING_CONFLICT_ALTERNATIVES,
@@ -2591,6 +2603,18 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: TEST_RECIPIENT_LOGIN_USERS }
   }
   // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
+  /*
+   * 配布URLの土台。無いと既定の器（`{items,total,page,limit}`）が返り、
+   * 画面が器に `.replace` して白画面になっていた。
+   * 本物は文字列か null を返す（`account-settings.ts`）。
+   */
+  if (pathname === '/api/account-settings/link-base-url') {
+    return { success: true, data: null }
+  }
+  if (pathname === '/api/account-settings/tracked-link-base-url') {
+    return { success: true, data: null }
+  }
+  // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
   if (method === 'POST' && pathname === '/api/forms/drafts') {
     return { success: true, data: { id: 'form-draft-qa', isActive: false } }
   }
@@ -2622,6 +2646,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const formDuplicate = method === 'POST' && /^\/api\/forms\/([^/]+)\/duplicate$/.exec(pathname)
   if (formDuplicate) {
     return { success: true, data: { id: 'form-duplicate-qa', isActive: false } }
+  }
+  /*
+    管理者確認（担当未割り当て）の口。実口（`forms.ts`）と同じく配列で返す。
+    既定の `{items,total,…}` に落ちると、画面が配列として読めず
+    `e is not iterable` で落ちる（2026-10-03 点検）。
+    見本のフォームはすべて担当付きなので空が正しい。
+  */
+  if (pathname === '/api/forms/unassigned') {
+    return { success: true, data: [] }
   }
   if (pathname === '/api/forms') {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
@@ -2975,6 +3008,68 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/chats') return { success: true, data: CHATS }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
+  /*
+    メールの会話の中身。実口（`support-inbox.ts`）と同じ
+    `{thread, messages, …}` の形。無いと既定の `{items,total,…}` に落ち、
+    受信箱でメールを開くと `reading 'id'`（`detail.thread.id`）で落ちる
+    （2026-10-03 点検）。載っていない ID は実口と同じく失敗にする。
+  */
+  const emailThread = /^\/api\/support\/email\/threads\/([^/]+)$/.exec(pathname)
+  if (emailThread) {
+    const item = SUPPORT_EMAIL_ITEMS.find((mail) => mail.threadId === emailThread[1])
+    if (!item) return { success: false, error: 'Thread not found' }
+    const thread = {
+      id: item.threadId,
+      customer_email: item.customerIdentifier,
+      customer_name: item.customerName,
+      subject: item.subject,
+      status: item.status,
+      assigned_staff_id: item.assignedStaffId,
+      notes: null,
+      last_message_at: item.lastIncomingAt,
+      last_incoming_at: item.lastIncomingAt,
+      last_outgoing_at: null,
+      resolved_at: null,
+      revision: item.revision,
+    }
+    const messages = [
+      {
+        id: `${item.threadId}-msg-1`,
+        direction: 'incoming',
+        sender_email: item.customerIdentifier,
+        sender_name: item.customerName,
+        recipient_email: 'support@example.com',
+        subject: item.subject,
+        body_text: item.preview,
+        sent_by_staff_id: null,
+        sent_by_staff_name: null,
+        created_at: item.lastIncomingAt,
+      },
+      {
+        id: `${item.threadId}-msg-2`,
+        direction: 'outgoing',
+        sender_email: 'support@example.com',
+        sender_name: null,
+        recipient_email: item.customerIdentifier,
+        subject: `Re: ${item.subject}`,
+        body_text: 'ご連絡ありがとうございます。確認してご案内します。',
+        sent_by_staff_id: 'operator-kenta',
+        sent_by_staff_name: 'Kenta',
+        created_at: item.lastIncomingAt,
+      },
+    ]
+    return {
+      success: true,
+      data: {
+        thread,
+        messages,
+        total: messages.length,
+        hasMoreOlder: false,
+        oldestCursor: null,
+        newestCursor: null,
+      },
+    }
+  }
   if (pathname === '/api/support/inbox') {
     /*
       **同じ口を2つの画面が読む。返す形が違う。**
@@ -3432,6 +3527,43 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/nen/health') {
     return { success: true, data: NEN_HEALTH_LIST }
   }
+  const nenHealthSummary = /^\/api\/nen\/health\/([^/]+)\/summary$/.exec(pathname)
+  if (method === 'GET' && nenHealthSummary) {
+    /*
+     * 本物は `GET /api/nen/health/:petId/summary` の形（apps/worker/src/routes/nen-pets.ts）。
+     * 無いと既定の器が返り、まとめ窓の `summary.pet.callName` で `/nen/health` が落ちていた。
+     */
+    const item = NEN_HEALTH_LIST.items.find((entry) => entry.pet.id === decodeURIComponent(nenHealthSummary[1]))
+    if (!item) return { success: false, error: 'Pet not found' }
+    const weights = (item.weightSeries ?? []).filter((value) => value != null)
+    const stoolCounts = item.latestStool ? { [item.latestStool]: item.count30d } : {}
+    const appetiteCounts = item.latestAppetite ? { [item.latestAppetite]: item.count30d } : {}
+    return {
+      success: true,
+      data: {
+        pet: { ...item.pet, weightKg: item.latestWeightKg },
+        owner: item.owner,
+        generatedAt: '2026-10-02T10:00:00+09:00',
+        summary: {
+          days: 30,
+          records: item.count30d,
+          weight: weights.length ? { first: weights[0], last: weights[weights.length - 1], min: Math.min(...weights), max: Math.max(...weights) } : null,
+          heartRateAvg: null,
+          respiratoryRateAvg: null,
+          stool: stoolCounts,
+          appetite: appetiteCounts,
+          skin: {},
+          tearStain: {},
+          notes: [],
+          logs: [],
+        },
+        labels: {
+          stool: { normal: '正常', soft: 'やわらかい', hard: 'かたい', diarrhea: '下痢', bloody: '血が混じる', other: 'その他' },
+          appetite: { good: '良好', normal: '普通', poor: '不良' },
+        },
+      },
+    }
+  }
   if (pathname === '/api/ec-commerce/notification-runs') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
     const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
@@ -3568,6 +3700,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
   if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
   if (/^\/api\/affiliates\/[^/]+\/links$/.test(pathname)) return { success: true, data: AFFILIATE_LINKS }
+  /*
+   * 紹介者の内訳（来た人の一覧）。無いと既定の器（`{items,total,page,limit}`）が
+   * 返り、画面が器に `.filter` して白画面になっていた。
+   * 本物は配列と次の印を返す（`affiliates.ts` の journeys）。
+   */
+  if (/^\/api\/affiliates\/[^/]+\/journeys$/.test(pathname)) {
+    return {
+      success: true,
+      data: [
+        { friendId: 'friend-4', displayName: 'さくら', addedAt: '2026-09-20T10:02:00.000+09:00', refCode: 'tanaka01', touchCount: 3, formCount: 1, conversionCount: 1, lastEventAt: '2026-09-21T09:00:00.000+09:00' },
+        { friendId: 'friend-9', displayName: null, addedAt: '2026-09-18T21:40:00.000+09:00', refCode: null, touchCount: 1, formCount: 0, conversionCount: 0, lastEventAt: '2026-09-18T21:40:00.000+09:00' },
+      ],
+      nextCursor: null,
+    }
+  }
   /*
    * 要対応の交換の一覧。型どおりの名前（items/pagination）で返す。
    * 失敗中と送ったか分からない配送中（照合待ち）を混ぜ、21件以上でも

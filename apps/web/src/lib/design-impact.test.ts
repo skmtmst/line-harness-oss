@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする63ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする61ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -73,9 +73,8 @@ describe('共通部品の影響範囲', () => {
       // ★V8 自動応答の実行結果（nWmLg）。表の下にページ送りを置く。
       'app/auto-replies/runs/runs-v8.tsx',
       'app/automations/page.tsx',
-      // ★V8-B オートメーション（LWQXd ルール・g98F9 動いた記録）。
+      // ★V8-B オートメーション（g98F9 動いた記録）。一覧は #1297 が正本。
       // 札・表の下にページ送りを置く。
-      'app/automations/rules-v8.tsx',
       'app/automations/runs-v8.tsx',
       // 2026-09-27 R24: 実行記録が先頭20件に固定で21件目以降へ届かなかった。
       // 20件ずつのページ送りに寄せた。
@@ -96,6 +95,8 @@ describe('共通部品の影響範囲', () => {
       'app/contents/page.tsx',
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
       'app/contents/vars/impact-review.tsx',
+      // ★V8 共通情報の一覧（FM94M）。表の下にページ送りを置く。
+      'app/contents/vars/list-v8.tsx',
       'app/contents/vars/page.tsx',
       'app/conversions/page.tsx',
       // #1011 FRIEND-11: 重複候補が50件を超えると後ろの候補へ辿れなかった。
@@ -205,6 +206,7 @@ describe('共通部品の影響範囲', () => {
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
       // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。
+      'app/webinars/edit/participants-v8.tsx',
       'app/webinars/list-v8.tsx',
       'app/webinars/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',

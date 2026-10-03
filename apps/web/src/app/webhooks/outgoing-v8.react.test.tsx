@@ -116,6 +116,8 @@ test('v8 では ZSbFY の一覧（帯・表・動いているの札）が出る'
   // 表の行：いつ送るか・送るもの・ようすの札。
   expect(board?.textContent).toContain('友だちが追加されたとき')
   expect(board?.textContent).toContain('動いている')
+  // 板 `ZSbFY` 全行の操作欄に「中身を見る」「設定」。
+  expect(board?.textContent).toContain('中身を見る')
   expect(board?.textContent).toContain('設定')
 })
 
@@ -133,7 +135,8 @@ test('v8 で失敗がある行は失敗ありの札と失敗の内訳が出る',
   const board = host.querySelector('[data-design-node="ZSbFY"]')
   expect(board?.textContent).toContain('失敗あり')
   expect(board?.textContent).toContain('失敗 2回')
-  expect(board?.textContent).toContain('失敗をやり直す')
+  // 板 `ZSbFY` 行3の操作欄。「…」の中の「失敗をやり直す」ではなく表のボタンの文言で見る。
+  expect(board?.textContent).toContain('やり直す')
 })
 
 test('v8 で何も無いときは wWrpY の「まだ無い」が出る', async () => {
