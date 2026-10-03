@@ -13658,6 +13658,10 @@ export interface BookingMenu {
   sort_order: number;
   is_active: number;
   auto_tag_id: string | null;
+  /** メニューの写真。登録メディアから1枚。無いときは null。 */
+  photo_media_id?: string | null;
+  /** メニューの写真の宛先。無いときは null。 */
+  photo_url?: string | null;
   /** 同じ時間帯に受けられる件数。1 なら重ねない（従来どおり） */
   concurrent_capacity?: number;
   /** 何日先まで予約を受けるか。null なら制限なし */
@@ -13754,6 +13758,10 @@ export interface BookingSettings {
   reminderDayBeforeTime: string | null;
   /** 当日お知らせを開始の何時間前に送るか。 */
   reminderHoursBefore: number;
+  /** お店の写真。登録メディアから1枚。無いときは null。 */
+  storePhotoMediaId: string | null;
+  /** お店の写真の宛先。無いときは null。 */
+  store_photo_url: string | null;
   menuCount: number;
   activeMenuCount: number;
   inactiveMenuCount: number;
@@ -13785,6 +13793,8 @@ export type SaveBookingSettings = Pick<
   /** 当日お知らせを何時間前に送るか（1〜72）。null で従来の2時間前。 */
   reminderHoursBefore: number | null;
   businessHours?: BookingSettings['businessHours'];
+  /** お店の写真。省いたら今の値を保つ。null で外す。 */
+  store_photo_media_id?: string | null;
 };
 
 export interface BookingStaff {
@@ -13799,6 +13809,10 @@ export interface BookingStaff {
   is_active: number;
   /** N-411: 本人勤務の対象となるログインユーザー。 */
   staff_member_id?: string | null;
+  /** スタッフの写真。登録メディアから1枚。無いときは null。 */
+  photo_media_id?: string | null;
+  /** スタッフの写真の宛先。無いときは null。 */
+  photo_url?: string | null;
 }
 
 export interface BookingMenuStaff {
@@ -13810,6 +13824,10 @@ export interface BookingMenuStaff {
   is_designation_optional: number;
   price: number;
   duration_minutes: number;
+  /** スタッフの写真。登録メディアから1枚。無いときは null。 */
+  photo_media_id?: string | null;
+  /** スタッフの写真の宛先。無いときは null。 */
+  photo_url?: string | null;
 }
 
 export interface BookingShift {
