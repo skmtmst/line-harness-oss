@@ -17,6 +17,7 @@ import {
   type BroadcastPreflight,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
 import {
@@ -615,6 +616,8 @@ export default function BroadcastForm({
   onStepChange,
   visualQaAugustCampaign = false,
 }: BroadcastFormProps) {
+  const theme = useAdminTheme()
+  const v8 = theme === 'v8'
   const { selectedAccountId, loading: accountLoading } = useAccount()
   /*
    * テスト送信と本番予約で同じ下書きを使う。
@@ -2033,7 +2036,7 @@ export default function BroadcastForm({
     }
   }
 
-  return <div className="broadcast-form-v6 mb-8">
+  return <div className="broadcast-form-v6 mb-8" data-design-node={v8 ? 'FU2aU' : undefined}>
     {currentStep ? (
       <Link href="/broadcasts" className="mb-5 inline-flex text-sm font-semibold text-action hover:underline">
         ← 一斉配信一覧
