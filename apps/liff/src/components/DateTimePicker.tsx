@@ -182,7 +182,7 @@ function DaySlots({
       {times.length === 0 ? (
         <p className="text-[13px] leading-6 text-liff-sub">この日は満席です。別の日を選んでください。</p>
       ) : (
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-3 gap-2">
           {times.map((t) => {
             const active = selected?.date === day && selected?.start === t.start;
             return (
@@ -602,7 +602,7 @@ export default function DateTimePicker({
         ) : weekLoading || !weekByDate || !loadedWins.has(winStart) ? (
           <LoadingView />
         ) : !weekHasOpen ? (
-          <div className="flex flex-col items-center px-6 py-10 text-center">
+          <div className="flex flex-col items-center px-6 py-10 text-center" data-design-node="ADutg">
             <span className="text-liff-idle" aria-hidden="true">
               <Icon name="calendar-x" className="h-10 w-10" />
             </span>
@@ -635,7 +635,7 @@ export default function DateTimePicker({
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
               </button>
-              <div ref={stripRef} className="grid flex-1 grid-cols-5 gap-1.5" role="group" aria-label="日付">
+              <div ref={stripRef} className="grid flex-1 grid-cols-5 gap-[5px]" role="group" aria-label="日付">
                 {weekDays.map((d) => {
                   const state = stateOf(d, weekByDate, weekFull, weekClosed, today, windowEnd);
                   const open = state === 'open';
@@ -721,7 +721,7 @@ export default function DateTimePicker({
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
               </button>
-              <p aria-live="polite" className="text-sm font-bold text-ink">
+              <p aria-live="polite" className="text-[15px] font-bold text-ink">
                 {monthLabel}
               </p>
               <button

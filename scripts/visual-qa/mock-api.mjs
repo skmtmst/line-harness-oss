@@ -2603,6 +2603,18 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: TEST_RECIPIENT_LOGIN_USERS }
   }
   // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
+  /*
+   * 配布URLの土台。無いと既定の器（`{items,total,page,limit}`）が返り、
+   * 画面が器に `.replace` して白画面になっていた。
+   * 本物は文字列か null を返す（`account-settings.ts`）。
+   */
+  if (pathname === '/api/account-settings/link-base-url') {
+    return { success: true, data: null }
+  }
+  if (pathname === '/api/account-settings/tracked-link-base-url') {
+    return { success: true, data: null }
+  }
+  // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
   if (method === 'POST' && pathname === '/api/forms/drafts') {
     return { success: true, data: { id: 'form-draft-qa', isActive: false } }
   }
@@ -3515,6 +3527,43 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/nen/health') {
     return { success: true, data: NEN_HEALTH_LIST }
   }
+  const nenHealthSummary = /^\/api\/nen\/health\/([^/]+)\/summary$/.exec(pathname)
+  if (method === 'GET' && nenHealthSummary) {
+    /*
+     * 本物は `GET /api/nen/health/:petId/summary` の形（apps/worker/src/routes/nen-pets.ts）。
+     * 無いと既定の器が返り、まとめ窓の `summary.pet.callName` で `/nen/health` が落ちていた。
+     */
+    const item = NEN_HEALTH_LIST.items.find((entry) => entry.pet.id === decodeURIComponent(nenHealthSummary[1]))
+    if (!item) return { success: false, error: 'Pet not found' }
+    const weights = (item.weightSeries ?? []).filter((value) => value != null)
+    const stoolCounts = item.latestStool ? { [item.latestStool]: item.count30d } : {}
+    const appetiteCounts = item.latestAppetite ? { [item.latestAppetite]: item.count30d } : {}
+    return {
+      success: true,
+      data: {
+        pet: { ...item.pet, weightKg: item.latestWeightKg },
+        owner: item.owner,
+        generatedAt: '2026-10-02T10:00:00+09:00',
+        summary: {
+          days: 30,
+          records: item.count30d,
+          weight: weights.length ? { first: weights[0], last: weights[weights.length - 1], min: Math.min(...weights), max: Math.max(...weights) } : null,
+          heartRateAvg: null,
+          respiratoryRateAvg: null,
+          stool: stoolCounts,
+          appetite: appetiteCounts,
+          skin: {},
+          tearStain: {},
+          notes: [],
+          logs: [],
+        },
+        labels: {
+          stool: { normal: '正常', soft: 'やわらかい', hard: 'かたい', diarrhea: '下痢', bloody: '血が混じる', other: 'その他' },
+          appetite: { good: '良好', normal: '普通', poor: '不良' },
+        },
+      },
+    }
+  }
   if (pathname === '/api/ec-commerce/notification-runs') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
     const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
@@ -3651,6 +3700,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
   if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
   if (/^\/api\/affiliates\/[^/]+\/links$/.test(pathname)) return { success: true, data: AFFILIATE_LINKS }
+  /*
+   * 紹介者の内訳（来た人の一覧）。無いと既定の器（`{items,total,page,limit}`）が
+   * 返り、画面が器に `.filter` して白画面になっていた。
+   * 本物は配列と次の印を返す（`affiliates.ts` の journeys）。
+   */
+  if (/^\/api\/affiliates\/[^/]+\/journeys$/.test(pathname)) {
+    return {
+      success: true,
+      data: [
+        { friendId: 'friend-4', displayName: 'さくら', addedAt: '2026-09-20T10:02:00.000+09:00', refCode: 'tanaka01', touchCount: 3, formCount: 1, conversionCount: 1, lastEventAt: '2026-09-21T09:00:00.000+09:00' },
+        { friendId: 'friend-9', displayName: null, addedAt: '2026-09-18T21:40:00.000+09:00', refCode: null, touchCount: 1, formCount: 0, conversionCount: 0, lastEventAt: '2026-09-18T21:40:00.000+09:00' },
+      ],
+      nextCursor: null,
+    }
+  }
   /*
    * 要対応の交換の一覧。型どおりの名前（items/pagination）で返す。
    * 失敗中と送ったか分からない配送中（照合待ち）を混ぜ、21件以上でも

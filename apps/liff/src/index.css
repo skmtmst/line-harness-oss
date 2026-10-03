@@ -32,7 +32,7 @@
   --color-liff-idle: #b8bec6;
   --color-liff-line: #e6e9ed;
   --color-liff-divider: #eef0f2;
-  --color-liff-chip: #f0f1f3;
+  --color-liff-chip: #f1f3f5;
   --color-liff-off-bg: #f7f8f9;
   --color-liff-off-ink: #c3c8cf;
   --color-liff-line-strong: #dfe3e8;
@@ -57,6 +57,9 @@
   /* 暗い地での会話の名前。ほか・自分を文字色で分ける */
   --color-night-name: #8fb8ff;
   --color-night-mine: #7ee2a8;
+  /* ── ウェビナー配信中 (RpW2h。値は板の書き出しから) ── */
+  --color-night-body: #e6e8eb;
+  --color-night-dim: #8a9098;
   /* 押せない枠の地。設計の満席の枠 (2-event.png の 14:00〜15:00) の灰色。 */
   --color-shell-gray: #ebedf1;
 }

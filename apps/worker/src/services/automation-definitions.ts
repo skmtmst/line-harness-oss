@@ -416,6 +416,8 @@ export async function runAutomationTest(
     friendId: unknown;
     lineAccountId: string;
     credentialEncryptionKey?: string;
+    /** F-14: 担当者通知の送達に使う環境（メール経路用）。 */
+    operatorMailEnv?: import('../index.js').Env['Bindings'];
     /**
      * 同じ確認画面の操作を識別する鍵（R484）。確認を開くたびに画面が振る。
      * 応答が失われたあとの再試行は同じ鍵で来るので、2件目の実行を作らず
@@ -537,6 +539,7 @@ export async function runAutomationTest(
     ? await processAutomationRun(db, started.runId, {
       executors: createAutomationActionExecutors({
         credentialEncryptionKey: input.credentialEncryptionKey,
+        operatorMailEnv: input.operatorMailEnv,
       }),
     })
     : started.status;
