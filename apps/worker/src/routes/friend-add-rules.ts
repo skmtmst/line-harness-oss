@@ -12,6 +12,7 @@ import {
   listFriendAddRules,
   listFriendAddRulesPage,
   reorderFriendAddRulePriorities,
+  reorderFriendAddRulePrioritiesCAS,
   publishFriendAddRule,
   recordFriendAddRuleTest,
   saveFriendAddRuleDraft,
@@ -1214,7 +1215,31 @@ friendAddRules.put('/api/friend-add-rules/order', requireRole('owner', 'admin'),
         data: { currentVersion },
       }, 409);
     }
-    await reorderFriendAddRulePriorities(c.env.DB, { lineAccountId: accountId, friendKind: kind, ids });
+    /*
+     * F8補修: 版確認と全順序更新を1文のCASで結ぶ。確認と書込のあいだへ
+     * 割り込まれても、版がずれていれば1行も書かず409にする。
+     */
+    try {
+      await reorderFriendAddRulePrioritiesCAS(c.env.DB, {
+        lineAccountId: accountId,
+        friendKind: kind,
+        ids,
+        expectedVersion: body.expectedVersion as number,
+      });
+    } catch {
+      // 確認後に割り込まれた。何が変わったか読み直して理由を分ける。
+      const raced = await listFriendAddRuleOrderIds(c.env.DB, { lineAccountId: accountId, friendKind: kind });
+      if (raced.length !== ids.length || !raced.every((id) => ids.includes(id))) {
+        return c.json({ success: false, code: 'ORDER_CHANGED', error: 'ほかの画面で一覧が変わっています。読み直してから、もう一度お試しください' }, 409);
+      }
+      const racedVersion = await getFriendAddOrderVersion(c.env.DB, accountId, kind);
+      return c.json({
+        success: false,
+        code: 'ORDER_VERSION_CONFLICT',
+        error: 'ほかの画面で並びが変わっています。最新の状態を読み直してください',
+        data: { currentVersion: racedVersion },
+      }, 409);
+    }
     const orderVersion = await getFriendAddOrderVersion(c.env.DB, accountId, kind);
     return c.json({ success: true, data: { updated: ids.length, orderVersion } });
   } catch (error) {

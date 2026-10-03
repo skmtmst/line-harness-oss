@@ -624,3 +624,49 @@ export async function reorderFriendAddRulePriorities(
     ),
   );
 }
+
+/**
+ * F8補修: 並びの版確認と全順序更新を1文で結ぶ原子的CAS。
+ * 版（受け皿以外の lock_version 合計）が expectedVersion と合うときだけ
+ * 書く。合わなければ1行も書かず FRIEND_ADD_RULE_ORDER_VERSION_CONFLICT
+ * を投げる。1文なので確認と書込のあいだへの割り込みは起きない。
+ * 順は JSON 配列で渡し、束ね数は8個に固定（D1の束ね上限に当たらない）。
+ */
+export async function reorderFriendAddRulePrioritiesCAS(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    friendKind: FriendAddRuleKind;
+    ids: string[];
+    expectedVersion: number;
+  },
+): Promise<{ updated: number }> {
+  const now = jstNow();
+  const orderJson = JSON.stringify(input.ids);
+  const result = await db.prepare(
+    `UPDATE friend_add_rules
+        SET priority = (
+              SELECT key + 1 FROM json_each(?) WHERE value = friend_add_rules.id
+            ),
+            lock_version = lock_version + 1,
+            updated_at = ?
+      WHERE line_account_id = ? AND friend_kind = ?
+        AND is_unknown_route_fallback = 0 AND archived_at IS NULL
+        AND id IN (SELECT value FROM json_each(?))
+        AND (SELECT COALESCE(SUM(lock_version), 0) FROM friend_add_rules
+              WHERE line_account_id = ? AND friend_kind = ?
+                AND is_unknown_route_fallback = 0 AND archived_at IS NULL) = ?`,
+  ).bind(
+    orderJson,
+    now,
+    input.lineAccountId,
+    input.friendKind,
+    orderJson,
+    input.lineAccountId,
+    input.friendKind,
+    input.expectedVersion,
+  ).run();
+  const changed = Number(result.meta?.changes ?? 0);
+  if (changed !== input.ids.length) throw new Error('FRIEND_ADD_RULE_ORDER_VERSION_CONFLICT');
+  return { updated: changed };
+}

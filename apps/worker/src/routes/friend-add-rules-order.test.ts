@@ -217,3 +217,120 @@ describe('F8: PUT /api/friend-add-rules/order の厳密なCAS', () => {
     expect(wrongKind.status).toBe(409);
   });
 });
+
+/*
+ * F8補修: 同じ版での2要求の割り込み。Aの版確認と書込のあいだにBが
+ * 書き終えても、Aは409で止まり、Bの順を上書きしない（部分更新0）。
+ * Aの書込文が走る直前にBのPUT全体を割り込ませて再現する。
+ */
+function hookOrderWrite(
+  testDb: SqliteD1,
+  onFire: () => Promise<void>,
+): { db: D1Database; wasFired: () => boolean } {
+  let fired = false;
+  const inner = testDb.db as unknown as {
+    prepare: (sql: string) => {
+      bind: (...args: unknown[]) => { run: (...a: never[]) => Promise<unknown> } & Record<string, unknown>;
+      sql: string;
+    };
+    batch: (statements: Array<{ sql?: string }>) => Promise<unknown[]>;
+  };
+  const isOrderWrite = (sql: string): boolean =>
+    sql.includes('UPDATE friend_add_rules') && sql.includes('priority');
+  const db = {
+    prepare: (sql: string) => {
+      const stmt = inner.prepare(sql);
+      return {
+        ...stmt,
+        bind: (...args: unknown[]) => {
+          const bound = stmt.bind(...args) as {
+            run: (...a: never[]) => Promise<unknown>;
+          } & Record<string, unknown>;
+          const through = { ...bound };
+          const originalRun = bound.run.bind(bound);
+          (through as Record<string, unknown>).run = async (...a: never[]) => {
+            if (!fired && isOrderWrite(sql)) {
+              fired = true;
+              await onFire();
+            }
+            return originalRun(...a);
+          };
+          return through;
+        },
+      };
+    },
+    batch: async (statements: Array<{ sql?: string }>) => {
+      const sqls = statements.map((item) => item?.sql ?? '');
+      if (!fired && sqls.some(isOrderWrite)) {
+        fired = true;
+        await onFire();
+      }
+      return inner.batch(statements);
+    },
+  } as unknown as D1Database;
+  return { db, wasFired: () => fired };
+}
+
+describe('F8補修: 同版2要求の原子的CAS', () => {
+  let testDb: SqliteD1;
+
+  beforeEach(() => {
+    testDb = createTestD1();
+    seedBase(testDb.raw);
+  });
+
+  function scopeState(): { order: string[]; version: number } {
+    const rows = testDb.raw.prepare(
+      `SELECT id FROM friend_add_rules
+        WHERE line_account_id = 'account-1' AND friend_kind = 'first_time'
+          AND is_unknown_route_fallback = 0 AND archived_at IS NULL
+        ORDER BY priority ASC`,
+    ).all() as { id: string }[];
+    const version = testDb.raw.prepare(
+      `SELECT COALESCE(SUM(lock_version), 0) AS version FROM friend_add_rules
+        WHERE line_account_id = 'account-1' AND friend_kind = 'first_time'
+          AND is_unknown_route_fallback = 0 AND archived_at IS NULL`,
+    ).get() as { version: number };
+    return { order: rows.map((row) => row.id), version: Number(version.version) };
+  }
+
+  it('割り込んだBが200、Aは409でBの順を壊さない', async () => {
+    const plain = buildApp(testDb.db);
+    const version = await getOrderVersion(plain);
+    const { db: hookedDb, wasFired } = hookOrderWrite(testDb, async () => {
+      // Aの書込直前にBが同じ版で書き終える。
+      const rival = buildApp(testDb.db);
+      const second = await rival.instance.request(
+        '/api/friend-add-rules/order',
+        jsonRequest('PUT', {
+          accountId: 'account-1',
+          friendKind: 'first_time',
+          ids: ['rule-2', 'rule-1'],
+          expectedVersion: version,
+        }),
+        rival.bindings,
+      );
+      expect(second.status).toBe(200);
+    });
+
+    const first = buildApp(hookedDb);
+    const res = await first.instance.request(
+      '/api/friend-add-rules/order',
+      jsonRequest('PUT', {
+        accountId: 'account-1',
+        friendKind: 'first_time',
+        ids: ['rule-1', 'rule-2'],
+        expectedVersion: version,
+      }),
+      first.bindings,
+    );
+    // 割り込みが実際に起きたこと（空振りの合格にしない）。
+    expect(wasFired()).toBe(true);
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe('ORDER_VERSION_CONFLICT');
+
+    // Bの順のまま。Aの部分更新は無い（版はBの1回分だけ進む）。
+    expect(scopeState()).toEqual({ order: ['rule-2', 'rule-1'], version: version + 2 });
+  });
+});
