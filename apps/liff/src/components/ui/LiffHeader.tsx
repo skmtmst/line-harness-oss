@@ -30,7 +30,7 @@ export default function LiffHeader({ title }: { title: string }) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-10 border-b border-liff-line bg-canvas">
+    <header className="sticky top-0 z-10 border-b border-[var(--liff-look-line)] bg-canvas">
       <div className="mx-auto flex h-12 w-full max-w-md items-center gap-2 px-3">
         <button
           type="button"
@@ -41,12 +41,12 @@ export default function LiffHeader({ title }: { title: string }) {
           <Icon name="x" className="h-5 w-5" />
         </button>
         <div className="flex min-w-0 flex-1 flex-col items-center">
-          <p className="max-w-full truncate text-[13px] font-bold text-ink">
+          <p className="max-w-full truncate text-[13px] font-bold text-[var(--liff-look-ink)]">
             {title}
           </p>
           {shopName && (
             <p
-              className="max-w-full truncate text-[10px] text-liff-sub"
+              className="max-w-full truncate text-[10px] text-[var(--liff-look-sub)]"
               title={shopName}
             >
               {shopName}

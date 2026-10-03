@@ -25,8 +25,13 @@ export default function LoadErrorView({
       <span className="text-liff-idle" aria-hidden="true">
         <Icon name="wifi-off" className="h-10 w-10" />
       </span>
-      <p className="mt-4 text-lg font-bold text-ink">読み込めませんでした</p>
-      <p className="mt-2 text-[13px] leading-6 text-pretty text-liff-sub">
+      <p
+        className="mt-4 text-lg font-bold text-[var(--liff-look-ink)]"
+        style={{ fontFamily: 'var(--liff-look-font-heading)' }}
+      >
+        読み込めませんでした
+      </p>
+      <p className="mt-2 text-[13px] leading-6 text-pretty text-[var(--liff-look-sub)]">
         {message ?? LOAD_FAILED_MESSAGE}
         {!message && note && (
           <>

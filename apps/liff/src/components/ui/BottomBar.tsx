@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 export default function BottomBar({ children }: { children: ReactNode }) {
   return (
     <div
-      className="fixed inset-x-0 bottom-0 border-t border-liff-line bg-canvas px-4 pt-3"
+      className="fixed inset-x-0 bottom-0 border-t border-[var(--liff-look-line)] bg-canvas px-4 pt-3"
       style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
     >
       <div className="mx-auto flex w-full max-w-md flex-col items-stretch gap-2">{children}</div>

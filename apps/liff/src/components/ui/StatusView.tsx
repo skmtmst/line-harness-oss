@@ -26,27 +26,32 @@ export default function StatusView({
   const mark =
     tone === 'success' ? (
       <span
-        className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-soft text-liff-primary"
+        className="flex h-18 w-18 items-center justify-center rounded-full bg-[var(--liff-look-soft)] text-[var(--liff-look-main)]"
         aria-hidden="true"
       >
         <Icon name={icon} className="h-9 w-9" />
       </span>
     ) : tone === 'wait' ? (
       <span
-        className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-wait-bg text-liff-wait-ink"
+        className="flex h-18 w-18 items-center justify-center rounded-full bg-[var(--liff-look-wait-bg)] text-[var(--liff-look-wait-ink)]"
         aria-hidden="true"
       >
         <Icon name={icon} className="h-8 w-8" />
       </span>
     ) : (
-      <span className={dark ? 'text-night-faint' : 'text-liff-idle'} aria-hidden="true">
+      <span className={dark ? 'text-night-faint' : 'text-[var(--liff-look-idle)]'} aria-hidden="true">
         <Icon name={icon} className="h-10 w-10" />
       </span>
     );
   return (
     <div className="flex flex-col items-center px-6 py-10 text-center">
       {mark}
-      <p className={`mt-4 text-[17px] font-bold ${dark ? 'text-canvas' : 'text-ink'}`}>{title}</p>
+      <p
+        className={`mt-4 text-[17px] font-bold ${dark ? 'text-canvas' : 'text-[var(--liff-look-ink)]'}`}
+        style={dark ? undefined : { fontFamily: 'var(--liff-look-font-heading)' }}
+      >
+        {title}
+      </p>
       {body && <BodyText text={body} dark={dark} />}
       {action && (
         <div className="mt-6 w-full max-w-55">
@@ -63,7 +68,7 @@ function BodyText({ text, dark = false }: { text: string; dark?: boolean }) {
   const lines = text.split('\n');
   return (
     <p
-      className={`mt-2 text-[13px] leading-6 text-pretty ${dark ? 'text-night-faint' : 'text-liff-sub'}`}
+      className={`mt-2 text-[13px] leading-6 text-pretty ${dark ? 'text-night-faint' : 'text-[var(--liff-look-sub)]'}`}
     >
       {lines.map((line, i) => (
         <span key={i}>
