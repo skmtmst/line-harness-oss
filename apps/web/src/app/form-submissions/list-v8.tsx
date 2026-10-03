@@ -47,6 +47,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import styles from './list-v8.module.css'
 
 interface UsedByAccount {
@@ -195,6 +196,9 @@ export default function FormSubmissionsListV8() {
    */
   const [canManageFolders] = useState(() =>
     typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  // 1152の板（`GrnO4`）。折り畳みはCSSのコンテナ問い合わせが担い、
+  // ここでは板の印だけを切り替える。
+  const narrow = useNarrowViewport()
   const [forms, setForms] = useState<Form[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
@@ -1117,7 +1121,7 @@ export default function FormSubmissionsListV8() {
   const showPager = !loading && !loadError && visibleForms.length > 0
 
   return (
-    <div data-design-node="I3L41O" className={styles.board}>
+    <div data-design-node={narrow ? 'GrnO4' : 'I3L41O'} className={styles.board}>
       {/* 見出し：画面名＋一行の説明。右に管理者確認の切り替え（i2ZAS）。 */}
       <div className={styles.head}>
         <div className={styles.headText}>
@@ -1135,6 +1139,13 @@ export default function FormSubmissionsListV8() {
           </FilterChip>
         </div>
       </div>
+
+      {/* 見るだけの人への帯（`JV2oR`）。箱の操作と同じく staff には出さない。 */}
+      {!canManageFolders && (
+        <p className="border-info bg-info-bg text-ink rounded-control border px-3 py-2 text-sm" data-design-node="JV2oR">
+          閲覧のみで見ています。変える操作は管理者に頼んでください。
+        </p>
+      )}
 
       {/* 数の帯。管理者確認モードは別のアカウント群の数なので出さない。 */}
       {!reviewMode ? (
