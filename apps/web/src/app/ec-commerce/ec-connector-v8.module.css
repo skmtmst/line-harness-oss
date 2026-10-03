@@ -1,0 +1,61 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8-B EC連携の「つなぎ先」（板 `iLJmw`）。
+ *
+ * 入力そのものは今のつなぎ先の板（`connector-panel.tsx`）をそのまま使う。
+ * V8 の枠（題・説明・設定の中の案内・入口のタブ・板ID）だけを足す。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 左に設定の中の案内、右に本文。 */
+.body {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 板が 1100px を切ったら案内を畳む（V8 の決まり）。 */
+@container (max-width: 1099px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
