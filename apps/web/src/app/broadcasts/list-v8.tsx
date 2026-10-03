@@ -950,7 +950,7 @@ export default function BroadcastListV8() {
                             <p className={styles.cellSub}>{rowExcerpt(broadcast.messageType, broadcast.messageContent)}</p>
                             <p className={styles.cellAudience} title={audience}>{audience}</p>
                           </td>
-                          <td>
+                          <td className={styles.statusCell}>
                             {approvalDuplicatesStatus
                               ? <ApprovalBadge status={broadcast.approvalStatus} />
                               : statusBadge(broadcast)}

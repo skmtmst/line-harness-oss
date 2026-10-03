@@ -463,6 +463,18 @@
   background: currentcolor;
 }
 
+/*
+ * 状態のセル：承認待ちの札と「?」は横に並べる。
+ * 狭い列で「?」だけが下へ落ちないよう折り返さない。
+ */
+.statusCell {
+  white-space: nowrap;
+}
+
+.statusCell > * + * {
+  margin-left: 6px;
+}
+
 .statusNeutral {
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
