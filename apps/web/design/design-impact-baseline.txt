@@ -270,7 +270,9 @@ shared-button-importer app/webhooks/new/page.tsx
 shared-button-importer app/webhooks/page.tsx
 shared-button-importer app/webhooks/webhook-interactions.tsx
 shared-button-importer app/webhooks/webhook-overviews.tsx
+shared-button-importer app/webinars/edit/comments-v8.tsx
 shared-button-importer app/webinars/edit/cta-v8.tsx
+shared-button-importer app/webinars/edit/detail-v8.tsx
 shared-button-importer app/webinars/edit/edit-v8.tsx
 shared-button-importer app/webinars/edit/notifications-v8.tsx
 shared-button-importer app/webinars/edit/page.tsx

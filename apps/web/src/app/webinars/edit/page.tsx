@@ -56,6 +56,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import EditV8Shell from './edit-v8'
+import DetailV8 from './detail-v8'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
@@ -2544,8 +2545,27 @@ function EditWebinarInner() {
   const registrations = analytics?.summary.reservations ?? null
 
   /*
-    ★V8 の編集②〜⑤は別の器（EditV8Shell）で描く。基本設定・参加者・
-    分析・コメント演出・視聴後アクション・プレビューは V8 の対象外なので
+    ★V8 の結果まわり（参加者・分析・コメント演出）は別の器（DetailV8）で描く。
+    視聴後アクション・プレビューは V8 の対象外なので v7 のまま出す
+    （v7 の見た目は変えない）。
+  */
+  if (theme === 'v8' && id && (pane === 'participants' || pane === 'analytics' || pane === 'comments') && webinar && editor) {
+    return (
+      <DetailV8
+        webinar={webinar}
+        deliveryKind={editor.deliveryKind}
+        participantCount={analytics?.summary.reservations ?? null}
+        analytics={analytics}
+        analyticsState={analyticsState}
+        tab={pane}
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
+    )
+  }
+
+  /*
+    ★V8 の編集②〜⑤は別の器（EditV8Shell）で描く。基本設定・
+    視聴後アクション・プレビューは V8 の対象外なので
     v7 のまま出す（v7 の見た目は変えない）。
   */
   if (theme === 'v8' && id && (pane === 'video' || pane === 'cta' || pane === 'notifications' || pane === 'review') && webinar && editor) {

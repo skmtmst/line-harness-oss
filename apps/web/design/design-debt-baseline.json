@@ -566,24 +566,30 @@
   "app/webhooks/webhook-interactions.tsx": {
     "unresolved-classname": 35
   },
-  "app/webinars/edit/cta-v8.tsx": {
-    "unresolved-classname": 1
+  "app/webinars/edit/comments-v8.tsx": {
+    "unresolved-classname": 18
   },
-  "app/webinars/edit/edit-v8-shared.tsx": {
-    "arbitrary-value": 2
+  "app/webinars/edit/detail-v8.tsx": {
+    "unresolved-classname": 34
+  },
+  "app/webinars/edit/cta-v8.tsx": {
+    "unresolved-classname": 38
+  },
+  "app/webinars/edit/detail-v8.tsx": {
+    "unresolved-classname": 34
   },
   "app/webinars/edit/edit-v8.tsx": {
     "unresolved-classname": 8
   },
   "app/webinars/edit/notifications-v8.tsx": {
-    "unresolved-classname": 1
+    "unresolved-classname": 44
   },
   "app/webinars/edit/page.tsx": {
     "arbitrary-value": 21,
     "unresolved-classname": 9
   },
   "app/webinars/edit/review-v8.tsx": {
-    "unresolved-classname": 1
+    "unresolved-classname": 24
   },
   "app/webinars/edit/video-v8.tsx": {
     "unresolved-classname": 49

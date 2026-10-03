@@ -3,56 +3,57 @@
 /*
  * ★V8-B ウェビナー編集⑤確認（板 `XCUNf`）。
  *
- * v7 の編集画面（`page.tsx` の `ReviewStep`）と同じ中身。
- * v7 側は触らず、こちらの段から使う。公開前検査・最終確認・公開を持つ。
+ * 見本の形：公開前の確認（8つの項目のできた・まだと、まだの理由・
+ * 日時・件数）と設定のまとめ、右に公開ページでの見え方。
+ * 「この版を公開」はここで持つ（検査が通るまで押せない）。
+ * 口は v7 と同じ（`publishValidation`・`publish`・`videoAsset`・
+ * `testPublicPage`・`testNotifications`）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
 import { webinarApi, type Webinar, type WebinarEditor, type WebinarPublishValidation } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
-import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
-import { publishBlockers, type StepKey } from './edit-steps'
-import { reviewActionSummaryText, reviewMonitoringText, reviewTestSummaryBody } from './review-text'
-import { SummaryAside } from './edit-v8-shared'
 import styles from './review-v8.module.css'
 
-type WebinarWithPublication = Webinar & {
-  publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
-  publicationStartsAt?: string | null
-  publicationEndsAt?: string | null
+function formatTestedAt(value: string | null | undefined): string {
+  if (!value) return ''
+  try {
+    const date = new Date(value)
+    return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  } catch {
+    return ''
+  }
 }
 
-function deliveryWindow(webinar: Webinar): string {
-  /* 5枝の決まりは共有(`components/webinars/publication-label`)。ここは編集画面だけの落としどころ。 */
-  const publication = webinar as WebinarWithPublication
-  const shared = publicationStateLabel(publication.publicationState, publication.publicationStartsAt, publication.publicationEndsAt)
-  if (shared !== null) return shared
-  const daily = webinar.schedule.find((rule) => rule.type === 'daily' && rule.time)
-  const once = webinar.schedule.find((rule) => rule.type === 'once' && rule.at)
-  if (once?.at) return formatDateTime(Math.floor(new Date(once.at).getTime() / 1000) * 1000)
-  if (daily?.time) return `毎日 ${daily.time}`
-  return '—（公開期間は未設定）'
-}
-
-export default function ReviewStepV8({ webinar, editor, registrations, ctaCount, onBack, onPublished }: {
+export default function ReviewStepV8({ webinar, editor, ctaCount, publicUrl, canOpenPublicPage, publicPageReason, onEditorChange, onBack, onPublished }: {
   webinar: Webinar
   editor: WebinarEditor
-  registrations: number | null
   ctaCount: number
-  onBack: (key: StepKey) => void
+  publicUrl: string | null
+  canOpenPublicPage: boolean
+  publicPageReason: string
+  onEditorChange: (editor: WebinarEditor) => void
+  onBack: (key: 'basic' | 'video' | 'cta' | 'notifications') => void
   onPublished: () => void
 }) {
   const [validation, setValidation] = useState<WebinarPublishValidation | null>(null)
   const [validationState, setValidationState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [videoReady, setVideoReady] = useState<boolean | null>(null)
+  const [notifySummary, setNotifySummary] = useState<string | null>(null)
   const [publishing, setPublishing] = useState(false)
   const [publishError, setPublishError] = useState('')
+  const [testingPage, setTestingPage] = useState(false)
+  const [pageNotice, setPageNotice] = useState('')
+  const [testConfirmOpen, setTestConfirmOpen] = useState(false)
+  const [testingNotify, setTestingNotify] = useState(false)
+  const [notifyResult, setNotifyResult] = useState('')
   const validationRequestId = useRef(0)
-  /*
-    検査の取得に失敗しても「読み込み中」のまま公開ボタンを固めない。
-    失敗は失敗と出して、やり直しと次の一手を添える。
-  */
+
   const loadValidation = useCallback(() => {
     const requestId = ++validationRequestId.current
     setValidationState('loading')
@@ -68,22 +69,62 @@ export default function ReviewStepV8({ webinar, editor, registrations, ctaCount,
         setValidationState('error')
       })
   }, [webinar.id])
+
   useEffect(() => {
     loadValidation()
-    return () => { validationRequestId.current += 1 }
-  }, [loadValidation])
+    let cancelled = false
+    webinarApi.videoAsset(webinar.id)
+      .then((res) => { if (!cancelled) setVideoReady(res.data.asset?.stage === 'ready') })
+      .catch(() => { if (!cancelled) setVideoReady(null) })
+    webinarApi.notifications(webinar.id)
+      .then((res) => {
+        if (cancelled) return
+        const settings = res.data.settings
+        if (!settings) {
+          setNotifySummary(null)
+          return
+        }
+        const enabled = [
+          settings.registrationEnabled,
+          settings.dayBeforeEnabled,
+          settings.hourBeforeEnabled,
+          settings.startEnabled,
+          settings.missedEnabled,
+          settings.completedEnabled,
+        ].filter(Boolean).length
+        setNotifySummary(`${enabled}つ${settings.missedEnabled ? '' : '（見逃し案内は止めている）'}`)
+      })
+      .catch(() => { if (!cancelled) setNotifySummary(null) })
+    return () => {
+      validationRequestId.current += 1
+      cancelled = true
+    }
+  }, [loadValidation, webinar.id])
+
+  const checkStatus = (key: string): 'passed' | 'warning' | 'failed' | null =>
+    validation?.checks.find((check) => check.key === key)?.status ?? null
+
+  const formActive = editor.publicPage.form?.active === true
+  const notifyTestPassed = editor.notificationTest?.status === 'passed'
+  const pageTestPassed = editor.publicPage.test?.status === 'passed'
+  const frameCount = webinar.schedule.length
+
+  const items: Array<{ label: string; done: boolean | null; note: string }> = [
+    { label: '動画の準備ができている', done: videoReady, note: '' },
+    { label: '申込フォームが公開中', done: editor.publicPage.form ? formActive : null, note: '' },
+    { label: 'CTAの時刻とリンク', done: ctaCount > 0 ? true : validation ? checkStatus('cta') !== 'failed' : null, note: '' },
+    { label: '配信枠が1件以上', done: frameCount > 0, note: frameCount > 0 ? `${frameCount}件` : '' },
+    { label: '通知のテスト送信', done: notifyTestPassed, note: formatTestedAt(editor.notificationTest?.testedAt) },
+    { label: '公開ページを確かめた', done: pageTestPassed, note: pageTestPassed ? '' : 'ページをテストしてください' },
+    { label: '通知が重なっていない', done: checkStatus('notification_duplicates') === 'passed' ? true : checkStatus('notification_duplicates') === null ? null : false, note: '' },
+    { label: 'アクションの参照先がある', done: checkStatus('action_dependencies') === 'passed' ? true : checkStatus('action_dependencies') === null ? null : false, note: '' },
+  ]
+  const doneCount = items.filter((item) => item.done === true).length
   const blockers = validation
     ? validation.checks.filter((check) => check.status === 'failed').map((check) => check.detail || check.label)
-    : publishBlockers(webinar)
-  /*
-    R93: 最終確認と設定サマリーの文言は値に連動させる。
-    検査の有無・合否と関係ない固定文（「確認しました」「追加」）は出さない。
-  */
-  const actionSummary = reviewActionSummaryText(validation)
-  const testSummaryBody = reviewTestSummaryBody(validation, validationState)
-  const monitoringFailures = editor.monitoring.notificationFailures +
-    editor.monitoring.viewSegmentFailures + editor.monitoring.actionFailures
-  const monitoringSummary = reviewMonitoringText(monitoringFailures)
+    : []
+  const firstBlocker = blockers[0] ?? null
+
   const publish = async () => {
     setPublishing(true)
     setPublishError('')
@@ -101,69 +142,113 @@ export default function ReviewStepV8({ webinar, editor, registrations, ctaCount,
       setPublishing(false)
     }
   }
+
+  const testPage = async () => {
+    setTestingPage(true)
+    setPageNotice('')
+    try {
+      const response = await webinarApi.testPublicPage(webinar.id, editor.version)
+      onEditorChange(response.data)
+      setPageNotice(response.data.publicPage.test?.status === 'passed' ? '公開ページを確認しました。' : '公開ページに未設定があります。')
+    } catch (cause) {
+      setPageNotice(webinarErrorText(cause, '公開ページを確認できませんでした。'))
+    } finally {
+      setTestingPage(false)
+    }
+  }
+
+  const runNotificationTest = async () => {
+    setTestConfirmOpen(false)
+    setTestingNotify(true)
+    setNotifyResult('')
+    try {
+      const response = await webinarApi.testNotifications(webinar.id)
+      setNotifyResult(`テスト送信しました。成功 ${response.data.sent}件・失敗 ${response.data.failed}件`)
+      webinarApi.editor(webinar.id)
+        .then((editorResponse) => onEditorChange(editorResponse.data))
+        .catch(() => undefined)
+    } catch (cause) {
+      setNotifyResult(webinarErrorText(cause, 'テスト送信できませんでした。時間をおいてもう一度お試しください。'))
+    } finally {
+      setTestingNotify(false)
+    }
+  }
+
+  const notifyTestDone = editor.notificationTest?.status === 'passed'
+
   return (
-    <div className={styles.body}>
-      <div className="min-w-0 flex-1 space-y-3">
-      <section className="border-hairline bg-canvas space-y-4 rounded-card border p-5 shadow-card">
-      <div><h2 className="text-ink font-bold">公開前チェック</h2><p className="text-ink-faint mt-1 text-xs">公開に必要な設定を確認します。</p></div>
-      {validationState === 'ready' && blockers.length > 0 ? (
-        <Notice tone="warn">
-          <p className="font-bold">このままでは公開できません。</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
-            {blockers.map((text) => <li key={text}>{text}</li>)}
-          </ul>
-        </Notice>
-      ) : validationState === 'ready' ? (
-        <Notice tone="success">
-          必要なものは揃っています。
-        </Notice>
-      ) : null}
-      <ul className="divide-hairline border-hairline divide-y rounded-card border text-sm">
-        {(validation?.checks ?? []).map((check) => <li key={check.key} className="text-ink flex items-start gap-2 px-4 py-3"><span className={check.status === 'passed' ? 'text-success' : check.status === 'warning' ? 'text-warning' : 'text-danger'}>{check.status === 'passed' ? '✓' : '!'}</span><span><strong className="block">{check.label}</strong><span className="text-ink-faint text-xs">{check.detail}</span></span></li>)}
-        {validationState === 'loading' ? <li className="text-ink-faint px-4 py-3">公開前検査を読み込んでいます。</li> : null}
-      </ul>
-      {validationState === 'error' ? (
-        <Notice
-          tone="danger"
-          action={<Button onClick={loadValidation}>もう一度読み込む</Button>}
-        >
-          <p className="font-bold">公開前検査を読み込めませんでした。このままでは公開できません。</p>
-          <p className="mt-1 text-xs">まず下のボタンでもう一度読み込んでください。直らなければ基本設定・動画・CTAの各段が保存済みか確かめ、時間をおいて開き直してください。</p>
-        </Notice>
-      ) : null}
-      </section>
-      <section className="border-hairline bg-canvas space-y-4 rounded-card border p-5 shadow-card">
-      <div><h2 className="text-ink font-bold">最終確認</h2><p className="text-ink-faint mt-1 text-xs">公開すると、申込・配信条件に合う友だちが視聴できます。</p></div>
-      <dl className="divide-hairline border-hairline divide-y rounded-card border">
-        {[
-          ['ウェビナー名', webinar.title || '未設定'],
-          ['動画・公開', webinar.videoPrefix ? '申込者向け' : '未設定'],
-          ['公開期間', deliveryWindow(webinar)],
-          ['対象', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
-          ['CTA・フォーム', ctaCount > 0 ? `${ctaCount}件のCTA` : webinar.cta ? '動画＋CTA＋フォーム' : '未設定'],
-          ['アクション', actionSummary],
-        ].map(([label, value]) => (
-          <div key={label} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
-            <dt className="text-ink-faint text-xs font-semibold">{label}</dt>
-            <dd className="text-ink text-sm">{value}</dd>
+    <div className={styles.columns}>
+      <div className={styles.main}>
+        <section className={styles.card} aria-label="公開前の確認">
+          <h2 className={styles.cardTitle}>公開前の確認 {doneCount}/{items.length}</h2>
+          <p className={styles.cardDesc}>{items.length}つ全部が通ると公開できます。</p>
+          {validationState === 'loading' ? <ListState kind="loading" /> : (
+            <ul className={styles.rows}>
+              {items.map((item) => (
+                <li key={item.label} className={styles.row}>
+                  <StatusBadge tone={item.done === true ? 'success' : item.done === false ? 'danger' : 'neutral'}>
+                    {item.done === true ? 'できた' : item.done === false ? 'まだ' : '確認中'}
+                  </StatusBadge>
+                  <span className={styles.rowTitle}>{item.label}</span>
+                  {item.note ? <span className={styles.rowNote}>{item.note}</span> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+          {validationState === 'error' ? (
+            <Notice
+              tone="danger"
+              action={<Button onClick={loadValidation}>もう一度読み込む</Button>}
+            >
+              公開前検査を読み込めませんでした。このままでは公開できません。
+            </Notice>
+          ) : null}
+          {firstBlocker ? <p className={styles.blocker}>このままでは公開できません：{firstBlocker}。</p> : null}
+          <div className={styles.rowActions}>
+            <Button variant="primary" disabled={testingPage} onClick={() => void testPage()} busy={testingPage} busyLabel="確認中…">ページをテスト</Button>
+            <Button disabled={testingNotify || notifyTestDone} onClick={() => setTestConfirmOpen(true)} busy={testingNotify} busyLabel="送信中…">{notifyTestDone ? '通知のテスト済み' : '通知のテストを送る'}</Button>
           </div>
-        ))}
-      </dl>
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => onBack('basic')}>基本設定へ戻る</Button>
-        <Button onClick={() => onBack('video')}>動画へ戻る</Button>
-        <Button variant="primary" disabled={!validation || blockers.length > 0 || publishing} onClick={() => void publish()} busy={publishing} busyLabel="公開中…">この版を公開</Button>
+          {pageNotice ? <p className="text-ink-secondary text-xs">{pageNotice}</p> : null}
+          {notifyResult ? <p className="text-ink-secondary text-xs" role="status">{notifyResult}</p> : null}
+        </section>
+        <section className={styles.card} aria-label="設定のまとめ">
+          <h2 className={styles.cardTitle}>設定のまとめ</h2>
+          <dl className={styles.summary}>
+            <div className={styles.summaryRow}><dt>開催形式</dt><dd>{editor.deliveryKind === 'scheduled' ? '日時指定配信' : 'オンデマンド・いつでも視聴'}</dd></div>
+            <div className={styles.summaryRow}><dt>公開期間</dt><dd>{webinar.publicationStartsAt ? `${formatDateTime(webinar.publicationStartsAt)}から` : '未設定'}</dd></div>
+            <div className={styles.summaryRow}><dt>CTA</dt><dd>{ctaCount > 0 ? `${ctaCount}件` : '未設定'}</dd></div>
+            <div className={styles.summaryRow}><dt>通知</dt><dd>{notifySummary ?? '—'}</dd></div>
+          </dl>
+        </section>
+        <div className={styles.rowActions}>
+          <Button onClick={() => onBack('basic')}>基本設定へ戻る</Button>
+          <Button onClick={() => onBack('video')}>動画へ戻る</Button>
+          <Button variant="primary" disabled={!validation || blockers.length > 0 || publishing} onClick={() => void publish()} busy={publishing} busyLabel="公開中…">この版を公開</Button>
+        </div>
+        {publishError ? <p className="text-danger text-xs" role="alert">{publishError}</p> : null}
+        <p className="text-ink-faint text-xs">公開時点の版を固定し、編集中の下書きとは分けて保存します。</p>
       </div>
-      {publishError ? <p className="text-danger text-xs" role="alert">{publishError}</p> : null}
-      <p className="text-ink-faint text-xs">公開時点の版を固定し、編集中の下書きとは分けて保存します。</p>
-      </section>
+      <div>
+        <h2 className={styles.previewTitle}>公開ページでの見え方</h2>
+        <div className={styles.previewCard}>
+          <p className={styles.previewHeading}>{webinar.title || '無題のウェビナー'}</p>
+          <div className={styles.previewScreen} aria-hidden="true">▶</div>
+        </div>
+        <div className={styles.rowActions}>
+          {canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}
+          <Button onClick={() => void testPage()} disabled={testingPage} busy={testingPage} busyLabel="確認中…">テストを送る</Button>
+        </div>
+        {!(canOpenPublicPage && publicUrl) && publicPageReason ? <p className="text-ink-faint text-xs">{publicPageReason}</p> : null}
       </div>
-      <SummaryAside rows={[
-        ['状態', webinar.status === 'active' ? '公開中' : '有効化前'],
-        ['申込見込み', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
-        ['通知重複', validation?.checks.find((check) => check.key === 'notification_duplicates')?.status === 'passed' ? '重複なし' : '要確認'],
-        ['監視', monitoringSummary],
-      ]} previewBody={testSummaryBody} previewFirst />
+      <ConfirmDialog
+        open={testConfirmOpen}
+        title="通知をテスト送信しますか？"
+        description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。"
+        confirmLabel="テストを送る"
+        busy={testingNotify}
+        onCancel={() => { if (!testingNotify) setTestConfirmOpen(false) }}
+        onConfirm={() => void runNotificationTest()}
+      />
     </div>
   )
 }

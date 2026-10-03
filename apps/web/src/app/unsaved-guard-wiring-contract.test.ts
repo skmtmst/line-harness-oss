@@ -101,6 +101,7 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'app/templates/questions/question-v8.tsx': 'app/templates/editor-v8.tsx',
   'components/webinars/webinar-form.tsx': 'app/webinars/edit/page.tsx',
   'components/webinars/webinar-notifications.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/cta-v8.tsx': 'app/webinars/edit/edit-v8.tsx',
   'app/webinars/edit/video-v8.tsx': 'app/webinars/edit/edit-v8.tsx',
   'app/webinars/edit/notifications-v8.tsx': 'app/webinars/edit/edit-v8.tsx',
   'app/webinars/edit/review-v8.tsx': 'app/webinars/edit/edit-v8.tsx',
@@ -117,8 +118,8 @@ const COVERED_BY_PARENT: Record<string, string> = {
 const EXEMPTIONS: Record<string, string> = {
   'app/affiliates/payment-tab.tsx':
     '支払いCSV出力の確認窓（Vの本人確認入力を含む）。保存する編集画面ではなく番兵の対象外',
-  'app/webinars/edit/cta-v8.tsx':
-    'CTAカード・申込フォームの選択は枠内の保存ボタン確定式で下書きを持たない。v7 の CtaDesignStep と同じ画面の★V8版のため、同じ扱い',
+  'app/webinars/edit/comments-v8.tsx':
+    '流すコメントの表は枠内の保存ボタン確定式で下書きを持たない。v7 の CommentsTab と同じ画面の★V8版のため、同じ扱い',
   'app/affiliates/new/page.tsx':
     '「未保存の追加情報を破棄して一覧へ戻る」明示フロー。dirty管理ではなく部分保存の案内',
   'app/automations/new/page.tsx':

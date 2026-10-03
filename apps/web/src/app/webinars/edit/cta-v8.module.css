@@ -1,17 +1,203 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 
 /*
- * ★V8-B ウェビナー編集③CTA（板 `Q0Jrk`）の器。
- * 中の部品の見た目は v7 と同じ。ここでは並びだけ決める。
+ * ★V8-B ウェビナー編集③CTA（板 `Q0Jrk`）。
+ * 左のカード一覧・選んだ1枚の編集・申込フォームと、右の見え方。
  */
-.body {
-  display: flex;
-  flex-direction: column;
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 16px;
+  align-items: start;
 }
 
-@media (min-width: 80rem) {
-  .body {
-    flex-direction: row;
-  }
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cardDesc {
+  margin: 4px 0 12px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.row,
+.rowOn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: 13px;
+  text-align: left;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  cursor: pointer;
+}
+
+.rowOn {
+  background: var(--color-canvas-sunken);
+}
+
+.rowTime {
+  font-weight: 700;
+  color: var(--color-ink);
+  min-width: 48px;
+}
+
+.rowTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+}
+
+.addLink {
+  color: var(--color-action);
+  font-size: 13px;
+  margin-top: 12px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.editor {
+  margin-top: 12px;
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas-sunken);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.editorTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.textInput {
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 10px);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.rowActions {
+  display: flex;
+  gap: 8px;
+}
+
+.deleteLink {
+  color: var(--color-danger);
+  font-size: 13px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.previewTitle {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.previewCard {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 12px;
+}
+
+.previewScreen {
+  border-radius: var(--radius-mini, 7px);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  font-size: 24px;
+}
+
+.previewBody {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-mini, 7px);
+  margin-top: 8px;
+  padding: 12px;
+}
+
+.previewHeading {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.previewText {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.previewButton {
+  margin: 8px 0 0;
+  border-radius: var(--radius-control, 10px);
+  background: var(--color-success);
+  color: var(--color-canvas);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  padding: 8px;
 }

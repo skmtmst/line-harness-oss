@@ -154,11 +154,11 @@ export default function EditV8Shell({ webinarId, pane, webinar, editor, registra
           {pane === 'video' ? (
             <VideoStepV8 webinar={webinar} editor={editor} onWebinarChange={onWebinarChange} onEditorChange={onEditorChange} onDirtyChange={setDirty} registerSave={registerSave} />
           ) : pane === 'cta' ? (
-            <CtaStepV8 webinar={webinar} editor={editor} accountId={webinar.accountId} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={webinar.status === 'active' && publicUrl !== null} publicPageReason={publicPageReason} onEditorChange={onEditorChange} onCtasReport={onCtasReport} />
+            <CtaStepV8 webinar={webinar} editor={editor} accountId={webinar.accountId} onEditorChange={onEditorChange} onCtasReport={onCtasReport} onDirtyChange={setDirty} registerSave={registerSave} />
           ) : pane === 'notifications' ? (
-            <NotificationsStepV8 webinarId={webinarId} webinarTitle={webinar.title} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={webinar.status === 'active' && publicUrl !== null} publicPageReason={publicPageReason} onDirtyChange={setDirty} registerSave={registerSave} />
+            <NotificationsStepV8 webinarId={webinarId} webinarTitle={webinar.title} editor={editor} onEditorChange={onEditorChange} onDirtyChange={setDirty} registerSave={registerSave} />
           ) : pane === 'review' ? (
-            <ReviewStepV8 webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onBack={(key) => router.push(`/webinars/edit?id=${encodeURIComponent(webinarId)}&pane=${key}`)} onPublished={disarm} />
+            <ReviewStepV8 webinar={webinar} editor={editor} ctaCount={ctaCount} publicUrl={publicUrl} canOpenPublicPage={webinar.status === 'active' && publicUrl !== null} publicPageReason={publicPageReason} onEditorChange={onEditorChange} onBack={(key) => router.push(`/webinars/edit?id=${encodeURIComponent(webinarId)}&pane=${key}`)} onPublished={disarm} />
           ) : null}
         </Suspense>
       </div>
