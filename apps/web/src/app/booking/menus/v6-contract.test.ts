@@ -7,6 +7,8 @@ const ROOT = join(process.cwd(), 'src', 'app', 'booking', 'menus')
 const LIST = readFileSync(join(ROOT, 'page.tsx'), 'utf8')
 const CREATE = readFileSync(join(ROOT, 'new', 'page.tsx'), 'utf8')
 const SETTINGS_V8 = readFileSync(join(ROOT, 'settings-v8.tsx'), 'utf8')
+// タブの中身は settings-tabs/ に分かれている（見た目・動きは同じ）。
+const SETTINGS_MENUS_TAB = readFileSync(join(ROOT, 'settings-tabs', 'menus-tab.tsx'), 'utf8')
 const SETTINGS_CSS = readFileSync(join(ROOT, 'settings-v8.module.css'), 'utf8')
 
 describe('V6 予約設定', () => {
@@ -144,8 +146,9 @@ describe('V6 予約設定', () => {
   })
 
   it('C9fv7A: 閲覧のみは帯と押せない作るボタンと目印を出す', () => {
-    expect(SETTINGS_V8).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
-    expect(SETTINGS_V8).toContain('<Button variant="primary" disabled')
+    // 閲覧のみの帯と押せない作るボタンはメニュータブの中にある。
+    expect(SETTINGS_MENUS_TAB).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
+    expect(SETTINGS_MENUS_TAB).toContain('<Button variant="primary" disabled')
     expect(SETTINGS_V8).toContain("tab === 'menus' && !canEditMenus ? 'C9fv7A'")
   })
 
