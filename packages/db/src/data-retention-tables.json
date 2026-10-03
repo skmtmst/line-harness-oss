@@ -100,6 +100,15 @@
       "parentColumn": "id"
     }
   },
+  "ad_event_mappings": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "conversion_point_id",
+      "parent": "conversion_points",
+      "parentColumn": "id"
+    }
+  },
   "ad_platforms": {
     "category": "purge",
     "scope": {
