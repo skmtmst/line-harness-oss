@@ -534,6 +534,13 @@ function OverviewTab({
   currentAccountId: string
 }) {
   const descLen = (draft.description ?? '').length
+  /* 保存前に欄を離れたとき出す直し方（文は保存時と同じ）。 */
+  const [nameError, setNameError] = useState<string | null>(null)
+  function checkName(value: string): string | null {
+    if (!value.trim()) return 'イベント名は必須です'
+    if (value.length > EVENT_NAME_MAX_LENGTH) return 'イベント名は255字以内で入力してください'
+    return null
+  }
   const targetType = draft.target_type ?? 'single'
   const accountIds: string[] = Array.isArray(draft.account_ids)
     ? draft.account_ids
@@ -550,11 +557,19 @@ function OverviewTab({
         <input
           type="text"
           value={draft.name}
-          onChange={(e) => update('name', e.target.value)}
+          onChange={(e) => {
+            update('name', e.target.value)
+            if (nameError !== null) setNameError(checkName(e.target.value))
+          }}
+          onBlur={() => setNameError(checkName(draft.name))}
           maxLength={EVENT_NAME_MAX_LENGTH}
           placeholder="例: 第1回 AAA 説明会"
           className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
+          aria-invalid={nameError !== null}
         />
+        {nameError !== null && (
+          <p className="text-status-danger mt-1 text-xs" role="alert">{nameError}</p>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
