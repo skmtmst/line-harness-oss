@@ -5,10 +5,14 @@ import {
   createFriendAddRuleDraft,
   ensureFriendAddFallbackRules,
   getFriendAddRule,
+  getFriendByLineUserIdForAccount,
+  getLineAccountById,
+  jstNow,
   listFriendAddRuleOrderIds,
   listFriendAddRules,
   listFriendAddRulesPage,
   reorderFriendAddRulePriorities,
+  reorderFriendAddRulePrioritiesCAS,
   publishFriendAddRule,
   recordFriendAddRuleTest,
   saveFriendAddRuleDraft,
@@ -17,6 +21,8 @@ import {
   type FriendAddRuleKind,
   type FriendAddRuleRow,
 } from '@line-crm/db';
+import { LineClient } from '@line-crm/line-sdk';
+import { CommonVarResolutionFailedError, expandSendCommonVars } from '../services/interpolation-context.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -46,6 +52,11 @@ const ACTION_TYPES = new Set([
   'add_tag',
   'remove_tag',
   'start_scenario',
+  // F9: 友だち情報を入れる・対応マークを付ける・マイルを渡す・共通情報を使う。
+  'set_friend_field',
+  'add_support_mark',
+  'grant_mileage',
+  'use_common_var',
 ]);
 
 type RuleInput = {
@@ -275,6 +286,51 @@ function validateInput(body: RuleInput): string | null {
   if (!conditionAst.ok && conditionAst.error !== 'legacy_text') {
     return CONDITION_AST_MESSAGES[conditionAst.error];
   }
+  /*
+   * F9: 4つの操作は形が壊れていると実行時に黙って飛ぶだけになる。
+   * 保存の側で止める（下書きも含む。壊れた値を残すと公開前確認でも
+   * 理由が「参照先」だけになり、何が悪いか分からなくなる）。
+   */
+  const actions = body.definition?.actions;
+  if (actions != null) {
+    if (!Array.isArray(actions)) return 'することの指定が正しくありません';
+    for (const raw of actions) {
+      const action = (raw ?? {}) as { type?: unknown; targetId?: unknown; value?: unknown; amount?: unknown; op?: unknown };
+      switch (action.type) {
+        case 'set_friend_field':
+          if (typeof action.targetId !== 'string' || !action.targetId) {
+            return '入れる友だち情報の項目を選んでください';
+          }
+          if (typeof action.value !== 'string' || [...action.value].length > 2000) {
+            return '入れる値は2000文字までの文字で入力してください';
+          }
+          break;
+        case 'add_support_mark':
+          if (typeof action.targetId !== 'string' || !action.targetId) {
+            return '付ける対応マークを選んでください';
+          }
+          break;
+        case 'grant_mileage':
+          if (!Number.isInteger(action.amount) || (action.amount as number) < 1 || (action.amount as number) > 1000000) {
+            return '渡すマイルは1〜1000000の整数で入力してください';
+          }
+          break;
+        case 'use_common_var':
+          if (typeof action.targetId !== 'string' || !action.targetId) {
+            return '使う共通情報を選んでください';
+          }
+          if (action.op !== 'add' && action.op !== 'sub') {
+            return '共通情報の足し引きの向きを選んでください';
+          }
+          if (typeof action.value !== 'string' || !Number.isFinite(Number(action.value))) {
+            return '共通情報に足し引きする数は数字で入力してください';
+          }
+          break;
+        default:
+          break;
+      }
+    }
+  }
   return null;
 }
 
@@ -375,6 +431,54 @@ async function validateReferences(
         WHERE line_account_id = ? AND is_active = 1 AND id IN (${placeholders})`,
     ).bind(accountId, ...unique).all<{ id: string }>();
     if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えないシナリオが含まれています。');
+  }
+  /*
+   * F9: 4つの操作の参照先も、このアカウントの持ち物かを確かめる。
+   * 友だち情報欄は scopes の所属を見る（所属が無ければ共通。reminders と同じ形）。
+   * 対応マークに所属の置き場は無いので存在だけを見る。
+   * 共通情報は var_key と所属・未保管を見る（実行側と同じ条件）。
+   * マイルは金額だけなので参照先が無い（形は保存側の validateInput が見る）。
+   */
+  const actionFieldIds = definition.actions
+    .filter((action) => action.type === 'set_friend_field')
+    .map((action) => action.targetId)
+    .filter((id): id is string => typeof id === 'string' && Boolean(id));
+  if (actionFieldIds.length > 0) {
+    const unique = [...new Set(actionFieldIds)];
+    const placeholders = unique.map(() => '?').join(',');
+    const rows = await db.prepare(
+      `SELECT DISTINCT ff.id AS id FROM friend_fields ff
+         LEFT JOIN friend_field_scopes ffs ON ffs.field_id = ff.id
+        WHERE ff.id IN (${placeholders})
+          AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)`,
+    ).bind(...unique, accountId).all<{ id: string }>();
+    if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えない友だち情報の項目が含まれています。');
+  }
+  const actionMarkIds = definition.actions
+    .filter((action) => action.type === 'add_support_mark')
+    .map((action) => action.targetId)
+    .filter((id): id is string => typeof id === 'string' && Boolean(id));
+  if (actionMarkIds.length > 0) {
+    const unique = [...new Set(actionMarkIds)];
+    const placeholders = unique.map(() => '?').join(',');
+    const rows = await db.prepare(
+      `SELECT id FROM support_marks WHERE id IN (${placeholders})`,
+    ).bind(...unique).all<{ id: string }>();
+    if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えない対応マークが含まれています。');
+  }
+  const actionVarKeys = definition.actions
+    .filter((action) => action.type === 'use_common_var')
+    .map((action) => action.targetId)
+    .filter((id): id is string => typeof id === 'string' && Boolean(id));
+  if (actionVarKeys.length > 0) {
+    const unique = [...new Set(actionVarKeys)];
+    const placeholders = unique.map(() => '?').join(',');
+    const rows = await db.prepare(
+      `SELECT var_key FROM common_vars
+        WHERE var_key IN (${placeholders})
+          AND line_account_id = ? AND archived_at IS NULL`,
+    ).bind(...unique, accountId).all<{ var_key: string }>();
+    if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えない共通情報が含まれています。');
   }
   if (definition.activeFrom && definition.activeUntil && definition.activeFrom > definition.activeUntil) {
     push(friendKind, '有効期間の終了は開始より後にしてください。');
@@ -930,7 +1034,7 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
   try {
     if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
     await ensureFriendAddFallbackRules(c.env.DB, accountId);
-    const [page, options, summary, ruleSummary, folderCounts] = await Promise.all([
+    const [page, options, summary, ruleSummary, folderCounts, orderVersion] = await Promise.all([
       listFriendAddRulesPage(c.env.DB, {
         lineAccountId: accountId,
         friendKind: kind,
@@ -974,6 +1078,8 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
           WHERE line_account_id = ? AND friend_kind = ? AND archived_at IS NULL
           GROUP BY folder_name`,
       ).bind(accountId, kind).all<{ folder_name: string | null; count: number }>(),
+      // F8: 並びの版。PUT /order の expectedVersion に使う。
+      getFriendAddOrderVersion(c.env.DB, accountId, kind),
     ]);
     const rows = page.items;
     const routeNames = new Map(options.routes.map((route) => [route.id, route.name]));
@@ -984,6 +1090,7 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
         items: rows.map((row) => toRule(row, routeNames, scenarioNames)),
         total: page.total,
         nextCursor: page.nextCursor,
+        orderVersion,
         folderCounts: (folderCounts.results ?? []).map((entry) => ({
           name: entry.folder_name,
           count: entry.count,
@@ -1008,6 +1115,26 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
     return c.json({ success: false, error: '友だち追加時の配信を取得できませんでした' }, 500);
   }
 });
+
+/*
+ * 並びの版。受け皿以外の生きている設定の lock_version の合計。
+ * 並べ替え・下書き保存・停止のたびにどれかが行の版を上げるので、
+ * 合計が変わる。行の増減はIDの集合で見る。合計と集合の両方で
+ * 並びの今の姿を掴み、PUT /order の expectedVersion と突き合わせる。
+ */
+async function getFriendAddOrderVersion(
+  db: D1Database,
+  lineAccountId: string,
+  friendKind: FriendAddRuleKind,
+): Promise<number> {
+  const row = await db.prepare(
+    `SELECT COALESCE(SUM(lock_version), 0) AS version
+       FROM friend_add_rules
+      WHERE line_account_id = ? AND friend_kind = ?
+        AND is_unknown_route_fallback = 0 AND archived_at IS NULL`,
+  ).bind(lineAccountId, friendKind).first<{ version: number | null }>();
+  return Number(row?.version ?? 0);
+}
 
 /*
  * PATCH /api/friend-add-rules/reorder — 一覧のつまみで動かした順を
@@ -1042,6 +1169,82 @@ friendAddRules.patch('/api/friend-add-rules/reorder', requireRole('owner', 'admi
     return c.json({ success: true, data: { updated: ids.length } });
   } catch (error) {
     console.error('PATCH /api/friend-add-rules/reorder error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/*
+ * PUT /api/friend-add-rules/order — F8: まとめて並べ替える口。
+ * 対象IDの全部・所属・区分・expectedVersion の4点を厳密に見る。
+ * - 所属: 見えるLINEアカウントだけ（canUseAccount）。
+ * - 区分: first_time / returning だけ。
+ * - 対象ID: その所属・区分の受け皿以外の全件とちょうど一致。
+ * - 版: 並びの版（lock_version の合計）が expectedVersion と一致。
+ * どれか1つでも合わなければ書かず 409 で読み直しを促す。
+ * PATCH /reorder は従来の画面が使うので残し、版は見ないままにする。
+ */
+friendAddRules.put('/api/friend-add-rules/order', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{
+      accountId?: string; friendKind?: FriendAddRuleKind; ids?: unknown; expectedVersion?: unknown;
+    }>();
+    const accountId = accountIdFrom(c, body);
+    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    const kind = body.friendKind;
+    if (!kind || !KINDS.has(kind)) return c.json({ success: false, error: 'friendKind が正しくありません' }, 400);
+    if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
+      return c.json({ success: false, error: 'ids must be an array of rule ids' }, 400);
+    }
+    const ids = body.ids as string[];
+    if (ids.length > 500 || new Set(ids).size !== ids.length) {
+      return c.json({ success: false, error: 'ids must be unique and at most 500' }, 400);
+    }
+    if (!Number.isInteger(body.expectedVersion) || (body.expectedVersion as number) < 0) {
+      return c.json({ success: false, error: 'expectedVersion は0以上の整数で指定してください' }, 400);
+    }
+    if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+    const current = await listFriendAddRuleOrderIds(c.env.DB, { lineAccountId: accountId, friendKind: kind });
+    if (current.length !== ids.length || !current.every((id) => ids.includes(id))) {
+      return c.json({ success: false, code: 'ORDER_CHANGED', error: 'ほかの画面で一覧が変わっています。読み直してから、もう一度お試しください' }, 409);
+    }
+    const currentVersion = await getFriendAddOrderVersion(c.env.DB, accountId, kind);
+    if (currentVersion !== body.expectedVersion) {
+      return c.json({
+        success: false,
+        code: 'ORDER_VERSION_CONFLICT',
+        error: 'ほかの画面で並びが変わっています。最新の状態を読み直してください',
+        data: { currentVersion },
+      }, 409);
+    }
+    /*
+     * F8補修: 版確認と全順序更新を1文のCASで結ぶ。確認と書込のあいだへ
+     * 割り込まれても、版がずれていれば1行も書かず409にする。
+     */
+    try {
+      await reorderFriendAddRulePrioritiesCAS(c.env.DB, {
+        lineAccountId: accountId,
+        friendKind: kind,
+        ids,
+        expectedVersion: body.expectedVersion as number,
+      });
+    } catch {
+      // 確認後に割り込まれた。何が変わったか読み直して理由を分ける。
+      const raced = await listFriendAddRuleOrderIds(c.env.DB, { lineAccountId: accountId, friendKind: kind });
+      if (raced.length !== ids.length || !raced.every((id) => ids.includes(id))) {
+        return c.json({ success: false, code: 'ORDER_CHANGED', error: 'ほかの画面で一覧が変わっています。読み直してから、もう一度お試しください' }, 409);
+      }
+      const racedVersion = await getFriendAddOrderVersion(c.env.DB, accountId, kind);
+      return c.json({
+        success: false,
+        code: 'ORDER_VERSION_CONFLICT',
+        error: 'ほかの画面で並びが変わっています。最新の状態を読み直してください',
+        data: { currentVersion: racedVersion },
+      }, 409);
+    }
+    const orderVersion = await getFriendAddOrderVersion(c.env.DB, accountId, kind);
+    return c.json({ success: true, data: { updated: ids.length, orderVersion } });
+  } catch (error) {
+    console.error('PUT /api/friend-add-rules/order error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1313,6 +1516,121 @@ friendAddRules.post('/api/friend-add-rules/:id/test', requireRole('owner', 'admi
     expectedAt: body.expectedAt ?? null,
     friendId: body.friendId ?? null,
   });
+});
+
+/*
+ * POST /api/friend-add-rules/:id/test-send — F12: 保存済みの本文・版で固定し、
+ * 操作した本人だけへテスト送信する。
+ * - 送る本文は要求ではなく保存済み版の snapshot（版も応答に返す）。
+ * - 送り先は操作者のLINEだけ。本文・引数での送り先指定は受け付けない。
+ * - 手動の扱いとして messages_log へ source='manual'・delivery_type='test' で記録する。
+ *   ヘッダ X-Line-Harness-Source: manual 自体はプロキシ経路の印なので付けない。
+ *   既存の手動契約（手動1:1は緊急停止の対象外・手動として記録）に新しい例外は作らない。
+ * - 実顧客へは送らない。短時間の二度押しは 429 で止める。
+ */
+friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = accountIdFrom(c);
+  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  try {
+    if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+    const staff = c.get('staff');
+    if (staff.role === 'staff' && !staff.permissionKeys?.includes('/friend-add-settings')) {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
+    const idempotencyKey = c.req.header('Idempotency-Key');
+    if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) {
+      return c.json({ success: false, error: 'テスト送信には有効な冪等キーが必要です' }, 400);
+    }
+    const row = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
+    if (!row || !row.definition_snapshot) return c.json({ success: false, error: '設定が見つかりません' }, 404);
+    const definition = parseSnapshot(row.definition_snapshot);
+    if (definition.messageType !== 'text' || !definition.messageText.trim()) {
+      return c.json({ success: false, error: 'テスト送信できるのはテキストの本文がある版だけです' }, 422);
+    }
+    // 送り先は操作者本人だけ。staff の LINE 連携からこのアカウントの友だちを引く。
+    const staffRow = await c.env.DB.prepare(
+      `SELECT line_user_id FROM staff_members WHERE id = ? AND is_active = 1`,
+    ).bind(staff.id).first<{ line_user_id: string | null }>();
+    const friend = staffRow?.line_user_id
+      ? await getFriendByLineUserIdForAccount(c.env.DB, staffRow.line_user_id, accountId)
+      : null;
+    if (!friend || friend.line_account_id !== accountId || !friend.is_following) {
+      return c.json({
+        success: false,
+        error: 'あなたのLINEがこのアカウントの友だちに見つかりません。先に友だち追加してブロックを解除してください',
+      }, 409);
+    }
+    // 短時間の二度押しは送らず止める（一斉配信のテスト送信と同じ形）。
+    const claim = await c.env.DB.prepare(
+      `INSERT INTO operation_audit (id, target_kind, target_id, action, actor_id, detail_json)
+       SELECT ?, 'friend_add_rule', ?, 'test_send', ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM operation_audit
+          WHERE target_kind = 'friend_add_rule' AND target_id = ?
+            AND action = 'test_send' AND actor_id = ?
+            AND datetime(created_at) >= datetime('now', '+9 hours', '-10 seconds')
+       )`,
+    ).bind(
+      crypto.randomUUID(),
+      row.id,
+      staff.id,
+      JSON.stringify({ versionId: row.version_id }),
+      row.id,
+      staff.id,
+    ).run();
+    if ((claim.meta.changes ?? 0) !== 1) {
+      return c.json(
+        { success: false, error: '短時間に繰り返し送信しています。10秒待ってからやり直してください' },
+        { status: 429, headers: { 'Retry-After': '10' } },
+      );
+    }
+    const account = await getLineAccountById(c.env.DB, accountId);
+    if (!account) return c.json({ success: false, error: 'LINEアカウントが見つかりません' }, 400);
+    // 共通情報の差し込みは厳格に解く（N-189）。解けなければ送らない。
+    let resolvedBody: string;
+    try {
+      resolvedBody = await expandSendCommonVars(
+        c.env.DB,
+        definition.messageText,
+        { kind: 'test_send', id: row.id },
+        { lineAccountId: accountId },
+      );
+    } catch (error) {
+      if (error instanceof CommonVarResolutionFailedError) {
+        return c.json({
+          success: false,
+          code: 'UNRESOLVED_TEMPLATE_VARIABLES',
+          error: `共通情報を解決できません: ${error.failures.map((f) => `{{var.${f.varKey}}}`).join(', ')}`,
+        }, 422);
+      }
+      throw error;
+    }
+    const text = `【テスト配信】\n${resolvedBody}`;
+    try {
+      await new LineClient(account.channel_access_token)
+        .pushMessage(friend.line_user_id, [{ type: 'text', text }], idempotencyKey);
+    } catch (error) {
+      console.error('POST /api/friend-add-rules/:id/test-send push failed:', error);
+      return c.json({ success: false, error: 'LINEへ送信できませんでした' }, 502);
+    }
+    await c.env.DB.prepare(
+      `INSERT INTO messages_log
+         (id, friend_id, direction, message_type, content, delivery_type, source, line_account_id, created_at)
+       VALUES (?, ?, 'outgoing', 'text', ?, 'test', 'manual', ?, ?)`,
+    ).bind(crypto.randomUUID(), friend.id, text, accountId, jstNow()).run();
+    return c.json({
+      success: true,
+      data: {
+        sent: 1,
+        versionId: row.version_id,
+        versionNumber: row.version_number,
+        recipientKind: 'self',
+      },
+    });
+  } catch (error) {
+    console.error('POST /api/friend-add-rules/:id/test-send error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
 });
 
 friendAddRules.post('/api/friend-add-rules/:id/publish', requireRole('owner', 'admin'), async (c) => {
