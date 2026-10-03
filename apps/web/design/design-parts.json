@@ -2975,6 +2975,60 @@
         }
       ]
     },
+    "detail-panel": {
+      "name": "V8 右から出る詳細パネル",
+      "pencilNodes": [
+        "VJKAT"
+      ],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/detail-panel.tsx",
+      "cssModule": "src/components/shared/detail-panel.module.css",
+      "components": [
+        "DetailPanel",
+        "useDetailPanelUrl"
+      ],
+      "cssPrefix": "detail-panel",
+      "pencilUsage": "一覧の行の詳細表示",
+      "lastCheckedAt": "2026-10-04",
+      "note": "窓の埋め込み面を土台にし、一覧は左に見えたままにする。↑↓で前・次の行、URLに行を残す。",
+      "routes": {
+        "active": [],
+        "impact": "行の詳細パネルを持つ管理画面"
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1152
+        ],
+        "reason": "司令塔が録画で確かめる。"
+      },
+      "declarations": [
+        {
+          "pencil": "panel width",
+          "class": "panel",
+          "prop": "width",
+          "source": "360px",
+          "resolved": "360px"
+        },
+        {
+          "pencil": "title 15/600",
+          "class": "title",
+          "prop": "font",
+          "source": "15px/600",
+          "resolved": "15px/600"
+        },
+        {
+          "pencil": "radius card",
+          "class": "panel",
+          "prop": "border-radius",
+          "source": "var(--radius-card)",
+          "resolved": "12px"
+        }
+      ]
+    },
     "notice": {
       "name": "★V7 共通の帯（Notice）",
       "pencilNodes": [
