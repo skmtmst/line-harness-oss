@@ -27,9 +27,13 @@ vi.mock('../services/booking-notifier.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/booking-notifier.js')>();
   return { ...actual, sendBookingNotification: vi.fn(async () => {}) };
 });
-import { sendBookingNotification } from '../services/booking-notifier.js';
+vi.mock('../services/booking-waitlist-card.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../services/booking-waitlist-card.js')>();
+  return { ...actual, sendWaitlistInviteCard: vi.fn(async () => {}) };
+});
+import { sendWaitlistInviteCard } from '../services/booking-waitlist-card.js';
 
-const sender = vi.mocked(sendBookingNotification);
+const cardSender = vi.mocked(sendWaitlistInviteCard);
 
 function asD1(sqlite: Database.Database): D1Database {
   const wrap = (sql: string, params: unknown[]) => ({
@@ -71,7 +75,7 @@ function makeApp(db: D1Database, route: Hono<Env>) {
     return next();
   });
   app.route('/', route);
-  const env = { DB: db } as Env['Bindings'];
+  const env = { DB: db, LIFF_URL: 'https://liff.line.me/test123' } as Env['Bindings'];
   // 取り消し口はカレンダー削除を waitUntil へ回す。試験ではその場で捨てる。
   const execCtx = {
     waitUntil: (promise: Promise<unknown>) => { promise.catch(() => {}); },
@@ -121,7 +125,7 @@ beforeEach(async () => {
   db = asD1(sqlite);
   ({ default: bookingRoute } = await import('./booking.js'));
   access.canAccessAllLineAccounts.mockClear();
-  sender.mockClear();
+  cardSender.mockClear();
 });
 
 describe('キャンセル待ちの口', () => {
@@ -171,9 +175,15 @@ describe('キャンセル待ちの口', () => {
     }, env);
     expect(cancelled.status).toBe(200);
 
-    // 早い順の1人（friend-a）にだけ1通。
-    expect(sender).toHaveBeenCalledTimes(1);
-    expect(sender.mock.calls[0]?.[0]).toMatchObject({ kind: 'waitlist_invite', toLineUserId: 'U-a' });
+    // 早い順の1人（friend-a）にだけカードが1通。
+    expect(cardSender).toHaveBeenCalledTimes(1);
+    const sent = cardSender.mock.calls[0]?.[0] as { toLineUserId: string; bubble: unknown };
+    expect(sent.toLineUserId).toBe('U-a');
+    const card = JSON.stringify(sent.bubble);
+    expect(card).toContain('この時間で予約する');
+    expect(card).toContain('今回は見送る');
+    expect(card).toContain('/booking/waitlist/');
+    expect(card).toContain('/decline');
     const rows = sqlite.prepare(
       `SELECT friend_id, status, notified_at FROM booking_waitlist ORDER BY created_at`).all() as Array<{
       friend_id: string; status: string; notified_at: string | null;

@@ -1431,7 +1431,7 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
       lineAccountId: accountId,
       staffId: row.staff_id,
       startsAt: row.starts_at,
-    });
+    }, undefined, c.env.LIFF_URL ?? '');
   } catch (error) {
     console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId }));
   }
@@ -1477,7 +1477,7 @@ async function runSelfBookingCancelSideEffects(
       lineAccountId: self.accountId,
       staffId: row.staff_id,
       startsAt: row.starts_at,
-    });
+    }, undefined, c.env.LIFF_URL ?? '');
   } catch {
     console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId: row.id }));
   }
@@ -7017,7 +7017,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         lineAccountId: accountId,
         staffId: row.staff_id,
         startsAt: row.starts_at,
-      });
+      }, undefined, c.env.LIFF_URL ?? '');
     } catch {
       console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId: id }));
     }

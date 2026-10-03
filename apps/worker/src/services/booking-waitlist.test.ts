@@ -1,8 +1,8 @@
 /**
  * booking-plus 2: キャンセル待ちの繰り上げ。
  *
- * - 空いたら登録の早い順に1人だけ招く（LINE は1通）。
- * - 仮押さえ中は次の人を招かない。期限切れは列へ戻す。
+ * - 空いたら登録の早い順に1組だけ招く（カードの LINE は1通）。
+ * - 仮押さえ中は次の人を招かない。期限切れは列の後ろへ回す。
  * - 仮押さえ分数は店の設定を使う。
  * - LINE未連携の電話客は送らず invited のまま（店が電話する）。
  */
@@ -58,6 +58,7 @@ let db: D1Database;
 const sender = vi.fn();
 
 const SLOT = '2026-10-10T05:00:00.000Z';
+const LIFF_BASE = 'https://liff.line.me/test123';
 
 function addWaitlist(id: string, friendId: string | null, customerId: string | null, createdAt: string) {
   sqlite.prepare(`INSERT INTO booking_waitlist
@@ -69,6 +70,11 @@ function addWaitlist(id: string, friendId: string | null, customerId: string | n
       friendId, customerId,
       friendId ? `friend:${friendId}` : `customer:${customerId}`,
       createdAt);
+}
+
+function promote() {
+  return promoteBookingWaitlist(
+    db, { lineAccountId: 'account-a', staffId: 'staff-a', startsAt: SLOT }, sender, LIFF_BASE);
 }
 
 beforeEach(() => {
@@ -98,12 +104,11 @@ beforeEach(() => {
 });
 
 describe('キャンセル待ちの繰り上げ', () => {
-  it('早い順に1人だけ招き、店の設定分数で仮押さえする', async () => {
+  it('早い順に1人だけカードで知らせ、店の設定分数で仮押さえする', async () => {
     sqlite.prepare(`UPDATE booking_settings SET waitlist_hold_minutes = 45 WHERE id = 'settings-a'`).run();
     addWaitlist('wait-1', 'friend-a', null, '2026-10-04T01:00:00.000Z');
     addWaitlist('wait-2', 'friend-b', null, '2026-10-04T02:00:00.000Z');
-    const result = await promoteBookingWaitlist(
-      db, { lineAccountId: 'account-a', staffId: 'staff-a', startsAt: SLOT }, sender);
+    const result = await promote();
     expect(result.promoted).toBe(true);
     if (result.promoted) {
       expect(result.entry.id).toBe('wait-1');
@@ -111,8 +116,17 @@ describe('キャンセル待ちの繰り上げ', () => {
       expect(result.entry.notified_at).not.toBeNull();
     }
     expect(sender).toHaveBeenCalledTimes(1);
-    expect(sender.mock.calls[0]?.[0]).toMatchObject({ kind: 'waitlist_invite', toLineUserId: 'U-a' });
-    expect(sender.mock.calls[0]?.[0].ctx).toMatchObject({ holdMinutes: 45 });
+    const sent = sender.mock.calls[0]?.[0] as {
+      toLineUserId: string; altText: string; bubble: unknown;
+    };
+    expect(sent.toLineUserId).toBe('U-a');
+    const card = JSON.stringify(sent.bubble);
+    // 見出し・中身・押し先2つが入っている。
+    expect(card).toContain('に空きが出ました');
+    expect(card).toContain('この時間で予約する');
+    expect(card).toContain('今回は見送る');
+    expect(card).toContain(`waitlist=${'wait-1'}`);
+    expect(card).toContain(`/booking/waitlist/${'wait-1'}/decline`);
     // 2番目はまだ待っている。
     expect(sqlite.prepare(`SELECT status FROM booking_waitlist WHERE id = 'wait-2'`).get())
       .toMatchObject({ status: 'waiting' });
@@ -121,10 +135,8 @@ describe('キャンセル待ちの繰り上げ', () => {
   it('仮押さえ中は次の人を招かない', async () => {
     addWaitlist('wait-1', 'friend-a', null, '2026-10-04T01:00:00.000Z');
     addWaitlist('wait-2', 'friend-b', null, '2026-10-04T02:00:00.000Z');
-    await promoteBookingWaitlist(
-      db, { lineAccountId: 'account-a', staffId: 'staff-a', startsAt: SLOT }, sender);
-    const second = await promoteBookingWaitlist(
-      db, { lineAccountId: 'account-a', staffId: 'staff-a', startsAt: SLOT }, sender);
+    await promote();
+    const second = await promote();
     expect(second).toMatchObject({ promoted: false, reason: 'hold_active' });
     expect(sender).toHaveBeenCalledTimes(1);
   });
@@ -132,11 +144,9 @@ describe('キャンセル待ちの繰り上げ', () => {
   it('仮押さえの期限切れは列へ戻し、次の人を招く', async () => {
     addWaitlist('wait-1', 'friend-a', null, '2026-09-01T01:00:00.000Z');
     addWaitlist('wait-2', 'friend-b', null, '2026-09-02T01:00:00.000Z');
-    await promoteBookingWaitlist(
-      db, { lineAccountId: 'account-a', staffId: 'staff-a', startsAt: SLOT }, sender);
+    await promote();
     sqlite.prepare(`UPDATE booking_waitlist SET hold_expires_at = '2020-01-01T00:00:00.000Z' WHERE id = 'wait-1'`).run();
-    const result = await promoteBookingWaitlist(
-      db, { lineAccountId: 'account-a', staffId: 'staff-a', startsAt: SLOT }, sender);
+    const result = await promote();
     expect(result.promoted).toBe(true);
     if (result.promoted) expect(result.entry.id).toBe('wait-2');
     expect(sender).toHaveBeenCalledTimes(2);
@@ -147,8 +157,7 @@ describe('キャンセル待ちの繰り上げ', () => {
 
   it('電話客は送らず invited のままにする', async () => {
     addWaitlist('wait-p', null, 'customer-p', '2026-10-04T01:00:00.000Z');
-    const result = await promoteBookingWaitlist(
-      db, { lineAccountId: 'account-a', staffId: 'staff-a', startsAt: SLOT }, sender);
+    const result = await promote();
     expect(result.promoted).toBe(true);
     expect(sender).not.toHaveBeenCalled();
     expect(sqlite.prepare(`SELECT status, notified_at FROM booking_waitlist WHERE id = 'wait-p'`).get())
@@ -156,8 +165,7 @@ describe('キャンセル待ちの繰り上げ', () => {
   });
 
   it('誰も待っていなければ empty', async () => {
-    const result = await promoteBookingWaitlist(
-      db, { lineAccountId: 'account-a', staffId: 'staff-a', startsAt: SLOT }, sender);
+    const result = await promote();
     expect(result).toMatchObject({ promoted: false, reason: 'empty' });
     expect(sender).not.toHaveBeenCalled();
   });
