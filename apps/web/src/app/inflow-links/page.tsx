@@ -38,6 +38,7 @@ import Select from '@/components/shared/select'
 import { formatDay, formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import InflowListV8 from './inflow-list-v8'
+import { AdConnectionsV8, AdHistoryV8, AdMetricsV8 } from './ad-integration-v8'
 
 interface MessageTemplate {
   id: string
@@ -1590,10 +1591,11 @@ function InflowLinksPageHost() {
   const { selectedAccountId } = useAccount()
   const visibility = useFeatureVisibility(selectedAccountId)
   const tab = useMergedTab(MERGED_TABS)
-  // ★V8-B：一覧タブだけ先に積み替える（板 `xbHxg`）。ほかのタブは
-  // 後のPRで板 `XjOte`・`qSTVR`・`FDBsG`・`p0kA3` へ積み替える。
+  // ★V8-B：一覧・広告連携・つなぎ・送信履歴を積み替える
+  // （板 `xbHxg`・`qSTVR`・`FDBsG`・`p0kA3`）。サイトスクリプトは
+  // 板 `XjOte` へ積み替えるまでタブのまま残す。
   const theme = useAdminTheme()
-  const v8Links = theme === 'v8' && tab === 'links'
+  const v8NoTabs = theme === 'v8' && tab !== 'script'
   const params = useSearchParams()
   const adView = params.get('view') === 'history' ? 'history' : 'connections'
   /*
@@ -1639,7 +1641,7 @@ function InflowLinksPageHost() {
     !!tabFeature && visibility.status === 'ready' && !visibility.enabled(tabFeature)
   return (
     <div>
-      {v8Links ? null : (
+      {v8NoTabs ? null : (
         <MergedTabs basePath="/inflow-links" tabs={visibleTabs} active={tab} />
       )}
       {tabBlocked ? (
@@ -1653,8 +1655,11 @@ function InflowLinksPageHost() {
               一瞬に計測APIを呼ぶと、offのaccountで403が画面全体のゲートを
               起こしてしまう。 */}
           {tab === 'script' && visibility.status === 'ready' && <SiteScript />}
-          {tab === 'ads' && <AdIntegration view="metrics" onPlatformCountsChange={handleAdCounts} />}
-          {tab === 'connections' && <AdIntegration view={adView} onPlatformCountsChange={handleAdCounts} />}
+          {tab === 'ads' && theme === 'v8' && <AdMetricsV8 />}
+          {tab === 'ads' && theme !== 'v8' && <AdIntegration view="metrics" onPlatformCountsChange={handleAdCounts} />}
+          {tab === 'connections' && theme === 'v8' && adView === 'history' && <AdHistoryV8 />}
+          {tab === 'connections' && theme === 'v8' && adView !== 'history' && <AdConnectionsV8 />}
+          {tab === 'connections' && theme !== 'v8' && <AdIntegration view={adView} onPlatformCountsChange={handleAdCounts} />}
         </>
       )}
     </div>

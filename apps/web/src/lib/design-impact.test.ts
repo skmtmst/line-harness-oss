@@ -117,6 +117,8 @@ describe('共通部品の影響範囲', () => {
       // IDEA-18 (#1036): 経路別の注文明細が増えても画面を重くしないよう
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
       'app/inflow-links/_components/ref-orders.tsx',
+      // ★V8-B 広告への送信履歴（p0kA3）。表の下にページ送りを置く。
+      'app/inflow-links/ad-integration-v8.tsx',
       // #565: 送信履歴が増えても描画を際限なく重くしないよう、20件ずつのページ送りに寄せた。
       'app/inflow-links/ad-integration.tsx',
       // ★V8-B 流入と計測の詳細（Q5le3）。友だちの表の下にページ送りを置く。
