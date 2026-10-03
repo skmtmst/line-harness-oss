@@ -485,11 +485,18 @@ export function FeatureSettingsV8() {
           )}
 
           {filteredGroups.length === 0 ? (
-            <ListState
-              kind="empty"
-              title="当てはまる機能がありません"
-              description="探す言葉を変えてください。"
-            />
+            <div data-design-node="bR6a1">
+              <ListState
+                kind="empty"
+                title="当てはまる機能がありません"
+                description="探す言葉を変えてください。"
+                action={query ? (
+                  <Button variant="secondary" onClick={() => setQuery('')}>
+                    条件を外す
+                  </Button>
+                ) : undefined}
+              />
+            </div>
           ) : (
             <div className={styles.cards}>
               {columns.map((column, columnIndex) => (
