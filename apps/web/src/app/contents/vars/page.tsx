@@ -47,6 +47,8 @@ import {
 } from './list-model'
 import VarsExportPanel from './export-panel'
 import { formatDay, formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import CommonVarsListV8 from './list-v8'
 
 /**
  * 共通情報の一覧。
@@ -1462,13 +1464,22 @@ function VarsPageInner() {
   )
 }
 
+/*
+ * ★V8: data-theme="v8" のときだけ新しい一覧（`FM94M`）を出す。
+ * v7 の見た目は VarsPageInner のまま変えない。
+ */
+function CommonVarsPageSwitch() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <CommonVarsListV8 /> : <VarsPageInner />
+}
+
 export default function CommonVarsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
       {/* 直URLでも共通情報オフのaccountには画面を出さない。 */}
       <FeatureGate feature="common_vars">
-        <VarsPageInner />
+        <CommonVarsPageSwitch />
       </FeatureGate>
     </Suspense>
   )
