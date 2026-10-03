@@ -213,6 +213,8 @@ shared-button-importer app/restaurant-test/v8/google.tsx
 shared-button-importer app/restaurant-test/v8/inventory.tsx
 shared-button-importer app/restaurant-test/v8/menu.tsx
 shared-button-importer app/restaurant-test/v8/organization.tsx
+shared-button-importer app/restaurant-test/v8/reservation-phone.tsx
+shared-button-importer app/restaurant-test/v8/reservations.tsx
 shared-button-importer app/restaurant-test/v8/tables.tsx
 shared-button-importer app/rich-menus/connections/page.tsx
 shared-button-importer app/rich-menus/edit/page.tsx

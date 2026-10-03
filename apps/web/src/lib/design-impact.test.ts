@@ -165,6 +165,8 @@ describe('共通部品の影響範囲', () => {
       'app/restaurant-test/restaurant-console.tsx',
       // ★V8-B Googleビジネス（j0Wcg）。口コミ一覧の表の下にページ送りを置く。
       'app/restaurant-test/v8/google.tsx',
+      // ★V8-B 予約台帳 一覧（Z3FoM）。表の下にページ送りを置く。
+      'app/restaurant-test/v8/reservations.tsx',
       // ★V8 リッチメニュー一覧（rZEGN）。表の下にページ送りを置く。
       'app/rich-menus/list-v8.tsx',
       'app/rich-menus/page.tsx',
