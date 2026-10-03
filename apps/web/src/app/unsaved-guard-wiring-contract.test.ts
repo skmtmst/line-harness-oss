@@ -212,6 +212,8 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 の組織・権限（bSp4h）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。行内のフォームは保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
   'app/contents/vars/list-v8.tsx':
     '★V8 の共通情報一覧。一覧上の操作（停止・再開・差し替え・削除・フォルダ追加）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。窓内の理由欄は開く・閉じるときに戻るダイアログ内の入力',
+  'app/contents/list-v8.tsx':
+    '★V8 の登録メディア一覧（O7hUt7）。一覧上の操作（名前を変える・フォルダへ移す・アーカイブ・削除・フォルダ追加）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。名前・理由・移し先の入力は閉じると戻る札・窓の中だけ',
   'app/restaurant-test/v8/tables.tsx':
     '★V8-B の座席・卓管理（BERxg）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。卓の追加・変更は保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
   'app/restaurant-test/v8/menu.tsx':
