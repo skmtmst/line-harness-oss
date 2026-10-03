@@ -644,12 +644,41 @@ jobs:
       - name: No layout breaks at 1152, 1440 and 1920 (v7 and v8)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
+      # ここから2つは「報告だけ」（止めない）。今の開発用に直っていないずれがあるため、数を Summary に出して見えるようにする。
+      # Devin の直し（夕9〜夕14）が入ったら continue-on-error を外して止める形にする（2026-10-01）
+      - name: "Report only: layout at laptop widths (1229, 1280, 1366, 1536)"
+        if: steps.scope.outputs.run == 'true'
+        continue-on-error: true
+        env:
+          WIDTHS: 1229,1280,1366,1536
+        run: |
+          set -o pipefail
+          node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout-laptop.json | tee /tmp/v8-guard/layout-laptop.txt
+          { echo "## V8 の見張り：ノートPCの幅（報告だけ）"; echo '```'; tail -20 /tmp/v8-guard/layout-laptop.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: "Report only: heights, keyboard and retired words"
+        if: steps.scope.outputs.run == 'true'
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node apps/web/scripts/v8-guard/report-checks.mjs http://127.0.0.1:4310 /tmp/v8-guard/report.md "$BASE_SHA"
+          cat /tmp/v8-guard/report.md >> "$GITHUB_STEP_SUMMARY"
       - name: v7 screens are pixel-identical to the base
         if: steps.scope.outputs.diff == 'true'
         run: |
           node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4311 /tmp/v8-guard/base v7
           node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4310 /tmp/v8-guard/head v7
           node apps/web/scripts/v8-guard/v7-pixel-diff.mjs /tmp/v8-guard/base /tmp/v8-guard/head /tmp/v8-guard/v7-diff
+      # 合格して固定した v8 のページ（v8-locked.json）は、v8 の見た目も変えない（2026-10-01）。
+      # わざと変える PR はラベル v8-look-change を付ける（Pencil を先に直す）。一覧が空のうちは何もしない
+      - name: Approved v8 pages keep their look
+        if: steps.scope.outputs.diff == 'true' && !contains(github.event.pull_request.labels.*.name, 'v8-look-change')
+        run: |
+          LOCKED=$(node -e "console.log(require('./apps/web/scripts/v8-guard/v8-locked.json').routes.join(','))")
+          if [ -z "$LOCKED" ]; then echo "固定した v8 のページはまだありません。"; exit 0; fi
+          node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4311 /tmp/v8-guard/base-v8 v8
+          node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4310 /tmp/v8-guard/head-v8 v8
+          PREFIX=v8- ONLY="$LOCKED" node apps/web/scripts/v8-guard/v7-pixel-diff.mjs /tmp/v8-guard/base-v8 /tmp/v8-guard/head-v8 /tmp/v8-guard/v8-diff
       - name: Upload V8 screen guard results
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

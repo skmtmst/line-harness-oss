@@ -6,6 +6,7 @@
  *
  * 許す差：色の段階 255 のうち 2 まで（影のぼかしの揺れ。同じ版を2回撮って最大 1 だった）。
  * 対照：同じフォルダどうし → 0、1画素だけ塗った写し → 1 を確かめてから入れた（2026-10-01）。
+ * PREFIX=v8- ONLY=dashboard,friends で、合格して固定した v8 のページだけを比べる（v8-locked.json。2026-10-01）
  * 同じ CI の中で、統合先の版と PR の版を両方撮って比べる（Mac と Linux では文字の描き方が違うため、手元の写真は基準にしない）。
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
@@ -16,7 +17,12 @@ const [before, after, outArg] = process.argv.slice(2)
 if (!before || !after) throw new Error('使い方: v7-pixel-diff.mjs <変える前> <変えた後> [出力フォルダ]')
 const out = outArg ?? join(after, '_v7-diff')
 const TOL = 2
-const names = readdirSync(before).filter((f) => f.startsWith('v7-') && f.endsWith('.png')).sort()
+const PREFIX = process.env.PREFIX || 'v7-'
+const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(',').filter(Boolean)) : null
+const names = readdirSync(before)
+  .filter((f) => f.startsWith(PREFIX) && f.endsWith('.png'))
+  .filter((f) => !ONLY || ONLY.has(f.replace(/\.png$/, '').split('-').slice(2).join('-')))
+  .sort()
 let bad = 0
 for (const n of names) {
   const pb = join(after, n)

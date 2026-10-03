@@ -1,0 +1,4 @@
+{
+  "$description": "合格して見た目を固定した v8 のページ（browser-env.mjs の ROUTES の名前）。ここに足したページは、別の PR が v8 の見た目を変えると CI が止める。見た目をわざと変える PR は、ラベル v8-look-change を付け、Pencil を先に直してから出す。2026-10-01",
+  "routes": []
+}

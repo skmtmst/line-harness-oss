@@ -21,7 +21,8 @@ export const ROUTES = {
   login: '/login',
 }
 
-export const WIDTHS = [1152, 1440, 1920]
+// WIDTHS=1229,1280,1366,1536 で変えられる（ノートPC・Windows の 125% 拡大。報告だけの見張りで使う）
+export const WIDTHS = process.env.WIDTHS ? process.env.WIDTHS.split(',').map(Number) : [1152, 1440, 1920]
 
 const SESSION = {
   lh_csrf: 'visual-qa-csrf',
