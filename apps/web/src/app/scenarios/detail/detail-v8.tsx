@@ -1804,8 +1804,8 @@ export default function ScenarioDetailV8({
         {stepError && <p className="text-danger text-xs">{stepError}</p>}
 
         <div className="flex gap-2">
-          <Button variant="primary" className="px-4 py-2 min-h-[44px] font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={handleSaveStep} disabled={stepSaving}>
-            {stepSaving ? '保存中...' : editingStepId ? '更新' : '追加する'}
+          <Button variant="primary" className="px-4 py-2 min-h-[44px] font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={handleSaveStep} disabled={stepSaving} busy={stepSaving}>
+            {editingStepId ? '更新' : '追加する'}
           </Button>
           <button
             onClick={closeStepForm}
