@@ -67,7 +67,10 @@ const meetState: {
   realRegister?: (...args: never[]) => Promise<unknown>;
   realCancel?: (...args: never[]) => Promise<unknown>;
 } = {};
-const meetGate: { hook: (() => Promise<void>) | null } = { hook: null };
+const meetGate: { hook: (() => Promise<void>) | null; afterHook: (() => Promise<void>) | null } = {
+  hook: null,
+  afterHook: null,
+};
 const meetCtl: { failCancelOnce: boolean } = { failCancelOnce: false };
 vi.mock('../services/meet-consultation-reminders.js', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../services/meet-consultation-reminders.js')>();
@@ -77,7 +80,9 @@ vi.mock('../services/meet-consultation-reminders.js', async (importOriginal) => 
     ...orig,
     registerMeetConsultation: async (...args: Parameters<typeof orig.registerMeetConsultation>) => {
       if (meetGate.hook) await meetGate.hook();
-      return (meetState.realRegister as (...a: unknown[]) => Promise<unknown>)(...args);
+      const out = await (meetState.realRegister as (...a: unknown[]) => Promise<unknown>)(...args);
+      if (meetGate.afterHook) await meetGate.afterHook();
+      return out;
     },
     cancelMeetConsultation: async (...args: Parameters<typeof orig.cancelMeetConsultation>) => {
       if (meetCtl.failCancelOnce) {
@@ -254,6 +259,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       (triggerState.real as (...a: unknown[]) => Promise<unknown>)(...args),
     );
     meetGate.hook = null;
+    meetGate.afterHook = null;
     notifierMocks.sendBookingNotification.mockResolvedValue(undefined);
     calendarSyncMocks.runBookingGoogleSync.mockImplementation(async () => 'skipped');
     meetCtl.failCancelOnce = false;
@@ -819,19 +825,181 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       await new Promise((r) => setTimeout(r, 10));
       if (i === 199) throw new Error('cancelByTrigger に到達しませんでした');
     }
-    // 後発が先に成功する。時刻は Frozen のまま（同msでも所有権で区別する）。
+    // 後発が先に成功する。時刻は Frozen のまま（同msでも uuid の主張で区別する）。
     const b = await Promise.race([
       selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 }),
       timeout,
     ]);
     expect(b.status).toBe(200);
     const decidedAfterB = (bookingRow(id) as Record<string, unknown>).decided_at;
-    // 先行の rollback は後発の decided_at を消さない。
+    const claimAfterB = (bookingRow(id) as Record<string, unknown>).cancel_claim_id;
+    expect(typeof claimAfterB).toBe('string');
+    // 先行の rollback は後発の decided_at・主張を消さない。
     gateResolve();
     const a = await Promise.race([aPromise, timeout]);
     expect(a.status).toBe(409);
     expect(bookingRow(id).status).toBe('cancelled');
     expect((bookingRow(id) as Record<string, unknown>).decided_at).toBe(decidedAfterB);
+    expect((bookingRow(id) as Record<string, unknown>).cancel_claim_id).toBe(claimAfterB);
+  });
+
+  test('再送の主張はuuidで回転し、同msでも上書きが区別できる', async () => {
+    mockSlots([D11]);
+    const id = await adminCreate('menu-ok', T1, 'cx-claim-rotate');
+    const first = await selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 });
+    expect(first.status).toBe(200);
+    const c1 = bookingRow(id).cancel_claim_id;
+    expect(typeof c1).toBe('string');
+    const r1 = await selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 });
+    expect(r1.status).toBe(200);
+    const c2 = bookingRow(id).cancel_claim_id;
+    expect(typeof c2).toBe('string');
+    expect(c2).not.toBe(c1);
+    const r2 = await selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 });
+    expect(r2.status).toBe(200);
+    const c3 = bookingRow(id).cancel_claim_id;
+    expect(c3).not.toBe(c2);
+    expect(bookingRow(id).status).toBe('cancelled');
+  });
+
+  test('同じ予定IDの古い版の補償は勝者の相談を消さない（版所有）', async () => {
+    const { registerMeetConsultation, cancelMeetConsultation } = await import(
+      '../services/meet-consultation-reminders.js'
+    );
+    mockSlots([D11, D12, D13]);
+    const id = await adminCreate('menu-ok', T1, 'meet-versioned');
+    const evt = 'evt-versioned';
+    const base = {
+      externalEventId: evt,
+      friendId: 'friend-self',
+      title: '個別相談',
+      meetUrl: 'https://meet.google.com/aaa-bbbb-ccc',
+    };
+    // 旧版の登録 (版0・旧日時)。
+    const r1 = await registerMeetConsultation(db, {
+      ...base,
+      startsAt: T1,
+      endsAt: '2026-11-02T16:00:00.000Z',
+      bookingId: id,
+      bookingVersion: 0,
+    });
+    expect(r1.updated).toBe(true);
+    // 勝者の登録 (同event・新版・新日時で上書き)。
+    const r2 = await registerMeetConsultation(db, {
+      ...base,
+      startsAt: T2,
+      endsAt: T3,
+      bookingId: id,
+      bookingVersion: 1,
+    });
+    expect(r2.updated).toBe(true);
+    // 古い敗者の補償再開 → 版不一致で何も変えず false。
+    const stale = await cancelMeetConsultation(db, evt, new Date(), {
+      expectedBookingId: id,
+      expectedBookingVersion: 0,
+    });
+    expect(stale).toBe(false);
+    // 勝者の相談・最新日時・pending2が維持され、古い通知は送られない。
+    const row = sqlite.prepare(
+      'SELECT * FROM meet_consultations WHERE external_event_id = ?',
+    ).get(evt) as Record<string, unknown>;
+    expect(row.status).toBe('confirmed');
+    expect(row.starts_at).toBe(T2);
+    expect(row.booking_version).toBe(1);
+    const pending = sqlite.prepare(
+      `SELECT kind, scheduled_at, status FROM meet_consultation_reminders
+        WHERE consultation_id = ? AND status IN ('pending','failed') ORDER BY kind`,
+    ).all(row.id) as Array<{ kind: string; scheduled_at: string; status: string }>;
+    expect(pending).toEqual([
+      { kind: 'day_before', scheduled_at: '2026-11-01T16:00:00.000Z', status: 'pending' },
+      { kind: 'hour_before', scheduled_at: '2026-11-02T15:00:00.000Z', status: 'pending' },
+    ]);
+    // 古い版の再登録も跳ねられ、勝者の行に触らない。
+    const r3 = await registerMeetConsultation(db, {
+      ...base,
+      startsAt: T1,
+      endsAt: '2026-11-02T16:00:00.000Z',
+      bookingId: id,
+      bookingVersion: 0,
+    });
+    expect(r3.updated).toBe(false);
+    const kept = sqlite.prepare(
+      'SELECT starts_at, booking_version FROM meet_consultations WHERE external_event_id = ?',
+    ).get(evt) as { starts_at: string; booking_version: number };
+    expect(kept.starts_at).toBe(T2);
+    expect(kept.booking_version).toBe(1);
+    // 正しい版の取消は通り、正当な補償は壊さない。
+    const ok = await cancelMeetConsultation(db, evt, new Date(), {
+      expectedBookingId: id,
+      expectedBookingVersion: 1,
+    });
+    expect(ok).toBe(true);
+    const gone = sqlite.prepare(
+      'SELECT status FROM meet_consultations WHERE external_event_id = ?',
+    ).get(evt) as { status: string };
+    expect(gone.status).toBe('cancelled');
+  });
+
+  test('登録後に勝者が確定したら補償は正当な行だけ消す', async () => {
+    // A→B→C の3段交差。B を register 直後・post-check 直前で止め、
+    // C を完走させてから B を解放する有限barrier。B の補償は自分の版の
+    // 行だけを消し (C が旧扱いで止めずみでも冪等に通る)、C の勝者は残す。
+    const T4 = '2026-11-02T18:00:00.000Z';
+    mockSlots([
+      D11, D12, D13,
+      { iso: T4, date: '2026-11-02', start: '13:00', end: '14:00' },
+    ]);
+    // 回転あり (実runner+接続)。接続は予約作成より先に置く (作成時に写すため)。
+    linkCalendar();
+    useRealGoogleRunner();
+    const id = await adminCreate('menu-ok', T1, 'race-comp-legit');
+    linkMeet(id);
+    // A: T1→T2 を完走し、evtA の相談を版1で登録する。
+    const aRes = await selfPost(`/api/liff/booking/${id}/reschedule`, {
+      starts_at: T2, lock_version: 0,
+    });
+    expect(aRes.status).toBe(200);
+    expect((await aRes.json<Record<string, unknown>>()).meet_sync).toBe('recreated');
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('race timeout')), 15000);
+    });
+    // B: T2→T3。register 直後 (post-check 前) で C (T3→T4) を完走させる。
+    meetGate.afterHook = async () => {
+      meetGate.afterHook = null;
+      const cRes = await selfPost(`/api/liff/booking/${id}/reschedule`, {
+        starts_at: T4, lock_version: 2,
+      });
+      expect(cRes.status).toBe(200);
+    };
+    const res = await Promise.race([
+      selfPost(`/api/liff/booking/${id}/reschedule`, { starts_at: T3, lock_version: 1 }),
+      timeout,
+    ]);
+    expect(res.status).toBe(200);
+    // B は敗者だが、補償は自分の版の行だけを消し、C の勝者は残す。
+    expect((await res.json<Record<string, unknown>>()).meet_sync).toBe('superseded');
+    expect(bookingRow(id).status).toBe('confirmed');
+    expect(bookingRow(id).starts_at).toBe(T4);
+    // C の勝者の相談が confirmed・最新日時・pending2 で残る。
+    const winnerEvt = bookingRow(id).external_event_id as string;
+    const winner = sqlite.prepare(
+      'SELECT * FROM meet_consultations WHERE external_event_id = ?',
+    ).get(winnerEvt) as Record<string, unknown>;
+    expect(winner.status).toBe('confirmed');
+    expect(winner.starts_at).toBe(T4);
+    expect(winner.booking_version).toBe(3);
+    const pending = sqlite.prepare(
+      `SELECT COUNT(*) AS n FROM meet_consultation_reminders
+        WHERE consultation_id = ? AND status IN ('pending','failed')`,
+    ).get(winner.id) as { n: number };
+    expect(pending.n).toBe(2);
+    // B の旧event・A の旧相談・最初の旧相談はすべて止まる。
+    const olds = sqlite.prepare(
+      `SELECT status FROM meet_consultations WHERE external_event_id != ?`,
+    ).all(winnerEvt) as Array<{ status: string }>;
+    expect(olds.length).toBe(3);
+    expect(olds.every((c) => c.status === 'cancelled')).toBe(true);
+    await drainWaits();
   });
 
   test('補償の失敗は隠さず、取消再送で回収できる', async () => {
