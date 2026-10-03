@@ -63,6 +63,20 @@ vi.mock('../services/reminder-trigger.js', async (importOriginal) => {
   };
 });
 
+const meetState: { realRegister?: (...args: never[]) => Promise<unknown> } = {};
+const meetGate: { hook: (() => Promise<void>) | null } = { hook: null };
+vi.mock('../services/meet-consultation-reminders.js', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('../services/meet-consultation-reminders.js')>();
+  meetState.realRegister = orig.registerMeetConsultation as unknown as typeof meetState.realRegister;
+  return {
+    ...orig,
+    registerMeetConsultation: async (...args: Parameters<typeof orig.registerMeetConsultation>) => {
+      if (meetGate.hook) await meetGate.hook();
+      return (meetState.realRegister as (...a: never[]) => Promise<unknown>)(...args);
+    },
+  };
+});
+
 vi.mock('../services/booking-channels.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../services/booking-channels.js')>()),
   bookingAutomaticNotificationAllowed: vi.fn(async () => true),
@@ -223,6 +237,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     triggerMocks.cancelByTrigger.mockImplementation((...args: unknown[]) =>
       (triggerState.real as (...a: unknown[]) => Promise<unknown>)(...args),
     );
+    meetGate.hook = null;
     notifierMocks.sendBookingNotification.mockResolvedValue(undefined);
     calendarSyncMocks.runBookingGoogleSync.mockImplementation(async () => 'skipped');
 
@@ -695,7 +710,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(ops.n).toBe(2);
   });
 
-  test('予定作り直しでは古いMeetを止め、古いURLを新予定へ流用しない', async () => {
+  test('予定作り直しでは同一相談を新eventへ登録し直す（URL継続・両reminder）', async () => {
     useRealGoogleRunner();
     linkCalendar();
     mockSlots([D11, D12]);
@@ -708,14 +723,98 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect((await res.json<Record<string, unknown>>()).meet_sync).toBe('recreated');
     const newEvt = bookingRow(id).external_event_id as string;
     expect(newEvt).not.toBe('evt-old');
+    // 古い相談は止まり、新予定ID・本人・新日時・同じ Meet URL で登録される。
     const old = sqlite.prepare(
       'SELECT status FROM meet_consultations WHERE external_event_id = ?',
     ).get('evt-old') as { status: string };
     expect(old.status).toBe('cancelled');
-    // 新予定IDの相談は作らない。古い URL の流用も無い。
-    const rows = sqlite.prepare('SELECT * FROM meet_consultations').all() as Array<Record<string, unknown>>;
-    expect(rows.length).toBe(1);
-    expect(rows[0].external_event_id).toBe('evt-old');
+    const next = sqlite.prepare(
+      'SELECT * FROM meet_consultations WHERE external_event_id = ?',
+    ).get(newEvt) as Record<string, unknown>;
+    expect(next.status).toBe('confirmed');
+    expect(next.friend_id).toBe('friend-self');
+    expect(next.starts_at).toBe(T2);
+    expect(next.meet_url).toBe('https://meet.google.com/aaa-bbbb-ccc');
+    const reminders = sqlite.prepare(
+      'SELECT kind, scheduled_at, status FROM meet_consultation_reminders WHERE consultation_id = ? ORDER BY kind',
+    ).all(next.id) as Array<{ kind: string; scheduled_at: string; status: string }>;
+    expect(reminders).toEqual([
+      { kind: 'day_before', scheduled_at: '2026-11-01T16:00:00.000Z', status: 'pending' },
+      { kind: 'hour_before', scheduled_at: '2026-11-02T15:00:00.000Z', status: 'pending' },
+    ]);
+  });
+
+  test('register直前の取消は書込み後に補償され、相談は復活しない', async () => {
+    mockSlots([D11, D12]);
+    const id = await adminCreate('menu-ok', T1, 'race-meet');
+    linkMeet(id);
+    // register の直前で取消を完走させる有限barrier。
+    meetGate.hook = async () => {
+      meetGate.hook = null;
+      const cancelRes = await selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 1 });
+      expect(cancelRes.status).toBe(200);
+    };
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('race timeout')), 15000);
+    });
+    const res = await Promise.race([
+      selfPost(`/api/liff/booking/${id}/reschedule`, { starts_at: T2, lock_version: 0 }),
+      timeout,
+    ]);
+    expect(res.status).toBe(200);
+    // 予約の変更は成立したが、間に勝った取消をMeetが覆さない。
+    expect((await res.json<Record<string, unknown>>()).meet_sync).toBe('superseded');
+    expect(bookingRow(id).status).toBe('cancelled');
+    const consults = sqlite.prepare(
+      'SELECT status FROM meet_consultations',
+    ).all() as Array<{ status: string }>;
+    expect(consults.every((c) => c.status === 'cancelled')).toBe(true);
+    const pending = sqlite.prepare(
+      "SELECT COUNT(*) AS n FROM meet_consultation_reminders WHERE status IN ('pending','failed')",
+    ).get() as { n: number };
+    expect(pending.n).toBe(0);
+    await drainWaits();
+  });
+
+  test('先行失敗のrollbackは後発成功の取消を巻き戻さない', async () => {
+    mockSlots([D11]);
+    const id = await adminCreate('menu-ok', T1, 'race-rollback');
+    let enteredFlag = false;
+    let gateResolve: (() => void) | null = null;
+    const gate = new Promise<void>((resolve) => { gateResolve = resolve; });
+    let calls = 0;
+    triggerMocks.cancelByTrigger.mockImplementation(async (...args: unknown[]) => {
+      calls += 1;
+      if (calls === 1) {
+        enteredFlag = true;
+        await gate;
+        throw new Error('REMINDER_SEND_IN_FLIGHT');
+      }
+      return (triggerState.real as (...a: unknown[]) => Promise<unknown>)(...args);
+    });
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('race timeout')), 15000);
+    });
+    const aPromise = selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 });
+    for (let i = 0; i < 200; i++) {
+      if (enteredFlag) break;
+      await new Promise((r) => setTimeout(r, 10));
+      if (i === 199) throw new Error('cancelByTrigger に到達しませんでした');
+    }
+    // 後発が先に成功する。時刻を進めて decided_at を区別する。
+    vi.setSystemTime(new Date('2026-10-20T12:00:01.000Z'));
+    const b = await Promise.race([
+      selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 }),
+      timeout,
+    ]);
+    expect(b.status).toBe(200);
+    const decidedAfterB = (bookingRow(id) as Record<string, unknown>).decided_at;
+    // 先行の rollback は後発の decided_at を消さない。
+    gateResolve?.();
+    const a = await Promise.race([aPromise, timeout]);
+    expect(a.status).toBe(409);
+    expect(bookingRow(id).status).toBe('cancelled');
+    expect((bookingRow(id) as Record<string, unknown>).decided_at).toBe(decidedAfterB);
   });
 
   test('変更対取消の交差は片方だけ通り、敗者は副作用を残さない', async () => {

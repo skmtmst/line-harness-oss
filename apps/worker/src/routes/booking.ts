@@ -1127,9 +1127,9 @@ async function syncSelfBookingMeet(
     }
     const newEventId = booking.external_event_id ?? oldEventId;
     if (newEventId !== oldEventId) {
-      // 予定が作り直されたら古い相談は止める。古い Meet URL を新予定へ流用しない。
+      // 予定が作り直されても同一相談は続ける。古い相談を止め、新予定ID・
+      // 本人・新日時・同じ Meet URL で登録し直す（前日・1時間前も組み直す）。
       await cancelMeetConsultation(c.env.DB, oldEventId, new Date(), { failOnSendInFlight: true });
-      return 'recreated';
     }
     await registerMeetConsultation(c.env.DB, {
       externalEventId: newEventId,
@@ -1139,7 +1139,25 @@ async function syncSelfBookingMeet(
       endsAt: booking.ends_at,
       meetUrl: consult.meet_url,
     });
-    return 'updated';
+    // 書込み後の再確認。register との間に取消・別変更が勝っていたら、
+    // 今書いた相談を取り消して戻す（敗者が復活を残さない）。
+    const after = await c.env.DB
+      .prepare(
+        `SELECT status, friend_id, lock_version FROM bookings
+          WHERE id = ? AND line_account_id = ?`,
+      )
+      .bind(bookingId, self.accountId)
+      .first<{ status: BookingStatus; friend_id: string | null; lock_version: number }>();
+    if (
+      !after ||
+      after.friend_id !== self.friendId ||
+      (after.status !== 'requested' && after.status !== 'confirmed') ||
+      Number(after.lock_version) !== expectedVersion
+    ) {
+      await cancelMeetConsultation(c.env.DB, newEventId, new Date()).catch(() => undefined);
+      return 'superseded';
+    }
+    return newEventId !== oldEventId ? 'recreated' : 'updated';
   } catch {
     return 'failed';
   }
@@ -1224,8 +1242,29 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
   };
   const cancelReason = `booking_cancelled:${bookingId}:by:self:${caller.lineUserId}`;
   // 取消ずみの再送: 版が合えば副作用をそろえて 200 (冪等再送)。
+  // 先に再送の所有権を decided_at で取り直す。先行失敗の rollback が
+  // 後発の成功を巻き戻さない (rollback は古い decided_at に合わない)。
   if (row.status === 'cancelled' || row.status === 'expired') {
     if (Number(row.lock_version) !== expectedVersion) {
+      return c.json({ error: 'version_conflict' }, 409);
+    }
+    const claimAt = new Date().toISOString();
+    const claim = await c.env.DB
+      .prepare(
+        `UPDATE bookings SET decided_at = ?,
+                              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+          WHERE id = ? AND line_account_id = ?
+            AND status IN ('cancelled','expired')
+            AND lock_version = ? AND friend_id = ?`,
+      )
+      .bind(claimAt, bookingId, accountId, expectedVersion, caller.friendId)
+      .run();
+    if ((claim.meta?.changes ?? 0) === 0) {
+      const current = await c.env.DB
+        .prepare(`SELECT lock_version, status FROM bookings WHERE id = ? AND line_account_id = ?`)
+        .bind(bookingId, accountId)
+        .first<{ lock_version: number; status: string }>();
+      if (!current) return c.json({ error: 'booking_not_found' }, 404);
       return c.json({ error: 'version_conflict' }, 409);
     }
     // 送信中は 409 で再試行させる。未実施の副作用を適用対象外にしない。
@@ -1287,13 +1326,16 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
   } catch (error) {
     if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
       // 送信中の 409 では確定を取り消して再試行させる (取消確定後の送信を起こさない)。
+      // 後発の成功取消を巻き戻さないよう、自分が書いた decided_at・版・所有に絞る。
       await c.env.DB
         .prepare(
           `UPDATE bookings SET status = ?, decided_at = ?,
                                 updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-            WHERE id = ? AND status = ?`,
+            WHERE id = ? AND line_account_id = ? AND status = ?
+              AND decided_at = ? AND lock_version = ? AND friend_id = ?`,
         )
-        .bind(row.status, row.decided_at, bookingId, 'cancelled')
+        .bind(row.status, row.decided_at, bookingId, accountId, 'cancelled',
+          decidedAt, expectedVersion, caller.friendId)
         .run();
       return c.json({ error: 'send_in_flight_retry' }, 409);
     }
