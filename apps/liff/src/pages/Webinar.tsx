@@ -256,7 +256,7 @@ export default function Webinar() {
 
   // ---- 暗い地の共通の殻 ----
   const shell = (content: ReactNode) => (
-    <div className="min-h-screen bg-night text-white">
+    <div className="min-h-screen bg-night text-white" data-design-node="RpW2h">
       <div className="mx-auto w-full max-w-md px-4 pt-4 pb-12">{content}</div>
     </div>
   );
@@ -388,12 +388,12 @@ export default function Webinar() {
     );
   }
 
-  // ---- ライブ中 (7-b・7-c) ----
+  // ---- ライブ中 (7-b・7-c。RpW2h) ----
   return (
-    <div className="flex h-screen flex-col bg-night text-white">
+    <div className="flex h-screen flex-col bg-night text-white" data-design-node="RpW2h">
       <div className="relative">
         <video ref={videoRef} className="w-full" playsInline />
-        <span className="absolute top-2 left-2 rounded bg-danger px-2 py-0.5 text-xs font-bold text-white">
+        <span className="absolute top-2 left-2 rounded bg-liff-sun px-2 py-0.5 text-xs font-bold text-white">
           ● ライブ
         </span>
         {needsTap && (
@@ -413,6 +413,12 @@ export default function Webinar() {
             タップで音声ON
           </button>
         )}
+      </div>
+
+      <div className="border-b border-night-line px-4 py-3">
+        <h1 className="truncate text-base font-bold text-white" title={state.title}>
+          {state.title}
+        </h1>
       </div>
 
       <div ref={chatBoxRef} className="flex-1 overflow-y-auto p-3 text-sm">

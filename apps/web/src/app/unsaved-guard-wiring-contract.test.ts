@@ -41,9 +41,13 @@ const GUARDED = [
   'app/inflow-links/new/page.tsx',
   'app/line-notifications/operator/new/page.tsx',
   'app/mileage/earning-rules/edit/page.tsx',
+  'app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx',
   'app/mileage/earning-rules/new/page.tsx',
+  'app/mileage/earning-rules/new/v8-earning-rule-new.tsx',
   'app/mileage/page.tsx',
   'app/mileage/rewards/edit/page.tsx',
+  'app/mileage/rewards/edit/v8-reward-edit.tsx',
+  'app/mileage/v8-earning-rules-tab.tsx',
   'app/nen-campaigns/columns/new/page.tsx',
   'app/nen-campaigns/edit/campaign-editor.tsx',
   'app/nen-campaigns/edit/page.tsx',
@@ -78,6 +82,7 @@ const GUARDED = [
   'app/templates/questions/new/page.tsx',
   'app/webhooks/new/page.tsx',
   'app/webinars/edit/page.tsx',
+  'app/webinars/new/new-v8.tsx',
   'app/webinars/new/page.tsx',
   'components/accounts/account-ordering.tsx',
   'components/broadcasts/broadcast-form.tsx',
@@ -164,6 +169,8 @@ const EXEMPTIONS: Record<string, string> = {
     '転送先の編集は保存ボタン確定式。下書き・dirty 管理がなく番兵の扱いは別途検討',
   'app/mileage/score-rules/page.tsx':
     '下書き保存式の編集画面。番兵の扱いは別途検討',
+  'app/mileage/v8-score-tab.tsx':
+    '★V8 の行動スコア一覧（IRPw8）。点数の変更・ルールの公開停止・できごとの除外は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。名前・できごとの検索欄は絞り込みで閉じると戻る',
   'components/friend-attributes-v2/tag-list-v2.tsx':
     '分類の変更は選んだ直後に即時保存し、下書きを持たない',
   'components/friend-fields/tags-page-v4.tsx':
@@ -194,6 +201,8 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8-B 広告連携（qSTVR）。費用の手入力はダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/inflow-links/site-script-v8.tsx':
     '★V8-B サイトスクリプト（XjOte）。サイトの追加・編集の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
+  'app/webinars/list-v8.tsx':
+    '★V8-B のウェビナー一覧（UyUMw）。一覧と絞り込みが中心で、フォルダの追加・変更・削除とアーカイブは押した直後に確認窓か即時保存で確定する。フォルダ名の入力は閉じると戻る窓の中だけなので、この画面に残る下書きを持たない',
 }
 
 /*

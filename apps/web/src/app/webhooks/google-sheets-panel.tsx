@@ -652,6 +652,7 @@ export default function GoogleSheetsPanel() {
       <ConfirmDialog
         open={disconnectFor !== null}
         title="Google Sheets との接続を解除しますか？"
+        designNode="YZ57z"
         description={`「${disconnectFor?.label ?? ''}」の連携を解除します。Google側の許可を取り消し、このアカウントの連携設定と同期の記録をすべて削除します。書き出し済みのシート側のデータは残ります。この操作は取り消せません。`}
         confirmLabel="接続を解除する"
         destructive

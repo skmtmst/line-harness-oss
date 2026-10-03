@@ -102,6 +102,8 @@ describe('UpcomingCard（今後の予定）', () => {
 
   it('旧Workerでは予約だけの表示へ戻る', async () => {
     apiMocks.upcoming.mockRejectedValue(new Error('not found'))
+    // 表示は実時刻より後の予約だけを残す。固定の日付を書くと、その日が
+    // 過ぎた時点でこのテストが落ちるので、いまより後ろの時刻を作る。
     const bookings = [
       { id: 'bk-9', menu_name: '相談', friend_name: 'あおい', starts_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), status: 'confirmed' },
     ]

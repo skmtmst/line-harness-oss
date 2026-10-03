@@ -139,8 +139,15 @@ describe('画面', () => {
     await act(async () => { setValue(subject, 'メンテナンスのお知らせ'); setValue(body, '本文です') })
     await act(async () => { button('今すぐ送る')!.click() })
     await flush()
-    expect(document.body.textContent).toContain('今すぐ送りますか？')
-    await act(async () => { button('送る')!.click() })
+    // 板 `TJUUl`「送る前の確認」：宛先・届く方法・日時と件名・本文を見てから送る。
+    const confirm = document.body.querySelector('[data-design-node="TJUUl"]')
+    expect(confirm, '送る前の確認の窓が出ない').not.toBeNull()
+    for (const row of ['このお知らせを送りますか？', '宛先', '届く方法', '送る日時', '件名：メンテナンスのお知らせ', '取り下げられます', '戻って直す', '今すぐ送る']) {
+      expect(confirm?.textContent ?? '', `「${row}」がない`).toContain(row)
+    }
+    const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.trim() === '今すぐ送る')
+    expect(sendInDialog, '小窓の中に送るボタンがない').not.toBeUndefined()
+    await act(async () => { (sendInDialog as HTMLButtonElement).click() })
     await flush()
     const post = calls.find((c) => c.url.endsWith('/api/ops/announcements') && c.method === 'POST')!
     expect(post.body).toMatchObject({ subject: 'メンテナンスのお知らせ', body: '本文です', audienceKind: 'all', channels: ['line', 'screen'], mode: 'send', publishAt: null })
@@ -198,7 +205,9 @@ describe('画面', () => {
     })
     await act(async () => { button('今すぐ送る')!.click() })
     await flush()
-    await act(async () => { button('送る')!.click() })
+    const confirm = document.body.querySelector('[data-design-node="TJUUl"]')
+    const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.trim() === '今すぐ送る') as HTMLButtonElement
+    await act(async () => { sendInDialog.click() })
     await flush()
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください')
     expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/api/ops/announcements'))).toBe(false)
@@ -266,7 +275,9 @@ describe('二重押しと同時保存（M512/M513）', () => {
     })
     await act(async () => { button('今すぐ送る')!.click() })
     await flush()
-    await act(async () => { button('送る')!.click() })
+    const confirm = document.body.querySelector('[data-design-node="TJUUl"]')
+    const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.trim() === '今すぐ送る') as HTMLButtonElement
+    await act(async () => { sendInDialog.click() })
     await flush()
     const post = calls.find((c) => c.url.endsWith('/api/ops/announcements') && c.method === 'POST')!
     expect(post.headers['idempotency-key']).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
