@@ -84,6 +84,28 @@
   outline-offset: 2px;
 }
 
+/*
+ * ★V8 仕上げ（M10-2）：丸の点の出入りとカードの押した動き。
+ * 点は 120ms で色が変わり、カードを押したときはほんの少し沈む
+ * （明るさで）。選んだ面の色は変えない。
+ */
+[data-theme='v8'] .radio {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .card {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    filter var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .card:active {
+  filter: brightness(0.97);
+}
+
 .disabled {
   cursor: not-allowed;
   background: var(--color-canvas-sunken);
