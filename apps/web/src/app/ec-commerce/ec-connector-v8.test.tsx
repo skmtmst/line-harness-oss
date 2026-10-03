@@ -144,6 +144,11 @@ describe('V8-B つなぎ先（iLJmw）', () => {
     expect(document.body.textContent).toContain('見るだけの権限では設定を変えられません')
   })
 
+  it('読み上げ: つなぎ先の知らせの失敗は alert・成功は status で出す', () => {
+    const panel = readFileSync(join(process.cwd(), 'src/app/ec-commerce/connector-panel.tsx'), 'utf8')
+    expect(panel).toContain("role={notice.tone === 'success' ? 'status' : 'alert'}")
+  })
+
   it('V8 の決まり（layer・色直書きなし・準備中なし）を守る', async () => {
     await renderV8()
     expect(v8css.split('\n')[0]).toContain('@layer properties, theme, base, components, utilities;')

@@ -41,9 +41,11 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListRange from '@/components/ui/list-range'
 import { notifyToast } from '@/components/shared/toast'
+import { runUndoable } from '@/lib/undoable'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
@@ -180,6 +182,63 @@ function referenceLabel(reference: FormDeleteImpact['references'][number]): stri
   if (reference.kind === 'webinar') return `ウェビナー「${name}」`
   if (reference.kind === 'scenario') return `シナリオ「${name}」`
   return `「${name}」`
+}
+
+/**
+ * A. 読み込み中の骨組み（V8だけ）。本物の表と同じ見出し・列幅で5行出し、
+ * 入れ替わってもガタつかない。0.3秒以内に来たら出さない・出したら最低
+ * 0.4秒は `DelayedSkeleton` が面倒を見る（自前の骨組みはやめた）。
+ */
+function FormListSkeleton({ label }: { label: string }) {
+  return (
+    <div className={styles.tableWrap} aria-busy="true">
+      <span className="sr-only">{label}</span>
+      <DelayedSkeleton
+        loading
+        skeleton={
+          <table className={styles.table} aria-hidden="true" inert>
+            <FormListHead reviewMode={false} />
+            <tbody>
+              {[0, 1, 2, 3, 4].map((index) => (
+                <tr key={index}>
+                  <td>
+                    <Skeleton className="block h-3.5 w-2/3" />
+                    <span className="mt-1 block"><Skeleton className="block h-3 w-1/2" /></span>
+                  </td>
+                  <td className={styles.destCell}><Skeleton className="block h-3.5 w-20" /></td>
+                  <td><Skeleton className="block h-5.5 w-16" /></td>
+                  <td className={styles.answerCell}>
+                    <Skeleton className="block h-3.5 w-16" />
+                    <span className="mt-0.5 block"><Skeleton className="block h-3 w-24" /></span>
+                  </td>
+                  <td><Skeleton className="block h-8 w-13" /></td>
+                  <td><Skeleton className="ml-auto block h-8 w-8" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        }
+      />
+    </div>
+  )
+}
+
+/**
+ * 表の見出し（本物と骨組みで同じものを出す。2か所に書くとずれる）。
+ */
+function FormListHead({ reviewMode }: { reviewMode: boolean }) {
+  return (
+    <thead>
+      <tr>
+        <th>フォーム（質問の数）</th>
+        <th className={styles.colDest}>保存先</th>
+        <th className={styles.colStatus}>状態</th>
+        <th className={styles.colAnswers}>回答</th>
+        <th className={styles.colUrl}>URL</th>
+        {!reviewMode ? <th className={styles.menuCell} aria-label="操作" /> : null}
+      </tr>
+    </thead>
+  )
 }
 
 export default function FormSubmissionsListV8() {
@@ -715,21 +774,32 @@ export default function FormSubmissionsListV8() {
   /*
    * R25: 箱の並び替え。2つの更新は口が1回で行う。途中で片方だけ変わらない。
    */
-  const moveFolder = async (index: number, direction: -1 | 1) => {
+  /*
+   * B. フォルダの並べ替えは押した瞬間に画面を変え、裏で保存する。
+   * 5秒は Toast の「元に戻す」で止められる（戻す口は同じ入れ替え）。
+   */
+  const moveFolder = (index: number, direction: -1 | 1) => {
     const target = folders[index]
     const neighbor = folders[index + direction]
     if (!target || !neighbor || folderBusy || !selectedAccountId) return
-    setFolderBusy(true)
+    const before = folders
+    const swapped = [...folders]
+    swapped[index] = neighbor
+    swapped[index + direction] = target
+    setFolders(swapped)
     setFolderError('')
-    try {
-      const result = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId)
-      if (!result.success) throw new Error(result.error)
-      await loadForms()
-    } catch {
-      setFolderError('並び順を変えられませんでした。')
-    } finally {
-      setFolderBusy(false)
-    }
+    runUndoable({
+      message: `フォルダ「${target.name}」の並び順を変えました`,
+      commit: async () => {
+        const result = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId)
+        if (!result.success) return { success: false, error: result.error }
+      },
+      undo: () => setFolders(before),
+      onCommitted: () => {
+        void loadForms()
+      },
+      failureMessage: '並び順を変えられませんでした。',
+    })
   }
 
   const openFolderDelete = async (folder: Folder) => {
@@ -994,13 +1064,7 @@ export default function FormSubmissionsListV8() {
   /* ===== 一覧の中身（読込中・失敗・空・0件・表を分ける） ===== */
   let listBody
   if (accountLoading) {
-    listBody = (
-      <div className={styles.skeletonRows} aria-label="読み込んでいます">
-        {[0, 1, 2, 3].map((index) => (
-          <div key={index} className={styles.skeletonRow}><span className={styles.skeletonBar} /></div>
-        ))}
-      </div>
-    )
+    listBody = <FormListSkeleton label="回答フォームの一覧を読み込んでいます" />
   } else if (!selectedAccountId) {
     listBody = (
       <div className={styles.stateCard}>
@@ -1010,13 +1074,7 @@ export default function FormSubmissionsListV8() {
       </div>
     )
   } else if (loading) {
-    listBody = (
-      <div className={styles.skeletonRows} aria-label="読み込んでいます">
-        {[0, 1, 2, 3, 4].map((index) => (
-          <div key={index} className={styles.skeletonRow}><span className={styles.skeletonBar} /></div>
-        ))}
-      </div>
-    )
+    listBody = <FormListSkeleton label="回答フォームの一覧を読み込んでいます" />
   } else if (loadError) {
     listBody = (
       <div className={styles.stateCard}>
@@ -1072,16 +1130,7 @@ export default function FormSubmissionsListV8() {
     listBody = (
       <div className={styles.tableWrap}>
         <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>フォーム（質問の数）</th>
-              <th className={styles.colDest}>保存先</th>
-              <th className={styles.colStatus}>状態</th>
-              <th className={styles.colAnswers}>回答</th>
-              <th className={styles.colUrl}>URL</th>
-              {!reviewMode ? <th className={styles.menuCell} aria-label="操作" /> : null}
-            </tr>
-          </thead>
+          <FormListHead reviewMode={reviewMode} />
           <tbody>
             {visibleForms.map((form) => {
               const normalizedName = displayFormName(form.name)
