@@ -1892,6 +1892,7 @@ function serializeApiToken(row: IntegrationApiTokenRow) {
     lastUsedAt: row.last_used_at,
     rotatedFromId: row.rotated_from_id,
     createdAt: row.created_at,
+    revokedAt: row.revoked_at,
   };
 }
 
@@ -1906,7 +1907,8 @@ webhooks.get('/api/webhooks/api-tokens', requireRole('owner', 'admin', 'staff'),
     if (!await canAccessAllLineAccounts(c.env.DB, staff, [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
-    const items = await listIntegrationApiTokens(c.env.DB, lineAccountId);
+    const includeRevoked = c.req.query('includeRevoked') === '1';
+    const items = await listIntegrationApiTokens(c.env.DB, lineAccountId, { includeRevoked });
     return c.json({ success: true, data: items.map(serializeApiToken) });
   } catch (err) {
     console.error('GET /api/webhooks/api-tokens error:', err);

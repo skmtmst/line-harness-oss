@@ -264,6 +264,7 @@ export interface IntegrationApiTokenInfo {
   lastUsedAt: string | null
   rotatedFromId: string | null
   createdAt: string
+  revokedAt: string | null
 }
 
 /** 発行・入れ替えの応答にだけ1回だけ平文が乗る。 */
@@ -12295,6 +12296,11 @@ export const api = {
           `/api/webhooks/interactions/${id}/retry?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', body: JSON.stringify({ confirmed: options?.confirmed === true }) },
         ),
+      payload: (id: string, lineAccountId: string) =>
+        // F-18: 伏せた本文。available が false のとき body は null。
+        fetchApi<ApiResponse<{ id: string; body: unknown; available: boolean }>>(
+          `/api/webhooks/interactions/${id}/payload?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
       retryFailed: (lineAccountId: string) =>
         // remaining: 1回の外部通信上限で今回やり直せず残った失敗の件数(N-387)。
         // needsReview: 届いたか分からず、相手先で確かめてから1件ずつ
@@ -12306,9 +12312,9 @@ export const api = {
     },
     /* 外部システムが公開APIを呼ぶための鍵(#939 N-380)。 */
     apiTokens: {
-      list: (lineAccountId: string) =>
+      list: (lineAccountId: string, includeRevoked = false) =>
         fetchApi<ApiResponse<IntegrationApiTokenInfo[]>>(
-          `/api/webhooks/api-tokens?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          `/api/webhooks/api-tokens?lineAccountId=${encodeURIComponent(lineAccountId)}${includeRevoked ? '&includeRevoked=1' : ''}`,
         ),
       create: (lineAccountId: string, data: { name: string; scopes: string[] }, stepUpToken?: string) =>
         fetchApi<ApiResponse<IssuedIntegrationApiToken>>('/api/webhooks/api-tokens', {
@@ -12324,6 +12330,11 @@ export const api = {
       rotate: (id: string, lineAccountId: string, stepUpToken?: string) =>
         fetchApi<ApiResponse<IssuedIntegrationApiToken>>(
           `/api/webhooks/api-tokens/${encodeURIComponent(id)}/rotate?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined, body: '{}' },
+        ),
+      reactivate: (id: string, lineAccountId: string, stepUpToken?: string) =>
+        fetchApi<ApiResponse<IntegrationApiTokenInfo>>(
+          `/api/webhooks/api-tokens/${encodeURIComponent(id)}/reactivate?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined, body: '{}' },
         ),
     },
