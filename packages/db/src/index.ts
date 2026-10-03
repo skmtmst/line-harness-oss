@@ -144,6 +144,8 @@ export * from './ops-support';
 export * from './ops-dashboard';
 export * from './platform-announcements';
 export * from './tenant-billing';
+export * from './tenant-data-retention';
+export * from './data-retention-tables';
 export * from './billing-invoices';
 export * from './auth-email';
 export * from './friend-tag-side-effects';
