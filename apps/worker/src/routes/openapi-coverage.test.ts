@@ -555,6 +555,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/webhooks/api-tokens/{id}/revoke',
   'POST /api/webhooks/api-tokens/{id}/reactivate',
   'POST /api/webhooks/api-tokens/{id}/rotate',
+  'GET /api/webhooks/interactions/{id}/payload',
   'GET /api/public/v1/tags',
   'PATCH /api/measurement-sites/{id}',
   'POST /api/measurement-sites',

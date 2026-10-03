@@ -4140,6 +4140,23 @@ const spec = {
         responses: { '200': { description: '失効した' }, '404': { description: 'Not found' } },
       },
     },
+    '/api/webhooks/interactions/{id}/payload': {
+      get: {
+        tags: ['Webhook'],
+        summary: 'やり取りの本文（伏せて返す）',
+        description: '送った・受け取った本文を伏せて返す(F-18)。'
+          + '名前・電話・メール・住所・トークンに当たる値は `***` に置き換える。'
+          + 'JSON でない・空の本文は body に null を返す。元やDBは変えない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '伏せた本文' },
+          '404': { description: 'Not found' },
+        },
+      },
+    },
     '/api/webhooks/api-tokens/{id}/reactivate': {
       post: {
         tags: ['Webhook'],

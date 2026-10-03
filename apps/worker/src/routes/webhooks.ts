@@ -62,6 +62,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { auditLog } from '../lib/audit-log.js';
+import { maskInteractionPayload } from '../lib/mask-payload.js';
 import {
   incomingTestIdempotencyKey,
   retryWebhookInteraction,
@@ -1408,6 +1409,24 @@ webhooks.get('/api/webhooks/interactions', requireRole('owner', 'admin', 'staff'
     });
   } catch (err) {
     console.error('GET /api/webhooks/interactions error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webhooks.get('/api/webhooks/interactions/:id/payload', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const access = await requireInteractionAccount(c);
+    if ('error' in access) return access.error;
+    const original = await getWebhookInteractionById(c.env.DB, c.req.param('id'), access.lineAccountId);
+    if (!original) return c.json({ success: false, error: 'Not found' }, 404);
+    // 本文は伏せて返す（F-18）。元やDBは変えない。
+    const masked = maskInteractionPayload(original.request_body_json);
+    return c.json({
+      success: true,
+      data: { id: original.id, body: masked.body, available: masked.available },
+    });
+  } catch (err) {
+    console.error('GET /api/webhooks/interactions/:id/payload error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
