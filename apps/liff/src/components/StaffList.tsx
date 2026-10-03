@@ -74,7 +74,7 @@ export default function StaffList({
                 type="button"
                 onClick={() => onSelect(s)}
                 aria-pressed={selected}
-                className={`liff-press flex w-full items-center gap-3 rounded-[14px] p-3.5 text-left outline focus-visible:outline-2 focus-visible:outline-ink ${
+                className={`liff-press flex w-full items-center gap-3 rounded-(--liff-radius-lg) p-3.5 text-left outline focus-visible:outline-2 focus-visible:outline-ink ${
                   selected
                     ? 'bg-liff-soft outline-2 -outline-offset-1 outline-liff-primary'
                     : 'bg-canvas outline-1 -outline-offset-1 outline-liff-line'
