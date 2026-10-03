@@ -206,8 +206,8 @@
     "unresolved-classname": 31
   },
   "app/events/events-list-v8.tsx": {
-    "unresolved-classname": 48,
-    "arbitrary-value": 6,
+    "unresolved-classname": 49,
+    "arbitrary-value": 7,
     "direct-th": 6
   },
   "app/events/new/events-new-v8.tsx": {
@@ -684,7 +684,7 @@
     "unresolved-classname": 1
   },
   "app/webinars/list-v8.tsx": {
-    "unresolved-classname": 38
+    "unresolved-classname": 43
   },
   "app/webinars/new/new-v8.tsx": {
     "unresolved-classname": 41
