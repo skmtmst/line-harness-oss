@@ -23,7 +23,7 @@
     "direct-th": 20
   },
   "app/affiliates/v8-affiliates-tab.tsx": {
-    "unresolved-classname": 25,
+    "unresolved-classname": 27,
     "direct-th": 7
   },
   "app/affiliates/v8-approvals-tab.tsx": {
@@ -31,8 +31,8 @@
     "direct-th": 8
   },
   "app/affiliates/v8-drawer.tsx": {
-    "unresolved-classname": 48,
-    "direct-th": 8
+    "unresolved-classname": 50,
+    "direct-th": 9
   },
   "app/affiliates/v8-offers-tab.tsx": {
     "unresolved-classname": 33,
