@@ -112,8 +112,10 @@ import {
   STATE_LABELS,
   sourceTriggerLabel,
   usageLabel,
+  type ConversionStopAction,
   type EditForm,
 } from './_components/conversion-dialogs'
+import ConversionPointsV8 from './conversion-points-v8'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -202,7 +204,7 @@ const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> =
   'name': 'name_asc',
 }
 
-function ConversionsPageInner({ accountId }: { accountId: string | null }) {
+function ConversionsPageInner({ accountId, v8 }: { accountId: string | null; v8: boolean }) {
   /*
    * N-264: 作成画面が `?highlight=<作った行のID>` で戻ってくる。
    * 読み込んだ一覧の中でその行を見つけ、帯を出し・その頁へ移し・
@@ -263,8 +265,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [stopTarget, setStopTarget] = useState<ConversionDefinitionListItem | null>(null)
   const [stopImpact, setStopImpact] = useState<ConversionDefinitionDeleteImpact | null>(null)
   const [stopImpactLoading, setStopImpactLoading] = useState(false)
-  const [stopAction, setStopAction] = useState<'stop' | 'replace' | 'delete'>('stop')
+  const [stopAction, setStopAction] = useState<ConversionStopAction>('stop')
   const [replacementId, setReplacementId] = useState('')
+  /** V8 の止める小窓の理由（必須）。v7 の窓には欄が無く、空のまま送る。 */
+  const [stopReason, setStopReason] = useState('')
   const [detailTarget, setDetailTarget] = useState<ConversionDefinitionListItem | null>(null)
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState('')
@@ -663,13 +667,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     }
   }
 
-  const openStop = async (target: ConversionDefinitionListItem) => {
+  const openStop = async (target: ConversionDefinitionListItem, preset: ConversionStopAction = 'stop') => {
     setDetailTarget(null)
     setStopTarget(target)
     setStopImpact(null)
     setStopError('')
-    setStopAction('stop')
+    setStopAction(preset)
     setReplacementId('')
+    setStopReason('')
     setStopImpactLoading(true)
     try {
       const response = await api.conversions.definitionDeleteImpact(target.id)
@@ -699,26 +704,30 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     setStopError('')
     try {
       const replacement = stopImpact.replacementCandidates.find((item) => item.id === replacementId)
+      // V8 の小窓では理由が必須で、ここへ届く。v7 の窓には欄が無いので
+      // 空のまま来て、従来どおりの文言で送る。
+      const reason = stopReason.trim()
       const res = stopAction === 'replace'
         ? replacement
           ? await api.conversions.replaceDefinition(stopTarget.id, {
               replacementId: replacement.id,
               expectedVersion: stopImpact.definition.version,
               replacementExpectedVersion: replacement.version,
-              reason: '管理画面で利用先を差し替え',
+              reason: reason || '管理画面で利用先を差し替え',
             })
           : { success: false as const, error: '差し替え先を選んでください' }
         : stopAction === 'delete'
           ? await api.conversions.deleteDefinition(stopTarget.id, {
               expectedVersion: stopImpact.definition.version,
-              reason: '未使用の成果地点を削除',
+              reason: reason || '未使用の成果地点を削除',
             })
           : await api.conversions.stopDefinition(stopTarget.id, {
               expectedVersion: stopImpact.definition.version,
-              reason: '管理画面で計測を停止',
+              reason: reason || '管理画面で計測を停止',
             })
       if (!res.success) throw new Error(res.error)
       setStopTarget(null)
+      setStopReason('')
       await load()
     } catch {
       setStopError(stopAction === 'replace'
@@ -801,6 +810,118 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   useEffect(() => {
     highlightRowRef.current?.scrollIntoView({ block: 'center' })
   }, [highlightedPoint, current])
+
+  // 共用の窓への受け渡し（v7 の描画と V8 で同じものを使う）。
+  const detailDialogProps = {
+    detailTarget,
+    setDetailTarget,
+    publishing,
+    publishDraft: (target: ConversionDefinitionListItem) => void publishDraft(target),
+    openEdit,
+    openStop: (target: ConversionDefinitionListItem) => void openStop(target),
+    issueIngest: (target: ConversionDefinitionListItem) => void issueIngest(target),
+    toggleIngest: (target: ConversionDefinitionListItem) => void toggleIngest(target),
+    ingestBusy,
+    ingestError,
+    issuedSecret,
+    ingestEvents,
+    definitionEvents,
+    eventsFailed,
+    canReverse,
+    openReversal,
+  }
+  const reversalDialogProps = {
+    reversalTarget,
+    reversalKind,
+    reversalBusy,
+    reversalError,
+    reversalReason,
+    setReversalTarget,
+    setReversalReason,
+    submitReversal: () => void submitReversal(),
+  }
+  const editDialogProps = {
+    editTarget,
+    setEditTarget,
+    editForm,
+    setEditForm,
+    editValueModeNotice,
+    setEditValueModeNotice,
+    editSaving,
+    editError,
+    submitEdit: () => void submitEdit(),
+  }
+
+  // ★V8-B コンバージョンの一覧（`r6dJFy`）。止める窓は表の下の小窓で、
+  // 共用の止める窓（`ConversionStopDialog`）は V8 では開かない。
+  if (v8) {
+    return (
+      <>
+        <ConversionPointsV8
+          model={{
+            loading,
+            loadFailed,
+            points,
+            shown,
+            total: definitions?.pagination.total ?? null,
+            stateCounts: definitions?.stateCounts ?? null,
+            listTruncated,
+            query,
+            onQueryChange: (value) => {
+              setQuery(value)
+              setPage(1)
+            },
+            status,
+            onStatusChange: (value) => {
+              setStatus(value)
+              setPage(1)
+            },
+            onReload: () => void load(),
+            onExportCsv: () => void exportCsv(),
+            exporting,
+            exportError,
+            highlightedId: highlightId,
+            publishing,
+            onOpenDetail: (point) => setDetailTarget(point),
+            onOpenEdit: openEdit,
+            onOpenStop: (point, action) => void openStop(point, action),
+            onPublishDraft: (point) => void publishDraft(point),
+            stopTarget,
+            stopImpact,
+            stopImpactLoading,
+            stopAction,
+            onStopActionChange: setStopAction,
+            replacementId,
+            onReplacementIdChange: setReplacementId,
+            stopReason,
+            onStopReasonChange: setStopReason,
+            stopping,
+            stopError,
+            onConfirmStop: () => void runStop(),
+            onCancelStop: () => {
+              if (stopping) return
+              setStopTarget(null)
+              setStopImpact(null)
+              setStopError('')
+              setStopReason('')
+            },
+            detailDialog: detailDialogProps,
+            editDialog: editDialogProps,
+            reversalDialog: reversalDialogProps,
+            onIssueIngest: (point) => void issueIngest(point),
+            onToggleIngest: (point) => void toggleIngest(point),
+            ingestBusy,
+            ingestError,
+            issuedSecret,
+            onClearIssuedSecret: () => setIssuedSecret(''),
+          }}
+        />
+        <ConversionDetailDialog {...detailDialogProps} />
+        <ConversionReversalDialog {...reversalDialogProps} />
+        <ConversionEditDialog {...editDialogProps} />
+      </>
+    )
+  }
 
   return (
     <div data-conversion-points-design="v6" className="flex flex-col gap-4">
@@ -1136,47 +1257,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         </div>
       </div>
 
-      <ConversionDetailDialog
-        detailTarget={detailTarget}
-        setDetailTarget={setDetailTarget}
-        publishing={publishing}
-        publishDraft={(target) => void publishDraft(target)}
-        openEdit={openEdit}
-        openStop={(target) => void openStop(target)}
-        issueIngest={(target) => void issueIngest(target)}
-        toggleIngest={(target) => void toggleIngest(target)}
-        ingestBusy={ingestBusy}
-        ingestError={ingestError}
-        issuedSecret={issuedSecret}
-        ingestEvents={ingestEvents}
-        definitionEvents={definitionEvents}
-        eventsFailed={eventsFailed}
-        canReverse={canReverse}
-        openReversal={openReversal}
-      />
+      <ConversionDetailDialog {...detailDialogProps} />
 
-      <ConversionReversalDialog
-        reversalTarget={reversalTarget}
-        reversalKind={reversalKind}
-        reversalBusy={reversalBusy}
-        reversalError={reversalError}
-        reversalReason={reversalReason}
-        setReversalTarget={setReversalTarget}
-        setReversalReason={setReversalReason}
-        submitReversal={() => void submitReversal()}
-      />
+      <ConversionReversalDialog {...reversalDialogProps} />
 
-      <ConversionEditDialog
-        editTarget={editTarget}
-        setEditTarget={setEditTarget}
-        editForm={editForm}
-        setEditForm={setEditForm}
-        editValueModeNotice={editValueModeNotice}
-        setEditValueModeNotice={setEditValueModeNotice}
-        editSaving={editSaving}
-        editError={editError}
-        submitEdit={() => void submitEdit()}
-      />
+      <ConversionEditDialog {...editDialogProps} />
 
       <ConversionStopDialog
         stopTarget={stopTarget}
@@ -1578,7 +1663,7 @@ function ConversionsPageHost() {
         defaultKey={DEFAULT_TAB}
         label="成果とアフィリエイト・コンバージョンの画面"
       />
-      {tab === 'points' && <ConversionsPageInner accountId={selectedAccountId} />}
+      {tab === 'points' && <ConversionsPageInner accountId={selectedAccountId} v8={theme === 'v8'} />}
       {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} focusAffiliateId={affiliateFocus} />}
       {tab === 'offers' && <OffersTab />}
       {tab === 'approvals' && <ApprovalQueue focusAffiliateId={affiliateFocus} />}

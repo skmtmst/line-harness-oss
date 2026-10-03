@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする55ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする56ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -91,6 +91,8 @@ describe('共通部品の影響範囲', () => {
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
       'app/contents/vars/impact-review.tsx',
       'app/contents/vars/page.tsx',
+      // ★V8-B コンバージョンの一覧（r6dJFy）。表の下にページ送りを置く。
+      'app/conversions/conversion-points-v8.tsx',
       'app/conversions/page.tsx',
       // #1011 FRIEND-11: 重複候補が50件を超えると後ろの候補へ辿れなかった。
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
