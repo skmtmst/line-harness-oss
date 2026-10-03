@@ -21,7 +21,9 @@ import TargetMissing from '@/components/shared/target-missing'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { TextInput } from '@/components/shared/form-controls'
 import { useStepUpGate } from '@/components/step-up-prompt'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import HandoverV8 from './handover-v8'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import {
   DIFFERENT_PROVIDER_NOTE,
@@ -819,10 +821,19 @@ function Handover() {
   )
 }
 
-export default function HandoverPage() {
+/*
+ * ★V8-B（板 `x2dSNv`）：見た目テーマが v8 のときだけ新しい見せ方
+ * （`handover-v8.tsx`）に切り替える。v7 の見た目はそのまま変えない。
+ */
+function HandoverSwitch() {
+  const theme = useAdminTheme()
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <Handover />
+      {theme === 'v8' ? <HandoverV8 /> : <Handover />}
     </Suspense>
   )
+}
+
+export default function HandoverPage() {
+  return <HandoverSwitch />
 }

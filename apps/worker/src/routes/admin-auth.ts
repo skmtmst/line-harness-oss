@@ -16,7 +16,7 @@ import {
   expiredCookie,
   sha256Hex,
 } from '../middleware/auth.js';
-import { clientIp, issueSession, maskIpPrefix, randomToken, startTwoFactorChallenge, twoFactorLoginUrl, twoFactorRequired, twoFactorSetupUrl } from '../services/admin-session.js';
+import { clientIp, issueSession, maskIpPrefix, randomToken } from '../services/admin-session.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import { recordAuditEvent, recordLoginAudit } from '@line-crm/db';
 import {
@@ -41,7 +41,6 @@ import {
   getTwoFactorChallenge,
   incrementTwoFactorChallengeAttempts,
   reserveStepUpAttempt,
-  staffRequiresMfa,
   stepUpAttemptRetryAfterSeconds,
   updateStaffMember,
 } from '@line-crm/db';
@@ -288,28 +287,7 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
 
     const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
     if (config.misconfigured) return c.redirect(adminLoginUrl(c, 'configuration_error', next));
-    if (twoFactorRequired(staff)) {
-      if (!c.env.TOTP_ENCRYPTION_KEY) return c.redirect(adminLoginUrl(c, 'configuration_error', next));
-      try {
-        const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'verify', remember });
-        return c.redirect(twoFactorLoginUrl(c, challengeToken, next));
-      } catch (error) {
-        logAuthFailure('startTwoFactorChallenge', error);
-        return c.redirect(adminLoginUrl(c, 'line_login_failed', next));
-      }
-    }
-    // 運営コンソールは役割束に関係なくTOTP必須。統括側は従来どおり
-    // 管理者束（owner/admin・閲覧専用でない）だけを設定へ回す（N-426）。
-    if (next === 'ops' || staffRequiresMfa(staff)) {
-      if (!c.env.TOTP_ENCRYPTION_KEY) return c.redirect(adminLoginUrl(c, 'configuration_error', next));
-      try {
-        const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'setup', remember });
-        return c.redirect(twoFactorSetupUrl(c, challengeToken, next));
-      } catch (error) {
-        logAuthFailure('startTwoFactorChallenge', error);
-        return c.redirect(adminLoginUrl(c, 'line_login_failed', next));
-      }
-    }
+    // 2段階認証は削除済み。LINE認証後すぐセッション発行
     let session: Awaited<ReturnType<typeof issueSession>>;
     try {
       session = await issueSession(c, staff.id, config.sameSite, remember);
@@ -686,19 +664,7 @@ adminAuth.post('/api/auth/login', async (c) => {
     c.header('Set-Cookie', adminSessionCookie(apiKey, config.sameSite, maxAge), { append: true });
     c.header('Set-Cookie', csrfCookie(csrfToken, config.sameSite, maxAge), { append: true });
   } else {
-    // APIキー経由でも管理者のMFA必須は迂回できない。セッション発行前に
-    // 二段階認証の確認・初回設定のどちらかへ回す（N-426）。
-    const staffRow = await getStaffById(c.env.DB, staff.id);
-    if (staffRow && twoFactorRequired(staffRow)) {
-      if (!c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定に不備があります' }, 500);
-      const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'verify', remember });
-      return c.json({ success: true, data: { twoFactor: true, challengeToken } });
-    }
-    if (staffRow && staffRequiresMfa(staffRow)) {
-      if (!c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定に不備があります' }, 500);
-      const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'setup', remember });
-      return c.json({ success: true, data: { twoFactorSetup: true, challengeToken } });
-    }
+    // 2段階認証は削除済み。APIキー確認後そのままセッションを発行する。
     csrfToken = (await issueSession(c, staff.id, config.sameSite, remember)).csrfToken;
   }
   await recordLoginAudit(c.env.DB, {
