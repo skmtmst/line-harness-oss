@@ -863,6 +863,7 @@ function RankSettingsTabV8({
 
       {/* 削除の確認：会員がいるランクには移す先が必須（API 側の決まりと同じ）。 */}
       <ConfirmDialog
+        designNode="dEv6G"
         open={removeTarget !== null && removeRow !== null && removeRow.id !== null}
         title={`「${removeRow?.name.trim() || `ランク ${(removeTarget ?? 0) + 1}`}」を削除しますか？`}
         description={

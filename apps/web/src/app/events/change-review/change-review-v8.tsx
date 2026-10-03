@@ -12,6 +12,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -63,6 +64,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
     runApply,
   } = model
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   if (!selectedAccountId) {
     return (
@@ -396,7 +398,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
         </Button>
         <Button
           variant="primary"
-          onClick={() => void runApply()}
+          onClick={() => setConfirmOpen(true)}
           disabled={!preview || preview.blocked || applyBusy}
           busy={applyBusy}
           busyLabel="変えています…"
@@ -405,6 +407,29 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
           ✓ 変えてお知らせする
         </Button>
       </div>
+      {confirmOpen && preview ? (
+        <div data-design-node="qUdNh">
+          <Dialog
+            open
+            title="変更内容を確認"
+            description={`${event.name} の変更を確定し、確定した申込 ${preview.total_confirmed}人へ LINE でお知らせします。`}
+            confirmLabel={`変えて ${preview.total_confirmed}人にお知らせする`}
+            cancelLabel="戻って直す"
+            busy={applyBusy}
+            onConfirm={() => { setConfirmOpen(false); void runApply() }}
+            onCancel={() => setConfirmOpen(false)}
+          >
+            {changedLines.length > 0 ? (
+              <ul className={styles.promiseList}>
+                {changedLines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            ) : null}
+            <p className={styles.cardNote}>キャンセル待ち {preview.total_waiting}人は順番のままです。</p>
+          </Dialog>
+        </div>
+      ) : null}
       {applyError && (
         <p className="text-danger text-center text-sm" role="alert">
           {applyError}

@@ -62,6 +62,7 @@ import { fetchAllPages } from '../bookings/fetch-all-pages'
 import { slotReasonLabel } from '../staff/shifts/slot-reason'
 import { bookingErrorMessage, bookingRulesErrorMessage } from './menu-validation'
 
+import ChannelsTabV8 from './channels-tab-v8'
 import MenuVersionHistory from './menu-version-history'
 import { EMPTY_STAFF, StaffEditModal } from '../staff/staff-edit-dialog'
 import { LiffPhoneDatetimeStep, LiffPhoneMenuStep, LiffPhoneStaffStep } from './liff-phone-v8'
@@ -75,6 +76,7 @@ const V8_TABS = [
   { key: 'holidays', label: '休業日', node: 'KRgTQ' },
   { key: 'rules', label: '予約のルール', node: 'x1OZS6' },
   { key: 'staff', label: '担当スタッフ', node: 'VLEaj' },
+  { key: 'channels', label: '予約経路', node: 'ZyDd6' },
 ] as const
 type V8TabKey = (typeof V8_TABS)[number]['key']
 const V8_TAB_KEYS = new Set<string>(V8_TABS.map((tab) => tab.key))
@@ -84,6 +86,7 @@ const V8_TAB_NODE: Record<V8TabKey, string> = {
   holidays: 'KRgTQ',
   rules: 'x1OZS6',
   staff: 'VLEaj',
+  channels: 'ZyDd6',
 }
 
 const MENU_PAGE_SIZE = 6
@@ -661,7 +664,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
                 onSaved={(next) => setSettings(next)}
                 onReload={() => void loadCore()}
               />
-            ) : (
+            ) : tab === 'staff' ? (
               <StaffTabV8
                 accountId={accountId}
                 staff={staff}
@@ -673,6 +676,8 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
                 canEdit={canEditSettings}
                 onReload={() => void loadCore()}
               />
+            ) : (
+              <ChannelsTabV8 accountId={accountId} canEdit={canEditSettings} />
             )}
           </div>
 

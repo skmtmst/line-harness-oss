@@ -9,7 +9,7 @@
  * 競合（ほかの担当者が先に保存・409）は黄色の帯と比べる窓で受ける。
  *
  * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
- * - タブ（予約経路の連携・自動で合わせるルール）：中身の板が無いので出さない。
+ * - タブ（自動で合わせるルール）：ルールの口（F-24）が無いので出さない。
  * - 開ける時間の曜日ごとの編集：週単位で保存する口が無いので出さない。
  *   時間帯ごとの席数は表と箱で直せる。
  * - 下の固定帯の文言：開ける時間が出せないので「配分を保存」にする。
@@ -27,6 +27,8 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { Tabs } from '@/components/shared/tabs'
+import InventoryChannels from './inventory-channels'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import { restaurantTestApi, type RestaurantInventory } from '@/lib/restaurant-test-api'
@@ -390,10 +392,33 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
   )
 }
 
+function InventoryTabs({ ctx }: { ctx: RestaurantV8Context }) {
+  const [tab, setTab] = useState<'stock' | 'channels'>('stock')
+  const { selectedAccountId } = useAccount()
+  return (
+    <div className="flex min-w-0 flex-col gap-4">
+      <Tabs
+        label="予約枠・在庫の切り替え"
+        items={[
+          { label: '時間帯ごとの在庫', current: tab === 'stock', onClick: () => setTab('stock') },
+          { label: '予約経路の連携', current: tab === 'channels', onClick: () => setTab('channels') },
+        ]}
+      />
+      {tab === 'stock' ? (
+        <InventoryBoard ctx={ctx} />
+      ) : selectedAccountId && ctx.selectedStoreId ? (
+        <InventoryChannels accountId={selectedAccountId} storeId={ctx.selectedStoreId} connectors={ctx.data.connectors} />
+      ) : (
+        <ListState kind="empty" title="店舗を選んでください" description="予約経路を見たい店舗を選んでください。" />
+      )}
+    </div>
+  )
+}
+
 export default function InventoryV8() {
   return (
     <RestaurantShell boardId="Y8SjT2" title="予約枠・在庫" description="時間帯ごとの総枠と、媒体・LINE・当日枠の配分を確認します。">
-      {(ctx) => <InventoryBoard ctx={ctx} />}
+      {(ctx) => <InventoryTabs ctx={ctx} />}
     </RestaurantShell>
   )
 }

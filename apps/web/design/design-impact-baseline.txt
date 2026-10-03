@@ -35,6 +35,7 @@ shared-button-importer app/booking/bookings/booking-detail-v8.tsx
 shared-button-importer app/booking/bookings/detail/page.tsx
 shared-button-importer app/booking/bookings/new/page.tsx
 shared-button-importer app/booking/bookings/page.tsx
+shared-button-importer app/booking/menus/channels-tab-v8.tsx
 shared-button-importer app/booking/menus/edit-menu-dialog.tsx
 shared-button-importer app/booking/menus/new/menu-form-v8.tsx
 shared-button-importer app/booking/menus/new/page.tsx
@@ -213,6 +214,7 @@ shared-button-importer app/restaurant-test/stores/new/terms-consent.tsx
 shared-button-importer app/restaurant-test/v8/approvals.tsx
 shared-button-importer app/restaurant-test/v8/dashboard.tsx
 shared-button-importer app/restaurant-test/v8/google.tsx
+shared-button-importer app/restaurant-test/v8/inventory-channels.tsx
 shared-button-importer app/restaurant-test/v8/inventory.tsx
 shared-button-importer app/restaurant-test/v8/menu.tsx
 shared-button-importer app/restaurant-test/v8/organization.tsx
