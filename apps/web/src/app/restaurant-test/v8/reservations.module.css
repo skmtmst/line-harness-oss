@@ -1,0 +1,446 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B 予約台帳（板 `Z3FoM` 一覧・`l9NlC0` 今日・`rm92Y` 電話の予約を入れる・
+ * 1152 `xzCK6`）。
+ *
+ * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
+ * 板が 1100px を切ったら右の欄をカレンダーの下へ積み、道具の段は2段にする。
+ * 色・丸み・影は全部トークン（直接の値の契約）。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+  min-width: 0;
+}
+
+/* 器の中の台帳のまとまり。1152 の折り畳みの基準（白い板の幅）。 */
+.ledgerBoard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+  min-width: 0;
+}
+
+/* 見方の切り替え（今日・今週・今月・一覧）。件数は読み上げと一緒に。 */
+.viewTabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+
+.viewTab {
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.viewTab[aria-selected='true'] {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-card);
+}
+
+/* 道具の段：左に見方・日送り・絞り込み、右に操作。 */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.toolbarLeft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.toolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dateNav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dateLabel {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+/* 今日の段：カレンダーと右の欄。 */
+.todayBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: start;
+}
+
+.sideCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 時間×卓のます目。列は時間＋卓の数だけ。 */
+.dayGrid {
+  display: grid;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  overflow-x: auto;
+}
+
+.dayGridInner {
+  display: grid;
+  min-width: 640px;
+}
+
+.timeHead {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  padding: 8px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.tableHead {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+  padding: 8px;
+  border-bottom: 1px solid var(--color-hairline);
+  border-left: 1px solid var(--color-hairline);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timeCell {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--color-divider-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeCellNow {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.slotCell {
+  border-bottom: 1px solid var(--color-divider-soft);
+  border-left: 1px solid var(--color-hairline);
+  min-height: 44px;
+  padding: 2px;
+}
+
+/* 予約の箱。予約元の淡い地・承認待ちは黄の枠。 */
+.block {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-left-width: 3px;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  padding: 4px 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.blockSourceLine { border-left-color: var(--color-accent-deep); background: var(--color-success-bg); }
+.blockSourcePhone { border-left-color: var(--color-ink-faint); background: var(--color-canvas-sunken); }
+.blockSourceMedia { border-left-color: var(--color-danger); background: var(--color-danger-bg); }
+.blockPending { border-color: var(--color-warning); background: var(--color-warning-bg); }
+
+.blockName {
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.blockMeta {
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.blockAlert {
+  color: var(--color-danger);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slotAdd {
+  display: block;
+  width: 100%;
+  border: 1px dashed var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-action);
+  font-size: 12px;
+  padding: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* 右の欄の小カード。 */
+.sideCard {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.sideCardTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+  margin-bottom: 8px;
+}
+
+.nextCard {
+  border-radius: var(--radius-control);
+  background: var(--color-success-bg);
+  padding: 12px;
+}
+
+.nextName {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.nextMeta {
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+  margin-top: 2px;
+}
+
+.nextFrom {
+  font-size: 13px;
+  color: var(--color-danger);
+  margin-top: 2px;
+}
+
+.sideButtons {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sideButtons > * {
+  flex: 1 1 0;
+}
+
+.careList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.careAlert {
+  color: var(--color-danger);
+}
+
+.breakRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+  padding: 2px 0;
+}
+
+.breakRow strong {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sideLinks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.tableChips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tableChip {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tableChipBusy {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger);
+  color: var(--color-ink);
+}
+
+.tableChipFree {
+  background: var(--color-success-bg);
+  border-color: var(--color-accent-deep);
+  color: var(--color-ink);
+}
+
+.tableChip[aria-pressed='true'] {
+  outline: 2px solid var(--color-accent-deep);
+  outline-offset: 1px;
+}
+
+.chipLegend {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  margin-top: 8px;
+}
+
+.timeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.timeChip {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  font-size: 13px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeChip[aria-pressed='true'] {
+  background: var(--color-accent-deep);
+  border-color: var(--color-accent-deep);
+  color: var(--color-canvas);
+  font-weight: 600;
+}
+
+.personCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: var(--radius-control);
+  background: var(--color-success-bg);
+  padding: 12px;
+}
+
+.personName {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.personMeta {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  margin-top: 2px;
+}
+
+/* 電話の予約：左に手順、右に見本（`rm92Y`）。 */
+.phoneBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: start;
+}
+
+.phoneMain {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.previewBubbleTitle {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.previewBubbleBody {
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+  margin-top: 4px;
+}
+
+.formError {
+  font-size: 13px;
+  color: var(--color-danger);
+  margin-top: 8px;
+}
+
+.fieldHelp {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  margin-top: 4px;
+}
+
+.inlineNote {
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+/* 板 1100px 未満（`xzCK6`）：右の欄をカレンダーの下へ積み、道具は2段。 */
+@container (max-width: 1100px) {
+  .todayBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .phoneBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbarActions {
+    justify-content: flex-start;
+  }
+}

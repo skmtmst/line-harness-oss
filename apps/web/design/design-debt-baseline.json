@@ -97,7 +97,7 @@
     "unresolved-classname": 11
   },
   "app/booking/menus/settings-v8.tsx": {
-    "unresolved-classname": 207
+    "unresolved-classname": 208
   },
   "app/booking/menus/staff/assign-v8.tsx": {
     "unresolved-classname": 61,
@@ -126,7 +126,7 @@
     "arbitrary-value": 1
   },
   "app/broadcasts/detail-v8.tsx": {
-    "unresolved-classname": 75
+    "unresolved-classname": 78
   },
   "app/broadcasts/detail/page.tsx": {
     "direct-secondary-button": 1
@@ -224,7 +224,7 @@
     "unresolved-classname": 38
   },
   "app/friends/detail/page.tsx": {
-    "unresolved-classname": 3,
+    "unresolved-classname": 4,
     "arbitrary-value": 5
   },
   "app/friends/friends-nav-v8.tsx": {
@@ -415,6 +415,12 @@
   },
   "app/restaurant-test/v8/organization.tsx": {
     "unresolved-classname": 58
+  },
+  "app/restaurant-test/v8/reservation-phone.tsx": {
+    "unresolved-classname": 33
+  },
+  "app/restaurant-test/v8/reservations.tsx": {
+    "unresolved-classname": 46
   },
   "app/restaurant-test/v8/tables.tsx": {
     "unresolved-classname": 37
