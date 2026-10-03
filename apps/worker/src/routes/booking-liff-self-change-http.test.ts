@@ -171,6 +171,11 @@ function expectNoManualHeader() {
   }
 }
 
+/** provider（googleapis）への外部呼出し回数。 */
+function googleCallCount() {
+  return fetchCalls.filter((call) => call.url.includes('www.googleapis.com')).length;
+}
+
 const NY = 'America/New_York';
 /** 基準時 2026-10-20T12:00Z。menu-ok の期限1h・締切1h。 */
 const T1 = '2026-11-02T15:00:00.000Z';
@@ -618,6 +623,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     linkCalendar();
     mockSlots([D11, D12]);
     const id = await adminCreate('menu-ok', T1, 'rs-real');
+    const createdCalls = googleCallCount();
     googleFailCreate = 1;
     const first = await selfPost(`/api/liff/booking/${id}/reschedule`, {
       starts_at: T2, lock_version: 0,
@@ -625,6 +631,8 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(first.status).toBe(200);
     expect((await first.json<Record<string, unknown>>()).calendar_sync).toBe('failed');
     expect(bookingRow(id).external_event_id).toBeNull();
+    // 失敗時は delete＋create の2回だけ外部へ出る。
+    expect(googleCallCount() - createdCalls).toBe(2);
     const replay = await selfPost(`/api/liff/booking/${id}/reschedule`, {
       starts_at: T2, lock_version: 1,
     });
@@ -634,6 +642,8 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(body.calendar_sync).toBe('synced');
     const evt = bookingRow(id).external_event_id as string;
     expect(evt).toMatch(/^lh/);
+    // 回復の再送は create の1回だけ外部へ出る。
+    expect(googleCallCount() - createdCalls).toBe(3);
     // 版ごとの冪等キーで台帳は2行（作成v0・変更v1）。v1行は成功で閉じる。
     const calOps = sqlite.prepare(
       "SELECT idempotency_key, status FROM booking_operation_runs WHERE booking_id = ? AND kind = 'google_calendar' ORDER BY created_at",
@@ -653,6 +663,36 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(new Set(pending.map((r) => `${r.kind}@${r.scheduled_at}`)).size).toBe(2);
     await drainWaits();
     expectNoManualHeader();
+  });
+
+  test('成功ずみ同日時再送は外部呼出し0（guard）', async () => {
+    useRealGoogleRunner();
+    linkCalendar();
+    mockSlots([D11, D12]);
+    const id = await adminCreate('menu-ok', T1, 'rs-guard');
+    const createdCalls = googleCallCount();
+    const first = await selfPost(`/api/liff/booking/${id}/reschedule`, {
+      starts_at: T2, lock_version: 0,
+    });
+    expect(first.status).toBe(200);
+    expect((await first.json<Record<string, unknown>>()).calendar_sync).toBe('synced');
+    const evt = bookingRow(id).external_event_id as string;
+    // 作成時1回＋変更時 delete/create 2回。
+    expect(googleCallCount() - createdCalls).toBe(2);
+    const replay = await selfPost(`/api/liff/booking/${id}/reschedule`, {
+      starts_at: T2, lock_version: 1,
+    });
+    expect(replay.status).toBe(200);
+    const body = await replay.json<Record<string, unknown>>();
+    expect(body.changed).toBe(false);
+    expect(body.calendar_sync).toBe('synced');
+    // 成功ずみ再送は外部へ出ない。予定IDも採番し直さない。台帳も増えない。
+    expect(googleCallCount() - createdCalls).toBe(2);
+    expect(bookingRow(id).external_event_id).toBe(evt);
+    const ops = sqlite.prepare(
+      'SELECT COUNT(*) AS n FROM booking_operation_runs WHERE booking_id = ? AND kind = ?',
+    ).get(id, 'google_calendar') as { n: number };
+    expect(ops.n).toBe(2);
   });
 
   test('予定作り直しでは古いMeetを止め、古いURLを新予定へ流用しない', async () => {
