@@ -95,6 +95,13 @@
   gap: 10px;
 }
 
+/* 板 VFxWU（1152）：畳んだスマホの代わりの「見え方」ボタン。
+   スマホが見えている広い板では出さない。 */
+.sidePhoneButton {
+  display: flex;
+  flex-direction: column;
+}
+
 .sideAction {
   display: flex;
 }
@@ -134,6 +141,10 @@
 
 @container (min-width: 1081px) {
   .sideLineLink {
+    display: none;
+  }
+
+  .sidePhoneButton {
     display: none;
   }
 }

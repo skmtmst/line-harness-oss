@@ -300,6 +300,8 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
   const [staffError, setStaffError] = useState<string | null>(null)
   const [staffMatrices, setStaffMatrices] = useState<Record<string, StaffMenuMatrix[]>>({})
   const [staffExtras, setStaffExtras] = useState<Record<string, { work: string | null; calendar: 'loading' | 'connected' | 'none' | 'error' }>>({})
+  /** 板 VFxWU（1152）：畳んだスマホの代わりに開く見え方窓。 */
+  const [phoneOpen, setPhoneOpen] = useState(false)
   const [members, setMembers] = useState<StaffMember[]>([])
   const [resources, setResources] = useState<BookingResource[] | null>(null)
   const [resourcesStatus, setResourcesStatus] = useState<LoadStatus>('loading')
@@ -676,15 +678,16 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
 
           <aside className={styles.side} data-design="Side">
             <div className={styles.sideActions}>
+              <span className={styles.sidePhoneButton}>
+                <Button onClick={() => setPhoneOpen(true)}>LINEでの見え方を見る</Button>
+              </span>
               {previewUrl ? <Button href={previewUrl}>お客さまに見える画面を確かめる</Button> : null}
             </div>
             <p className={styles.sideTitle}>お客さまの予約画面</p>
             <div className={styles.sidePhone}>{phone}</div>
-            <p className={styles.sideLineLink}>
-              {previewUrl
-                ? <a href={previewUrl} target="_blank" rel="noreferrer">実際の画面で確かめる ↗</a>
-                : 'このアカウントには予約画面のURLがまだありません'}
-            </p>
+            {previewUrl ? null : (
+              <p className={styles.sideLineLink}>このアカウントには予約画面のURLがまだありません</p>
+            )}
           </aside>
         </div>
 
@@ -724,6 +727,14 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
+      {/* 板 VFxWU（1152）：畳んだスマホの代わりに見せる窓。実行ボタンなしの参照窓。 */}
+      <Dialog
+        open={phoneOpen}
+        title="お客さまの予約画面"
+        onCancel={() => setPhoneOpen(false)}
+      >
+        {phone}
+      </Dialog>
     </V8TabEditContext.Provider>
   )
 }
@@ -2512,6 +2523,7 @@ function StaffTabV8({ accountId, staff, status, error, matrices, extras, members
         onCancel={() => { if (!removing) setRemoveTarget(null) }}
         onConfirm={() => void remove()}
       />
+
     </div>
   )
 }

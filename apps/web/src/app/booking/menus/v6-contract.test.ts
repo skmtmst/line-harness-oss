@@ -153,6 +153,13 @@ describe('V6 予約設定', () => {
     expect(SETTINGS_CSS).toContain('@container (max-width: 1080px)')
     expect(SETTINGS_CSS).toMatch(/\.colStaff,\s*\.colCount\s*\{\s*display:\s*none/)
   })
+
+  it('VFxWU: 1152の右欄は見え方ボタンと確かめるボタンの2つ', () => {
+    expect(SETTINGS_V8).toContain('LINEでの見え方を見る')
+    expect(SETTINGS_V8).toContain('setPhoneOpen(true)')
+    expect(SETTINGS_V8).toContain('お客さまに見える画面を確かめる')
+    expect(SETTINGS_CSS).toMatch(/\.sidePhoneButton\s*\{[^}]*display:\s*flex/)
+  })
 })
 
 describe('画面確認の固定メニューは本番と同じ器を持つ', () => {
