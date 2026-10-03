@@ -145,4 +145,14 @@
 [data-theme='v8'] .memo {
   line-height: 1.35;
 }
+
+/*
+ * ★V8 仕上げ3回目（M10）④：消える行は 150ms で薄くなる
+ * （--motion-exit。閉じる・消える系の速さ）。外す合図は画面側が
+ * `leaving` で渡す。動きを減らす設定では globals の規定で一瞬になる。
+ */
+[data-theme='v8'] .row[data-leaving='true'] {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease-out);
+}
 }
