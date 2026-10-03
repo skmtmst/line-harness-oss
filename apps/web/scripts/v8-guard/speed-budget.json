@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "updated": "2026-10-04T00:00:00+09:00",
+  "note": "初版は予算だけ。基準が空の間は絶対値（表示1秒・反応100ms・長い作業50ms）だけで判定する。CIの実測を --update-baseline で記入すると、10%則とJSラチェットが効き始める。",
+  "budgets": {
+    "showMs": 1000,
+    "lcpMs": 1000,
+    "pressMs": 100,
+    "longTaskMs": 50
+  },
+  "baselines": {}
+}
