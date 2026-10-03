@@ -63,6 +63,8 @@ const GUARDED = [
   'app/restaurant-test/google/google-posts.tsx',
   'app/restaurant-test/google/google-profile.tsx',
   'app/restaurant-test/stores/new/page.tsx',
+  'app/restaurant-test/v8/reservation-phone.tsx',
+  'app/restaurant-test/v8/reservations.tsx',
   'app/rich-menus/edit/page.tsx',
   'app/rich-menus/new/create-v8.tsx',
   'app/rich-menus/new/page.tsx',
