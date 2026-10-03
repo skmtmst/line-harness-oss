@@ -435,6 +435,7 @@ export default function AutoRepliesListV8() {
       setPendingToggle(null)
       setToggleReason('')
       setSelectedIds(new Set())
+      notifyToast(kind === 'stop' ? '自動応答を停止しました' : '自動応答を再開しました')
       if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch (reason) {
       setToggleError(

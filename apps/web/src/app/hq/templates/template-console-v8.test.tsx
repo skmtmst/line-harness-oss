@@ -58,4 +58,16 @@ describe('配布の V8（meBRB）', () => {
     expect(progress.textContent).toMatch(/配布番号：p1/)
     expect(calls.distribute).toHaveBeenCalledOnce()
   })
+
+  it('行の「…」は矢印キーで項目を移動できる', async () => {
+    render(<TemplateConsole type="tag" useCanonicalEditors={false} />)
+    fireEvent.click(await screen.findByLabelText('来店済みの操作'))
+    const edit = await screen.findByRole('button', { name: '来店済みを編集' })
+    const distribute = screen.getByRole('button', { name: '来店済みを配布' })
+    edit.focus()
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(distribute)
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(edit)
+  })
 })

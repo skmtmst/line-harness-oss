@@ -14,6 +14,7 @@ import {
   type AutomationActionContext,
   type AutomationActionExecutor,
 } from './automation-engine.js';
+import type { Env } from '../index.js';
 import {
   completeOutboundSendStatement,
   hashOutboundPayload,
@@ -43,6 +44,11 @@ export interface AutomationActionExecutorDependencies {
   fetch?: typeof fetch;
   lookupHost?: WebhookDnsLookup;
   now?: () => string;
+  /**
+   * F-14: 担当者通知の送達に使う環境（メール経路用）。渡さない呼び出しでは
+   * メール経路のあるルールは送らずに止める（LINE・画面内通知は送れる）。
+   */
+  operatorMailEnv?: Env['Bindings'];
 }
 
 interface ScopedFriend {
@@ -640,12 +646,49 @@ async function webhookExecutor(
   return { output: { status: response.status } };
 }
 
+/**
+ * F-14 すること「担当へ知らせる」。担当者通知のルールを、自動通知として
+ * 動かす（`X-Line-Harness-Source: manual` は付けない。自動の扱い）。
+ * 送り先・経路はルール側に従い、文面だけこの処理のひと言で上書きする。
+ */
+async function notifyStaffExecutor(
+  context: AutomationActionContext,
+  dependencies: AutomationActionExecutorDependencies,
+): Promise<{ output: Record<string, unknown> }> {
+  const ruleId = requiredString(context.action.params.notificationRuleId, 'notification_rule_required', '担当者通知');
+  const message = requiredText(context.action.params.message, 'message_required', '通知文');
+  const { getNotificationRuleById } = await import('@line-crm/db');
+  const rule = await getNotificationRuleById(context.db, ruleId, context.lineAccountId);
+  if (!rule || rule.is_active !== 1) {
+    throw invalid('notification_rule_not_found', '担当者通知が見つからないか、別のLINE公式アカウントにあります');
+  }
+  const { dispatchOperatorRule, ruleChannels } = await import('./operator-notification-dispatch.js');
+  const mailEnv = dependencies.operatorMailEnv;
+  if (ruleChannels(rule).includes('email') && !mailEnv) {
+    throw invalid('email_unavailable', 'メールの送信先が使えないため、担当者通知を送れませんでした');
+  }
+  // メール経路が無ければ env は読まれない（送達側が env を使うのはメールだけ）。
+  const result = await dispatchOperatorRule(
+    context.db,
+    mailEnv as Env['Bindings'],
+    rule,
+    {
+      lineAccountId: context.lineAccountId,
+      sourceEventId: context.sourceEventId,
+      message,
+      executionMode: context.isTest ? 'test' : 'automatic',
+    },
+  );
+  return { output: { notificationRuleId: rule.id, accepted: result.accepted, failed: result.failed } };
+}
+
 export function createAutomationActionExecutors(
   dependencies: AutomationActionExecutorDependencies = {},
 ): Record<string, AutomationActionExecutor> {
   return {
     add_tag: (context) => tagExecutor(context, 'add'),
     remove_tag: (context) => tagExecutor(context, 'remove'),
+    notify_staff: (context) => notifyStaffExecutor(context, dependencies),
     set_metadata: metadataExecutor,
     set_support_mark: (context) => supportMarkExecutor(context, dependencies),
     start_scenario: scenarioExecutor,
