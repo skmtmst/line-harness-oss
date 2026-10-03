@@ -117,7 +117,7 @@ export function PhotoRewardPolicyCard({
   )
 }
 
-function PhotoRewardPolicyDrawer({
+export function PhotoRewardPolicyDrawer({
   open,
   versions,
   loading,
