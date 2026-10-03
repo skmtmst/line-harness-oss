@@ -17,6 +17,7 @@ import OpsShell from './ops/ops-shell'
 import ImpersonationNotice from './ops/impersonation-notice'
 import UnfamiliarLoginNotice from './unfamiliar-login-notice'
 import SuspendedSidebar from './layout/suspended-sidebar'
+import HoverPrefetch from './shared/hover-prefetch'
 import TopBar from './shared/top-bar'
 import NoteBar from './shared/note-bar'
 import PlatformNotices from './hq/platform-notices'
@@ -95,6 +96,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               {/* V-2: いつもと違う端末・場所からのログイン帯。そのログイン中だけ出る。 */}
               <UnfamiliarLoginNotice />
               <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
+                {/* V8 の先読み（F①）。V8 のときだけ中の聞き耳が働く。 */}
+                <HoverPrefetch />
                 <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
                 <Workspace>
                   {guardedContent}
