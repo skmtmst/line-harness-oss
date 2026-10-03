@@ -37,6 +37,8 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConditionBuilder, { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { originInfoOf } from '../origin-labels'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ConversionCreateV8 from './conversion-create-v8'
 import { useAccount } from '@/contexts/account-context'
 import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
 import { formatNumber } from '@/lib/format'
@@ -370,6 +372,12 @@ export default function NewConversionPointPage() {
     selectedUsageKeys.size > 0
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
+
+  // ★V8-B 成果地点を作る（`j8p3yj`・競合 `cXqlS`）。
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return <ConversionCreateV8 />
+  }
 
   return (
     <CreatePage

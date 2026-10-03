@@ -72,6 +72,7 @@ shared-button-importer app/contents/vars/new/page.tsx
 shared-button-importer app/contents/vars/page.tsx
 shared-button-importer app/conversions/_components/conversion-dialogs.tsx
 shared-button-importer app/conversions/conversion-points-v8.tsx
+shared-button-importer app/conversions/new/conversion-create-v8.tsx
 shared-button-importer app/conversions/new/page.tsx
 shared-button-importer app/conversions/page.tsx
 shared-button-importer app/duplicates/duplicates-v8.tsx
