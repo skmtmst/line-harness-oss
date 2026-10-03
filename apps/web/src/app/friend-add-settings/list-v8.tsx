@@ -577,13 +577,14 @@ function FriendAddListV8Inner() {
       </span>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
+          {/* 列幅は板 `MRhef`：順 28・設定は伸び縮み・最初に送るもの 170・状態 80・直近7日 64・操作 28 */}
           <colgroup>
-            <col style={{ width: 72 }} />
+            <col style={{ width: 28 }} />
             <col />
-            <col style={{ width: 200 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 80 }} className={styles.recentCol} />
-            <col style={{ width: 44 }} />
+            <col style={{ width: 170 }} />
+            <col style={{ width: 80 }} />
+            <col style={{ width: 64 }} className={styles.recentCol} />
+            <col style={{ width: 28 }} />
           </colgroup>
           <thead>
             <tr>

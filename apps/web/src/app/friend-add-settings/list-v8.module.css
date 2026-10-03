@@ -54,35 +54,39 @@
   gap: 12px;
 }
 
+/* 数の帯のマス（板 `MRhef`「数 初回案内」：余白 16/20・間 8）。 */
 .kpi {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
-  padding: 14px 16px;
+  padding: 16px 20px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
 }
 
+/* 数の帯の題（板 `MRhef`「題」：12・500・ink・行18）。 */
 .kpiLabel {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--color-ink-secondary);
+  color: var(--color-ink);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .kpiLabel svg {
   color: var(--color-ink-faint);
 }
 
+/* 数の帯の数（板 `MRhef`：22・600）。 */
 .kpiValue {
   margin: 0;
   color: var(--color-ink);
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
 }
@@ -165,9 +169,12 @@
   flex: 1;
 }
 
+/* 探す欄の幅（板 `MRhef`「検索」：幅 220・高さは共有部品）。 */
 .searchWrap {
-  width: 240px;
-  min-width: 160px;
+  flex: 0 0 auto;
+  width: 220px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* 操作の失敗の帯。 */
@@ -213,21 +220,23 @@
   font-size: 13px;
 }
 
+/* 表の見出し（板 `MRhef`「表の見出し」：余白 12/24・文字 12/600/secondary・地 table-head）。 */
 .table th {
-  padding: 10px 12px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-faint);
-  font-size: 11px;
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
 }
 
+/* 表の行（板 `MRhef`「行 店頭QRの初回案内」ほか：余白 12/24・中央寄せ）。 */
 .table td {
-  padding: 12px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--color-hairline);
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .table tbody tr:last-child td {
