@@ -384,7 +384,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         </div>
         <Button type="button" variant="secondary" onClick={() => setHistoryOpen(true)}>版の履歴を見る</Button>
       </div>
-      <div data-design="Tabs" data-design-node="photo-tabs-v8">
+      <div data-design-node="photo-tabs-v8">
         <Tabs
           items={[
             { label: '審査待ち', count: countsReady ? counts.pending : undefined, current: view === 'list' && status === 'pending', onClick: () => changeTab('pending') },
@@ -576,7 +576,7 @@ function ReviewListV8(props: ReviewListV8Props) {
           見るだけの権限です。採用・見送りはできません。並べて見る／1枚ずつ大きく見る・探すは使えます。
         </NoteBar>
       ) : null}
-      <div className={styles.tools} data-design="ListControls" data-design-node="photo-controls-v8">
+      <div className={styles.tools} data-design-node="photo-controls-v8">
         <form
           className={styles.searchGrow}
           onSubmit={(event) => {
@@ -619,7 +619,7 @@ function ReviewListV8(props: ReviewListV8Props) {
         <ListState kind="empty" emptyPreset="readonly" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" />
       ) : (
         <div className={showRail ? styles.reviewGrid : undefined}>
-          <ul className={styles.cards} data-design="Cards" data-design-node="photo-cards-v8">
+          <ul className={styles.cards} data-design-node="photo-cards-v8">
             {photos.map((photo) => (
               <PhotoCardV8 key={text(photo.id)} photo={photo} {...props} />
             ))}
@@ -978,7 +978,7 @@ function PublicationsV8({
         <ListState kind="empty" emptyPreset="readonly" title="公式サイト掲載中の写真はありません" description="同意のある写真を掲載すると、使っている場所と表示回数がここに出ます。" />
       ) : (
         <div className={styles.reviewGrid}>
-          <section data-design="Table" data-design-node="photo-pubs-table-v8">
+          <section data-design-node="photo-pubs-table-v8">
             <div className={styles.tableWrap}>
               <DataTable className="@container">
                 <thead>

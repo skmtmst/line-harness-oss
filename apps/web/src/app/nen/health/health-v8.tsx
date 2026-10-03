@@ -95,7 +95,6 @@ export default function HealthPageV8({
       setSummaryStatus('error')
     })
     return () => { active = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- まとめの取り直しは回数で起こす
   }, [accountId, summaryPetId, retryNonce])
 
   const closeSummary = () => {

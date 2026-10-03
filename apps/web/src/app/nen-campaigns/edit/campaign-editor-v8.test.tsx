@@ -29,6 +29,9 @@ vi.mock('@/lib/api', () => ({
     nenCampaigns: { settings, overview },
     forms: { list: formsList },
     accountSettings: { getTestRecipientLoginUsers: loginUsers },
+    /* 差し込み道具が載るため。無いと未処理の失敗が漏れる。 */
+    friendFields: { list: async () => ({ success: true, data: [] }) },
+    commonVars: { list: async () => ({ success: true, data: [] }) },
   },
 }))
 
