@@ -169,6 +169,26 @@ describe('今日の予約', () => {
     expect(await marked.json()).toMatchObject({ status: 'no_show' });
   });
 
+  test('印を取り消すと確定へ戻り、印が消える', async () => {
+    seedBooking('booking-1', '2026-11-10T00:00:00.000Z', 'confirmed');
+    const { app, env } = makeApp(db, bookingRoute);
+    await app.request('/api/booking/admin/bookings/booking-1/visit?account_id=account-a', {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ kind: 'visited' }),
+    }, env);
+    const undone = await app.request('/api/booking/admin/bookings/booking-1/visit?account_id=account-a', {
+      method: 'DELETE',
+    }, env);
+    expect(undone.status).toBe(200);
+    expect(await undone.json()).toMatchObject({ status: 'confirmed' });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM booking_visit_marks`).get())
+      .toMatchObject({ n: 0 });
+    // 印が無ければ404。
+    const again = await app.request('/api/booking/admin/bookings/booking-1/visit?account_id=account-a', {
+      method: 'DELETE',
+    }, env);
+    expect(again.status).toBe(404);
+  });
+
   test('終わった予約には付けられない・日付が変なら400', async () => {
     seedBooking('booking-1', '2026-11-10T00:00:00.000Z', 'cancelled');
     const { app, env } = makeApp(db, bookingRoute);

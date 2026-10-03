@@ -3427,19 +3427,35 @@ booking.delete('/api/booking/admin/waitlist/:id', requireRole('owner', 'admin', 
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const id = c.req.param('id');
+  const entry = await c.env.DB
+    .prepare(`SELECT staff_id, starts_at, status FROM booking_waitlist
+      WHERE id = ? AND line_account_id = ?`)
+    .bind(id, accountId)
+    .first<{ staff_id: string; starts_at: string; status: string }>();
+  if (!entry) return c.json({ error: 'not_found' }, 404);
+  if (entry.status !== 'waiting' && entry.status !== 'invited') {
+    return c.json({ error: 'already_closed' }, 409);
+  }
+  const wasInvited = entry.status === 'invited';
   const updated = await c.env.DB
     .prepare(`UPDATE booking_waitlist SET status = 'cancelled',
                   updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-      WHERE id = ? AND line_account_id = ? AND status IN ('waiting', 'invited')`)
-    .bind(id, accountId)
+      WHERE id = ? AND status IN ('waiting', 'invited')`)
+    .bind(id)
     .run();
-  if ((updated.meta?.changes ?? 0) > 0) return c.json({ status: 'cancelled' });
-  const row = await c.env.DB
-    .prepare(`SELECT id FROM booking_waitlist WHERE id = ? AND line_account_id = ?`)
-    .bind(id, accountId)
-    .first<{ id: string }>();
-  if (!row) return c.json({ error: 'not_found' }, 404);
-  return c.json({ error: 'already_closed' }, 409);
+  if ((updated.meta?.changes ?? 0) === 0) return c.json({ error: 'already_closed' }, 409);
+  if (wasInvited) {
+    try {
+      await promoteBookingWaitlist(c.env.DB, {
+        lineAccountId: accountId,
+        staffId: entry.staff_id,
+        startsAt: entry.starts_at,
+      }, undefined, c.env.LIFF_URL ?? '');
+    } catch {
+      console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', waitlistId: id }));
+    }
+  }
+  return c.json({ status: 'cancelled' });
 });
 
 /**
@@ -3511,15 +3527,59 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
   const caller = await resolveSelfBookingCaller(c);
   if (!caller.ok) return c.json({ error: caller.error }, caller.status);
   const id = c.req.param('id');
+  const entry = await c.env.DB
+    .prepare(`SELECT staff_id, starts_at, status FROM booking_waitlist
+      WHERE id = ? AND line_account_id = ? AND friend_id = ?`)
+    .bind(id, caller.accountId, caller.friendId)
+    .first<{ staff_id: string; starts_at: string; status: string }>();
+  if (!entry || (entry.status !== 'waiting' && entry.status !== 'invited')) {
+    return c.json({ error: 'not_found' }, 404);
+  }
+  const wasInvited = entry.status === 'invited';
   const updated = await c.env.DB
     .prepare(`UPDATE booking_waitlist SET status = 'cancelled',
                   updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-      WHERE id = ? AND line_account_id = ? AND friend_id = ?
-        AND status IN ('waiting', 'invited')`)
-    .bind(id, caller.accountId, caller.friendId)
+      WHERE id = ? AND status IN ('waiting', 'invited')`)
+    .bind(id)
     .run();
-  if ((updated.meta?.changes ?? 0) > 0) return c.json({ status: 'cancelled' });
-  return c.json({ error: 'not_found' }, 404);
+  if ((updated.meta?.changes ?? 0) === 0) return c.json({ error: 'not_found' }, 404);
+  if (wasInvited) {
+    // 見送りで仮押さえが空いたら、次の人へすぐ回す。
+    try {
+      await promoteBookingWaitlist(c.env.DB, {
+        lineAccountId: caller.accountId,
+        staffId: entry.staff_id,
+        startsAt: entry.starts_at,
+      }, undefined, c.env.LIFF_URL ?? '');
+    } catch {
+      console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', waitlistId: id }));
+    }
+  }
+  return c.json({ status: 'cancelled' });
+});
+
+/**
+ * 自分のキャンセル待ち一覧（お客さまの予約画面用）。
+ * M6 の LIFF 画面が「空き枠入りで開く」「取り消しの確認」に使う。
+ */
+booking.get('/api/liff/booking/waitlist', async (c) => {
+  const caller = await resolveSelfBookingCaller(c);
+  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  const rows = await c.env.DB
+    .prepare(
+      `SELECT w.id, w.staff_id, w.menu_id, w.starts_at, w.status,
+              w.hold_minutes, w.invited_at, w.hold_expires_at, w.created_at,
+              m.name AS menu_name, s.display_name AS staff_name
+         FROM booking_waitlist w
+         INNER JOIN menus m ON m.id = w.menu_id
+         INNER JOIN staff s ON s.id = w.staff_id
+        WHERE w.line_account_id = ? AND w.friend_id = ?
+          AND w.status IN ('waiting', 'invited')
+        ORDER BY w.starts_at ASC, w.created_at ASC LIMIT 50`,
+    )
+    .bind(caller.accountId, caller.friendId)
+    .all();
+  return c.json({ waitlist: rows.results });
 });
 
 /**
@@ -3711,6 +3771,63 @@ booking.post('/api/booking/admin/bookings/:id/visit', requireRole('owner', 'admi
       marked_at: markedAt,
     },
   });
+});
+
+/**
+ * 今日の予約の印を取り消す（「取り消す」・知らせの「元に戻す」）。
+ *
+ * 最新の印を1件消す。印が状態を変えていた（来店→完了・来なかった→無断）
+ * ときは確定へ戻す。遅れるは印を消すだけ。
+ */
+booking.delete('/api/booking/admin/bookings/:id/visit', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const id = c.req.param('id');
+  const mark = await c.env.DB
+    .prepare(`SELECT id, kind FROM booking_visit_marks
+      WHERE booking_id = ? AND line_account_id = ?
+      ORDER BY marked_at DESC LIMIT 1`)
+    .bind(id, accountId)
+    .first<{ id: string; kind: string }>();
+  if (!mark) return c.json({ error: 'not_found' }, 404);
+  const row = await c.env.DB
+    .prepare(`SELECT status FROM bookings WHERE id = ? AND line_account_id = ?`)
+    .bind(id, accountId)
+    .first<{ status: BookingStatus }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+  let next = row.status;
+  if (mark.kind === 'visited' && row.status === 'completed') next = 'confirmed';
+  else if (mark.kind === 'no_show' && row.status === 'no_show') next = 'confirmed';
+  else if (mark.kind !== 'late') return c.json({ error: 'status_changed' }, 409);
+  if (next !== row.status) {
+    const updated = await c.env.DB
+      .prepare(`UPDATE bookings SET status = ?,
+                    updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ? AND status = ?`)
+      .bind(next, id, row.status)
+      .run();
+    if ((updated.meta?.changes ?? 0) === 0) {
+      return c.json({ error: 'concurrent_update' }, 409);
+    }
+  }
+  await c.env.DB
+    .prepare(`DELETE FROM booking_visit_marks WHERE id = ?`)
+    .bind(mark.id)
+    .run();
+  const me = c.get('staff') as { id?: string; name?: string } | undefined;
+  await recordBookingAudit(c.env.DB, {
+    bookingId: id,
+    lineAccountId: accountId,
+    action: 'visit_unmarked',
+    before: { status: row.status, visit_kind: mark.kind },
+    after: { status: next },
+    reason: 'today_visit_unmark',
+    actorType: 'staff',
+    actorId: typeof me?.id === 'string' ? me.id : null,
+    actorName: typeof me?.name === 'string' ? me.name : null,
+    occurredAt: new Date().toISOString(),
+  });
+  return c.json({ status: next });
 });
 
 booking.get('/api/booking/admin/reminder-preview', async (c) => {
