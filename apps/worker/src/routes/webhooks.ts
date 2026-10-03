@@ -37,6 +37,7 @@ import {
   getIntegrationApiTokenById,
   createIntegrationApiToken,
   revokeIntegrationApiToken,
+  reactivateIntegrationApiToken,
   rotateIntegrationApiToken,
   INTEGRATION_API_SCOPES,
   isOperationCapabilityStopped,
@@ -1957,6 +1958,34 @@ webhooks.post('/api/webhooks/api-tokens/:id/revoke', requireRole('owner'), async
     return c.json({ success: true, data: { id } });
   } catch (err) {
     console.error('POST /api/webhooks/api-tokens/:id/revoke error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webhooks.post('/api/webhooks/api-tokens/:id/reactivate', requireRole('owner'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const id = c.req.param('id');
+    // 止めた鍵を動かし直すのも鍵・トークンの操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.api_token')) {
+      return stepUpRequiredResponse(c, 'APIトークンの再開には本人確認が必要です');
+    }
+    const current = await getIntegrationApiTokenById(c.env.DB, id, lineAccountId);
+    if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+    if (current.revoked_at === null) {
+      return c.json({ success: false, error: 'このトークンは止められていません' }, 409);
+    }
+    const reactivated = await reactivateIntegrationApiToken(c.env.DB, id, lineAccountId);
+    if (!reactivated) return c.json({ success: false, error: 'Not found' }, 404);
+    auditLog(c, 'webhook.api_token.reactivate', { kind: 'integration_api_token', id }, { lineAccountId });
+    const row = await getIntegrationApiTokenById(c.env.DB, id, lineAccountId);
+    return c.json({ success: true, data: serializeApiToken(row!) });
+  } catch (err) {
+    console.error('POST /api/webhooks/api-tokens/:id/reactivate error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
