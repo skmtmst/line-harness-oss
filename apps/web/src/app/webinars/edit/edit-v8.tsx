@@ -13,10 +13,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import type { Webinar, WebinarCtaCard, WebinarEditor } from '@/lib/api'
+import { webinarApi, type Webinar, type WebinarCtaCard, type WebinarEditor } from '@/lib/api'
 import { STEPS, type StepKey } from './edit-steps'
 import VideoStepV8 from './video-v8'
 import CtaStepV8 from './cta-v8'
@@ -100,8 +101,32 @@ export default function EditV8Shell({ webinarId, pane, webinar, editor, registra
   const router = useRouter()
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [conflict, setConflict] = useState(false)
   const saveRef = useRef<(() => Promise<boolean>) | null>(null)
   const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy })
+
+  /*
+    ★V8-B 競合（板 `pvimJ`）。他の人が先に保存したとき（409）は、
+    このまま保存すると相手の変更が消える。帯で止めて、最新を
+    読み込んでから続ける。誰が・いつ保存したかは口が返さないので、
+    名前と時刻は出さない。
+  */
+  const reportConflict = useCallback(() => setConflict(true), [])
+  const reloadLatest = useCallback(async () => {
+    setBusy(true)
+    try {
+      const [webinarResponse, editorResponse] = await Promise.all([
+        webinarApi.get(webinarId),
+        webinarApi.editor(webinarId),
+      ])
+      onWebinarChange(webinarResponse.data)
+      onEditorChange(editorResponse.data)
+      setConflict(false)
+      setDirty(false)
+    } finally {
+      setBusy(false)
+    }
+  }, [webinarId, onWebinarChange, onEditorChange])
 
   const registerSave = useCallback((save: (() => Promise<boolean>) | null) => {
     saveRef.current = save
@@ -149,16 +174,25 @@ export default function EditV8Shell({ webinarId, pane, webinar, editor, registra
       <h1 className={styles.title}>{PANE_TITLE[pane]}</h1>
       <StepBand current={pane} />
       {PANE_DESC[pane] ? <p className={styles.stepDesc}>{PANE_DESC[pane]}</p> : null}
+      {conflict ? (
+        <Notice tone="warn">
+          <p className="font-bold">他の人がこのウェビナーを保存しました</p>
+          <p className="mt-1 text-xs">このまま保存すると、その人の変更が消えます。最新を読み込んでから続けてください。</p>
+          <span className={styles.conflictActions}>
+            <Button disabled={busy} onClick={() => void reloadLatest()} busy={busy} busyLabel="読み込み中…">最新を読み込んで続ける</Button>
+          </span>
+        </Notice>
+      ) : null}
       <div className={styles.body}>
         <Suspense fallback={<ListState kind="loading" />}>
           {pane === 'video' ? (
-            <VideoStepV8 webinar={webinar} editor={editor} onWebinarChange={onWebinarChange} onEditorChange={onEditorChange} onDirtyChange={setDirty} registerSave={registerSave} />
+            <VideoStepV8 webinar={webinar} editor={editor} onWebinarChange={onWebinarChange} onEditorChange={onEditorChange} onDirtyChange={setDirty} registerSave={registerSave} onConflict={reportConflict} />
           ) : pane === 'cta' ? (
-            <CtaStepV8 webinar={webinar} editor={editor} accountId={webinar.accountId} onEditorChange={onEditorChange} onCtasReport={onCtasReport} onDirtyChange={setDirty} registerSave={registerSave} />
+            <CtaStepV8 webinar={webinar} editor={editor} accountId={webinar.accountId} onEditorChange={onEditorChange} onCtasReport={onCtasReport} onDirtyChange={setDirty} registerSave={registerSave} onConflict={reportConflict} />
           ) : pane === 'notifications' ? (
-            <NotificationsStepV8 webinarId={webinarId} webinarTitle={webinar.title} editor={editor} onEditorChange={onEditorChange} onDirtyChange={setDirty} registerSave={registerSave} />
+            <NotificationsStepV8 webinarId={webinarId} webinarTitle={webinar.title} editor={editor} onEditorChange={onEditorChange} onDirtyChange={setDirty} registerSave={registerSave} onConflict={reportConflict} />
           ) : pane === 'review' ? (
-            <ReviewStepV8 webinar={webinar} editor={editor} ctaCount={ctaCount} publicUrl={publicUrl} canOpenPublicPage={webinar.status === 'active' && publicUrl !== null} publicPageReason={publicPageReason} onEditorChange={onEditorChange} onBack={(key) => router.push(`/webinars/edit?id=${encodeURIComponent(webinarId)}&pane=${key}`)} onPublished={disarm} />
+            <ReviewStepV8 webinar={webinar} editor={editor} ctaCount={ctaCount} publicUrl={publicUrl} canOpenPublicPage={webinar.status === 'active' && publicUrl !== null} publicPageReason={publicPageReason} onEditorChange={onEditorChange} onBack={(key) => router.push(`/webinars/edit?id=${encodeURIComponent(webinarId)}&pane=${key}`)} onPublished={disarm} onConflict={reportConflict} />
           ) : null}
         </Suspense>
       </div>

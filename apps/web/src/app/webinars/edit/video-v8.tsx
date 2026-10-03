@@ -24,7 +24,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { RowActions } from '@/components/shared/row-actions'
 import StatusBadge from '@/components/shared/status-badge'
-import { api, webinarApi, type Webinar, type WebinarEditor, type WebinarScheduleRule, type WebinarVideoAsset } from '@/lib/api'
+import { ApiError, api, webinarApi, type Webinar, type WebinarEditor, type WebinarScheduleRule, type WebinarVideoAsset } from '@/lib/api'
 import VideoStages from './video-stages'
 import styles from './video-v8.module.css'
 
@@ -53,13 +53,14 @@ function ruleLabel(rule: WebinarScheduleRule): { when: string; note: string } {
   return { when: '単発', note: rule.at ?? '' }
 }
 
-export default function VideoStepV8({ webinar: initial, editor, onWebinarChange, onEditorChange, onDirtyChange, registerSave }: {
+export default function VideoStepV8({ webinar: initial, editor, onWebinarChange, onEditorChange, onDirtyChange, registerSave, onConflict }: {
   webinar: Webinar
   editor: WebinarEditor
   onWebinarChange: (next: Webinar) => void
   onEditorChange: (next: WebinarEditor) => void
   onDirtyChange: (dirty: boolean) => void
   registerSave: (save: (() => Promise<boolean>) | null) => void
+  onConflict: () => void
 }) {
   const [webinar, setWebinar] = useState(initial)
   useEffect(() => setWebinar(initial), [initial])
@@ -91,13 +92,15 @@ export default function VideoStepV8({ webinar: initial, editor, onWebinarChange,
       onEditorChange(nextEditor.data)
       setBaseline(JSON.stringify({ startsAt, endsAt, missingPolicy, rules }))
       return true
-    } catch {
+    } catch (cause) {
+      /* 他の人が先に保存したときは競合の帯を出す（板 `pvimJ`）。 */
+      if (cause instanceof ApiError && cause.status === 409) onConflict()
       setSaveError('保存できませんでした。入力を見直してください。')
       return false
     } finally {
       setSaving(false)
     }
-  }, [webinar.id, startsAt, endsAt, rules, editor.version, missingPolicy, onWebinarChange, onEditorChange])
+  }, [webinar.id, startsAt, endsAt, rules, editor.version, missingPolicy, onWebinarChange, onEditorChange, onConflict])
 
   useEffect(() => {
     registerSave(dirty ? save : null)

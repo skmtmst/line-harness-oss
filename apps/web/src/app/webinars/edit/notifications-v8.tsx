@@ -17,7 +17,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
-import { webinarApi, type WebinarAction, type WebinarEditor, type WebinarNotificationOverview, type WebinarNotificationSettings } from '@/lib/api'
+import { ApiError, webinarApi, type WebinarAction, type WebinarEditor, type WebinarNotificationOverview, type WebinarNotificationSettings } from '@/lib/api'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { notificationPreview } from './preview-body'
 import styles from './notifications-v8.module.css'
@@ -54,13 +54,14 @@ function actionSummary(action: WebinarAction): string {
   return base
 }
 
-export default function NotificationsStepV8({ webinarId, webinarTitle, editor, onEditorChange, onDirtyChange, registerSave }: {
+export default function NotificationsStepV8({ webinarId, webinarTitle, editor, onEditorChange, onDirtyChange, registerSave, onConflict }: {
   webinarId: string
   webinarTitle: string
   editor: WebinarEditor
   onEditorChange: (editor: WebinarEditor) => void
   onDirtyChange: (dirty: boolean) => void
   registerSave: (save: (() => Promise<boolean>) | null) => void
+  onConflict: () => void
 }) {
   const [settings, setSettings] = useState<WebinarNotificationSettings | null>(null)
   const [overview, setOverview] = useState<WebinarNotificationOverview | null>(null)
@@ -134,10 +135,12 @@ export default function NotificationsStepV8({ webinarId, webinarTitle, editor, o
       setMessage('通知の設定を保存しました')
       return true
     } catch (cause) {
+      /* 他の人が先に保存したときは競合の帯を出す（板 `pvimJ`）。 */
+      if (cause instanceof ApiError && cause.status === 409) onConflict()
       setMessage(webinarErrorText(cause, '保存できませんでした。開き直して試してください。'))
       return false
     }
-  }, [dirty, settingsDirty, policyDirty, settings, templateBody, missingPolicy, webinarId, editor.version, onEditorChange])
+  }, [dirty, settingsDirty, policyDirty, settings, templateBody, missingPolicy, webinarId, editor.version, onEditorChange, onConflict])
 
   useEffect(() => {
     registerSave(dirty ? save : null)

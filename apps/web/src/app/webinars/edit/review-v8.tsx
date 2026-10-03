@@ -15,7 +15,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
-import { webinarApi, type Webinar, type WebinarEditor, type WebinarPublishValidation } from '@/lib/api'
+import { ApiError, webinarApi, type Webinar, type WebinarEditor, type WebinarPublishValidation } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import styles from './review-v8.module.css'
@@ -30,7 +30,7 @@ function formatTestedAt(value: string | null | undefined): string {
   }
 }
 
-export default function ReviewStepV8({ webinar, editor, ctaCount, publicUrl, canOpenPublicPage, publicPageReason, onEditorChange, onBack, onPublished }: {
+export default function ReviewStepV8({ webinar, editor, ctaCount, publicUrl, canOpenPublicPage, publicPageReason, onEditorChange, onBack, onPublished, onConflict }: {
   webinar: Webinar
   editor: WebinarEditor
   ctaCount: number
@@ -40,6 +40,7 @@ export default function ReviewStepV8({ webinar, editor, ctaCount, publicUrl, can
   onEditorChange: (editor: WebinarEditor) => void
   onBack: (key: 'basic' | 'video' | 'cta' | 'notifications') => void
   onPublished: () => void
+  onConflict: () => void
 }) {
   const [validation, setValidation] = useState<WebinarPublishValidation | null>(null)
   const [validationState, setValidationState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -138,6 +139,8 @@ export default function ReviewStepV8({ webinar, editor, ctaCount, publicUrl, can
       onPublished()
       window.location.assign(`/webinars/published?id=${encodeURIComponent(webinar.id)}`)
     } catch (cause) {
+      /* 他の人が先に保存したときは競合の帯を出す（板 `pvimJ`）。 */
+      if (cause instanceof ApiError && cause.status === 409) onConflict()
       setPublishError(webinarErrorText(cause, '公開できませんでした'))
       setPublishing(false)
     }

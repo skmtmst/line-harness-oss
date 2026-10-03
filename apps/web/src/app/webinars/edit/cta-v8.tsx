@@ -40,7 +40,7 @@ function emptyCard(): WebinarCtaCard {
   return { atSeconds: 0, kind: 'form', title: '', body: null, buttonLabel: '', autoOpen: false, formId: null, url: null }
 }
 
-export default function CtaStepV8({ webinar, editor, accountId, onEditorChange, onCtasReport, onDirtyChange, registerSave }: {
+export default function CtaStepV8({ webinar, editor, accountId, onEditorChange, onCtasReport, onDirtyChange, registerSave, onConflict }: {
   webinar: Webinar
   editor: WebinarEditor
   accountId: string | null
@@ -48,6 +48,7 @@ export default function CtaStepV8({ webinar, editor, accountId, onEditorChange, 
   onCtasReport?: (ctas: WebinarCtaCard[] | null) => void
   onDirtyChange: (dirty: boolean) => void
   registerSave: (save: (() => Promise<boolean>) | null) => void
+  onConflict: () => void
 }) {
   const webinarId = webinar.id
   const durationSeconds = webinar.durationSeconds
@@ -108,10 +109,12 @@ export default function CtaStepV8({ webinar, editor, accountId, onEditorChange, 
       setMessage(`${sorted.length}件保存しました`)
       return true
     } catch (err) {
+      /* 他の人が先に保存したときは競合の帯を出す（板 `pvimJ`）。 */
+      if (err instanceof ApiError && err.status === 409) onConflict()
       setMessage(`保存に失敗しました: ${(err as Error).message}`)
       return false
     }
-  }, [ctas, durationSeconds, webinarId, onCtasReport])
+  }, [ctas, durationSeconds, webinarId, onCtasReport, onConflict])
 
   useEffect(() => {
     registerSave(dirty ? save : null)
@@ -188,6 +191,8 @@ export default function CtaStepV8({ webinar, editor, accountId, onEditorChange, 
       if (cause instanceof ApiError && (cause.code === 'form_inactive_or_missing' || cause.code === 'form_account_mismatch')) {
         loadForms()
       }
+      /* 他の人が先に保存したときは競合の帯を出す（板 `pvimJ`）。 */
+      if (cause instanceof ApiError && cause.status === 409) onConflict()
       setFormError(webinarErrorText(cause, '申込フォームを保存できませんでした。開き直して試してください。'))
     } finally {
       setSavingForm(false)
