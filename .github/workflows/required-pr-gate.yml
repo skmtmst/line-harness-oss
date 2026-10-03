@@ -644,6 +644,13 @@ jobs:
       - name: No layout breaks at 1152, 1440 and 1920 (v7 and v8)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
+      # 速さ予算（2026-10-04 オーナー採用「1」）。主要10画面を V8 で開き、
+      # 表示1秒・反応100ms・長い作業50ms・JSラチェットを見る。超えたら落とす。
+      # 初回は絶対値だけで判定し、CIの実測を --update-baseline で表へ記入後に
+      # 10% 則が効く。道具の対照は speed-budget.mjs の頭に書いた。
+      - name: Speed budget on V8 (10 screens on a real browser)
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/speed-budget.mjs http://127.0.0.1:4310 /tmp/v8-guard/speed.json
       - name: v7 screens are pixel-identical to the base
         if: steps.scope.outputs.diff == 'true'
         run: |
