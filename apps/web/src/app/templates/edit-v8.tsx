@@ -23,6 +23,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import LinePreview from '@/components/shared/line-preview'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { notifyToast } from '@/components/shared/toast'
 import { Field } from '@/components/shared/form-controls'
 import FlexPreviewComponent from '@/components/flex-preview'
 import { useAccount } from '@/contexts/account-context'
@@ -257,7 +258,10 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
         return
       }
       const ok = await publishNow(templateId, detail.data)
-      if (ok) router.push('/templates')
+      if (ok) {
+        notifyToast('公開しました')
+        router.push('/templates')
+      }
     } finally {
       setPublishing(false)
     }
@@ -296,7 +300,10 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
 
   const onSaveDraft = async () => {
     const savedId = await saveNow()
-    if (savedId) router.push('/templates')
+    if (savedId) {
+      notifyToast('下書きを保存しました')
+      router.push('/templates')
+    }
   }
 
   const onPublish = async () => {
@@ -501,6 +508,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
             const ok = await publishNow(publishCheck.id)
             if (ok) {
               setPublishCheck(null)
+              notifyToast('公開しました')
               router.push('/templates')
             }
           } finally {
