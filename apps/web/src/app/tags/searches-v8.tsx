@@ -15,6 +15,10 @@ import type { SavedSearch, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import InlineEdit from '@/components/shared/inline-edit'
+import { withViewTransition } from '@/components/shared/view-transition'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
@@ -53,6 +57,12 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /*
+   * 行の詳細パネル（C①）。URL に ?search=<id> を残す。
+   * 行を押すとつながる移り変わり（D・E）で右から出て、↑↓で前・次へ。
+   */
+  const [activeSearchId, setActiveSearchId] = useDetailPanelUrl('search')
+  const openSearchDetail = (id: string) => withViewTransition(() => setActiveSearchId(id))
   const loadSequence = useRef(0)
 
   const load = useCallback(async () => {
@@ -172,7 +182,23 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
   const pages = Math.max(1, Math.ceil(filteredList.length / pageSize))
   const currentPage = Math.min(page, pages)
   const visible = filteredList.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  /* 詳細パネルに出す行（一覧全体から探すので、URL直打ちでも開く）。前・次は見えている行の中。 */
+  const activeSearch = items.find((item) => item.id === activeSearchId) ?? null
+  const activeSearchIndex = visible.findIndex((item) => item.id === activeSearchId)
   useEffect(() => setPage(1), [query, usageFilter, matchFilter, pageSize])
+
+  /*
+   * 右クリックのメニュー（C③）。行の「…」と同じ操作
+   * （友だち一覧へ・編集・削除する）。押せない理由もそのまま渡す。
+   */
+  const searchContextItems = (search: SavedSearch): ContextMenuItem[] =>
+    rowMenuItems(search).map((item) => ({
+      id: item.id,
+      label: item.label,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      onSelect: () => item.onSelect(),
+    }))
 
   const rowMenuItems = (search: SavedSearch): ActionMenuItem[] => {
     const readonly = !canEdit
@@ -361,12 +387,12 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                         key={search.id}
                         className={styles.rowClick}
                         tabIndex={0}
-                        onClick={() => { if (editHref) router.push(editHref) }}
+                        onClick={() => openSearchDetail(search.id)}
                         onKeyDown={(event) => {
-                          if (event.target !== event.currentTarget || !editHref) return
+                          if (event.target !== event.currentTarget) return
                           if (event.key === 'Enter') {
                             event.preventDefault()
-                            router.push(editHref)
+                            openSearchDetail(search.id)
                           }
                         }}
                       >
@@ -383,6 +409,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                           />
                         </td>
                         <td>
+                          <ContextMenu label={`保存した検索「${search.name}」の操作`} items={searchContextItems(search)}>
                           <div className={styles.nameRow}>
                             {editHref ? (
                               <Link
@@ -404,6 +431,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                           <p className={styles.cellSub} title={`${search.isShared ? '全員' : '自分だけ'}・${selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・ライブ参照・v${search.revision ?? 1}`}>
                             {search.isShared ? '全員' : '自分だけ'}・{selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・v{search.revision ?? 1}
                           </p>
+                          </ContextMenu>
                         </td>
                         <td className={styles.cellMuted}>
                           {all.length > 0 ? <span className={styles.cellTruncate} title={all.join('・')}>{all.join('・')}・AND</span> : null}
@@ -487,6 +515,84 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
           </>
         )}
       </div>
+
+      {/* 行の詳細パネル（C①）。名前はその場で直せる（C②）。確認の窓（削除）は残す。 */}
+      <DetailPanel
+        open={activeSearch !== null}
+        title={activeSearch?.name ?? ''}
+        description={activeSearch ? `${activeSearch.isShared ? '全員' : '自分だけ'}・v${activeSearch.revision ?? 1}` : undefined}
+        onClose={() => setActiveSearchId(null)}
+        hasPrev={activeSearchIndex > 0}
+        hasNext={activeSearchIndex >= 0 && activeSearchIndex < visible.length - 1}
+        onPrev={activeSearchIndex > 0 ? () => setActiveSearchId(visible[activeSearchIndex - 1].id) : undefined}
+        onNext={activeSearchIndex >= 0 && activeSearchIndex < visible.length - 1 ? () => setActiveSearchId(visible[activeSearchIndex + 1].id) : undefined}
+        footer={activeSearch?.lineAccountId ? (
+          <>
+            <Button href={`/friends?savedSearch=${activeSearch.id}`}>友だち一覧へ</Button>
+            <Button href={`/tags/searches/edit?id=${encodeURIComponent(activeSearch.id)}`}>編集する</Button>
+          </>
+        ) : undefined}
+      >
+        {activeSearch ? (
+          <dl>
+            <div>
+              <dt className={styles.cellMuted}>検索名</dt>
+              <dd>
+                <InlineEdit
+                  label="検索名"
+                  value={activeSearch.name}
+                  maxLength={60}
+                  disabled={!canEdit || !activeSearch.lineAccountId}
+                  onSave={async (next) => {
+                    if (!activeSearch.lineAccountId) throw new Error('no account')
+                    const res = await api.savedSearches.update(activeSearch.id, activeSearch.lineAccountId, { name: next })
+                    if (!res.success) throw new Error(res.error)
+                    void load()
+                  }}
+                />
+              </dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>条件</dt>
+              <dd className={styles.cellText}>
+                {(() => {
+                  const { all, any, note } = splitConditions(activeSearch.conditions, tags, conditionLabels)
+                  const parts = [
+                    ...(all.length > 0 ? [`${all.join('・')}・AND`] : []),
+                    ...(any.length > 0 ? [`いずれか1つ以上：${any.join('・')}・OR`] : []),
+                    ...(note ? [note] : []),
+                  ]
+                  return parts.length > 0 ? parts.join('／') : '指定なし'
+                })()}
+              </dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>人数</dt>
+              <dd>
+                {activeSearch.lineAccountId && activeSearch.matchCount !== null && activeSearch.matchCount !== undefined ? (
+                  <Link href={`/friends?savedSearch=${activeSearch.id}`} className={styles.countLink}>
+                    {formatNumber(activeSearch.matchCount)}人
+                  </Link>
+                ) : (
+                  <span className={styles.cellMuted}>—</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>使用先</dt>
+              <dd className={styles.cellText}>
+                {activeSearch.usedIn === undefined ? '—' : activeSearch.usedIn.length === 0 ? '未使用' : activeSearch.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}
+              </dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>更新者・日時</dt>
+              <dd className={styles.cellText}>
+                {activeSearch.updatedBy ?? activeSearch.createdBy ?? '—'}・{formatDateTime(activeSearch.updatedAt ?? activeSearch.createdAt)}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+      </DetailPanel>
 
       <ConfirmDialog
         open={pendingDelete !== null}
