@@ -1,0 +1,200 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B 外部連携の API 接続（板 `ralAc`）。
+ * 鍵の発行・一覧（入れ替える＋…）・発行直後の1回表示。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+  min-width: 0;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.createRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.createNote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  margin-left: auto;
+}
+
+.createBox {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.createTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  max-width: 480px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 10px);
+  padding: 0 12px;
+  height: 36px;
+  font-size: 13px;
+  color: var(--color-ink);
+  background: var(--color-canvas);
+}
+
+.fieldError {
+  margin: 4px 0 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.checkRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.issuedBox {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 20px 24px;
+}
+
+.issuedTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.issuedNote {
+  margin: 4px 0 12px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+.issuedToken {
+  border-radius: var(--radius-control, 10px);
+  background: var(--color-canvas-sunken);
+  padding: 12px 16px;
+  font-family: monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  color: var(--color-ink);
+  user-select: all;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table thead th {
+  background: var(--color-canvas-sunken);
+  border-bottom: 1px solid var(--color-hairline);
+  padding: 13px 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table tbody td {
+  border-bottom: 1px solid var(--color-hairline);
+  padding: 9px 20px;
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.nameCell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.dimCell {
+  white-space: nowrap;
+  color: var(--color-ink-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.opsCell {
+  white-space: nowrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-pill, 999px);
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pillActive {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.footNote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+@container (max-width: 1100px) {
+  .createNote {
+    margin-left: 0;
+  }
+}
