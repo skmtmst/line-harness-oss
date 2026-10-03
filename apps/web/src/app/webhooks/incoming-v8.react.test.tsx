@@ -113,3 +113,23 @@ test('v7 では従来の受け取るタブが出て gW0F2 は出ない', async (
   await renderPage()
   expect(host.querySelector('[data-design-node="gW0F2"]')).toBeNull()
 })
+
+test('v8 の読み込み中は受け取り口の形の骨組みが出て「読み込み中」の文字は無い', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  vi.useFakeTimers()
+  try {
+    vi.stubGlobal('fetch', () => new Promise<Response>(() => {}))
+    await act(async () => {
+      root.render(<WebhooksPage />)
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(350)
+    })
+    const board = host.querySelector('[data-design-node="gW0F2"]')
+    expect(board?.querySelector('[aria-busy="true"]')).not.toBeNull()
+    expect(board?.querySelectorAll('[data-skeleton]').length).toBeGreaterThan(0)
+    expect(board?.textContent).not.toContain('読み込み中')
+  } finally {
+    vi.useRealTimers()
+  }
+})

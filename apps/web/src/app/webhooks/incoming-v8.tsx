@@ -26,6 +26,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -652,7 +653,23 @@ function IncomingV8Inner() {
             </form>
           ) : null}
           <p className={styles.inletListLabel}>受け取り口</p>
-          {incomingStatus === 'loading' ? <ListState kind="loading" title="受け取り口を読み込んでいます" /> : null}
+          {incomingStatus === 'loading' ? (
+            <div aria-busy="true" aria-label="受け取り口を読み込んでいます">
+              <DelayedSkeleton
+                loading
+                skeleton={(
+                  <div aria-hidden="true">
+                    {[0, 1, 2, 3].map((row) => (
+                      <div key={row} className={styles.inletItem}>
+                        <Skeleton height={14} width="55%" />
+                        <Skeleton className="mt-1" height={11} width="35%" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              />
+            </div>
+          ) : null}
           {incomingStatus === 'error' ? (
             <ListState
               kind="error"
