@@ -50,6 +50,8 @@ export interface AvailabilityResponse {
 export interface LiffBookingSettings {
   liff_date_view: 'list' | 'calendar';
   booking_window_days: number;
+  /** 予約のルール「お店が承認してから確定する」。無いときは承認あり扱い。 */
+  approval_mode?: 'automatic' | 'manual';
 }
 
 export interface BookingHistoryItem {
