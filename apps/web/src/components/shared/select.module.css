@@ -91,6 +91,27 @@
   background: var(--color-canvas);
 }
 
+/*
+ * ★V8 仕上げ（M10）：選ぶ欄の候補も少し下から（200ms ease-out）。
+ * 開く速さは窓・メニューと同じにする。
+ */
+[data-theme='v8'] .listbox {
+  animation: select-v8-enter var(--motion-base) var(--motion-ease-out);
+  transform-origin: top center;
+}
+
+@keyframes select-v8-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .option {
   display: flex;
   width: 100%;
