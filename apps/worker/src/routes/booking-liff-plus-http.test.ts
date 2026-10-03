@@ -122,7 +122,7 @@ beforeEach(() => {
   db = asD1(sqlite);
   selfApp = new Hono<Env>();
   selfApp.route('/', booking);
-  env = { DB: db };
+  env = { DB: db } as Env['Bindings'];
   // idToken 検証は sub を U-a で返す。本人=花子（friend-a）になる。
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString();
