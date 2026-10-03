@@ -1119,9 +1119,9 @@ function FormEditInner() {
                     削除する
                   </button>
 
-                  <div className="relative">
+                  <div className="relative" data-design-node="WOPjZ">
                     <Button variant="primary" className="px-3 py-1.5 text-xs font-medium border-0 h-auto whitespace-normal" ref={addMenuButtonRef} onClick={() => setShowAddMenu((v) => !v)} aria-expanded={showAddMenu} aria-haspopup="menu">
-                      ＋ ブロックを追加する（12種）
+                      ＋ ブロックを追加する（14種）
                     </Button>
                     <ActionMenu
                       open={showAddMenu}

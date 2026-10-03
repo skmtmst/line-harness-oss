@@ -39,6 +39,8 @@ export const BLOCK_MENU: { kind: string; type?: FormInputType; label: string; gr
   { kind: 'input', type: 'file', label: 'ファイル', group: '入力' },
   { kind: 'input', type: 'date', label: '日付', group: '入力' },
   { kind: 'input', type: 'prefecture', label: '都道府県', group: '入力' },
+  { kind: 'input', type: 'rating', label: '5段階評価', group: '入力' },
+  { kind: 'input', type: 'address', label: '住所', group: '入力' },
 ]
 
 const INPUT_TYPE_LABEL: Record<FormInputType, string> = {
