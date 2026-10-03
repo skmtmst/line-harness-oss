@@ -17,7 +17,7 @@
  * - 届いたらすることの「することを足す」：足す口が無いので出さない。
  * - 届いたつもりで試すの見本：最後に届いた見本が無いときは空のまま。
  */
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { api, ApiError, type IncomingWebhookDetail as DetailType, type IncomingWebhookTestResult, type IncomingWebhookUnmatchedItem, type OutgoingWebhookOverview } from '@/lib/api'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -27,6 +27,7 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -189,7 +190,14 @@ function IncomingV8Inner() {
   const canResolveUnmatched = staffRole === null || staffRole === 'owner' || staffRole === 'admin'
   const manageReason = '統括だけが変更できます。必要なときは統括に頼んでください。'
 
-  const selected = incoming.find((item) => item.id === selectedId) ?? incoming[0] ?? null
+  // B. 押した瞬間に札とスイッチを変えて裏で保存する。
+  const [optimisticActive, setOptimisticActive] = useState<Record<string, boolean>>({})
+  const displayed = useMemo(() => (
+    incoming.map((item) => (
+      optimisticActive[item.id] === undefined ? item : { ...item, isActive: optimisticActive[item.id] }
+    ))
+  ), [incoming, optimisticActive])
+  const selected = displayed.find((item) => item.id === selectedId) ?? displayed[0] ?? null
   const selectedDetailId = selected?.id ?? null
   const endpointUrl = (id: string) => `${API_BASE}/api/webhooks/incoming/${id}/receive`
 
@@ -341,25 +349,45 @@ function IncomingV8Inner() {
       return
     }
     beginToggle(key)
+    // 先に札とスイッチを変える。裏の保存が終わるまでこの値を出し続ける。
+    const name = incoming.find((item) => item.id === id)?.name ?? 'この受け取り口'
+    setOptimisticActive((current) => ({ ...current, [id]: !currentActive }))
+    const clearOptimistic = () => {
+      setOptimisticActive((current) => {
+        if (current[id] === undefined) return current
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
+    }
+    const failMessage = (reason: string) => {
+      clearOptimistic()
+      setToggleFailures((current) => ({ ...current, [key]: reason }))
+      notifyToast(reason, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void handleToggle(id, currentActive) },
+      })
+    }
     try {
       const res = await api.webhooks.incoming.update(id, requestAccountId, { isActive: !currentActive })
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
-        const name = incoming.find((item) => item.id === id)?.name ?? 'この受け取り口'
-        setToggleFailures((current) => ({ ...current, [key]: `「${name}」は切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。` }))
+        failMessage(`「${name}」は切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。`)
         return
       }
       if (selectedAccountIdRef.current === requestAccountId) await load()
+      clearOptimistic()
+      notifyToast(`「${name}」を${!currentActive ? '動かしました' : '止めました'}。`, {
+        actionLabel: '元に戻す',
+        onAction: () => { void handleToggle(id, !currentActive) },
+      })
     } catch (caught) {
       if (selectedAccountIdRef.current !== requestAccountId) return
       const forbidden = caught instanceof ApiError && caught.status === 403
-      const name = incoming.find((item) => item.id === id)?.name ?? 'この受け取り口'
-      setToggleFailures((current) => ({
-        ...current,
-        [key]: forbidden
-          ? `「${name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
-          : `「${name}」は切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。`,
-      }))
+      failMessage(forbidden
+        ? `「${name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
+        : `「${name}」は切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。`)
     } finally {
       endToggle(key)
     }
@@ -680,7 +708,7 @@ function IncomingV8Inner() {
           {readyCounts && incoming.length === 0 ? (
             <ListState kind="empty" title="まだ受け取り口がありません" />
           ) : null}
-          {incoming.map((item) => {
+          {displayed.map((item) => {
             const isSelected = selected?.id === item.id
             return (
               <button
