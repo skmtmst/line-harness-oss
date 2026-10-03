@@ -563,19 +563,19 @@
     "unresolved-classname": 48
   },
   "app/tags/marks-v8.tsx": {
-    "unresolved-classname": 51
+    "unresolved-classname": 60
   },
   "app/tags/search-editor-v8.tsx": {
     "unresolved-classname": 53
   },
   "app/tags/searches-v8.tsx": {
-    "unresolved-classname": 59
+    "unresolved-classname": 69
   },
   "app/tags/tag-editor-v8.tsx": {
     "unresolved-classname": 113
   },
   "app/tags/tags-tab-v8.tsx": {
-    "unresolved-classname": 67
+    "unresolved-classname": 79
   },
   "app/templates/asset-editor-v8.tsx": {
     "unresolved-classname": 63
