@@ -159,28 +159,31 @@ export default function PetsTab({
               {data.items.map((pet) => <PetCard key={pet.id} pet={pet} canEdit={canEdit} onEdit={() => setEditing(pet)} />)}
             </ul>
             <div className="hidden md:block">
-            <DataTable>
+            {/*
+              R618: 1152px・1440px・1920pxの全幅で横スクロールが出ていた。
+              原因は表全体の幅ではなく、操作列の中身（枠付きボタン2つ＋
+              「⋯」の場所取り約174px）が w-40（160px）に収まらずセルから
+              はみ出し、外枠の scrollWidth を押し広げていたこと。
+              操作列を w-52 に広げ、見出しが収まらない体重の更新を w-24
+              にする。かわりにペット・飼い主を少し細くし（省略＋titleは
+              そのまま）、狭い容器では運動量を畳む（今日の目安に反映済み・
+              スマホのカードにもともと無い）。幅は members-tab と同じく
+              見出しと行の両方に書く。表の出し分け自体（LAY-17）は変えない。
+            */}
+            <DataTable className="@container">
               <thead>
                 <TableHeadRow>
-                  {/*
-                    1440pxで表がはみ出さないよう、固定幅の合計を容器（1103px）
-                    に収める。操作列 w-40 は LAY-17 の契約で保つ。
-                    伸ばすのは文字の主食の列だけ（全ルート監査、2026-09-25）。
-                  */}
-                  <Th className="w-48">ペット</Th>
-                  <Th className="w-36">飼い主</Th>
+                  <Th className="w-44">ペット</Th>
+                  <Th className="w-32">飼い主</Th>
                   <Th className="w-20">年齢</Th>
                   <Th className="w-20" align="right">体重</Th>
                   <Th className="w-28">今日の目安</Th>
                   <Th className="w-24">避妊去勢</Th>
-                  <Th className="w-20">運動量</Th>
+                  <Th className="cq-hide-below-1120 w-20">運動量</Th>
                   <Th>主食</Th>
-                  <Th className="w-20">体重の更新</Th>
-                  {/*
-                    「飼い主」「編集」の枠付きボタンが横に並べて入る幅を
-                    先に確保する（LAY-17/18）。
-                  */}
-                  <Th className="w-40" align="right"><span className="sr-only">操作</span></Th>
+                  <Th className="w-24">体重の更新</Th>
+                  {/* LAY-18: 「飼い主」「編集」の枠付きボタン＋場所取りが入る幅。 */}
+                  <Th className="w-52" align="right"><span className="sr-only">操作</span></Th>
                 </TableHeadRow>
               </thead>
               <tbody>
@@ -202,7 +205,7 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
   const kind = petAnimalTypeLabel(pet.animalType)
   return (
     <Tr>
-      <Td>
+      <Td className="w-44">
         <span className="flex items-center gap-3">
           {pet.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- お客様がマイページで登録した写真
@@ -216,13 +219,13 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
           </span>
         </span>
       </Td>
-      <Td>
+      <Td className="w-32">
         <span className="block truncate text-label text-ink" title={pet.owner.name}>{pet.owner.name || '（名前なし）'}</span>
         <span className="block truncate text-micro text-ink-faint">{pet.owner.customerId ? `EC会員 ${pet.owner.customerId}` : 'EC未連携'}</span>
       </Td>
-      <Td><span className="text-label text-ink-secondary">{pet.ageLabel}</span></Td>
-      <Td align="right"><span className="text-label tabular-nums text-ink">{pet.weightKg == null ? '—' : `${pet.weightKg}kg`}</span></Td>
-      <Td>
+      <Td className="w-20"><span className="text-label text-ink-secondary">{pet.ageLabel}</span></Td>
+      <Td align="right" className="w-20"><span className="text-label tabular-nums text-ink">{pet.weightKg == null ? '—' : `${pet.weightKg}kg`}</span></Td>
+      <Td className="w-28">
         {pet.feeding?.dailyGrams != null ? (
           <>
             <span className="block text-label font-semibold tabular-nums text-ink">{pet.feeding.dailyGrams}g／日</span>
@@ -241,10 +244,10 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
           </>
         )}
       </Td>
-      <Td><span className="block truncate text-label text-ink-secondary" title={NEUTERED_LABEL[pet.neutered]}>{NEUTERED_LABEL[pet.neutered]}</span></Td>
-      <Td><span className="block truncate text-label text-ink-secondary" title={pet.activityLabel}>{pet.activityLabel}</span></Td>
+      <Td className="w-24"><span className="block truncate text-label text-ink-secondary" title={NEUTERED_LABEL[pet.neutered]}>{NEUTERED_LABEL[pet.neutered]}</span></Td>
+      <Td className="cq-hide-below-1120 w-20"><span className="block truncate text-label text-ink-secondary" title={pet.activityLabel}>{pet.activityLabel}</span></Td>
       <Td><span className="block truncate text-label text-ink-secondary" title={pet.productName ?? '（未設定）'}>{pet.productName ?? '（未設定）'}</span></Td>
-      <Td>
+      <Td className="w-24">
         {pet.weightStale ? (
           <Chip tone="warn">{pet.weightUpdatedAt.slice(5, 10).replace('-', '/')}</Chip>
         ) : (
@@ -257,7 +260,7 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
         ここの「詳細」の行き先はペットではなく飼い主の友だち詳細なので、
         監査の指摘どおり行き先が分かる「飼い主」と明記する。
       */}
-      <ActionCell>
+      <ActionCell className="w-52">
         <RowActions
           subjectName={pet.callName || pet.name || '（名前なし）'}
           detail={{ label: '飼い主', href: `/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}` }}

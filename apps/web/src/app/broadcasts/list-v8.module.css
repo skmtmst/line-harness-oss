@@ -1,0 +1,653 @@
+/*
+ * ★V8 一斉配信の一覧（Pencil `l5V9a`、1152 は `jjFNi`、状態は `A8jzaQ`）。
+ *
+ * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
+ * 板が 1100px を切ったらフォルダの列を道具の段へ畳む
+ * （`docs/v8` RESPONSIVE の決まり。約 1352px 未満の画面幅に相当）。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+/* 見出しブロック：画面名＋一行の説明。 */
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 数の帯：4つのマス。アイコンつき。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.kpiHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kpiLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpiLabel svg {
+  color: var(--color-ink-faint);
+}
+
+.kpiMenu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: transparent;
+  color: var(--color-ink-faint);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kpiMenu:hover {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+.kpiValue {
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.kpiDetail {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 本体：左にフォルダの列 200px、右に一覧。 */
+.split {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.folderCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* フォルダ列の中の共通パネルは枠を持っているので、ここでは余白だけ調える。 */
+.folderCol :global(.v8-folder-create) {
+  width: 100%;
+}
+
+.folderNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.listCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 道具の段：検索・配信日・保存。右端は「保存した検索」。 */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 広い板では「作る」とフォルダ選びはフォルダの列にいる。道具の段には出さない。 */
+.toolbarCreate,
+.folderSelectWrap {
+  display: none;
+}
+
+.saveCurrentButton {
+  display: inline-flex;
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+.searchWrap {
+  width: 200px;
+  min-width: 160px;
+}
+
+/* 「配信日：指定なし」の選ぶ欄。 */
+.dateButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-control-border, var(--color-hairline));
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dateButton:hover {
+  border-color: var(--color-ink-faint);
+}
+
+.dateButton[data-active='true'] {
+  border-color: var(--color-action);
+  color: var(--color-action);
+}
+
+.datePopoverWrap {
+  position: relative;
+}
+
+.datePopover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 260px;
+  padding: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  box-shadow: var(--v8-popover-shadow);
+}
+
+.datePopoverLabel {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.datePopoverActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.saveRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+}
+
+.saveInput {
+  min-width: 240px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  font-size: 13px;
+}
+
+/* 2段目：状態の札（件数つき）。右に表示件数・並び順。 */
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip svg {
+  color: var(--color-ink-faint);
+}
+
+.chip:hover {
+  border-color: var(--color-ink-faint);
+}
+
+.chip[data-selected='true'] {
+  border-color: transparent;
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+
+.chip[data-selected='true'] svg,
+.chip[data-selected='true'] .chipCount {
+  color: var(--color-canvas);
+}
+
+.chipCount {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 状態の選ぶ欄（板が狭いときの札の代わり）。 */
+.statusSelectWrap {
+  display: none;
+}
+
+.filterRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterRightLabel {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 表。 */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: top;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.rowClick {
+  cursor: pointer;
+}
+
+.rowClick:hover td {
+  background: var(--color-canvas-sunken);
+}
+
+.cellTitle {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellTitle:hover {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+.cellSub {
+  margin: 2px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+/* 板が狭いとき「配信条件」はタイトルの下へ小さく移す。 */
+.cellAudience {
+  display: none;
+  margin: 2px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+.audienceCol {
+  max-width: 200px;
+}
+
+.audienceText {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dateSecond {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+.resultMain {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.resultSub {
+  margin: 2px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: currentcolor;
+}
+
+.statusNeutral {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+.statusInfo {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+.statusWarning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.statusSuccess {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.statusDanger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.menuCell {
+  width: 44px;
+  text-align: right;
+}
+
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.menuButton:hover {
+  background: var(--color-canvas-sunken);
+}
+
+/* 読み込み中の骨格の行。 */
+.skeletonRows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.skeletonRow:last-child {
+  border-bottom: 0;
+}
+
+.skeletonDot {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+
+.skeletonBar {
+  height: 12px;
+  flex: 1;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+}
+
+/* ページ送りの行。 */
+.pagerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 空・失敗の1枚。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  text-align: center;
+}
+
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.stateIconError {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ===== 板が 1100px を切ったら（画面幅で約 1352px 未満） ===== */
+@container (max-width: 1099px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* フォルダの列は道具の段の選ぶ欄へ畳む。「配信を作る」は道具の段の左端。 */
+  .folderCol {
+    display: none;
+  }
+
+  .toolbarCreate {
+    display: inline-flex;
+  }
+
+  .folderSelectWrap {
+    display: block;
+  }
+
+  /* 状態の札は1本の選ぶ欄へ畳む（絵 `jjFNi`）。 */
+  .chips {
+    display: none;
+  }
+
+  .statusSelectWrap {
+    display: block;
+  }
+
+  /* 「この条件を保存する」は「保存した検索」の中へ畳む。 */
+  .saveCurrentButton {
+    display: none;
+  }
+
+  /* 「配信条件」の列を隠し、タイトルの下へ小さく出す。 */
+  .audienceCol {
+    display: none;
+  }
+
+  .cellAudience {
+    display: block;
+  }
+}
+
+/* さらに狭い板では数の帯も1列に。 */
+@container (max-width: 560px) {
+  .kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .searchWrap {
+    width: 100%;
+  }
+}

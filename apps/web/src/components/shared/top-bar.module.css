@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * Pencil `cBSCb`（V6s 共通トップバー）の実測値。
@@ -301,6 +302,27 @@
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ページが渡した手前の段。戻れるのでリンク色＋押せる形にする。 */
+.crumbFromWrap {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.crumbFromLink {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crumbFromLink:hover {
+  color: var(--color-action);
+  text-decoration: underline;
 }
 
 .crumbSep {

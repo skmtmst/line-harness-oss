@@ -133,6 +133,8 @@ type Group = {
   targetingEnabled: boolean
   /** 159: フォルダ。分けていなければ null。 */
   folderId: string | null
+  /** M951: 読んだときの版。保存時に送り返し、古ければ 409 で止まる。 */
+  version: number
   pages: Page[]
 }
 
@@ -734,7 +736,14 @@ function Editor({
   }
 
   async function persistDraft(): Promise<void> {
+    // M951: 読んだときの版を付けて保存する。別画面・別タブで先に保存
+    // されていたら 409 になり、上書きせず読み直しを促す。
+    const version = group?.version
+    if (version === undefined) {
+      throw new Error('メニューを読み込めていません。一覧から開き直してください。')
+    }
     const res = await api.richMenuGroups.update(groupId, {
+      expectedVersion: version,
       name,
       chatBarText,
       isDefaultForAll,
@@ -853,7 +862,10 @@ function Editor({
       )
       await reload()
     } catch {
-      setConfirmError('取り下げできませんでした。しばらくおいてから、もう一度お試しください。')
+      // M953: LINE 側の削除に失敗したときは draft 確定にならず published の
+      // まま残る。メニューが LINE 上に残っていることを明示し、この窓のまま
+      // もう一度取り下げられるようにする（窓は閉じない）。
+      setConfirmError('LINE上のメニューを取り下げできませんでした。メニューはLINE上に残っています。最新の状態を確認して、もう一度お試しください。')
     } finally {
       setUnpublishing(false)
     }
@@ -1636,9 +1648,19 @@ function Editor({
         onConfirm={() => void handlePublish()}
         onCancel={closeConfirm}
       >
-        <ul className="text-ink-secondary space-y-1 text-xs leading-5">
-          <li>・まだ起きないこと: この操作だけでは、友だちのトーク画面には出ません。</li>
-          <li>・次にすること: 友だちに見せるには、登録後に一覧の「友だちに表示」を実行してください。</li>
+        {/*
+        R204: aside と公開成功案内と同じく、確認窓でも設定別に出る人を言う。
+        全設定共通の「出ません／友だちに表示を実行」では、全員既定・条件ありの
+        場合と矛盾する。言い回しは成功案内とそろえる。
+      */}
+      <ul className="text-ink-secondary space-y-1 text-xs leading-5">
+          <li>・出る人: {isDefaultForAll
+            ? '個別に指定した人を除く、すべての友だちの既定メニューになります。'
+            : targetingEnabled
+              ? (targetingCondition
+                ? '条件に当てはまる人の画面に、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。'
+                : 'いまの条件では誰にも出ません（今0人）。条件を決めるか、「条件で出し分ける」をオフにしてください。')
+              : 'この操作だけでは、友だちのトーク画面には出ません。出すには登録後に一覧の「表示先」から操作してください。'}</li>
           <li>・戻せます: 登録したあとでも「LINEから取り下げ」で下書きに戻せます。</li>
         </ul>
       </ConfirmDialog>
@@ -2061,6 +2083,20 @@ function PublishStep({
     }).then(() => refreshSchedules()).catch(() => refreshSchedules())
   }
 
+  /*
+   * R204残差: 「いますぐ出す」の注記も aside・確認窓・完了文と同じく設定別にする。
+   * 全枝共通の「保存したらすぐ、条件に当てはまる人のトーク画面に出ます」では、
+   * 条件あり（順次）・条件空（今0人）・登録のみ（登録だけ）と矛盾する。
+   * 実現されていない即時は言わない。「すぐ」は全員の既定のときだけ。
+   */
+  const nowNote = isDefaultForAll
+    ? '保存したらすぐ、個別に指定した人を除くすべての友だちの既定メニューになります'
+    : targetingEnabled && conditionEmpty
+      ? 'いまの条件では誰にも出ません（今0人）。条件を決めてから出してください'
+      : targetingEnabled
+        ? '保存するとLINEに登録され、条件に当てはまる人の画面に出来事のタイミングで順次出ます'
+        : 'LINEへの登録だけで、友だちの画面は変わりません。出す相手は一覧の「表示先」で決めてください'
+
   return (
     <div data-design-node="UMiJ9" className="pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
@@ -2074,9 +2110,9 @@ function PublishStep({
           <div className="mt-4">
             <RadioCardGroup legend="公開時期の選択" className="grid gap-3">
               {[
-                ['now', 'いますぐ出す', '保存したらすぐ、条件に当てはまる人のトーク画面に出ます'],
-                ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
-                ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
+                ['now', 'いますぐ出す', nowNote],
+                ['scheduled', '日時を決めて出す', '指定した時刻にLINEへ登録する予約です。誰の画面に出るかは「公開すると何が変わるか」で確認してください'],
+                ['period', '期間を決める', '指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください'],
               ].map(([value, label, note]) => (
                 <RadioCard
                   key={value}

@@ -1,0 +1,163 @@
+/* ★V8 シナリオを作る②：1通目を設定（Pencil `V6xAo`）。
+   左に段（誰に送るか・いつ・1通目の内容）、右の欄に本物のスマホ。 */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.headTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.headDescription {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+/* 左の段と右の欄（本物のスマホ）。右の欄は固定幅で付いてくる。 */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 20px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.side {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 1つの「段」。 */
+.section {
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.sectionDesc {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink-faint);
+}
+
+.sectionBody {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: block;
+  min-width: 0;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.fieldHint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-ink-faint);
+}
+
+/* 「いつ」の段。日数・時刻と、右に届く日時の例。 */
+.whenRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.whenInputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.whenNumber {
+  width: 72px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  font-size: 14px;
+  color: var(--color-ink);
+}
+
+.whenNumber:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.whenUnit {
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.whenAside {
+  margin-left: auto;
+  padding: 8px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink-secondary);
+}
+
+/* 本文の入力欄。160px 下限・内容に応じて伸長（SCENARIO-19）。 */
+.bodyField {
+  min-height: 160px;
+  resize: vertical;
+}
+
+/* 横幅が足りないとき、右の欄は下へ（白い板1100未満）。 */
+@media (max-width: 1352px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    position: static;
+  }
+}

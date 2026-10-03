@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { petAnimalTypeLabel, type NenHealthSummaryData } from '@/lib/nen-pets-api'
 import type { SummaryStatus } from './page'
 import { formatDay } from '@/lib/format'
@@ -30,6 +31,7 @@ export default function SummaryDrawer({
   open,
   status,
   summary,
+  error,
   onClose,
   onRetry,
   onPrint,
@@ -37,6 +39,12 @@ export default function SummaryDrawer({
   open: boolean
   status: SummaryStatus
   summary: NenHealthSummaryData | null
+  /**
+   * 取得で捕まえた失敗（M034）。`error` のときだけ見る。
+   * 403 は権限の案内にし、押しても直らない再試行の口は出さない。
+   * 429 は待ち案内を添え、再試行の口は残す。
+   */
+  error?: unknown
   onClose: () => void
   onRetry: () => void
   onPrint: () => void
@@ -54,7 +62,14 @@ export default function SummaryDrawer({
       {status === 'loading' ? (
         <ListState kind="loading" title="まとめを作っています" />
       ) : status === 'error' || !summary || !s ? (
-        <ListState kind="error" title="まとめを作れませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
+        <ListState
+          kind="error"
+          title="まとめを作れませんでした"
+          // M034: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。それ以外は画面の文のまま。
+          description={isForbiddenOrRateLimited(error) ? undefined : '通信の状態を確認して、もう一度お試しください。'}
+          error={error ?? undefined}
+          onRetry={onRetry}
+        />
       ) : (
         <div className="flex flex-col gap-4">
           <dl className="grid grid-cols-2 gap-3">

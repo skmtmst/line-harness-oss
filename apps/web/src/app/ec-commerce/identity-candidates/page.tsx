@@ -1,5 +1,9 @@
 'use client'
 
+import '@/app/notifications/readonly-v8.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import NoteBar from '@/components/shared/note-bar'
@@ -59,6 +63,7 @@ function candidateImpactText(value: unknown): string {
  * account scope付き集計を使う。推測した数字は表示しない。
  */
 export default function EcIdentityCandidatesPage() {
+  const theme = useAdminTheme()
   const { selectedAccountId } = useAccount()
   const review = useIdentityReview('ec_member', { lineAccountId: selectedAccountId })
   const detail = review.detail
@@ -159,7 +164,8 @@ export default function EcIdentityCandidatesPage() {
       : 'ready'
 
   return (
-    <div className={ecStyles.root}>
+    <div className={`${ecStyles.root} v8-ro-notifications-page`} data-design-node={theme === 'v8' ? 'w1W8h' : undefined}>
+      {theme === 'v8' && <ReadonlyHeaderV8 title="EC連携" description="LINEとまだ結びついていない出来事と、会員の候補を分けて確認します。" />}
       <PageHeader
         breadcrumb={[
           { label: '専用機能' },
@@ -183,7 +189,7 @@ export default function EcIdentityCandidatesPage() {
 
       {pageState === 'ready' ? (
         <>
-          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          <div data-ro-kpis="true" className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             <KpiCard
               variant="v6"
               title="結びついていない"

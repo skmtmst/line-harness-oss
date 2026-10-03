@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
+import liff from '@line/liff';
 import {
   PREFECTURES,
   collectInputs,
@@ -22,6 +23,7 @@ import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import Button from '../components/ui/Button.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import StatusView from '../components/ui/StatusView.js';
 import Icon from '../components/ui/Icon.js';
@@ -59,12 +61,12 @@ function initialAnswers(layout: FormLayout): Answers {
 }
 
 /**
- * 必須の印。★V7 (4-a) は欄名の横の小さな太字で、色は待ちの札と同じ琥珀。
- * 入力の失敗の赤 (お店のテーマの error) とは分け、必須は常に琥珀にする。
+ * 必須の印。★V8 (B8rCt・g9osGN) は欄名の横の小さな赤い札。
+ * 入力の失敗 (お店のテーマの error) とは分け、必須は常にこの札にする。
  */
 function RequiredMark() {
   return (
-    <span className="ml-1 text-xs font-bold whitespace-nowrap text-wait-ink">
+    <span className="ml-1 rounded bg-liff-required-bg px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-liff-sun">
       必須
     </span>
   );
@@ -471,26 +473,37 @@ export default function Form() {
   // P（試し回答）：試し合言葉があるときは、受付停止の下書きでも試せる。
   if (!form.isActive && !testToken) {
     return (
-      <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
-        <StatusView icon="calendar" title="このフォームは、いま回答を受け付けていません。" />
+      <div className="min-h-screen bg-ground">
+        <LiffHeader title={options.pageTitle || form.name} />
+        <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
+          <StatusView icon="calendar" title="このフォームは、いま回答を受け付けていません。" />
+        </div>
       </div>
     );
   }
 
   if (done) {
     return (
-      <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
-        <StatusView
-          icon="check"
-          tone="success"
-          title="送信しました"
-          body={layout.options?.thanksText || 'ご回答ありがとうございました。'}
-        />
-        {testToken ? (
-          <p className="px-6 pb-8 text-center text-xs text-ink-faint">
-            試しの回答のため、集計には入りません。
-          </p>
-        ) : null}
+      <div className="min-h-screen bg-ground" data-design-node="aNZKe">
+        <LiffHeader title={options.pageTitle || form.name} />
+        <div className="mx-auto max-w-md pb-28" style={{ backgroundColor: theme.sub }}>
+          <StatusView
+            icon="check"
+            tone="success"
+            title="送信しました"
+            body={layout.options?.thanksText || 'ご回答ありがとうございました。'}
+          />
+          {testToken ? (
+            <p className="px-6 pb-8 text-center text-xs text-ink-faint">
+              試しの回答のため、集計には入りません。
+            </p>
+          ) : null}
+        </div>
+        <BottomBar>
+          <Button variant="primary" onClick={() => liff.closeWindow()}>
+            LINEに戻る
+          </Button>
+        </BottomBar>
       </div>
     );
   }
@@ -498,10 +511,13 @@ export default function Form() {
   const multi = layout.sections.length > 1;
   const radius = theme.cornerRadius === 'none' ? '0' : theme.cornerRadius === 'round' ? '1rem' : '0.5rem';
 
+  const pageTitle = options.pageTitle || form.name;
+
   return (
-    <div className="min-h-screen bg-ground">
+    <div className="min-h-screen bg-ground" data-design-node="B8rCt">
+      <LiffHeader title={pageTitle} />
       <div
-        className="mx-auto min-h-screen w-full max-w-md px-4 pt-4 pb-28"
+        className="mx-auto min-h-screen w-full max-w-md px-4 pt-3 pb-28"
         style={{
           color: theme.text,
           backgroundColor: hasCustomTheme ? theme.sub : undefined,
@@ -511,39 +527,37 @@ export default function Form() {
           fontFamily: theme.fontFamily === 'serif' ? 'serif' : 'sans-serif',
         }}
       >
-        {options.pageTitle && (
-          <div className="-mx-4 -mt-4 border-b border-hairline bg-canvas px-4 py-3.5">
-            <h1 className="text-[17px] leading-[26px] font-bold text-ink">{options.pageTitle}</h1>
-          </div>
-        )}
-        {testToken ? (
-          <p className="mt-4 rounded-lg border border-hairline bg-canvas px-3 py-2 text-center text-xs text-ink-faint">
-            試し回答中です。この回答は集計に入りません。
-          </p>
-        ) : null}
-        <div className={options.pageTitle ? 'mt-4' : undefined}>
-          {form.description && (
-            <p className="mb-4 text-sm leading-relaxed whitespace-pre-wrap text-ink-secondary">
-              {form.description}
-            </p>
-          )}
-          {multi && options.sectionHeader !== 'none' && (
-            <div className="mb-4 flex items-center justify-center gap-2">
+        {multi && options.sectionHeader !== 'none' && (
+          <div className="mb-3">
+            <div className="flex gap-1" aria-hidden="true">
               {layout.sections.map((s, i) => (
                 <span
                   key={s.id}
-                  className={`text-xs tabular-nums ${
-                    i === sectionIndex ? 'font-bold' : 'text-ink-faint'
-                  }`}
-                  style={i === sectionIndex ? { color: theme.main } : undefined}
-                >
-                  {options.sectionHeader === 'name' ? s.name : i + 1}
-                </span>
+                  className={`h-1 flex-1 rounded-full ${i <= sectionIndex ? 'bg-liff-primary' : 'bg-liff-line'}`}
+                />
               ))}
             </div>
+            <p className="mt-1.5 text-xs text-ink-faint tabular-nums">
+              {options.sectionHeader === 'name'
+                ? layout.sections[sectionIndex]?.name
+                : `${sectionIndex + 1} / ${layout.sections.length}ページ`}
+            </p>
+          </div>
+        )}
+        {testToken ? (
+          <p className="mb-3 rounded-lg border border-hairline bg-canvas px-3 py-2 text-center text-xs text-ink-faint">
+            試し回答中です。この回答は集計に入りません。
+          </p>
+        ) : null}
+        <div>
+          <h1 className="text-xl font-bold text-ink">{pageTitle}</h1>
+          {form.description && (
+            <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap text-ink-secondary">
+              {form.description}
+            </p>
           )}
 
-          <div className="space-y-5">
+          <div className="mt-4 space-y-5">
             {[...layout.header, ...(section?.blocks ?? [])].map((block) => (
               <BlockView
                 key={block.id}
@@ -576,26 +590,24 @@ export default function Form() {
       </div>
 
       <BottomBar>
-        <div className="flex gap-2">
-          {trail.length > 0 && (
-            <button
-              type="button"
-              onClick={goBack}
-              className="flex-1 rounded-lg border border-hairline bg-canvas py-3 text-sm font-medium text-ink disabled:opacity-50"
-            >
-              {options.prevLabel || '前へ'}
-            </button>
-          )}
+        <button
+          type="button"
+          onClick={() => (isLast ? submit() : goNext())}
+          disabled={sending}
+          className="w-full py-3 text-[15px] font-bold disabled:opacity-50"
+          style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
+        >
+          {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
+        </button>
+        {trail.length > 0 && (
           <button
             type="button"
-            onClick={() => (isLast ? submit() : goNext())}
-            disabled={sending}
-            className="flex-1 py-3 text-sm font-bold disabled:opacity-50"
-            style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
+            onClick={goBack}
+            className="self-center px-4 py-1 text-xs text-ink-secondary focus-visible:outline-2 focus-visible:outline-ink"
           >
-            {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
+            ← {options.prevLabel || '前のページへ'}
           </button>
-        </div>
+        )}
       </BottomBar>
 
       {confirming && (
@@ -686,8 +698,8 @@ function BlockView({
         rel="noreferrer"
         className={`block rounded-lg py-3 text-center text-sm font-bold ${
           block.style === 'outline'
-            ? 'border border-accent-deep text-accent-deep'
-            : 'bg-accent-deep text-white'
+            ? 'border border-liff-primary text-liff-primary'
+            : 'bg-liff-primary text-white'
         }`}
       >
         {block.label}
@@ -701,7 +713,7 @@ function BlockView({
   const text = typeof value === 'string' ? value : '';
   const checked = Array.isArray(value) ? (value as string[]) : [];
   const inputClass =
-    'w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm text-ink focus:border-accent-deep focus:outline-none';
+    'w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm text-ink focus:border-liff-primary focus:outline-none';
   /** 直しがある欄は枠を直しの色にする (お店のテーマの error)。 */
   const invalidStyle = error ? { borderColor: errorColor } : undefined;
 
@@ -805,7 +817,7 @@ function BlockView({
         )}
 
         {block.type === 'radio' && (
-          <div className={block.inline ? 'flex flex-wrap gap-3' : 'space-y-2'}>
+          <div className={block.inline ? 'flex flex-wrap gap-2' : 'space-y-2'}>
             {(block.choices ?? []).map((choice) => {
               // 「その他」は、ラベルそのものだけでなく自由記入の値でも選中扱い
               const isFree = choice.isOther ? isOtherFreeText(block, text) : false;
@@ -814,13 +826,19 @@ function BlockView({
                 : text === choice.label;
               return (
                 <div key={choice.id}>
-                  <label className="flex min-h-11 items-center gap-2 text-sm text-ink-secondary">
+                  <label
+                    className={`flex min-h-12 items-center gap-2.5 rounded-xl border px-4 py-3 text-sm ${
+                      checkedRadio
+                        ? 'border-liff-primary bg-liff-soft font-semibold text-ink'
+                        : 'border-hairline bg-canvas text-ink'
+                    }`}
+                  >
                     <input
                       type="radio"
                       name={block.name}
                       checked={checkedRadio}
                       onChange={() => onChange(block.name, choice.label)}
-                      className="h-4 w-4 accent-accent-deep"
+                      className="h-5 w-5 shrink-0 accent-liff-primary"
                     />
                     {choice.label}
                   </label>
@@ -838,7 +856,7 @@ function BlockView({
         )}
 
         {block.type === 'checkbox' && (
-          <div className={block.inline ? 'flex flex-wrap gap-3' : 'space-y-2'}>
+          <div className={block.inline ? 'flex flex-wrap gap-2' : 'space-y-2'}>
             {(block.choices ?? []).map((choice) => {
               const freeTexts = checked.filter((v) => isOtherFreeText(block, v));
               const isChecked = choice.isOther
@@ -846,11 +864,17 @@ function BlockView({
                 : checked.includes(choice.label);
               return (
                 <div key={choice.id}>
-                  <label className="flex min-h-11 items-center gap-2 text-sm text-ink-secondary">
+                  <label
+                    className={`flex min-h-12 items-center gap-2.5 rounded-xl border px-4 py-3 text-sm ${
+                      isChecked
+                        ? 'border-liff-primary bg-liff-soft font-semibold text-ink'
+                        : 'border-hairline bg-canvas text-ink'
+                    }`}
+                  >
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      className="h-4 w-4 accent-accent-deep"
+                      className="h-5 w-5 shrink-0 accent-liff-primary"
                       onChange={() => {
                         if (!choice.isOther) {
                           onToggle(block.name, choice.label);
@@ -909,7 +933,7 @@ function BlockView({
                 const file = e.target.files?.[0];
                 if (file) onUpload(block.name, file);
               }}
-              className="w-full text-sm text-ink-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-accent-deep file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:opacity-50"
+              className="w-full text-sm text-ink-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-liff-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:opacity-50"
             />
             {uploading && <p className="mt-1 text-xs text-ink-faint">送っています...</p>}
             {text && (

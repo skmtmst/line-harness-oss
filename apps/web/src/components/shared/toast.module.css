@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 保存の知らせ（Toast）。★V7 共通部品その2 §2。
@@ -131,5 +132,10 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ★V8（夕13）：重なる物の外縁は border-soft（TOKENS-20261001）。 */
+[data-theme="v8"] .toast {
+  border-color: var(--color-border-soft);
 }
 }

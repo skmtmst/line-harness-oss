@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 日時の選択・時刻の選択。Pencil ★V7「日付の選択」（V7 文書 `Fw065`）の仲間。

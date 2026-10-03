@@ -1,11 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import Button from '@/components/shared/button'
 import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, storeAdminSession, takeTwoFactorNextPath } from '@/lib/admin-session'
+import { ApiError } from '@/lib/api'
 import { useBrand } from '@/lib/use-brand'
 import { qrToDataURL } from '@/lib/qr-image'
+import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -29,9 +31,53 @@ export default function TwoFactorSetupPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  /** M033: 開始の読み込み失敗。その場で再試行できるよう捕まえた失敗を残す。 */
+  const [setupError, setSetupError] = useState<unknown>(null)
+  const [retrying, setRetrying] = useState(false)
   /** R508: 合言葉が使えなくなった（期限切れ・回数制限）。入力は終わらせる。 */
   const [expired, setExpired] = useState(false)
   const brand = useBrand()
+
+  // M033: 開始の失敗は合言葉が生きていればその場で再試行する。
+  // 再ログインに戻すのは、合言葉が無いときと期限切れ401のときだけ。
+  // 403は再試行を出さず、429は待ち案内にする（ListState の error が言い分ける）。
+  const loadSetup = useCallback(async (token: string, isRetry = false) => {
+    if (isRetry) setRetrying(true)
+    else setLoading(true)
+    setSetupError(null)
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/two-factor/setup`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeToken: token }),
+      })
+      const body = await response.json().catch(() => ({})) as { success?: boolean; error?: string; data?: SetupData }
+      if (!response.ok || !body.success || !body.data) {
+        const retryAfter = Number(response.headers?.get('Retry-After'))
+        throw new ApiError(
+          response.status,
+          typeof body.error === 'string' && body.error ? body.error : '設定を始められませんでした',
+          undefined, undefined, undefined,
+          Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+        )
+      }
+      setSetup(body.data)
+    } catch (caught) {
+      const failure = caught instanceof ApiError
+        ? caught
+        : new ApiError(0, caught instanceof Error && caught.message ? caught.message : '設定を始められませんでした')
+      if (failure.status === 401) {
+        // 合言葉の期限切れ。再試行は通らないので入力を終わらせる。
+        setExpired(true)
+        setSetup(null)
+        setError(failure.message || '設定を始められませんでした')
+      } else {
+        setSetupError(failure)
+      }
+    } finally {
+      setLoading(false)
+      setRetrying(false)
+    }
+  }, [])
 
   useEffect(() => {
     const token = captureTwoFactorChallenge()
@@ -41,20 +87,8 @@ export default function TwoFactorSetupPage() {
       setLoading(false)
       return
     }
-    void (async () => {
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/two-factor/setup`, {
-          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ challengeToken: token }),
-        })
-        const body = await response.json() as { success: boolean; error?: string; data?: SetupData }
-        if (!response.ok || !body.success || !body.data) throw new Error(body.error || '設定を始められませんでした')
-        setSetup(body.data)
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : '設定を始められませんでした')
-      } finally { setLoading(false) }
-    })()
-  }, [])
+    void loadSetup(token)
+  }, [loadSetup])
 
   useEffect(() => {
     if (!setup?.provisioningUri) return
@@ -109,8 +143,8 @@ export default function TwoFactorSetupPage() {
   return <main className="flex min-h-[100svh] items-center justify-center bg-canvas-sunken px-4 py-8">
     <section className="w-full max-w-md rounded-card bg-canvas px-6 py-8 shadow-card sm:px-10">
       <div className="flex items-center justify-center gap-3 text-sm font-semibold text-ink">
-        <span className="flex h-8 w-8 items-center justify-center rounded-control bg-accent-soft font-bold text-accent-deep">然</span>
-        {brand.name ?? '然-NEN- 公式'}
+        <span className="flex h-8 w-8 items-center justify-center rounded-control bg-accent-soft font-bold text-accent-deep">{brand.name?.slice(0, 1) ?? 'm'}</span>
+        {brand.name ?? 'musubo'}
       </div>
       {/*
         320px では2列がはみ出す（監査 m18e）。狭い幅では1列に積む。
@@ -157,9 +191,19 @@ export default function TwoFactorSetupPage() {
         </form>
       ) : null}
       {!loading && !setup ? (
-        <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-6 block text-center text-xs font-medium text-action hover:underline">
-          ログインへ戻る
-        </Link>
+        expired || !challenge ? (
+          <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-6 block text-center text-xs font-medium text-action hover:underline">
+            ログインへ戻る
+          </Link>
+        ) : (
+          // M033: 合言葉は生きているので、その場で読み直せる。再ログインは強要しない。
+          <div className="mt-6">
+            <ListState kind="error" error={setupError ?? undefined} onRetry={() => void loadSetup(challenge, true)} retrying={retrying} />
+            <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-4 block text-center text-xs font-medium text-action hover:underline">
+              ログインへ戻る
+            </Link>
+          </div>
+        )
       ) : null}
     </section>
   </main>

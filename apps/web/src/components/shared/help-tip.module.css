@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 見出し・ラベル横の「？」（共通ルール 2-1b・★V7 `LYs5d`「？ 補足の印」）。

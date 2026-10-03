@@ -96,25 +96,25 @@ try {
     await shot(page, viewport, 'booking-staff', '/booking?liffId=qa', {
       waitMs: 2000,
       after: async (p) => {
-        await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: /トリミング（小型犬）/ }).click();
         await p.getByRole('button', { name: '担当を選ぶ' }).click();
       },
     });
     await shot(page, viewport, 'booking-datetime', '/booking?liffId=qa', {
       waitMs: 2000,
       after: async (p) => {
-        await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: /トリミング（小型犬）/ }).click();
         await p.getByRole('button', { name: '担当を選ぶ' }).click();
-        await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: /指名なし/ }).click();
         await p.getByRole('button', { name: '日時を選ぶ' }).click();
       },
     });
     await shot(page, viewport, 'booking-calendar', '/booking?liffId=qa', {
       waitMs: 2000,
       after: async (p) => {
-        await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: /トリミング（小型犬）/ }).click();
         await p.getByRole('button', { name: '担当を選ぶ' }).click();
-        await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: /指名なし/ }).click();
         await p.getByRole('button', { name: '日時を選ぶ' }).click();
         await p.getByRole('radio', { name: 'カレンダー' }).click();
       },
@@ -122,14 +122,15 @@ try {
     await shot(page, viewport, 'booking-calendar-selected', '/booking?liffId=qa', {
       waitMs: 2000,
       after: async (p) => {
-        await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: /トリミング（小型犬）/ }).click();
         await p.getByRole('button', { name: '担当を選ぶ' }).click();
-        await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: /指名なし/ }).click();
         await p.getByRole('button', { name: '日時を選ぶ' }).click();
         await p.getByRole('radio', { name: 'カレンダー' }).click();
         // 空き日を月をまたいで探す（今月に空きが無い時もある）。
         // 2番目に早い空き日を選び、その日の時刻を選んだ状態で撮る。
         await pickOpenDay(p);
+        await p.getByRole('button', { name: 'この日の時間を選ぶ' }).click();
         await p.getByRole('button', { name: '11:00' }).click();
       },
     });
@@ -144,24 +145,24 @@ try {
     await shot(page, viewport, 'booking-confirm', '/booking?liffId=qa', {
       waitMs: 1500,
       after: async (p) => {
-        await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: /トリミング（小型犬）/ }).click();
         await p.getByRole('button', { name: '担当を選ぶ' }).click();
-        await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: /指名なし/ }).click();
         await p.getByRole('button', { name: '日時を選ぶ' }).click();
         await p.getByRole('button', { name: '10:00' }).click();
-        await p.getByRole('button', { name: /で確認へ/ }).click();
+        await p.getByRole('button', { name: '内容を確かめる' }).click();
       },
     });
     await shot(page, viewport, 'booking-done', '/booking?liffId=qa', {
       waitMs: 1500,
       after: async (p) => {
-        await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: /トリミング（小型犬）/ }).click();
         await p.getByRole('button', { name: '担当を選ぶ' }).click();
-        await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: /指名なし/ }).click();
         await p.getByRole('button', { name: '日時を選ぶ' }).click();
         await p.getByRole('button', { name: '10:00' }).click();
-        await p.getByRole('button', { name: /で確認へ/ }).click();
-        await p.getByRole('button', { name: '予約をリクエストする' }).click();
+        await p.getByRole('button', { name: '内容を確かめる' }).click();
+        await p.getByRole('button', { name: 'この内容で予約をリクエスト' }).click();
         await p.waitForTimeout(1500);
       },
     });
@@ -221,14 +222,14 @@ try {
     await shot(page, viewport, 'waitlist', '/?eventWaitlistToken=qa-token-1&liffId=qa');
     await shot(page, viewport, 'waitlist-confirmed', '/?eventWaitlistToken=qa-token-1&liffId=qa', {
       after: async (p) => {
-        await p.getByRole('button', { name: 'この席を予約する' }).click();
+        await p.getByRole('button', { name: 'この席を取る' }).click();
         await p.waitForTimeout(1200);
       },
     });
     await shot(page, viewport, 'waitlist-error', '/?eventWaitlistToken=qa-token-1&liffId=qa', {
       mock: { fail: 'all' },
       after: async (p) => {
-        await p.getByRole('button', { name: 'この席を予約する' }).click();
+        await p.getByRole('button', { name: 'この席を取る' }).click();
         await p.waitForTimeout(1200);
       },
     });

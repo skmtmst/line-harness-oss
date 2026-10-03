@@ -1,5 +1,9 @@
 'use client'
 
+import '@/app/notifications/readonly-v8.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 /*
  * 通知一覧（V6 1-1 ダッシュボードの通知パネルからの全件行き先）。
  *
@@ -12,6 +16,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, Download } from 'lucide-react'
 import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import {
+  loadFailureCopy,
+  loadFailureNotice,
+} from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Card from '@/components/shared/card'
@@ -31,6 +39,7 @@ import {
 const PAGE_SIZE = 50
 
 function NotificationsPageInner() {
+  const theme = useAdminTheme()
   usePageTitle('通知')
   const router = useRouter()
   const params = useSearchParams()
@@ -51,6 +60,10 @@ function NotificationsPageInner() {
   const [counts, setCounts] = useState<NotificationCenterData['counts'] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // M037: 捕まえた一覧の読み込み失敗。403・429の言い分けと再試行の有無に使う。
+  const [loadError, setLoadError] = useState<unknown>(null)
+  // 一覧の失敗で帯に出した文。取り直しが通ったら同じ文だけ消す。
+  const lastListFailure = useRef<string | null>(null)
   const requestId = useRef(0)
 
   const selectFilter = (next: DashboardNotificationFilter) => {
@@ -68,11 +81,15 @@ function NotificationsPageInner() {
       setItems([])
       setCounts(null)
       setError('LINEアカウントを選択してください')
+      setLoadError(null)
       setLoading(false)
       return
     }
     setLoading(true)
-    if (!append) setError('')
+    if (!append) {
+      setError('')
+      setLoadError(null)
+    }
     try {
       const response = await api.notifications.center.list(selectedAccountId, {
         category: filter,
@@ -84,13 +101,21 @@ function NotificationsPageInner() {
       if (!isDashboardNotificationData(response.data)) throw new Error('invalid notification center response')
       setItems((current) => append ? [...current, ...response.data.items] : response.data.items)
       setCounts(response.data.counts)
-    } catch {
+      // M037: 直ったので失敗の控えを消す。追加読み込みの失敗文も消える。
+      setLoadError(null)
+      if (!append) setError('')
+      else setError((current) => current === lastListFailure.current ? '' : current)
+    } catch (caught) {
       if (id !== requestId.current) return
       if (!append) {
         setItems([])
         setCounts(null)
       }
-      setError(`通知を${STATE_TEXT.error}`)
+      // M037: 生の `API error: NNN` を出さず、原因どおりに言い分ける。
+      const message = loadFailureNotice(caught, '通知')
+      lastListFailure.current = message
+      setLoadError(caught)
+      setError(message)
     } finally {
       if (id === requestId.current) setLoading(false)
     }
@@ -153,10 +178,15 @@ function NotificationsPageInner() {
   ]
   const total = counts ? (filter === 'error' ? counts.error : filter === 'update' ? counts.update : counts.all) : 0
   const hasMore = items.length < total
+  // M037: 一覧自体が取れなかったときは空と混ぜない。共通の失敗の1枚にする。
+  // 403は押しても直らないので再試行なし、429と通信失敗は同じ画面から取り直せる。
+  const listFailed = loadError !== null && items.length === 0
+  const listFailure = loadError !== null ? loadFailureCopy(loadError, '通知') : null
 
   /* ★V7: 画面側で狭い中央寄せをしない。中身の幅は共通の枠が持つ。 */
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 v8-ro-notifications-page" data-design-node={theme === 'v8' ? 'y8QQV' : undefined}>
+      {theme === 'v8' && <ReadonlyHeaderV8 title="通知" description="配信のエラーやアップデートのお知らせです。未読のお知らせから確認できます。" />}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
           items={filters.map((entry) => ({
@@ -168,7 +198,7 @@ function NotificationsPageInner() {
         />
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={() => { void markAllRead() }} disabled={!counts || counts.unread === 0}>
-            すべて既読にする
+            {theme === 'v8' && filter !== 'all' ? 'この分類をすべて既読にする' : 'すべて既読にする'}
           </Button>
           <Button variant="secondary" href="/line-notifications?tab=operator">
             通知設定
@@ -176,16 +206,24 @@ function NotificationsPageInner() {
         </div>
       </div>
 
-      {error ? (
+      {error && !listFailed ? (
         <Notice
           tone="danger"
           message={error}
-          action={<button type="button" onClick={() => void load(0, false)} className="shrink-0 font-medium underline">もう一度読み込む</button>}
+          action={loadError !== null && listFailure?.retryable ? (
+            <button type="button" onClick={() => void load(0, false)} className="shrink-0 font-medium underline">もう一度読み込む</button>
+          ) : undefined}
         />
       ) : null}
 
-      <Card overflow="hidden">
-        {items.length === 0 && !loading ? (
+      <Card overflow="hidden" className="v8-ro-notifications-noticeList">
+        {listFailed ? (
+          <ListState
+            kind="error"
+            error={loadError ?? undefined}
+            onRetry={listFailure?.retryable ? () => void load(0, false) : undefined}
+          />
+        ) : items.length === 0 && !loading ? (
           <ListState
             kind="empty"
             title="通知はまだありません"
@@ -194,7 +232,7 @@ function NotificationsPageInner() {
         ) : (
           <ul className="divide-hairline divide-y">
             {orderedItems.map((item) => (
-              <li key={item.id}>
+              <li key={item.id} data-unread={!item.isRead}>
                 <button
                   type="button"
                   onClick={() => openNotification(item)}
@@ -228,6 +266,7 @@ function NotificationsPageInner() {
         ) : null}
       </Card>
 
+      {theme === 'v8' && counts?.unread === 0 && !loading && !listFailed ? <p className="v8-ro-notifications-readNotice" role="status">未読のお知らせはありません。</p> : null}
       {hasMore ? (
         <div className="flex justify-center">
           <Button variant="secondary" onClick={() => { void load(items.length, true) }} disabled={loading}>

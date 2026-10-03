@@ -155,9 +155,14 @@ function oauthClientForEnv(env: Env['Bindings'], origin?: string): GoogleOAuthCl
   const clientId = env.GOOGLE_BUSINESS_OAUTH_CLIENT_ID?.trim();
   const clientSecret = env.GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) return null;
+  // redirectUri は環境ごとに1つへ固定する。Workerは独自ドメインと workers.dev の
+  // どちらでも開けるため、リクエストのoriginから組み立てるとGoogleに登録した1行と
+  // ずれて redirect_uri_mismatch になる。WORKER_PUBLIC_URL を正本にすれば、
+  // 管理画面がどちらのホストを呼んでも同じURIを送る。
   // refresh には redirectUri を使わない。cron などリクエスト外から呼ぶときは
   // ダミーの origin でよい（google-sheets の sheetsOauthClient と同じ扱い）。
-  return { clientId, clientSecret, redirectUri: `${origin ?? 'https://localhost'}${CALLBACK_PATH}` };
+  const base = env.WORKER_PUBLIC_URL?.trim().replace(/\/+$/, '') || origin || 'https://localhost';
+  return { clientId, clientSecret, redirectUri: `${base}${CALLBACK_PATH}` };
 }
 
 function oauthClient(c: Context<Env>): GoogleOAuthClient | null {

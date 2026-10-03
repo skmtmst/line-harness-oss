@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import QuestionEditor, {
   emptyQuestion,
@@ -23,6 +24,8 @@ import type { Folder } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import QuestionTemplateV8 from '../question-v8'
 
 function displayText(value: string): string {
   return value
@@ -201,8 +204,13 @@ function QuestionTemplatePageInner() {
         return
       }
       router.push('/templates')
-    } catch {
-      setError('保存できませんでした。通信状態を確認してもう一度お試しください。')
+    } catch (caught) {
+      // 実行時のAPI失敗（500を含む）は原因どおりの文で出す。実送はしない。
+      if (caught instanceof ApiError && caught.status === 500) {
+        setError(`${describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' })}`)
+      } else {
+        setError(describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' }))
+      }
     } finally {
       setSaving(false)
     }
@@ -345,10 +353,19 @@ function QuestionTemplatePageInner() {
   )
 }
 
+/*
+ * ★V8: data-theme="v8" のときだけ新しい作る画面（../question-v8）を出す。
+ * v7 の QuestionTemplatePageInner は見た目も動きもそのまま残す。
+ */
+function QuestionTemplateThemed() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <QuestionTemplateV8 /> : <QuestionTemplatePageInner />
+}
+
 export default function QuestionTemplatePage() {
   return (
     <Suspense fallback={<ListState kind="loading" title="質問テンプレートを準備しています" />}>
-      <QuestionTemplatePageInner />
+      <QuestionTemplateThemed />
     </Suspense>
   )
 }

@@ -1,5 +1,9 @@
 'use client'
 
+import '@/app/notifications/readonly-v8.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -31,6 +35,11 @@ import {
   type LineNotificationQuota,
 } from './customer-kpis'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import {
+  isForbidden,
+  isForbiddenOrRateLimited,
+  loadFailureNotice,
+} from '@/components/shared/api-error-message'
 import styles from './customer-notifications.module.css'
 import { formatDateTime } from '@/lib/format'
 
@@ -235,6 +244,8 @@ type OperatorTabState = 'loading' | 'ready' | 'error' | 'forbidden'
 function operatorTabCountLabel(state: OperatorTabState, count: number | null): string {
   if (state === 'ready' && count !== null) return `${count}`
   if (state === 'loading') return '—'
+  // M031: 403は取れなかったのではなく権限が無い。「取得失敗」と混ぜない。
+  if (state === 'forbidden') return '権限なし'
   return '取得失敗'
 }
 
@@ -643,6 +654,7 @@ function CustomerNotificationEditor({
 }
 
 function LineNotificationsPage() {
+  const theme = useAdminTheme()
   const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
   /*
@@ -687,6 +699,10 @@ function LineNotificationsPage() {
   // N-341: 運用者タブの件数は実データで出す。子部品とは別に親で取る。
   const [operatorCount, setOperatorCount] = useState<number | null>(null)
   const [operatorState, setOperatorState] = useState<OperatorTabState>('loading')
+  // M031: 捕まえた件数取得の失敗。403・429の言い分けと再試行の有無に使う。
+  const [operatorCountError, setOperatorCountError] = useState<unknown>(null)
+  // M031: 顧客タブの読み込み失敗。ListState の error へ渡す。
+  const [customerLoadError, setCustomerLoadError] = useState<unknown>(null)
   // N-340: 保存していない編集のあるお知らせ。離脱警告と復元の目印。
   const [dirtyEvents, setDirtyEvents] = useState<readonly string[]>([])
   // N-340: 保存済みの姿。編集中に戻るときの戻し先。
@@ -715,6 +731,8 @@ function LineNotificationsPage() {
     testRecipientGeneration.current += 1
     setOperatorCount(null)
     setOperatorState('loading')
+    setOperatorCountError(null)
+    setCustomerLoadError(null)
     setDirtyEvents([])
     setBusy(null)
     lastSavedRef.current = new Map()
@@ -739,10 +757,12 @@ function LineNotificationsPage() {
       if (!operatorRes.success) throw new Error('operator count failed')
       setOperatorCount(operatorRes.data.summary.total)
       setOperatorState('ready')
+      setOperatorCountError(null)
     } catch (error) {
       if (stale()) return
       setOperatorCount(null)
       setOperatorState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
+      setOperatorCountError(error)
     }
     // 顧客タブだけが定義・集計を読む。運用者・記録タブは子部品が自前で取る（#509 軽1）。
     // 設定口は列車側で店別になったため、持ち回しはしない。
@@ -851,11 +871,14 @@ function LineNotificationsPage() {
         setNotice({ tone: 'success', text: `未保存の編集を${restoredEvents.length}件復元しました。確認して保存してください。` })
       }
       setLoadState('ready')
+      setCustomerLoadError(null)
     } catch (error) {
       if (!stale()) {
         // ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。
         // 一覧の場所の ListState error だけにまとめる。
         setLoadState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
+        // M031: 捕まえた失敗を ListState へ渡す。403は再試行なし、429は待ち案内になる。
+        setCustomerLoadError(error)
       }
     }
   }, [selectedAccountId, tab])
@@ -911,6 +934,12 @@ function LineNotificationsPage() {
       .slice(0, 3)
     return ranked.map((item) => `${labelOf.get(item.eventType) ?? item.eventType} ${item.today}`).join('・')
   }, [sendCounts, settings])
+  /*
+   * R611: 一覧の取得に失敗したときは、上部の件数・送信枠も「取得中」の
+   * ままにしない。値は「—」のまま、注記を失敗の言葉へ変える。
+   * 権限不足も同じく、取れていないのに「取得中」とは出さない。
+   */
+  const customerLoadFailed = loadState === 'error' || loadState === 'forbidden'
   const kpis = customerNotificationKpis({
     ready: loadState === 'ready' && overview !== null,
     settingsCount: settings.length,
@@ -919,6 +948,7 @@ function LineNotificationsPage() {
     sentBreakdown,
     failed: overview?.failed ?? null,
     quota,
+    loadFailed: customerLoadFailed,
   })
   /*
    * send-countsだけ取れなかったときは、そのカードだけ「取得できませんでした」にする。
@@ -1113,7 +1143,8 @@ function LineNotificationsPage() {
     setBusy(null)
   }
 
-  return <div className="flex flex-col gap-4">
+  return <div className={`flex flex-col gap-4 ${expandedSetting === null ? 'v8-ro-notifications-page' : ''}`} data-design-node={theme === 'v8' && expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}>
+    {theme === 'v8' && expandedSetting === null && <ReadonlyHeaderV8 title="LINE通知" description="注文・予約・運用の出来事を知らせます。顧客向けと運用者向けの記録を分けて確認できます。" />}
     {expandedSetting === null ? <MergedTabs basePath="/line-notifications" tabs={tabsWithCounts} active={tab} defaultKey="customer" /> : null}
     {/*
       * #634: 運用者タブの件数だけが取れなかったとき、タブの「取得失敗」の
@@ -1124,10 +1155,16 @@ function LineNotificationsPage() {
       ★V7 `x63W5x`：補助のデータ（運用者タブの件数）だけ取れないときは、
       その場所に小さく1行だけ。黄色の帯にしない。
     */}
-    {expandedSetting === null && operatorState === 'error' ? (
+    {expandedSetting === null && (operatorState === 'error' || operatorState === 'forbidden') ? (
       <p role="alert" className="text-ink-secondary text-xs">
-        運用者へのお知らせの件数を読み込めませんでした。
-        <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => void load()}>もう一度</button>
+        {isForbiddenOrRateLimited(operatorCountError)
+          // M031: 403・429は共通の言い方（権限の案内・待ち案内）へ切り替える。
+          ? loadFailureNotice(operatorCountError, '運用者へのお知らせ')
+          : '運用者へのお知らせの件数を読み込めませんでした。'}
+        {/* M031: 403は押しても直らないので再試行の口は出さない。 */}
+        {isForbidden(operatorCountError) ? null : (
+          <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => void load()}>もう一度</button>
+        )}
       </p>
     ) : null}
     {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
@@ -1217,7 +1254,7 @@ function LineNotificationsPage() {
       送信枠の3枚は全幅のまとまりとして2段目へ置き、中で3列に並べる。
       KpiCollapseの中に入れるのは、狭い幅で畳む対象から外さないため。
     */}
-    <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <KpiCollapse data-design="KPIs" data-ro-kpis="true" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {kpisWithSendCountsState.filter((kpi) => kpi.group === 'notice').map(renderKpiCard)}
       <section className="sm:col-span-2 xl:col-span-4" aria-label="今月の送信枠">
         <p className="text-ink-faint mb-2 text-xs font-semibold">今月の送信枠（LINE公式アカウントの月間上限）</p>
@@ -1226,6 +1263,12 @@ function LineNotificationsPage() {
         </div>
       </section>
     </KpiCollapse>
+    {/*
+      R611: 一覧の取得に失敗したときは、上部の件数も取れていないことを添え、
+      下の一覧の再読み込みへ案内する。読み直しの口は一覧の ListState が持つ
+      ので、ここにはボタンも帯も置かない。赤も使わない（★V7 `x63W5x`）。
+    */}
+    {loadState === 'error' ? <p className="text-xs text-ink-secondary">お知らせの件数は取得失敗です。下の一覧の「もう一度読み込む」から読み直してください。</p> : null}
     <div><NoteBar help="お知らせは売り込みではなく取引に必要な連絡です" helpLabel="お知らせの意味">これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。</NoteBar></div>
     {/*
       send-countsだけ読み込めなかったときの部分表示。一覧全体は残す。
@@ -1248,7 +1291,7 @@ function LineNotificationsPage() {
     <section className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas">
       {loadState === 'loading' ? <ListState kind="loading" title="顧客へのお知らせを読み込んでいます" />
         : loadState === 'forbidden' ? <ListState kind="forbidden" />
-        : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" onRetry={() => void load()} />
+        : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" error={customerLoadError ?? undefined} onRetry={() => void load()} />
         : settings.length === 0 ? <ListState kind="empty" title="顧客へのお知らせはまだありません" description="EC連携の取引イベントを接続すると、ここで種類ごとに管理できます。" />
         : visible.length === 0 ? <ListState kind="empty" title="条件に合うお知らせはありません" description="絞り込みを変えてください。" />
         : <>

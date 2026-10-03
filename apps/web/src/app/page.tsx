@@ -278,8 +278,18 @@ function FriendAddLinkCard({
     <Card padding="roomy">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-ink text-sm font-semibold">友だち追加リンク</h2>
-          <p className="text-ink-faint mt-1 text-xs leading-relaxed">このURLから追加された友だちは、流入元を記録して計測できます。</p>
+          {/*
+            ★V8（夕27・WQmep 段C）：説明文は見出しの「？」へ移し、
+            段の高さを右の「友だちの状態」とそろえる。v7 は文を
+            見出しの下に出すまま（v7-only / v8-only で出し分け）。
+          */}
+          <div className="flex items-center gap-1">
+            <h2 className="text-ink text-sm font-semibold">友だち追加リンク</h2>
+            <HelpTip label="友だち追加リンクの説明" className="v8-only">
+              このURLから追加された友だちは、流入元を記録して計測できます。
+            </HelpTip>
+          </div>
+          <p className="v7-only text-ink-faint mt-1 text-xs leading-relaxed">このURLから追加された友だちは、流入元を記録して計測できます。</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex min-w-[220px] items-center gap-2">
@@ -321,7 +331,7 @@ function FriendAddLinkCard({
       <QrDialog
         open={showQr}
         onClose={() => writeQr(null)}
-        accountName={selectedAccount?.displayName ?? '然-NEN- 公式'}
+        accountName={selectedAccount?.displayName ?? 'LINE公式アカウント'}
         officialProfileUrl={visualQa?.officialProfileUrl ?? officialProfileUrl}
         accountBasicId={selectedAccount?.basicId ?? null}
         baseLink={baseLink}

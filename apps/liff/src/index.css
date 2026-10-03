@@ -23,6 +23,32 @@
   --color-danger: #b3261e;
   --color-skeleton: #e9ebef;
   --color-state-mark: #ebedf1;
+  /* ── ★V8 LIFF (specs/pages/14-liff.md)。値は板の書き出しから。
+   * 管理画面 V8 の濃い緑 (#087a3e) とは別物。LINE の #06c755 は
+   * LINE ログインボタン専用で、ここには使わない。 ── */
+  --color-liff-primary: #03873a;
+  --color-liff-soft: #f0fbf4;
+  --color-liff-sub: #5f6670;
+  --color-liff-idle: #b8bec6;
+  --color-liff-line: #e6e9ed;
+  --color-liff-divider: #eef0f2;
+  --color-liff-chip: #f0f1f3;
+  --color-liff-off-bg: #f7f8f9;
+  --color-liff-off-ink: #c3c8cf;
+  --color-liff-line-strong: #dfe3e8;
+  --color-liff-photo: #e9e2d4;
+  --color-liff-photo-ink: #6b5b3e;
+  --color-liff-note: #f2f6fe;
+  /* 必須の札の地 (B8rCt・g9osGN。文字は --color-liff-sun)。 */
+  --color-liff-required-bg: #fdecec;
+  /* マイルの貯まった箱の深い緑 (S3uBl)。主の緑より濃い。 */
+  --color-liff-deep: #0f3d24;
+  --color-liff-wait-bg: #fff6e5;
+  --color-liff-wait-ink: #b26b00;
+  --color-liff-ok-bg: #e8f8ee;
+  --color-liff-ok-ink: #0a7a3e;
+  --color-liff-sun: #e5484d;
+  --color-liff-sat: #2f6fde;
   /* ── ウェビナーの暗い地 (7-webinar。値は liff-v7.html の書き出しから) ── */
   --color-night: #15181d;
   --color-night-soft: #23272e;
@@ -37,10 +63,12 @@
 
 body {
   margin: 0;
-  background: var(--color-ground);
+  background: var(--color-canvas);
   color: var(--color-ink);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
-    "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  /* ★V8: 日本語は Noto Sans JP、英数字は Inter (Inter に日本語
+   * グリフが無いので、かなと漢字は自動で Noto Sans JP に落ちる)。 */
+  font-family: "Inter", "Noto Sans JP", system-ui, -apple-system,
+    BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
 }
 
 /* 読み込み中は中身の形 (LoadingView の骨組み) を出す。回る印は使わない。 */

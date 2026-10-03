@@ -1,9 +1,13 @@
 'use client'
 
+import KpiCard from '@/components/shared/kpi-card'
+import '@/app/ops/readonly-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Search } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeArticleKind, knowledgeDate, knowledgeState } from '@/components/ops/knowledge-format'
 import KnowledgeEditor from '@/components/ops/knowledge-editor'
 import Button from '@/components/shared/button'
@@ -17,8 +21,21 @@ import { TextField } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
 import styles from '@/components/ops/knowledge.module.css'
 
+/*
+ * 読み込み失敗の説明。403・429 は説明を渡さず、ListState が捕まえた失敗から
+ * 共通の1枚（権限の案内・待ち案内）を作る。それ以外は捕まえた言葉をそのまま
+ * 出す（通信断の「通信できませんでした」など）。
+ */
+function loadDescription(err: unknown): string | undefined {
+  if (isForbiddenOrRateLimited(err)) return undefined
+  if (err instanceof TypeError) return '通信できませんでした。ネットワークを確認してもう一度お試しください'
+  if (err instanceof Error && err.message && !/^API error: /.test(err.message)) return err.message
+  return undefined
+}
+
 /** Canonical V6 37-11 list, shared with the review/edit feature parts. */
 export default function KnowledgeList() {
+  const theme = useAdminTheme()
   const [rows, setRows] = useState<OpsKnowledgeArticle[]>([])
   const [total, setTotal] = useState(0)
   const [q, setQ] = useState('')
@@ -27,19 +44,27 @@ export default function KnowledgeList() {
   const [state, setState] = useState('')
   const [offset, setOffset] = useState(0)
   const [loaded, setLoaded] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<unknown>(null)
   const [actionError, setActionError] = useState('')
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState<OpsKnowledgeArticle | null>(null)
   const request = useRef(0)
   const load = useCallback(async () => {
     const current = ++request.current
-    setLoaded(false); setError('')
-    const res = await opsCall(api.ops.knowledge.list({ q, kind, articleKind, state, offset }))
-    if (current !== request.current) return
-    setLoaded(true)
-    if (!res.success) { setError(res.error || '読み込めませんでした'); return }
-    setRows(res.data); setTotal(res.total)
+    setLoaded(false); setError(null)
+    try {
+      const res = await api.ops.knowledge.list({ q, kind, articleKind, state, offset })
+      if (current !== request.current) return
+      if (!res.success) { setLoaded(true); setError(new Error(res.error || '読み込めませんでした')); return }
+      setLoaded(true)
+      setRows(res.data); setTotal(res.total)
+    } catch (caught) {
+      // M040：捕まえた失敗をそのまま残す。ListState が 403 は権限の案内
+      // （再試行なし）・429 は待ち案内に切り替える。
+      if (current !== request.current) return
+      setLoaded(true)
+      setError(caught)
+    }
   }, [q, kind, articleKind, state, offset])
   useEffect(() => {
     const timer = setTimeout(() => void load(), 150)
@@ -60,7 +85,12 @@ export default function KnowledgeList() {
     setEditing(res.data)
   }
   return <div className={styles.page} data-design-node="csVox">
-    <div className={styles.heading}><h2>ナレッジ一覧</h2></div>
+    {theme === 'v8' ? <div className="v8-ro-ops-metrics" aria-label="条件に合う記事とこのページの状況">
+      <KpiCard variant="v6" title="条件に合う記事" value={loaded && !error ? total : null} unit="件" detail="" loading={!loaded} />
+      <KpiCard variant="v6" title="このページの承認待ち" value={loaded && !error ? rows.filter(row => row.reviewState === 'pending').length : null} unit="件" detail="" loading={!loaded} />
+      <KpiCard variant="v6" title="このページの承認済み" value={loaded && !error ? rows.filter(row => knowledgeState(row).label === '承認済み').length : null} unit="件" detail="" loading={!loaded} />
+      <KpiCard variant="v6" title="このページの利用回数" value={loaded && !error ? rows.reduce((sum, row) => sum + row.usedCount, 0) : null} unit="回" detail="" loading={!loaded} />
+    </div> : <div className={styles.heading}><h2>ナレッジ一覧</h2></div>}
     <div className={styles.filters}>
       <div className={styles.search}><Search aria-hidden="true" /><TextField aria-label="タイトル・質問・キーワードで検索"
         placeholder="タイトル・質問・キーワードで検索" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} maxLength={200} /></div>
@@ -76,7 +106,7 @@ export default function KnowledgeList() {
     {/* ★V7: 緑は「正常」だけ。説明の帯は枠なしの info の小さい帯にする。 */}
     <Notice tone="info">解決した問い合わせを自動確認し、根拠が揃ったものだけ下書きにします。AI の返信に使うのは承認済みの記事だけです。</Notice>
     {actionError && <p role="alert" className={styles.error}>{actionError}</p>}
-    {!loaded ? <ListState kind="loading" /> : error ? <ListState kind="error" description={error} onRetry={() => void load()} /> : rows.length === 0
+    {!loaded ? <ListState kind="loading" /> : error ? <ListState kind="error" description={loadDescription(error)} error={error ?? undefined} onRetry={() => void load()} /> : rows.length === 0
       ? <ListState kind="empty" emptyPreset="readonly" title="記事はありません" description="解決した問い合わせの確認結果がここに並びます。" />
       : <DataTable className={styles.table}>
         <colgroup><col /><col className={styles.kindColumn} /><col className={styles.articleKindColumn} /><col className={styles.stateColumn} /><col className={styles.numberColumn} /><col className={styles.helpfulColumn} /><col className={styles.dateColumn} /><col className={styles.actionsColumn} /></colgroup>
@@ -100,8 +130,8 @@ export default function KnowledgeList() {
           </Tr>
         })}</tbody>
       </DataTable>}
-    {loaded && !error && total > 50 && <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-      <ListRange total={total} first={offset + 1} last={Math.min(offset + 50, total)} />
+    {loaded && !error && total > 0 && (theme === 'v8' || total > 50) && <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+      <ListRange total={total} first={offset + 1} last={Math.min(offset + (theme === 'v8' ? rows.length : 50), total)} />
       <Pagination page={Math.floor(offset / 50) + 1} pageCount={Math.ceil(total / 50)} onPageChange={(next) => setOffset((next - 1) * 50)} />
     </div>}
     {editing && <KnowledgeEditor key={editing.id} article={editing} onClose={() => setEditing(null)} onSaved={() => void load()} />}

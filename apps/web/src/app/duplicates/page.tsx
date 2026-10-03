@@ -1,6 +1,5 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -8,226 +7,53 @@ import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { TableStateRow } from '@/components/shared/table'
-import { api } from '@/lib/api'
 import { isForbidden } from '@/components/shared/api-error-message'
-import type { IdentityCandidateListItem, IdentityCandidateStatus } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import DuplicatesStatsNotice from './duplicates-stats-notice'
+import DuplicatesV8 from './duplicates-v8'
+import { CANDIDATE_PAGE_SIZE, formatRelative, useDuplicatesData } from './use-duplicates-data'
 import { formatDateTime, formatNumber } from '@/lib/format'
 
-interface PerAccountStat {
-  accountId: string
-  accountName: string
-  friends: number
-  dups: number
-  dupRate: number
-}
-
-interface PairwiseOverlap {
-  fromAccountId: string
-  toAccountId: string
-  overlap: number
-}
-
-interface DuplicatesStatsData {
-  totalFollowing: number
-  uniquePeople: number
-  friendDups: number
-  duplicateGroups: number
-  // 送信実績ではなく friendDups × 単価の見積り。実績が繋がるまで画面には出さない。
-  wastedPerBroadcastYen: number
-  msgUnitYen: number
-  perAccount: PerAccountStat[]
-  // Optional: an older worker deployment (mid-rollout) may not include this
-  // field. Guarded at every access site below; do not assume non-empty.
-  pairwiseOverlap?: PairwiseOverlap[]
-  // Optional during rolling deploys.
-  computedAt?: string
-}
-
-function formatRelative(iso: string): string {
-  const elapsedMs = Date.now() - new Date(iso).getTime()
-  if (elapsedMs < 0) return 'たった今'
-  const sec = Math.floor(elapsedMs / 1000)
-  if (sec < 60) return `${sec}秒前`
-  const min = Math.floor(sec / 60)
-  if (min < 60) return `${min}分前`
-  const hr = Math.floor(min / 60)
-  return `${hr}時間前`
-}
-
-
-const CANDIDATE_PAGE_SIZE = 50
-
 export default function DuplicatesPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <DuplicatesV8 />
+  return <DuplicatesPageV7 />
+}
+
+function DuplicatesPageV7() {
   usePageTitle('重複検出')
-  const [data, setData] = useState<DuplicatesStatsData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState('')
-  // R598: 集計だけ失敗しても候補一覧は残す。集計欄の失敗表示に使うため、
-  // 捕まえた失敗をそのまま残す（403は権限の案内・再試行なしに言い分ける）。
-  const [statsFailure, setStatsFailure] = useState<unknown>(null)
-  const [candidates, setCandidates] = useState<IdentityCandidateListItem[]>([])
-  const [candidateTotal, setCandidateTotal] = useState(0)
-  // statusCounts / lowConfidenceCount は旧Workerとの互換で省かれることがある。
-  // 省かれたときは null のまま残し、空の集計で0組と誤案内しない。
-  const [statusCounts, setStatusCounts] = useState<Partial<Record<IdentityCandidateStatus, number>> | null>(null)
-  const [lowConfidenceCount, setLowConfidenceCount] = useState<number | null>(null)
-  const [query, setQuery] = useState('')
-  // FRIEND-11: 検索はサーバーへ渡して全件へかける。入力中の逐次送信を避けるため debounce。
-  const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [status, setStatus] = useState('')
-  const [page, setPage] = useState(1)
-  const [candidatesLoading, setCandidatesLoading] = useState(false)
-  const [candidateError, setCandidateError] = useState('')
-  // 表の中の失敗表示（403の言い分けつき）に渡すため、捕まえた失敗を残す。
-  const [candidateFailure, setCandidateFailure] = useState<unknown>(null)
-  /*
-   * FRIEND-12: 状態切替で先行した要求の応答が後から届いても採用しない。
-   * 番号の新しい要求だけを採用し、検索キー（状態・検索語・ページ）も
-   * 照合して「選んだ条件」と「出ている結果」がずれないようにする。
-   */
-  const candidatesReqRef = useRef(0)
-  const candidatesKeyRef = useRef('')
-  const statsReqRef = useRef(0)
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query), 250)
-    return () => clearTimeout(timer)
-  }, [query])
-
-  // 条件を変えたら1ページ目へ戻す（FRIEND-11）。
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedQuery, status])
-
-  const loadStats = useCallback(async (opts?: { forceRefresh?: boolean }) => {
-    if (opts?.forceRefresh) setRefreshing(true)
-    const req = ++statsReqRef.current
-    try {
-      const statsRes = await api.duplicates.stats(opts)
-      if (req !== statsReqRef.current) return
-      if (statsRes.success) {
-        setData(statsRes.data)
-        setStatsFailure(null)
-        setError('')
-      } else {
-        // success:false には状態が付かないので汎用（再試行あり）扱いにする。
-        setStatsFailure(new Error('集計を読み込めませんでした'))
-        setError('読み込めませんでした')
-      }
-    } catch (err) {
-      if (req !== statsReqRef.current) return
-      setStatsFailure(err)
-      setError('読み込めませんでした')
-    } finally {
-      if (req === statsReqRef.current) {
-        setLoading(false)
-        setRefreshing(false)
-      }
-    }
-  }, [])
-
-  const loadCandidates = useCallback(async () => {
-    const req = ++candidatesReqRef.current
-    const key = JSON.stringify({ status, q: debouncedQuery.trim(), page })
-    candidatesKeyRef.current = key
-    setCandidatesLoading(true)
-    setCandidateError('')
-    try {
-      const res = await api.identityCandidates.list({
-        kind: 'friend_duplicate',
-        // FRIEND-11: 「すべて」は本当に全状態を見る（従来は pending だけだった）。
-        status: (status || 'all') as IdentityCandidateStatus | 'all',
-        q: debouncedQuery.trim() || undefined,
-        limit: CANDIDATE_PAGE_SIZE,
-        offset: (page - 1) * CANDIDATE_PAGE_SIZE,
-      })
-      // 古い応答・別条件の応答は捨てる（FRIEND-12）。
-      if (req !== candidatesReqRef.current || candidatesKeyRef.current !== key) return
-      if (res.success) {
-        setCandidates(res.data.items)
-        setCandidateTotal(res.data.total)
-        setStatusCounts(res.data.statusCounts ?? null)
-        setLowConfidenceCount(res.data.lowConfidenceCount ?? null)
-        setCandidateFailure(null)
-      } else {
-        // FRIEND-12: 失敗を「新しい条件の0件」と誤認させない。
-        setCandidates([])
-        setCandidateTotal(0)
-        setCandidateError('候補一覧を読み込めませんでした')
-        setCandidateFailure(new Error('候補一覧を読み込めませんでした'))
-      }
-    } catch (err) {
-      if (req !== candidatesReqRef.current || candidatesKeyRef.current !== key) return
-      setCandidates([])
-      setCandidateTotal(0)
-      setCandidateError('候補一覧を読み込めませんでした')
-      setCandidateFailure(err)
-    } finally {
-      if (req === candidatesReqRef.current) setCandidatesLoading(false)
-    }
-  }, [status, debouncedQuery, page])
-
-  const load = useCallback(async (opts?: { forceRefresh?: boolean }) => {
-    await Promise.all([loadStats(opts), loadCandidates()])
-  }, [loadStats, loadCandidates])
-
-  const detect = async () => {
-    setRefreshing(true)
-    setError('')
-    try {
-      const result = await api.identityCandidates.detectFriendDuplicates({ limit: 100 })
-      if (!result.success) throw new Error('failed')
-      await load({ forceRefresh: true })
-    } catch {
-      setError('重複候補を再検出できませんでした。表示中の候補は前回の結果です。')
-      setRefreshing(false)
-    }
-  }
+  // 読み込み・絞り込み・再検出のロジックは use-duplicates-data.ts が正本。
+  // ★V8 の画面（duplicates-v8.tsx）も同じ口を使う。
+  const {
+    data,
+    loading,
+    refreshing,
+    error,
+    statsFailure,
+    candidates,
+    candidateTotal,
+    statusCounts,
+    lowConfidenceCount,
+    query,
+    setQuery,
+    status,
+    setStatus,
+    page,
+    setPage,
+    candidatesLoading,
+    candidateError,
+    candidateFailure,
+    load,
+    loadCandidates,
+    detect,
+    duplicateTotalText,
+    duplicateDetail,
+  } = useDuplicatesData()
 
   const candidatePageCount = Math.max(1, Math.ceil(candidateTotal / CANDIDATE_PAGE_SIZE))
   const rangeStart = candidateTotal === 0 ? 0 : (page - 1) * CANDIDATE_PAGE_SIZE + 1
   const rangeEnd = Math.min(page * CANDIDATE_PAGE_SIZE, candidateTotal)
-
-  useEffect(() => {
-    loadStats()
-  }, [loadStats])
-
-  useEffect(() => {
-    void loadCandidates()
-  }, [loadCandidates])
-
-  // Tick once a minute so the "○分前に計算" label keeps refreshing while
-  // the operator leaves the page open. setNow reads Date.now() implicitly
-  // on the next render via formatRelative.
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 60_000)
-    return () => clearInterval(interval)
-  }, [])
-
-  /*
-   * R598の件数矛盾の修正：statusCounts が無い（旧Worker）とき合計を0組と
-   * 誤案内しない。絞り込み無しなら一覧の total が全体の総数と確実に等しい
-   * のでそれを出し、内訳（確認待ち・確認済み・根拠不足）は「—」にする。
-   * 絞り込み中は全体が分からないので合計も「—」（一覧の下に絞り込み後の
-   * 件数が出ている）。読み込み待ちの0も出さない（FRIEND-12）。
-   */
-  const unfilteredCandidates = status === '' && debouncedQuery.trim() === ''
-  const duplicateTotalText =
-    statusCounts !== null
-      ? `${formatNumber(Object.values(statusCounts).reduce((sum, n) => sum + (n ?? 0), 0))}組`
-      : !unfilteredCandidates || candidateError || (candidatesLoading && candidateTotal === 0)
-        ? '—'
-        : `${formatNumber(candidateTotal)}組`
-  const duplicateDetail =
-    statusCounts !== null
-      ? `${formatNumber(statusCounts.pending ?? 0)}組を確認待ち`
-      : !unfilteredCandidates || candidateError
-        ? '読み込めませんでした'
-        : '内訳は読み込めませんでした'
 
   return (
     <div className="flex flex-col gap-4" data-duplicates-design="v4">
@@ -408,7 +234,7 @@ export default function DuplicatesPage() {
                     <td className="py-3 pr-3 pl-5 font-semibold text-ink" title={`${candidate.left.label} ↔ ${candidate.right.label}`}><span className="block truncate">{candidate.left.label} ↔ {candidate.right.label}</span></td>
                     <td className="px-3 py-3 text-ink-secondary">{candidate.confidence.label === 'very_high' ? '最高' : candidate.confidence.label === 'high' ? '高' : candidate.confidence.label === 'medium' ? '中' : '低'}</td>
                     <td className="truncate px-3 py-3 text-ink-secondary" title={candidate.evidenceSummary.join('・')}>{candidate.evidenceSummary.join('・') || '根拠を確認'}</td>
-                    <td className="truncate px-3 py-3 text-ink-secondary">{[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ') || '—'}</td>
+                    <td className="truncate px-3 py-3 text-ink-secondary" title={[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ')}>{[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ') || '—'}</td>
                     <td className="px-3 py-3 text-ink-secondary">{formatDateTime(candidate.reviewedAt ?? candidate.detectedAt)}</td>
                     <td className="px-3 py-3 font-semibold text-ink">{candidate.status === 'pending' ? '未確認' : candidate.status === 'linked' ? '確認済み' : candidate.status === 'deferred' ? '保留' : '別人'}</td>
                     <td className="whitespace-nowrap py-2 pr-5 pl-3 text-right"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>重複候補を確認</Button></td>

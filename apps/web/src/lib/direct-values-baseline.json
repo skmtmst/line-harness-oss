@@ -39,6 +39,16 @@
     "radius": 5,
     "shadow": 0
   },
+  "app/reminders/wizard-v8.module.css": {
+    "color": 0,
+    "radius": 0,
+    "shadow": 1
+  },
+  "app/rich-menus/new/create-v8.module.css": {
+    "color": 6,
+    "radius": 4,
+    "shadow": 1
+  },
   "app/staff/page.tsx": {
     "color": 2,
     "radius": 0,
@@ -46,6 +56,11 @@
   },
   "app/tags/folders/new/page.tsx": {
     "color": 8,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/tags/mark-editor-v8.tsx": {
+    "color": 6,
     "radius": 0,
     "shadow": 0
   },
@@ -95,7 +110,7 @@
     "shadow": 0
   },
   "components/friend-fields/tags-page-v4.tsx": {
-    "color": 3,
+    "color": 1,
     "radius": 0,
     "shadow": 0
   },

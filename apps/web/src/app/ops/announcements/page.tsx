@@ -3,6 +3,7 @@
 import { Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  ApiError,
   api,
   type OpsAnnouncement,
   type OpsAnnouncementAudience,
@@ -11,12 +12,15 @@ import {
   type OpsAudiencePreview,
   type OpsTenantRow,
 } from '@/lib/api'
-import OpsPageHeader from '@/components/ops/ops-page-header'
-import { formatDateTime, opsCall } from '@/components/ops/ops-ui'
+import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
+import '@/app/ops/readonly-v8.css'
+import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
 import { previewLabel, toLocalInput, toPublishAt } from './format'
 import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -47,6 +51,34 @@ const CHANNELS: Array<{ key: OpsAnnouncementChannel; label: string }> = [
 ]
 const STATUS_TONE: Record<OpsAnnouncement['status'], ChipTone> = { draft: 'neutral', scheduled: 'info', sending: 'warn', sent: 'ok', failed: 'danger' }
 
+/** 板 `TJUUl`「送る前の確認」の宛先の1行。 */
+function confirmAudience(form: Form, preview: OpsAudiencePreview | null): string {
+  const base = form.audienceKind === 'all'
+    ? 'すべての契約先'
+    : form.audienceKind === 'plan'
+      ? `${form.audiencePlans.map((key) => PLANS.find((p) => p.key === key)?.label ?? key).join('・')}の契約先`
+      : `選んだ契約先 ${form.audienceTenantIds.length}社`
+  return preview ? `${base} ${preview.tenants}社` : `${base}（数えています…）`
+}
+
+/** 板 `TJUUl`「送る前の確認」の届く方法の1行。 */
+function confirmChannels(form: Form, preview: OpsAudiencePreview | null): string {
+  if (!preview) return '数えています…'
+  return form.channels.map((key) => {
+    if (key === 'screen') return `画面 ${preview.tenants}`
+    if (key === 'email') return `メール ${preview.withEmail}`
+    const unlinked = Math.max(preview.staff - preview.lineLinked, 0)
+    return `LINE ${preview.lineLinked}（LINE 未登録 ${unlinked}）`
+  }).join('・')
+}
+
+/** 「2026-10-05T10:00」を「10/5 10:00」にする。送るボタンの文字用。 */
+function shortPublishAt(local: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local.trim())
+  if (!match) return local.trim()
+  return `${Number(match[2])}/${Number(match[3])} ${match[4]}:${match[5]}`
+}
+
 type Form = {
   subject: string
   body: string
@@ -58,6 +90,18 @@ type Form = {
 }
 const EMPTY: Form = { subject: '', body: '', audienceKind: 'all', audiencePlans: [], audienceTenantIds: [], channels: ['line', 'screen'], publishAt: '' }
 
+/*
+ * 一覧の読み込み失敗の説明。403・429 は説明を渡さず、ListState が捕まえた
+ * 失敗から共通の1枚（権限の案内・待ち案内）を作る。それ以外は捕まえた言葉を
+ * そのまま出す（通信断の「通信できませんでした」など）。
+ */
+function loadDescription(err: unknown): string | undefined {
+  if (isForbiddenOrRateLimited(err)) return undefined
+  if (err instanceof TypeError) return '通信できませんでした。ネットワークを確認してもう一度お試しください'
+  if (err instanceof Error && err.message && !/^API error: /.test(err.message)) return err.message
+  return undefined
+}
+
 export default function OpsAnnouncementsPage() {
   const [rows, setRows] = useState<OpsAnnouncement[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -66,6 +110,13 @@ export default function OpsAnnouncementsPage() {
   const [tenants, setTenants] = useState<OpsTenantRow[]>([])
   const [form, setForm] = useState<Form>(EMPTY)
   const [editingId, setEditingId] = useState<string | null>(null)
+  /*
+   * M512: 作る欄の再実行キー。二重押し・通信再送でも1件だけ作る。
+   * 保存できたら・作り直すときは新しいキーに替える。
+   */
+  const [createKey, setCreateKey] = useState(() => crypto.randomUUID())
+  /* M513: 直し始めたときの版。違う版からの保存は最新の内容つきで409になる。 */
+  const [editingUpdatedAt, setEditingUpdatedAt] = useState<string | null>(null)
   const [preview, setPreview] = useState<OpsAudiencePreview | null>(null)
   const [busy, setBusy] = useState(false)
   /*
@@ -73,7 +124,7 @@ export default function OpsAnnouncementsPage() {
    * 場所に、入力の検証・保存・削除の失敗（formError）は作る欄の上に出す。
    * まとめると「件名を入力してください」で一覧まで失敗表示に変わる（監査 R154）。
    */
-  const [loadError, setLoadError] = useState('')
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [formError, setFormError] = useState('')
   const [notice, setNotice] = useState('')
   const [confirmSend, setConfirmSend] = useState(false)
@@ -85,13 +136,20 @@ export default function OpsAnnouncementsPage() {
   const [baseline, setBaseline] = useState<Form>(EMPTY)
 
   const load = useCallback(async () => {
-    setLoadError('')
-    const res = await opsCall(api.ops.announcements.list())
-    setLoaded(true)
-    if (!res.success) { setLoadError(res.error || '読み込めませんでした'); return }
-    setRows(res.data)
-    setLineConfigured(res.noticeLineConfigured)
-    setLinked(res.linked)
+    setLoadError(null)
+    try {
+      const res = await api.ops.announcements.list()
+      if (!res.success) { setLoadError(new Error(res.error || '読み込めませんでした')); return }
+      setRows(res.data)
+      setLineConfigured(res.noticeLineConfigured)
+      setLinked(res.linked)
+    } catch (caught) {
+      // M038：捕まえた失敗をそのまま残す。ListState が 403 は権限の案内
+      // （再試行なし）・429 は待ち案内に切り替える。
+      setLoadError(caught)
+    } finally {
+      setLoaded(true)
+    }
   }, [])
 
   useEffect(() => { void load() }, [load])
@@ -138,25 +196,60 @@ export default function OpsAnnouncementsPage() {
     if (validation) { setFormError(validation); return }
     setBusy(true)
     setFormError('')
-    const res = await opsCall(editingId ? api.ops.announcements.update(editingId, input(mode)) : api.ops.announcements.create(input(mode)))
-    setBusy(false)
     setConfirmSend(false)
-    if (!res.success) { setFormError(res.error || '保存できませんでした'); return }
-    setNotice(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${res.data.recipientsTotal}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
-    setBaseline(EMPTY)
-    setForm(EMPTY)
-    setEditingId(null)
-    await load()
+    try {
+      const res = editingId
+        ? await api.ops.announcements.update(editingId, input(mode), editingUpdatedAt ?? undefined)
+        : await api.ops.announcements.create(input(mode), createKey)
+      if (!res.success) { setFormError('保存できませんでした'); return }
+      setNotice(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${res.data.recipientsTotal}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
+      setBaseline(EMPTY)
+      setForm(EMPTY)
+      setEditingId(null)
+      setEditingUpdatedAt(null)
+      setCreateKey(crypto.randomUUID())
+      await load()
+    } catch (error) {
+      // M512/M513: 二重押しの取り違え・ほかの人の先行保存は理由を言い分け、
+      // 最新の一覧を見せる。入力は残したまま保存し直せる。
+      if (error instanceof ApiError && error.status === 409) {
+        if (error.code === 'IDEMPOTENCY_CONFLICT') {
+          setFormError('同じ再実行キーが別の内容に使われています。作り直してください。')
+          setCreateKey(crypto.randomUUID())
+          return
+        }
+        const latest = (error.data as { latest?: { updatedAt?: string } } | null)?.latest
+        if (latest?.updatedAt) setEditingUpdatedAt(latest.updatedAt)
+        setFormError(error.message && !error.message.startsWith('API error:')
+          ? error.message
+          : 'ほかの人が先に保存しました。一覧を読み直してから、もう一度保存してください。入力した内容はそのまま残っています。')
+        await load()
+        return
+      }
+      setFormError(error instanceof ApiError ? opsErrorMessage(error) : '保存できませんでした')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const edit = (a: OpsAnnouncement) => {
     const loaded: Form = { subject: a.subject, body: a.body, audienceKind: a.audienceKind, audiencePlans: a.audiencePlans, audienceTenantIds: a.audienceTenantIds, channels: a.channels, publishAt: toLocalInput(a.publishAt) }
     setEditingId(a.id)
+    setEditingUpdatedAt(a.updatedAt)
     setBaseline(loaded)
     setForm(loaded)
     setFormError('')
     setNotice('')
     window.scrollTo({ top: 0 })
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditingUpdatedAt(null)
+    setBaseline(EMPTY)
+    setForm(EMPTY)
+    setFormError('')
+    setCreateKey(crypto.randomUUID())
   }
 
   const remove = async () => {
@@ -173,7 +266,7 @@ export default function OpsAnnouncementsPage() {
   const scheduled = form.publishAt.trim().length > 0
 
   return (
-    <div data-design-node="q2CokV" className="flex flex-col gap-4">
+    <ReadonlyDesignNode node="tQ2MJ"><div data-design-node="q2CokV" className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader
         title="お知らせ"
@@ -242,10 +335,10 @@ export default function OpsAnnouncementsPage() {
             <DateTimeField value={form.publishAt} onChange={(v) => setForm((f) => ({ ...f, publishAt: v }))} aria-label="公開日時（日本時間）" />
             <span className="text-micro text-ink-faint">空のまま「今すぐ送る」を押すとすぐに送ります。日時を入れると「配信を予約する」に変わります（日本時間）。</span>
           </div>
-          {editingId ? <Button onClick={() => { setEditingId(null); setBaseline(EMPTY); setForm(EMPTY); setFormError('') }}>キャンセル</Button> : null}
+          {editingId ? <Button onClick={cancelEdit}>直すのをやめる</Button> : null}
         </section>
 
-        <section aria-label="配信済みの表" className="rounded-card border border-hairline bg-canvas xl:col-span-3">
+        <section aria-label="配信済みの表" className="v8-ro-ops-page rounded-card border border-hairline bg-canvas xl:col-span-3">
           <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
             <h3 className="text-label font-semibold text-ink">配信済み・予約・下書き</h3>
             <span className="text-micro text-ink-faint">{linked ? `契約者専用LINEの登録 ${linked.linked}人 / ${linked.total}人` : ''}</span>
@@ -254,7 +347,7 @@ export default function OpsAnnouncementsPage() {
             <ListState kind="loading" title="読み込んでいます" />
           ) : loadError && rows.length === 0 ? (
             // 「まだ無い」と「読み込めなかった」を言い分ける。失敗時は空の案内ではなくエラーと再読み込みを出す。
-            <ListState kind="error" title="お知らせを表示できませんでした" onRetry={() => void load()} />
+            <ListState kind="error" title="お知らせを表示できませんでした" description={loadDescription(loadError)} error={loadError ?? undefined} onRetry={() => void load()} />
           ) : rows.length === 0 ? (
             <div className="bg-canvas rounded-card border-hairline border">
               <ListState kind="empty" title="まだお知らせはありません" description="左で作って「今すぐ送る」か「配信を予約する」を押すと、ここに並びます。" />
@@ -319,16 +412,40 @@ export default function OpsAnnouncementsPage() {
         </section>
       </div>
 
-      <ConfirmDialog
+      <Dialog
         open={confirmSend}
-        title="今すぐ送りますか？"
-        description={`${previewLabel(preview, form.channels)}。送ったあとは取り消せません。`}
-        confirmLabel="送る"
+        title="このお知らせを送りますか？"
+        cancelLabel="戻って直す"
+        confirmLabel={scheduled ? `${shortPublishAt(form.publishAt)}に送る` : '今すぐ送る'}
+        confirmIcon={<Send size={16} aria-hidden="true" />}
         busy={busy}
-        error={formError}
+        error={formError || undefined}
+        designNode="TJUUl"
         onConfirm={() => void submit('send')}
         onCancel={() => { if (!busy) setConfirmSend(false) }}
-      />
+      >
+        <div className="flex flex-col gap-4">
+          <dl className="grid gap-1.5 rounded-card bg-canvas-sunken px-4 py-3">
+            <div className="flex gap-3">
+              <dt className="w-16 shrink-0 text-caption text-ink-faint">宛先</dt>
+              <dd className="text-caption font-medium text-ink">{confirmAudience(form, preview)}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-16 shrink-0 text-caption text-ink-faint">届く方法</dt>
+              <dd className="text-caption font-medium text-ink">{confirmChannels(form, preview)}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-16 shrink-0 text-caption text-ink-faint">送る日時</dt>
+              <dd className="text-caption font-medium text-ink">{scheduled ? `${formatDateTime(toPublishAt(form.publishAt))}（予約）` : '今すぐ送る'}</dd>
+            </div>
+          </dl>
+          <div>
+            <p className="text-label font-semibold text-ink">件名：{form.subject.trim()}</p>
+            <p className="mt-1 text-caption text-ink-secondary">{form.body.trim().length > 80 ? `${form.body.trim().slice(0, 80)} …` : form.body.trim()}</p>
+          </div>
+          <p className="text-caption text-ink-secondary">送ったあとは本文を直せません。画面のお知らせは取り下げられます（メール・LINE は取り消せません）。</p>
+        </div>
+      </Dialog>
       <ConfirmDialog
         open={deleting !== null}
         title={deleting ? `「${deleting.subject}」を消しますか？` : ''}
@@ -341,6 +458,6 @@ export default function OpsAnnouncementsPage() {
         onCancel={() => { if (!busy) setDeleting(null) }}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></ReadonlyDesignNode>
   )
 }

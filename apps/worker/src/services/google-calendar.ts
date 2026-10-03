@@ -13,6 +13,10 @@ export interface BusyInterval {
   end: string;
 }
 
+export class GoogleCalendarReadError extends Error {
+  constructor(readonly status: number) { super('calendar_read_failed'); }
+}
+
 export interface CreateEventInput {
   summary: string;
   start: string;   // ISO datetime string
@@ -25,6 +29,25 @@ export interface CreateEventInput {
 
 export class GoogleCalendarClient {
   constructor(private config: GoogleCalendarConfig) {}
+
+  /** 件数は FreeBusy の結合された区間数ではなく、個々の予定から数える。 */
+  async listEventIds(timeMin: string, timeMax: string): Promise<string[]> {
+    const ids: string[] = [];
+    let pageToken: string | undefined;
+    for (let page = 0; page < 100; page++) {
+      const query = new URLSearchParams({ timeMin, timeMax, singleEvents: 'true', showDeleted: 'false', maxResults: '2500', fields: 'items(id,status),nextPageToken' });
+      if (pageToken) query.set('pageToken', pageToken);
+      const res = await fetch(`${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events?${query}`, {
+        headers: { Authorization: `Bearer ${this.config.accessToken}` },
+      });
+      if (!res.ok) throw new GoogleCalendarReadError(res.status);
+      const data = await res.json() as { items?: Array<{ id: string; status?: string }>; nextPageToken?: string };
+      ids.push(...(data.items ?? []).filter((event) => event.status !== 'cancelled').map((event) => event.id));
+      pageToken = data.nextPageToken;
+      if (!pageToken) return [...new Set(ids)];
+    }
+    throw new GoogleCalendarReadError(502);
+  }
 
   /**
    * Get busy time intervals from Google Calendar FreeBusy API.

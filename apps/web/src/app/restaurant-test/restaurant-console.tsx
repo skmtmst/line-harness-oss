@@ -8,6 +8,7 @@ import StoreContextBanner from './stores/store-context-banner'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import HelpTip from '@/components/shared/help-tip'
+import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -79,7 +80,7 @@ function Status({ value }: { value: string }) {
 
 function TestBoundary() {
   return <div className="mb-5 flex flex-col gap-3 rounded-card border border-nen-border bg-nen-ivory px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-    <div><span className="mr-2 inline-flex rounded-pill bg-nen-green px-2.5 py-1 text-xs font-medium text-on-accent">検証環境専用</span><span className="text-nen-copy">既存の然-NEN運用とは分離された飲食店向けテスト領域です。</span></div>
+    <div><span className="mr-2 inline-flex rounded-pill bg-nen-green px-2.5 py-1 text-xs font-medium text-on-accent">検証環境専用</span><span className="text-nen-copy">既存の運用とは分離された飲食店向けテスト領域です。</span></div>
     <div className="flex items-center gap-2 font-semibold text-nen-green"><span className="h-2 w-2 rounded-pill bg-nen-gold" />予約媒体は受信専用・外部更新なし</div>
   </div>
 }
@@ -103,7 +104,7 @@ function Panel({ title, description, action, children, className = '' }: { title
 
 function EmptySetup() {
   return <div className="rounded-card border border-nen-border bg-canvas p-10 text-center">
-    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-pill bg-nen-ivory text-2xl text-nen-gold">然</div>
+    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-pill bg-nen-ivory text-2xl text-nen-gold">店</div>
     <h2 className="mt-5 text-xl font-bold text-nen-green">店舗が登録されていません</h2>
     <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-ink-secondary">統括から店舗を登録してください。</p>
   </div>
@@ -117,6 +118,11 @@ export default function RestaurantConsole({ view }: { view: string }) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  /*
+   * D024: 取得失敗を未登録（EmptySetup）と混ぜない。理由は帯に残し、
+   * ここでは理由と読み直し口だけを出す。機能自体は変えない。
+   */
+  const [loadError, setLoadError] = useState<unknown>(null)
   // R103: 台帳の絞り込み条件は台帳画面が持ち、ダッシュボードは今後の有効予約だけを読む。
   const [todayStartIso] = useState(() => { const day = new Date(); day.setHours(0, 0, 0, 0); return day.toISOString() })
   const [ledgerQuery, setLedgerQuery] = useState<ReservationQuery | null>(null)
@@ -127,15 +133,23 @@ export default function RestaurantConsole({ view }: { view: string }) {
       : undefined, [activeView, ledgerQuery, todayStartIso])
 
   const load = useCallback(async () => {
-    if (!selectedAccountId) { setSnapshot(null); setLoading(false); return }
+    if (!selectedAccountId) { setSnapshot(null); setLoadError(null); setLoading(false); return }
     setLoading(true)
     try {
       const res = await restaurantTestApi.snapshot(selectedAccountId, effectiveQuery)
       setSnapshot(res.data)
+      setLoadError(null)
       setSelectedStoreId((current) => res.data.stores.some((item) => item.id === current)
         ? current
         : res.data.stores[0]?.id || '')
-    } catch { setNotice({ tone: 'error', text: '飲食店向けテストデータを読み込めませんでした。' }) }
+    } catch (caught) {
+      /*
+       * R619: 読み込み失敗は下の ListState の1枚に集める。ここで帯にも
+       * 出すと「読めません」と「店舗未登録」が同時に並ぶ。操作の成否の
+       * 帯（mutate 側）は残す。
+       */
+      setLoadError(caught)
+    }
     finally { setLoading(false) }
   }, [selectedAccountId, effectiveQuery])
   useEffect(() => { void load() }, [load])
@@ -154,6 +168,7 @@ export default function RestaurantConsole({ view }: { view: string }) {
     <TestBoundary />
     {notice && <div className={`mb-4 rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
     {loading ? <div className="rounded-card border border-hairline bg-canvas p-16 text-center text-sm text-ink-faint">読み込み中…</div>
+      : loadError !== null && !snapshot?.organization ? <ListState kind="error" error={loadError} onRetry={() => void load()} />
       : !snapshot?.organization ? <EmptySetup />
       : activeView === 'dashboard' ? <Dashboard data={snapshot} />
       : activeView === 'organization' ? <Organization
@@ -719,5 +734,5 @@ function LineFlowCard({ flow, busy, save }: { flow: RestaurantLineFlow; busy: bo
   const [title, setTitle] = useState(flow.title)
   const [body, setBody] = useState(flow.body)
   const timing = flow.timing_minutes === null ? '常設' : flow.timing_minutes < 0 ? `${Math.abs(flow.timing_minutes) / 60}時間前` : `${flow.timing_minutes / 60}時間後`
-  return <article className="overflow-hidden rounded-card border border-nen-border bg-canvas"><div className="border-b border-nen-border bg-nen-ivory px-5 py-4"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-medium tracking-[0.18em] text-nen-label">NEN RESTAURANT</p><h2 className="mt-1 font-medium text-nen-green">{flow.title}</h2></div><Status value={flow.delivery_mode} /></div></div><div className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_220px]"><div className="space-y-3"><label className="block text-xs font-medium text-ink-secondary">タイトル<input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal" /></label><label className="block text-xs font-medium text-ink-secondary">本文<textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} className="mt-1 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal leading-6" /></label><div className="flex items-center justify-between"><span className="text-xs font-medium text-nen-label">配信: {timing}</span><button disabled={busy} onClick={() => save(flow, { title, body, timingMinutes: flow.timing_minutes, isEnabled: Boolean(flow.is_enabled) })} className="rounded-control bg-nen-green px-4 py-2 text-xs font-medium text-on-accent disabled:opacity-50">下書きを保存する</button></div></div><div className="rounded-card bg-nen-green p-4 text-on-accent shadow-float"><p className="text-micro tracking-[0.2em] text-nen-gold-soft">然 NEN</p><p className="mt-3 text-sm font-medium">{title}</p><p className="mt-2 text-xs leading-5 text-on-accent/80">{body}</p><div className="mt-4 rounded-control bg-canvas/10 px-3 py-2 text-center text-xs font-medium">予約内容を確認</div></div></div></article>
+  return <article className="overflow-hidden rounded-card border border-nen-border bg-canvas"><div className="border-b border-nen-border bg-nen-ivory px-5 py-4"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-medium tracking-[0.18em] text-nen-label">RESTAURANT</p><h2 className="mt-1 font-medium text-nen-green">{flow.title}</h2></div><Status value={flow.delivery_mode} /></div></div><div className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_220px]"><div className="space-y-3"><label className="block text-xs font-medium text-ink-secondary">タイトル<input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal" /></label><label className="block text-xs font-medium text-ink-secondary">本文<textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} className="mt-1 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal leading-6" /></label><div className="flex items-center justify-between"><span className="text-xs font-medium text-nen-label">配信: {timing}</span><button disabled={busy} onClick={() => save(flow, { title, body, timingMinutes: flow.timing_minutes, isEnabled: Boolean(flow.is_enabled) })} className="rounded-control bg-nen-green px-4 py-2 text-xs font-medium text-on-accent disabled:opacity-50">下書きを保存する</button></div></div><div className="rounded-card bg-nen-green p-4 text-on-accent shadow-float"><p className="text-micro tracking-[0.2em] text-nen-gold-soft">サンプル店舗</p><p className="mt-3 text-sm font-medium">{title}</p><p className="mt-2 text-xs leading-5 text-on-accent/80">{body}</p><div className="mt-4 rounded-control bg-canvas/10 px-3 py-2 text-center text-xs font-medium">予約内容を確認</div></div></div></article>
 }

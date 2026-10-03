@@ -6,7 +6,7 @@
  * `line-notifications` 名で無く、更新扱い（405）で返っていたこと。
  */
 import React from 'react'
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const apiMocks = vi.hoisted(() => ({ previewRecipients: vi.fn() }))
@@ -39,6 +39,27 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('operator/new の受け取る人', () => {
+  it('R612: 候補0人なら理由と準備・次の画面を案内する', async () => {
+    apiMocks.previewRecipients.mockResolvedValue({ success: true, data: { items: [] } })
+    render(<Page />)
+    await flush()
+    expect(await screen.findByText('受け取る人がいません')).toBeTruthy()
+    expect(screen.getByText('スタッフを登録し、LINE連携が済んだ人が宛先になります。')).toBeTruthy()
+    const guide = screen.getByRole('link', { name: 'ログインユーザーでスタッフを確認する' })
+    expect(guide.getAttribute('href')).toBe('/staff')
+  })
+
+  it('R612: 候補0人で保存すると準備への案内が出る', async () => {
+    apiMocks.previewRecipients.mockResolvedValue({ success: true, data: { items: [] } })
+    render(<Page />)
+    await flush()
+    await screen.findByText('受け取る人がいません')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+    })
+    expect(await screen.findByText('受け取る人がいません。先にログインユーザーでスタッフ登録とLINE連携を済ませてください。')).toBeTruthy()
+  })
+
   it('候補の器（items/summary）で名前が出る', async () => {
     apiMocks.previewRecipients.mockResolvedValue({
       success: true,

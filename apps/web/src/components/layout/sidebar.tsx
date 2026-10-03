@@ -7,11 +7,13 @@ import { useAccount } from '@/contexts/account-context'
 import { SIDEBAR_TOGGLE_EVENT, UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
-import { HQ_MENU_SECTIONS, menuOwnerForScreen, orderedMenuSections, type MenuItem } from '@/lib/menu'
+import { HQ_MENU_SECTIONS, menuOwnerForScreen, orderedMenuSections, type MenuItem, type MenuSection } from '@/lib/menu'
 import { HQ_TEMPLATE_DISTRIBUTION_ENABLED } from '@/lib/hq-template-availability'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import SidebarIdentity from './sidebar-identity'
+import { brandInitial } from './brand-initial'
 import SidebarVersion from './sidebar-version'
 import Notice from '@/components/shared/notice'
 import HqAccountMenu from '@/components/hq/account-menu'
@@ -25,6 +27,15 @@ import styles from './sidebar.module.css'
 /* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
    反映するため同型のエイリアスを使う（描画後の1回分のズレを防ぐ）。 */
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
+
+/** ★V8（夕44-A）：はじめから開く4組。ほかは見出しだけで畳む。 */
+const V8_GROUPS_OPEN_BY_DEFAULT = new Set(['basic', 'delivery', 'contents', 'booking'])
+
+/** 組の開閉を覚えるキー（ブラウザごと）。 */
+const SIDEBAR_GROUPS_KEY = 'lh-sidebar-groups'
+
+/** 左メニューのいちばん下の「設定」（夕41・部品 njl8e）。歯車は予約設定と同じ形。 */
+const SETTINGS_GEAR_ICON = 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31-.826 2.37-2.37 1.04-.6 2.296-.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
 
 /** 配布の受け口が無いあいだ、統括サイドバーから外す4画面。 */
 const HQ_UNAVAILABLE_DISTRIBUTION_HREFS = new Set([
@@ -102,6 +113,51 @@ export default function Sidebar({
   const { title: chromeTitle } = usePageChrome()
   const mobileTitle = chromeTitle ?? defaultTitleForPath(pathname ?? '')
   const [isOpen, setIsOpen] = useState(false)
+  /*
+   * ★V8（夕44-A・部品 T7XSI6）：組の開閉と V2 モードの扱いにテーマが要る。
+   * SSR・最初の描画は v7 の形（hydration を一致させるため）で、
+   * レイアウト効果の中で本当のテーマへ揃える。
+   */
+  const isV8 = useAdminTheme() === 'v8'
+  /*
+   * V2 の友だち属性モード（移行中だけの特別な形）で組を丸ごと隠すのは
+   * V8 では真似しない（MIGRATION-RISKS §1-2）。V8 では組の見出しは常に出て、
+   * 中身の開閉だけが変わる。
+   */
+  const attrV2Mode = friendAttributesV2Mode && !isV8
+
+  /*
+   * ★V8（夕44-A）：メイン・配信・コンテンツ・予約は開いた形、それ以外は
+   * 見出しだけで畳む。押すと開き、開いた状態はブラウザが覚える
+   * （lh-sidebar-groups）。いまの画面の組は常に開く。
+   */
+  const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>({})
+  useIsoLayoutEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(SIDEBAR_GROUPS_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved) as unknown
+        if (isBooleanRecord(parsed)) setGroupOpen(parsed)
+      }
+    } catch {
+      // localStorage が使えないときは既定の開閉だけで動かす
+    }
+  }, [])
+  const groupOpenByDefault = (section: MenuSection) =>
+    V8_GROUPS_OPEN_BY_DEFAULT.has(section.id)
+  const groupIsOpen = (section: MenuSection) =>
+    groupOpen[section.id] ?? groupOpenByDefault(section)
+  const toggleGroup = (section: MenuSection) => {
+    setGroupOpen((current) => {
+      const next = { ...current, [section.id]: !(current[section.id] ?? groupOpenByDefault(section)) }
+      try {
+        window.localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify(next))
+      } catch {
+        // 覚えられなくても開閉自体は動かす
+      }
+      return next
+    })
+  }
 
   /*
    * ★V8 外側：左メニューの畳み（幅 64・アイコンだけ）。
@@ -312,9 +368,9 @@ export default function Sidebar({
         if (isHq) return true
         // 移行中のV2画面では、承認画像どおり「友だち属性」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
-        if (friendAttributesV2Mode && item.href === '/tags') return false
-        if (friendAttributesV2Mode && item.href === '/conversions') return false
-        if (friendAttributesV2Mode && item.href === '/analytics') return false
+        if (attrV2Mode && item.href === '/tags') return false
+        if (attrV2Mode && item.href === '/conversions') return false
+        if (attrV2Mode && item.href === '/analytics') return false
         if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
         // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
@@ -331,7 +387,7 @@ export default function Sidebar({
       }),
     }))
     .filter((section) => section.items.length > 0)
-    .filter((section) => !friendAttributesV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
+    .filter((section) => !attrV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
 
   /*
    * PERF-08: バッジ用の件数は「出す項目があるもの」だけを購読する。
@@ -550,6 +606,14 @@ export default function Sidebar({
     return !siblingQueries.some((siblingQuery) => currentSearch === `?${siblingQuery}`)
   }
 
+  /*
+   * ★V8（夕41）：左メニューのいちばん下の「設定」（歯車）は、設定の組の
+   * どこかの画面を開いているとき選ばれた形にする。
+   */
+  const settingsActive = Boolean(
+    sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item)),
+  )
+
   /**
    * 中身は1つ。ドロワーでも常時表示でも同じものを出す。
    *
@@ -567,10 +631,10 @@ export default function Sidebar({
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-card object-cover" />
           ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-ink">{brand.name ?? '然-NEN- LINE管理システム'}</p>
+            <p className="truncate text-sm font-bold text-ink">{brand.name ?? 'musubo LINE管理システム'}</p>
             <p className="mt-0.5 text-micro font-medium text-ink-faint">管理メニュー</p>
           </div>
         </div>
@@ -589,9 +653,10 @@ export default function Sidebar({
         <div className={`px-[13px] pb-[9px] pt-[18px] ${styles.collapseHide}`}>
           <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
           <div className="flex h-[66px] items-center rounded-card border border-hairline bg-canvas px-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-[14px] font-semibold text-accent-deep">然</div>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-[14px] font-semibold text-accent-deep">サ</div>
             <div className="ml-3 min-w-0 flex-1">
-              <p className="truncate text-[14px] font-semibold text-ink">然-NEN- TEST</p>
+              {/* デザイン確認用の見本。特定の利用者の名前は書かない。 */}
+              <p className="truncate text-[14px] font-semibold text-ink">サンプルアカウント</p>
               <p className="mt-0.5 truncate text-micro text-ink-faint">コミュニケーション</p>
             </div>
           </div>
@@ -626,14 +691,45 @@ export default function Sidebar({
             機能設定を読み込めませんでした。
           </Notice>
         )}
-        {visibleSections.map((section, si) => (
-          <div key={si} className={styles.section}>
+        {visibleSections.map((section) => {
+          /*
+           * ★V8（夕44-A）：組の見出しは押せる開閉。畳んだ組は見出しだけ
+           * 残るので、組が丸ごと消えることはない。見出しの無い組（統括）は
+           * 畳めない。いまいる画面の組は常に開く。アイコンだけの帯では
+           * 見出し自体が無いので、畳みは効かせず全部のアイコンを出す。
+           */
+          const collapsible = isV8 && Boolean(section.label)
+          const sectionOpen =
+            !collapsible || groupIsOpen(section) || section.items.some((item) => isActive(item))
+          const hideItems = isV8 && !sectionOpen && !(collapsed && !drawer)
+          return (
+          <div key={section.id} className={styles.section}>
             {section.label && (
-              <div className={friendAttributesV2Mode ? 'flex h-[20px] items-center px-3' : styles.sectionHeading}>
-                <p>{section.label}</p>
-              </div>
+              isV8 ? (
+                <button
+                  type="button"
+                  className={styles.sectionToggle}
+                  onClick={() => toggleGroup(section)}
+                  aria-expanded={sectionOpen}
+                >
+                  <span className="min-w-0 flex-1 truncate text-left">{section.label}</span>
+                  <svg
+                    className={`${styles.sectionChevron} ${sectionOpen ? '' : styles.sectionChevronClosed}`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+              ) : (
+                <div className={attrV2Mode ? 'flex h-[20px] items-center px-3' : styles.sectionHeading}>
+                  <p>{section.label}</p>
+                </div>
+              )
             )}
-            {section.items.map((item) => {
+            {!hideItems && section.items.map((item) => {
               const active = isActive(item)
               const isDanger = 'danger' in item && item.danger
               const visibleLabel = item.label
@@ -649,11 +745,11 @@ export default function Sidebar({
                     なって一覧の中でそこだけ浮き、目が先にそこへ行く。
                     印は「いまここ」を示せれば足りる。
                   */
-                  className={`${styles.item} ${friendAttributesV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} border border-transparent text-[13px]` : ''} ${
+                  className={`${styles.item} ${attrV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} border border-transparent text-[13px]` : ''} ${
                     active
                       ? isDanger
                         ? `${styles.active} ${styles.danger}`
-                        : friendAttributesV2Mode
+                        : attrV2Mode
                           ? `${styles.active} border-accent`
                           : styles.active
                       : isDanger
@@ -679,8 +775,27 @@ export default function Sidebar({
               )
             })}
           </div>
-        ))}
+          )
+        })}
       </nav>
+
+      {/*
+        ★V8（夕41・部品 njl8e）：左メニューのいちばん下、版の上に「設定」。
+        オーナー・管理者にだけ出す。設定の画面ではここが選ばれた形にする。
+        nav は中身が多いときだけ縦に送り、この入口と版は下端に固定される。
+      */}
+      {isV8 && !isHq && !preview && (staffRole === 'owner' || staffRole === 'admin') && (
+        <div className={styles.settingsEntry}>
+          <Link
+            href="/settings"
+            title="設定"
+            className={`${styles.item} ${settingsActive ? styles.active : ''}`}
+          >
+            <span className="shrink-0"><NavIcon d={SETTINGS_GEAR_ICON} /></span>
+            <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>設定</span>
+          </Link>
+        </div>
+      )}
 
       {/*
         メニューの下の版の表示（★V7 監査の直し E）。いま動いている版・
@@ -730,7 +845,7 @@ export default function Sidebar({
             1280px 未満では PC のトップバー（画面の唯一の <h1>）を畳むので、
             現在地を h1 で持つのはここ（#734: 390px で全画面 h1 が消えていた）。 */}
         <h1 className={styles.mobileTitle} title={mobileTitle || brand.name || undefined}>
-          {mobileTitle || brand.name || '然-NEN- LINE管理システム'}
+          {mobileTitle || brand.name || 'musubo LINE管理システム'}
         </h1>
         {/* 公式アカウントの印。名前は画面名が持つので、ここはアイコンだけ。 */}
         <div className={styles.mobileBrand}>
@@ -738,7 +853,7 @@ export default function Sidebar({
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-control object-cover" />
           ) : (
-            <div className="w-7 h-7 rounded-control flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="w-7 h-7 rounded-control flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
           )}
         </div>
       </div>

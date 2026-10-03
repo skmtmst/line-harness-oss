@@ -1165,11 +1165,11 @@ export const NEN_COLUMNS = [
 ]
 
 export const NEN_PETS = [
-  { id: 'nen-pet-momo', friendId: 'friend-1', customerId: 'customer-1', name: 'ももちゃん', animalType: 'dog', gender: 'female', birthday: '2022-09-02', ownerName: '高橋 直人', lineUserId: 'Uvisualfriend000001' },
-  { id: 'nen-pet-sora', friendId: 'friend-2', customerId: 'customer-2', name: 'そらくん', animalType: 'cat', gender: 'male', birthday: '2024-08-28', ownerName: '前田 さくら', lineUserId: 'Uvisualfriend000002' },
-  { id: 'nen-pet-komugi', friendId: 'friend-3', customerId: 'customer-3', name: 'こむぎちゃん', animalType: 'dog', gender: 'female', birthday: '2018-11-14', ownerName: '木村 亮', lineUserId: 'Uvisualfriend000003' },
-  { id: 'nen-pet-leo', friendId: 'friend-4', customerId: 'customer-4', name: 'レオくん', animalType: 'dog', gender: 'male', birthday: null, ownerName: '大西 健一', lineUserId: 'Uvisualfriend000004' },
-  { id: 'nen-pet-purin', friendId: 'friend-5', customerId: 'customer-5', name: 'ぷりんちゃん', animalType: 'other', gender: 'female', birthday: '2022-10-05', ownerName: '中村 彩', lineUserId: 'Uvisualfriend000005' },
+  { id: 'nen-pet-momo', friendId: 'friend-1', customerId: 'customer-1', name: 'ももちゃん', animalType: 'dog', gender: 'female', birthday: '2022-09-02', ownerName: '高橋 直人', lineUserId: 'Uvisualfriend000001', updatedAt: '2026-09-10T10:00:00.000+09:00' },
+  { id: 'nen-pet-sora', friendId: 'friend-2', customerId: 'customer-2', name: 'そらくん', animalType: 'cat', gender: 'male', birthday: '2024-08-28', ownerName: '前田 さくら', lineUserId: 'Uvisualfriend000002', updatedAt: '2026-09-10T10:00:00.000+09:00' },
+  { id: 'nen-pet-komugi', friendId: 'friend-3', customerId: 'customer-3', name: 'こむぎちゃん', animalType: 'dog', gender: 'female', birthday: '2018-11-14', ownerName: '木村 亮', lineUserId: 'Uvisualfriend000003', updatedAt: '2026-09-10T10:00:00.000+09:00' },
+  { id: 'nen-pet-leo', friendId: 'friend-4', customerId: 'customer-4', name: 'レオくん', animalType: 'dog', gender: 'male', birthday: null, ownerName: '大西 健一', lineUserId: 'Uvisualfriend000004', updatedAt: '2026-09-10T10:00:00.000+09:00' },
+  { id: 'nen-pet-purin', friendId: 'friend-5', customerId: 'customer-5', name: 'ぷりんちゃん', animalType: 'other', gender: 'female', birthday: '2022-10-05', ownerName: '中村 彩', lineUserId: 'Uvisualfriend000005', updatedAt: '2026-09-10T10:00:00.000+09:00' },
 ]
 
 const nenJob = (id, campaignKey, label, friendName, scheduledAt, status, attempts, sentAt, triggerLabel, reactionLabel, lineAccountName = 'LINE 本店') => ({
@@ -1970,6 +1970,7 @@ const RICH_MENU_BASE = {
   targetingEnabled: true,
   folderId: 'rich-menu-folder-members',
   displayOrder: 1,
+  version: 1,
   thumbnailR2Key: null,
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-20T00:00:00.000Z',
@@ -2616,10 +2617,16 @@ const RUN_BASE = {
 }
 
 export const REMINDER_RUNS = {
-  reminder: { id: 'reminder-1', name: '予約前日のお知らせ', isActive: true },
+  reminder: {
+    id: 'reminder-1', name: '予約前日のお知らせ', isActive: true,
+    /** V8詳細（rbAig）はこの3つで「いまの状態」の札と操作を分ける。 */
+    lifecycleStatus: 'published', stopConditions: null, hasPublishedVersion: true,
+  },
   summary: {
     sent: 1126, scheduled: 398, stopped: 28, errors: 2,
     targetCount: 398, nextScheduledAt: '2026-08-24T09:00:00+09:00',
+    /* V8詳細の「いまの状態」。`getReminderDeliveryRunSummary` の追加列と同じ意味。 */
+    sentThisMonth: 386, scheduledNext7Days: 124,
   },
   steps: [
     {
@@ -3233,6 +3240,12 @@ export const BROADCAST_LIST_META = {
     openRate: 69.4,
   },
   pagination: { total: 24, limit: 20, cursor: 0, nextCursor: '20' },
+  /*
+   * 絞り込みの札の横の数（10の状態で数えたもの。V8 一覧が読む）。
+   * 合計は pagination.total と同じ24にそろえる——数が合わないと
+   * 絵の見比べで「札とページ送りで数が違う」に見える。
+   */
+  statusCounts: { all: 24, scheduled: 6, draft: 5, pending_approval: 2, sent: 9, partial_failed: 1, failed: 1 },
 }
 
 /** 機能6。予約完了画面に出すSlack通知設定。 */
@@ -4125,6 +4138,23 @@ export const AD_PLATFORMS = [
 ]
 
 /*
+ * #818 流入元ごとの広告費の台帳。数は V8 の板（`qSTVR`・`ZxKL5`）にそろえる。
+ * この30日の広告費 ¥86,000（Google ¥54,000＋Meta ¥32,000）・
+ * 友だち追加 73 人（45＋28）・つないだ広告 2 件。
+ * 友だち1人あたりは ¥1,178（86,000÷73、四捨五入）で板と合う。
+ * 通貨は円（JPYは最小単位が円そのもの）。日時は固定。
+ */
+export const AD_COST_ROWS = [
+  { sourceLabel: 'Google広告', adPlatformId: 'ad-google', entryRouteId: 'g-ads-summer', source: 'import', totals: [{ currency: 'JPY', amountMinor: 54000 }], friendAdds: 45, costPerFriendMinor: 1200, lastImportedAt: '2026-10-01T06:00:00+09:00' },
+  { sourceLabel: 'Meta広告', adPlatformId: 'ad-meta', entryRouteId: 'summer-ig', source: 'import', totals: [{ currency: 'JPY', amountMinor: 32000 }], friendAdds: 28, costPerFriendMinor: 1143, lastImportedAt: '2026-10-01T06:00:00+09:00' },
+]
+
+export const AD_COST_PLATFORMS = [
+  { id: 'ad-google', name: 'google', displayName: 'Google広告', lastSuccessAt: '2026-10-01T06:00:00+09:00', lastRunStatus: 'success', lastRunAt: '2026-10-01T06:00:00+09:00', lastError: null },
+  { id: 'ad-meta', name: 'meta', displayName: 'Meta広告', lastSuccessAt: '2026-10-01T06:00:00+09:00', lastRunStatus: 'success', lastRunAt: '2026-10-01T06:00:00+09:00', lastError: null },
+]
+
+/*
   #514-8: 本番の口が返す形だけにする。friendName・conversionName・nextRetryAt は
   口が返さない(画面も読まない)。豊富な形を返すとずれを隠す。
 */
@@ -4802,11 +4832,15 @@ export const CONVERSION_EXPORT_CSV = `\uFEFF${[
   内訳の面が `Cannot read properties of undefined (reading 'toLocaleString')` で
   落ちる（実装が行の有無を確かめずに数を整形しているため。別途 Issue に出した）。
 */
+/*
+ * 今月の成果の合計は V8 の板（`nJlxX`）の 38 件にそろえる。
+ * 6人の並び・承認済み報酬の列は変えない（別の板が読む）。
+ */
 export const AFFILIATE_REPORT = [
-  { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', commissionRate: 10, totalClicks: 820, totalConversions: 24, totalRevenue: 860000, confirmedReward: 86000, linkCount: 3, friendAdds: 58 },
-  { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', commissionRate: 0, totalClicks: 1240, totalConversions: 16, totalRevenue: 0, confirmedReward: 144000, linkCount: 2, friendAdds: 86 },
-  { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', commissionRate: 15, totalClicks: 420, totalConversions: 9, totalRevenue: 620000, confirmedReward: 93000, linkCount: 1, friendAdds: 31 },
-  { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', commissionRate: 10, totalClicks: 260, totalConversions: 5, totalRevenue: 400000, confirmedReward: 40000, linkCount: 1, friendAdds: 18 },
+  { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', commissionRate: 10, totalClicks: 820, totalConversions: 16, totalRevenue: 860000, confirmedReward: 86000, linkCount: 3, friendAdds: 58 },
+  { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', commissionRate: 0, totalClicks: 1240, totalConversions: 12, totalRevenue: 0, confirmedReward: 144000, linkCount: 2, friendAdds: 86 },
+  { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', commissionRate: 15, totalClicks: 420, totalConversions: 6, totalRevenue: 620000, confirmedReward: 93000, linkCount: 1, friendAdds: 31 },
+  { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', commissionRate: 10, totalClicks: 260, totalConversions: 3, totalRevenue: 400000, confirmedReward: 40000, linkCount: 1, friendAdds: 18 },
   { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', commissionRate: 5, totalClicks: 90, totalConversions: 1, totalRevenue: 60000, confirmedReward: 3000, linkCount: 1, friendAdds: 4 },
   { /* 成果0の人。0と未取得を混ぜないため、0はきちんと0で返す。 */ affiliateId: 'af-6', affiliateName: '旧パートナーA', code: 'old-a', commissionRate: 10, totalClicks: 0, totalConversions: 0, totalRevenue: 0, confirmedReward: 0, linkCount: 1, friendAdds: 0 },
 ]
@@ -4836,18 +4870,22 @@ export const AFFILIATE_REPORT_DETAIL = {
   duplicateFlags: [{ friendId: 'friend-4', identityKey: 'ik-friend-4' }],
 }
 
-/** 機能16。成果を締め、振込データと明細を作る新しい実API契約。 */
+/*
+ * 機能16。成果を締め、振込データと明細を作る新しい実API契約。
+ * 今月の報酬の合計は V8 の板（`nJlxX`）の ¥70,400 にそろえる。
+ * 内訳3人の合計も 70,400 に合わせる（合計と内訳が違う絵にしない）。
+ */
 export const AFFILIATE_SETTLEMENT_PREVIEW = {
   lineAccountId: 'visual-qa-account',
   periodFrom: '2026-08-01T00:00:00.000Z',
   periodTo: '2026-08-31T23:59:59.999Z',
   currency: 'JPY',
-  totalAmount: 174000,
+  totalAmount: 70400,
   conversionCount: 36,
   affiliates: [
-    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', amount: 72000, conversionCount: 18, bankProfileRegistered: true },
-    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', amount: 62000, conversionCount: 12, bankProfileRegistered: true },
-    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', amount: 40000, conversionCount: 6, bankProfileRegistered: false },
+    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', amount: 30000, conversionCount: 18, bankProfileRegistered: true },
+    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', amount: 25000, conversionCount: 12, bankProfileRegistered: true },
+    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', amount: 15400, conversionCount: 6, bankProfileRegistered: false },
   ],
   previewVersion: '82e052367d36df0428262a3c69e38ec22e45b05de382deec83e924960f1aa13d',
 }
@@ -4990,10 +5028,15 @@ const automationRun = ({
   failureReason,
 })
 
+/*
+ * 動いた数の見本は V8 の板（`LWQXd`・`g98F9`）の数にそろえる。
+ * 今月動いた 2,988 回・条件に外れた 1,240 回・失敗 6 件。
+ * 明細の7行は見本の行（撮影用）で、集計の数とは別。
+ */
 export const AUTOMATION_RUNS = {
   summary: {
-    total: 9660,
-    executed: 8420,
+    total: 4234,
+    executed: 2988,
     skipped: 1240,
     failed: 6,
     mostRunName: '「予約」で予約画面を出す',
@@ -5008,7 +5051,7 @@ export const AUTOMATION_RUNS = {
     automationRun({ id: 'run-6', occurredAt: '2026-08-24T09:05:00+09:00', subject: '高橋 直人', accountLabel: 'LINE 本店', triggerLabel: '毎日決まった時刻', status: 'succeeded', detail: '対応マーク「気にかける」', durationMs: 300, automationId: 'au-inactive', automationName: '反応がない人を気にかける', domainStatus: 'success', successfulActions: ['対応マーク「気にかける」'] }),
     automationRun({ id: 'run-7', occurredAt: '2026-08-23T20:00:00+09:00', subject: '前田 さくら', accountLabel: 'LINE 本店', triggerLabel: '友だちが追加されたとき', status: 'skipped', detail: '対象条件に当てはまりませんでした', durationMs: null, automationId: 'au-welcome', automationName: '友だち追加から案内を始める', domainStatus: 'skipped_condition' }),
   ],
-  pagination: { total: 9660, limit: 20, offset: 0 },
+  pagination: { total: 4234, limit: 20, offset: 0 },
 }
 
 /** 設計 `WjYAC` と同じ12件。選択後に利用者の実データを選び直す見本。 */
@@ -7032,9 +7075,10 @@ export const HQ_BANNER_IMAGES = [
 /** 然-NEN- 会員のランク設定。本物は `settingsResponse` の形。 */
 export const NEN_RANK_SETTINGS = {
   ranks: [
-    { id: 'nen-rank-gold', key: 'gold', name: 'ゴールド', annualThresholdYen: 100000, mileRatePercent: 5, tagId: 'tag-nen-gold', tagName: 'NENゴールド', memberCount: 4 },
-    { id: 'nen-rank-silver', key: 'silver', name: 'シルバー', annualThresholdYen: 30000, mileRatePercent: 3, tagId: 'tag-nen-silver', tagName: 'NENシルバー', memberCount: 6 },
-    { id: 'nen-rank-bronze', key: 'bronze', name: 'ブロンズ', annualThresholdYen: 0, mileRatePercent: 1, tagId: 'tag-nen-bronze', tagName: 'NENブロンズ', memberCount: 2 },
+    { id: 'nen-rank-platinum', key: 'platinum', name: 'プラチナ', annualThresholdYen: 200000, mileRatePercent: 3, tagId: 'tag-nen-platinum', tagName: '会員ランク：プラチナ', memberCount: 1 },
+    { id: 'nen-rank-gold', key: 'gold', name: 'ゴールド', annualThresholdYen: 50000, mileRatePercent: 2, tagId: 'tag-nen-gold', tagName: '会員ランク：ゴールド', memberCount: 3 },
+    { id: 'nen-rank-silver', key: 'silver', name: 'シルバー', annualThresholdYen: 20000, mileRatePercent: 1.5, tagId: 'tag-nen-silver', tagName: '会員ランク：シルバー', memberCount: 2 },
+    { id: 'nen-rank-bronze', key: 'bronze', name: 'ブロンズ', annualThresholdYen: 0, mileRatePercent: 1, tagId: 'tag-nen-bronze', tagName: '会員ランク：ブロンズ', memberCount: 6 },
   ],
   rules: {
     yearStartMonth: 1, applyOnReach: 'immediate', keepUntil: 'next_year_end', countOrders: 'paid',
@@ -7043,34 +7087,91 @@ export const NEN_RANK_SETTINGS = {
   milestones: [
     { id: 'nen-milestone-1', thresholdYen: 100000, title: '10万円到達', benefitKind: null, benefitNote: null, notifyOnReach: true, reachedCount: 4 },
   ],
-  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { gold: 4, silver: 6, bronze: 2 } },
+  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { platinum: 1, gold: 3, silver: 2, bronze: 6 }, linkedMembers: 9, petMembers: 8, monthPurchaseYen: 186400, monthBuyers: 7 },
 }
 
 /** 然-NEN- 会員の一覧。本物は `GET /api/nen/members` の形。 */
 export const NEN_MEMBER_LIST = {
   items: [
     {
-      friendId: 'friend-1', name: '高橋 直人', pictureUrl: null, customerId: 'customer-1',
-      rankKey: 'gold', rankName: 'ゴールド', mileRatePercent: 5,
-      annualMilesYen: 128000, lifetimeMilesYen: 486000, mileBalance: 8200,
-      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-05T10:00:00+09:00', purchaseCount: 14,
-      petCount: 1, petNames: 'ももちゃん', syncedAt: '2026-09-07T09:00:00+09:00',
+      friendId: 'friend-1', name: '田中 明子', pictureUrl: null, customerId: '10234',
+      rankKey: 'platinum', rankName: 'プラチナ', mileRatePercent: 3,
+      annualMilesYen: 82400, lifetimeMilesYen: 312000, mileBalance: 1240,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-28T10:00:00+09:00', purchaseCount: 14,
+      petCount: 2, petNames: 'こむぎ・ハナ', syncedAt: '2026-09-07T09:00:00+09:00',
     },
     {
-      friendId: 'friend-2', name: '前田 さくら', pictureUrl: null, customerId: 'customer-2',
-      rankKey: 'silver', rankName: 'シルバー', mileRatePercent: 3,
-      annualMilesYen: 42000, lifetimeMilesYen: 96000, mileBalance: 3100,
-      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-02T10:00:00+09:00', purchaseCount: 6,
-      petCount: 1, petNames: 'そらくん', syncedAt: '2026-09-07T09:00:00+09:00',
+      friendId: 'friend-2', name: '佐藤 健', pictureUrl: null, customerId: '10198',
+      rankKey: 'gold', rankName: 'ゴールド', mileRatePercent: 2,
+      annualMilesYen: 56100, lifetimeMilesYen: 148300, mileBalance: 860,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-21T10:00:00+09:00', purchaseCount: 9,
+      petCount: 2, petNames: 'そら・ピヨ', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-3', name: '鈴木 真理', pictureUrl: null, customerId: '10311',
+      rankKey: 'silver', rankName: 'シルバー', mileRatePercent: 1.5,
+      annualMilesYen: 31800, lifetimeMilesYen: 64500, mileBalance: 420,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-30T10:00:00+09:00', purchaseCount: 6,
+      petCount: 2, petNames: 'もも・ちび', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-4', name: '山田 太郎', pictureUrl: null, customerId: '10288',
+      rankKey: 'gold', rankName: 'ゴールド', mileRatePercent: 2,
+      annualMilesYen: 52000, lifetimeMilesYen: 98000, mileBalance: 640,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-12T10:00:00+09:00', purchaseCount: 8,
+      petCount: 0, petNames: null, syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-5', name: '坂本 真人', pictureUrl: null, customerId: '10301',
+      rankKey: 'gold', rankName: 'ゴールド', mileRatePercent: 2,
+      annualMilesYen: 50400, lifetimeMilesYen: 76200, mileBalance: 510,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-18T10:00:00+09:00', purchaseCount: 7,
+      petCount: 1, petNames: 'レオ', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-6', name: '中村 彩', pictureUrl: null, customerId: '10340',
+      rankKey: 'silver', rankName: 'シルバー', mileRatePercent: 1.5,
+      annualMilesYen: 28700, lifetimeMilesYen: 41900, mileBalance: 300,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-08-30T10:00:00+09:00', purchaseCount: 5,
+      petCount: 1, petNames: 'くう', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-7', name: '高橋 優', pictureUrl: null, customerId: null,
+      rankKey: 'bronze', rankName: 'ブロンズ', mileRatePercent: 1,
+      annualMilesYen: 12000, lifetimeMilesYen: 12000, mileBalance: 0,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-25T10:00:00+09:00', purchaseCount: 2,
+      petCount: 1, petNames: 'ラッキー', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-8', name: '伊藤 さくら', pictureUrl: null, customerId: '10455',
+      rankKey: 'bronze', rankName: 'ブロンズ', mileRatePercent: 1,
+      annualMilesYen: 8900, lifetimeMilesYen: 8900, mileBalance: 90,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-02T10:00:00+09:00', purchaseCount: 1,
+      petCount: 1, petNames: 'まる', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-9', name: '小林 健太', pictureUrl: null, customerId: null,
+      rankKey: 'bronze', rankName: 'ブロンズ', mileRatePercent: 1,
+      annualMilesYen: 6200, lifetimeMilesYen: 6200, mileBalance: 0,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-08-18T10:00:00+09:00', purchaseCount: 1,
+      petCount: 0, petNames: null, syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-10', name: '加藤 舞', pictureUrl: null, customerId: '10470',
+      rankKey: 'bronze', rankName: 'ブロンズ', mileRatePercent: 1,
+      annualMilesYen: 4800, lifetimeMilesYen: 4800, mileBalance: 48,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-27T10:00:00+09:00', purchaseCount: 1,
+      petCount: 1, petNames: 'ココ', syncedAt: '2026-09-07T09:00:00+09:00',
     },
   ],
-  total: 2,
+  total: 12,
   page: 1,
-  pageSize: 20,
-  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { gold: 4, silver: 6, bronze: 2 } },
+  pageSize: 10,
+  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { platinum: 1, gold: 3, silver: 2, bronze: 6 }, linkedMembers: 9, petMembers: 8, monthPurchaseYen: 186400, monthBuyers: 7 },
   ranks: [
-    { key: 'gold', name: 'ゴールド', annualThresholdYen: 100000, mileRatePercent: 5 },
-    { key: 'silver', name: 'シルバー', annualThresholdYen: 30000, mileRatePercent: 3 },
+    { key: 'platinum', name: 'プラチナ', annualThresholdYen: 200000, mileRatePercent: 3 },
+    { key: 'gold', name: 'ゴールド', annualThresholdYen: 50000, mileRatePercent: 2 },
+    { key: 'silver', name: 'シルバー', annualThresholdYen: 20000, mileRatePercent: 1.5 },
     { key: 'bronze', name: 'ブロンズ', annualThresholdYen: 0, mileRatePercent: 1 },
   ],
 }

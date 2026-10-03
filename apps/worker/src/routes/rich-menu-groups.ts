@@ -5,8 +5,7 @@ import {
   getRichMenuGroupWithPages,
   getRichMenuDeleteImpact,
   createRichMenuGroup,
-  updateRichMenuGroupMeta,
-  replaceRichMenuPages,
+  saveRichMenuGroupDraft,
   deleteRichMenuGroup,
   setRichMenuPageImage,
   pageBelongsToGroup,
@@ -133,6 +132,10 @@ function serializeGroup(row: RichMenuGroup) {
     targetingEnabled: row.targeting_enabled === 1,
     folderId: row.folder_id,
     displayOrder: row.display_order,
+    // V8「トークを開いたとき メニューを開いておく」。LINE payload の selected。
+    defaultOpen: row.default_open === 1,
+    // M951: 保存時に送り返す版。古い版での保存は 409 で止める。
+    version: row.version ?? 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -187,6 +190,7 @@ function manualPublishFingerprint(row: RichMenuGroupWithPages): string {
     targetingEnabled: row.targeting_enabled === 1,
     folderId: row.folder_id,
     displayOrder: row.display_order,
+    defaultOpen: row.default_open === 1,
     pages: row.pages.map((page) => ({
       id: page.id,
       orderIndex: page.order_index,
@@ -267,6 +271,7 @@ function fingerprintFromSnapshot(snapshot: unknown): string | null {
     targetingEnabled: s.targetingEnabled === true,
     folderId: s.folderId,
     displayOrder: s.displayOrder,
+    defaultOpen: s.defaultOpen === true,
     pages,
   });
 }
@@ -580,6 +585,9 @@ function parseCreateBody(raw: unknown): Parsed<CreateRichMenuGroupInput> {
   if (r.targetingEnabled !== undefined && typeof r.targetingEnabled !== 'boolean') {
     return { ok: false, error: 'targetingEnabled must be boolean' };
   }
+  if (r.defaultOpen !== undefined && typeof r.defaultOpen !== 'boolean') {
+    return { ok: false, error: 'defaultOpen must be boolean' };
+  }
   if (r.targetingPriority !== undefined) {
     if (typeof r.targetingPriority !== 'number' || !Number.isInteger(r.targetingPriority)) {
       return { ok: false, error: 'targetingPriority must be an integer' };
@@ -618,6 +626,7 @@ function parseCreateBody(raw: unknown): Parsed<CreateRichMenuGroupInput> {
       targetingEnabled: r.targetingEnabled === true,
       targetingCondition,
       targetingPriority: typeof r.targetingPriority === 'number' ? r.targetingPriority : 0,
+      defaultOpen: r.defaultOpen === true,
     },
   };
 }
@@ -682,6 +691,10 @@ function parsePatchBody(raw: unknown): Parsed<{ meta: UpdateRichMenuGroupMetaInp
       return { ok: false, error: 'displayOrder must be an integer' };
     }
     meta.displayOrder = r.displayOrder;
+  }
+  if (r.defaultOpen !== undefined) {
+    if (typeof r.defaultOpen !== 'boolean') return { ok: false, error: 'defaultOpen must be boolean' };
+    meta.defaultOpen = r.defaultOpen;
   }
   let pages: RichMenuPageInput[] | undefined;
   if (r.pages !== undefined) {
@@ -1228,7 +1241,10 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
     const pageItems = paging ? sorted.slice(paging.offset, paging.offset + paging.limit) : sorted;
     // 各 group の代表画像 (default_page_id の image_r2_key、なければ order_index=0 の page) を取得。
     // 一覧カードでサムネを出すために 1 クエリで JOIN する。
+    // ★V8 一覧の「大・6面・切替タブ 2」の表示にはページ数と代表ページの面数も要るので、
+    // 同じ1クエリで数える。
     const imageByGroupId = new Map<string, { key: string; contentType: string | null }>();
+    const shapeByGroupId = new Map<string, { pageCount: number; areaCount: number }>();
     if (pageItems.length > 0) {
       const placeholders = pageItems.map(() => '?').join(',');
       const result = await c.env.DB
@@ -1242,12 +1258,23 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
             COALESCE(
               (SELECT image_content_type FROM rich_menu_pages WHERE id = g.default_page_id),
               (SELECT image_content_type FROM rich_menu_pages WHERE group_id = g.id ORDER BY order_index LIMIT 1)
-            ) AS image_content_type
+            ) AS image_content_type,
+            (SELECT COUNT(*) FROM rich_menu_pages p WHERE p.group_id = g.id) AS page_count,
+            (SELECT COUNT(*) FROM rich_menu_areas a WHERE a.page_id = COALESCE(
+              g.default_page_id,
+              (SELECT p2.id FROM rich_menu_pages p2 WHERE p2.group_id = g.id ORDER BY p2.order_index LIMIT 1)
+            )) AS default_area_count
            FROM rich_menu_groups g
           WHERE g.id IN (${placeholders})`,
         )
         .bind(...pageItems.map((g) => g.id))
-        .all<{ group_id: string; image_r2_key: string | null; image_content_type: string | null }>();
+        .all<{
+          group_id: string;
+          image_r2_key: string | null;
+          image_content_type: string | null;
+          page_count: number;
+          default_area_count: number;
+        }>();
       for (const r of result.results ?? []) {
         if (r.image_r2_key) {
           imageByGroupId.set(r.group_id, {
@@ -1255,11 +1282,45 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
             contentType: r.image_content_type,
           });
         }
+        shapeByGroupId.set(r.group_id, {
+          pageCount: r.page_count ?? 0,
+          areaCount: r.default_area_count ?? 0,
+        });
       }
     }
+    /*
+     * ★V8 一覧の「誰に出すか」列の「対象 N人」。条件で出し分けている行だけ、
+     * このページに出る分を数える（ページ内で打ち切るので、行数ぶんを超える
+     * 問い合わせにはならない）。条件が読めない行は null のまま残す。
+     */
+    const audienceByGroupId = new Map<string, number>();
+    await Promise.all(pageItems.map(async (g) => {
+      if (!g.targetingEnabled || !g.targetingCondition) return;
+      const condition = parseCondition(g.targetingCondition);
+      if (!condition) return;
+      try {
+        const where = buildSegmentWhere(condition);
+        const row = await c.env.DB
+          .prepare(
+            `SELECT COUNT(*) AS count
+               FROM friends f
+              WHERE f.line_account_id = ?
+                AND f.is_following = 1
+                AND (${where.sql})`,
+          )
+          .bind(accountId, ...where.bindings)
+          .first<{ count: number }>();
+        if (row) audienceByGroupId.set(g.id, row.count);
+      } catch {
+        // 数えられない行があっても一覧は出す。その行だけ人数を出さない。
+      }
+    }));
     const items = pageItems.map((g) => ({
         ...g,
         thumbnailR2Key: imageByGroupId.get(g.id)?.key ?? null,
+        pageCount: shapeByGroupId.get(g.id)?.pageCount ?? 0,
+        defaultPageAreaCount: shapeByGroupId.get(g.id)?.areaCount ?? 0,
+        audienceCount: audienceByGroupId.get(g.id) ?? null,
       }));
     if (paging) {
       const sort = sortKey === 'taps'
@@ -1662,7 +1723,17 @@ richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), asyn
       const ext = contentType === 'image/png' ? 'png' : 'jpg';
       const key = `rich-menus/${parsed.value.accountId}/${created.id}/${defaultPage.id}/${Date.now()}.${ext}`;
       await c.env.IMAGES.put(key, buf, { httpMetadata: { contentType } });
-      await setRichMenuPageImage(c.env.DB, defaultPage.id, key, contentType);
+      try {
+        await setRichMenuPageImage(c.env.DB, defaultPage.id, key, contentType);
+      } catch (dbError) {
+        // M954 と同じく、DB への記録に失敗したら上げた画像を片付ける。
+        try {
+          await c.env.IMAGES.delete(key);
+        } catch {
+          console.error('POST /api/rich-menu-groups image apply orphan cleanup failed:', key);
+        }
+        throw dbError;
+      }
       const refreshed = await getRichMenuGroupWithPages(c.env.DB, created.id);
       return c.json({ success: true, data: serializeGroupWithPages(refreshed ?? created) });
     } catch (error) {
@@ -1696,6 +1767,47 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
   const parsed = parsePatchBody(body);
   if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
 
+  // M951: 保存に版を付ける (タグ編集の expectedVersion と同じ約束)。
+  // 無し・不正は 400、古い版は 409。先に読んだ側の変更が黙って消えないようにする。
+  const rawVersion = isJsonRecord(body) ? body.expectedVersion : undefined;
+  if (rawVersion === undefined) {
+    return c.json(
+      {
+        success: false,
+        error: '保存の版情報がありません。画面を読み込み直して、もう一度保存してください。',
+      },
+      400,
+    );
+  }
+  const expectedVersion = Number(rawVersion);
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+    return c.json(
+      {
+        success: false,
+        error: '保存の版情報が正しくありません。画面を読み込み直して、もう一度保存してください。',
+      },
+      400,
+    );
+  }
+
+  // M952: 作成口と同じ検査を保存口にも入れる。「条件で出し分ける」のに
+  // 条件が無いメニューは誰にも出ない。片方だけの変更でも、残りと合わせた
+  // 形で見る。
+  const effectiveTargetingEnabled = parsed.value.meta.targetingEnabled
+    ?? (existing.targeting_enabled === 1);
+  const effectiveTargetingCondition = parsed.value.meta.targetingCondition !== undefined
+    ? parsed.value.meta.targetingCondition
+    : existing.targeting_condition;
+  if (effectiveTargetingEnabled && !effectiveTargetingCondition) {
+    return c.json(
+      {
+        success: false,
+        error: '「条件で出し分ける」を使うには、出し分けの条件が必要です。条件を設定するか、「条件で出し分ける」をオフにしてください。',
+      },
+      400,
+    );
+  }
+
   // #827 (N-158): 公開中の定義(LINEに出ている形)は直接上書きしない。ページ構成・
   // トークバー文言・全員既定の指定を変えるには、いったん取り下げて下書きへ戻すか、
   // 取り込み/新規作成で別IDの下書きを作る。名前・出し分け条件・フォルダ・並び順は
@@ -1704,7 +1816,8 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
     existing.status === 'published'
     && (parsed.value.pages !== undefined
       || parsed.value.meta.chatBarText !== undefined
-      || parsed.value.meta.isDefaultForAll !== undefined)
+      || parsed.value.meta.isDefaultForAll !== undefined
+      || parsed.value.meta.defaultOpen !== undefined)
   ) {
     return c.json(
       {
@@ -1715,9 +1828,31 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
     );
   }
 
-  await updateRichMenuGroupMeta(c.env.DB, groupId, parsed.value.meta);
-  if (parsed.value.pages) {
-    await replaceRichMenuPages(c.env.DB, groupId, parsed.value.pages);
+  // M950: meta と pages を同じ取引で確定する。pages が失敗したら meta も
+  // 戻る (saveRichMenuGroupDraft が 1 batch で流す)。古い版は書かず 409。
+  const saved = await saveRichMenuGroupDraft(c.env.DB, groupId, {
+    meta: parsed.value.meta,
+    pages: parsed.value.pages,
+    expectedVersion,
+  });
+  if (!saved.ok) {
+    // 保存の直前に消されていたら、不在として一覧へ戻す。
+    if (saved.currentVersion === null) {
+      return c.json(
+        {
+          success: false,
+          error: 'このリッチメニューは見つかりません。削除された可能性があります。一覧から選び直してください。',
+        },
+        404,
+      );
+    }
+    return c.json(
+      {
+        success: false,
+        error: 'ほかの人がこのメニューを先に保存しました。画面を読み込み直してから、もう一度保存してください。',
+      },
+      409,
+    );
   }
   const refreshed = await getRichMenuGroupWithPages(c.env.DB, groupId);
   if (!refreshed) return c.json({ success: false, error: 'group disappeared after update' }, 500);
@@ -1869,7 +2004,26 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
   const ext = contentType === 'image/png' ? 'png' : 'jpg';
   const key = `rich-menus/${group.account_id}/${groupId}/${pageId}/${Date.now()}.${ext}`;
   await c.env.IMAGES.put(key, buf, { httpMetadata: { contentType } });
-  await setRichMenuPageImage(c.env.DB, pageId, key, contentType);
+  try {
+    await setRichMenuPageImage(c.env.DB, pageId, key, contentType);
+  } catch (error) {
+    // M954: DB への記録に失敗したら、上げた画像を片付ける。
+    // 置きっぱなしにすると再試行のたびに孤児が溜まる。
+    try {
+      await c.env.IMAGES.delete(key);
+    } catch {
+      // 片付けの失敗は元の失敗に付けない。ログだけ残す。
+      console.error('POST /api/rich-menu-groups/:groupId/pages/:pageId/image orphan cleanup failed:', key);
+    }
+    console.error('POST /api/rich-menu-groups/:groupId/pages/:pageId/image db error:', error);
+    return c.json(
+      {
+        success: false,
+        error: '画像の保存に失敗しました。もう一度お試しください。',
+      },
+      500,
+    );
+  }
 
   return c.json({
     success: true,
@@ -2136,6 +2290,7 @@ async function buildPublishGroupInput(
     size: latestGroup.size,
     chatBarText: latestGroup.chat_bar_text,
     isDefaultForAll: latestGroup.is_default_for_all === 1,
+    defaultOpen: latestGroup.default_open === 1,
     formBaseUrl,
     pages: latestGroup.pages.map((p) => ({
       id: p.id, orderIndex: p.order_index, name: p.name,

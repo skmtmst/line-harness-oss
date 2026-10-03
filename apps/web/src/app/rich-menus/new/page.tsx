@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { Folder, MediaItem } from '@line-crm/shared'
@@ -19,10 +19,13 @@ import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
+import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { TEMPLATES } from '@/lib/rich-menu-templates'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { pruneCondition } from '@/lib/segment-condition'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import RichMenuCreateV8 from './create-v8'
 
 /**
  * N-161: 作成画面の「切替ボタン」は行き先を orderIndex の文字列で持つ
@@ -42,7 +45,16 @@ function areaDraftsWithSwitchTargets(areas: Area[]) {
   })
 }
 
+/*
+ * v7 の本体（NewRichMenuPageV7）は変えない。★V8 のときだけ
+ * 4手順の作る画面（JeINq/Z0uO6/OxEMM/F4gELj）へ切り替える。
+ */
 export default function NewRichMenuPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <RichMenuCreateV8 /> : <NewRichMenuPageV7 />
+}
+
+function NewRichMenuPageV7() {
   usePageTitle('リッチメニューを作る')
   const router = useRouter()
   const { selectedAccount } = useAccount()
@@ -88,26 +100,72 @@ export default function NewRichMenuPage() {
 
   // R23: 別アカウントの同名タグが混ざらないよう、候補は今のアカウントだけ。
   const [tagPruneNotice, setTagPruneNotice] = useState<string | null>(null)
+  // 5種の候補取得の失敗。理由（どの候補か）と読み直しの口を残す。
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [loadFailedKinds, setLoadFailedKinds] = useState<string[]>([])
+
+  const load = useCallback(async () => {
+    setLoadError(null)
+    setLoadFailedKinds([])
+    const [folderRes, tagRes, templateRes, formRes, linkRes] = await Promise.allSettled([
+      api.folders.list('rich_menu'),
+      api.tags.list(selectedAccount ? { accountId: selectedAccount.id } : undefined),
+      api.templates.list(undefined, selectedAccount?.id ?? undefined),
+      selectedAccount ? api.forms.list(selectedAccount.id) : Promise.resolve({ success: true as const, data: [] }),
+      api.trackedLinks.list(),
+    ])
+    const failed: string[] = []
+    let firstError: unknown = null
+    const noteFailure = (name: string, res: unknown) => {
+      failed.push(name)
+      if (firstError === null) {
+        if (typeof res === 'object' && res !== null && 'reason' in res) {
+          firstError = (res as { reason: unknown }).reason
+        } else {
+          firstError = new Error(`${name}の読み込みに失敗しました`)
+        }
+      }
+    }
+    if (folderRes.status === 'fulfilled' && folderRes.value.success) {
+      setFolders(folderRes.value.data)
+    } else {
+      noteFailure('フォルダ', folderRes)
+    }
+    if (tagRes.status === 'fulfilled' && tagRes.value.success) {
+      setTags(tagRes.value.data.map(({ id, name }) => ({ id, name })))
+    } else {
+      noteFailure('タグ', tagRes)
+    }
+    if (templateRes.status === 'fulfilled' && templateRes.value.success) {
+      setTemplates(templateRes.value.data.map(({ id, name }) => ({ id, name })))
+    } else {
+      noteFailure('テンプレート', templateRes)
+    }
+    if (formRes.status === 'fulfilled' && formRes.value.success) {
+      setForms(formRes.value.data.map(({ id, name }) => ({ id, name })))
+    } else {
+      noteFailure('フォーム', formRes)
+    }
+    if (linkRes.status === 'fulfilled' && linkRes.value.success) {
+      setTrackedLinks(linkRes.value.data.map(({ id, name }) => ({ id, name })))
+    } else {
+      noteFailure('計測リンク', linkRes)
+    }
+    if (failed.length > 0) {
+      const caught = firstError
+      setLoadError(caught)
+      setLoadFailedKinds(failed)
+      if (isForbiddenOrRateLimited(caught)) {
+        setError(loadFailureNotice(caught, '候補'))
+      } else {
+        setError(`候補の読み込みに失敗しました（${failed.join('・')}）。もう一度読み込んでください。`)
+      }
+    }
+  }, [selectedAccount])
 
   useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      const [folderRes, tagRes, templateRes, formRes, linkRes] = await Promise.allSettled([
-        api.folders.list('rich_menu'),
-        api.tags.list(selectedAccount ? { accountId: selectedAccount.id } : undefined),
-        api.templates.list(undefined, selectedAccount?.id ?? undefined),
-        selectedAccount ? api.forms.list(selectedAccount.id) : Promise.resolve({ success: true as const, data: [] }),
-        api.trackedLinks.list(),
-      ])
-      if (cancelled) return
-      if (folderRes.status === 'fulfilled' && folderRes.value.success) setFolders(folderRes.value.data)
-      if (tagRes.status === 'fulfilled' && tagRes.value.success) setTags(tagRes.value.data.map(({ id, name }) => ({ id, name })))
-      if (templateRes.status === 'fulfilled' && templateRes.value.success) setTemplates(templateRes.value.data.map(({ id, name }) => ({ id, name })))
-      if (formRes.status === 'fulfilled' && formRes.value.success) setForms(formRes.value.data.map(({ id, name }) => ({ id, name })))
-      if (linkRes.status === 'fulfilled' && linkRes.value.success) setTrackedLinks(linkRes.value.data.map(({ id, name }) => ({ id, name })))
-    })()
-    return () => { cancelled = true }
-  }, [selectedAccount])
+    void load()
+  }, [load])
 
   /*
    * R23: アカウントを切り替えたら候補が変わる。前のアカウントにしかない
@@ -196,7 +254,8 @@ export default function NewRichMenuPage() {
       const incomplete = !selectedMedia || unsetAreaLabels(areas).length > 0
       router.push(`/rich-menus/edit?id=${response.data.id}${incomplete ? '' : '&step=publish'}`)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      // 変更系は原因どおりの文で出す（403は依頼案内・429は待ち案内）。
+      setError(describeApiFailure(cause, 'リッチメニューの作成', { forbidden: 'リッチメニューを作れるのは、権限を持つ人だけです。必要なときは統括に頼んでください。' }))
       setSubmitting(false)
     }
   }
@@ -248,7 +307,18 @@ export default function NewRichMenuPage() {
           )}
           footer={<StickyBar actions={<><Button href="/rich-menus">キャンセル</Button><Button type="submit" variant="primary" disabled={submitting || !selectedAccount} busy={submitting} busyLabel="作成中...">作って編集へ</Button></>} />}
         />
-        {error ? <Notice tone="danger" message={error} className="mt-3" /> : null}
+        {error ? (
+          <Notice
+            tone="danger"
+            message={error}
+            className="mt-3"
+            action={loadFailedKinds.length > 0 && !isForbidden(loadError) ? (
+              <Button type="button" onClick={() => { setError(null); void load() }}>
+                もう一度読み込む
+              </Button>
+            ) : undefined}
+          />
+        ) : null}
       </form>
       {/* N-164: キャンセル（onClose）は何も変えない。入力した内容はそのまま残る。 */}
       <MediaPickerDialog

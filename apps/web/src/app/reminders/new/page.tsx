@@ -17,6 +17,8 @@ import { useAccount } from '@/contexts/account-context'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { Field, LinePreview, ReminderFooter, ReminderPanel, ReminderWizard, ReminderWorkspace, SummaryCard } from '@/components/reminders/reminder-v6-ui'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import NewReminderV8 from './new-v8'
 import styles from './page.module.css'
 
 const inputClass = 'border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
@@ -104,7 +106,7 @@ const reminderTemplates: ReminderTemplate[] = [
 
 type SaveState = 'unsaved' | 'saving' | 'saved' | 'failed'
 
-export default function NewReminderPage() {
+function NewReminderPageV7() {
   usePageTitle('リマインダを作成・基本設定')
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -458,4 +460,13 @@ export default function NewReminderPage() {
       <ConfirmDialog open={pendingTemplate !== null} title="ひな形で入力を置き換えますか？" description={pendingTemplate ? `「${pendingTemplate.title}」を使うと、基準日・タイミング・本文の設定がひな形の内容に置き換わります。` : ''} confirmLabel="このひな形を使う" cancelLabel="キャンセル" onConfirm={() => { if (pendingTemplate) applyTemplate(pendingTemplate); setPendingTemplate(null) }} onCancel={() => setPendingTemplate(null)} />
     </div>
   )
+}
+
+/*
+ * 見た目テーマが v8 のときだけ新しい作成画面（`new-v8.tsx`、Pencil `VE1u5`）
+ * に切り替える。v7 の見た目は `NewReminderPageV7` のまま変えない。
+ */
+export default function NewReminderPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <NewReminderV8 /> : <NewReminderPageV7 />
 }

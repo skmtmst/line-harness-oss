@@ -1,6 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ReadonlyHeaderV8 from '../analytics/readonly-header-v8'
+import AnalyticsNavigationV8 from '../analytics/navigation-v8'
+import '../analytics/readonly-v8.css'
 import MergedTabs from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
@@ -65,7 +69,7 @@ function MetricCard({
   const delta = percentDelta(current, previous, lowerIsBetter)
   const positive = delta !== null && delta >= 0
   return (
-    <div className="rounded-card border-hairline border bg-canvas p-5">
+    <div className="rounded-card border-hairline border bg-canvas p-5" data-search-metric="true">
       <div className="flex items-center justify-between gap-3">
         <p className="text-ink-secondary whitespace-nowrap text-sm font-medium">{label}</p>
         <span className="h-2.5 w-2.5 rounded-pill" style={{ backgroundColor: color }} />
@@ -180,7 +184,8 @@ function SetupCard({ setup, denied = false }: { setup: SearchConsoleSetup | null
 }
 
 export default function SearchConsolePage() {
-  usePageTitle('分析')
+  const theme = useAdminTheme()
+  usePageTitle(theme === 'v8' ? 'Search Console' : '分析')
   const [days, setDays] = useState<RangeDays>(28)
   const [data, setData] = useState<SearchConsolePerformance | null>(null)
   const [setup, setSetup] = useState<SearchConsoleSetup | null>(null)
@@ -265,9 +270,10 @@ export default function SearchConsolePage() {
     : null
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 v8-ro-analytics-page" data-design-node={theme === 'v8' ? 'h1G4d' : undefined}>
+      {theme === 'v8' && <><ReadonlyHeaderV8 title="Search Console" description="Google検索での表示回数・クリック・掲載順位を見ます。検索から友だち追加への突合は未取得です。" /><AnalyticsNavigationV8 active="search" /></>}
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <MergedTabs basePath="/analytics" tabs={ANALYTICS_TABS} active="search" />
+      <div className="v8-ro-analytics-legacyHead"><MergedTabs basePath="/analytics" tabs={ANALYTICS_TABS} active="search" /></div>
 
       <div data-design="Head" className="flex flex-wrap items-center justify-end gap-2">
         {data ? <Button onClick={exportCsv}>CSVで書き出す</Button> : null}
@@ -315,7 +321,7 @@ export default function SearchConsolePage() {
             </div>
             <p className="text-ink-faint whitespace-nowrap">集計期間 {data.startDate.replaceAll('-', '/')} 〜 {data.endDate.replaceAll('-', '/')}</p>
           </div>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 v8-ro-analytics-kpis">
             {metrics.map((item) => <MetricCard key={item.key} label={item.label} value={item.value} current={data.summary[item.key]} previous={data.previousSummary[item.key]} color={item.color} lowerIsBetter={item.lower} />)}
           </div>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">

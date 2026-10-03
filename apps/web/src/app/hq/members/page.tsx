@@ -1,5 +1,9 @@
 'use client'
 
+import ReadonlyHeader from '@/app/hq/readonly-header-v8'
+import '@/app/hq/readonly-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import OperatorHistory from '@/components/hq/operator-history'
 import { Plus } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
@@ -7,6 +11,8 @@ import type { LineAccount, StaffMember } from '@line-crm/shared'
 import MemberDialog, { type MemberDialogValue } from '@/components/hq/members/member-dialog'
 import StepUpPrompt from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
+import Chip from '@/components/shared/chip'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -47,6 +53,7 @@ export default function HqMembersPage() {
 }
 
 function MembersInner() {
+  const theme = useAdminTheme()
   usePageTitle('メンバー管理')
   const router = useRouter()
   const params = useSearchParams()
@@ -65,6 +72,8 @@ function MembersInner() {
   const [resendingId, setResendingId] = useState<string | null>(null)
   /* 権限変更が STEP_UP_REQUIRED で止まったときの本人確認。通ったら grant を付けて同じ保存をやり直す。 */
   const [stepUp, setStepUp] = useState<null | { retry: (token: string) => Promise<void> }>(null)
+  /* 板 `M4jS9`「権限を変える確認」。変える前に変更前→変更後を見せる。 */
+  const [confirmChange, setConfirmChange] = useState<{ member: StaffMember; value: MemberDialogValue } | null>(null)
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -168,7 +177,8 @@ function MembersInner() {
   const changeTab = (next: Tab) => router.replace(next === 'tenant' ? '/hq/members?tab=tenant' : '/hq/members')
 
   return (
-    <div data-design-node="CRL4w" className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' ? tab === 'tenant' ? 'K7HYu' : 'r4ARpV' : 'CRL4w'} className="v8-ro-hq-page flex flex-col gap-4">
+      {theme === 'v8' && <ReadonlyHeader title={tab === 'tenant' ? '統括の情報' : 'メンバー'} description={tab === 'tenant' ? '統括の名前と、運営による操作を確認します。' : '権限者の役割、担当範囲、招待とログインの状況を確認します。'} />}
       <div data-design="Tabs" data-design-node="oGWXI">
         {/* U091: 右にはみ出すタブへ届くよう、横スクロール＋端の送りボタン付き。 */}
         <ScrollableTabs
@@ -192,7 +202,7 @@ function MembersInner() {
       ) : (
         <>
           {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-          <KpiCollapse data-design="KPIs" data-design-node="kCaRU" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <KpiCollapse data-ro-kpis data-design="KPIs" data-design-node="kCaRU" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <KpiCard variant="v6" title="権限者" value={status === 'ready' ? kpis.total : null} unit="人" detail={status === 'ready' ? `有効 ${kpis.active}人` : '—'} loading={status === 'loading'} />
             <KpiCard variant="v6" title="招待中" value={status === 'ready' ? kpis.invited : null} unit="人" detail="" help="まだ承諾していない招待です" loading={status === 'loading'} />
             <KpiCard variant="v6" title="閲覧のみ" value={status === 'ready' ? kpis.viewers : null} unit="人" detail="" help="編集できない権限者です" loading={status === 'loading'} />
@@ -412,12 +422,33 @@ function MembersInner() {
             isSelf={dialog.member?.id === me?.id}
             busy={dialogBusy}
             error={dialogError}
-            onSubmit={(value) => void submitDialog(value)}
+            onSubmit={(value) => {
+              if (dialog.member) {
+                setConfirmChange({ member: dialog.member, value })
+              } else {
+                void submitDialog(value)
+              }
+            }}
             onCancel={() => {
               if (dialogBusy) return
               setDialog({ open: false, member: null })
             }}
           />
+          {confirmChange ? (
+            <MemberChangeConfirm
+              member={confirmChange.member}
+              value={confirmChange.value}
+              accountNames={accountNames}
+              busy={dialogBusy}
+              error={dialogError}
+              onCancel={() => { if (!dialogBusy) setConfirmChange(null) }}
+              onConfirm={() => {
+                const pending = confirmChange
+                setConfirmChange(null)
+                void submitDialog(pending.value)
+              }}
+            />
+          ) : null}
           {stepUp ? (
             <StepUpPrompt
               request={{ purpose: 'staff.permissions.change', action: 'メンバーの権限を変更する', retry: stepUp.retry }}
@@ -431,8 +462,67 @@ function MembersInner() {
   )
 }
 
+const ROLE_LABEL: Record<string, string> = { owner: '所有者', admin: '管理者', staff: 'スタッフ', viewer: '閲覧のみ' }
+
+/** 板 `M4jS9`「権限を変える確認」。変更前→変更後を並べてから変える。 */
+function MemberChangeConfirm({ member, value, accountNames, busy, error, onCancel, onConfirm }: {
+  member: StaffMember
+  value: MemberDialogValue
+  accountNames: Map<string, string>
+  busy: boolean
+  error: string
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const roleOf = (role: string) => ROLE_LABEL[role] ?? role
+  const scopeOf = (scope: 'all' | 'accounts', ids: string[]) => (
+    scope === 'all' ? 'すべてのアカウント' : ids.map((id) => accountNames.get(id) ?? id).join('・') || '（選択なし）'
+  )
+  const beforeScope = member.accountScope ?? 'all'
+  const beforeIds = member.scopedLineAccountIds ?? []
+  const rows = [
+    { label: '役割', before: roleOf(member.role), after: roleOf(value.role), changed: member.role !== value.role },
+    {
+      label: '担当範囲',
+      before: scopeOf(beforeScope, beforeIds),
+      after: scopeOf(value.accountScope, value.scopedLineAccountIds),
+      changed: beforeScope !== value.accountScope || beforeIds.join(',') !== value.scopedLineAccountIds.join(','),
+    },
+    {
+      label: '状態',
+      before: member.isActive ? '有効' : '停止中',
+      after: value.isActive ? '有効' : '停止中',
+      changed: member.isActive !== value.isActive,
+    },
+  ]
+  return (
+    <ConfirmDialog
+      open
+      title={`${member.name}さんの権限を変えますか？`}
+      description="変える内容を確かめてから変えてください。管理者が1人だけのときは、その管理者を外せません。"
+      confirmLabel="変える"
+      busy={busy}
+      error={error || undefined}
+      designNode="M4jS9"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    >
+      <dl className="grid gap-1.5">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center gap-3 border-b border-hairline pb-1.5">
+            <dt className="w-16 shrink-0 text-caption text-ink-faint">{row.label}</dt>
+            <dd className="min-w-0 flex-1 truncate text-caption text-ink">{row.before} → {row.after}</dd>
+            {row.changed ? <Chip tone="warn">変わる</Chip> : null}
+          </div>
+        ))}
+      </dl>
+    </ConfirmDialog>
+  )
+}
+
 /** 「統括の情報」タブ。統括名の変更（旧 /hq/settings のフォーム）。 */
 function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
+  const theme = useAdminTheme()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -480,7 +570,7 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
   return (
     <>
       <NoteBar tone="info" help="統括名は統括コンソールとメールの差出人に使われます" helpLabel="統括名の意味">統括名は、統括コンソールとメールの差出人に使われます。アカウントの名前はそれぞれのアカウントの設定で変えます。</NoteBar>
-      <form onSubmit={save} className="flex max-w-2xl flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
+      {theme === 'v8' && !canEdit ? <section className="rounded-card border border-hairline p-5"><dl><dt className="text-caption text-ink-secondary">統括名</dt><dd className="mt-2 text-label text-ink">{loading ? '読み込んでいます…' : error ? '読み込めませんでした' : name || '—'}</dd></dl>{error && <p role="alert" className="mt-2 text-caption text-danger">{error}</p>}</section> : <form onSubmit={save} className="flex max-w-2xl flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="tenant-name" className="text-label font-medium text-ink">統括名</label>
           <p className="text-micro text-ink-faint">100文字以内で入力してください。</p>
@@ -495,7 +585,8 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
         </div>
         {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
         {saved ? <p className="text-label text-accent-deep" role="status">保存しました。</p> : null}
-      </form>
+      </form>}
+      {theme === 'v8' && <OperatorHistory />}
       <div className="sticky bottom-0 z-10">
         <StickyBar
           status={canEdit ? undefined : '統括名の変更は管理者だけができます'}

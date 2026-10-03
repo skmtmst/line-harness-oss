@@ -69,6 +69,9 @@ describe('processDueMeetConsultationReminders', () => {
                     meet_url: 'https://meet.google.com/abc-defg-hij',
                     line_user_id: 'U00000000000000000000000000000000',
                     channel_access_token: 'channel-token',
+                    snapshot_booking_id: null,
+                    snapshot_booking_version: null,
+                    snapshot_friend_id: 'friend-1',
                   }],
                 };
               },
@@ -105,6 +108,13 @@ describe('processDueMeetConsultationReminders', () => {
       '2026-08-09T00:00:00.000Z',
       '2026-08-09T00:00:00.000Z',
       '6db37bc2-f0c4-4fa8-baa6-5ec7069e1165',
+      'consultation-1',
+      null,
+      null,
+      null,
+      null,
+      '2026-08-09T01:00:00.000Z',
+      'friend-1',
     ]);
   });
 
@@ -132,6 +142,9 @@ describe('processDueMeetConsultationReminders', () => {
                     meet_url: 'https://meet.google.com/abc-defg-hij',
                     line_user_id: 'U00000000000000000000000000000000',
                     channel_access_token: 'channel-token',
+                    snapshot_booking_id: null,
+                    snapshot_booking_version: null,
+                    snapshot_friend_id: 'friend-1',
                   }],
                 };
               },
@@ -157,6 +170,13 @@ describe('processDueMeetConsultationReminders', () => {
     expect(updates).toContainEqual([
       '2026-08-09T00:00:00.000Z',
       'reminder-cancelled-1',
+      'consultation-9',
+      null,
+      null,
+      null,
+      null,
+      '2026-08-09T01:00:00.000Z',
+      'friend-1',
     ]);
   });
 });

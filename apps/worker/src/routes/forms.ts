@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import {
   getForms,
   getFormsWithStats,
+  FORM_SUBMIT_CLAIM_STALE_MS,
   getFormById,
   type FormSubmitClaim,
   type FormSubmitClaimScope,
@@ -93,6 +94,7 @@ import {
 } from '../services/form-layout-effects.js';
 import {
   collectInputs,
+  formatAddressValue,
   layoutToFields,
   normalizeLayout,
   parseLayout,
@@ -197,11 +199,9 @@ const NON_PAGINATED_SUBMISSIONS_MAX = 200;
 const FORM_IDEMPOTENCY_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 /** 同じキーの再送を受け付ける期間。通信の再送や連打はこの中に収まる。 */
 const FORM_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
-/**
- * 処理中の予約を止まったとみなす期間。Webhook の待ち時間(10秒)や副作用の
- * 実行を覆う余裕を持たせ、生きている処理の横取りはしない。
- */
-const FORM_SUBMIT_CLAIM_STALE_MS = 60 * 1000;
+// 処理中の予約を止まったとみなす期間(FORM_SUBMIT_CLAIM_STALE_MS)は
+// @line-crm/db 側の定数を使う。一覧の未完の札・数の帯と同じ目安でないと
+// 「止まっているのに数えない」すれ違いが起きるため。
 /** 回答 data の上限。項目数と JSON 全体の大きさの両方を見る。 */
 const FORM_SUBMIT_DATA_MAX_FIELDS = 200;
 const FORM_SUBMIT_DATA_MAX_BYTES = 100 * 1024;
@@ -215,7 +215,9 @@ const FORM_LIST_PAGE_FALLBACK_LIMIT = 20;
 
 /** 一覧の絞り込み。知らない値は「すべて」へ落とす（画面と同じ規則）。 */
 function validFormListFilter(value: string | undefined): FormListFilter {
-  return value === 'published' || value === 'draft' || value === 'stored' ? value : 'all';
+  return value === 'published' || value === 'draft' || value === 'stored' || value === 'pending'
+    ? value
+    : 'all';
 }
 
 /** 一覧の並び順。知らない値は「最新の回答順」へ落とす（画面と同じ規則）。 */
@@ -356,6 +358,10 @@ function serializeForm(
     monthlySubmitCount: (row as Partial<DbFormWithStats>).monthly_submit_count ?? null,
     monthlyOpenCount: (row as Partial<DbFormWithStats>).monthly_open_count ?? null,
     monthlyCompletionRate: (row as Partial<DbFormWithStats>).monthly_completion_rate ?? null,
+    // ★V8 一覧の「後処理の未完」の札。一覧取得のときだけ付き、
+    // それ以外は null（未完が無いとは言わない）。
+    pendingPostActionCount:
+      (row as Partial<DbFormWithStats>).pending_post_action_count ?? null,
     ogTitle: row.og_title,
     ogDescription: row.og_description,
     ogImageUrl: row.og_image_url,
@@ -697,6 +703,32 @@ function dateFieldsOfForm(form: DbForm): Array<{ key: string; label: string }> {
     .filter((field) => field.key);
 }
 
+function ratingFieldsOfForm(form: DbForm): Array<{ key: string; label: string }> {
+  const layout = form.layout ? parseLayout(form.layout, form.fields) : null;
+  if (layout) {
+    return collectInputs(layout)
+      .filter((block) => block.type === 'rating' && block.name)
+      .map((block) => ({ key: block.name, label: block.label || block.name }));
+  }
+  return parseFormFields(form.fields)
+    .filter((field) => field.type === 'rating')
+    .map((field) => ({
+      key: field.name ?? field.id ?? '',
+      label: field.label ?? field.name ?? field.id ?? '',
+    }))
+    .filter((field) => field.key);
+}
+
+function displayAnswerValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-';
+  if (Array.isArray(value)) return value.map(String).join(', ');
+  if (typeof value === 'object') {
+    const formatted = formatAddressValue(value);
+    return formatted === '' ? '-' : formatted;
+  }
+  return String(value);
+}
+
 async function writeLegacyFriendFields(
   db: D1Database,
   form: DbForm,
@@ -727,7 +759,9 @@ async function writeLegacyFriendFields(
           ? null
           : Array.isArray(answer)
             ? answer.join(', ')
-            : String(answer);
+            : typeof answer === 'object'
+              ? formatAddressValue(answer)
+              : String(answer);
       const checked = validateFriendFieldValue(target, rawForCheck);
       if (!checked.ok) {
         result.failed += 1;
@@ -1544,6 +1578,7 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
         id,
         c.req.query('account_id')!,
         dateFieldsOfForm(form),
+        ratingFieldsOfForm(form),
       ),
     ]);
     // N-168: 後処理の未完を運用者へ見せる。予約(claim)の工程記録と
@@ -3387,7 +3422,7 @@ async function runFormPostEffects(input: {
       const answerRows = entries.map(([key, value]) => {
         const field = form.fields ? (JSON.parse(form.fields) as Array<{ name: string; label: string }>).find((f: { name: string }) => f.name === key) : null;
         const label = field?.label || key;
-        const val = Array.isArray(value) ? value.join(', ') : (value !== null && value !== undefined && value !== '') ? String(value) : '-';
+        const val = displayAnswerValue(value);
         return {
           type: 'box' as const, layout: 'vertical' as const, margin: 'md' as const,
           contents: [
@@ -3412,7 +3447,7 @@ async function runFormPostEffects(input: {
           contents: [
             ...answerRows,
             { type: 'separator', margin: 'lg' },
-            { type: 'text', text: '他社サービスでは、フォームの回答内容に合わせたリアルタイム返信はできません。LINE Harnessだからこそ可能な体験です。', size: 'xs', color: '#06C755', weight: 'bold', wrap: true, margin: 'lg' },
+            { type: 'text', text: '他社サービスでは、フォームの回答内容に合わせたリアルタイム返信はできません。musuboだからこそ可能な体験です。', size: 'xs', color: '#06C755', weight: 'bold', wrap: true, margin: 'lg' },
           ],
           paddingAll: '20px',
         },
