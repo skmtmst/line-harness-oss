@@ -11,7 +11,9 @@ import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
 import { api, type FriendAddRunDetail } from '@/lib/api'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { describeFriendAddFailure } from '../../friend-add-failure'
+import FriendAddRunDetailV8 from './detail-v8'
 import {
   DELIVERY_UNKNOWN_ACTION,
   DELIVERY_UNKNOWN_CODE,
@@ -298,7 +300,15 @@ export default function FriendAddRunDetailPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <FriendAddRunDetailInner />
+      <FriendAddRunDetailSwitch />
     </Suspense>
   )
+}
+
+function FriendAddRunDetailSwitch() {
+  /*
+   * ★V8 分岐：実行の詳細（板 `N43uVX`）を `data-theme="v8"` の下で積み替える。
+   */
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <FriendAddRunDetailV8 /> : <FriendAddRunDetailInner />
 }
