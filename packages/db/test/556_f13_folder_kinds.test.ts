@@ -243,5 +243,11 @@ describe('556_f13_folder_kinds の子のひも付け(#1269)', () => {
       };
       expect({ [table]: row.folder_id }).toEqual({ [table]: folderId });
     }
+
+    // 退避表は 556 では残す（点検が DROP を許さないため）。片付けは後の番号。
+    const kept = db.prepare(
+      `SELECT folder_id FROM _556_folders_backup_tags WHERE id = 'tag1'`,
+    ).get() as { folder_id: string | null };
+    expect(kept.folder_id).toBe('fo-tag');
   });
 });

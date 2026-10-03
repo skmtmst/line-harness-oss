@@ -17,7 +17,9 @@
 -- #1269: D1 では外部キーが有効なので、ただ落とすと暗黙の削除が走り、
 -- 子の表の folder_id が ON DELETE SET NULL で全部 NULL になる。
 -- 落とす前に子の (id, folder_id) を退避し、作り直した後に戻す。
--- 退避表は最後に落とす。適用はしないこと（PR 本文に番号だけ書く）。
+-- 退避表は 556 では消さない（作り直しの点検が DROP を許すのは
+-- <表名>_new の組だけのため）。片付けは後の番号でやる。
+-- 適用はしないこと（PR 本文に番号だけ書く）。
 CREATE TABLE _556_folders_backup_templates (id TEXT PRIMARY KEY, folder_id TEXT);
 INSERT INTO _556_folders_backup_templates (id, folder_id) SELECT id, folder_id FROM templates;
 CREATE TABLE _556_folders_backup_scenarios (id TEXT PRIMARY KEY, folder_id TEXT);
@@ -104,16 +106,4 @@ UPDATE media_upload_sessions SET folder_id = (SELECT folder_id FROM _556_folders
 UPDATE forms SET folder_id = (SELECT folder_id FROM _556_folders_backup_forms WHERE _556_folders_backup_forms.id = forms.id)
   WHERE EXISTS (SELECT 1 FROM _556_folders_backup_forms WHERE _556_folders_backup_forms.id = forms.id);
 
-DROP TABLE _556_folders_backup_templates;
-DROP TABLE _556_folders_backup_scenarios;
-DROP TABLE _556_folders_backup_auto_replies;
-DROP TABLE _556_folders_backup_reminders;
-DROP TABLE _556_folders_backup_tags;
-DROP TABLE _556_folders_backup_friend_fields;
-DROP TABLE _556_folders_backup_media;
-DROP TABLE _556_folders_backup_common_vars;
-DROP TABLE _556_folders_backup_broadcasts;
-DROP TABLE _556_folders_backup_rich_menu_groups;
-DROP TABLE _556_folders_backup_webinars;
-DROP TABLE _556_folders_backup_media_upload_sessions;
-DROP TABLE _556_folders_backup_forms;
+-- 退避表は残す。片付けは後の番号でやる（上の注意書き）。
