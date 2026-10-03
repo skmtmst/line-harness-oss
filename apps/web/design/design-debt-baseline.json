@@ -605,7 +605,7 @@
     "unresolved-classname": 19
   },
   "app/templates/list-v8.tsx": {
-    "unresolved-classname": 81,
+    "unresolved-classname": 94,
     "direct-th": 8
   },
   "app/templates/page.tsx": {
