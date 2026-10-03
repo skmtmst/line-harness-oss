@@ -33,3 +33,20 @@ export function moveTargetingGroup<T extends TargetingOrderItem>(
   ;[reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]]
   return reordered.map((group, priority) => ({ id: group.id, priority }))
 }
+
+/**
+ * 保存を待たずに画面へ出す並び。IDの順に並べ替え、順番の番号を
+ * 0,1,2…に振り直す。知らないIDは飛ばす（消さない）。
+ */
+export function withNormalizedPriority<T extends TargetingOrderItem>(
+  groups: T[],
+  orderedIds: string[],
+): T[] {
+  const byId = new Map(groups.map((group) => [group.id, group]))
+  const next: T[] = []
+  for (const [priority, id] of orderedIds.entries()) {
+    const group = byId.get(id)
+    if (group) next.push({ ...group, targetingPriority: priority })
+  }
+  return next
+}
