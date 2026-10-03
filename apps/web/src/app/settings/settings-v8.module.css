@@ -474,6 +474,76 @@
   white-space: nowrap;
 }
 
+/* 並び替えの窓の中の「サイドメニューの見え方」（v7 の右の欄と同じ）。 */
+.previewWrap {
+  margin: 12px 18px 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-shell);
+}
+
+.previewTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.previewGroup {
+  margin-top: 8px;
+}
+
+.previewGroupLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+}
+
+.previewRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+.previewOff {
+  color: var(--color-ink-faint);
+}
+
+.previewDot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--color-canvas-sunken);
+}
+
+.previewDotOn {
+  background: var(--color-accent);
+}
+
+.previewLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previewOffTag {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--color-ink-faint);
+}
+
+.previewNote {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
 .moveBtn {
   border: 1px solid var(--color-hairline);
   background: var(--color-canvas);
