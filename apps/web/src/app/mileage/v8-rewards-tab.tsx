@@ -20,9 +20,12 @@ import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
+import MileageTableSkeleton from './mileage-table-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import {
   ApiError,
@@ -131,6 +134,8 @@ export default function V8RewardsTab({
   const [popularName, setPopularName] = useState<string | null>(null)
   const [popularCount, setPopularCount] = useState<number | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
+  /* 数の帯の骨組み判定（0.3秒以内なら出さない・出したら最低0.4秒）。 */
+  const showKpiSkel = useDelayedSkeleton(status === 'loading')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [failed, setFailed] = useState<FailedRedemption[]>([])
@@ -271,9 +276,22 @@ export default function V8RewardsTab({
     }
   }
 
-  const changeState = async (reward: MileageRewardSummary) => {
+  /*
+   * 止める・また出すは先に画面を変えて裏で保存する（サクサク感 B）。
+   * 失敗したら戻して Toast で理由と「もう一度」、成功したら Toast の
+   * 「元に戻す」（同じ口で戻せる）で取り消せる。下書きの公開は重い操作の
+   * まま（元に戻すと止めた状態になり下書きに戻らないため対象外）。
+   */
+  const changeState = async (reward: MileageRewardSummary, options?: { silent?: boolean }) => {
     if (readonly || !accountId
       || (reward.status !== 'published' && reward.status !== 'draft' && reward.status !== 'stopped')) return
+    const optimistic = reward.status === 'published' || reward.status === 'stopped'
+    const toStatus = reward.status === 'published' ? 'stopped' : reward.status === 'stopped' ? 'published' : reward.status
+    if (optimistic) {
+      setRewards((current) => current.map((item) => (
+        item.id === reward.id ? { ...item, status: toStatus } : item
+      )))
+    }
     setBusyId(reward.id)
     setActionError('')
     try {
@@ -289,12 +307,28 @@ export default function V8RewardsTab({
         )
       if (!response.success) throw new Error(response.error)
       await load()
+      if (optimistic && !options?.silent) {
+        const flipped: MileageRewardSummary = { ...reward, status: toStatus }
+        notifyToast(reward.status === 'published' ? '止めています' : 'また出しています', {
+          actionLabel: '元に戻す',
+          onAction: () => void changeState(flipped, { silent: true }),
+        })
+      }
     } catch {
-      setActionError(reward.status === 'published'
-        ? '使い道を止められませんでした。もう一度お試しください。'
-        : reward.status === 'stopped'
-          ? '使い道をまた出せませんでした。もう一度お試しください。'
-          : '使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+      if (optimistic) {
+        setRewards((current) => current.map((item) => (
+          item.id === reward.id ? { ...item, status: reward.status } : item
+        )))
+        notifyToast(reward.status === 'published'
+          ? '使い道を止められませんでした'
+          : '使い道をまた出せませんでした', {
+          tone: 'error',
+          actionLabel: 'もう一度試す',
+          onAction: () => void changeState(reward),
+        })
+      } else {
+        setActionError('使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+      }
     } finally {
       setBusyId(null)
     }
@@ -363,11 +397,10 @@ export default function V8RewardsTab({
             <span className={styles.kpiLabel}>使い道</span>
           </div>
           <p className={styles.kpiValue}>
-            {status !== 'ready' ? '—' : formatMileageNumber(rewards.length)}
-            <span className={styles.kpiUnit}> 件</span>
+            {showKpiSkel ? <Skeleton width="4ch" height={24} /> : status !== 'ready' ? '—' : (<>{formatMileageNumber(rewards.length)}<span className={styles.kpiUnit}> 件</span></>)}
           </p>
           <p className={styles.kpiSub}>
-            {status !== 'ready'
+            {showKpiSkel ? <Skeleton width="12ch" height={12} /> : status !== 'ready'
               ? '—'
               : `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}`}
           </p>
@@ -378,11 +411,10 @@ export default function V8RewardsTab({
             <span className={styles.kpiLabel}>今月交換</span>
           </div>
           <p className={styles.kpiValue}>
-            {status !== 'ready' ? '—' : formatMileageNumber(exchangedCount ?? 0)}
-            <span className={styles.kpiUnit}> 件</span>
+            {showKpiSkel ? <Skeleton width="4ch" height={24} /> : status !== 'ready' ? '—' : (<>{formatMileageNumber(exchangedCount ?? 0)}<span className={styles.kpiUnit}> 件</span></>)}
           </p>
           <p className={styles.kpiSub}>
-            {status !== 'ready' ? '—' : `${formatMileageNumber(redeemedMiles ?? 0)} マイル`}
+            {showKpiSkel ? <Skeleton width="7ch" height={12} /> : status !== 'ready' ? '—' : `${formatMileageNumber(redeemedMiles ?? 0)} マイル`}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -391,10 +423,10 @@ export default function V8RewardsTab({
             <span className={styles.kpiLabel}>いちばん人気</span>
           </div>
           <p className={styles.kpiValue} style={{ fontSize: 20 }} title={popularName ?? undefined}>
-            {status !== 'ready' ? '—' : (popularName ?? '—')}
+            {showKpiSkel ? <Skeleton width="10ch" height={20} /> : status !== 'ready' ? '—' : (popularName ?? '—')}
           </p>
           <p className={styles.kpiSub}>
-            {status !== 'ready' ? '—' : popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません'}
+            {showKpiSkel ? <Skeleton width="8ch" height={12} /> : status !== 'ready' ? '—' : popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません'}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -403,8 +435,7 @@ export default function V8RewardsTab({
             <span className={styles.kpiLabel}>渡せなかった</span>
           </div>
           <p className={styles.kpiValue}>
-            {redemptionsLoad === 'loading' ? '—' : formatMileageNumber(failedTotal)}
-            <span className={styles.kpiUnit}> 件</span>
+            {showKpiSkel || redemptionsLoad === 'loading' ? <Skeleton width="4ch" height={24} /> : (<>{formatMileageNumber(failedTotal)}<span className={styles.kpiUnit}> 件</span></>)}
           </p>
           <p className={styles.kpiSub}>
             {failed.length > 0 ? failed[0].rewardName : '要対応の交換はありません'}
@@ -513,19 +544,23 @@ export default function V8RewardsTab({
             </span>
           </div>
 
-          {status === 'loading' ? (
-            <div className={styles.stateWrap} role="status" aria-label="読み込み中">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className={styles.skelRow} aria-hidden="true">
-                  <span className={styles.skelDot} />
-                  <span className={styles.skelBar} style={{ width: '22%' }} />
-                  <span className={styles.skelBar} style={{ width: '14%' }} />
-                  <span className={styles.skelBar} style={{ width: '18%' }} />
-                  <span className={styles.skelBar} style={{ width: '10%', marginLeft: 'auto' }} />
-                </div>
-              ))}
-            </div>
-          ) : status === 'forbidden' ? (
+          <div aria-busy={status === 'loading'}>
+            <DelayedSkeleton
+              loading={status === 'loading'}
+              skeleton={(
+                <MileageTableSkeleton
+                  columns={[
+                    { header: '使い道', bar: '40%' },
+                    { header: '必要なマイル', bar: '50%' },
+                    { header: '交換すると渡るもの', bar: '70%' },
+                    { header: '今月交換された', bar: '50%' },
+                    { header: '状態', bar: '70%' },
+                    { header: '操作', bar: '85%' },
+                  ]}
+                />
+              )}
+            >
+              {status === 'forbidden' ? (
             <div className={styles.stateWrap}>
               <div className={styles.stateCard}>
                 <p className={styles.stateTitle}>使い道を見る権限がありません</p>
@@ -628,6 +663,8 @@ export default function V8RewardsTab({
               </table>
             </div>
           )}
+            </DelayedSkeleton>
+          </div>
 
           {status === 'ready' && visible.length > 0 ? (
             <div className={styles.footer}>

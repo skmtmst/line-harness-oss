@@ -23,6 +23,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { notifyToast } from '@/components/shared/toast'
 import TargetMissing from '@/components/shared/target-missing'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -119,6 +120,7 @@ export default function HandoverV8() {
   /** 段4。人が書き換えた判断（保存するまで下書き）。 */
   const [decisionEdits, setDecisionEdits] = useState<Record<string, 'link' | 'new' | 'skip'>>({})
   const [savingDecisions, setSavingDecisions] = useState(false)
+  const [justSavedDecisions, setJustSavedDecisions] = useState(false)
   const [decisionError, setDecisionError] = useState('')
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -292,6 +294,8 @@ export default function HandoverV8() {
       if (detail.success) {
         setHandover(detail.data as HandoverView)
         setDecisionEdits({})
+        setJustSavedDecisions(true)
+        window.setTimeout(() => setJustSavedDecisions(false), 3000)
       }
     } catch (caught) {
       setDecisionError(
@@ -403,8 +407,20 @@ export default function HandoverV8() {
   }
   if (status === 'loading') {
     return (
-      <div className={styles.board} data-design-node="x2dSNv">
-        <ListState kind="loading" />
+      <div className={styles.board} data-design-node="x2dSNv" aria-busy="true" aria-label="アカウント引継ぎを読み込んでいます">
+        <DelayedSkeleton
+          loading
+          skeleton={(
+            <div aria-hidden="true">
+              <Skeleton width="16ch" height="1.5em" />
+              <Skeleton width="100%" height="0.9em" />
+              <Skeleton width="100%" height="0.9em" />
+              <Skeleton width="100%" height="0.9em" />
+              <Skeleton width="100%" height="0.9em" />
+              <Skeleton width="100%" height="0.9em" />
+            </div>
+          )}
+        />
       </div>
     )
   }
@@ -678,19 +694,28 @@ export default function HandoverV8() {
         </p>
       </div>
 
-      {canManage && Object.keys(decisionEdits).length > 0 && (
+      {canManage && (Object.keys(decisionEdits).length > 0 || justSavedDecisions) && (
         <div className={styles.pendingBand}>
-          {decisionError
-            ? <p role="alert" className="text-danger text-xs">{decisionError}</p>
-            : <p className={styles.pendingText}>{Object.keys(decisionEdits).length}件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
-          <div className={styles.pendingActions}>
-            <Button type="button" variant="secondary" disabled={refreshing || !countsAreComplete} onClick={() => void rerunPreview()} busy={refreshing} busyLabel="確認中…">
-              事前確認をやり直す
-            </Button>
-            <Button type="button" variant="primary" disabled={savingDecisions}
-              onClick={() => void saveDecisions()} busy={savingDecisions}>判断を保存する
-            </Button>
-          </div>
+          {Object.keys(decisionEdits).length > 0 ? (
+            <>
+              {decisionError
+                ? <p role="alert" className="text-danger text-xs">{decisionError}</p>
+                : <p className={styles.pendingText}>{Object.keys(decisionEdits).length}件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
+              <div className={styles.pendingActions}>
+                <Button type="button" variant="secondary" disabled={refreshing || !countsAreComplete} onClick={() => void rerunPreview()} busy={refreshing} busyLabel="確認中…">
+                  事前確認をやり直す
+                </Button>
+                <Button type="button" variant="primary" disabled={savingDecisions}
+                  onClick={() => void saveDecisions()} busy={savingDecisions}>判断を保存する
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className={styles.pendingActions}>
+              <Button type="button" variant="primary" disabled done={justSavedDecisions}>判断を保存する
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
