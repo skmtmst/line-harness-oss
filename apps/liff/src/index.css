@@ -62,8 +62,16 @@
   --color-night-dim: #8a9098;
   /* 押せない枠の地。設計の満席の枠 (2-event.png の 14:00〜15:00) の灰色。 */
   --color-shell-gray: #ebedf1;
-  /* 空きの点の金 (残りわずか)。夜の型では金の #c9a96a に替える。 */
+  /* 空きの点の金 (残りわずか)。型ごとに替える。 */
   --color-liff-dot-few: #b26b00;
+  /* 満席の字。今は押せない薄字と同じ。型ごとに替える。 */
+  --color-liff-full: #c3c8cf;
+}
+
+/* 角丸の素。今の値 (10・箱は14) を既定にし、型ごとに替える。 */
+:root {
+  --liff-radius: 10px;
+  --liff-radius-lg: 14px;
 }
 
 /* 主の色の上の字。店の色で上書きする (見やすさの計算で白か濃字か)。 */
@@ -159,11 +167,15 @@ body {
   }
 }
 
-/* ─── M2 LIFF の見た目の型 (V8.pen 修正案 L-2・L-3) ───
+/* ─── M2 LIFF の見た目の型 (V8.pen 修正案 L-2・L-3。値は色見本どおり) ───
  * 5つの型は包み (LiffLookScope) の div の data-liff-theme で切り替える。
- * 型を選んでいない店 (⑤ LINE らしい) は data-liff-theme="line" で、
- * 専用の上書きを持たない＝今の見た目のまま。
- * 値は指示書どおり。④夜は深い紺 (黒は使わない)。
+ * 型を選んでいない店と ⑤ LINE らしいは専用の上書きを持たない
+ * (⑤＝今の見た目そのまま。主 #03873a・契約テストもそのまま)。
+ * 地は --color-canvas に、面は --color-ground に重ねる。
+ * ④夜は深い紺 (黒は使わない)。②モダンの主は真っ黒を避けた #2b2d31。
+ * 上の字は見本＋司令塔の直しどおりで、4つとも白字 4.5 以上を実測済み
+ * (①12.11・②13.79・③4.95・④7.59)。店が自由に決める色だけ、
+ * 見やすさの計算で濃字に替える。
  * 知らせ (注意書きの箱 --color-liff-note) はどの型でも白地のまま
  * (オーナー)。動き (L-1・L-4) はどの型でも共通。 */
 
@@ -172,38 +184,101 @@ body {
 [data-liff-theme] h2 {
   font-family: var(--liff-font-heading, inherit);
 }
+/* ②モダンの見出しは太く (800)。 */
+[data-liff-theme="modern"] h1,
+[data-liff-theme="modern"] h2 {
+  font-weight: 800;
+}
+/* 日付・時刻の数字。型ごとに見た目の書体と太さ (⑤は今のまま)。 */
+[data-liff-theme="natural"] .liff-num,
+[data-liff-theme="night"] .liff-num {
+  font-family: "Inter", "Noto Sans JP", sans-serif;
+  font-weight: 300;
+}
+[data-liff-theme="modern"] .liff-num {
+  font-family: "Inter", "Noto Sans JP", sans-serif;
+  font-weight: 500;
+}
+[data-liff-theme="gentle"] .liff-num {
+  font-family: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", sans-serif;
+  font-weight: 500;
+}
 
-/* ①ナチュラル (生成り・しっぽり明朝・深い緑 #123d2f)。 */
+/* ①ナチュラル。 */
 [data-liff-theme="natural"] {
-  --color-canvas: #f7f2e4;
-  --color-ground: #efe8d3;
+  --color-canvas: #fbfaf7;
+  --color-ground: #ffffff;
+  --color-hairline: #e9e4dc;
+  --color-liff-line: #e9e4dc;
+  --color-liff-line-strong: #e9e4dc;
+  --color-liff-divider: #e9e4dc;
+  --color-ink-secondary: #76716a;
+  --color-ink-faint: #76716a;
+  --color-liff-sub: #76716a;
+  --color-liff-idle: #76716a;
+  --color-liff-off-ink: #76716a;
+  --color-ink: #1a1a1a;
   --color-liff-primary: #123d2f;
   --color-liff-soft: #e7ecea;
   --liff-on-primary: #ffffff;
+  --color-liff-dot-few: #c9a96a;
+  --color-liff-full: #c4beb4;
   --liff-font-heading: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --liff-radius: 23px;
+  --liff-radius-lg: 23px;
 }
 
-/* ②モダン (白黒すっきり。主の色は墨＝--color-ink と同じ値)。 */
+/* ②モダン。 */
 [data-liff-theme="modern"] {
-  --color-liff-primary: #1d1d1f;
-  --color-liff-soft: #f1f3f5;
+  --color-canvas: #ffffff;
+  --color-ground: #f5f5f5;
+  --color-hairline: #e8e8e8;
+  --color-liff-line: #e8e8e8;
+  --color-liff-line-strong: #e8e8e8;
+  --color-liff-divider: #e8e8e8;
+  --color-ink-secondary: #6e6e73;
+  --color-ink-faint: #6e6e73;
+  --color-liff-sub: #6e6e73;
+  --color-liff-idle: #6e6e73;
+  --color-liff-off-ink: #6e6e73;
+  --color-ink: #111111;
+  --color-liff-primary: #2b2d31;
+  --color-liff-soft: #f5f5f5;
   --liff-on-primary: #ffffff;
+  --color-liff-dot-few: #ff9f0a;
+  --color-liff-full: #c7c7cc;
+  --liff-radius: 10px;
+  --liff-radius-lg: 10px;
 }
 
-/* ③やさしい (暖かい白・Zen Maru Gothic・テラコッタ)。 */
+/* ③やさしい。主は見やすさ 4.5 のため濃くした #b5532f (白字 4.95)。 */
 [data-liff-theme="gentle"] {
-  --color-canvas: #fdf9f3;
-  --color-ground: #f6efe3;
-  --color-liff-primary: #b25f42;
-  --color-liff-soft: #f7efec;
+  --color-canvas: #fff8f3;
+  --color-ground: #ffffff;
+  --color-hairline: #f1e2d6;
+  --color-liff-line: #f1e2d6;
+  --color-liff-line-strong: #f1e2d6;
+  --color-liff-divider: #f1e2d6;
+  --color-ink-secondary: #8a7468;
+  --color-ink-faint: #8a7468;
+  --color-liff-sub: #8a7468;
+  --color-liff-idle: #8a7468;
+  --color-liff-off-ink: #8a7468;
+  --color-ink: #3b2a22;
+  --color-liff-primary: #b5532f;
+  --color-liff-soft: #f8eeea;
   --liff-on-primary: #ffffff;
+  --color-liff-dot-few: #e8b04a;
+  --color-liff-full: #d6c6bb;
   --liff-font-heading: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", sans-serif;
+  --liff-radius: 21px;
+  --liff-radius-lg: 21px;
 }
 
-/* ④夜 (深い紺。黒は使わない)。 */
+/* ④夜 (深い紺。黒は使わない。主は金で字は紺)。 */
 [data-liff-theme="night"] {
   --color-canvas: #0f1c33;
-  --color-ground: #0f1c33;
+  --color-ground: #172a47;
   --color-liff-chip: #172a47;
   --color-liff-off-bg: #172a47;
   --color-liff-soft: #172a47;
@@ -218,6 +293,12 @@ body {
   --color-liff-sub: #a9b8d0;
   --color-liff-idle: #a9b8d0;
   --color-liff-off-ink: #a9b8d0;
-  --color-liff-dot-few: #c9a96a;
+  --color-liff-primary: #c9a96a;
+  --liff-on-primary: #0f1c33;
+  --color-liff-dot-few: #e0c48a;
+  --color-liff-full: #4a5f82;
   --color-liff-wait-ink: #c9a96a;
+  --liff-font-heading: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --liff-radius: 23px;
+  --liff-radius-lg: 23px;
 }
