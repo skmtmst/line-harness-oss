@@ -688,7 +688,7 @@ function IncomingV8Inner() {
                 skeleton={(
                   <div aria-hidden="true">
                     {[0, 1, 2, 3].map((row) => (
-                      <div key={row} className={styles.inletItem}>
+                      <div key={row} style={{ padding: '10px 12px' }}>
                         <Skeleton height={14} width="55%" />
                         <Skeleton className="mt-1" height={11} width="35%" />
                       </div>

@@ -598,7 +598,16 @@ function OutgoingV8Inner() {
   const listBody = (() => {
     if (outgoingStatus === 'loading') {
       return (
-        <div className={styles.tableWrap} aria-busy="true" aria-label="送り先を読み込んでいます">
+        <div
+          style={{
+            overflowX: 'auto',
+            border: '1px solid var(--color-hairline)',
+            borderRadius: 'var(--radius-card, 12px)',
+            background: 'var(--color-canvas)',
+          }}
+          aria-busy="true"
+          aria-label="送り先を読み込んでいます"
+        >
           <DelayedSkeleton
             loading
             skeleton={(
