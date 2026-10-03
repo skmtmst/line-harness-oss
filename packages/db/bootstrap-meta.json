@@ -505,7 +505,8 @@
     "555_tenant_data_retention.sql",
     "556_f13_folder_kinds.sql",
     "559_booking_plus_repeat_waitlist_visit.sql",
-    "562_booking_plus_seat_waitlist_visit.sql"
+    "562_booking_plus_seat_waitlist_visit.sql",
+    "564_form_versions_purge_delete.sql"
   ],
-  "migrationCount": 506
+  "migrationCount": 507
 }
