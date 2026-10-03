@@ -149,4 +149,14 @@
   opacity: 0;
   transition: opacity var(--motion-exit) var(--motion-ease-out);
 }
+
+/*
+ * 素の tr の一覧（画面側の表）も同じ速さで薄くなる。クラスを持たない
+ * 行のための受け口で、対象は data-leaving を付けた行だけ。
+ * 動きを減らす設定では globals の規定で一瞬になる。
+ */
+[data-theme='v8'] tr[data-leaving='true'] {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease-out);
+}
 }
