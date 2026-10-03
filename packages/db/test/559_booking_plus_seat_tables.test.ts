@@ -1,5 +1,5 @@
 /**
- * 562: 席の空き待ちと席の来店の印の表。
+ * 559（席の版。旧 562 を1本化）: 席の空き待ちと席の来店の印の表。
  *
  * - rt_seat_waitlist: 同じ店・同じ開始時刻に同じ組は二度並べない
  *   （待っている・仮押さえ中だけ）。取り消し後は並び直せる。
@@ -12,17 +12,24 @@ import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const migration = readFileSync(
-  join(import.meta.dirname, '..', 'migrations', '562_booking_plus_seat_waitlist_visit.sql'),
+  join(import.meta.dirname, '..', 'migrations', '559_booking_plus_repeat_waitlist_visit.sql'),
   'utf8',
 );
 
-describe('migration 562 席の空き待ちと来店の印の表', () => {
+describe('migration 559 席の空き待ちと来店の印の表', () => {
   let sqlite: Database.Database;
 
   beforeEach(() => {
     sqlite = new Database(':memory:');
     sqlite.pragma('foreign_keys = ON');
     sqlite.exec(`
+      CREATE TABLE line_accounts (id TEXT PRIMARY KEY);
+      CREATE TABLE staff (id TEXT PRIMARY KEY);
+      CREATE TABLE menus (id TEXT PRIMARY KEY);
+      CREATE TABLE friends (id TEXT PRIMARY KEY);
+      CREATE TABLE booking_customers (id TEXT PRIMARY KEY);
+      CREATE TABLE bookings (id TEXT PRIMARY KEY);
+      CREATE TABLE booking_settings (id TEXT PRIMARY KEY);
       CREATE TABLE rt_organizations (id TEXT PRIMARY KEY, account_id TEXT NOT NULL);
       CREATE TABLE rt_stores (
         id TEXT PRIMARY KEY,

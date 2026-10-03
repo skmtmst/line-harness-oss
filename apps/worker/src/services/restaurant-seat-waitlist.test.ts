@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { promoteSeatWaitlist } from './restaurant-seat-waitlist.js';
 
 const migration = readFileSync(
-  join(import.meta.dirname, '..', '..', '..', '..', 'packages', 'db', 'migrations', '562_booking_plus_seat_waitlist_visit.sql'),
+  join(import.meta.dirname, '..', '..', '..', '..', 'packages', 'db', 'migrations', '559_booking_plus_repeat_waitlist_visit.sql'),
   'utf8',
 );
 
@@ -73,6 +73,11 @@ beforeEach(() => {
   sqlite.exec(`
     CREATE TABLE line_accounts (id TEXT PRIMARY KEY, name TEXT NOT NULL,
       channel_access_token TEXT, channel_access_token_encrypted TEXT);
+    CREATE TABLE staff (id TEXT PRIMARY KEY);
+    CREATE TABLE menus (id TEXT PRIMARY KEY);
+    CREATE TABLE friends (id TEXT PRIMARY KEY);
+    CREATE TABLE booking_customers (id TEXT PRIMARY KEY);
+    CREATE TABLE bookings (id TEXT PRIMARY KEY);
     CREATE TABLE rt_organizations (id TEXT PRIMARY KEY, account_id TEXT NOT NULL);
     CREATE TABLE rt_stores (id TEXT PRIMARY KEY,
       organization_id TEXT NOT NULL, line_account_id TEXT, timezone TEXT);

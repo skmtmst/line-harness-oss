@@ -89,6 +89,9 @@ beforeEach(() => {
     CREATE TABLE booking_customers (id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL);
     CREATE TABLE bookings (id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL);
     CREATE TABLE booking_settings (id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL UNIQUE);
+    CREATE TABLE rt_stores (id TEXT PRIMARY KEY);
+    CREATE TABLE rt_tables (id TEXT PRIMARY KEY);
+    CREATE TABLE rt_reservations (id TEXT PRIMARY KEY);
     INSERT INTO line_accounts (id, name, created_at, channel_access_token, timezone)
       VALUES ('account-a', '本店', '2026-10-04', 'token', 'Asia/Tokyo');
     INSERT INTO staff (id, line_account_id) VALUES ('staff-a', 'account-a');
