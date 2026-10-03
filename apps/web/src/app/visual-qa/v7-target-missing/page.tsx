@@ -36,7 +36,7 @@ export default function V7TargetMissingVisualQaPage() {
             kind="not-found"
             title="このテンプレートは見つかりません"
             description="削除されたか、別の LINE アカウントのものです。"
-            accountName="然-NEN-TEST"
+            accountName="サンプルアカウント"
             backHref="/templates"
             backLabel="テンプレートの一覧へ戻る"
           />
