@@ -49,6 +49,7 @@ import { AfterActionsSection, ReceptionSection, ThanksSection, WordsSection } fr
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import Toggle from '@/components/shared/toggle'
 import { conflictMessage } from './form-conflict-message'
+import { describeConflictDiff, type ConflictSide } from './form-conflict-diff'
 import { formSavedContentMatches, type FormSavedContent } from './form-save-reconcile'
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -156,6 +157,11 @@ function FormEditInner() {
    * 運用者に決めてもらう。`updatedAt` は相手がいつ保存したかの手がかり。
    */
   const [conflict, setConflict] = useState<{ updatedAt: string } | null>(null)
+  // V8の公開の確かめ（Z9wXm）と競合の比べ（J1pdB）。v7の直接公開は変えない。
+  const [showPublish, setShowPublish] = useState(false)
+  const [compareTarget, setCompareTarget] = useState<ConflictSide | null>(null)
+  const [compareBusy, setCompareBusy] = useState(false)
+  const [compareError, setCompareError] = useState('')
 
   useEffect(() => {
     if (editorTab === 'options') setShowOptions(true)
@@ -240,6 +246,29 @@ function FormEditInner() {
       setNotice('最新の内容を読み込みました')
     } catch {
       setError('読み込みに失敗しました。もう一度読み込んでください。')
+    }
+  }
+
+  // J1pdB「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
+  const openCompare = async () => {
+    if (!id || !selectedAccountId || compareBusy) return
+    setCompareBusy(true)
+    setCompareError('')
+    try {
+      const res = await api.forms.get(id, selectedAccountId)
+      if (!res.success) {
+        setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+        return
+      }
+      setCompareTarget({
+        name: res.data.name,
+        description: res.data.description ?? '',
+        layout: res.data.layout ?? emptyLayout(),
+      })
+    } catch {
+      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+    } finally {
+      setCompareBusy(false)
     }
   }
 
@@ -865,6 +894,26 @@ function FormEditInner() {
           ))}
         </div>
 
+        {conflict && (
+          <div data-design-node="J1pdB" className="border-accent bg-accent-soft flex flex-wrap items-center gap-3 rounded-card border p-4">
+            <p className="text-ink min-w-0 flex-1 text-sm">
+              <span className="font-bold">{conflictMessage(conflict.updatedAt)}</span>
+              <span className="mt-0.5 block text-xs">あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。</span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
+                {compareBusy ? '比べています...' : '違いを比べる'}
+              </Button>
+              <Button variant="primary" onClick={() => void reloadAfterConflict()}>
+                最新を読み込んで続ける
+              </Button>
+            </div>
+          </div>
+        )}
+        {!conflict && error && (
+          <p role="alert" className="text-danger text-sm">{error}</p>
+        )}
+
         {loading || !formLoaded ? (
           <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
             読み込み中...
@@ -1069,15 +1118,80 @@ function FormEditInner() {
         <StickyBar
           actions={(
             <div className="flex flex-wrap gap-2">
+              <Button href="/form-submissions" variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal">
+                キャンセル
+              </Button>
               <Button variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => void save(false)} disabled={saving} title="フォームを保存（公開中の内容は変わりません）">
                 {saving ? '保存中...' : '下書きを保存する'}
               </Button>
-              <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => void save(true)} disabled={saving}>
-                {saving ? '処理中...' : 'この版を公開'}
+              <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => setShowPublish(true)} disabled={saving}>
+                この版を公開
               </Button>
             </div>
           )}
         />
+
+        <ConfirmDialog
+          open={showPublish}
+          title="この版を公開する"
+          description="公開すると、配っているURLを開いた人に新しい内容が出ます。"
+          confirmLabel="この版を公開"
+          busy={saving}
+          error={error || undefined}
+          designNode="Z9wXm"
+          onConfirm={() => {
+            void (async () => {
+              const ok = await save(true)
+              if (ok) setShowPublish(false)
+            })()
+          }}
+          onCancel={() => setShowPublish(false)}
+        >
+          <ul className="text-ink-secondary mt-3 space-y-1 text-xs">
+            <li>・すでに集まった回答（{submitCount}件）は消えません。消した質問の答えも残ります。</li>
+            <li>・公開するまで、今の版がそのまま使われます。</li>
+          </ul>
+        </ConfirmDialog>
+
+        <ConfirmDialog
+          open={compareTarget !== null || compareError !== ''}
+          title="最新の保存と比べる"
+          description="あなたの下書きと、相手が保存した最新の内容の違いです。読み込むまでは画面は変わりません。"
+          confirmLabel="最新を読み込んで続ける"
+          busy={compareBusy}
+          error={compareError || undefined}
+          onConfirm={() => {
+            setCompareTarget(null)
+            setCompareError('')
+            void reloadAfterConflict()
+          }}
+          onCancel={() => {
+            setCompareTarget(null)
+            setCompareError('')
+          }}
+        >
+          {compareTarget && (() => {
+            const mine: ConflictSide = { name, description, layout }
+            const { lines, omitted } = describeConflictDiff(mine, compareTarget)
+            return lines.length === 0 ? (
+              <p className="text-ink-secondary mt-3 text-sm">違いは見つかりませんでした。そのまま読み込めます。</p>
+            ) : (
+              <ul className="mt-3 space-y-1.5 text-sm">
+                {lines.map((line, index) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <span aria-hidden className={line.kind === 'remove' ? 'text-danger font-bold' : line.kind === 'add' ? 'text-success font-bold' : 'text-accent-deep font-bold'}>
+                      {line.kind === 'remove' ? '−' : line.kind === 'add' ? '＋' : '・'}
+                    </span>
+                    <span className="text-ink">{line.text}</span>
+                  </li>
+                ))}
+                {omitted > 0 && (
+                  <li className="text-ink-faint text-xs">ほか{omitted}件の違いがあります</li>
+                )}
+              </ul>
+            )
+          })()}
+        </ConfirmDialog>
 
         {showOptions && theme !== 'v8' && (
           <OptionsDialog
