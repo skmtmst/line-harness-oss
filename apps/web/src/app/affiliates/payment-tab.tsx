@@ -110,6 +110,7 @@ export function SettlementCloseDialog({
   return (
     <Dialog
       open={Boolean(preview)}
+      designNode="usDpO"
       title={`${dateLabel(preview?.periodTo ?? null)} で締めますか？`}
       description="この期間に認めた成果を固定します。締めたあとの取消は次の支払いで差し引かれます。"
       busy={busy}
