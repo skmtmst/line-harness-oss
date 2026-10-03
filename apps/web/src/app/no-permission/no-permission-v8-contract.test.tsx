@@ -103,4 +103,39 @@ describe('V8 権限なし（O5tUeE）の受け口', () => {
     expect(VARS_V8).toContain('<NoPermissionV8')
     expect(VARS_V8).toContain('featureName="共通情報"')
   })
+
+  test('V8 の全画面403で共通の板を出す', () => {
+    // 全画面の 403 枝はこの板で出す。埋め込みの失敗文（保存・切替・行内）は対象外。
+    const receivers = [
+      'src/app/auto-replies/list-v8.tsx',
+      'src/app/auto-replies/edit/wizard-v8.tsx',
+      'src/app/booking/menus/new/menu-form-v8.tsx',
+      'src/app/booking/staff/new/staff-new-v8.tsx',
+      'src/app/broadcasts/list-v8.tsx',
+      'src/app/contents/vars/list-v8.tsx',
+      'src/app/events/events-list-v8.tsx',
+      'src/app/form-submissions/list-v8.tsx',
+      'src/app/friend-add-settings/runs/detail/detail-v8.tsx',
+      'src/app/friends/migrations/migrations-v8.tsx',
+      'src/app/hq/banners/project/page.tsx',
+      'src/app/hq/billing/page.tsx',
+      'src/app/hq/members/page.tsx',
+      'src/app/nen/members/members-v8.tsx',
+      'src/app/settings/file-scan/file-scan-v8.tsx',
+      'src/app/settings/manual-links/manual-links-v8.tsx',
+      'src/app/tags/field-migrate-v8.tsx',
+      'src/app/tags/fields-tab-v8.tsx',
+      'src/app/tags/mark-editor-v8.tsx',
+      'src/app/tags/marks-v8.tsx',
+      'src/app/tags/searches-v8.tsx',
+      'src/app/tags/tags-tab-v8.tsx',
+      'src/app/templates/list-v8.tsx',
+      'src/app/webhooks/apitokens-v8.tsx',
+      'src/app/webinars/list-v8.tsx',
+    ]
+    for (const receiver of receivers) {
+      const source = readFileSync(receiver, 'utf8')
+      expect(source, receiver).toContain('<NoPermissionV8')
+    }
+  })
 })
