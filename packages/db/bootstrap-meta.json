@@ -500,7 +500,8 @@
     "550_nen_member_rank_sync.sql",
     "551_rich_menu_group_default_open.sql",
     "552_self_cancel_claim.sql",
-    "553_meet_consultation_booking_link.sql"
+    "553_meet_consultation_booking_link.sql",
+    "554_meet_cancel_claim.sql"
   ],
-  "migrationCount": 501
+  "migrationCount": 502
 }

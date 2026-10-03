@@ -3919,7 +3919,7 @@ CREATE TABLE meet_consultations (
                     CHECK (status IN ('confirmed', 'cancelled', 'completed')),
   created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, booking_id TEXT, booking_version INTEGER);
+, booking_id TEXT, booking_version INTEGER, cancel_claim_id TEXT);
 
 CREATE TABLE menu_versions (
   id TEXT PRIMARY KEY,

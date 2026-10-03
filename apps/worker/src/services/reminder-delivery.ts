@@ -46,6 +46,7 @@ import {
 import type { ReminderDeliveryRunRow, ReminderStepRow } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
 import { featureJobCanRun } from './feature-enforcement.js';
+import { isMeetConsultationSendable } from './meet-consultation-reminders.js';
 
 const LEASE_MINUTES = 5;
 
@@ -407,6 +408,24 @@ export async function processReminderDeliveries(
         continue enrollmentLoop;
       }
 
+      // Meet個別相談のV6行は、結び付き予約の版・日時・本人・状態が
+      // 一致するときだけ送る。古い版の予定はここで止める (版なし旧行は通す)。
+      // 取消後に残った実行行は送らず止める。
+      if (
+        enrollment.source_kind === 'meet' &&
+        enrollment.source_id &&
+        !(await isMeetConsultationSendable(db, enrollment.source_id))
+      ) {
+        await db.prepare(
+          `UPDATE reminder_delivery_runs
+              SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
+                  next_retry_at = NULL, updated_at = ?
+            WHERE id = ? AND status = 'claimed' AND lease_expires_at = ?`,
+        ).bind(nowIso, nowIso, run.id, claimLease).run();
+        result.skipped++;
+        continue enrollmentLoop;
+      }
+
       if (!friend) {
         await skipReminderDeliveryRun(db, {
           id: run.id,
@@ -469,6 +488,24 @@ export async function processReminderDeliveries(
         })) {
           result.skipped++;
           continue;
+        }
+        // Meet個別相談のV6行は、認証・本文の解決awaitの後も結び付き予約の
+        // 版・日時・本人・状態が一致するときだけ送る。直前の検証は版なし旧行と
+        // 日時だけを見るため、最終送信権の直前で関係も確かめる。古ければ
+        // 実行行を取り消して止める (勝者の新版行には触れない)。
+        if (
+          enrollment.source_kind === 'meet' &&
+          enrollment.source_id &&
+          !(await isMeetConsultationSendable(db, enrollment.source_id))
+        ) {
+          await db.prepare(
+            `UPDATE reminder_delivery_runs
+                SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
+                    next_retry_at = NULL, updated_at = ?
+              WHERE id = ? AND status = 'claimed' AND lease_expires_at = ?`,
+          ).bind(nowIso, nowIso, run.id, claimLease).run();
+          result.skipped++;
+          continue enrollmentLoop;
         }
         // 外部送信の直前にも緊急停止を確かめる (#1050)。claim 後に停止へ
         // 切り替わった分は claim をキューへ戻し、失敗・skipped にはしない
