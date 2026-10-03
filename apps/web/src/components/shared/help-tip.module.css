@@ -146,4 +146,40 @@
   font-size: var(--text-nano);
   font-weight: 600;
 }
+
+/*
+ * ★V8 仕上げ（M10-2）：「?」の乗せた・押した・中身の開く動き。
+ * 印に乗せたときは地を少し沈め、押したときはほんの少し縮む。
+ * 中身は少し下からふっと出る（小さいふきだしなので 120ms）。
+ */
+[data-theme='v8'] .button {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    scale var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .button:hover {
+  background: var(--color-canvas-sunken);
+}
+
+[data-theme='v8'] .button:active {
+  scale: 0.88;
+}
+
+[data-theme='v8'] .tip {
+  animation: help-tip-v8-in var(--motion-fast) var(--motion-ease-out);
+  transform-origin: top left;
+}
+
+@keyframes help-tip-v8-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 }

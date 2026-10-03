@@ -33,6 +33,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Select from '@/components/shared/select'
 import StepUpDialog from '@/components/shared/step-up-dialog'
 import SaveConflictBar from '@/components/shared/save-conflict-bar'
@@ -658,8 +659,32 @@ const EmergencyControlV8 = (
       <section aria-labelledby="emergency-records-heading">
         <h2 id="emergency-records-heading" className={styles.cardTitle}>止めた・戻した記録</h2>
         {historyState === 'loading' ? (
-          <div className={styles.card} style={{ marginTop: 12 }}>
-            <ListState kind="loading" title="記録を読み込んでいます" />
+          <div className={styles.card} style={{ marginTop: 12 }} aria-busy="true" aria-label="止めた・戻した記録を読み込んでいます">
+            <DelayedSkeleton
+              loading
+              skeleton={(
+                <div aria-hidden="true">
+                  <div style={{ display: 'flex', gap: 24, padding: '12px 16px' }}>
+                    <Skeleton height={12} width={40} />
+                    <Skeleton height={12} width={60} />
+                    <Skeleton height={12} width={40} />
+                    <Skeleton height={12} width={40} />
+                    <Skeleton height={12} width={70} />
+                    <Skeleton height={12} width={120} />
+                  </div>
+                  {[0, 1, 2].map((row) => (
+                    <div key={row} style={{ display: 'flex', gap: 16, padding: '12px 16px', borderTop: '1px solid var(--color-hairline)' }}>
+                      <Skeleton height={14} width={120} />
+                      <Skeleton height={14} width={80} />
+                      <Skeleton height={14} width={100} />
+                      <Skeleton height={14} width={90} />
+                      <Skeleton height={14} width={60} />
+                      <Skeleton height={14} width={110} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            />
           </div>
         ) : historyState === 'error' ? (
           <div className={styles.card} style={{ marginTop: 12 }}>

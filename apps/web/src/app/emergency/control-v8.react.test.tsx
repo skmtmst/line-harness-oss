@@ -94,6 +94,41 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+test('記録の読み込み中は表の形の骨組みが出て「読み込み中」の文字は無い', async () => {
+  vi.useFakeTimers()
+  try {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/api/operations/control/preview')) {
+        return response({
+          success: true,
+          data: {
+            control: controlBase,
+            counts: {},
+            impact,
+            permissions: { canControl },
+            calculatedAt: '2026-10-02T06:00:00.000Z',
+          },
+        })
+      }
+      // 記録だけ返さず、読み込み中のままにする。
+      if (url.includes('/api/operations/history')) return new Promise<Response>(() => {})
+      return response({ success: false, error: 'not mocked' }, 500)
+    }))
+    await act(async () => {
+      root?.render(<EmergencyControlV8 accounts={[]} />)
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(350)
+    })
+    expect(host?.querySelector('[aria-label="止めた・戻した記録を読み込んでいます"]')).not.toBeNull()
+    expect(host?.querySelectorAll('[data-skeleton]').length).toBeGreaterThan(0)
+    expect(host?.textContent).not.toContain('読み込み中')
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
 async function renderControl() {
   await act(async () => {
     root?.render(<EmergencyControlV8 accounts={[]} />)

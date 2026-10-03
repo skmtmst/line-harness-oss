@@ -1,7 +1,8 @@
 'use client'
 
 /*
- * ★V8 一斉配信の詳細（絵 `cgiGB` 下書き・`pNiUk` 承認待ち・`F3X1Mo` 送信済み）。
+ * ★V8 一斉配信の詳細（絵 `cgiGB` 下書き・`pNiUk` 承認待ち・`F3X1Mo` 送信済み。
+ * 再撮の板 `dK1aE`（下書き）・`wfHIE`（承認待ち）・`tPm3e`（送った後）は同じ画面の状態として外枠に付ける）。
  *
  * v7 の詳細（detail/page.tsx）とは置き場が違うだけで、読む口・操作の中身は
  * 同じものを受け取る。並びは 見出し（題＋札＋1行説明＋操作）→ 進みの帯
@@ -229,7 +230,7 @@ export default function BroadcastDetailV8({
   const bubbleCount = broadcast.messageBubbles?.length ?? (broadcast.messageContent ? 1 : 0)
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node="dK1aE wfHIE tPm3e">
       {/* 見出し：題＋状態の札＋1行の説明＋進みの帯。右に操作。 */}
       <header className={styles.header}>
         <div className={styles.headerMain}>
