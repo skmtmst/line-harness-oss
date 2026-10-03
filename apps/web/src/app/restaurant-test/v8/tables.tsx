@@ -8,6 +8,10 @@
  * （選ぶと結合札・停止中は灰色）→ 卓の詳細（変更・停止／再開）→ 自動配席ルール。
  * 配置図のドラッグ移動は今の作りのまま扱わない（申送り BERxg の指摘どおり、
  * 閲覧だけ。座標の保存口が無いため動かせない）。
+ * - 板 `gBrCz`（追加・変更）：見本は窓だが、共通の窓部品への置き換えは
+ *   仕上げ係 M10 の範囲なので、今の作りの枠のまま外枠に印だけ付ける。
+ * - 板 `eY9F3`（止める確認）：見本の先の予約の一覧・移し先の選択・LINE通知は、
+ *   予約と卓を結ぶ口と通知の口が無いので出さない。今の確認文のまま印だけ付ける。
  * v7 を直す必要が出たら向こうも同じ判断を入れる（V8 完成までの二重管理）。
  */
 import { FormEvent, useState } from 'react'
@@ -111,6 +115,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <Button variant="primary" onClick={() => setShowForm((open) => !open)}>＋ 卓を追加する</Button>
       </div>
       {showForm ? (
+        <div data-design-node="gBrCz">
         <Panel title="新しい卓">
           <form onSubmit={submit} className={styles.formGrid}>
             <label className={styles.field}>卓番<TextField name="code" required aria-label="卓番" /></label>
@@ -127,8 +132,10 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
             </div>
           </form>
         </Panel>
+        </div>
       ) : null}
       {editing ? (
+        <div data-design-node="gBrCz">
         <Panel title={`${editing.code}・${editing.label}を変更`}>
           <form key={editing.id} onSubmit={(event) => void submitEdit(event)} className={styles.formGrid}>
             <label className={styles.field}>卓番<TextField name="code" defaultValue={editing.code} required aria-label="卓番" /></label>
@@ -146,12 +153,14 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
             </div>
           </form>
         </Panel>
+        </div>
       ) : null}
       <ConfirmDialog
         open={Boolean(stopping)}
         title="この卓を停止しますか？"
         description="予約履歴と卓の情報は残ります。停止中の卓は自動配席の候補から外れ、後で再開できます。"
         confirmLabel="停止する"
+        designNode="eY9F3"
         busy={busy}
         onCancel={() => setStopId('')}
         onConfirm={() => { if (stopping) stop(stopping) }}
