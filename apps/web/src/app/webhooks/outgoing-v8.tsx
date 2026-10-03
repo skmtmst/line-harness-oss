@@ -599,12 +599,7 @@ function OutgoingV8Inner() {
     if (outgoingStatus === 'loading') {
       return (
         <div
-          style={{
-            overflowX: 'auto',
-            border: '1px solid var(--color-hairline)',
-            borderRadius: 'var(--radius-card, 12px)',
-            background: 'var(--color-canvas)',
-          }}
+          className="overflow-x-auto rounded-card border border-hairline bg-canvas"
           aria-busy="true"
           aria-label="送り先を読み込んでいます"
         >
