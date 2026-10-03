@@ -110,7 +110,7 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 7px;
+  border-radius: var(--radius-tile-sm);
   background: var(--color-surface-pearl);
   color: var(--color-ink-secondary);
 }

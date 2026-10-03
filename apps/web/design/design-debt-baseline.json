@@ -147,6 +147,16 @@
   "app/contents/page.tsx": {
     "arbitrary-value": 5
   },
+  "app/contents/vars/edit/edit-v8.tsx": {
+    "unresolved-classname": 109
+  },
+  "app/contents/vars/list-v8.tsx": {
+    "unresolved-classname": 105,
+    "direct-th": 6
+  },
+  "app/contents/vars/new/new-v8.tsx": {
+    "unresolved-classname": 55
+  },
   "app/contents/vars/page.tsx": {
     "arbitrary-value": 3
   },
@@ -299,18 +309,35 @@
   "app/recipes/page.tsx": {
     "unresolved-classname": 17
   },
+  "app/reminders/basics-form-v8.tsx": {
+    "unresolved-classname": 39
+  },
+  "app/reminders/detail/detail-v8.tsx": {
+    "unresolved-classname": 69,
+    "direct-th": 23
+  },
   "app/reminders/detail/page.tsx": {
     "unresolved-classname": 29
+  },
+  "app/reminders/edit/edit-v8.tsx": {
+    "unresolved-classname": 168,
+    "direct-th": 4
   },
   "app/reminders/list-v8.tsx": {
     "unresolved-classname": 71,
     "direct-th": 7
+  },
+  "app/reminders/new/new-v8.tsx": {
+    "unresolved-classname": 6
   },
   "app/reminders/new/page.tsx": {
     "unresolved-classname": 7
   },
   "app/reminders/page.tsx": {
     "arbitrary-value": 4
+  },
+  "app/reminders/wizard-v8-ui.tsx": {
+    "unresolved-classname": 33
   },
   "app/restaurant-test/restaurant-console.tsx": {
     "arbitrary-value": 11,
@@ -905,22 +932,5 @@
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 8,
     "arbitrary-value": 2
-  },
-  "app/reminders/basics-form-v8.tsx": {
-    "unresolved-classname": 39
-  },
-  "app/reminders/detail/detail-v8.tsx": {
-    "unresolved-classname": 69,
-    "direct-th": 23
-  },
-  "app/reminders/edit/edit-v8.tsx": {
-    "unresolved-classname": 168,
-    "direct-th": 4
-  },
-  "app/reminders/new/new-v8.tsx": {
-    "unresolved-classname": 6
-  },
-  "app/reminders/wizard-v8-ui.tsx": {
-    "unresolved-classname": 33
   }
 }
