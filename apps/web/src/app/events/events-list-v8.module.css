@@ -86,7 +86,7 @@
   height: 22px;
   background: var(--color-surface-pearl);
   border: 1px solid var(--color-hairline);
-  border-radius: 7px;
+  border-radius: var(--radius-tile-sm);
   color: var(--color-ink-secondary);
 }
 

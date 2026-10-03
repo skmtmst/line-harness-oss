@@ -469,7 +469,7 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
           <p className="text-ink-faint py-4 text-sm">この開催回には申込者もキャンセル待ちもいません。</p>
         ) : (
           <div className={styles.tableScroll}>
-            <DataTable data-design="Table">
+            <DataTable>
               <thead>
                 <TableHeadRow>
                   <Th style={{ width: '24%' }}>申込者</Th>
@@ -609,7 +609,7 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
           </Button>
         </div>
         <div className={styles.tableScroll}>
-          <DataTable data-design="Table">
+          <DataTable>
             <thead>
               <TableHeadRow>
                 <Th style={{ width: '24%' }}>友だち</Th>
@@ -658,7 +658,7 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
       <section className={styles.section} aria-label="キャンセル">
         <h3 className={styles.sectionTitle}>キャンセル</h3>
         <div className={styles.tableScroll}>
-          <DataTable data-design="Table">
+          <DataTable>
             <thead>
               <TableHeadRow>
                 <Th style={{ width: '40%' }}>友だち</Th>

@@ -65,7 +65,7 @@ function formatShortJpDate(iso: string | null): string {
 function loadDetail(hasAccount: boolean, status: LoadStatus, readyDetail: string): string {
   if (!hasAccount) return 'アカウントを選択'
   if (status === 'loading') return '読み込み中'
-  if (status === 'error') return '取得できませんでした'
+  if (status === 'error') return '読み込めませんでした'
   if (status === 'forbidden') return '見る権限がありません'
   return readyDetail
 }
