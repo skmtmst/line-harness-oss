@@ -1,10 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { X } from 'lucide-react'
-import { api, bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
+import { api, bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff, type BookingTodayResponse, type BookingTodaySeatRow, type BookingWaitlistEntry } from '@/lib/api'
+import { restaurantTestApi, type RestaurantReservation, type SeatWaitlistEntry } from '@/lib/restaurant-test-api'
+import SegmentedControl from '@/components/shared/segmented'
+import { notifyToast } from '@/components/shared/toast'
+import BookingDayTimeline, { type DayWaitEntry } from './booking-day-v8'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
@@ -123,6 +127,43 @@ function formatJpDay(iso: string): string {
 
 function jstDay(iso: string): string {
   return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+}
+
+const JP_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
+
+/** V8 の日送り「10月4日（土）」。曜日は暦どおり。 */
+function v8DayLabel(day: string): string {
+  const [year, month, date] = day.split('-').map(Number)
+  if (!year || !month || !date) return day
+  const weekday = JP_WEEKDAYS[new Date(Date.UTC(year, month - 1, date)).getUTCDay()]
+  return `${month}月${date}日（${weekday}）`
+}
+
+/**
+ * V8 の席の予約を今のカレンダーの形に入れ替える写し。
+ * 列は卓名、札は人数・コース・お客さま。席の詳細画面はまだ無いので
+ * 開く操作は人の予約だけに通す（呼び出し側で `seat:` をはじく）。
+ */
+function seatToCalendarItem(row: BookingTodaySeatRow): BookingRequest {
+  return {
+    id: `seat:${row.id}`,
+    friend_id: null,
+    booking_customer_id: null,
+    starts_at: row.starts_at,
+    ends_at: row.ends_at,
+    status: row.status,
+    customer_note: null,
+    internal_note: null,
+    price_at_booking: 0,
+    menu_name: row.course_name ?? `${row.guest_count}名`,
+    staff_name: row.table_label ?? '席の指定なし',
+    friend_name: `${row.customer_name} 様`,
+    requested_at: row.starts_at,
+    decided_at: null,
+    external_event_id: null,
+    staff_id: `seat:${row.table_label ?? row.store_name}`,
+    source: 'operator',
+  }
 }
 
 function monthKey(offset: number): string {
@@ -255,6 +296,23 @@ export default function BookingsPage() {
   const [total, setTotal] = useState(0)
   const [calendarItems, setCalendarItems] = useState<BookingRequest[]>([])
   /*
+   * V8 の「日」（booking-plus 6）。時刻順の帯・その場の印・右の待ちの列。
+   * v7 の見た目は変えないため、状態・取得・操作はここに寄せ、
+   * 描画は `booking-day-v8.tsx` だけが持つ。
+   */
+  const [dayMode, setDayMode] = useState<'staff' | 'seat' | 'both'>('staff')
+  const [daySort, setDaySort] = useState<'time' | 'staff'>('time')
+  const [dayData, setDayData] = useState<BookingTodayResponse | null>(null)
+  const [dayLoading, setDayLoading] = useState(false)
+  const [daySeq, setDaySeq] = useState(0)
+  const [dayBusyId, setDayBusyId] = useState<string | null>(null)
+  const [staffWaitlist, setStaffWaitlist] = useState<BookingWaitlistEntry[]>([])
+  const [seatWaitlist, setSeatWaitlist] = useState<SeatWaitlistEntry[]>([])
+  const [seatStores, setSeatStores] = useState<Array<{ id: string; name: string }>>([])
+  const [seatWeekRows, setSeatWeekRows] = useState<BookingTodaySeatRow[]>([])
+  const [holdMinutes, setHoldMinutes] = useState(30)
+  const [dayError, setDayError] = useState(false)
+  /*
    * BOOKING-01: カレンダーが実際に表示している日・週の基点。以前は内部で
    * 持ち、取得範囲は常に「今日起点」だったため、翌週へ進んでも予約が
    * 読まれず全マスが空きに見えた。表示範囲と取得範囲を一致させる。
@@ -328,6 +386,9 @@ export default function BookingsPage() {
   // 最新の行を引き直せるので、パネルに古い状態が残らない。
   const [detailId, setDetailId] = useState<string | null>(null)
   const adminTheme = useAdminTheme()
+  /* V8 の「日」まわりで使う。v7 の描画には触らない。 */
+  const isV8Day = adminTheme === 'v8'
+  const dayNow = useMemo(() => new Date(), [daySeq, calendarAnchor, view])
 
   const liffId = selectedAccount?.liffId ?? null
   // Worker `/o` は ref 解決・追跡なしで liffId を直接受けるラップ URL。
@@ -554,6 +615,146 @@ export default function BookingsPage() {
     })
     return () => { alive = false }
   }, [selectedAccountId, view, calendarFrom, calendarTo, calendarSeq])
+
+  /*
+   * V8 の「日」（時刻順）の取得。v7 の取得には触らない。
+   * 人・席・両方をその日の帯1本に混ぜて取る。印の付け直し後は daySeq を回す。
+   */
+  useEffect(() => {
+    if (!isV8Day || !selectedAccountId || view !== 'day') return
+    let alive = true
+    setDayLoading(true)
+    bookingApi.getToday(selectedAccountId, {
+      date: calendarAnchor,
+      mode: dayMode === 'both' ? 'both' : dayMode,
+    })
+      .then((response) => {
+        if (!alive) return
+        setDayData(response)
+        setDayError(false)
+        setDayLoading(false)
+      })
+      .catch(() => { if (alive) { setDayError(true); setDayLoading(false) } })
+    return () => { alive = false }
+  }, [isV8Day, selectedAccountId, view, daySort, dayMode, calendarAnchor, daySeq])
+
+  /* V8 の「日」の右の待ちの列。人と席をその日の分だけ集める。 */
+  useEffect(() => {
+    if (!isV8Day || !selectedAccountId || view !== 'day' || daySort !== 'time') return
+    let alive = true
+    const anchorDay = calendarAnchor
+    const isSameDay = (iso: string) => iso.slice(0, 10) === anchorDay
+      || new Date(new Date(iso).getTime() + 9 * 3_600_000).toISOString().slice(0, 10) === anchorDay
+    if (dayMode !== 'seat') {
+      bookingApi.listWaitlist(selectedAccountId).then((response) => {
+        if (!alive) return
+        setStaffWaitlist(response.waitlist.filter(
+          (entry) => (entry.status === 'waiting' || entry.status === 'invited') && isSameDay(entry.starts_at),
+        ))
+      }).catch(() => {})
+    } else {
+      setStaffWaitlist([])
+    }
+    if (dayMode !== 'staff') {
+      restaurantTestApi.snapshot(selectedAccountId).then((snapshot) => {
+        if (!alive) return
+        const stores = snapshot.data?.stores?.filter((store) => store.status === 'active') ?? []
+        setSeatStores(stores.map((store) => ({ id: store.id, name: store.name })))
+        void Promise.all(stores.map((store) =>
+          restaurantTestApi.listSeatWaitlist(selectedAccountId, { storeId: store.id })
+            .then((response) => response.data.waitlist)
+            .catch(() => [] as SeatWaitlistEntry[]),
+        )).then((lists) => {
+          if (!alive) return
+          setSeatWaitlist(lists.flat().filter(
+            (entry) => (entry.status === 'waiting' || entry.status === 'invited') && isSameDay(entry.starts_at),
+          ))
+        })
+      }).catch(() => {})
+    } else {
+      setSeatWaitlist([])
+      setSeatStores([])
+    }
+    return () => { alive = false }
+  }, [isV8Day, selectedAccountId, view, daySort, dayMode, calendarAnchor, daySeq])
+
+  /*
+   * V8 の「週」（と「日」の担当ごと）の席。同じカレンダーの形に
+   * 入れ替えて出すため、期間の席を取る。印は日の帯で付ける。
+   */
+  useEffect(() => {
+    if (!isV8Day || !selectedAccountId || dayMode === 'staff') {
+      setSeatWeekRows([])
+      return
+    }
+    if (view !== 'week' && !(view === 'day' && daySort === 'staff')) return
+    let alive = true
+    const from = view === 'week' ? startOfWeek(calendarAnchor) : calendarAnchor
+    const to = view === 'week' ? moveDay(from, 6) : calendarAnchor
+    bookingApi.getToday(selectedAccountId, { from, to, mode: 'seat' })
+      .then((response) => { if (alive) setSeatWeekRows(response.seats) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [isV8Day, selectedAccountId, view, daySort, dayMode, calendarAnchor, daySeq])
+
+  /* 待ちの列の仮押さえ分数。店の設定を読む。 */
+  useEffect(() => {
+    if (!isV8Day || !selectedAccountId) return
+    bookingApi.getSettings(selectedAccountId)
+      .then((response) => {
+        const minutes = response.success ? response.data?.waitlistHoldMinutes : undefined
+        if (typeof minutes === 'number') setHoldMinutes(minutes)
+      })
+      .catch(() => {})
+  }, [isV8Day, selectedAccountId])
+
+  /** V8 の「日」の印を付ける。席は席の口へ。失敗は知らせて false を返す。 */
+  const markDayRow = useCallback(async (
+    row: { kind: 'staff' | 'seat'; id: string },
+    kind: 'visited' | 'late' | 'no_show',
+    lateMinutes?: number,
+  ): Promise<boolean> => {
+    if (!selectedAccountId || !canOperate) return false
+    setDayBusyId(row.id)
+    try {
+      if (row.kind === 'staff') {
+        await bookingApi.postVisitMark(selectedAccountId, row.id, {
+          kind, ...(lateMinutes !== undefined ? { late_minutes: lateMinutes } : {}),
+        })
+      } else {
+        await restaurantTestApi.postSeatVisitMark(selectedAccountId, row.id, {
+          kind, ...(lateMinutes !== undefined ? { lateMinutes } : {}),
+        })
+      }
+      setDaySeq((n) => n + 1)
+      return true
+    } catch {
+      notifyToast('印を付けられませんでした。開き直してもう一度押してください')
+      return false
+    } finally {
+      setDayBusyId(null)
+    }
+  }, [selectedAccountId, canOperate])
+
+  /** V8 の「日」の印を取り消す（元に戻す）。 */
+  const unmarkDayRow = useCallback(async (row: { kind: 'staff' | 'seat'; id: string }): Promise<boolean> => {
+    if (!selectedAccountId || !canOperate) return false
+    setDayBusyId(row.id)
+    try {
+      if (row.kind === 'staff') {
+        await bookingApi.deleteVisitMark(selectedAccountId, row.id)
+      } else {
+        await restaurantTestApi.deleteSeatVisitMark(selectedAccountId, row.id)
+      }
+      setDaySeq((n) => n + 1)
+      return true
+    } catch {
+      notifyToast('取り消せませんでした。開き直してもう一度押してください')
+      return false
+    } finally {
+      setDayBusyId(null)
+    }
+  }, [selectedAccountId, canOperate])
 
   /*
    * BOOKING-01: 空き枠の実績を空き枠APIから取る。受付可能な時間は
@@ -823,6 +1024,72 @@ export default function BookingsPage() {
   )
 
   /*
+   * V8 の頭（B-1）。見出し・日送り・人／席の切り替え・見方の切り替えを1段に。
+   * v7 の pageHead は残し、v8 のときだけこちらを出す。
+   */
+  const showModeToggle = (dayData?.has_seat_stores ?? false) || seatStores.length > 0 || seatWeekRows.length > 0
+  const effectiveMode = showModeToggle ? dayMode : 'staff'
+  const v8Head = (
+    <>
+      <div data-design="Toolbar" className="flex flex-wrap items-center justify-between gap-3">
+        <nav className="text-ink-faint text-xs" aria-label="パンくず">
+          <span>予約</span>
+          <span className="mx-1.5">/</span>
+          <span>予約管理</span>
+        </nav>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-xl font-semibold">予約管理</h1>
+        {view === 'day' ? (
+          <span className="inline-flex items-center gap-1" aria-label="日の移動">
+            <button type="button" className="rounded-control px-2 py-1 text-sm hover:bg-canvas-sunken" onClick={() => setCalendarAnchor(moveDay(calendarAnchor, -1))} aria-label="前の日">〈</button>
+            <span className="text-sm font-semibold" aria-live="polite">{v8DayLabel(calendarAnchor)}</span>
+            <button type="button" className="rounded-control px-2 py-1 text-sm hover:bg-canvas-sunken" onClick={() => setCalendarAnchor(moveDay(calendarAnchor, 1))} aria-label="次の日">〉</button>
+          </span>
+        ) : null}
+        {showModeToggle ? (
+          <SegmentedControl
+            options={[
+              { value: 'staff', label: '人（スタッフ）' },
+              { value: 'seat', label: '席（卓）' },
+              { value: 'both', label: '両方' },
+            ]}
+            value={dayMode}
+            onChange={setDayMode}
+            aria-label="人と席の切り替え"
+          />
+        ) : null}
+        <span className="ml-auto">
+          <SegmentedControl
+            options={[
+              { value: 'day', label: '日' },
+              { value: 'week', label: '週' },
+              { value: 'month', label: '月' },
+              { value: 'list', label: '一覧' },
+            ]}
+            value={view}
+            onChange={setView}
+            aria-label="予約の見方"
+          />
+        </span>
+      </div>
+      {view === 'day' ? (
+        <div className="mt-2">
+          <SegmentedControl
+            options={[
+              { value: 'time', label: '時刻順' },
+              { value: 'staff', label: effectiveMode === 'seat' ? '席ごと' : '担当ごと' },
+            ]}
+            value={daySort}
+            onChange={setDaySort}
+            aria-label="日の並べ方"
+          />
+        </div>
+      ) : null}
+    </>
+  )
+
+  /*
    * 作る操作は一覧のすぐ上の左の並びへ。見出しの行の右端には置かない。
    * N-401: 閲覧のみの人には代理予約の入口を出さない。
    */
@@ -878,9 +1145,89 @@ export default function BookingsPage() {
 
   {/* 帯同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
   if (view === 'day' || view === 'week') {
+    /* V8 の席・両方：同じカレンダーの形に席を入れ替える。v7 は従来のまま。 */
+    const v8SeatSource = isV8Day && effectiveMode !== 'staff'
+      && (view === 'week' || (view === 'day' && daySort === 'staff'))
+      ? (view === 'week' ? seatWeekRows : (dayData?.seats ?? []))
+      : []
+    const v8SeatItems = v8SeatSource.map(seatToCalendarItem)
+    const v8TableNames = [...new Set(v8SeatItems.map((item) => item.staff_name))]
+    const v8CalendarItems = !isV8Day || effectiveMode === 'staff'
+      ? calendarItems
+      : effectiveMode === 'seat'
+        ? v8SeatItems
+        : [...calendarItems, ...v8SeatItems]
+    const v8StaffNames = !isV8Day || effectiveMode === 'staff'
+      ? staffList.map((item) => item.display_name)
+      : effectiveMode === 'seat'
+        ? v8TableNames
+        : [...staffList.map((item) => item.display_name), ...v8TableNames]
+    /* V8 の「日」（時刻順）の右の待ちの列。その日の分だけ、枠ごとの順番で。 */
+    const v8WaitEntries: DayWaitEntry[] = (() => {
+      if (!(isV8Day && view === 'day' && daySort === 'time')) return []
+      const groups = new Map<string, number>()
+      const staff = effectiveMode === 'seat' ? [] : staffWaitlist.map((entry) => ({
+        id: entry.id,
+        startsAt: entry.starts_at,
+        title: entry.customer_name ?? '名前の登録なし',
+        sub: [entry.menu_name, entry.staff_name ? `担当 ${entry.staff_name}` : null].filter(Boolean).join('・'),
+        status: entry.status as 'waiting' | 'invited',
+        holdExpiresAt: entry.hold_expires_at,
+        createdAt: entry.created_at,
+      }))
+      const seat = effectiveMode === 'staff' ? [] : seatWaitlist.map((entry) => ({
+        id: entry.id,
+        startsAt: entry.starts_at,
+        title: `${entry.customer_name}様（${entry.guest_count}名）`,
+        sub: entry.table_label ?? '',
+        status: entry.status as 'waiting' | 'invited',
+        holdExpiresAt: entry.hold_expires_at,
+        createdAt: entry.created_at,
+      }))
+      return [...staff, ...seat]
+        .sort((a, b) => (a.startsAt < b.startsAt ? -1 : a.startsAt > b.startsAt ? 1 : a.createdAt < b.createdAt ? -1 : 1))
+        .map(({ createdAt: _createdAt, ...entry }) => {
+          const position = groups.get(entry.startsAt) ?? 0
+          groups.set(entry.startsAt, position + 1)
+          return { ...entry, position }
+        })
+    })()
+    if (view === 'day' && isV8Day && daySort === 'time') {
+      return (
+        <div className="flex flex-col gap-4">
+          {v8Head}
+          {createRow}
+          {dayError && !dayData ? (
+            <ListState
+              kind="error"
+              title="今日の予約を読み込めませんでした"
+              description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+              onRetry={() => setDaySeq((n) => n + 1)}
+            />
+          ) : (
+            <BookingDayTimeline
+              rows={dayData?.timeline ?? []}
+              waitlist={v8WaitEntries}
+              waitlistTitle={effectiveMode === 'seat' ? '席の空き待ち' : 'キャンセル待ち'}
+              waitlistNote={effectiveMode === 'seat'
+                ? '席が空いたら、待っている組の早い順に1組ずつ知らせる。人数が入る席だけを候補にする。'
+                : `空いたら登録の早い順に自動で1人ずつ知らせる。${holdMinutes}分取らなければ次の人へ。`}
+              loading={dayLoading}
+              now={dayNow}
+              showNowLine={calendarAnchor === jstDay(dayNow.toISOString())}
+              busyId={dayBusyId}
+              canMark={canOperate}
+              onMark={markDayRow}
+              onUnmark={unmarkDayRow}
+            />
+          )}
+          {dialogs}
+        </div>
+      )
+    }
     return (
       <div className="flex flex-col gap-4">
-        {pageHead}
+        {isV8Day ? v8Head : pageHead}
         {createRow}
         {/*
           ★V7 `x63W5x`：同じ失敗を1画面に1つへ。失敗の1枚はカレンダーの場所に
@@ -899,13 +1246,14 @@ export default function BookingsPage() {
         ) : (
           <BookingCalendar
             mode={view}
-            items={calendarItems}
-            onOpen={setDetailId}
-            staffNames={staffList.map((item) => item.display_name)}
+            items={v8CalendarItems}
+            onOpen={(id) => { if (!id.startsWith('seat:')) setDetailId(id) }}
+            staffNames={v8StaffNames}
             canCreate={canOperate}
             anchorDay={calendarAnchor}
             onAnchorChange={setCalendarAnchor}
-            availability={availability}
+            onDateClick={isV8Day && view === 'week' ? (day) => { setCalendarAnchor(day); setView('day') } : undefined}
+            availability={effectiveMode === 'staff' ? availability : { status: 'ready', slots: [] }}
             dataState={loading ? 'loading' : 'ready'}
             /*
              * #634: 空き枠の失敗からその場で読み直す。空き枠は集計・メニュー・
@@ -922,7 +1270,7 @@ export default function BookingsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      {pageHead}
+      {isV8Day ? v8Head : pageHead}
 
       {/*
         ★V7 `x63W5x`：一覧の失敗でページ上のピンクの帯は出さない。
@@ -1126,7 +1474,18 @@ export default function BookingsPage() {
                     {shown.map((b) => (
                       <Tr key={b.id} interactive className="group">
                         <Td className="whitespace-nowrap">
-                          {formatShort(b.starts_at)}
+                          {isV8Day && view === 'month' ? (
+                            <button
+                              type="button"
+                              className="hover:underline"
+                              onClick={() => { setCalendarAnchor(jstDay(b.starts_at)); setView('day') }}
+                              aria-label={`${formatShort(b.starts_at)}の日で見る`}
+                            >
+                              {formatShort(b.starts_at)}
+                            </button>
+                          ) : (
+                            formatShort(b.starts_at)
+                          )}
                         </Td>
                         <Td>
                           {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
