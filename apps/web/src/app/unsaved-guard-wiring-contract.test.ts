@@ -79,6 +79,7 @@ const GUARDED = [
   'app/templates/editor-v8.tsx',
   'app/templates/questions/new/page.tsx',
   'app/webhooks/new/page.tsx',
+  'app/webhooks/new/new-v8.tsx',
   'app/webinars/edit/page.tsx',
   'app/webinars/new/new-v8.tsx',
   'app/webinars/new/page.tsx',
@@ -157,6 +158,8 @@ const EXEMPTIONS: Record<string, string> = {
     'ボタンの共通部品。開いた直後の標的用の ref を受けられるだけで、編集を持たない',
   'app/nen-members/photo-reward-policy.tsx':
     '棚（Drawer）の中の小さな操作。閉じると入力は戻る仕様で、画面離脱ガードの対象外。保存中・戻し中は棚を閉じられない',
+  'app/pools/new/pool-new-v8.tsx':
+    'new/page.tsx（hq 未判定）と同じ画面の★V8版。作る前の一時入力だけで下書きを持たないため、番兵の要否は元の画面と一緒に決める',
   'app/form-submissions/page.tsx':
     '一覧と絞り込みが中心。作る操作は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
   'app/inflow-links/page.tsx':
@@ -193,6 +196,14 @@ const EXEMPTIONS: Record<string, string> = {
     'サイトの追加・編集・停止理由の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
   'app/restaurant-test/v8/organization.tsx':
     '★V8 の組織・権限（bSp4h）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。行内のフォームは保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
+  'app/restaurant-test/v8/tables.tsx':
+    '★V8-B の座席・卓管理（BERxg）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。卓の追加・変更は保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
+  'app/restaurant-test/v8/menu.tsx':
+    '★V8-B のメニュー管理（MJoJR）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。メニューの追加・変更は保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
+  'app/restaurant-test/v8/inventory.tsx':
+    '★V8-B の予約枠・在庫（Y8SjT2）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。配分の保存は保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
+  'app/events/bookings/bookings-v8.tsx':
+    '★V8 のイベント予約者（gHmNK）。承認・キャンセル・待ち順の操作は確認窓で確定して即時保存し、お知らせ送信も「送る」で即時送信する。窓内の理由欄は閉じると戻るダイアログ内の入力で、画面に残る下書きを持たない',
   'app/webinars/list-v8.tsx':
     '★V8-B のウェビナー一覧（UyUMw）。一覧と絞り込みが中心で、フォルダの追加・変更・削除とアーカイブは押した直後に確認窓か即時保存で確定する。フォルダ名の入力は閉じると戻る窓の中だけなので、この画面に残る下書きを持たない',
 }
@@ -269,6 +280,8 @@ const UNTRIAGED: Record<string, string> = {
     's2: テンプレート編集の本体（app/templates/edit から載る）。V6R-S2-a（board#1066）で付ける',
   'app/webhooks/edit/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/webhooks/incoming-v8.tsx':
+    '★V8-B 外部連携のこちらで受け取る（gW0F2）。受け取り口の作る・直す・試すは確認窓（Dialog）の中で完結し、窓を閉じれば捨てられる小さな操作のため、画面離脱の番兵は要らない。一覧の開始・停止は押した直後に即時保存する',
   'app/webhooks/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/accounts/account-edit-modal.tsx':

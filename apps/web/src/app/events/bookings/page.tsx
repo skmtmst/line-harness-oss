@@ -4,7 +4,9 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import BookingsV8 from './bookings-v8'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
@@ -1560,10 +1562,36 @@ function BookingsInner() {
   )
 }
 
-export default function EventBookingsPage() {
+function BookingsInnerV8() {
+  const params = useSearchParams()
+  const eventId = params.get('id')
+  if (!eventId) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="どのイベントの申込かが決まっていません"
+        description="イベントの一覧から選び直してください。"
+        backHref="/events"
+        backLabel="イベント一覧へ戻る"
+      />
+    )
+  }
+  return <BookingsV8 eventId={eventId} />
+}
+
+/*
+ * ★V8-B（板 `Mu8qW`）：見た目テーマが v8 のときだけ開催回ごとの見せ方
+ * （`bookings-v8.tsx`）に切り替える。v7 の見た目はそのまま変えない。
+ */
+function BookingsSwitch() {
+  const theme = useAdminTheme()
   return (
     <Suspense fallback={<div className="text-ink-faint p-4">読み込み中...</div>}>
-      <BookingsInner />
+      {theme === 'v8' ? <BookingsInnerV8 /> : <BookingsInner />}
     </Suspense>
   )
+}
+
+export default function EventBookingsPage() {
+  return <BookingsSwitch />
 }
