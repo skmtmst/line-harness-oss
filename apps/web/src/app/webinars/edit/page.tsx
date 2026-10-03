@@ -2,6 +2,7 @@
 
 import Disclosure from '@/components/shared/disclosure'
 import CtaV8 from './cta-v8'
+import NotificationsV8 from './notifications-v8'
 import VideoV8 from './video-v8'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import RetentionSection from './retention-section'
@@ -2702,7 +2703,15 @@ function EditWebinarInner() {
       ) : null}
       {visitedPanes.has('notifications') ? (
         <div hidden={pane !== 'notifications'}>
-          <NotificationDesignStep webinarId={webinar.id} webinarTitle={webinar.title} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} onDirtyChange={dirtyReporterFor('notifications')} registerSave={saveRegistrarFor('notifications')} />
+          {/*
+            ★V8 切替（通知 `E7iAYs`）。v7 の見た目は
+            data-theme="v8" が付くまで 1画素も変えない。
+          */}
+          {adminTheme === 'v8' ? (
+            <NotificationsV8 webinarId={webinar.id} webinarTitle={webinar.title} editor={editor} onOpenActions={() => goStep('actions')} />
+          ) : (
+            <NotificationDesignStep webinarId={webinar.id} webinarTitle={webinar.title} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} onDirtyChange={dirtyReporterFor('notifications')} registerSave={saveRegistrarFor('notifications')} />
+          )}
         </div>
       ) : null}
       {pane === 'review' && <ReviewStep webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onBack={goStep} onPublished={disarm} />}
