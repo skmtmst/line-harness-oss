@@ -122,6 +122,15 @@ export type EcEvent = {
       birthday?: string | null;
     }>;
   };
+  /**
+   * 公式サイトの掲載写真の閲覧数（F-20）。
+   * ECが数えた累計を写真ID単位で送る。musuboは大きい方だけ残す。
+   */
+  publication_views?: Array<{
+    photo_id?: string | number | null;
+    view_count?: number | null;
+    placement_label?: string | null;
+  }> | null;
 };
 
 function utf8Length(value: string): number {
@@ -150,11 +159,35 @@ function constantTimeHexEqual(left: string, right: string): boolean {
   return diff === 0;
 }
 
+/**
+ * 公式サイトの掲載閲覧数（F-20）。共通の種類名簿（@line-crm/shared）は
+ * 共有部品なので触らず、ここだけで受け付ける。本採用時にM側で名簿へ移す。
+ */
+export const PUBLICATION_VIEW_EVENT_TYPE = 'ec.site.publication_viewed';
+const EXTRA_EVENT_TYPES = new Set<string>([PUBLICATION_VIEW_EVENT_TYPE]);
+
+function isValidPublicationViews(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 100) return false;
+  for (const item of value) {
+    if (!item || typeof item !== 'object') return false;
+    const view = item as { photo_id?: unknown; view_count?: unknown; placement_label?: unknown };
+    const photoId = String(view.photo_id ?? '').trim();
+    if (!photoId || photoId.length > 128) return false;
+    if (!Number.isFinite(view.view_count) || Number(view.view_count) < 0) return false;
+    if (view.placement_label != null
+      && (typeof view.placement_label !== 'string' || view.placement_label.trim().length > 512)) return false;
+  }
+  return true;
+}
+
 export function validateEvent(value: unknown): value is EcEvent {
   if (!value || typeof value !== 'object') return false;
   const event = value as Partial<EcEvent>;
   if (typeof event.event_id !== 'string' || event.event_id.length < 8 || event.event_id.length > 255) return false;
-  if (typeof event.event_type !== 'string' || !EVENT_TYPES.has(event.event_type)) return false;
+  if (typeof event.event_type !== 'string'
+    || (!EVENT_TYPES.has(event.event_type) && !EXTRA_EVENT_TYPES.has(event.event_type))) return false;
+  if (event.event_type === PUBLICATION_VIEW_EVENT_TYPE
+    && !isValidPublicationViews(event.publication_views)) return false;
   if (event.line_user_id != null
       && (typeof event.line_user_id !== 'string' || !/^U[0-9a-f]{32}$/i.test(event.line_user_id))) return false;
   if (typeof event.occurred_at !== 'string' || !Number.isFinite(Date.parse(event.occurred_at))) return false;
@@ -430,6 +463,53 @@ async function getConnectorSecret(
   }
 }
 
+/**
+ * 公式サイトの掲載閲覧数を保存する（F-20）。
+ *
+ * ECが数えた累計を、今ある数と比べて大きい方だけ残す。足し算しないので、
+ * 再送や順番の入れ替わりで数が減ったり二重に増えたりしない。
+ * 掲載先の表示名が付いていて、同じ site の掲載先が既にあれば、そちらも同じ扱いで直す。
+ * musuboに無い写真IDは無視して、呼び出し元へ知らせる（ typo の発見用）。
+ */
+export async function applyPublicationViewCounts(
+  db: D1Database,
+  lineAccountId: string,
+  views: NonNullable<EcEvent['publication_views']>,
+  now: string,
+): Promise<{ saved: Array<{ photo_id: string; view_count: number; placement_label: string | null }>; unknownPhotos: string[] }> {
+  const saved: Array<{ photo_id: string; view_count: number; placement_label: string | null }> = [];
+  const unknownPhotos: string[] = [];
+  for (const view of views) {
+    const photoId = String(view.photo_id ?? '').trim();
+    const reported = Math.max(0, Math.trunc(Number(view.view_count)));
+    const publication = await db.prepare(
+      `SELECT id, view_count FROM nen_photo_publications WHERE photo_id = ? AND line_account_id = ?`,
+    ).bind(photoId, lineAccountId).first<{ id: string; view_count: number | null }>();
+    if (!publication) {
+      unknownPhotos.push(photoId);
+      continue;
+    }
+    const next = Math.max(Number(publication.view_count ?? 0), reported);
+    await db.prepare(
+      `UPDATE nen_photo_publications SET view_count = ?, updated_at = ? WHERE id = ?`,
+    ).bind(next, now, publication.id).run();
+    const label = typeof view.placement_label === 'string' ? view.placement_label.trim().slice(0, 512) : '';
+    if (label) {
+      const placement = await db.prepare(
+        `SELECT id, view_count FROM nen_photo_publication_placements
+          WHERE publication_id = ? AND placement_type = 'site' AND placement_label = ?`,
+      ).bind(publication.id, label).first<{ id: string; view_count: number | null }>();
+      if (placement) {
+        await db.prepare(
+          `UPDATE nen_photo_publication_placements SET view_count = ? WHERE id = ?`,
+        ).bind(Math.max(Number(placement.view_count ?? 0), reported), placement.id).run();
+      }
+    }
+    saved.push({ photo_id: photoId, view_count: next, placement_label: label || null });
+  }
+  return { saved, unknownPhotos };
+}
+
 /** 候補の鍵を順に試し、1つでも合えば通す。移行期間の両受けが本体。 */
 async function verifyWithAnySecret(
   secrets: Array<string | null>,
@@ -607,7 +687,8 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     }
   }
 
-  if (!event.line_user_id) {
+  // F-20の閲覧数は友だちに結びつけない（回数だけ数える）ので、本人探しを飛ばす。
+  if (!event.line_user_id && event.event_type !== PUBLICATION_VIEW_EVENT_TYPE) {
     await c.env.DB.prepare(
       `UPDATE ec_events
           SET status = 'identity_pending', error_message = 'line_identity_unmatched', updated_at = ?
@@ -635,6 +716,27 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       errorCode: 'connector_paused', errorMessageSafe: '取り込みは停止中のため処理しませんでした', now,
     });
     return c.json({ success: true, status: 'paused' }, 202);
+  }
+
+  /*
+   * F-20: 公式サイトの掲載閲覧数。友だちの突き合わせは要らない（回数だけ数える）
+   * ので、ここで受けて返す。停止中（paused）の取り込みは、他の種類と同じく
+   * 受付の保存だけ残して書き込まない。
+   */
+  if (event.event_type === PUBLICATION_VIEW_EVENT_TYPE) {
+    // 台帳に既にある event_id（EC側の再送）は触らず、受け付け済みとして返す。
+    if (!inserted.meta.changes) {
+      return c.json({ success: true, duplicate: true, status: row.status });
+    }
+    try {
+      const result = await applyPublicationViewCounts(
+        c.env.DB, lineAccountId, event.publication_views ?? [], now,
+      );
+      return c.json({ success: true, status: 'view_counts_saved', ...result });
+    } catch (viewError) {
+      console.error(`[ec-event] publication views failed event=${event.event_id}`, viewError);
+      return c.json({ success: false, error: 'Event processing failed' }, 503);
+    }
   }
 
   try {

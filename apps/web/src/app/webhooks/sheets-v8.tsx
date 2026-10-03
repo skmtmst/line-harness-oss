@@ -21,6 +21,7 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Notice from '@/components/shared/notice'
 import { isGoogleSheetsConnectionPayload, isGoogleSheetsRunsPayload } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -359,7 +360,28 @@ function SheetsV8Inner() {
         </Notice>
       ) : null}
 
-      {status === 'loading' ? <ListState kind="loading" title="連携の状態を読み込んでいます" /> : null}
+      {status === 'loading' ? (
+        <div aria-busy="true" aria-label="連携の状態を読み込んでいます">
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true" style={{ display: 'flex', gap: 16 }}>
+                {[0, 1].map((card) => (
+                  <div key={card} style={{ flex: 1 }}>
+                    <Skeleton height={16} width="40%" />
+                    {[0, 1, 2].map((row) => (
+                      <div key={row} style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+                        <span style={{ flex: 1 }}><Skeleton height={14} width="70%" /></span>
+                        <Skeleton height={30} width={96} />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          />
+        </div>
+      ) : null}
       {status === 'error' ? (
         <ListState
           kind="error"

@@ -182,7 +182,7 @@ function DaySlots({
       {times.length === 0 ? (
         <p className="text-[13px] leading-6 text-liff-sub">この日は満席です。別の日を選んでください。</p>
       ) : (
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-3 gap-2">
           {times.map((t) => {
             const active = selected?.date === day && selected?.start === t.start;
             return (
@@ -192,7 +192,7 @@ function DaySlots({
                 onClick={() => onSelect({ date: day, start: t.start })}
                 disabled={!t.open}
                 aria-pressed={active}
-                className={`h-11 rounded-[10px] px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                className={`liff-press h-11 rounded-[10px] px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                   active
                     ? 'bg-liff-primary font-bold text-white'
                     : t.open
@@ -635,7 +635,7 @@ export default function DateTimePicker({
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
               </button>
-              <div ref={stripRef} className="grid flex-1 grid-cols-5 gap-1.5" role="group" aria-label="日付">
+              <div ref={stripRef} className="grid flex-1 grid-cols-5 gap-[5px]" role="group" aria-label="日付">
                 {weekDays.map((d) => {
                   const state = stateOf(d, weekByDate, weekFull, weekClosed, today, windowEnd);
                   const open = state === 'open';
@@ -652,7 +652,7 @@ export default function DateTimePicker({
                       aria-pressed={active}
                       aria-label={dayStateLabel(d, state)}
                       title={dayStateLabel(d, state)}
-                      className={`flex flex-col items-center gap-0.5 rounded-[10px] py-2 outline -outline-offset-1 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                      className={`liff-press flex flex-col items-center gap-0.5 rounded-[10px] py-2 outline -outline-offset-1 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                         active
                           ? 'bg-liff-soft outline-2 outline-liff-primary'
                           : state === 'closed' || state === 'empty'
@@ -721,7 +721,7 @@ export default function DateTimePicker({
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
               </button>
-              <p aria-live="polite" className="text-sm font-bold text-ink">
+              <p aria-live="polite" className="text-[15px] font-bold text-ink">
                 {monthLabel}
               </p>
               <button
@@ -768,7 +768,7 @@ export default function DateTimePicker({
                         disabled={!selectable}
                         aria-pressed={active}
                         aria-label={dayStateLabel(d, state)}
-                        className={`flex h-11 flex-col items-center justify-center gap-0.5 rounded-[10px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                        className={`liff-press flex h-11 flex-col items-center justify-center gap-0.5 rounded-[10px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                           active
                             ? 'bg-liff-primary font-semibold text-white'
                             : selectable
