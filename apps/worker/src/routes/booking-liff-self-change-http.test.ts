@@ -763,8 +763,16 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       ]),
       timeout,
     ]);
-    expect(a.status).toBe(200);
-    expect(b.status).toBe(200);
+    // 勝者は200。敗者は再送200か送信フェンス409。どちらも確定を壊さない。
+    const sorted = [a.status, b.status].sort();
+    expect([JSON.stringify([200, 200]), JSON.stringify([200, 409])]).toContain(JSON.stringify(sorted));
+    for (const res of [a, b]) {
+      if (res.status === 409) {
+        expect((await res.json<{ error: string }>()).error).toBe('send_in_flight_retry');
+      }
+    }
+    const retry = await selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 });
+    expect(retry.status).toBe(200);
     expect(bookingRow(id).status).toBe('cancelled');
     // 削除の安定キーは1行に集約される（作成時sync鍵と削除鍵の2鍵・各1行）。
     const calOps = sqlite.prepare(
