@@ -22,7 +22,7 @@ import {
  * - S2: 共有の処理4種 = 下書きunionの4種(過不足なし)
  * - S3: 共有のきっかけ10種 ⊆ 実行門(出来事門+定期門)
  * - S4: 共有の処理 ⊆ 実行器の鍵(共通アクションは実行計画で展開)
- * - S5: 共有の10種×4処理を下書き保存が受け付ける(実DB)
+ * - S5: 共有の10種×5処理を下書き保存が受け付ける(実DB)
  * - S6: union外のきっかけ・処理は保存しない
  */
 
@@ -96,6 +96,12 @@ describe('下書きの選択可能一覧(#734)', () => {
       `INSERT INTO common_actions (id, line_account_id, name, status, current_published_version_id)
        VALUES ('common-1', 'account-1', '会員向け一式', 'published', 'cv-1')`,
     ).run();
+    // F-14: 担当者通知の選択肢。下書き保存で指せる有効なルール。
+    testDb.raw.prepare(
+      `INSERT INTO notification_rules
+         (id, name, event_type, conditions, channels, line_account_id, is_active, version)
+       VALUES ('notify-1', '担当者通知', 'booking_created', '{}', '["dashboard"]', 'account-1', 1, 1)`,
+    ).run();
     testDb.raw.prepare(
       `INSERT INTO common_action_versions (id, common_action_id, version_number, status, action_config)
        VALUES ('cv-1', 'common-1', 1, 'published', '[]')`,
@@ -138,7 +144,7 @@ describe('下書きの選択可能一覧(#734)', () => {
     }
   });
 
-  it('S5: 共有の10種×4処理を下書き保存が受け付ける', async () => {
+  it('S5: 共有の10種×5処理を下書き保存が受け付ける', async () => {
     for (const trigger of AUTOMATION_DRAFT_TRIGGER_OPTIONS) {
       for (const action of AUTOMATION_DRAFT_ACTION_OPTIONS) {
         const created = await createAutomationDraftFromTemplate(testDb.db, {
@@ -163,7 +169,9 @@ describe('下書きの選択可能一覧(#734)', () => {
                 ? { scenarioId: 'scenario-1' }
                 : action.value === 'common_action'
                   ? { commonActionId: 'common-1' }
-                  : { messageType: 'text', content: '確認' },
+                  : action.value === 'notify_staff'
+                    ? { notificationRuleId: 'notify-1', message: '確認' }
+                    : { messageType: 'text', content: '確認' },
             onFailure: 'stop',
           }],
         });

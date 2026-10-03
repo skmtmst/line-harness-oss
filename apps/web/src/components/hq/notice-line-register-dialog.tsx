@@ -52,7 +52,7 @@ export default function NoticeLineRegisterDialog({ open, onClose, quietWhenUnava
       description="今後の大事なお知らせ（メンテナンス、料金、重要な変更）はこの LINE に届きます。メールを見逃しても気づけるよう、必ず登録をお願いします。"
       onCancel={onClose}
       footer={<div className="flex justify-end"><Button variant="primary" onClick={onClose}>あとで確認する</Button></div>}
-      designNode="GiwgF"
+      designNode="D6fh3"
     >
       {!info ? (
         <p className="text-caption text-ink-faint">読み込んでいます…</p>

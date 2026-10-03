@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import type { RichMenuAreaResponse } from '@/lib/api'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import LinePreview from '@/components/shared/line-preview'
@@ -13,9 +14,9 @@ import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
-import PageHeader from '@/components/shared/page-header'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { analyzeConnections, type ConnectionPage } from './connection-analysis'
+import ConnectionHeading from './connection-heading'
 
 type RichMenuGroup = {
   id: string
@@ -34,6 +35,8 @@ function isRichMenuGroupResponse(value: unknown): value is RichMenuGroup {
 }
 
 function ConnectionsContent() {
+  const theme = useAdminTheme()
+  const v8 = theme === 'v8'
   const groupId = useSearchParams().get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const activeAccountIdRef = useRef(selectedAccountId)
@@ -151,68 +154,91 @@ function ConnectionsContent() {
     && !analysis.edges.some((edge) => edge.fromPageId === page.id && edge.targetPageId === analysis.entryPageId),
   )
 
+  const aside = (pageCount: number) => (v8 ? (
+    <div className="space-y-4">
+      <ConnectionStatusRail group={group} pageCount={pageCount} />
+      <ConnectionAside />
+    </div>
+  ) : (
+    <ConnectionAside />
+  ))
+
   if (analysis.edges.length === 0) {
-    return (
-      <div data-design-node="NXdDk" className="flex flex-col gap-4 pb-24">
-        <ConnectionHeading group={group} />
-        <div className="grid gap-4 xl:grid-cols-3">
-          <section className="border-hairline bg-canvas rounded-card min-h-96 border p-6 shadow-card xl:col-span-2">
-            <div className="flex items-start justify-between gap-3">
-              <div><h2 className="text-ink text-base font-bold">つながりの図</h2><p className="text-ink-faint mt-1 text-xs">切替先を足すと、ここに「どのメニューからどこへ移れるか」が出ます</p></div>
-              <Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加する</Button>
-            </div>
-            <div className="mt-16 flex min-h-64 flex-col items-center justify-center rounded-card border border-dashed border-hairline bg-canvas-sunken px-6 text-center">
-              <p className="text-ink text-lg font-bold">まだ切替先がありません</p>
-              <p className="text-ink-faint mt-2 max-w-md text-sm leading-6">このメニューだけで動きます。切替先を足すと、タブでメニューを行き来できます。</p>
-              <Button className="mt-5" variant="primary" href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加する</Button>
-            </div>
-          </section>
-          <ConnectionAside />
-        </div>
-        <ConnectionFooter status="切替先はまだありません" groupId={group.id} />
+    const body = (<>
+      <ConnectionHeading group={group} v8={v8} />
+      <div className="grid gap-4 xl:grid-cols-3">
+        <section className="border-hairline bg-canvas rounded-card min-h-96 border p-6 shadow-card xl:col-span-2">
+          <div className="flex items-start justify-between gap-3">
+            <div><h2 className="text-ink text-base font-bold">つながりの図</h2><p className="text-ink-faint mt-1 text-xs">切替先を足すと、ここに「どのメニューからどこへ移れるか」が出ます</p></div>
+            <Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加する</Button>
+          </div>
+          <div className="mt-16 flex min-h-64 flex-col items-center justify-center rounded-card border border-dashed border-hairline bg-canvas-sunken px-6 text-center">
+            <p className="text-ink text-lg font-bold">まだ切替先がありません</p>
+            <p className="text-ink-faint mt-2 max-w-md text-sm leading-6">このメニューだけで動きます。切替先を足すと、タブでメニューを行き来できます。</p>
+            <Button className="mt-5" variant="primary" href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加する</Button>
+          </div>
+        </section>
+        {aside(0)}
       </div>
+      <ConnectionFooter status="切替先はまだありません" groupId={group.id} />
+    </>)
+    return v8 ? (
+      <div data-design-node="wxIQ7" className="flex flex-col gap-4 pb-24">{body}</div>
+    ) : (
+      <div data-design-node="NXdDk" className="flex flex-col gap-4 pb-24">{body}</div>
     )
   }
 
-  return (
-    <div data-design-node="DIUbO" className="flex flex-col gap-4 pb-24">
-      <ConnectionHeading group={group} />
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="flex flex-col gap-4 xl:col-span-2">
-          <section className="border-hairline bg-canvas rounded-card border p-6 shadow-card">
-            <div className="flex items-start justify-between gap-3"><div><h2 className="text-ink text-base font-bold">つながりの図</h2><p className="text-ink-faint mt-1 text-xs">緑のタブが「別のメニューへ移る」ボタン</p></div><Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加する（最大10枚）</Button></div>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {pages.map((page, index) => {
-                const outgoing = analysis.edges.filter((edge) => edge.fromPageId === page.id)
-                const lacksReturn = missingDirectReturn.some((item) => item.id === page.id)
-                return <article key={page.id} className={`rounded-card border p-4 ${lacksReturn ? 'border-danger bg-danger-bg/30' : 'border-hairline'}`}><div className="flex items-center gap-3"><span className="bg-canvas-sunken flex h-8 w-8 items-center justify-center rounded-pill text-sm font-semibold">{index + 1}</span><strong className="text-ink truncate text-sm" title={page.name}>{page.name}</strong></div><div className="mt-4 grid grid-cols-3 gap-1">{['A','B','C'].map((tab, tabIndex) => { const edge = outgoing[tabIndex]; return <div key={tab} className={`rounded-control border px-2 py-2 text-center text-xs font-medium ${edge ? 'border-accent bg-accent/10 text-accent-deep' : 'border-hairline text-ink-faint'}`}>{tab}</div> })}</div>{lacksReturn ? <p className="text-danger mt-3 text-xs font-semibold">トップへ戻るタブがありません</p> : <p className="text-accent-deep mt-3 flex items-center gap-1 text-xs"><CircleCheck size={13} />戻り道を確認済み</p>}</article>
-              })}
-            </div>
-            {missingDirectReturn.length > 0 ? <NoteBar tone="warn">「{missingDirectReturn.map((page) => page.name).join('」「')}」からトップへ戻るタブがありません。お客さまが戻れなくなります。</NoteBar> : null}
-          </section>
+  const body = (<>
+    <ConnectionHeading group={group} v8={v8} />
+    <div className="grid gap-4 xl:grid-cols-3">
+      <div className="flex flex-col gap-4 xl:col-span-2">
+        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-card">
+          <div className="flex items-start justify-between gap-3"><div><h2 className="text-ink text-base font-bold">つながりの図</h2><p className="text-ink-faint mt-1 text-xs">緑のタブが「別のメニューへ移る」ボタン</p></div><Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加する（最大10枚）</Button></div>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {pages.map((page, index) => {
+              const outgoing = analysis.edges.filter((edge) => edge.fromPageId === page.id)
+              const lacksReturn = missingDirectReturn.some((item) => item.id === page.id)
+              return <article key={page.id} className={`rounded-card border p-4 ${lacksReturn ? 'border-danger bg-danger-bg/30' : 'border-hairline'}`}><div className="flex items-center gap-3"><span className="bg-canvas-sunken flex h-8 w-8 items-center justify-center rounded-pill text-sm font-semibold">{index + 1}</span><strong className="text-ink truncate text-sm" title={page.name}>{page.name}</strong></div><div className="mt-4 grid grid-cols-3 gap-1">{['A','B','C'].map((tab, tabIndex) => { const edge = outgoing[tabIndex]; return <div key={tab} className={`rounded-control border px-2 py-2 text-center text-xs font-medium ${edge ? 'border-accent bg-accent/10 text-accent-deep' : 'border-hairline text-ink-faint'}`}>{tab}</div> })}</div>{lacksReturn ? <p className="text-danger mt-3 text-xs font-semibold">トップへ戻るタブがありません</p> : <p className="text-accent-deep mt-3 flex items-center gap-1 text-xs"><CircleCheck size={13} />戻り道を確認済み</p>}</article>
+            })}
+          </div>
+          {missingDirectReturn.length > 0 ? <NoteBar tone="warn">「{missingDirectReturn.map((page) => page.name).join('」「')}」からトップへ戻るタブがありません。お客さまが戻れなくなります。</NoteBar> : null}
+        </section>
 
-          <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
-            <div className="px-5 py-4"><h2 className="text-ink text-sm font-bold">それぞれのメニューのタブ</h2></div>
-            <table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th>メニュー</Th><Th>タブA</Th><Th>タブB</Th><Th>タブC</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{pages.map((page) => { const outgoing = analysis.edges.filter((edge) => edge.fromPageId === page.id); return <tr key={page.id}><td className="px-4 py-3 font-semibold">{page.name}</td>{[0,1,2].map((index) => { const edge = outgoing[index]; const target = edge?.targetPageId ? pageName.get(edge.targetPageId) : null; return <td key={index} className={`px-4 py-3 text-xs ${edge && !target ? 'text-danger font-semibold' : 'text-ink-secondary'}`}>{target ? `→ ${target}` : index === pages.indexOf(page) ? '（このページ）' : '未設定'}</td> })}</tr> })}</tbody></table>
-          </section>
-        </div>
-        <ConnectionAside />
+        <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
+          <div className="px-5 py-4"><h2 className="text-ink text-sm font-bold">それぞれのメニューのタブ</h2></div>
+          <table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th>メニュー</Th><Th>タブA</Th><Th>タブB</Th><Th>タブC</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{pages.map((page) => { const outgoing = analysis.edges.filter((edge) => edge.fromPageId === page.id); return <tr key={page.id}><td className="px-4 py-3 font-semibold">{page.name}</td>{[0,1,2].map((index) => { const edge = outgoing[index]; const target = edge?.targetPageId ? pageName.get(edge.targetPageId) : null; return <td key={index} className={`px-4 py-3 text-xs ${edge && !target ? 'text-danger font-semibold' : 'text-ink-secondary'}`}>{target ? `→ ${target}` : index === pages.indexOf(page) ? '（このページ）' : '未設定'}</td> })}</tr> })}</tbody></table>
+        </section>
       </div>
-      <ConnectionFooter status={`つながりに問題が ${Math.max(issueCount, missingDirectReturn.length)}件 あります`} groupId={group.id} />
+      {aside(pages.length)}
     </div>
+    <ConnectionFooter status={`つながりに問題が ${Math.max(issueCount, missingDirectReturn.length)}件 あります`} groupId={group.id} />
+  </>)
+  return v8 ? (
+    <div data-design-node="wxIQ7" className="flex flex-col gap-4 pb-24">{body}</div>
+  ) : (
+    <div data-design-node="DIUbO" className="flex flex-col gap-4 pb-24">{body}</div>
   )
 }
 
-function ConnectionHeading({ group }: { group: RichMenuGroup }) {
+/*
+ * 板 `wxIQ7` 右の欄「いまの状態」。取れる数だけ出す（無い数は書かない）。
+ */
+function ConnectionStatusRail({ group, pageCount }: { group: RichMenuGroup; pageCount: number }) {
   return (
-    <PageHeader
-      breadcrumb={[
-        { label: 'リッチメニュー', href: '/rich-menus' },
-        { label: group.name },
-      ]}
-      title="切替メニューのつながり"
-      description={`${group.name} の切替先と戻り道を確認します。`}
-    />
+    <section aria-label="いまの状態" className="border-hairline bg-canvas rounded-card border p-5">
+      <h2 className="text-ink text-sm font-bold">いまの状態</h2>
+      <dl className="mt-3 space-y-2 text-sm">
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-ink-secondary">状態</dt>
+          <dd className="text-ink font-semibold">{group.status === 'published' ? '公開中' : '下書き'}</dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-ink-secondary">切替の枚数</dt>
+          <dd className="text-ink font-semibold">{pageCount}枚</dd>
+        </div>
+      </dl>
+    </section>
   )
 }
 

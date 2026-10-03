@@ -69,6 +69,15 @@ describe('オートメーションの見本と下書き', () => {
       expect.objectContaining({ key: 'welcome-scenario' }),
       expect.objectContaining({ key: 'received-message-tag' }),
       expect.objectContaining({ key: 'tag-followup-scenario' }),
+      expect.objectContaining({ key: 'first-order-thanks' }),
+      expect.objectContaining({ key: 'birthday-coupon' }),
+      expect.objectContaining({ key: 'shipping-notice' }),
+      expect.objectContaining({ key: 'subscription-pause-guide' }),
+      expect.objectContaining({ key: 'monthly-first' }),
+      expect.objectContaining({ key: 'form-thanks' }),
+      expect.objectContaining({ key: 'booking-confirm' }),
+      expect.objectContaining({ key: 'link-interest-tag' }),
+      expect.objectContaining({ key: 'weekly-recommend' }),
     ]);
   });
 
@@ -88,6 +97,21 @@ describe('オートメーションの見本と下書き', () => {
     expect(testDb.raw.prepare(
       'SELECT status, current_published_version_id FROM automation_definitions WHERE id = ?',
     ).get(created.id)).toEqual({ status: 'draft', current_published_version_id: null });
+  });
+
+  it('新しい見本からも空の設定のまま下書きを作れる', async () => {
+    const created = await createAutomationDraftFromTemplate(testDb.db, {
+      templateKey: 'first-order-thanks',
+      lineAccountId: 'account-1',
+      operationKey: 'op-first-order-1',
+      createdBy: 'staff-1',
+    });
+    const draft = await getAutomationDraft(testDb.db, { id: created.id, lineAccountId: 'account-1' });
+    expect(draft).toMatchObject({
+      draftVersionId: created.draftVersionId,
+      eventType: 'ec.order.confirmed',
+      actions: [{ type: 'send_message', params: {} }],
+    });
   });
 
   it('別アカウントから下書きを読めない', async () => {

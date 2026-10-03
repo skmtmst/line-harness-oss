@@ -40,7 +40,7 @@
 
 機能は現在の `apps/worker/src/routes/` にある `broadcasts.ts`、`scenarios.ts`、`tags.ts`、`chats.ts`、`forms.ts`、`booking.ts`、`rich-menus.ts`、`hq-banners.ts` とWebの統括画面・メンバー管理に基づく。レストラン専用テスト機能は一般提供機能として広告していない。実績数・導入企業・売上効果・認定マークは創作していない。画面図は説明用サンプルであり、スクリーンショットや実顧客のデータではない。
 
-登録・ログインは `docs/hq-signup-and-password-login.md`、トライアル期間は `apps/worker/src/services/billing-plans.ts` の30日を参照。料金はStripeが正本で、同ファイルの9,800 / 29,800 / 59,800円はfallbackのため広告に使用しない。90日の保存についても画面案内だけでは削除運用が確認できないため、確定した契約上の約束にはしない。
+登録・ログインは `docs/hq-signup-and-password-login.md`、トライアル期間は `apps/worker/src/services/billing-plans.ts` の30日を参照。料金はStripeが正本で、同ファイルの9,800 / 29,800 / 59,800円はfallbackのため広告に使用しない。90日の保存は `packages/shared/src/data-retention.json` の `dataRetentionDays` が正本で、サイトの案内文と実際の削除処理（`apps/worker/src/services/tenant-data-purge.ts` を6時間ごとの定期処理から実行）が同じ値を読む。画面案内だけで削除運用が確認できない状態は解消した。
 
 事業者の名称・所在地・代表者は2026-09-13のMasatoからの回答を使用。電話は取得中、公式LINEは作成中。メールアドレスや電話番号を推測していない。
 
