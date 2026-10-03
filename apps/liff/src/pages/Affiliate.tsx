@@ -322,9 +322,9 @@ function mileageSourceLabel(source: string): string {
 function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
   const { mileage, insights } = wallet;
   return (
-    <section aria-label="貯まったマイル" className="rounded-2xl bg-liff-deep p-5 text-white">
+    <section aria-label="貯まったマイル" className="rounded-2xl bg-liff-deep p-[18px] text-white">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold text-white/70">使えるマイル</p>
+        <p className="text-xs text-white/70">使えるマイル</p>
         {mileage.pending > 0 && (
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-bold whitespace-nowrap">
             確定待ち {mileage.pending.toLocaleString()}
@@ -332,27 +332,27 @@ function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
           </span>
         )}
       </div>
-      <p className="mt-1 text-4xl font-bold tracking-tight tabular-nums">
+      <p className="mt-3 text-4xl font-bold tracking-tight tabular-nums">
         {mileage.available.toLocaleString()}
-        <span className="ml-1 text-sm font-semibold text-white/70">マイル</span>
+        <span className="ml-1 text-[13px] text-white/70">マイル</span>
       </p>
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <div className="rounded-xl bg-white/10 p-3">
-          <p className="text-xs text-white/70">これまでに得た</p>
-          <p className="mt-0.5 text-lg font-bold tabular-nums">{mileage.lifetimeEarned.toLocaleString()}</p>
+          <p className="text-[11px] text-white/70">これまでに得た</p>
+          <p className="mt-1 text-lg font-bold tabular-nums">{mileage.lifetimeEarned.toLocaleString()}</p>
         </div>
         <div className="rounded-xl bg-white/10 p-3">
-          <p className="text-xs text-white/70">紹介で得た</p>
-          <p className="mt-0.5 text-lg font-bold tabular-nums">{insights.referralMiles.toLocaleString()}</p>
+          <p className="text-[11px] text-white/70">紹介で得た</p>
+          <p className="mt-1 text-lg font-bold tabular-nums">{insights.referralMiles.toLocaleString()}</p>
         </div>
         <div className="rounded-xl bg-white/10 p-3">
-          <p className="text-xs text-white/70">使った</p>
-          <p className="mt-0.5 text-lg font-bold tabular-nums">{mileage.spent.toLocaleString()}</p>
+          <p className="text-[11px] text-white/70">使った</p>
+          <p className="mt-1 text-lg font-bold tabular-nums">{mileage.spent.toLocaleString()}</p>
         </div>
         <div className="rounded-xl bg-white/10 p-3">
-          <p className="text-xs text-white/70">良質な紹介</p>
-          <p className="mt-0.5 text-lg font-bold tabular-nums">{insights.qualityReferralCount.toLocaleString()}人</p>
+          <p className="text-[11px] text-white/70">良質な紹介</p>
+          <p className="mt-1 text-lg font-bold tabular-nums">{insights.qualityReferralCount.toLocaleString()}人</p>
         </div>
       </div>
 
