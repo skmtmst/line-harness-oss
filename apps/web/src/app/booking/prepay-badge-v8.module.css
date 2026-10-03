@@ -1,0 +1,54 @@
+/* 前払いのみの印（B-1 eih0r）。色は globals.css の名前だけ。 */
+
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-warning-bg);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.icon {
+  flex-shrink: 0;
+  color: var(--color-warning);
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.dates {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  margin: 2px 0 0;
+}
+
+.event {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  margin: 2px 0 0;
+}
+
+.reasonLabel {
+  display: block;
+  font-size: 13px;
+}
+
+.reasonLabel input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--color-hairline);
+  padding: 0 12px;
+  font: inherit;
+}
