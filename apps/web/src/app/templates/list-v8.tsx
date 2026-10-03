@@ -58,6 +58,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
+import { runUndoable } from '@/lib/undoable'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Tabs } from '@/components/shared/tabs'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import StaffAssetList from './staff-asset-list'
@@ -353,7 +355,7 @@ export default function TemplatesListV8() {
 
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
-  const [moving, setMoving] = useState(false)
+
   const [moveError, setMoveError] = useState('')
 
   const [duplicateTarget, setDuplicateTarget] = useState<Template | null>(null)
@@ -740,34 +742,47 @@ export default function TemplatesListV8() {
     setMoveDraft('')
     setMoveError('')
   }
-  const runMove = async () => {
+  /*
+   * フォルダへ移す（1件でもまとめてでも同じ窓）。窓を閉じた瞬間に画面へ
+   * 映し、保存は5秒後に送る。「元に戻す」で止めたら送らない。
+   */
+  const runMove = () => {
     if (!moveIds) return
-    setMoving(true)
+    const targetIds = moveIds
+    const targetFolderId = moveDraft === '' ? null : moveDraft
+    const previousFolders = new Map(templates.map((t) => [t.id, t.folderId]))
+    const folderName = targetFolderId === null
+      ? '未分類'
+      : (folders.find((f) => f.id === targetFolderId)?.name ?? 'フォルダ')
+    setTemplates((rows) =>
+      rows.map((t) => (targetIds.includes(t.id) ? { ...t, folderId: targetFolderId } : t)),
+    )
+    setMoveIds(null)
+    setSelectedIds(new Set())
     setMoveError('')
-    try {
-      let failed = 0
-      for (const id of moveIds) {
-        const result = await api.templates.update(id, { folderId: moveDraft === '' ? null : moveDraft })
-        if (!result.success) failed += 1
-      }
-      if (failed > 0) {
-        setMoveError(`${failed}件を移動できませんでした。状態を読み直してからお試しください。`)
-        await Promise.all([load(), loadFolders()])
-        return
-      }
-      setMoveIds(null)
-      setSelectedIds(new Set())
-      notifyToast('フォルダへ移しました', { tone: 'success' })
-      await Promise.all([load(), loadFolders()])
-    } catch (reason) {
-      setMoveError(
-        reason instanceof ApiError && reason.status === 403
-          ? 'テンプレートを移すには権限が要ります。オーナーか管理者に頼んでください。'
-          : 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
+    const restore = () => {
+      setTemplates((rows) =>
+        rows.map((t) => (previousFolders.has(t.id) ? { ...t, folderId: previousFolders.get(t.id) ?? null } : t)),
       )
-    } finally {
-      setMoving(false)
     }
+    runUndoable({
+      message: `${targetIds.length}件を「${folderName}」へ移しました`,
+      commit: async () => {
+        for (const id of targetIds) {
+          const result = await api.templates.update(id, { folderId: targetFolderId })
+          if (!result.success) throw new Error(result.error ?? 'move_failed')
+        }
+      },
+      undo: restore,
+      onCommitError: () => {
+        restore()
+        void Promise.all([load(), loadFolders()])
+      },
+      failureMessage: 'フォルダへ移せませんでした。元のフォルダに戻しています。',
+      onCommitted: () => {
+        void Promise.all([load(), loadFolders()])
+      },
+    })
   }
 
   /*
@@ -970,17 +985,73 @@ export default function TemplatesListV8() {
 
   /* ===== 一覧の中身（`susGP`：読込中・読み込めない・空・0件を分ける） ===== */
   const sectionWord = activeSection === 'question' ? '質問のテンプレート' : 'メッセージのテンプレート'
-  const listBody = accountLoading || view === 'loading' ? (
-    <div className={styles.skeletonRows} aria-label="読み込み中">
-      {[0, 1, 2, 3].map((i) => (
-        <div key={i} className={styles.skeletonRow}>
-          <span className={styles.skeletonDot} />
-          <span className={styles.skeletonBar} />
-          <span className={styles.skeletonBar} style={{ flex: 0.6 }} />
-          <span className={styles.skeletonBar} style={{ flex: 0.4 }} />
-        </div>
-      ))}
+  /* 見出しは本物と骨組みで同じものを出す（二重に書かない）。 */
+  const templateTableColumns = (
+    <colgroup>
+      <col style={{ width: 40 }} />
+      <col />
+      <col style={{ width: 104 }} />
+      <col style={{ width: 120 }} />
+      <col style={{ width: 96 }} />
+      <col style={{ width: 96 }} />
+      <col style={{ width: 84 }} />
+      <col style={{ width: 44 }} />
+    </colgroup>
+  )
+  const templateTableHead = (
+    <thead>
+      <tr>
+        <th className={styles.selectCell} aria-label="選択">
+          <Checkbox
+            checked={allOnPageSelected}
+            indeterminate={!allOnPageSelected && selectedCount > 0}
+            onCheckedChange={() => toggleAllOnPage()}
+            aria-label="このページのテンプレートをすべて選択"
+          />
+        </th>
+        <th>テンプレート</th>
+        <th>種類</th>
+        <th>公開</th>
+        <th>使っている所</th>
+        <th>今月送った数</th>
+        <th>更新</th>
+        <th aria-label="操作" />
+      </tr>
+    </thead>
+  )
+  /* 出来上がりの表と同じ幅・高さの骨組み。入れ替わってもガタつかない。 */
+  const tableSkeleton = (
+    <div className={styles.tableWrap} aria-hidden="true">
+      <table className={styles.table}>
+        {templateTableColumns}
+        {templateTableHead}
+        <tbody>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <tr key={i}>
+              <td><Skeleton width={18} height={18} /></td>
+              <td>
+                <span className="block">
+                  <Skeleton width="70%" height={14} />
+                </span>
+                <span className="mt-1 block">
+                  <Skeleton width="100%" height={12} />
+                </span>
+              </td>
+              <td><Skeleton width={64} height={22} /></td>
+              <td><Skeleton width={72} height={22} /></td>
+              <td><Skeleton width="100%" height={14} /></td>
+              <td><Skeleton width={56} height={14} /></td>
+              <td><Skeleton width="100%" height={14} /></td>
+              <td><Skeleton width={20} height={20} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
+  )
+  const listLoading = (accountLoading || view === 'loading') && templates.length === 0 && view !== 'error' && view !== 'forbidden'
+  const listBody = listLoading ? (
+    <DelayedSkeleton loading skeleton={tableSkeleton} />
   ) : !selectedAccountId ? (
     <div className={styles.stateCard}>
       <span className={styles.stateIcon}>
@@ -1048,35 +1119,8 @@ export default function TemplatesListV8() {
     <>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
-          <colgroup>
-            <col style={{ width: 40 }} />
-            <col />
-            <col style={{ width: 104 }} />
-            <col style={{ width: 120 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 84 }} />
-            <col style={{ width: 44 }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th className={styles.selectCell} aria-label="選択">
-                <Checkbox
-                  checked={allOnPageSelected}
-                  indeterminate={!allOnPageSelected && selectedCount > 0}
-                  onCheckedChange={() => toggleAllOnPage()}
-                  aria-label="このページのテンプレートをすべて選択"
-                />
-              </th>
-              <th>テンプレート</th>
-              <th>種類</th>
-              <th>公開</th>
-              <th>使っている所</th>
-              <th>今月送った数</th>
-              <th>更新</th>
-              <th aria-label="操作" />
-            </tr>
-          </thead>
+          {templateTableColumns}
+          {templateTableHead}
           <tbody>
             {shownItems.map((t) => {
               const publish = publishStateOf(t)
@@ -1191,7 +1235,7 @@ export default function TemplatesListV8() {
           <Button
             type="button"
             variant="secondary"
-            disabled={!canMutateTemplates || moving}
+            disabled={!canMutateTemplates}
             title={!canMutateTemplates ? NO_MANAGE_NOTE : undefined}
             onClick={() => openMove([...selectedIds])}
           >
@@ -1399,7 +1443,9 @@ export default function TemplatesListV8() {
                 />
               </div>
 
-              {listBody}
+              <div aria-busy={listLoading || undefined}>
+                {listBody}
+              </div>
             </div>
           </div>
         </>
@@ -1565,12 +1611,10 @@ export default function TemplatesListV8() {
             : `${moveIds?.length ?? 0}件のテンプレートをフォルダへ移す`
         }
         description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
-        confirmLabel={moving ? '移動中…' : '移動する'}
-        busy={moving}
+        confirmLabel="移動する"
         error={moveError}
-        onConfirm={() => void runMove()}
+        onConfirm={() => runMove()}
         onCancel={() => {
-          if (moving) return
           setMoveIds(null)
           setMoveError('')
         }}
@@ -1582,7 +1626,6 @@ export default function TemplatesListV8() {
             size="full"
             value={moveDraft}
             onChange={(value) => setMoveDraft(value)}
-            disabled={moving}
             options={[
               { value: '', label: '未分類' },
               ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
