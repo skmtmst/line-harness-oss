@@ -46,7 +46,12 @@ import {
 import type { ReminderDeliveryRunRow, ReminderStepRow } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
 import { featureJobCanRun } from './feature-enforcement.js';
-import { isMeetConsultationSendable } from './meet-consultation-reminders.js';
+import {
+  isMeetConsultationSendable,
+  isMeetSendCandidateCurrent,
+  readMeetSendCandidate,
+  type MeetSendCandidate,
+} from './meet-consultation-reminders.js';
 
 const LEASE_MINUTES = 5;
 
@@ -411,19 +416,30 @@ export async function processReminderDeliveries(
       // Meet個別相談のV6行は、結び付き予約の版・日時・本人・状態が
       // 一致するときだけ送る。古い版の予定はここで止める (版なし旧行は通す)。
       // 取消後に残った実行行は送らず止める。
-      if (
-        enrollment.source_kind === 'meet' &&
-        enrollment.source_id &&
-        !(await isMeetConsultationSendable(db, enrollment.source_id))
-      ) {
-        await db.prepare(
-          `UPDATE reminder_delivery_runs
-              SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
-                  next_retry_at = NULL, updated_at = ?
-            WHERE id = ? AND status = 'claimed' AND lease_expires_at = ?`,
-        ).bind(nowIso, nowIso, run.id, claimLease).run();
-        result.skipped++;
-        continue enrollmentLoop;
+      // 本文解決の前に送信候補の写しを読み、最終送信権と突き合わせる。
+      let meetCandidate: MeetSendCandidate | null = null;
+      if (enrollment.source_kind === 'meet' && enrollment.source_id) {
+        if (!(await isMeetConsultationSendable(db, enrollment.source_id))) {
+          await db.prepare(
+            `UPDATE reminder_delivery_runs
+                SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
+                    next_retry_at = NULL, updated_at = ?
+              WHERE id = ? AND status = 'claimed' AND lease_expires_at = ?`,
+          ).bind(nowIso, nowIso, run.id, claimLease).run();
+          result.skipped++;
+          continue enrollmentLoop;
+        }
+        meetCandidate = await readMeetSendCandidate(db, enrollment.source_id);
+        if (!meetCandidate) {
+          await db.prepare(
+            `UPDATE reminder_delivery_runs
+                SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
+                    next_retry_at = NULL, updated_at = ?
+              WHERE id = ? AND status = 'claimed' AND lease_expires_at = ?`,
+          ).bind(nowIso, nowIso, run.id, claimLease).run();
+          result.skipped++;
+          continue enrollmentLoop;
+        }
       }
 
       if (!friend) {
@@ -461,7 +477,8 @@ export async function processReminderDeliveries(
           db, run, step, friend, sendAt, pinnedTemplateVersions, ownedLeases, nowIso,
         );
         // 取消と送信の競合対策: push の直前に送る権利を1文で確かめる。
-        // この後 push まで待たない (間に取消が入る余地を残さない)。
+        // この後も beforePush・再検証・関係確認・停止確認のawaitがあり、
+        // その間の更新は後の確認で拾う。push呼出しとの間にはawaitを挟まない。
         // 外部送信は巻き戻せないため、権利取得と取消確定の順序は DB の1文で
         // 直列化し、確定後の送信は成功にできない (後段で検出・記録する)。
         if (!await verifyClaimedRunBeforeSend(db, {
@@ -477,7 +494,7 @@ export async function processReminderDeliveries(
         }
         await options.beforePush?.({ id: run.id, friendReminderId: enrollment.id });
         // シーム (試験割り込み) の後に取り直す。シーム中の取消をここで拾う。
-        // 本番で beforePush は無く、この2文の間に待たない。
+        // 本番で beforePush は無い (2つの検証の間に他の処理は挟まない)。
         if (!await verifyClaimedRunBeforeSend(db, {
           id: run.id,
           friendReminderId: enrollment.id,
@@ -489,14 +506,16 @@ export async function processReminderDeliveries(
           result.skipped++;
           continue;
         }
-        // Meet個別相談のV6行は、認証・本文の解決awaitの後も結び付き予約の
-        // 版・日時・本人・状態が一致するときだけ送る。直前の検証は版なし旧行と
-        // 日時だけを見るため、最終送信権の直前で関係も確かめる。古ければ
-        // 実行行を取り消して止める (勝者の新版行には触れない)。
+        // Meet個別相談のV6行は、認証・本文の解決awaitの後の最終送信権でも
+        // 送信候補の写しと結び付き関係を同一文で確かめる。直前の検証は
+        // 登録の日時と貸出だけを見るため、claim後の関係照合・停止照合の
+        // await中に新版へ進んだ旧payloadはここで止める。古ければ実行行だけ
+        // 取り消す (勝者の新版通知には触れない)。push呼出しとの間には
+        // awaitを挟まないが、呼出し自体の間の取消は残差として残る。
         if (
           enrollment.source_kind === 'meet' &&
           enrollment.source_id &&
-          !(await isMeetConsultationSendable(db, enrollment.source_id))
+          !(await isMeetSendCandidateCurrent(db, enrollment.source_id, meetCandidate))
         ) {
           await db.prepare(
             `UPDATE reminder_delivery_runs
