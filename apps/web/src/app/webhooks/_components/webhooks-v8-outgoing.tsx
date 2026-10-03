@@ -28,6 +28,7 @@ import { RowActions } from '@/components/shared/row-actions'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { inputClass } from '@/components/shared/form-controls'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
@@ -117,6 +118,7 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
   const [rotateTarget, setRotateTarget] = useState<OutgoingWebhookOverview | null>(null)
   const [rotateSecret, setRotateSecret] = useState('')
   const [rotateBusy, setRotateBusy] = useState(false)
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const [rotateError, setRotateError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<OutgoingWebhookOverview | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -252,7 +254,7 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
     }
   }
 
-  const runRotate = async () => {
+  const runRotate = async (stepUpToken?: string) => {
     const accountId = selectedAccountId
     if (!accountId || !rotateTarget || rotateBusy) return
     if (rotateSecret.length < MIN_SECRET_LENGTH) {
@@ -263,14 +265,19 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
     setRotateError('')
     try {
       const res = await api.webhooks.outgoing.update(
-        rotateTarget.id, accountId, { secret: rotateSecret },
+        rotateTarget.id, accountId, { secret: rotateSecret }, stepUpToken,
       )
       if (!res.success) throw new Error(res.error)
       setRotateTarget(null)
       setRotateSecret('')
       setNotice(`「${rotateTarget.name}」の鍵を作り直しました。相手側の設定も新しい鍵に変えてください。`)
       await load()
-    } catch {
+    } catch (caught) {
+      // 合言葉の入れ替えは本人確認が要ることがある（v7 と同じ）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'webhook.secret', action: '合言葉を作り直す', retry: (token) => runRotate(token) })
+        return
+      }
       setRotateError('鍵を作り直せませんでした。統括に頼んでください。')
     } finally {
       setRotateBusy(false)
@@ -776,6 +783,7 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
           setDeleteError('')
         }}
       />
+      {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </>
   )
 }
