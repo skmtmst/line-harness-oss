@@ -6126,6 +6126,104 @@ const spec = {
         },
       },
     },
+    // ── Booking plus B: sales + noshow/prepay ───────────────────────────────
+    '/api/booking/admin/sales-summary': {
+      get: {
+        tags: ['Booking'],
+        summary: '予約からの売上集計を見る',
+        description: '確定のみ集計。無断キャンセルは売上に入れない。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'from', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'to', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '売上合計と件数' },
+          '400': { description: 'account_id 未指定' },
+        },
+      },
+    },
+    '/api/booking/admin/noshow-settings': {
+      get: {
+        tags: ['Booking'],
+        summary: '無断キャンセルから前払いのみへの境目を見る',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '何回で前払いのみか' },
+          '400': { description: 'account_id 未指定' },
+        },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '無断キャンセルから前払いのみへの境目を保存',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['threshold'],
+                properties: {
+                  threshold: { type: 'integer', minimum: 1, maximum: 100 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '保存した境目' },
+          '400': { description: '入力が正しくない' },
+        },
+      },
+    },
+    '/api/booking/admin/friends/{friendId}/noshow': {
+      get: {
+        tags: ['Booking'],
+        summary: 'お客さまの無断キャンセル回数を見る',
+        parameters: [
+          { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '無断キャンセル回数と前払いのみの有無' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
+    '/api/booking/admin/friends/{friendId}/prepay': {
+      post: {
+        tags: ['Booking'],
+        summary: 'お客さまを手で前払いのみにする',
+        parameters: [
+          { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '前払いのみにした結果' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+      delete: {
+        tags: ['Booking'],
+        summary: 'お客さまの前払いのみを手で外す',
+        parameters: [
+          { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '前払いのみを外した結果' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
     // ── Booking settings (N-406 #754) ────────────────────────────────────────
     '/api/booking/admin/settings': {
       get: {
