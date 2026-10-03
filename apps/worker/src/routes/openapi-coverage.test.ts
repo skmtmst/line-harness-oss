@@ -440,6 +440,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/integrations/google-sheets/disconnect',
   'POST /api/integrations/google-sheets/sync',
   'POST /api/integrations/tiktok-pnl/sync',
+  'POST /api/liff/booking/{id}/cancel',
+  'POST /api/liff/booking/{id}/reschedule',
   'POST /api/liff/events/waitlist/{token}/accept',
   'POST /api/nen-campaigns/pets',
   'POST /api/ops/announcements',
