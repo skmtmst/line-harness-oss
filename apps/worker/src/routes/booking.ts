@@ -113,6 +113,7 @@ import {
   getBookingAdminDetail,
   getBookingCustomerContext,
 } from '../services/booking-admin-detail.js';
+import { promoteBookingWaitlist } from '../services/booking-waitlist.js';
 
 import {
   getBookingAutoAssign,
@@ -1260,7 +1261,7 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
   const expectedVersion = Number(body.lock_version);
   const row = await c.env.DB
     .prepare(
-      `SELECT id, status, friend_id, lock_version, starts_at, menu_id,
+      `SELECT id, status, friend_id, lock_version, starts_at, menu_id, staff_id,
               decided_at, external_event_id
          FROM bookings WHERE id = ? AND line_account_id = ?`,
     )
@@ -1272,6 +1273,7 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
       lock_version: number;
       starts_at: string;
       menu_id: string;
+      staff_id: string;
       decided_at: string | null;
       external_event_id: string | null;
     }>();
@@ -1422,6 +1424,17 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
     actorName: null,
     occurredAt: new Date().toISOString(),
   });
+  // キャンセル待ち：空いた枠を登録の早い順で1人に知らせる。
+  // 知らせの失敗で取り消し自体を失敗させない。
+  try {
+    await promoteBookingWaitlist(c.env.DB, {
+      lineAccountId: accountId,
+      staffId: row.staff_id,
+      startsAt: row.starts_at,
+    });
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId }));
+  }
   return c.json({
     status: 'cancelled',
     lock_version: expectedVersion,
@@ -1434,7 +1447,7 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
 async function runSelfBookingCancelSideEffects(
   c: Context<Env>,
   self: SelfBookingChange,
-  row: { id: string; starts_at: string; friend_id: string | null; external_event_id: string | null },
+  row: { id: string; starts_at: string; staff_id: string; friend_id: string | null; external_event_id: string | null },
 ): Promise<{ calendar_sync: string; meet_sync: string }> {
   const cancelReason = `booking_cancelled:${row.id}:by:self:${self.lineUserId}-retry`;
   // 送信中の REMINDER_SEND_IN_FLIGHT は投げて 409 にする。
@@ -1458,6 +1471,16 @@ async function runSelfBookingCancelSideEffects(
     remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), row.id),
   });
   const meetSync = await cancelSelfBookingMeet(c, self, row.id, row.external_event_id);
+  // 取り消し再送でも空き知らせは行う（仮押さえ中なら何もしない）。
+  try {
+    await promoteBookingWaitlist(c.env.DB, {
+      lineAccountId: self.accountId,
+      staffId: row.staff_id,
+      startsAt: row.starts_at,
+    });
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId: row.id }));
+  }
   return {
     calendar_sync: calResult === 'succeeded' ? 'synced' : calResult === 'retry_wait' ? 'failed' : 'not_applicable',
     meet_sync: meetSync,
@@ -3247,6 +3270,249 @@ booking.get('/api/booking/admin/last-booking', async (c) => {
   });
 });
 
+/**
+ * キャンセル待ちの登録の共通処理（管理画面・LIFF）。
+ *
+ * 満席の判定は空き照会の表示側で行い、登録口は受け付ける。
+ * 開始時刻は UTC ISO (Z) にそろえる（取り消し時の突き合わせ用）。
+ */
+async function insertWaitlistEntry(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    staffId: string;
+    menuId: string;
+    startsAt: string;
+    friendId: string | null;
+    bookingCustomerId: string | null;
+  },
+): Promise<
+  | { ok: true; id: string }
+  | { ok: false; error: 'invalid_slot' | 'missing_customer' | 'customer_not_found' | 'invalid_starts_at' | 'starts_at_in_past' | 'already_waiting' }
+> {
+  const staffId = input.staffId.trim();
+  const menuId = input.menuId.trim();
+  if (!staffId || !menuId) return { ok: false, error: 'invalid_slot' };
+  const startsAtMs = Date.parse(input.startsAt);
+  if (Number.isNaN(startsAtMs)) return { ok: false, error: 'invalid_starts_at' };
+  if (startsAtMs <= Date.now()) return { ok: false, error: 'starts_at_in_past' };
+  const startsAt = new Date(startsAtMs).toISOString();
+  const { friendId, bookingCustomerId } = input;
+  if ((!friendId && !bookingCustomerId) || (friendId && bookingCustomerId)) {
+    return { ok: false, error: 'missing_customer' };
+  }
+  const staff = await db
+    .prepare(`SELECT 1 AS ok FROM staff
+      WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL AND is_active = 1`)
+    .bind(staffId, input.lineAccountId)
+    .first<{ ok: number }>();
+  const menu = await db
+    .prepare(`SELECT 1 AS ok FROM menus
+      WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL AND is_active = 1`)
+    .bind(menuId, input.lineAccountId)
+    .first<{ ok: number }>();
+  if (!staff || !menu) return { ok: false, error: 'invalid_slot' };
+  const ownerTable = friendId ? 'friends' : 'booking_customers';
+  const ownerId = (friendId ?? bookingCustomerId) as string;
+  const owner = await db
+    .prepare(`SELECT 1 AS ok FROM ${ownerTable} WHERE id = ? AND line_account_id = ?`)
+    .bind(ownerId, input.lineAccountId)
+    .first<{ ok: number }>();
+  if (!owner) return { ok: false, error: 'customer_not_found' };
+  const identityKey = friendId ? `friend:${friendId}` : `customer:${bookingCustomerId}`;
+  const existing = await db
+    .prepare(`SELECT id FROM booking_waitlist
+      WHERE line_account_id = ? AND staff_id = ? AND starts_at = ?
+        AND identity_key = ? AND status IN ('waiting', 'invited')`)
+    .bind(input.lineAccountId, staffId, startsAt, identityKey)
+    .first<{ id: string }>();
+  if (existing) return { ok: false, error: 'already_waiting' };
+  const id = crypto.randomUUID();
+  try {
+    await db
+      .prepare(`INSERT INTO booking_waitlist
+        (id, line_account_id, staff_id, menu_id, starts_at, friend_id,
+         booking_customer_id, identity_key)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, input.lineAccountId, staffId, menuId, startsAt,
+        friendId, bookingCustomerId, identityKey)
+      .run();
+  } catch (error) {
+    // 同時登録の race は部分一致キーが止める。
+    if (error instanceof Error && /UNIQUE/i.test(error.message)) {
+      return { ok: false, error: 'already_waiting' };
+    }
+    throw error;
+  }
+  return { ok: true, id };
+}
+
+const WAITLIST_ERROR_STATUS: Record<string, number> = {
+  invalid_slot: 400,
+  missing_customer: 400,
+  invalid_starts_at: 400,
+  starts_at_in_past: 400,
+  customer_not_found: 404,
+  already_waiting: 409,
+};
+
+booking.post('/api/booking/admin/waitlist', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  if (!body) return c.json({ error: 'invalid_json' }, 400);
+  const result = await insertWaitlistEntry(c.env.DB, {
+    lineAccountId: accountId,
+    staffId: typeof body.staff_id === 'string' ? body.staff_id : '',
+    menuId: typeof body.menu_id === 'string' ? body.menu_id : '',
+    startsAt: typeof body.starts_at === 'string' ? body.starts_at : '',
+    friendId: typeof body.friend_id === 'string' && body.friend_id.trim() ? body.friend_id.trim() : null,
+    bookingCustomerId: typeof body.booking_customer_id === 'string' && body.booking_customer_id.trim()
+      ? (body.booking_customer_id as string).trim()
+      : null,
+  });
+  if (!result.ok) return c.json({ error: result.error }, WAITLIST_ERROR_STATUS[result.error] as 400 | 404 | 409);
+  const entry = await c.env.DB
+    .prepare(`SELECT * FROM booking_waitlist WHERE id = ?`)
+    .bind(result.id)
+    .first();
+  return c.json({ waitlist: entry }, 201);
+});
+
+booking.get('/api/booking/admin/waitlist', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const conditions = ['w.line_account_id = ?'];
+  const values: unknown[] = [accountId];
+  const staffId = c.req.query('staff_id')?.trim();
+  if (staffId) { conditions.push('w.staff_id = ?'); values.push(staffId); }
+  const startsAt = c.req.query('starts_at')?.trim();
+  if (startsAt) {
+    const startsAtMs = Date.parse(startsAt);
+    if (Number.isNaN(startsAtMs)) return c.json({ error: 'invalid_starts_at' }, 400);
+    conditions.push('w.starts_at = ?');
+    values.push(new Date(startsAtMs).toISOString());
+  }
+  const status = c.req.query('status')?.trim();
+  if (status && ['waiting', 'invited', 'converted', 'cancelled'].includes(status)) {
+    conditions.push('w.status = ?'); values.push(status);
+  }
+  const rows = await c.env.DB
+    .prepare(
+      `SELECT w.*, m.name AS menu_name, s.display_name AS staff_name,
+              COALESCE(f.display_name, bc.display_name) AS customer_name
+         FROM booking_waitlist w
+         INNER JOIN menus m ON m.id = w.menu_id
+         INNER JOIN staff s ON s.id = w.staff_id
+         LEFT JOIN friends f ON f.id = w.friend_id
+         LEFT JOIN booking_customers bc ON bc.id = w.booking_customer_id
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY w.starts_at ASC, w.created_at ASC LIMIT 100`,
+    )
+    .bind(...values)
+    .all();
+  return c.json({ waitlist: rows.results });
+});
+
+booking.delete('/api/booking/admin/waitlist/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const id = c.req.param('id');
+  const updated = await c.env.DB
+    .prepare(`UPDATE booking_waitlist SET status = 'cancelled',
+                  updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+      WHERE id = ? AND line_account_id = ? AND status IN ('waiting', 'invited')`)
+    .bind(id, accountId)
+    .run();
+  if ((updated.meta?.changes ?? 0) > 0) return c.json({ status: 'cancelled' });
+  const row = await c.env.DB
+    .prepare(`SELECT id FROM booking_waitlist WHERE id = ? AND line_account_id = ?`)
+    .bind(id, accountId)
+    .first<{ id: string }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+  return c.json({ error: 'already_closed' }, 409);
+});
+
+/**
+ * 招待ずみの人が予約を取ったとき、待ちを「予約になった」へ進める。
+ * 同じ枠・同じ人の予約だけ受け付ける。
+ */
+booking.post('/api/booking/admin/waitlist/:id/convert', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const id = c.req.param('id');
+  const body = await c.req.json<{ booking_id?: unknown }>().catch(() => null);
+  const bookingId = typeof body?.booking_id === 'string' ? body.booking_id : '';
+  if (!bookingId) return c.json({ error: 'missing_booking_id' }, 400);
+  const entry = await c.env.DB
+    .prepare(`SELECT * FROM booking_waitlist WHERE id = ? AND line_account_id = ?`)
+    .bind(id, accountId)
+    .first<WaitlistEntryLike>();
+  if (!entry) return c.json({ error: 'not_found' }, 404);
+  if (entry.status !== 'waiting' && entry.status !== 'invited') {
+    return c.json({ error: 'already_closed' }, 409);
+  }
+  const booking = await c.env.DB
+    .prepare(`SELECT staff_id, starts_at, friend_id, booking_customer_id FROM bookings
+      WHERE id = ? AND line_account_id = ? AND status NOT IN ('cancelled', 'rejected', 'expired')`)
+    .bind(bookingId, accountId)
+    .first<{ staff_id: string; starts_at: string; friend_id: string | null; booking_customer_id: string | null }>();
+  if (!booking
+    || booking.staff_id !== entry.staff_id
+    || booking.starts_at !== entry.starts_at
+    || booking.friend_id !== entry.friend_id
+    || booking.booking_customer_id !== entry.booking_customer_id) {
+    return c.json({ error: 'booking_mismatch' }, 409);
+  }
+  await c.env.DB
+    .prepare(`UPDATE booking_waitlist SET status = 'converted',
+                  updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+      WHERE id = ? AND status IN ('waiting', 'invited')`)
+    .bind(id)
+    .run();
+  return c.json({ status: 'converted' });
+});
+
+interface WaitlistEntryLike {
+  staff_id: string;
+  starts_at: string;
+  friend_id: string | null;
+  booking_customer_id: string | null;
+  status: string;
+}
+
+booking.post('/api/liff/booking/waitlist', async (c) => {
+  const caller = await resolveSelfBookingCaller(c);
+  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  if (!body) return c.json({ error: 'invalid_json' }, 400);
+  const result = await insertWaitlistEntry(c.env.DB, {
+    lineAccountId: caller.accountId,
+    staffId: typeof body.staff_id === 'string' ? body.staff_id : '',
+    menuId: typeof body.menu_id === 'string' ? body.menu_id : '',
+    startsAt: typeof body.starts_at === 'string' ? body.starts_at : '',
+    friendId: caller.friendId,
+    bookingCustomerId: null,
+  });
+  if (!result.ok) return c.json({ error: result.error }, WAITLIST_ERROR_STATUS[result.error] as 400 | 404 | 409);
+  return c.json({ id: result.id }, 201);
+});
+
+booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
+  const caller = await resolveSelfBookingCaller(c);
+  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  const id = c.req.param('id');
+  const updated = await c.env.DB
+    .prepare(`UPDATE booking_waitlist SET status = 'cancelled',
+                  updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+      WHERE id = ? AND line_account_id = ? AND friend_id = ?
+        AND status IN ('waiting', 'invited')`)
+    .bind(id, caller.accountId, caller.friendId)
+    .run();
+  if ((updated.meta?.changes ?? 0) > 0) return c.json({ status: 'cancelled' });
+  return c.json({ error: 'not_found' }, 404);
+});
+
 booking.get('/api/booking/admin/reminder-preview', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
@@ -4068,6 +4334,8 @@ booking.post(
       changed: ['confirmed'],
       day_before: ['confirmed'],
       hours_before: ['confirmed'],
+      // 待ち知らせは予約の操作台帳を通さないため、ここでは再送しない。
+      waitlist_invite: [],
     };
     if (!retryableStatuses[notificationKind].includes(bookingRow.status)) {
       return c.json({
@@ -6542,6 +6810,17 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), id),
       }).catch((error) => console.error('Google Calendar delete failed:', error)),
     );
+    // キャンセル待ち：空いた枠を登録の早い順で1人に知らせる。
+    // 知らせの失敗で取り消し自体を失敗させない。
+    try {
+      await promoteBookingWaitlist(c.env.DB, {
+        lineAccountId: accountId,
+        staffId: row.staff_id,
+        startsAt: row.starts_at,
+      });
+    } catch {
+      console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId: id }));
+    }
   }
 
   // R329: 成功履歴は取消ガードと状態確定の後に残す。送信中の 409 で
