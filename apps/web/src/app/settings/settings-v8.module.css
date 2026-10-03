@@ -479,7 +479,7 @@
   margin: 12px 18px 8px;
   padding: 12px 14px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-card);
   background: var(--color-shell);
 }
 
@@ -516,7 +516,7 @@
   width: 6px;
   height: 6px;
   flex-shrink: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-canvas-sunken);
 }
 

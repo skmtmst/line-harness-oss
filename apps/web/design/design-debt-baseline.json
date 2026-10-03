@@ -157,8 +157,8 @@
     "unresolved-classname": 109
   },
   "app/contents/vars/list-v8.tsx": {
-    "unresolved-classname": 105,
-    "direct-th": 6
+    "unresolved-classname": 107,
+    "direct-th": 7
   },
   "app/contents/vars/new/new-v8.tsx": {
     "unresolved-classname": 55
@@ -466,8 +466,8 @@
     "direct-secondary-button": 1
   },
   "app/rich-menus/list-v8.tsx": {
-    "unresolved-classname": 81,
-    "direct-th": 6,
+    "unresolved-classname": 83,
+    "direct-th": 7,
     "arbitrary-value": 1
   },
   "app/rich-menus/new/create-v8.tsx": {
@@ -514,7 +514,7 @@
     "arbitrary-value": 2
   },
   "app/settings/feature-settings-v8.tsx": {
-    "unresolved-classname": 55
+    "unresolved-classname": 64
   },
   "app/settings/file-scan/file-scan-v8.tsx": {
     "unresolved-classname": 29,
