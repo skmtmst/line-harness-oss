@@ -49,6 +49,9 @@ import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { Th } from '@/components/shared/table'
+import { runUndoable } from '@/lib/undoable'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
@@ -174,21 +177,14 @@ export default function RemindersListV8() {
 
   /* 窓・まとめての帯の状態。 */
   const [pauseTarget, setPauseTarget] = useState<ReminderRow | null>(null)
-  const [pausing, setPausing] = useState(false)
-  const [pauseError, setPauseError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<ReminderRow | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
-  const [moving, setMoving] = useState(false)
-  const [moveError, setMoveError] = useState('')
   const [duplicateTarget, setDuplicateTarget] = useState<ReminderRow | null>(null)
   const [duplicating, setDuplicating] = useState(false)
   const [duplicateError, setDuplicateError] = useState('')
-  const [bulkToggle, setBulkToggle] = useState<{ next: boolean; ids: string[] } | null>(null)
-  const [bulkBusy, setBulkBusy] = useState(false)
-  const [bulkError, setBulkError] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
   const [moveNotice, setMoveNotice] = useState('')
 
@@ -264,41 +260,69 @@ export default function RemindersListV8() {
     load: loadReminderPage,
     initialLimit: perPage,
   })
-  const reminders = reminderList.items
+  /*
+   * 押した瞬間の見せ方（★V8 サクサク感 B）。軽い操作は先にこの重ねで
+   * 描き換え、裏で保存する。確定・失敗・取り消しで重ねを外し、読み直す。
+   * ページ・絞り込みが変わったら重ねは捨てる（違う一覧に貼らない）。
+   */
+  const [optimisticRows, setOptimisticRows] = useState<{ key: string; rows: ReminderRow[] } | null>(null)
+  const listContextKey = JSON.stringify({
+    account: selectedAccountId ?? '',
+    query: deferredNameQuery,
+    folder: folderFilter,
+    status: statusFilter,
+    perPage,
+    sort,
+    page: reminderList.page,
+  })
+  const reminders = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : reminderList.items
   const detailHref = (id: string) => `/reminders/detail?id=${encodeURIComponent(id)}`
   const filterActive = Boolean(nameQuery.trim() || folderFilter || statusFilter)
 
   /* ===== 行の操作 ===== */
 
-  const runToggle = async (row: ReminderRow, next: boolean) => {
-    const res = await api.reminders.update(row.id, { isActive: next })
-    if (!res.success) throw new Error(res.error)
-    reminderList.retry()
-    void loadStats()
-  }
-
-  const runPause = async () => {
-    if (!pauseTarget || pausing) return
-    setPausing(true)
-    setPauseError('')
-    try {
-      await runToggle(pauseTarget, false)
-      setPauseTarget(null)
-    } catch {
-      setPauseError('このリマインダを一時停止できませんでした。状態を読み直してから、もう一度お試しください。')
-    } finally {
-      setPausing(false)
-    }
-  }
-
-  const runResume = async (row: ReminderRow) => {
+  /*
+   * 1件の「一時停止／再開」は押した瞬間に描き換え、裏で保存する
+   * （★V8 サクサク感 B）。5秒のあいだ知らせの「元に戻す」で
+   * 送らずに戻せる。一時停止の窓（`RwVo5`）は残し、確定で即反映する。
+   */
+  const runToggle = (row: ReminderRow, next: boolean) => {
     setActionError('')
-    try {
-      await runToggle(row, true)
-    } catch {
-      setActionError(`「${row.name}」を再開できませんでした。状態を読み直してから、もう一度お試しください。`)
-    }
+    const key = listContextKey
+    setOptimisticRows({
+      key,
+      rows: reminders.map((item) =>
+        item.id === row.id
+          ? { ...item, isActive: next, lifecycleStatus: next ? 'published' : 'stopped' }
+          : item,
+      ),
+    })
+    runUndoable({
+      message: next ? `「${row.name}」を再開しました` : `「${row.name}」を一時停止しました`,
+      commit: async () => {
+        const res = await api.reminders.update(row.id, { isActive: next })
+        if (!res.success) throw new Error(res.error)
+      },
+      undo: () => setOptimisticRows(null),
+      failureMessage: next
+        ? `「${row.name}」を再開できませんでした。`
+        : `「${row.name}」を一時停止できませんでした。`,
+      onCommitted: () => {
+        setOptimisticRows(null)
+        reminderList.retry()
+        void loadStats()
+      },
+    })
   }
+
+  const runPause = () => {
+    if (!pauseTarget) return
+    const row = pauseTarget
+    setPauseTarget(null)
+    runToggle(row, false)
+  }
+
+  const runResume = (row: ReminderRow) => runToggle(row, true)
 
   /* ===== 削除 ===== */
 
@@ -359,30 +383,41 @@ export default function RemindersListV8() {
   const openMove = (ids: string[]) => {
     if (ids.length === 0) return
     setMoveDraft('')
-    setMoveError('')
     setMoveIds(ids)
   }
 
-  const runMove = async () => {
-    if (!moveIds || moveIds.length === 0 || moving) return
-    setMoving(true)
-    setMoveError('')
-    try {
-      const results = await Promise.all(
-        moveIds.map((id) => api.reminders.update(id, { folderId: moveDraft || null }).catch(() => null)),
-      )
-      const failed = results.filter((res) => !res || !res.success).length
-      reminderList.retry()
-      if (failed > 0) {
-        setMoveError(`${failed}件のフォルダを移動できませんでした。状態を読み直してから、もう一度お試しください。`)
-        return
-      }
-      const moved = new Set(moveIds)
-      setSelectedIds((current) => new Set([...current].filter((id) => !moved.has(id))))
-      setMoveIds(null)
-    } finally {
-      setMoving(false)
-    }
+  /*
+   * フォルダ移動は窓で行き先だけ選び、押した瞬間に描き換えて裏で保存する
+   * （★V8 サクサク感 B）。5秒のあいだ知らせの「元に戻す」で送らずに戻せる。
+   */
+  const runMove = () => {
+    if (!moveIds || moveIds.length === 0) return
+    const ids = moveIds
+    const folderId = moveDraft || null
+    const key = listContextKey
+    setOptimisticRows({
+      key,
+      rows: reminders.map((row) => (ids.includes(row.id) ? { ...row, folderId } : row)),
+    })
+    setMoveIds(null)
+    runUndoable({
+      message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
+      commit: async () => {
+        const results = await Promise.all(
+          ids.map((id) => api.reminders.update(id, { folderId }).catch(() => null)),
+        )
+        const failed = results.filter((res) => !res || !res.success).length
+        if (failed > 0) throw new Error(`${failed}件のフォルダを移動できませんでした`)
+      },
+      undo: () => setOptimisticRows(null),
+      failureMessage: 'フォルダを移動できませんでした。',
+      onCommitted: () => {
+        setOptimisticRows(null)
+        const moved = new Set(ids)
+        setSelectedIds((current) => new Set([...current].filter((id) => !moved.has(id))))
+        reminderList.retry()
+      },
+    })
   }
 
   /* ===== まとめて「止める／再開」 ===== */
@@ -410,45 +445,71 @@ export default function RemindersListV8() {
     })
   }
 
-  const runBulkToggle = async () => {
-    if (!bulkToggle || bulkBusy) return
-    setBulkBusy(true)
-    setBulkError('')
-    try {
-      const results = await Promise.all(
-        bulkToggle.ids.map((id) =>
-          api.reminders.update(id, { isActive: bulkToggle.next }).catch(() => null),
-        ),
-      )
-      const failed = results.filter((res) => !res || !res.success).length
-      reminderList.retry()
-      void loadStats()
-      if (failed > 0) {
-        setBulkError(
-          bulkToggle.next
-            ? `${failed}件の再開ができませんでした。状態を読み直してから、もう一度お試しください。`
-            : `${failed}件の一時停止ができませんでした。状態を読み直してから、もう一度お試しください。`,
+  /*
+   * まとめて「一時停止／再開」は押した瞬間に描き換え、裏で保存する
+   * （★V8 サクサク感 B）。確認の窓は出さず、5秒のあいだ知らせの
+   * 「元に戻す」で送らずに戻せる。
+   */
+  const runBulkToggle = (next: boolean, ids: string[]) => {
+    if (ids.length === 0) return
+    const key = listContextKey
+    setOptimisticRows({
+      key,
+      rows: reminders.map((row) =>
+        ids.includes(row.id)
+          ? { ...row, isActive: next, lifecycleStatus: next ? 'published' : 'stopped' }
+          : row,
+      ),
+    })
+    runUndoable({
+      message: next ? `${ids.length}件を再開しました` : `${ids.length}件を一時停止しました`,
+      commit: async () => {
+        const results = await Promise.all(
+          ids.map((id) => api.reminders.update(id, { isActive: next }).catch(() => null)),
         )
-        return
-      }
-      setBulkToggle(null)
-      setSelectedIds(new Set())
-    } finally {
-      setBulkBusy(false)
-    }
+        const failed = results.filter((res) => !res || !res.success).length
+        if (failed > 0) throw new Error(`${failed}件の保存に失敗しました`)
+      },
+      undo: () => setOptimisticRows(null),
+      failureMessage: next ? '再開できませんでした。' : '一時停止できませんでした。',
+      onCommitted: () => {
+        setOptimisticRows(null)
+        setSelectedIds(new Set())
+        reminderList.retry()
+        void loadStats()
+      },
+    })
   }
 
   /* ===== 並び替え ===== */
 
-  const handleReorder = async (order: string[]) => {
-    try {
-      const res = await api.reminders.reorder(order)
-      if (!res.success) throw new Error(res.error)
-    } catch {
-      setActionError('並び替えを保存できませんでした。状態を読み直してから、もう一度お試しください。')
-    } finally {
+  /*
+   * 掴んで入れ替えた並びを先に描き換え、裏で保存する（★V8 サクサク感 B）。
+   * 5秒のあいだは知らせの「元に戻す」で送らずに戻せる。
+   */
+  const handleReorder = (order: string[]) => {
+    setActionError('')
+    const key = listContextKey
+    const byId = new Map(reminders.map((row) => [row.id, row]))
+    const nextRows = order.map((id) => byId.get(id)).filter((row): row is ReminderRow => row !== undefined)
+    if (nextRows.length !== reminders.length) {
       reminderList.retry()
+      return
     }
+    setOptimisticRows({ key, rows: nextRows })
+    runUndoable({
+      message: '並び順を変えました',
+      commit: async () => {
+        const res = await api.reminders.reorder(order)
+        if (!res.success) throw new Error(res.error)
+      },
+      undo: () => setOptimisticRows(null),
+      failureMessage: '並び替えを保存できませんでした。',
+      onCommitted: () => {
+        setOptimisticRows(null)
+        reminderList.retry()
+      },
+    })
   }
 
   const dropOn = (targetId: string) => {
@@ -587,8 +648,7 @@ export default function RemindersListV8() {
             disabled: !canEdit,
             disabledReason: canEdit ? undefined : readonlyReason,
             onSelect: () => {
-              setPauseError('')
-              setPauseTarget(row)
+                        setPauseTarget(row)
             },
           }
         : status === 'stopped'
@@ -630,17 +690,69 @@ export default function RemindersListV8() {
 
   /* ===== 表 ===== */
 
+  /*
+   * 見出しの6列は実表と共有する。骨組み用に書き写すと直書きの見出し
+   * （`direct-th`）が二重に数えられるため、同じ要素を使い回す。
+   * 選択の列だけは実表が箱（Checkbox）付き・骨組みが共通 `Th` の空見出し。
+   */
+  const tableHeadCells = (
+    <>
+      <th aria-label="並び替え" />
+      <th>リマインダ（基準日・いつ送るか）</th>
+      <th>状態</th>
+      <th>これから送る</th>
+      <th>次に送る</th>
+      <th aria-label="操作" />
+    </>
+  )
+
+  const loadingSkeleton = (
+    <table className={styles.table}>
+      <colgroup>
+        {canEdit && <col style={{ width: 40 }} />}
+        <col style={{ width: 44 }} />
+        <col />
+        <col style={{ width: 96 }} />
+        <col style={{ width: 112 }} />
+        <col style={{ width: 128 }} />
+        <col style={{ width: 44 }} />
+      </colgroup>
+      <thead>
+        <tr>
+          {canEdit && <Th aria-label="選択" />}
+          {tableHeadCells}
+        </tr>
+      </thead>
+      <tbody>
+        {[0, 1, 2, 3, 4].map((n) => (
+          <tr key={n}>
+            {canEdit && <td className={styles.selectCell} />}
+            <td className={styles.gripCell} />
+            <td>
+              <Skeleton width={220} height={16} />
+              <span style={{ display: 'block', height: 4 }} aria-hidden="true" />
+              <Skeleton width={160} height={12} />
+            </td>
+            <td>
+              <Skeleton width={64} height={24} className="rounded-pill" />
+            </td>
+            <td className={styles.countCell}>
+              <Skeleton width={56} height={16} />
+            </td>
+            <td>
+              <Skeleton width={96} height={16} />
+            </td>
+            <td />
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+
   const table =
     reminderList.loading && reminders.length === 0 ? (
-      <div className={styles.skeletonRows} role="status">
-        <span className="sr-only">読み込んでいます</span>
-        {[0, 1, 2, 3, 4].map((n) => (
-          <div key={n} className={styles.skeletonRow}>
-            <span className={styles.skeletonDot} />
-            <span className={styles.skeletonBar} />
-            <span className={styles.skeletonBar} style={{ maxWidth: 120 }} />
-          </div>
-        ))}
+      <div className={styles.tableWrap} aria-busy="true" aria-label="読み込んでいます">
+        <DelayedSkeleton loading skeleton={loadingSkeleton} />
       </div>
     ) : reminderList.error ? (
       <div className={styles.stateCard}>
@@ -720,12 +832,7 @@ export default function RemindersListV8() {
                     />
                   </th>
                 )}
-                <th aria-label="並び替え" />
-                <th>リマインダ（基準日・いつ送るか）</th>
-                <th>状態</th>
-                <th>これから送る</th>
-                <th>次に送る</th>
-                <th aria-label="操作" />
+                {tableHeadCells}
               </tr>
             </thead>
             <tbody>
@@ -940,12 +1047,9 @@ export default function RemindersListV8() {
             <Button
               type="button"
               variant="secondary"
-              disabled={bulkBusy || stoppableIds.length === 0}
+              disabled={stoppableIds.length === 0}
               title={stoppableIds.length === 0 ? '有効なリマインダが選ばれていません' : undefined}
-              onClick={() => {
-                setBulkError('')
-                setBulkToggle({ next: false, ids: stoppableIds })
-              }}
+              onClick={() => runBulkToggle(false, stoppableIds)}
             >
               <Square size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               止める
@@ -953,12 +1057,9 @@ export default function RemindersListV8() {
             <Button
               type="button"
               variant="secondary"
-              disabled={bulkBusy || resumableIds.length === 0}
+              disabled={resumableIds.length === 0}
               title={resumableIds.length === 0 ? '停止中のリマインダが選ばれていません' : undefined}
-              onClick={() => {
-                setBulkError('')
-                setBulkToggle({ next: true, ids: resumableIds })
-              }}
+              onClick={() => runBulkToggle(true, resumableIds)}
             >
               <Play size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               再開
@@ -966,7 +1067,6 @@ export default function RemindersListV8() {
             <Button
               type="button"
               variant="secondary"
-              disabled={bulkBusy}
               onClick={() => openMove([...selectedIds])}
             >
               <FolderIcon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
@@ -1037,21 +1137,17 @@ export default function RemindersListV8() {
         />
       )}
 
-      {/* 一時停止の窓（★V8 `RwVo5`）。 */}
+      {/* 一時停止の窓（★V8 `RwVo5`）。確定で即反映し、裏で保存する。 */}
       <ConfirmDialog
         open={pauseTarget !== null}
         designNode="RwVo5"
         title={pauseTarget ? `「${pauseTarget.name}」を一時停止する` : ''}
         description="再開するまで、このリマインダの通知は送られません。"
         confirmLabel="一時停止する"
-        busy={pausing}
-        error={pauseError}
-        onConfirm={() => void runPause()}
+        onConfirm={() => runPause()}
         onCancel={() => {
-          if (pausing) return
           setPauseTarget(null)
-          setPauseError('')
-        }}
+              }}
       >
         {pauseTarget && (
           <p className={styles.warnNote}>
@@ -1091,8 +1187,7 @@ export default function RemindersListV8() {
                 type="button"
                 className={styles.altAction}
                 onClick={() => {
-                  setPauseError('')
-                  setPauseTarget(deleteTarget)
+                                setPauseTarget(deleteTarget)
                   setDeleteTarget(null)
                 }}
               >
@@ -1133,14 +1228,10 @@ export default function RemindersListV8() {
             : `${moveIds?.length ?? 0}件のリマインダのフォルダを移動`
         }
         description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
-        confirmLabel={moving ? '移動中…' : '移動する'}
-        busy={moving}
-        error={moveError}
-        onConfirm={() => void runMove()}
+        confirmLabel="移動する"
+        onConfirm={() => runMove()}
         onCancel={() => {
-          if (moving) return
           setMoveIds(null)
-          setMoveError('')
         }}
       >
         <div className={styles.moveBody}>
@@ -1151,7 +1242,6 @@ export default function RemindersListV8() {
               size="full"
               value={moveDraft}
               onChange={(value) => setMoveDraft(value)}
-              disabled={moving}
               options={[
                 { value: '', label: '未分類' },
                 ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
@@ -1160,37 +1250,6 @@ export default function RemindersListV8() {
           </label>
         </div>
       </ConfirmDialog>
-
-      {/* まとめて「一時停止」の確認。 */}
-      <ConfirmDialog
-        open={bulkToggle !== null && !bulkToggle.next}
-        title={`${bulkToggle?.ids.length ?? 0}件のリマインダを一時停止しますか？`}
-        description="止めるとこれから送る予定の通知が送られなくなります。すでに送ったメッセージは友だちのトークに残ります。"
-        confirmLabel="まとめて止める"
-        busy={bulkBusy}
-        error={bulkError}
-        onConfirm={() => void runBulkToggle()}
-        onCancel={() => {
-          if (bulkBusy) return
-          setBulkToggle(null)
-          setBulkError('')
-        }}
-      />
-      {/* まとめて「再開」の確認。 */}
-      <ConfirmDialog
-        open={bulkToggle !== null && bulkToggle.next}
-        title={`${bulkToggle?.ids.length ?? 0}件のリマインダを再開しますか？`}
-        description="再開すると、送る予定の通知がまた送られ始めます。"
-        confirmLabel="まとめて再開"
-        busy={bulkBusy}
-        error={bulkError}
-        onConfirm={() => void runBulkToggle()}
-        onCancel={() => {
-          if (bulkBusy) return
-          setBulkToggle(null)
-          setBulkError('')
-        }}
-      />
 
       <div data-design="Body" className={styles.split}>
         {/* 左のフォルダの列。いちばん上は「リマインダを作る」。 */}

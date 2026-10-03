@@ -734,6 +734,8 @@ export default function BroadcastForm({
   const [scheduledDate, setScheduledDate] = useState(initialScheduledDate)
   const [scheduledTime, setScheduledTime] = useState(initialScheduledTime)
   const [saving, setSaving] = useState(false)
+  /** 保存が通った直後の「✓保存しました」（共通 Button の done、1.2秒）。 */
+  const [saveDone, setSaveDone] = useState(false)
   /*
     最終確認（設計 `FpgxH`）。**「配信を予約する」で直に送らない。**
     ここまでは、押した瞬間に `save()` が走って 1,000人以上へ予約が入り、
@@ -1524,6 +1526,9 @@ export default function BroadcastForm({
     if (cleanFingerprintRef.current === null) cleanFingerprintRef.current = formFingerprint
   })
   const dirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
+  useEffect(() => {
+    if (dirty) setSaveDone(false)
+  }, [dirty])
   const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving })
   const leaveTargetRef = useRef(leaveTarget)
   leaveTargetRef.current = leaveTarget
@@ -1643,6 +1648,7 @@ export default function BroadcastForm({
       if (saved) {
         cleanFingerprintRef.current = fingerprintAtSave
         setDraftSavedAt(Date.now())
+        setSaveDone(true)
         notifyToast('下書きを保存しました。')
         // BROADCAST-16: フォームは閉じない保存なので、背後の一覧と
         // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
@@ -2948,7 +2954,7 @@ export default function BroadcastForm({
       {currentStep ? (
         <>
           {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
-          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
+          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()} busy={saving} busyLabel="保存中…" done={saveDone}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
           {currentStep !== 'confirm' ? (
             <Button variant="primary" onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}>
               {currentStep === 'basic' ? '対象設定へ'

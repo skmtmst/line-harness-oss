@@ -37,6 +37,9 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
+import { runUndoable } from '@/lib/undoable'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import HelpTip from '@/components/shared/help-tip'
@@ -219,16 +222,12 @@ export default function AutoRepliesListV8() {
   const [deleteError, setDeleteError] = useState('')
   const [pendingToggle, setPendingToggle] = useState<PendingToggle | null>(null)
   const [toggleReason, setToggleReason] = useState('')
-  const [toggling, setToggling] = useState(false)
   const [toggleError, setToggleError] = useState('')
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
-  const [moving, setMoving] = useState(false)
-  const [moveError, setMoveError] = useState('')
   const [duplicateTarget, setDuplicateTarget] = useState<AutoReply | null>(null)
   const [duplicating, setDuplicating] = useState(false)
   const [duplicateError, setDuplicateError] = useState('')
-  const [reordering, setReordering] = useState(false)
   const [actionError, setActionError] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
   const [moveNotice, setMoveNotice] = useState('')
@@ -306,24 +305,41 @@ export default function AutoRepliesListV8() {
 
   const templateById = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates])
 
+  /*
+   * 押した瞬間の見せ方（★V8 サクサク感 B）。軽い操作は先にこの重ねで
+   * 描き換え、裏で保存する。確定・失敗・取り消しで重ねを外し、読み直す。
+   * ページ・絞り込みが変わったら重ねは捨てる（違う一覧に貼らない）。
+   */
+  const [optimisticRows, setOptimisticRows] = useState<{ key: string; rows: AutoReply[] } | null>(null)
+  const listContextKey = JSON.stringify({
+    account: selectedAccountId ?? '',
+    query,
+    folder: folderFilter,
+    sort: sortKey,
+    chips: [conflictOnly, stoppedOnly, timedOnly, zeroThisMonthOnly, savedFilter],
+    pageSize,
+    page,
+  })
+  const rules = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : items
+
   /* ===== 数の帯 ===== */
-  const hitsAllKnown = items.length > 0 && items.every((r) => r.hits !== undefined)
+  const hitsAllKnown = rules.length > 0 && rules.every((r) => r.hits !== undefined)
   const monthlyHits = hitsAllKnown
-    ? items.reduce((sum, r) => sum + (r.hits?.period ?? 0), 0)
+    ? rules.reduce((sum, r) => sum + (r.hits?.period ?? 0), 0)
     : null
   const totalHits = hitsAllKnown
-    ? items.reduce((sum, r) => sum + (r.hits?.total ?? 0), 0)
+    ? rules.reduce((sum, r) => sum + (r.hits?.total ?? 0), 0)
     : null
-  const actionExecutionsAllKnown = items.length > 0 && items.every((r) => r.actionExecutionCount != null)
+  const actionExecutionsAllKnown = rules.length > 0 && rules.every((r) => r.actionExecutionCount != null)
   const actionExecutionCount = actionExecutionsAllKnown
-    ? items.reduce((sum, r) => sum + (r.actionExecutionCount ?? 0), 0)
+    ? rules.reduce((sum, r) => sum + (r.actionExecutionCount ?? 0), 0)
     : null
 
   const visibleLoadState = visibleAutoReplyLoadState(loadState, loadedAccountId, selectedAccountId)
   const ready = visibleLoadState === 'ready'
 
   /* ===== 絞り込み ===== */
-  const afterQuery = items.filter((r) => autoReplyMatchesQuery(r, query))
+  const afterQuery = rules.filter((r) => autoReplyMatchesQuery(r, query))
   const inFolder = afterQuery.filter((r) => {
     if (folderFilter === UNFILED) return !r.folderId
     if (folderFilter) return r.folderId === folderFilter
@@ -398,14 +414,18 @@ export default function AutoRepliesListV8() {
     })
   }
   const selectedCount = selectedIds.size
-  const selectedRules = items.filter((r) => selectedIds.has(r.id))
+  const selectedRules = rules.filter((r) => selectedIds.has(r.id))
   const stoppableIds = selectedRules.filter((r) => r.isActive).map((r) => r.id)
   const resumableIds = selectedRules.filter((r) => !r.isActive && r.lifecycleStatus !== 'draft').map((r) => r.id)
 
   /* ===== 操作 ===== */
 
-  /** 停止・再開そのもの。確認窓の決定ボタンからだけ呼ぶ。 */
-  const runToggle = async () => {
+  /*
+   * 停止・再開は確認窓の決定で窓を閉じて即反映し、裏で保存する
+   * （★V8 サクサク感 B）。止める理由（任意）は窓で受け取り、そのまま
+   * 記録へ送る。5秒のあいだ知らせの「元に戻す」で送らずに戻せる。
+   */
+  const runToggle = () => {
     if (!pendingToggle) return
     if (pendingToggle.accountId !== selectedAccountId) {
       setToggleError('アカウントが切り替わりました。操作する自動応答を選び直してください。')
@@ -414,44 +434,64 @@ export default function AutoRepliesListV8() {
     const requestAccountId = pendingToggle.accountId
     const ids = pendingToggle.ids
     const kind = pendingToggle.kind
-    setToggling(true)
+    const reason = toggleReason.trim() === '' ? null : toggleReason.trim()
+    const next = kind === 'resume'
+    const key = listContextKey
+    setOptimisticRows({
+      key,
+      rows: rules.map((r) =>
+        ids.includes(r.id)
+          ? { ...r, isActive: next, stopReason: kind === 'stop' ? reason : r.stopReason }
+          : r,
+      ),
+    })
+    setPendingToggle(null)
+    setToggleReason('')
     setToggleError('')
-    try {
-      let failed = 0
-      for (const id of ids) {
-        const result = kind === 'stop'
-          ? await api.autoReplies.stop(
-              id,
-              { reason: toggleReason.trim() === '' ? null : toggleReason.trim() },
-              crypto.randomUUID(),
-            )
-          : await api.autoReplies.update(id, { isActive: true })
-        if (!result.success) failed += 1
-      }
-      if (failed > 0) {
-        setToggleError(
-          kind === 'stop'
-            ? `${failed}件を停止できませんでした。状態を読み直してからお試しください。`
-            : `${failed}件を再開できませんでした。状態を読み直してからお試しください。`,
-        )
-        if (selectedAccountIdRef.current === requestAccountId) await load()
-        return
-      }
-      setPendingToggle(null)
-      setToggleReason('')
-      setSelectedIds(new Set())
-      if (selectedAccountIdRef.current === requestAccountId) await load()
-    } catch (reason) {
-      setToggleError(
-        reason instanceof ApiError && reason.status === 403
-          ? `${NO_WRITE_PERMISSION.label}。自動応答を止めたり動かしたりするには権限が要ります。`
-          : kind === 'stop'
-            ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
-            : '自動応答を再開できませんでした。状態を読み直してからお試しください。',
-      )
-    } finally {
-      setToggling(false)
-    }
+    runUndoable({
+      message:
+        ids.length === 1
+          ? next
+            ? '自動応答を再開しました'
+            : '自動応答を止めました'
+          : next
+            ? `${ids.length}件の自動応答を再開しました`
+            : `${ids.length}件の自動応答を止めました`,
+      commit: async () => {
+        let failed = 0
+        let forbidden = false
+        for (const id of ids) {
+          try {
+            const result = kind === 'stop'
+              ? await api.autoReplies.stop(id, { reason }, crypto.randomUUID())
+              : await api.autoReplies.update(id, { isActive: true })
+            if (!result.success) failed += 1
+          } catch (error) {
+            if (error instanceof ApiError && error.status === 403) forbidden = true
+            failed += 1
+          }
+        }
+        if (failed > 0) {
+          throw new Error(
+            forbidden
+              ? `${NO_WRITE_PERMISSION.label}。自動応答を止めたり動かしたりするには権限が要ります。`
+              : kind === 'stop'
+                ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
+                : '自動応答を再開できませんでした。状態を読み直してからお試しください。',
+          )
+        }
+      },
+      undo: () => setOptimisticRows(null),
+      failureMessage:
+        kind === 'stop'
+          ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
+          : '自動応答を再開できませんでした。状態を読み直してからお試しください。',
+      onCommitted: () => {
+        setOptimisticRows(null)
+        setSelectedIds(new Set())
+        if (selectedAccountIdRef.current === requestAccountId) void load()
+      },
+    })
   }
 
   const runDelete = async () => {
@@ -500,38 +540,51 @@ export default function AutoRepliesListV8() {
 
   /** フォルダへ移す（1件でもまとめてでも同じ窓）。 */
   const openMove = (ids: string[]) => {
+    if (ids.length === 0) return
     setMoveIds(ids)
     setMoveDraft('')
-    setMoveError('')
   }
-  const runMove = async () => {
-    if (!moveIds) return
-    setMoving(true)
-    setMoveError('')
-    try {
-      let failed = 0
-      for (const id of moveIds) {
-        const result = await api.autoReplies.update(id, { folderId: moveDraft === '' ? null : moveDraft })
-        if (!result.success) failed += 1
-      }
-      if (failed > 0) {
-        setMoveError(`${failed}件を移動できませんでした。状態を読み直してからお試しください。`)
-        await load()
-        return
-      }
-      setMoveIds(null)
-      setSelectedIds(new Set())
-      notifyToast('フォルダへ移しました', { tone: 'success' })
-      await load()
-    } catch (reason) {
-      setMoveError(
-        reason instanceof ApiError && reason.status === 403
-          ? `${NO_WRITE_PERMISSION.label}。${NO_WRITE_PERMISSION.note}`
-          : 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
-      )
-    } finally {
-      setMoving(false)
-    }
+  /*
+   * フォルダ移動は窓で行き先だけ選び、押した瞬間に描き換えて裏で保存する
+   * （★V8 サクサク感 B）。5秒のあいだ知らせの「元に戻す」で送らずに戻せる。
+   */
+  const runMove = () => {
+    if (!moveIds || moveIds.length === 0) return
+    const ids = moveIds
+    const requestAccountId = selectedAccountId
+    const folderId = moveDraft === '' ? null : moveDraft
+    const key = listContextKey
+    setOptimisticRows({
+      key,
+      rows: rules.map((r) => (ids.includes(r.id) ? { ...r, folderId } : r)),
+    })
+    setMoveIds(null)
+    runUndoable({
+      message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
+      commit: async () => {
+        let failed = 0
+        for (const id of ids) {
+          try {
+            const result = await api.autoReplies.update(id, { folderId })
+            if (!result.success) failed += 1
+          } catch {
+            failed += 1
+          }
+        }
+        if (failed > 0) throw new Error(`${failed}件のフォルダ移動に失敗しました`)
+      },
+      undo: () => setOptimisticRows(null),
+      failureMessage: 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
+      onCommitted: () => {
+        setOptimisticRows(null)
+        const moved = new Set(ids)
+        setSelectedIds((current) => new Set([...current].filter((id) => !moved.has(id))))
+        if (selectedAccountIdRef.current === requestAccountId) {
+          void load()
+          void loadFolders()
+        }
+      },
+    })
   }
 
   /*
@@ -595,28 +648,46 @@ export default function AutoRepliesListV8() {
    * （同点だけ1ずらし）で、既存の更新口を使う。ドラッグで任意の位置へ
    * 落としたときは、隣との交換を目的の位置まで繰り返す。
    */
-  const applyPriorityUpdates = async (updates: Array<{ id: string; priority: number }>) => {
-    setReordering(true)
+  /*
+   * 並べ替えは押した瞬間に描き換え、裏で番号を保存する（★V8 サクサク感 B）。
+   * 5秒のあいだ知らせの「元に戻す」で送らずに戻せる。読み上げには
+   * 動かした結果をそのまま知らせる（`moveNotice` は残す）。
+   */
+  const applyPriorityUpdates = (updates: Array<{ id: string; priority: number }>, notice: string) => {
+    if (updates.length === 0) return
+    const requestAccountId = selectedAccountId
+    const nextById = new Map(updates.map((u) => [u.id, u.priority] as const))
+    const key = listContextKey
+    setOptimisticRows({
+      key,
+      rows: rules.map((r) =>
+        nextById.has(r.id) ? { ...r, priority: nextById.get(r.id) as number } : r,
+      ),
+    })
+    setMoveNotice(notice)
     setActionError('')
-    try {
-      for (const update of updates) {
-        const result = await api.autoReplies.update(update.id, { priority: update.priority })
-        if (!result.success) throw new Error('reorder_failed')
-      }
-      await load()
-    } catch {
-      setActionError('順番を変えられませんでした。画面を読み直してからお試しください。')
-    } finally {
-      setReordering(false)
-    }
+    runUndoable({
+      message: '並び順を変えました',
+      commit: async () => {
+        for (const update of updates) {
+          const result = await api.autoReplies.update(update.id, { priority: update.priority })
+          if (!result.success) throw new Error('reorder_failed')
+        }
+      },
+      undo: () => setOptimisticRows(null),
+      failureMessage: '順番を変えられませんでした。画面を読み直してからお試しください。',
+      onCommitted: () => {
+        setOptimisticRows(null)
+        if (selectedAccountIdRef.current === requestAccountId) void load()
+      },
+    })
   }
 
   const keyboardMove = (id: string, direction: -1 | 1) => {
     const updates = movePriorityUpdates(sortedItems, id, direction)
-    if (!updates || reordering) return
-    const name = displayName(items.find((r) => r.id === id) ?? ({} as AutoReply))
-    setMoveNotice(`${name}を${direction === -1 ? '1つ上' : '1つ下'}へ動かしました`)
-    void applyPriorityUpdates(updates)
+    if (!updates) return
+    const name = displayName(rules.find((r) => r.id === id) ?? ({} as AutoReply))
+    applyPriorityUpdates(updates, `${name}を${direction === -1 ? '1つ上' : '1つ下'}へ動かしました`)
   }
 
   const dropOn = (targetId: string) => {
@@ -628,7 +699,7 @@ export default function AutoRepliesListV8() {
     const fromIndex = ordered.findIndex((r) => r.id === dragId)
     const targetIndex = ordered.findIndex((r) => r.id === targetId)
     setDragId(null)
-    if (fromIndex < 0 || targetIndex < 0 || reordering) return
+    if (fromIndex < 0 || targetIndex < 0) return
     // 目的の位置まで隣との交換を繰り返し、各行の最終の番号だけを送る。
     const working = [...ordered]
     const direction = targetIndex > fromIndex ? 1 : -1
@@ -643,8 +714,10 @@ export default function AutoRepliesListV8() {
       current += direction
     }
     const name = displayName(ordered[fromIndex])
-    setMoveNotice(`${name}の順番を変えました`)
-    void applyPriorityUpdates([...finalUpdates.entries()].map(([id, priority]) => ({ id, priority })))
+    applyPriorityUpdates(
+      [...finalUpdates.entries()].map(([id, priority]) => ({ id, priority })),
+      `${name}の順番を変えました`,
+    )
   }
 
   /* ===== 行の「…」（Pencil `IIesG`） ===== */
@@ -770,7 +843,7 @@ export default function AutoRepliesListV8() {
 
   /* ===== フォルダの列 ===== */
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: items.length },
+    { id: '', label: 'すべて', count: rules.length },
     ...folders.map((f) => ({
       id: f.id,
       label: f.name,
@@ -811,10 +884,10 @@ export default function AutoRepliesListV8() {
       key: 'active',
       title: '有効',
       icon: CircleCheck,
-      value: ready ? items.filter((r) => r.isActive).length : null,
+      value: ready ? rules.filter((r) => r.isActive).length : null,
       unit: '件',
       detail: ready
-        ? `動いていない ${items.filter((r) => !r.isActive).length}件`
+        ? `動いていない ${rules.filter((r) => !r.isActive).length}件`
         : LOAD_STATE_WORDS[visibleLoadState].label,
     },
     {
@@ -861,16 +934,68 @@ export default function AutoRepliesListV8() {
   const toggleTargetStale =
     pendingToggle !== null && pendingToggle.accountId !== selectedAccountId
 
+  /*
+   * 見出しの6列は実表と共有する。骨組み用に書き写すと直書きの見出し
+   * （`direct-th`）が二重に数えられるため、同じ要素を使い回す。
+   * 選択の列だけは実表が箱（Checkbox）付き・骨組みが共通 `Th` の空見出し。
+   */
+  const tableHeadCells = (
+    <>
+      <th aria-label="並び替え" />
+      <th>ルール</th>
+      <th>返すもの</th>
+      <th>今月動いた回数</th>
+      <th>状態</th>
+      <th aria-label="操作" />
+    </>
+  )
+
+  const loadingSkeleton = (
+    <table className={styles.table}>
+      <colgroup>
+        <col style={{ width: 40 }} />
+        <col style={{ width: 44 }} />
+        <col />
+        <col style={{ width: '22%' }} />
+        <col style={{ width: 96 }} />
+        <col style={{ width: 96 }} />
+        <col style={{ width: 44 }} />
+      </colgroup>
+      <thead>
+        <tr>
+          <Th aria-label="選択" />
+          {tableHeadCells}
+        </tr>
+      </thead>
+      <tbody>
+        {[0, 1, 2, 3, 4].map((n) => (
+          <tr key={n}>
+            <td />
+            <td />
+            <td>
+              <Skeleton width={200} height={16} />
+              <span style={{ display: 'block', height: 4 }} aria-hidden="true" />
+              <Skeleton width={140} height={12} />
+            </td>
+            <td>
+              <Skeleton width={120} height={12} />
+            </td>
+            <td className={styles.countCell}>
+              <Skeleton width={56} height={16} />
+            </td>
+            <td>
+              <Skeleton width={64} height={24} className="rounded-pill" />
+            </td>
+            <td />
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+
   const listBody = visibleLoadState === 'loading' ? (
-    <div className={styles.skeletonRows} aria-label="読み込み中">
-      {[0, 1, 2, 3].map((i) => (
-        <div key={i} className={styles.skeletonRow}>
-          <span className={styles.skeletonDot} />
-          <span className={styles.skeletonBar} />
-          <span className={styles.skeletonBar} style={{ flex: 0.6 }} />
-          <span className={styles.skeletonBar} style={{ flex: 0.4 }} />
-        </div>
-      ))}
+    <div className={styles.tableWrap} aria-busy="true" aria-label="読み込んでいます">
+      <DelayedSkeleton loading skeleton={loadingSkeleton} />
     </div>
   ) : visibleLoadState === 'error' || visibleLoadState === 'forbidden' ? (
     <div className={styles.stateCard}>
@@ -949,12 +1074,7 @@ export default function AutoRepliesListV8() {
                   aria-label="このページのルールをすべて選択"
                 />
               </th>
-              <th aria-label="並び替え" />
-              <th>ルール</th>
-              <th>返すもの</th>
-              <th>今月動いた回数</th>
-              <th>状態</th>
-              <th aria-label="操作" />
+              {tableHeadCells}
             </tr>
           </thead>
           <tbody>
@@ -998,7 +1118,7 @@ export default function AutoRepliesListV8() {
                   >
                     <ReorderGrip
                       label={name}
-                      disabled={!canEdit || sortKey !== 'priority' || reordering}
+                      disabled={!canEdit || sortKey !== 'priority'}
                       disabledReason={
                         !canEdit
                           ? NO_MANAGE_NOTE
@@ -1200,7 +1320,7 @@ export default function AutoRepliesListV8() {
           <Button
             type="button"
             variant="secondary"
-            disabled={!canEdit || toggling || stoppableIds.length === 0}
+            disabled={!canEdit || stoppableIds.length === 0}
             title={
               !canEdit
                 ? NO_MANAGE_NOTE
@@ -1220,7 +1340,7 @@ export default function AutoRepliesListV8() {
           <Button
             type="button"
             variant="secondary"
-            disabled={!canEdit || toggling || resumableIds.length === 0}
+            disabled={!canEdit || resumableIds.length === 0}
             title={
               !canEdit
                 ? NO_MANAGE_NOTE
@@ -1239,7 +1359,7 @@ export default function AutoRepliesListV8() {
           <Button
             type="button"
             variant="secondary"
-            disabled={!canEdit || moving}
+            disabled={!canEdit}
             title={!canEdit ? NO_MANAGE_NOTE : undefined}
             onClick={() => openMove([...selectedIds])}
           >
@@ -1354,15 +1474,13 @@ export default function AutoRepliesListV8() {
             : '止めているあいだ、この自動応答は動きません。いつ・誰が・なぜ止めたかが記録に残り、あとから再開できます。'
         }
         confirmLabel={pendingToggle?.kind === 'resume' ? '再開する' : '止める'}
-        busy={toggling}
         error={toggleError}
         onCancel={() => {
-          if (toggling) return
           setToggleError('')
           setToggleReason('')
           setPendingToggle(null)
         }}
-        onConfirm={toggleTargetStale ? undefined : () => void runToggle()}
+        onConfirm={toggleTargetStale ? undefined : () => runToggle()}
       >
         {pendingToggle?.kind === 'stop' && (
           <div>
@@ -1461,18 +1579,14 @@ export default function AutoRepliesListV8() {
         open={moveIds !== null}
         title={
           moveIds && moveIds.length === 1
-            ? `「${displayName(items.find((r) => r.id === moveIds[0]) ?? ({} as AutoReply))}」のフォルダを移す`
+            ? `「${displayName(rules.find((r) => r.id === moveIds[0]) ?? ({} as AutoReply))}」のフォルダを移す`
             : `${moveIds?.length ?? 0}件の自動応答をフォルダへ移す`
         }
         description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
-        confirmLabel={moving ? '移動中…' : '移動する'}
-        busy={moving}
-        error={moveError}
-        onConfirm={() => void runMove()}
+        confirmLabel="移動する"
+        onConfirm={() => runMove()}
         onCancel={() => {
-          if (moving) return
           setMoveIds(null)
-          setMoveError('')
         }}
       >
         <div className={styles.moveBody}>
@@ -1482,7 +1596,6 @@ export default function AutoRepliesListV8() {
             size="full"
             value={moveDraft}
             onChange={(value) => setMoveDraft(value)}
-            disabled={moving}
             options={[
               { value: '', label: '未分類' },
               ...folders.map((folder) => ({ value: folder.id, label: folder.name })),

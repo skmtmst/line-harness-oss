@@ -433,6 +433,8 @@ export default function ScenarioDetailV8({
         ? '確認できません'
         : (folders.find((f) => f.id === scenario.folderId)?.name ?? '名前を確認できません')
   const [saving, setSaving] = useState(false)
+  /* 保存ボタンの「✓ 保存しました」（★V8 サクサク感 B）。変えたら消す。 */
+  const [saveDone, setSaveDone] = useState(false)
 
   const router = useRouter()
   const [duplicating, setDuplicating] = useState(false)
@@ -943,6 +945,7 @@ export default function ScenarioDetailV8({
       if (res.success) {
         setEditing(false)
         setRenameOpen(false)
+        setSaveDone(true)
         loadScenario(true)
       } else {
         setError(res.error)
@@ -1037,6 +1040,10 @@ export default function ScenarioDetailV8({
         editForm.description !== (scenario.description ?? '') ||
         editForm.folderId !== (scenario.folderId ?? '')),
   )
+
+  useEffect(() => {
+    if (editDirty) setSaveDone(false)
+  }, [editDirty])
 
   /** 追従バーの「キャンセル」。未保存があれば戻し、なければ一覧へ。 */
   const handleCancel = () => {
@@ -2212,6 +2219,7 @@ export default function ScenarioDetailV8({
                   onClick={() => void handleSaveScenario()}
                   disabled={!editDirty || saving || !canEdit}
                   busy={saving}
+                  done={saveDone}
                   title={!canEdit ? readonlyReason : !editDirty ? '変えたところがありません' : undefined}
                 >
                   変更を保存
@@ -2684,6 +2692,7 @@ export default function ScenarioDetailV8({
               onClick={() => void handleSaveScenario()}
               disabled={!editDirty || saving || !canEdit}
               busy={saving}
+              done={saveDone}
               title={!canEdit ? readonlyReason : !editDirty ? '変えたところがありません' : undefined}
             >
               保存する
