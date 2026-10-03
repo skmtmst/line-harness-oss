@@ -22,6 +22,7 @@ import {
   type FriendAddRuleRow,
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
+import { CommonVarResolutionFailedError, expandSendCommonVars } from '../services/interpolation-context.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -1585,7 +1586,26 @@ friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 
     }
     const account = await getLineAccountById(c.env.DB, accountId);
     if (!account) return c.json({ success: false, error: 'LINEアカウントが見つかりません' }, 400);
-    const text = `【テスト配信】\n${definition.messageText}`;
+    // 共通情報の差し込みは厳格に解く（N-189）。解けなければ送らない。
+    let resolvedBody: string;
+    try {
+      resolvedBody = await expandSendCommonVars(
+        c.env.DB,
+        definition.messageText,
+        { kind: 'test_send', id: row.id },
+        { lineAccountId: accountId },
+      );
+    } catch (error) {
+      if (error instanceof CommonVarResolutionFailedError) {
+        return c.json({
+          success: false,
+          code: 'UNRESOLVED_TEMPLATE_VARIABLES',
+          error: `共通情報を解決できません: ${error.failures.map((f) => `{{var.${f.varKey}}}`).join(', ')}`,
+        }, 422);
+      }
+      throw error;
+    }
+    const text = `【テスト配信】\n${resolvedBody}`;
     try {
       await new LineClient(account.channel_access_token)
         .pushMessage(friend.line_user_id, [{ type: 'text', text }], idempotencyKey);

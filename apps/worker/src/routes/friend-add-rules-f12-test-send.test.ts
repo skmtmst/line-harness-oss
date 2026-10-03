@@ -164,6 +164,39 @@ describe('F12: 本人だけへのテスト送信', () => {
     expect(to).toBe('UOWNERLINEUSERID000000000000000001');
   });
 
+  it('解けない共通情報がある本文は送らず422', async () => {
+    const definition = JSON.stringify({
+      routeIds: [],
+      scenarioId: null,
+      messageType: 'text',
+      messageText: '残高は{{var.no_such_var}}です',
+      timing: 'immediate',
+      actions: [],
+      friendCondition: '',
+      activeFrom: null,
+      activeUntil: null,
+    });
+    testDb.raw.prepare(
+      `INSERT INTO friend_add_rules
+        (id, line_account_id, friend_kind, name, priority, status, current_version_id, created_at, updated_at)
+       VALUES ('rule-12c', 'account-1', 'first_time', 'F12の未解決', 3, 'draft', 'version-12c',
+               '2026-10-01T09:00:00+09:00', '2026-10-01T09:00:00+09:00')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO friend_add_rule_versions
+        (id, rule_id, version_number, definition_snapshot, status)
+       VALUES ('version-12c', 'rule-12c', 1, ?, 'draft')`,
+    ).run(definition);
+    const target = buildApp(testDb.db);
+    const res = await target.instance.request(
+      '/api/friend-add-rules/rule-12c/test-send?account_id=account-1',
+      jsonRequest('POST', {}, { 'Idempotency-Key': 'f12-test-key-0005' }),
+      target.bindings,
+    );
+    expect(res.status).toBe(422);
+    expect(lineClientMocks.pushMessage).not.toHaveBeenCalled();
+  });
+
   it('本文が空の版は送らず422', async () => {
     const definition = JSON.stringify({
       routeIds: [],
