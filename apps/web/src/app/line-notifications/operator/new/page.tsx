@@ -24,6 +24,8 @@ import {
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import NewOperatorNotificationV8 from './operator-new-v8'
 import {
   DEFAULT_OPERATOR_EVENT_TYPE,
   OPERATOR_EVENT_OPTIONS,
@@ -525,11 +527,20 @@ function NewOperatorNotificationInner() {
   )
 }
 
+/*
+ * ★V8-B: data-theme="v8" のときだけ新しい作成画面（`gjUz3`）を出す。
+ * v7 の見た目は NewOperatorNotificationInner のまま変えない。
+ */
+function NewOperatorNotificationPageSwitch() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <NewOperatorNotificationV8 /> : <NewOperatorNotificationInner />
+}
+
 // useSearchParams を使うので、静的生成の境目に Suspense が要る。
 export default function NewOperatorNotificationPage() {
   return (
     <Suspense>
-      <NewOperatorNotificationInner />
+      <NewOperatorNotificationPageSwitch />
     </Suspense>
   )
 }
