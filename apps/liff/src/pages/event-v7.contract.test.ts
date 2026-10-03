@@ -192,9 +192,8 @@ describe('詳細の満席と上限のお知らせ (m11b 仕上げ)', () => {
     expect(event).toContain('text-ink-faint');
   });
 
-  it('選んだ時間は薄い緑の地＋濃い緑の枠', () => {
-    expect(event).toContain('bg-ok-bg');
-    expect(event).toContain('border-accent-deep');
+  it('選んだ時間は濃い緑の地＋白文字 (gVjiC・予約の日時選びと同じ形)', () => {
+    expect(event).toContain('bg-liff-primary');
     expect(event).toContain('setSelectedId(s.id)');
   });
 

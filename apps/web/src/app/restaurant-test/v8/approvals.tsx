@@ -147,6 +147,7 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
     <Dialog
       open={item !== null}
       title="差し戻しますか？"
+      designNode="n4j0Rm"
       onCancel={onCancel}
       footer={(
         <div className={styles.dialogActions}>

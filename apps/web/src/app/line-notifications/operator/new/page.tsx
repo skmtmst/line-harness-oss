@@ -3,9 +3,11 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
-import { ArrowRight, Building2 } from 'lucide-react'
+import { ArrowRight, Building2, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import Chip from '@/components/shared/chip'
+import Dialog from '@/components/shared/dialog'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
@@ -303,18 +305,34 @@ function NewOperatorNotificationInner() {
     }
   }
 
+  // 板 `sDXNy`「このお知らせを公開しますか？」。保存してから中身を見て決める。
+  const [confirmPublish, setConfirmPublish] = useState(false)
+  const [publishRuleId, setPublishRuleId] = useState<string | null>(null)
+  const [publishError, setPublishError] = useState('')
+
   const publish = async () => {
     if (!selectedAccountId || saving || ruleLoading) return
     // 保存後に直した分も出す。古い内容のまま出さない。
     const ruleId = await saveDraft()
     if (!ruleId) return
-    setSaving(true); setError('')
+    setPublishRuleId(ruleId)
+    setPublishError('')
+    setConfirmPublish(true)
+  }
+
+  const publishTargets = recipients?.items.filter((item) => recipientIds.includes(item.id)) ?? []
+  const publishLineCount = publishTargets.filter((item) => item.channels.line).length
+
+  const confirmPublishSend = async () => {
+    if (!selectedAccountId || !publishRuleId || saving) return
+    setSaving(true); setPublishError('')
     try {
-      await api.lineNotifications.operatorRules.publish(ruleId, selectedAccountId)
-      router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(ruleId)}`)
+      await api.lineNotifications.operatorRules.publish(publishRuleId, selectedAccountId)
+      setConfirmPublish(false)
+      router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(publishRuleId)}`)
     } catch (caught) {
       // M032: 生の `API error: NNN` を出さず、原因どおりに言い分ける。
-      setError(describeApiFailure(caught, '公開', {
+      setPublishError(describeApiFailure(caught, '公開', {
         forbidden: 'このLINEアカウントのお知らせを公開する権限がありません。',
       }))
     } finally { setSaving(false) }
@@ -463,6 +481,46 @@ function NewOperatorNotificationInner() {
           <Button onClick={() => void publish()} disabled={saving || ruleLoading} variant="primary">運用者へのお知らせを公開</Button>
         </>}
       />
+      <Dialog
+        open={confirmPublish}
+        title="このお知らせを公開しますか？"
+        cancelLabel="戻って直す"
+        confirmLabel={publishLineCount > 0 ? `公開して${publishLineCount}人にLINEで送る` : '公開する'}
+        confirmIcon={<Send size={16} aria-hidden="true" />}
+        busy={saving}
+        error={publishError || undefined}
+        designNode="sDXNy"
+        onConfirm={() => void confirmPublishSend()}
+        onCancel={() => { if (!saving) setConfirmPublish(false) }}
+      >
+        <div className="flex flex-col gap-4">
+          <dl className="grid gap-1.5 rounded-card bg-canvas-sunken px-4 py-3">
+            <div className="flex gap-3">
+              <dt className="w-24 shrink-0 text-caption text-ink-faint">お知らせ</dt>
+              <dd className="text-caption font-medium text-ink">{name.trim() || 'お知らせ名'}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-24 shrink-0 text-caption text-ink-faint">宛先</dt>
+              <dd className="text-caption font-medium text-ink">{publishTargets.length}人</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-24 shrink-0 text-caption text-ink-faint">LINEが届く人</dt>
+              <dd className="text-caption font-medium text-ink">
+                {publishLineCount}人{publishTargets.length - publishLineCount > 0 ? `（${publishTargets.length - publishLineCount}人はLINE未登録）` : ''}
+              </dd>
+            </div>
+          </dl>
+          <ul className="grid gap-1.5">
+            {publishTargets.map((target) => (
+              <li key={target.id} className="flex items-center gap-3 border-b border-hairline pb-1.5">
+                <span className="min-w-0 flex-1 truncate text-caption text-ink">{target.name}</span>
+                {target.channels.line ? <Chip tone="ok">LINE</Chip> : <Chip tone="neutral">画面だけ</Chip>}
+              </li>
+            ))}
+          </ul>
+          <p className="text-caption text-ink-secondary">LINE未登録の人には、管理画面のお知らせだけで届きます。</p>
+        </div>
+      </Dialog>
       {/* U063: 選び欄は欄いっぱいに広げる（部品の size="full" を使う）。 */}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したお知らせ" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>

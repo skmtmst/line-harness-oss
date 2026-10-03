@@ -1448,14 +1448,15 @@ function EmergencyPageInner() {
     : tab === 'control' && theme === 'v8'
       ? <Button variant="danger" type="button" onClick={() => controlV8Ref.current?.openStop()}>緊急停止する</Button>
       : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
-  return <div className={`flex flex-col gap-4 ${tab === 'control' ? '' : 'v8-ro-notifications-page'}`} data-design-node={theme === 'v8' && tab !== 'control' ? (tab === 'health' ? 'Y4LkX1' : 'I2V65v') : undefined}>{theme === 'v8' && tab !== 'control' && <ReadonlyHeaderV8 title="運用状態" description="自動確認の結果と、止めた・戻した記録、管理画面の更新を確認します。" />}<OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-semibold text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-semibold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} onManualRunSettled={settleManualRun} />}{
+  return <div className={`flex flex-col gap-4 ${tab === 'control' ? '' : 'v8-ro-notifications-page'}`} data-design-node={theme === 'v8' ? (tab === 'health' ? 'Y4LkX1' : tab === 'history' ? 'I2V65v' : tab === 'control' ? 'OHwbU' : undefined) : undefined}>{theme === 'v8' && tab !== 'control' && <ReadonlyHeaderV8 title="運用状態" description="自動確認の結果と、止めた・戻した記録、管理画面の更新を確認します。" />}<OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-semibold text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-semibold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} onManualRunSettled={settleManualRun} />}{tab === 'control' && (theme === 'v8'
             /*
              * ★V8-B: data-theme="v8" のときだけ新しい制御タブ（`OHwbU`）を出す。
              * v7 の見た目は EmergencyControlPanel のまま変えない。
+             * 外枠の data-design-node（土台側）と中の板の node（この画面側）の
+             * 両方を残す。外が板全体、内が操作部という入れ子になる。
              */
-            tab === 'control' && (theme === 'v8'
-              ? <EmergencyControlV8 ref={controlV8Ref} accounts={accounts} />
-              : <EmergencyControlPanel accounts={accounts} />)}{tab === 'history' && <HistoryPanel />}</div>
+            ? <EmergencyControlV8 ref={controlV8Ref} accounts={accounts} />
+            : <EmergencyControlPanel accounts={accounts} />)}{tab === 'history' && <HistoryPanel />}</div>
 }
 
 function EmergencyPage() {
