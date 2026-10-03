@@ -10,25 +10,12 @@
  * 触る頻度が低いので、開いたときだけ出す。
  */
 
-import type { FormAction, FormOptions } from '@line-crm/shared'
+import type { FormOptions } from '@line-crm/shared'
 import styles from './options-dialog.module.css'
-import ActionEditor from './action-editor'
-import { describeAction } from './form-update-summary'
-import { fieldInput, type FormRefs } from './form-refs'
+import { AfterActionsSection, ReceptionSection, ThanksSection, WordsSection } from './options-sections'
+import type { FormRefs } from './form-refs'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import DateTimeField from '@/components/shared/date-time-field'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
-
-/**
- * 期限を初めてONにしたときの初期値。日本時間で「7日後の23:59」。
- * 決め打ちの日付を表示だけに置くと、入れた覚えのない日が
- * そのまま保存されてしまうため、ONにした時点で実値を入れる。
- */
-function defaultDeadlineEndsAt(): string {
-  const jst = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 9 * 60 * 60 * 1000)
-  return `${jst.toISOString().slice(0, 10)}T23:59`
-}
 
 export default function OptionsDialog({
   value,
@@ -79,83 +66,11 @@ export default function OptionsDialog({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-          <section>
-            <h3 className="text-ink text-sm font-bold">答え終わったあと</h3>
-            <div className="bg-canvas-sunken mt-3 rounded-control p-4">
-              {/*
-                R26: 動作の欄の最小幅680をやめる。390pxの画面ではタグ選択と
-                削除が画面の外へ出ていた。幅いっぱいに広げ、中の行は折り返す。
-              */}
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <p className="text-ink text-xs font-medium">実行すること</p>
-                <details className="group min-w-0">
-                  <summary className="border-accent text-accent-deep rounded-control inline-block cursor-pointer list-none border px-3 py-2 text-xs font-medium">アクションを設定</summary>
-                  <div className="bg-canvas mt-3 min-w-0 p-3 shadow-float">
-                    <ActionEditor value={value.afterActions ?? []} onChange={(afterActions: FormAction[]) => patch({ afterActions })} refs={refs} />
-                  </div>
-                </details>
-              </div>
-              {(value.afterActions ?? []).length === 0 ? (
-                <p className="text-ink-secondary mt-2 text-sm">実行することはまだありません</p>
-              ) : (
-                <ul className="text-ink-secondary mt-2 list-disc space-y-0.5 pl-5 text-sm">
-                  {(value.afterActions ?? []).map((action, index) => (
-                    <li key={index}>{describeAction(action, refs)}</li>
-                  ))}
-                </ul>
-              )}
-              <p className="text-ink-faint mt-2 text-xs">カルーセルの選択肢・質問の答え・自動応答からも、同じ画面が開きます</p>
-            </div>
-          </section>
-
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FieldLine label="答えたあとに開くページ（任意）"><input type="url" value={value.thanksUrl ?? ''} onChange={(e) => patch({ thanksUrl: e.target.value || null })} placeholder="https://..." className={fieldInput} /></FieldLine>
-            <FieldLine label="ページを使わないときに出す文"><input value={value.thanksText ?? ''} onChange={(e) => patch({ thanksText: e.target.value })} placeholder="ご回答ありがとうございました。" className={fieldInput} /></FieldLine>
-          </div>
-
-          <section className="mt-3">
-            <h3 className="text-ink text-sm font-bold">受付のきまり</h3>
-            <div className="mt-2 grid gap-2">
-              <OptionCard checked={value.oncePerFriend?.enabled ?? false} onChange={(enabled) => patch({ oncePerFriend: { ...value.oncePerFriend, enabled } })} label="1人1回だけ答えられるようにする" note="2回目に開いた人には「回答済みです」と出ます" />
-              <OptionCard checked={value.restorePrevious ?? false} onChange={(restorePrevious) => patch({ restorePrevious })} label="前回の答えを最初から入れておく" note="同じ人が答え直すとき、前の内容が入った状態で開きます。別の端末では戻せません" />
-              <OptionCard checked={value.deadline?.enabled ?? false} onChange={(enabled) => patch({ deadline: { ...value.deadline, enabled, ...(enabled && !value.deadline?.endsAt ? { endsAt: defaultDeadlineEndsAt() } : {}) } })} label="受付の期限を決める" note="期限を過ぎたら、開いても「受付は終了しました」と出ます" />
-              <OptionCard checked={value.confirmDialog?.enabled ?? false} onChange={(enabled) => patch({ confirmDialog: { ...value.confirmDialog, enabled } })} label="送信する前に確認画面を出す" note="入力ミスを減らせます。ブロックが多いフォームで効きます" />
-            </div>
-          </section>
-
-          {value.deadline?.enabled && <div className="bg-accent-soft mt-2 grid grid-cols-1 gap-3 rounded-control p-3 sm:grid-cols-2">
-            <FieldLine label="受付の期限"><DateTimeField aria-label="受付の期限" value={value.deadline.endsAt ?? ''} onChange={(v) => patch({ deadline: { ...value.deadline, enabled: true, endsAt: v } })} /></FieldLine>
-            <FieldLine label="期限を過ぎた人に出す文"><input type="text" value={value.deadline.message ?? ''} onChange={(e) => patch({ deadline: { ...value.deadline, enabled: true, message: e.target.value } })} className={fieldInput} /></FieldLine>
-          </div>}
-
-          <section className="mt-4">
-            <h3 className="text-ink text-sm font-bold">見た目の言葉</h3>
-            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3"><FieldLine label="ページの題名">
-            <input
-              type="text"
-              value={value.pageTitle ?? ''}
-              onChange={(e) => patch({ pageTitle: e.target.value || null })}
-              placeholder="回答フォーム"
-              className={fieldInput}
-            />
-          </FieldLine>
-
-          <FieldLine label="送信ボタンの文字">
-            <div>
-              <input
-                type="text"
-                value={value.submitLabel ?? ''}
-                onChange={(e) => patch({ submitLabel: e.target.value })}
-                placeholder="送信する"
-                className={fieldInput}
-                style={{ maxWidth: '10rem' }}
-                aria-label="送信ボタンの文字"
-              />
-            </div>
-          </FieldLine>
-          <FieldLine label="ページ送りの文字"><div className="flex gap-2"><input value={value.prevLabel ?? ''} onChange={(e) => patch({ prevLabel: e.target.value })} className={fieldInput} aria-label="前へボタンの文字" /><input value={value.nextLabel ?? ''} onChange={(e) => patch({ nextLabel: e.target.value })} className={fieldInput} aria-label="次へボタンの文字" /></div></FieldLine></div>
-          </section>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-6">
+          <ThanksSection value={value} onChange={patch} />
+          <AfterActionsSection value={value} refs={refs} onChange={patch} />
+          <ReceptionSection value={value} onChange={patch} />
+          <WordsSection value={value} onChange={patch} />
         </div>
 
         <div className="border-hairline flex shrink-0 justify-end gap-2 border-t px-5 py-3">
@@ -166,12 +81,4 @@ export default function OptionsDialog({
       </div>
     </div>
   )
-}
-
-function OptionCard({ checked, onChange, label, note }: { checked: boolean; onChange: (next: boolean) => void; label: string; note: string }) {
-  return <Checkbox checked={checked} onCheckedChange={onChange} description={note} className="rounded-control border border-hairline p-3">{label}</Checkbox>
-}
-
-function FieldLine({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label><span className="text-ink-secondary mb-1 block text-xs font-medium">{label}</span>{children}</label>
 }

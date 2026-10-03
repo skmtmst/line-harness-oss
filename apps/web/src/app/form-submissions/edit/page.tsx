@@ -34,7 +34,7 @@ import {
 import { normalizeSectionName } from '@/components/forms/section-name'
 import { api, ApiError, fetchApi } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { Field, inputClass } from '@/components/shared/form-controls'
+import { Field, inputClass, TextArea, TextInput } from '@/components/shared/form-controls'
 import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
 import FormPreview from '@/components/forms/form-preview'
 import FormDesignSettings from './form-design-settings'
@@ -45,6 +45,9 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import SaveConflictBar from '@/components/shared/save-conflict-bar'
 import TargetMissing from '@/components/shared/target-missing'
+import { AfterActionsSection, ReceptionSection, ThanksSection, WordsSection } from '@/components/forms/options-sections'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import Toggle from '@/components/shared/toggle'
 import { conflictMessage } from './form-conflict-message'
 import { formSavedContentMatches, type FormSavedContent } from './form-save-reconcile'
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
@@ -113,6 +116,9 @@ function FormEditInner() {
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
   const [showOptions, setShowOptions] = useState(editorTab === 'options')
+  const theme = useAdminTheme()
+  /** V8 の3つのタブ（中身・答え終わったあと・受付と見た目）。v7 の ?tab= とは別に動く。 */
+  const [v8Tab, setV8Tab] = useState<'content' | 'after' | 'appearance'>('content')
   const [showAddMenu, setShowAddMenu] = useState(false)
   const addMenuButtonRef = useRef<HTMLButtonElement>(null)
   const [loading, setLoading] = useState(true)
@@ -808,6 +814,287 @@ function FormEditInner() {
     )
   }
 
+  if (theme === 'v8') {
+    // 部品として置くと親の描き直しごとに入力が作り直されてしまうため、
+    // そのまま呼ぶ（フックは使っていない）。
+    return renderV8Edit()
+  }
+
+  function renderV8Edit() {
+    const node = v8Tab === 'content' ? 'm1cWEy' : v8Tab === 'after' ? 'XXFT4' : 'tpRRT'
+    const patchOptions = (next: Partial<FormOptions>) => {
+      setLayout((prev) => ({ ...prev, options: { ...prev.options, ...next } }))
+    }
+    const copyAnswerUrl = () => {
+      if (!answerUrl) return
+      void navigator.clipboard
+        .writeText(answerUrl)
+        .then(() => setNotice('URLをコピーしました'))
+        .catch(() => window.prompt('コピーしてください:', answerUrl))
+    }
+    return (
+      <div className="flex flex-col gap-4" data-design-node={node}>
+        <div>
+          <Link href="/form-submissions" className="text-action text-sm">
+            ←回答フォームへ
+          </Link>
+          <h1 className="text-ink mt-1 text-xl font-bold">{name || 'フォーム名未設定'}</h1>
+          {dirty && publishedVersionId && (
+            <p className="text-ink-secondary mt-1 text-xs">下書き・公開中の版と違うところがあります</p>
+          )}
+        </div>
+
+        <div role="tablist" aria-label="編集する内容" className="border-hairline flex gap-4 border-b text-sm">
+          {(
+            [
+              { key: 'content', label: '中身' },
+              { key: 'after', label: '答え終わったあと' },
+              { key: 'appearance', label: '受付と見た目' },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={v8Tab === tab.key}
+              onClick={() => setV8Tab(tab.key)}
+              className={v8Tab === tab.key ? 'text-ink border-ink border-b-2 pb-2 font-bold' : 'text-ink-secondary pb-2'}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {loading || !formLoaded ? (
+          <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+            読み込み中...
+          </div>
+        ) : (
+          <div className="grid items-start gap-4 xl:grid-cols-3">
+            <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
+              {v8Tab === 'content' && (
+                <>
+                  <section className="bg-canvas rounded-card border-hairline border p-4">
+                    <h2 className="text-ink text-sm font-bold">フォームのこと</h2>
+                    <div className="mt-3 grid gap-3">
+                      <div className="grid items-end gap-3 sm:grid-cols-2">
+                        <Field label="フォーム名" htmlFor="v8-fm-name" required>
+                          <TextInput id="v8-fm-name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+                        </Field>
+                        <div>
+                          <span className="text-ink-secondary mb-1 block text-xs font-medium">公開状態</span>
+                          <Toggle checked={isActive} onChange={setIsActive} label="公開状態" />
+                          <span className="text-ink-secondary text-xs">{isActive ? '公開中' : '停止中'}</span>
+                        </div>
+                      </div>
+                      <Field label="説明（覚え書き・お客さまには出ません）" htmlFor="v8-fm-desc">
+                        <TextArea id="v8-fm-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} className="resize-y" />
+                      </Field>
+                      <div className="flex flex-wrap items-end gap-3">
+                        <Field label="回答したときに付けるタグ" htmlFor="v8-fm-tag" note="このフォームに答えた人を、あとから絞り込めます。">
+                          <Select
+                            id="v8-fm-tag"
+                            aria-label="回答したときに付けるタグ"
+                            value={onSubmitTagId}
+                            onChange={(value) => setOnSubmitTagId(value)}
+                            options={[{ value: '', label: '— 付けない —' }, ...refs.tags.map((t) => ({ value: t.id, label: t.name }))]}
+                            size="full"
+                          />
+                        </Field>
+                        <Link href={`/form-submissions/responses?id=${encodeURIComponent(id)}`} className="text-action text-sm">
+                          回答 {submitCount}件
+                        </Link>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="bg-canvas rounded-card border-hairline border p-4">
+                    <h2 className="text-ink text-sm font-bold">ページ</h2>
+                    <p className="text-ink-faint mt-1 text-xs">ページごとに「次へ」で進みます</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {layout.sections.map((section, index) => (
+                        <button
+                          key={section.id}
+                          type="button"
+                          onClick={() => { setTab(index); setSelectedBlockId(null) }}
+                          onDoubleClick={() => renameSection(index)}
+                          title="ダブルクリックで名前を変えられます"
+                          className={index === tab ? 'rounded-pill bg-ink text-canvas px-3 py-1.5 text-sm font-medium' : 'rounded-pill bg-canvas-sunken text-ink-secondary px-3 py-1.5 text-sm'}
+                        >
+                          {index + 1} {section.name}
+                        </button>
+                      ))}
+                      <button type="button" onClick={addSection} className="text-ink-secondary px-2 py-1.5 text-sm">
+                        ＋ ページを足す
+                      </button>
+                    </div>
+                  </section>
+
+                  <section className="bg-canvas rounded-card border-hairline border p-4">
+                    <h2 className="text-ink text-sm font-bold">ページ{tab + 1}のブロック</h2>
+                    <p className="text-ink-faint mt-1 text-xs">つまみで並べ替え。押すと設定が開きます</p>
+                    <div data-design="Inspector" className="mt-3 space-y-3">
+                      {blocks.length === 0 ? (
+                        <p className="text-ink-faint bg-canvas rounded-card border-hairline border border-dashed p-8 text-center text-sm">
+                          「ブロックを足す」から作ってください
+                        </p>
+                      ) : (
+                        blocks.map((block, index) => (
+                          <BlockEditor
+                            key={block.id}
+                            block={block}
+                            index={index}
+                            sections={layout.sections}
+                            refs={refs}
+                            inHeader={tab === HEADER_TAB}
+                            selected={block.id === selectedBlockId}
+                            onSelect={() => setSelectedBlockId(block.id)}
+                            onChange={(patch) => patchBlock(block.id, patch)}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </section>
+
+                  <section className="bg-canvas rounded-card border-hairline border p-4">
+                    <h2 className="text-ink text-sm font-bold">ブロックを足す</h2>
+                    {BLOCK_GROUPS.map((group) => (
+                      <div key={group.title} className="mt-3">
+                        <h3 className="text-ink-secondary text-xs font-medium">{group.title}</h3>
+                        <div className="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          {(group.inputTypes
+                            ? group.inputTypes.map((input) => BLOCK_MENU.find((m) => m.type === input))
+                            : (group.decoLabels ?? []).map((label) => BLOCK_MENU.find((m) => m.type === undefined && m.label === label))
+                          )
+                            .filter((m): m is (typeof BLOCK_MENU)[number] => Boolean(m))
+                            .map((m) => (
+                              <Button
+                                key={m.label}
+                                variant="secondary"
+                                onClick={() => addBlock(m.kind, m.type)}
+                                className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left whitespace-normal"
+                              >
+                                <span className="block font-medium">{m.label}</span>
+                                <span className="text-ink-faint block text-xs font-normal">{BLOCK_HINTS[m.type ?? m.label] ?? ''}</span>
+                              </Button>
+                            ))}
+                        </div>
+                      </div>
+                    ))}
+                  </section>
+                </>
+              )}
+
+              {v8Tab === 'after' && (
+                <div className="flex flex-col gap-4">
+                  <ThanksSection value={layout.options} onChange={patchOptions} />
+                  <AfterActionsSection value={layout.options} refs={refs} onChange={patchOptions} />
+                </div>
+              )}
+
+              {v8Tab === 'appearance' && (
+                <div className="flex flex-col gap-4">
+                  <ReceptionSection value={layout.options} onChange={patchOptions} />
+                  <WordsSection value={layout.options} onChange={patchOptions} />
+                  <section className="bg-canvas rounded-card border-hairline border p-4">
+                    <h2 className="text-ink text-sm font-bold">色と文字</h2>
+                    <p className="text-ink-faint mt-1 text-xs">お客さまの画面の色・書体・背景を変えます</p>
+                    <div className="mt-3">
+                      <FormDesignSettings
+                        formId={id}
+                        accountId={selectedAccountId}
+                        value={layout.options.theme}
+                        ogTitle={ogTitle}
+                        ogDescription={ogDescription}
+                        ogImageUrl={ogImageUrl}
+                        onChange={(theme) => patchOptions({ theme })}
+                        onOgTitleChange={setOgTitle}
+                        onOgDescriptionChange={setOgDescription}
+                        onOgImageUrlChange={setOgImageUrl}
+                      />
+                    </div>
+                  </section>
+                </div>
+              )}
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-4">
+              <section className="bg-canvas rounded-card border-hairline border p-4">
+                <h2 className="text-ink text-sm font-bold">回答用URL</h2>
+                {answerUrl ? (
+                  <>
+                    <div className="mt-2 flex items-center gap-1">
+                      <TextInput readOnly value={answerUrl} onFocus={(e) => e.currentTarget.select()} aria-label="回答用URL" className="text-xs" />
+                      <Button variant="secondary" className="shrink-0 px-2 py-2 text-xs whitespace-nowrap h-auto" onClick={copyAnswerUrl}>
+                        コピー
+                      </Button>
+                    </div>
+                    <p className="text-ink-faint mt-1 text-xs">友だちに配るURLです。LINEの中で開きます。</p>
+                    <Button variant="secondary" onClick={() => void startTest()} disabled={testBusy || !answerUrl} className="mt-2" title="保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入りません" busy={testBusy} busyLabel="用意しています...">
+                      公開前に試す（試しのURLを作る）
+                    </Button>
+                    {testError && <p role="alert" className="text-danger mt-1 text-xs whitespace-pre-wrap">{testError}</p>}
+                    {testUrl && (
+                      <p className="mt-1 text-xs break-all">
+                        <Link href={testUrl} target="_blank" rel="noreferrer" className="text-action">
+                          試しのURLを開く
+                        </Link>
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-ink-secondary mt-2 text-sm">回答用URLを発行する設定がまだありません。LINEアカウント設定を確認してください。</p>
+                )}
+              </section>
+
+              <section className="bg-canvas rounded-card border-hairline border p-4">
+                <h2 className="text-ink text-sm font-bold">お客さまに見える形</h2>
+                <div className="mt-2">
+                  <FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} />
+                </div>
+              </section>
+            </div>
+          </div>
+        )}
+
+        {notice && <p className="text-success text-sm" role="status">{notice}</p>}
+
+        <UnsavedLeaveDialog
+          open={leaveTarget !== null}
+          subject="フォームへの変更"
+          onConfirm={confirmLeave}
+          onCancel={cancelLeave}
+        />
+
+        <StickyBar
+          actions={(
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => void save(false)} disabled={saving} title="フォームを保存（公開中の内容は変わりません）">
+                {saving ? '保存中...' : '下書きを保存する'}
+              </Button>
+              <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => void save(true)} disabled={saving}>
+                {saving ? '処理中...' : 'この版を公開'}
+              </Button>
+            </div>
+          )}
+        />
+
+        {showOptions && theme !== 'v8' && (
+          <OptionsDialog
+            value={layout.options}
+            refs={refs}
+            onChange={(next: FormOptions) => setLayout((prev) => ({ ...prev, options: next }))}
+            onClose={() => setShowOptions(false)}
+            onSave={async () => {
+              const res = await save(false)
+              if (res !== null) setShowOptions(false)
+            }}
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
@@ -1316,4 +1603,31 @@ export default function FormEditPage() {
       <FormEditInner />
     </Suspense>
   )
+}
+
+/**
+ * 足すブロックの4組（m1cWEy）。型に無いもの（5段階・時刻・メール電話・住所・
+ * 予約を入れる）は口も無いため出さない。
+ */
+const BLOCK_GROUPS: { title: string; inputTypes?: FormInputType[]; decoLabels?: string[] }[] = [
+  { title: '選んでもらう', inputTypes: ['radio', 'checkbox', 'select', 'prefecture'] },
+  { title: '書いてもらう', inputTypes: ['text', 'textarea'] },
+  { title: '日にち・予約', inputTypes: ['date', 'file'] },
+  { title: '飾り', decoLabels: ['画像', '見出し', 'テキスト', 'ボタン'] },
+]
+
+/** 足す欄の短い説明（m1cWEy）。種類の札は BLOCK_MENU の名前を使う。 */
+const BLOCK_HINTS: Record<string, string> = {
+  radio: '1つだけ選ぶ',
+  checkbox: 'いくつでも選ぶ',
+  select: 'たくさんの中から1つ',
+  prefecture: '47の中から1つ',
+  text: '名前・会員番号など',
+  textarea: '複数行のフリーテキスト',
+  date: 'カレンダーで選ぶ',
+  file: '写真・書類を送る',
+  画像: 'ロゴ・写真',
+  見出し: '区切りの題',
+  テキスト: '説明の文',
+  ボタン: '別のページを開く',
 }
