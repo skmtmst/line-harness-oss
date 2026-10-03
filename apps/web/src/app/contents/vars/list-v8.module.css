@@ -84,12 +84,13 @@
   background: var(--color-canvas);
 }
 
+/* 数の帯のマス（板 `FM94M`「数 共通情報」：余白 16/20・間 8）。 */
 .kpi {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
-  padding: 12px 16px;
+  padding: 16px 20px;
 }
 
 .kpi + .kpi {
@@ -115,11 +116,13 @@
   color: var(--color-ink-secondary);
 }
 
+/* 数の帯の題（板 `FM94M`「題」：12・500・ink・行18）。 */
 .kpiLabel {
   overflow: hidden;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
+  color: var(--color-ink);
+  font-size: 12px;
   font-weight: 500;
+  line-height: 1.5;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -135,11 +138,12 @@
   line-height: 0;
 }
 
+/* 数の帯の数（板 `FM94M`：22・600）。 */
 .kpiValue {
   margin: 0;
   color: var(--color-ink);
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.3;
   font-variant-numeric: tabular-nums;
 }
@@ -177,13 +181,13 @@
   text-decoration: underline;
 }
 
-/* 空のまま使われているときの黄色の帯（板 `FM94M`）。 */
+/* 空のまま使われているときの黄色の帯（板 `FM94M`「警告」：余白 10/14・間 10）。 */
 .alertBand {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
-  padding: 12px 16px;
+  gap: 10px;
+  padding: 10px 14px;
   border-radius: var(--radius-control, 8px);
   background: var(--color-status-warn-soft);
   color: var(--color-ink);
@@ -252,8 +256,11 @@
   min-width: 160px;
 }
 
+/* 探す欄の幅（板 `FM94M`「検索」：幅 200・高さは共有部品）。 */
 .searchWrap {
-  flex: 1 1 220px;
+  flex: 0 0 auto;
+  width: 200px;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -277,21 +284,36 @@
   font-size: 13px;
 }
 
+/* 表の見出し（板 `FM94M`「表の見出し」：余白 12/24・文字 12/600/secondary・地 table-head）。 */
 .table th {
-  padding: 10px 12px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-faint);
-  font-size: 11px;
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
 }
 
+/* 表の行（板 `FM94M`「行 会社名」ほか：余白 12/24・間 16。行高 60.5 は中身の結果なので追わない）。 */
 .table td {
-  padding: 12px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--color-hairline);
   vertical-align: middle;
+}
+
+/* 列幅（板 `FM94M`：中身 170・状態 80・使っている所 90。1列目は伸び縮み）。 */
+.cellValue {
+  width: 170px;
+}
+
+.cellStatus {
+  width: 80px;
+}
+
+.cellUsage {
+  width: 90px;
 }
 
 .table tbody tr:last-child td {
@@ -370,17 +392,19 @@
   white-space: nowrap;
 }
 
+/* ページ送りの段（板 `FM94M`「ページ送り」：余白 10/20・間 6。「件数」は 13/secondary）。 */
 .foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
+  padding: 10px 20px;
 }
 
 .footCount {
-  color: var(--color-ink-faint);
-  font-size: 12px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
 }
 
 /* 状態の板（`RqO7O`）：まだ無い・0件・読み込み中・失敗は同じ枠・同じ高さ。 */
