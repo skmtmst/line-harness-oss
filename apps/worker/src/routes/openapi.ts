@@ -5851,6 +5851,164 @@ const spec = {
         },
       },
     },
+    // ── Booking plus (前回・キャンセル待ち・今日・来店の印) ──────────────────
+    '/api/liff/booking/last-booking': {
+      get: {
+        tags: ['Booking'],
+        summary: '本人の前回の予約（メニュー・担当）を取得',
+        description: 'idToken→account→friendだけに許可。取り消し・却下・期限切れを除く最新1件。担当が辞めた・メニューが止まっているときは available=false。写真は担当の顔写真。',
+        security: [],
+        parameters: [
+          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'available と前回の予約（menu・staff）または available=false と理由' },
+          '401': { description: 'idToken 検証失敗' },
+          '404': { description: 'Unknown LIFF ID・友だちなし' },
+        },
+      },
+    },
+    '/api/liff/booking/waitlist/mine': {
+      get: {
+        tags: ['Booking'],
+        summary: '枠を指定して自分の待ち登録を取得',
+        description: 'idToken→account→friendだけに許可。待っている・仮押さえ中の登録があれば返す。シートの登録・取り消しの切り替え用。',
+        security: [],
+        parameters: [
+          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'staff_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'menu_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'starts_at', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'entry（登録）または entry: null' },
+          '400': { description: '枠の指定が不正' },
+          '401': { description: 'idToken 検証失敗' },
+          '404': { description: 'Unknown LIFF ID・友だちなし' },
+        },
+      },
+    },
+    '/api/liff/booking/waitlist': {
+      post: {
+        tags: ['Booking'],
+        summary: '満席の枠にキャンセル待ちを登録',
+        description: 'idToken→account→friendだけに許可。1人が同じ枠に二重登録できない（409）。',
+        security: [],
+        parameters: [
+          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '201': { description: '登録成立（id）' },
+          '400': { description: '枠の指定が不正' },
+          '401': { description: 'idToken 検証失敗' },
+          '404': { description: 'Unknown LIFF ID・友だちなし' },
+          '409': { description: '二重登録' },
+        },
+      },
+    },
+    '/api/liff/booking/waitlist/{id}': {
+      delete: {
+        tags: ['Booking'],
+        summary: '自分のキャンセル待ちを取り消し',
+        description: 'idToken→account→friendだけに許可。本人の待っている・仮押さえ中の登録だけ取り消せる。',
+        security: [],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '取り消し成立' },
+          '401': { description: 'idToken 検証失敗' },
+          '404': { description: 'Unknown LIFF ID・友だち・登録なし' },
+        },
+      },
+    },
+    '/api/booking/admin/last-booking': {
+      get: {
+        tags: ['Booking'],
+        summary: '友だちの前回の予約（メニュー・担当）を取得',
+        description: '取り消し・却下・期限切れを除く最新1件。担当が辞めた・メニューが止まっているときは available=false。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'available と前回の予約または available=false と理由' },
+        },
+      },
+    },
+    '/api/booking/admin/waitlist': {
+      get: {
+        tags: ['Booking'],
+        summary: 'キャンセル待ちの一覧を取得',
+        description: '枠・状態で絞り込める。時刻順・登録の早い順（上限100件）。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'waitlist の一覧' },
+        },
+      },
+      post: {
+        tags: ['Booking'],
+        summary: 'キャンセル待ちを登録',
+        description: '1人が同じ枠に二重登録できない（409）。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '201': { description: '登録成立' },
+          '409': { description: '二重登録' },
+        },
+      },
+    },
+    '/api/booking/admin/waitlist/{id}': {
+      delete: {
+        tags: ['Booking'],
+        summary: 'キャンセル待ちを取り消し',
+        description: '空きができたら登録の早い順に1人ずつ LINE で知らせる（自動送信）。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '取り消し成立' },
+        },
+      },
+    },
+    '/api/booking/admin/waitlist/{id}/convert': {
+      post: {
+        tags: ['Booking'],
+        summary: '待ち登録を予約に進める',
+        description: '同じ枠・同じ人の予約と突き合わせて「予約になった」へ進める。違う枠は 409。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '進行成立' },
+          '409': { description: '枠・人の不一致' },
+        },
+      },
+    },
+    '/api/booking/admin/today': {
+      get: {
+        tags: ['Booking'],
+        summary: 'その日の予約を時刻順に取得',
+        description: '店の暦日（JST）で区切る。状態・担当で絞り込める。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '予約の一覧（来店の印つき）' },
+        },
+      },
+    },
+    '/api/booking/admin/bookings/{id}/visit': {
+      post: {
+        tags: ['Booking'],
+        summary: '今日の予約に来店・遅れ・無断の印を付ける',
+        description: 'だれがいつ付けたかを残す。「来なかった」は無断の回数に数える。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '印の記録成立' },
+        },
+      },
+    },
     // ── Booking channels (V8-B) ──────────────────────────────────────────────
     '/api/booking/admin/channels': {
       get: {

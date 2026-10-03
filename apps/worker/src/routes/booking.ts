@@ -3566,6 +3566,99 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
 });
 
 /**
+ * 前回と同じで予約（LIFF）：本人の「前回の予約（メニュー・担当）」を返す。
+ *
+ * 管理の /api/booking/admin/last-booking と同じ決めごと。友だち本人に
+ * 絞る（idToken 検証ずみ）。前回の担当が辞めた・メニューが止まっている
+ * ときは返さない（available=false）。写真は担当の顔写真を使う
+ * （メニューに写真は無い）。
+ */
+booking.get('/api/liff/booking/last-booking', async (c) => {
+  const caller = await resolveSelfBookingCaller(c);
+  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  const row = await c.env.DB
+    .prepare(
+      `SELECT b.id, b.starts_at, b.status,
+              m.id AS menu_id, m.name AS menu_name, m.is_active AS menu_active,
+              m.deleted_at AS menu_deleted_at,
+              s.id AS staff_id, s.display_name AS staff_name,
+              s.profile_image_url AS staff_image_url,
+              s.is_active AS staff_active, s.deleted_at AS staff_deleted_at,
+              sm.is_offered AS staff_offers_menu
+         FROM bookings b
+         INNER JOIN menus m ON m.id = b.menu_id
+         INNER JOIN staff s ON s.id = b.staff_id
+         LEFT JOIN staff_menus sm ON sm.staff_id = b.staff_id AND sm.menu_id = b.menu_id
+        WHERE b.line_account_id = ? AND b.friend_id = ?
+          AND b.status NOT IN ('cancelled', 'rejected', 'expired')
+        ORDER BY b.starts_at DESC LIMIT 1`,
+    )
+    .bind(caller.accountId, caller.friendId)
+    .first<{
+      id: string;
+      starts_at: string;
+      status: string;
+      menu_id: string;
+      menu_name: string;
+      menu_active: number;
+      menu_deleted_at: string | null;
+      staff_id: string;
+      staff_name: string;
+      staff_image_url: string | null;
+      staff_active: number;
+      staff_deleted_at: string | null;
+      staff_offers_menu: number | null;
+    }>();
+  if (!row) return c.json({ available: false, reason: 'no_history' });
+  if (Number(row.menu_active) !== 1 || row.menu_deleted_at !== null) {
+    return c.json({ available: false, reason: 'menu_inactive' });
+  }
+  if (Number(row.staff_active) !== 1 || row.staff_deleted_at !== null) {
+    return c.json({ available: false, reason: 'staff_inactive' });
+  }
+  if (row.staff_offers_menu !== null && Number(row.staff_offers_menu) !== 1) {
+    return c.json({ available: false, reason: 'not_offered' });
+  }
+  return c.json({
+    available: true,
+    booking: {
+      id: row.id,
+      starts_at: row.starts_at,
+      status: row.status,
+      menu: { id: row.menu_id, name: row.menu_name },
+      staff: { id: row.staff_id, display_name: row.staff_name, profile_image_url: row.staff_image_url },
+    },
+  });
+});
+
+/**
+ * キャンセル待ちの自分の登録（LIFF）：枠を指定して待っている・
+ * 仮押さえ中の登録があれば返す。シートの登録・取り消しの切り替え用。
+ */
+booking.get('/api/liff/booking/waitlist/mine', async (c) => {
+  const caller = await resolveSelfBookingCaller(c);
+  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  const staffId = c.req.query('staff_id')?.trim() || '';
+  const menuId = c.req.query('menu_id')?.trim() || '';
+  const startsAtRaw = c.req.query('starts_at')?.trim() || '';
+  if (!staffId || !menuId || !startsAtRaw) return c.json({ error: 'missing_params' }, 400);
+  const startsAtMs = Date.parse(startsAtRaw);
+  if (Number.isNaN(startsAtMs)) return c.json({ error: 'invalid_starts_at' }, 400);
+  const entry = await c.env.DB
+    .prepare(
+      `SELECT id, status, created_at FROM booking_waitlist
+        WHERE line_account_id = ? AND staff_id = ? AND menu_id = ?
+          AND starts_at = ? AND friend_id = ?
+          AND status IN ('waiting', 'invited')
+        ORDER BY created_at ASC LIMIT 1`,
+    )
+    .bind(caller.accountId, staffId, menuId, new Date(startsAtMs).toISOString(), caller.friendId)
+    .first<{ id: string; status: string; created_at: string }>();
+  if (!entry) return c.json({ entry: null });
+  return c.json({ entry });
+});
+
+/**
  * 今日の予約を1画面で：その日の予約を時刻順に返す。
  *
  * date は店の暦日（YYYY-MM-DD、省いたら今日の日本日付）。
