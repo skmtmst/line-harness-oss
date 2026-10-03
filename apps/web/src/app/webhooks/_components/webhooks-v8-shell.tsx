@@ -15,6 +15,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import styles from './webhooks-v8-shell.module.css'
 import V8OutgoingTab from './webhooks-v8-outgoing'
+import WebhooksV8Interactions from './webhooks-v8-interactions'
 
 export type WebhooksV8TabKey = 'outgoing' | 'incoming' | 'api-tokens' | 'sheets' | 'interactions' | 'notify'
 
@@ -114,6 +115,7 @@ export function WebhooksV8Shell() {
         ))}
       </nav>
       {tab === 'outgoing' ? <V8OutgoingTab onCounts={setOutgoingCount} /> : null}
+      {tab === 'interactions' ? <WebhooksV8Interactions /> : null}
     </div>
   )
 }
