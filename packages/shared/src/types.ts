@@ -1798,7 +1798,7 @@ export type AutomationEventType =
   | "ec.subscription.cancelled";
 
 export interface AutomationAction {
-  type: "add_tag" | "remove_tag" | "start_scenario" | "send_message" | "send_webhook" | "switch_rich_menu";
+  type: "add_tag" | "remove_tag" | "start_scenario" | "send_message" | "send_webhook" | "switch_rich_menu" | "notify_staff";
   params: Record<string, unknown>;
 }
 

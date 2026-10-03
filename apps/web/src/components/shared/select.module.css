@@ -216,6 +216,30 @@
   border-color: var(--color-accent);
 }
 
+/*
+ * ★V8 仕上げ（M10-2）：選ぶ欄の乗せた・押した・候補の動き。
+ * 枠は 120ms で色が変わり、押したときはほんの少し沈む（明るさで）。
+ * 候補の行に乗せたときの薄い背景も 120ms。開く動きは候補の箱が持つ。
+ */
+[data-theme='v8'] .trigger {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    filter var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .trigger:hover {
+  background: var(--color-canvas-sunken);
+}
+
+[data-theme='v8'] .trigger:active:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+[data-theme='v8'] .option {
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
 [data-theme='v8'] .invalid .trigger {
   border-color: var(--color-danger);
 }
