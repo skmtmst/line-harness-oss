@@ -41,6 +41,8 @@
   --color-liff-note: #f2f6fe;
   /* 必須の札の地 (B8rCt・g9osGN。文字は --color-liff-sun)。 */
   --color-liff-required-bg: #fdecec;
+  /* 5段階評価の塗った星 (F-11・m1cWEy のスマホ見本の星色)。 */
+  --color-liff-star: #f5a623;
   /* マイルの貯まった箱の深い緑 (S3uBl)。主の緑より濃い。 */
   --color-liff-deep: #0f3d24;
   --color-liff-wait-bg: #fff6e5;
