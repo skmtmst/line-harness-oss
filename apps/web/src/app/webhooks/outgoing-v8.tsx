@@ -407,26 +407,46 @@ function OutgoingV8Inner() {
       return
     }
     beginToggle(key)
+    // 先に札を変える。裏の保存が終わるまでこの値を出し続ける。
+    const name = outgoing.find((item) => item.id === id)?.name ?? 'この送り先'
+    setOptimisticActive((current) => ({ ...current, [id]: !currentActive }))
+    const clearOptimistic = () => {
+      setOptimisticActive((current) => {
+        if (current[id] === undefined) return current
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
+    }
+    const failMessage = (reason: string) => {
+      clearOptimistic()
+      setToggleFailures((current) => ({ ...current, [key]: reason }))
+      notifyToast(reason, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void handleToggle(id, currentActive) },
+      })
+    }
     try {
       const res = await api.webhooks.outgoing.update(id, requestAccountId, { isActive: !currentActive })
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
-        const name = outgoing.find((item) => item.id === id)?.name ?? 'この送り先'
-        setToggleFailures((current) => ({ ...current, [key]: `「${name}」は切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。` }))
+        failMessage(`「${name}」は切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。`)
         return
       }
       if (selectedAccountIdRef.current === requestAccountId) await load()
+      clearOptimistic()
+      notifyToast(`「${name}」を${!currentActive ? '動かしました' : '止めました'}。`, {
+        actionLabel: '元に戻す',
+        onAction: () => { void handleToggle(id, !currentActive) },
+      })
     } catch (caught) {
       if (selectedAccountIdRef.current !== requestAccountId) return
       const forbidden = caught instanceof ApiError && caught.status === 403
-      const name = outgoing.find((item) => item.id === id)?.name ?? 'この送り先'
       if (!forbidden) await load().catch(() => {})
-      setToggleFailures((current) => ({
-        ...current,
-        [key]: forbidden
-          ? `「${name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
-          : `「${name}」は切り替えの応答を受け取れませんでした。一覧の表示を確かめてください。変わっている可能性があります。`,
-      }))
+      failMessage(forbidden
+        ? `「${name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
+        : `「${name}」は切り替えの応答を受け取れませんでした。一覧の表示を確かめてください。変わっている可能性があります。`)
     } finally {
       endToggle(key)
     }
@@ -535,8 +555,19 @@ function OutgoingV8Inner() {
     }
   }
 
+  /*
+   * B. 押した瞬間に札を変えて裏で保存する。`optimisticActive` がある行は
+   * その値を先に見せ、保存に失敗したら消して元へ戻す。
+   */
+  const [optimisticActive, setOptimisticActive] = useState<Record<string, boolean>>({})
+  const displayed = useMemo(() => (
+    outgoing.map((item) => (
+      optimisticActive[item.id] === undefined ? item : { ...item, isActive: optimisticActive[item.id] }
+    ))
+  ), [outgoing, optimisticActive])
+
   const filtered = useMemo(() => {
-    const rows = outgoing.filter((item) => matchesOutgoing(item, filter, query))
+    const rows = displayed.filter((item) => matchesOutgoing(item, filter, query))
     return [...rows].sort((a, b) => (sort === 'name'
       ? a.name.localeCompare(b.name, 'ja-JP')
       : b.deliverySummary.total - a.deliverySummary.total))
@@ -561,8 +592,8 @@ function OutgoingV8Inner() {
   }
 
   const readyCounts = outgoingStatus === 'ready'
-  const activeCount = outgoing.filter((item) => item.isActive).length
-  const pausedCount = outgoing.length - activeCount
+  const activeCount = displayed.filter((item) => item.isActive).length
+  const pausedCount = displayed.length - activeCount
 
   const listBody = (() => {
     if (outgoingStatus === 'loading') {

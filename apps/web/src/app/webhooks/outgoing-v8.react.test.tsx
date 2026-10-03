@@ -159,6 +159,43 @@ test('v7 では従来の一覧が出て ZSbFY は出ない', async () => {
   expect(host.querySelector('[data-design-node="ZSbFY"]')).toBeNull()
 })
 
+test('v8 の動かす・止めるは押した瞬間に札が変わり、失敗したら戻る', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  let resolveUpdate: ((response: Response) => void) | null = null
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/api/staff/me') || url.includes('/staff/me')) {
+      return json({ success: true, data: { role: staffRole } })
+    }
+    if (url.includes('/incoming')) return json({ success: true, data: [] })
+    if (url.includes('/api/webhooks/outgoing') && init?.method && init.method !== 'GET') {
+      return new Promise<Response>((resolve) => { resolveUpdate = resolve })
+    }
+    if (url.includes('/api/webhooks/outgoing')) {
+      return json({ success: true, data: outgoingItems })
+    }
+    if (url.includes('/interactions')) {
+      return json({ success: true, data: { summary: {
+        total: 2146, outgoing: 1734, incoming: 412, succeeded: 2144,
+        failed: 2, resultUnknown: 0, outgoingFailed: 2, retryable: 2, averageDurationMs: 400,
+      } } })
+    }
+    return json({ success: false, error: 'not found' }, 404)
+  })
+  await renderPage()
+  const board = host.querySelector('[data-design-node="ZSbFY"]')!
+  expect(board.textContent).toContain('動いている')
+  // 「設定」を開いて「止める」を押す。口の返事を待たず札が変わる。
+  const settingButton = [...board.querySelectorAll('button')].find((button) => button.textContent?.includes('設定'))!
+  await act(async () => { settingButton.click() })
+  const stopItem = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.includes('止める'))!
+  await act(async () => { (stopItem as HTMLElement).click() })
+  expect(board.textContent).toContain('止めている')
+  // 口が失敗したら札が戻り、知らせに「もう一度」が出る。
+  await act(async () => { resolveUpdate!(json({ success: false, error: 'boom' })) })
+  expect(board.textContent).toContain('動いている')
+})
+
 test('v8 の読み込み中は表の形の骨組みが出て「読み込み中」の文字は無い', async () => {
   document.documentElement.dataset.theme = 'v8'
   vi.useFakeTimers()
