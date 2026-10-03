@@ -583,7 +583,7 @@ export default function TagsTabV8({
           ) : null}
 
           {status === 'loading' || staleAccount ? (
-            <div className={styles.skeletonRows} role="status">
+            <div className={styles.skeletonRows} role="status" data-design-node="U0aKD">
               <span className="sr-only">読み込んでいます</span>
               {[0, 1, 2, 3, 4].map((row) => (
                 <div key={row} className={styles.skeletonRow}>
@@ -603,7 +603,7 @@ export default function TagsTabV8({
               <p className={styles.stateDesc}>タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。</p>
             </div>
           ) : status === 'error' ? (
-            <div className={styles.stateCard}>
+            <div className={styles.stateCard} data-design-node="U0aKD">
               <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
                 <AlertCircle size={20} aria-hidden="true" />
               </span>
@@ -612,7 +612,7 @@ export default function TagsTabV8({
               <Button type="button" onClick={() => void load()}>もう一度試す</Button>
             </div>
           ) : items.length === 0 ? (
-            <div className={styles.stateCard}>
+            <div className={styles.stateCard} data-design-node="U0aKD">
               <span className={styles.stateIcon}>
                 <TagIcon size={20} aria-hidden="true" />
               </span>
@@ -620,7 +620,7 @@ export default function TagsTabV8({
               <p className={styles.stateDesc}>「＋ タグを作る」から最初の1つを作ると、ここに並びます。</p>
             </div>
           ) : visible.length === 0 ? (
-            <div className={styles.stateCard}>
+            <div className={styles.stateCard} data-design-node="U0aKD">
               <p className={styles.stateTitle}>条件に合うタグはありません</p>
               <p className={styles.stateDesc}>検索語・フォルダ・絞り込みを変えてください。</p>
               {filterActive ? (
