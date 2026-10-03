@@ -327,6 +327,7 @@ export default function AffiliateDrawerV8({
                           <th>案件</th>
                           <th className={styles.numRight}>報酬単価</th>
                           <th className={styles.numRight}>承認済み</th>
+                          <th className={styles.numRight}>審査中</th>
                           <th className={styles.numRight}>確定報酬</th>
                         </tr>
                       </thead>
@@ -336,6 +337,7 @@ export default function AffiliateDrawerV8({
                             <td><span className={styles.cellMain} title={o.offerName}>{o.offerName}</span></td>
                             <td className={styles.numRight}>{formatYen(o.rewardAmount)}</td>
                             <td className={styles.numRight}>{formatNumber(o.conversionsApproved)}</td>
+                            <td className={styles.numRight}>{formatNumber(o.conversionsPending)}</td>
                             <td className={styles.numRight}>{formatYen(o.confirmedReward)}</td>
                           </tr>
                         ))}
