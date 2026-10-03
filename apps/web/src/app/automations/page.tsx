@@ -630,27 +630,27 @@ export default function AutomationsPage() {
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">動いているもの</p>
-          <p className="text-ink mt-1 text-2xl font-bold">
+        <div className="bg-canvas rounded-card border-hairline border px-5 py-4">
+          <p className="text-xs font-medium text-ink">動いているもの</p>
+          <p className="text-ink mt-1 text-[22px] font-semibold">
             {/* 監査6 #674: 数字の見せ方は MetricValue に寄せる */}
             <MetricValue value={activeCount} unit="本" />
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">稼働中 {activeCount ?? '—'}本・止めているもの {stoppedCount ?? '—'}本</p>
         </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">今月の実行（この30日）</p>
-          <p className="text-ink mt-1 text-2xl font-bold"><MetricValue value={automaticRuns ?? null} unit="回" /></p>
+        <div className="bg-canvas rounded-card border-hairline border px-5 py-4">
+          <p className="text-xs font-medium text-ink">今月の実行（この30日）</p>
+          <p className="text-ink mt-1 text-[22px] font-semibold"><MetricValue value={automaticRuns ?? null} unit="回" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">分析の「使われ方」と同じ集計</p>
         </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">失敗した</p>
-          <p className="text-ink mt-1 text-2xl font-bold"><MetricValue value={failedRuns ?? null} unit="回" /></p>
+        <div className="bg-canvas rounded-card border-hairline border px-5 py-4">
+          <p className="text-xs font-medium text-ink">失敗した</p>
+          <p className="text-ink mt-1 text-[22px] font-semibold"><MetricValue value={failedRuns ?? null} unit="回" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">部分成功を含む・この30日</p>
         </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">減らせた手作業</p>
-          <p className="text-ink mt-1 text-2xl font-bold"><MetricValue value={estimatedHoursSaved} prefix="およそ" unit="時間" /></p>
+        <div className="bg-canvas rounded-card border-hairline border px-5 py-4">
+          <p className="text-xs font-medium text-ink">減らせた手作業</p>
+          <p className="text-ink mt-1 text-[22px] font-semibold"><MetricValue value={estimatedHoursSaved} prefix="およそ" unit="時間" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">1回30秒として計算しています</p>
         </div>
       </KpiCollapse>
@@ -731,7 +731,7 @@ export default function AutomationsPage() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
-          <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
+          <div className="grid grid-cols-6 gap-3 bg-table-head px-5 py-[13px] text-xs font-semibold text-ink-secondary">
             <span>きっかけ</span><span>だれに（条件）</span><span>すること</span><span>この30日</span><span>状態</span><span aria-hidden />
           </div>
           {pagedAutomations.map((automation) => (
