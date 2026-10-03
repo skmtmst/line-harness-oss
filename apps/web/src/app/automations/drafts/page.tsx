@@ -6,6 +6,8 @@ import { useSearchParams } from 'next/navigation'
 import AutomationDraftEditor from '@/components/automations/automation-draft-editor'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { NewAutomationV8 } from '../new/new-v8'
 
 /*
   見本から作った下書きの編集面。
@@ -42,10 +44,34 @@ function AutomationDraftPageInner() {
   return <AutomationDraftEditor key={draftId} draftId={draftId} />
 }
 
+/*
+ * ★V8-B の切り替え。下書きの仕上げ（板 `J1VA8`）は作る画面と同じ器
+ * （new-v8.tsx）で描く。v7 の器・動きはそのまま残す。
+ */
 export default function AutomationDraftPage() {
   return (
     <Suspense fallback={null}>
-      <AutomationDraftPageInner />
+      <AutomationDraftPageBranch />
     </Suspense>
   )
+}
+
+function AutomationDraftPageBranch() {
+  const theme = useAdminTheme()
+  const draftId = useSearchParams().get('id')
+  if (theme === 'v8') {
+    if (!draftId) {
+      return (
+        <TargetMissing
+          kind="unspecified"
+          title="開く下書きが指定されていません"
+          description="見本の一覧から選び直してください。下書きは消えていません。"
+          backHref="/automations?tab=templates"
+          backLabel="見本の一覧へ戻る"
+        />
+      )
+    }
+    return <NewAutomationV8 chrome="draft" draftId={draftId} />
+  }
+  return <AutomationDraftPageInner />
 }
