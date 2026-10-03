@@ -130,7 +130,7 @@ export default function MenuFormV8() {
   /* ---- 保存・競合 ---- */
   const [saving, setSaving] = useState<null | 'draft' | 'publish' | 'conflict'>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [conflict, setConflict] = useState<{ name: string; author: string | null; at: string | null; version: number } | null>(null)
+  const [conflict, setConflict] = useState<{ name: string; author: string | null; at: string | null; version: number; updatedAt: string | null } | null>(null)
   const [comparing, setComparing] = useState(false)
   /** 作成済みなのに後工程が残っている（DEEP-16）。再押しても作り直さない。 */
   const [createdMenuNeedingFollowUp, setCreatedMenuNeedingFollowUp] = useState<{
@@ -527,9 +527,10 @@ export default function MenuFormV8() {
         author: latest?.author ?? null,
         at: latest?.at ?? null,
         version: latestMenu?.version ?? 0,
+        updatedAt: latestMenu?.updated_at ?? null,
       })
     } catch {
-      setConflict({ name: name.trim() || 'メニュー', author: null, at: null, version: 0 })
+      setConflict({ name: name.trim() || 'メニュー', author: null, at: null, version: 0, updatedAt: null })
     }
   }
 
@@ -557,7 +558,13 @@ export default function MenuFormV8() {
           throw new ApiError(409, 'version_conflict', 'version_conflict')
         }
         try {
-          const res = await bookingApi.updateMenu(selectedAccountId, menuId, expectedVersion, menuBody(editTarget?.is_active === 1))
+          // v8f の口：読んだ更新日時も送り、日時・版のどちらかがずれれば409になる。
+          // 競合からの上書きは読み直した最新の日時を使う。
+          const expectedUpdatedAt = overwrite && conflict ? conflict.updatedAt : editTarget?.updated_at
+          const res = await bookingApi.updateMenu(
+            selectedAccountId, menuId, expectedVersion, menuBody(editTarget?.is_active === 1),
+            typeof expectedUpdatedAt === 'string' ? expectedUpdatedAt : undefined,
+          )
           version = res.version
         } catch (e) {
           if (e instanceof ApiError && e.status === 409) {

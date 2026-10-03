@@ -2539,7 +2539,7 @@ booking.get('/api/booking/admin/menus', async (c) => {
       c.env.DB.prepare(
         `SELECT m.id, m.name, m.category_label, m.description,
                 m.duration_minutes, m.buffer_after_minutes,
-                m.base_price, m.price_mode, m.version,
+                m.base_price, m.price_mode, m.version, m.updated_at,
                 m.sort_order, m.is_active, m.auto_tag_id,
                 m.concurrent_capacity, m.booking_window_days, m.cutoff_hours_before,
                 m.cancel_deadline_hours_before, m.intake_question,
@@ -2614,6 +2614,7 @@ booking.get('/api/booking/admin/menus', async (c) => {
         base_price: row.base_price,
         price_mode: row.price_mode,
         version: row.version,
+        updated_at: row.updated_at,
         sort_order: row.sort_order,
         is_active: row.is_active,
         auto_tag_id: row.auto_tag_id,
