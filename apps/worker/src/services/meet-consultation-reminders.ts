@@ -18,6 +18,16 @@ export interface RegisterMeetConsultationInput {
   startsAt: string;
   endsAt: string;
   meetUrl: string;
+  /** 結び付く予約。版と組で後発の勝者を古い操作から守る。無いときは従来どおり無条件。 */
+  bookingId?: string | null;
+  bookingVersion?: number | null;
+}
+
+export interface CancelMeetConsultationOptions {
+  failOnSendInFlight?: boolean;
+  /** 行が見た版と違うときは何も変えず false (古い補償が勝者を消さない)。無いときは従来どおり無条件。 */
+  expectedBookingId?: string | null;
+  expectedBookingVersion?: number | null;
 }
 
 export interface MeetReminderSchedule {
@@ -40,6 +50,8 @@ interface MeetConsultationRow {
   ends_at: string;
   meet_url: string;
   status: 'confirmed' | 'cancelled' | 'completed';
+  booking_id: string | null;
+  booking_version: number | null;
 }
 
 interface DueMeetReminderRow {
@@ -115,7 +127,7 @@ export async function registerMeetConsultation(
   db: D1Database,
   input: RegisterMeetConsultationInput,
   now = new Date(),
-): Promise<{ id: string; reminders: MeetReminderSchedule[] }> {
+): Promise<{ id: string; reminders: MeetReminderSchedule[]; updated: boolean }> {
   if (!input.externalEventId.trim()) throw new Error('externalEventId is required');
   if (!input.friendId.trim()) throw new Error('friendId is required');
   if (!input.title.trim()) throw new Error('title is required');
@@ -149,12 +161,28 @@ export async function registerMeetConsultation(
       existing.meet_url !== input.meetUrl),
   );
   const nowIso = now.toISOString();
+  const schedules = calculateMeetReminderSchedule(normalizedStart, now);
 
-  await db
+  // 版フェンス: 同じ予定IDに後発の勝者がいるとき、古い登録は何も書かない
+  // (勝者の相談・未来通知・V6を残す)。版なし同士・同版の再送・版なし行への
+  // 上書きは従来どおり通す。SELECT と書込みの間の交差は下の WHERE でも防ぐ。
+  const incomingVersion = input.bookingVersion ?? null;
+  const storedVersion = existing?.booking_version ?? null;
+  if (
+    existing != null &&
+    incomingVersion !== null &&
+    storedVersion !== null &&
+    incomingVersion < storedVersion
+  ) {
+    return { id: consultationId, reminders: schedules, updated: false };
+  }
+
+  const upsert = await db
     .prepare(
       `INSERT INTO meet_consultations
-        (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)
+        (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url,
+         status, booking_id, booking_version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?)
        ON CONFLICT(external_event_id) DO UPDATE SET
          friend_id=excluded.friend_id,
          title=excluded.title,
@@ -162,7 +190,12 @@ export async function registerMeetConsultation(
          ends_at=excluded.ends_at,
          meet_url=excluded.meet_url,
          status='confirmed',
-         updated_at=excluded.updated_at`,
+         booking_id=excluded.booking_id,
+         booking_version=excluded.booking_version,
+         updated_at=excluded.updated_at
+       WHERE excluded.booking_version IS NULL
+          OR meet_consultations.booking_version IS NULL
+          OR excluded.booking_version >= meet_consultations.booking_version`,
     )
     .bind(
       consultationId,
@@ -172,12 +205,17 @@ export async function registerMeetConsultation(
       normalizedStart,
       normalizedEnd,
       input.meetUrl,
+      input.bookingId ?? null,
+      incomingVersion,
       nowIso,
       nowIso,
     )
     .run();
+  // SELECT 後に勝者が書いていたら WHERE が止めて 0 件になる。敗者は何も触らない。
+  if (existing != null && (upsert.meta?.changes ?? 0) === 0) {
+    return { id: consultationId, reminders: schedules, updated: false };
+  }
 
-  const schedules = calculateMeetReminderSchedule(normalizedStart, now);
   const expectedKinds = new Set(schedules.map((item) => item.kind));
   for (const item of schedules) {
     const reminder = await db
@@ -282,47 +320,107 @@ export async function registerMeetConsultation(
     }).catch((error) => console.error('meet reminder enroll (v6) failed:', error));
   }
 
-  return { id: consultationId, reminders: schedules };
+  return { id: consultationId, reminders: schedules, updated: true };
 }
 
 export async function cancelMeetConsultation(
   db: D1Database,
   externalEventId: string,
   now = new Date(),
-  options?: { failOnSendInFlight?: boolean },
+  options?: CancelMeetConsultationOptions,
 ): Promise<boolean> {
   const consultation = await db
     .prepare(
-      `SELECT c.id, c.friend_id, c.starts_at, f.line_account_id
+      `SELECT c.id, c.friend_id, c.starts_at, c.status, c.booking_id, c.booking_version,
+              f.line_account_id
          FROM meet_consultations c
          LEFT JOIN friends f ON f.id = c.friend_id
         WHERE c.external_event_id = ?`,
     )
     .bind(externalEventId)
-    .first<{ id: string; friend_id: string; starts_at: string; line_account_id: string | null }>();
+    .first<{
+      id: string;
+      friend_id: string;
+      starts_at: string;
+      status: 'confirmed' | 'cancelled' | 'completed';
+      booking_id: string | null;
+      booking_version: number | null;
+      line_account_id: string | null;
+    }>();
   if (!consultation) return false;
+  // 版フェンス: 期待と違う版の行は古い補償の対象外。何も変えず false。
+  // (同じ予定IDの後発の勝者を敗者が取り消せない)。期待なしは従来どおり無条件。
+  if (
+    options?.expectedBookingVersion !== undefined &&
+    options.expectedBookingVersion !== consultation.booking_version
+  ) {
+    return false;
+  }
+  if (
+    options?.expectedBookingId !== undefined &&
+    options.expectedBookingId !== consultation.booking_id
+  ) {
+    return false;
+  }
   const nowIso = now.toISOString();
-  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
-  // 送信権の貸出中は投げて何も変えず 409 にする (状態更新より先に調べる。
-  // 配送側は通知行だけを見るため、状態だけ先に変えると貸出中の送信が
-  // 取消ずみの相談へ届いてしまう)。再送は active が無いため 0 件で返す。
-  // 移行前の行は探さない。
-  await cancelByTrigger(db, {
-    triggerType: 'booking',
-    sourceKind: 'meet',
-    sourceId: consultation.id,
-    sourceEventId: externalEventId,
-    friendId: consultation.friend_id,
-    startsAtIso: consultation.starts_at,
-    lineAccountId: consultation.line_account_id,
-    cancelReason: `meet_cancel:${externalEventId}:by:admin`,
-    allowLegacyFallback: false,
-    failOnSendInFlight: options?.failOnSendInFlight,
-  });
-  await db
-    .prepare("UPDATE meet_consultations SET status='cancelled', updated_at=? WHERE id=?")
-    .bind(nowIso, consultation.id)
+  // 行の確定を先に条件付きで勝ち取る。SELECT 後に勝者が上書きしていたら
+  // 0 件になり、V6・通知には触らず false (敗者は何も壊さない)。
+  const claimed = await db
+    .prepare(
+      `UPDATE meet_consultations SET status='cancelled', updated_at=?
+        WHERE id=?
+          AND (booking_version = ? OR (booking_version IS NULL AND ? IS NULL))
+          AND (booking_id = ? OR (booking_id IS NULL AND ? IS NULL))`,
+    )
+    .bind(
+      nowIso,
+      consultation.id,
+      consultation.booking_version,
+      consultation.booking_version,
+      consultation.booking_id,
+      consultation.booking_id,
+    )
     .run();
+  if ((claimed.meta?.changes ?? 0) === 0) return false;
+  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
+  // 再送は active が無いため 0 件で返す。移行前の行は探さない。
+  try {
+    await cancelByTrigger(db, {
+      triggerType: 'booking',
+      sourceKind: 'meet',
+      sourceId: consultation.id,
+      sourceEventId: externalEventId,
+      friendId: consultation.friend_id,
+      startsAtIso: consultation.starts_at,
+      lineAccountId: consultation.line_account_id,
+      cancelReason: `meet_cancel:${externalEventId}:by:admin`,
+      allowLegacyFallback: false,
+      failOnSendInFlight: options?.failOnSendInFlight,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+      // 409 では行の確定も戻す (版が自分のまま・状態が自分の確定のときだけ)。
+      // 勝者が上書きずみなら 0 件になり、勝者の状態を残す。再送で回復できる。
+      await db
+        .prepare(
+          `UPDATE meet_consultations SET status=?, updated_at=?
+            WHERE id=? AND status='cancelled'
+              AND (booking_version = ? OR (booking_version IS NULL AND ? IS NULL))
+              AND (booking_id = ? OR (booking_id IS NULL AND ? IS NULL))`,
+        )
+        .bind(
+          consultation.status,
+          nowIso,
+          consultation.id,
+          consultation.booking_version,
+          consultation.booking_version,
+          consultation.booking_id,
+          consultation.booking_id,
+        )
+        .run();
+    }
+    throw error;
+  }
   await db
     .prepare(
       `UPDATE meet_consultation_reminders

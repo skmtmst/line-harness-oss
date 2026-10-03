@@ -1096,11 +1096,18 @@ async function syncSelfBookingMeet(
     if (!oldEventId) return 'not_linked';
     const consult = await c.env.DB
       .prepare(
-        `SELECT external_event_id, friend_id, title, meet_url
+        `SELECT external_event_id, friend_id, title, meet_url, booking_id, booking_version
            FROM meet_consultations WHERE external_event_id = ?`,
       )
       .bind(oldEventId)
-      .first<{ external_event_id: string; friend_id: string; title: string; meet_url: string }>();
+      .first<{
+        external_event_id: string;
+        friend_id: string;
+        title: string;
+        meet_url: string;
+        booking_id: string | null;
+        booking_version: number | null;
+      }>();
     if (!consult || consult.friend_id !== self.friendId) return 'not_linked';
     // フェンス: 予約の所有・状態・版を書き込み直前に再確認する。
     // 交差した取消・別変更が勝っていたら Meet を触らない。
@@ -1129,16 +1136,26 @@ async function syncSelfBookingMeet(
     if (newEventId !== oldEventId) {
       // 予定が作り直されても同一相談は続ける。古い相談を止め、新予定ID・
       // 本人・新日時・同じ Meet URL で登録し直す（前日・1時間前も組み直す）。
-      await cancelMeetConsultation(c.env.DB, oldEventId, new Date(), { failOnSendInFlight: true });
+      // 旧予定IDは回転ずみで誰の新予定でもないため、見た版のまま無条件で止める。
+      await cancelMeetConsultation(c.env.DB, oldEventId, new Date(), {
+        failOnSendInFlight: true,
+        expectedBookingId: consult.booking_id,
+        expectedBookingVersion: consult.booking_version,
+      });
     }
-    await registerMeetConsultation(c.env.DB, {
+    const registered = await registerMeetConsultation(c.env.DB, {
       externalEventId: newEventId,
       friendId: self.friendId,
       title: consult.title,
       startsAt: booking.starts_at,
       endsAt: booking.ends_at,
       meetUrl: consult.meet_url,
+      bookingId,
+      bookingVersion: expectedVersion,
     });
+    // 登録時に後発の勝者がいたら敗者は何も書いていない。補償で勝者を
+    // 消さないよう、そのまま superseded で終える (409)。
+    if (!registered.updated) return 'superseded';
     // 書込み後の再確認。register との間に取消・別変更が勝っていたら、
     // 今書いた相談を取り消して戻す（敗者が復活を残さない）。
     // 補償の失敗は隠さず failed と監査に残す。取消再送が回収口になる。
@@ -1156,7 +1173,14 @@ async function syncSelfBookingMeet(
       Number(after.lock_version) !== expectedVersion
     ) {
       try {
-        await cancelMeetConsultation(c.env.DB, newEventId, new Date(), { failOnSendInFlight: true });
+        // 補償は自分の版の行だけを消す。同じ予定IDに後発の勝者がいたら
+        // false になり、勝者の相談・通知を残して superseded で終える。
+        const compensated = await cancelMeetConsultation(c.env.DB, newEventId, new Date(), {
+          failOnSendInFlight: true,
+          expectedBookingId: bookingId,
+          expectedBookingVersion: expectedVersion,
+        });
+        if (!compensated) return 'superseded';
       } catch (error) {
         await recordBookingAudit(c.env.DB, {
           bookingId,
@@ -1259,21 +1283,23 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
   };
   const cancelReason = `booking_cancelled:${bookingId}:by:self:${caller.lineUserId}`;
   // 取消ずみの再送: 版が合えば副作用をそろえて 200 (冪等再送)。
-  // 所有権は decided_at 取直し＋監査の単調 rowid で主張する。時計の同msでも区別できる。
+  // 所有権は cancel_claim_id (uuid) の単文 CAS で主張する。主張と状態変更が
+  // 同じ UPDATE のため、claim→監査の別 await 窓は存在しない。時計の同msでも区別できる。
   if (row.status === 'cancelled' || row.status === 'expired') {
     if (Number(row.lock_version) !== expectedVersion) {
       return c.json({ error: 'version_conflict' }, 409);
     }
     const claimAt = new Date().toISOString();
+    const claimId = crypto.randomUUID();
     const claim = await c.env.DB
       .prepare(
-        `UPDATE bookings SET decided_at = ?,
+        `UPDATE bookings SET decided_at = ?, cancel_claim_id = ?,
                               updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
           WHERE id = ? AND line_account_id = ?
             AND status IN ('cancelled','expired')
             AND lock_version = ? AND friend_id = ?`,
       )
-      .bind(claimAt, bookingId, accountId, expectedVersion, caller.friendId)
+      .bind(claimAt, claimId, bookingId, accountId, expectedVersion, caller.friendId)
       .run();
     if ((claim.meta?.changes ?? 0) === 0) {
       const current = await c.env.DB
@@ -1283,13 +1309,13 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
       if (!current) return c.json({ error: 'booking_not_found' }, 404);
       return c.json({ error: 'version_conflict' }, 409);
     }
-    // 主張の証跡を先に残す。後続の rollback はこの行より新しい監査を見て止まる。
+    // 主張の証跡 (排他には使わない。所有権は上の単文 CAS の cancel_claim_id)。
     await recordBookingAudit(c.env.DB, {
       bookingId,
       lineAccountId: accountId,
       action: 'cancel_retry_claimed',
       before: { status: row.status },
-      after: { status: row.status, decided_at: claimAt },
+      after: { status: row.status, decided_at: claimAt, cancel_claim_id: claimId },
       reason: 'self_cancel_retry',
       actorType: 'customer',
       actorId: caller.friendId,
@@ -1323,22 +1349,18 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
     return c.json({ error: 'self_deadline_passed' }, 403);
   }
   // 条件付き確定: 同時取消の race では片方だけが通る。副作用は通った方だけ走る。
-  // 所有権の基準は監査の単調 rowid。確定より前に読み、rollback は
-  // この後の監査行が無いときだけ戻す (時計の同msでも区別できる)。
-  const auditBaseline = await c.env.DB
-    .prepare(`SELECT COALESCE(MAX(rowid), 0) AS m FROM booking_audit_logs WHERE booking_id = ?`)
-    .bind(bookingId)
-    .first<{ m: number }>()
-    .then((r) => Number(r?.m ?? 0));
+  // 所有権は cancel_claim_id (uuid) を同じ UPDATE で書く単文 CAS。
+  // 確定と主張が不可分のため、確定→監査の別 await 窓は存在しない。
   const decidedAt = new Date().toISOString();
+  const claimId = crypto.randomUUID();
   const updateResult = await c.env.DB
     .prepare(
-      `UPDATE bookings SET status = 'cancelled', decided_at = ?,
+      `UPDATE bookings SET status = 'cancelled', decided_at = ?, cancel_claim_id = ?,
                             updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
         WHERE id = ? AND line_account_id = ?
           AND lock_version = ? AND status IN ('requested','confirmed')`,
     )
-    .bind(decidedAt, bookingId, accountId, expectedVersion)
+    .bind(decidedAt, claimId, bookingId, accountId, expectedVersion)
     .run();
   if ((updateResult.meta?.changes ?? 0) === 0) {
     const current = await c.env.DB
@@ -1362,20 +1384,18 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
   } catch (error) {
     if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
       // 送信中の 409 では確定を取り消して再試行させる (取消確定後の送信を起こさない)。
-      // 後発の成功を取り込んだ監査行があれば戻さない。decided_at・版・所有も合わせる。
+      // 自分の claim_id と一致するときだけ戻す。後発の再送が主張を上書き
+      // ずみなら 0 件になり、後発の成功予約は cancelled のまま残る。
       await c.env.DB
         .prepare(
-          `UPDATE bookings SET status = ?, decided_at = ?,
+          `UPDATE bookings SET status = ?, decided_at = ?, cancel_claim_id = NULL,
                                 updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
             WHERE id = ? AND line_account_id = ? AND status = ?
               AND decided_at = ? AND lock_version = ? AND friend_id = ?
-              AND NOT EXISTS (
-                SELECT 1 FROM booking_audit_logs
-                WHERE booking_id = ? AND rowid > ?
-              )`,
+              AND cancel_claim_id = ?`,
         )
         .bind(row.status, row.decided_at, bookingId, accountId, 'cancelled',
-          decidedAt, expectedVersion, caller.friendId, bookingId, auditBaseline)
+          decidedAt, expectedVersion, caller.friendId, claimId)
         .run();
       return c.json({ error: 'send_in_flight_retry' }, 409);
     }
@@ -1461,12 +1481,19 @@ async function cancelSelfBookingMeet(
     if (!booking || booking.friend_id !== self.friendId) return 'not_linked';
     if (booking.status !== 'cancelled' && booking.status !== 'expired') return 'superseded';
     const consult = await c.env.DB
-      .prepare(`SELECT friend_id FROM meet_consultations WHERE external_event_id = ?`)
+      .prepare(
+        `SELECT friend_id, booking_id, booking_version
+           FROM meet_consultations WHERE external_event_id = ?`,
+      )
       .bind(externalEventId)
-      .first<{ friend_id: string }>();
+      .first<{ friend_id: string; booking_id: string | null; booking_version: number | null }>();
     if (!consult || consult.friend_id !== self.friendId) return 'not_linked';
+    // 見た版のまま止める。SELECT 後に別操作が上書きしていたら version が
+    // 合わず false になり、勝者の行には触らない。
     const cancelled = await cancelMeetConsultation(c.env.DB, externalEventId, new Date(), {
       failOnSendInFlight: true,
+      expectedBookingId: consult.booking_id,
+      expectedBookingVersion: consult.booking_version,
     });
     return cancelled ? 'cancelled' : 'not_linked';
   } catch {
