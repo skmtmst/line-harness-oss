@@ -252,6 +252,7 @@ export function UpcomingCard({
   bookings,
   loading,
   updatedAt,
+  startLoad = true,
 }: {
   /** 選択中のLINEアカウント。upcoming の取得に使う。 */
   accountId?: string | null
@@ -259,11 +260,17 @@ export function UpcomingCard({
   loading: boolean
   /* 明細を最後に取れた時刻。読込中・失敗時は出さない（IDEA-01）。 */
   updatedAt?: Date | null
+  /*
+   * V8 速さ対応：右の列が見えるまで取得を待つとき false。
+   * 省略時は今までどおりすぐ取る（v7 は変えない）。
+   */
+  startLoad?: boolean
 }) {
   const [upcoming, setUpcoming] = useState<DashboardUpcoming | null>(null)
   const [upcomingFailed, setUpcomingFailed] = useState(false)
   const [upcomingAt, setUpcomingAt] = useState<Date | null>(null)
   useEffect(() => {
+    if (!startLoad) return
     if (!accountId) return
     let cancelled = false
     setUpcoming(null)
@@ -285,7 +292,7 @@ export function UpcomingCard({
     return () => {
       cancelled = true
     }
-  }, [accountId])
+  }, [accountId, startLoad])
 
   const merged = accountId && !upcomingFailed ? upcoming : null
   if (merged) {
@@ -377,11 +384,19 @@ function formatAsOfMonthDay(iso: string): string {
  * 数えない。出どころといつ時点の数かは、見出しの「？」に出す。
  * 本文に補足を書いて箱を高くしない。
  */
-export function DeliveryFailuresCard({ accountId }: { accountId?: string | null }) {
+export function DeliveryFailuresCard({ accountId, startLoad = true }: {
+  accountId?: string | null
+  /*
+   * V8 速さ対応：右の列が見えるまで取得を待つとき false。
+   * 省略時は今までどおりすぐ取る（v7 は変えない）。
+   */
+  startLoad?: boolean
+}) {
   const [origins, setOrigins] = useState<DeliveryFailureOrigins | null>(null)
   const [failed, setFailed] = useState(false)
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null)
   useEffect(() => {
+    if (!startLoad) return
     if (!accountId) return
     let cancelled = false
     setOrigins(null)
@@ -403,7 +418,7 @@ export function DeliveryFailuresCard({ accountId }: { accountId?: string | null 
     return () => {
       cancelled = true
     }
-  }, [accountId])
+  }, [accountId, startLoad])
 
   const asOf = origins?.asOf ? formatAsOfMonthDay(origins.asOf) : null
   return (
