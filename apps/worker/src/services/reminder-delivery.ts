@@ -81,6 +81,73 @@ export interface ReminderDeliveryResult {
 }
 
 /** 本番配信と下書き試験が同じテンプレート・変数展開を通る共通口。 */
+/*
+ * F10: リマインダの差し込み「予約日時・Google Meet URL」。
+ * 個別相談の確定予定（meet_consultations）から、その人への値を引く。
+ * 直近の確定予定が先。確定が1つも無ければ空文字（残さない）。
+ * 取消・完了は確定ではないので空扱い。F6・Meet送信版・lease・
+ * 日時変更/取消ガードには触らない。読むだけ。
+ */
+export const RESERVATION_DATETIME_PATTERN = /\{\{\s*reservation_datetime\s*\}\}/;
+const MEET_URL_PATTERN = /\{\{\s*meet_url\s*\}\}/;
+
+export function contentNeedsBookingPlaceholders(content: string): boolean {
+  return RESERVATION_DATETIME_PATTERN.test(content) || MEET_URL_PATTERN.test(content);
+}
+
+export interface BookingInterpolation {
+  reservationDatetime: string;
+  meetUrl: string;
+}
+
+/** 開始日時を「10月10日（木）10:00」の形にする（Meet通知と同じ形）。 */
+export function formatBookingDatetime(startsAt: string): string {
+  const start = new Date(startsAt);
+  const jst = new Date(start.getTime() + 9 * 60 * 60 * 1000);
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+  const iso = jst.toISOString();
+  const month = Number(iso.slice(5, 7));
+  const day = Number(iso.slice(8, 10));
+  const time = iso.slice(11, 16);
+  return `${month}月${day}日（${weekdays[jst.getUTCDay()]}）${time}`;
+}
+
+export async function resolveBookingInterpolation(
+  db: D1Database,
+  friendId: string,
+  now: Date = new Date(),
+): Promise<BookingInterpolation> {
+  const empty = { reservationDatetime: '', meetUrl: '' };
+  const rows = await db.prepare(
+    `SELECT starts_at, meet_url FROM meet_consultations
+      WHERE friend_id = ? AND status = 'confirmed'`,
+  ).bind(friendId).all<{ starts_at: string; meet_url: string | null }>();
+  const list = rows.results ?? [];
+  if (list.length === 0) return empty;
+  const nowMs = now.getTime();
+  const upcoming = list
+    .filter((row) => Number.isFinite(Date.parse(row.starts_at)) && Date.parse(row.starts_at) >= nowMs)
+    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  const past = list
+    .filter((row) => Number.isFinite(Date.parse(row.starts_at)) && Date.parse(row.starts_at) < nowMs)
+    .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
+  const picked = upcoming[0] ?? past[0] ?? null;
+  if (!picked) return empty;
+  return {
+    reservationDatetime: formatBookingDatetime(picked.starts_at),
+    meetUrl: picked.meet_url ?? '',
+  };
+}
+
+export function substituteBookingPlaceholders(
+  content: string,
+  values: BookingInterpolation,
+): string {
+  return content
+    .replace(/\{\{\s*reservation_datetime\s*\}\}/g, values.reservationDatetime)
+    .replace(/\{\{\s*meet_url\s*\}\}/g, values.meetUrl);
+}
+
 export async function buildReminderStepMessage(
   db: D1Database,
   step: ReminderStepRow,
@@ -125,11 +192,19 @@ export async function buildReminderStepMessage(
     }
   }
   const resolvedMeta = await resolveMetadata(db, friend);
+  // F10: 予約日時・Meet URL は送る側で置き換える。共通展開より先に潰すので、
+  // 利用者が入れた値に同じ文字があっても二重に展開しない。
+  const bookingContent = contentNeedsBookingPlaceholders(messageContent)
+    ? substituteBookingPlaceholders(
+      messageContent,
+      await resolveBookingInterpolation(db, friend.id, deliveredAt),
+    )
+    : messageContent;
   const extra = await resolveSendInterpolationExtra(
-    db, friend.id, messageContent, { kind: sourceKind, id: step.id },
+    db, friend.id, bookingContent, { kind: sourceKind, id: step.id },
   );
   const expanded = expandVariables(
-    messageContent,
+    bookingContent,
     { ...friend, metadata: resolvedMeta },
     undefined,
     messageType,

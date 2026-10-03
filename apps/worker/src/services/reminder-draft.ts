@@ -3,13 +3,14 @@ import {
   getFriendByLineUserIdForAccount,
   getLineAccountById,
   getReminderVersionSteps,
+  getTemplateById,
   jstNow,
   type ReminderDraftSettings,
   type ReminderVersionRow,
 } from '@line-crm/db';
 import { resolveReminderSendAt } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
-import { buildReminderStepMessage } from './reminder-delivery.js';
+import { buildReminderStepMessage, contentNeedsBookingPlaceholders } from './reminder-delivery.js';
 import { buildPublicSegmentQuery, buildSegmentWhere, isEmptySegmentCondition } from './segment-query.js';
 import {
   completeOutboundSendStatement,
@@ -204,8 +205,69 @@ export async function validateReminderDraft(
   checks.push(check('test_send', 'テスト送信', testPassed, testPassed
     ? '直近のテスト送信が成功しています'
     : '公開前にテスト送信を成功させてください'));
+  // F10: 予約日時・Meet URL の差し込みを使うときは、値が空の人がいないか見る。
+  // 空の人（確定予定が無い人）へ送ると日時もURLも空で届くので、公開前に止める。
+  const bookingEmpty = await countBookingEmptyAudience(db, settings);
+  checks.push(check('booking_placeholders', '予約の差し込み', bookingEmpty.empty === 0,
+    !bookingEmpty.uses
+      ? '予約日時・Meet URLの差し込みは使っていません'
+      : bookingEmpty.empty === 0
+        ? '予約の差し込みが空の人はいません'
+        : `予約日時・Meet URLが空の人が${bookingEmpty.empty}人います。確定予定の無い人には空で届きます`));
   const audience = await countReminderAudience(db, settings);
   return { valid: checks.every((item) => item.status === 'passed'), checks, audience };
+}
+
+/*
+ * F10: 差し込みを使う通知の届け先のうち、確定予定が無い人の数。
+ * 数の数え方は countReminderAudience と同じ3枝（条件・タグ・全員）。
+ * 使っていないときは数えない（0人扱い）。
+ */
+export async function countBookingEmptyAudience(
+  db: D1Database,
+  settings: ReminderDraftSettings,
+): Promise<{ uses: boolean; empty: number }> {
+  const contents: string[] = [];
+  for (const step of settings.steps) {
+    if (step.templateId) {
+      const template = await getTemplateById(db, step.templateId);
+      if (template) contents.push(template.message_content);
+    } else {
+      contents.push(step.messageContent);
+    }
+  }
+  if (!contents.some((content) => contentNeedsBookingPlaceholders(content))) {
+    return { uses: false, empty: 0 };
+  }
+  const emptyCondition = `NOT EXISTS (
+    SELECT 1 FROM meet_consultations mc
+     WHERE mc.friend_id = f.id AND mc.status = 'confirmed'
+  )`;
+  let row: { count: number | null } | null;
+  if (!isEmptySegmentCondition(settings.targetCondition as never)) {
+    buildPublicSegmentQuery(settings.targetCondition as never);
+    const where = buildSegmentWhere(settings.targetCondition as never);
+    row = await db.prepare(
+      `SELECT COUNT(*) AS count FROM friends f
+        WHERE f.line_account_id = ? AND f.is_following = 1 AND (${where.sql})
+          AND ${emptyCondition}`,
+    ).bind(settings.lineAccountId, ...where.bindings).first<{ count: number | null }>();
+  } else if (settings.targetTagId) {
+    row = await db.prepare(
+      `SELECT COUNT(DISTINCT f.id) AS count
+         FROM friends f
+         JOIN friend_tags ft ON ft.friend_id = f.id AND ft.tag_id = ?
+        WHERE f.line_account_id = ? AND f.is_following = 1
+          AND ${emptyCondition}`,
+    ).bind(settings.targetTagId, settings.lineAccountId).first<{ count: number | null }>();
+  } else {
+    row = await db.prepare(
+      `SELECT COUNT(*) AS count FROM friends f
+        WHERE f.line_account_id = ? AND f.is_following = 1
+          AND ${emptyCondition}`,
+    ).bind(settings.lineAccountId).first<{ count: number | null }>();
+  }
+  return { uses: true, empty: Number(row?.count ?? 0) };
 }
 
 export async function previewReminderDraft(
