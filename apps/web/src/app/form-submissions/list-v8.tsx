@@ -240,6 +240,12 @@ export default function FormSubmissionsListV8() {
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  /* 行の名前を変更。保存は編集保存と同じ口を通すので版を添える（v7 と同じ）。 */
+  const [renameTarget, setRenameTarget] = useState<Form | null>(null)
+  const [renameName, setRenameName] = useState('')
+  const [renameRevision, setRenameRevision] = useState<number | null>(null)
+  const [renaming, setRenaming] = useState(false)
+  const [renameError, setRenameError] = useState('')
   /* 「受付を止める」の確認。止めるにも編集の版が要るので影響口で読む(#723)。 */
   const [stopTarget, setStopTarget] = useState<Form | null>(null)
   const [stopRevision, setStopRevision] = useState<number | null>(null)
@@ -270,6 +276,7 @@ export default function FormSubmissionsListV8() {
     setStopTarget(null)
     setMoveTarget(null)
     setDuplicateTarget(null)
+    setRenameTarget(null)
     setOpenMenuId(null)
     setStats(null)
     setStatsFailed(false)
@@ -582,6 +589,70 @@ export default function FormSubmissionsListV8() {
   }
 
   /* 「受付を止める」の窓を開く。止める保存には編集の版が要るので影響口で読む。 */
+  /*
+   * R27: 名前の変更は「…」の中の操作（v7 と同じ）。保存は編集保存と同じ口を
+   * 通るので、確認した編集の版を添える。一覧は版を持っていないため、窓を
+   * 開くときに1件取得で読む。版なしで送ると口が 400 にする（#723）。
+   */
+  const openRename = async (form: Form) => {
+    setRenameTarget(form)
+    setRenameName(displayFormName(form.name))
+    setRenameError('')
+    setRenameRevision(null)
+    if (!selectedAccountId) {
+      setRenameError('LINE公式アカウントを選んでください。')
+      return
+    }
+    try {
+      const res = await fetchApi<{ success: boolean; data: { contentRevision?: number } }>(
+        `/api/forms/${form.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+      )
+      if (!res.success) throw new Error('rename_revision_failed')
+      const revision = res.data.contentRevision
+      if (!Number.isInteger(revision)) throw new Error('rename_revision_failed')
+      setRenameRevision(revision as number)
+    } catch {
+      setRenameError('フォームの状態を確認できませんでした。開き直してください。')
+    }
+  }
+
+  const saveRename = async () => {
+    if (!renameTarget || !renameName.trim() || renaming || !selectedAccountId) return
+    const name = displayFormName(renameName)
+    setRenaming(true)
+    setRenameError('')
+    try {
+      let revision = renameRevision
+      if (revision === null) {
+        const res = await fetchApi<{ success: boolean; data: { contentRevision?: number } }>(
+          `/api/forms/${renameTarget.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+        )
+        if (!res.success || !Number.isInteger(res.data.contentRevision)) {
+          throw new Error('rename_revision_failed')
+        }
+        revision = res.data.contentRevision as number
+        setRenameRevision(revision)
+      }
+      const res = await api.forms.update(renameTarget.id, selectedAccountId, {
+        name,
+        expectedContentRevision: revision,
+      })
+      if (!res.success) throw new Error('rename_failed')
+      setForms((current) => current.map((form) => (
+        form.id === renameTarget.id ? { ...form, name } : form
+      )))
+      setRenameTarget(null)
+      // 名前は検索・名前順の対象。サーバー側の絞り込み・並びとずれないよう読み直す。
+      void loadForms()
+    } catch (error) {
+      setRenameError(error instanceof ApiError && error.status === 409
+        ? 'ほかの人が先にこの回答フォームを保存しました。開き直して、もう一度お試しください。'
+        : 'フォーム名を変更できませんでした。もう一度お試しください。')
+    } finally {
+      setRenaming(false)
+    }
+  }
+
   const openStop = async (form: Form) => {
     setStopTarget(form)
     setStopRevision(null)
@@ -834,12 +905,17 @@ export default function FormSubmissionsListV8() {
     },
   ]
 
-  /* ===== 行の「…」（I3L41O：編集・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・削除） ===== */
+  /* ===== 行の「…」（I3L41O：編集・名前を変更・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・削除） ===== */
   const rowMenuItems = (form: Form): ActionMenuItem[] => [
     {
       id: 'edit',
       label: '編集',
       onSelect: () => router.push(`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`),
+    },
+    {
+      id: 'rename',
+      label: '名前を変更',
+      onSelect: () => void openRename(form),
     },
     {
       id: 'responses',
@@ -1509,6 +1585,61 @@ export default function FormSubmissionsListV8() {
           </div>
         ) : null}
         {deleteError ? <p className={styles.dialogError} role="alert">{deleteError}</p> : null}
+      </Dialog>
+
+      {/*
+       * 行の名前を変更（v7 と同じ操作）。回答データやURLは変わらない。
+       */}
+      <Dialog
+        open={renameTarget !== null}
+        title="フォーム名を変更"
+        description="回答データやURLは変わりませんが、回答者に表示されるフォーム名も変わります。"
+        busy={renaming}
+        onCancel={() => {
+          if (renaming) return
+          setRenameTarget(null)
+          setRenameError('')
+        }}
+        footer={(
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex-1" />
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={renaming}
+              onClick={() => {
+                if (renaming) return
+                setRenameTarget(null)
+                setRenameError('')
+              }}
+            >
+              キャンセル
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              busy={renaming}
+              busyLabel="保存中"
+              disabled={renaming || !renameName.trim()}
+              onClick={() => void saveRename()}
+            >
+              保存する
+            </Button>
+          </div>
+        )}
+      >
+        <label className="block">
+          <span className="text-ink-secondary mb-1 block text-xs font-medium">フォーム名</span>
+          <input
+            type="text"
+            value={renameName}
+            onChange={(e) => setRenameName(e.target.value)}
+            disabled={renaming}
+            maxLength={100}
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+          />
+        </label>
+        {renameError ? <p className="text-sm text-danger" role="alert">{renameError}</p> : null}
       </Dialog>
     </div>
   )
