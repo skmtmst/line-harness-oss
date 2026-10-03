@@ -1,8 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState, type FormEvent } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import { OpsInviteV8 } from './invite-v8'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'
@@ -13,6 +11,7 @@ import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { adminSessionHandoffPath, storeAdminSession } from '@/lib/admin-session'
 import { authRequest, passwordError } from '@/lib/auth-email'
 import { ApiError } from '@/lib/api'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 /**
@@ -24,24 +23,13 @@ import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
  */
 type Check = { email: string; name: string; needsPassword: boolean }
 
-/*
- * ★V8-B の切り替え。v8 の器は別ファイル（invite-v8.tsx）に置き、
- * v7 の器・動きはこの下の V7 のまま残す。
- */
 export default function OpsInvitePage() {
   const theme = useAdminTheme()
-  if (theme === 'v8') {
-    return (
-      <Suspense fallback={null}>
-        <OpsInviteV8 />
-      </Suspense>
-    )
-  }
-  return <OpsInvitePageV7 />
-}
-
-function OpsInvitePageV7() {
+  const v8 = theme === 'v8'
   const [token, setToken] = useState('')
+  // 招待の状態（期限切れ・使用済み・不明）。裏側の code をそのまま使う。
+  const [inviteCode, setInviteCode] = useState<string | null>(null)
+  const [acceptCode, setAcceptCode] = useState<string | null>(null)
   const [check, setCheck] = useState<Check | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'invalid'>('loading')
   const [message, setMessage] = useState('')
@@ -65,12 +53,15 @@ function OpsInvitePageV7() {
     setState('loading')
     setMessage('')
     setCheckFailed(null)
+    setInviteCode(null)
     if (!value) { setState('invalid'); setMessage('この招待は見つかりません。招待した運営メンバーに確認してください'); return }
     const res = await authRequest<Check>(`/api/auth/ops-invite/check?token=${encodeURIComponent(value)}`)
     if (!res.ok || !res.data) {
       setCheckFailed(new ApiError(res.status, res.error))
+      setInviteCode(res.code ?? null)
       setState('invalid'); setMessage(res.error || 'この招待は使えません'); return
     }
+    setInviteCode(null)
     setCheck(res.data)
     setName(res.data.needsPassword ? '' : res.data.name)
     setState('ready')
@@ -92,15 +83,19 @@ function OpsInvitePageV7() {
     }
     setBusy(true)
     setError('')
+    setAcceptCode(null)
     const res = await authRequest<{ next: string; sessionToken?: string }>('/api/auth/ops-invite/accept', {
       token,
       ...(check.needsPassword ? { name: name.trim(), password } : {}),
     })
     if (!res.ok || !res.data) {
       setError(res.error || '登録を進められませんでした')
+      // 二重送信などで先に使われたときは、ログインへの案内を出す。
+      setAcceptCode(res.code ?? null)
       setBusy(false)
       return
     }
+    setAcceptCode(null)
     resetAuthSelectionCleared(localStorage, sessionStorage)
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
     else if (res.csrfToken) {
@@ -109,9 +104,13 @@ function OpsInvitePageV7() {
     window.location.assign(adminSessionHandoffPath('/ops/two-factor', res.data.sessionToken, res.csrfToken))
   }
 
+  // 期限切れと使用済みを分ける（V8だけ。v7 は裏側の文のまま）。
+  // 使用済みはログインへの案内、期限切れは送り直しの依頼が出口。
+  const usedInvite = inviteCode === 'used' || acceptCode === 'used'
+
   return (
     <AuthCard
-      node="J6KbIg"
+      node={v8 ? 'tVaUh' : 'J6KbIg'}
       cardNode="v6cPGq"
       title="運営メンバーの招待"
       description={
@@ -126,17 +125,25 @@ function OpsInvitePageV7() {
       {state === 'loading' ? (
         <ListState kind="loading" title="招待を確認しています" />
       ) : state === 'invalid' ? (
-        <ListState
-          kind="error"
-          title="この招待は使えません"
-          description={isForbiddenOrRateLimited(checkFailed) ? undefined : message}
-          error={checkFailed ?? undefined}
-          onRetry={() => void checkInvite()}
-        />
+        <>
+          <ListState
+            kind="error"
+            title={v8 && inviteCode === 'used' ? 'この招待はすでに使われています' : v8 && inviteCode === 'expired' ? 'この招待は期限切れです' : 'この招待は使えません'}
+            description={isForbiddenOrRateLimited(checkFailed) ? undefined : message}
+            error={checkFailed ?? undefined}
+            onRetry={() => void checkInvite()}
+          />
+          {v8 && inviteCode === 'used' ? (
+            <Button href="/ops/login" className="w-full">運営のログインへ</Button>
+          ) : null}
+        </>
       ) : (
         <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
           {error ? (
             <Notice tone="danger" message={error} />
+          ) : null}
+          {v8 && usedInvite && error ? (
+            <Button href="/ops/login" className="w-full">運営のログインへ</Button>
           ) : null}
           <AuthField label="メールアドレス" htmlFor="ops-invite-email">
             <TextField id="ops-invite-email" type="email" value={check?.email ?? ''} readOnly />
@@ -154,7 +161,7 @@ function OpsInvitePageV7() {
               </AuthField>
             </>
           ) : null}
-          <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="進めています…">設定して2要素認証へ進む
+          <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="進めています…">{v8 && check?.needsPassword ? '→ パスワードを設定して次へ' : '設定して2要素認証へ進む'}
           </Button>
           <p className="text-center text-caption text-ink-faint">
             招待の有効期限は24時間です。期限が切れたときは、招待した運営メンバーに送り直しを依頼してください
