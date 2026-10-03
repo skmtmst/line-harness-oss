@@ -45,6 +45,7 @@ import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shar
 import MileageTableSkeleton from './mileage-table-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ActionMenu from '@/components/shared/action-menu'
+import { notifyToast } from '@/components/shared/toast'
 import {
   api,
   type MileageAdminHistory,
@@ -391,16 +392,44 @@ export default function V8EarningRulesTab({
     }
   }
 
-  const toggleRule = async (rule: MileageEarningRuleV6) => {
+  /*
+   * 止める・動かすは先に画面を変えて裏で保存する（サクサク感 B）。
+   * 失敗したら戻して Toast で理由と「もう一度」、成功したら Toast の
+   * 「元に戻す」（同じ口で戻せる）で取り消せる。
+   */
+  const toggleRule = async (rule: MileageEarningRuleV6, options?: { silent?: boolean }) => {
     if (readonly) return
+    const toActive = rule.published.status !== 'published'
+    setRules((current) => current.map((item) => (
+      item.id === rule.id
+        ? { ...item, published: { ...item.published, status: toActive ? 'published' : 'stopped' } }
+        : item
+    )))
     setSavingId(rule.id)
     setActionError('')
     try {
-      const res = await api.mileage.updateRule(rule.id, { isActive: rule.published.status !== 'published' })
+      const res = await api.mileage.updateRule(rule.id, { isActive: toActive })
       if (!res.success) throw new Error(res.error)
       await load()
+      if (!options?.silent) {
+        const flipped: MileageEarningRuleV6 = {
+          ...rule,
+          published: { ...rule.published, status: toActive ? 'published' : 'stopped' },
+        }
+        notifyToast(toActive ? '動かしています' : '止めています', {
+          actionLabel: '元に戻す',
+          onAction: () => void toggleRule(flipped, { silent: true }),
+        })
+      }
     } catch {
-      setActionError('たまる決めごとを更新できませんでした。もう一度お試しください。')
+      setRules((current) => current.map((item) => (
+        item.id === rule.id ? { ...item, published: { ...item.published, status: rule.published.status } } : item
+      )))
+      notifyToast('たまる決めごとを更新できませんでした', {
+        tone: 'error',
+        actionLabel: 'もう一度試す',
+        onAction: () => void toggleRule(rule),
+      })
     } finally {
       setSavingId(null)
     }

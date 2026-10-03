@@ -20,6 +20,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -275,9 +276,22 @@ export default function V8RewardsTab({
     }
   }
 
-  const changeState = async (reward: MileageRewardSummary) => {
+  /*
+   * 止める・また出すは先に画面を変えて裏で保存する（サクサク感 B）。
+   * 失敗したら戻して Toast で理由と「もう一度」、成功したら Toast の
+   * 「元に戻す」（同じ口で戻せる）で取り消せる。下書きの公開は重い操作の
+   * まま（元に戻すと止めた状態になり下書きに戻らないため対象外）。
+   */
+  const changeState = async (reward: MileageRewardSummary, options?: { silent?: boolean }) => {
     if (readonly || !accountId
       || (reward.status !== 'published' && reward.status !== 'draft' && reward.status !== 'stopped')) return
+    const optimistic = reward.status === 'published' || reward.status === 'stopped'
+    const toStatus = reward.status === 'published' ? 'stopped' : reward.status === 'stopped' ? 'published' : reward.status
+    if (optimistic) {
+      setRewards((current) => current.map((item) => (
+        item.id === reward.id ? { ...item, status: toStatus } : item
+      )))
+    }
     setBusyId(reward.id)
     setActionError('')
     try {
@@ -293,12 +307,28 @@ export default function V8RewardsTab({
         )
       if (!response.success) throw new Error(response.error)
       await load()
+      if (optimistic && !options?.silent) {
+        const flipped: MileageRewardSummary = { ...reward, status: toStatus }
+        notifyToast(reward.status === 'published' ? '止めています' : 'また出しています', {
+          actionLabel: '元に戻す',
+          onAction: () => void changeState(flipped, { silent: true }),
+        })
+      }
     } catch {
-      setActionError(reward.status === 'published'
-        ? '使い道を止められませんでした。もう一度お試しください。'
-        : reward.status === 'stopped'
-          ? '使い道をまた出せませんでした。もう一度お試しください。'
-          : '使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+      if (optimistic) {
+        setRewards((current) => current.map((item) => (
+          item.id === reward.id ? { ...item, status: reward.status } : item
+        )))
+        notifyToast(reward.status === 'published'
+          ? '使い道を止められませんでした'
+          : '使い道をまた出せませんでした', {
+          tone: 'error',
+          actionLabel: 'もう一度試す',
+          onAction: () => void changeState(reward),
+        })
+      } else {
+        setActionError('使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+      }
     } finally {
       setBusyId(null)
     }
