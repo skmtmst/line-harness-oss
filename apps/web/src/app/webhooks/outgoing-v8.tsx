@@ -30,6 +30,7 @@ import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
 import type { WebhookInteractionSummary } from '@line-crm/shared'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
@@ -564,7 +565,37 @@ function OutgoingV8Inner() {
   const pausedCount = outgoing.length - activeCount
 
   const listBody = (() => {
-    if (outgoingStatus === 'loading') return <ListState kind="loading" title="送り先を読み込んでいます" />
+    if (outgoingStatus === 'loading') {
+      return (
+        <div className={styles.tableWrap} aria-busy="true" aria-label="送り先を読み込んでいます">
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true">
+                <div style={{ display: 'flex', gap: 40, padding: '13px 20px' }}>
+                  <Skeleton height={12} width={60} />
+                  <Skeleton height={12} width={90} />
+                  <Skeleton height={12} width={70} />
+                  <Skeleton height={12} width={60} />
+                  <Skeleton height={12} width={50} />
+                  <Skeleton height={12} width={40} />
+                </div>
+                {[0, 1, 2, 3, 4].map((row) => (
+                  <div key={row} style={{ display: 'flex', gap: 20, padding: '9px 20px', borderTop: '1px solid var(--color-hairline)' }}>
+                    <span style={{ flex: 1 }}><Skeleton height={14} width="60%" /><Skeleton className="mt-1" height={11} width="80%" /></span>
+                    <Skeleton height={14} width="7rem" />
+                    <Skeleton height={14} width="10rem" />
+                    <Skeleton height={14} width="6rem" />
+                    <Skeleton height={14} width="10rem" />
+                    <Skeleton height={30} width="12rem" />
+                  </div>
+                ))}
+              </div>
+            )}
+          />
+        </div>
+      )
+    }
     if (!selectedAccountId) {
       return (
         <ListState

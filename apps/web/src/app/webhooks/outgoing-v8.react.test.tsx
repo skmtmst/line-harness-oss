@@ -158,3 +158,24 @@ test('v7 では従来の一覧が出て ZSbFY は出ない', async () => {
   await renderPage()
   expect(host.querySelector('[data-design-node="ZSbFY"]')).toBeNull()
 })
+
+test('v8 の読み込み中は表の形の骨組みが出て「読み込み中」の文字は無い', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  vi.useFakeTimers()
+  try {
+    vi.stubGlobal('fetch', () => new Promise<Response>(() => {}))
+    await act(async () => {
+      root.render(<WebhooksPage />)
+    })
+    // 骨組みは0.3秒待ってから出る。
+    await act(async () => {
+      vi.advanceTimersByTime(350)
+    })
+    const board = host.querySelector('[data-design-node="ZSbFY"]')
+    expect(board?.querySelector('[aria-busy="true"]')).not.toBeNull()
+    expect(board?.querySelectorAll('[data-skeleton]').length).toBeGreaterThan(0)
+    expect(board?.textContent).not.toContain('読み込み中')
+  } finally {
+    vi.useRealTimers()
+  }
+})
