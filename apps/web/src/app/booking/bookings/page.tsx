@@ -879,7 +879,7 @@ export default function BookingsPage() {
   {/* 帯同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
   if (view === 'day' || view === 'week') {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4" data-design-node="acRIl">
         {pageHead}
         {createRow}
         {/*
@@ -921,7 +921,7 @@ export default function BookingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-design-node="acRIl">
       {pageHead}
 
       {/*
