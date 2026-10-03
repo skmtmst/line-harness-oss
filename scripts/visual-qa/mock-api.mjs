@@ -78,6 +78,7 @@ import {
   SUPPORT_MARKS, SUPPORT_MARK_ARCHIVE_IMPACT, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, OUTGOING_WEBHOOK_TEST_RESULT, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, ENTRY_ROUTES, INFLOW_SUMMARY,
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS, TRACKED_LINKS,
+  AD_COST_ROWS, AD_COST_PLATFORMS,
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
@@ -1082,14 +1083,15 @@ const ANALYTICS_SAVED = [
   },
 }))
 
+/*
+ * 承認待ちは V8 の板（`nJlxX`・`OylSV`）の 5 件にそろえる。
+ * 重複の疑い3件は残す（板にも出る）。
+ */
 const PENDING_APPROVALS = [
   ['木村 亮', '合同会社ノース', 'ao-2', '定期便のお申し込み', 'ECの定期が確定したとき', 5000, true],
   ['大西 健一', '合同会社ノース', 'ao-4', '資料請求', '資料請求', 1500, true],
   ['岡本 遥', '旧パートナーA（停止中）', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, true],
   ['高橋 直人', '田中 明', 'ao-2', '定期便のお申し込み', 'ECの定期が確定したとき', 5000, false],
-  ['藤井 理沙', '中村 彩', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, false],
-  ['前田 さくら', '木村 亮', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, false],
-  ['松本 圭', '山口 商店', 'ao-3', '友だち追加', '友だち追加', 100, false],
   ['石田 未来', '田中 明', 'ao-4', '資料請求', '資料請求', 6000, false],
 ].map(([friendName, affiliateName, offerId, offerName, conversionPointName, value, duplicateFlag], index) => ({
   eventId: `cv-p-${index + 1}`,
@@ -1107,7 +1109,8 @@ const PENDING_APPROVALS = [
   duplicateFlag,
 }))
 
-const APPROVED_APPROVALS = Array.from({ length: 34 }, (_, index) => {
+/* 今月認めた数は V8 の板（`OylSV`）の 33 件にそろえる。 */
+const APPROVED_APPROVALS = Array.from({ length: 33 }, (_, index) => {
   const offerIndex = index < 18 ? 1 : index < 26 ? 2 : index < 31 ? 3 : 4
   const rewards = [0, 3000, 5000, 100, 1500]
   const names = ['', '体験の申し込み', '定期便のお申し込み', '友だち追加', '資料請求']
@@ -3148,6 +3151,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
+  /*
+   * #818 流入元ごとの広告費の台帳。数は V8 の板（`qSTVR`・`ZxKL5`）にそろえる。
+   * この30日の広告費 ¥86,000・友だち追加 73 人・つないだ広告 2 件。
+   * 手入力の記録は無い（板にも無い）ので空で返す。
+   */
+  if (pathname === '/api/ad-costs') {
+    return {
+      success: true,
+      data: { rows: AD_COST_ROWS, platforms: AD_COST_PLATFORMS, manualEntries: [] },
+    }
+  }
   if (pathname === '/api/ad-platforms/logs') {
     const page = Math.max(1, Number(query.get('page')) || 1)
     const limit = Math.min(200, Math.max(1, Number(query.get('limit')) || 20))

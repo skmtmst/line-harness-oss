@@ -42,6 +42,7 @@ import MetricValue from '@/components/ui/metric-value'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Chip, { type ChipTone } from '@/components/shared/chip'
@@ -2048,8 +2049,20 @@ function FunnelForm({
     }
   }
 
+  // 板 `VDPz5`「ファネルを作る」。作る・直す操作は小窓で出す。
   return (
-    <div className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
+    <Dialog
+      open
+      title={edit ? 'ファネルを直す' : 'ファネルを作る'}
+      confirmLabel={edit ? '新版として保存する' : '作る'}
+      cancelLabel="キャンセル"
+      busy={saving}
+      error={error || undefined}
+      designNode={edit ? undefined : 'VDPz5'}
+      onConfirm={() => void save()}
+      onCancel={onCancel}
+    >
+    <div className="space-y-4">
       {presetConversion && !edit ? (
         <Notice tone="info">
           成果地点「{presetConversion.name}」を2段目に入れています。このまま段を組んで作成すると、その成果地点を使う分析として登録されます。
@@ -2164,22 +2177,8 @@ function FunnelForm({
         段は2つ以上10個まで。1段だけだと「ただの件数」になり、どこで離れたかが分かりません。
       </p>
 
-      {error && <p className="text-danger text-sm">{error}</p>}
-
-      <div className="flex gap-2">
-        <Button
-          onClick={save}
-          disabled={saving}
-          variant="primary" busy={saving} busyLabel="保存中...">
-          {edit ? '新版として保存する' : '作る'}
-        </Button>
-        <Button
-          onClick={onCancel}
-        >
-          キャンセル
-        </Button>
-      </div>
     </div>
+    </Dialog>
   )
 }
 

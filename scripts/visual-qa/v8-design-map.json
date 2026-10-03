@@ -1,0 +1,5869 @@
+{
+  "generatedBy": "scripts/visual-qa/build-v8-design-map.mjs",
+  "sources": [
+    "BOARD-INDEX.md",
+    "HANDOVER-MAP.md",
+    "V8B-HANDOVER-MAP.md",
+    "specs/pages/*.md"
+  ],
+  "designDir": "/Users/kentakenta/lh-work/design/v8",
+  "boardCount": 504,
+  "retired": [],
+  "boards": {
+    "A0pDt": {
+      "doc": "V8",
+      "name": "自動応答 作る② どんなときに動くか V8",
+      "kind": "画面",
+      "route": "/auto-replies/edit",
+      "routes": [
+        "/auto-replies/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/A0pDt.png",
+      "url": "/auto-replies/edit"
+    },
+    "A35Gh": {
+      "doc": "V8",
+      "name": "設定 ログインユーザー（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/staff",
+      "routes": [
+        "/staff"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/A35Gh.png",
+      "url": "/staff"
+    },
+    "A8jzaQ": {
+      "doc": "V8",
+      "name": "一覧の状態",
+      "shot": null,
+      "kind": "状態",
+      "route": "/broadcasts",
+      "url": "/broadcasts",
+      "routes": [
+        "/broadcasts"
+      ],
+      "width": 1440
+    },
+    "ADjK8": {
+      "doc": "V8",
+      "name": "友だち 統合ユーザー V8",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/ADjK8.png",
+      "url": null
+    },
+    "ADutg": {
+      "doc": "V8",
+      "name": "LIFF 状態：空きがない",
+      "kind": "状態",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/ADutg.png",
+      "url": null
+    },
+    "AOWoJ": {
+      "doc": "V8-B",
+      "name": "会員 一覧 V8（機能追加 F-19・API待ち）",
+      "kind": "画面",
+      "route": "/nen/members",
+      "routes": [
+        "/nen/members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/AOWoJ.png",
+      "url": "/nen/members"
+    },
+    "ARuZ4": {
+      "doc": "V8",
+      "name": "シナリオ配信 編集（停止中） V8",
+      "kind": "画面",
+      "route": "/scenarios/detail",
+      "routes": [
+        "/scenarios/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/ARuZ4.png",
+      "url": "/scenarios/detail"
+    },
+    "AYc6O": {
+      "doc": "V8",
+      "name": "共通情報 編集（変える前に影響を見る） V8",
+      "kind": "画面",
+      "route": "/contents/vars/edit",
+      "routes": [
+        "/contents/vars/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/AYc6O.png",
+      "url": "/contents/vars/edit"
+    },
+    "AcTHQ": {
+      "doc": "V8",
+      "name": "LIFF 状態：読み込み中",
+      "kind": "状態",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/AcTHQ.png",
+      "url": null
+    },
+    "AjZhH": {
+      "doc": "V8-B",
+      "name": "予約台帳 予約の詳細 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/AjZhH.png"
+    },
+    "Al4Ek": {
+      "doc": "V8",
+      "name": "シナリオ配信 複製のダイアログ V8",
+      "kind": "小窓",
+      "route": "/scenarios",
+      "routes": [
+        "/scenarios"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Al4Ek.png",
+      "url": "/scenarios"
+    },
+    "AnwtH": {
+      "doc": "V8-B",
+      "name": "統括 バナー生成（画像を取り込む）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/AnwtH.png",
+      "url": "/hq"
+    },
+    "AqDWN": {
+      "doc": "V8",
+      "name": "友だち属性 保存した検索の編集 V8",
+      "kind": "画面",
+      "route": "/tags/searches/edit",
+      "routes": [
+        "/tags/searches/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/AqDWN.png",
+      "url": "/tags/searches/edit"
+    },
+    "AsfFB": {
+      "doc": "V8-B",
+      "name": "外部連携 一覧 1152 V8",
+      "kind": "1152",
+      "route": "/webhooks",
+      "routes": [
+        "/webhooks"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/AsfFB.png",
+      "url": "/webhooks"
+    },
+    "AzrZq": {
+      "doc": "V8-B",
+      "name": "分析 成果地点ごとのレポート V8",
+      "kind": "画面",
+      "route": "/analytics",
+      "routes": [
+        "/analytics?view=conversion-report"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/AzrZq.png",
+      "url": "/analytics?view=conversion-report"
+    },
+    "B24oNg": {
+      "doc": "V8-B",
+      "name": "統括 バナー生成（一覧から外す・確認）V8",
+      "kind": "小窓",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/B24oNg.png",
+      "url": "/hq"
+    },
+    "B8rCt": {
+      "doc": "V8",
+      "name": "LIFF 回答フォーム ①（ページ1）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/B8rCt.png",
+      "url": null
+    },
+    "B9ZAr": {
+      "doc": "V8-B",
+      "name": "統括 バナー生成（プロジェクト一覧）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/B9ZAr.png",
+      "url": "/hq"
+    },
+    "BERxg": {
+      "doc": "V8-B",
+      "name": "座席・卓管理 V8",
+      "kind": "画面",
+      "route": "/restaurant-test/tables",
+      "routes": [
+        "/restaurant-test/tables"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/BERxg.png",
+      "url": "/restaurant-test/tables"
+    },
+    "BHEl9": {
+      "doc": "V8-B",
+      "name": "統括 メンバー（権限を変更する）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/BHEl9.png",
+      "url": "/hq"
+    },
+    "BOj1a": {
+      "doc": "V8",
+      "name": "★P6 ログイン・はじめの設定 2026-10-01",
+      "kind": "まとめ板",
+      "route": "/login",
+      "routes": [
+        "/login",
+        "/login/two-factor",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/BOj1a.png",
+      "url": "/login"
+    },
+    "BVuYh": {
+      "doc": "V8-B",
+      "name": "健康日記 30日のまとめ（引き出し）V8",
+      "kind": "小窓",
+      "route": "/nen/health",
+      "routes": [
+        "/nen/health"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/BVuYh.png",
+      "url": "/nen/health"
+    },
+    "BeNtj": {
+      "doc": "V8",
+      "name": "一斉配信 予約を取り消す（確かめ）V8",
+      "kind": "小窓",
+      "route": "/broadcasts/reserved",
+      "routes": [
+        "/broadcasts/reserved"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/BeNtj.png",
+      "url": "/broadcasts/reserved"
+    },
+    "BjcuB": {
+      "doc": "V8",
+      "name": "LIFF イベント 空きが出た（席を取る）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/BjcuB.png",
+      "url": null
+    },
+    "BnrQp": {
+      "doc": "V8-B",
+      "name": "マイル たまる決めごとを作る（競合）V8",
+      "kind": "競合",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/BnrQp.png",
+      "url": "/mileage"
+    },
+    "BxGhV": {
+      "doc": "V8",
+      "name": "★V8 シナリオ配信 一覧の状態",
+      "kind": "状態",
+      "route": "/scenarios",
+      "routes": [
+        "/scenarios"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/BxGhV.png",
+      "url": "/scenarios"
+    },
+    "BygrU": {
+      "doc": "V8-B",
+      "name": "コンバージョン 一覧 1152 V8",
+      "kind": "1152",
+      "route": "/conversions",
+      "routes": [
+        "/conversions"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/BygrU.png",
+      "url": "/conversions"
+    },
+    "C0lfUP": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 受け皿の「…」を開いた V8",
+      "kind": "小窓",
+      "route": "/friend-add-settings",
+      "routes": [
+        "/friend-add-settings"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/C0lfUP.png",
+      "url": "/friend-add-settings"
+    },
+    "C67dE": {
+      "doc": "V8",
+      "name": "共通情報 編集（1152）V8",
+      "kind": "1152",
+      "route": "/contents/vars/edit",
+      "routes": [
+        "/contents/vars/edit"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/C67dE.png",
+      "url": "/contents/vars/edit"
+    },
+    "C9fv7A": {
+      "doc": "V8",
+      "name": "予約設定 メニュー（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/booking/menus",
+      "routes": [
+        "/booking/menus"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/C9fv7A.png",
+      "url": "/booking/menus"
+    },
+    "CFAyf": {
+      "doc": "V8-B",
+      "name": "LINEアカウント 送受信を止める V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/CFAyf.png"
+    },
+    "CHz31": {
+      "doc": "V8-B",
+      "name": "店舗ダッシュボード V8",
+      "kind": "画面",
+      "route": "/restaurant-test/dashboard",
+      "routes": [
+        "/restaurant-test/dashboard"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/CHz31.png",
+      "url": "/restaurant-test/dashboard"
+    },
+    "CJlf4": {
+      "doc": "V8-B",
+      "name": "マイル 友だちの残高 V8",
+      "kind": "画面",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/CJlf4.png",
+      "url": "/mileage"
+    },
+    "CRtK8": {
+      "doc": "V8",
+      "name": "欄 予約した後",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/CRtK8.png"
+    },
+    "CVz5d": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト 銀行用 CSV（本人確認）V8",
+      "kind": "小窓",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/CVz5d.png",
+      "url": "/affiliates"
+    },
+    "CYJ0L": {
+      "doc": "V8",
+      "name": "★P1-2 友だち一覧から開くもの 2026-10-01（機能追加 F-1・API待ち）",
+      "kind": "まとめ板",
+      "route": "/friends",
+      "routes": [
+        "/friends"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/CYJ0L.png",
+      "url": "/friends"
+    },
+    "CbGpr": {
+      "doc": "V8",
+      "name": "LIFF 予約 ⑤ 確認（お支払いあり・将来）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/CbGpr.png",
+      "url": null
+    },
+    "CcA4k": {
+      "doc": "V8",
+      "name": "予約設定 予約スタッフを登録 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/CcA4k.png"
+    },
+    "Cfed0": {
+      "doc": "V8-B",
+      "name": "Googleビジネス 投稿 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Cfed0.png"
+    },
+    "CuHXG": {
+      "doc": "V8-B",
+      "name": "Googleビジネス 設定 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/CuHXG.png"
+    },
+    "CyW0E": {
+      "doc": "V8-B",
+      "name": "運営 ダッシュボード V8",
+      "kind": "画面",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/CyW0E.png",
+      "url": "/ops"
+    },
+    "D0AOyx": {
+      "doc": "V8-B",
+      "name": "プール管理 プールを作る V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/D0AOyx.png",
+      "url": "/notifications"
+    },
+    "D6fh3": {
+      "doc": "V8-B",
+      "name": "統括 お問い合わせ（運営のLINEを登録）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/D6fh3.png",
+      "url": "/hq"
+    },
+    "D6ljr": {
+      "doc": "V8-B",
+      "name": "統括 アカウントをアーカイブ V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/D6ljr.png"
+    },
+    "D9JALJ": {
+      "doc": "V8-B",
+      "name": "運営 ログイン V8",
+      "kind": "画面",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/D9JALJ.png",
+      "url": "/ops"
+    },
+    "DA0Ag": {
+      "doc": "V8-B",
+      "name": "外部連携 やり取りの中身 V8（機能追加 F-18・API待ち）",
+      "kind": "画面",
+      "route": "/webhooks",
+      "routes": [
+        "/webhooks"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/DA0Ag.png",
+      "url": "/webhooks"
+    },
+    "DFl3Q": {
+      "doc": "V8-B",
+      "name": "予約管理 予約が重なった知らせ（人）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/DFl3Q.png"
+    },
+    "DkRDE": {
+      "doc": "V8-B",
+      "name": "分析 ファネル V8",
+      "kind": "画面",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/DkRDE.png",
+      "url": "/analytics"
+    },
+    "DrwMm": {
+      "doc": "V8-B",
+      "name": "LINE通知 送れなかったもの V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/DrwMm.png",
+      "url": "/notifications"
+    },
+    "DxAAA": {
+      "doc": "V8-B",
+      "name": "外部連携 Google Sheets V8",
+      "kind": "画面",
+      "route": "/webhooks",
+      "routes": [
+        "/webhooks"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/DxAAA.png",
+      "url": "/webhooks"
+    },
+    "E14GFm": {
+      "doc": "V8-B",
+      "name": "流入と計測 作る（競合の比べ）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/E14GFm.png"
+    },
+    "E2Any": {
+      "doc": "V8-B",
+      "name": "マイル たまる決めごと（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/E2Any.png",
+      "url": "/mileage"
+    },
+    "E2l8cw": {
+      "doc": "V8-B",
+      "name": "★V8-B コンバージョン 一覧の状態",
+      "kind": "状態",
+      "route": "/conversions",
+      "routes": [
+        "/conversions"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/E2l8cw.png",
+      "url": "/conversions"
+    },
+    "E3YDK": {
+      "doc": "V8",
+      "name": "自分の勤務（スタッフ本人）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/E3YDK.png"
+    },
+    "E7iAYs": {
+      "doc": "V8-B",
+      "name": "ウェビナー ④通知 V8",
+      "kind": "画面",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/E7iAYs.png",
+      "url": "/webinars"
+    },
+    "EA8rM": {
+      "doc": "V8-B",
+      "name": "運用状態 緊急停止の確認 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/EA8rM.png"
+    },
+    "EFV8l": {
+      "doc": "V8",
+      "name": "テンプレート リッチメッセージを作る V8（機能追加 F-4・API待ち）",
+      "kind": "画面",
+      "route": "/templates/edit",
+      "routes": [
+        "/templates/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/EFV8l.png",
+      "url": "/templates/edit"
+    },
+    "EML2F": {
+      "doc": "V8",
+      "name": "欄 一覧",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/EML2F.png"
+    },
+    "EMUl9": {
+      "doc": "V8-B",
+      "name": "流入と計測 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/EMUl9.png",
+      "url": "/inflow-links"
+    },
+    "En14p": {
+      "doc": "V8-B",
+      "name": "オートメーション 一覧 1152 V8",
+      "kind": "1152",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/En14p.png",
+      "url": "/automations"
+    },
+    "Eo56k": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト レポート V8",
+      "kind": "画面",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Eo56k.png",
+      "url": "/affiliates"
+    },
+    "EsYo4": {
+      "doc": "V8",
+      "name": "テンプレート リサーチを作る V8",
+      "kind": "画面",
+      "route": "/templates/edit",
+      "routes": [
+        "/templates/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/EsYo4.png",
+      "url": "/templates/edit"
+    },
+    "EscPA": {
+      "doc": "V8",
+      "name": "LIFF イベント 申し込みの確認",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/EscPA.png",
+      "url": null
+    },
+    "F1LK4e": {
+      "doc": "V8",
+      "name": "シナリオ配信 配信を始める前の確認（小窓） V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/F1LK4e.png"
+    },
+    "F3X1Mo": {
+      "doc": "V8",
+      "name": "詳細（送った後）",
+      "shot": null,
+      "kind": "画面",
+      "route": "/broadcasts/detail",
+      "url": "/broadcasts/detail",
+      "routes": [
+        "/broadcasts/detail"
+      ],
+      "width": 1440
+    },
+    "F4gELj": {
+      "doc": "V8",
+      "name": "リッチメニュー 作る④ 公開 V8",
+      "kind": "画面",
+      "route": "/rich-menus/new",
+      "routes": [
+        "/rich-menus/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/F4gELj.png",
+      "url": "/rich-menus/new"
+    },
+    "FDBsG": {
+      "doc": "V8-B",
+      "name": "流入と計測 広告とのつなぎ V8（機能追加 F-21・API待ち）",
+      "kind": "画面",
+      "route": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/FDBsG.png",
+      "url": "/inflow-links"
+    },
+    "FM94M": {
+      "doc": "V8",
+      "name": "共通情報 一覧 V8",
+      "kind": "画面",
+      "route": "/contents/vars",
+      "routes": [
+        "/contents/vars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/FM94M.png",
+      "url": "/contents/vars"
+    },
+    "FU2aU": {
+      "doc": "V8",
+      "name": "★P3 一斉配信の作成 /broadcasts/new（5つの手順）2026-10-01",
+      "kind": "まとめ板",
+      "route": "/broadcasts/new",
+      "routes": [
+        "/broadcasts/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/FU2aU.png",
+      "url": "/broadcasts/new"
+    },
+    "FvbHW": {
+      "doc": "V8-B",
+      "name": "運営 メンバー管理 V8",
+      "kind": "画面",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/FvbHW.png",
+      "url": "/ops"
+    },
+    "G4GejG": {
+      "doc": "V8",
+      "name": "自動応答 かんたんに作る（小窓 560）V8（機能追加 F-7・API待ち）",
+      "kind": "小窓",
+      "route": "/auto-replies",
+      "routes": [
+        "/auto-replies"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/G4GejG.png",
+      "url": "/auto-replies"
+    },
+    "G83vi": {
+      "doc": "V8-B",
+      "name": "分析 レポートを作る（競合）V8",
+      "kind": "競合",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/G83vi.png",
+      "url": "/analytics"
+    },
+    "G8i4xP": {
+      "doc": "V8",
+      "name": "★V8 自動応答 一覧の状態",
+      "kind": "状態",
+      "route": "/auto-replies",
+      "routes": [
+        "/auto-replies"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/G8i4xP.png",
+      "url": "/auto-replies"
+    },
+    "G9C4Uw": {
+      "doc": "V8",
+      "name": "友だち 重複検出（1152）V8",
+      "kind": "1152",
+      "route": "/friends/identity-candidates",
+      "routes": [
+        "/friends/identity-candidates"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/G9C4Uw.png",
+      "url": "/friends/identity-candidates"
+    },
+    "GVizd": {
+      "doc": "V8",
+      "name": "回答フォーム アーカイブ・削除 V8",
+      "kind": "小窓",
+      "route": "/form-submissions",
+      "routes": [
+        "/form-submissions"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/GVizd.png",
+      "url": "/form-submissions"
+    },
+    "GgP2d": {
+      "doc": "V8-B",
+      "name": "運営 お問い合わせ 返事を送る前の確認 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/GgP2d.png"
+    },
+    "GmVR5": {
+      "doc": "V8-B",
+      "name": "設定 EC連携 V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/GmVR5.png",
+      "url": "/notifications"
+    },
+    "GobMd": {
+      "doc": "V8",
+      "name": "友だち属性 友だち情報欄の移行 V8",
+      "kind": "画面",
+      "route": "/tags/fields/migrate",
+      "routes": [
+        "/tags/fields/migrate"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/GobMd.png",
+      "url": "/tags/fields/migrate"
+    },
+    "Gqve5": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト アフィリエイターを作る（競合）V8",
+      "kind": "競合",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Gqve5.png",
+      "url": "/affiliates"
+    },
+    "GrnO4": {
+      "doc": "V8",
+      "name": "回答フォーム 一覧（1152）V8",
+      "kind": "1152",
+      "route": "/form-submissions",
+      "routes": [
+        "/form-submissions"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/GrnO4.png",
+      "url": "/form-submissions"
+    },
+    "GtI4Y": {
+      "doc": "V8-B",
+      "name": "流入と計測 QR コードの小窓 V8",
+      "kind": "小窓",
+      "route": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/GtI4Y.png",
+      "url": "/inflow-links"
+    },
+    "Guoye": {
+      "doc": "V8",
+      "name": "自動応答 作る④ 優先順位 V8",
+      "kind": "画面",
+      "route": "/auto-replies/edit",
+      "routes": [
+        "/auto-replies/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Guoye.png",
+      "url": "/auto-replies/edit"
+    },
+    "GwKE2": {
+      "doc": "V8-B",
+      "name": "統括 LINEアカウントを登録 ③基本情報 V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/GwKE2.png",
+      "url": "/hq"
+    },
+    "H031gC": {
+      "doc": "V8-B",
+      "name": "外部連携 受け取る設定を追加 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/H031gC.png"
+    },
+    "H5UoIu": {
+      "doc": "V8-B",
+      "name": "分析 レポートを作る V8",
+      "kind": "画面",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/H5UoIu.png",
+      "url": "/analytics"
+    },
+    "HFsO9": {
+      "doc": "V8-B",
+      "name": "統括 アカウントをアーカイブから戻す V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/HFsO9.png"
+    },
+    "HMpVx": {
+      "doc": "V8-B",
+      "name": "統括 アカウント（アカウントの設定）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/HMpVx.png",
+      "url": "/hq"
+    },
+    "Hhl9M": {
+      "doc": "V8",
+      "name": "共通情報 止めるダイアログ V8",
+      "kind": "小窓",
+      "route": "/contents/vars",
+      "routes": [
+        "/contents/vars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Hhl9M.png",
+      "url": "/contents/vars"
+    },
+    "Hn9eE": {
+      "doc": "V8",
+      "name": "友だち 統合ユーザーの詳細 V8",
+      "kind": "画面",
+      "route": "/friends/detail",
+      "routes": [
+        "/friends/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Hn9eE.png",
+      "url": "/friends/detail"
+    },
+    "I0w2e": {
+      "doc": "V8-B",
+      "name": "統括 バナー生成（アーカイブ・確認）V8",
+      "kind": "小窓",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/I0w2e.png",
+      "url": "/hq"
+    },
+    "I1E7Bt": {
+      "doc": "V8",
+      "name": "友だち属性 タグ V8",
+      "kind": "画面",
+      "route": "/tags",
+      "routes": [
+        "/tags"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/I1E7Bt.png",
+      "url": "/tags"
+    },
+    "I2V65v": {
+      "doc": "V8-B",
+      "name": "運用状態 更新履歴 V8",
+      "kind": "状態",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/I2V65v.png",
+      "url": "/notifications"
+    },
+    "I3L41O": {
+      "doc": "V8",
+      "name": "回答フォーム 一覧 V8",
+      "kind": "画面",
+      "route": "/form-submissions",
+      "routes": [
+        "/form-submissions"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/I3L41O.png",
+      "url": "/form-submissions"
+    },
+    "IIesG": {
+      "doc": "V8",
+      "name": "自動応答 行の「…」を開いた V8",
+      "kind": "小窓",
+      "route": "/auto-replies",
+      "routes": [
+        "/auto-replies"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/IIesG.png",
+      "url": "/auto-replies"
+    },
+    "IRPw8": {
+      "doc": "V8-B",
+      "name": "マイル 行動スコア V8",
+      "kind": "画面",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/IRPw8.png",
+      "url": "/mileage"
+    },
+    "ITBAB": {
+      "doc": "V8",
+      "name": "回答フォーム 編集（1152）V8",
+      "kind": "1152",
+      "route": "/form-submissions/edit",
+      "routes": [
+        "/form-submissions/edit"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/ITBAB.png",
+      "url": "/form-submissions/edit"
+    },
+    "IWnYX": {
+      "doc": "V8",
+      "name": "友だち属性 保存した検索 V8",
+      "kind": "画面",
+      "route": "/tags",
+      "routes": [
+        "/tags?tab=searches"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/IWnYX.png",
+      "url": "/tags?tab=searches"
+    },
+    "If9Mh": {
+      "doc": "V8",
+      "name": "★P2-2 予約：電話の予約・予約の詳細 2026-10-01",
+      "kind": "まとめ板",
+      "route": "/booking/bookings/new",
+      "routes": [
+        "/booking/bookings/new",
+        "/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/If9Mh.png",
+      "url": "/booking/bookings/new"
+    },
+    "Iffil": {
+      "doc": "V8",
+      "name": "リマインダ 一覧（1152）V8",
+      "kind": "1152",
+      "route": "/reminders",
+      "routes": [
+        "/reminders"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/Iffil.png",
+      "url": "/reminders"
+    },
+    "IjVpM": {
+      "doc": "V8",
+      "name": "友だち属性 フォルダを追加（ダイアログ） V8",
+      "kind": "小窓",
+      "route": "/tags/folders/new",
+      "routes": [
+        "/tags/folders/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/IjVpM.png",
+      "url": "/tags/folders/new"
+    },
+    "IruGD": {
+      "doc": "V8",
+      "name": "LIFF 予約 ① メニューを選ぶ",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/IruGD.png",
+      "url": null
+    },
+    "Izau1": {
+      "doc": "V8-B",
+      "name": "運営 お問い合わせを代わりに起票 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Izau1.png"
+    },
+    "J1VA8": {
+      "doc": "V8-B",
+      "name": "オートメーション 下書きを仕上げる V8（機能追加 F-15・API待ち）",
+      "kind": "画面",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/J1VA8.png",
+      "url": "/automations"
+    },
+    "J1pdB": {
+      "doc": "V8",
+      "name": "回答フォーム 編集（競合）V8",
+      "kind": "競合",
+      "route": "/form-submissions/edit",
+      "routes": [
+        "/form-submissions/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/J1pdB.png",
+      "url": "/form-submissions/edit"
+    },
+    "J60utH": {
+      "doc": "V8",
+      "name": "テンプレート カルーセルを作る V8",
+      "kind": "画面",
+      "route": "/templates/carousel",
+      "routes": [
+        "/templates/carousel"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/J60utH.png",
+      "url": "/templates/carousel"
+    },
+    "JB8V1": {
+      "doc": "V8-B",
+      "name": "統括 請求 V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/JB8V1.png",
+      "url": "/hq"
+    },
+    "JKjsE": {
+      "doc": "V8-B",
+      "name": "統括 アカウント（ホーム）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/JKjsE.png",
+      "url": "/hq"
+    },
+    "JUTGz": {
+      "doc": "V8-B",
+      "name": "Googleビジネス プロフィール V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/JUTGz.png"
+    },
+    "JV2oR": {
+      "doc": "V8",
+      "name": "回答フォーム 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/form-submissions",
+      "routes": [
+        "/form-submissions"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/JV2oR.png",
+      "url": "/form-submissions"
+    },
+    "JYfda": {
+      "doc": "V8-B",
+      "name": "統括 LINEアカウントを登録 ②チャネル設定 V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/JYfda.png",
+      "url": "/hq"
+    },
+    "JeINq": {
+      "doc": "V8",
+      "name": "リッチメニュー 作る① 形と画像 V8",
+      "kind": "画面",
+      "route": "/rich-menus/new",
+      "routes": [
+        "/rich-menus/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/JeINq.png",
+      "url": "/rich-menus/new"
+    },
+    "Jn95h": {
+      "doc": "V8-B",
+      "name": "投稿 写真の審査（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/nen-members",
+      "routes": [
+        "/nen-members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Jn95h.png",
+      "url": "/nen-members"
+    },
+    "Jxmqh": {
+      "doc": "V8-B",
+      "name": "NEN配信 コラム一覧 V8",
+      "kind": "画面",
+      "route": "/nen-campaigns",
+      "routes": [
+        "/nen-campaigns"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Jxmqh.png",
+      "url": "/nen-campaigns"
+    },
+    "K7HWG": {
+      "doc": "V8",
+      "name": "自動応答 作る① 基本設定 V8",
+      "kind": "画面",
+      "route": "/auto-replies/edit",
+      "routes": [
+        "/auto-replies/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/K7HWG.png",
+      "url": "/auto-replies/edit"
+    },
+    "K7HYu": {
+      "doc": "V8-B",
+      "name": "統括 統括の情報 V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/K7HYu.png",
+      "url": "/hq"
+    },
+    "KMaMk": {
+      "doc": "V8-B",
+      "name": "流入と計測 作る V8",
+      "kind": "画面",
+      "route": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/KMaMk.png",
+      "url": "/inflow-links"
+    },
+    "KRgTQ": {
+      "doc": "V8",
+      "name": "予約設定 休業日 V8",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/KRgTQ.png",
+      "url": null
+    },
+    "KdFRI": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト アフィリエイター 1152 V8",
+      "kind": "1152",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/KdFRI.png",
+      "url": "/affiliates"
+    },
+    "L2Bzp": {
+      "doc": "V8-B",
+      "name": "マイル 使い道を作る V8",
+      "kind": "画面",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/L2Bzp.png",
+      "url": "/mileage"
+    },
+    "L48eY": {
+      "doc": "V8",
+      "name": "友だち UID移行（本移行と照合・完了） V8",
+      "kind": "画面",
+      "route": "/friends/migrations",
+      "routes": [
+        "/friends/migrations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/L48eY.png",
+      "url": "/friends/migrations"
+    },
+    "L4Uov": {
+      "doc": "V8-B",
+      "name": "分析 友だちの増減（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/L4Uov.png",
+      "url": "/analytics"
+    },
+    "L7zA7C": {
+      "doc": "V8",
+      "name": "テンプレート 一覧（1152）V8",
+      "kind": "1152",
+      "route": "/templates",
+      "routes": [
+        "/templates"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/L7zA7C.png",
+      "url": "/templates"
+    },
+    "LEwkJ": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/friend-add-settings",
+      "routes": [
+        "/friend-add-settings"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/LEwkJ.png",
+      "url": "/friend-add-settings"
+    },
+    "LPOe7": {
+      "doc": "V8-B",
+      "name": "ウェビナー ②動画（日時指定・開催回）V8",
+      "kind": "画面",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/LPOe7.png",
+      "url": "/webinars"
+    },
+    "LRc93": {
+      "doc": "V8-B",
+      "name": "統括 テンプレート（ひな形の一覧）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/LRc93.png",
+      "url": "/hq"
+    },
+    "LWQXd": {
+      "doc": "V8-B",
+      "name": "オートメーション 一覧 V8（機能追加 F-14・API待ち）",
+      "kind": "画面",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/LWQXd.png",
+      "url": "/automations"
+    },
+    "LnGNw": {
+      "doc": "V8-B",
+      "name": "オートメーション 共通アクション V8",
+      "kind": "画面",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/LnGNw.png",
+      "url": "/automations"
+    },
+    "M0393": {
+      "doc": "V8",
+      "name": "★P4 受信箱 /chats 2026-10-01",
+      "kind": "まとめ板",
+      "route": "/chats",
+      "routes": [
+        "/chats"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/M0393.png",
+      "url": "/chats"
+    },
+    "M2p63S": {
+      "doc": "V8",
+      "name": "LIFF 予約 ③ 日時を選ぶ（週）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/M2p63S.png",
+      "url": null
+    },
+    "M4jS9": {
+      "doc": "V8-B",
+      "name": "統括 メンバー 権限を変える（確認）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/M4jS9.png"
+    },
+    "M4torY": {
+      "doc": "V8-B",
+      "name": "オートメーション ルールを作る V8",
+      "kind": "画面",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/M4torY.png",
+      "url": "/automations"
+    },
+    "M8zhjL": {
+      "doc": "V8-B",
+      "name": "マイル マイルを手で増やす・減らす V8",
+      "kind": "小窓",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/M8zhjL.png",
+      "url": "/mileage"
+    },
+    "MJoJR": {
+      "doc": "V8-B",
+      "name": "メニュー管理 V8",
+      "kind": "画面",
+      "route": "/restaurant-test/menu",
+      "routes": [
+        "/restaurant-test/menu"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/MJoJR.png",
+      "url": "/restaurant-test/menu"
+    },
+    "MKQyJ": {
+      "doc": "V8",
+      "name": "回答フォーム 集まった回答（1件ずつ） V8",
+      "kind": "画面",
+      "route": "/form-submissions/responses",
+      "routes": [
+        "/form-submissions/responses"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/MKQyJ.png",
+      "url": "/form-submissions/responses"
+    },
+    "MRhef": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 一覧（はじめての人） V8（機能追加 F-8・API待ち）",
+      "kind": "画面",
+      "route": "/friend-add-settings",
+      "routes": [
+        "/friend-add-settings"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/MRhef.png",
+      "url": "/friend-add-settings"
+    },
+    "MV5Os": {
+      "doc": "V8-B",
+      "name": "メニュー管理 停止の確認 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/MV5Os.png"
+    },
+    "Msb1j": {
+      "doc": "V8-B",
+      "name": "LINEアカウント 資格情報を差し替える V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Msb1j.png"
+    },
+    "Mu8qW": {
+      "doc": "V8-B",
+      "name": "イベント予約 申込者 V8",
+      "kind": "画面",
+      "route": "/events",
+      "routes": [
+        "/events"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Mu8qW.png",
+      "url": "/events"
+    },
+    "MuhWR": {
+      "doc": "V8-B",
+      "name": "NEN配信 一覧（自動配信）V8",
+      "kind": "画面",
+      "route": "/nen-campaigns",
+      "routes": [
+        "/nen-campaigns"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/MuhWR.png",
+      "url": "/nen-campaigns"
+    },
+    "MyJP7": {
+      "doc": "V8",
+      "name": "友だち「…」から予約して送る（小窓）V8",
+      "kind": "小窓",
+      "route": "/friends",
+      "routes": [
+        "/friends"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/MyJP7.png",
+      "url": "/friends"
+    },
+    "N1br7": {
+      "doc": "V8-B",
+      "name": "投稿 報酬の決まり 版の履歴 V8",
+      "kind": "画面",
+      "route": "/nen-members",
+      "routes": [
+        "/nen-members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/N1br7.png",
+      "url": "/nen-members"
+    },
+    "N43uVX": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 実行の詳細（失敗あり） V8",
+      "kind": "画面",
+      "route": "/friend-add-settings/runs/detail",
+      "routes": [
+        "/friend-add-settings/runs/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/N43uVX.png",
+      "url": "/friend-add-settings/runs/detail"
+    },
+    "N8ZrUl": {
+      "doc": "V8-B",
+      "name": "分析 使われ方 V8",
+      "kind": "画面",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/N8ZrUl.png",
+      "url": "/analytics"
+    },
+    "NCbYn": {
+      "doc": "V8",
+      "name": "テンプレート 編集（競合）V8",
+      "kind": "競合",
+      "route": "/templates/edit",
+      "routes": [
+        "/templates/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/NCbYn.png",
+      "url": "/templates/edit"
+    },
+    "NGh7b": {
+      "doc": "V8-B",
+      "name": "外部連携 送り先を作る（競合）V8",
+      "kind": "競合",
+      "route": "/webhooks",
+      "routes": [
+        "/webhooks"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/NGh7b.png",
+      "url": "/webhooks"
+    },
+    "NkmwU": {
+      "doc": "V8-B",
+      "name": "メニュー管理 メニューを追加・変更 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/NkmwU.png"
+    },
+    "NtCE3": {
+      "doc": "V8",
+      "name": "一斉配信 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/broadcasts",
+      "routes": [
+        "/broadcasts"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/NtCE3.png",
+      "url": "/broadcasts"
+    },
+    "Nv7An": {
+      "doc": "V8-B",
+      "name": "マイル 行動スコアを手で直す V8",
+      "kind": "小窓",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Nv7An.png",
+      "url": "/mileage"
+    },
+    "O5tUeE": {
+      "doc": "V8",
+      "name": "権限なし（その機能に入れない）V8",
+      "kind": "権限なし",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/O5tUeE.png",
+      "url": null
+    },
+    "O7hUt7": {
+      "doc": "V8-B",
+      "name": "登録メディア一覧 V8",
+      "kind": "画面",
+      "route": "/contents",
+      "routes": [
+        "/contents"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/O7hUt7.png",
+      "url": "/contents"
+    },
+    "OC0gy": {
+      "doc": "V8-B",
+      "name": "マイル たまる決めごと V8",
+      "kind": "画面",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/OC0gy.png",
+      "url": "/mileage"
+    },
+    "OHwbU": {
+      "doc": "V8-B",
+      "name": "運用状態 緊急コントロール V8",
+      "kind": "状態",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/OHwbU.png",
+      "url": "/notifications"
+    },
+    "OPGU2": {
+      "doc": "V8",
+      "name": "シナリオ配信 止める確認（小窓） V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/OPGU2.png"
+    },
+    "OhguS": {
+      "doc": "V8-B",
+      "name": "統括 お問い合わせ（やり取り）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/OhguS.png",
+      "url": "/hq"
+    },
+    "Omqd4": {
+      "doc": "V8-B",
+      "name": "ウェビナー コメント演出 V8",
+      "kind": "画面",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Omqd4.png",
+      "url": "/webinars"
+    },
+    "Oub6x": {
+      "doc": "V8-B",
+      "name": "運営 契約先の詳細 V8",
+      "kind": "画面",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Oub6x.png",
+      "url": "/ops"
+    },
+    "OxEMM": {
+      "doc": "V8",
+      "name": "リッチメニュー 作る③ 誰に出すか V8",
+      "kind": "画面",
+      "route": "/rich-menus/new",
+      "routes": [
+        "/rich-menus/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/OxEMM.png",
+      "url": "/rich-menus/new"
+    },
+    "OxSw8": {
+      "doc": "V8",
+      "name": "共通情報 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/contents/vars",
+      "routes": [
+        "/contents/vars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/OxSw8.png",
+      "url": "/contents/vars"
+    },
+    "OylSV": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト 成果承認 V8",
+      "kind": "画面",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/OylSV.png",
+      "url": "/affiliates"
+    },
+    "P0jhqO": {
+      "doc": "V8-B",
+      "name": "運営 お問い合わせ V8",
+      "kind": "画面",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/P0jhqO.png",
+      "url": "/ops"
+    },
+    "P20kYU": {
+      "doc": "V8",
+      "name": "友だち追加時 一覧（1152）V8",
+      "kind": "1152",
+      "route": "/friend-add-settings",
+      "routes": [
+        "/friend-add-settings"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/P20kYU.png",
+      "url": "/friend-add-settings"
+    },
+    "P6EdLW": {
+      "doc": "V8",
+      "name": "予約設定 メニュー（1152）V8",
+      "kind": "1152",
+      "route": "/booking/menus",
+      "routes": [
+        "/booking/menus"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/P6EdLW.png",
+      "url": "/booking/menus"
+    },
+    "P6vbxn": {
+      "doc": "V8",
+      "name": "一斉配信 かんたんに送る（小窓 640）V8",
+      "kind": "小窓",
+      "route": "/broadcasts",
+      "routes": [
+        "/broadcasts"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/P6vbxn.png",
+      "url": "/broadcasts"
+    },
+    "PFe9c": {
+      "doc": "V8-B",
+      "name": "分析 経路と成果 V8",
+      "kind": "画面",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/PFe9c.png",
+      "url": "/analytics"
+    },
+    "PMLkX": {
+      "doc": "V8",
+      "name": "シナリオ配信 編集（稼働中） V8",
+      "kind": "画面",
+      "route": "/scenarios/detail",
+      "routes": [
+        "/scenarios/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/PMLkX.png",
+      "url": "/scenarios/detail"
+    },
+    "PZBVb": {
+      "doc": "V8-B",
+      "name": "LINE通知 記録 V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/PZBVb.png",
+      "url": "/notifications"
+    },
+    "PfA4o": {
+      "doc": "V8",
+      "name": "設定 ファイルの検査 V8",
+      "kind": "画面",
+      "route": "/settings/file-scan",
+      "routes": [
+        "/settings/file-scan"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/PfA4o.png",
+      "url": "/settings/file-scan"
+    },
+    "Q0Jrk": {
+      "doc": "V8-B",
+      "name": "ウェビナー ③CTA・フォーム V8",
+      "kind": "画面",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Q0Jrk.png",
+      "url": "/webinars"
+    },
+    "Q28Gb": {
+      "doc": "V8",
+      "name": "一斉配信 詳細（競合）V8",
+      "kind": "競合",
+      "route": "/broadcasts/detail",
+      "routes": [
+        "/broadcasts/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Q28Gb.png",
+      "url": "/broadcasts/detail"
+    },
+    "Q5F2QE": {
+      "doc": "V8",
+      "name": "★P1-4 友だち詳細 /friends/detail 2026-10-01",
+      "kind": "まとめ板",
+      "route": "/friends/detail",
+      "routes": [
+        "/friends/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Q5F2QE.png",
+      "url": "/friends/detail"
+    },
+    "Q5lOCc": {
+      "doc": "V8",
+      "name": "自動応答 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/auto-replies",
+      "routes": [
+        "/auto-replies"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Q5lOCc.png",
+      "url": "/auto-replies"
+    },
+    "Q5le3": {
+      "doc": "V8-B",
+      "name": "流入と計測 詳細（新）V8",
+      "kind": "画面",
+      "route": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Q5le3.png",
+      "url": "/inflow-links"
+    },
+    "Qat9s": {
+      "doc": "V8",
+      "name": "友だち属性 タグの編集 V8",
+      "kind": "画面",
+      "route": "/tags/edit",
+      "routes": [
+        "/tags/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Qat9s.png",
+      "url": "/tags/edit"
+    },
+    "QqER7": {
+      "doc": "V8",
+      "name": "予約設定 メニューを作る V8",
+      "kind": "画面",
+      "route": "/booking/menus/new",
+      "routes": [
+        "/booking/menus/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/QqER7.png",
+      "url": "/booking/menus/new"
+    },
+    "R5ckwJ": {
+      "doc": "V8-B",
+      "name": "運営 ナレッジの記事 V8",
+      "kind": "画面",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/R5ckwJ.png",
+      "url": "/ops"
+    },
+    "R6kIG": {
+      "doc": "V8-B",
+      "name": "マイル 友だちのマイル詳細（新）V8",
+      "kind": "画面",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/R6kIG.png",
+      "url": "/mileage"
+    },
+    "R8NNi": {
+      "doc": "V8-B",
+      "name": "マイル 点数の変化の明細 V8",
+      "kind": "画面",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/R8NNi.png",
+      "url": "/mileage"
+    },
+    "R9XUMr": {
+      "doc": "V8",
+      "name": "テンプレート 作る：種類を選ぶ V8（機能追加 F-5・API待ち）",
+      "kind": "小窓",
+      "route": "/templates",
+      "routes": [
+        "/templates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/R9XUMr.png",
+      "url": "/templates"
+    },
+    "REIxB": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 実行結果 V8",
+      "kind": "画面",
+      "route": "/friend-add-settings/runs",
+      "routes": [
+        "/friend-add-settings/runs"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/REIxB.png",
+      "url": "/friend-add-settings/runs"
+    },
+    "RaMf3": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト アフィリエイターを作る V8",
+      "kind": "画面",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/RaMf3.png",
+      "url": "/affiliates"
+    },
+    "RmjcT": {
+      "doc": "V8",
+      "name": "LIFF 予約 ⑥ お支払い（決済サービスの画面へ）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/RmjcT.png",
+      "url": null
+    },
+    "RpW2h": {
+      "doc": "V8",
+      "name": "LIFF ウェビナー 配信中",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/RpW2h.png",
+      "url": null
+    },
+    "RqO7O": {
+      "doc": "V8",
+      "name": "★V8 共通情報 状態",
+      "kind": "状態",
+      "route": "/contents/vars",
+      "routes": [
+        "/contents/vars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/RqO7O.png",
+      "url": "/contents/vars"
+    },
+    "RrYYJ": {
+      "doc": "V8",
+      "name": "★V8 リマインダ 状態",
+      "kind": "状態",
+      "route": "/reminders",
+      "routes": [
+        "/reminders"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/RrYYJ.png",
+      "url": "/reminders"
+    },
+    "RwVo5": {
+      "doc": "V8",
+      "name": "リマインダ 一時停止ダイアログ V8",
+      "kind": "小窓",
+      "route": "/reminders",
+      "routes": [
+        "/reminders"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/RwVo5.png",
+      "url": "/reminders"
+    },
+    "S35pO": {
+      "doc": "V8-B",
+      "name": "マイル 使い道 V8",
+      "kind": "画面",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/S35pO.png",
+      "url": "/mileage"
+    },
+    "S3pdQ": {
+      "doc": "V8-B",
+      "name": "オートメーション 状態 V8",
+      "kind": "状態",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/S3pdQ.png",
+      "url": "/automations"
+    },
+    "S3uBl": {
+      "doc": "V8",
+      "name": "LIFF マイル・紹介",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/S3uBl.png",
+      "url": null
+    },
+    "S6FEuB": {
+      "doc": "V8",
+      "name": "テンプレート クーポンを作る V8",
+      "kind": "画面",
+      "route": "/templates/edit",
+      "routes": [
+        "/templates/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/S6FEuB.png",
+      "url": "/templates/edit"
+    },
+    "SAUCs": {
+      "doc": "V8-B",
+      "name": "外部連携 見本 V8",
+      "kind": "画面",
+      "route": "/webhooks",
+      "routes": [
+        "/webhooks"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/SAUCs.png",
+      "url": "/webhooks"
+    },
+    "SXCb3": {
+      "doc": "V8",
+      "name": "★V8 友だちの残り 状態",
+      "kind": "状態",
+      "route": "/friends",
+      "routes": [
+        "/friends"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/SXCb3.png",
+      "url": "/friends"
+    },
+    "SkY9V": {
+      "doc": "V8",
+      "name": "リマインダ 行の「…」を開いた V8",
+      "kind": "小窓",
+      "route": "/reminders",
+      "routes": [
+        "/reminders"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/SkY9V.png",
+      "url": "/reminders"
+    },
+    "SrmVs": {
+      "doc": "V8-B",
+      "name": "Googleビジネス パフォーマンス V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/SrmVs.png"
+    },
+    "SyQA1": {
+      "doc": "V8-B",
+      "name": "投稿 公式サイト掲載 V8（機能追加 F-20・API待ち）",
+      "kind": "画面",
+      "route": "/nen-members",
+      "routes": [
+        "/nen-members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/SyQA1.png",
+      "url": "/nen-members"
+    },
+    "T0nis": {
+      "doc": "V8",
+      "name": "リマインダ 作る④ 配信予定 V8",
+      "kind": "画面",
+      "route": "/reminders/new",
+      "routes": [
+        "/reminders/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/T0nis.png",
+      "url": "/reminders/new"
+    },
+    "T1j2Sw": {
+      "doc": "V8-B",
+      "name": "Googleビジネス 投稿を作る V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/T1j2Sw.png"
+    },
+    "T9gblG": {
+      "doc": "V8",
+      "name": "友だち CSVで書き出す・取り込む V8",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/T9gblG.png",
+      "url": null
+    },
+    "TJUUl": {
+      "doc": "V8-B",
+      "name": "運営 お知らせ 送る前の確認 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/TJUUl.png"
+    },
+    "Td4TN": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト 案件を作る V8（機能追加 F-23・API待ち）",
+      "kind": "画面",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Td4TN.png",
+      "url": "/affiliates"
+    },
+    "Tj7n4": {
+      "doc": "V8-B",
+      "name": "NEN配信 送った履歴 V8",
+      "kind": "画面",
+      "route": "/nen-campaigns",
+      "routes": [
+        "/nen-campaigns"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Tj7n4.png",
+      "url": "/nen-campaigns"
+    },
+    "TkA4D": {
+      "doc": "V8-B",
+      "name": "投稿 写真の審査 V8",
+      "kind": "画面",
+      "route": "/nen-members",
+      "routes": [
+        "/nen-members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/TkA4D.png",
+      "url": "/nen-members"
+    },
+    "TvXII": {
+      "doc": "V8-B",
+      "name": "統括 LINEアカウントを登録 ⑤完了 V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/TvXII.png",
+      "url": "/hq"
+    },
+    "U0aKD": {
+      "doc": "V8",
+      "name": "★V8 友だち属性 一覧の状態",
+      "kind": "状態",
+      "route": "/tags",
+      "routes": [
+        "/tags"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/U0aKD.png",
+      "url": "/tags"
+    },
+    "U5rxyH": {
+      "doc": "V8",
+      "name": "シナリオ 作る②（1152）V8",
+      "kind": "1152",
+      "route": "/scenarios/first-step",
+      "routes": [
+        "/scenarios/first-step"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/U5rxyH.png",
+      "url": "/scenarios/first-step"
+    },
+    "U8Xm3X": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 作る⑤ 確認 V8",
+      "kind": "画面",
+      "route": "/friend-add-settings/publish",
+      "routes": [
+        "/friend-add-settings/publish"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/U8Xm3X.png",
+      "url": "/friend-add-settings/publish"
+    },
+    "UGrd2": {
+      "doc": "V8",
+      "name": "自動応答 編集（競合）V8",
+      "kind": "競合",
+      "route": "/auto-replies/edit",
+      "routes": [
+        "/auto-replies/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/UGrd2.png",
+      "url": "/auto-replies/edit"
+    },
+    "URzvC": {
+      "doc": "V8-B",
+      "name": "★V8-B 流入と計測 一覧の状態",
+      "kind": "状態",
+      "route": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/URzvC.png",
+      "url": "/inflow-links"
+    },
+    "UTbi1": {
+      "doc": "V8",
+      "name": "テンプレート 詳細（未公開の変更あり） V8",
+      "kind": "画面",
+      "route": "/templates/detail",
+      "routes": [
+        "/templates/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/UTbi1.png",
+      "url": "/templates/detail"
+    },
+    "UcBQ5": {
+      "doc": "V8-B",
+      "name": "統括 バナー生成（参照画像を選ぶ）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/UcBQ5.png",
+      "url": "/hq"
+    },
+    "UkZLi": {
+      "doc": "V8-B",
+      "name": "外部連携 鍵を発行しました V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/UkZLi.png"
+    },
+    "Uv9AA": {
+      "doc": "V8-B",
+      "name": "外部連携 やり取りの記録 V8",
+      "kind": "画面",
+      "route": "/webhooks",
+      "routes": [
+        "/webhooks"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Uv9AA.png",
+      "url": "/webhooks"
+    },
+    "UyUMw": {
+      "doc": "V8-B",
+      "name": "ウェビナー 一覧 V8",
+      "kind": "画面",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/UyUMw.png",
+      "url": "/webinars"
+    },
+    "V4LjH": {
+      "doc": "V8",
+      "name": "自動応答 作る 完了（有効にした） V8",
+      "kind": "画面",
+      "route": "/auto-replies/publish",
+      "routes": [
+        "/auto-replies/publish"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/V4LjH.png",
+      "url": "/auto-replies/publish"
+    },
+    "V6JFnd": {
+      "doc": "V8",
+      "name": "テンプレート 削除（使っていない） V8",
+      "kind": "小窓",
+      "route": "/templates",
+      "routes": [
+        "/templates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/V6JFnd.png",
+      "url": "/templates"
+    },
+    "V6xAo": {
+      "doc": "V8",
+      "name": "シナリオ配信 作る②（1通目を設定） V8",
+      "kind": "画面",
+      "route": "/scenarios/first-step",
+      "routes": [
+        "/scenarios/first-step"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/V6xAo.png",
+      "url": "/scenarios/first-step"
+    },
+    "V7vn3": {
+      "doc": "V8-B",
+      "name": "設定 LINEアカウント V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/V7vn3.png",
+      "url": "/notifications"
+    },
+    "VDPz5": {
+      "doc": "V8-B",
+      "name": "分析 ファネルを作る V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/VDPz5.png"
+    },
+    "VE1u5": {
+      "doc": "V8",
+      "name": "リマインダ 作る① 基本設定 V8",
+      "kind": "画面",
+      "route": "/reminders/new",
+      "routes": [
+        "/reminders/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/VE1u5.png",
+      "url": "/reminders/new"
+    },
+    "VFxWU": {
+      "doc": "V8",
+      "name": "予約設定 受付枠（1152）V8",
+      "kind": "1152",
+      "route": null,
+      "routes": [],
+      "width": 1152,
+      "shot": "lint/V8/shots/VFxWU.png",
+      "url": null
+    },
+    "VLEaj": {
+      "doc": "V8",
+      "name": "予約設定 担当スタッフ V8",
+      "kind": "画面",
+      "route": "/booking/staff",
+      "routes": [
+        "/booking/staff"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/VLEaj.png",
+      "url": "/booking/staff"
+    },
+    "VU6Xi": {
+      "doc": "V8",
+      "name": "LIFF 予約 ⑥ 受け付けました",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/VU6Xi.png",
+      "url": null
+    },
+    "VUyYu": {
+      "doc": "V8-B",
+      "name": "運営 メンバーを停止 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/VUyYu.png"
+    },
+    "VWNaA": {
+      "doc": "V8-B",
+      "name": "ウェビナー ②動画 V8",
+      "kind": "画面",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/VWNaA.png",
+      "url": "/webinars"
+    },
+    "VXZ6T": {
+      "doc": "V8-B",
+      "name": "ウェビナー アーカイブの確認 V8",
+      "kind": "小窓",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/VXZ6T.png",
+      "url": "/webinars"
+    },
+    "VdKOK": {
+      "doc": "V8-B",
+      "name": "飲食店向け 利用規約 V8",
+      "kind": "画面",
+      "route": "/restaurant-test/dashboard",
+      "routes": [
+        "/restaurant-test/dashboard"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/VdKOK.png",
+      "url": "/restaurant-test/dashboard"
+    },
+    "VsSyu": {
+      "doc": "V8",
+      "name": "リマインダ 削除ダイアログ V8",
+      "kind": "小窓",
+      "route": "/reminders",
+      "routes": [
+        "/reminders"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/VsSyu.png",
+      "url": "/reminders"
+    },
+    "VtJQ6": {
+      "doc": "V8-B",
+      "name": "運営 代理ログイン中（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/VtJQ6.png",
+      "url": "/ops"
+    },
+    "W5Wxr": {
+      "doc": "V8-B",
+      "name": "統括 バナー生成（画像ライブラリ）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/W5Wxr.png",
+      "url": "/hq"
+    },
+    "W7Z57": {
+      "doc": "V8-B",
+      "name": "統括 バナー生成（プロジェクトを作る）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/W7Z57.png",
+      "url": "/hq"
+    },
+    "WOPjZ": {
+      "doc": "V8",
+      "name": "回答フォーム 5段階・住所のブロック（機能追加 F-11・API待ち）",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/WOPjZ.png"
+    },
+    "WOfBN": {
+      "doc": "V8-B",
+      "name": "LINEアカウント アーカイブ V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/WOfBN.png"
+    },
+    "WPrd5": {
+      "doc": "V8",
+      "name": "自動応答 一覧（1152）V8",
+      "kind": "1152",
+      "route": "/auto-replies",
+      "routes": [
+        "/auto-replies"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/WPrd5.png",
+      "url": "/auto-replies"
+    },
+    "WQmep": {
+      "doc": "V8",
+      "name": "ダッシュボード V8",
+      "shot": null,
+      "kind": "画面",
+      "route": "/",
+      "url": "/",
+      "routes": [
+        "/"
+      ],
+      "width": 1440
+    },
+    "WSGvo": {
+      "doc": "V8-B",
+      "name": "コンバージョン 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/conversions",
+      "routes": [
+        "/conversions"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/WSGvo.png",
+      "url": "/conversions"
+    },
+    "X0QrW0": {
+      "doc": "V8",
+      "name": "シナリオ配信 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/scenarios",
+      "routes": [
+        "/scenarios"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/X0QrW0.png",
+      "url": "/scenarios"
+    },
+    "X4JcOf": {
+      "doc": "V8-B",
+      "name": "統括 テンプレート（ひな形を作る）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/X4JcOf.png",
+      "url": "/hq"
+    },
+    "X4STXS": {
+      "doc": "V8",
+      "name": "シナリオ配信 配信結果 V8",
+      "kind": "画面",
+      "route": "/scenarios/results",
+      "routes": [
+        "/scenarios/results"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/X4STXS.png",
+      "url": "/scenarios/results"
+    },
+    "XCUNf": {
+      "doc": "V8-B",
+      "name": "ウェビナー ⑤確認 V8",
+      "kind": "小窓",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/XCUNf.png",
+      "url": "/webinars"
+    },
+    "XIzkJ": {
+      "doc": "V8",
+      "name": "共通情報 一覧（1152）V8",
+      "kind": "1152",
+      "route": "/contents/vars",
+      "routes": [
+        "/contents/vars"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/XIzkJ.png",
+      "url": "/contents/vars"
+    },
+    "XJUqs": {
+      "doc": "V8",
+      "name": "自動応答 作る⑤ 確認 V8",
+      "kind": "画面",
+      "route": "/auto-replies/publish",
+      "routes": [
+        "/auto-replies/publish"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/XJUqs.png",
+      "url": "/auto-replies/publish"
+    },
+    "XWtYC": {
+      "doc": "V8-B",
+      "name": "運営 契約先アカウント V8",
+      "kind": "画面",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/XWtYC.png",
+      "url": "/ops"
+    },
+    "XXFT4": {
+      "doc": "V8",
+      "name": "回答フォーム 編集（答え終わったあと） V8",
+      "kind": "画面",
+      "route": "/form-submissions/edit",
+      "routes": [
+        "/form-submissions/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/XXFT4.png",
+      "url": "/form-submissions/edit"
+    },
+    "XjOte": {
+      "doc": "V8-B",
+      "name": "流入と計測 サイトスクリプト V8",
+      "kind": "画面",
+      "route": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/XjOte.png",
+      "url": "/inflow-links"
+    },
+    "Xr6eu": {
+      "doc": "V8",
+      "name": "一斉配信・自動応答 作るボタンの分け方 V8",
+      "kind": "画面",
+      "route": "/broadcasts",
+      "routes": [
+        "/broadcasts",
+        "/auto-replies"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Xr6eu.png",
+      "url": "/broadcasts"
+    },
+    "Y4LkX1": {
+      "doc": "V8-B",
+      "name": "設定 運用状態 V8",
+      "kind": "状態",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Y4LkX1.png",
+      "url": "/notifications"
+    },
+    "Y8SjT2": {
+      "doc": "V8-B",
+      "name": "予約枠・在庫 V8",
+      "kind": "画面",
+      "route": "/restaurant-test/inventory",
+      "routes": [
+        "/restaurant-test/inventory"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Y8SjT2.png",
+      "url": "/restaurant-test/inventory"
+    },
+    "Y9ASp": {
+      "doc": "V8",
+      "name": "リッチメニュー 一覧（1152）V8",
+      "kind": "1152",
+      "route": "/rich-menus",
+      "routes": [
+        "/rich-menus"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/Y9ASp.png",
+      "url": "/rich-menus"
+    },
+    "YChR6": {
+      "doc": "V8",
+      "name": "リマインダ 作る② 対象者と止める条件 V8",
+      "kind": "画面",
+      "route": "/reminders/new",
+      "routes": [
+        "/reminders/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/YChR6.png",
+      "url": "/reminders/new"
+    },
+    "YXrF6": {
+      "doc": "V8-B",
+      "name": "予約台帳 予約を変更 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/YXrF6.png"
+    },
+    "YZ57z": {
+      "doc": "V8-B",
+      "name": "外部連携 Google Sheets の接続を解除 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/YZ57z.png"
+    },
+    "YvTJ3": {
+      "doc": "V8",
+      "name": "LIFF 予約の履歴（機能追加 F-6・API待ち）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/YvTJ3.png",
+      "url": null
+    },
+    "Yyw6i": {
+      "doc": "V8-B",
+      "name": "予約枠・在庫 媒体を閉じる知らせ V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Yyw6i.png"
+    },
+    "Z0g3si": {
+      "doc": "V8",
+      "name": "テンプレート 削除（使っている所がある） V8",
+      "kind": "小窓",
+      "route": "/templates",
+      "routes": [
+        "/templates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Z0g3si.png",
+      "url": "/templates"
+    },
+    "Z0jHp": {
+      "doc": "V8",
+      "name": "友だち UID移行（要確認の判断） V8（機能追加 F-3・API待ち）",
+      "kind": "画面",
+      "route": "/friends/migrations",
+      "routes": [
+        "/friends/migrations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Z0jHp.png",
+      "url": "/friends/migrations"
+    },
+    "Z0uO6": {
+      "doc": "V8",
+      "name": "リッチメニュー 作る② ボタンの動き V8",
+      "kind": "画面",
+      "route": "/rich-menus/new",
+      "routes": [
+        "/rich-menus/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Z0uO6.png",
+      "url": "/rich-menus/new"
+    },
+    "Z2LIUx": {
+      "doc": "V8",
+      "name": "自動応答 作る②（1152）V8",
+      "kind": "1152",
+      "route": "/auto-replies/edit",
+      "routes": [
+        "/auto-replies/edit"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/Z2LIUx.png",
+      "url": "/auto-replies/edit"
+    },
+    "Z3FoM": {
+      "doc": "V8-B",
+      "name": "予約台帳 一覧 V8",
+      "kind": "画面",
+      "route": "/restaurant-test/reservations",
+      "routes": [
+        "/restaurant-test/reservations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Z3FoM.png",
+      "url": "/restaurant-test/reservations"
+    },
+    "Z9wXm": {
+      "doc": "V8",
+      "name": "回答フォーム この版を公開（確かめ） V8",
+      "kind": "小窓",
+      "route": "/form-submissions/edit",
+      "routes": [
+        "/form-submissions/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/Z9wXm.png",
+      "url": "/form-submissions/edit"
+    },
+    "ZJIyl": {
+      "doc": "V8-B",
+      "name": "マイル たまる決めごと 1152 V8",
+      "kind": "1152",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/ZJIyl.png",
+      "url": "/mileage"
+    },
+    "ZSbFY": {
+      "doc": "V8-B",
+      "name": "外部連携 一覧（こちらから送る）V8",
+      "kind": "画面",
+      "route": "/webhooks",
+      "routes": [
+        "/webhooks"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ZSbFY.png",
+      "url": "/webhooks"
+    },
+    "ZoKow": {
+      "doc": "V8",
+      "name": "リッチメニュー 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/rich-menus",
+      "routes": [
+        "/rich-menus"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/ZoKow.png",
+      "url": "/rich-menus"
+    },
+    "ZxKL5": {
+      "doc": "V8-B",
+      "name": "流入と計測 広告費を手で入れる V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ZxKL5.png"
+    },
+    "ZyDd6": {
+      "doc": "V8-B",
+      "name": "予約設定 予約経路の連携（人）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ZyDd6.png"
+    },
+    "a1k3d": {
+      "doc": "V8",
+      "name": "テンプレート メッセージを作る（1152）V8",
+      "kind": "1152",
+      "route": "/templates/edit",
+      "routes": [
+        "/templates/edit"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/a1k3d.png",
+      "url": "/templates/edit"
+    },
+    "a5C1p": {
+      "doc": "V8",
+      "name": "リマインダ 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/reminders",
+      "routes": [
+        "/reminders"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/a5C1p.png",
+      "url": "/reminders"
+    },
+    "a7lUk": {
+      "doc": "V8-B",
+      "name": "設定 LINEアカウント 並び順と親子を変える V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/a7lUk.png"
+    },
+    "aINnz": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト 支払い V8",
+      "kind": "画面",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/aINnz.png",
+      "url": "/affiliates"
+    },
+    "aNZKe": {
+      "doc": "V8",
+      "name": "LIFF 回答フォーム 送った",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/aNZKe.png",
+      "url": null
+    },
+    "aPeD8": {
+      "doc": "V8",
+      "name": "友だち属性 一覧（1152）V8",
+      "kind": "1152",
+      "route": "/tags",
+      "routes": [
+        "/tags"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/aPeD8.png",
+      "url": "/tags"
+    },
+    "acRIl": {
+      "doc": "V8",
+      "name": "★P2 予約 /booking/bookings（今日・今週・今月・一覧）2026-10-01",
+      "kind": "まとめ板",
+      "route": "/booking/bookings",
+      "routes": [
+        "/booking/bookings"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/acRIl.png",
+      "url": "/booking/bookings"
+    },
+    "al47K": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 作る③ 初回案内 V8",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/al47K.png",
+      "url": null
+    },
+    "ao15G": {
+      "doc": "V8-B",
+      "name": "飲食店向け 店舗を追加 ①利用規約への同意 V8",
+      "kind": "画面",
+      "route": "/restaurant-test/dashboard",
+      "routes": [
+        "/restaurant-test/dashboard"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ao15G.png",
+      "url": "/restaurant-test/dashboard"
+    },
+    "apLqS": {
+      "doc": "V8",
+      "name": "リマインダ 一覧 V8",
+      "kind": "画面",
+      "route": "/reminders",
+      "routes": [
+        "/reminders"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/apLqS.png",
+      "url": "/reminders"
+    },
+    "axFrW": {
+      "doc": "V8",
+      "name": "シナリオ配信 一覧 V8",
+      "kind": "画面",
+      "route": "/scenarios",
+      "routes": [
+        "/scenarios"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/axFrW.png",
+      "url": "/scenarios"
+    },
+    "b8xBtZ": {
+      "doc": "V8-B",
+      "name": "統括 お問い合わせ V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/b8xBtZ.png",
+      "url": "/hq"
+    },
+    "bIdqV": {
+      "doc": "V8",
+      "name": "欄 一覧の状態",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/bIdqV.png"
+    },
+    "bKipf": {
+      "doc": "V8",
+      "name": "機能設定（1152）V8",
+      "kind": "1152",
+      "route": "/settings",
+      "routes": [
+        "/settings"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/bKipf.png",
+      "url": "/settings"
+    },
+    "bMpC5": {
+      "doc": "V8-B",
+      "name": "組織・権限 ユーザーの停止 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/bMpC5.png"
+    },
+    "bR6a1": {
+      "doc": "V8",
+      "name": "★V8 設定 状態",
+      "kind": "状態",
+      "route": "/settings",
+      "routes": [
+        "/settings"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/bR6a1.png",
+      "url": "/settings"
+    },
+    "bSp4h": {
+      "doc": "V8-B",
+      "name": "組織・権限 V8",
+      "kind": "画面",
+      "route": "/restaurant-test/organization",
+      "routes": [
+        "/restaurant-test/organization"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/bSp4h.png",
+      "url": "/restaurant-test/organization"
+    },
+    "bglah": {
+      "doc": "V8-B",
+      "name": "分析 保存した分析 V8",
+      "kind": "画面",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/bglah.png",
+      "url": "/analytics"
+    },
+    "biNP5": {
+      "doc": "V8",
+      "name": "LIFF 予約 ② 担当を選ぶ",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/biNP5.png",
+      "url": null
+    },
+    "c7dxp": {
+      "doc": "V8-B",
+      "name": "オートメーション 見本 V8（機能追加 F-16・API待ち）",
+      "kind": "画面",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/c7dxp.png",
+      "url": "/automations"
+    },
+    "cFo2p": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 受け皿は止められない（案内） V8",
+      "kind": "小窓",
+      "route": "/friend-add-settings",
+      "routes": [
+        "/friend-add-settings"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/cFo2p.png",
+      "url": "/friend-add-settings"
+    },
+    "cIdA2": {
+      "doc": "V8",
+      "name": "設定 マニュアルの正本表 V8",
+      "kind": "画面",
+      "route": "/settings/manual-links",
+      "routes": [
+        "/settings/manual-links"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/cIdA2.png",
+      "url": "/settings/manual-links"
+    },
+    "cXqlS": {
+      "doc": "V8-B",
+      "name": "コンバージョン 作る（競合）V8",
+      "kind": "競合",
+      "route": "/conversions",
+      "routes": [
+        "/conversions"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/cXqlS.png",
+      "url": "/conversions"
+    },
+    "cdZBf": {
+      "doc": "V8",
+      "name": "予約した後",
+      "shot": null,
+      "kind": "画面",
+      "route": "/broadcasts/reserved",
+      "url": "/broadcasts/reserved",
+      "routes": [
+        "/broadcasts/reserved"
+      ],
+      "width": 1440
+    },
+    "cgiGB": {
+      "doc": "V8",
+      "name": "詳細（下書き）",
+      "shot": null,
+      "kind": "画面",
+      "route": "/broadcasts/detail",
+      "url": "/broadcasts/detail",
+      "routes": [
+        "/broadcasts/detail"
+      ],
+      "width": 1440
+    },
+    "cniyw": {
+      "doc": "V8-B",
+      "name": "投稿 採用 V8",
+      "kind": "画面",
+      "route": "/nen-members",
+      "routes": [
+        "/nen-members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/cniyw.png",
+      "url": "/nen-members"
+    },
+    "ctLwT": {
+      "doc": "V8-B",
+      "name": "マイル たまる決めごとを作る V8",
+      "kind": "画面",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ctLwT.png",
+      "url": "/mileage"
+    },
+    "cuR8I": {
+      "doc": "V8",
+      "name": "テンプレート 公開する（確かめ） V8",
+      "kind": "小窓",
+      "route": "/templates/detail",
+      "routes": [
+        "/templates/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/cuR8I.png",
+      "url": "/templates/detail"
+    },
+    "d4adD4": {
+      "doc": "V8-B",
+      "name": "イベント予約 イベントを作る V8",
+      "kind": "画面",
+      "route": "/events",
+      "routes": [
+        "/events"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/d4adD4.png",
+      "url": "/events"
+    },
+    "d5fmnM": {
+      "doc": "V8",
+      "name": "予約設定 勤務とシフト（管理者）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/d5fmnM.png"
+    },
+    "d8X09": {
+      "doc": "V8",
+      "name": "1. ダッシュボード",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/d8X09.png"
+    },
+    "d9xoI": {
+      "doc": "V8",
+      "name": "友だち属性 タグを作る V8",
+      "kind": "画面",
+      "route": "/tags/new",
+      "routes": [
+        "/tags/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/d9xoI.png",
+      "url": "/tags/new"
+    },
+    "dEv6G": {
+      "doc": "V8-B",
+      "name": "会員 ランクを消す（確認）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/dEv6G.png"
+    },
+    "dEvJM": {
+      "doc": "V8-B",
+      "name": "統括 テンプレートを配る（結果）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/dEvJM.png"
+    },
+    "dK1aE": {
+      "doc": "V8",
+      "name": "欄 詳細（下書き）",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/dK1aE.png"
+    },
+    "dnzqC": {
+      "doc": "V8",
+      "name": "シナリオ配信 作る①（シナリオ情報・配信方式） V8",
+      "kind": "画面",
+      "route": "/scenarios/new",
+      "routes": [
+        "/scenarios/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/dnzqC.png",
+      "url": "/scenarios/new"
+    },
+    "dzx5D": {
+      "doc": "V8-B",
+      "name": "専用機能 状態 V8",
+      "kind": "状態",
+      "route": "/nen/members",
+      "routes": [
+        "/nen/members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/dzx5D.png",
+      "url": "/nen/members"
+    },
+    "e0FD1J": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 作る 完了（有効にした） V8",
+      "kind": "画面",
+      "route": "/friend-add-settings/publish",
+      "routes": [
+        "/friend-add-settings/publish"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/e0FD1J.png",
+      "url": "/friend-add-settings/publish"
+    },
+    "e2ekFu": {
+      "doc": "V8-B",
+      "name": "イベント予約 一覧 V8",
+      "kind": "画面",
+      "route": "/events",
+      "routes": [
+        "/events"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/e2ekFu.png",
+      "url": "/events"
+    },
+    "e5yBLx": {
+      "doc": "V8-B",
+      "name": "会員 ランク設定（競合）V8",
+      "kind": "競合",
+      "route": "/nen/members",
+      "routes": [
+        "/nen/members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/e5yBLx.png",
+      "url": "/nen/members"
+    },
+    "e7ljE": {
+      "doc": "V8-B",
+      "name": "運営 監査ログ V8",
+      "kind": "画面",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/e7ljE.png",
+      "url": "/ops"
+    },
+    "eAQ3t": {
+      "doc": "V8-B",
+      "name": "ウェビナー 状態 V8",
+      "kind": "状態",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/eAQ3t.png",
+      "url": "/webinars"
+    },
+    "eEhYU": {
+      "doc": "V8-B",
+      "name": "分析 友だちの増減 1152 V8",
+      "kind": "1152",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/eEhYU.png",
+      "url": "/analytics"
+    },
+    "eLjeQ": {
+      "doc": "V8-B",
+      "name": "マイペット ペットの情報を直す V8",
+      "kind": "小窓",
+      "route": "/nen/pets",
+      "routes": [
+        "/nen/pets"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/eLjeQ.png",
+      "url": "/nen/pets"
+    },
+    "eSXxA": {
+      "doc": "V8-B",
+      "name": "運営 ナレッジ 保存して承認 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/eSXxA.png"
+    },
+    "eY9F3": {
+      "doc": "V8-B",
+      "name": "座席・卓 卓を止める（確認）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/eY9F3.png"
+    },
+    "f3SoAm": {
+      "doc": "V8",
+      "name": "★V8 リッチメニュー 状態",
+      "kind": "状態",
+      "route": "/rich-menus",
+      "routes": [
+        "/rich-menus"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/f3SoAm.png",
+      "url": "/rich-menus"
+    },
+    "faGn4": {
+      "doc": "V8-B",
+      "name": "飲食店向け 店舗を追加 ②店舗の基本情報 V8",
+      "kind": "画面",
+      "route": "/restaurant-test/dashboard",
+      "routes": [
+        "/restaurant-test/dashboard"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/faGn4.png",
+      "url": "/restaurant-test/dashboard"
+    },
+    "fb9NJ": {
+      "doc": "V8-B",
+      "name": "会員 ランク設定 V8",
+      "kind": "画面",
+      "route": "/nen/members",
+      "routes": [
+        "/nen/members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/fb9NJ.png",
+      "url": "/nen/members"
+    },
+    "fcg2D": {
+      "doc": "V8",
+      "name": "友だち 重複候補を比べて決める V8",
+      "kind": "画面",
+      "route": "/friends/identity-candidates",
+      "routes": [
+        "/friends/identity-candidates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/fcg2D.png",
+      "url": "/friends/identity-candidates"
+    },
+    "fkGUR": {
+      "doc": "V8",
+      "name": "友だち属性 タグ（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/tags",
+      "routes": [
+        "/tags"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/fkGUR.png",
+      "url": "/tags"
+    },
+    "fy5dz": {
+      "doc": "V8",
+      "name": "アイコンボタン",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/fy5dz.png"
+    },
+    "g3iDs": {
+      "doc": "V8-B",
+      "name": "LINE通知 V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/g3iDs.png",
+      "url": "/notifications"
+    },
+    "g98F9": {
+      "doc": "V8-B",
+      "name": "オートメーション 動いた記録 V8",
+      "kind": "画面",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/g98F9.png",
+      "url": "/automations"
+    },
+    "g9osGN": {
+      "doc": "V8",
+      "name": "LIFF 回答フォーム ②（予約を入れる・新）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/g9osGN.png",
+      "url": null
+    },
+    "gBrCz": {
+      "doc": "V8-B",
+      "name": "座席・卓 卓を追加・変更 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/gBrCz.png"
+    },
+    "gLReL": {
+      "doc": "V8",
+      "name": "LIFF 予約 ⑤ 内容の確認",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/gLReL.png",
+      "url": null
+    },
+    "gVjiC": {
+      "doc": "V8",
+      "name": "LIFF イベント 詳細",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/gVjiC.png",
+      "url": null
+    },
+    "gW0F2": {
+      "doc": "V8-B",
+      "name": "外部連携 こちらで受け取る V8",
+      "kind": "画面",
+      "route": "/webhooks",
+      "routes": [
+        "/webhooks"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/gW0F2.png",
+      "url": "/webhooks"
+    },
+    "gjUz3": {
+      "doc": "V8-B",
+      "name": "LINE通知 運用者へのお知らせを作る V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/gjUz3.png",
+      "url": "/notifications"
+    },
+    "gzkXs": {
+      "doc": "V8",
+      "name": "入力欄",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/gzkXs.png"
+    },
+    "h114s": {
+      "doc": "V8-B",
+      "name": "運営 ナレッジ V8",
+      "kind": "画面",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/h114s.png",
+      "url": "/ops"
+    },
+    "h1G4d": {
+      "doc": "V8-B",
+      "name": "分析 Search Console V8",
+      "kind": "画面",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/h1G4d.png",
+      "url": "/analytics"
+    },
+    "h5rm8t": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 編集（競合）V8",
+      "kind": "競合",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/h5rm8t.png",
+      "url": null
+    },
+    "h7A2F": {
+      "doc": "V8-B",
+      "name": "マイペット ごはんの目安 V8",
+      "kind": "画面",
+      "route": "/nen/pets",
+      "routes": [
+        "/nen/pets"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/h7A2F.png",
+      "url": "/nen/pets"
+    },
+    "h7dmB": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト 案件 V8",
+      "kind": "画面",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/h7dmB.png",
+      "url": "/affiliates"
+    },
+    "h8uNW": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 作る② 流入リンク V8",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/h8uNW.png",
+      "url": null
+    },
+    "hEDTK": {
+      "doc": "V8",
+      "name": "テンプレート 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/templates",
+      "routes": [
+        "/templates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/hEDTK.png",
+      "url": "/templates"
+    },
+    "hKr8f": {
+      "doc": "V8",
+      "name": "リッチメニュー 公開した（公開の進み） V8",
+      "kind": "画面",
+      "route": "/rich-menus/edit",
+      "routes": [
+        "/rich-menus/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/hKr8f.png",
+      "url": "/rich-menus/edit"
+    },
+    "hQQlt": {
+      "doc": "V8-B",
+      "name": "予約枠・在庫 予約経路の連携 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/hQQlt.png"
+    },
+    "hadfk": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト 成果をまとめて操作（操作を選ぶ）V8",
+      "kind": "画面",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/hadfk.png",
+      "url": "/affiliates"
+    },
+    "hiBO8": {
+      "doc": "V8-B",
+      "name": "LINE通知 顧客へのお知らせを編集する V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/hiBO8.png"
+    },
+    "hjNpJ": {
+      "doc": "V8",
+      "name": "リマインダ 作る 完了（有効にした） V8",
+      "kind": "画面",
+      "route": "/reminders/new",
+      "routes": [
+        "/reminders/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/hjNpJ.png",
+      "url": "/reminders/new"
+    },
+    "hmr2P": {
+      "doc": "V8-B",
+      "name": "イベント予約 変更の確認 V8",
+      "kind": "小窓",
+      "route": "/events",
+      "routes": [
+        "/events"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/hmr2P.png",
+      "url": "/events"
+    },
+    "hn6Y8": {
+      "doc": "V8",
+      "name": "友だち 重複検出 V8（機能追加 F-2・API待ち）",
+      "kind": "画面",
+      "route": "/friends/identity-candidates",
+      "routes": [
+        "/friends/identity-candidates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/hn6Y8.png",
+      "url": "/friends/identity-candidates"
+    },
+    "hsD8e": {
+      "doc": "V8-B",
+      "name": "外部連携 送り先を作る V8",
+      "kind": "画面",
+      "route": "/webhooks",
+      "routes": [
+        "/webhooks"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/hsD8e.png",
+      "url": "/webhooks"
+    },
+    "i0FTN": {
+      "doc": "V8-B",
+      "name": "運営 契約先を作る V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/i0FTN.png"
+    },
+    "i1nThZ": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 作る④ あわせて行うこと V8（機能追加 F-9・API待ち）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/i1nThZ.png",
+      "url": null
+    },
+    "i2ZAS": {
+      "doc": "V8",
+      "name": "★V8 回答フォーム 状態",
+      "kind": "状態",
+      "route": "/form-submissions",
+      "routes": [
+        "/form-submissions"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/i2ZAS.png",
+      "url": "/form-submissions"
+    },
+    "i7Zkz": {
+      "doc": "V8",
+      "name": "決済の準備（将来）",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/i7Zkz.png"
+    },
+    "i8F12": {
+      "doc": "V8",
+      "name": "自動応答 止めるダイアログ V8",
+      "kind": "小窓",
+      "route": "/auto-replies",
+      "routes": [
+        "/auto-replies"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/i8F12.png",
+      "url": "/auto-replies"
+    },
+    "iJdAi": {
+      "doc": "V8-B",
+      "name": "予約台帳 取消の確認 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/iJdAi.png"
+    },
+    "iK4cQ": {
+      "doc": "V8-B",
+      "name": "分析 URLクリック V8",
+      "kind": "画面",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/iK4cQ.png",
+      "url": "/analytics"
+    },
+    "iLJmw": {
+      "doc": "V8-B",
+      "name": "EC連携 つなぎ先 V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/iLJmw.png",
+      "url": "/notifications"
+    },
+    "iMnph": {
+      "doc": "V8-B",
+      "name": "統括 バナー生成（プロジェクトの中）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/iMnph.png",
+      "url": "/hq"
+    },
+    "ihjfd": {
+      "doc": "V8-B",
+      "name": "LINEアカウント 詳細 V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ihjfd.png",
+      "url": "/notifications"
+    },
+    "ijxur": {
+      "doc": "V8",
+      "name": "回答フォーム 編集（予約を入れるブロック） V8",
+      "kind": "画面",
+      "route": "/form-submissions/edit",
+      "routes": [
+        "/form-submissions/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/ijxur.png",
+      "url": "/form-submissions/edit"
+    },
+    "j0Wcg": {
+      "doc": "V8-B",
+      "name": "Googleビジネス V8",
+      "kind": "画面",
+      "route": "/restaurant-test/google",
+      "routes": [
+        "/restaurant-test/google"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/j0Wcg.png",
+      "url": "/restaurant-test/google"
+    },
+    "j2hfkS": {
+      "doc": "V8-B",
+      "name": "オートメーション 共通アクションを作る V8",
+      "kind": "画面",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/j2hfkS.png",
+      "url": "/automations"
+    },
+    "j7PP04": {
+      "doc": "V8-B",
+      "name": "ウェビナー ①基本設定（作る）V8",
+      "kind": "画面",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/j7PP04.png",
+      "url": "/webinars"
+    },
+    "j8p3yj": {
+      "doc": "V8-B",
+      "name": "コンバージョン 作る V8",
+      "kind": "画面",
+      "route": "/conversions",
+      "routes": [
+        "/conversions"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/j8p3yj.png",
+      "url": "/conversions"
+    },
+    "jiNg0": {
+      "doc": "V8-B",
+      "name": "ウェビナー 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/jiNg0.png",
+      "url": "/webinars"
+    },
+    "jjFNi": {
+      "doc": "V8",
+      "name": "一覧（1152）",
+      "shot": null,
+      "kind": "1152",
+      "route": "/broadcasts",
+      "url": "/broadcasts",
+      "routes": [
+        "/broadcasts"
+      ],
+      "width": 1152
+    },
+    "k32cn": {
+      "doc": "V8",
+      "name": "リマインダ 編集（競合）V8",
+      "kind": "競合",
+      "route": "/reminders/edit",
+      "routes": [
+        "/reminders/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/k32cn.png",
+      "url": "/reminders/edit"
+    },
+    "k3aJKU": {
+      "doc": "V8",
+      "name": "LIFF 予約 ④ 日時を選ぶ（カレンダー）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/k3aJKU.png",
+      "url": null
+    },
+    "kFz4b": {
+      "doc": "V8",
+      "name": "★V8 友だち追加時の配信 状態",
+      "kind": "状態",
+      "route": "/friend-add-settings",
+      "routes": [
+        "/friend-add-settings"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/kFz4b.png",
+      "url": "/friend-add-settings"
+    },
+    "kdWac": {
+      "doc": "V8",
+      "name": "設定の場所（左のメニュー）",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/kdWac.png"
+    },
+    "kmTab": {
+      "doc": "V8",
+      "name": "リッチメニュー 作る②（1152）V8",
+      "kind": "1152",
+      "route": "/rich-menus/new",
+      "routes": [
+        "/rich-menus/new"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/kmTab.png",
+      "url": "/rich-menus/new"
+    },
+    "kz2B6": {
+      "doc": "V8",
+      "name": "シナリオ配信 編集（競合）V8",
+      "kind": "競合",
+      "route": "/scenarios/detail",
+      "routes": [
+        "/scenarios/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/kz2B6.png",
+      "url": "/scenarios/detail"
+    },
+    "l4qsT": {
+      "doc": "V8-B",
+      "name": "予約台帳 受信データを試す V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/l4qsT.png"
+    },
+    "l5SRfT": {
+      "doc": "V8-B",
+      "name": "外部連携 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/webhooks",
+      "routes": [
+        "/webhooks"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/l5SRfT.png",
+      "url": "/webhooks"
+    },
+    "l5V9a": {
+      "doc": "V8",
+      "name": "一覧",
+      "shot": null,
+      "kind": "画面",
+      "route": "/broadcasts",
+      "url": "/broadcasts",
+      "routes": [
+        "/broadcasts"
+      ],
+      "width": 1440
+    },
+    "l87p1J": {
+      "doc": "V8",
+      "name": "テンプレート 質問を作る V8",
+      "kind": "画面",
+      "route": "/templates/questions/new",
+      "routes": [
+        "/templates/questions/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/l87p1J.png",
+      "url": "/templates/questions/new"
+    },
+    "l9NlC0": {
+      "doc": "V8-B",
+      "name": "予約台帳 今日（時間×卓）V8",
+      "kind": "画面",
+      "route": "/restaurant-test/reservations",
+      "routes": [
+        "/restaurant-test/reservations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/l9NlC0.png",
+      "url": "/restaurant-test/reservations"
+    },
+    "loVfW": {
+      "doc": "V8",
+      "name": "リマインダ 登録者を管理 V8",
+      "kind": "画面",
+      "route": "/reminders/detail",
+      "routes": [
+        "/reminders/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/loVfW.png",
+      "url": "/reminders/detail"
+    },
+    "ltAaq": {
+      "doc": "V8",
+      "name": "リマインダ 作る⑤ 確認 V8（機能追加 F-10・API待ち）",
+      "kind": "画面",
+      "route": "/reminders/new",
+      "routes": [
+        "/reminders/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/ltAaq.png",
+      "url": "/reminders/new"
+    },
+    "m1cWEy": {
+      "doc": "V8",
+      "name": "回答フォーム 編集（中身） V8（機能追加 F-11・API待ち）",
+      "kind": "画面",
+      "route": "/form-submissions/edit",
+      "routes": [
+        "/form-submissions/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/m1cWEy.png",
+      "url": "/form-submissions/edit"
+    },
+    "mIwA4": {
+      "doc": "V8-B",
+      "name": "健康日記 一覧 V8",
+      "kind": "画面",
+      "route": "/nen/health",
+      "routes": [
+        "/nen/health"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/mIwA4.png",
+      "url": "/nen/health"
+    },
+    "mcOqK": {
+      "doc": "V8",
+      "name": "★P5 ダッシュボード /（編集・隠れているカード）2026-10-01",
+      "kind": "まとめ板",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/mcOqK.png",
+      "url": null
+    },
+    "meBRB": {
+      "doc": "V8-B",
+      "name": "統括 テンプレート（アカウントへ配る）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/meBRB.png",
+      "url": "/hq"
+    },
+    "n4DT7": {
+      "doc": "V8-B",
+      "name": "承認ワークフロー（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/restaurant-test/approvals",
+      "routes": [
+        "/restaurant-test/approvals"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/n4DT7.png",
+      "url": "/restaurant-test/approvals"
+    },
+    "n4j0Rm": {
+      "doc": "V8-B",
+      "name": "承認ワークフロー 差し戻す（理由）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/n4j0Rm.png"
+    },
+    "n9Z2P": {
+      "doc": "V8-B",
+      "name": "LINEアカウント 登録の内容を編集する V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/n9Z2P.png"
+    },
+    "nAesv": {
+      "doc": "V8-B",
+      "name": "EC連携 注文の状況（引き出し）V8",
+      "kind": "小窓",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/nAesv.png",
+      "url": "/notifications"
+    },
+    "nGcY1": {
+      "doc": "V8-B",
+      "name": "予約枠・在庫 自動で合わせるルール V8（機能追加 F-24・API待ち）",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/nGcY1.png"
+    },
+    "nH9L8": {
+      "doc": "V8-B",
+      "name": "オートメーション 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/nH9L8.png",
+      "url": "/automations"
+    },
+    "nJlxX": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト アフィリエイター V8",
+      "kind": "画面",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/nJlxX.png",
+      "url": "/affiliates"
+    },
+    "nMSiE": {
+      "doc": "V8",
+      "name": "シナリオ配信 編集（配信を始めた直後） V8",
+      "kind": "画面",
+      "route": "/scenarios/detail",
+      "routes": [
+        "/scenarios/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/nMSiE.png",
+      "url": "/scenarios/detail"
+    },
+    "nUYyb": {
+      "doc": "V8",
+      "name": "",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/nUYyb.png"
+    },
+    "nWmLg": {
+      "doc": "V8",
+      "name": "自動応答 実行結果 V8",
+      "kind": "画面",
+      "route": "/auto-replies/runs",
+      "routes": [
+        "/auto-replies/runs"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/nWmLg.png",
+      "url": "/auto-replies/runs"
+    },
+    "nku0f": {
+      "doc": "V8",
+      "name": "設定 ログインユーザー（管理者・権限） V8",
+      "kind": "画面",
+      "route": "/staff",
+      "routes": [
+        "/staff"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/nku0f.png",
+      "url": "/staff"
+    },
+    "oRbJi": {
+      "doc": "V8-B",
+      "name": "マイル 履歴 V8",
+      "kind": "画面",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/oRbJi.png",
+      "url": "/mileage"
+    },
+    "okXoi": {
+      "doc": "V8-B",
+      "name": "運営 契約先を停止 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/okXoi.png"
+    },
+    "ooufy": {
+      "doc": "V8",
+      "name": "予約設定 担当メニューをまとめて決める V8",
+      "kind": "画面",
+      "route": "/booking/menus/staff",
+      "routes": [
+        "/booking/menus/staff"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/ooufy.png",
+      "url": "/booking/menus/staff"
+    },
+    "oqSJP": {
+      "doc": "V8-B",
+      "name": "NEN配信 誕生日クーポンの決めごと（引き出し）V8",
+      "kind": "小窓",
+      "route": "/nen-campaigns",
+      "routes": [
+        "/nen-campaigns"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/oqSJP.png",
+      "url": "/nen-campaigns"
+    },
+    "ou60i": {
+      "doc": "V8-B",
+      "name": "組織・権限 ユーザーを追加・変更 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ou60i.png"
+    },
+    "owaS3": {
+      "doc": "V8",
+      "name": "予約設定 メニュー V8",
+      "kind": "画面",
+      "route": "/booking/menus",
+      "routes": [
+        "/booking/menus"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/owaS3.png",
+      "url": "/booking/menus"
+    },
+    "p03ImY": {
+      "doc": "V8-B",
+      "name": "統括 バナー生成（生成中）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/p03ImY.png",
+      "url": "/hq"
+    },
+    "p0kA3": {
+      "doc": "V8-B",
+      "name": "流入と計測 広告への送信履歴 V8（機能追加 F-22・API待ち）",
+      "kind": "画面",
+      "route": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/p0kA3.png",
+      "url": "/inflow-links"
+    },
+    "p15At": {
+      "doc": "V8",
+      "name": "友だち 比べて決める（1152）V8",
+      "kind": "1152",
+      "route": "/friends/identity-candidates",
+      "routes": [
+        "/friends/identity-candidates"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/p15At.png",
+      "url": "/friends/identity-candidates"
+    },
+    "p5YuP": {
+      "doc": "V8",
+      "name": "リマインダ 作る③ 通知の中身 V8（機能追加 F-10・API待ち）",
+      "kind": "画面",
+      "route": "/reminders/new",
+      "routes": [
+        "/reminders/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/p5YuP.png",
+      "url": "/reminders/new"
+    },
+    "p82v9": {
+      "doc": "V8",
+      "name": "共通情報 作る V8",
+      "kind": "画面",
+      "route": "/contents/vars/new",
+      "routes": [
+        "/contents/vars/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/p82v9.png",
+      "url": "/contents/vars/new"
+    },
+    "pNiUk": {
+      "doc": "V8",
+      "name": "詳細（承認待ち）",
+      "shot": null,
+      "kind": "画面",
+      "route": "/broadcasts/detail",
+      "url": "/broadcasts/detail",
+      "routes": [
+        "/broadcasts/detail"
+      ],
+      "width": 1440
+    },
+    "piWhz": {
+      "doc": "V8",
+      "name": "共通情報 編集（競合）V8",
+      "kind": "競合",
+      "route": "/contents/vars/edit",
+      "routes": [
+        "/contents/vars/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/piWhz.png",
+      "url": "/contents/vars/edit"
+    },
+    "pvimJ": {
+      "doc": "V8-B",
+      "name": "ウェビナー ③CTA・フォーム（競合）V8",
+      "kind": "競合",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/pvimJ.png",
+      "url": "/webinars"
+    },
+    "q5gbcM": {
+      "doc": "V8",
+      "name": "友だち属性 友だち情報欄 V8",
+      "kind": "画面",
+      "route": "/tags",
+      "routes": [
+        "/tags?tab=fields"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/q5gbcM.png",
+      "url": "/tags?tab=fields"
+    },
+    "qJNti": {
+      "doc": "V8",
+      "name": "LIFF 予約 ⑦ 予約が確定しました（支払い済み）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/qJNti.png",
+      "url": null
+    },
+    "qSTVR": {
+      "doc": "V8-B",
+      "name": "流入と計測 広告連携 V8",
+      "kind": "画面",
+      "route": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/qSTVR.png",
+      "url": "/inflow-links"
+    },
+    "qUdNh": {
+      "doc": "V8-B",
+      "name": "イベント予約 変更内容を確認 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/qUdNh.png"
+    },
+    "qVdiX": {
+      "doc": "V8",
+      "name": "LIFF イベント 申し込み完了・キャンセル待ち",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/qVdiX.png",
+      "url": null
+    },
+    "qf3ky": {
+      "doc": "V8-B",
+      "name": "予約枠・在庫（競合）V8",
+      "kind": "競合",
+      "route": "/restaurant-test/inventory",
+      "routes": [
+        "/restaurant-test/inventory"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/qf3ky.png",
+      "url": "/restaurant-test/inventory"
+    },
+    "qod6X": {
+      "doc": "V8-B",
+      "name": "運営 2要素認証を設定 V8",
+      "kind": "画面",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/qod6X.png",
+      "url": "/ops"
+    },
+    "qw80E": {
+      "doc": "V8-B",
+      "name": "統括 LINEアカウント 接続確認（手動の項目）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/qw80E.png"
+    },
+    "r1l0bT": {
+      "doc": "V8",
+      "name": "リマインダ 作る③（1152）V8",
+      "kind": "1152",
+      "route": "/reminders/new",
+      "routes": [
+        "/reminders/new"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/r1l0bT.png",
+      "url": "/reminders/new"
+    },
+    "r4ARpV": {
+      "doc": "V8-B",
+      "name": "統括 メンバー V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/r4ARpV.png",
+      "url": "/hq"
+    },
+    "r6dJFy": {
+      "doc": "V8-B",
+      "name": "コンバージョン 一覧 V8",
+      "kind": "画面",
+      "route": "/conversions",
+      "routes": [
+        "/conversions"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/r6dJFy.png",
+      "url": "/conversions"
+    },
+    "r8dGXT": {
+      "doc": "V8",
+      "name": "リッチメニュー 編集（競合）V8",
+      "kind": "競合",
+      "route": "/rich-menus/edit",
+      "routes": [
+        "/rich-menus/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/r8dGXT.png",
+      "url": "/rich-menus/edit"
+    },
+    "rI5uh": {
+      "doc": "V8-B",
+      "name": "統括 バナー生成（画像の詳細）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/rI5uh.png",
+      "url": "/hq"
+    },
+    "rRk0C": {
+      "doc": "V8-B",
+      "name": "★V8-B 成果とアフィリエイト 状態",
+      "kind": "状態",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/rRk0C.png",
+      "url": "/affiliates"
+    },
+    "rSRFK": {
+      "doc": "V8-B",
+      "name": "組織・権限 アドレスを発行（再発行の確認）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/rSRFK.png"
+    },
+    "rZEGN": {
+      "doc": "V8",
+      "name": "リッチメニュー 一覧 V8",
+      "kind": "画面",
+      "route": "/rich-menus",
+      "routes": [
+        "/rich-menus"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/rZEGN.png",
+      "url": "/rich-menus"
+    },
+    "ralAc": {
+      "doc": "V8-B",
+      "name": "外部連携 API 接続 V8（機能追加 F-17・API待ち）",
+      "kind": "画面",
+      "route": "/webhooks",
+      "routes": [
+        "/webhooks"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ralAc.png",
+      "url": "/webhooks"
+    },
+    "rbAig": {
+      "doc": "V8",
+      "name": "リマインダ 詳細（概要） V8",
+      "kind": "画面",
+      "route": "/reminders/detail",
+      "routes": [
+        "/reminders/detail"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/rbAig.png",
+      "url": "/reminders/detail"
+    },
+    "rfdmA": {
+      "doc": "V8",
+      "name": "欄 一覧（1152）",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1152,
+      "shot": "lint/V8/shots/rfdmA.png"
+    },
+    "rfhIf": {
+      "doc": "V8",
+      "name": "自動応答 作る③ 何を返すか V8",
+      "kind": "画面",
+      "route": "/auto-replies/edit",
+      "routes": [
+        "/auto-replies/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/rfhIf.png",
+      "url": "/auto-replies/edit"
+    },
+    "rm92Y": {
+      "doc": "V8-B",
+      "name": "予約台帳 電話の予約を入れる V8",
+      "kind": "画面",
+      "route": "/restaurant-test/reservations",
+      "routes": [
+        "/restaurant-test/reservations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/rm92Y.png",
+      "url": "/restaurant-test/reservations"
+    },
+    "sDXNy": {
+      "doc": "V8-B",
+      "name": "LINE通知 運用者へのお知らせ 公開前の確認 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/sDXNy.png"
+    },
+    "sFwWf": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 テストで自分に送る（機能追加 F-12・API待ち）",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/sFwWf.png"
+    },
+    "susGP": {
+      "doc": "V8",
+      "name": "★V8 テンプレート 状態",
+      "kind": "状態",
+      "route": "/templates",
+      "routes": [
+        "/templates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/susGP.png",
+      "url": "/templates"
+    },
+    "sxNO5": {
+      "doc": "V8",
+      "name": "LIFFの決まり",
+      "kind": "決まり",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/sxNO5.png",
+      "url": null
+    },
+    "t2SMXX": {
+      "doc": "V8-B",
+      "name": "マイペット 一覧 1152 V8",
+      "kind": "1152",
+      "route": "/nen/pets",
+      "routes": [
+        "/nen/pets"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/t2SMXX.png",
+      "url": "/nen/pets"
+    },
+    "t8WgD8": {
+      "doc": "V8-B",
+      "name": "承認ワークフロー V8",
+      "kind": "画面",
+      "route": "/restaurant-test/approvals",
+      "routes": [
+        "/restaurant-test/approvals"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/t8WgD8.png",
+      "url": "/restaurant-test/approvals"
+    },
+    "tJqST": {
+      "doc": "V8-B",
+      "name": "オートメーション ルールを作る（競合）V8",
+      "kind": "競合",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/tJqST.png",
+      "url": "/automations"
+    },
+    "tOPeY": {
+      "doc": "V8-B",
+      "name": "運営 ログイン 2段目（6桁）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/tOPeY.png"
+    },
+    "tPm3e": {
+      "doc": "V8",
+      "name": "欄 詳細（送った後）",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/tPm3e.png"
+    },
+    "tQ2MJ": {
+      "doc": "V8-B",
+      "name": "運営 お知らせ V8",
+      "kind": "画面",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/tQ2MJ.png",
+      "url": "/ops"
+    },
+    "tVaUh": {
+      "doc": "V8-B",
+      "name": "運営 メンバーの招待 V8",
+      "kind": "画面",
+      "route": "/ops",
+      "routes": [
+        "/ops"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/tVaUh.png",
+      "url": "/ops"
+    },
+    "tnTn9": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト アフィリエイターの詳細（引き出し）V8",
+      "kind": "小窓",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/tnTn9.png",
+      "url": "/affiliates"
+    },
+    "tpRRT": {
+      "doc": "V8",
+      "name": "回答フォーム 編集（受付と見た目） V8",
+      "kind": "画面",
+      "route": "/form-submissions/edit",
+      "routes": [
+        "/form-submissions/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/tpRRT.png",
+      "url": "/form-submissions/edit"
+    },
+    "u3iab3": {
+      "doc": "V8-B",
+      "name": "設定 プール管理 V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/u3iab3.png",
+      "url": "/notifications"
+    },
+    "u5CuB8": {
+      "doc": "V8-B",
+      "name": "分析 クロス分析 V8",
+      "kind": "画面",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/u5CuB8.png",
+      "url": "/analytics"
+    },
+    "u5YC6": {
+      "doc": "V8",
+      "name": "テンプレート メッセージを作る V8",
+      "kind": "画面",
+      "route": "/templates/edit",
+      "routes": [
+        "/templates/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/u5YC6.png",
+      "url": "/templates/edit"
+    },
+    "u8sKN": {
+      "doc": "V8",
+      "name": "自動応答 削除ダイアログ V8",
+      "kind": "小窓",
+      "route": "/auto-replies",
+      "routes": [
+        "/auto-replies"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/u8sKN.png",
+      "url": "/auto-replies"
+    },
+    "u8xibp": {
+      "doc": "V8-B",
+      "name": "LINE通知 運用者へのお知らせ V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/u8xibp.png",
+      "url": "/notifications"
+    },
+    "uAWb7": {
+      "doc": "V8",
+      "name": "設定 会社とロゴ V8（新）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/uAWb7.png",
+      "url": null
+    },
+    "uBMuB": {
+      "doc": "V8-B",
+      "name": "ウェビナー 一覧 1152 V8",
+      "kind": "1152",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/uBMuB.png",
+      "url": "/webinars"
+    },
+    "uE9gf": {
+      "doc": "V8",
+      "name": "自動応答 一覧 V8",
+      "kind": "画面",
+      "route": "/auto-replies",
+      "routes": [
+        "/auto-replies"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/uE9gf.png",
+      "url": "/auto-replies"
+    },
+    "uNsEy": {
+      "doc": "V8-B",
+      "name": "ウェビナー 参加者 V8",
+      "kind": "画面",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/uNsEy.png",
+      "url": "/webinars"
+    },
+    "uZqMA": {
+      "doc": "V8",
+      "name": "LIFF 予約 ⑤ 内容の確認（414）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/uZqMA.png",
+      "url": null
+    },
+    "ujcar": {
+      "doc": "V8-B",
+      "name": "投稿 この写真を見送る V8",
+      "kind": "画面",
+      "route": "/nen-members",
+      "routes": [
+        "/nen-members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ujcar.png",
+      "url": "/nen-members"
+    },
+    "ukPgd": {
+      "doc": "V8-B",
+      "name": "統括 メンバー 招待（入力の間違い）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ukPgd.png"
+    },
+    "ulq9Y": {
+      "doc": "V8",
+      "name": "友だち属性 対応マークの編集 V8",
+      "kind": "画面",
+      "route": "/tags/marks/edit",
+      "routes": [
+        "/tags/marks/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/ulq9Y.png",
+      "url": "/tags/marks/edit"
+    },
+    "usDpO": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト 期間を締める（確かめ）V8",
+      "kind": "画面",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/usDpO.png",
+      "url": "/affiliates"
+    },
+    "v0SbYR": {
+      "doc": "V8",
+      "name": "回答フォーム 集まった回答（まとめて見る） V8",
+      "kind": "画面",
+      "route": "/form-submissions/responses",
+      "routes": [
+        "/form-submissions/responses"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/v0SbYR.png",
+      "url": "/form-submissions/responses"
+    },
+    "v19Ivv": {
+      "doc": "V8",
+      "name": "テンプレート 一覧（メッセージ） V8",
+      "kind": "画面",
+      "route": "/templates",
+      "routes": [
+        "/templates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/v19Ivv.png",
+      "url": "/templates"
+    },
+    "v2KMj": {
+      "doc": "V8-B",
+      "name": "統括 LINEアカウントを登録 ④接続確認 V8",
+      "kind": "小窓",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/v2KMj.png",
+      "url": "/hq"
+    },
+    "v5L19Z": {
+      "doc": "V8",
+      "name": "予約設定 メニュー編集（競合）V8",
+      "kind": "競合",
+      "route": "/booking/menus/new",
+      "routes": [
+        "/booking/menus/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/v5L19Z.png",
+      "url": "/booking/menus/new"
+    },
+    "v9JWQ": {
+      "doc": "V8-B",
+      "name": "成果とアフィリエイト アフィリエイター（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/affiliates",
+      "routes": [
+        "/affiliates"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/v9JWQ.png",
+      "url": "/affiliates"
+    },
+    "v9WJd": {
+      "doc": "V8",
+      "name": "LIFF 予約 お支払いが終わらなかった",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/v9WJd.png",
+      "url": null
+    },
+    "vCEKM": {
+      "doc": "V8-B",
+      "name": "組織・権限 店舗を編集 V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/vCEKM.png"
+    },
+    "vKDj5": {
+      "doc": "V8",
+      "name": "友だち属性 対応マーク V8",
+      "kind": "画面",
+      "route": "/tags",
+      "routes": [
+        "/tags?tab=marks"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/vKDj5.png",
+      "url": "/tags?tab=marks"
+    },
+    "vWJEm": {
+      "doc": "V8-B",
+      "name": "流入と計測 作る（競合）V8",
+      "kind": "競合",
+      "route": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/vWJEm.png",
+      "url": "/inflow-links"
+    },
+    "vqu9B": {
+      "doc": "V8",
+      "name": "",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/vqu9B.png"
+    },
+    "w1W8h": {
+      "doc": "V8-B",
+      "name": "EC連携 会員のつき合わせ V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/w1W8h.png",
+      "url": "/notifications"
+    },
+    "w5pwG": {
+      "doc": "V8-B",
+      "name": "NEN配信 配信を直す（口コミのお願い）V8",
+      "kind": "画面",
+      "route": "/nen-campaigns",
+      "routes": [
+        "/nen-campaigns"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/w5pwG.png",
+      "url": "/nen-campaigns"
+    },
+    "w9zY5": {
+      "doc": "V8",
+      "name": "友だち属性 友だち情報欄を作る・編集 V8",
+      "kind": "画面",
+      "route": "/tags/fields/edit",
+      "routes": [
+        "/tags/fields/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/w9zY5.png",
+      "url": "/tags/fields/edit"
+    },
+    "wDzkc": {
+      "doc": "V8",
+      "name": "友だち追加時の配信 作る① 基本設定 V8",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/wDzkc.png",
+      "url": null
+    },
+    "wJYQb": {
+      "doc": "V8-B",
+      "name": "予約設定 自動で合わせるルール（人）V8（機能追加 F-25・API待ち）",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/wJYQb.png"
+    },
+    "wPfqW": {
+      "doc": "V8",
+      "name": "LIFF 回答フォーム ①（414）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/wPfqW.png",
+      "url": null
+    },
+    "wTIej": {
+      "doc": "V8-B",
+      "name": "マイペット 一覧 V8",
+      "kind": "画面",
+      "route": "/nen/pets",
+      "routes": [
+        "/nen/pets"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/wTIej.png",
+      "url": "/nen/pets"
+    },
+    "wWrpY": {
+      "doc": "V8-B",
+      "name": "外部連携 状態 V8",
+      "kind": "状態",
+      "route": "/webhooks",
+      "routes": [
+        "/webhooks"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/wWrpY.png",
+      "url": "/webhooks"
+    },
+    "wbDHy": {
+      "doc": "V8",
+      "name": "ログインユーザー（1152）V8",
+      "kind": "1152",
+      "route": "/staff",
+      "routes": [
+        "/staff"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/wbDHy.png",
+      "url": "/staff"
+    },
+    "wfHIE": {
+      "doc": "V8",
+      "name": "欄 詳細（承認待ち）",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/wfHIE.png"
+    },
+    "wjfLe": {
+      "doc": "V8",
+      "name": "シナリオ 一覧（1152）V8",
+      "kind": "1152",
+      "route": "/scenarios",
+      "routes": [
+        "/scenarios"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/wjfLe.png",
+      "url": "/scenarios"
+    },
+    "wqC8x": {
+      "doc": "V8-B",
+      "name": "EC連携 定期便 V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/wqC8x.png",
+      "url": "/notifications"
+    },
+    "ws9wt": {
+      "doc": "V8-B",
+      "name": "分析 友だちの増減 V8",
+      "kind": "画面",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ws9wt.png",
+      "url": "/analytics"
+    },
+    "wvGke": {
+      "doc": "V8",
+      "name": "自分の勤務（ひも付けなし）V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/wvGke.png"
+    },
+    "wxIQ7": {
+      "doc": "V8",
+      "name": "リッチメニュー 切替のつながり V8",
+      "kind": "画面",
+      "route": "/rich-menus/connections",
+      "routes": [
+        "/rich-menus/connections"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/wxIQ7.png",
+      "url": "/rich-menus/connections"
+    },
+    "x1OZS6": {
+      "doc": "V8",
+      "name": "予約設定 予約のルール V8",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/x1OZS6.png",
+      "url": null
+    },
+    "x2dSNv": {
+      "doc": "V8-B",
+      "name": "LINEアカウント 乗り換え V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/x2dSNv.png",
+      "url": "/notifications"
+    },
+    "x6QsVz": {
+      "doc": "V8",
+      "name": "友だち一覧 V8（閲覧のみ）",
+      "kind": "閲覧のみ",
+      "route": "/friends",
+      "routes": [
+        "/friends"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/x6QsVz.png",
+      "url": "/friends"
+    },
+    "x9HIR": {
+      "doc": "V8-B",
+      "name": "Googleビジネス 返信を作る V8",
+      "kind": null,
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/x9HIR.png"
+    },
+    "xCoDe": {
+      "doc": "V8",
+      "name": "★V8 予約設定 状態",
+      "kind": "状態",
+      "route": "/booking/menus",
+      "routes": [
+        "/booking/menus"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/xCoDe.png",
+      "url": "/booking/menus"
+    },
+    "xHpkS": {
+      "doc": "V8",
+      "name": "友だち追加時 作る②（1152）V8",
+      "kind": "1152",
+      "route": null,
+      "routes": [],
+      "width": 1152,
+      "shot": "lint/V8/shots/xHpkS.png",
+      "url": null
+    },
+    "xLpnS": {
+      "doc": "V8-B",
+      "name": "LINE来店フォロー V8",
+      "kind": "画面",
+      "route": "/restaurant-test/line-followup",
+      "routes": [
+        "/restaurant-test/line-followup"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/xLpnS.png",
+      "url": "/restaurant-test/line-followup"
+    },
+    "xbHxg": {
+      "doc": "V8-B",
+      "name": "流入と計測 一覧 V8",
+      "kind": "画面",
+      "route": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/xbHxg.png",
+      "url": "/inflow-links"
+    },
+    "xj3zz": {
+      "doc": "V8-B",
+      "name": "統括 LINEアカウントを登録 ①LINE準備 V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/xj3zz.png",
+      "url": "/hq"
+    },
+    "xn95q": {
+      "doc": "V8",
+      "name": "友だち属性 タグの編集（競合）V8",
+      "kind": "競合",
+      "route": "/tags/edit",
+      "routes": [
+        "/tags/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/xn95q.png",
+      "url": "/tags/edit"
+    },
+    "xuJ7D": {
+      "doc": "V8-B",
+      "name": "設定 はじめの設定 V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/xuJ7D.png",
+      "url": "/notifications"
+    },
+    "xvtSz": {
+      "doc": "V8",
+      "name": "LIFF 予約 ③ 日時を選ぶ（414）",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/xvtSz.png",
+      "url": null
+    },
+    "xxKtW": {
+      "doc": "V8",
+      "name": "共通情報 削除ダイアログ V8",
+      "kind": "小窓",
+      "route": "/contents/vars",
+      "routes": [
+        "/contents/vars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/xxKtW.png",
+      "url": "/contents/vars"
+    },
+    "xzCK6": {
+      "doc": "V8-B",
+      "name": "予約台帳 今日（1152）V8",
+      "kind": "1152",
+      "route": "/restaurant-test/reservations",
+      "routes": [
+        "/restaurant-test/reservations"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/xzCK6.png",
+      "url": "/restaurant-test/reservations"
+    },
+    "y1bs9A": {
+      "doc": "V8",
+      "name": "LIFF 自分のイベント",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/y1bs9A.png",
+      "url": null
+    },
+    "y1ztx": {
+      "doc": "V8-B",
+      "name": "流入と計測 一覧 1152 V8",
+      "kind": "1152",
+      "route": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/y1ztx.png",
+      "url": "/inflow-links"
+    },
+    "y8QQV": {
+      "doc": "V8-B",
+      "name": "通知 V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/y8QQV.png",
+      "url": "/notifications"
+    },
+    "yLKwV": {
+      "doc": "V8-B",
+      "name": "統括 メンバー（権限者を招待）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/yLKwV.png",
+      "url": "/hq"
+    },
+    "yOyCg": {
+      "doc": "V8",
+      "name": "リッチメニュー 削除できない理由 V8",
+      "kind": "小窓",
+      "route": "/rich-menus",
+      "routes": [
+        "/rich-menus"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/yOyCg.png",
+      "url": "/rich-menus"
+    },
+    "yRDwW": {
+      "doc": "V8-B",
+      "name": "NEN配信 コラムを書く V8",
+      "kind": "画面",
+      "route": "/nen-campaigns",
+      "routes": [
+        "/nen-campaigns"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/yRDwW.png",
+      "url": "/nen-campaigns"
+    },
+    "yRPxl": {
+      "doc": "V8",
+      "name": "予約設定 受付枠 V8",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/yRPxl.png",
+      "url": null
+    },
+    "yvOtn": {
+      "doc": "V8-B",
+      "name": "分析 配信の反応 V8",
+      "kind": "画面",
+      "route": "/analytics",
+      "routes": [
+        "/analytics"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/yvOtn.png",
+      "url": "/analytics"
+    },
+    "ywFJT": {
+      "doc": "V8",
+      "name": "設定 機能設定 V8",
+      "kind": "画面",
+      "route": "/settings",
+      "routes": [
+        "/settings"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/ywFJT.png",
+      "url": "/settings"
+    },
+    "ywJ5H": {
+      "doc": "V8",
+      "name": "★P1 友だち一覧 /friends（個別設計・承認待ち）2026-10-01",
+      "kind": "まとめ板",
+      "route": "/friends",
+      "routes": [
+        "/friends"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/ywJ5H.png",
+      "url": "/friends"
+    },
+    "z2dgw": {
+      "doc": "V8-B",
+      "name": "ウェビナー 分析 V8",
+      "kind": "画面",
+      "route": "/webinars",
+      "routes": [
+        "/webinars"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/z2dgw.png",
+      "url": "/webinars"
+    },
+    "z2tvtX": {
+      "doc": "V8-B",
+      "name": "健康日記 記録の項目 V8",
+      "kind": "画面",
+      "route": "/nen/health",
+      "routes": [
+        "/nen/health"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/z2tvtX.png",
+      "url": "/nen/health"
+    },
+    "zOpMG": {
+      "doc": "V8-B",
+      "name": "統括 バナー生成（上限に達した）V8",
+      "kind": "画面",
+      "route": "/hq",
+      "routes": [
+        "/hq"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/zOpMG.png",
+      "url": "/hq"
+    },
+    "zQ5vY": {
+      "doc": "V8-B",
+      "name": "会員 ライフタイム V8",
+      "kind": "画面",
+      "route": "/nen/members",
+      "routes": [
+        "/nen/members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/zQ5vY.png",
+      "url": "/nen/members"
+    },
+    "zaqP9": {
+      "doc": "V8-B",
+      "name": "マイル 状態 V8",
+      "kind": "状態",
+      "route": "/mileage",
+      "routes": [
+        "/mileage"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/zaqP9.png",
+      "url": "/mileage"
+    },
+    "ziSgL": {
+      "doc": "V8-B",
+      "name": "オートメーション 共通アクション 版と使われている場所 V8",
+      "kind": "画面",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ziSgL.png",
+      "url": "/automations"
+    },
+    "ziYCN": {
+      "doc": "V8",
+      "name": "設定 機能設定（競合）V8",
+      "kind": "競合",
+      "route": "/settings",
+      "routes": [
+        "/settings"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/ziYCN.png",
+      "url": "/settings"
+    },
+    "ztgRD": {
+      "doc": "V8",
+      "name": "設定 並びを変える V8",
+      "kind": "小窓",
+      "route": "/settings",
+      "routes": [
+        "/settings"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/ztgRD.png",
+      "url": "/settings"
+    },
+    "zz9R3": {
+      "doc": "V8",
+      "name": "LIFF 状態：読み込めなかった",
+      "kind": "状態",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/zz9R3.png",
+      "url": null
+    }
+  }
+}
