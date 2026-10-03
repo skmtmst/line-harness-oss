@@ -160,6 +160,7 @@ describe('LINEアカウント作成ウィザード', () => {
     fireEvent.click(screen.getByRole('button', { name: '接続して保存する' }))
     expect(await screen.findAllByText(/既存の友だちを取り込んでいます/)).toHaveLength(2)
     expect((screen.getByRole('button', { name: '登録したアカウントを見る' }) as HTMLButtonElement).disabled).toBe(true)
+    await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalled())
     finishStep({ success: true, data: { state: {
       capability: 'available', phase: 'hydrating_profiles', received: 10, imported: 10,
     }, busy: false } })
