@@ -20,6 +20,7 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './report-v8.module.css'
+import ReportHeadV8 from './report-head-v8'
 import {
   api,
   ApiError,
@@ -948,13 +949,7 @@ function AnalyticsReportFormPage() {
     // U054: 左右の余白は app-shell が持つ（16px/24px/40px）。
     // ここで px-6 を重ねるとスマホで入力幅が二重に削られる。
     <div className={`text-ink mx-auto flex max-w-screen-2xl flex-col gap-4 pb-24 ${styles.page}`} data-design-node={v8 ? (updateConflict ? 'G83vi' : 'H5UoIu') : 'URqOA'}>
-      {v8 && (
-        <div className={styles.head}>
-          <Link className={styles.back} href="/analytics">← 分析へ</Link>
-          <h1 className={styles.title}>{editing ? '定期レポートを直す' : 'レポートを作る'}</h1>
-          <p className={styles.lead}>見たい数をまとめて、決まった曜日・時刻にLINEやメールで届けます。数が急に動いたときだけ知らせることもできます。</p>
-        </div>
-      )}
+      {v8 && <ReportHeadV8 editing={Boolean(editing)} />}
       <div className={styles.legacyHead}>
         <PageHeader
           breadcrumb={[{ label: '分析', href: '/analytics' }, { label: editing ? '定期レポートを直す' : '定期レポートをつくる' }]}
