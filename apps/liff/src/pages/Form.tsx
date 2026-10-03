@@ -541,14 +541,12 @@ export default function Form() {
                   className="h-1 flex-1 rounded-full"
                   style={{
                     backgroundColor:
-                      i <= sectionIndex
-                        ? 'var(--form-look-main, #03873a)'
-                        : 'var(--form-look-line, #e6e9ed)',
+                      i <= sectionIndex ? 'var(--form-look-main)' : 'var(--form-look-line)',
                   }}
                 />
               ))}
             </div>
-            <p className="mt-1.5 text-[10px] text-[var(--form-look-sub,#5f6670)] tabular-nums">
+            <p className="mt-1.5 text-[10px] text-[var(--form-look-sub)] tabular-nums">
               {options.sectionHeader === 'name'
                 ? layout.sections[sectionIndex]?.name
                 : `${sectionIndex + 1} / ${layout.sections.length}ページ`}
@@ -561,9 +559,9 @@ export default function Form() {
           </p>
         ) : null}
         <div>
-          <h1 className="text-xl font-bold text-[var(--form-look-ink,#1d1d1f)]">{pageTitle}</h1>
+          <h1 className="text-xl font-bold text-[var(--form-look-ink)]">{pageTitle}</h1>
           {form.description && (
-            <p className="mt-1 text-xs leading-relaxed whitespace-pre-wrap text-[var(--form-look-sub,#5f6670)]">
+            <p className="mt-1 text-xs leading-relaxed whitespace-pre-wrap text-[var(--form-look-sub)]">
               {form.description}
             </p>
           )}
@@ -614,7 +612,7 @@ export default function Form() {
           <button
             type="button"
             onClick={goBack}
-            className="self-center px-4 py-1 text-xs text-[var(--form-look-sub,#5f6670)] focus-visible:outline-2 focus-visible:outline-ink"
+            className="self-center px-4 py-1 text-xs text-[var(--form-look-sub)] focus-visible:outline-2 focus-visible:outline-ink"
           >
             ← {options.prevLabel || '前のページへ'}
           </button>
@@ -676,7 +674,7 @@ function BlockView({
 }) {
   if (block.kind === 'heading') {
     const size = block.level === 1 ? 'text-xl' : block.level === 3 ? 'text-sm' : 'text-lg';
-    return <h2 className={`font-bold text-[var(--form-look-ink,#1d1d1f)] ${size}`}>{block.text}</h2>;
+    return <h2 className={`font-bold text-[var(--form-look-ink)] ${size}`}>{block.text}</h2>;
   }
 
   if (block.kind === 'text') {
@@ -709,8 +707,8 @@ function BlockView({
         rel="noreferrer"
         className={`block rounded-lg py-3 text-center text-sm font-bold ${
           block.style === 'outline'
-            ? 'border border-[var(--form-look-main,#03873a)] text-[var(--form-look-main,#03873a)]'
-            : 'bg-[var(--form-look-main,#03873a)] text-white'
+            ? 'border border-[var(--form-look-main)] text-[var(--form-look-main)]'
+            : 'bg-[var(--form-look-main)] text-white'
         }`}
       >
         {block.label}
@@ -724,13 +722,13 @@ function BlockView({
   const text = typeof value === 'string' ? value : '';
   const checked = Array.isArray(value) ? (value as string[]) : [];
   const inputClass =
-    'w-full rounded-[10px] border border-[var(--form-look-line-strong,#dfe3e8)] bg-canvas px-3 py-2 text-sm text-[var(--form-look-ink,#1d1d1f)] placeholder:text-[var(--form-look-idle,#b8bec6)] focus:border-[var(--form-look-main,#03873a)] focus:outline-none';
+    'w-full rounded-[10px] border border-[var(--form-look-line-strong)] bg-canvas px-3 py-2 text-sm text-[var(--form-look-ink)] placeholder:text-[var(--form-look-idle)] focus:border-[var(--form-look-main)] focus:outline-none';
   /** 直しがある欄は枠を直しの色にする (お店のテーマの error)。 */
   const invalidStyle = error ? { borderColor: errorColor } : undefined;
 
   return (
     <div>
-      <label className="block text-sm font-bold text-[var(--form-look-ink,#1d1d1f)]">
+      <label className="block text-sm font-bold text-[var(--form-look-ink)]">
         {block.label}
         {block.required && <RequiredMark />}
       </label>
@@ -840,8 +838,8 @@ function BlockView({
                   <label
                     className={`flex min-h-12 items-center gap-2.5 rounded-[10px] border px-3.5 py-3 text-sm ${
                       checkedRadio
-                        ? 'border-[var(--form-look-main,#03873a)] bg-[var(--form-look-soft,#f0fbf4)] font-semibold text-ink'
-                        : 'border-[var(--form-look-line-strong,#dfe3e8)] bg-canvas text-ink'
+                        ? 'border-[var(--form-look-main)] bg-[var(--form-look-soft)] font-semibold text-ink'
+                        : 'border-[var(--form-look-line-strong)] bg-canvas text-ink'
                     }`}
                   >
                     <input
@@ -849,7 +847,7 @@ function BlockView({
                       name={block.name}
                       checked={checkedRadio}
                       onChange={() => onChange(block.name, choice.label)}
-                      className="h-[18px] w-[18px] shrink-0 accent-[var(--form-look-main,#03873a)]"
+                      className="h-[18px] w-[18px] shrink-0 accent-[var(--form-look-main)]"
                     />
                     {choice.label}
                   </label>
@@ -878,14 +876,14 @@ function BlockView({
                   <label
                     className={`flex min-h-12 items-center gap-2.5 rounded-[10px] border px-3.5 py-3 text-sm ${
                       isChecked
-                        ? 'border-[var(--form-look-main,#03873a)] bg-[var(--form-look-soft,#f0fbf4)] font-semibold text-ink'
-                        : 'border-[var(--form-look-line-strong,#dfe3e8)] bg-canvas text-ink'
+                        ? 'border-[var(--form-look-main)] bg-[var(--form-look-soft)] font-semibold text-ink'
+                        : 'border-[var(--form-look-line-strong)] bg-canvas text-ink'
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      className="h-[18px] w-[18px] shrink-0 accent-[var(--form-look-main,#03873a)]"
+                      className="h-[18px] w-[18px] shrink-0 accent-[var(--form-look-main)]"
                       onChange={() => {
                         if (!choice.isOther) {
                           onToggle(block.name, choice.label);
@@ -944,7 +942,7 @@ function BlockView({
                 const file = e.target.files?.[0];
                 if (file) onUpload(block.name, file);
               }}
-              className="w-full text-sm text-ink-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--form-look-main,#03873a)] file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:opacity-50"
+              className="w-full text-sm text-ink-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--form-look-main)] file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:opacity-50"
             />
             {uploading && <p className="mt-1 text-xs text-ink-faint">送っています...</p>}
             {text && (
