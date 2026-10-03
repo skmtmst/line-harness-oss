@@ -62,6 +62,7 @@ vi.mock('@/components/shared/select', () => ({
 }))
 
 import HqMembersPage from './page'
+import { inviteExpiryLabel } from '@/components/hq/members/member-dialog'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -107,6 +108,25 @@ afterEach(() => {
 async function flush() {
   for (let i = 0; i < 10; i += 1) await act(async () => { await Promise.resolve() })
 }
+
+describe('招待メールの期限は7日（板 yLKwV）', () => {
+  it('期限の日時は「月/日（曜） 時:分」の形になる', () => {
+    // 2026-10-02 18:40 JST の7日後は 10/9（金）18:40。
+    expect(inviteExpiryLabel(new Date('2026-10-02T18:40:00+09:00'))).toBe('10/9（金） 18:40')
+  })
+
+  it('招待の窓に7日の期限と板の目印が出る', async () => {
+    await act(async () => { root.render(<HqMembersPage />) })
+    await flush()
+    const invite = Array.from(host.querySelectorAll('button')).find((b) => (b.textContent ?? '').includes('権限者を招待'))
+    expect(invite, '招待ボタンがない').not.toBeUndefined()
+    await act(async () => { (invite as HTMLButtonElement).click() })
+    await flush()
+    const dialog = document.body.querySelector('[data-design-node="yLKwV"]')
+    expect(dialog, '招待の窓に目印がない').not.toBeNull()
+    expect(dialog?.textContent ?? '').toContain('送った日から7日')
+  })
+})
 
 describe('権限を変える確認（板 M4jS9）', () => {
   it('変える前に変更前→変更後を見せてから保存口へ送る', async () => {

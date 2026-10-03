@@ -19,6 +19,20 @@ export type MemberDialogValue = {
 }
 
 /**
+ * 板 `yLKwV`：招待メールは送った日から7日（実装 `staff-invite.ts` が7日で送る）。
+ * 「10/9（金）18:40」の形で出す。
+ */
+export function inviteExpiryLabel(now: Date = new Date()): string {
+  const at = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric',
+    weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(at)
+  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${pick('month')}/${pick('day')}（${pick('weekday')}） ${pick('hour')}:${pick('minute')}`
+}
+
+/**
  * 権限者を招待する／変更する。★V6 36-5 の「＋ 権限者を招待」と「変更」。
  *
  * 招待では名前・メール・役割・最初に表示するアカウント・担当範囲を聞く。
@@ -76,7 +90,8 @@ export default function MemberDialog({
     <Dialog
       open={open}
       title={member ? `${member.name}さんの権限を変える` : '権限者を招待'}
-      description={member ? undefined : '招待メールが届き、メールの確認と LINE の連携が済むとログインできます。招待メールの有効期限は48時間です。'}
+      description={member ? undefined : `招待メールは送った日から7日（${inviteExpiryLabel()}まで）有効です。メールの確認とLINEの連携が済むとログインできます。`}
+      designNode={member ? undefined : 'yLKwV'}
       confirmLabel={member ? '変更を保存' : '招待メールを送る'}
       busy={busy}
       error={localError || error}
