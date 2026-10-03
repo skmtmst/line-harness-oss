@@ -20,6 +20,7 @@ import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -49,6 +50,34 @@ const CHANNELS: Array<{ key: OpsAnnouncementChannel; label: string }> = [
   { key: 'line', label: '契約者専用LINE' }, { key: 'screen', label: '画面のお知らせ' }, { key: 'email', label: 'メール' },
 ]
 const STATUS_TONE: Record<OpsAnnouncement['status'], ChipTone> = { draft: 'neutral', scheduled: 'info', sending: 'warn', sent: 'ok', failed: 'danger' }
+
+/** 板 `TJUUl`「送る前の確認」の宛先の1行。 */
+function confirmAudience(form: Form, preview: OpsAudiencePreview | null): string {
+  const base = form.audienceKind === 'all'
+    ? 'すべての契約先'
+    : form.audienceKind === 'plan'
+      ? `${form.audiencePlans.map((key) => PLANS.find((p) => p.key === key)?.label ?? key).join('・')}の契約先`
+      : `選んだ契約先 ${form.audienceTenantIds.length}社`
+  return preview ? `${base} ${preview.tenants}社` : `${base}（数えています…）`
+}
+
+/** 板 `TJUUl`「送る前の確認」の届く方法の1行。 */
+function confirmChannels(form: Form, preview: OpsAudiencePreview | null): string {
+  if (!preview) return '数えています…'
+  return form.channels.map((key) => {
+    if (key === 'screen') return `画面 ${preview.tenants}`
+    if (key === 'email') return `メール ${preview.withEmail}`
+    const unlinked = Math.max(preview.staff - preview.lineLinked, 0)
+    return `LINE ${preview.lineLinked}（LINE 未登録 ${unlinked}）`
+  }).join('・')
+}
+
+/** 「2026-10-05T10:00」を「10/5 10:00」にする。送るボタンの文字用。 */
+function shortPublishAt(local: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local.trim())
+  if (!match) return local.trim()
+  return `${Number(match[2])}/${Number(match[3])} ${match[4]}:${match[5]}`
+}
 
 type Form = {
   subject: string
@@ -383,16 +412,40 @@ export default function OpsAnnouncementsPage() {
         </section>
       </div>
 
-      <ConfirmDialog
+      <Dialog
         open={confirmSend}
-        title="今すぐ送りますか？"
-        description={`${previewLabel(preview, form.channels)}。送ったあとは取り消せません。`}
-        confirmLabel="送る"
+        title="このお知らせを送りますか？"
+        cancelLabel="戻って直す"
+        confirmLabel={scheduled ? `${shortPublishAt(form.publishAt)}に送る` : '今すぐ送る'}
+        confirmIcon={<Send size={16} aria-hidden="true" />}
         busy={busy}
-        error={formError}
+        error={formError || undefined}
+        designNode="TJUUl"
         onConfirm={() => void submit('send')}
         onCancel={() => { if (!busy) setConfirmSend(false) }}
-      />
+      >
+        <div className="flex flex-col gap-4">
+          <dl className="grid gap-1.5 rounded-card bg-canvas-sunken px-4 py-3">
+            <div className="flex gap-3">
+              <dt className="w-16 shrink-0 text-caption text-ink-faint">宛先</dt>
+              <dd className="text-caption font-medium text-ink">{confirmAudience(form, preview)}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-16 shrink-0 text-caption text-ink-faint">届く方法</dt>
+              <dd className="text-caption font-medium text-ink">{confirmChannels(form, preview)}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-16 shrink-0 text-caption text-ink-faint">送る日時</dt>
+              <dd className="text-caption font-medium text-ink">{scheduled ? `${formatDateTime(toPublishAt(form.publishAt))}（予約）` : '今すぐ送る'}</dd>
+            </div>
+          </dl>
+          <div>
+            <p className="text-label font-semibold text-ink">件名：{form.subject.trim()}</p>
+            <p className="mt-1 text-caption text-ink-secondary">{form.body.trim().length > 80 ? `${form.body.trim().slice(0, 80)} …` : form.body.trim()}</p>
+          </div>
+          <p className="text-caption text-ink-secondary">送ったあとは本文を直せません。画面のお知らせは取り下げられます（メール・LINE は取り消せません）。</p>
+        </div>
+      </Dialog>
       <ConfirmDialog
         open={deleting !== null}
         title={deleting ? `「${deleting.subject}」を消しますか？` : ''}

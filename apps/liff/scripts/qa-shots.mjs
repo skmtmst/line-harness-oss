@@ -222,14 +222,14 @@ try {
     await shot(page, viewport, 'waitlist', '/?eventWaitlistToken=qa-token-1&liffId=qa');
     await shot(page, viewport, 'waitlist-confirmed', '/?eventWaitlistToken=qa-token-1&liffId=qa', {
       after: async (p) => {
-        await p.getByRole('button', { name: 'この席を予約する' }).click();
+        await p.getByRole('button', { name: 'この席を取る' }).click();
         await p.waitForTimeout(1200);
       },
     });
     await shot(page, viewport, 'waitlist-error', '/?eventWaitlistToken=qa-token-1&liffId=qa', {
       mock: { fail: 'all' },
       after: async (p) => {
-        await p.getByRole('button', { name: 'この席を予約する' }).click();
+        await p.getByRole('button', { name: 'この席を取る' }).click();
         await p.waitForTimeout(1200);
       },
     });

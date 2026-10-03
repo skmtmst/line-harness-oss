@@ -199,6 +199,3 @@
   :global([data-design-node='DHdsw'][role='presentation']):has(.editor),
   :global([data-design-node='ZAOc7'][role='presentation']):has(.editor) { padding-top: 24px; }
 }
-/* eSXxA: 解決の読み合わせの補足。 */
-.resolveNote { display: block; margin-top: 4px; color: var(--color-ink-faint); font-size: var(--text-caption); }
-}

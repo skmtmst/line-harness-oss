@@ -192,6 +192,7 @@ export default function AccountEditModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={modalTitleId}
+        data-design-node={initialSection === 'credentials' ? 'Msb1j' : 'n9Z2P'}
         className="my-2 w-full max-w-2xl overflow-hidden rounded-control bg-canvas shadow-float sm:my-4"
         onClick={(e) => e.stopPropagation()}
       >
