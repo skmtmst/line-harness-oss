@@ -163,7 +163,7 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
   }
 
   return (
-    <>
+    <div data-design-node="iLJmw">
       <NoteBar tone={connector?.status === 'paused' ? 'warn' : 'info'}>
         {connector?.status === 'paused' ? '取り込みを止めています。保存済みの設定は残っています。' : connector ? `つながっています。最後にデータが届いたのは ${dateTime(data?.health.lastReceivedAt ?? null)} です。` : 'まだつながっていません。下の情報を入れて保存してください。'}
       </NoteBar>
@@ -281,6 +281,6 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
-    </>
+    </div>
   )
 }

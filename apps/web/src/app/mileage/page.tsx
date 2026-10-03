@@ -23,6 +23,8 @@ import Select from '@/components/shared/select'
 import KpiCard from '@/components/shared/kpi-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import MileageV8 from './mileage-v8'
 import {
   api,
   type MileageAdjustmentApprovalRequest,
@@ -1249,7 +1251,17 @@ function MileagePageInner() {
 export default function MileagePage() {
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">マイルを読み込んでいます</div>}>
-      <MileagePageInner />
+      <MileageThemeBranch />
     </Suspense>
   )
+}
+
+/*
+ * ★V8 分岐：テーマが v8 のときだけ V8-B の器（mileage-v8.tsx）で積み替える
+ * （板 `OC0gy` ほか）。v7 の器（MileagePageInner）はこの PR では触らない。
+ */
+function MileageThemeBranch() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <MileageV8 />
+  return <MileagePageInner />
 }
