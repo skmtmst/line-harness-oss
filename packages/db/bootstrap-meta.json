@@ -507,5 +507,5 @@
     "558_booking_payments.sql",
     "560_booking_sales_noshow.sql"
   ],
-  "migrationCount": 507
+  "migrationCount": 506
 }
