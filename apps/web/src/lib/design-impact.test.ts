@@ -140,14 +140,19 @@ describe('共通部品の影響範囲', () => {
       'app/mileage/v8-rewards-tab.tsx',
       'app/mileage/v8-score-tab.tsx',
       // 2026-09-18: NEN配信のコラム一覧（★V6 37-6-A）。8本ずつのページ送り。
+      'app/nen-campaigns/nen-campaigns-v8.tsx',
       'app/nen-campaigns/nen-overview.tsx',
       // 2026-09-16 採用: 然の健康日記（★V6 37-4）とマイペット（★V6 37-3）。20頭ずつのページ送り。
       'app/nen/health/health-tab.tsx',
+      // ★V8-B 健康日記一覧（mIwA4）。表の下にページ送りを置く。
+      'app/nen/health/health-v8.tsx',
       // 2026-09-16: 然の会員一覧（★V6 37-1）。20人ずつのページ送り。
       'app/nen/members/members-tab.tsx',
       // ★V8-B 会員一覧（AOWoJ）。表の下にページ送りを置く。
       'app/nen/members/members-v8.tsx',
       'app/nen/pets/pets-tab.tsx',
+      // ★V8-B マイペット一覧（wTIej）。表の下にページ送りを置く。
+      'app/nen/pets/pets-v8.tsx',
       'app/ops/audit/page.tsx',
       // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
       'app/reminders/detail/detail-v8.tsx',
