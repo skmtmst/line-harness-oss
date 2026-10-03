@@ -102,8 +102,9 @@ function isHttpsUrl(value: string): boolean {
 }
 
 function matchesOutgoing(item: OutgoingWebhookOverview, filter: OutgoingFilter, query: string): boolean {
-  const q = query.trim()
-  if (q && !`${item.name} ${firstEventLabel(item)} ${payloadLabel(item)}`.includes(q)) return false
+  // v7 と同じ探し方：名前・URL・イベント型（大文字小文字を区別しない）。
+  const q = query.trim().toLocaleLowerCase('ja-JP')
+  if (q && ![item.name, item.url, ...item.eventTypes].some((value) => value.toLocaleLowerCase('ja-JP').includes(q))) return false
   switch (filter) {
     case 'active': return item.isActive
     case 'paused': return !item.isActive
