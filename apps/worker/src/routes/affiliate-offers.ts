@@ -234,17 +234,24 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
     });
     // 作った案件の決まりを初版として残す(#823)。版が無いと期間30日・上限なしの
     // 扱いになるため、値は今の案件と同じものを写す。
-    await createOfferVersion(c.env.DB, {
-      offerId: offer.id,
-      rewardAmount: body.rewardAmount,
-      rewardMiles: body.rewardMiles,
-      windowDays: body.windowDays,
-      capTotal: body.capTotal,
-      capMonthlyPerAffiliate: body.capMonthlyPerAffiliate,
-      receptionFrom: body.receptionFrom ?? null,
-      receptionTo: body.receptionTo ?? null,
-      createdBy: c.get('staff')?.id ?? null,
-    });
+    // 版がある再送（応答喪失・報酬編集後の古いPOST）では何も足さない。
+    // この確認で、修正前に作られた鍵なし初版を持つ案件の再送も守る。
+    // 版が無いときだけ初版を作る（版の保存だけ落ちた後の再送の回収）。
+    // 確認キーは案件ごとに固定し、同時再送の交差は1件に束ねる(F-23)。
+    if (!(await getCurrentOfferVersion(c.env.DB, offer.id))) {
+      await createOfferVersion(c.env.DB, {
+        offerId: offer.id,
+        rewardAmount: body.rewardAmount,
+        rewardMiles: body.rewardMiles,
+        windowDays: body.windowDays,
+        capTotal: body.capTotal,
+        capMonthlyPerAffiliate: body.capMonthlyPerAffiliate,
+        receptionFrom: body.receptionFrom ?? null,
+        receptionTo: body.receptionTo ?? null,
+        createdBy: c.get('staff')?.id ?? null,
+        idempotencyKey: `offer-create:${offer.id}`,
+      });
+    }
     return c.json({ success: true, data: serializeOffer(offer) }, 201);
   } catch (err) {
     console.error('POST /api/affiliate-offers error:', err);
