@@ -25,8 +25,12 @@ export default function Confirm({
   slot: SlotPick;
   /** 「← 日時を選び直す」。日時の段へ戻る。 */
   onBack: () => void;
-  /** 予約ができたら予約IDと支払い(お支払いありのときだけ付く)を渡す。 */
-  onSubmitted: (result: { bookingId: string; payment: CreateBookingResponse['payment'] }) => void;
+  /** 予約ができたら予約IDと支払い(お支払いありのときだけ付く)を渡す。前払いのみの案内も付く。 */
+  onSubmitted: (result: {
+    bookingId: string;
+    payment: CreateBookingResponse['payment'];
+    prepayNotice: string | null;
+  }) => void;
 }) {
   // 414 幅の板（`uZqMA`）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
@@ -48,7 +52,11 @@ export default function Confirm({
         },
         idemKey,
       );
-      onSubmitted({ bookingId: created.booking_id, payment: created.payment ?? null });
+      onSubmitted({
+        bookingId: created.booking_id,
+        payment: created.payment ?? null,
+        prepayNotice: created.prepayNotice ?? null,
+      });
     } catch (e) {
       logFailure('create-request', e);
       const err = e as { status?: number; body?: { error?: string } };

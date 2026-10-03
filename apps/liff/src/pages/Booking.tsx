@@ -34,6 +34,7 @@ export default function Booking() {
   const [slot, setSlot] = useState<SlotPick | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [paymentDue, setPaymentDue] = useState(false);
+  const [prepayNotice, setPrepayNotice] = useState<string | null>(null);
   // 読み込み中・失敗の間は下の帯を出さない (押せないボタンの飾りを置かない)。
   const [stepReady, setStepReady] = useState(false);
   useEffect(() => {
@@ -117,7 +118,9 @@ export default function Booking() {
             onSubmitted={(result) => {
               setBookingId(result.bookingId);
               // お支払いありのときだけ支払いの段へ。なしの店では今までどおり完了へ。
+              // 前払いのみの案内があるときは完了の段で案内と支払いへのボタンを出す。
               setPaymentDue(Boolean(result.payment));
+              setPrepayNotice(result.prepayNotice);
               setStep(result.payment ? 'payment' : 'done');
             }}
           />
@@ -132,7 +135,13 @@ export default function Booking() {
           />
         )}
         {step === 'done' && menu && staff && slot && (
-          <Done menuName={menu.name} slot={slot} durationMinutes={staff.duration_minutes} />
+          <Done
+            menuName={menu.name}
+            slot={slot}
+            durationMinutes={staff.duration_minutes}
+            bookingId={bookingId}
+            prepayNotice={prepayNotice}
+          />
         )}
         </div>
       </div>
