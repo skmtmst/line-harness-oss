@@ -384,6 +384,11 @@
    * 一緒にいちばん上にあることを示す。
    */
   --shadow-overlay: 0px 8px 16px -4px rgba(29, 29, 31, 0.10), 0px 24px 48px -8px rgba(29, 29, 31, 0.18), 0px 0px 0px 1px rgba(29, 29, 31, 0.08);
+  /*
+   * 選んだ丸（ラジオ）の内側の縁。地の色で3pxの輪を描き、選んだ印を
+   * 中に浮かせる（M10 polish・任意影の置き換え。見た目は同一）。
+   */
+  --shadow-ring-inset: inset 0 0 0 3px var(--color-canvas);
 
   /*
    * Tailwind の transition-colors などの既定の速さ（★V7 修正方針 §4）。

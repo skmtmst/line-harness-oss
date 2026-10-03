@@ -245,7 +245,7 @@ export default function StepPreview({
       {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。届く日時は見える札のまま残す。 */}
       <div className="-mx-4 -mt-4 mb-4">
         <LinePreview
-          caption={<span className="inline-flex items-center gap-1"><Clock aria-hidden size={13} strokeWidth={1.75} />{timeMissing ? `時刻を入れると届く日時が出ます（${stepLabel}）` : `${words}に届きます（${stepLabel}）`}</span>}
+          caption={<span className="inline-flex items-center gap-1"><Clock aria-hidden size={13} strokeWidth={1.8} />{timeMissing ? `時刻を入れると届く日時が出ます（${stepLabel}）` : `${words}に届きます（${stepLabel}）`}</span>}
         >
           {templateName ? (
             <Bubble>
@@ -274,7 +274,7 @@ export default function StepPreview({
         {/* 届く日時の帯（設計 h=26 r=full 11/600 アイコン13）。 */}
         <p className="flex justify-center">
           <span className={`${styles.band} bg-accent-soft text-accent-deep rounded-pill flex items-center gap-1 px-2.5 text-micro font-semibold`}>
-            <Clock aria-hidden size={13} strokeWidth={1.75} />
+            <Clock aria-hidden size={13} strokeWidth={1.8} />
             {timeMissing ? '時刻が未入力です' : `${words}・${formatJst(at)}`}
           </span>
         </p>
