@@ -117,6 +117,21 @@ describe('POST /api/conversions/approvals/bulk (R353)', () => {
     expect(body.data.succeeded).toEqual(['ce-2']);
     expect(body.data.failed.map((item) => item.id)).toEqual(['ce-1']);
   });
+
+  it('当時額が未確定の成果（F-23 unbillable）は成功に入れず失敗に分ける', async () => {
+    dbMocks.decideConversionApproval.mockImplementation(async (_db: unknown, eventId: string) => {
+      if (eventId === 'ce-1') return { outcome: 'unbillable', currentStatus: 'pending' };
+      return { outcome: 'updated', currentStatus: 'approved' };
+    });
+    const res = await req('/api/conversions/approvals/bulk', bulkItems(['ce-1', 'ce-2']));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      success: boolean;
+      data: { succeeded: string[]; failed: Array<{ id: string }> };
+    };
+    expect(body.data.succeeded).toEqual(['ce-2']);
+    expect(body.data.failed.map((item) => item.id)).toEqual(['ce-1']);
+  });
 });
 
 describe('POST /api/conversions/approvals/bulk (R354)', () => {
