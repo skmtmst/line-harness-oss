@@ -37,6 +37,11 @@ const liffDateViewMigration = readFileSync(
   join(import.meta.dirname, '..', 'migrations', '502_booking_liff_date_view.sql'),
   'utf8',
 );
+// 559 で booking_settings にキャンセル待ち仮押さえ分数の列が足された。同じく追従させる。
+const waitlistHoldMigration = readFileSync(
+  join(import.meta.dirname, '..', 'migrations', '559_booking_plus_repeat_waitlist_visit.sql'),
+  'utf8',
+);
 // 490 で menu_versions 表ができ、updateBookingMenuSettings が保存のたび版を残す。
 // 版に写す側が menus の列を読むので、表と一緒に追従させる。
 const menuVersionsMigration = readFileSync(
@@ -102,6 +107,7 @@ describe('migration 323 店舗共通の予約設定', () => {
     sqlite.exec(businessHoursConfiguredMigration);
     sqlite.exec(auditAndReminderMigration);
     sqlite.exec(liffDateViewMigration);
+    sqlite.exec(waitlistHoldMigration);
     sqlite.exec(menuVersionsMigration);
     sqlite.exec(`
       INSERT INTO booking_business_hours
