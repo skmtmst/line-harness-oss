@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest'
 const ROOT = join(process.cwd(), 'src', 'app', 'booking', 'menus')
 const LIST = readFileSync(join(ROOT, 'page.tsx'), 'utf8')
 const CREATE = readFileSync(join(ROOT, 'new', 'page.tsx'), 'utf8')
+const SETTINGS_V8 = readFileSync(join(ROOT, 'settings-v8.tsx'), 'utf8')
+const SETTINGS_CSS = readFileSync(join(ROOT, 'settings-v8.module.css'), 'utf8')
 
 describe('V6 予約設定', () => {
   it('V6の一覧・状態・作成画面を実ノードへ結び付ける', () => {
@@ -139,6 +141,24 @@ describe('V6 予約設定', () => {
 
   it('営業時間の要約で存在しない末尾を断言しない', () => {
     expect(LIST).not.toContain('.at(-1)!')
+  })
+
+  it('C9fv7A: 閲覧のみは帯と押せない作るボタンと目印を出す', () => {
+    expect(SETTINGS_V8).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
+    expect(SETTINGS_V8).toContain('<Button variant="primary" disabled')
+    expect(SETTINGS_V8).toContain("tab === 'menus' && !canEditMenus ? 'C9fv7A'")
+  })
+
+  it('P6EdLW: 1152ではメニュー表の担当・30日を畳む', () => {
+    expect(SETTINGS_CSS).toContain('@container (max-width: 1080px)')
+    expect(SETTINGS_CSS).toMatch(/\.colStaff,\s*\.colCount\s*\{\s*display:\s*none/)
+  })
+
+  it('VFxWU: 1152の右欄は見え方ボタンと確かめるボタンの2つ', () => {
+    expect(SETTINGS_V8).toContain('LINEでの見え方を見る')
+    expect(SETTINGS_V8).toContain('setPhoneOpen(true)')
+    expect(SETTINGS_V8).toContain('お客さまに見える画面を確かめる')
+    expect(SETTINGS_CSS).toMatch(/\.sidePhoneButton\s*\{[^}]*display:\s*flex/)
   })
 })
 

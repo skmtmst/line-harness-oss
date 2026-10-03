@@ -20,7 +20,7 @@ describe('予約設定の残りの板ID', () => {
   })
 
   it('メニューを見るだけの人に C9fv7A の帯が出る', () => {
-    expect(SETTINGS).toContain('data-design-node="C9fv7A"')
-    expect(SETTINGS).toContain('閲覧のみです。変更には予約設定の権限が必要です。')
+    expect(SETTINGS).toContain("tab === 'menus' && !canEditMenus ? 'C9fv7A' : tabNode")
+    expect(SETTINGS).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
   })
 })
