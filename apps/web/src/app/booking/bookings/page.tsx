@@ -18,6 +18,8 @@ import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import BookingDetailV8 from './booking-detail-v8'
 import { canOperateBookings } from '../lib/booking-permissions'
 import { fetchAllPages } from './fetch-all-pages'
 import BookingCalendar, {
@@ -325,6 +327,7 @@ export default function BookingsPage() {
   // 詳細パネルは行の実体ではなく id を保持する。承認などで再読み込みしたあとも
   // 最新の行を引き直せるので、パネルに古い状態が残らない。
   const [detailId, setDetailId] = useState<string | null>(null)
+  const adminTheme = useAdminTheme()
 
   const liffId = selectedAccount?.liffId ?? null
   // Worker `/o` は ref 解決・追跡なしで liffId を直接受けるラップ URL。
@@ -831,7 +834,20 @@ export default function BookingsPage() {
 
   const dialogs = (
     <>
-      {detail && (
+      {detail && (adminTheme === 'v8' ? (
+        /*
+         * ★V8-B 予約の詳細（`AjZhH`）。v7 の引き出しは残し、
+         * `data-theme="v8"` のときだけ小窓にする。
+         */
+        <BookingDetailV8
+          booking={detail}
+          accountId={selectedAccountId}
+          canOperate={canOperate}
+          onClose={() => setDetailId(null)}
+          onCancel={() => handleDecide(detail.id, 'cancel')}
+          detailHref={`/booking/bookings/detail?id=${encodeURIComponent(detail.id)}`}
+        />
+      ) : (
         <BookingDetailPanel
           booking={detail}
           accountId={selectedAccountId}
@@ -839,7 +855,7 @@ export default function BookingsPage() {
           onClose={() => setDetailId(null)}
           onAction={(a) => handleDecide(detail.id, a)}
         />
-      )}
+      ))}
       <ConfirmDialog
         open={decideTarget !== null}
         designNode={decideTarget?.action === 'cancel' ? 'iJdAi' : undefined}
