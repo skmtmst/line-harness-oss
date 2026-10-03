@@ -448,7 +448,7 @@
   },
   "app/scenarios/detail/detail-v8.tsx": {
     "arbitrary-value": 2,
-    "unresolved-classname": 109
+    "unresolved-classname": 113
   },
   "app/scenarios/detail/scenario-detail-client.tsx": {
     "arbitrary-value": 5
@@ -484,7 +484,7 @@
     "arbitrary-value": 2
   },
   "app/settings/feature-settings-v8.tsx": {
-    "unresolved-classname": 55
+    "unresolved-classname": 59
   },
   "app/settings/file-scan/file-scan-v8.tsx": {
     "unresolved-classname": 29,
