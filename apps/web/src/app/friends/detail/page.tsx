@@ -35,7 +35,6 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { loadFailureKind } from './load-failure-kind'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
  * 友だち詳細。
@@ -447,9 +446,7 @@ function FriendDetailInner() {
   // 既定はタイムライン。設計でも最初に開くのはやり取り。
   const tab: TabKey = (TABS.find((t) => t.key === rawTab)?.key ?? 'timeline') as TabKey
   // ★V8 `Q5F2QE`：概要・履歴・回答フォームのタブに板ID。v7 はそのまま。
-  // （情報欄タブは #1236 の分。合流したら1枚になる）
-  const adminTheme = useAdminTheme()
-  const v8 = adminTheme === 'v8'
+  // （情報欄タブは #1236 の分。合流して4枚になった）
 
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [fields, setFields] = useState<FriendField[]>([])
