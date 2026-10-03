@@ -144,6 +144,8 @@ describe('共通部品の影響範囲', () => {
       // ★V8-B 会員一覧（AOWoJ）。表の下にページ送りを置く。
       'app/nen/members/members-v8.tsx',
       'app/nen/pets/pets-tab.tsx',
+      // ★V8-B マイペット一覧（wTIej）。表の下にページ送りを置く。
+      'app/nen/pets/pets-v8.tsx',
       'app/ops/audit/page.tsx',
       // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
       'app/reminders/detail/detail-v8.tsx',

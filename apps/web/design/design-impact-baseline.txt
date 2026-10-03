@@ -162,6 +162,7 @@ shared-button-importer app/nen/members/rank-settings-tab.tsx
 shared-button-importer app/nen/pets/feeding-tab.tsx
 shared-button-importer app/nen/pets/page.tsx
 shared-button-importer app/nen/pets/pet-editor.tsx
+shared-button-importer app/nen/pets/pets-v8.tsx
 shared-button-importer app/not-found.tsx
 shared-button-importer app/notifications/page.tsx
 shared-button-importer app/ops/announcements/page.tsx

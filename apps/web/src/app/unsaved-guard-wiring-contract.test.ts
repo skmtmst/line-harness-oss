@@ -54,6 +54,7 @@ const GUARDED = [
   'app/nen/members/members-v8.tsx',
   'app/nen/members/rank-settings-tab.tsx',
   'app/nen/pets/feeding-tab.tsx',
+  'app/nen/pets/pets-v8.tsx',
   'app/ops/announcements/page.tsx',
   'app/reminders/edit/edit-v8.tsx',
   'app/reminders/edit/issue469-reminder-screens.tsx',
