@@ -2421,6 +2421,13 @@ const spec = {
         responses: { '200': { description: 'Visible auto replies' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
       },
     },
+    '/api/auto-replies/{id}/restore': {
+      post: {
+        tags: ['Auto replies'], summary: '削除した自動応答を元に戻す（戻した直後は停止のまま）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Auto reply restored as stopped' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Auto reply not found or not deleted' } },
+      },
+    },
     '/api/auto-replies/{id}/stop': {
       post: {
         tags: ['Auto replies'], summary: '自動応答を停止し、理由・担当者・日時を記録（E-01）',

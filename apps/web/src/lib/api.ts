@@ -10242,6 +10242,21 @@ export const api = {
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(body),
       }),
+    /*
+     * B 元に戻す: 削除の取り消し。戻した直後は停止のまま。再開は update で行う。
+     * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+     */
+    restore: (id: string) =>
+      fetchApi<ApiResponse<{
+        id: string;
+        isActive: boolean;
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
+      }>>(`/api/auto-replies/${id}/restore`, {
+        method: 'POST',
+      }),
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?accountId=' + encodeURIComponent(params.accountId) : ''
       return fetchApi<ApiResponse<Array<{
