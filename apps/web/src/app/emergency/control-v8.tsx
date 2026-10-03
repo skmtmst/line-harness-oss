@@ -37,6 +37,7 @@ import Select from '@/components/shared/select'
 import StepUpDialog from '@/components/shared/step-up-dialog'
 import SaveConflictBar from '@/components/shared/save-conflict-bar'
 import { CAPABILITY_LABEL, describeRestoreBlockers, describeRestoreDrift, describeRestoreResult } from './restore-drift'
+import { SendPathCoveragePanel } from './send-path-coverage-panel'
 import releaseLog from '@/generated/release-log-summary.json'
 import type { UpdateRelease } from './update-history'
 import styles from './control-v8.module.css'
@@ -609,6 +610,37 @@ const EmergencyControlV8 = (
           </Button>
         </div>
 
+        <div className={styles.accountRow}>
+          <div className={styles.accountField}>
+            <label htmlFor="emergency-reason-v8-body" className={styles.fieldLabel}>止める理由（記録に残ります）</label>
+            <Select
+              size="full"
+              id="emergency-reason-v8-body"
+              value={reason}
+              onChange={(value) => setReason(value)}
+              disabled={mutationLocked || isStopped}
+              aria-label="緊急停止の理由"
+              options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))}
+            />
+          </div>
+        </div>
+        <div className={styles.detailBlock}>
+          <div className={styles.detailHead}>
+            <label htmlFor="emergency-detail-v8-body" className={styles.fieldLabel}>補足（任意）</label>
+            <p className={styles.detailCounter}>あと{1000 - reasonDetail.length}文字</p>
+          </div>
+          <textarea
+            id="emergency-detail-v8-body"
+            value={reasonDetail}
+            onChange={(event) => setReasonDetail(event.target.value)}
+            disabled={mutationLocked || isStopped}
+            rows={2}
+            maxLength={1000}
+            placeholder="発生していることを短く入力"
+            className={styles.detailTextarea}
+          />
+        </div>
+
         {isStopped && control ? (
           <div className={styles.stoppedBand} role="status">
             <p className={styles.stoppedTitle}>止めているとき</p>
@@ -634,6 +666,8 @@ const EmergencyControlV8 = (
         ) : null}
       </section>
 
+      <SendPathCoveragePanel accountId={targetAccountId === 'all' ? null : targetAccountId} revision={control?.version ?? 0} />
+
       <div className={styles.infoGrid}>
         <section className={styles.card} aria-labelledby="emergency-after-stop-heading">
           <h2 id="emergency-after-stop-heading" className={styles.cardTitle}>止めるとどうなるか</h2>
@@ -651,6 +685,14 @@ const EmergencyControlV8 = (
             <li>変更・追加があった配信は再開しません</li>
             <li>期限を過ぎた予約配信は戻りません（下書きへ）</li>
             <li>止めているあいだの時刻ぶんは、戻しても送りません</li>
+          </ul>
+        </section>
+        <section className={styles.card} aria-labelledby="emergency-links-heading">
+          <h2 id="emergency-links-heading" className={styles.cardTitle}>つながる先</h2>
+          <ul className={styles.infoList}>
+            <li><Link href="/emergency?tab=health" className={styles.relatedLink}>→ 健全性チェック</Link><br />止める前に、どこが変かを確認</li>
+            <li><Link href="/emergency?tab=history" className={styles.relatedLink}>→ 更新履歴</Link><br />止めた・戻した記録</li>
+            <li><Link href="/broadcasts" className={styles.relatedLink}>→ 一斉配信</Link><br />下書きに戻った配信</li>
           </ul>
         </section>
       </div>
@@ -711,6 +753,28 @@ const EmergencyControlV8 = (
         </p>
       </section>
 
+      <div className={styles.stickyBar} role="region" aria-label="緊急停止の操作">
+        <p className={styles.stickySummary}>4つのうち{selectedTargets.length}つを選択 ／ {accountName} ／ 理由「{reason}」</p>
+        <div className={styles.stickyActions}>
+          <button
+            type="button"
+            onClick={() => { setTargets({ broadcasts: true, scenarios: true, reminders: true, automations: false }); setReason('障害対応'); setReasonDetail('') }}
+            disabled={mutationLocked || isStopped}
+            className={styles.stickyCancel}
+          >
+            キャンセル
+          </button>
+          <Button
+            type="button"
+            variant="danger"
+            onClick={openStopConfirm}
+            disabled={mutationLocked || isStopped || impactFailed || !impact || !control || !canControl}
+          >
+            緊急停止する
+          </Button>
+        </div>
+      </div>
+
       {/* 確認の窓：影響の数 → 理由の表示 → 「停止／復旧」の言葉。 */}
       <Dialog
         open={confirmMode !== null}
@@ -754,6 +818,7 @@ const EmergencyControlV8 = (
                   </div>
                 ))}
               </div>
+              <p className={styles.dialogHint}>止まらないもの：{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</p>
               <div className={styles.confirmReason}>
                 <label htmlFor="emergency-reason-v8" className={styles.dialogLabel}>止める理由（記録に残ります）</label>
                 <Select
