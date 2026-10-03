@@ -31,6 +31,7 @@ vi.mock('../pets/pet-editor', () => ({ default: () => null }))
 
 import PetsTab from '../pets/pets-tab'
 import HealthTab from './health-tab'
+import SummaryDrawer from './summary-drawer'
 import type { PetsQuery } from '../pets/pets-tab'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -86,5 +87,15 @@ describe('ペット・健康日記V8の骨組み', () => {
     await act(async () => { vi.advanceTimersByTime(350) })
     expect(document.querySelector('[aria-busy="true"][aria-label="ペットを読み込んでいます"]')).toBeNull()
     expect(document.body.textContent).toContain('ペットを読み込んでいます')
+  })
+
+  it('まとめの引き出しは数の帯と段の骨組みを出す', async () => {
+    render(<SummaryDrawer open status="loading" summary={null} onClose={() => {}} onRetry={() => {}} onPrint={() => {}} />)
+    await flush()
+    await act(async () => { vi.advanceTimersByTime(350) })
+    const busy = document.querySelector('[aria-busy="true"][aria-label="まとめを作っています"]')
+    expect(busy, '骨組みの入れ物').toBeTruthy()
+    expect(busy?.querySelector('[data-skeleton]'), '骨組みがある').toBeTruthy()
+    expect(document.body.textContent).not.toContain('読み込み中')
   })
 })
