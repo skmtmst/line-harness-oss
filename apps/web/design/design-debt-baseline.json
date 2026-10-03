@@ -214,14 +214,27 @@
     "arbitrary-value": 4
   },
   "app/friend-add-settings/list-v8.tsx": {
-    "unresolved-classname": 77,
+    "unresolved-classname": 80,
     "direct-th": 6
+  },
+  "app/friend-add-settings/editor-v8.tsx": {
+    "unresolved-classname": 189
   },
   "app/friend-add-settings/page.tsx": {
     "arbitrary-value": 2
   },
   "app/friend-add-settings/publish/page.tsx": {
     "unresolved-classname": 38
+  },
+  "app/friend-add-settings/publish/done-v8.tsx": {
+    "unresolved-classname": 18
+  },
+  "app/friend-add-settings/runs/detail/detail-v8.tsx": {
+    "unresolved-classname": 39
+  },
+  "app/friend-add-settings/runs/runs-v8.tsx": {
+    "unresolved-classname": 69,
+    "direct-th": 7
   },
   "app/friends/detail/page.tsx": {
     "unresolved-classname": 3,
