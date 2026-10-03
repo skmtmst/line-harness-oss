@@ -155,7 +155,11 @@ export default function Event() {
   }
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node="gVjiC">
+    <div
+      className="min-h-screen bg-ground"
+      data-design-node="gVjiC"
+      style={{ fontFamily: 'var(--liff-look-font-body)' }}
+    >
       <LiffHeader title="イベント" />
       <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-28">
         {isHttpsUrl(event.image_url) ? (
@@ -173,7 +177,12 @@ export default function Event() {
           </div>
         )}
         <div className="space-y-2">
-          <h2 className="text-xl font-bold text-ink">{event.name}</h2>
+          <h2
+            className="text-xl font-bold text-[var(--liff-look-ink)]"
+            style={{ fontFamily: 'var(--liff-look-font-heading)' }}
+          >
+            {event.name}
+          </h2>
           {span && (
             <p className="flex items-start gap-2 text-[13px] text-ink">
               <Icon name="calendar" className="mt-0.5 h-4 w-4 shrink-0 text-ink-secondary" />
@@ -190,7 +199,7 @@ export default function Event() {
           )}
           <p className="flex items-start gap-2 text-[13px]">
             <Icon name="users" className="mt-0.5 h-4 w-4 shrink-0 text-ink-secondary" />
-            <span className={hasSeats ? 'font-bold text-liff-wait-ink' : 'text-ink'}>{seats}</span>
+            <span className={hasSeats ? 'font-bold text-[var(--liff-look-wait-ink)]' : 'text-ink'}>{seats}</span>
           </p>
           {isHttpsUrl(event.venue_url) && (
             <a
@@ -206,14 +215,14 @@ export default function Event() {
         </div>
         {event.description && (
           <p
-            className={`text-xs leading-6 whitespace-pre-wrap text-liff-sub ${event.description_centered === 1 ? 'text-center' : ''}`}
+            className={`text-xs leading-6 whitespace-pre-wrap text-[var(--liff-look-sub)] ${event.description_centered === 1 ? 'text-center' : ''}`}
           >
             {event.description}
           </p>
         )}
 
         <div>
-          <h3 className="mb-2 text-sm font-bold text-ink">時間を選ぶ</h3>
+          <h3 className="mb-2 text-sm font-bold text-[var(--liff-look-ink)]">時間を選ぶ</h3>
           {slots.length === 0 ? (
             <p className="text-sm text-ink-secondary">現在予約可能な枠はありません。</p>
           ) : (
@@ -245,7 +254,7 @@ export default function Event() {
                       aria-label={full ? `${timeText} 満席` : undefined}
                       onClick={() => setSelectedId(s.id)}
                       title={formatJstEventAt(s.starts_at)}
-                      className={`flex min-h-[42px] w-full items-center justify-between gap-3 rounded-[10px] border px-4 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${tone}`}
+                      className={`flex min-h-[42px] w-full items-center justify-between gap-3 rounded-[var(--liff-look-radius)] border px-4 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${tone}`}
                     >
                       <span
                         className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-white' : 'text-ink'}`}
@@ -254,7 +263,7 @@ export default function Event() {
                         {utcToJstHm(s.ends_at)}
                       </span>
                       <span
-                        className={`shrink-0 text-xs font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-white' : full && !disabled ? 'text-liff-wait-ink' : 'text-ink-secondary'}`}
+                        className={`shrink-0 text-xs font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-white' : full && !disabled ? 'text-[var(--liff-look-wait-ink)]' : 'text-ink-secondary'}`}
                       >
                         {fullLabel}
                       </span>

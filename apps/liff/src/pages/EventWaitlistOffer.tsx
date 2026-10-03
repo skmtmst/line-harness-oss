@@ -43,7 +43,11 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node="BjcuB">
+    <div
+      className="min-h-screen bg-ground"
+      data-design-node="BjcuB"
+      style={{ fontFamily: 'var(--liff-look-font-body)' }}
+    >
       <LiffHeader title="イベント" />
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
         {state === 'confirmed' ? (
@@ -100,13 +104,18 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
           <div className="pb-28">
             <div className="flex flex-col items-center px-6 py-10 text-center">
               <span
-                className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-soft text-liff-primary"
+                className="flex h-18 w-18 items-center justify-center rounded-full bg-[var(--liff-look-soft)] text-[var(--liff-look-main)]"
                 aria-hidden="true"
               >
                 <Icon name="circle-check" className="h-9 w-9" />
               </span>
-              <p className="mt-4 text-xl font-bold text-ink">空きが出ました</p>
-              <p className="mt-2 text-[13px] leading-6 text-pretty text-liff-sub">
+              <p
+                className="mt-4 text-xl font-bold text-[var(--liff-look-ink)]"
+                style={{ fontFamily: 'var(--liff-look-font-heading)' }}
+              >
+                空きが出ました
+              </p>
+              <p className="mt-2 text-[13px] leading-6 text-pretty text-[var(--liff-look-sub)]">
                 下のボタンを押すと予約が確定します。
                 <br />
                 押すまでは予約になりません。

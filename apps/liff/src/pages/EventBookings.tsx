@@ -189,10 +189,19 @@ export default function EventBookings() {
   }
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node="y1bs9A">
+    <div
+      className="min-h-screen bg-ground"
+      data-design-node="y1bs9A"
+      style={{ fontFamily: 'var(--liff-look-font-body)' }}
+    >
       <LiffHeader title="自分のイベント" />
       <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-10">
-        <h1 className="text-xl font-bold text-ink">自分のイベント</h1>
+        <h1
+          className="text-xl font-bold text-[var(--liff-look-ink)]"
+          style={{ fontFamily: 'var(--liff-look-font-heading)' }}
+        >
+          自分のイベント
+        </h1>
         {loading ? (
           <LoadingView />
         ) : loadFailed ? (
@@ -200,7 +209,7 @@ export default function EventBookings() {
         ) : (
           <>
             <div
-              className="flex rounded-[10px] bg-liff-chip p-[3px]"
+              className="flex rounded-[var(--liff-look-radius)] bg-[var(--liff-look-chip)] p-[3px]"
               role="tablist"
               aria-label="イベントの期間"
             >
@@ -218,8 +227,8 @@ export default function EventBookings() {
                   onClick={() => setTab(t.key)}
                   className={`flex h-8 flex-1 items-center justify-center rounded-lg px-1 text-xs focus-visible:outline-2 focus-visible:outline-ink ${
                     tab === t.key
-                      ? 'bg-canvas font-bold text-ink'
-                      : 'font-semibold text-liff-sub'
+                      ? 'bg-canvas font-bold text-[var(--liff-look-ink)]'
+                      : 'font-semibold text-[var(--liff-look-sub)]'
                   }`}
                 >
                   {t.label}
@@ -249,20 +258,20 @@ export default function EventBookings() {
                             className="flex w-14 shrink-0 flex-col items-center"
                             aria-label={`${utcToJstMd(b.slot_starts_at)} ${utcToJstHm(b.slot_starts_at)}`}
                           >
-                            <span className="text-[15px] font-bold whitespace-nowrap text-ink">
+                            <span className="text-[15px] font-bold whitespace-nowrap text-[var(--liff-look-ink)]">
                               {utcToJstMd(b.slot_starts_at)}
                             </span>
-                            <span className="text-[11px] text-liff-sub">
+                            <span className="text-[11px] text-[var(--liff-look-sub)]">
                               {utcToJstHm(b.slot_starts_at)}
                             </span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-semibold text-ink" title={b.event_name}>
+                            <div className="truncate text-sm font-semibold text-[var(--liff-look-ink)]" title={b.event_name}>
                               {b.event_name}
                             </div>
                             {b.venue_name && (
                               <div
-                                className="mt-[3px] truncate text-[11.5px] text-liff-sub"
+                                className="mt-[3px] truncate text-[11.5px] text-[var(--liff-look-sub)]"
                                 title={b.venue_name}
                               >
                                 {b.venue_name}
@@ -291,7 +300,7 @@ export default function EventBookings() {
                                 void openChange(b);
                               }}
                               disabled={busy}
-                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-hairline bg-canvas px-3 text-xs font-semibold text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-hairline bg-canvas px-3 text-xs font-semibold text-[var(--liff-look-ink)] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
                             >
                               時間を変える
                             </button>
@@ -394,12 +403,12 @@ export default function EventBookings() {
                           disabled
                             ? 'border-hairline bg-shell-gray'
                             : selected
-                              ? 'border-liff-primary bg-liff-primary'
+                              ? 'border-[var(--liff-look-main)] bg-[var(--liff-look-main)]'
                               : 'border-hairline bg-canvas'
                         }`}
                       >
                         <span
-                          className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-white' : 'text-ink'}`}
+                          className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-white' : 'text-[var(--liff-look-ink)]'}`}
                         >
                           {utcToJstMd(s.starts_at)} {utcToJstHm(s.starts_at)}〜
                           {utcToJstHm(s.ends_at)}
