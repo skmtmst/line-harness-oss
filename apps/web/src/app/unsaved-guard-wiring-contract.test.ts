@@ -77,6 +77,7 @@ const GUARDED = [
   'app/templates/questions/new/page.tsx',
   'app/webhooks/new/page.tsx',
   'app/webinars/edit/page.tsx',
+  'app/webinars/new/new-v8.tsx',
   'app/webinars/new/page.tsx',
   'components/accounts/account-ordering.tsx',
   'components/broadcasts/broadcast-form.tsx',
@@ -187,6 +188,8 @@ const EXEMPTIONS: Record<string, string> = {
     'サイトの追加・編集・停止理由の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
   'app/restaurant-test/v8/organization.tsx':
     '★V8 の組織・権限（bSp4h）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。行内のフォームは保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
+  'app/webinars/list-v8.tsx':
+    '★V8-B のウェビナー一覧（UyUMw）。一覧と絞り込みが中心で、フォルダの追加・変更・削除とアーカイブは押した直後に確認窓か即時保存で確定する。フォルダ名の入力は閉じると戻る窓の中だけなので、この画面に残る下書きを持たない',
 }
 
 /*
