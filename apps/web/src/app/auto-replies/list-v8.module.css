@@ -187,6 +187,8 @@
   line-height: 1.6;
 }
 
+/* 見るだけの人への帯（`Q5lOCc`）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */
+
 /* 操作の失敗の帯。 */
 .errorBand {
   display: flex;
@@ -603,10 +605,6 @@
 
 /* ===== 板が 1100px を切ったら（画面幅で約 1352px 未満） ===== */
 @container (max-width: 1099px) {
-  .kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .split {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -625,7 +623,13 @@
   }
 }
 
-/* さらに狭い板では数の帯も1列に。 */
+/* 数の帯は 1152（板 ~870px）でも4列を保つ（`WPrd5`）。760px を切ったら2列、560px で1列に。 */
+@container (max-width: 759px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @container (max-width: 560px) {
   .kpis {
     grid-template-columns: minmax(0, 1fr);

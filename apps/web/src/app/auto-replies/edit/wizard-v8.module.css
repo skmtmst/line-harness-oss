@@ -710,3 +710,5 @@
   color: var(--color-ink-faint);
   font-size: 12px;
 }
+
+/* 編集の競合の帯（`UGrd2`）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */
