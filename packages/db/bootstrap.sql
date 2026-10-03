@@ -1452,7 +1452,13 @@ CREATE TABLE booking_settings (
              AND substr(reminder_day_before_time, 1, 2) <= '23')), reminder_hours_before INTEGER
   CHECK (reminder_hours_before IS NULL
          OR reminder_hours_before BETWEEN 1 AND 72), liff_date_view TEXT NOT NULL DEFAULT 'list'
-  CHECK (liff_date_view IN ('list', 'calendar')));
+  CHECK (liff_date_view IN ('list', 'calendar')), liff_theme TEXT NOT NULL DEFAULT 'line'
+  CHECK (liff_theme IN ('natural', 'modern', 'gentle', 'night', 'line')), liff_primary_color TEXT
+  CHECK (liff_primary_color IS NULL OR liff_primary_color GLOB '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'), liff_background_color TEXT
+  CHECK (liff_background_color IS NULL OR liff_background_color GLOB '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'), liff_heading_font TEXT NOT NULL DEFAULT 'default'
+  CHECK (liff_heading_font IN ('default', 'serif', 'maru', 'sans')), liff_calendar_mode TEXT NOT NULL DEFAULT 'week_first'
+  CHECK (liff_calendar_mode IN ('week_first', 'month_first', 'week_only', 'month_only')), liff_vacancy_dots INTEGER NOT NULL DEFAULT 1
+  CHECK (liff_vacancy_dots IN (0, 1)));
 
 CREATE TABLE "bookings" (
   id                           TEXT PRIMARY KEY,
@@ -2660,7 +2666,12 @@ CREATE TABLE forms (
 , on_submit_message_type TEXT CHECK (on_submit_message_type IN ('text', 'flex')) DEFAULT NULL, on_submit_message_content TEXT DEFAULT NULL, on_submit_webhook_url TEXT, on_submit_webhook_headers TEXT, on_submit_webhook_fail_message TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, layout TEXT, status TEXT NOT NULL DEFAULT 'active'
   CHECK (status IN ('active', 'archived')), archived_at TEXT, revision INTEGER NOT NULL DEFAULT 1
   CHECK (revision >= 1), content_revision INTEGER NOT NULL DEFAULT 1
-  CHECK (content_revision >= 1), current_published_version_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
+  CHECK (content_revision >= 1), current_published_version_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, liff_appearance_mode TEXT NOT NULL DEFAULT 'inherit'
+  CHECK (liff_appearance_mode IN ('inherit', 'custom')), liff_theme TEXT NOT NULL DEFAULT 'line'
+  CHECK (liff_theme IN ('natural', 'modern', 'gentle', 'night', 'line')), liff_primary_color TEXT
+  CHECK (liff_primary_color IS NULL OR liff_primary_color GLOB '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'), liff_background_color TEXT
+  CHECK (liff_background_color IS NULL OR liff_background_color GLOB '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'), liff_heading_font TEXT NOT NULL DEFAULT 'default'
+  CHECK (liff_heading_font IN ('default', 'serif', 'maru', 'sans')));
 
 CREATE TABLE "friend_add_action_runs" (
   id                  TEXT PRIMARY KEY,
