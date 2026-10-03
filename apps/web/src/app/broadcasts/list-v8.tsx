@@ -1,7 +1,8 @@
 'use client'
 
 /*
- * ★V8 一斉配信の一覧（Pencil `l5V9a`。1152 は `jjFNi`、状態別の見え方は `A8jzaQ`）。
+ * ★V8 一斉配信の一覧（Pencil `l5V9a`。1152 は `jjFNi`、状態別の見え方は `A8jzaQ`。
+ * 再撮の板 `EML2F`（一覧）・`bIdqV`（一覧の状態）を外枠に、`rfdmA`（一覧1152）を道具の段に付ける）。
  *
  * v7 の一覧（page.tsx の BroadcastList）とは別の部品として持つ。
  * データの口は同じ `/api/broadcasts`。違いは置き場と見せ方だけ——
@@ -610,7 +611,7 @@ export default function BroadcastListV8() {
   }
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node="EML2F bIdqV">
       {folderDialogOpen && (
         <FolderAddDialog
           kind="broadcast"
@@ -692,8 +693,8 @@ export default function BroadcastListV8() {
         </div>
 
         <div className={styles.listCol}>
-          {/* 道具の段。狭い板では「＋配信を作る」とフォルダ選びがここへ畳まれる。 */}
-          <div className={styles.toolbar}>
+          {/* 道具の段。狭い板では「＋配信を作る」とフォルダ選びがここへ畳まれる（1152 は `rfdmA`）。 */}
+          <div className={styles.toolbar} data-design-node="rfdmA">
             <Button
               type="button"
               variant="primary"
@@ -904,7 +905,7 @@ export default function BroadcastListV8() {
             )
           ) : (
             <>
-              <div className={styles.tableWrap}>
+              <div className={styles.tableWrap} data-content-in="">
                 <table className={styles.table}>
                   <thead>
                     <TableHeadRow>
@@ -950,7 +951,7 @@ export default function BroadcastListV8() {
                             <p className={styles.cellSub}>{rowExcerpt(broadcast.messageType, broadcast.messageContent)}</p>
                             <p className={styles.cellAudience} title={audience}>{audience}</p>
                           </td>
-                          <td>
+                          <td className={styles.statusCell}>
                             {approvalDuplicatesStatus
                               ? <ApprovalBadge status={broadcast.approvalStatus} />
                               : statusBadge(broadcast)}

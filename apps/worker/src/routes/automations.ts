@@ -672,6 +672,7 @@ automations.post(
       friendId: body.friendId,
       lineAccountId: accountId,
       credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+      operatorMailEnv: c.env,
       operationKey: body.operationKey,
       // R487: 確認時に見せた共通アクションの版の一式。食い違えば409で送らない。
       expectedCommonActions: body.expectedCommonActions,

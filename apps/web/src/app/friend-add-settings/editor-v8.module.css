@@ -1,0 +1,935 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8 友だち追加時の配信を作る・直す（作る① `wDzkc` → ② `h8uNW` →
+ * ③ `al47K` → ④ `i1nThZ` → ⑤確認 `U8Xm3X`）。
+ * 真ん中の段・右の「設定内容」・下に追従する帯の3つで組む。
+ * 右の列は板が 1100px を切ったら真ん中の下へ畳む。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  container-type: inline-size;
+}
+
+.backLink {
+  align-self: flex-start;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* 手順の輪：済みは緑の丸・今は緑の縁・まだは灰。 */
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+}
+
+.stepWrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.stepDone,
+.stepCurrent,
+.stepTodo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 4px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.stepMark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.stepDone .stepMark {
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+}
+
+.stepCurrent .stepMark {
+  border: 2px solid var(--color-accent-deep);
+  color: var(--color-accent-deep);
+}
+
+.stepTodo .stepMark {
+  border: 1px solid var(--color-hairline);
+  color: var(--color-ink-faint);
+}
+
+.stepCurrent {
+  color: var(--color-ink);
+}
+
+.stepLine {
+  width: 24px;
+  height: 1px;
+  margin: 0 4px;
+  background: var(--color-hairline);
+}
+
+.stepNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+/* 帯：失敗は赤・知らせは緑の薄地・閲覧のみは青の薄地。 */
+.errorBand {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-status-danger-border);
+  border-radius: var(--radius-control);
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.noticeBand {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-control);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.readonlyBand,
+.infoBand {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-info-bg);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 真ん中の段と右の列。 */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sideNote {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 白い札。 */
+.card {
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cardDesc {
+  margin: 6px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 欄：名前と2列・スマホでは1列。 */
+.fieldGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 12px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.fieldGrid .field {
+  margin-top: 0;
+}
+
+.fieldLabel {
+  font-weight: 600;
+}
+
+.fieldError {
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.input:disabled,
+.textarea:disabled {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.selectWrap {
+  position: relative;
+  display: block;
+}
+
+.selectWrap .input {
+  appearance: none;
+  padding-right: 32px;
+}
+
+.selectIcon {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  translate: 0 -50%;
+  color: var(--color-ink-faint);
+  pointer-events: none;
+}
+
+/* 選ぶ札2つ（だれに・再追加のとき）。選んだ札は緑の縁＋薄い緑の地。 */
+.pickRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.pick,
+.pickActive {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pickActive {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+}
+
+.pick:disabled,
+.pickActive:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.pickRadio {
+  grid-row: span 2;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+}
+
+.pickActive .pickRadio {
+  border: 5px solid var(--color-accent-deep);
+}
+
+.pick strong,
+.pickActive strong {
+  font-weight: 600;
+}
+
+.pick small,
+.pickActive small {
+  grid-column: 2 / span 2;
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+}
+
+/* 流入リンクの探す欄と選ぶ行。 */
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-faint);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 13px;
+  outline: none;
+}
+
+.routeList {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.route,
+.routeActive {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.routeActive {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+}
+
+.route:disabled,
+.routeActive:disabled {
+  cursor: not-allowed;
+}
+
+.routeCheck {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas);
+  color: transparent;
+  flex-shrink: 0;
+}
+
+.routeActive .routeCheck {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+}
+
+.routeText {
+  display: block;
+  min-width: 0;
+}
+
+.routeText strong {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.routeText small {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+}
+
+.routeFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.textLink {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.textLink:hover {
+  text-decoration: underline;
+}
+
+.textLink:disabled {
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.countNote {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+/* 札の段（送るもの・いつ送るか）。 */
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chip,
+.chipActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chipActive {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+
+.chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* 差し込む段。 */
+.insertRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.insertLabel {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.insertButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.insertButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.insertRow .countNote {
+  margin-left: auto;
+}
+
+/* 曜日の丸い札と時間帯の段。 */
+.weekRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.week,
+.weekActive {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.weekActive {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+.timeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.timeRow .input {
+  width: 150px;
+}
+
+.iconButton {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* 入り切り。 */
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.switchText {
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.switch,
+.switchOn {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-hairline);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.switchOn {
+  background: var(--color-accent-deep);
+}
+
+.switchKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  transition: left var(--motion-fast) var(--motion-ease-out);
+}
+
+.switchOn .switchKnob {
+  left: 22px;
+}
+
+/* あわせて行うことの段。 */
+.actionList {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.actionGrip {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.actionIndex {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.actionLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actionButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.actionButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.actionButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* 確認の段の行（名前・だれに・流入・送るもの・行うこと・順番）。 */
+.confirmRows {
+  display: grid;
+  margin: 12px 0 0;
+}
+
+.confirmRow {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.confirmRow:last-child {
+  border-bottom: 0;
+}
+
+.confirmRow dt {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.confirmRow dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+
+/* テストの段。 */
+.testRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.testTarget {
+  flex: 1;
+  min-width: 200px;
+  padding: 9px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+/* 有効にする前の確認の4行。 */
+.checkList {
+  display: grid;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.checkRow:last-child {
+  border-bottom: 0;
+}
+
+.checkOk,
+.checkNg {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.checkOk {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+.checkNg {
+  background: var(--color-status-warn-soft);
+  color: var(--color-ink-secondary);
+}
+
+.checkText {
+  flex: 1;
+  min-width: 0;
+}
+
+.checkText strong {
+  display: block;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.checkText small {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 右の「設定内容」の行。 */
+.summaryRows {
+  display: grid;
+  margin: 8px 0 0;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.summaryRow:last-child {
+  border-bottom: 0;
+}
+
+.summaryRow dt {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.summaryRow dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* スマホの見え方（簡易の枠・トークンの色だけ）。 */
+.phoneTitle {
+  margin: 0 0 8px;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.phone {
+  padding: 14px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-sunken);
+}
+
+.phoneHead {
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  text-align: center;
+}
+
+.phoneBubble {
+  max-width: 90%;
+  padding: 10px 12px;
+  border-top-left-radius: var(--radius-mini);
+  border-top-right-radius: var(--radius-card);
+  border-bottom-right-radius: var(--radius-card);
+  border-bottom-left-radius: var(--radius-card);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+/* 下に追従する帯（キャンセル・下書きを保存・次へ）。 */
+.bottomBar {
+  position: sticky;
+  bottom: 0;
+  padding: 12px 0 4px;
+  background: linear-gradient(transparent, var(--color-canvas) 32px);
+}
+
+.bottomActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ===== 板が 1100px を切ったら右の列を真ん中の下へ ===== */
+@container (max-width: 1099px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .phone {
+    max-width: 340px;
+  }
+}
+
+@container (max-width: 560px) {
+  .fieldGrid,
+  .pickRow,
+  .side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .confirmRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .confirmRow dt {
+    grid-column: 1 / span 2;
+  }
+}

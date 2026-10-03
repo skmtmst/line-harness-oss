@@ -1,0 +1,272 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B 運用者へのお知らせを作る（板 `gjUz3`、公開前の確認 `sDXNy`）。
+ *
+ * v7 の作成画面（`page.tsx` 内の NewOperatorNotificationInner）とは別の部品
+ * として持つ。データの口・下書き保存・公開・テスト送信・版の守りは同じ。
+ * 違いは置き場と見せ方だけ——左に3枚のカード（どんなときに知らせるか・
+ * だれが受け取るか・いつ送るか・重ならないか）、右に届き方の見本・
+ * 気をつけること・つながる先、下の帯にキャンセル・下書きを保存・公開。
+ * 公開の前には `sDXNy` の確認の窓で宛先と LINE の届く人数を確かめる。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 閲覧のみの帯。見出しの下。 */
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 本体：左に入力のカード、右に案内（340〜380px）。 */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  align-items: start;
+  gap: 16px;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.cardNote {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.fieldFull {
+  margin-top: 12px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fieldInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.fieldHint {
+  margin: 8px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.checkRow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* 受け取る人の小さな選び欄。1人ずつ外せる形は今のまま残す。 */
+.recipientList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.recipientSummary {
+  margin: 8px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+/* 右の届き方の見本。 */
+.previewBox {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas-sunken);
+}
+
+.previewName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.previewExample {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.previewActions {
+  margin-top: 12px;
+}
+
+/* 気をつけること。 */
+.warnList {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.9;
+}
+
+/* つながる先。 */
+.linkList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.linkItem {
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.linkItem:hover {
+  text-decoration: underline;
+}
+
+.formError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.formNotice {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-success, var(--color-accent-deep));
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+/* 公開前の確認の窓（板 `sDXNy`）の中身。 */
+.confirmSummary {
+  margin: 0 0 12px;
+  padding: 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  font-size: 13px;
+  line-height: 2;
+}
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-hairline);
+  font-size: 13px;
+}
+
+.confirmName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.confirmRole {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.confirmNote {
+  margin: 12px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 板が狭いときは右の列を下へ畳む。 */
+@container (max-width: 1099px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fieldGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

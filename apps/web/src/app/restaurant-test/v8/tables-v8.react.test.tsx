@@ -72,4 +72,18 @@ describe('BERxg 座席・卓管理のV8', () => {
     fireEvent.click(within(detail).getByRole('button', { name: '再開' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 'pb', { isActive: true }))
   })
+
+  it('追加・変更の枠に板 gBrCz の印が付く', async () => {
+    render(<TablesV8 />)
+    const detail = (await screen.findByRole('heading', { name: '卓の詳細' })).closest('section')!
+    fireEvent.click(within(detail).getAllByRole('button', { name: '変更' })[0])
+    expect(document.querySelector('[data-design-node="gBrCz"]')).not.toBeNull()
+  })
+
+  it('止める確認に板 eY9F3 の印が付く', async () => {
+    render(<TablesV8 />)
+    const detail = (await screen.findByRole('heading', { name: '卓の詳細' })).closest('section')!
+    fireEvent.click(within(detail).getAllByRole('button', { name: '停止' })[0])
+    expect(document.querySelector('[data-design-node="eY9F3"]')).not.toBeNull()
+  })
 })
