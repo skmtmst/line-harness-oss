@@ -19,6 +19,7 @@ import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import Pagination from '@/components/shared/pagination'
 import { MoreAction } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifyToast } from '@/components/shared/toast'
@@ -602,6 +603,17 @@ export default function AffiliatesTabV8({
           </div>
         </div>
       )}
+
+      {listState === 'ready' ? (
+        <div className={styles.pageFoot}>
+          <p className={styles.pageCount}>
+            {shownRows.length === rows.length
+              ? `全 ${formatNumber(rows.length)}件`
+              : `${formatNumber(shownRows.length)}件 / 全 ${formatNumber(rows.length)}件`}
+          </p>
+          {pageCount > 1 ? <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} /> : null}
+        </div>
+      ) : null}
 
       <p className={styles.footNote}>
         行の「…」から 成果を見る・紹介リンクをコピー・編集・紹介を止める。止めると、その人の紹介リンクからの成果を数えなくなります。
