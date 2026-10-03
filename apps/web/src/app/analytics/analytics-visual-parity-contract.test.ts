@@ -66,4 +66,15 @@ describe('V6 機能20の画面比較で直した契約', () => {
     expect(PAGE).not.toContain('className="px-4 py-3 text-xs whitespace-normal"')
     expect(PAGE).not.toContain('className="text-ink px-4 py-3 text-sm font-medium">{row.label}')
   })
+
+  it('板 DkRDE: ファネル作成ボタンの字は見本どおり（13・600）', () => {
+    // 見本 lint/V8-B/DkRDE.html：「ファネルを作る」は 13px/600。
+    expect(PAGE).toContain('text-label px-3 py-1.5 font-semibold h-auto whitespace-normal')
+  })
+
+  it('板 DkRDE: 段の行の字は見本どおり（12・段名500）', () => {
+    // 見本 lint/V8-B/DkRDE.html：段名 12px/500、補足 12px/400。
+    expect(PAGE).toContain('className="text-ink text-caption font-medium"')
+    expect(PAGE).toContain('className="text-ink-secondary text-caption tabular-nums"')
+  })
 })

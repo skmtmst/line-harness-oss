@@ -1487,7 +1487,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   {`この${funnelDays}日を再集計`}
                 </Button>
                 {canManage && (
-                  <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs font-medium h-auto whitespace-normal" onClick={() => setCreating(true)}>
+                  <Button variant="secondary" className="text-ink-secondary text-label px-3 py-1.5 font-semibold h-auto whitespace-normal" onClick={() => setCreating(true)}>
                     ＋ 段を足す
                   </Button>
                 )}
@@ -1697,10 +1697,10 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   return (
                     <div key={step.stepOrder}>
                       <div className="mb-1 flex items-baseline justify-between gap-2">
-                        <p className="text-ink text-sm font-medium">
+                        <p className="text-ink text-caption font-medium">
                           {i + 1}. {step.label}
                         </p>
-                        <p className="text-ink-secondary text-sm tabular-nums" id={`funnel-step-${step.stepOrder}-value`}>
+                        <p className="text-ink-secondary text-caption tabular-nums" id={`funnel-step-${step.stepOrder}-value`}>
                           {measurable ? `${formatNumber(step.reached)} 人` : '—'}
                           {measurable && i > 0 && (
                             <span className="text-ink-faint ml-2 text-xs">
