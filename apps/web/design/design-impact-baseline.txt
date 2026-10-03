@@ -39,6 +39,7 @@ shared-button-importer app/booking/menus/edit-menu-dialog.tsx
 shared-button-importer app/booking/menus/new/menu-form-v8.tsx
 shared-button-importer app/booking/menus/new/page.tsx
 shared-button-importer app/booking/menus/page.tsx
+shared-button-importer app/booking/menus/payment-tab-v8.tsx
 shared-button-importer app/booking/menus/settings-v8.tsx
 shared-button-importer app/booking/menus/staff/assign-v8.tsx
 shared-button-importer app/booking/menus/staff/page.tsx
