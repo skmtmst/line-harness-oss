@@ -31,14 +31,14 @@
 .headTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.4;
 }
 
 .headDesc {
   margin: 0;
-  color: var(--color-ink-secondary);
+  color: var(--color-ink-faint);
   font-size: 12px;
   line-height: 1.6;
 }
