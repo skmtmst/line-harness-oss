@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import {
   BookOpen,
   Building2,
@@ -283,6 +283,15 @@ function OpsAccountMenu({ me }: { me: OpsMe }) {
           className="w-60 rounded-mini border border-hairline bg-canvas py-2 shadow-float"
           // 最上層では absolute 指定を無効にする（位置は器が決める）。
           style={{ position: 'static' }}
+          onKeyDown={(event: ReactKeyboardEvent<HTMLElement>) => {
+            if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+            const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])'))
+            if (items.length === 0) return
+            event.preventDefault()
+            const current = items.indexOf(document.activeElement as HTMLElement)
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : event.key === 'ArrowDown' ? (current + 1) % items.length : (current - 1 + items.length) % items.length
+            items[next].focus()
+          }}
         >
           <div className="px-3.5 pb-2.5 pt-1.5">
             <p className="text-label font-medium text-ink">{me.name}</p>

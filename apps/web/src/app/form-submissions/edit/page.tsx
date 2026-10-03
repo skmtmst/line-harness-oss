@@ -14,6 +14,7 @@
  */
 
 import ListState from '@/components/shared/list-state'
+import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -669,8 +670,10 @@ function FormEditInner() {
         setPublishedVersionId(published.data.id)
         setIsActive(true)
         setNotice(published.data.replayed ? 'この版は公開済みです' : 'この版を公開しました')
+        notifyToast(published.data.replayed ? 'この版は公開済みです' : 'この版を公開しました')
       } else {
         setNotice(publishedVersionId ? '下書きを保存しました。公開中の内容は変わっていません' : '下書きを保存しました')
+        notifyToast('下書きを保存しました')
       }
       if (publishAfter) {
         savedSnapshot.current = JSON.stringify({

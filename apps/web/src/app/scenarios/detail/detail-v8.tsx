@@ -96,6 +96,7 @@ import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { notifyToast } from '@/components/shared/toast'
 import StatusChip from '@/components/shared/status-chip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -943,6 +944,7 @@ export default function ScenarioDetailV8({
       if (res.success) {
         setEditing(false)
         setRenameOpen(false)
+        notifyToast('保存しました')
         loadScenario(true)
       } else {
         setError(res.error)
@@ -971,6 +973,7 @@ export default function ScenarioDetailV8({
       }
       setStartOpen(false)
       setJustStarted(true)
+      notifyToast('配信を始めました')
       loadScenario(true)
       reloadStats()
     } catch {
@@ -997,6 +1000,7 @@ export default function ScenarioDetailV8({
         return
       }
       setStopOpen(false)
+      notifyToast('配信を一時停止しました')
       loadScenario(true)
       reloadStats()
     } catch {
@@ -1804,8 +1808,8 @@ export default function ScenarioDetailV8({
         {stepError && <p className="text-danger text-xs">{stepError}</p>}
 
         <div className="flex gap-2">
-          <Button variant="primary" className="px-4 py-2 min-h-[44px] font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={handleSaveStep} disabled={stepSaving}>
-            {stepSaving ? '保存中...' : editingStepId ? '更新' : '追加する'}
+          <Button variant="primary" className="px-4 py-2 min-h-[44px] font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={handleSaveStep} disabled={stepSaving} busy={stepSaving}>
+            {editingStepId ? '更新' : '追加する'}
           </Button>
           <button
             onClick={closeStepForm}
