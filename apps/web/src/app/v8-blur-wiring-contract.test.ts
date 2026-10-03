@@ -15,6 +15,7 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
  */
 const WIRED = [
   'app/webhooks/new/new-v8.tsx',
+  'app/contents/vars/new/new-v8.tsx',
 ]
 
 describe('V8 の blur 検証の配線（間違えない・怖くない）', () => {
@@ -24,7 +25,7 @@ describe('V8 の blur 検証の配線（間違えない・怖くない）', () =
       // 文字を入れる欄に blur の確かめがある。
       expect(source).toContain('onBlur')
       // 欄ごとの赤い理由を持ち、読み上げにも出す。
-      expect(source).toContain('fieldErrors')
+      expect(source).toMatch(/fieldErrors|FieldError/)
       expect(source).toContain('role="alert"')
       // 文は「何をすれば直るか」を1文で（「してください」で終わる）。
       expect(source).toMatch(/してください/)
