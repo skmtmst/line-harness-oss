@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { jstToday, addDays, formatJpLong, formatWeekday, addMinutesHm } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
+import { useWideViewport } from '../lib/use-wide-viewport.js';
 import LoadErrorView from './LoadErrorView.js';
 import LoadingView from './LoadingView.js';
 import Icon from './ui/Icon.js';
@@ -243,6 +244,8 @@ export default function DateTimePicker({
   onLoadState?: (ready: boolean) => void;
 }) {
   const today = jstToday();
+  // 414 幅の板（`xvtSz`）は板 ID だけを替える。中身は同じ。
+  const wide = useWideViewport();
   // 予約の設定（最初の形・受付期間）。読めるまで切り替えは出さない。
   const [settings, setSettings] = useState<{ initialView: DateView; windowDays: number } | null>(
     null,
@@ -575,7 +578,7 @@ export default function DateTimePicker({
   );
 
   return (
-    <div className="space-y-3.5" data-design-node={view === 'calendar' ? 'k3aJKU' : 'M2p63S'}>
+    <div className="space-y-3.5" data-design-node={view === 'calendar' ? 'k3aJKU' : wide ? 'xvtSz' : 'M2p63S'}>
       <div>
         <h2 className="text-xl font-bold text-ink">日時を選んでください</h2>
         <p className="mt-1 text-xs text-liff-sub">
