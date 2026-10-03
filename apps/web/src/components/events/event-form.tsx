@@ -12,6 +12,8 @@ import { useAccount } from '@/contexts/account-context'
 import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
 import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Dialog from '@/components/shared/dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
@@ -102,10 +104,16 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const { selectedAccount, accounts } = useAccount()
   const [tab, setTab] = useState<Tab>('overview')
   const [draft, setDraft] = useState<EventDetail>(DEFAULT_DRAFT)
+  /* 保存済みの写し。draft との差が「書きかけ」。枠タブの操作は
+     その場でサーバへ送る即時型なので番兵の対象外。 */
+  const [savedDraft, setSavedDraft] = useState<EventDetail>(DEFAULT_DRAFT)
   const [slots, setSlots] = useState<EventSlot[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const dirty = JSON.stringify(draft) !== JSON.stringify(savedDraft)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
@@ -163,7 +171,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         if (cancelled) return
         // Worker は質問定義を questions_json の文字列で返す。フォームは
         // 配列で触るので、ここでほぐしてから draft に載せる。
+        // 読み直しは書きかけの起点にもなるので写しも揃える。
         setDraft(toEventDraft(ev))
+        setSavedDraft(toEventDraft(ev))
         setSlots(slotsRes.items)
       } catch (e) {
         // 生の `API error: 404` を主文にしない。消えたものと通信の失敗を言い分ける。
@@ -247,7 +257,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         const updated = await eventsApi.updateEvent(accountId, eventId, payload, draft.version ?? 1)
         // 応答は questions_json の文字列で返る。ほぐさず載せると次の保存で
         // questions:null を送り、質問を消してしまう（R82）。
+        // 保存後は書きかけを解くので写しも揃える。
         setDraft(toEventDraft(updated))
+        setSavedDraft(toEventDraft(updated))
         notifyToast('保存しました')
         if (nextTab) setTab(nextTab)
       } else {
@@ -501,6 +513,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           />
         )}
       </div>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="イベントへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
