@@ -41,20 +41,20 @@ export default function Done({
           この画面は閉じてかまいません。
         </p>
       </div>
-      <dl className="divide-y divide-liff-divider rounded-[14px] bg-canvas px-3.5 outline outline-1 -outline-offset-1 outline-liff-line">
-        <div className="flex items-baseline gap-4 py-3">
+      <dl className="divide-y divide-liff-divider rounded-[14px] bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
+        <div className="flex items-baseline gap-2 py-2.5">
           <dt className="w-18 shrink-0 text-xs text-liff-sub">日時</dt>
           <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">
             {formatJpLong(slot.date)} {slot.start}〜{addMinutesHm(slot.start, durationMinutes)}
           </dd>
         </div>
-        <div className="flex items-baseline gap-4 py-3">
+        <div className="flex items-baseline gap-2 py-2.5">
           <dt className="w-18 shrink-0 text-xs text-liff-sub">メニュー</dt>
           <dd className="min-w-0 flex-1 truncate text-sm font-semibold text-ink" title={menuName}>
             {menuName}
           </dd>
         </div>
-        <div className="flex items-baseline gap-4 py-3">
+        <div className="flex items-baseline gap-2 py-2.5">
           <dt className="w-18 shrink-0 text-xs text-liff-sub">状態</dt>
           <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">お店の確認待ち</dd>
         </div>
