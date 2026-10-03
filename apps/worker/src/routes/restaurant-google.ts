@@ -579,6 +579,9 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnec
       state,
       codeChallenge: await codeChallengeFor(verifier),
       loginHint: existing?.google_account_email ?? null,
+      // どのGoogleアカウントでも接続できるよう、毎回アカウント選択画面を出す。
+      // loginHint は「前回つないだアカウント」の目印で、別のアカウントを選んでもよい。
+      selectAccount: true,
     }),
   });
 });
@@ -639,8 +642,33 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     if (stateRow.mode === 'reconnect' && existing?.location_name) {
       const same = locations.find((location) => location.name === existing.location_name);
       if (!same) {
-        await writeLog(c, store.id, { kind: 'reconnect', targetName: existing.location_name, result: 'failed', error: 'location_mismatch' });
-        return c.redirect(adminReturnUrl(c, lineAccountId, 'error:location_mismatch'));
+        // 別のGoogleアカウント（または管理店舗が変わったアカウント）で戻ってきた場合。
+        // ここで止めず、そのアカウントが管理している店舗を一覧で選べるようにする。
+        // 旧店舗名は残したまま「選択待ち」にして、切り替えの確認は選択時に取る。
+        if (locations.length === 0) {
+          await writeLog(c, store.id, { kind: 'reconnect', targetName: existing.location_name, result: 'failed', error: 'no_locations' });
+          return c.redirect(adminReturnUrl(c, lineAccountId, 'error:no_locations'));
+        }
+        await db
+          .prepare(
+            `UPDATE rt_google_connections
+             SET google_account_email = ?, refresh_token_enc = ?, access_token_enc = ?, access_token_expires_at = ?,
+                 status = 'pending_location', connected_by_staff_id = ?, disconnected_at = NULL,
+                 last_sync_error = NULL, updated_at = ?
+             WHERE store_id = ?`,
+          )
+          .bind(email, refreshEnc, accessEnc, accessExpires, c.get('staff')!.id, nowIso(), store.id)
+          .run();
+        await db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id).run();
+        await db.batch(
+          locations.map((location) =>
+            db
+              .prepare('INSERT OR IGNORE INTO rt_google_location_candidates (id, store_id, location_name, location_title, address_text) VALUES (?, ?, ?, ?, ?)')
+              .bind(crypto.randomUUID(), store.id, location.name, location.title, location.addressText),
+          ),
+        );
+        await writeLog(c, store.id, { kind: 'reconnect', targetName: existing.location_name, result: 'unknown', error: 'location_switch_pending' });
+        return c.redirect(adminReturnUrl(c, lineAccountId, 'select_location'));
       }
       await db
         .prepare(
@@ -661,7 +689,10 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     if (locations.length === 0) {
       return c.redirect(adminReturnUrl(c, lineAccountId, 'error:no_locations'));
     }
-    const single: GoogleLocation | null = locations.length === 1 ? locations[0] : null;
+    // 前の店舗が残っている状態（切り替え待ちや解除後）で別の店舗しか無いときは、1件でも自動確定しない。
+    // 旧店舗の取り込み済みデータを消す確認を店舗選択画面で取る必要があるため。
+    const autoSelectable = locations.length === 1 && (!existing?.location_name || existing.location_name === locations[0].name);
+    const single: GoogleLocation | null = autoSelectable ? locations[0] : null;
     const status: ConnectionStatus = single ? 'connected' : 'pending_location';
     await db
       .prepare(
@@ -690,9 +721,10 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
         store.id,
         store.line_account_id,
         email,
-        single?.name ?? null,
-        single?.title ?? null,
-        single?.mapsUri ?? null,
+        // 店舗未確定のときは前の店舗名を残す（切り替え確認とデータ削除の判定に使う）。
+        single?.name ?? existing?.location_name ?? null,
+        single?.title ?? existing?.location_title ?? null,
+        single?.mapsUri ?? existing?.location_maps_url ?? null,
         refreshEnc,
         accessEnc,
         accessExpires,
@@ -728,9 +760,19 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const connection = await connectionFor(c, store.id);
   if (!connection || connection.status !== 'pending_location') return fail(c, 409, '店舗の選択待ちではありません');
-  const body = await c.req.json<{ locationName?: string }>().catch(() => ({}) as { locationName?: string });
+  const body = await c.req
+    .json<{ locationName?: string; confirmSwitch?: boolean }>()
+    .catch(() => ({}) as { locationName?: string; confirmSwitch?: boolean });
   const locationName = body.locationName?.trim();
   if (!locationName) return fail(c, 400, 'locationName が必要です');
+  // 以前つないでいた店舗が残っている状態で別の店舗を選ぶのは「店舗の切り替え」。
+  // 取得済みの口コミ・プロフィール・投稿・数値は前の店舗のものなので、
+  // 本人の確認なしには切り替えない（確認したら下で消す）。
+  const previousName = connection.location_name;
+  const switching = Boolean(previousName) && previousName !== locationName;
+  if (switching && body.confirmSwitch !== true) {
+    return fail(c, 400, '店舗を切り替えるには確認が必要です', { code: 'switch_confirmation_required' });
+  }
   const db = dbFor(c.env, store.id);
   const candidate = await db
     .prepare('SELECT location_name, location_title FROM rt_google_location_candidates WHERE store_id = ? AND location_name = ? LIMIT 1')
@@ -747,14 +789,36 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
     return googleErrorResponse(c, error);
   }
   if (!selectedLocation) return fail(c, 409, '選択した店舗をGoogleで確認できません', { code: 'location_mismatch' });
+  if (switching) {
+    // 取り込み済みのものは全部「前の店舗」の中身。新しい店舗の画面に混ざらないよう先に消す。
+    // 操作の記録（rt_google_write_log）は誰がいつ切り替えたかを追えるように残す。
+    await db.batch([
+      db.prepare('DELETE FROM rt_google_reviews WHERE store_id = ?').bind(store.id),
+      db.prepare('DELETE FROM rt_google_changes WHERE store_id = ?').bind(store.id),
+      db.prepare('DELETE FROM rt_google_profiles WHERE store_id = ?').bind(store.id),
+      db.prepare('DELETE FROM rt_google_posts WHERE store_id = ?').bind(store.id),
+      db.prepare('DELETE FROM rt_google_metrics_daily WHERE store_id = ?').bind(store.id),
+    ]);
+  }
   await db
     .prepare(
-      `UPDATE rt_google_connections SET location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ? WHERE store_id = ?`,
+      switching
+        ? // 件数・評価・最終同期も前の店舗のものなので空に戻し、新しい店舗で取り直させる。
+          `UPDATE rt_google_connections
+             SET location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ?,
+                 average_rating = NULL, total_review_count = NULL, last_synced_at = NULL, last_metrics_synced_at = NULL, last_sync_error = NULL
+             WHERE store_id = ?`
+        : `UPDATE rt_google_connections SET location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ? WHERE store_id = ?`,
     )
     .bind(candidate.location_name, selectedLocation.title, selectedLocation.mapsUri, nowIso(), nowIso(), store.id)
     .run();
   await db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id).run();
-  await writeLog(c, store.id, { kind: 'connect', targetName: candidate.location_name, result: 'accepted' });
+  await writeLog(c, store.id, {
+    kind: switching ? 'reconnect' : 'connect',
+    targetName: candidate.location_name,
+    beforeText: switching ? previousName : null,
+    result: 'accepted',
+  });
   auditLog(c, 'restaurant.google.connect', { id: store.id, kind: 'rt_store' }, { lineAccountId: store.lineAccountId });
   return c.json({ success: true, connection: publicConnection(await connectionFor(c, store.id)) });
 });

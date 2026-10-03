@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { jstToday, addDays, formatJpLong, formatWeekday, addMinutesHm } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
+import { useWideViewport } from '../lib/use-wide-viewport.js';
 import LoadErrorView from './LoadErrorView.js';
 import LoadingView from './LoadingView.js';
 import Icon from './ui/Icon.js';
@@ -181,7 +182,7 @@ function DaySlots({
       {times.length === 0 ? (
         <p className="text-[13px] leading-6 text-liff-sub">この日は満席です。別の日を選んでください。</p>
       ) : (
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-3 gap-2">
           {times.map((t) => {
             const active = selected?.date === day && selected?.start === t.start;
             return (
@@ -243,6 +244,8 @@ export default function DateTimePicker({
   onLoadState?: (ready: boolean) => void;
 }) {
   const today = jstToday();
+  // 414 幅の板（`xvtSz`）は板 ID だけを替える。中身は同じ。
+  const wide = useWideViewport();
   // 予約の設定（最初の形・受付期間）。読めるまで切り替えは出さない。
   const [settings, setSettings] = useState<{ initialView: DateView; windowDays: number } | null>(
     null,
@@ -575,7 +578,7 @@ export default function DateTimePicker({
   );
 
   return (
-    <div className="space-y-3.5" data-design-node={view === 'calendar' ? 'k3aJKU' : 'M2p63S'}>
+    <div className="space-y-3.5" data-design-node={view === 'calendar' ? 'k3aJKU' : wide ? 'xvtSz' : 'M2p63S'}>
       <div>
         <h2 className="text-xl font-bold text-ink">日時を選んでください</h2>
         <p className="mt-1 text-xs text-liff-sub">
@@ -599,7 +602,7 @@ export default function DateTimePicker({
         ) : weekLoading || !weekByDate || !loadedWins.has(winStart) ? (
           <LoadingView />
         ) : !weekHasOpen ? (
-          <div className="flex flex-col items-center px-6 py-10 text-center">
+          <div className="flex flex-col items-center px-6 py-10 text-center" data-design-node="ADutg">
             <span className="text-liff-idle" aria-hidden="true">
               <Icon name="calendar-x" className="h-10 w-10" />
             </span>
@@ -632,7 +635,7 @@ export default function DateTimePicker({
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
               </button>
-              <div ref={stripRef} className="grid flex-1 grid-cols-5 gap-1.5" role="group" aria-label="日付">
+              <div ref={stripRef} className="grid flex-1 grid-cols-5 gap-[5px]" role="group" aria-label="日付">
                 {weekDays.map((d) => {
                   const state = stateOf(d, weekByDate, weekFull, weekClosed, today, windowEnd);
                   const open = state === 'open';
@@ -718,7 +721,7 @@ export default function DateTimePicker({
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
               </button>
-              <p aria-live="polite" className="text-sm font-bold text-ink">
+              <p aria-live="polite" className="text-[15px] font-bold text-ink">
                 {monthLabel}
               </p>
               <button

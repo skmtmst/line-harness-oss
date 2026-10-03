@@ -63,6 +63,25 @@ describe('Y8SjT2 予約枠・在庫のV8', () => {
     await waitFor(() => expect(fixture.updateInventory).toHaveBeenCalledWith('account-1', 's1', expect.objectContaining({ otaCapacity: 3 })))
   })
 
+  it('残りが少ないと閉じる知らせ（Yyw6i）が出る', async () => {
+    fixture.snapshot.mockResolvedValue({
+      data: {
+        ...data,
+        reservations: [
+          ...reservations,
+          { id: 'r2', store_id: 'store-1', store_name: '渋谷店', source: 'walkin', external_id: null, customer_name: '鈴木', customer_phone: null, line_uid: null, guest_count: 6, starts_at: '2026-10-02T19:00:00+09:00', ends_at: '2026-10-02T21:00:00+09:00', table_id: 't1', table_label: 'T1', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+        ],
+      },
+    })
+    render(<InventoryV8 />)
+    await screen.findByText('席と枠の配分（卓とつながる）')
+    fireEvent.click(screen.getByRole('button', { name: '閉じる知らせを確認する' }))
+    expect(document.querySelector('[data-design-node="Yyw6i"]')).not.toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Hot Pepperを閉じた' }))
+    fireEvent.click(screen.getByRole('button', { name: '閉じたものを記録する' }))
+    expect(screen.queryByRole('button', { name: '閉じる知らせを確認する' })).toBeNull()
+  })
+
   it('競合（409）のとき黄色の帯と比べる窓が出る', async () => {
     fixture.updateInventory.mockRejectedValueOnce(new ApiError(409, '競合しました', 'conflict'))
     render(<InventoryV8 />)

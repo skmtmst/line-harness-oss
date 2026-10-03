@@ -30,14 +30,18 @@ const GUARDED = [
   'app/booking/staff/new/page.tsx',
   'app/booking/staff/new/staff-new-v8.tsx',
   'app/booking/staff/shifts/page.tsx',
+  'app/contents/vars/edit/edit-v8.tsx',
   'app/contents/vars/edit/page.tsx',
+  'app/contents/vars/new/new-v8.tsx',
   'app/contents/vars/new/page.tsx',
   'app/conversions/new/page.tsx',
   'app/ec-commerce/connector-panel.tsx',
   'app/form-submissions/edit/page.tsx',
+  'app/friend-add-settings/editor-v8.tsx',
   'app/friend-add-settings/friend-add-rule-editor.tsx',
   'app/inflow-links/new/page.tsx',
   'app/line-notifications/operator/new/page.tsx',
+  'app/line-notifications/operator/new/operator-new-v8.tsx',
   'app/mileage/earning-rules/edit/page.tsx',
   'app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx',
   'app/mileage/earning-rules/new/page.tsx',
@@ -103,6 +107,12 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'app/templates/questions/question-v8.tsx': 'app/templates/editor-v8.tsx',
   'components/webinars/webinar-form.tsx': 'app/webinars/edit/page.tsx',
   'components/webinars/webinar-notifications.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/comments-v8.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/video-v8.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/cta-v8.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/notifications-v8.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/participants-v8.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/review-v8.tsx': 'app/webinars/edit/page.tsx',
   // ★V8 版の描画。番兵（useUnsavedGuard）は同じ画面の page.tsx が
   // 共有フック経由で持つ。どちらのテーマでも同じ番兵が効く。
   'app/settings/feature-settings-v8.tsx': 'app/settings/page.tsx',
@@ -126,6 +136,8 @@ const EXEMPTIONS: Record<string, string> = {
     'dirty管理なし（コメント中の「未保存」記述のみ）',
   'app/hq/templates/template-console.tsx':
     '多段ウィザード＋sessionStorage下書き。段の途中離脱の扱いは別途検討',
+  'app/hq/account-settings-dialogs.tsx':
+    '統括の3つの窓（HMpVx・D6ljr・HFsO9）。窓内の入力は閉じると戻る仕様で、画面に残る下書きを持たないため画面離脱ガードの対象外',
   'app/line-notifications/page.tsx':
     '入力を端末の下書きへ随時保存し、閉じる確認はエディタ内で済ませる設計。画面離脱への警告は要検討',
   'app/nen-campaigns/nen-overview.tsx':
@@ -198,6 +210,8 @@ const EXEMPTIONS: Record<string, string> = {
     'サイトの追加・編集・停止理由の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
   'app/restaurant-test/v8/organization.tsx':
     '★V8 の組織・権限（bSp4h）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。行内のフォームは保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
+  'app/contents/vars/list-v8.tsx':
+    '★V8 の共通情報一覧。一覧上の操作（停止・再開・差し替え・削除・フォルダ追加）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。窓内の理由欄は開く・閉じるときに戻るダイアログ内の入力',
   'app/restaurant-test/v8/tables.tsx':
     '★V8-B の座席・卓管理（BERxg）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。卓の追加・変更は保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
   'app/restaurant-test/v8/menu.tsx':
