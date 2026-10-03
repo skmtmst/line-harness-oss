@@ -174,6 +174,10 @@ describe('共通部品の影響範囲', () => {
       'app/templates/list-v8.tsx',
       // ★V8 統合ユーザーの一覧（ADjK8）。20件ずつのページ送り。
       'app/users/users-v8.tsx',
+      // ★V8-B 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りがある。
+      'app/webhooks/interactions-v8.tsx',
+      // ★V8-B 外部連携の一覧（ZSbFY）。表の下にページ送りがある。
+      'app/webhooks/outgoing-v8.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
       'app/webinars/page.tsx',

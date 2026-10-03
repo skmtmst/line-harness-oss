@@ -75,6 +75,7 @@ const GUARDED = [
   'app/templates/editor-v8.tsx',
   'app/templates/questions/new/page.tsx',
   'app/webhooks/new/page.tsx',
+  'app/webhooks/new/new-v8.tsx',
   'app/webinars/edit/page.tsx',
   'app/webinars/new/page.tsx',
   'components/accounts/account-ordering.tsx',
