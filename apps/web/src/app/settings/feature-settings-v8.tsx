@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import VersionCompare from '@/components/shared/version-compare'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import Toggle from '@/components/shared/toggle'
@@ -356,6 +358,10 @@ export function FeatureSettingsV8() {
     loading,
     saving,
     error,
+    conflict,
+    setConflict,
+    reloadSaved,
+    savedFeatures,
     loadFailed,
     reason,
     setReason,
@@ -393,6 +399,18 @@ export function FeatureSettingsV8() {
 
   const [query, setQuery] = useState('')
   const [reorderOpen, setReorderOpen] = useState(false)
+  const [compareOpen, setCompareOpen] = useState(false)
+
+  /*
+   * ★V8 `ziYCN`「違いを比べる」の比べる文。最新と入力中の
+   * オン・オフを並べ、VersionCompare（行ごとの比べる）へ渡す。
+   */
+  const describeFeatureSummary = (values: Record<string, boolean>): string =>
+    Object.keys(values).sort()
+      .map((key) => `${featureLabelByKey.get(key) ?? key}：${values[key] ? 'オン' : 'オフ'}`)
+      .join('\n')
+  const currentSummary = describeFeatureSummary(features)
+  const latestSummary = describeFeatureSummary(savedFeatures)
   const [openGroups, setOpenGroups] = useState<Set<string> | null>(null)
 
   const filteredGroups = useMemo(() => {
@@ -440,6 +458,29 @@ export function FeatureSettingsV8() {
         並び順は「並びを変える」から入れ替えてください。
       </p>
 
+      {conflict && (
+        <div className={styles.conflictBar} data-design-node="ziYCN" role="alert">
+          <div>
+            <p className={styles.conflictTitle}>ほかの人が機能設定を保存しました</p>
+            <p className={styles.conflictBody}>
+              あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。
+            </p>
+          </div>
+          <div className={styles.conflictActions}>
+            <Button type="button" variant="secondary" onClick={() => setCompareOpen(true)}>
+              違いを比べる
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => { setConflict(false); setCompareOpen(false); void reloadSaved() }}
+            >
+              最新を読み込んで続ける
+            </Button>
+          </div>
+        </div>
+      )}
+
       {!selectedAccountId ? (
         <p className={`${styles.card} ${styles.stateBox}`}>
           先に上部でLINEアカウントを選んでください。
@@ -485,11 +526,18 @@ export function FeatureSettingsV8() {
           )}
 
           {filteredGroups.length === 0 ? (
-            <ListState
-              kind="empty"
-              title="当てはまる機能がありません"
-              description="探す言葉を変えてください。"
-            />
+            <div data-design-node="bR6a1">
+              <ListState
+                kind="empty"
+                title="当てはまる機能がありません"
+                description="探す言葉を変えてください。"
+                action={query ? (
+                  <Button variant="secondary" onClick={() => setQuery('')}>
+                    条件を外す
+                  </Button>
+                ) : undefined}
+              />
+            </div>
           ) : (
             <div className={styles.cards}>
               {columns.map((column, columnIndex) => (
@@ -556,17 +604,33 @@ export function FeatureSettingsV8() {
               </Button>
               <Button
                 variant="primary"
-                onClick={() => void save()}
-                disabled={saving || !dirty}
+                onClick={() => { if (conflict) { setCompareOpen(true) } else { void save() } }}
+                disabled={saving || (!dirty && !conflict)}
                 busy={saving}
-                title={!dirty ? '変更すると保存できます' : undefined}
+                title={!dirty && !conflict ? '変更すると保存できます' : undefined}
               >
-                機能設定を保存
+                {conflict ? '比べてから保存' : '機能設定を保存'}
               </Button>
             </>
           )}
         />
       )}
+
+      {/* ★V8 `ziYCN`「違いを比べる」の窓。最新と入力中のオン・オフを比べる。 */}
+      <Dialog
+        open={compareOpen}
+        title="違いを比べる"
+        description="ほかの人が保存した最新の内容と、あなたが直している内容を比べます。"
+        cancelLabel="閉じる"
+        onCancel={() => setCompareOpen(false)}
+        footer={
+          <Button type="button" variant="primary" onClick={() => { setCompareOpen(false); void save() }}>
+            この内容で保存する
+          </Button>
+        }
+      >
+        <VersionCompare before={latestSummary} after={currentSummary} />
+      </Dialog>
 
       {reorderOpen && (
         <ReorderDialog

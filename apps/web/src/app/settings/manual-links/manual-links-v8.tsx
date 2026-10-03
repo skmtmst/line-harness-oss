@@ -117,11 +117,18 @@ export function ManualLinksV8() {
       </p>
 
       {shown.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="当てはまる行がありません"
-          description="検索の言葉か、状態の絞り込みを変えてください。"
-        />
+        <div data-design-node="bR6a1">
+          <ListState
+            kind="empty"
+            title="当てはまる行がありません"
+            description="検索の言葉か、状態の絞り込みを変えてください。"
+            action={query || filter !== 'all' ? (
+              <Button variant="secondary" onClick={() => { setQuery(''); setFilter('all') }}>
+                条件を外す
+              </Button>
+            ) : undefined}
+          />
+        </div>
       ) : (
         <div className={styles.tableCard}>
           <table>
