@@ -939,7 +939,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   }, [highlightedPoint, current])
 
   return (
-    <div data-conversion-points-design="v6" className="flex flex-col gap-4">
+    <div data-conversion-points-design="v6" data-design-node="r6dJFy WSGvo E2l8cw BygrU" className="flex flex-col gap-4">
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       {/*
