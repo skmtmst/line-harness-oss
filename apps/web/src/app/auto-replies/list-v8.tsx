@@ -888,13 +888,13 @@ export default function AutoRepliesListV8() {
       <div className={styles.tableWrap} data-content-in="">
         <table className={styles.table}>
           <colgroup>
-            <col style={{ width: 40 }} />
-            <col style={{ width: 44 }} />
+            <col style={{ width: 64 }} />
+            <col style={{ width: 62 }} />
             <col />
-            <col style={{ width: '22%' }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 44 }} />
+            <col style={{ width: 248 }} />
+            <col style={{ width: 144 }} />
+            <col style={{ width: 128 }} />
+            <col style={{ width: 76 }} />
           </colgroup>
           <thead>
             <tr>
@@ -993,7 +993,7 @@ export default function AutoRepliesListV8() {
                         </button>
                       )}
                     </div>
-                    <p className={styles.cellSub} title={triggerSummary(r).title}>
+                    <p className={styles.cellTrigger} title={triggerSummary(r).title}>
                       {triggerSummary(r).text}
                     </p>
                     {conditionChips(r).length > 0 && (

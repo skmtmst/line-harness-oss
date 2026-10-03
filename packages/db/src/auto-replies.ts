@@ -572,6 +572,32 @@ export async function deleteAutoReply(
   await removeConsumerReferences(db, 'auto_reply', id);
 }
 
+/*
+ * 削除の取り消し（B 元に戻す）。deleted_at を空に戻すだけ。
+ * 戻した直後は止めたまま（is_active = 0）にする。戻した瞬間に送り出すと、
+ * 消えているつもりの間に変わった設定がお客さまへ届くため。再開は画面の
+ * 再開操作（update isActive）で行う。参照の復活はしない（削除時に外した
+ * 参照先が変わっている場合があるため。必要なら画面で付け直す）。
+ */
+export async function restoreAutoReply(
+  db: D1Database,
+  id: string,
+): Promise<AutoReply | null> {
+  const result = await db
+    .prepare(
+      `UPDATE auto_replies
+          SET deleted_at = NULL, deleted_by_staff_id = NULL, is_active = 0
+        WHERE id = ? AND deleted_at IS NOT NULL`,
+    )
+    .bind(id)
+    .run();
+  if ((result.meta.changes ?? 0) !== 1) return null;
+  return db
+    .prepare(`SELECT * FROM auto_replies WHERE id = ?`)
+    .bind(id)
+    .first<AutoReply>();
+}
+
 // =============================================================================
 // 当たった記録（152）
 // =============================================================================
