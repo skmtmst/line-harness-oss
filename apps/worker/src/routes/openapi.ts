@@ -4143,6 +4143,41 @@ const spec = {
         responses: { '200': { description: '失効した' }, '404': { description: 'Not found' } },
       },
     },
+    '/api/webhooks/interactions/{id}/payload': {
+      get: {
+        tags: ['Webhook'],
+        summary: 'やり取りの本文（伏せて返す）',
+        description: '送った・受け取った本文を伏せて返す(F-18)。'
+          + '名前・電話・メール・住所・トークンに当たる値は `***` に置き換える。'
+          + 'JSON でない・空の本文は body に null を返す。元やDBは変えない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '伏せた本文' },
+          '404': { description: 'Not found' },
+        },
+      },
+    },
+    '/api/webhooks/api-tokens/{id}/reactivate': {
+      post: {
+        tags: ['Webhook'],
+        summary: '止めた公開APIトークンを動かし直す',
+        description: '止めている行だけが対象。平文は保存していないが hash が残っているため、'
+          + '止める前の合言葉がそのまま使えるようになる（新しい発行はしない）。'
+          + '止めた人（revoked_by）は履歴として残し、動かし直しは監査記録へ残す(F-17)。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '動かし直した。止める前の合言葉が使える' },
+          '404': { description: 'Not found' },
+          '409': { description: '止められていない' },
+        },
+      },
+    },
     '/api/webhooks/api-tokens/{id}/rotate': {
       post: {
         tags: ['Webhook'],
