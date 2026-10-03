@@ -13,6 +13,7 @@ import { Copy, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import {
   CLICK_SUMMARY_LABEL,
   LINK_CODE_HEADING,
@@ -102,7 +103,7 @@ export default function AffiliateDrawerV8({
       if (!isCurrent(id, gen)) return
       // 形を確かめてから入れる。読めない返事を入れると描くときに落ちる。
       setReport(reportRes.success ? asReportV2(reportRes.data) : null)
-      if (linksRes.success) setLinks(linksRes.data as unknown as AffiliateLink[])
+      if (linksRes.success && Array.isArray(linksRes.data)) setLinks(linksRes.data as unknown as AffiliateLink[])
       if (!reportRes.success || !linksRes.success) setError(true)
     } catch {
       if (!isCurrent(id, gen)) return
@@ -118,7 +119,8 @@ export default function AffiliateDrawerV8({
     try {
       const res = await api.affiliates.journeys(id, { limit: JOURNEY_PAGE_SIZE })
       if (!isCurrent(id, gen)) return
-      if (res.success) {
+      // 口が器（`{items,…}`）を返すことがある。配列でなければ失敗扱い。
+      if (res.success && Array.isArray(res.data)) {
         setJourneys(res.data)
         journeyCursorRef.current = res.nextCursor ?? null
         setJourneyMore(Boolean(res.nextCursor))
@@ -145,7 +147,7 @@ export default function AffiliateDrawerV8({
         beforeId: cursor.beforeId,
       })
       if (!isCurrent(id, gen)) return
-      if (res.success) {
+      if (res.success && Array.isArray(res.data)) {
         setJourneys((prev) => {
           const seen = new Set(prev.map((j) => j.friendId))
           return [...prev, ...res.data.filter((j) => !seen.has(j.friendId))]
@@ -185,6 +187,8 @@ export default function AffiliateDrawerV8({
     }
   }, [accountId])
 
+  // 焦点移動・Esc・背景スクロール停止・元のボタンへの復帰は共通へ任せる。
+  const panelRef = useOverlayFocus(true, onClose)
   useEffect(() => {
     genRef.current += 1
     idRef.current = affiliate.id
@@ -192,18 +196,7 @@ export default function AffiliateDrawerV8({
     void loadDetail(affiliate.id, gen)
     void loadJourneys(affiliate.id, gen)
     void loadSettlement(affiliate.id)
-    // Esc / 背面のスクロール
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prevOverflow
-    }
-  }, [affiliate.id, loadDetail, loadJourneys, loadSettlement, onClose])
+  }, [affiliate.id, loadDetail, loadJourneys, loadSettlement])
 
   const copyLinkUrl = useCallback(async (link: AffiliateLink) => {
     const url = distributionUrl(link.ref_code, linkBaseUrl)
@@ -226,6 +219,8 @@ export default function AffiliateDrawerV8({
         aria-modal="true"
         aria-label={`${affiliate.name}の成果の詳細`}
         data-design-node="tnTn9"
+        ref={panelRef}
+        tabIndex={-1}
       >
         <div className={styles.drawerHead}>
           <div>
