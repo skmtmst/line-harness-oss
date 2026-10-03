@@ -24,6 +24,7 @@ import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { loadOperators } from '@/lib/operators-cache'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import TagBadge from '@/components/friends/tag-badge'
+import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
@@ -538,6 +539,8 @@ function FriendDetailInner() {
   */
   const [canSaveFields] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin() || canEditFeature('attribute.personal_info.edit'))
   const [canManageFieldDefs] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  /* 前払いのみの印を外せるのは店の管理者だけ（口も owner/admin だけ）。 */
+  const [canClearPrepay] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin())
   // staff は個人情報の項目だけ書ける。それ以外はサーバも受けない。
   const canEditField = (field: FriendField) =>
     canManageFieldDefs || (field.isPersonal && canSaveFields)
@@ -1412,6 +1415,11 @@ function FriendDetailInner() {
               {/* 同じ画面の「情報欄」タブへ移る。今いる画面と同じ名前・チェスの駒の記号は紛らわしかった（★V7）。 */}
               <Button href={`/friends/detail?id=${friendId}&tab=info`} className="mt-3">情報欄を見る</Button>
             </div>
+            {selectedAccountId && friendId ? (
+              <div className="border-hairline border-b px-5 py-3">
+                <PrepayBadgeV8 accountId={selectedAccountId} friendId={friendId} canEdit={canClearPrepay} />
+              </div>
+            ) : null}
 
             {/* FRIEND-31: lg未満ではここから下（マイル以降の補助プロフィール）を畳む。 */}
             <button
