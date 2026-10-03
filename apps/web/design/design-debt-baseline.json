@@ -121,7 +121,7 @@
     "unresolved-classname": 5
   },
   "app/booking/staff/new/staff-new-v8.tsx": {
-    "unresolved-classname": 68
+    "unresolved-classname": 69
   },
   "app/booking/staff/shifts/liff-preview.tsx": {
     "arbitrary-value": 2,
@@ -708,7 +708,7 @@
     "unresolved-classname": 43
   },
   "app/webinars/new/new-v8.tsx": {
-    "unresolved-classname": 41
+    "unresolved-classname": 43
   },
   "app/webinars/page.tsx": {
     "arbitrary-value": 4,

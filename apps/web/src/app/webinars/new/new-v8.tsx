@@ -42,6 +42,20 @@ const FOLDERS_BLOCKED_MESSAGE = 'フォルダを読み込めていないため�
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
+const TITLE_EMPTY_MESSAGE = 'ウェビナー名を入力してください'
+const SLUG_PATTERN_MESSAGE = '公開ページのURLは、半角の英小文字・数字・-（ハイフン）だけで入力してください'
+
+/** 名前欄の今の値に対する直し方。問題なければ null。 */
+function validateTitleField(value: string): string | null {
+  return value.trim() ? null : TITLE_EMPTY_MESSAGE
+}
+
+/** URL欄の今の値に対する直し方。空欄は自動採番になるので問題なし。 */
+function validateSlugField(value: string): string | null {
+  const trimmed = value.trim().toLowerCase()
+  return trimmed && !SLUG_PATTERN.test(trimmed) ? SLUG_PATTERN_MESSAGE : null
+}
+
 function StepBand({ current }: { current: number }) {
   return (
     <ol className={styles.steps} aria-label="ウェビナー作成の進み方">
@@ -83,6 +97,8 @@ function NewWebinarV8Inner() {
   const [folderId, setFolderId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /* 欄を離れたときに出す直し方（保存を押す前から1欄ずつ確かめる）。 */
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string; slug?: string }>({})
   const [foldersState, setFoldersState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [canCreateWebinar] = useState(() =>
     typeof window === 'undefined' ? true : isOwnerOrAdmin())
@@ -126,18 +142,21 @@ function NewWebinarV8Inner() {
       setError(FOLDERS_BLOCKED_MESSAGE)
       return
     }
-    if (!title.trim()) {
-      setError('ウェビナー名を入力してください')
-      return
-    }
-    const slugTrimmed = slug.trim().toLowerCase()
-    if (slugTrimmed && !SLUG_PATTERN.test(slugTrimmed)) {
-      setError('公開ページのURLは、半角の英小文字・数字・-（ハイフン）だけで入力してください')
+    const titleError = validateTitleField(title)
+    const slugError = validateSlugField(slug)
+    if (titleError !== null || slugError !== null) {
+      setFieldErrors({
+        ...(titleError !== null ? { title: titleError } : {}),
+        ...(slugError !== null ? { slug: slugError } : {}),
+      })
+      setError(titleError ?? slugError)
       return
     }
 
     setSaving(true)
     setError(null)
+    setFieldErrors({})
+    const slugTrimmed = slug.trim().toLowerCase()
     try {
       const created = await webinarApi.create({
         accountId: selectedAccountId,
@@ -186,21 +205,47 @@ function NewWebinarV8Inner() {
                 <input
                   id="webinar-v8-title"
                   value={title}
-                  onChange={(event) => setTitle(event.target.value)}
+                  onChange={(event) => {
+                    setTitle(event.target.value)
+                    if (fieldErrors.title !== undefined) {
+                      setFieldErrors((previous) => ({ ...previous, title: validateTitleField(event.target.value) ?? undefined }))
+                    }
+                  }}
+                  onBlur={() => {
+                    const message = validateTitleField(title)
+                    setFieldErrors((previous) => ({ ...previous, title: message ?? undefined }))
+                  }}
                   placeholder="NEN活用スタートセミナー"
                   className={styles.input}
+                  aria-invalid={fieldErrors.title !== undefined}
                 />
+                {fieldErrors.title !== undefined ? (
+                  <p className={styles.fieldError} role="alert">{fieldErrors.title}</p>
+                ) : null}
               </div>
               <div>
                 <label className={styles.label} htmlFor="webinar-v8-slug">公開ページのURL</label>
                 <input
                   id="webinar-v8-slug"
                   value={slug}
-                  onChange={(event) => setSlug(event.target.value)}
+                  onChange={(event) => {
+                    setSlug(event.target.value)
+                    if (fieldErrors.slug !== undefined) {
+                      setFieldErrors((previous) => ({ ...previous, slug: validateSlugField(event.target.value) ?? undefined }))
+                    }
+                  }}
+                  onBlur={() => {
+                    const message = validateSlugField(slug)
+                    setFieldErrors((previous) => ({ ...previous, slug: message ?? undefined }))
+                  }}
                   placeholder="nen-start"
                   inputMode="url"
                   className={styles.input}
+                  aria-invalid={fieldErrors.slug !== undefined}
                 />
+                {fieldErrors.slug !== undefined ? (
+                  <p className={styles.fieldError} role="alert">{fieldErrors.slug}</p>
+                ) : null}
                 <p className={styles.fieldHelp}>アドレスの最後の部分です。空のままなら自動で付けます。</p>
               </div>
               <div>
