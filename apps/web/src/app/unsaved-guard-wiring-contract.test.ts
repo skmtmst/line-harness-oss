@@ -38,6 +38,7 @@ const GUARDED = [
   'app/friend-add-settings/friend-add-rule-editor.tsx',
   'app/inflow-links/new/page.tsx',
   'app/line-notifications/operator/new/page.tsx',
+  'app/line-notifications/operator/new/operator-new-v8.tsx',
   'app/mileage/earning-rules/edit/page.tsx',
   'app/mileage/earning-rules/new/page.tsx',
   'app/mileage/page.tsx',
