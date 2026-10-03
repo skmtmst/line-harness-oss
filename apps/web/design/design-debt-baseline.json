@@ -980,7 +980,7 @@
     "unresolved-classname": 4
   },
   "components/shared/tabs.tsx": {
-    "unresolved-classname": 4
+    "unresolved-classname": 5
   },
   "components/shared/target-missing.tsx": {
     "unresolved-classname": 5

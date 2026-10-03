@@ -784,6 +784,30 @@ aside[aria-label="フォルダ"] .shadow-lg {
   animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
 }
 
+/*
+ * ★V8 仕上げ（M10）：読み込み中の表示→中身はふっと出る
+ * （opacity＋少し下から 4px、200ms ease-out）。
+ * `data-content-in` を付けた器が載せ替わったときに1回だけ出る。
+ * 動きを減らす設定では末尾の規定で一瞬になる。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] [data-content-in] {
+    animation: v8-content-in var(--motion-base) var(--motion-ease-out);
+  }
+}
+
+@keyframes v8-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 [data-design-part="dialog"][data-design-node] {
   box-shadow: var(--shadow-overlay);
 }
