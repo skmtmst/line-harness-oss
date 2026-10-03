@@ -1059,6 +1059,8 @@ export default function FormSubmissionsListV8() {
             {visibleForms.map((form) => {
               const normalizedName = displayFormName(form.name)
               const answerCount = formAnswerCount(form)
+              /* 補足の行は1行のまま省略表示にするため、全文を title にも持つ。 */
+              const answerSubText = `今月 ${form.monthlySubmitCount == null ? '—' : formatNumber(form.monthlySubmitCount)}・完了 ${form.monthlyCompletionRate == null ? '—' : `${formatNumber(form.monthlyCompletionRate)}%`}`
               const pendingCount = form.pendingPostActionCount ?? 0
               const answerUrl = formAnswerUrl(selectedAccount?.liffId, form.id)
               return (
@@ -1113,9 +1115,8 @@ export default function FormSubmissionsListV8() {
                       今月開いた人。試しの回答は入れない。取れていない数は
                       「—」だけ出す（0 とは言わない）。
                     */}
-                    <p className={styles.answerSub}>
-                      今月 {form.monthlySubmitCount == null ? '—' : formatNumber(form.monthlySubmitCount)}
-                      ・完了 {form.monthlyCompletionRate == null ? '—' : `${formatNumber(form.monthlyCompletionRate)}%`}
+                    <p className={styles.answerSub} title={answerSubText}>
+                      {answerSubText}
                     </p>
                   </td>
                   <td>
