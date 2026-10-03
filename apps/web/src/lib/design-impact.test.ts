@@ -159,6 +159,8 @@ describe('共通部品の影響範囲', () => {
       'app/restaurant-test/google/google-profile.tsx',
       // #919: 予約台帳が増えても消えないよう、期間・状態の絞り込みと20件ずつのページ送りに寄せた。
       'app/restaurant-test/restaurant-console.tsx',
+      // ★V8-B Googleビジネス（j0Wcg）。口コミ一覧の表の下にページ送りを置く。
+      'app/restaurant-test/v8/google.tsx',
       // ★V8 リッチメニュー一覧（rZEGN）。表の下にページ送りを置く。
       'app/rich-menus/list-v8.tsx',
       'app/rich-menus/page.tsx',
