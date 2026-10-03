@@ -32,6 +32,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { pruneCondition } from '@/lib/segment-condition'
@@ -108,6 +109,30 @@ function editorSnapshot(rule: EditorRule, definition: FriendAddRuleDefinition) {
   })
 }
 
+/*
+ * 作る画面の骨組み（サクサク感 A）。題・手順・入力欄の形だけ。
+ * 光は共通 `Skeleton`。出す・消すの判定は `DelayedSkeleton` が持つ。
+ */
+function EditorLoadingSkeleton() {
+  return (
+    <div className={styles.board} role="status" aria-label="設定を読み込んでいます">
+      <span className="sr-only">設定を読み込んでいます</span>
+      <Skeleton width={200} height={24} />
+      <div style={{ display: 'flex', gap: 8, marginTop: 16 }} aria-hidden="true">
+        {[0, 1, 2, 3, 4].map((n) => (<Skeleton key={n} width={90} height={28} />))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 24 }} aria-hidden="true">
+        {[0, 1, 2].map((n) => (
+          <div key={n} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skeleton width={120} height={14} />
+            <Skeleton width="100%" height={44} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function FriendAddEditorV8({ ruleId }: { ruleId?: string }) {
   return (
     <Suspense fallback={<ListState kind="loading" />}>
@@ -136,6 +161,9 @@ function FriendAddEditorV8Inner({ ruleId }: { ruleId?: string }) {
   const [validateChecks, setValidateChecks] = useState<Array<{ key: string; status: string; detail: string }> | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  /* 保存ボタンの「✓ 保存しました」表示（2秒で戻る）。 */
+  const [justSaved, setJustSaved] = useState(false)
+  const savedTimer = useRef(0)
   const [enabling, setEnabling] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -216,6 +244,7 @@ function FriendAddEditorV8Inner({ ruleId }: { ruleId?: string }) {
   }, [ruleId, selectedAccountId])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => () => { window.clearTimeout(savedTimer.current) }, [])
 
   const currentIndex = STEPS.findIndex((item) => item.key === step)
   const hrefFor = (next: Step, extra = '') => ruleId
@@ -294,6 +323,9 @@ function FriendAddEditorV8Inner({ ruleId }: { ruleId?: string }) {
       }
       savedSnapshot.current = editorSnapshot(rule, definition)
       setNotice('下書きを保存しました。')
+      setJustSaved(true)
+      window.clearTimeout(savedTimer.current)
+      savedTimer.current = window.setTimeout(() => setJustSaved(false), 2000)
       if (!ruleId || nextStep) router.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
     } catch (error) {
@@ -408,12 +440,14 @@ function FriendAddEditorV8Inner({ ruleId }: { ruleId?: string }) {
     routeIds: current.routeIds.includes(id) ? current.routeIds.filter((routeId) => routeId !== id) : [...current.routeIds, id],
   }))
 
-  if (accountLoading || loading) return <ListState kind="loading" title="設定を読み込んでいます" />
+  if (accountLoading || loading) {
+    return <DelayedSkeleton loading skeleton={<EditorLoadingSkeleton />} />
+  }
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" description={accounts.length ? '上のバーで対象を選ぶと設定を表示します。' : '先にLINE公式アカウントを登録してください。'} />
   if (loadedAccountId !== selectedAccountId) {
     return error
       ? <ListState kind="error" title="設定を表示できませんでした" description={error} onRetry={() => void load()} />
-      : <ListState kind="loading" title="設定を読み込んでいます" />
+      : <DelayedSkeleton loading skeleton={<EditorLoadingSkeleton />} />
   }
   if (error && !rule.name && ruleId) return <ListState kind="error" title="設定を表示できませんでした" description={error} onRetry={() => void load()} />
 
@@ -513,7 +547,7 @@ function FriendAddEditorV8Inner({ ruleId }: { ruleId?: string }) {
       <div className={styles.bottomBar}>
         <div className={styles.bottomActions}>
           <Button href="/friend-add-settings" variant="secondary">キャンセル</Button>
-          <Button type="button" variant="secondary" disabled={!canEdit || saving || enabling} title={!canEdit ? readonlyReason : undefined} onClick={() => void save()}>下書きを保存</Button>
+          <Button type="button" variant="secondary" disabled={!canEdit || saving || enabling} title={!canEdit ? readonlyReason : undefined} busy={saving} busyLabel="保存中…" onClick={() => void save()}>{justSaved && !saving ? '✓ 保存しました' : '下書きを保存'}</Button>
           {step === 'preview' ? (
             <Button
               type="button"
