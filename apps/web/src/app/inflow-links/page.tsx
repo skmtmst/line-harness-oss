@@ -894,27 +894,6 @@ function InflowLinksPageInner({
             }}
             filters={
               <div className="flex flex-wrap items-center gap-2" aria-label="流入経路の絞り込み">
-                {/*
-                  ★V8（`y1ztx` 1152）：板が狭いときは左のフォルダの列を畳む
-                  ので、ここでフォルダを選ぶ。ふだんは畳む（v7 に出さない）。
-                */}
-                <div className={`${styles.railSelect} w-full sm:w-56`}>
-                  <Select
-                    aria-label="フォルダ"
-                    label="フォルダ"
-                    size="full"
-                    value={selectedGenre}
-                    options={[
-                      { value: '', label: 'すべて' },
-                      ...availableGenres.map((genre) => ({ value: genre.name, label: genre.name })),
-                      ...(hasUncategorized ? [{ value: UNCATEGORIZED, label: '未分類' }] : []),
-                    ]}
-                    onChange={(value) => {
-                      setSelectedGenre(value)
-                      setPage(1)
-                    }}
-                  />
-                </div>
                 {([
                   ['all', 'すべて', genreRows.length],
                   ['has-friends', '友だち追加あり', genreRows.filter((row) => (row.stats?.friendCount ?? 0) > 0).length],
@@ -933,6 +912,28 @@ function InflowLinksPageInner({
                     {label}
                   </FilterChip>
                 ))}
+                {/*
+                  ★V8（`y1ztx` 1152）：板が狭いときは左のフォルダの列を畳む
+                  ので、ここでフォルダを選ぶ。ふだんは畳む（v7 に出さない）。
+                  札の後ろに置く（札の文言とぶつけない）。見た目は先頭に寄せる。
+                */}
+                <div className={`${styles.railSelect} order-first w-full sm:w-56`}>
+                  <Select
+                    aria-label="フォルダ"
+                    label="フォルダ"
+                    size="full"
+                    value={selectedGenre}
+                    options={[
+                      { value: '', label: 'すべて' },
+                      ...availableGenres.map((genre) => ({ value: genre.name, label: genre.name })),
+                      ...(hasUncategorized ? [{ value: UNCATEGORIZED, label: '未分類' }] : []),
+                    ]}
+                    onChange={(value) => {
+                      setSelectedGenre(value)
+                      setPage(1)
+                    }}
+                  />
+                </div>
               </div>
             }
             trailing={
