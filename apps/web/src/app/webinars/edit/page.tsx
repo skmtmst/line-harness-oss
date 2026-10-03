@@ -1,6 +1,8 @@
 'use client'
 
 import Disclosure from '@/components/shared/disclosure'
+import VideoV8 from './video-v8'
+import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import RetentionSection from './retention-section'
 import SessionCapacityCell from './session-capacity-cell'
 import VideoStages from './video-stages'
@@ -2227,6 +2229,25 @@ function EditWebinarInner() {
     : 'basic'
   const [pane, setPane] = useState<PaneKey>(initialPane)
   /*
+    ★V8 切替用。共通の useAdminTheme は使わない（node 実行の試験で
+    document が無いときに落ちるため）。ここでは document が読める
+    ときだけ読み、読めなければ v7 のままにする。
+  */
+  const readAdminTheme = (): 'v7' | 'v8' =>
+    typeof document === 'undefined'
+      ? 'v7'
+      : document.documentElement?.dataset?.theme === 'v8'
+        ? 'v8'
+        : 'v7'
+  const [adminTheme, setAdminTheme] = useState<'v7' | 'v8'>(readAdminTheme)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return
+    const update = () => setAdminTheme(readAdminTheme())
+    update()
+    window.addEventListener(ADMIN_THEME_CHANGED_EVENT, update)
+    return () => window.removeEventListener(ADMIN_THEME_CHANGED_EVENT, update)
+  }, [])
+  /*
     CTAの印と最終確認が見るカード件数。初期値はエディタ応答の ctaCount、
     CTAの段を開いた後は子タブが保存・再取得した結果を正本にする。
     「どのウェビナーの分か」を一緒に持ち、切替後に前の件数を出さない。
@@ -2643,7 +2664,30 @@ function EditWebinarInner() {
       ) : null}
       {visitedPanes.has('video') ? (
         <div hidden={pane !== 'video'}>
-          <VideoDesignStep webinar={webinar} editor={editor} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} onWebinarSaved={handleWebinarSaved} onDirtyChange={dirtyReporterFor('video')} registerSave={saveRegistrarFor('video')} />
+          {/*
+            ★V8 切替（動画 `VWNaA`・開催回 `LPOe7`）。v7 の見た目は
+            data-theme="v8" が付くまで 1画素も変えない。
+          */}
+          {adminTheme === 'v8' ? (
+            <VideoV8
+              webinar={webinar}
+              editor={editor}
+              publicUrl={publicUrl}
+              canOpenPublicPage={canOpenPublicPage}
+              publicPageReason={publicPageReason}
+              completionLabel={
+                participantRule
+                  ? `最大視聴位置が動画の90%（${fmtSec(participantRule.completionThresholdSeconds)}）以上`
+                  : null
+              }
+              onWebinarSaved={handleWebinarSaved}
+              onDirtyChange={dirtyReporterFor('video')}
+              registerSave={saveRegistrarFor('video')}
+              onEditVideo={() => goStep('basic')}
+            />
+          ) : (
+            <VideoDesignStep webinar={webinar} editor={editor} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} onWebinarSaved={handleWebinarSaved} onDirtyChange={dirtyReporterFor('video')} registerSave={saveRegistrarFor('video')} />
+          )}
         </div>
       ) : null}
       {visitedPanes.has('cta') ? (
