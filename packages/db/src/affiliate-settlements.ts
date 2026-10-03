@@ -95,7 +95,10 @@ export interface ApprovalRewardVersionBasis {
 
 export type ApprovalRewardBasis =
   | { kind: 'version'; version: ApprovalRewardVersionBasis }
-  | { kind: 'legacy-live' };
+  // 旧来経路の現在額。承認判断時点で読んだ値をそのまま持ち、承認・凍結・
+  // 計算で同じ値を使い回す（precheck→UPDATE→freezeの間の割り込みで
+  // 根拠がずれないようにする。F-23 交差の有限barrier）。
+  | { kind: 'legacy-live'; rewardAmount: number | null; rewardMiles: number | null };
 
 /**
  * 記録時刻以前に作られた最新の版。無ければ null。
@@ -139,13 +142,15 @@ export async function resolveApprovalRewardBasis(
 ): Promise<ApprovalRewardBasis | null> {
   const hasVersionTables = (await dbTableExists(db, 'affiliate_offer_versions'))
     && (await dbTableExists(db, 'affiliate_attribution_decisions'));
-  if (!hasVersionTables) return { kind: 'legacy-live' };
+  if (!hasVersionTables) return { kind: 'legacy-live', rewardAmount: null, rewardMiles: null };
   const row = await db
     .prepare(
       `SELECT ce.created_at AS recorded_at,
               a.commission_rate AS commission_rate,
               dad.offer_version_id AS decision_version_id,
-              al.offer_id AS link_offer_id
+              al.offer_id AS link_offer_id,
+              off.reward_amount AS offer_reward,
+              off.reward_miles AS offer_miles
          FROM conversion_events ce
          JOIN affiliates a ON a.id = ce.affiliate_id
          LEFT JOIN affiliate_attribution_decisions dad
@@ -153,6 +158,7 @@ export async function resolveApprovalRewardBasis(
          LEFT JOIN affiliate_links al
            ON al.ref_code = ce.attributed_ref_code
           AND al.affiliate_id = ce.affiliate_id
+         LEFT JOIN affiliate_offers off ON off.id = al.offer_id
         WHERE ce.id = ? AND ce.affiliate_id IS NOT NULL`,
     )
     .bind(eventId)
@@ -161,14 +167,20 @@ export async function resolveApprovalRewardBasis(
       commission_rate: number | null;
       decision_version_id: string | null;
       link_offer_id: string | null;
+      offer_reward: number | null;
+      offer_miles: number | null;
     }>();
   // 帰属のない行は呼び出し側が先に弾く。ここでは旧来経路に任せる。
-  if (!row) return { kind: 'legacy-live' };
+  if (!row) return { kind: 'legacy-live', rewardAmount: null, rewardMiles: null };
   const rate = row.commission_rate === null ? 0 : Number(row.commission_rate);
   // 率の紹介者は版で金額を決めない（率の版管理はこの正本の範囲外）。
-  if (rate > 0) return { kind: 'legacy-live' };
+  if (rate > 0) {
+    return { kind: 'legacy-live', rewardAmount: row.offer_reward, rewardMiles: row.offer_miles };
+  }
   // 汎用リンク（案件なし）は旧来どおり。
-  if (!row.link_offer_id) return { kind: 'legacy-live' };
+  if (!row.link_offer_id) {
+    return { kind: 'legacy-live', rewardAmount: row.offer_reward, rewardMiles: row.offer_miles };
+  }
   if (row.decision_version_id) {
     const decided = await db
       .prepare(`SELECT reward_amount, reward_miles FROM affiliate_offer_versions WHERE id = ?`)
@@ -189,7 +201,10 @@ export async function resolveApprovalRewardBasis(
     .bind(row.link_offer_id)
     .first<{ n: number }>();
   // 版が1つも無い昔の案件は旧来どおり（公開経路では版が必ずある）。
-  if ((versionCount?.n ?? 0) === 0) return { kind: 'legacy-live' };
+  // 版なしの一般仕様の選択は司令塔の判断前には広げない。
+  if ((versionCount?.n ?? 0) === 0) {
+    return { kind: 'legacy-live', rewardAmount: row.offer_reward, rewardMiles: row.offer_miles };
+  }
   return null;
 }
 
@@ -209,6 +224,12 @@ export async function ensureConversionRewardSnapshot(
   db: D1Database,
   eventId: string,
   now = new Date().toISOString(),
+  /**
+   * 承認判断時に確定した根拠。渡されたときは再解決せず同じ値を使う
+   * （precheck→UPDATE→freezeの間の割り込みで根拠がずれないようにする。
+   * F-23 交差の有限barrier）。省略時はその場で確かめ直す。
+   */
+  basisOverride?: ApprovalRewardBasis | null,
 ): Promise<AffiliateRewardCalculation | null> {
   // 付けた時点の版があれば、その版の決まりを優先する(#823)。
   // 版の表が無い古いスキーマ（最小構成の単体試験など）では、
@@ -356,11 +377,13 @@ export async function ensureConversionRewardSnapshot(
     } else if (!hasVersionTables) {
       pricedFixedReward = Math.round(Number(row.offer_reward ?? 0));
     } else {
-      const basis = await resolveApprovalRewardBasis(db, eventId);
+      const basis = basisOverride !== undefined
+        ? basisOverride
+        : await resolveApprovalRewardBasis(db, eventId);
       if (basis === null) return null;
       pricedFixedReward = basis.kind === 'version'
         ? Math.round(Number(basis.version.rewardAmount))
-        : Math.round(Number(row.offer_reward ?? 0));
+        : Math.round(Number(basis.rewardAmount ?? row.offer_reward ?? 0));
     }
   }
   const fixedReward = formula === 'fixed'
