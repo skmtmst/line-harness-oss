@@ -10,7 +10,13 @@ import {
 } from '@line-crm/db';
 import { resolveReminderSendAt } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
-import { buildReminderStepMessage, contentNeedsBookingPlaceholders } from './reminder-delivery.js';
+import {
+  MEET_URL_PATTERN,
+  RESERVATION_DATETIME_PATTERN,
+  buildReminderStepMessage,
+  pickBookingConsultation,
+  type BookingConsultationRow,
+} from './reminder-delivery.js';
 import { buildPublicSegmentQuery, buildSegmentWhere, isEmptySegmentCondition } from './segment-query.js';
 import {
   completeOutboundSendStatement,
@@ -206,27 +212,32 @@ export async function validateReminderDraft(
     ? '直近のテスト送信が成功しています'
     : '公開前にテスト送信を成功させてください'));
   // F10: 予約日時・Meet URL の差し込みを使うときは、値が空の人がいないか見る。
-  // 空の人（確定予定が無い人）へ送ると日時もURLも空で届くので、公開前に止める。
+  // 空の人へ送ると差し込みが空で届くので、公開前に止める。
   const bookingEmpty = await countBookingEmptyAudience(db, settings);
   checks.push(check('booking_placeholders', '予約の差し込み', bookingEmpty.empty === 0,
     !bookingEmpty.uses
       ? '予約日時・Meet URLの差し込みは使っていません'
       : bookingEmpty.empty === 0
         ? '予約の差し込みが空の人はいません'
-        : `予約日時・Meet URLが空の人が${bookingEmpty.empty}人います。確定予定の無い人には空で届きます`));
+        : `予約日時・Meet URLが空の人が${bookingEmpty.empty}人います（空: ${bookingEmpty.emptyTokens.join('・')}）。値の無い人には空で届きます`));
   const audience = await countReminderAudience(db, settings);
   return { valid: checks.every((item) => item.status === 'passed'), checks, audience };
 }
 
 /*
- * F10: 差し込みを使う通知の届け先のうち、確定予定が無い人の数。
+ * F10: 差し込みを使う通知の届け先のうち、値が空で届く人の数。
  * 数の数え方は countReminderAudience と同じ3枝（条件・タグ・全員）。
  * 使っていないときは数えない（0人扱い）。
+ *
+ * F10補修: 「空」の決め方は送る側の解決値とそろえる。送る側は
+ * pickBookingConsultation で行を選び、無効な日時は飛ばし、
+ * 空の meet_url は空文字にする。ここでも人ごとに行を集めて
+ * 同じ選び方で見て、使う差し込みごとに空を数える。
  */
 export async function countBookingEmptyAudience(
   db: D1Database,
   settings: ReminderDraftSettings,
-): Promise<{ uses: boolean; empty: number }> {
+): Promise<{ uses: boolean; empty: number; emptyTokens: string[] }> {
   const contents: string[] = [];
   for (const step of settings.steps) {
     if (step.templateId) {
@@ -236,38 +247,53 @@ export async function countBookingEmptyAudience(
       contents.push(step.messageContent);
     }
   }
-  if (!contents.some((content) => contentNeedsBookingPlaceholders(content))) {
-    return { uses: false, empty: 0 };
+  const usesDatetime = contents.some((content) => RESERVATION_DATETIME_PATTERN.test(content));
+  const usesMeetUrl = contents.some((content) => MEET_URL_PATTERN.test(content));
+  if (!usesDatetime && !usesMeetUrl) {
+    return { uses: false, empty: 0, emptyTokens: [] };
   }
-  const emptyCondition = `NOT EXISTS (
-    SELECT 1 FROM meet_consultations mc
-     WHERE mc.friend_id = f.id AND mc.status = 'confirmed'
-  )`;
-  let row: { count: number | null } | null;
+  let audienceFrom = 'FROM friends f';
+  let audienceWhere = 'f.line_account_id = ? AND f.is_following = 1';
+  let audienceBindings: unknown[] = [settings.lineAccountId];
   if (!isEmptySegmentCondition(settings.targetCondition as never)) {
     buildPublicSegmentQuery(settings.targetCondition as never);
     const where = buildSegmentWhere(settings.targetCondition as never);
-    row = await db.prepare(
-      `SELECT COUNT(*) AS count FROM friends f
-        WHERE f.line_account_id = ? AND f.is_following = 1 AND (${where.sql})
-          AND ${emptyCondition}`,
-    ).bind(settings.lineAccountId, ...where.bindings).first<{ count: number | null }>();
+    audienceWhere += ` AND (${where.sql})`;
+    audienceBindings = [...audienceBindings, ...where.bindings];
   } else if (settings.targetTagId) {
-    row = await db.prepare(
-      `SELECT COUNT(DISTINCT f.id) AS count
-         FROM friends f
-         JOIN friend_tags ft ON ft.friend_id = f.id AND ft.tag_id = ?
-        WHERE f.line_account_id = ? AND f.is_following = 1
-          AND ${emptyCondition}`,
-    ).bind(settings.targetTagId, settings.lineAccountId).first<{ count: number | null }>();
-  } else {
-    row = await db.prepare(
-      `SELECT COUNT(*) AS count FROM friends f
-        WHERE f.line_account_id = ? AND f.is_following = 1
-          AND ${emptyCondition}`,
-    ).bind(settings.lineAccountId).first<{ count: number | null }>();
+    audienceFrom += ' JOIN friend_tags ft ON ft.friend_id = f.id AND ft.tag_id = ?';
+    audienceBindings = [...audienceBindings, settings.targetTagId];
   }
-  return { uses: true, empty: Number(row?.count ?? 0) };
+  const rows = await db.prepare(
+    `SELECT DISTINCT f.id AS fid, mc.starts_at, mc.meet_url
+       ${audienceFrom}
+       LEFT JOIN meet_consultations mc
+         ON mc.friend_id = f.id AND mc.status = 'confirmed'
+      WHERE ${audienceWhere}`,
+  ).bind(...audienceBindings).all<{ fid: string } & BookingConsultationRow>();
+  const byFriend = new Map<string, BookingConsultationRow[]>();
+  for (const row of rows.results ?? []) {
+    const list = byFriend.get(row.fid) ?? [];
+    if (row.starts_at != null) list.push({ starts_at: row.starts_at, meet_url: row.meet_url });
+    byFriend.set(row.fid, list);
+  }
+  const nowMs = Date.now();
+  let empty = 0;
+  let datetimeEmpty = false;
+  let meetUrlEmpty = false;
+  for (const list of byFriend.values()) {
+    const picked = pickBookingConsultation(list, nowMs);
+    const dateEmpty = picked == null;
+    const urlEmpty = picked == null || !picked.meet_url;
+    if ((usesDatetime && dateEmpty) || (usesMeetUrl && urlEmpty)) empty += 1;
+    if (usesDatetime && dateEmpty) datetimeEmpty = true;
+    if (usesMeetUrl && urlEmpty) meetUrlEmpty = true;
+  }
+  const emptyTokens = [
+    ...(datetimeEmpty ? ['予約日時'] : []),
+    ...(meetUrlEmpty ? ['Meet URL'] : []),
+  ];
+  return { uses: true, empty, emptyTokens };
 }
 
 export async function previewReminderDraft(

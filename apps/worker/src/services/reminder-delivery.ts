@@ -89,7 +89,7 @@ export interface ReminderDeliveryResult {
  * 日時変更/取消ガードには触らない。読むだけ。
  */
 export const RESERVATION_DATETIME_PATTERN = /\{\{\s*reservation_datetime\s*\}\}/;
-const MEET_URL_PATTERN = /\{\{\s*meet_url\s*\}\}/;
+export const MEET_URL_PATTERN = /\{\{\s*meet_url\s*\}\}/;
 
 export function contentNeedsBookingPlaceholders(content: string): boolean {
   return RESERVATION_DATETIME_PATTERN.test(content) || MEET_URL_PATTERN.test(content);
@@ -112,6 +112,29 @@ export function formatBookingDatetime(startsAt: string): string {
   return `${month}月${day}日（${weekdays[jst.getUTCDay()]}）${time}`;
 }
 
+export interface BookingConsultationRow {
+  starts_at: string;
+  meet_url: string | null;
+}
+
+/*
+ * F10補修: 送る側と公開前検査で同じ行選びを使う。
+ * 直近の確定予定が先。無効な日時は飛ばす。確定が無ければ null。
+ */
+export function pickBookingConsultation(
+  rows: BookingConsultationRow[],
+  nowMs: number,
+): BookingConsultationRow | null {
+  const valid = rows.filter((row) => Number.isFinite(Date.parse(row.starts_at)));
+  const upcoming = valid
+    .filter((row) => Date.parse(row.starts_at) >= nowMs)
+    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  const past = valid
+    .filter((row) => Date.parse(row.starts_at) < nowMs)
+    .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
+  return upcoming[0] ?? past[0] ?? null;
+}
+
 export async function resolveBookingInterpolation(
   db: D1Database,
   friendId: string,
@@ -121,17 +144,8 @@ export async function resolveBookingInterpolation(
   const rows = await db.prepare(
     `SELECT starts_at, meet_url FROM meet_consultations
       WHERE friend_id = ? AND status = 'confirmed'`,
-  ).bind(friendId).all<{ starts_at: string; meet_url: string | null }>();
-  const list = rows.results ?? [];
-  if (list.length === 0) return empty;
-  const nowMs = now.getTime();
-  const upcoming = list
-    .filter((row) => Number.isFinite(Date.parse(row.starts_at)) && Date.parse(row.starts_at) >= nowMs)
-    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
-  const past = list
-    .filter((row) => Number.isFinite(Date.parse(row.starts_at)) && Date.parse(row.starts_at) < nowMs)
-    .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
-  const picked = upcoming[0] ?? past[0] ?? null;
+  ).bind(friendId).all<BookingConsultationRow>();
+  const picked = pickBookingConsultation(rows.results ?? [], now.getTime());
   if (!picked) return empty;
   return {
     reservationDatetime: formatBookingDatetime(picked.starts_at),

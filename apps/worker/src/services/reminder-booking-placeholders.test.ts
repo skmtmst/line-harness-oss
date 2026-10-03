@@ -173,4 +173,80 @@ describe('F10: 予約日時・Meet URLの差し込み', () => {
     expect(built.messageContent).not.toContain('{{');
     expect(built.messageContent).not.toContain('10月10日');
   });
+
+  it('公開前検査は無効な日時を持つ行を空扱いにする', async () => {
+    // 直接書かれた壊れた行（正規登録では起きないが既存行に混ざりうる）。
+    // もう1人は有効な予定を持つので、数えられるのは壊れた行の人だけになる。
+    testDb.raw.prepare(`UPDATE meet_consultations SET starts_at = 'not-a-date' WHERE id = 'meet-1'`).run();
+    testDb.raw.prepare(
+      `INSERT INTO meet_consultations
+        (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status)
+       VALUES ('meet-2', 'event-2', 'friend-10b', '個別相談',
+               '2026-10-11T01:00:00.000Z', '2026-10-11T01:30:00.000Z', ?, 'confirmed')`,
+    ).run(MEET_URL);
+    const result = await validateReminderDraft(
+      testDb.db,
+      settingsWith('ご予約は{{reservation_datetime}}です。こちらから{{meet_url}}'),
+      version,
+    );
+    expect(result.valid).toBe(false);
+    const booking = result.checks.find((item) => item.key === 'booking_placeholders');
+    expect(booking?.status).toBe('failed');
+  });
+
+  it('公開前検査は空のMeet URLを行ごとに見る', async () => {
+    testDb.raw.prepare(`UPDATE meet_consultations SET meet_url = '' WHERE id = 'meet-1'`).run();
+    testDb.raw.prepare(
+      `INSERT INTO meet_consultations
+        (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status)
+       VALUES ('meet-2', 'event-2', 'friend-10b', '個別相談',
+               '2026-10-11T01:00:00.000Z', '2026-10-11T01:30:00.000Z', ?, 'confirmed')`,
+    ).run(MEET_URL);
+    // 両方の差し込みを使うときは空として数える。
+    const both = await validateReminderDraft(
+      testDb.db,
+      settingsWith('ご予約は{{reservation_datetime}}です。こちらから{{meet_url}}'),
+      version,
+    );
+    expect(both.valid).toBe(false);
+    // 日時だけ使うときは空にならない（日時自体は有効）。
+    const dateOnly = await validateReminderDraft(
+      testDb.db,
+      settingsWith('ご予約は{{reservation_datetime}}です'),
+      version,
+    );
+    expect(dateOnly.valid).toBe(true);
+  });
+
+  it('送る側は無効な日時を飛ばし有効な予定を選ぶ', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO meet_consultations
+        (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status)
+       VALUES ('meet-bad', 'event-bad', 'friend-10a', '壊れた予定',
+               'not-a-date', 'not-a-date', '', 'confirmed')`,
+    ).run();
+    const built = await buildReminderStepMessage(
+      testDb.db,
+      stepRow('ご予約は{{reservation_datetime}}です。こちらから{{meet_url}}'),
+      await friendRow(testDb.db, 'friend-10a'),
+      new Date('2026-10-09T10:00:00+09:00'),
+      'reminder',
+    );
+    expect(built.messageContent).toContain('10月10日');
+    expect(built.messageContent).toContain(MEET_URL);
+  });
+
+  it('送る側は空のMeet URLを空文字にする', async () => {
+    testDb.raw.prepare(`UPDATE meet_consultations SET meet_url = '' WHERE id = 'meet-1'`).run();
+    const built = await buildReminderStepMessage(
+      testDb.db,
+      stepRow('ご予約は{{reservation_datetime}}です。こちらから[{{meet_url}}]'),
+      await friendRow(testDb.db, 'friend-10a'),
+      new Date('2026-10-09T10:00:00+09:00'),
+      'reminder',
+    );
+    expect(built.messageContent).toContain('10月10日');
+    expect(built.messageContent).toContain('こちらから[]');
+    expect(built.messageContent).not.toContain('{{');
+  });
 });
