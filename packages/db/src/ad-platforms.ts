@@ -942,3 +942,90 @@ export async function getAdConversionLogs(
     .all<AdConversionLog>();
   return result.results;
 }
+
+export interface AdEventMapping {
+  conversion_point_id: string;
+  event_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * F-21 対応表の読み。地点ごとの広告イベント名。対応が無いとき null。
+ */
+export async function getAdEventMapping(
+  db: D1Database,
+  conversionPointId: string,
+): Promise<AdEventMapping | null> {
+  return db
+    .prepare(`SELECT * FROM ad_event_mappings WHERE conversion_point_id = ?`)
+    .bind(conversionPointId)
+    .first<AdEventMapping>();
+}
+
+/**
+ * F-21 対応表の保存。広告イベント名は前後の空白を除いて1〜100文字。
+ * 形式が違うときは文言を投げる（呼び出し側が400にする）。
+ */
+export async function upsertAdEventMapping(
+  db: D1Database,
+  conversionPointId: string,
+  eventName: string,
+): Promise<AdEventMapping> {
+  const name = eventName.trim();
+  if (name.length < 1 || name.length > 100) {
+    throw new Error('ad_event_mapping_name_invalid');
+  }
+  const now = jstNow();
+  await db
+    .prepare(
+      `INSERT INTO ad_event_mappings (conversion_point_id, event_name, created_at, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT (conversion_point_id) DO UPDATE SET event_name = excluded.event_name, updated_at = excluded.updated_at`,
+    )
+    .bind(conversionPointId, name, now, now)
+    .run();
+  const row = await getAdEventMapping(db, conversionPointId);
+  if (!row) {
+    throw new Error('ad_event_mapping_save_failed');
+  }
+  return row;
+}
+
+/** F-22 やり直しの期限（日）。元の成果からこの日数を過ぎたら拒む。 */
+export const AD_CONVERSION_RETRY_EXPIRES_DAYS = 90;
+
+/**
+ * F-22 広告への送信のやり直し。失敗した待ち行だけを送り直しの列に戻す。
+ * 行の冪等キーは変えないので、媒体側で二重に数えない。
+ * 失敗でない行・90日を過ぎた行は理由を返す（呼び出し側が422にする）。
+ */
+export async function retryAdConversionOutbox(
+  db: D1Database,
+  id: string,
+  now: Date = new Date(),
+): Promise<{ ok: true } | { ok: false; reason: 'not_found' | 'not_failed' | 'expired' }> {
+  const row = await db
+    .prepare(`SELECT id, status, created_at FROM ad_conversion_outbox WHERE id = ?`)
+    .bind(id)
+    .first<{ id: string; status: string; created_at: string }>();
+  if (!row) {
+    return { ok: false, reason: 'not_found' };
+  }
+  if (row.status !== 'failed') {
+    return { ok: false, reason: 'not_failed' };
+  }
+  const created = new Date(row.created_at).getTime();
+  if (Number.isNaN(created) || now.getTime() - created > AD_CONVERSION_RETRY_EXPIRES_DAYS * 86_400_000) {
+    return { ok: false, reason: 'expired' };
+  }
+  await db
+    .prepare(
+      `UPDATE ad_conversion_outbox
+       SET status = 'pending', is_retryable = 1, next_attempt_at = ?, last_error = NULL, lease_token = NULL, updated_at = ?
+       WHERE id = ? AND status = 'failed'`,
+    )
+    .bind(jstNow(), jstNow(), id)
+    .run();
+  return { ok: true };
+}
