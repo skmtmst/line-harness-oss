@@ -7,6 +7,7 @@ shared-button-importer app/accounts/new/page.tsx
 shared-button-importer app/accounts/page.tsx
 shared-button-importer app/accounts/uid-migration-v8.tsx
 shared-button-importer app/affiliates/action-dialogs.tsx
+shared-button-importer app/affiliates/bulk-op-wizard.tsx
 shared-button-importer app/affiliates/new/page.tsx
 shared-button-importer app/affiliates/payment-tab.tsx
 shared-button-importer app/affiliates/tabs.tsx
@@ -116,6 +117,7 @@ shared-button-importer app/friends/page.tsx
 shared-button-importer app/getting-started/feature-set-card.tsx
 shared-button-importer app/health/page.tsx
 shared-button-importer app/hq/account-browser-v8.tsx
+shared-button-importer app/hq/account-settings-dialogs.tsx
 shared-button-importer app/hq/banners/project/page.tsx
 shared-button-importer app/hq/billing/page.tsx
 shared-button-importer app/hq/members/page.tsx
