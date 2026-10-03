@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Activity,
+  Download,
   Info,
   MoreHorizontal,
   Plus,
@@ -49,6 +50,7 @@ import {
   type FriendScoreDetail,
 } from '@/lib/api'
 import { actionScoreReasonLabel, formatMileageDate, formatMileageNumber } from './mileage-display'
+import { csvCell } from '@/lib/presentation'
 import { actionScoreAdjustmentErrorMessage } from './action-score-adjustment-dialog'
 import styles from './mileage-v8.module.css'
 
@@ -181,6 +183,28 @@ export default function V8ScoreTab({
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
   }, [accountId, filter, page, pageSize, search, sort])
+
+  // v7 と同じ6列（友だち・いまの点数・帯・30日間の変化・最後に点数が変わった理由・最終変動）。
+  const exportCurrentPage = () => {
+    if (!overview?.items.length) return
+    const rows = overview.items.map((item) => [
+      item.displayName,
+      item.currentScore ?? '',
+      BAND_LABELS[item.band],
+      item.change30d ?? '',
+      actionScoreReasonLabel(item.lastReason),
+      formatMileageDate(item.lastChangedAt),
+    ])
+    const csv = [['友だち', 'いまの点数', '帯', '30日間の変化', '最後に点数が変わった理由', '最終変動'], ...rows]
+      .map((row) => row.map((value) => csvCell(value)).join(','))
+      .join('\n')
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `action-scores-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   const loadRules = useCallback(async () => {
     const accountAtRequest = accountId
@@ -467,6 +491,9 @@ export default function V8ScoreTab({
           </FilterChip>
         ))}
         <span className={styles.toolbarRight}>
+          <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
+            <Download size={14} aria-hidden="true" /> この頁の行動スコアをCSVで書き出す
+          </Button>
           <Button href={broadcastHref}>
             <Send size={14} aria-hidden="true" /> この帯の人に送る
           </Button>
