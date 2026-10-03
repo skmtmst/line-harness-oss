@@ -8,6 +8,8 @@ import {
   updateAdPlatformCAS,
   deleteAdPlatformCAS,
   getAdConversionLogs,
+  getAdConversionOutboxById,
+  retryAdConversionOutbox,
   markAdPlatformVerified,
   resolveAdPlatformConfig,
   splitAdPlatformSecrets,
@@ -526,6 +528,40 @@ adPlatforms.get('/api/ad-platforms/:id/logs', requireRole('owner', 'admin', 'sta
     });
   } catch (err) {
     console.error('GET /api/ad-platforms/:id/logs error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/ad-platforms/outbox/:id/retry - F-22 失敗した広告送信のやり直し
+// 行の冪等キーは変えないので、媒体側で二重に数えない。失敗でない行と、
+// 元の成果から90日を過ぎた行は拒む。
+adPlatforms.post('/api/ad-platforms/outbox/:id/retry', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const row = await getAdConversionOutboxById(c.env.DB, id);
+    if (!row) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const platform = await getAdPlatformById(c.env.DB, row.ad_platform_id);
+    if (!platform) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [platform.line_account_id])) {
+      return c.json({ success: false, error: 'この送信をやり直す権限がありません' }, 403);
+    }
+    const result = await retryAdConversionOutbox(c.env.DB, id);
+    if (!result.ok && result.reason === 'not_failed') {
+      return c.json({ success: false, error: '失敗した送信だけやり直せます' }, 422);
+    }
+    if (!result.ok && result.reason === 'expired') {
+      return c.json({ success: false, error: '成果から90日を過ぎたためやり直せません' }, 422);
+    }
+    if (!result.ok) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    return c.json({ success: true, data: { id, status: 'pending' } });
+  } catch (err) {
+    console.error('POST /api/ad-platforms/outbox/:id/retry error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
