@@ -15,6 +15,7 @@ import {
   getVisibleLineAccountScope,
 } from '../services/account-access.js';
 import { sendRestaurantLineConfirmation, type RestaurantLineNotice } from '../services/restaurant-line-confirmation.js';
+import { getStoreAutoRules, saveStoreAutoRules, validateStoreAutoRules } from '../services/restaurant-auto-rules.js';
 import { dbFor } from '../services/db-router.js';
 import {
   issueRestaurantIntakeAddress,
@@ -1010,6 +1011,36 @@ restaurantTest.post('/api/restaurant-test/inbound-emails/:id/manual-import', req
   } finally {
     await releaseLock(db, key, owner);
   }
+});
+
+/**
+ * F-24 店ごとの自動で合わせるルール（読む・保存する）。無ければ既定で返す。
+ * 保存は owner・admin のみ。
+ */
+restaurantTest.get('/api/restaurant-test/stores/:storeId/auto-rules', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const storeId = c.req.param('storeId');
+  if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) {
+    return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  }
+  c.header('Cache-Control', 'no-store');
+  return c.json({ success: true, data: await getStoreAutoRules(dbFor(c.env, storeId), storeId) });
+});
+
+restaurantTest.put('/api/restaurant-test/stores/:storeId/auto-rules', requireRole('owner', 'admin'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const storeId = c.req.param('storeId');
+  if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) {
+    return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  }
+  const checked = validateStoreAutoRules(await c.req.json().catch(() => null));
+  if (!checked.ok) return c.json({ success: false, error: checked.error }, 400);
+  await saveStoreAutoRules(dbFor(c.env, storeId), storeId, checked.value);
+  return c.json({ success: true, data: checked.value });
 });
 
 restaurantTest.patch('/api/restaurant-test/approvals/:id', requireRole('owner', 'admin'), async (c) => {
