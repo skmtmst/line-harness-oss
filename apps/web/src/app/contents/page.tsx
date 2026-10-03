@@ -9,6 +9,7 @@ import type {
 } from '@line-crm/shared'
 import { LayoutGrid, List as ListIcon } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
+import { useRowLeaving } from '@/lib/use-row-leaving'
 import FeatureGate from '@/components/feature-gate'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -257,6 +258,7 @@ function MediaLibraryInner() {
   const [deleteError, setDeleteError] = useState('')
   /** まとめて削除の確認。ブラウザ標準の確認では戻せないことが伝わらない。 */
   const [bulkConfirm, setBulkConfirm] = useState<string[] | null>(null)
+  const { isLeaving, leaveMany } = useRowLeaving()
   const [bulkBusy, setBulkBusy] = useState(false)
   /** まとめて削除の進み具合。件数が多いときに止まっているように見せない。 */
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
@@ -605,10 +607,12 @@ function MediaLibraryInner() {
     setError('')
     let deleted = 0
     const failedNames: string[] = []
+    const goneIds: string[] = []
     for (const id of ids) {
       const name = items.find((m) => m.id === id)?.filename ?? id
       try {
         await api.media.delete(id, accountAtRequest)
+        goneIds.push(id)
       } catch {
         /*
           409（読み直したら使われ始めていた）も通信失敗も、ここでは
@@ -632,13 +636,15 @@ function MediaLibraryInner() {
       setBulkProgress({ done: deleted + failedNames.length, total: ids.length })
     }
     const result = summarizeBulkDeleteResult(deleted, failedNames)
-    setSelected(new Set())
     setBulkConfirm(null)
     setBulkBusy(false)
     setBulkProgress(null)
     if (result.tone === 'success') notifyToast(result.message)
     else setError(result.message)
-    void load()
+    leaveMany(goneIds, () => {
+      setSelected(new Set())
+      void load()
+    })
   }
 
   /**
@@ -1220,7 +1226,8 @@ function MediaLibraryInner() {
           {current.map((item) => (
             <div
               key={item.id}
-              className={`bg-canvas rounded-card border-hairline overflow-hidden border ${
+              data-leaving={isLeaving(item.id) || undefined}
+              className={`bg-canvas rounded-card border-hairline overflow-hidden border motion-safe:transition-opacity motion-safe:duration-[var(--motion-exit)] motion-safe:ease-[var(--motion-ease-out)] data-[leaving=true]:opacity-0 ${
                 view === 'grid' ? 'flex flex-col' : 'flex flex-row items-center gap-3'
               }`}
             >
