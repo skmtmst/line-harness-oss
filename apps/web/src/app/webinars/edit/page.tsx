@@ -1,6 +1,7 @@
 'use client'
 
 import Disclosure from '@/components/shared/disclosure'
+import CtaV8 from './cta-v8'
 import VideoV8 from './video-v8'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import RetentionSection from './retention-section'
@@ -2675,11 +2676,7 @@ function EditWebinarInner() {
               publicUrl={publicUrl}
               canOpenPublicPage={canOpenPublicPage}
               publicPageReason={publicPageReason}
-              completionLabel={
-                participantRule
-                  ? `最大視聴位置が動画の90%（${fmtSec(participantRule.completionThresholdSeconds)}）以上`
-                  : null
-              }
+              completionLabel={editor.viewingCondition.label || null}
               onWebinarSaved={handleWebinarSaved}
               onDirtyChange={dirtyReporterFor('video')}
               registerSave={saveRegistrarFor('video')}
@@ -2692,7 +2689,15 @@ function EditWebinarInner() {
       ) : null}
       {visitedPanes.has('cta') ? (
         <div hidden={pane !== 'cta'}>
-          <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} registrations={registrations} onEditorChange={setEditor} onCtasReport={handleCtasReport} />
+          {/*
+            ★V8 切替（CTA・フォーム `Q0Jrk`）。v7 の見た目は
+            data-theme="v8" が付くまで 1画素も変えない。
+          */}
+          {adminTheme === 'v8' ? (
+            <CtaV8 webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} onEditorChange={setEditor} onCtasReport={handleCtasReport} />
+          ) : (
+            <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} registrations={registrations} onEditorChange={setEditor} onCtasReport={handleCtasReport} />
+          )}
         </div>
       ) : null}
       {visitedPanes.has('notifications') ? (

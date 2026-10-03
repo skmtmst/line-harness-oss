@@ -110,7 +110,7 @@ export default function VideoV8({
       onWebinarSaved(res.data)
       return true
     } catch (cause) {
-      setError(describeSaveFailure(cause, '配信枠を保存できませんでした。時間をおいてもう一度お試しください。'))
+      setError(describeSaveFailure(cause))
       return false
     } finally {
       setBusy(false)
@@ -130,7 +130,7 @@ export default function VideoV8({
   }
 
   const addRule = async () => {
-    const rule: WebinarScheduleRule =
+    const rule: WebinarScheduleRule | null =
       newKind === 'daily'
         ? { type: 'daily', time: newTime }
         : newKind === 'weekly'
@@ -175,7 +175,7 @@ export default function VideoV8({
       })
       onWebinarSaved(res.data)
     } catch (cause) {
-      setPeriodError(describeSaveFailure(cause, '公開期間を保存できませんでした。時間をおいてもう一度お試しください。'))
+      setPeriodError(describeSaveFailure(cause))
     } finally {
       setPeriodBusy(false)
     }
@@ -333,6 +333,7 @@ export default function VideoV8({
             <div className="border-hairline mt-3 space-y-3 rounded-control border p-3">
               <Select
                 label="枠の種類"
+                aria-label="枠の種類"
                 value={newKind}
                 onChange={(value) => setNewKind(value as 'daily' | 'weekly' | 'once')}
                 options={[
@@ -447,6 +448,7 @@ export default function VideoV8({
             <div>
               <Select
                 label="結果が取れないとき"
+                aria-label="結果が取れないとき"
                 value={policy}
                 disabled={policyBusy}
                 onChange={(value) => savePolicy(value as 'escalate' | 'retry_next_day')}
@@ -483,22 +485,25 @@ export default function VideoV8({
             {webinar.publicationEndsAt ? '期間内だけ見られます' : 'いつでも見られます'}・{formatMinutes(webinar.durationSeconds)}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              {...(publicUrl ? { href: publicUrl } : {})}
-              disabled={!canOpenPublicPage}
-              title={publicPageReason}
-            >
-              PCで見る
-            </Button>
-            <Button
-              variant="secondary"
-              {...(publicUrl ? { href: publicUrl } : {})}
-              disabled={!canOpenPublicPage}
-              title={publicPageReason}
-            >
-              スマホで見る
-            </Button>
+            {publicUrl && canOpenPublicPage ? (
+              <>
+                <Button variant="secondary" href={publicUrl} title={publicPageReason}>
+                  PCで見る
+                </Button>
+                <Button variant="secondary" href={publicUrl} title={publicPageReason}>
+                  スマホで見る
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="secondary" disabled title={publicPageReason}>
+                  PCで見る
+                </Button>
+                <Button variant="secondary" disabled title={publicPageReason}>
+                  スマホで見る
+                </Button>
+              </>
+            )}
           </div>
           {!canOpenPublicPage && publicPageReason ? (
             <p className="text-ink-faint mt-2 text-xs">{publicPageReason}</p>
