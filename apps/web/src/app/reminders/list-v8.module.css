@@ -572,10 +572,6 @@
 
 /* ===== 板が 1100px を切ったら（画面幅で約 1352px 未満） ===== */
 @container (max-width: 1099px) {
-  .kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .split {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -591,6 +587,13 @@
 
   .folderSelectWrap {
     display: block;
+  }
+}
+
+/* 数の帯は 1152（板 ~870px）でも4列を保つ（`Iffil`）。760px を切ったら2列に。 */
+@container (max-width: 759px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
