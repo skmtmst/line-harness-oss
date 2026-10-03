@@ -895,7 +895,7 @@ function mediaReferenceReplacePairs(
  * 置き換え文をD1のbind上限内に収める。
  *
  * 置き換え対が少ない通常時は表ごとに1文（従来どおり、行は1回だけ数える）。
- * 版数が多くて対が膨らんだときだけ列・対ごとに分け、LIKE条件で実際に
+ * 版数が多くて対が膨らんだときだけ列・対ごとに分け、含有判定(instr)で実際に
  * そのトークンを含む行だけを対象にする。
  */
 const USAGE_REPLACE_PAIR_CHUNK = 24;
@@ -927,7 +927,11 @@ function usageReplaceStatements(
     for (let index = 0; index < opts.pairs.length; index += USAGE_REPLACE_PAIR_CHUNK) {
       const chunk = opts.pairs.slice(index, index + USAGE_REPLACE_PAIR_CHUNK);
       const expression = chunk.reduce((expr) => `REPLACE(${expr}, ?, ?)`, column);
-      const guard = chunk.map(() => `${column} LIKE ?`).join(' OR ');
+      // LIKE '%...%' は使わない。R2キーのような長いトークンだとD1が
+      // 「LIKE or GLOB pattern too complex」で落ちる（上限50文字、実測85文字）。
+      // ワイルドカード不要の部分一致なので instr() にする。%・_ を
+      // 誤ってワイルドカード扱いしなくなる利点もある。
+      const guard = chunk.map(() => `instr(${column}, ?) > 0`).join(' OR ');
       statements.push(db.prepare(
         `UPDATE ${opts.table} SET ${column} = ${expression}
           WHERE ${opts.scopeSql} AND id IN (${opts.idSubquery}) AND (${guard})`,
@@ -935,7 +939,7 @@ function usageReplaceStatements(
         ...chunk.flatMap(([from, to]) => [from, to]),
         ...opts.scopeBinds,
         ...opts.idSubqueryBinds,
-        ...chunk.map(([from]) => `%${from}%`),
+        ...chunk.map(([from]) => from),
       ));
     }
   }
@@ -1481,12 +1485,14 @@ export async function retargetMediaUsageReference(
       if (value.includes(livePath)) pairs.push([livePath, `/images/${targetKey}`]);
     }
     if (pairs.length === 0) continue;
-    // D1 は1文100 bindまで。置換2＋LIKE1ずつに対象ID・所属を足すため、
+    // D1 は1文100 bindまで。置換2＋含有判定1ずつに対象ID・所属を足すため、
     // 24対ずつに分ける（最大74 bind）。
     for (let index = 0; index < pairs.length; index += USAGE_REPLACE_PAIR_CHUNK) {
       const chunk = pairs.slice(index, index + USAGE_REPLACE_PAIR_CHUNK);
       const expression = chunk.reduce((expr) => `REPLACE(${expr}, ?, ?)`, column);
-      const guard = chunk.map(() => `${column} LIKE ?`).join(' OR ');
+      // 上と同じ理由で LIKE '%...%' を使わない（長いR2キーでD1が
+      // 「pattern too complex」を返す）。
+      const guard = chunk.map(() => `instr(${column}, ?) > 0`).join(' OR ');
       statements.push(db.prepare(
         `UPDATE ${targetTable} SET ${column} = ${expression}
           WHERE id = ? AND ${scope.sql} AND (${guard})`,
@@ -1494,7 +1500,7 @@ export async function retargetMediaUsageReference(
         ...chunk.flatMap(([from, to]) => [from, to]),
         input.refId,
         ...scope.binds,
-        ...chunk.map(([from]) => `%${from}%`),
+        ...chunk.map(([from]) => from),
       ));
     }
   }
