@@ -679,6 +679,7 @@ export default function AdIntegration({
   const avgCostPerFriend = linkedFriendAdds > 0 ? Math.round(linkedJpyCost / linkedFriendAdds) : null
 
   return (
+    <div data-design-node="qSTVR">
     <div className="space-y-4" data-design-node="v0HaI">
       <Notice tone="info">
         広告の管理画面では「クリック数」までしか分かりません。ここでは、かかった費用と友だち追加がつながって見えます。
@@ -938,6 +939,7 @@ export default function AdIntegration({
           </div>
         ) : null}
       </Dialog>
+    </div>
     </div>
   )
 }
