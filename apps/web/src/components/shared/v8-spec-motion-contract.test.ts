@@ -30,6 +30,23 @@ describe('V8 仕上げ3回目の動き', () => {
     expect(button).toMatch(/busyLabel = '保存中…'/)
   })
 
+  it('⑤ …・プルダウンの開きは200msで統一（色・暦ポップは120msのまま）', () => {
+    for (const file of ['./action-menu.module.css', './select.module.css']) {
+      const css = readFileSync(new URL(file, import.meta.url), 'utf8')
+      expect(css).toContain('var(--motion-base) var(--motion-ease-out)')
+    }
+    // 選ぶ箱は名前＋長さの分離指定（combobox-v8-in・motion-base）。
+    const combo = readFileSync(new URL('./combobox.module.css', import.meta.url), 'utf8')
+    expect(combo).toMatch(/animation-duration:\s*var\(--motion-base\)/s)
+    const multi = readFileSync(new URL('./multi-select.module.css', import.meta.url), 'utf8')
+    expect(multi).toMatch(/\[data-theme='v8'\] \.popup \{[^}]*animation-duration:\s*var\(--motion-base\)/s)
+    // 色を選ぶポップ・暦は正本（MOTION.md）どおり 120ms のまま変えない。
+    const color = readFileSync(new URL('./color-well.module.css', import.meta.url), 'utf8')
+    expect(color).toMatch(/animation:\s*color-well-pop var\(--motion-fast\)/)
+    const date = readFileSync(new URL('./date-field.module.css', import.meta.url), 'utf8')
+    expect(date).toMatch(/animation:\s*date-field-in var\(--motion-fast\)/)
+  })
+
   it('④ 消える行は150msで薄くなる（leaving 受け口あり・渡さなければ不変）', () => {
     const css = read('./data-table.module.css')
     expect(css).toMatch(/\[data-theme='v8'\] \.row\[data-leaving='true'\] \{[^}]*opacity:\s*0/s)
