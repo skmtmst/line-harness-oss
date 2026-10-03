@@ -23,6 +23,8 @@ import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
 import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/components/friend-fields/mark-list'
 import { STATE_TEXT } from '@/components/shared/not-connected'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
 
 type MarkRow = SupportMarkListItem
@@ -326,18 +328,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
           </p>
         ) : null}
 
-        {status === 'loading' ? (
-          <div className={styles.skeletonRows} role="status">
-            <span className="sr-only">読み込んでいます</span>
-            {[0, 1, 2, 3].map((row) => (
-              <div key={row} className={styles.skeletonRow}>
-                <span className={styles.skeletonDot} />
-                <span className={styles.skeletonBar} />
-                <span className={styles.skeletonBar} style={{ maxWidth: 120 }} />
-              </div>
-            ))}
-          </div>
-        ) : status === 'forbidden' ? (
+        {status === 'forbidden' ? (
           <div className={styles.stateCard}>
             <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
               <AlertCircle size={20} aria-hidden="true" />
@@ -371,7 +362,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
             ) : null}
           </div>
         ) : (
-          <>
+          <DelayedSkeleton loading={status === 'loading'} skeleton={<TagRowsSkeleton rows={4} narrow={[120]} />}>
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
@@ -501,7 +492,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
               <h2 className={styles.safetyNoteTitle}>受信時自動変更・保管・初期値の安全確認</h2>
               <p className={styles.safetyNoteBody}>「受信時に変更」の設定は追加・編集画面で確認できます。保管時は影響人数と置き換え先を表示し、初期値は保管できません。</p>
             </section>
-          </>
+          </DelayedSkeleton>
         )}
       </div>
 

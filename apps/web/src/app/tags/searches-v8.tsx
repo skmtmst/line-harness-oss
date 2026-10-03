@@ -31,6 +31,8 @@ import {
   type SavedSearchUsageFilter,
 } from '@/components/friend-fields/saved-search-kpis'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
 
 export default function SearchesTabV8({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
@@ -290,18 +292,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
           </p>
         ) : null}
 
-        {loading ? (
-          <div className={styles.skeletonRows} role="status">
-            <span className="sr-only">読み込んでいます</span>
-            {[0, 1, 2, 3].map((row) => (
-              <div key={row} className={styles.skeletonRow}>
-                <span className={styles.skeletonDot} />
-                <span className={styles.skeletonBar} />
-                <span className={styles.skeletonBar} style={{ maxWidth: 160 }} />
-              </div>
-            ))}
-          </div>
-        ) : !accountId ? null
+        {!accountId ? null
         : forbidden ? (
           <div className={styles.stateCard}>
             <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
@@ -337,7 +328,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
             ) : null}
           </div>
         ) : (
-          <>
+          <DelayedSkeleton loading={loading} skeleton={<TagRowsSkeleton rows={4} narrow={[160]} />}>
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
@@ -484,7 +475,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                 />
               </div>
             </div>
-          </>
+          </DelayedSkeleton>
         )}
       </div>
 

@@ -27,6 +27,8 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { TagRowsSkeleton } from './tag-rows-skeleton'
 import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
 import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
 import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state'
@@ -582,19 +584,7 @@ export default function TagsTabV8({
             </p>
           ) : null}
 
-          {status === 'loading' || staleAccount ? (
-            <div className={styles.skeletonRows} role="status">
-              <span className="sr-only">読み込んでいます</span>
-              {[0, 1, 2, 3, 4].map((row) => (
-                <div key={row} className={styles.skeletonRow}>
-                  <span className={styles.skeletonDot} />
-                  <span className={styles.skeletonBar} />
-                  <span className={styles.skeletonBar} style={{ maxWidth: 120 }} />
-                  <span className={styles.skeletonBar} style={{ maxWidth: 160 }} />
-                </div>
-              ))}
-            </div>
-          ) : status === 'forbidden' ? (
+          {status === 'forbidden' ? (
             <div className={styles.stateCard}>
               <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
                 <AlertCircle size={20} aria-hidden="true" />
@@ -630,7 +620,7 @@ export default function TagsTabV8({
               ) : null}
             </div>
           ) : (
-            <>
+            <DelayedSkeleton loading={status === 'loading' || staleAccount} skeleton={<TagRowsSkeleton rows={5} narrow={[120, 160]} />}>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
@@ -769,7 +759,7 @@ export default function TagsTabV8({
                   />
                 </div>
               </div>
-            </>
+            </DelayedSkeleton>
           )}
         </div>
       </div>
