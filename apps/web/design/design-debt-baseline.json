@@ -79,7 +79,7 @@
     "unresolved-classname": 55
   },
   "app/automations/page.tsx": {
-    "arbitrary-value": 1
+    "arbitrary-value": 2
   },
   "app/booking/bookings/detail/page.tsx": {
     "unresolved-classname": 1
@@ -157,7 +157,7 @@
     "unresolved-classname": 109
   },
   "app/contents/vars/list-v8.tsx": {
-    "unresolved-classname": 105,
+    "unresolved-classname": 108,
     "direct-th": 6
   },
   "app/contents/vars/new/new-v8.tsx": {
@@ -168,6 +168,9 @@
   },
   "app/conversions/new/page.tsx": {
     "unresolved-classname": 5
+  },
+  "app/conversions/page.tsx": {
+    "arbitrary-value": 7
   },
   "app/duplicates/duplicates-v8.tsx": {
     "unresolved-classname": 65,
@@ -296,7 +299,7 @@
     "unresolved-classname": 4
   },
   "app/inflow-links/page.tsx": {
-    "arbitrary-value": 14,
+    "arbitrary-value": 24,
     "direct-secondary-button": 1
   },
   "app/layout.tsx": {

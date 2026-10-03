@@ -18,9 +18,10 @@ describe("automations 一覧の板の数字", () => {
     expect(PAGE).not.toMatch(/text-ink-faint text-xs">動いているもの/);
   });
 
-  it("KPI数字は22px・粗600 (text-[22px] font-semibold)", () => {
-    expect(PAGE).toMatch(/text-\[22px\] font-semibold/);
+  it("KPI数字は22px・粗600 (text-metric トークン)", () => {
+    expect(PAGE).toMatch(/text-metric font-semibold/);
     expect(PAGE).not.toMatch(/text-2xl font-bold/);
+    expect(PAGE).not.toMatch(/text-\[22px\]/);
   });
 
   it("KPIカード内側は左右20・上下16 (px-5 py-4)", () => {

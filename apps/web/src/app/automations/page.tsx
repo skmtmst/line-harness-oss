@@ -632,7 +632,7 @@ export default function AutomationsPage() {
       <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border px-5 py-4">
           <p className="text-xs font-medium text-ink">動いているもの</p>
-          <p className="text-ink mt-1 text-[22px] font-semibold">
+          <p className="text-ink mt-1 text-metric font-semibold">
             {/* 監査6 #674: 数字の見せ方は MetricValue に寄せる */}
             <MetricValue value={activeCount} unit="本" />
           </p>
@@ -640,17 +640,17 @@ export default function AutomationsPage() {
         </div>
         <div className="bg-canvas rounded-card border-hairline border px-5 py-4">
           <p className="text-xs font-medium text-ink">今月の実行（この30日）</p>
-          <p className="text-ink mt-1 text-[22px] font-semibold"><MetricValue value={automaticRuns ?? null} unit="回" /></p>
+          <p className="text-ink mt-1 text-metric font-semibold"><MetricValue value={automaticRuns ?? null} unit="回" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">分析の「使われ方」と同じ集計</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border px-5 py-4">
           <p className="text-xs font-medium text-ink">失敗した</p>
-          <p className="text-ink mt-1 text-[22px] font-semibold"><MetricValue value={failedRuns ?? null} unit="回" /></p>
+          <p className="text-ink mt-1 text-metric font-semibold"><MetricValue value={failedRuns ?? null} unit="回" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">部分成功を含む・この30日</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border px-5 py-4">
           <p className="text-xs font-medium text-ink">減らせた手作業</p>
-          <p className="text-ink mt-1 text-[22px] font-semibold"><MetricValue value={estimatedHoursSaved} prefix="およそ" unit="時間" /></p>
+          <p className="text-ink mt-1 text-metric font-semibold"><MetricValue value={estimatedHoursSaved} prefix="およそ" unit="時間" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">1回30秒として計算しています</p>
         </div>
       </KpiCollapse>
