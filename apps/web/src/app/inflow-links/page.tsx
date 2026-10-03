@@ -1080,7 +1080,7 @@ function InflowLinksPageInner({
                     accountId={selectedAccountId}
                     orderStats={r.stats}
                   >
-                    <td className="py-3 pr-2 pl-5" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-5 py-[9px]" onClick={(e) => e.stopPropagation()}>
                       {r.entryRouteId ? (
                         <Checkbox
                           aria-label={`${r.name}をまとめて操作の対象にする`}
@@ -1099,7 +1099,7 @@ function InflowLinksPageInner({
                         <span className="sr-only">まとめて操作は登録済みの流入経路だけに使えます</span>
                       )}
                     </td>
-                    <td className="px-2 py-3 font-medium text-ink">
+                    <td className="px-5 py-[9px] font-medium text-ink">
                       {r.source === 'entry_route' && r.entryRouteId ? (
                         <Link
                           href={`/inflow-links/detail?id=${r.entryRouteId}`}
@@ -1134,7 +1134,7 @@ function InflowLinksPageInner({
                         {r.refCode}
                       </span>
                     </td>
-                    <td className="px-2 py-3 text-ink-secondary">
+                    <td className="px-5 py-[9px] text-ink-secondary">
                       {pool ? (
                         <span className="block truncate whitespace-nowrap" title={pool.name}>{pool.name}</span>
                       ) : r.source === 'tracked_link' ? (
@@ -1153,10 +1153,10 @@ function InflowLinksPageInner({
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-3 text-ink-secondary" title={sc?.name ?? undefined}>
+                    <td className="px-5 py-[9px] text-ink-secondary" title={sc?.name ?? undefined}>
                       <span className="block truncate whitespace-nowrap">{sc?.name ?? '—'}</span>
                     </td>
-                    <td className="px-2 py-3 text-ink-secondary">
+                    <td className="px-5 py-[9px] text-ink-secondary">
                       {tag ? (
                         <span
                           className="block truncate whitespace-nowrap rounded-pill px-2 py-0.5 text-center text-[11px] font-medium"
@@ -1172,7 +1172,7 @@ function InflowLinksPageInner({
                         <span className="text-ink-faint">—</span>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-3 text-ink-secondary">
+                    <td className="whitespace-nowrap px-5 py-[9px] text-ink-secondary">
                       {r.source === 'entry_route'
                         ? r.runAccountFriendAddScenarios
                           ? '並走'
@@ -1184,16 +1184,16 @@ function InflowLinksPageInner({
                             '並走'
                           : '—'}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-3 text-right font-semibold text-ink">
+                    <td className="whitespace-nowrap px-5 py-[9px] text-right font-semibold text-ink">
                       {summaryAvailable ? formatNumber((r.stats?.friendCount ?? 0)) : '—'}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-3 text-right text-ink-secondary">
+                    <td className="whitespace-nowrap px-5 py-[9px] text-right text-ink-secondary">
                       {summaryAvailable ? formatNumber((r.stats?.clickCount ?? 0)) : '—'}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-3 text-ink-faint">
+                    <td className="whitespace-nowrap px-5 py-[9px] text-ink-faint">
                       {summaryAvailable ? formatDate(r.stats?.latestAt ?? null) : '—'}
                     </td>
-                    <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-5 py-[9px]" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-2 whitespace-nowrap">
                         <button
                           onClick={() => onCopy(r.refCode, r.refCode)}
