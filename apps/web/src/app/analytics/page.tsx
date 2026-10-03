@@ -932,21 +932,21 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
             <table className="w-full table-fixed">
               <thead>
                 <tr className="bg-canvas-sunken border-hairline border-b">
-                  <Th className="px-4 py-3 text-xs whitespace-normal">
+                  <Th className="text-micro px-4 py-3 font-semibold whitespace-normal">
                     {rowLabel} ＼ {fieldName}
                   </Th>
                   {cols.map((col) => (
-                    <Th align="right" className="px-4 py-3 text-xs whitespace-normal" key={col.key}>
+                    <Th align="right" className="text-micro px-4 py-3 font-semibold whitespace-normal" key={col.key}>
                       {col.label}
                     </Th>
                   ))}
-                  <Th align="right" className="px-4 py-3 text-xs whitespace-normal">合計</Th>
+                  <Th align="right" className="text-micro px-4 py-3 font-semibold whitespace-normal">合計</Th>
                 </tr>
               </thead>
               <tbody className="divide-hairline divide-y">
                 {rows.map((row) => (
                   <tr key={row.key} className="hover:bg-canvas-sunken">
-                    <td className="text-ink px-4 py-3 text-sm font-medium">{row.label}</td>
+                    <td className="text-ink text-caption px-4 py-3 font-semibold">{row.label}</td>
                     {cols.map((col) => {
                       const n = lookup.get(`${row.key}\u0000${col.key}`) ?? 0
                       const active = picked?.rowKey === row.key && picked?.columnKey === col.key
@@ -969,7 +969,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
                               } : null)
                             }}
                             disabled={n === 0}
-                            className={`w-full px-4 py-3 text-right text-sm tabular-nums transition-colors ${
+                            className={`text-caption w-full px-4 py-3 text-right font-semibold tabular-nums transition-colors ${
                               n === 0 ? 'text-ink-faint' : 'text-ink-secondary hover:bg-accent-soft'
                             } ${active ? 'ring-accent ring-2 ring-inset' : ''}`}
                             style={
@@ -983,19 +983,19 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
                         </td>
                       )
                     })}
-                    <td className="text-ink px-4 py-3 text-right text-sm font-medium tabular-nums">
+                    <td className="text-ink text-caption px-4 py-3 text-right font-medium tabular-nums">
                       {formatNumber((rowTotals.get(row.key) ?? 0))}
                     </td>
                   </tr>
                 ))}
                 <tr className="bg-canvas-sunken">
-                  <td className="text-ink-secondary px-4 py-3 text-sm font-medium">合計</td>
+                  <td className="text-ink-secondary text-caption px-4 py-3 font-medium">合計</td>
                   {cols.map((col) => (
-                    <td key={col.key} className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                    <td key={col.key} className="text-ink-secondary text-caption px-4 py-3 text-right tabular-nums">
                       {formatNumber((colTotals.get(col.key) ?? 0))}
                     </td>
                   ))}
-                  <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
+                  <td className="text-ink text-caption px-4 py-3 text-right font-semibold tabular-nums">
                     {formatNumber(grandTotal)}
                   </td>
                 </tr>

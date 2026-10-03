@@ -56,4 +56,14 @@ describe('V6 機能20の画面比較で直した契約', () => {
     expect(PAGE).toContain('条件に合う保存済み分析はありません')
     expect(PAGE).toContain('一覧から分析を選んでください')
   })
+
+  it('板 u5CuB8: クロス表の字は見本どおり（列見出し11・行と数12・700禁止）', () => {
+    // 見本 lint/V8-B/u5CuB8.html：列見出し 11px/600、行札 12px/600、数 12px/700。
+    // 700は管理画面の決まりで使わないので600に寄せる。
+    expect(PAGE).toContain('className="text-micro px-4 py-3 font-semibold whitespace-normal"')
+    expect(PAGE).toContain('className="text-ink text-caption px-4 py-3 font-semibold"')
+    expect(PAGE).toContain('text-caption w-full px-4 py-3 text-right font-semibold tabular-nums')
+    expect(PAGE).not.toContain('className="px-4 py-3 text-xs whitespace-normal"')
+    expect(PAGE).not.toContain('className="text-ink px-4 py-3 text-sm font-medium">{row.label}')
+  })
 })
