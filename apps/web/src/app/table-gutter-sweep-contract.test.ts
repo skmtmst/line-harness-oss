@@ -65,9 +65,14 @@ describe('表の外側の余白の洗い出し', () => {
     expect(body).not.toContain('<Th className="w-52">メール</Th>')
   })
 
-  it('/ops/tenants（/ops の行き先）：操作列はボタン幅まで広げる', () => {
+  it('/ops/tenants（/ops の行き先）：操作列は中身の幅で固定する', () => {
     const body = code(read('app', 'ops', 'tenants', 'page.tsx'))
-    expect(body).toContain('<Th className="w-36" align="right">操作</Th>')
+    // v7 は w-36 のまま。V8 だけ中身の幅（8rem）へ寄せる（1152 の決まり）。
+    // 掛け金クラスを外すと V8 の上書きが効かなくなる。
+    expect(body).toMatch(/<Th className="w-36[^"]*" align="right">操作<\/Th>/)
+    expect(body).toContain('tenants-op-col')
+    const v8 = code(read('app', 'ops', 'readonly-v8.css'))
+    expect(v8).toMatch(/\[data-theme='v8'\] th\.tenants-op-col \{\s*width:\s*8rem;/)
   })
 
   it('/ops/dashboard：契約先で吸収し、使用率は右へ寄せる', () => {

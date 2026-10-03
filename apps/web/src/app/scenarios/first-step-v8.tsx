@@ -48,6 +48,7 @@ import Stepper from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import TargetMissing from '@/components/shared/target-missing'
 import StickyBar from '@/components/shared/sticky-bar'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -426,6 +427,7 @@ export default function ScenarioFirstStepV8() {
         return
       }
       scenarioReferenceData.invalidateScenario(id)
+      notifyToast('1通目を保存しました')
       goDetail()
     } catch (submitError) {
       /*

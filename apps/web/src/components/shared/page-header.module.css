@@ -56,4 +56,9 @@
   font-size: var(--text-label);
   font-weight: 400;
 }
+
+/* 余白は正規5段（4・8・12・16・24）から選ぶ。題と説明の間 5 は段に無いので V8 だけ 4 に寄せる。v7 は不変。 */
+[data-theme='v8'] .heading {
+  gap: 4px;
+}
 }

@@ -40,6 +40,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { RowActions } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ListRange from '@/components/ui/list-range'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import SortSelect from '@/components/ui/sort-select'
@@ -50,6 +51,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { runUndoable } from '@/lib/undoable'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { X } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
@@ -290,6 +292,54 @@ function WebinarArchiveConfirmV8({
         </Notice>
       ) : null}
     </ConfirmDialog>
+  )
+}
+
+/**
+ * A. 読み込み中の骨組み（V8だけ）。本物の表と同じ見出し・列幅・行の
+ * 高さで5行出し、入れ替わってもガタつかない。0.3秒以内に来たら出さない・
+ * 出したら最低0.4秒は `DelayedSkeleton` が面倒を見る。
+ */
+function WebinarListSkeleton() {
+  return (
+    <div className={styles.tableWrap} aria-busy="true">
+      <span className="sr-only">ウェビナーの一覧を読み込んでいます</span>
+      <DelayedSkeleton
+        loading
+        skeleton={
+          <table className={styles.table} aria-hidden="true" inert>
+            <thead>
+              <TableHeadRow>
+                <Th>ウェビナー名</Th>
+                <Th>状態</Th>
+                <Th align="right">申込</Th>
+                <Th>視聴</Th>
+                <Th>公開期間</Th>
+                <Th>操作</Th>
+              </TableHeadRow>
+            </thead>
+            <tbody>
+              {[0, 1, 2, 3, 4].map((index) => (
+                <tr key={index}>
+                  <td className={styles.nameCell}>
+                    <Skeleton className="block h-3.5 w-3/4" />
+                    <span className="mt-0.5 block"><Skeleton className="block h-2.5 w-1/2" /></span>
+                  </td>
+                  <td><Skeleton className="block h-5.5 w-16" /></td>
+                  <td className={styles.countCell}><Skeleton className="ml-auto block h-3.5 w-12" /></td>
+                  <td>
+                    <Skeleton className="block h-3 w-24" />
+                    <span className="mt-1 block"><Skeleton className="block h-3 w-20" /></span>
+                  </td>
+                  <td><Skeleton className="block h-3.5 w-40" /></td>
+                  <td className={styles.opsCell}><Skeleton className="block h-8 w-18" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        }
+      />
+    </div>
   )
 }
 
@@ -616,26 +666,38 @@ function WebinarListV8Inner() {
     }
   }
 
-  const moveFolder = async (index: number, direction: -1 | 1) => {
+  /*
+   * B. フォルダの並べ替えは押した瞬間に画面を変え、裏で保存する。
+   * 5秒は Toast の「元に戻す」で止められる（戻す口は同じ並べ替え）。
+   */
+  const moveFolder = (index: number, direction: -1 | 1) => {
     if (!selectedAccountId || folderBusy) return
     const otherIndex = index + direction
     const current = folders[index]
     const other = folders[otherIndex]
     if (!current || !other) return
-    setFolderBusy(true)
+    const before = folders
+    const swapped = [...folders]
+    swapped[index] = other
+    swapped[otherIndex] = current
+    setFolders(swapped)
     setFolderError('')
-    try {
-      await Promise.all([
-        webinarApi.updateFolder(selectedAccountId, current.id, { displayOrder: other.displayOrder }),
-        webinarApi.updateFolder(selectedAccountId, other.id, { displayOrder: current.displayOrder }),
-      ])
-      await refreshFolders()
-      await refreshGrandTotal()
-    } catch {
-      setFolderError('並び順を保存できませんでした。もう一度お試しください。')
-    } finally {
-      setFolderBusy(false)
-    }
+    runUndoable({
+      message: `フォルダ「${current.name}」の並び順を変えました`,
+      commit: async () => {
+        const results = await Promise.all([
+          webinarApi.updateFolder(selectedAccountId, current.id, { displayOrder: other.displayOrder }),
+          webinarApi.updateFolder(selectedAccountId, other.id, { displayOrder: current.displayOrder }),
+        ])
+        if (results.some((result) => !result.success)) return { success: false }
+      },
+      undo: () => setFolders(before),
+      onCommitted: () => {
+        void refreshFolders()
+        void refreshGrandTotal()
+      },
+      failureMessage: '並び順を保存できませんでした。もう一度お試しください。',
+    })
   }
 
   const removeFolder = async () => {
@@ -718,7 +780,7 @@ function WebinarListV8Inner() {
   ]
 
   const listBody = (() => {
-    if (accountLoading || loading) return <ListState kind="loading" />
+    if (accountLoading || loading) return <WebinarListSkeleton />
     if (!selectedAccountId) {
       return (
         <ListState
