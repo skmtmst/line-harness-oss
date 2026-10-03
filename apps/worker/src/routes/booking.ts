@@ -1090,7 +1090,8 @@ async function syncSelfBookingMeet(
   self: SelfBookingChange,
   bookingId: string,
   oldEventId: string | null,
-): Promise<'updated' | 'recreated' | 'not_linked' | 'failed'> {
+  expectedVersion: number,
+): Promise<'updated' | 'recreated' | 'not_linked' | 'failed' | 'superseded'> {
   try {
     if (!oldEventId) return 'not_linked';
     const consult = await c.env.DB
@@ -1101,17 +1102,34 @@ async function syncSelfBookingMeet(
       .bind(oldEventId)
       .first<{ external_event_id: string; friend_id: string; title: string; meet_url: string }>();
     if (!consult || consult.friend_id !== self.friendId) return 'not_linked';
+    // フェンス: 予約の所有・状態・版を書き込み直前に再確認する。
+    // 交差した取消・別変更が勝っていたら Meet を触らない。
     const booking = await c.env.DB
       .prepare(
-        `SELECT starts_at, ends_at, external_event_id
+        `SELECT status, friend_id, lock_version, starts_at, ends_at, external_event_id
            FROM bookings WHERE id = ? AND line_account_id = ?`,
       )
       .bind(bookingId, self.accountId)
-      .first<{ starts_at: string; ends_at: string; external_event_id: string | null }>();
-    if (!booking) return 'failed';
+      .first<{
+        status: BookingStatus;
+        friend_id: string | null;
+        lock_version: number;
+        starts_at: string;
+        ends_at: string;
+        external_event_id: string | null;
+      }>();
+    if (!booking || booking.friend_id !== self.friendId) return 'not_linked';
+    if (
+      (booking.status !== 'requested' && booking.status !== 'confirmed') ||
+      Number(booking.lock_version) !== expectedVersion
+    ) {
+      return 'superseded';
+    }
     const newEventId = booking.external_event_id ?? oldEventId;
     if (newEventId !== oldEventId) {
+      // 予定が作り直されたら古い相談は止める。古い Meet URL を新予定へ流用しない。
       await cancelMeetConsultation(c.env.DB, oldEventId, new Date(), { failOnSendInFlight: true });
+      return 'recreated';
     }
     await registerMeetConsultation(c.env.DB, {
       externalEventId: newEventId,
@@ -1121,7 +1139,7 @@ async function syncSelfBookingMeet(
       endsAt: booking.ends_at,
       meetUrl: consult.meet_url,
     });
-    return newEventId !== oldEventId ? 'recreated' : 'updated';
+    return 'updated';
   } catch {
     return 'failed';
   }
@@ -1160,10 +1178,14 @@ booking.post('/api/liff/booking/:id/reschedule', async (c) => {
     .prepare(`SELECT external_event_id FROM bookings WHERE id = ? AND line_account_id = ?`)
     .bind(bookingId, caller.accountId)
     .first<{ external_event_id: string | null }>();
-  const meetSync = await syncSelfBookingMeet(
-    c, self, bookingId, before?.external_event_id ?? after?.external_event_id ?? null,
-  );
   const out = await res.json<Record<string, unknown>>();
+  const meetSync = await syncSelfBookingMeet(
+    c,
+    self,
+    bookingId,
+    before?.external_event_id ?? after?.external_event_id ?? null,
+    Number(out.lock_version),
+  );
   return c.json({ ...out, meet_sync: meetSync });
 });
 
@@ -1285,7 +1307,7 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
     lineAccountId: accountId,
     remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), bookingId),
   });
-  const meetSync = await cancelSelfBookingMeet(c, self, row.external_event_id);
+  const meetSync = await cancelSelfBookingMeet(c, self, bookingId, row.external_event_id);
   await recordBookingAudit(c.env.DB, {
     bookingId,
     lineAccountId: accountId,
@@ -1333,7 +1355,7 @@ async function runSelfBookingCancelSideEffects(
     lineAccountId: self.accountId,
     remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), row.id),
   });
-  const meetSync = await cancelSelfBookingMeet(c, self, row.external_event_id);
+  const meetSync = await cancelSelfBookingMeet(c, self, row.id, row.external_event_id);
   return {
     calendar_sync: calResult === 'succeeded' ? 'synced' : calResult === 'retry_wait' ? 'failed' : 'not_applicable',
     meet_sync: meetSync,
@@ -1344,10 +1366,18 @@ async function runSelfBookingCancelSideEffects(
 async function cancelSelfBookingMeet(
   c: Context<Env>,
   self: SelfBookingChange,
+  bookingId: string,
   externalEventId: string | null,
-): Promise<'cancelled' | 'not_linked' | 'failed'> {
+): Promise<'cancelled' | 'not_linked' | 'failed' | 'superseded'> {
   try {
     if (!externalEventId) return 'not_linked';
+    // フェンス: 予約が取消確定・本人所有のままかを先に確かめる。
+    const booking = await c.env.DB
+      .prepare(`SELECT status, friend_id FROM bookings WHERE id = ? AND line_account_id = ?`)
+      .bind(bookingId, self.accountId)
+      .first<{ status: BookingStatus; friend_id: string | null }>();
+    if (!booking || booking.friend_id !== self.friendId) return 'not_linked';
+    if (booking.status !== 'cancelled' && booking.status !== 'expired') return 'superseded';
     const consult = await c.env.DB
       .prepare(`SELECT friend_id FROM meet_consultations WHERE external_event_id = ?`)
       .bind(externalEventId)

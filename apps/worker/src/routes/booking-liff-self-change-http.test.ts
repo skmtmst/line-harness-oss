@@ -5,8 +5,12 @@
  * - LINE idToken 検証は fetch stub（sub を切替可能）
  * - 空き枠計算 getAvailability だけ mock（他は本物）
  * - 送信 sendBookingNotification は mock（実送信0）
- * - Google 同期 runBookingGoogleSync は既定 real、失敗系だけ mock で retry_wait
+ * - Google 同期 runBookingGoogleSync は既定で skipped の mock。
+ *   実 runner 結合は別 test で real に戻し、provider（fetch の googleapis）だけを
+ *   有限失敗→成功させる
  * - 自動通知の許可 bookingAutomaticNotificationAllowed は mock で true
+ * - 管理者 fixture 用 app と本人リクエスト用 app を分ける。
+ *   本人 app には staff を設定しない（公開認証経路の証拠）
  *
  * 見ること: 本人/越境/期限/CAS/空き/再送冪等/Meet取消/通知（manual印なし）。
  * 待ち列は扱わない。
@@ -20,9 +24,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Env } from '../index.js';
 
+const notifierMocks = { sendBookingNotification: vi.fn() };
 vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
-  sendBookingNotification: vi.fn(async () => undefined),
+  ...notifierMocks,
 }));
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: vi.fn(async () => true),
@@ -34,11 +39,17 @@ vi.mock('../services/availability.js', async (importOriginal) => ({
   ...availabilityMocks,
 }));
 
+const calendarState: { real?: (...args: never[]) => Promise<unknown> } = {};
 const calendarSyncMocks = { runBookingGoogleSync: vi.fn() };
-vi.mock('../services/booking-calendar-sync.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-calendar-sync.js')>()),
-  ...calendarSyncMocks,
-}));
+vi.mock('../services/booking-calendar-sync.js', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('../services/booking-calendar-sync.js')>();
+  calendarState.real = orig.runBookingGoogleSync as unknown as typeof calendarState.real;
+  return {
+    ...orig,
+    runBookingGoogleSync: (...args: Parameters<typeof orig.runBookingGoogleSync>) =>
+      calendarSyncMocks.runBookingGoogleSync(...args),
+  };
+});
 
 const triggerState: { real?: (...args: never[]) => Promise<unknown> } = {};
 const triggerMocks = { cancelByTrigger: vi.fn() };
@@ -98,10 +109,67 @@ function asD1(sqlite: Database.Database): D1Database {
   return db as unknown as D1Database;
 }
 
+let waited: Array<Promise<unknown>> = [];
 const execCtx = {
-  waitUntil: () => undefined,
+  waitUntil: (promise: Promise<unknown>) => {
+    waited.push(Promise.resolve(promise));
+  },
   passThroughOnException: () => undefined,
 } as unknown as ExecutionContext;
+
+async function drainWaits() {
+  const pending = waited;
+  waited = [];
+  await Promise.all(pending);
+}
+
+/** 送信は mock 受信側で見る。fetch へ出た物はすべて記録する。 */
+let fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+let googleFailCreate = 0;
+
+function mockFetch() {
+  fetchCalls = [];
+  googleFailCreate = 0;
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    if (url.includes('api.line.me/oauth2/v2.1/verify')) {
+      return new Response(JSON.stringify({ sub: lineSub }), { status: 200 });
+    }
+    if (url.includes('www.googleapis.com/calendar/v3')) {
+      fetchCalls.push({ url, init });
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (method === 'DELETE') return new Response(null, { status: 204 });
+      if (method === 'POST' && url.endsWith('/events')) {
+        if (googleFailCreate > 0) {
+          googleFailCreate -= 1;
+          return new Response('provider error', { status: 500 });
+        }
+        const body = JSON.parse(String(init?.body ?? '{}')) as { id?: string };
+        return new Response(JSON.stringify({ id: body.id ?? 'evt-new' }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ items: [] }), { status: 200 });
+    }
+    fetchCalls.push({ url, init });
+    throw new Error(`想定外の外部呼び出し: ${url}`);
+  }));
+}
+
+function headerOf(init?: RequestInit, name?: string): string | null {
+  if (!init?.headers || !name) return null;
+  if (typeof (init.headers as Headers).get === 'function') {
+    return (init.headers as Headers).get(name);
+  }
+  const record = init.headers as Record<string, string>;
+  const key = Object.keys(record).find((k) => k.toLowerCase() === name.toLowerCase());
+  return key ? record[key] : null;
+}
+
+/** 自動送信の fetch に manual 印が無いこと。 */
+function expectNoManualHeader() {
+  for (const call of fetchCalls) {
+    expect(headerOf(call.init, 'X-Line-Harness-Source')).toBeNull();
+  }
+}
 
 const NY = 'America/New_York';
 /** 基準時 2026-10-20T12:00Z。menu-ok の期限1h・締切1h。 */
@@ -137,7 +205,8 @@ const DSOON = { iso: T_SOON, date: '2026-10-20', start: '19:00', end: '20:00' };
 describe('F6 本人日時変更・取消（mock局所）', () => {
   let sqlite: Database.Database;
   let db: D1Database;
-  let app: Hono<Env>;
+  let adminApp: Hono<Env>;
+  let selfApp: Hono<Env>;
   let env: { DB: D1Database };
 
   beforeEach(() => {
@@ -149,6 +218,8 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     triggerMocks.cancelByTrigger.mockImplementation((...args: unknown[]) =>
       (triggerState.real as (...a: unknown[]) => Promise<unknown>)(...args),
     );
+    notifierMocks.sendBookingNotification.mockResolvedValue(undefined);
+    calendarSyncMocks.runBookingGoogleSync.mockImplementation(async () => 'skipped');
 
     sqlite = new Database(':memory:');
     sqlite.pragma('foreign_keys = ON');
@@ -179,21 +250,21 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     `);
     db = asD1(sqlite);
 
-    app = new Hono<Env>();
-    app.use('*', async (c, next) => {
+    // 管理者 fixture 用は staff あり。本人リクエスト用は staff 無し。
+    // staff 無しで本人操作が通ることが、公開認証経路（authMiddleware が
+    // /api/liff/ を外す＋idToken 検証）の証拠になる。
+    adminApp = new Hono<Env>();
+    adminApp.use('*', async (c, next) => {
       c.set('staff', { id: 'staff-ny', name: '担当NY', role: 'owner', readOnly: false });
       return next();
     });
-    app.route('/', booking);
+    adminApp.route('/', booking);
+    selfApp = new Hono<Env>();
+    selfApp.route('/', booking);
     env = { DB: db };
 
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : input.toString();
-      if (url.includes('api.line.me/oauth2/v2.1/verify')) {
-        return new Response(JSON.stringify({ sub: lineSub }), { status: 200 });
-      }
-      throw new Error(`想定外の外部呼び出し: ${url}`);
-    }));
+    // LIFF の id_token 検証と Google provider だけ通す。ほかは落とす。
+    mockFetch();
   });
 
   afterEach(() => {
@@ -203,7 +274,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
   });
 
   async function adminCreate(menuId: string, startsAt: string, key: string): Promise<string> {
-    const res = await app.request(
+    const res = await adminApp.request(
       '/api/booking/admin/bookings?account_id=account-ny',
       {
         method: 'POST',
@@ -222,7 +293,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
   }
 
   function selfPost(path: string, body: unknown, liff = 'liff-ny-1') {
-    return app.request(
+    return selfApp.request(
       `${path}?liffId=${liff}`,
       {
         method: 'POST',
@@ -257,6 +328,12 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(notice).toBeDefined();
     expect(notice!.result_json).toContain('changed');
     expect(notice!.result_json).not.toContain('manual');
+    // waitUntil を回収し、実 mock 受信側で自動送信に manual 印が無いことを見る。
+    await drainWaits();
+    expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1);
+    const sent = notifierMocks.sendBookingNotification.mock.calls[0][0] as Record<string, unknown>;
+    expect(JSON.stringify(sent)).not.toContain('manual');
+    expectNoManualHeader();
   });
 
   test('別人の予約・別店舗の予約は404で見せない', async () => {
@@ -276,7 +353,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
   });
 
   test('idTokenが無ければ401', async () => {
-    const res = await app.request(
+    const res = await selfApp.request(
       '/api/liff/booking/xxx/reschedule?liffId=liff-ny-1',
       {
         method: 'POST',
@@ -352,15 +429,29 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(bookingRow(id).starts_at).toBe(T2);
   });
 
-  function linkMeet(bookingId: string) {
+  function linkCalendar() {
+    sqlite.prepare(
+      `INSERT INTO google_calendar_connections
+         (id, calendar_id, line_account_id, staff_id, access_token, auth_type, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+    ).run('conn-1', 'cal-1', 'account-ny', 'staff-ny', 'tok-test', 'oauth');
+  }
+
+  function useRealGoogleRunner() {
+    calendarSyncMocks.runBookingGoogleSync.mockImplementation((...args: never[]) =>
+      (calendarState.real as (...a: never[]) => Promise<unknown>)(...args),
+    );
+  }
+
+  function linkMeet(bookingId: string, eventId = 'evt-1') {
     sqlite.prepare('UPDATE bookings SET external_event_id = ? WHERE id = ?')
-      .run('evt-1', bookingId);
+      .run(eventId, bookingId);
     sqlite.prepare(
       `INSERT INTO meet_consultations
          (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed')`,
     ).run(
-      'consult-1', 'evt-1', 'friend-self', '個別相談',
+      'consult-1', eventId, 'friend-self', '個別相談',
       T1, '2026-11-02T16:00:00.000Z', 'https://meet.google.com/aaa-bbbb-ccc',
     );
     sqlite.prepare(
@@ -446,6 +537,14 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     ).get('consult-1') as { starts_at: string; status: string };
     expect(consult.starts_at).toBe(T2);
     expect(consult.status).toBe('confirmed');
+    // 前日・1時間前の予定が新日時に組み直される。
+    const reminders = sqlite.prepare(
+      'SELECT kind, scheduled_at, status FROM meet_consultation_reminders WHERE consultation_id = ? ORDER BY kind',
+    ).all('consult-1') as Array<{ kind: string; scheduled_at: string; status: string }>;
+    expect(reminders).toEqual([
+      { kind: 'day_before', scheduled_at: '2026-11-01T16:00:00.000Z', status: 'pending' },
+      { kind: 'hour_before', scheduled_at: '2026-11-02T15:00:00.000Z', status: 'pending' },
+    ]);
   });
 
   test('送信中の取消再送は409で、副作用は未実施のまま残る', async () => {
@@ -512,5 +611,126 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       starts_at: T2, lock_version: 0,
     });
     expect(res.status).toBe(409);
+  });
+
+  test('実runner結合: provider有限失敗→同日時再送で回復（台帳1行・重複0）', async () => {
+    useRealGoogleRunner();
+    linkCalendar();
+    mockSlots([D11, D12]);
+    const id = await adminCreate('menu-ok', T1, 'rs-real');
+    googleFailCreate = 1;
+    const first = await selfPost(`/api/liff/booking/${id}/reschedule`, {
+      starts_at: T2, lock_version: 0,
+    });
+    expect(first.status).toBe(200);
+    expect((await first.json<Record<string, unknown>>()).calendar_sync).toBe('failed');
+    expect(bookingRow(id).external_event_id).toBeNull();
+    const replay = await selfPost(`/api/liff/booking/${id}/reschedule`, {
+      starts_at: T2, lock_version: 1,
+    });
+    expect(replay.status).toBe(200);
+    const body = await replay.json<Record<string, unknown>>();
+    expect(body.changed).toBe(false);
+    expect(body.calendar_sync).toBe('synced');
+    const evt = bookingRow(id).external_event_id as string;
+    expect(evt).toMatch(/^lh/);
+    // 版ごとの冪等キーで台帳は2行（作成v0・変更v1）。v1行は成功で閉じる。
+    const calOps = sqlite.prepare(
+      "SELECT idempotency_key, status FROM booking_operation_runs WHERE booking_id = ? AND kind = 'google_calendar' ORDER BY created_at",
+    ).all(id) as Array<{ idempotency_key: string; status: string }>;
+    expect(calOps.length).toBe(2);
+    expect(new Set(calOps.map((op) => op.idempotency_key)).size).toBe(2);
+    expect(calOps[1].status).toBe('succeeded');
+    // 通知は初回だけ、予定の重複なし。
+    const notices = sqlite.prepare(
+      "SELECT COUNT(*) AS n FROM booking_operation_runs WHERE booking_id = ? AND kind = 'confirmation_line'",
+    ).get(id) as { n: number };
+    expect(notices.n).toBe(1);
+    const pending = sqlite.prepare(
+      "SELECT kind, scheduled_at FROM booking_reminders WHERE booking_id = ? AND status = 'pending' ORDER BY kind",
+    ).all(id) as Array<{ kind: string; scheduled_at: string }>;
+    expect(pending.length).toBe(2);
+    expect(new Set(pending.map((r) => `${r.kind}@${r.scheduled_at}`)).size).toBe(2);
+    await drainWaits();
+    expectNoManualHeader();
+  });
+
+  test('予定作り直しでは古いMeetを止め、古いURLを新予定へ流用しない', async () => {
+    useRealGoogleRunner();
+    linkCalendar();
+    mockSlots([D11, D12]);
+    const id = await adminCreate('menu-ok', T1, 'rs-recreate');
+    linkMeet(id, 'evt-old');
+    const res = await selfPost(`/api/liff/booking/${id}/reschedule`, {
+      starts_at: T2, lock_version: 0,
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json<Record<string, unknown>>()).meet_sync).toBe('recreated');
+    const newEvt = bookingRow(id).external_event_id as string;
+    expect(newEvt).not.toBe('evt-old');
+    const old = sqlite.prepare(
+      'SELECT status FROM meet_consultations WHERE external_event_id = ?',
+    ).get('evt-old') as { status: string };
+    expect(old.status).toBe('cancelled');
+    // 新予定IDの相談は作らない。古い URL の流用も無い。
+    const rows = sqlite.prepare('SELECT * FROM meet_consultations').all() as Array<Record<string, unknown>>;
+    expect(rows.length).toBe(1);
+    expect(rows[0].external_event_id).toBe('evt-old');
+  });
+
+  test('変更対取消の交差は片方だけ通り、敗者は副作用を残さない', async () => {
+    mockSlots([D11, D12]);
+    const id = await adminCreate('menu-ok', T1, 'race-1');
+    linkMeet(id);
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('race timeout')), 15000);
+    });
+    const [a, b] = await Promise.race([
+      Promise.all([
+        selfPost(`/api/liff/booking/${id}/reschedule`, { starts_at: T2, lock_version: 0 }),
+        selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 }),
+      ]),
+      timeout,
+    ]);
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    await drainWaits();
+    const row = bookingRow(id);
+    if (row.status === 'cancelled') {
+      expect(row.starts_at).toBe(T1);
+    } else {
+      expect(row.starts_at).toBe(T2);
+    }
+    // Meet 相談は増えない。通知も最大1件。
+    const consults = sqlite.prepare('SELECT COUNT(*) AS n FROM meet_consultations').get() as { n: number };
+    expect(consults.n).toBe(1);
+    const notices = sqlite.prepare(
+      "SELECT COUNT(*) AS n FROM booking_operation_runs WHERE booking_id = ? AND kind = 'confirmation_line'",
+    ).get(id) as { n: number };
+    expect(notices.n).toBeLessThanOrEqual(1);
+    expectNoManualHeader();
+  });
+
+  test('取消対取消再送の交差は確定を壊さず、カレンダー台帳は1行', async () => {
+    mockSlots([D11]);
+    const id = await adminCreate('menu-ok', T1, 'race-2');
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('race timeout')), 15000);
+    });
+    const [a, b] = await Promise.race([
+      Promise.all([
+        selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 }),
+        selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 }),
+      ]),
+      timeout,
+    ]);
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(200);
+    expect(bookingRow(id).status).toBe('cancelled');
+    // 削除の安定キーは1行に集約される（作成時sync鍵と削除鍵の2鍵・各1行）。
+    const calOps = sqlite.prepare(
+      'SELECT idempotency_key, COUNT(*) AS n FROM booking_operation_runs WHERE booking_id = ? AND kind = ? GROUP BY idempotency_key',
+    ).all(id, 'google_calendar') as Array<{ idempotency_key: string; n: number }>;
+    expect(calOps.length).toBe(2);
+    expect(calOps.every((op) => op.n === 1)).toBe(true);
   });
 });
