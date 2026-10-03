@@ -202,8 +202,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 の回答フォーム一覧（I3L41O）。一覧上の操作（受付を止める・複製・削除・フォルダ移動）は押した直後に確認窓か即時保存で確定し、作る操作は下書きを作って編集画面へ渡すため、この画面に残る下書きを持たない。複製窓の名前欄は閉じると戻るダイアログ内の入力',
   'app/booking/menus/page.tsx':
     '予約メニュー編集窓（Dialog）内の dirty。×・Esc・背景・キャンセルは窓内の破棄確認に集め、閉じると入力は戻る仕様で画面離脱ガードの対象外',
-  'app/booking/menus/edit-menu-dialog.tsx':
-    'app/booking/menus/page.tsx から切り出したメニュー編集窓。dirty は窓の中だけで、閉じると入力は戻る仕様で画面離脱ガードの対象外',
   'app/booking/staff/shifts/staff-detail-v8.tsx':
     '★V8 の勤務とシフト（d5fmnM・E3YDK・wvGke）。各段がそれぞれの「保存」「作る」「足す」でその場で確定し、画面に残る下書きを持たない。v7 の staff-detail.tsx と同じ構造（番兵は shifts/page.tsx 側の GUARDED 行が担保）',
   'components/inflow-links/site-script.tsx':
