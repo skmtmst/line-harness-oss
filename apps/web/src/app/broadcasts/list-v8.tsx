@@ -46,6 +46,7 @@ import Pagination from '@/components/shared/pagination'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
 import { notifyToast } from '@/components/shared/toast'
+import { useRowLeaving } from '@/components/shared/row-leaving'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import { formatDateTime, formatNumber, formatYmd } from '@/lib/format'
 import styles from './list-v8.module.css'
@@ -414,6 +415,8 @@ export default function BroadcastListV8() {
     }
   }
 
+  const { isLeaving, fadeOut } = useRowLeaving()
+
   const handleDelete = async () => {
     if (!deleteTarget || deleting) return
     const targetId = deleteTarget.id
@@ -423,7 +426,8 @@ export default function BroadcastListV8() {
       const res = await api.broadcasts.delete(targetId)
       if (!res.success) throw new Error(res.error)
       setDeleteTarget(null)
-      await load((page - 1) * pageSize)
+      // 消えた行は 150ms 薄くしてから読み直す（V8 の動き §8）。
+      await fadeOut([targetId], () => load((page - 1) * pageSize))
     } catch {
       setDeleteError('この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
@@ -928,6 +932,7 @@ export default function BroadcastListV8() {
                         <tr
                           key={broadcast.id}
                           className={styles.rowClick}
+                          data-leaving={isLeaving(broadcast.id) || undefined}
                           tabIndex={0}
                           onClick={() => router.push(detailHref)}
                           onKeyDown={(event) => {
