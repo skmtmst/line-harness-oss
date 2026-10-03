@@ -15,7 +15,7 @@
       "lcpMs": 660,
       "pressMs": 69,
       "longTaskMs": 51,
-      "jsBytes": 4403725
+      "jsBytes": 4413935
     },
     "inbox": {
       "route": "/chats",
@@ -23,7 +23,7 @@
       "lcpMs": 324,
       "pressMs": 67,
       "longTaskMs": 0,
-      "jsBytes": 3546855
+      "jsBytes": 3555021
     },
     "friends": {
       "route": "/friends",
@@ -31,7 +31,7 @@
       "lcpMs": 368,
       "pressMs": 67,
       "longTaskMs": 51,
-      "jsBytes": 3672266
+      "jsBytes": 3680432
     },
     "broadcasts": {
       "route": "/broadcasts",
@@ -39,7 +39,7 @@
       "lcpMs": 388,
       "pressMs": 187,
       "longTaskMs": 68,
-      "jsBytes": 3657189
+      "jsBytes": 3665355
     },
     "broadcast-new": {
       "route": "/broadcasts/new",
@@ -47,7 +47,7 @@
       "lcpMs": 440,
       "pressMs": null,
       "longTaskMs": 58,
-      "jsBytes": 3560040
+      "jsBytes": 3568201
     },
     "templates": {
       "route": "/templates",
@@ -55,7 +55,7 @@
       "lcpMs": 364,
       "pressMs": 66,
       "longTaskMs": 52,
-      "jsBytes": 3616118
+      "jsBytes": 3624284
     },
     "booking": {
       "route": "/booking/bookings",
@@ -63,7 +63,7 @@
       "lcpMs": 388,
       "pressMs": 66,
       "longTaskMs": 0,
-      "jsBytes": 3601168
+      "jsBytes": 3609329
     },
     "answers": {
       "route": "/form-submissions",
@@ -71,7 +71,7 @@
       "lcpMs": 348,
       "pressMs": 84,
       "longTaskMs": 51,
-      "jsBytes": 3700033
+      "jsBytes": 3704874
     },
     "tags": {
       "route": "/tags",
@@ -79,7 +79,7 @@
       "lcpMs": 376,
       "pressMs": 67,
       "longTaskMs": 56,
-      "jsBytes": 3691989
+      "jsBytes": 3700223
     },
     "settings": {
       "route": "/settings",
@@ -87,7 +87,7 @@
       "lcpMs": 296,
       "pressMs": 106,
       "longTaskMs": 67,
-      "jsBytes": 4274111
+      "jsBytes": 4286392
     },
     "friends-2000": {
       "route": "/friends",
@@ -95,7 +95,7 @@
       "lcpMs": 380,
       "pressMs": null,
       "longTaskMs": 905,
-      "jsBytes": 3672266,
+      "jsBytes": 3680432,
       "rows": 2000
     }
   }
