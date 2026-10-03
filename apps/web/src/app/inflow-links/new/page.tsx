@@ -20,6 +20,8 @@ import CreatePage, {
 } from '@/components/shared/create-page'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import InflowCreateV8 from './inflow-create-v8'
 
 /** 流入元の情報と、友だち追加時の動きをまとめて設定する。 */
 
@@ -41,6 +43,16 @@ function suggestRef(name: string): string {
 }
 
 export default function NewInflowLinkPage() {
+  /*
+   * ★V8-B 流入リンクを作る（板 `KMaMk`、競合 `vWJEm`）。
+   * v8 のときだけ新しい見せ方。v7 の描画は下のまま残す。
+   */
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <InflowCreateV8 />
+  return <NewInflowLinkFormV7 />
+}
+
+function NewInflowLinkFormV7() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState('')

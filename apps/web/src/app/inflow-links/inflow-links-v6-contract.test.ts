@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+// 「まとめて操作」の窓は v7・V8 の両方で使う共用部品へ移した（中身は同じ）。
+const BULK = readFileSync(new URL('./_components/bulk-routes-dialog.tsx', import.meta.url), 'utf8')
 
 /**
  * V6 18-1-F `BMmxU`（空・読込・エラー）の契約。
@@ -124,10 +126,10 @@ describe('V6 流入経路一覧の契約', () => {
     // ★V7：選択は共通のチェックボックス（本物の checkbox を包んでいる）。
     expect(PAGE).toContain('<Checkbox')
     expect(PAGE).toContain('selectedRouteIds')
-    // 実行は既存の更新口へ、1件ずつ結果を分けて出す。
-    expect(PAGE).toContain('api.entryRoutes.update(route.id')
-    expect(PAGE).toContain('件に実行する')
-    expect(PAGE).toContain('は実行できませんでした')
+    // 実行は既存の更新口へ、1件ずつ結果を分けて出す（共用部品の中身）。
+    expect(BULK).toContain('api.entryRoutes.update(route.id')
+    expect(BULK).toContain('件に実行する')
+    expect(BULK).toContain('は実行できませんでした')
   })
 
   it('素のTailwind色を残さず、V6トークンで塗る', () => {
