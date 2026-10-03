@@ -9,6 +9,8 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import V8EarningRuleNew from './v8-earning-rule-new'
 import CreatePage, {
   AsideCard,
   ChoiceCard,
@@ -59,6 +61,12 @@ const DAILY_CAPS = [
 ]
 
 export default function NewMileageRulePage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <V8EarningRuleNew />
+  return <NewMileageRuleInner />
+}
+
+function NewMileageRuleInner() {
   usePageTitle('たまる決めごとをつくる')
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('予約してくれたら 300 マイル')

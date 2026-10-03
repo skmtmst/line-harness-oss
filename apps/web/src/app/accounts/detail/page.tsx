@@ -17,6 +17,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextArea } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
@@ -564,25 +565,26 @@ function AccountDetail() {
         destructive={stopTarget?.isActive}
         busy={busy}
         error={dialogError || undefined}
+        designNode={stopTarget?.isActive ? 'CFAyf' : undefined}
         onCancel={() => { if (!busy) { setStopTarget(null); setStopReason(''); setDialogError('') } }}
         onConfirm={() => void toggleActive()}
       >
-        {/* 理由は必須（X-1）。あとから「なぜ止めたか」を追うため。 */}
+        {/* 理由は必須（X-1）。あとから「なぜ止めたか」を追うため。板 `CFAyf` は1行入力。 */}
         <label className="mt-3 block">
           <span className="text-ink-secondary text-xs">
             {stopTarget?.isActive ? '止める理由' : '再開する理由'}（必須）
           </span>
-          <TextArea
-            className="mt-1"
-            rows={2}
-            maxLength={500}
-            placeholder={stopTarget?.isActive
-              ? '例: LINE側の表示がおかしいので、確認するまで止める'
-              : '例: 接続を直したので再開する'}
-            value={stopReason}
-            onChange={(e) => setStopReason(e.target.value)}
-            disabled={busy}
-          />
+          <span className="mt-1 block">
+            <TextField
+              maxLength={500}
+              placeholder={stopTarget?.isActive
+                ? '例: LINE側の表示がおかしいので、確認するまで止める'
+                : '例: 接続を直したので再開する'}
+              value={stopReason}
+              onChange={(e) => setStopReason(e.target.value)}
+              aria-label={stopTarget?.isActive ? '止める理由（必須）' : '再開する理由（必須）'}
+            />
+          </span>
         </label>
       </ConfirmDialog>
 
@@ -594,6 +596,7 @@ function AccountDetail() {
         destructive
         busy={busy}
         error={dialogError || undefined}
+        designNode="WOfBN"
         onCancel={() => { if (!busy) { setArchiveTarget(null); setArchiveReason(''); setDialogError('') } }}
         onConfirm={() => void runArchive()}
       >

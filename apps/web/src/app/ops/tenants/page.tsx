@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { Plus } from 'lucide-react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
 import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
 import '@/app/ops/readonly-v8.css'
@@ -10,14 +11,15 @@ import { formatDate, formatDateTime, planLabel, planStatusChip, tenantDetailHref
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
 import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
 
 /** 契約先アカウント（一覧）。★V6 37-3 `X9f5jy`。 */
 
@@ -57,6 +59,8 @@ export default function OpsTenantsPage() {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newRestaurant, setNewRestaurant] = useState(false)
+  const [createBusy, setCreateBusy] = useState(false)
+  const [createError, setCreateError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -108,11 +112,22 @@ export default function OpsTenantsPage() {
     window.location.assign('/hq')
   }
 
-  const create = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!newName.trim()) return
+  const closeCreate = () => {
+    if (createBusy) return
+    setCreating(false)
+    setNewName('')
+    setNewRestaurant(false)
+    setCreateError('')
+  }
+
+  const create = async () => {
+    if (createBusy) return
+    if (!newName.trim()) { setCreateError('統括名を入力してください'); return }
+    setCreateBusy(true)
+    setCreateError('')
     const res = await opsCall(api.ops.createTenant(newName.trim(), newRestaurant ? ['restaurant'] : []))
-    if (!res.success) { setError(res.error || '作成できませんでした'); return }
+    setCreateBusy(false)
+    if (!res.success) { setCreateError(res.error || '作成できませんでした'); return }
     setNewName('')
     setNewRestaurant(false)
     setCreating(false)
@@ -140,7 +155,7 @@ export default function OpsTenantsPage() {
         探す・絞り込むも一覧の操作なので同じ並びへ。
       */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="primary" onClick={() => setCreating((v) => !v)}>
+        <Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}>
           ＋ 契約先を作る
         </Button>
         <div className="w-full max-w-md">
@@ -161,29 +176,45 @@ export default function OpsTenantsPage() {
         </div>
       </div>
 
-      {creating ? (
-        <form onSubmit={(event) => void create(event)} className="flex flex-wrap items-center gap-2 rounded-card border border-hairline bg-canvas px-4 py-3">
-          <div className="flex-1">
+      <Dialog
+        open={creating}
+        title="契約先を作る"
+        confirmLabel="作る"
+        cancelLabel="キャンセル"
+        confirmIcon={<Plus size={16} aria-hidden="true" />}
+        busy={createBusy}
+        error={createError || undefined}
+        designNode="i0FTN"
+        onConfirm={() => void create()}
+        onCancel={closeCreate}
+      >
+        <div className="flex flex-col gap-4">
+          <label className="block">
+            <span className="mb-1.5 block text-caption font-medium text-ink">統括名（会社名）</span>
             <TextField
               value={newName}
               onChange={(event) => setNewName(event.target.value)}
-              placeholder="統括名（会社名）"
+              placeholder="株式会社 然"
               maxLength={100}
-              aria-label="統括名"
+              aria-label="統括名（会社名）"
             />
-          </div>
-          <label className="flex items-center gap-2 whitespace-nowrap">
-            <Toggle
-              checked={newRestaurant}
-              label={`飲食店機能を${newRestaurant ? 'オフ' : 'オン'}にする`}
-              onChange={setNewRestaurant}
-            />
-            <span className="text-caption text-ink-secondary">飲食店機能</span>
           </label>
-          <Button onClick={() => setCreating(false)}>キャンセル</Button>
-          <Button type="submit" variant="primary">作る</Button>
-        </form>
-      ) : null}
+          <label className="block">
+            <span className="mb-1.5 block text-caption font-medium text-ink">飲食店機能</span>
+            <Select
+              aria-label="飲食店機能"
+              value={newRestaurant ? 'use' : 'skip'}
+              onChange={(value) => setNewRestaurant(value === 'use')}
+              size="full"
+              options={[
+                { value: 'skip', label: '使わない' },
+                { value: 'use', label: '使う' },
+              ]}
+            />
+          </label>
+          <p className="text-caption text-ink-secondary">作ると、統括の最初の権限者へ招待を送れるようになります。プランは契約先の詳細で決めます。</p>
+        </div>
+      </Dialog>
 
       {/*
         ★V7：一覧の失敗は一覧の場所の1枚で出すので、ここでは操作の知らせだけ出す。
