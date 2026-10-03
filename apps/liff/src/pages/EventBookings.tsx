@@ -11,6 +11,7 @@ import Button from '../components/ui/Button.js';
 import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 import Icon from '../components/ui/Icon.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 
 /** 札の文字は設計どおり (参加・承認待ち…)。意味は今の状態名のまま変えない。 */
@@ -189,7 +190,7 @@ export default function EventBookings() {
   }
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node="y1bs9A">
+    <LiffLookScope className="min-h-screen bg-ground" designNode="y1bs9A">
       <LiffHeader title="自分のイベント" />
       <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-10">
         <h1 className="text-xl font-bold text-ink">自分のイベント</h1>
@@ -399,13 +400,13 @@ export default function EventBookings() {
                         }`}
                       >
                         <span
-                          className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-white' : 'text-ink'}`}
+                          className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}
                         >
                           {utcToJstMd(s.starts_at)} {utcToJstHm(s.starts_at)}〜
                           {utcToJstHm(s.ends_at)}
                         </span>
                         <span
-                          className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-white' : 'text-ink-secondary'}`}
+                          className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-(--liff-on-primary)' : 'text-ink-secondary'}`}
                         >
                           {current ? '今の時間' : full ? '満席' : '空きあり'}
                         </span>
@@ -418,6 +419,6 @@ export default function EventBookings() {
           </div>
         )}
       </ConfirmDialog>
-    </div>
+    </LiffLookScope>
   );
 }

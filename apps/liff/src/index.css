@@ -62,6 +62,13 @@
   --color-night-dim: #8a9098;
   /* 押せない枠の地。設計の満席の枠 (2-event.png の 14:00〜15:00) の灰色。 */
   --color-shell-gray: #ebedf1;
+  /* 空きの点の金 (残りわずか)。夜の型では金の #c9a96a に替える。 */
+  --color-liff-dot-few: #b26b00;
+}
+
+/* 主の色の上の字。店の色で上書きする (見やすさの計算で白か濃字か)。 */
+:root {
+  --liff-on-primary: #ffffff;
 }
 
 body {
@@ -150,4 +157,67 @@ body {
   .liff-step {
     animation: liff-feel-fade 120ms ease-out;
   }
+}
+
+/* ─── M2 LIFF の見た目の型 (V8.pen 修正案 L-2・L-3) ───
+ * 5つの型は包み (LiffLookScope) の div の data-liff-theme で切り替える。
+ * 型を選んでいない店 (⑤ LINE らしい) は data-liff-theme="line" で、
+ * 専用の上書きを持たない＝今の見た目のまま。
+ * 値は指示書どおり。④夜は深い紺 (黒は使わない)。
+ * 知らせ (注意書きの箱 --color-liff-note) はどの型でも白地のまま
+ * (オーナー)。動き (L-1・L-4) はどの型でも共通。 */
+
+/* 見出しの書体。型・店の設定で --liff-font-heading を渡す。 */
+[data-liff-theme] h1,
+[data-liff-theme] h2 {
+  font-family: var(--liff-font-heading, inherit);
+}
+
+/* ①ナチュラル (生成り・しっぽり明朝・深い緑 #123d2f)。 */
+[data-liff-theme="natural"] {
+  --color-canvas: #f7f2e4;
+  --color-ground: #efe8d3;
+  --color-liff-primary: #123d2f;
+  --color-liff-soft: #e7ecea;
+  --liff-on-primary: #ffffff;
+  --liff-font-heading: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+}
+
+/* ②モダン (白黒すっきり。主の色は墨＝--color-ink と同じ値)。 */
+[data-liff-theme="modern"] {
+  --color-liff-primary: #1d1d1f;
+  --color-liff-soft: #f1f3f5;
+  --liff-on-primary: #ffffff;
+}
+
+/* ③やさしい (暖かい白・Zen Maru Gothic・テラコッタ)。 */
+[data-liff-theme="gentle"] {
+  --color-canvas: #fdf9f3;
+  --color-ground: #f6efe3;
+  --color-liff-primary: #b25f42;
+  --color-liff-soft: #f7efec;
+  --liff-on-primary: #ffffff;
+  --liff-font-heading: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", sans-serif;
+}
+
+/* ④夜 (深い紺。黒は使わない)。 */
+[data-liff-theme="night"] {
+  --color-canvas: #0f1c33;
+  --color-ground: #0f1c33;
+  --color-liff-chip: #172a47;
+  --color-liff-off-bg: #172a47;
+  --color-liff-soft: #172a47;
+  --color-skeleton: #172a47;
+  --color-hairline: #27406a;
+  --color-liff-line: #27406a;
+  --color-liff-line-strong: #27406a;
+  --color-liff-divider: #27406a;
+  --color-ink: #f2f5fa;
+  --color-ink-secondary: #a9b8d0;
+  --color-ink-faint: #a9b8d0;
+  --color-liff-sub: #a9b8d0;
+  --color-liff-idle: #a9b8d0;
+  --color-liff-off-ink: #a9b8d0;
+  --color-liff-dot-few: #c9a96a;
+  --color-liff-wait-ink: #c9a96a;
 }
