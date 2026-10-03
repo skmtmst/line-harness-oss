@@ -248,11 +248,11 @@
   color: var(--color-canvas);
 }
 
-/* スマホの見本：角丸 38・黒い縁・LINE の青い地・白い吹き出し。 */
+/* スマホの見本：黒い縁・LINE の青い地・白い吹き出し。丸みはトークンで同心円（外側＝内側＋縁の10px）。 */
 .phone {
   overflow: hidden;
   border: 10px solid var(--color-ink);
-  border-radius: 38px;
+  border-radius: var(--radius-large);
   background: var(--color-ink);
 }
 
@@ -260,7 +260,7 @@
   display: flex;
   flex-direction: column;
   min-height: 420px;
-  border-radius: 28px;
+  border-radius: var(--radius-control);
   background: var(--color-canvas-sunken);
 }
 
@@ -327,7 +327,7 @@
 .phoneBubble {
   max-width: 75%;
   padding: 8px 12px;
-  border-radius: 0 12px 12px 12px;
+  border-radius: var(--radius-none) var(--radius-card, 12px) var(--radius-card, 12px) var(--radius-card, 12px);
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: 12px;

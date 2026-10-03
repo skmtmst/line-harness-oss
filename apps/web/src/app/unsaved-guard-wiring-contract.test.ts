@@ -32,10 +32,12 @@ const GUARDED = [
   'app/booking/staff/shifts/page.tsx',
   'app/contents/vars/edit/page.tsx',
   'app/contents/vars/new/page.tsx',
+  'app/conversions/new/conversion-create-v8.tsx',
   'app/conversions/new/page.tsx',
   'app/ec-commerce/connector-panel.tsx',
   'app/form-submissions/edit/page.tsx',
   'app/friend-add-settings/friend-add-rule-editor.tsx',
+  'app/inflow-links/new/inflow-create-v8.tsx',
   'app/inflow-links/new/page.tsx',
   'app/line-notifications/operator/new/page.tsx',
   'app/mileage/earning-rules/edit/page.tsx',
@@ -186,6 +188,12 @@ const EXEMPTIONS: Record<string, string> = {
     'サイトの追加・編集・停止理由の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
   'app/restaurant-test/v8/organization.tsx':
     '★V8 の組織・権限（bSp4h）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。行内のフォームは保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
+  'app/conversions/conversion-points-v8.tsx':
+    '★V8-B コンバージョンの一覧（r6dJFy）。探す欄・絞り込み・件数表示は一覧上の操作で下書きを持たない。止める小窓の理由欄は閉じると戻る小窓内の入力',
+  'app/inflow-links/ad-integration-v8.tsx':
+    '★V8-B 広告連携（qSTVR）。費用の手入力はダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
+  'components/inflow-links/site-script-v8.tsx':
+    '★V8-B サイトスクリプト（XjOte）。サイトの追加・編集の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
 }
 
 /*

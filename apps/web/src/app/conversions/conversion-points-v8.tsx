@@ -43,9 +43,10 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { RowActions } from '@/components/shared/row-actions'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import { inputClass } from '@/components/shared/create-page'
+import { inputClass } from '@/components/shared/form-controls'
 import styles from './conversion-points-v8.module.css'
 
 /** V8 の絞り込み。`all` を含む以外は v7 の `StatusFilter` と同じ。 */
@@ -434,14 +435,14 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr>
-                    <th scope="col">成果地点</th>
-                    <th scope="col">何が起きたら数えるか</th>
-                    <th scope="col" className={styles.numeric}>この30日</th>
-                    <th scope="col" className={styles.numeric}>金額</th>
-                    <th scope="col">使われている場所</th>
-                    <th scope="col">操作</th>
-                  </tr>
+                  <TableHeadRow>
+                    <Th>成果地点</Th>
+                    <Th>何が起きたら数えるか</Th>
+                    <Th align="right">この30日</Th>
+                    <Th align="right">金額</Th>
+                    <Th>使われている場所</Th>
+                    <Th>操作</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody>
                   {current.map((point) => (

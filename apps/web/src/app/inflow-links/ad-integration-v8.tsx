@@ -30,6 +30,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { RowActions } from '@/components/shared/row-actions'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import styles from './ad-integration-v8.module.css'
 
 const LOG_PAGE_SIZE = 20
@@ -847,21 +848,15 @@ export function AdMetricsV8() {
                   <col style={{ width: 130 }} />
                 </colgroup>
                 <thead>
-                  <tr>
-                    <th scope="col">流入元</th>
-                    <th scope="col">媒体</th>
-                    <th scope="col">計測リンク</th>
-                    <th scope="col" className={styles.numeric}>
-                      この30日の費用
-                    </th>
-                    <th scope="col" className={styles.numeric}>
-                      友だち追加
-                    </th>
-                    <th scope="col" className={styles.numeric}>
-                      1人あたり
-                    </th>
-                    <th scope="col">取り込み</th>
-                  </tr>
+                  <TableHeadRow>
+                    <Th>流入元</Th>
+                    <Th>媒体</Th>
+                    <Th>計測リンク</Th>
+                    <Th align="right">この30日の費用</Th>
+                    <Th align="right">友だち追加</Th>
+                    <Th align="right">1人あたり</Th>
+                    <Th>取り込み</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody>
                   {model.costRows.map((row) => {
@@ -1224,13 +1219,13 @@ export function AdHistoryV8() {
                   <col style={{ width: 150 }} />
                 </colgroup>
                 <thead>
-                  <tr>
-                    <th scope="col">いつ・何の成果</th>
-                    <th scope="col">媒体</th>
-                    <th scope="col">状態</th>
-                    <th scope="col">次の予定</th>
-                    <th scope="col">操作</th>
-                  </tr>
+                  <TableHeadRow>
+                    <Th>いつ・何の成果</Th>
+                    <Th>媒体</Th>
+                    <Th>状態</Th>
+                    <Th>次の予定</Th>
+                    <Th>操作</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody>
                   {model.logs.map((log) => {

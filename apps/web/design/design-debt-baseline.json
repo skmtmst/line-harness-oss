@@ -922,5 +922,29 @@
   },
   "app/reminders/wizard-v8-ui.tsx": {
     "unresolved-classname": 33
+  },
+  "app/conversions/conversion-points-v8.tsx": {
+    "unresolved-classname": 101
+  },
+  "app/conversions/new/conversion-create-v8.tsx": {
+    "unresolved-classname": 90
+  },
+  "app/inflow-links/_components/inflow-delete-dialog.tsx": {
+    "direct-secondary-button": 1
+  },
+  "app/inflow-links/ad-integration-v8.tsx": {
+    "unresolved-classname": 141
+  },
+  "app/inflow-links/detail/inflow-detail-v8.tsx": {
+    "unresolved-classname": 99
+  },
+  "app/inflow-links/inflow-list-v8.tsx": {
+    "unresolved-classname": 75
+  },
+  "app/inflow-links/new/inflow-create-v8.tsx": {
+    "unresolved-classname": 75
+  },
+  "components/inflow-links/site-script-v8.tsx": {
+    "unresolved-classname": 104
   }
 }

@@ -22,6 +22,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import { RowActions } from '@/components/shared/row-actions'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import styles from './site-script-v8.module.css'
 
@@ -338,14 +339,14 @@ export default function SiteScriptV8() {
                         <col style={{ width: 56 }} />
                       </colgroup>
                       <thead>
-                        <tr>
-                          <th scope="col">サイト</th>
-                          <th scope="col">ドメイン</th>
-                          <th scope="col">状態</th>
-                          <th scope="col">
+                        <TableHeadRow>
+                          <Th>サイト</Th>
+                          <Th>ドメイン</Th>
+                          <Th>状態</Th>
+                          <Th>
                             <span className="sr-only">操作</span>
-                          </th>
-                        </tr>
+                          </Th>
+                        </TableHeadRow>
                       </thead>
                       <tbody>
                         {sites.map((site) => {
@@ -457,7 +458,7 @@ export default function SiteScriptV8() {
               ) : (
                 <>
                   <p className={styles.cardNote}>
-                    計測コードを取得できませんでした。アカウントごとの鍵が無いと他の計測と混ざるため、以前の共通の鍵は表示しません。通信状態を確かめて、もう一度お試しください。
+                    計測コードを読み込めませんでした。アカウントごとの鍵が無いと他の計測と混ざるため、以前の共通の鍵は表示しません。通信状態を確かめて、もう一度お試しください。
                   </p>
                   <div className={styles.codeActions}>
                     <Button onClick={() => setKeyAttempt((n) => n + 1)}>
@@ -538,15 +539,11 @@ export default function SiteScriptV8() {
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
-                    <tr>
-                      <th scope="col">ページ</th>
-                      <th scope="col" className={styles.numeric}>
-                        この30日のページ表示
-                      </th>
-                      <th scope="col" className={styles.numeric}>
-                        友だち追加
-                      </th>
-                    </tr>
+                    <TableHeadRow>
+                      <Th>ページ</Th>
+                      <Th align="right">この30日のページ表示</Th>
+                      <Th align="right">友だち追加</Th>
+                    </TableHeadRow>
                   </thead>
                   <tbody>
                     {pages.slice(0, 4).map((page) => (

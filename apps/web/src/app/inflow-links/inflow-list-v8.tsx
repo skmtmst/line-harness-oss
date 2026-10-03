@@ -41,6 +41,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import { RowActions } from '@/components/shared/row-actions'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import { loadFailureCopy } from '@/components/shared/api-error-message'
 import BulkRoutesDialog from './_components/bulk-routes-dialog'
 import GenreModal from './_components/create-genre-modal'
@@ -384,7 +385,7 @@ export default function InflowListV8({ model }: { model: InflowListV8Model }) {
             )}
           </p>
           <p className={styles.kpiDetail}>
-            {model.summaryAvailable ? '累計' : model.loading ? '読み込んでいます' : '取得できません'}
+            {model.summaryAvailable ? '累計' : model.loading ? '読み込んでいます' : '読み込めませんでした'}
           </p>
         </li>
         <li className={styles.kpi}>
@@ -424,7 +425,7 @@ export default function InflowListV8({ model }: { model: InflowListV8Model }) {
               ? (connectedPlatforms.map((p) => p.displayName ?? p.name).join('・') || '—')
               : model.loading
                 ? '読み込んでいます'
-                : '取得できません'}
+                : '読み込めませんでした'}
           </p>
         </li>
       </ul>
@@ -621,8 +622,8 @@ export default function InflowListV8({ model }: { model: InflowListV8Model }) {
                     <col style={{ width: 168 }} />
                   </colgroup>
                   <thead>
-                    <tr>
-                      <th scope="col">
+                    <TableHeadRow>
+                      <Th>
                         <Checkbox
                           aria-label="表示中の登録済み経路をすべて選ぶ"
                           checked={model.allShownSelected}
@@ -640,22 +641,18 @@ export default function InflowListV8({ model }: { model: InflowListV8Model }) {
                           }
                           onCheckedChange={model.onSelectAll}
                         />
-                      </th>
-                      <th scope="col">流入元名</th>
-                      <th scope="col">追加先</th>
-                      <th scope="col">友だちになったら</th>
-                      <th scope="col" className={styles.numeric}>
-                        友だち追加
-                      </th>
-                      <th scope="col" className={styles.numeric}>
-                        クリック
-                      </th>
-                      <th scope="col">最新追加</th>
-                      <th scope="col">発行URL</th>
-                      <th scope="col">
+                      </Th>
+                      <Th>流入元名</Th>
+                      <Th>追加先</Th>
+                      <Th>友だちになったら</Th>
+                      <Th align="right">友だち追加</Th>
+                      <Th align="right">クリック</Th>
+                      <Th>最新追加</Th>
+                      <Th>発行URL</Th>
+                      <Th>
                         <span className="sr-only">操作</span>
-                      </th>
-                    </tr>
+                      </Th>
+                    </TableHeadRow>
                   </thead>
                   <tbody>
                     {model.rows.map((row) => {

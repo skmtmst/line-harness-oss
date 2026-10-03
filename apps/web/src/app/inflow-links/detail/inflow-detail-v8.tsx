@@ -35,6 +35,7 @@ import SearchField from '@/components/shared/search-field'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import TargetMissing from '@/components/shared/target-missing'
 import { RowActions } from '@/components/shared/row-actions'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import EditRouteModal from '../_components/edit-route-modal'
 import InflowDeleteDialog from '../_components/inflow-delete-dialog'
 import RefOrdersPanel, { type RefOrdersResult } from '../_components/ref-orders'
@@ -523,7 +524,7 @@ function InflowDetailV8Inner() {
           </ul>
         ) : funnelError ? (
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 12 }}>
-            <p className={styles.cardNote}>段階を取得できませんでした。集計データは消えていません。</p>
+            <p className={styles.cardNote}>段階を読み込めませんでした。集計データは消えていません。</p>
             <Button variant="secondary" onClick={() => setFunnelAttempt((n) => n + 1)}>
               段階を再読み込み
             </Button>
@@ -659,17 +660,17 @@ function InflowDetailV8Inner() {
                   <col style={{ width: 56 }} />
                 </colgroup>
                 <thead>
-                  <tr>
-                    <th scope="col">日時</th>
-                    <th scope="col">友だち</th>
-                    <th scope="col">入ったLINEアカウント</th>
-                    <th scope="col">今の状態</th>
-                    <th scope="col">付いたタグ・その後</th>
-                    <th scope="col">成果</th>
-                    <th scope="col">
+                  <TableHeadRow>
+                    <Th>日時</Th>
+                    <Th>友だち</Th>
+                    <Th>入ったLINEアカウント</Th>
+                    <Th>今の状態</Th>
+                    <Th>付いたタグ・その後</Th>
+                    <Th>成果</Th>
+                    <Th>
                       <span className="sr-only">操作</span>
-                    </th>
-                  </tr>
+                    </Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody>
                   {shownFriends.map((friend) => (
