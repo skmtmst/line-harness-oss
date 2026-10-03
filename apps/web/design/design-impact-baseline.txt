@@ -1,5 +1,6 @@
 # 共通Buttonを直接importする利用先。追加・削除したPRは該当行だけを変える。
 shared-button-importer app/accounts/detail/page.tsx
+shared-button-importer app/accounts/handover/handover-v8.tsx
 shared-button-importer app/accounts/handover/page.tsx
 shared-button-importer app/accounts/migration.tsx
 shared-button-importer app/accounts/new/page.tsx
@@ -75,14 +76,18 @@ shared-button-importer app/conversions/page.tsx
 shared-button-importer app/duplicates/duplicates-v8.tsx
 shared-button-importer app/duplicates/page.tsx
 shared-button-importer app/ec-commerce/connector-panel.tsx
+shared-button-importer app/ec-commerce/ec-connector-v8.tsx
 shared-button-importer app/ec-commerce/identity-candidates/page.tsx
 shared-button-importer app/ec-commerce/order-detail-drawer.tsx
 shared-button-importer app/ec-commerce/page.tsx
 shared-button-importer app/ec-commerce/subscriptions-panel.tsx
 shared-button-importer app/emergency/page.tsx
+shared-button-importer app/events/bookings/bookings-v8.tsx
 shared-button-importer app/events/bookings/page.tsx
+shared-button-importer app/events/change-review/change-review-v8.tsx
 shared-button-importer app/events/change-review/page.tsx
 shared-button-importer app/events/edit/page.tsx
+shared-button-importer app/events/events-list-v8.tsx
 shared-button-importer app/events/page.tsx
 shared-button-importer app/events/preview/page.tsx
 shared-button-importer app/form-submissions/edit/form-design-settings.tsx
@@ -177,6 +182,7 @@ shared-button-importer app/ops/two-factor/page.tsx
 shared-button-importer app/page.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
+shared-button-importer app/pools/new/pool-new-v8.tsx
 shared-button-importer app/pools/page.tsx
 shared-button-importer app/recipes/page.tsx
 shared-button-importer app/register/complete/page.tsx
@@ -199,7 +205,11 @@ shared-button-importer app/restaurant-test/stores/new/page.tsx
 shared-button-importer app/restaurant-test/stores/new/terms-consent.tsx
 shared-button-importer app/restaurant-test/v8/approvals.tsx
 shared-button-importer app/restaurant-test/v8/dashboard.tsx
+shared-button-importer app/restaurant-test/v8/google.tsx
+shared-button-importer app/restaurant-test/v8/inventory.tsx
+shared-button-importer app/restaurant-test/v8/menu.tsx
 shared-button-importer app/restaurant-test/v8/organization.tsx
+shared-button-importer app/restaurant-test/v8/tables.tsx
 shared-button-importer app/rich-menus/connections/page.tsx
 shared-button-importer app/rich-menus/edit/page.tsx
 shared-button-importer app/rich-menus/edit/prepublish-check-section.tsx
