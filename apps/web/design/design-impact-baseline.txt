@@ -101,8 +101,10 @@ shared-button-importer app/friend-add-settings/list-v8.tsx
 shared-button-importer app/friend-add-settings/page.tsx
 shared-button-importer app/friend-add-settings/publish/done-v8.tsx
 shared-button-importer app/friend-add-settings/publish/page.tsx
+shared-button-importer app/friend-add-settings/runs/detail/detail-v8.tsx
 shared-button-importer app/friend-add-settings/runs/detail/page.tsx
 shared-button-importer app/friend-add-settings/runs/page.tsx
+shared-button-importer app/friend-add-settings/runs/runs-v8.tsx
 shared-button-importer app/friends/detail/page.tsx
 shared-button-importer app/friends/friends-nav-v8.tsx
 shared-button-importer app/friends/identity-candidates/identity-candidates-v8.tsx

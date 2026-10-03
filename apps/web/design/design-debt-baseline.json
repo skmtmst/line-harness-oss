@@ -229,6 +229,13 @@
   "app/friend-add-settings/publish/done-v8.tsx": {
     "unresolved-classname": 18
   },
+  "app/friend-add-settings/runs/detail/detail-v8.tsx": {
+    "unresolved-classname": 39
+  },
+  "app/friend-add-settings/runs/runs-v8.tsx": {
+    "unresolved-classname": 69,
+    "direct-th": 7
+  },
   "app/friends/detail/page.tsx": {
     "unresolved-classname": 3,
     "arbitrary-value": 5
