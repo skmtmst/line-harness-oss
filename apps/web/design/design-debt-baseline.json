@@ -182,8 +182,22 @@
     "unresolved-classname": 4,
     "arbitrary-value": 6
   },
+  "app/events/bookings/bookings-v8.tsx": {
+    "unresolved-classname": 45
+  },
   "app/events/bookings/page.tsx": {
     "direct-th": 6
+  },
+  "app/events/change-review/change-review-v8.tsx": {
+    "unresolved-classname": 31
+  },
+  "app/events/events-list-v8.tsx": {
+    "unresolved-classname": 48,
+    "arbitrary-value": 6,
+    "direct-th": 6
+  },
+  "app/events/new/events-new-v8.tsx": {
+    "unresolved-classname": 4
   },
   "app/events/page.tsx": {
     "direct-primary-button": 1
@@ -237,7 +251,7 @@
     "unresolved-classname": 5
   },
   "app/hq/templates/template-console.tsx": {
-    "unresolved-classname": 82
+    "unresolved-classname": 86
   },
   "app/hq/templates/template-definition-editor.tsx": {
     "unresolved-classname": 6
@@ -390,8 +404,20 @@
   "app/restaurant-test/v8/dashboard.tsx": {
     "unresolved-classname": 7
   },
+  "app/restaurant-test/v8/google.tsx": {
+    "unresolved-classname": 23
+  },
+  "app/restaurant-test/v8/inventory.tsx": {
+    "unresolved-classname": 46
+  },
+  "app/restaurant-test/v8/menu.tsx": {
+    "unresolved-classname": 24
+  },
   "app/restaurant-test/v8/organization.tsx": {
     "unresolved-classname": 58
+  },
+  "app/restaurant-test/v8/tables.tsx": {
+    "unresolved-classname": 37
   },
   "app/restaurant-test/v8/shell.tsx": {
     "unresolved-classname": 26
@@ -560,8 +586,34 @@
   "app/webhooks/edit/page.tsx": {
     "unresolved-classname": 4
   },
+  "app/webhooks/apitokens-v8.tsx": {
+    "direct-th": 6,
+    "unresolved-classname": 26
+  },
+  "app/webhooks/incoming-v8.tsx": {
+    "direct-th": 4,
+    "unresolved-classname": 84
+  },
+  "app/webhooks/interactions-v8.tsx": {
+    "unresolved-classname": 42,
+    "direct-th": 6
+  },
+  "app/webhooks/new/new-v8.tsx": {
+    "unresolved-classname": 59
+  },
   "app/webhooks/new/page.tsx": {
     "unresolved-classname": 5
+  },
+  "app/webhooks/outgoing-v8.tsx": {
+    "unresolved-classname": 34,
+    "direct-th": 6
+  },
+  "app/webhooks/samples-v8.tsx": {
+    "unresolved-classname": 23
+  },
+  "app/webhooks/sheets-v8.tsx": {
+    "direct-th": 4,
+    "unresolved-classname": 48
   },
   "app/webhooks/webhook-interactions.tsx": {
     "unresolved-classname": 35
