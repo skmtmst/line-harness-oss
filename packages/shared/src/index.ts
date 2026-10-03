@@ -10,6 +10,7 @@ export * from "./shipping-schedule";
 export * from "./form-layout";
 export * from "./flex-content";
 export * from "./tenant";
+export * from "./data-retention";
 export * from "./friend-bulk-runs";
 export * from "./identity-candidates";
 export * from "./merged-people";

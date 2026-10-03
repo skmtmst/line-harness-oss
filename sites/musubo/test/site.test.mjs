@@ -298,3 +298,21 @@ test("package contains only static public output, not source or configuration", 
     "terms",
   ]);
 });
+
+test("the retention notice uses the same day count as the deletion implementation", async () => {
+  // 案内文の日数は packages/shared/src/data-retention.json が唯一の出どころ。
+  // Workerの削除処理も同じファイルを読むので、ここが一致していれば案内と運用がずれない。
+  const spec = JSON.parse(
+    await readFile(
+      new URL("../../../packages/shared/src/data-retention.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.equal(config.legal.retentionDays, spec.dataRetentionDays);
+  assert.match(config.legal.retention, new RegExp(`${spec.dataRetentionDays}日`));
+  // 保存期間を書いているのは利用規約とプライバシーポリシーの2ページ。
+  for (const route of ["terms", "privacy"]) {
+    const html = await page(route);
+    assert.match(html, new RegExp(`${spec.dataRetentionDays}日`));
+  }
+});
