@@ -27,6 +27,17 @@
   background: var(--color-canvas); /* fill: $canvas */
 }
 
+/*
+ * ★A の下の帯（M10）：V8 は下から 12px 浮かせ、枠線をやめて
+ * ふんわり影にする。角丸と並び（削除は左端・操作は中央）はそのまま。
+ * v7 は今までどおり。
+ */
+[data-theme='v8'] .bar {
+  bottom: 12px;
+  border: 0;
+  box-shadow: var(--shadow-bar-float);
+}
+
 /* 左端。削除と、あれば状態の文字。 */
 .lead {
   display: flex;

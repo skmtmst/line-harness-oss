@@ -206,8 +206,8 @@
     "unresolved-classname": 31
   },
   "app/events/events-list-v8.tsx": {
-    "unresolved-classname": 48,
-    "arbitrary-value": 6,
+    "unresolved-classname": 49,
+    "arbitrary-value": 7,
     "direct-th": 6
   },
   "app/events/new/events-new-v8.tsx": {
@@ -593,6 +593,9 @@
   "app/tags/tag-editor-v8.tsx": {
     "unresolved-classname": 113
   },
+  "app/tags/tag-rows-skeleton.tsx": {
+    "unresolved-classname": 5
+  },
   "app/tags/tags-tab-v8.tsx": {
     "unresolved-classname": 67
   },
@@ -684,7 +687,7 @@
     "unresolved-classname": 1
   },
   "app/webinars/list-v8.tsx": {
-    "unresolved-classname": 38
+    "unresolved-classname": 43
   },
   "app/webinars/new/new-v8.tsx": {
     "unresolved-classname": 41
@@ -1112,5 +1115,8 @@
   },
   "app/pools/new/pool-new-v8.tsx": {
     "unresolved-classname": 2
+  },
+  "app/no-permission/no-permission-v8.tsx": {
+    "unresolved-classname": 10
   }
 }
