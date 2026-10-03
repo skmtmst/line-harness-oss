@@ -1,10 +1,9 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState, type FormEvent } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import { OpsInviteV8 } from './invite-v8'
-import AuthCard, { AuthField } from '@/components/auth/auth-card'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
+import { OpsAuthV8 } from '../auth-v8'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -25,22 +24,12 @@ import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 type Check = { email: string; name: string; needsPassword: boolean }
 
 /*
- * ★V8-B の切り替え。v8 の器は別ファイル（invite-v8.tsx）に置き、
- * v7 の器・動きはこの下の V7 のまま残す。
+ * ★V8-B 運営メンバーの招待（板 `tVaUh`）。
+ * v7（page.tsx の器）とは別の器。データの口・動きは v7 と同じ。
+ * 招待した人の名前は口が返さないため、見本の文面は使わない。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる。
  */
-export default function OpsInvitePage() {
-  const theme = useAdminTheme()
-  if (theme === 'v8') {
-    return (
-      <Suspense fallback={null}>
-        <OpsInviteV8 />
-      </Suspense>
-    )
-  }
-  return <OpsInvitePageV7 />
-}
-
-function OpsInvitePageV7() {
+export function OpsInviteV8() {
   const [token, setToken] = useState('')
   const [check, setCheck] = useState<Check | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'invalid'>('loading')
@@ -110,18 +99,15 @@ function OpsInvitePageV7() {
   }
 
   return (
-    <AuthCard
-      node="J6KbIg"
-      cardNode="v6cPGq"
+    <OpsAuthV8
+      node="tVaUh"
       title="運営メンバーの招待"
       description={
-        <>
-          <span className="mb-1 block text-caption font-medium text-ink-faint">運営コンソール</span>
-          {check?.needsPassword
-            ? 'musubo 運営コンソールに招待されています。名前とパスワードを設定してください。設定のあと、2要素認証の登録に進みます。'
-            : 'musubo 運営コンソールに招待されています。続けると 2要素認証の登録に進みます。'}
-        </>
+        check?.needsPassword
+          ? 'musubo 運営コンソールに招待されています。名前とパスワードを決めると、次に2要素認証を設定します。'
+          : 'musubo 運営コンソールに招待されています。続けると 2要素認証の登録に進みます。'
       }
+      footNote="この画面は運営メンバーだけが開けます。操作はすべて記録されます。"
     >
       {state === 'loading' ? (
         <ListState kind="loading" title="招待を確認しています" />
@@ -154,13 +140,16 @@ function OpsInvitePageV7() {
               </AuthField>
             </>
           ) : null}
-          <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="進めています…">設定して2要素認証へ進む
+          <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="進めています…">
+            {check?.needsPassword ? 'パスワードを設定して次へ' : '設定して2要素認証へ進む'}
           </Button>
-          <p className="text-center text-caption text-ink-faint">
-            招待の有効期限は24時間です。期限が切れたときは、招待した運営メンバーに送り直しを依頼してください
-          </p>
+          {check?.needsPassword ? null : (
+            <p className="text-center text-caption text-ink-faint">
+              招待の有効期限は24時間です。期限が切れたときは、招待した運営メンバーに送り直しを依頼してください
+            </p>
+          )}
         </form>
       )}
-    </AuthCard>
+    </OpsAuthV8>
   )
 }

@@ -1,10 +1,10 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import { OpsTwoFactorV8 } from './two-factor-v8'
-import AuthCard, { AuthField } from '@/components/auth/auth-card'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { AuthField } from '@/components/auth/auth-card'
 import { opsCall } from '@/components/ops/ops-ui'
+import { OpsAuthV8 } from '../auth-v8'
+import authStyles from '../auth-v8.module.css'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -26,22 +26,11 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null }
 
 /*
- * ★V8-B の切り替え。v8 の器は別ファイル（two-factor-v8.tsx）に置き、
- * v7 の器・動きはこの下の V7 のまま残す。
+ * ★V8-B 2要素認証を設定（板 `qod6X`）。
+ * v7（page.tsx の器）とは別の器。データの口・動きは v7 と同じ。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる。
  */
-export default function OpsTwoFactorPage() {
-  const theme = useAdminTheme()
-  if (theme === 'v8') {
-    return (
-      <Suspense fallback={null}>
-        <OpsTwoFactorV8 />
-      </Suspense>
-    )
-  }
-  return <OpsTwoFactorPageV7 />
-}
-
-function OpsTwoFactorPageV7() {
+export function OpsTwoFactorV8() {
   const [session, setSession] = useState<Session | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'done' | 'denied'>('loading')
   const [uri, setUri] = useState('')
@@ -131,16 +120,11 @@ function OpsTwoFactorPageV7() {
   }
 
   return (
-    <AuthCard
-      node="NAJKx"
-      cardNode="ckBzA"
+    <OpsAuthV8
+      node="qod6X"
       title="2要素認証を設定"
-      description={
-        <>
-          <span className="mb-1 block text-caption font-medium text-ink-faint">運営コンソール</span>
-          運営コンソールは2要素認証が必須です。認証アプリ（Google Authenticator など）でQRコードを読み取り、表示された6桁の数字を入れてください。確認が通ると登録が完了します。
-        </>
-      }
+      description="認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。"
+      footNote="この画面は運営メンバーだけが開けます。操作はすべて記録されます。"
     >
       {state === 'loading' ? (
         <ListState kind="loading" title="準備しています" />
@@ -155,7 +139,7 @@ function OpsTwoFactorPageV7() {
           <Button variant="primary" onClick={() => void logoutAndGoToLogin('/ops/login')} className="w-full">運営のログインへ</Button>
         </div>
       ) : (
-        <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col items-center gap-4">
+        <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
           {error ? (
             <Notice tone="danger" message={error} className="w-full" />
           ) : null}
@@ -163,33 +147,38 @@ function OpsTwoFactorPageV7() {
             <Button onClick={() => void load()} className="w-full">もう一度読み込む</Button>
           ) : null}
           {qr ? (
-            // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
-            <img src={qr} alt="認証アプリ登録用のQRコード" className="h-52 w-52 rounded-control border border-hairline" />
+            <div className={authStyles.qrRow}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない */}
+              <img src={qr} alt="認証アプリ登録用のQRコード" className={authStyles.qrImage} />
+              <div>
+                <p className="text-caption text-ink-faint">読み取れないときは、このキーを手で入力</p>
+                <p className={authStyles.manualKey}>{manualKey || '—'}</p>
+                <div className="mt-2">
+                  <Button variant="secondary" size="compact" onClick={() => setQrAttempt((n) => n + 1)}>QRをもう一度表示する</Button>
+                </div>
+              </div>
+            </div>
           ) : qrFailed ? (
             <div className="flex w-full flex-col items-center gap-2">
               <p role="alert" className="text-center text-caption text-danger">QRコードを表示できませんでした。接続を確かめて、もう一度お試しください。</p>
               <Button onClick={() => setQrAttempt((n) => n + 1)}>QRをもう一度表示する</Button>
             </div>
           ) : (
-            <DelayedSkeleton loading skeleton={<Skeleton className="block h-52 w-52 rounded-control" />} />
+            <DelayedSkeleton loading skeleton={<Skeleton className={`block ${authStyles.qrSkeleton}`} />} />
           )}
-          <div className="text-center">
-            <p className="text-caption text-ink-faint">読み取れないときは、このキーを手で入力</p>
-            <p className="mt-1 break-all font-mono text-label font-medium tracking-wider text-ink">{manualKey || '—'}</p>
-          </div>
           <div className="w-full">
-            <AuthField label="認証アプリの6桁の数字" htmlFor="ops-totp-code">
+            <AuthField label="認証コード（6桁）" htmlFor="ops-totp-code">
               {/* ★V7 共通 認証コード入力（xHzFK）。 */}
-              <OtpInput id="ops-totp-code" value={code} onChange={setCode} label="認証アプリの6桁の数字" invalid={Boolean(error)} disabled={busy} />
+              <OtpInput id="ops-totp-code" value={code} onChange={setCode} label="認証コード（6桁）" invalid={Boolean(error)} disabled={busy} />
             </AuthField>
           </div>
-          <Button type="submit" variant="primary" disabled={busy || !uri} className="w-full" busy={busy} busyLabel="確認しています…">確認して登録を完了する
+          <Button type="submit" variant="primary" disabled={busy || !uri || code.replace(/\D/g, '').length !== 6} className="w-full" busy={busy} busyLabel="確認しています…">登録する
           </Button>
           <p className="text-center text-caption text-ink-faint">
-            確認が通ると、安全のため一度ログアウトします。メールとパスワード、次に6桁の数字でログインし直してください
+            登録すると安全のため一度ログアウトします。メールとパスワード、次に6桁の数字でログインし直してください。
           </p>
         </form>
       )}
-    </AuthCard>
+    </OpsAuthV8>
   )
 }

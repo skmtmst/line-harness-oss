@@ -169,13 +169,16 @@ shared-button-importer app/notifications/page.tsx
 shared-button-importer app/ops/announcements/page.tsx
 shared-button-importer app/ops/audit/page.tsx
 shared-button-importer app/ops/dashboard/page.tsx
+shared-button-importer app/ops/invite/invite-v8.tsx
 shared-button-importer app/ops/invite/page.tsx
+shared-button-importer app/ops/login/login-v8.tsx
 shared-button-importer app/ops/login/page.tsx
 shared-button-importer app/ops/members/page.tsx
 shared-button-importer app/ops/support/page.tsx
 shared-button-importer app/ops/tenants/detail/page.tsx
 shared-button-importer app/ops/tenants/page.tsx
 shared-button-importer app/ops/two-factor/page.tsx
+shared-button-importer app/ops/two-factor/two-factor-v8.tsx
 shared-button-importer app/page.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
