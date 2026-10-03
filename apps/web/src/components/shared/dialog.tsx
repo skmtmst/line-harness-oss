@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import Button from './button'
 import IconButton from './icon-button'
-import { useOverlayFocus } from './overlay-utils'
+import { useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
 
 export type DialogProps = {
@@ -69,6 +69,8 @@ export default function Dialog({
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
+  /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
+  const leaving = useV8Leave(open)
   /*
    * open=true で初回マウントした場合、最初の描画は通常DOMで、effect後に
    * portal へ移る。フォーカス制御は portal の準備ができてから始める
@@ -91,7 +93,7 @@ export default function Dialog({
     : ''
 
   useEffect(() => setMounted(true), [])
-  if (!open) return null
+  if (!open && !leaving) return null
 
   const titleNode = (
     <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`}>{title}</h2>
@@ -118,6 +120,7 @@ export default function Dialog({
       aria-describedby={description ? descriptionId : undefined}
       aria-busy={busy || undefined}
       tabIndex={-1}
+      data-closing={leaving || undefined}
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
     >
@@ -165,7 +168,7 @@ export default function Dialog({
 
   if (!modal) return panel
   const overlay = (
-    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-design-node={designNode} onMouseDown={(event) => {
+    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) onCancel()
     }}>
       {panel}
