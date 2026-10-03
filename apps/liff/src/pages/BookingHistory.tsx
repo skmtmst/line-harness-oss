@@ -53,7 +53,7 @@ export default function BookingHistory() {
         ) : (
           <>
             <div
-              className="flex rounded-[10px] bg-liff-chip p-[3px]"
+              className="flex rounded-(--liff-radius) bg-liff-chip p-[3px]"
               role="tablist"
               aria-label="予約の期間"
             >

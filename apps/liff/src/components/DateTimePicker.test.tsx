@@ -680,9 +680,10 @@ describe('カレンダーの見た目（設計合わせ）', () => {
         expect(cell.className).not.toContain('min-h-14');
         expect(cell.className).toContain('h-11');
       }
-      // 選んだ日だけ濃い緑で塗る。ほかは塗らない。
+      // 選んだ日だけ型の主の色で塗る。ほかは塗らない。
+      // 角丸は型の値 (既定 10px) を変数で受ける。
       expect(selected.className).toContain('bg-liff-primary');
-      expect(selected.className).toContain('rounded-[10px]');
+      expect(selected.className).toContain('rounded-(--liff-radius)');
       const others = cells.filter((cell) => cell !== selected);
       expect(others.length).toBeGreaterThan(0);
       for (const cell of others) {

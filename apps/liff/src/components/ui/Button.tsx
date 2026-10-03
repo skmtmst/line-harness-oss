@@ -20,7 +20,7 @@ export default function Button({
   ref?: Ref<HTMLButtonElement>;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
   const base =
-    'liff-press flex w-full items-center justify-center gap-2 rounded-[10px] px-4 font-bold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50';
+    'liff-press flex w-full items-center justify-center gap-2 rounded-(--liff-radius) px-4 font-bold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50';
   const tone =
     variant === 'primary'
       ? 'min-h-12 bg-liff-primary text-[15px] text-(--liff-on-primary) focus-visible:outline-liff-primary active:opacity-90'

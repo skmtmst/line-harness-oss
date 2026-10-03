@@ -246,10 +246,10 @@ export default function Event() {
                       aria-label={full ? `${timeText} 満席` : undefined}
                       onClick={() => setSelectedId(s.id)}
                       title={formatJstEventAt(s.starts_at)}
-                      className={`flex min-h-[42px] w-full items-center justify-between gap-3 rounded-[10px] border px-4 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${tone}`}
+                      className={`flex min-h-[42px] w-full items-center justify-between gap-3 rounded-(--liff-radius) border px-4 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${tone}`}
                     >
                       <span
-                        className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-(--liff-on-primary)' : 'text-ink'}`}
+                        className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-(--liff-on-primary)' : 'text-ink'}`}
                       >
                         {utcToJstMd(s.starts_at)}({utcToJstWeekday(s.starts_at)}) {utcToJstHm(s.starts_at)}〜
                         {utcToJstHm(s.ends_at)}

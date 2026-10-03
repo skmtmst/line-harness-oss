@@ -181,7 +181,7 @@ export default function EventConfirm() {
       <LiffHeader title="申し込みの確認" />
       <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-28">
         <h1 className="text-xl font-bold text-ink">内容を確かめてください</h1>
-        <dl className="divide-y divide-liff-divider rounded-[14px] bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
+        <dl className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
           <Row label="イベント" value={event.name} />
           <Row label="日時" value={formatJstEventAt(slot.starts_at)} />
           {event.venue_name && <Row label="場所" value={event.venue_name} />}

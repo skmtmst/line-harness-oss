@@ -216,7 +216,7 @@ function DaySlots({
                 onClick={() => onSelect({ date: day, start: t.start })}
                 disabled={!t.open}
                 aria-pressed={active}
-                className={`liff-press h-11 rounded-[10px] px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                className={`liff-press liff-num h-11 rounded-(--liff-radius) px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                   active
                     ? 'bg-liff-primary font-bold text-(--liff-on-primary)'
                     : t.open
@@ -663,7 +663,7 @@ export default function DateTimePicker({
           role="radiogroup"
           aria-label="表示の切り替え"
           onKeyDown={moveViewKey}
-          className="flex gap-1 rounded-[10px] bg-liff-chip p-[3px]"
+          className="flex gap-1 rounded-(--liff-radius) bg-liff-chip p-[3px]"
         >
           {toggleButton('list', '週で見る')}
           {toggleButton('calendar', 'カレンダー')}
@@ -736,7 +736,7 @@ export default function DateTimePicker({
                       aria-pressed={active}
                       aria-label={dayStateLabel(d, state)}
                       title={dayStateLabel(d, state)}
-                      className={`liff-press flex flex-col items-center gap-0.5 rounded-[10px] py-2 outline -outline-offset-1 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                      className={`liff-press flex flex-col items-center gap-0.5 rounded-(--liff-radius) py-2 outline -outline-offset-1 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                         active
                           ? 'bg-liff-soft outline-2 outline-liff-primary'
                           : state === 'closed' || state === 'empty'
@@ -746,7 +746,7 @@ export default function DateTimePicker({
                     >
                       <span className="text-[10px] text-liff-sub">{formatWeekday(d)}</span>
                       <span
-                        className={`text-base font-bold ${active ? 'text-liff-primary' : selectable || state === 'full' ? 'text-ink' : 'text-liff-off-ink'}`}
+                        className={`liff-num text-base font-bold ${active ? 'text-liff-primary' : selectable || state === 'full' ? 'text-ink' : 'text-liff-off-ink'}`}
                       >
                         {Number(d.slice(8, 10))}
                       </span>
@@ -758,7 +758,9 @@ export default function DateTimePicker({
                               ? 'text-liff-primary'
                               : state === 'few'
                                 ? 'text-liff-dot-few'
-                                : 'text-liff-off-ink'
+                                : state === 'full'
+                                  ? 'text-liff-full'
+                                  : 'text-liff-off-ink'
                           }`}
                         >
                           {weekMark(state)}
@@ -870,15 +872,17 @@ export default function DateTimePicker({
                         disabled={!selectable}
                         aria-pressed={active}
                         aria-label={dayStateLabel(d, state)}
-                        className={`liff-press flex h-11 flex-col items-center justify-center gap-0.5 rounded-[10px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                        className={`liff-press flex h-11 flex-col items-center justify-center gap-0.5 rounded-(--liff-radius) focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                           active
                             ? 'bg-liff-primary font-semibold text-(--liff-on-primary)'
                             : selectable
                               ? 'font-semibold text-ink'
-                              : 'font-semibold text-liff-off-ink'
+                              : state === 'full'
+                                ? 'font-semibold text-liff-full'
+                                : 'font-semibold text-liff-off-ink'
                         }`}
                       >
-                        <span className="text-sm leading-tight">{dayNum}</span>
+                        <span className="liff-num text-sm leading-tight">{dayNum}</span>
                         <span className="flex h-1.5 items-center leading-none">
                           {/* 空きの点 (緑＝空き・金＝残りわずか)。消す設定では点を出さない。 */}
                           {settings.vacancyDots && (state === 'open' || state === 'few') && (

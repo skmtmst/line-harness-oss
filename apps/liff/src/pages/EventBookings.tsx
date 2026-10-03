@@ -201,7 +201,7 @@ export default function EventBookings() {
         ) : (
           <>
             <div
-              className="flex rounded-[10px] bg-liff-chip p-[3px]"
+              className="flex rounded-(--liff-radius) bg-liff-chip p-[3px]"
               role="tablist"
               aria-label="イベントの期間"
             >
@@ -391,7 +391,7 @@ export default function EventBookings() {
                             prev ? { ...prev, selectedSlotId: s.id, changeError: null } : prev,
                           )
                         }
-                        className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${
+                        className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-(--liff-radius) border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${
                           disabled
                             ? 'border-hairline bg-shell-gray'
                             : selected
@@ -400,7 +400,7 @@ export default function EventBookings() {
                         }`}
                       >
                         <span
-                          className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}
+                          className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}
                         >
                           {utcToJstMd(s.starts_at)} {utcToJstHm(s.starts_at)}〜
                           {utcToJstHm(s.ends_at)}
