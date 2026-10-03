@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SIDEBAR = readFileSync(join(HERE, 'friend-info-sidebar.tsx'), 'utf8')
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
+const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('受信箱A-2 右パネルでその場で直す', () => {
   it('対応状況は3つのボタンで1タップ（未対応・対応中・対応済み）', () => {
@@ -58,5 +59,18 @@ describe('受信箱A-2 右パネルでその場で直す', () => {
   it('右パネルは340幅、狭い幅では畳んで頭のボタンで出す', () => {
     expect(PAGE).toContain('w-[340px]')
     expect(PAGE).toContain('customer-info-toggle')
+  })
+
+  it('前払いのみの印は顔の下（友だち詳細と同じ置き場所）', () => {
+    expect(SIDEBAR).toContain('PrepayBadgeV8')
+    expect(SIDEBAR).toContain('accountId')
+    expect(SIDEBAR).toContain('canClearPrepay')
+    expect(PAGE).toContain('accountId={selectedAccountId')
+  })
+
+  it('前払い判定の口がAPIにある', () => {
+    expect(API).toContain('getFriendNoshow')
+    expect(API).toContain('setFriendPrepay')
+    expect(API).toContain('BookingPrepayDecision')
   })
 })

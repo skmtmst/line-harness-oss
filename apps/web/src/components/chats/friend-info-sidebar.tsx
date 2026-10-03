@@ -11,6 +11,8 @@ import Checkbox from '@/components/shared/checkbox'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import InlineEdit from '@/components/shared/inline-edit'
 import { runOptimistic } from '@/lib/undoable'
+import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { GripVertical, X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 
@@ -60,6 +62,8 @@ interface Props {
   operators?: Array<{ id: string; name: string }>
   /** 現在の担当 ID。無いときは未割り当て扱い。 */
   operatorId?: string | null
+  /** 開いているLINEアカウントの ID。前払いのみの印に使う。無いときは印を出さない。 */
+  accountId?: string | null
   /** 保存が通ったあとに親へ知らせる（一覧の読み直しなど）。 */
   onChatChanged?: () => void
 }
@@ -180,10 +184,12 @@ function upcomingDeliveryHref(delivery: NonNullable<FriendUpcoming['nextAutoDeli
     : `/reminders/detail?id=${delivery.id}`
 }
 
-export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, chatId, revision, operators, operatorId, onChatChanged }: Props) {
+export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, chatId, revision, operators, operatorId, accountId, onChatChanged }: Props) {
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /* 前払いのみの印を外せるのは店の管理者だけ（友だち詳細と同じ決まり）。 */
+  const [canClearPrepay] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin())
   // A-2: その場で直したときの画面側の持ち直し（楽観更新）。親の chatDetail とは別に、
   // このパネル内での見た目だけを先に変える。保存が失敗したら戻す。
   const [localStatus, setLocalStatus] = useState<ChatStatusInfo['status'] | undefined>(undefined)
@@ -861,6 +867,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 友だち詳細
               </Button>
             </div>
+            {/* 前払いのみの印（友だち詳細と同じ置き場所・顔の下）。前払いの人だけ出る。 */}
+            {accountId && friendId ? (
+              <div className="border-hairline border-b px-5 py-3">
+                <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} />
+              </div>
+            ) : null}
 
             {/*
               名前（設計 `友だち詳細` の「名前」）。

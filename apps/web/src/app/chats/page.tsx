@@ -3988,6 +3988,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               revision={chatDetail && chatDetail.id === selectedChatId ? chatDetail.revision : undefined}
               operators={operators}
               operatorId={chatDetail && chatDetail.id === selectedChatId ? chatDetail.operatorId : null}
+              accountId={selectedAccountId || null}
               onChatChanged={() => {
                 if (selectedChatId) void loadChatDetail(selectedChatId)
                 void loadChats()
