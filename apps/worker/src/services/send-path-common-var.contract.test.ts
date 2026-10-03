@@ -37,6 +37,7 @@ const SEND_PATHS: Array<{ file: string; mustCall: string; label: string }> = [
   { file: 'services/carousel-tap.ts', mustCall: 'expandSendCommonVars', label: 'カルーセル制限時の返信' },
   { file: 'routes/liff.ts', mustCall: 'expandSendCommonVars', label: 'LIFFの案内テンプレート送信' },
   { file: 'routes/friends.ts', mustCall: 'expandSendCommonVars', label: '友だち詳細からの直接送信' },
+  { file: 'routes/friend-add-rules.ts', mustCall: 'expandSendCommonVars', label: '友だち追加時の配信のテスト送信' },
   { file: 'routes/webhook.ts', mustCall: 'expandSendCommonVars', label: '流入リンク案内・追加クーポン' },
   { file: 'services/ec-event-processing.ts', mustCall: 'expandSendCommonVars', label: 'ECイベント通知' },
   { file: 'routes/ec-commerce.ts', mustCall: 'expandSendCommonVars', label: 'EC通知のテスト送信' },
