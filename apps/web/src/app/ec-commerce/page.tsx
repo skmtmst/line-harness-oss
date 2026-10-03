@@ -385,7 +385,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
         </p>
       ) : null}
       <NoteBar help="注文にはLINEの友だちが書かれていないため、メールアドレスか電話番号で結びつけます" helpLabel="つき合わせの仕方">ECの注文には、LINEの友だちが誰なのかが書かれていません。メールアドレスか電話番号で結びつけています。どちらも一致しなかった注文は「会員のつき合わせ」に並びます。</NoteBar>
-      {notice ? <div className={notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError} role="status">{notice.text}</div> : null}
+      {notice ? <div className={notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError} role={notice.tone === 'success' ? 'status' : 'alert'}>{notice.text}</div> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <input
           type="search"
