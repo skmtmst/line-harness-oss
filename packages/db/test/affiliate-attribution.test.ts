@@ -404,10 +404,12 @@ describe('trackConversion + attribution integration', () => {
       createdAt: jstDaysAgo(2),
     });
 
+    // 流入の記録は NOW からの相対で入れる。実時刻で数えると、NOW から
+    // 90日(計測期間)が過ぎた日にこのテストだけが落ちる。
     const ev = (await trackConversion(db, {
       conversionPointId: 'cp-1',
       friendId: 'friend-x',
-    })) as ConversionEvent & {
+    }, { now: new Date(NOW).getTime() })) as ConversionEvent & {
       affiliate_id: string | null;
       attributed_ref_code: string | null;
     };
@@ -422,7 +424,7 @@ describe('trackConversion + attribution integration', () => {
     const ev = (await trackConversion(db, {
       conversionPointId: 'cp-1',
       friendId: 'friend-y',
-    })) as ConversionEvent & {
+    }, { now: new Date(NOW).getTime() })) as ConversionEvent & {
       affiliate_id: string | null;
       attributed_ref_code: string | null;
     };
