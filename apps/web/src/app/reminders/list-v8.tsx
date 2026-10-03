@@ -45,6 +45,9 @@ import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-pan
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
@@ -160,6 +163,8 @@ export default function RemindersListV8() {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [foldersError, setFoldersError] = useState(false)
 
@@ -531,19 +536,39 @@ export default function RemindersListV8() {
 
   /* ===== 行の「…」の中身（★V8 `SkY9V`） ===== */
 
+  /** 一覧の行→詳細はつながる移り変わりで開く。 */
+  const goDetail = (href: string) => {
+    withViewTransition(() => {
+      router.push(href)
+    })
+  }
+
+  /** 右クリックは「…」と同じ項目をマウスの位置に出す。 */
+  const rowContextItems = (row: ReminderRow): ContextMenuItem[] =>
+    rowMenuItems(row).map((item) => ({
+      id: item.id,
+      label: item.label,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      onSelect: () => item.onSelect(),
+    }))
+
+  const panelIndex = panelId === null ? -1 : reminders.findIndex((row) => row.id === panelId)
+  const panelRow = panelIndex >= 0 ? reminders[panelIndex] : null
+
   const rowMenuItems = (row: ReminderRow): ActionMenuItem[] => {
     const status = statusKeyOf(row)
     return [
-      { id: 'detail', label: '詳細を見る', onSelect: () => router.push(detailHref(row.id)) },
-      { id: 'registrants', label: '登録者を管理', onSelect: () => router.push(detailHref(row.id)) },
-      { id: 'planned', label: '配信予定を見る', onSelect: () => router.push(`${detailHref(row.id)}&status=planned`) },
-      { id: 'runs', label: '実行結果を見る', onSelect: () => router.push(detailHref(row.id)) },
+      { id: 'detail', label: '詳細を見る', onSelect: () => goDetail(detailHref(row.id)) },
+      { id: 'registrants', label: '登録者を管理', onSelect: () => goDetail(detailHref(row.id)) },
+      { id: 'planned', label: '配信予定を見る', onSelect: () => goDetail(`${detailHref(row.id)}&status=planned`) },
+      { id: 'runs', label: '実行結果を見る', onSelect: () => goDetail(detailHref(row.id)) },
       {
         id: 'edit',
         label: '編集する',
         disabled: !canEdit,
         disabledReason: canEdit ? undefined : readonlyReason,
-        onSelect: () => router.push(`/reminders/edit?id=${encodeURIComponent(row.id)}`),
+        onSelect: () => goDetail(`/reminders/edit?id=${encodeURIComponent(row.id)}`),
       },
       {
         id: 'duplicate',
@@ -719,12 +744,12 @@ export default function RemindersListV8() {
                     key={row.id}
                     className={styles.rowClick}
                     tabIndex={0}
-                    onClick={() => router.push(detailHref(row.id))}
+                    onClick={() => setPanelId(row.id)}
                     onKeyDown={(event) => {
                       if (event.target !== event.currentTarget) return
                       if (event.key === 'Enter') {
                         event.preventDefault()
-                        router.push(detailHref(row.id))
+                        setPanelId(row.id)
                       }
                     }}
                   >
@@ -761,7 +786,12 @@ export default function RemindersListV8() {
                           href={detailHref(row.id)}
                           title={row.name}
                           className={styles.cellTitle}
-                          onClick={(event) => event.stopPropagation()}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                            event.preventDefault()
+                            goDetail(detailHref(row.id))
+                          }}
                         >
                           {row.name}
                         </Link>
@@ -802,18 +832,23 @@ export default function RemindersListV8() {
                       <div className={styles.countMain}>{nextSend}</div>
                     </td>
                     <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
-                      <button
-                        type="button"
-                        className={styles.menuButton}
-                        title={`リマインダ「${row.name}」の操作`}
-                        aria-label={`リマインダ「${row.name}」の操作`}
-                        aria-haspopup="menu"
-                        onClick={() =>
-                          setOpenMenuId((current) => (current === row.id ? null : row.id))
-                        }
+                      <ContextMenu
+                        label={`リマインダ「${row.name}」の操作`}
+                        items={rowContextItems(row)}
                       >
-                        <MoreHorizontal size={16} aria-hidden="true" />
-                      </button>
+                        <button
+                          type="button"
+                          className={styles.menuButton}
+                          title={`リマインダ「${row.name}」の操作`}
+                          aria-label={`リマインダ「${row.name}」の操作`}
+                          aria-haspopup="menu"
+                          onClick={() =>
+                            setOpenMenuId((current) => (current === row.id ? null : row.id))
+                          }
+                        >
+                          <MoreHorizontal size={16} aria-hidden="true" />
+                        </button>
+                      </ContextMenu>
                       <ActionMenu
                         open={openMenuId === row.id}
                         onClose={() => setOpenMenuId(null)}
@@ -827,6 +862,76 @@ export default function RemindersListV8() {
             </tbody>
           </table>
         </div>
+
+        {/* 行の詳細パネル（V8「サクサク感」C①・E）。一覧は左に見えたまま。 */}
+        {panelRow &&
+          (() => {
+            const view = rowView(panelRow)
+            const planned =
+              view.status === 'draft' || view.status === 'stopped'
+                ? '—'
+                : panelRow.plannedDeliveries == null
+                  ? '—'
+                  : `${formatNumber(panelRow.plannedDeliveries)}通`
+            const nextSend = view.status === 'active' ? formatNextSend(panelRow.nextScheduledAt) : '—'
+            return (
+              <DetailPanel
+                open
+                title={panelRow.name}
+                description={view.subtitle}
+                onClose={() => setPanelId(null)}
+                onPrev={panelIndex > 0 ? () => setPanelId(reminders[panelIndex - 1].id) : undefined}
+                onNext={
+                  panelIndex < reminders.length - 1
+                    ? () => setPanelId(reminders[panelIndex + 1].id)
+                    : undefined
+                }
+                hasPrev={panelIndex > 0}
+                hasNext={panelIndex < reminders.length - 1}
+                footer={
+                  <>
+                    <Button variant="primary" onClick={() => goDetail(detailHref(panelRow.id))}>
+                      詳細を見る
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={!canEdit}
+                      onClick={() => goDetail(`/reminders/edit?id=${encodeURIComponent(panelRow.id)}`)}
+                    >
+                      編集する
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={!canEdit}
+                      onClick={() => {
+                        setDuplicateError('')
+                        setDuplicateTarget(panelRow)
+                        setPanelId(null)
+                      }}
+                    >
+                      複製する
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={!canEdit}
+                      onClick={() => {
+                        setDeleteError('')
+                        setDeleteTarget(panelRow)
+                        setPanelId(null)
+                      }}
+                    >
+                      削除する
+                    </Button>
+                  </>
+                }
+              >
+                <p>
+                  {view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'} ／
+                  これから送る {planned} ／ 次に送る {nextSend}
+                </p>
+              </DetailPanel>
+            )
+          })()}
 
         {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
         {canEdit && selectedCount > 0 ? (
