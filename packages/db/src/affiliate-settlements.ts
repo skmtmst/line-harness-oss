@@ -84,7 +84,9 @@ async function sha256Hex(value: string): Promise<string> {
 // - 'version' … 不変の版で価格が決まる（判断の版か、記録時刻以前の最新版。
 //   ただし最新版が記録時刻と同時刻で他に候補があるときは確定不能として null）
 // - 'legacy-live' … 版管理前の昔の案件・汎用リンク・率の紹介者・古いスキーマ。
-//   旧来どおり今の案件額を使う（公開経路では版が必ずあるため実質変わらない）
+//   旧来どおり今の案件額を使う。版0の公開案件にも到達する（POSTの案件行
+//   INSERT成功→初版INSERT失敗で残り、同キー再送が回収する。F-23 交差の
+//   有限barrierで再現）。機能保証の変更はしない。
 // - null … 版管理下の案件なのに記録時刻の版が無い（欠落・改ざん）。
 //   承認してはならない。呼び出し側が状態を変えずに拒む。
 
@@ -200,8 +202,9 @@ export async function resolveApprovalRewardBasis(
     .prepare(`SELECT COUNT(*) AS n FROM affiliate_offer_versions WHERE offer_id = ?`)
     .bind(row.link_offer_id)
     .first<{ n: number }>();
-  // 版が1つも無い昔の案件は旧来どおり（公開経路では版が必ずある）。
-  // 版なしの一般仕様の選択は司令塔の判断前には広げない。
+  // 版が1つも無い案件は旧来どおり。POSTの案件行INSERT成功→初版INSERT失敗
+  // でも到達する（同キー再送が回収する）が、版なしの一般仕様の選択は
+  // 司令塔の判断前には広げない。
   if ((versionCount?.n ?? 0) === 0) {
     return { kind: 'legacy-live', rewardAmount: row.offer_reward, rewardMiles: row.offer_miles };
   }
