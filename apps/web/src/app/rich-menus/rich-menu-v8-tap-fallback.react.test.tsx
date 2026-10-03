@@ -29,6 +29,7 @@ const groupItem = (id: string, name: string, monthlyStats?: { taps: number }) =>
   displayOrder: 0,
   defaultOpen: false,
   thumbnailR2Key: null,
+  updatedAt: '2026-09-20T00:00:00.000Z',
   ...(monthlyStats ? { monthlyStats: { from: '2026-09-01', to: '2026-10-01', taps: monthlyStats.taps, uniqueAudience: { value: null, state: 'none' } } } : {}),
 })
 
@@ -104,6 +105,16 @@ describe('リッチメニューV8一覧のタップ数', () => {
     const row = await rendered.findByText('秋メニュー')
     const tableRow = row.closest('tr') ?? row.closest('[role="row"]') ?? rendered.container
     expect(within(tableRow as HTMLElement).getByText('7回')).toBeTruthy()
+  })
+
+  test('更新日列とボタンの文言を行に出す（v7と同じ情報）', async () => {
+    fixture.listPage = () => Promise.resolve(listResult([groupItem('g5', '春メニュー')]))
+    fixture.tapStats = () => Promise.resolve(tapResult([]))
+    const rendered = await renderV8List()
+    const row = await rendered.findByText('春メニュー')
+    const tableRow = row.closest('tr') ?? row.closest('[role="row"]') ?? rendered.container
+    expect((tableRow as HTMLElement).textContent).toContain('ボタン「メニュー」')
+    expect((tableRow as HTMLElement).textContent).toContain('9月20日')
   })
 
   test('集計自体が取れなければ「—」のままにする', async () => {
