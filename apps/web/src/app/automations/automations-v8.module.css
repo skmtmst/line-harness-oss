@@ -817,3 +817,346 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* 見出しの段の戻る道。 */
+.backLink {
+  color: var(--color-info);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+/* 作る画面の白い板（j2hfkS・M4torY・J1VA8）。左に本文、右に rails。 */
+.formCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: 20px;
+}
+
+.formTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.formGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.optional {
+  color: var(--color-ink-faint);
+  font-weight: 400;
+}
+
+.inlineField {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+/* rails の決まり文の表（つながる先・版のこと）。 */
+.kvList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.kvRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.kvRow + .kvRow {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.kvKey {
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+.kvValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.noteList {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 版の履歴の段（ziSgL）。版・札・変わり・日時の1行。 */
+.versionList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.versionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 0;
+}
+
+.versionRow + .versionRow {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.versionName {
+  flex: none;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.versionSummary {
+  min-width: 0;
+  flex: 1 1 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+.versionMeta {
+  flex: none;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 案内の帯（下書きの説明・保存した下書きの案内）。 */
+.infoBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 競合の帯（tJqST）。相手の変更を消さないよう止める。 */
+.conflictBand {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+}
+
+.conflictTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* きっかけの組の見出し。 */
+.groupLabel {
+  margin: 12px 0 8px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* きっかけの札（M4torY・J1VA8）。選んだ札だけ緑の縁。 */
+.triggerGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.triggerCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+}
+
+.triggerCardSelected {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+}
+
+.triggerCardSelected::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+}
+
+.triggerName {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  padding-right: 24px;
+}
+
+.triggerNote {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 板の中の小箱（きっかけの詳しい設定・1人テストの確認）。 */
+.subBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  padding: 12px;
+}
+
+/* 条件の札の並び（だれに）。押せない印なので button にしない。 */
+.pillRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pillStatic {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* することの段（M4torY・J1VA8）。番号・中身・「…」の1行。 */
+.actionList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.actionRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: 12px;
+}
+
+.actionNum {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.actionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.miniMenuButton {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  padding-bottom: 4px;
+}
+
+.miniMenuButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@container (max-width: 1100px) {
+  .triggerGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -25,6 +25,7 @@ shared-button-importer app/auto-replies/publish/page.tsx
 shared-button-importer app/auto-replies/runs/page.tsx
 shared-button-importer app/auto-replies/runs/runs-v8.tsx
 shared-button-importer app/automations/automations-v8.tsx
+shared-button-importer app/automations/new/new-v8.tsx
 shared-button-importer app/automations/new/friend-multi-select.tsx
 shared-button-importer app/automations/new/page.tsx
 shared-button-importer app/automations/page.tsx
@@ -59,6 +60,9 @@ shared-button-importer app/broadcasts/reserved-v8.tsx
 shared-button-importer app/broadcasts/reserved/page.tsx
 shared-button-importer app/chats/page.tsx
 shared-button-importer app/common-actions/branch-editor.tsx
+shared-button-importer app/common-actions/common-action-new-v8.tsx
+shared-button-importer app/common-actions/common-action-versions-v8.tsx
+shared-button-importer app/common-actions/common-actions-v8.tsx
 shared-button-importer app/common-actions/edit/page.tsx
 shared-button-importer app/common-actions/new/page.tsx
 shared-button-importer app/common-actions/page.tsx

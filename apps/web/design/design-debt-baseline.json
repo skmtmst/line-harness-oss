@@ -78,6 +78,9 @@
   "app/automations/automations-v8.tsx": {
     "unresolved-classname": 9
   },
+  "app/automations/new/new-v8.tsx": {
+    "unresolved-classname": 140
+  },
   "app/automations/new/page.tsx": {
     "unresolved-classname": 55
   },
@@ -159,6 +162,17 @@
     "arbitrary-value": 37,
     "unresolved-classname": 2,
     "direct-secondary-button": 2
+  },
+  "app/common-actions/common-action-new-v8.tsx": {
+    "unresolved-classname": 43
+  },
+  "app/common-actions/common-action-versions-v8.tsx": {
+    "unresolved-classname": 66,
+    "direct-th": 6
+  },
+  "app/common-actions/common-actions-v8.tsx": {
+    "unresolved-classname": 39,
+    "direct-th": 6
   },
   "app/contents/page.tsx": {
     "arbitrary-value": 5
