@@ -91,7 +91,7 @@
     "unresolved-classname": 75
   },
   "app/booking/menus/new/menu-form-v8.tsx": {
-    "unresolved-classname": 115
+    "unresolved-classname": 122
   },
   "app/booking/menus/new/page.tsx": {
     "unresolved-classname": 11
@@ -100,8 +100,8 @@
     "unresolved-classname": 208
   },
   "app/booking/menus/staff/assign-v8.tsx": {
-    "unresolved-classname": 61,
-    "direct-th": 3
+    "unresolved-classname": 66,
+    "direct-th": 6
   },
   "app/booking/menus/staff/page.tsx": {
     "arbitrary-value": 6,

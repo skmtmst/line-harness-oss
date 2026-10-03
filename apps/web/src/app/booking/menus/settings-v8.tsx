@@ -39,6 +39,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { notifyToast } from '@/components/shared/toast'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { useAccount } from '@/contexts/account-context'
 import { canEditFeature } from '@/lib/staff-capability'
 import {
@@ -254,14 +255,15 @@ function StateCard({ icon, title, description, action }: {
   )
 }
 
+/* 読み込み中の骨組み。形は行のまま・中身は共通の Skeleton。 */
 function SkeletonRows({ rows = 4 }: { rows?: number }) {
   return (
-    <div className={styles.skeletonRows} aria-label="読み込み中" role="status">
+    <div className={styles.skeletonRows} aria-hidden="true">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className={styles.skeletonRow}>
-          <span className={styles.skeletonDot} />
-          <span className={styles.skeletonBar} />
-          <span className={`${styles.skeletonBar} ${styles.skeletonBarShort}`} />
+          <Skeleton circle width={24} height={24} />
+          <Skeleton className={styles.skeletonBar} height={12} />
+          <Skeleton className={`${styles.skeletonBar} ${styles.skeletonBarShort}`} height={12} />
         </div>
       ))}
     </div>
@@ -527,6 +529,19 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     setTabEdit(next)
   }, [])
   const [switchTarget, setSwitchTarget] = useState<V8TabKey | null>(null)
+  /* 保存が終わったらボタンを「✓ 保存しました」にする（B-17）。 */
+  const [saveDone, setSaveDone] = useState(false)
+  const prevSavingRef = useRef(false)
+  useEffect(() => {
+    const saving = tabEdit?.saving === true
+    if (prevSavingRef.current && !saving && tabEdit && !tabEdit.dirty) {
+      setSaveDone(true)
+      const timer = setTimeout(() => setSaveDone(false), 1300)
+      prevSavingRef.current = saving
+      return () => clearTimeout(timer)
+    }
+    prevSavingRef.current = saving
+  })
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
     dirty: Boolean(tabEdit?.dirty),
     busy: tabEdit?.saving,
@@ -691,7 +706,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
           </aside>
         </div>
 
-        {tabEdit?.dirty && tabEdit.showBar !== false ? (
+        {tabEdit && (tabEdit.dirty || saveDone) && tabEdit.showBar !== false ? (
           <div className={styles.saveBar} data-design="Savebar">
             <span className={styles.saveBarStatus}>
               <span className={styles.saveBarStatusDot} aria-hidden="true" />
@@ -703,6 +718,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
               onClick={() => tabEdit.onSave()}
               disabled={tabEdit.saving || tabEdit.saveDisabled}
               busy={tabEdit.saving}
+              done={saveDone}
             >
               {tabEdit.saveLabel ?? '保存する'}
             </Button>
@@ -763,20 +779,31 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [historyTarget, setHistoryTarget] = useState<BookingMenu | null>(null)
-  const [visibilityTarget, setVisibilityTarget] = useState<BookingMenu | null>(null)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
   const [updatingVisibility, setUpdatingVisibility] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [reorderBusy, setReorderBusy] = useState(false)
   const [reorderError, setReorderError] = useState<string | null>(null)
+  /* 先に画面を変える分（公開・並び）。裏の保存が終わるまでここが勝つ。 */
+  const [visOverride, setVisOverride] = useState<Record<string, boolean>>({})
+  const [orderOverride, setOrderOverride] = useState<string[] | null>(null)
+  const menusRef = useRef(menus)
+  menusRef.current = menus
+
+  const orderedBase = useMemo(() => {
+    const sorted = sortedMenus(menus)
+    if (!orderOverride || orderOverride.length !== sorted.length) return sorted
+    const byId = new Map(sorted.map((menu) => [menu.id, menu]))
+    const applied = orderOverride.map((id) => byId.get(id)).filter((menu): menu is BookingMenu => Boolean(menu))
+    return applied.length === sorted.length ? applied : sorted
+  }, [menus, orderOverride])
 
   const shown = useMemo(() => {
-    const ordered = sortedMenus(menus)
     const keyword = query.trim()
     return keyword
-      ? ordered.filter((menu) => menu.name.toLowerCase().includes(keyword.toLowerCase()))
-      : ordered
-  }, [menus, query])
+      ? orderedBase.filter((menu) => menu.name.toLowerCase().includes(keyword.toLowerCase()))
+      : orderedBase
+  }, [orderedBase, query])
   const pageCount = Math.max(1, Math.ceil(shown.length / MENU_PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
   const visible = shown.slice((safePage - 1) * MENU_PAGE_SIZE, safePage * MENU_PAGE_SIZE)
@@ -786,10 +813,10 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
     router.push(`/booking/menus/new?menu=${menu.id}`)
   }
 
-  /* 「…」の上へ・下へ。2件の sort_order を版つき updateMenu で交換する（v7 と同じ）。 */
+  /* 「…」の上へ・下へ。先に並びを変えて裏で保存する。 */
   async function moveMenu(menu: BookingMenu, delta: -1 | 1) {
     if (reorderBusy) return
-    const ordered = sortedMenus(menus)
+    const ordered = orderedBase
     const index = ordered.findIndex((item) => item.id === menu.id)
     const nextIndex = index + delta
     if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return
@@ -802,40 +829,96 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
       setReorderError('最新の状態を読み直しました。もう一度お試しください。')
       return
     }
+    const nextIds = ordered.map((item) => item.id)
+    const moved = nextIds[index]
+    nextIds[index] = nextIds[nextIndex]
+    nextIds[nextIndex] = moved
+    setOrderOverride(nextIds)
     setReorderBusy(true)
     setReorderError(null)
     try {
       await bookingApi.updateMenu(accountId, menu.id, version, { ...menu, sort_order: other.sort_order })
       await bookingApi.updateMenu(accountId, other.id, otherVersion, { ...other, sort_order: menu.sort_order })
+      setOrderOverride(null)
       onReload()
+      notifyToast(`「${menu.name}」を${delta < 0 ? '上' : '下'}へ移しました。`, {
+        actionLabel: '元に戻す',
+        onAction: () => {
+          const latest = menusRef.current.find((item) => item.id === menu.id) ?? menu
+          void moveMenu(latest, delta < 0 ? 1 : -1)
+        },
+      })
     } catch (cause) {
-      setReorderError(bookingErrorMessage(cause, '保存'))
+      setOrderOverride(null)
+      onReload()
+      notifyToast(bookingErrorMessage(cause, '保存'), {
+        actionLabel: 'もう一度',
+        onAction: () => {
+          const latest = menusRef.current.find((item) => item.id === menu.id) ?? menu
+          void moveMenu(latest, delta)
+        },
+      })
     } finally {
       setReorderBusy(false)
     }
   }
 
-  async function toggleVisibility(menu: BookingMenu) {
+  /* 公開・止める。先に札を変えて裏で保存する。 */
+  async function toggleVisibility(menu: BookingMenu, force?: boolean) {
+    if (updatingVisibility) return
+    const next = force ?? !(visOverride[menu.id] ?? menu.is_active)
+    setVisOverride((current) => ({ ...current, [menu.id]: next }))
     setUpdatingVisibility(true)
     setVisibilityError(null)
     try {
       const version = menu.version
       if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
-        onReload()
-        setVisibilityError('最新の状態を読み直しました。もう一度お試しください。')
-        return
+        throw new Error('booking_menu_version_missing')
       }
-      await bookingApi.patchMenu(accountId, menu.id, version, { is_active: !menu.is_active })
-      setVisibilityTarget(null)
+      await bookingApi.patchMenu(accountId, menu.id, version, { is_active: next })
+      setVisOverride((current) => {
+        const copy = { ...current }
+        delete copy[menu.id]
+        return copy
+      })
       onReload()
+      notifyToast(next ? `「${menu.name}」をお客さまの画面へ出しました。` : `「${menu.name}」の新しい予約を止めました。`, {
+        actionLabel: '元に戻す',
+        onAction: () => {
+          const latest = menusRef.current.find((item) => item.id === menu.id) ?? menu
+          void toggleVisibility(latest, !next)
+        },
+      })
     } catch (cause) {
-      setVisibilityError(bookingErrorMessage(cause, '保存'))
+      setVisOverride((current) => {
+        const copy = { ...current }
+        delete copy[menu.id]
+        return copy
+      })
+      onReload()
+      if (cause instanceof Error && cause.message === 'booking_menu_version_missing') {
+        setVisibilityError('最新の状態を読み直しました。もう一度お試しください。')
+      } else {
+        notifyToast(bookingErrorMessage(cause, '保存'), {
+          actionLabel: 'もう一度',
+          onAction: () => {
+            const latest = menusRef.current.find((item) => item.id === menu.id) ?? menu
+            void toggleVisibility(latest, next)
+          },
+        })
+      }
     } finally {
       setUpdatingVisibility(false)
     }
   }
 
-  if (status === 'loading') return <SkeletonRows rows={5} />
+  if (status === 'loading') {
+    return (
+      <div aria-busy="true">
+        <DelayedSkeleton loading skeleton={<SkeletonRows rows={5} />} />
+      </div>
+    )
+  }
   if (status === 'error') {
     return (
       <StateCard
@@ -874,6 +957,7 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
       </div>
 
       {reorderError ? <p className="text-danger mt-2 text-xs" role="alert">{reorderError}</p> : null}
+      {visibilityError ? <p className="text-danger mt-2 text-xs" role="alert">{visibilityError}</p> : null}
 
       {menus.length === 0 ? (
         <StateCard
@@ -930,9 +1014,9 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
                 },
                 {
                   id: 'visibility',
-                  label: menu.is_active ? '止める' : '出す',
+                  label: (visOverride[menu.id] ?? menu.is_active) ? '止める' : '出す',
                   dividerBefore: true,
-                  onSelect: () => { setVisibilityError(null); setVisibilityTarget(menu) },
+                  onSelect: () => void toggleVisibility(menu),
                 },
               ] satisfies ActionMenuItem[] : []),
             ]
@@ -980,9 +1064,9 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
                   <span className={styles.cellNum}>{menu.booking_count_30_days ?? 0}件</span>
                 </span>
                 <span className={styles.colStatus}>
-                  <span className={`${styles.statePill} ${menu.is_active ? styles.statePillOn : styles.statePillOff}`}>
+                  <span className={`${styles.statePill} ${(visOverride[menu.id] ?? menu.is_active) ? styles.statePillOn : styles.statePillOff}`}>
                     <span className={styles.stateDot} aria-hidden="true" />
-                    {menu.is_active ? '公開中' : '止めている'}
+                    {(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '止めている'}
                   </span>
                 </span>
                 <span className={styles.colMenu}>
@@ -1033,19 +1117,6 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
         />
       ) : null}
 
-      <ConfirmDialog
-        open={visibilityTarget !== null}
-        title={`「${visibilityTarget?.name ?? ''}」を${visibilityTarget?.is_active ? '止め' : '出し'}ますか？`}
-        description={visibilityTarget?.is_active
-          ? 'お客さまの画面から外し、新しい予約を止めます。すでに入っている予約はそのまま残ります。'
-          : 'お客さまの画面へ出し、新しい予約を受け付けます。担当と受付枠を確認してから出してください。'}
-        confirmLabel={visibilityTarget?.is_active ? '新しい予約を止める' : 'お客さまの画面へ出す'}
-        destructive={Boolean(visibilityTarget?.is_active)}
-        busy={updatingVisibility}
-        error={visibilityError ?? undefined}
-        onCancel={() => { setVisibilityTarget(null); setVisibilityError(null) }}
-        onConfirm={() => { if (visibilityTarget) void toggleVisibility(visibilityTarget) }}
-      />
     </div>
   )
 }
@@ -1135,7 +1206,13 @@ function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resour
     }
   }
 
-  if (settingsStatus === 'loading' || draft === null) return <SkeletonRows rows={7} />
+  if (settingsStatus === 'loading' || draft === null) {
+    return (
+      <div aria-busy="true">
+        <DelayedSkeleton loading skeleton={<SkeletonRows rows={7} />} />
+      </div>
+    )
+  }
   if (settingsStatus === 'error' || !settings) {
     return (
       <StateCard
@@ -1246,7 +1323,9 @@ function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resour
             <Button onClick={() => setAddingResource(true)}>＋ 設備を追加する</Button>
           ) : null}
         </div>
-        {resourcesStatus === 'loading' ? <SkeletonRows rows={2} /> : null}
+        <div aria-busy={resourcesStatus === 'loading'}>
+          <DelayedSkeleton loading={resourcesStatus === 'loading'} skeleton={<SkeletonRows rows={2} />} />
+        </div>
         {resourcesStatus === 'error' ? (
           <StateCard
             icon={<AccountIcon />}
@@ -1760,7 +1839,13 @@ function HolidaysTabV8({ accountId, settings, status, error, exceptions, closedW
     }
   }
 
-  if (status === 'loading') return <SkeletonRows rows={6} />
+  if (status === 'loading') {
+    return (
+      <div aria-busy="true">
+        <DelayedSkeleton loading skeleton={<SkeletonRows rows={6} />} />
+      </div>
+    )
+  }
   if (status === 'error' || !settings) {
     return (
       <StateCard
@@ -2105,7 +2190,13 @@ function RulesTabV8({ accountId, settings, status, error, staff, staffReady, can
     }
   }
 
-  if (status === 'loading' || draft === null) return <SkeletonRows rows={5} />
+  if (status === 'loading' || draft === null) {
+    return (
+      <div aria-busy="true">
+        <DelayedSkeleton loading skeleton={<SkeletonRows rows={5} />} />
+      </div>
+    )
+  }
   if (status === 'error' || !settings) {
     return (
       <StateCard
@@ -2346,7 +2437,13 @@ function StaffTabV8({ accountId, staff, status, error, matrices, extras, members
     return `${member.name}（${role}）`
   }
 
-  if (status === 'loading') return <SkeletonRows rows={4} />
+  if (status === 'loading') {
+    return (
+      <div aria-busy="true">
+        <DelayedSkeleton loading skeleton={<SkeletonRows rows={4} />} />
+      </div>
+    )
+  }
   if (status === 'error') {
     return (
       <StateCard

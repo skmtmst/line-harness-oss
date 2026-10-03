@@ -11,8 +11,10 @@ import ListState from '@/components/shared/list-state'
 import { isForbidden, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canEditFeature } from '@/lib/staff-capability'
 // 編集窓は V8 予約設定の担当スタッフタブ（menus/settings-v8.tsx）と共用。
@@ -20,9 +22,49 @@ import { EMPTY_STAFF as EMPTY, StaffEditModal } from './staff-edit-dialog'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
+/** 担当一覧の読み込み待ちの骨組み（見出しはそのまま・5行・列幅も本物と同じ）。 */
+function StaffTableSkeleton() {
+  return (
+    <DataTable data-design="Table" aria-hidden="true">
+      <thead>
+        <TableHeadRow>
+          <Th>スタッフ</Th>
+          <Th style={{ width: '16%' }}>役職</Th>
+          <Th style={{ width: '14%' }} align="center">指名なし枠</Th>
+          <Th style={{ width: '10%' }} align="right">並び順</Th>
+          <Th style={{ width: '10%' }} align="center">有効</Th>
+          <Th align="right" className="w-32">操作</Th>
+        </TableHeadRow>
+      </thead>
+      <tbody>
+        {[0, 1, 2, 3, 4].map((row) => (
+          <Tr key={row}>
+            <Td>
+              <div className="flex items-center gap-3">
+                <Skeleton circle width={36} height={36} />
+                <div>
+                  <Skeleton width={96} height={16} />
+                  <Skeleton width={64} height={12} />
+                </div>
+              </div>
+            </Td>
+            <Td><Skeleton width="60%" height={14} /></Td>
+            <Td align="center"><Skeleton width={48} height={18} /></Td>
+            <Td align="right"><Skeleton width={32} height={14} /></Td>
+            <Td align="center"><Skeleton width={40} height={18} /></Td>
+            <Td align="right"><Skeleton width={96} height={28} /></Td>
+          </Tr>
+        ))}
+      </tbody>
+    </DataTable>
+  )
+}
+
 export default function BookingStaffPage() {
   usePageTitle('予約設定')
   const { selectedAccountId } = useAccount()
+  /* V8 のときだけ骨組み・保存中表示へ。v7 は従来の見た目のまま。 */
+  const adminTheme = useAdminTheme()
   const [items, setItems] = useState<BookingStaff[]>([])
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
@@ -135,7 +177,14 @@ export default function BookingStaffPage() {
           <ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、予約スタッフを管理するLINEアカウントを選んでください。" />
         </div>
       ) : loadStatus === 'loading' ? (
-        <ListState kind="loading" title="予約スタッフを読み込んでいます" />
+        adminTheme === 'v8' ? (
+          <div aria-busy="true">
+            <span className="sr-only" role="status">予約スタッフを読み込んでいます</span>
+            <DelayedSkeleton loading skeleton={<StaffTableSkeleton />} />
+          </div>
+        ) : (
+          <ListState kind="loading" title="予約スタッフを読み込んでいます" />
+        )
       ) : loadStatus === 'error' ? (
         <ListState
           kind="error"
