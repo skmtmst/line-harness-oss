@@ -214,7 +214,8 @@ function formatYen(n: number): string {
 const WORKER_BASE = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
 export function distributionUrl(refCode: string, customBase: string | null): string {
-  if (customBase) return `${customBase.replace(/\/$/, '')}/${refCode}`
+  // 口が器（`{items,…}`）を返すことがある。文字列でなければ土台なし扱い。
+  if (typeof customBase === 'string' && customBase) return `${customBase.replace(/\/$/, '')}/${refCode}`
   if (WORKER_BASE) return `${WORKER_BASE}/r/${encodeURIComponent(refCode)}`
   return ''
 }
@@ -520,7 +521,7 @@ export function AffiliatorsTab({
       if (!isCurrentDetail(id, gen)) return
       /* **形を確かめてから入れる。** 読めない返事を入れると、描くときに落ちる。 */
       setReport(reportRes.success ? asReportV2(reportRes.data) : null)
-      if (linksRes.success) setLinks(linksRes.data as unknown as AffiliateLink[])
+      if (linksRes.success && Array.isArray(linksRes.data)) setLinks(linksRes.data as unknown as AffiliateLink[])
       // 失敗は握りつぶさず、内訳面に再試行を出す（#554 点検#505中7）。
       if (!reportRes.success || !linksRes.success) setDetailError(true)
     } catch {
@@ -538,7 +539,8 @@ export function AffiliatorsTab({
     try {
       const res = await api.affiliates.journeys(id, { limit: JOURNEY_PAGE_SIZE })
       if (!isCurrentDetail(id, gen)) return
-      if (res.success) {
+      // 口が器（`{items,…}`）を返すことがある。配列でなければ失敗扱い。
+      if (res.success && Array.isArray(res.data)) {
         setJourneys(res.data)
         journeyCursorRef.current = res.nextCursor ?? null
         setJourneyMore(Boolean(res.nextCursor))
@@ -567,7 +569,7 @@ export function AffiliatorsTab({
       })
       // R289: 追加読み込みの遅い応答も、別の紹介者へは混ぜない。
       if (!isCurrentDetail(id, gen)) return
-      if (res.success) {
+      if (res.success && Array.isArray(res.data)) {
         setJourneys((prev) => {
           const seen = new Set(prev.map((j) => j.friendId))
           return [...prev, ...res.data.filter((j) => !seen.has(j.friendId))]

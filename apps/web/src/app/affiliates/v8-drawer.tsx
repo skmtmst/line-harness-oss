@@ -102,7 +102,7 @@ export default function AffiliateDrawerV8({
       if (!isCurrent(id, gen)) return
       // 形を確かめてから入れる。読めない返事を入れると描くときに落ちる。
       setReport(reportRes.success ? asReportV2(reportRes.data) : null)
-      if (linksRes.success) setLinks(linksRes.data as unknown as AffiliateLink[])
+      if (linksRes.success && Array.isArray(linksRes.data)) setLinks(linksRes.data as unknown as AffiliateLink[])
       if (!reportRes.success || !linksRes.success) setError(true)
     } catch {
       if (!isCurrent(id, gen)) return
@@ -118,7 +118,8 @@ export default function AffiliateDrawerV8({
     try {
       const res = await api.affiliates.journeys(id, { limit: JOURNEY_PAGE_SIZE })
       if (!isCurrent(id, gen)) return
-      if (res.success) {
+      // 口が器（`{items,…}`）を返すことがある。配列でなければ失敗扱い。
+      if (res.success && Array.isArray(res.data)) {
         setJourneys(res.data)
         journeyCursorRef.current = res.nextCursor ?? null
         setJourneyMore(Boolean(res.nextCursor))
@@ -145,7 +146,7 @@ export default function AffiliateDrawerV8({
         beforeId: cursor.beforeId,
       })
       if (!isCurrent(id, gen)) return
-      if (res.success) {
+      if (res.success && Array.isArray(res.data)) {
         setJourneys((prev) => {
           const seen = new Set(prev.map((j) => j.friendId))
           return [...prev, ...res.data.filter((j) => !seen.has(j.friendId))]

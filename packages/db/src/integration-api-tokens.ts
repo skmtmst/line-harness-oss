@@ -154,6 +154,27 @@ export async function revokeIntegrationApiToken(
   return (result.meta.changes ?? 0) > 0;
 }
 
+/**
+ * 止めた鍵を動かし直す（F-17）。
+ *
+ * 止めている行だけが対象。平文は保存していないが hash は残っているので、
+ * 止める前の合言葉がそのまま使えるようになる（新しい発行はしない）。
+ * 止めた人（revoked_by）は履歴として残し、動かし直し自体は監査記録へ残す。
+ */
+export async function reactivateIntegrationApiToken(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<boolean> {
+  const now = jstNow();
+  const result = await db.prepare(
+    `UPDATE integration_api_tokens
+        SET revoked_at = NULL, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND revoked_at IS NOT NULL`,
+  ).bind(now, id, lineAccountId).run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
 export type RotateIntegrationApiTokenResult =
   /** 再発行できた。row が新しい行、token はこの応答にだけ乗る平文。 */
   | { status: 'ok'; row: IntegrationApiTokenRow; token: string }

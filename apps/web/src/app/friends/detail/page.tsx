@@ -1743,6 +1743,7 @@ function FriendDetailInner() {
               {tabsOverflowing ? (
                 <div
                   aria-hidden="true"
+                  data-tab-fade="right"
                   className="from-canvas-sunken pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l to-transparent"
                 />
               ) : null}
