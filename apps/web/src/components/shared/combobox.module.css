@@ -143,6 +143,27 @@
   }
 }
 
+/*
+ * ★V8 仕上げ（M10）：候補は少し下から 200ms（窓・メニューと同じ速さ）。
+ * v7 は 120ms のまま。
+ */
+[data-theme='v8'] .popup {
+  animation-name: combobox-v8-in;
+  animation-duration: var(--motion-base);
+}
+
+@keyframes combobox-v8-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .list {
   display: flex;
   flex-direction: column;
@@ -166,6 +187,25 @@
 
 .option[data-active] {
   background: var(--color-canvas-sunken);
+}
+
+/*
+ * ★V8 仕上げ（M10-2）：探す欄の乗せた・候補の動き。
+ * 枠は 120ms で色が変わり、候補の行に乗せたときの薄い背景も 120ms。
+ * 開く動きは候補の箱が持つ。
+ */
+[data-theme='v8'] .field {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .field:hover {
+  background: var(--color-canvas-sunken);
+}
+
+[data-theme='v8'] .option {
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .option[aria-disabled='true'] {

@@ -472,6 +472,13 @@
   --motion-fast: 120ms;
   --motion-base: 200ms;
   --motion-slow: 300ms;
+  /*
+   * ★V8 仕上げ（M10）：閉じる 150ms・引き出し 240ms。
+   * 開く 200ms の逆再生と、横から出る面だけ少しゆっくりの指定。
+   * `@theme` ではなく `:root` に置く（使われないと出力されないため）。
+   */
+  --motion-exit: 150ms;
+  --motion-panel: 240ms;
   /* 骨組みの明滅 1 周期（★V7 仕上げ §3）。transition ではなく animation の周期専用。 */
   --motion-pulse: 1.2s;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -775,6 +782,58 @@ aside[aria-label="フォルダ"] .shadow-lg {
 /* モーダルは中央から。最前面の影（★V7 段3）で浮かせる。 */
 [data-design-part="dialog"] {
   animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
+}
+
+/*
+ * ★V8 仕上げ（M10）：読み込み中の表示→中身はふっと出る
+ * （opacity＋少し下から 4px、200ms ease-out）。
+ * `data-content-in` を付けた器が載せ替わったときに1回だけ出る。
+ * 動きを減らす設定では末尾の規定で一瞬になる。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] [data-content-in] {
+    animation: v8-content-in var(--motion-base) var(--motion-ease-out);
+  }
+}
+
+@keyframes v8-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * ★V8 仕上げ3回目（M10）①④：表の行は上から順に少しずつ出る。
+ * 載せ替わり（タブ・絞り込み・ページ送り）や行の追加で載った行も
+ * 同じ速さで出る。v8-content-in（200ms ease-out）を使い回し、
+ * 1 行ずつ 40ms ずらし・4 行目以降は同時（全体 320ms 以内。
+ * v7 の v7-stagger と同じ刻み）。`both` の終端が最終表示なので、
+ * 動きを減らす設定では出ない代わりに正しく表示される。
+ * 層の外に書く（部品の CSS Module より勝つ必要はなく、
+ * 行に animation を持つ部品は今ないため）。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] tbody > tr {
+    animation: v8-content-in var(--motion-base) var(--motion-ease-out) both;
+  }
+
+  [data-theme="v8"] tbody > tr:nth-child(2) {
+    animation-delay: 40ms;
+  }
+
+  [data-theme="v8"] tbody > tr:nth-child(3) {
+    animation-delay: 80ms;
+  }
+
+  [data-theme="v8"] tbody > tr:nth-child(n + 4) {
+    animation-delay: 120ms;
+  }
 }
 
 [data-design-part="dialog"][data-design-node] {

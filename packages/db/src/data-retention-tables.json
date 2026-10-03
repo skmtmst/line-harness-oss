@@ -1,0 +1,3614 @@
+{
+  "_556_folders_backup_auto_replies": {
+    "category": "global"
+  },
+  "_556_folders_backup_broadcasts": {
+    "category": "global"
+  },
+  "_556_folders_backup_common_vars": {
+    "category": "global"
+  },
+  "_556_folders_backup_forms": {
+    "category": "global"
+  },
+  "_556_folders_backup_friend_fields": {
+    "category": "global"
+  },
+  "_556_folders_backup_media": {
+    "category": "global"
+  },
+  "_556_folders_backup_media_upload_sessions": {
+    "category": "global"
+  },
+  "_556_folders_backup_reminders": {
+    "category": "global"
+  },
+  "_556_folders_backup_rich_menu_groups": {
+    "category": "global"
+  },
+  "_556_folders_backup_scenarios": {
+    "category": "global"
+  },
+  "_556_folders_backup_tags": {
+    "category": "global"
+  },
+  "_556_folders_backup_templates": {
+    "category": "global"
+  },
+  "_556_folders_backup_webinars": {
+    "category": "global"
+  },
+  "account_handover_decisions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "handover_id",
+      "parent": "account_handovers",
+      "parentColumn": "id"
+    }
+  },
+  "account_handovers": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "from_account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  },
+  "account_health_logs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "account_migrations": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "from_account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  },
+  "account_pool_switch_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "account_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "account_skipped_deliveries": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "action_score_rule_sets": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "action_score_rule_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "rule_set_id",
+      "parent": "action_score_rule_sets",
+      "parentColumn": "id"
+    }
+  },
+  "ad_conversion_logs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ad_conversion_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ad_cost_entries": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ad_cost_import_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "ad_platform_id",
+      "parent": "ad_platforms",
+      "parentColumn": "id"
+    }
+  },
+  "ad_platforms": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "admin_sessions": {
+    "category": "global"
+  },
+  "admin_two_factor_challenges": {
+    "category": "global"
+  },
+  "admin_users": {
+    "category": "global"
+  },
+  "affiliate_adjustments": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "affiliate_attribution_decisions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "conversion_event_id",
+      "parent": "conversion_events",
+      "parentColumn": "id"
+    }
+  },
+  "affiliate_bank_profiles": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "affiliate_clicks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "affiliate_id",
+      "parent": "affiliates",
+      "parentColumn": "id"
+    }
+  },
+  "affiliate_links": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "affiliate_offer_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "offer_id",
+      "parent": "affiliate_offers",
+      "parentColumn": "id"
+    }
+  },
+  "affiliate_offers": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "affiliate_payout_batch_lines": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "batch_id",
+      "parent": "affiliate_payout_batches",
+      "parentColumn": "id"
+    }
+  },
+  "affiliate_payout_batches": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "affiliate_payout_results": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "batch_id",
+      "parent": "affiliate_payout_batches",
+      "parentColumn": "id"
+    }
+  },
+  "affiliate_reward_calculations": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "affiliate_reward_entries": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "affiliate_settlement_lines": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "settlement_id",
+      "parent": "affiliate_settlements",
+      "parentColumn": "id"
+    }
+  },
+  "affiliate_settlements": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "affiliate_statements": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "affiliates": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "ai_loop_slack_reports": {
+    "category": "global"
+  },
+  "analytics_cross_run_members": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_cross_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_daily_metrics": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_event_coverage": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_export_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_funnel_run_members": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_funnel_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_funnel_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_projection_friend_stage": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_projection_metric_stage": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_projection_progress": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_projection_scheduler_state": {
+    "category": "global"
+  },
+  "analytics_reconciliation_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_report_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_report_schedules": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_result_audience_members": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "audience_id",
+      "parent": "analytics_result_audiences",
+      "parentColumn": "id"
+    }
+  },
+  "analytics_result_audiences": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_saved_analyses": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_saved_analysis_snapshots": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_saved_analysis_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_url_exposure_queue": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "analytics_url_exposures": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "audit_events": {
+    "category": "retain",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "auth_email_tokens": {
+    "category": "global"
+  },
+  "auth_step_up_attempts": {
+    "category": "global"
+  },
+  "auth_step_up_grants": {
+    "category": "global"
+  },
+  "auth_throttles": {
+    "category": "global"
+  },
+  "auto_replies": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "auto_reply_action_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "evaluation_id",
+      "parent": "auto_reply_evaluations",
+      "parentColumn": "id"
+    }
+  },
+  "auto_reply_create_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "auto_reply_evaluation_details": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "evaluation_id",
+      "parent": "auto_reply_evaluations",
+      "parentColumn": "id"
+    }
+  },
+  "auto_reply_evaluations": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "auto_reply_hits": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "auto_reply_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "automation_definitions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "automation_logs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "automation_id",
+      "parent": "automations",
+      "parentColumn": "id"
+    }
+  },
+  "automation_run_daily_counts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "automation_run_steps": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "automation_run_id",
+      "parent": "automation_runs",
+      "parentColumn": "id"
+    }
+  },
+  "automation_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "automation_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "automation_id",
+      "parent": "automation_definitions",
+      "parentColumn": "id"
+    }
+  },
+  "automations": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "banner_generations": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "banner_image_deliveries": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "banner_images": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "banner_projects": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "banner_usage_ledger": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "billing_events": {
+    "category": "retain",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "billing_invoices": {
+    "category": "retain",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "booking_audit_logs": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_availability_exceptions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_business_hours": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "booking_settings_id",
+      "parent": "booking_settings",
+      "parentColumn": "id"
+    }
+  },
+  "booking_customers": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_idempotency_keys": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_menu_resources": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "menu_id",
+      "parent": "menus",
+      "parentColumn": "id"
+    }
+  },
+  "booking_operation_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_reminders": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "booking_id",
+      "parent": "bookings",
+      "parentColumn": "id"
+    }
+  },
+  "booking_resource_consumptions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_resources": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "bookings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "broadcast_after_action_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
+  "broadcast_approval_events": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
+  "broadcast_asset_folders": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "broadcast_asset_publish_keys": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "asset_id",
+      "parent": "broadcast_message_assets",
+      "parentColumn": "id"
+    }
+  },
+  "broadcast_asset_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "asset_id",
+      "parent": "broadcast_message_assets",
+      "parentColumn": "id"
+    }
+  },
+  "broadcast_insights": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
+  "broadcast_lifecycle_events": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
+  "broadcast_message_assets": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "broadcast_saved_views": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "broadcast_send_claims": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "broadcast_tracked_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
+  "broadcasts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "calendar_bookings": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "connection_id",
+      "parent": "google_calendar_connections",
+      "parentColumn": "id"
+    }
+  },
+  "carousel_taps": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "chats": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "codex_cloud_tasks": {
+    "category": "global"
+  },
+  "common_action_binding_migration_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "common_action_bindings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "common_action_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "common_action_id",
+      "parent": "common_actions",
+      "parentColumn": "id"
+    }
+  },
+  "common_actions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "common_var_export_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "common_var_replacement_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "common_var_resolution_failures": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "common_var_schedules": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "var_id",
+      "parent": "common_vars",
+      "parentColumn": "id"
+    }
+  },
+  "common_var_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "common_var_id",
+      "parent": "common_vars",
+      "parentColumn": "id"
+    }
+  },
+  "common_vars": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "conversion_anonymous_days": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "conversion_point_id",
+      "parent": "conversion_points",
+      "parentColumn": "id"
+    }
+  },
+  "conversion_definition_operations": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "conversion_point_id",
+      "parent": "conversion_points",
+      "parentColumn": "id"
+    }
+  },
+  "conversion_definition_revisions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "conversion_point_id",
+      "parent": "conversion_points",
+      "parentColumn": "id"
+    }
+  },
+  "conversion_definition_usages": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "conversion_event_dedup_claims": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "conversion_point_id",
+      "parent": "conversion_points",
+      "parentColumn": "id"
+    }
+  },
+  "conversion_event_reversals": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "conversion_event_id",
+      "parent": "conversion_events",
+      "parentColumn": "id"
+    }
+  },
+  "conversion_events": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "conversion_ingestion_events": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "conversion_point_id",
+      "parent": "conversion_points",
+      "parentColumn": "id"
+    }
+  },
+  "conversion_points": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "customer_notification_definitions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "customer_notification_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "definition_id",
+      "parent": "customer_notification_definitions",
+      "parentColumn": "id"
+    }
+  },
+  "dashboard_default_preferences": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "dashboard_preferences": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ec_action_execution_attempts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "action_execution_id",
+      "parent": "ec_action_executions",
+      "parentColumn": "id"
+    }
+  },
+  "ec_action_executions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ec_connectors": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ec_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ec_identity_links": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "ec_notification_account_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ec_notification_settings": {
+    "category": "global"
+  },
+  "ec_order_lines": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "order_id",
+      "parent": "ec_orders",
+      "parentColumn": "id"
+    }
+  },
+  "ec_orders": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ec_v6_dispatches": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "event_id",
+      "parent": "ec_events",
+      "parentColumn": "id"
+    }
+  },
+  "engagement_events": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "actor_user_id",
+      "parent": "users",
+      "parentColumn": "id"
+    }
+  },
+  "entry_route_genres": {
+    "category": "global"
+  },
+  "entry_route_stop_suppressions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "entry_routes": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "error_messages": {
+    "category": "global"
+  },
+  "event_booking_idempotency_keys": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "event_booking_reminders": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "booking_id",
+      "parent": "event_bookings",
+      "parentColumn": "id"
+    }
+  },
+  "event_bookings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "event_change_logs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "event_occurrence_applicant_snapshots": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "event_slots": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "event_id",
+      "parent": "events",
+      "parentColumn": "id"
+    }
+  },
+  "event_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "event_waitlist": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "event_waitlist_promotion_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "field_migration_items": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "run_id",
+      "parent": "field_migration_runs",
+      "parentColumn": "id"
+    }
+  },
+  "field_migration_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "file_scan_configs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "folders": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  },
+  "form_accounts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "form_capacity_claims": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "form_id",
+      "parent": "forms",
+      "parentColumn": "id"
+    }
+  },
+  "form_opens": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "form_id",
+      "parent": "forms",
+      "parentColumn": "id"
+    }
+  },
+  "form_submissions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "form_submit_claims": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "form_submit_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "form_test_tokens": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "form_id",
+      "parent": "forms",
+      "parentColumn": "id"
+    }
+  },
+  "form_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "form_id",
+      "parent": "forms",
+      "parentColumn": "id"
+    }
+  },
+  "forms": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "on_submit_tag_id",
+      "parent": "tags",
+      "parentColumn": "id"
+    }
+  },
+  "friend_add_action_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "event_id",
+      "parent": "friend_add_events",
+      "parentColumn": "id"
+    }
+  },
+  "friend_add_attribution_candidates": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "friend_add_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "friend_add_routing_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "friend_add_rule_folders": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "friend_add_rule_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "rule_id",
+      "parent": "friend_add_rules",
+      "parentColumn": "id"
+    }
+  },
+  "friend_add_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "friend_add_send_claims": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "friend_bulk_message_approval_events": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "run_id",
+      "parent": "friend_bulk_runs",
+      "parentColumn": "id"
+    }
+  },
+  "friend_bulk_message_approvals": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "run_id",
+      "parent": "friend_bulk_runs",
+      "parentColumn": "id"
+    }
+  },
+  "friend_bulk_run_items": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "friend_bulk_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "friend_daily_snapshots": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "friend_export_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "friend_field_create_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "friend_field_reminder_scan_states": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reminder_id",
+      "parent": "reminders",
+      "parentColumn": "id"
+    }
+  },
+  "friend_field_scopes": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "friend_field_values": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "friend_fields": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "folders",
+      "parentColumn": "id"
+    }
+  },
+  "friend_identity_links": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "friend_import_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "friend_reminder_deliveries": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_reminder_id",
+      "parent": "friend_reminders",
+      "parentColumn": "id"
+    }
+  },
+  "friend_reminders": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "friend_scenario_op_keys": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_scenario_id",
+      "parent": "friend_scenarios",
+      "parentColumn": "id"
+    }
+  },
+  "friend_scenarios": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "friend_scores": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "friend_tag_side_effect_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "friend_tags": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "friends": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "funnel_steps": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "funnel_id",
+      "parent": "funnels",
+      "parentColumn": "id"
+    }
+  },
+  "funnels": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "google_calendar_connections": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "google_sheets_integrations": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "google_sheets_oauth_states": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "google_sheets_sync_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "integration_id",
+      "parent": "google_sheets_integrations",
+      "parentColumn": "id"
+    }
+  },
+  "hq_support_messages": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "request_id",
+      "parent": "hq_support_requests",
+      "parentColumn": "id"
+    }
+  },
+  "hq_support_reply_drafts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "request_id",
+      "parent": "hq_support_requests",
+      "parentColumn": "id"
+    }
+  },
+  "hq_support_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_template_distribution_results": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_template_distribution_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_template_owned_r2_keys": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_template_preflight_resolutions": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_template_preflights": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_template_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_templates": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "identity_candidate_decisions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "candidate_id",
+      "parent": "identity_candidates",
+      "parentColumn": "id"
+    }
+  },
+  "identity_candidates": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "identity_events": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "impersonation_sessions": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "inbox_conversation_events": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "conversation_id",
+      "parent": "chats",
+      "parentColumn": "id"
+    }
+  },
+  "inbox_notes": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "conversation_id",
+      "parent": "chats",
+      "parentColumn": "id"
+    }
+  },
+  "inbox_reply_leases": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "conversation_id",
+      "parent": "chats",
+      "parentColumn": "id"
+    }
+  },
+  "inbox_staff_reads": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "conversation_id",
+      "parent": "chats",
+      "parentColumn": "id"
+    }
+  },
+  "incoming_webhook_receipts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "webhook_id",
+      "parent": "incoming_webhooks",
+      "parentColumn": "id"
+    }
+  },
+  "incoming_webhook_steps": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "source_event_id",
+      "parent": "incoming_webhook_receipts",
+      "parentColumn": "source_event_id"
+    }
+  },
+  "incoming_webhook_unmatched_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "incoming_webhooks": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "integration_api_tokens": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "line_account_connection_checks": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "line_account_tag_links": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "line_account_tags": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "line_accounts": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "line_message_unsends": {
+    "category": "global"
+  },
+  "line_webhook_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "link_clicks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "tracked_link_id",
+      "parent": "tracked_links",
+      "parentColumn": "id"
+    }
+  },
+  "login_audit": {
+    "category": "retain"
+  },
+  "manual_link_check_history": {
+    "category": "global"
+  },
+  "manual_links": {
+    "category": "global"
+  },
+  "measurement_domain_rejections": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "site_id",
+      "parent": "measurement_sites",
+      "parentColumn": "id"
+    }
+  },
+  "measurement_site_domains": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "site_id",
+      "parent": "measurement_sites",
+      "parentColumn": "id"
+    }
+  },
+  "measurement_sites": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "media": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "media_file_scans": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "media_storage_quotas": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "media_upload_sessions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "media_usage_scan_state": {
+    "category": "global"
+  },
+  "media_usages": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "media_id",
+      "parent": "media",
+      "parentColumn": "id"
+    }
+  },
+  "media_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "media_id",
+      "parent": "media",
+      "parentColumn": "id"
+    }
+  },
+  "meet_callback_receipts": {
+    "category": "global"
+  },
+  "meet_consultation_reminders": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "consultation_id",
+      "parent": "meet_consultations",
+      "parentColumn": "id"
+    }
+  },
+  "meet_consultations": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "menu_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "menu_id",
+      "parent": "menus",
+      "parentColumn": "id"
+    }
+  },
+  "menus": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "message_templates": {
+    "category": "global"
+  },
+  "messages_log": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "mileage_adjustment_approval_events": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "request_id",
+      "parent": "mileage_adjustment_approval_requests",
+      "parentColumn": "id"
+    }
+  },
+  "mileage_adjustment_approval_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "mileage_adjustment_notifications": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "mileage_earning_rule_drafts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "mileage_earning_rule_published_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "rule_id",
+      "parent": "mileage_rules",
+      "parentColumn": "id"
+    }
+  },
+  "mileage_event_queue": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "engagement_event_id",
+      "parent": "engagement_events",
+      "parentColumn": "id"
+    }
+  },
+  "mileage_grant_lots": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "ledger_entry_id",
+      "parent": "mileage_ledger",
+      "parentColumn": "id"
+    }
+  },
+  "mileage_ledger": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "beneficiary_user_id",
+      "parent": "users",
+      "parentColumn": "id"
+    }
+  },
+  "mileage_programs": {
+    "category": "global"
+  },
+  "mileage_redemption_attempts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "redemption_id",
+      "parent": "mileage_redemptions",
+      "parentColumn": "id"
+    }
+  },
+  "mileage_redemption_step_deliveries": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "redemption_id",
+      "parent": "mileage_redemptions",
+      "parentColumn": "id"
+    }
+  },
+  "mileage_redemptions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "mileage_reward_codes": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "redemption_id",
+      "parent": "mileage_redemptions",
+      "parentColumn": "id"
+    }
+  },
+  "mileage_reward_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reward_id",
+      "parent": "mileage_rewards",
+      "parentColumn": "id"
+    }
+  },
+  "mileage_rewards": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "mileage_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "mileage_spend_allocations": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "redemption_id",
+      "parent": "mileage_redemptions",
+      "parentColumn": "id"
+    }
+  },
+  "mileage_wallets": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "beneficiary_user_id",
+      "parent": "users",
+      "parentColumn": "id"
+    }
+  },
+  "nen_birthday_coupon_settings": {
+    "category": "global"
+  },
+  "nen_campaign_settings": {
+    "category": "global"
+  },
+  "nen_care_flags": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "nen_column_read_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_columns": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_consultation_logs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "nen_consultation_logs_v2": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "nen_coupon_issues": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "nen_delivery_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_ec_member_snapshots": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "nen_feeding_products": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_feeding_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_friend_add_coupon_issues": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_health_logs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "nen_knowledge_articles": {
+    "category": "global"
+  },
+  "nen_lifetime_milestones": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_member_rank_sync": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_pet_profiles": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "nen_photo_assessment_runs": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_photo_asset_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_photo_bulk_decision_receipts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_photo_derivatives": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_photo_original_download_audit": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_photo_original_download_grants": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_photo_publication_placements": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_photo_publications": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_photo_review_events": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_photo_reward_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_photo_risk_assessments": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_photo_submissions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_point_ledger": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "nen_rank_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_rank_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_rich_menu_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_tag_refresh_state": {
+    "category": "global"
+  },
+  "notification_aggregate_metrics": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "notification_deliveries": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "notification_delivery_attempts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "delivery_id",
+      "parent": "notification_deliveries",
+      "parentColumn": "id"
+    }
+  },
+  "notification_instances": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "notification_interactions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "delivery_id",
+      "parent": "notification_deliveries",
+      "parentColumn": "id"
+    }
+  },
+  "notification_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "notifications": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "operation_alert_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "operation_alert_notification_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "operation_alerts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "operation_audit": {
+    "category": "retain"
+  },
+  "operation_control_sets": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "operation_deployment_events": {
+    "category": "global"
+  },
+  "operation_dispatcher_heartbeats": {
+    "category": "global"
+  },
+  "operation_health_results": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "run_id",
+      "parent": "operation_health_runs",
+      "parentColumn": "id"
+    }
+  },
+  "operation_health_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "operation_incidents": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "operation_infra_probes": {
+    "category": "global"
+  },
+  "operation_notification_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "incident_id",
+      "parent": "operation_incidents",
+      "parentColumn": "id"
+    }
+  },
+  "operation_request_receipts": {
+    "category": "global"
+  },
+  "operators": {
+    "category": "global"
+  },
+  "outbound_send_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "outgoing_webhook_deliveries": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "outgoing_webhooks": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "photo_reward_policies": {
+    "category": "global"
+  },
+  "pii_reveal_logs": {
+    "category": "retain",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "platform_admin_invites": {
+    "category": "global"
+  },
+  "platform_admins": {
+    "category": "global"
+  },
+  "platform_ai_calls": {
+    "category": "global"
+  },
+  "platform_announcement_recipients": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "platform_announcements": {
+    "category": "global"
+  },
+  "platform_audit_logs": {
+    "category": "retain",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "platform_counters": {
+    "category": "global"
+  },
+  "platform_knowledge_articles": {
+    "category": "global"
+  },
+  "platform_knowledge_jobs": {
+    "category": "global"
+  },
+  "platform_knowledge_usage": {
+    "category": "global"
+  },
+  "platform_settings": {
+    "category": "global"
+  },
+  "pool_accounts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "postal_codes": {
+    "category": "global"
+  },
+  "postal_import_manifest": {
+    "category": "global"
+  },
+  "recipe_clone_items": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "run_id",
+      "parent": "recipe_clone_runs",
+      "parentColumn": "id"
+    }
+  },
+  "recipe_clone_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "recipes": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ref_tracking": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "reminder_delivery_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "reminder_steps": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reminder_id",
+      "parent": "reminders",
+      "parentColumn": "id"
+    }
+  },
+  "reminder_version_steps": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reminder_version_id",
+      "parent": "reminder_versions",
+      "parentColumn": "id"
+    }
+  },
+  "reminder_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reminder_id",
+      "parent": "reminders",
+      "parentColumn": "id"
+    }
+  },
+  "reminders": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "rich_menu_area_taps": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "rich_menu_areas": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "page_id",
+      "parent": "rich_menu_pages",
+      "parentColumn": "id"
+    }
+  },
+  "rich_menu_assignment_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "rich_menu_assignments": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "rich_menu_device_confirmations": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "group_id",
+      "parent": "rich_menu_groups",
+      "parentColumn": "id"
+    }
+  },
+  "rich_menu_duplicate_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  },
+  "rich_menu_groups": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  },
+  "rich_menu_manual_publish_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "group_id",
+      "parent": "rich_menu_groups",
+      "parentColumn": "id"
+    }
+  },
+  "rich_menu_manual_publish_shells": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "request_id",
+      "parent": "rich_menu_manual_publish_requests",
+      "parentColumn": "id"
+    }
+  },
+  "rich_menu_pages": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "group_id",
+      "parent": "rich_menu_groups",
+      "parentColumn": "id"
+    }
+  },
+  "rich_menu_publish_run_pages": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "run_id",
+      "parent": "rich_menu_publish_runs",
+      "parentColumn": "id"
+    }
+  },
+  "rich_menu_publish_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "group_id",
+      "parent": "rich_menu_groups",
+      "parentColumn": "id"
+    }
+  },
+  "rich_menu_schedule_publications": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "schedule_id",
+      "parent": "rich_menu_schedules",
+      "parentColumn": "id"
+    }
+  },
+  "rich_menu_schedules": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "group_id",
+      "parent": "rich_menu_groups",
+      "parentColumn": "id"
+    }
+  },
+  "rich_menu_test_applies": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "group_id",
+      "parent": "rich_menu_groups",
+      "parentColumn": "id"
+    }
+  },
+  "rich_menu_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "group_id",
+      "parent": "rich_menu_groups",
+      "parentColumn": "id"
+    }
+  },
+  "rt_approval_requests": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "organization_id",
+      "parent": "rt_organizations",
+      "parentColumn": "id"
+    }
+  },
+  "rt_connector_status": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_email_digests": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_gbp_posts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_gbp_reviews": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_google_changes": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_google_connections": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "rt_google_location_candidates": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_google_metrics_daily": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_google_oauth_states": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "rt_google_posts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_google_profiles": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_google_reviews": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_google_write_log": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_inbound_emails": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_intake_addresses": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_inventory_slots": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_line_flows": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "organization_id",
+      "parent": "rt_organizations",
+      "parentColumn": "id"
+    }
+  },
+  "rt_media": {
+    "category": "global"
+  },
+  "rt_memberships": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "organization_id",
+      "parent": "rt_organizations",
+      "parentColumn": "id"
+    }
+  },
+  "rt_menu_change_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "approval_id",
+      "parent": "rt_approval_requests",
+      "parentColumn": "id"
+    }
+  },
+  "rt_menu_items": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_opening_hours_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_organization_agreements": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "organization_id",
+      "parent": "rt_organizations",
+      "parentColumn": "id"
+    }
+  },
+  "rt_organizations": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "rt_reservations": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_resource_locks": {
+    "category": "global"
+  },
+  "rt_stores": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "rt_sync_events": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_tables": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "saved_search_references": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "saved_search_revisions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "saved_search_usage_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "saved_searches": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "scenario_action_fires": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "scenario_actions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "scenario_id",
+      "parent": "scenarios",
+      "parentColumn": "id"
+    }
+  },
+  "scenario_drafts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "scenario_pinned_action_fires": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "scenario_publish_keys": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "scenario_id",
+      "parent": "scenarios",
+      "parentColumn": "id"
+    }
+  },
+  "scenario_steps": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "scenario_id",
+      "parent": "scenarios",
+      "parentColumn": "id"
+    }
+  },
+  "scenario_test_send_claims": {
+    "category": "global"
+  },
+  "scenario_triggers": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "scenario_id",
+      "parent": "scenarios",
+      "parentColumn": "id"
+    }
+  },
+  "scenario_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "scenario_id",
+      "parent": "scenarios",
+      "parentColumn": "id"
+    }
+  },
+  "scenarios": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "scheduled_chat_sends": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "scoring_rules": {
+    "category": "global"
+  },
+  "site_consent_days": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "site_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "site_tracking_keys": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "site_visitors": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "staff": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "staff_account_scopes": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "staff_availability_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff",
+      "parentColumn": "id"
+    }
+  },
+  "staff_break_dates": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff",
+      "parentColumn": "id"
+    }
+  },
+  "staff_breaks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff",
+      "parentColumn": "id"
+    }
+  },
+  "staff_line_link_codes": {
+    "category": "global"
+  },
+  "staff_members": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "staff_menus": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff",
+      "parentColumn": "id"
+    }
+  },
+  "staff_notification_reads": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "notification_id",
+      "parent": "notifications",
+      "parentColumn": "id"
+    }
+  },
+  "staff_permission_receipts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
+      "parentColumn": "id"
+    }
+  },
+  "staff_shifts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff",
+      "parentColumn": "id"
+    }
+  },
+  "staff_two_factor_setup_attempts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
+      "parentColumn": "id"
+    }
+  },
+  "stripe_events": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "support_email_messages": {
+    "category": "global"
+  },
+  "support_email_sync_state": {
+    "category": "global"
+  },
+  "support_email_threads": {
+    "category": "global"
+  },
+  "support_mark_archive_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "support_mark_create_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "support_mark_rule_create_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "support_mark_scopes": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "support_marks": {
+    "category": "global"
+  },
+  "tag_groups": {
+    "category": "global"
+  },
+  "tag_update_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "tag_id",
+      "parent": "tags",
+      "parentColumn": "id"
+    }
+  },
+  "tags": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "template_publish_keys": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "template_id",
+      "parent": "templates",
+      "parentColumn": "id"
+    }
+  },
+  "template_references": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "template_id",
+      "parent": "templates",
+      "parentColumn": "id"
+    }
+  },
+  "template_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "template_id",
+      "parent": "templates",
+      "parentColumn": "id"
+    }
+  },
+  "templates": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "tenant_data_purge_audit": {
+    "category": "retain",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "tenants": {
+    "category": "global"
+  },
+  "tiktok_pnl_order_lines": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "tiktok_pnl_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "tracked_links": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "traffic_pools": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "active_account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  },
+  "uid_migration_items": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "old_friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "uid_migration_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "from_account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  },
+  "update_history": {
+    "category": "global"
+  },
+  "user_delivery_priorities": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "user_profile_values": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "users": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "webhook_interaction_logs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "webinar_action_executions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_actions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "webinar_id",
+      "parent": "webinars",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_comments": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "webinar_id",
+      "parent": "webinars",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_ctas": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "form_id",
+      "parent": "forms",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_editor_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "registration_form_id",
+      "parent": "forms",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_followup_configs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "webinar_id",
+      "parent": "webinars",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_followups": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_funnel_events": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_heartbeat_rejects": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_journey_followups": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_notification_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_notification_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "webinar_id",
+      "parent": "webinars",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_picker_opens": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_registrations": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_sessions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "webinar_id",
+      "parent": "webinars",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_user_comments": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_versions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "webinar_id",
+      "parent": "webinars",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_video_assets": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "webinar_id",
+      "parent": "webinars",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_view_segments": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "webinar_viewers": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "webinars": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  }
+}
