@@ -113,10 +113,16 @@ export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'cl
   interactive?: boolean
   /** ★V7：行の高さ。`comfortable` は64px。未指定は58pxのまま。 */
   density?: 'standard' | 'comfortable'
+  /**
+   * ★V8 仕上げ3回目（M10）④：消える行。渡すと 150ms で薄くなってから
+   * 画面側が DOM から外す（外す側の合図は画面が持つ。ここは見た目だけ）。
+   * 渡さなければ何も変わらない。
+   */
+  leaving?: boolean
 }
 
 /** 標準一覧の高さ58pxの行。 */
-export function Tr({ children, className, selected, interactive, density, ...rowProps }: TrProps) {
+export function Tr({ children, className, selected, interactive, density, leaving, ...rowProps }: TrProps) {
   const classes = [
     shell.row,
     density === 'comfortable' && shell.rowComfortable,
@@ -130,6 +136,7 @@ export function Tr({ children, className, selected, interactive, density, ...row
     <tr
       className={classes}
       aria-selected={selected === undefined ? undefined : selected}
+      data-leaving={leaving || undefined}
       {...rowProps}
     >
       {children}
