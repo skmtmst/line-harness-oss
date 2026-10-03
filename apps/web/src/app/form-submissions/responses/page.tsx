@@ -7,6 +7,7 @@ import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
 import { postActionStepLabel } from './response-summary'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import PageHeader from '@/components/shared/page-header'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { TextInput } from '@/components/shared/form-controls'
 import StatusBadge from '@/components/shared/status-badge'
@@ -404,14 +405,11 @@ function FormResponsesInner() {
     return (
       <div className="flex flex-col gap-4" data-design-node={node}>
         <div>
-          <Link href="/form-submissions" className="text-action text-sm">
-            ←回答フォームへ
-          </Link>
-          <h1 className="text-ink mt-1 text-xl font-bold">集まった回答：{form.name}</h1>
-          <p className="text-ink-secondary mt-1 text-xs">
-            {total === null ? '—' : `${formatNumber(total)}件`}
-            {rate != null ? `・答え終えた割合${formatNumber(rate)}%` : ''}
-          </p>
+          <PageHeader
+            breadcrumb={[{ label: '回答フォーム', href: '/form-submissions' }, { label: `集まった回答：${form.name}` }]}
+            title={`集まった回答：${form.name}`}
+            description={total === null ? '—' : `${formatNumber(total)}件${rate != null ? `・答え終えた割合${formatNumber(rate)}%` : ''}`}
+          />
         </div>
 
         <div role="tablist" aria-label="回答の見方" className="border-hairline flex gap-4 border-b text-sm">

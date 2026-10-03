@@ -21,6 +21,7 @@ vi.mock('next/link', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  usePathname: () => '/form-submissions/responses',
   useSearchParams: () => new URLSearchParams('id=form-1'),
 }))
 
@@ -28,7 +29,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageChrome: () => ({}) }))
 
 import FormResponsesPage from './page'
 
