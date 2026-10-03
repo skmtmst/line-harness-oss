@@ -13,8 +13,10 @@ import { describe, expect, it } from 'vitest'
 import {
   expandFriends,
   judge,
+  median,
   parseArgs,
   SPEED_ROUTES,
+  targetMisses,
 } from '../../scripts/v8-guard/speed-budget.mjs'
 
 const BUDGET_PATH = join(
@@ -36,7 +38,7 @@ const SCREENS = [
   'friends-2000',
 ]
 
-const BUDGETS = { showMs: 1000, lcpMs: 1000, pressMs: 100, longTaskMs: 50 }
+const TARGETS = { showMs: 1000, lcpMs: 1000, pressMs: 100, longTaskMs: 50 }
 
 function row(over = {}) {
   return {
@@ -63,10 +65,10 @@ function base(over = {}) {
 }
 
 describe('速さ予算の表', () => {
-  it('予算は表示 1秒・LCP 1秒・反応 100ms・長い作業 50ms', () => {
+  it('目標は表示 1秒・LCP 1秒・反応 100ms・長い作業 50ms（落とさない）', () => {
     const budget = JSON.parse(readFileSync(BUDGET_PATH, 'utf-8'))
-    expect(budget.version).toBe(1)
-    expect(budget.budgets).toEqual(BUDGETS)
+    expect(budget.version).toBe(2)
+    expect(budget.targets).toEqual(TARGETS)
   })
 
   it('測るのは主要10画面＋2,000行の場面', () => {
@@ -92,32 +94,53 @@ describe('速さ予算の表', () => {
   })
 })
 
-describe('10% 則とラチェットの判定', () => {
+describe('悪化だけ落とす判定（20%・JS 1KB）', () => {
   it('基準どおりなら通る', () => {
-    expect(judge([row()], BUDGETS, { friends: base() })).toEqual([])
+    expect(judge([row()], { friends: base() })).toEqual([])
   })
 
-  it('予算を超えたら落ちる（表示 1秒・反応 100ms・長い作業 50ms）', () => {
-    expect(judge([row({ showMs: 1001 })], BUDGETS, {}).length).toBeGreaterThan(0)
-    expect(judge([row({ pressMs: 101 })], BUDGETS, {}).length).toBeGreaterThan(0)
-    expect(judge([row({ longTaskMs: 51 })], BUDGETS, {}).length).toBeGreaterThan(0)
+  it('基準が無い画面は飛ばす', () => {
+    expect(judge([row({ showMs: 9999 })], {})).toEqual([])
   })
 
-  it('基準より10%を超えて悪いと落ちる', () => {
-    const bad = judge([row({ showMs: 441 })], BUDGETS, { friends: base() })
-    expect(bad.length).toBeGreaterThan(0)
-    const ok = judge([row({ showMs: 440 })], BUDGETS, { friends: base() })
-    expect(ok).toEqual([])
+  it('基準より20%を超えて悪いと落ちる', () => {
+    /* 400 の20%は 480。481 で落ち、480 で通る */
+    expect(judge([row({ showMs: 481 })], { friends: base() }).length).toBeGreaterThan(0)
+    expect(judge([row({ showMs: 480 })], { friends: base() })).toEqual([])
   })
 
-  it('JS は1バイトでも増えたら落ちる（ラチェット）', () => {
-    const bad = judge([row({ jsBytes: 900001 })], BUDGETS, { friends: base() })
-    expect(bad.length).toBeGreaterThan(0)
-    expect(judge([row()], BUDGETS, { friends: base() })).toEqual([])
+  it('JS は1KBを超えて増えたら落ちる', () => {
+    expect(judge([row({ jsBytes: 900000 + 1025 })], { friends: base() }).length).toBeGreaterThan(0)
+    expect(judge([row({ jsBytes: 900000 + 1024 })], { friends: base() })).toEqual([])
   })
 
   it('反応が測れない画面（null）は飛ばす', () => {
-    expect(judge([row({ pressMs: null })], BUDGETS, { friends: base() })).toEqual([])
+    expect(judge([row({ pressMs: null })], { friends: base() })).toEqual([])
+  })
+})
+
+describe('3回測って真ん中', () => {
+  it('ぶれた1回に引っ張られない', () => {
+    expect(median([100, 300, 200])).toBe(200)
+    expect(median([66, 5024, 67])).toBe(67)
+  })
+
+  it('測れない回は除く。全部測れなければ null', () => {
+    expect(median([null, 50, null])).toBe(50)
+    expect(median([null, null])).toBeNull()
+    expect(median([])).toBeNull()
+  })
+})
+
+describe('目標未達は出すだけ（落とさない）', () => {
+  it('目標を超えた画面を列挙する', () => {
+    const misses = targetMisses([row({ showMs: 1177, pressMs: 66 })], TARGETS)
+    expect(misses.length).toBe(1)
+    expect(misses[0]).toContain('friends')
+  })
+
+  it('目標内なら空', () => {
+    expect(targetMisses([row({ showMs: 400, lcpMs: 500, pressMs: 40, longTaskMs: 0 })], TARGETS)).toEqual([])
   })
 })
 

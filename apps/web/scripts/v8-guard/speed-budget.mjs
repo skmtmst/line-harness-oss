@@ -17,8 +17,14 @@
  *   反応 pressMs          … 100ms 以内（押してから次の描画まで）
  *   長い作業 longTaskMs   … 50ms 以内（longtask が出たら超過）
  *   JS jsBytes            … ラチェット（基準より1バイトでも増えたら超過）
- * 基準より 10% を超えて悪くなっても落ちる。良くなったら
- * --update-baseline で基準を更新する（人が意図して回す）。
+ * 判定は「悪くなったら落とす」だけ（2026-10-04 司令塔決定）。
+ *   時間（表示・LCP・反応・長い作業）… 1画面3回測って真ん中の値で比べ、
+ *     基準より 20% を超えて悪くなったら落ちる
+ *   JS jsBytes … 基準より 1KB を超えて増えたら落ちる
+ * 良くなったら --update-baseline で基準を更新する（人が意図して回す）。
+ *
+ * 目標（表示1秒・反応100ms・長い作業50ms）は別の表 `targets` に残す。
+ * 届いていない画面は結果に出すだけで、落とさない。
  *
  * 対照（わざと遅くすると落ちること）: SLOW_MS=800 を付けると各画面の
  * 表示後に 800ms 待ってから測る。showMs が約800ms 増えて予算で落ちる。
@@ -46,8 +52,16 @@ export const SPEED_ROUTES = {
   settings: '/settings',
 }
 
-/* 10% を超える悪化で落とす。JS だけはラチェットなので係数 1.0。 */
-const REGRESSION_FACTOR = 1.1
+/* 悪くなったら落とす幅（2026-10-04 司令塔決定①）。時間は20%、JS は1KB。 */
+export const REGRESSION_FACTOR = 1.2
+export const JS_SLACK_BYTES = 1024
+
+/* 3回測って真ん中。1回のぶれ（CIで表示が15〜24%揺れた）に引っ張られないため。 */
+export function median(values) {
+  const nums = values.filter((v) => typeof v === 'number').sort((a, b) => a - b)
+  if (!nums.length) return null
+  return nums[Math.floor(nums.length / 2)]
+}
 
 const SESSION = {
   lh_csrf: 'visual-qa-csrf',
@@ -259,30 +273,42 @@ async function measureStress(browser, target) {
   return { name: 'friends-2000', route: '/friends', showMs, pressMs: null, lcpMs, ...rest, rows: 2000 }
 }
 
-function judge(measured, budgets, baselines) {
+/* 落とすのは悪化だけ。時間は20%、JS は1KB（2026-10-04 司令塔決定①）。 */
+function judge(measured, baselines) {
   const failures = []
   for (const m of measured) {
     const base = baselines[m.name]
-    const checks = [
-      ['showMs', m.showMs, budgets.showMs],
-      ['lcpMs', m.lcpMs, budgets.lcpMs],
-      ['pressMs', m.pressMs, budgets.pressMs],
-      ['longTaskMs', m.longTaskMs, budgets.longTaskMs],
-    ]
-    for (const [key, value, absolute] of checks) {
-      if (value == null) continue
-      if (value > absolute) failures.push(`${m.name} ${key}=${value} が予算 ${absolute} を超えた`)
-      const b = base?.[key]
-      if (typeof b === 'number' && value > b * REGRESSION_FACTOR) {
-        failures.push(`${m.name} ${key}=${value} が基準 ${b} より10%を超えて悪い`)
+    if (!base) continue
+    for (const key of ['showMs', 'lcpMs', 'pressMs', 'longTaskMs']) {
+      const value = m[key]
+      const b = base[key]
+      if (typeof value !== 'number' || typeof b !== 'number') continue
+      if (value > b * REGRESSION_FACTOR) {
+        failures.push(`${m.name} ${key}=${value} が基準 ${b} より20%を超えて悪い`)
       }
     }
-    /* JS はラチェット。1バイトでも増えたら落とす。 */
-    if (typeof base?.jsBytes === 'number' && m.jsBytes > base.jsBytes) {
-      failures.push(`${m.name} jsBytes=${m.jsBytes} が基準 ${base.jsBytes} より増えた`)
+    if (typeof m.jsBytes === 'number' && typeof base.jsBytes === 'number'
+      && m.jsBytes > base.jsBytes + JS_SLACK_BYTES) {
+      failures.push(`${m.name} jsBytes=${m.jsBytes} が基準 ${base.jsBytes} より1KBを超えて増えた`)
     }
   }
   return failures
+}
+
+/* 目標に届いていない画面。結果に出すだけで、落とさない（司令塔決定②）。 */
+function targetMisses(measured, targets) {
+  const misses = []
+  const pairs = [['showMs', '表示'], ['lcpMs', 'LCP'], ['pressMs', '反応'], ['longTaskMs', '長い作業']]
+  for (const m of measured) {
+    for (const [key, label] of pairs) {
+      const value = m[key]
+      const t = targets[key]
+      if (typeof value === 'number' && typeof t === 'number' && value > t) {
+        misses.push(`${m.name} ${label}=${value}（目標 ${t} に届いていない）`)
+      }
+    }
+  }
+  return misses
 }
 
 /* 直接実行されたときだけ測る。読み込まれたときは道具だけ貸す（試験用）。 */
@@ -313,6 +339,20 @@ async function buildTarget({ stubDir, baseUrl }) {
   return { stub: false, url: (route) => new URL(route, baseUrl).toString() }
 }
 
+/* 1画面3回測って真ん中を残す（司令塔決定①）。 */
+async function measureMedian(run) {
+  const tries = [await run(), await run(), await run()]
+  const at = (key) => median(tries.map((t) => t[key]))
+  return {
+    ...tries[0],
+    showMs: at('showMs'),
+    lcpMs: at('lcpMs'),
+    pressMs: at('pressMs'),
+    longTaskMs: at('longTaskMs'),
+    jsBytes: at('jsBytes'),
+  }
+}
+
 async function main() {
   const { updateBaseline, stubDir, out, baseUrl } = parseArgs(process.argv.slice(2))
   const target = await buildTarget({ stubDir, baseUrl })
@@ -320,14 +360,14 @@ async function main() {
   const browser = await chromium.launch()
   const measured = []
   for (const [name, route] of Object.entries(SPEED_ROUTES)) {
-    measured.push(await measureScreen(browser, target, name, route))
+    measured.push(await measureMedian(() => measureScreen(browser, target, name, route)))
   }
-  measured.push(await measureStress(browser, target))
+  measured.push(await measureMedian(() => measureStress(browser, target)))
   await browser.close()
   return { budget, updateBaseline, out, measured }
 }
 
-export { expandFriends, judge, parseArgs }
+export { expandFriends, judge, parseArgs, targetMisses }
 
 if (isMain) {
   const { budget, updateBaseline, out, measured } = await main()
@@ -360,7 +400,11 @@ if (isMain) {
     console.log(`${m.name} ${m.showMs} ${m.lcpMs ?? '-'} ${m.pressMs ?? '-'} ${m.longTaskMs} ${m.jsBytes}`)
   }
 
-  const failures = updateBaseline ? [] : judge(measured, budget.budgets, budget.baselines)
+  const failures = updateBaseline ? [] : judge(measured, budget.baselines)
+  /* 目標に届いていない画面は出すだけ。落とさない（司令塔決定②）。 */
+  for (const miss of targetMisses(measured, budget.targets ?? {})) {
+    console.log(`目標未達: ${miss}`)
+  }
   if (failures.length) {
     for (const f of failures) console.log(`予算超過: ${f}`)
     process.exit(1)
