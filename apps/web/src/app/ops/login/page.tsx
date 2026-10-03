@@ -126,7 +126,7 @@ export default function OpsLoginPage() {
       title="ログイン"
       description={
         <>
-          <span className="mb-1 block text-caption font-medium text-ink-faint">運営コンソール</span>
+          <span className="mb-1 block text-micro text-ink-secondary">運営コンソール</span>
           メールアドレスとパスワードでログインします。LINE で登録した運営メンバーは LINE でログインしてください。
         </>
       }
