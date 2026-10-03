@@ -7,6 +7,7 @@ shared-button-importer app/accounts/new/page.tsx
 shared-button-importer app/accounts/page.tsx
 shared-button-importer app/accounts/uid-migration-v8.tsx
 shared-button-importer app/affiliates/action-dialogs.tsx
+shared-button-importer app/affiliates/bulk-op-wizard.tsx
 shared-button-importer app/affiliates/new/page.tsx
 shared-button-importer app/affiliates/payment-tab.tsx
 shared-button-importer app/affiliates/tabs.tsx
