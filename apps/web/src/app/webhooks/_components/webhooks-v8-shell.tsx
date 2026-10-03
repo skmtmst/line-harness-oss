@@ -17,6 +17,9 @@ import styles from './webhooks-v8-shell.module.css'
 import V8OutgoingTab from './webhooks-v8-outgoing'
 import WebhooksV8Interactions from './webhooks-v8-interactions'
 import WebhooksV8Incoming from './webhooks-v8-incoming'
+import WebhooksV8ApiTokens from './webhooks-v8-api-tokens'
+import WebhooksV8Sheets from './webhooks-v8-sheets'
+import WebhooksV8Samples, { WEBHOOKS_V8_SAMPLES_COUNT } from './webhooks-v8-samples'
 
 export type WebhooksV8TabKey = 'outgoing' | 'incoming' | 'api-tokens' | 'sheets' | 'interactions' | 'notify'
 
@@ -26,7 +29,7 @@ const TABS: Array<{ key: WebhooksV8TabKey; label: string; node: string }> = [
   { key: 'api-tokens', label: 'API 接続', node: 'ralAc' },
   { key: 'sheets', label: 'Google Sheets', node: 'DxAAA' },
   { key: 'interactions', label: 'やり取りの記録', node: 'Uv9AA' },
-  { key: 'notify', label: '見本', node: 'ZSbFY' },
+  { key: 'notify', label: '見本', node: 'SAUCs' },
 ]
 
 export function webhooksV8Node(tab: WebhooksV8TabKey): string {
@@ -75,8 +78,8 @@ export function WebhooksV8Shell() {
     }
   }, [selectedAccountId])
 
-  // 見本の件数は `page.tsx` の見本データ（受け取る5＋送る4）と同じ数。
-  const samplesCount = 9
+  // 見本の件数は見本タブに並べる見本データと同じ数（#980）。
+  const samplesCount = WEBHOOKS_V8_SAMPLES_COUNT
   const countOf = (key: WebhooksV8TabKey): string => {
     if (key === 'outgoing') return outgoingCount === null ? '' : ` ${outgoingCount}`
     if (key === 'incoming') return incomingCount === null ? '' : ` ${incomingCount}`
@@ -118,6 +121,9 @@ export function WebhooksV8Shell() {
       {tab === 'outgoing' ? <V8OutgoingTab onCounts={setOutgoingCount} /> : null}
       {tab === 'incoming' ? <WebhooksV8Incoming onCounts={setIncomingCount} /> : null}
       {tab === 'interactions' ? <WebhooksV8Interactions /> : null}
+      {tab === 'api-tokens' ? <WebhooksV8ApiTokens /> : null}
+      {tab === 'sheets' ? <WebhooksV8Sheets /> : null}
+      {tab === 'notify' ? <WebhooksV8Samples /> : null}
     </div>
   )
 }

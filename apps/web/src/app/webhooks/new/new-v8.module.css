@@ -1,0 +1,297 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8-B 外部連携の送り先を作る（板 `hsD8e`）。
+ * 左の白板と右の案内・下の固定の操作帯。
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.backLink {
+  align-self: flex-start;
+}
+
+.title {
+  margin: 8px 0 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.lead {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.saveError {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.problems {
+  padding: 10px 14px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-warning-bg);
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.problemsTitle {
+  margin: 0;
+  font-weight: 700;
+}
+
+.problemsList {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cardLead {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.directionRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.directionCard,
+.directionCardButton {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  text-align: left;
+  text-decoration: none;
+}
+
+.directionCardButton {
+  cursor: pointer;
+}
+
+.directionActive {
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
+}
+
+.directionName {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.directionHint {
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.field {
+  margin-top: 12px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fieldHint {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.fieldError {
+  margin: 4px 0 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.secretRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.secretRow input {
+  flex: 1;
+  min-width: 0;
+}
+
+.mono {
+  font-family: monospace;
+}
+
+.modeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.eventGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.eventGroup {
+  padding: 10px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+}
+
+.eventGroupLabel {
+  margin: 0 0 4px;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.eventList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.advanced {
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+}
+
+.advancedSummary {
+  color: var(--color-accent-deep);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.retryRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.retryRow .fieldHint {
+  margin: 0;
+}
+
+.retryInput {
+  width: 96px;
+}
+
+.samplePre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  line-height: 1.8;
+  overflow-x: auto;
+}
+
+.cautionList {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.cautionList li::before {
+  content: "・";
+}
+
+.bottomBar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+}
+
+@container (max-width: 1099px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .aside {
+    display: none;
+  }
+}

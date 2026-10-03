@@ -9,6 +9,7 @@
  * v7 を直す必要が出たら `page.tsx`・`webhook-overviews.tsx` 側も同じ判断を入れる。
  */
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import type { IncomingWebhook } from '@line-crm/shared'
 import { ApiError, api, type IncomingWebhookDetail, type IncomingWebhookTestResult, type IncomingWebhookUnmatchedItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -128,6 +129,13 @@ function sourceName(value: string): string {
 
 export default function WebhooksV8Incoming({ onCounts }: { onCounts?: (total: number | null) => void }) {
   const { selectedAccountId } = useAccount()
+  const searchParams = useSearchParams()
+  // 見本タブから `?source=` 付きで来たときだけ、受け取る設定の種類を先に選んでおく。
+  // 知らない値は無視して空のままにする（v7 と同じ）。
+  const requestedSource = searchParams.get('source') ?? ''
+  const initialSource = SOURCE_PRESETS.some((preset) => preset.value === requestedSource)
+    ? requestedSource
+    : ''
   const [items, setItems] = useState<IncomingWebhook[]>([])
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -732,7 +740,7 @@ export default function WebhooksV8Incoming({ onCounts }: { onCounts?: (total: nu
       <div className={styles.rail}>
         {canManage ? (
           <Button className={styles.createButton} onClick={() => {
-            setCreateForm({ name: '', sourceType: '', secret: generateSecret() })
+            setCreateForm({ name: '', sourceType: initialSource, secret: generateSecret() })
             setSourceIsOther(false)
             setCreateFieldError({})
             setCreateError('')

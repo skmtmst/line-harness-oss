@@ -16,6 +16,8 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import NewWebhookPageV8 from './new-v8'
 
 /**
  * #975 U067: 送るイベントの正本は `packages/db/src/webhooks.ts` の
@@ -375,7 +377,15 @@ function NewWebhookForm() {
   )
 }
 
+/*
+ * ★V8-B の切り替え。v8 の器は別器（new-v8.tsx）に置き、
+ * v7 の器・動きはこの下の V7 のまま残す。
+ */
 export default function NewWebhookPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return <NewWebhookPageV8 />
+  }
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

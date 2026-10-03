@@ -581,8 +581,17 @@
     "unresolved-classname": 55,
     "direct-th": 5
   },
+  "app/webhooks/_components/webhooks-v8-api-tokens.tsx": {
+    "unresolved-classname": 20
+  },
   "app/webhooks/_components/webhooks-v8-incoming.tsx": {
     "unresolved-classname": 103
+  },
+  "app/webhooks/_components/webhooks-v8-samples.tsx": {
+    "unresolved-classname": 21
+  },
+  "app/webhooks/_components/webhooks-v8-sheets.tsx": {
+    "unresolved-classname": 58
   },
   "app/webhooks/_components/webhooks-v8-interactions.tsx": {
     "unresolved-classname": 55
@@ -595,6 +604,9 @@
   },
   "app/webhooks/edit/page.tsx": {
     "unresolved-classname": 4
+  },
+  "app/webhooks/new/new-v8.tsx": {
+    "unresolved-classname": 70
   },
   "app/webhooks/new/page.tsx": {
     "unresolved-classname": 5
