@@ -47,6 +47,7 @@ import type { ReminderDeliveryRunRow, ReminderStepRow } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
 import { featureJobCanRun } from './feature-enforcement.js';
 import {
+  assertFinalMeetSendRight,
   isMeetConsultationSendable,
   isMeetSendCandidateCurrent,
   readMeetSendCandidate,
@@ -506,12 +507,10 @@ export async function processReminderDeliveries(
           result.skipped++;
           continue;
         }
-        // Meet個別相談のV6行は、認証・本文の解決awaitの後の最終送信権でも
-        // 送信候補の写しと結び付き関係を同一文で確かめる。直前の検証は
-        // 登録の日時と貸出だけを見るため、claim後の関係照合・停止照合の
-        // await中に新版へ進んだ旧payloadはここで止める。古ければ実行行だけ
-        // 取り消す (勝者の新版通知には触れない)。push呼出しとの間には
-        // awaitを挟まないが、呼出し自体の間の取消は残差として残る。
+        // Meet個別相談のV6行は、認証・本文の解決awaitの後の早期選別でも
+        // 送信候補の写しと結び付き関係を確かめる。最終判断は停止確認の後の
+        // 最終送信権UPDATEで行う。古ければ実行行だけ取り消す
+        // (勝者の新版通知には触れない)。
         if (
           enrollment.source_kind === 'meet' &&
           enrollment.source_id &&
@@ -533,6 +532,36 @@ export async function processReminderDeliveries(
           await releaseClaimedReminderRun(db, { id: run.id, now: nowIso, expectedLeaseExpiresAt: ownedLeases });
           result.held += 1;
           continue enrollmentLoop;
+        }
+        // 最終送信権の確定：待機を全て終えた後、送信権の行と候補の
+        // 相談ID・予約ID・予約版・本人・対象日・run・leaseを同じUPDATE文で
+        // 結び直す。この後はpush呼出しまでawaitを置かない (呼出し自体の
+        // 間の取消は残差として記載)。既存の日時・lease保護はUPDATE内に維持。
+        if (enrollment.source_kind === 'meet' && enrollment.source_id) {
+          const finalRight = await assertFinalMeetSendRight(db, {
+            runId: run.id,
+            friendReminderId: enrollment.id,
+            expectedTargetDate: gate.targetDate,
+            ownedLeases,
+            candidate: meetCandidate,
+            leaseExpiresAt,
+            nowIso,
+          });
+          if (finalRight !== 'ok') {
+            // stale は旧候補のため実行行を取り消す。stolen
+            // (貸出が別処理へ移った) は行に触らず見送る。
+            if (finalRight === 'stale') {
+              const leaseList = ownedLeases.map(() => '?').join(',');
+              await db.prepare(
+                `UPDATE reminder_delivery_runs
+                    SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
+                        next_retry_at = NULL, updated_at = ?
+                  WHERE id = ? AND status = 'claimed' AND lease_expires_at IN (${leaseList})`,
+              ).bind(nowIso, nowIso, run.id, ...ownedLeases).run();
+            }
+            result.skipped++;
+            continue enrollmentLoop;
+          }
         }
         const response = await deliveryClient.pushMessageWithRequestId(
           friend.line_user_id,

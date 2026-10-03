@@ -537,6 +537,84 @@ export async function readMeetSendCandidate(
  * 送信候補の写しが最終送信権の時点で今も有効か。結び付き予約の生存と
  * 写し一致を同一文で確かめる。新版が勝てば false になり、勝者の通知を残す。
  */
+/**
+ * V6最終送信権の確定。認証・本文解決・beforePush・停止確認の待機を全て
+ * 終えた後、送信権の行と候補の版を同じUPDATE文で結び直す。この後は
+ * push呼出しまでawaitを置かない (呼出し自体の間の取消は残差)。
+ * 戻り値: 'ok' 送ってよい / 'stale' 旧候補 (呼出し側が実行行を取り消す) /
+ * 'stolen' 貸出が別処理へ移った (行に触らず見送る)。
+ */
+export async function assertFinalMeetSendRight(
+  db: D1Database,
+  input: {
+    runId: string;
+    friendReminderId: string;
+    expectedTargetDate: string;
+    ownedLeases: string[];
+    candidate: MeetSendCandidate | null;
+    leaseExpiresAt: string;
+    nowIso: string;
+  },
+): Promise<'ok' | 'stale' | 'stolen'> {
+  if (!input.candidate || input.ownedLeases.length === 0) return 'stale';
+  const leaseList = input.ownedLeases.map(() => '?').join(',');
+  const refreshed = await db
+    .prepare(
+      `UPDATE reminder_delivery_runs
+          SET lease_expires_at = ?, updated_at = ?
+        WHERE id = ?
+          AND status = 'claimed'
+          AND lease_expires_at IN (${leaseList})
+          AND EXISTS (
+            SELECT 1 FROM friend_reminders fr
+             WHERE fr.id = ?
+               AND fr.status = 'active'
+               AND fr.target_date = ?
+          )
+          AND EXISTS (
+            SELECT 1 FROM meet_consultations c
+             WHERE c.id = (
+                 SELECT fr2.source_id FROM friend_reminders fr2 WHERE fr2.id = ?
+               )
+               AND c.status = 'confirmed'
+               AND ${LINKED_BOOKING_ALIVE_SQL}
+               ${candidateSnapshotSql()}
+          )`,
+    )
+    .bind(
+      input.leaseExpiresAt,
+      input.nowIso,
+      input.runId,
+      ...input.ownedLeases,
+      input.friendReminderId,
+      input.expectedTargetDate,
+      input.friendReminderId,
+      input.candidate.bookingId,
+      input.candidate.bookingId,
+      input.candidate.bookingVersion,
+      input.candidate.bookingVersion,
+      input.candidate.startsAt,
+      input.candidate.friendId,
+    )
+    .run();
+  if ((refreshed.meta?.changes ?? 0) === 1) return 'ok';
+  // 0件のとき、貸出が自分のままなら旧候補。別処理へ移っていたら触らない。
+  const mine = await db
+    .prepare(
+      `SELECT status, lease_expires_at FROM reminder_delivery_runs WHERE id = ?`,
+    )
+    .bind(input.runId)
+    .first<{ status: string; lease_expires_at: string | null }>();
+  if (
+    mine?.status === 'claimed' &&
+    mine.lease_expires_at !== null &&
+    input.ownedLeases.includes(mine.lease_expires_at)
+  ) {
+    return 'stale';
+  }
+  return 'stolen';
+}
+
 export async function isMeetSendCandidateCurrent(
   db: D1Database,
   consultationId: string,
