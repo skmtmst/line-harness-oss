@@ -372,6 +372,7 @@ export default function NewConversionPointPage() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   return (
+    <div data-design-node="j8p3yj cXqlS">
     <CreatePage
       title="成果地点を作る"
       description="「申込」「購入」など、成果として数えたい行動を登録します。"
@@ -768,5 +769,6 @@ export default function NewConversionPointPage() {
       </FormSection>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した成果地点" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
+    </div>
   )
 }
