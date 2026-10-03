@@ -62,6 +62,22 @@ export interface BookingHistoryItem {
   profile_image_url: string | null;
 }
 
+/** 予約作成の応答。お支払いありの店・メニューだけ payment が付く。 */
+export interface CreateBookingResponse {
+  booking_id: string;
+  status: string;
+  payment?: { id: string; status: string; holdUntil: string | null } | null;
+}
+
+/** お客さまが見る支払いの状態。 */
+export interface BookingPayment {
+  id: string;
+  status: 'unpaid' | 'pending' | 'paid' | 'failed' | 'refunded' | 'expired';
+  amount?: number | null;
+  currency?: string | null;
+  hold_until?: string | null;
+}
+
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
   return { Authorization: `Bearer ${getIdToken()}`, ...extra };
 }
@@ -262,10 +278,20 @@ export const api = {
     body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string },
     idempotencyKey: string,
   ) =>
-    post<{ booking_id: string; status: string }>(
+    post<CreateBookingResponse>(
       '/api/liff/booking/requests',
       body,
       { 'Idempotency-Key': idempotencyKey },
+    ),
+  /** お支払いありの予約だけ payment が付く。なしの店では今までどおり付かない。 */
+  startBookingPayment: (bookingId: string) =>
+    post<{ payment: BookingPayment | null; checkoutUrl: string | null }>(
+      '/api/liff/booking/payments/start',
+      { bookingId },
+    ),
+  bookingPaymentStatus: (bookingId: string) =>
+    get<{ payment: BookingPayment | null }>(
+      `/api/liff/booking/payments/by-booking?bookingId=${encodeURIComponent(bookingId)}`,
     ),
   me: () => get<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] }>('/api/liff/booking/me'),
 
