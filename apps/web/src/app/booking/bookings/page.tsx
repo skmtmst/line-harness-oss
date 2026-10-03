@@ -1217,6 +1217,7 @@ export default function BookingsPage() {
               showNowLine={calendarAnchor === jstDay(dayNow.toISOString())}
               busyId={dayBusyId}
               canMark={canOperate}
+              showKindTag={effectiveMode === 'both'}
               onMark={markDayRow}
               onUnmark={unmarkDayRow}
             />

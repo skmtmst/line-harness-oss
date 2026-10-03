@@ -63,11 +63,13 @@ function rowName(row: BookingTodayRow): string {
 }
 
 function DayRow({
-  row, busy, canMark, lateOpen, moreOpen, onLate, onCloseLate, onMore, onCloseMore, onMark, onUnmark,
+  row, busy, canMark, showKindTag, lateOpen, moreOpen, onLate, onCloseLate, onMore, onCloseMore, onMark, onUnmark,
 }: {
   row: BookingTodayRow
   busy: boolean
   canMark: boolean
+  /** 両方の帯では人／席の札を付ける（B-1）。人だけ・席だけの帯では付けない。 */
+  showKindTag?: boolean
   lateOpen: boolean
   moreOpen: boolean
   onLate: () => void
@@ -84,7 +86,7 @@ function DayRow({
       <span className={`${styles.main}`}>
         <span className={`${styles.name}`}>
           {rowName(row)}
-          {row.kind === 'seat' ? <span className={`${styles.kind}`}>席</span> : null}
+          {showKindTag ? <span className={`${styles.kind}`}>{row.kind === 'seat' ? '席' : '人'}</span> : null}
         </span>
         <span className={`${styles.sub}`}>{rowSub(row)}</span>
       </span>
@@ -154,6 +156,7 @@ export default function BookingDayTimeline({
   showNowLine,
   busyId,
   canMark = true,
+  showKindTag = false,
   onMark,
   onUnmark,
 }: {
@@ -166,6 +169,7 @@ export default function BookingDayTimeline({
   showNowLine: boolean
   busyId: string | null
   canMark?: boolean
+  showKindTag?: boolean
   onMark: (row: BookingTodayRow, kind: 'visited' | 'late' | 'no_show', lateMinutes?: number) => Promise<boolean>
   onUnmark: (row: BookingTodayRow) => Promise<boolean>
 }) {
@@ -229,7 +233,7 @@ export default function BookingDayTimeline({
                   </li>,
                 )
               }
-              nodes.push(<DayRow key={row.id} row={row} busy={busyId === row.id} canMark={canMark} lateOpen={lateFor === row.id} moreOpen={moreFor === row.id} onLate={() => { setMoreFor(null); setLateFor(row.id) }} onCloseLate={() => setLateFor(null)} onMore={() => { setLateFor(null); setMoreFor(row.id) }} onCloseMore={() => setMoreFor(null)} onMark={(kind, lateMinutes) => void handleMark(row, kind, lateMinutes)} onUnmark={() => void handleUnmark(row)} />)
+              nodes.push(<DayRow key={row.id} row={row} busy={busyId === row.id} canMark={canMark} showKindTag={showKindTag} lateOpen={lateFor === row.id} moreOpen={moreFor === row.id} onLate={() => { setMoreFor(null); setLateFor(row.id) }} onCloseLate={() => setLateFor(null)} onMore={() => { setLateFor(null); setMoreFor(row.id) }} onCloseMore={() => setMoreFor(null)} onMark={(kind, lateMinutes) => void handleMark(row, kind, lateMinutes)} onUnmark={() => void handleUnmark(row)} />)
               return nodes
             })
           )}

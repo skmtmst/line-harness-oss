@@ -86,6 +86,7 @@ function renderTimeline(overrides?: Partial<React.ComponentProps<typeof BookingD
         now={new Date('2026-10-04T04:30:00.000Z')}
         showNowLine
         busyId={null}
+        showKindTag={overrides?.showKindTag}
         onMark={onMark}
         onUnmark={onUnmark}
       />,
@@ -122,6 +123,15 @@ test('来店したを押すと印が付き、取り消すで戻せる', async ()
   expect(undo.length).toBeGreaterThan(0)
   await act(async () => { undo[0].click() })
   expect(onUnmark).toHaveBeenCalled()
+})
+
+test('両方の帯では人／席の札が付き、人だけの帯では付かない', () => {
+  const kindTags = () => [...container.querySelectorAll('span')]
+    .map((el) => el.textContent).filter((text) => text === '人' || text === '席')
+  renderTimeline({ showKindTag: true })
+  expect(kindTags()).toEqual(['人', '人'])
+  renderTimeline({ showKindTag: false })
+  expect(kindTags()).toEqual([])
 })
 
 test('来なかったは「…」の中', async () => {
