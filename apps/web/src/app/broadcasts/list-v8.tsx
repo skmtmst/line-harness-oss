@@ -46,6 +46,8 @@ import Pagination from '@/components/shared/pagination'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
 import { notifyToast } from '@/components/shared/toast'
+import { runUndoable } from '@/lib/undoable'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import { formatDateTime, formatNumber, formatYmd } from '@/lib/format'
 import styles from './list-v8.module.css'
@@ -166,7 +168,6 @@ export default function BroadcastListV8() {
   /* 行の「…」メニュー。フォルダへ移すは同じメニューの2段目で選ぶ。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [menuMoveFor, setMenuMoveFor] = useState<string | null>(null)
-  const [moving, setMoving] = useState(false)
   const [savedViews, setSavedViews] = useState<BroadcastSavedView[]>([])
   const [savedViewsSeq, setSavedViewsSeq] = useState(0)
   const [savedViewName, setSavedViewName] = useState('')
@@ -431,25 +432,35 @@ export default function BroadcastListV8() {
     }
   }
 
-  /* 行の「…」→「フォルダへ移す」。宛先フォルダを同じメニューで選ぶ。 */
-  const moveBroadcastToFolder = async (broadcast: ApiBroadcast, folderId: string | null) => {
-    if (moving) return
-    setMoving(true)
-    try {
-      const res = await api.broadcasts.update(broadcast.id, {
-        folderId,
-        expectedVersion: broadcast.version ?? 0,
-      })
-      if (!res.success) throw new Error(res.error)
-      await load((page - 1) * pageSize)
-      await loadFolders()
-    } catch {
-      notifyToast('フォルダへ移せませんでした。状態を読み直してから、もう一度お試しください。')
-    } finally {
-      setMoving(false)
-      setOpenMenuId(null)
-      setMenuMoveFor(null)
-    }
+  /*
+   * 行の「…」→「フォルダへ移す」。押した瞬間に描き換え、裏で保存する
+   * （★V8 サクサク感 B）。5秒のあいだ知らせの「元に戻す」で送らずに戻せる。
+   */
+  const moveBroadcastToFolder = (broadcast: ApiBroadcast, folderId: string | null) => {
+    const key = listContextKey
+    setOptimisticRows({
+      key,
+      rows: listed.map((b) => (b.id === broadcast.id ? { ...b, folderId } : b)),
+    })
+    setOpenMenuId(null)
+    setMenuMoveFor(null)
+    runUndoable({
+      message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
+      commit: async () => {
+        const res = await api.broadcasts.update(broadcast.id, {
+          folderId,
+          expectedVersion: broadcast.version ?? 0,
+        })
+        if (!res.success) throw new Error(res.error)
+      },
+      undo: () => setOptimisticRows(null),
+      failureMessage: 'フォルダへ移せませんでした。状態を読み直してから、もう一度お試しください。',
+      onCommitted: () => {
+        setOptimisticRows(null)
+        void load((page - 1) * pageSize)
+        void loadFolders()
+      },
+    })
   }
 
   const getTagName = (tagId: string | null) => {
@@ -459,8 +470,35 @@ export default function BroadcastListV8() {
   const getScenarioName = (scenarioId: string) =>
     scenarios.find((s) => s.id === scenarioId)?.name ?? null
 
-  /* タイトルと配信日は手元で絞る（口は状態・フォルダまで）。 */
-  const visibleBroadcasts = broadcasts.filter((b) => {
+  /*
+   * 押した瞬間の見せ方（★V8 サクサク感 B）。軽い操作は先にこの重ねで
+   * 描き換え、裏で保存する。確定・失敗・取り消しで重ねを外し、読み直す。
+   * ページ・絞り込みが変わったら重ねは捨てる（違う一覧に貼らない）。
+   * 送る・止める・消すは取り消せないので、従来どおり確認の窓を残す。
+   */
+  const [optimisticRows, setOptimisticRows] = useState<{ key: string; rows: ApiBroadcast[] } | null>(null)
+  const listContextKey = JSON.stringify({
+    account: selectedAccountId ?? '',
+    query: titleQuery,
+    status: statusFilter,
+    folder: folderFilter,
+    from: dateFrom,
+    to: dateTo,
+    sort: sortKey,
+    pageSize,
+    page,
+    view: savedViewId,
+  })
+  const listed = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : broadcasts
+
+  /*
+   * タイトルと配信日は手元で絞る（口は状態・フォルダまで）。
+   * フォルダも手元で当て直す。口が既に絞っているので普段は変わらないが、
+   * フォルダ移動の重ね（まだ送っていない行き先）をすぐ表へ出すため。
+   */
+  const visibleBroadcasts = listed.filter((b) => {
+    if (folderFilter === UNFILED && b.folderId) return false
+    if (folderFilter && folderFilter !== UNFILED && b.folderId !== folderFilter) return false
     const query = titleQuery.trim().toLowerCase()
     if (query && !`${b.title} ${b.messageContent}`.toLowerCase().includes(query)) return false
     if (dateFrom || dateTo) {
@@ -610,6 +648,53 @@ export default function BroadcastListV8() {
     return items
   }
 
+  /*
+   * 見出しは実表と共有する（共通 `Th` なので直書きの見出しには数えない）。
+   * 骨組みと実表で列の並び・幅がずれると読み込みのたびにがたつく。
+   */
+  const tableHead = (
+    <thead>
+      <TableHeadRow>
+        <Th>タイトル・内容</Th>
+        <Th>状態</Th>
+        <Th className={styles.audienceCol}>配信条件</Th>
+        <Th>配信日時</Th>
+        <Th>結果</Th>
+        <Th className={styles.menuCell}><span className="sr-only">操作</span></Th>
+      </TableHeadRow>
+    </thead>
+  )
+
+  const loadingSkeleton = (
+    <table className={styles.table}>
+      {tableHead}
+      <tbody>
+        {[0, 1, 2, 3, 4].map((n) => (
+          <tr key={n}>
+            <td>
+              <Skeleton width={200} height={16} />
+              <span style={{ display: 'block', height: 4 }} aria-hidden="true" />
+              <Skeleton width={140} height={12} />
+            </td>
+            <td>
+              <Skeleton width={72} height={24} className="rounded-pill" />
+            </td>
+            <td>
+              <Skeleton width={120} height={12} />
+            </td>
+            <td>
+              <Skeleton width={96} height={16} />
+            </td>
+            <td>
+              <Skeleton width={64} height={16} />
+            </td>
+            <td />
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+
   return (
     <div className={styles.board} data-design-node="EML2F bIdqV">
       {folderDialogOpen && (
@@ -681,7 +766,7 @@ export default function BroadcastListV8() {
             <p className={styles.folderNote}>
               フォルダを消しても、入っていた配信は未分類として残ります。
             </p>
-            {folderError && (broadcasts.length > 0 || showCreate || !error) ? (
+            {folderError && (listed.length > 0 || showCreate || !error) ? (
               <p role="alert" className={styles.folderNote}>
                 {folderError}
                 <button type="button" onClick={() => void loadFolders()} className="text-action ml-2 font-semibold hover:underline">
@@ -857,16 +942,8 @@ export default function BroadcastListV8() {
           )}
 
           {loading ? (
-            <div className={styles.skeletonRows} role="status">
-              <span className="sr-only">読み込んでいます</span>
-              {[0, 1, 2, 3, 4].map((row) => (
-                <div key={row} className={styles.skeletonRow}>
-                  <span className={styles.skeletonDot} />
-                  <span className={styles.skeletonBar} />
-                  <span className={styles.skeletonBar} style={{ maxWidth: 120 }} />
-                  <span className={styles.skeletonBar} style={{ maxWidth: 160 }} />
-                </div>
-              ))}
+            <div className={styles.tableWrap} aria-busy="true" aria-label="読み込んでいます">
+              <DelayedSkeleton loading skeleton={loadingSkeleton} />
             </div>
           ) : forbidden ? (
             <div className={styles.stateCard}>
@@ -907,16 +984,7 @@ export default function BroadcastListV8() {
             <>
               <div className={styles.tableWrap} data-content-in="">
                 <table className={styles.table}>
-                  <thead>
-                    <TableHeadRow>
-                      <Th>タイトル・内容</Th>
-                      <Th>状態</Th>
-                      <Th className={styles.audienceCol}>配信条件</Th>
-                      <Th>配信日時</Th>
-                      <Th>結果</Th>
-                      <Th className={styles.menuCell}><span className="sr-only">操作</span></Th>
-                    </TableHeadRow>
-                  </thead>
+                  {tableHead}
                   <tbody>
                     {visibleBroadcasts.map((broadcast) => {
                       const approvalDuplicatesStatus = (broadcast.displayStatus === 'pending_approval' && broadcast.approvalStatus === 'pending')
@@ -999,7 +1067,8 @@ export default function BroadcastListV8() {
                               aria-expanded={openMenuId === broadcast.id}
                               title={`配信「${broadcast.title}」の操作`}
                               onClick={() => {
-                                setMenuMoveFor(null)
+                                // 行き先の段（menuMoveFor）は残す。「フォルダへ移す」を
+                                // 選ぶと窓はいったん閉じるので、開き直したとき行き先が出る。
                                 setOpenMenuId((current) => (current === broadcast.id ? null : broadcast.id))
                               }}
                             >
@@ -1007,7 +1076,7 @@ export default function BroadcastListV8() {
                             </button>
                             <ActionMenu
                               open={openMenuId === broadcast.id}
-                              onClose={() => { setOpenMenuId(null); setMenuMoveFor(null) }}
+                              onClose={() => { setOpenMenuId(null) }}
                               ariaLabel={`配信「${broadcast.title}」の操作`}
                               items={rowMenuItems(broadcast)}
                             />
@@ -1029,7 +1098,6 @@ export default function BroadcastListV8() {
                   pageCount={pageCount}
                   onPageChange={goPage}
                   ariaLabel="一斉配信のページ送り"
-                  disabled={moving}
                 />
               </div>
             </>
@@ -1041,7 +1109,7 @@ export default function BroadcastListV8() {
         open={deletingFolder !== null}
         title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
         description={`削除しても、中の配信は未分類に残ります。いまこのフォルダに入っているのは${
-          deletingFolder ? broadcasts.filter((b) => b.folderId === deletingFolder.id).length : 0
+          deletingFolder ? listed.filter((b) => b.folderId === deletingFolder.id).length : 0
         }件です。`}
         confirmLabel="削除する"
         destructive
