@@ -261,8 +261,9 @@ export async function countBookingEmptyAudience(
     audienceWhere += ` AND (${where.sql})`;
     audienceBindings = [...audienceBindings, ...where.bindings];
   } else if (settings.targetTagId) {
+    // JOINの ?（タグ）が先、WHEREの ?（所属）が後。束ねもその順にする。
     audienceFrom += ' JOIN friend_tags ft ON ft.friend_id = f.id AND ft.tag_id = ?';
-    audienceBindings = [...audienceBindings, settings.targetTagId];
+    audienceBindings = [settings.targetTagId, settings.lineAccountId];
   }
   const rows = await db.prepare(
     `SELECT DISTINCT f.id AS fid, mc.starts_at, mc.meet_url

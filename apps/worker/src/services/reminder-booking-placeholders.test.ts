@@ -29,10 +29,11 @@ function seedBase(raw: SqliteD1['raw']): void {
   ).run(MEET_URL);
 }
 
-function settingsWith(content: string): ReminderDraftSettings {
+function settingsWith(content: string, overrides: { lineAccountId?: string; targetTagId?: string } = {}): ReminderDraftSettings {
   return {
     name: '予約前のお知らせ',
-    lineAccountId: 'account-1',
+    lineAccountId: overrides.lineAccountId ?? 'account-1',
+    targetTagId: overrides.targetTagId ?? null,
     triggerType: 'booking',
     deliveryMode: 'time',
     stopConditions: {
@@ -234,6 +235,59 @@ describe('F10: 予約日時・Meet URLの差し込み', () => {
     );
     expect(built.messageContent).toContain('10月10日');
     expect(built.messageContent).toContain(MEET_URL);
+  });
+
+  it('タグ絞りではタグの付いた人だけを数える', async () => {
+    // friend-10b にタグを付ける（予定なし）。friend-10a は予定ありだがタグなし。
+    testDb.raw.prepare(`INSERT INTO tags (id, name) VALUES ('tag-1', '会員')`).run();
+    testDb.raw.prepare(`INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-10b', 'tag-1')`).run();
+    const result = await validateReminderDraft(
+      testDb.db,
+      settingsWith('ご予約は{{reservation_datetime}}です', { targetTagId: 'tag-1' }),
+      version,
+    );
+    expect(result.valid).toBe(false);
+    const booking = result.checks.find((item) => item.key === 'booking_placeholders');
+    expect(booking?.status).toBe('failed');
+    expect(booking?.message).toContain('1人');
+  });
+
+  it('タグ絞りで全員に予定があれば通る', async () => {
+    testDb.raw.prepare(`INSERT INTO tags (id, name) VALUES ('tag-1', '会員')`).run();
+    testDb.raw.prepare(`INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-10b', 'tag-1')`).run();
+    testDb.raw.prepare(
+      `INSERT INTO meet_consultations
+        (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status)
+       VALUES ('meet-2', 'event-2', 'friend-10b', '個別相談',
+               '2026-10-11T01:00:00.000Z', '2026-10-11T01:30:00.000Z', ?, 'confirmed')`,
+    ).run(MEET_URL);
+    const result = await validateReminderDraft(
+      testDb.db,
+      settingsWith('ご予約は{{reservation_datetime}}です', { targetTagId: 'tag-1' }),
+      version,
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it('タグ絞りでは別アカウントの人を数えない', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO line_accounts
+         (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
+       VALUES ('account-2', 'channel-2', '店舗2', '', '', 1, 'tenant-1')`,
+    ).run();
+    insertFriend(testDb.raw, 'friend-10c', { line_account_id: 'account-2', display_name: '他店の人' });
+    testDb.raw.prepare(`INSERT INTO tags (id, name) VALUES ('tag-1', '会員')`).run();
+    // 別アカウントの人にも同じタグを付ける（予定なし）。
+    testDb.raw.prepare(`INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-10c', 'tag-1')`).run();
+    // account-1 のタグ付きは予定ありの friend-10a だけにする。
+    testDb.raw.prepare(`INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-10a', 'tag-1')`).run();
+    const result = await validateReminderDraft(
+      testDb.db,
+      settingsWith('ご予約は{{reservation_datetime}}です', { targetTagId: 'tag-1' }),
+      version,
+    );
+    // account-1 の届け先は予定ありだけなので通る（別アカウントは数えない）。
+    expect(result.valid).toBe(true);
   });
 
   it('送る側は空のMeet URLを空文字にする', async () => {
