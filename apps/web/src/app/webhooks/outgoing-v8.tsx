@@ -112,7 +112,7 @@ function matchesOutgoing(item: OutgoingWebhookOverview, filter: OutgoingFilter, 
   }
 }
 
-type KpiCell = {
+export type V8KpiCell = {
   key: string
   icon: React.ReactNode
   label: string
@@ -125,11 +125,11 @@ type KpiCell = {
  * 数の帯の4マス。口の形のまま（無い数は「—」。0にしない）。
  * 先月の集計は口に無いので、今月送ったの下は「成功 N回」と出す。
  */
-function outgoingKpiCells(args: {
+export function outgoingKpiCells(args: {
   items: OutgoingWebhookOverview[] | null
   incomingCount: number | null
   summary: WebhookInteractionSummary | null
-}): KpiCell[] {
+}): V8KpiCell[] {
   const { items, incomingCount, summary } = args
   const active = items === null ? null : items.filter((item) => item.isActive).length
   const paused = items === null ? null : items.length - (active ?? 0)
@@ -197,14 +197,13 @@ export function WebhooksV8Head({ activeTab, outgoingCount, incomingCount }: {
   )
 }
 
-export function WebhooksV8Band({ items, incomingCount, summary }: {
-  items: OutgoingWebhookOverview[] | null
-  incomingCount: number | null
-  summary: WebhookInteractionSummary | null
+export function WebhooksV8Band({ cells, label }: {
+  cells: V8KpiCell[]
+  label?: string
 }) {
   return (
-    <section className={styles.kpiBand} aria-label="外部連携の数の帯">
-      {outgoingKpiCells({ items, incomingCount, summary }).map((cell) => (
+    <section className={styles.kpiBand} aria-label={label ?? '外部連携の数の帯'}>
+      {cells.map((cell) => (
         <div className={styles.kpiCell} key={cell.key}>
           <div className={styles.kpiHead}>
             <span className={styles.kpiIcon} aria-hidden="true">{cell.icon}</span>
@@ -574,7 +573,7 @@ function OutgoingV8Inner() {
   return (
     <div className={styles.board} data-design-node="ZSbFY">
       <WebhooksV8Head activeTab="outgoing" outgoingCount={readyCounts ? outgoing.length : null} incomingCount={incomingCount} />
-      <WebhooksV8Band items={outgoingStatus === 'ready' ? outgoing : null} incomingCount={incomingCount} summary={summaryStatus === 'ready' ? summary : null} />
+      <WebhooksV8Band cells={outgoingKpiCells({ items: outgoingStatus === 'ready' ? outgoing : null, incomingCount, summary: summaryStatus === 'ready' ? summary : null })} />
 
       <Notice tone="info">
         友だちの動きを、決めたタイミングでほかのシステムへ送ります。送るときは秘密の鍵を付けます。鍵は「設定」から作り直せます。

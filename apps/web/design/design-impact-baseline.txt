@@ -253,6 +253,7 @@ shared-button-importer app/webhooks/api-tokens-panel.tsx
 shared-button-importer app/webhooks/edit/page.tsx
 shared-button-importer app/webhooks/google-sheets-panel.tsx
 shared-button-importer app/webhooks/new/page.tsx
+shared-button-importer app/webhooks/interactions-v8.tsx
 shared-button-importer app/webhooks/outgoing-v8.tsx
 shared-button-importer app/webhooks/page.tsx
 shared-button-importer app/webhooks/webhook-interactions.tsx
