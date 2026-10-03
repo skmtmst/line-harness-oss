@@ -46,6 +46,9 @@ import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import { Tabs } from '@/components/shared/tabs'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { describeFriendAddFailure } from './friend-add-failure'
@@ -211,6 +214,8 @@ function FriendAddListV8Inner() {
   const requestSequence = useRef(0)
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている設定のID。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [moveNotice, setMoveNotice] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
@@ -465,6 +470,28 @@ function FriendAddListV8Inner() {
   const runsHref = (id: string) => `/friend-add-settings/runs?rule_id=${encodeURIComponent(id)}`
   const testHref = (id: string) => `/friend-add-settings?view=edit&id=${encodeURIComponent(id)}&step=preview`
 
+  /** 一覧→詳細・編集はつながる移り変わりで進む（V8「サクサク感」E）。 */
+  const goEdit = (id: string) => {
+    withViewTransition(() => {
+      router.push(editHref(id))
+    })
+  }
+  const goRuns = (id: string) => {
+    withViewTransition(() => {
+      router.push(runsHref(id))
+    })
+  }
+  const goTest = (id: string) => {
+    withViewTransition(() => {
+      router.push(testHref(id))
+    })
+  }
+  const goPublish = (id: string) => {
+    withViewTransition(() => {
+      router.push(`/friend-add-settings/publish?id=${encodeURIComponent(id)}`)
+    })
+  }
+
   const rowMenuItems = (rule: FriendAddRule): ActionMenuItem[] => [
     {
       id: 'edit',
@@ -472,13 +499,13 @@ function FriendAddListV8Inner() {
       icon: <Pencil size={15} />,
       disabled: !canEdit,
       disabledReason: canEdit ? undefined : readonlyReason,
-      onSelect: () => router.push(editHref(rule.id)),
+      onSelect: () => goEdit(rule.id),
     },
     {
       id: 'runs',
       label: '実行結果を見る',
       icon: <History size={15} />,
-      onSelect: () => router.push(runsHref(rule.id)),
+      onSelect: () => goRuns(rule.id),
     },
     {
       id: 'test',
@@ -486,7 +513,7 @@ function FriendAddListV8Inner() {
       icon: <Send size={15} />,
       disabled: !canEdit,
       disabledReason: canEdit ? undefined : readonlyReason,
-      onSelect: () => router.push(testHref(rule.id)),
+      onSelect: () => goTest(rule.id),
     },
     ...(rule.isFallback
       ? [{
@@ -514,7 +541,7 @@ function FriendAddListV8Inner() {
                   label: '最終確認・有効化へ進む',
                   disabled: !canEdit,
                   disabledReason: canEdit ? undefined : readonlyReason,
-                  onSelect: () => router.push(`/friend-add-settings/publish?id=${encodeURIComponent(rule.id)}`),
+                  onSelect: () => goPublish(rule.id),
                 }]
               : []),
           {
@@ -531,6 +558,23 @@ function FriendAddListV8Inner() {
           },
         ]),
   ]
+
+  /* ===== 行の詳細パネル（V8「サクサク感」C①②・D・E） ===== */
+
+  /** 右クリックは「…」と同じ項目をマウスの位置に出す。 */
+  const rowContextItems = (rule: FriendAddRule): ContextMenuItem[] =>
+    rowMenuItems(rule).map((item) => ({
+      id: item.id,
+      label: item.label,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      onSelect: () => item.onSelect(),
+    }))
+
+  /** 受け皿も行の1つとして、↑↓で移れる。 */
+  const panelRows = sinkRule ? [...regularItems, sinkRule] : regularItems
+  const panelIndex = panelId === null ? -1 : panelRows.findIndex((rule) => rule.id === panelId)
+  const panelRow = panelIndex >= 0 ? panelRows[panelIndex] : null
 
   /* ===== 数の帯（板 MRhef の4つ） ===== */
 
@@ -664,7 +708,19 @@ function FriendAddListV8Inner() {
           </thead>
           <tbody>
             {regularItems.map((rule, index) => (
-              <tr key={rule.id}>
+              <tr
+                key={rule.id}
+                className={styles.rowClick}
+                tabIndex={0}
+                onClick={() => setPanelId(rule.id)}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    setPanelId(rule.id)
+                  }
+                }}
+              >
                 <td
                   className={styles.orderCell}
                   draggable={canReorder}
@@ -686,7 +742,17 @@ function FriendAddListV8Inner() {
                   </span>
                 </td>
                 <td>
-                  <Link href={editHref(rule.id)} title={rule.name} className={styles.cellTitle}>
+                  <Link
+                    href={editHref(rule.id)}
+                    title={rule.name}
+                    className={styles.cellTitle}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                      event.preventDefault()
+                      goEdit(rule.id)
+                    }}
+                  >
                     {rule.name}
                   </Link>
                   <p className={styles.cellSub} title={rule.routeNames.join('、') || '未選択'}>
@@ -711,19 +777,24 @@ function FriendAddListV8Inner() {
                     {rule.status === 'draft' ? '—' : countText(rule.matchedLast7Days, '人')}
                   </span>
                 </td>
-                <td className={styles.menuCell}>
-                  <button
-                    type="button"
-                    className={styles.menuButton}
-                    title={`設定「${rule.name}」の操作`}
-                    aria-label={`設定「${rule.name}」の操作`}
-                    aria-haspopup="menu"
-                    onClick={() =>
-                      setOpenMenuId((current) => (current === rule.id ? null : rule.id))
-                    }
+                <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                  <ContextMenu
+                    label={`設定「${rule.name}」の操作`}
+                    items={rowContextItems(rule)}
                   >
-                    <MoreHorizontal size={16} aria-hidden="true" />
-                  </button>
+                    <button
+                      type="button"
+                      className={styles.menuButton}
+                      title={`設定「${rule.name}」の操作`}
+                      aria-label={`設定「${rule.name}」の操作`}
+                      aria-haspopup="menu"
+                      onClick={() =>
+                        setOpenMenuId((current) => (current === rule.id ? null : rule.id))
+                      }
+                    >
+                      <MoreHorizontal size={16} aria-hidden="true" />
+                    </button>
+                  </ContextMenu>
                   <ActionMenu
                     open={openMenuId === rule.id}
                     onClose={() => setOpenMenuId(null)}
@@ -734,14 +805,36 @@ function FriendAddListV8Inner() {
               </tr>
             ))}
             {sinkRule ? (
-              <tr key={sinkRule.id} className={styles.sinkRow}>
+              <tr
+                key={sinkRule.id}
+                className={`${styles.sinkRow} ${styles.rowClick}`}
+                tabIndex={0}
+                onClick={() => setPanelId(sinkRule.id)}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    setPanelId(sinkRule.id)
+                  }
+                }}
+              >
                 <td className={styles.orderCell}>
                   <span className={styles.sinkLock} title="いちばん最後に動く・動かせない">
                     <Lock size={14} aria-hidden="true" />
                   </span>
                 </td>
                 <td>
-                  <Link href={editHref(sinkRule.id)} title={sinkRule.name} className={styles.cellTitle}>
+                  <Link
+                    href={editHref(sinkRule.id)}
+                    title={sinkRule.name}
+                    className={styles.cellTitle}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                      event.preventDefault()
+                      goEdit(sinkRule.id)
+                    }}
+                  >
                     {sinkRule.name}
                   </Link>
                   <p className={styles.cellSub}>
@@ -764,19 +857,24 @@ function FriendAddListV8Inner() {
                 <td className={`${styles.countCell} ${styles.recentCol}`}>
                   <span className={styles.countMain}>{countText(sinkRule.matchedLast7Days, '人')}</span>
                 </td>
-                <td className={styles.menuCell}>
-                  <button
-                    type="button"
-                    className={styles.menuButton}
-                    title={`設定「${sinkRule.name}」の操作`}
-                    aria-label={`設定「${sinkRule.name}」の操作`}
-                    aria-haspopup="menu"
-                    onClick={() =>
-                      setOpenMenuId((current) => (current === sinkRule.id ? null : sinkRule.id))
-                    }
+                <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                  <ContextMenu
+                    label={`設定「${sinkRule.name}」の操作`}
+                    items={rowContextItems(sinkRule)}
                   >
-                    <MoreHorizontal size={16} aria-hidden="true" />
-                  </button>
+                    <button
+                      type="button"
+                      className={styles.menuButton}
+                      title={`設定「${sinkRule.name}」の操作`}
+                      aria-label={`設定「${sinkRule.name}」の操作`}
+                      aria-haspopup="menu"
+                      onClick={() =>
+                        setOpenMenuId((current) => (current === sinkRule.id ? null : sinkRule.id))
+                      }
+                    >
+                      <MoreHorizontal size={16} aria-hidden="true" />
+                    </button>
+                  </ContextMenu>
                   <ActionMenu
                     open={openMenuId === sinkRule.id}
                     onClose={() => setOpenMenuId(null)}
@@ -953,6 +1051,57 @@ function FriendAddListV8Inner() {
           {tableBody}
         </div>
       </div>
+
+      {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+      {panelRow && (
+        <DetailPanel
+          open
+          title={panelRow.name}
+          description={[statusLabel(panelRow), firstSendLabel(panelRow)].join('・')}
+          onClose={() => setPanelId(null)}
+          onPrev={panelIndex > 0 ? () => setPanelId(panelRows[panelIndex - 1].id) : undefined}
+          onNext={
+            panelIndex < panelRows.length - 1 ? () => setPanelId(panelRows[panelIndex + 1].id) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < panelRows.length - 1}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => goEdit(panelRow.id)}>
+                編集する
+              </Button>
+              <Button variant="secondary" onClick={() => goRuns(panelRow.id)}>
+                実行結果を見る
+              </Button>
+              <Button variant="secondary" disabled={!canEdit} onClick={() => goTest(panelRow.id)}>
+                テストを送る
+              </Button>
+              {!panelRow.isFallback && (
+                <Button
+                  variant="secondary"
+                  disabled={!canEdit}
+                  onClick={() => {
+                    setDeleteError('')
+                    setDeleteTarget(panelRow)
+                    setPanelId(null)
+                  }}
+                >
+                  削除する
+                </Button>
+              )}
+            </>
+          }
+        >
+          <p>
+            {statusLabel(panelRow)} ／ 直近7日{' '}
+            {panelRow.status === 'draft' ? '—' : countText(panelRow.matchedLast7Days, '人')}
+          </p>
+          <p>{panelRow.routeNames.join('、') || '未選択'}</p>
+          {actionLines(panelRow).map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+        </DetailPanel>
+      )}
 
       {/* 受け皿を止められない確かめ（板 `cFo2p`）。 */}
       <ConfirmDialog
