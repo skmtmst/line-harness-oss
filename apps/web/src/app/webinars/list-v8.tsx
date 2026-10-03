@@ -36,6 +36,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CalendarClock, MousePointerClick, Users, Video } from 'lucide-react'
 import Button from '@/components/shared/button'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import { RowActions } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
@@ -308,14 +309,14 @@ function WebinarListTableV8({
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
-          <tr>
-            <th scope="col">ウェビナー名</th>
-            <th scope="col">状態</th>
-            <th scope="col" style={{ textAlign: 'right' }}>申込</th>
-            <th scope="col">視聴</th>
-            <th scope="col">公開期間</th>
-            <th scope="col">操作</th>
-          </tr>
+          <TableHeadRow>
+            <Th>ウェビナー名</Th>
+            <Th>状態</Th>
+            <Th align="right">申込</Th>
+            <Th>視聴</Th>
+            <Th>公開期間</Th>
+            <Th>操作</Th>
+          </TableHeadRow>
         </thead>
         <tbody>
           {items.map((w) => {
