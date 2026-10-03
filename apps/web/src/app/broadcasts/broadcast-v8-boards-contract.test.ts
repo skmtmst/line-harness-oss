@@ -15,7 +15,8 @@ const read = (relative: string) => readFileSync(join(HERE, relative), 'utf8')
 describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
   it('一覧の外枠に EML2F（一覧）と bIdqV（一覧の状態）を付ける', () => {
     const list = read('list-v8.tsx')
-    expect(list, '一覧の板が無い').toContain('data-design-node="EML2F bIdqV"')
+    // 閲覧のみは NtCE3 に切り替わる形で両方の印を残す（印を消さない）。
+    expect(list, '一覧の板が無い').toContain("data-design-node={canEdit ? 'EML2F bIdqV' : 'NtCE3'}")
   })
 
   it('一覧の道具の段に rfdmA（1152）を付ける', () => {
