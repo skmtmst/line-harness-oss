@@ -6,6 +6,7 @@ import {
   createAutoReply,
   updateAutoReply,
   deleteAutoReply,
+  restoreAutoReply,
   stopAutoReply,
   getAutoReplyHitCounts,
   getAutoReplyHitCountSince,
@@ -96,6 +97,23 @@ async function assertTemplateVisible(
 }
 
 async function requireVisibleAutoReply(c: Context<Env>, next: () => Promise<void>) {
+  // B 元に戻す: 削除の取り消しは消えた行自体が対象。所属だけ確かめて通す。
+  // 行の有無（404）は restore 側が deleted_at 込みで判断する。
+  if (c.req.path.endsWith('/restore')) {
+    const row = await c.env.DB
+      .prepare(`SELECT line_account_id FROM auto_replies WHERE id = ?`)
+      .bind(c.req.param('id')!)
+      .first<{ line_account_id: string | null }>();
+    if (!row || !await canAccessAllLineAccounts(
+      c.env.DB,
+      c.get('staff'),
+      [row.line_account_id ?? null],
+    )) {
+      return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+    }
+    await next();
+    return;
+  }
   const item = await getAutoReplyById(c.env.DB, c.req.param('id')!);
   if (!item || !await canAccessAllLineAccounts(
     c.env.DB,
@@ -2107,6 +2125,29 @@ autoReplies.delete('/api/auto-replies/:id', requireRole('owner', 'admin'), async
   } catch (err) {
     console.error('DELETE /api/auto-replies/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * POST /api/auto-replies/:id/restore — 削除の取り消し（B 元に戻す）。
+ *
+ * 論理削除（deleted_at）の行だけを戻す。戻した直後は止めたまま
+ * （is_active = 0）で送り出さない。再開は画面の再開操作で行う。
+ * 消していない行・無い行は 404。
+ */
+autoReplies.post('/api/auto-replies/:id/restore', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const restored = await restoreAutoReply(c.env.DB, c.req.param('id'));
+    if (!restored) {
+      return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+    }
+    const memos = await internalMemosOf(c.env.DB, [restored.id]);
+    const data = serializeAutoReply(restored, memos.get(restored.id) ?? null);
+    await resolveStoppedByNames(c.env.DB, [data]);
+    return c.json({ success: true, data });
+  } catch (err) {
+    console.error('POST /api/auto-replies/:id/restore error:', err);
+    return c.json({ success: false, error: '自動応答を元に戻せませんでした' }, 500);
   }
 });
 
