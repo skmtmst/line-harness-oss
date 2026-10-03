@@ -784,6 +784,18 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
+        {/*
+          1152幅で表が器より広がらないよう、1列目（つなぎ先）だけ伸び縮み・
+          ほかは中身に合わせた固定幅にする（AsfFB 右端越えの直し）。
+        */}
+        <colgroup>
+          <col />
+          <col style={{ width: '7rem' }} />
+          <col style={{ width: '10rem' }} />
+          <col style={{ width: '6rem' }} />
+          <col style={{ width: '10rem' }} />
+          <col style={{ width: '12rem' }} />
+        </colgroup>
         <thead>
           <tr>
             <th scope="col">つなぎ先</th>
