@@ -22,6 +22,7 @@ import { notifyToast } from '@/components/shared/toast'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt'
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useAccount } from '@/contexts/account-context'
 import {
   ApiError,
@@ -41,6 +42,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './staff-actions'
 import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft'
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
+import StaffHeadV8, { STAFF_TAB_KEYS } from './staff-head-v8'
 import OtpInput from '@/components/shared/otp-input'
 import { formatDateTime } from '@/lib/format'
 
@@ -75,10 +77,6 @@ const NOTIFICATIONS = [
  */
 const EDIT_PERMISSION_PATHS = ['/', '/chats', '/friends', '/tags', '/scenarios', '/broadcasts', '/reminders', '/auto-replies', '/templates', '/rich-menus', '/form-submissions', '/contents/vars', '/contents', '/analytics', '/automations', '/webhooks', '/booking/bookings', '/ec-commerce', '/line-notifications', '/nen-campaigns', '/nen-members'] as const
 const PERMISSIONS: Array<readonly [string, string]> = EDIT_PERMISSION_PATHS.map((path) => [path, PERMISSION_LABELS[path]] as const)
-const STAFF_TAB_KEYS = [
-  { key: 'members', label: 'いまいる人' }, { key: 'invited', label: '招待中' },
-  { key: 'audit', label: '入った記録' }, { key: 'roles', label: '権限のかたまり' },
-] as const
 
 const LIST_SORT_OPTIONS = [
   { value: 'recent', label: '最後に入った日が新しい順' },
@@ -656,7 +654,36 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
     <div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving || !uri}>✓ {saving ? '確認中…' : '設定を完了'}</Button></div></Modal>
 }
 
+/*
+ * 板 `nku0f` 右の欄「役割でできること」。運用の目安の書き付け。
+ */
+function StaffRoleGuide() {
+  const rows = [
+    { role: 'オーナー', body: 'すべて。お金・会社とロゴ・ほかの人の役割も変えられる' },
+    { role: '管理者', body: 'すべての機能を作る・変える・送る。ログインユーザーの招待と役割' },
+    { role: '運用', body: '配信・受信箱・友だち・予約を作る・送る。設定は見るだけ' },
+    { role: '受付', body: '受信箱の返信と予約の受付だけ' },
+    { role: '見るだけ', body: '全部見られるが、押せない（隠さない）' },
+  ]
+  return (
+    <section aria-label="役割でできること" className="border-hairline bg-canvas rounded-card border p-5">
+      <h2 className="text-ink text-sm font-bold">役割でできること</h2>
+      <ul className="mt-3 space-y-3">
+        {rows.map((item) => (
+          <li key={item.role} className="flex items-start justify-between gap-3 border-b border-hairline pb-3 text-xs last:border-0 last:pb-0">
+            <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-1 font-semibold text-ink">{item.role}</span>
+            <span className="text-ink-secondary leading-5">{item.body}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-ink-faint mt-3 text-xs leading-5">「個別設定」にすると、画面ごと・アカウントごとに細かく決められます。</p>
+    </section>
+  )
+}
+
 function StaffPageHost() {
+  const theme = useAdminTheme()
+  const v8 = theme === 'v8'
   const tab = useMergedTab(STAFF_TAB_KEYS, 'tab', 'members')
   const { selectedAccountId } = useAccount()
   const [members, setMembers] = useState<StaffMember[]>([])
@@ -853,7 +880,12 @@ function StaffPageHost() {
     const permissionMember = memberById.get(permissionTarget.id)
     return <PermissionScopeView user={permissionTarget} memberId={permissionMember?.id ?? null} canSave={administrator} copyCandidates={copyCandidates} roleCounts={accessSummary.roleCounts} accountNames={accountNames} savedEditKeys={permissionMember?.permissionKeys ?? []} savedViewKeys={permissionMember?.permissionViewKeys ?? []} savedEmailMask={permissionMember?.emailMask ?? null} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} onConflict={handlePermissionConflict} />
   }
-  return <div data-design-node="e3jz3" className="flex flex-col gap-4"><div><MergedTabs basePath="/staff" tabs={staffTabs} active={tab} defaultKey="members" actions={tabAction} /></div>
+  const body = (<>
+    {v8 ? (
+      <StaffHeadV8 tab={tab} administrator={Boolean(administrator)} />
+    ) : (
+      <div><MergedTabs basePath="/staff" tabs={staffTabs} active={tab} defaultKey="members" actions={tabAction} /></div>
+    )}
     {/*
       #972 U031: 役わりの絞り込み（下の Tabs）は横スクロールを持たないので、
       この画面だけ「収まらないとき折り返す」にする。収まる幅では1行のまま。
@@ -924,7 +956,13 @@ function StaffPageHost() {
       <p className="text-ink-secondary text-sm">これまでの設定と操作記録は残ります。</p>
     </ConfirmDialog>
     {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-  </div>
+    {v8 && tab === 'members' ? <StaffRoleGuide /> : null}
+  </>)
+  return v8 ? (
+    <div data-design-node={administrator ? 'nku0f' : 'A35Gh'} className="flex flex-col gap-4">{body}</div>
+  ) : (
+    <div data-design-node="e3jz3" className="flex flex-col gap-4">{body}</div>
+  )
 }
 
 export default function StaffPage() {

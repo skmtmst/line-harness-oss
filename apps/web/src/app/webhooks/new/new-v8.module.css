@@ -1,85 +1,55 @@
-@layer properties, theme, base, components, utilities;
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 
 /*
  * ★V8-B 外部連携の送り先を作る（板 `hsD8e`）。
- * 左の白板と右の案内・下の固定の操作帯。
+ * 左の設定カード・右の見本・下の帯。
  */
-.page {
+.board {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  min-width: 0;
   container-type: inline-size;
 }
 
-.head {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.crumb {
+  font-size: 12px;
+  color: var(--color-ink-faint);
 }
 
-.backLink {
-  align-self: flex-start;
+.crumbLink {
+  color: var(--color-action);
 }
 
-.title {
-  margin: 8px 0 0;
+.crumbLink:hover {
+  text-decoration: underline;
+}
+
+.headTitle {
+  margin: 0;
   color: var(--color-ink);
   font-size: 20px;
   font-weight: 600;
   line-height: 1.4;
 }
 
-.lead {
+.headDescription {
   margin: 0;
   color: var(--color-ink-secondary);
   font-size: 13px;
   line-height: 1.6;
 }
 
-.saveError {
-  margin: 0;
-  padding: 10px 14px;
-  border-radius: var(--radius-control, 8px);
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.problems {
-  padding: 10px 14px;
-  border-radius: var(--radius-control, 8px);
-  background: var(--color-warning-bg);
-  color: var(--color-ink);
-  font-size: 13px;
-}
-
-.problemsTitle {
-  margin: 0;
-  font-weight: 700;
-}
-
-.problemsList {
-  margin: 4px 0 0;
-  padding-left: 20px;
-  list-style: disc;
-}
-
-.columns {
+/* 本体2列：左の設定・右の見本（幅 340〜380・左に細い線）。 */
+.body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 24px;
   align-items: start;
-}
-
-.main {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
   min-width: 0;
 }
 
-.aside {
+.form {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -90,81 +60,48 @@
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
-  padding: 16px;
+  padding: 20px 24px;
 }
 
 .cardTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
 }
 
-.cardLead {
+.cardNote {
   margin: 4px 0 0;
-  color: var(--color-ink-secondary);
+  color: var(--color-ink-faint);
   font-size: 12px;
-  line-height: 1.6;
-}
-
-.directionRow {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.directionCard,
-.directionCardButton {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
-  text-align: left;
-  text-decoration: none;
-}
-
-.directionCardButton {
-  cursor: pointer;
-}
-
-.directionActive {
-  border-color: var(--color-success);
-  background: var(--color-success-bg);
-}
-
-.directionName {
-  color: var(--color-ink);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.directionHint {
-  color: var(--color-ink-secondary);
-  font-size: 11px;
-  line-height: 1.6;
 }
 
 .field {
   margin-top: 12px;
 }
 
-.fieldLabel {
+.label {
   display: block;
   margin-bottom: 4px;
-  color: var(--color-ink);
-  font-size: 12px;
-  font-weight: 700;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.fieldHint {
-  margin: 4px 0 0;
-  color: var(--color-ink-faint);
-  font-size: 11px;
-  line-height: 1.6;
+.input {
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 10px);
+  padding: 0 12px;
+  height: 36px;
+  font-size: 13px;
+  color: var(--color-ink);
+  background: var(--color-canvas);
+}
+
+.input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
 }
 
 .fieldError {
@@ -173,125 +110,126 @@
   font-size: 12px;
 }
 
-.secretRow {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.secretRow input {
-  flex: 1;
-  min-width: 0;
-}
-
-.mono {
-  font-family: monospace;
-}
-
-.modeRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.eventGroups {
-  display: flex;
-  flex-direction: column;
+.radioRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   margin-top: 12px;
 }
 
+/* 送る範囲の1つ選びは、向きと同じ選ぶカード（RadioCard）で出す。 */
+
 .eventGroup {
-  padding: 10px 12px;
-  border-radius: var(--radius-control, 8px);
+  margin-top: 12px;
+  border-radius: var(--radius-card, 12px);
   background: var(--color-canvas-sunken);
+  padding: 12px 16px;
 }
 
-.eventGroupLabel {
-  margin: 0 0 4px;
-  color: var(--color-ink);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.eventList {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.advanced {
-  padding: 8px 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control, 8px);
-}
-
-.advancedSummary {
-  color: var(--color-accent-deep);
-  font-size: 12px;
+.eventGroupTitle {
+  margin: 0 0 8px;
+  font-size: 13px;
   font-weight: 600;
-  cursor: pointer;
+  color: var(--color-ink);
 }
 
-.retryRow {
+.eventChecks {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
 
-.retryRow .fieldHint {
+.detailsBox {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.detailsSummary {
+  cursor: pointer;
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+.selectRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.secretRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.secretRow .input {
+  font-family: monospace;
+}
+
+.side {
+  min-width: 0;
+  border-left: 1px solid var(--color-hairline);
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sideCard {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.sideTitle {
   margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
 }
 
-.retryInput {
-  width: 96px;
+.sideNote {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
 }
 
-.samplePre {
-  margin: 8px 0 0;
-  padding: 10px 12px;
-  border-radius: var(--radius-control, 8px);
+.sampleBox {
+  margin: 12px 0 0;
+  border-radius: var(--radius-control, 10px);
   background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
-  font-size: 11px;
+  padding: 12px;
+  font-size: 12px;
   line-height: 1.8;
-  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--color-ink-secondary);
 }
 
-.cautionList {
+.sideList {
   margin: 8px 0 0;
   padding: 0;
   list-style: none;
-  color: var(--color-ink-secondary);
   font-size: 12px;
   line-height: 1.8;
+  color: var(--color-ink-secondary);
 }
 
-.cautionList li::before {
-  content: "・";
+.testRow {
+  margin-top: 12px;
 }
 
-.bottomBar {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 0;
-  border-top: 1px solid var(--color-hairline);
-  background: var(--color-canvas);
-}
-
-@container (max-width: 1099px) {
-  .columns {
+@container (max-width: 1100px) {
+  .body {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .aside {
-    display: none;
+  .side {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--color-hairline);
+    padding-top: 16px;
   }
 }

@@ -169,6 +169,8 @@ describe('共通部品の影響範囲', () => {
       'app/restaurant-test/restaurant-console.tsx',
       // ★V8-B Googleビジネス（j0Wcg）。口コミ一覧の表の下にページ送りを置く。
       'app/restaurant-test/v8/google.tsx',
+      // ★V8-B 予約台帳 一覧（Z3FoM）。表の下にページ送りを置く。
+      'app/restaurant-test/v8/reservations.tsx',
       // ★V8 リッチメニュー一覧（rZEGN）。表の下にページ送りを置く。
       'app/rich-menus/list-v8.tsx',
       'app/rich-menus/page.tsx',
@@ -196,6 +198,10 @@ describe('共通部品の影響範囲', () => {
       'app/webhooks/_components/webhooks-v8-interactions.tsx',
       // ★V8-B 外部連携・こちらから送る（ZSbFY）。表の下にページ送りを置く。
       'app/webhooks/_components/webhooks-v8-outgoing.tsx',
+      // ★V8-B 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りがある。
+      'app/webhooks/interactions-v8.tsx',
+      // ★V8-B 外部連携の一覧（ZSbFY）。表の下にページ送りがある。
+      'app/webhooks/outgoing-v8.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
       // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。

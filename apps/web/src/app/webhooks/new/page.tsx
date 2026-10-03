@@ -12,11 +12,12 @@ import CreatePage, { AsideCard, Field, inputClass } from '@/components/shared/cr
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import NewOutgoingV8 from './new-v8'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import NewWebhookPageV8 from './new-v8'
 
 /**
@@ -389,7 +390,17 @@ export default function NewWebhookPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <NewWebhookForm />
+      <NewWebhookPageThemed />
     </Suspense>
   )
+}
+
+/*
+ * ★V8 切替（送り先を作る `hsD8e`）。v7 の見た目は data-theme="v8" が付くまで
+ * 1画素も変えない。
+ */
+function NewWebhookPageThemed() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <NewOutgoingV8 />
+  return <NewWebhookForm />
 }

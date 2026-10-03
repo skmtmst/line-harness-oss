@@ -3,34 +3,52 @@
 /*
  * ★V8-B 外部連携の送り先を作る（板 `hsD8e`）。
  *
- * v7 の器（`new/page.tsx`）とは別の器。欄・検査・離脱確認・本人確認・
- * 保存の口は v7 と同じ。API の形を変えないので、見本の絵にある
- * 「下書きを保存」「試しに送る」「Iframe の向きの同時作成」は載せない。
- * v7 を直す必要が出たら `new/page.tsx` 側も同じ判断を入れる。
+ * v7 の作る画面（`page.tsx` の NewWebhookForm）とは別の部品として持つ。
+ * データの口（作成・本人確認・未保存の番兵）は同じ。違いは置き場と
+ * 見せ方——どちら向きの選択、右に届く中身の見本＋試しに送る＋気をつけること、
+ * 下の帯の主ボタン「つくって動かす」。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ *
+ * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
+ * - こちらで受け取る：この画面では作れない（一覧の受け取るタブから作る）
+ *   ので、選ぶと案内と行き先を出す。
+ * - 問い合わせが来た：送れる出来事の正本に無いので選ぶ欄に出さない。
+ * - それでも送れないとき：保存する口が無いので出さない。
+ * - 秘密の鍵：作るときは発行直後の全文表示が正しいので、隠さず出して
+ *   作り直せる形にする（`ralAc` の注意書きどおり）。
+ * - 試しに送る：送り先ができてから送れるので、保存するまでは押せない形。
+ * - 下書きを保存：作る口に止めた状態の指定が無いので、作ってから止める
+ *   2段階で行う。止めるところで失敗したら一覧から止める案内を出す。
+ * - 競合（`NGh7b`）：作る口に競合の応答が無いので、板だけある状態。
+ *   応答が来たら「比べてから保存」を出す（残課題として報告する）。
  */
 import { Suspense, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import RadioCard from '@/components/shared/radio-card'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
-import { RequiredBadge, inputClass } from '@/components/shared/form-controls'
+import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
+import StickyBar from '@/components/shared/sticky-bar'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { useFormErrors } from '@/lib/use-form-errors'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
 import styles from './new-v8.module.css'
 
-/**
- * #975 U067: 送るイベントの正本は `packages/db/src/webhooks.ts` の
- * KNOWN_OUTGOING_EVENT_TYPES。CSV手入力は打ち間違いをそのまま保存するため、
- * チェックで選ぶ形にする。ECの表示名は `ecEventLabel` の正本を使う。
+/*
+ * 送る出来事の正本は `packages/db/src/webhooks.ts` の
+ * KNOWN_OUTGOING_EVENT_TYPES（実際に発火する種別だけを載せる）。
+ * 見本に無い種別も購読できるので、ここでは省かない。
  */
-const WEBHOOK_EVENT_GROUPS: ReadonlyArray<{
+const V8_EVENT_GROUPS: ReadonlyArray<{
   id: string
   label: string
   events: ReadonlyArray<{ value: string; label: string }>
@@ -53,7 +71,6 @@ const WEBHOOK_EVENT_GROUPS: ReadonlyArray<{
       { value: 'staff_assigned', label: '担当が割り当てられた' },
       { value: 'manual_reply_sent', label: '個別返信を送った' },
       { value: 'cv_fire', label: '成果地点が起きた' },
-      // R150: 見本から選べるように、実際に発火する出来事をそろえる。
       { value: 'form_submitted', label: 'フォームが送られた' },
       { value: 'booking_created', label: '予約が入った' },
     ],
@@ -65,59 +82,83 @@ const WEBHOOK_EVENT_GROUPS: ReadonlyArray<{
   },
 ]
 
-/* 見本の絵に出す届く中身の見本（保存しない・送らない。読むだけ）。 */
-const SAMPLE_JSON = `{
+const ALL_V8_EVENTS = V8_EVENT_GROUPS.flatMap((group) => group.events.map((event) => event.value))
+
+const RETRY_OPTIONS = [
+  { value: '0', label: '送り直さない' },
+  { value: '1', label: '1回まで' },
+  { value: '3', label: '3回まで（1分・5分・30分あと）' },
+  { value: '7', label: '7回まで' },
+]
+
+/* 届く中身の見本。実際に送られる形の例。中身は見本と分かる値にする。 */
+const SAMPLES: Record<string, { when: string; body: string }> = {
+  friend_add: {
+    when: '友だちになったとき',
+    body: `{
   "できごと": "友だちになった",
-  "友だちID": "U4af...",
+  "友だちID": "U4af…",
   "名前": "Kenta Kawano",
   "タグ": ["Instagram"],
   "日時": "2026-09-30T10:12"
-}`
+}`,
+  },
+  booking_created: {
+    when: '予約が入ったとき',
+    body: `{
+  "できごと": "予約が入った",
+  "予約ID": "bk_8f2…",
+  "メニュー": "カウンセリング 30分",
+  "友だち": "Masato S."
+}`,
+  },
+  'ec.order.confirmed': {
+    when: '注文が確定したとき',
+    body: `{
+  "できごと": "注文が確定した",
+  "注文番号": "ord_123…",
+  "金額": 4980,
+  "友だち": "菅野 亮"
+}`,
+  },
+}
 
-function NewWebhookFormV8() {
+export default function NewOutgoingV8() {
+  return (
+    <Suspense fallback={<ListState kind="loading" />}>
+      <NewOutgoingV8Inner />
+    </Suspense>
+  )
+}
+
+function NewOutgoingV8Inner() {
+  usePageTitle('送り先を作る')
+  const router = useRouter()
   const { selectedAccountId } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
-  const router = useRouter()
   const searchParams = useSearchParams()
-  /*
-   * R150: 見本の「送り先を作る」は /webhooks/new?event=<種類> で開く。
-   * 実在する購読対象だけを初期選択にし、来た値がカタログに無ければ
-   * 従来どおり「すべてのイベントを送る」を選んだ状態にする。
-   */
   const presetEvent = searchParams.get('event')
-  const presetValid = Boolean(
-    presetEvent
-      && WEBHOOK_EVENT_GROUPS.some((group) => group.events.some((event) => event.value === presetEvent)),
-  )
-  const presetLabel = presetValid
-    ? WEBHOOK_EVENT_GROUPS.flatMap((group) => group.events).find((event) => event.value === presetEvent)?.label
-    : null
+  const presetValid = Boolean(presetEvent && ALL_V8_EVENTS.includes(presetEvent!))
+
+  const [direction, setDirection] = useState<'outgoing' | 'incoming'>('outgoing')
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
-  /* #975 U067: CSV手入力ではなく「すべて」かチェック選択で決める。 */
+  const [secret, setSecret] = useState(generateSecret)
   const [sendAllEvents, setSendAllEvents] = useState(!presetValid)
   const [selectedEvents, setSelectedEvents] = useState<string[]>(presetValid ? [presetEvent!] : [])
-  /* 受信Webhookごとの発火 `incoming_webhook.<種類>` は種類IDで指定する詳細設定。 */
   const [incomingSources, setIncomingSources] = useState('')
-  const [secret, setSecret] = useState(generateSecret)
-  const [maxRetries, setMaxRetries] = useState('0')
+  const [maxRetries, setMaxRetries] = useState('3')
   const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const { gate, prompt: stepUpPrompt, cancel: cancelStepUp } = useStepUpGate()
-  /*
-   * d23b R420: 本人確認の窓を開いたままアカウントを切り替えられたら、
-   * 開いた時点のアカウントの操作としての意味はもう無い。窓を閉じて
-   * 待っている保存を止める。
-   */
+  const [staffRole, setStaffRole] = useState<string | null>(null)
+
   useEffect(() => {
     cancelStepUp()
   }, [selectedAccountId, cancelStepUp])
-  /*
-   * 送り先の作成は統括だけ（R32）。口側が `requireRole('owner')` で守っている。
-   * 直接URLで開いた管理者には作らず、統括への依頼を案内する。
-   */
-  const [staffRole, setStaffRole] = useState<string | null>(null)
+
   useEffect(() => {
     let cancelled = false
     void api.staff.me()
@@ -129,87 +170,70 @@ function NewWebhookFormV8() {
     return () => { cancelled = true }
   }, [])
 
-  /*
-   * 欄の検査（★V7 sTJsh §6）。欄から離れた時点で1回だけ理由を出し、
-   * 直すとその場で消える。保存時にも全部を見て、まとめを上に出す。
-   * 定義の順がまとめの並びになる。
-   */
-  const fields = useFormErrors()
-  fields.define('name', '名前', () => (name.trim() ? null : '名前を入力してください'))
-  fields.define('url', '送り先のURL', () =>
-    /^https:\/\//.test(url.trim()) ? null : 'URLは https:// で始めてください')
-  fields.define('secret', 'シークレット', () =>
-    secret.length >= MIN_SECRET_LENGTH ? null : `シークレットは${MIN_SECRET_LENGTH}文字以上にしてください`)
-  fields.define('events', '送るイベント', () =>
-    sendAllEvents || selectedEvents.length > 0 || incomingSources.trim()
-      ? null
-      : '送るイベントを選ぶか、「すべてのイベントを送る」を選んでください')
+  const initialSecretRef = useRef(secret)
+  const dirty = Boolean(
+    name || url || incomingSources || maxRetries !== '3' ||
+    secret !== initialSecretRef.current ||
+    sendAllEvents !== !presetValid ||
+    selectedEvents.join(',') !== (presetValid ? presetEvent! : ''),
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+
+  const validate = (): Record<string, string> => {
+    const errors: Record<string, string> = {}
+    if (!name.trim()) errors.name = '名前を入力してください'
+    if (!/^https:\/\//.test(url.trim())) errors.url = 'URLは https:// で始めてください'
+    if (secret.length < MIN_SECRET_LENGTH) errors.secret = `シークレットは${MIN_SECRET_LENGTH}文字以上にしてください`
+    if (!sendAllEvents && selectedEvents.length === 0 && !incomingSources.trim()) {
+      errors.events = '送るものを選ぶか、「すべて送る」を選んでください'
+    }
+    return errors
+  }
 
   const toggleEvent = (value: string) => {
-    // 欄群は blur が取れないので、触れた時点をここで記録する。
-    fields.touch('events')
     setSelectedEvents((current) =>
       current.includes(value) ? current.filter((item) => item !== value) : [...current, value],
     )
   }
-  /* 自動で振った署名は初期値。入れ直し・作り直しだけを未保存と数える。 */
-  const initialSecretRef = useRef(secret)
 
-  /*
-   * 追加途中の離脱確認。名前・URL・送る出来事・署名・送り直しのどれかに
-   * 手を付けていたら、キャンセルや左メニューで確認窓を出す。
-   * 追加が終わると一覧へ router.push するので、成功後に警告は出ない。
-   */
-  const dirty = Boolean(
-    name || url || incomingSources || maxRetries !== '0' ||
-    secret !== initialSecretRef.current ||
-    sendAllEvents !== !presetValid ||
-    selectedEvents.join(',') !== (presetValid ? presetEvent! : '')
-  )
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
-
-  const runSave = async () => {
-    if (saving) return
-    const problems = fields.submit()
-    if (!selectedAccountId) {
-      setSaveError('LINEアカウントを選択してください')
+  async function save(next: 'draft' | 'active') {
+    if (staffRole !== null && staffRole !== 'owner') {
+      setError('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
       return
     }
-    if (problems.length > 0) {
-      setSaveError('')
-      return
-    }
-    // d23b R420: 保存を始めた時点のアカウントを固定する。本人確認の
-    // 窓をまたぐあいだに切り替えられたら、別アカウントへ登録しない。
     const requestAccountId = selectedAccountId
-    const payload = {
-      lineAccountId: requestAccountId,
-      name: name.trim(),
-      url: url.trim(),
-      eventTypes: sendAllEvents
-        ? ['*']
-        : [
-            ...selectedEvents,
-            ...incomingSources
-              .split(',')
-              .map((value) => value.trim())
-              .filter(Boolean)
-              .map((value) => `incoming_webhook.${value}`),
-          ],
-      secret,
-      maxRetries: Number(maxRetries) || 0,
+    if (!requestAccountId) {
+      setError('上のバーでLINE公式アカウントを選んでください')
+      return
     }
-    const create = (stepUpToken?: string) => api.webhooks.outgoing.create(payload, stepUpToken)
+    const errors = validate()
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      setError('直す所があります。赤い理由を確かめてください。')
+      return
+    }
     setSaving(true)
-    setSaveError('')
+    setError(null)
     try {
+      const payload = {
+        lineAccountId: requestAccountId,
+        name: name.trim(),
+        url: url.trim(),
+        eventTypes: sendAllEvents
+          ? ['*']
+          : [
+              ...selectedEvents,
+              ...incomingSources.split(',').map((value) => value.trim()).filter(Boolean)
+                .map((value) => `incoming_webhook.${value}`),
+            ],
+        secret,
+        maxRetries: Number(maxRetries) || 0,
+      }
+      const create = (stepUpToken?: string) => api.webhooks.outgoing.create(payload, stepUpToken)
       let res
       try {
         res = await create()
       } catch (caught) {
-        // 秘密の値の登録は大事な操作。本人確認を求められたらその場で窓を立て、
-        // 確認が済んだgrantを付けて同じ保存をやり直す（V-1）。
-        // 作成は統括だけ。権限不足は生の `API error: 403` ではなく依頼の案内にする（R32）。
         if (!isStepUpRequired(caught)) {
           if (caught instanceof ApiError && caught.status === 403) {
             throw new Error('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
@@ -218,26 +242,33 @@ function NewWebhookFormV8() {
         }
         const token = await gate('webhook.secret', 'Webhookを登録する')
         if (!token) throw caught
-        // d23b R420: 本人確認のあいだに切り替えられたら、切り替え先の
-        // アカウントへ誤った送り先を登録しない。
         if (selectedAccountIdRef.current !== requestAccountId) {
           throw new Error('LINEアカウントが切り替わりました。登録せずに止めました。もう一度やり直してください。')
         }
         res = await create(token)
       }
       if (!res.success) throw new Error(res.error)
-      // 作った行を一覧で目立たせる。どこに増えたのか探させない。
-      router.push(`/webhooks?tab=outgoing&highlight=${res.data.id}`)
-    } catch (caught) {
-      setSaveError(caught instanceof Error ? caught.message : '送り先を作れませんでした。確かめてから、もう一度お試しください。')
-    } finally {
+      if (next === 'draft') {
+        // 作る口に止めた状態の指定が無いので、作ってから止める。
+        const stop = await api.webhooks.outgoing.update(res.data.id, requestAccountId, { isActive: false })
+        if (!stop.success) {
+          router.push('/webhooks')
+          throw new Error('送り先は作れましたが、止めるところで失敗しました。一覧の「設定 → 止める」で止めてください。')
+        }
+      }
+      router.push('/webhooks')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '保存できませんでした。もう一度お試しください。')
       setSaving(false)
     }
   }
 
+  const sampleKey = selectedEvents.find((value) => SAMPLES[value]) ?? 'friend_add'
+  const sample = SAMPLES[sampleKey]
+
   if (staffRole !== null && staffRole !== 'owner') {
     return (
-      <div className={styles.stack}>
+      <div className={styles.board} data-design-node="hsD8e">
         <Notice tone="info">
           送り先の作成は統括だけができます。必要なときは統括に頼んでください。
         </Notice>
@@ -248,214 +279,196 @@ function NewWebhookFormV8() {
     )
   }
 
-  const problems = fields.listProblems()
-
   return (
-    <div data-design-node="hsD8e" className={styles.page}>
-      <div className={styles.head}>
-        <Button variant="secondary" href="/webhooks" className={styles.backLink}>← 外部連携へ</Button>
-        <h1 className={styles.title}>送り先を作る</h1>
-        <p className={styles.lead}>友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。</p>
-      </div>
+    <div className={styles.board} data-design-node="hsD8e">
+      <nav className={styles.crumb} aria-label="パンくず">
+        <Link href="/webhooks" className={styles.crumbLink}>← 外部連携へ</Link>
+      </nav>
+      <h1 className={styles.headTitle}>送り先を作る</h1>
+      <p className={styles.headDescription}>友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。</p>
 
-      {saveError ? <p className={styles.saveError} role="alert">{saveError}</p> : null}
-      {problems.length > 0 ? (
-        <div className={styles.problems} role="alert">
-          <p className={styles.problemsTitle}>直してほしいところが{problems.length}件あります</p>
-          <ul className={styles.problemsList}>
-            {problems.map((problem) => (
-              <li key={problem.key}>{problem.label}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      {error ? <Notice tone="danger">{error}</Notice> : null}
 
-      <div className={styles.columns}>
-        <div className={styles.main}>
-          <section className={styles.card} aria-label="どちら向きの連携か">
-            <h2 className={styles.cardTitle}>どちら向きの連携か</h2>
-            <div className={styles.directionRow}>
-              <div className={`${styles.directionCard} ${styles.directionActive}`} aria-current="true">
-                <span className={styles.directionName}>こちらから送る</span>
-                <span className={styles.directionHint}>友だちの動きをほかへ知らせる</span>
-              </div>
-              <Button variant="secondary" href="/webhooks?tab=incoming" className={styles.directionCardButton}>
-                <span className={styles.directionName}>こちらで受け取る</span>
-                <span className={styles.directionHint}>ほかからの知らせを受け取る</span>
-              </Button>
-            </div>
+      <div className={styles.body}>
+        <div className={styles.form}>
+          <section className={styles.card} aria-labelledby="webhook-v8-direction">
+            <h2 className={styles.cardTitle} id="webhook-v8-direction">どちら向きの連携か</h2>
+            <RadioCardGroup legend="どちら向きの連携か" className={styles.radioRow}>
+              <RadioCard
+                name="webhook-v8-direction"
+                value="outgoing"
+                checked={direction === 'outgoing'}
+                onChange={() => setDirection('outgoing')}
+                title="こちらから送る"
+                note="友だちの動きをほかへ知らせる"
+              />
+              <RadioCard
+                name="webhook-v8-direction"
+                value="incoming"
+                checked={direction === 'incoming'}
+                onChange={() => setDirection('incoming')}
+                title="こちらで受け取る"
+                note="ほかからの知らせを受け取る"
+              />
+            </RadioCardGroup>
+            {direction === 'incoming' ? (
+              <p className={styles.cardNote}>
+                受け取り口はこの画面では作れません。{' '}
+                <Link href="/webhooks?tab=incoming" className={styles.crumbLink}>こちらで受け取るの一覧から作ってください</Link>。
+              </p>
+            ) : null}
           </section>
 
-          <section className={styles.card} aria-label="どこへ送りますか">
-            <h2 className={styles.cardTitle}>どこへ送りますか</h2>
+          <section className={styles.card} aria-labelledby="webhook-v8-dest">
+            <h2 className={styles.cardTitle} id="webhook-v8-dest">どこへ送りますか</h2>
             <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="wh-name">名前<RequiredBadge /></label>
+              <label className={styles.label} htmlFor="webhook-v8-name">名前 <RequiredBadge /></label>
               <input
-                {...fields.bind('name')}
-                id="wh-name"
-                type="text"
+                id="webhook-v8-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="例：顧客台帳（CRM）"
-                className={inputClass}
-                aria-invalid={fields.invalid('name') || undefined}
+                placeholder="顧客台帳（CRM）"
+                className={styles.input}
+                aria-invalid={fieldErrors.name ? true : undefined}
               />
-              {fields.error('name') ? <p className={styles.fieldError} role="alert">{fields.error('name')}</p> : null}
+              {fieldErrors.name ? <p className={styles.fieldError} role="alert">{fieldErrors.name}</p> : null}
             </div>
             <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="wh-url">送り先のURL<RequiredBadge /></label>
+              <label className={styles.label} htmlFor="webhook-v8-url">送り先のURL <RequiredBadge /></label>
               <input
-                {...fields.bind('url')}
-                id="wh-url"
+                id="webhook-v8-url"
                 type="url"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder="https://example.com/webhook"
-                className={inputClass}
-                aria-invalid={fields.invalid('url') || undefined}
+                placeholder="https://crm.example.com/line/hook"
+                className={styles.input}
+                aria-invalid={fieldErrors.url ? true : undefined}
               />
-              {fields.error('url') ? <p className={styles.fieldError} role="alert">{fields.error('url')}</p> : null}
-              <p className={styles.fieldHint}>https:// のみです。</p>
+              {fieldErrors.url ? <p className={styles.fieldError} role="alert">{fieldErrors.url}</p> : null}
             </div>
             <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="wh-secret">秘密の鍵<RequiredBadge /></label>
+              <label className={styles.label} htmlFor="webhook-v8-secret">秘密の鍵 <RequiredBadge /></label>
               <div className={styles.secretRow}>
                 <input
-                  {...fields.bind('secret')}
-                  id="wh-secret"
-                  type="text"
+                  id="webhook-v8-secret"
                   value={secret}
                   onChange={(event) => setSecret(event.target.value)}
-                  className={`${inputClass} ${styles.mono}`}
-                  aria-invalid={fields.invalid('secret') || undefined}
+                  className={styles.input}
+                  aria-invalid={fieldErrors.secret ? true : undefined}
                 />
-                <Button variant="secondary" type="button" onClick={() => setSecret(generateSecret())}>
-                  作り直す
-                </Button>
+                <Button type="button" onClick={() => setSecret(generateSecret())}>作り直す</Button>
               </div>
-              {fields.error('secret') ? <p className={styles.fieldError} role="alert">{fields.error('secret')}</p> : null}
+              {fieldErrors.secret ? <p className={styles.fieldError} role="alert">{fieldErrors.secret}</p> : null}
             </div>
           </section>
 
-          <section className={styles.card} aria-label="いつ送りますか">
-            <h2 className={styles.cardTitle}>いつ送りますか</h2>
-            <p className={styles.cardLead}>選んだできごとが起きるたびに送ります</p>
-            <div className={styles.modeRow}>
+          <section className={styles.card} aria-labelledby="webhook-v8-when">
+            <h2 className={styles.cardTitle} id="webhook-v8-when">いつ送りますか</h2>
+            <p className={styles.cardNote}>選んだできごとが起きるたびに送ります</p>
+            <RadioCardGroup legend="送る範囲" className={styles.radioRow}>
               <RadioCard
-                name="wh-event-mode"
+                name="webhook-v8-mode"
                 value="all"
                 checked={sendAllEvents}
-                onChange={() => { fields.touch('events'); setSendAllEvents(true) }}
+                onChange={() => setSendAllEvents(true)}
                 title="すべて送る"
               />
               <RadioCard
-                name="wh-event-mode"
+                name="webhook-v8-mode"
                 value="selected"
                 checked={!sendAllEvents}
-                onChange={() => { fields.touch('events'); setSendAllEvents(false) }}
+                onChange={() => setSendAllEvents(false)}
                 title="選んだものだけ送る"
               />
-            </div>
-            {fields.error('events') ? (
-              <p className={styles.fieldError} role="alert">{fields.error('events')}</p>
-            ) : null}
-            {presetLabel ? (
-              <p className={styles.fieldHint}>
-                見本「{presetLabel}」の条件を選んだ状態で開いています。すべてのイベントへ変えるときは上の選択を押してください。
-              </p>
-            ) : null}
-            {!sendAllEvents && (
-              <div className={styles.eventGroups}>
-                {WEBHOOK_EVENT_GROUPS.map((group) => (
+            </RadioCardGroup>
+            {fieldErrors.events ? <p className={styles.fieldError} role="alert">{fieldErrors.events}</p> : null}
+            {!sendAllEvents ? (
+              <>
+                {V8_EVENT_GROUPS.map((group) => (
                   <div key={group.id} className={styles.eventGroup}>
-                    <p className={styles.eventGroupLabel}>{group.label}</p>
-                    <ul className={styles.eventList}>
+                    <p className={styles.eventGroupTitle}>{group.label}</p>
+                    <div className={styles.eventChecks}>
                       {group.events.map((event) => (
-                        <li key={event.value}>
-                          <Checkbox
-                            checked={selectedEvents.includes(event.value)}
-                            onCheckedChange={() => toggleEvent(event.value)}
-                            description={event.value}
-                          >{event.label}</Checkbox>
-                        </li>
+                        <Checkbox
+                          key={event.value}
+                          checked={selectedEvents.includes(event.value)}
+                          onCheckedChange={() => toggleEvent(event.value)}
+                          description={event.value}
+                        >
+                          {event.label}
+                        </Checkbox>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 ))}
-                <details className={styles.advanced}>
-                  <summary className={styles.advancedSummary}>
-                    受信Webhookごとの出来事を種類IDで指定する（詳細設定）
-                  </summary>
+                <details className={styles.detailsBox}>
+                  <summary className={styles.detailsSummary}>詳細条件</summary>
                   <div className={styles.field}>
-                    <label className={styles.fieldLabel} htmlFor="wh-incoming">受信Webhookの種類ID</label>
+                    <label className={styles.label} htmlFor="webhook-v8-incoming">受信Webhookの種類ID</label>
                     <input
-                      id="wh-incoming"
-                      type="text"
+                      id="webhook-v8-incoming"
                       value={incomingSources}
                       onChange={(event) => setIncomingSources(event.target.value)}
                       placeholder="例: form-source, another-source"
-                      className={`${inputClass} ${styles.mono}`}
+                      className={styles.input}
                     />
-                    <p className={styles.fieldHint}>「incoming_webhook.&lt;種類ID&gt;」の形で送ります。カンマ区切りで複数入れられます。</p>
                   </div>
                 </details>
-              </div>
-            )}
+              </>
+            ) : null}
           </section>
 
-          <section className={styles.card} aria-label="送れなかったとき">
-            <h2 className={styles.cardTitle}>送れなかったとき</h2>
+          <section className={styles.card} aria-labelledby="webhook-v8-retry">
+            <h2 className={styles.cardTitle} id="webhook-v8-retry">送れなかったとき</h2>
             <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="wh-retries">失敗したときの送り直し</label>
-              <div className={styles.retryRow}>
-                <input
-                  id="wh-retries"
-                  type="number"
-                  min={0}
-                  max={7}
-                  value={maxRetries}
-                  onChange={(event) => setMaxRetries(event.target.value)}
-                  className={`${inputClass} ${styles.retryInput}`}
-                />
-                <span className={styles.fieldHint}>回まで</span>
-              </div>
-              <p className={styles.fieldHint}>相手が 5xx を返したときや、つながらなかったときに送り直します。1分・5分・30分…と間隔を空け、上限は7回です。相手が 4xx を返した場合は送り直しません。</p>
+              <label className={styles.label} htmlFor="webhook-v8-retries">やり直し</label>
+              <Select
+                id="webhook-v8-retries"
+                aria-label="やり直し"
+                value={maxRetries}
+                onChange={(value) => setMaxRetries(value)}
+                options={RETRY_OPTIONS}
+              />
             </div>
           </section>
         </div>
 
-        <aside className={styles.aside} aria-label="作るときの案内">
-          <section className={styles.card} aria-label="届く中身の見本">
-            <h2 className={styles.cardTitle}>届く中身の見本</h2>
-            <p className={styles.cardLead}>友だちになったとき</p>
-            <pre className={styles.samplePre}>{SAMPLE_JSON}</pre>
-          </section>
-          <section className={styles.card} aria-label="気をつけること">
-            <h2 className={styles.cardTitle}>気をつけること</h2>
-            <ul className={styles.cautionList}>
-              <li>秘密の鍵は保存すると二度と全部は見せません</li>
-              <li>作り直すと、前の鍵では届かなくなります</li>
-              <li>個人情報は必要なものだけ送ります</li>
+        <aside className={styles.side} aria-label="見本と注意">
+          <div className={styles.sideCard}>
+            <h2 className={styles.sideTitle}>届く中身の見本</h2>
+            <p className={styles.sideNote}>{sample.when}</p>
+            <pre className={styles.sampleBox}>{sample.body}</pre>
+          </div>
+          <div className={styles.sideCard}>
+            <h2 className={styles.sideTitle}>試しに送る</h2>
+            <p className={styles.sideNote}>見本の中身を1回だけ送ります</p>
+            <div className={styles.testRow}>
+              <Button disabled title="送り先を作ってから送れます">試しに送る</Button>
+            </div>
+          </div>
+          <div className={styles.sideCard}>
+            <h2 className={styles.sideTitle}>気をつけること</h2>
+            <ul className={styles.sideList}>
+              <li>・秘密の鍵は保存すると二度と全部は見えません</li>
+              <li>・作り直すと、前の鍵では届かなくなります</li>
+              <li>・個人情報は必要なものだけ送ります</li>
             </ul>
-          </section>
+          </div>
         </aside>
       </div>
 
-      <div className={styles.bottomBar}>
-        <Button variant="secondary" href="/webhooks">キャンセル</Button>
-        <Button variant="primary" onClick={() => void runSave()} disabled={saving} busy={saving} busyLabel="作っています…">送り先を作る</Button>
-      </div>
+      <StickyBar
+        status="下書き（まだ動いていません）"
+        actions={(
+          <>
+            <Button href="/webhooks">キャンセル</Button>
+            <Button disabled={saving} onClick={() => void save('draft')} busy={saving}>下書きを保存</Button>
+            <Button variant="primary" disabled={saving} onClick={() => void save('active')} busy={saving}>つくって動かす</Button>
+          </>
+        )}
+      />
       {stepUpPrompt}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した送り先" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
-  )
-}
-
-export default function NewWebhookPageV8() {
-  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
-  return (
-    <Suspense fallback={null}>
-      <NewWebhookFormV8 />
-    </Suspense>
   )
 }
