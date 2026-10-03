@@ -13801,6 +13801,8 @@ export interface BookingSettings {
   maxActiveBookingsPerFriend: number;
   approvalMode: 'automatic' | 'manual';
   holdMinutes: number;
+  /** キャンセル待ちの仮押さえ分数。古い応答では無いことがある。 */
+  waitlistHoldMinutes?: number;
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
   /** LIFF 予約「日時を選ぶ」段の最初の形。 */
   liffDateView: 'list' | 'calendar';
@@ -13911,6 +13913,82 @@ export interface BookingAvailabilityRule {
   start_time: string;
   end_time: string;
   is_active: number;
+}
+
+/** 今日の予約の印（booking-plus 6）。だれがいつ付けたか。 */
+export interface BookingVisitMark {
+  id?: string;
+  kind: 'visited' | 'late' | 'no_show';
+  late_minutes: number | null;
+  marked_by_name: string | null;
+  marked_at: string;
+}
+
+/** 今日の予約の人（スタッフ）の行。 */
+export interface BookingTodayStaffRow {
+  kind: 'staff';
+  id: string;
+  starts_at: string;
+  ends_at: string;
+  status: string;
+  price_at_booking: number;
+  friend_id: string | null;
+  booking_customer_id: string | null;
+  menu_id: string;
+  menu_name: string;
+  staff_id: string;
+  staff_name: string;
+  customer_name: string | null;
+  visit_mark: BookingVisitMark | null;
+}
+
+/** 今日の予約の席（卓）の行。 */
+export interface BookingTodaySeatRow {
+  kind: 'seat';
+  id: string;
+  store_id: string;
+  store_name: string;
+  starts_at: string;
+  ends_at: string;
+  status: string;
+  customer_name: string;
+  guest_count: number;
+  table_label: string | null;
+  course_name: string | null;
+  visit_mark: BookingVisitMark | null;
+}
+
+export type BookingTodayRow = BookingTodayStaffRow | BookingTodaySeatRow;
+
+/** 今日の予約の一覧（booking-plus 6）。 */
+export interface BookingTodayResponse {
+  date: string;
+  mode: 'staff' | 'seat' | 'both';
+  /** 席の切り替えを出すか（結び付きのある店だけ）。 */
+  has_seat_stores: boolean;
+  bookings: BookingTodayStaffRow[];
+  seats: BookingTodaySeatRow[];
+  /** 人と席を1本に混ぜた時刻順（両方用）。 */
+  timeline: BookingTodayRow[];
+}
+
+/** キャンセル待ちの1件（booking-plus 2）。 */
+export interface BookingWaitlistEntry {
+  id: string;
+  staff_id: string;
+  menu_id: string;
+  starts_at: string;
+  friend_id: string | null;
+  booking_customer_id: string | null;
+  status: 'waiting' | 'invited' | 'converted' | 'cancelled';
+  hold_minutes: number;
+  invited_at: string | null;
+  hold_expires_at: string | null;
+  notified_at: string | null;
+  created_at: string;
+  menu_name?: string;
+  staff_name?: string;
+  customer_name?: string | null;
 }
 
 export interface BookingBreak {
@@ -14779,6 +14857,64 @@ export const bookingApi = {
     ),
   pendingCount: (accountId: string) =>
     fetchApi<{ count: number }>(withAccount('/api/booking/admin/pending-count', accountId)),
+  /**
+   * 今日の予約（booking-plus 6）。その日の予約を時刻順に返す。
+   * mode=staff（人）・seat（席）・both（両方を1本に混ぜる）。
+   * from/to で期間も取れる（週・月用）。
+   */
+  getToday: (
+    accountId: string,
+    params: {
+      date?: string
+      from?: string
+      to?: string
+      mode?: 'staff' | 'seat' | 'both'
+      staffId?: string
+      storeId?: string
+      status?: string
+    } = {},
+  ) => {
+    const query = new URLSearchParams()
+    if (params.date) query.set('date', params.date)
+    if (params.from) query.set('from', params.from)
+    if (params.to) query.set('to', params.to)
+    if (params.mode) query.set('mode', params.mode)
+    if (params.staffId) query.set('staff_id', params.staffId)
+    if (params.storeId) query.set('store_id', params.storeId)
+    if (params.status) query.set('status', params.status)
+    return fetchApi<BookingTodayResponse>(
+      withAccount(`/api/booking/admin/today?${query.toString()}`, accountId),
+    )
+  },
+  /** キャンセル待ちの一覧（booking-plus 2）。 */
+  listWaitlist: (
+    accountId: string,
+    params: { staffId?: string; startsAt?: string; status?: string } = {},
+  ) => {
+    const query = new URLSearchParams()
+    if (params.staffId) query.set('staff_id', params.staffId)
+    if (params.startsAt) query.set('starts_at', params.startsAt)
+    if (params.status) query.set('status', params.status)
+    return fetchApi<{ waitlist: BookingWaitlistEntry[] }>(
+      withAccount(`/api/booking/admin/waitlist?${query.toString()}`, accountId),
+    )
+  },
+  /** 今日の予約に印を付ける（来店した・遅れる・来なかった）。 */
+  postVisitMark: (
+    accountId: string,
+    bookingId: string,
+    body: { kind: 'visited' | 'late' | 'no_show'; late_minutes?: number },
+  ) =>
+    fetchApi<{ status: string; visit_mark: BookingVisitMark }>(
+      withAccount(`/api/booking/admin/bookings/${bookingId}/visit`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** 今日の予約の印を取り消す（元に戻す）。 */
+  deleteVisitMark: (accountId: string, bookingId: string) =>
+    fetchApi<{ status: string }>(
+      withAccount(`/api/booking/admin/bookings/${bookingId}/visit`, accountId),
+      { method: 'DELETE' },
+    ),
 };
 
 // ============================================================

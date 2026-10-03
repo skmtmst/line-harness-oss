@@ -700,6 +700,20 @@
       "column": "line_account_id"
     }
   },
+  "booking_visit_marks": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_waitlist": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "bookings": {
     "category": "purge",
     "scope": {
@@ -2963,6 +2977,24 @@
   },
   "rt_resource_locks": {
     "category": "global"
+  },
+  "rt_seat_visit_marks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reservation_id",
+      "parent": "rt_reservations",
+      "parentColumn": "id"
+    }
+  },
+  "rt_seat_waitlist": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
   },
   "rt_stores": {
     "category": "purge",
