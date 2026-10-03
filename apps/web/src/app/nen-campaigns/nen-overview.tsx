@@ -82,7 +82,7 @@ export type ColumnDeliveryPlan = {
 
 export type FriendOption = { id: string; displayName: string | null }
 
-const statusLabel: Record<string, string> = {
+export const statusLabel: Record<string, string> = {
   pending: 'これから送ります',
   processing: '送信中',
   sent: '送りました',
@@ -91,7 +91,7 @@ const statusLabel: Record<string, string> = {
   cancelled: '取り消し済み',
 }
 
-const columnStatusLabel: Record<NenColumn['deliveryStatus'], string> = {
+export const columnStatusLabel: Record<NenColumn['deliveryStatus'], string> = {
   draft: '未配信',
   scheduled: '予約',
   queued: '配信待ち',
@@ -119,14 +119,14 @@ const skippedFixableReasons = new Set(['line_account_unavailable', 'campaign_dis
 
 // #733: 再送できるのは上限まで失敗した記録と、直せる理由で止まった記録だけ。
 // ボタンを出しても最終判断はサーバが行い、前提が直っていなければ409で止める。
-function canRetryDelivery(delivery: { status: string; attempts: number; unmetReasonCode: string | null }): boolean {
+export function canRetryDelivery(delivery: { status: string; attempts: number; unmetReasonCode: string | null }): boolean {
   if (delivery.status === 'failed') return delivery.attempts >= 5
   if (delivery.status !== 'skipped') return false
   return delivery.unmetReasonCode !== null && skippedFixableReasons.has(delivery.unmetReasonCode)
 }
 
 // #733: 直せない理由はボタンを出さず、理由別の説明だけ出す。
-const skippedNoRetryNote: Record<string, string> = {
+export const skippedNoRetryNote: Record<string, string> = {
   friend_unavailable: '友だち側の事情のため、この記録は再送できません。',
   campaign_snapshot_missing: '予約内容が残っていないため、この記録は再送できません。',
   line_account_mismatch: 'アカウントが一致しないため、この記録は再送できません。',
@@ -136,7 +136,7 @@ const skippedNoRetryNote: Record<string, string> = {
   order_refunded: '注文が返金になったため、この記録は再送しません。注文の状態は「EC連携」の取り込みの記録で確認できます。',
 }
 
-function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined): string | null {
+export function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined): string | null {
   if (!skippedReasons) return null
   const entries = Object.entries(skippedReasons).filter(([, count]) => count > 0)
   if (entries.length === 0) return null
@@ -149,7 +149,7 @@ function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined
   return `送らなかった内訳 ${breakdown}(うち直せる ${fixable})`
 }
 
-function num(value: number | null | undefined): string {
+export function num(value: number | null | undefined): string {
   return value == null ? '—' : formatNumber(value)
 }
 
@@ -172,7 +172,7 @@ function CampaignIcon({ campaignKey }: { campaignKey: string }) {
  * テスト送信先の選択。候補は「設定 › アカウント › テスト送信先」に登録した人だけ。
  * 誰も登録されていなければ、選ばせる代わりに登録先へ案内する（押しても届かない状態を作らない）。
  */
-function TestRecipientPicker({ friends, value, onChange, accountId }: {
+export function TestRecipientPicker({ friends, value, onChange, accountId }: {
   friends: FriendOption[]
   value: string
   onChange: (id: string) => void
@@ -525,7 +525,8 @@ function AutoPanel({
             options={[{ value: 'sent_desc', label: `並び：${monthLabel}の送信が多い順` }, { value: 'name', label: '並び：名前順' }]}
           />
         </div>
-        <span className="ml-auto text-caption font-semibold text-ink-faint">{shown.length}件</span>
+        {/* 読み込み中・失敗中は数を持たない。「0件」は「1つも無い」という別の意味になる。 */}
+        <span className="ml-auto text-caption font-semibold text-ink-faint">{loading || tabError ? '—' : `${shown.length}件`}</span>
       </div>
 
       {/* 開封の列は「—」しか並ばないので置かず、理由だけここに残す。 */}
@@ -632,7 +633,7 @@ function AutoPanel({
 
 /* ───────────── 誕生日クーポンの決めごと ───────────── */
 
-function CouponDrawer({ open, coupon, saving, onClose, onChange, onSave }: {
+export function CouponDrawer({ open, coupon, saving, onClose, onChange, onSave }: {
   open: boolean
   coupon: NenCoupon
   saving: boolean
@@ -683,7 +684,7 @@ function CouponDrawer({ open, coupon, saving, onClose, onChange, onSave }: {
 
 type ColumnDeliveryFilter = '' | 'draft' | 'scheduled' | 'sent'
 
-function columnDeliveryBadge(column: NenColumn) {
+export function columnDeliveryBadge(column: NenColumn) {
   if (column.deliveryStatus === 'sent') return <StatusBadge tone="success" size="compact">配信済み {jstShortDate(column.deliveryAt)}</StatusBadge>
   if (column.deliveryStatus === 'scheduled') return <StatusBadge tone="warning" size="compact">予約 {jstShortDateTime(column.deliveryAt)}</StatusBadge>
   if (column.deliveryStatus === 'queued') return <StatusBadge tone="info" size="compact">配信待ち {jstShortDateTime(column.deliveryAt)}</StatusBadge>
@@ -829,8 +830,9 @@ function ColumnsPanel({
               onChange={(value) => { setDelivery(value === 'draft' || value === 'scheduled' || value === 'sent' ? value : ''); setPage(1) }}
               options={[{ value: '', label: '配信：すべて' }, { value: 'draft', label: '配信：未配信' }, { value: 'scheduled', label: '配信：予約' }, { value: 'sent', label: '配信：配信済み' }]}
             />
+            {/* 読み込み中・失敗中は数を持たない。「0本」は「1つも無い」という別の意味になる。 */}
             <span className="ml-auto text-caption font-semibold text-ink-faint">
-              {columnsTruncated ? `${shown.length}本（全体 ${num(columnsTotal)}本）` : `${shown.length}本`}
+              {loading || tabError ? '—' : (columnsTruncated ? `${shown.length}本（全体 ${num(columnsTotal)}本）` : `${shown.length}本`)}
             </span>
           </div>
 
@@ -1189,15 +1191,18 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
           </DataTable>
         )}
       </section>
+      {/* 一覧が無い（読み込み中・失敗中）の間は件数を持たない。「全0記録」は「1つも無い」という別の意味になる。 */}
+      {!deliveryList || tabError ? null : (
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <ListRange label="記録" total={deliveryList?.pagination.total ?? 0} first={shown.length === 0 ? 0 : cursor + 1} last={shown.length === 0 ? 0 : cursor + shown.length} />
-        {deliveryList && (cursor > 0 || deliveryList.pagination.nextCursor) ? (
+        <ListRange label="記録" total={deliveryList.pagination.total} first={shown.length === 0 ? 0 : cursor + 1} last={shown.length === 0 ? 0 : cursor + shown.length} />
+        {(cursor > 0 || deliveryList.pagination.nextCursor) ? (
           <div className="flex gap-2" aria-label="送った履歴のページ送り">
             <Button type="button" disabled={cursor === 0} onClick={() => onChangeView(deliveryViewStatus(filter), String(Math.max(0, cursor - limit)), appliedQuery)}>前へ</Button>
             <Button type="button" disabled={!deliveryList.pagination.nextCursor} onClick={() => onChangeView(deliveryViewStatus(filter), deliveryList.pagination.nextCursor ?? undefined, appliedQuery)}>次へ</Button>
           </div>
         ) : null}
       </div>
+      )}
     </>
   )
 }
@@ -1209,7 +1214,7 @@ function deliveryViewStatus(filter: HistoryFilter): string | undefined {
   return filter
 }
 
-function deliveryTriggerLabel(campaignKey: string) {
+export function deliveryTriggerLabel(campaignKey: string) {
   const labels: Record<string, string> = {
     order_confirmed: '注文が確定', shipping_confirmed: '発送を登録', arrival_check: '発送後の到着確認',
     review_request: '発送後の口コミ依頼', cross_sell: '発送後のご案内', column: 'コラムの予約', birthday_coupon: 'ペットの誕生日',

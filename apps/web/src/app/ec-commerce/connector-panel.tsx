@@ -185,7 +185,7 @@ export default function ConnectorPanel({ accountId, canEdit = true }: { accountI
             : '「取り込みを再開する」を押しましたが、まだ再開していません。「設定を保存」を押すと再開します。'}
         </NoteBar>
       ) : null}
-      {notice ? <div className={notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError} role="status">{notice.text}</div> : null}
+      {notice ? <div className={notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError} role={notice.tone === 'success' ? 'status' : 'alert'}>{notice.text}</div> : null}
       <div className={styles.connectorGrid}>
         <div className={styles.stack}>
           <section className={styles.card}>
