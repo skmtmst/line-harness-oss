@@ -44,7 +44,22 @@ import type { StaffMember } from '@line-crm/shared'
 import { fetchAllPages } from '../bookings/fetch-all-pages'
 import { bookingErrorMessage, bookingRulesErrorMessage } from './menu-validation'
 
-import { LiffPhoneDatetimeStep, LiffPhoneMenuStep, LiffPhoneStaffStep } from './liff-phone-v8'
+/*
+ * 右の「見え方」の写し3部品も、見えてから読む（動的 import）。
+ * タブと同じく、読み待ちは骨組みで段を保つ。
+ */
+const LiffPhoneMenuStep = memo(dynamic(() => import('./liff-phone-v8').then((module) => module.LiffPhoneMenuStep), {
+  loading: () => <SkeletonRows rows={7} />,
+  ssr: false,
+}))
+const LiffPhoneDatetimeStep = memo(dynamic(() => import('./liff-phone-v8').then((module) => module.LiffPhoneDatetimeStep), {
+  loading: () => <SkeletonRows rows={7} />,
+  ssr: false,
+}))
+const LiffPhoneStaffStep = memo(dynamic(() => import('./liff-phone-v8').then((module) => module.LiffPhoneStaffStep), {
+  loading: () => <SkeletonRows rows={7} />,
+  ssr: false,
+}))
 import {
   DAYS,
   JST_OFFSET_MS,

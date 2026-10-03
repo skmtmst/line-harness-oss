@@ -50,14 +50,21 @@ describe('使わないタブは後から読む（動的 import）', () => {
     }
   })
 
-  it('読み待ちは骨組みで段を保つ', () => {
-    expect(SHELL.match(/loading: \(\) => <SkeletonRows/g)?.length).toBe(5)
+  it('読み待ちは骨組みで段を保つ（タブ5＋写し3）', () => {
+    expect(SHELL.match(/loading: \(\) => <SkeletonRows/g)?.length).toBe(8)
+  })
+
+  it('右の「見え方」の写し3部品も見えてから読む', () => {
+    for (const step of ['LiffPhoneMenuStep', 'LiffPhoneDatetimeStep', 'LiffPhoneStaffStep']) {
+      expect(SHELL).toContain(`import('./liff-phone-v8').then((module) => module.${step})`)
+    }
+    expect(SHELL).not.toContain("from './liff-phone-v8'")
   })
 })
 
 describe('殻の描き直しをタブの中へ波及させない', () => {
-  it('タブの包みは memo（同じ中身では描き直さない）', () => {
-    expect(SHELL.match(/memo\(dynamic\(/g)?.length).toBe(5)
+  it('タブと写しの包みは memo（同じ中身では描き直さない）', () => {
+    expect(SHELL.match(/memo\(dynamic\(/g)?.length).toBe(8)
   })
 
   it('タブへ渡す手は固定する（useCallback）', () => {
