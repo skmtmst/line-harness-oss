@@ -46,6 +46,7 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { TextField } from '@/components/shared/text-field'
+import { useRowLeaving } from '@/components/shared/row-leaving'
 import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
@@ -329,14 +330,17 @@ export default function ScenariosListV8() {
     }
   }
 
+  const { isLeaving, fadeOut } = useRowLeaving()
+
   const handleDelete = async (id: string) => {
     try {
       const res = await api.scenarios.delete(id)
       if (!res.success) throw new Error(res.error)
-      void loadScenarios()
-      void loadFolders()
-      void loadOverallTotal()
-      void loadStats()
+      // 消えた行は 150ms 薄くしてから読み直す（V8 の動き §8）。
+      await fadeOut([id], async () => {
+        loadScenarios()
+        await Promise.all([loadFolders(), loadOverallTotal(), loadStats()])
+      })
     } catch {
       throw new Error('シナリオを削除できませんでした')
     }
@@ -714,6 +718,7 @@ export default function ScenariosListV8() {
                   <tr
                     key={s.id}
                     className={styles.rowClick}
+                    data-leaving={isLeaving(s.id) || undefined}
                     tabIndex={0}
                     onClick={() => router.push(`/scenarios/detail?id=${s.id}`)}
                     onKeyDown={(event) => {
