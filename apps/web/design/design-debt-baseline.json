@@ -1112,5 +1112,8 @@
   },
   "app/pools/new/pool-new-v8.tsx": {
     "unresolved-classname": 2
+  },
+  "app/auto-replies/quick-create-v8.tsx": {
+    "unresolved-classname": 15
   }
 }
