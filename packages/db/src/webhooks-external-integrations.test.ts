@@ -33,6 +33,7 @@ import {
   listIntegrationApiTokens,
   resolveIntegrationApiToken,
   revokeIntegrationApiToken,
+  reactivateIntegrationApiToken,
   rotateIntegrationApiToken,
   tokenHasScope,
 } from './integration-api-tokens.js';
@@ -337,6 +338,29 @@ describe('外部APIの鍵 (N-380)', () => {
     expect(await resolveIntegrationApiToken(db, second.token)).toBeNull();
     // 二度目の無効化は何も起きない。
     expect(await revokeIntegrationApiToken(db, second.row.id, 'account-a')).toBe(false);
+  });
+
+  it('止めた鍵は動かし直すと止める前の合言葉が使える', async () => {
+    const issued = await createIntegrationApiToken(db, {
+      lineAccountId: 'account-a', name: 'EC基盤', scopes: ['tags:read'], createdBy: 'staff-1',
+    });
+    expect(await revokeIntegrationApiToken(db, issued.row.id, 'account-a', 'staff-2')).toBe(true);
+    expect(await resolveIntegrationApiToken(db, issued.token)).toBeNull();
+
+    // 動いている鍵の動かし直しは何も起きない。
+    const live = await createIntegrationApiToken(db, {
+      lineAccountId: 'account-a', name: '生きている鍵', scopes: ['tags:read'],
+    });
+    expect(await reactivateIntegrationApiToken(db, live.row.id, 'account-a')).toBe(false);
+
+    // 止めた鍵を動かし直すと、止める前の合言葉が使える。
+    expect(await reactivateIntegrationApiToken(db, issued.row.id, 'account-a')).toBe(true);
+    const resolved = await resolveIntegrationApiToken(db, issued.token);
+    expect(resolved).toMatchObject({ id: issued.row.id, line_account_id: 'account-a' });
+    // 二度目の動かし直しは何も起きない。別のアカウントでも効かない。
+    expect(await reactivateIntegrationApiToken(db, issued.row.id, 'account-a')).toBe(false);
+    expect(await reactivateIntegrationApiToken(db, issued.row.id, 'account-b')).toBe(false);
+    expect(await reactivateIntegrationApiToken(db, 'no-such-id', 'account-a')).toBe(false);
   });
 
   it('一覧は生きている鍵だけを返し、平文は含まない', async () => {

@@ -21,7 +21,7 @@ export default function LoadErrorView({
   onRetry: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center px-6 py-16 text-center">
+    <div className="flex flex-col items-center px-6 py-16 text-center" data-design-node="zz9R3">
       <span className="text-liff-idle" aria-hidden="true">
         <Icon name="wifi-off" className="h-10 w-10" />
       </span>

@@ -2001,6 +2001,20 @@ conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermiss
         409,
       );
     }
+    if (decided.outcome === 'unbillable') {
+      // F-23: 記録した当時の報酬額を確認できない成果は、承認すると今の額で
+      // 固まってしまうため承認しない。状態は変えず、監査にも残さない。
+      // 422 を返す: fetchApi は本文だけを文言として画面へ渡す。
+      return c.json(
+        {
+          success: false,
+          code: 'approval_unbillable',
+          error: '記録した当時の報酬額を確認できないため、承認できませんでした。対応方法が決まるまでこのままにしてください。',
+          data: { id: c.req.param('id'), currentStatus: decided.currentStatus },
+        },
+        422,
+      );
+    }
     auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: c.req.param('id') });
 
     // Mileage projection is retry-safe and runs even for `already_set`. This is
@@ -2182,6 +2196,12 @@ conversions.post('/api/conversions/approvals/bulk', requireApprovalPermission, a
         }
         if (decided.outcome === 'not_found') {
           result.failed.push({ id: itemId, error: 'Attributed conversion event not found' });
+          continue;
+        }
+        if (decided.outcome === 'unbillable') {
+          // F-23: 記録した当時の報酬額を確認できない成果は承認しない。
+          // 成功には入れず、失敗として分けて返す。
+          result.failed.push({ id: itemId, error: '記録した当時の報酬額を確認できないため承認できません' });
           continue;
         }
         auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: itemId });
