@@ -674,12 +674,15 @@ const spec = {
         parameters: [
           { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
           { name: 'rank', in: 'query', schema: { type: 'string' } },
+          { name: 'ranks', in: 'query', schema: { type: 'string', description: '「○○以上」の札：区切りに合うランクキーをカンマ区切り。rank より優先' } },
+          { name: 'link', in: 'query', schema: { type: 'string', enum: ['linked', 'unlinked'] } },
           { name: 'pet', in: 'query', schema: { type: 'string', enum: ['any', 'with', 'without'] } },
           { name: 'q', in: 'query', schema: { type: 'string' } },
           { name: 'sort', in: 'query', schema: { type: 'string', enum: ['annual_desc', 'lifetime_desc', 'balance_desc', 'recent'] } },
           { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
+          { name: 'pageSize', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
         ],
-        responses: { '200': { description: 'Paged members with KPIs and rank definitions' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
+        responses: { '200': { description: 'Paged members with KPIs (petMembers, monthPurchaseYen, monthBuyers) and rank definitions' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
       },
     },
     '/api/nen/feeding-products': {
