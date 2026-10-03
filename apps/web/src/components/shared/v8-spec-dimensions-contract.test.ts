@@ -37,6 +37,15 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     expect(read('./icon-button.module.css')).toMatch(/\[data-theme='v8'\] \.button \{[^}]*height:\s*36px/s)
   })
 
+  it('1152 の帯：札は潰さない・パンくずと自分の名前が縮む', () => {
+    const css = read('./top-bar.module.css')
+    expect(css).toMatch(/\[data-theme='v8'\] \.accountPill \{[^}]*flex-shrink:\s*0/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.crumbCurrent/s)
+    expect(css).toMatch(/min-width:\s*0/)
+    // v7 の札（縮む側）は変えない。
+    expect(css).not.toMatch(/^\.accountPill \{[^}]*flex-shrink/m)
+  })
+
   it('余白の段：板の頭の題と説明の間は正規5段の 4', () => {
     const css = read('./page-header.module.css')
     expect(css).toMatch(/\[data-theme='v8'\] \.heading \{[^}]*gap:\s*4px/s)
