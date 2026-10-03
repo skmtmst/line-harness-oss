@@ -13,15 +13,15 @@ import type { SummaryStatus } from './page'
 import { formatDay } from '@/lib/format'
 import './print.css'
 
-const SKIN_LABELS: Record<string, string> = { normal: '問題なし', itchy: 'かゆそう', red: '赤み', other: 'その他' }
-const TEAR_LABELS: Record<string, string> = { normal: '問題なし', mild: '少し気になる', concern: '気になる' }
+export const SKIN_LABELS: Record<string, string> = { normal: '問題なし', itchy: 'かゆそう', red: '赤み', other: 'その他' }
+export const TEAR_LABELS: Record<string, string> = { normal: '問題なし', mild: '少し気になる', concern: '気になる' }
 
-function countText(counts: Record<string, number>, labels: Record<string, string>): string {
+export function countText(counts: Record<string, number>, labels: Record<string, string>): string {
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1])
   return entries.length ? entries.map(([key, n]) => `${labels[key] ?? key} ${n}回`).join('・') : '—'
 }
 
-function md(date: string): string {
+export function md(date: string): string {
   return date.slice(5).replace('-', '/')
 }
 

@@ -133,11 +133,17 @@
 [data-theme='v8'] .name {
   font-size: var(--text-label);
   font-weight: 500;
+  line-height: 1.35;
 }
 
 [data-theme='v8'] .sub {
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
+  line-height: 1.35;
+}
+
+[data-theme='v8'] .memo {
+  line-height: 1.35;
 }
 
 /*

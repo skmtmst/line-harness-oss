@@ -467,7 +467,7 @@ export default function NotificationRunList({
       <div className="flex flex-wrap items-center gap-2">
         <label className="min-w-64 flex-1">
           <span className="sr-only">お客様の名前・注文番号で検索</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お客様の名前・注文番号で検索（表示中の20件のみ）" className="min-h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-accent" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お客様の名前・注文番号で検索（表示中の20件のみ）" className="min-h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent" />
         </label>
         {filters.map((item) => <FilterChip key={item.value} selected={filter === item.value} onChange={() => setFilter(item.value)}>{item.label}</FilterChip>)}
         <Select
@@ -545,16 +545,16 @@ export default function NotificationRunList({
                   <NameCell name={item.friendName || '名前は未取得'} sub={item.recipientType === 'customer' ? '顧客へのお知らせ' : '運用者へのお知らせ'} />
                   <Td><StatusBadge status={item.status} /></Td>
                   <Td>
-                    <span className="block whitespace-nowrap text-sm">{formatJst(item.receivedAt)}</span>
+                    <span className="block whitespace-nowrap text-caption font-semibold">{formatJst(item.receivedAt)}</span>
                     <span className="mt-1 block whitespace-nowrap text-xs text-ink-faint">LINE受付 {formatJst(item.acceptedAt)}</span>
                   </Td>
                   <Td>
-                    <span className="block text-sm">試行 {item.attemptCount == null ? '—' : `${item.attemptCount}回`}</span>
+                    <span className="block text-caption">試行 {item.attemptCount == null ? '—' : `${item.attemptCount}回`}</span>
                     <span className="mt-1 block text-xs text-ink-faint">クリック {formatJst(item.clickedAt)}</span>
                     {item.nextRetryAt ? <span className="mt-1 block text-xs text-warning">次回 {formatJst(item.nextRetryAt)}</span> : null}
                   </Td>
                   <Td>
-                    <span className="block text-sm leading-5 text-ink-secondary">{item.reason || '—'}</span>
+                    <span className="block text-caption leading-5 text-ink-secondary">{item.reason || '—'}</span>
                     {item.resolved ? (
                       <span className="mt-1 block text-xs font-semibold text-success">
                         対応済み {formatJst(item.resolvedAt ?? null)}{item.resolvedBy ? `／${item.resolvedBy}` : ''}
