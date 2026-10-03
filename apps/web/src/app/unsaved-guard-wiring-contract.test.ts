@@ -104,6 +104,7 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'app/webinars/edit/video-v8.tsx': 'app/webinars/edit/page.tsx',
   'app/webinars/edit/cta-v8.tsx': 'app/webinars/edit/page.tsx',
   'app/webinars/edit/notifications-v8.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/participants-v8.tsx': 'app/webinars/edit/page.tsx',
   'app/webinars/edit/review-v8.tsx': 'app/webinars/edit/page.tsx',
   // ★V8 版の描画。番兵（useUnsavedGuard）は同じ画面の page.tsx が
   // 共有フック経由で持つ。どちらのテーマでも同じ番兵が効く。
