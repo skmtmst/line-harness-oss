@@ -629,6 +629,52 @@ describe('POST /api/line-accounts/connect', () => {
     expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
   });
 
+  test('検査の成功時はV8の5行に載る内訳（verification）を返す', async () => {
+    installAutoConnectFetch();
+    lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
+    lineClientMocks.getFollowersInsight.mockResolvedValue({ status: 'ready', followers: 1284 });
+    const res = await setupApp('owner').request('/api/line-accounts/connect/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      success: boolean;
+      data: {
+        steps: Array<{ order: number; state: string }>;
+        verification: {
+          tokenOk: boolean; loginOk: boolean; sameProvider: boolean;
+          webhook: { registeredUrl: string | null; active: boolean | null; testPassed: boolean | null };
+          followerTotal: number | null;
+        };
+      };
+    };
+    expect(body.success).toBe(true);
+    expect(body.data.verification).toMatchObject({
+      tokenOk: true,
+      loginOk: true,
+      sameProvider: true,
+      webhook: { registeredUrl: 'http://localhost/webhook', active: true, testPassed: true },
+      followerTotal: 1284,
+    });
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+
+  test('友だち総数が取れなくても検査は通りfollowerTotalはnullになる', async () => {
+    installAutoConnectFetch();
+    lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
+    lineClientMocks.getFollowersInsight.mockRejectedValue(new Error('LINE API error: 503 Service Unavailable'));
+    const res = await setupApp('owner').request('/api/line-accounts/connect/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    const body = await res.json() as { success: boolean; data: { followerImport: { capability: string }; verification: { followerTotal: number | null } } };
+    expect(body.success).toBe(true);
+    expect(body.data.verification.followerTotal).toBeNull();
+  });
+
   test('5段成功時に1行だけ保存し、認証済みなら友だち取り込みを開始する', async () => {
     installAutoConnectFetch();
     let followerSetting: string | null = null;
