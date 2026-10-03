@@ -4083,6 +4083,28 @@ const spec = {
         responses: { '200': { description: '詳細' }, '404': { description: 'Not found' } },
       },
     },
+    '/api/webhooks/incoming/{id}/restore': {
+      post: {
+        tags: ['Webhook'],
+        summary: '削除した受信Webhookを元に戻す（戻した直後は停止のまま）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Incoming webhook restored as stopped' }, '400': { description: 'LINE account is required' }, '403': { description: 'Owner role required' }, '404': { description: 'Webhook not found or not deleted' } },
+      },
+    },
+    '/api/webhooks/outgoing/{id}/restore': {
+      post: {
+        tags: ['Webhook'],
+        summary: '削除した送信Webhookを元に戻す（戻した直後は停止のまま）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Outgoing webhook restored as stopped' }, '400': { description: 'LINE account is required' }, '403': { description: 'Owner role required' }, '404': { description: 'Webhook not found or not deleted' } },
+      },
+    },
     '/api/webhooks/incoming/{id}/test': {
       post: {
         tags: ['Webhook'],

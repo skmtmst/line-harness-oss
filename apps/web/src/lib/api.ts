@@ -12233,6 +12233,15 @@ export const api = {
           `/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
         ),
+      /*
+       * B 元に戻す: 削除の取り消し。戻した直後は停止のまま。
+       * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+       */
+      restore: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<IncomingWebhookDetail>>(
+          `/api/webhooks/incoming/${id}/restore?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST' },
+        ),
       /* 人が見つからなかった届物の箱(#939 N-367)。R401: 50件超えは limit/offset で辿る。 */
       unmatched: (
         id: string,
@@ -12286,6 +12295,15 @@ export const api = {
         fetchApi<ApiResponse<null>>(
           `/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
+        ),
+      /*
+       * B 元に戻す: 削除の取り消し。戻した直後は停止のまま。
+       * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+       */
+      restore: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<OutgoingWebhook>>(
+          `/api/webhooks/outgoing/${id}/restore?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST' },
         ),
       test: (id: string, lineAccountId: string) =>
         fetchApi<ApiResponse<{ delivered: boolean; responseStatus: number | null }>>(

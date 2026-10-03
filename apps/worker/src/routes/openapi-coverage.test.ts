@@ -552,6 +552,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   // #939: 外部連携の編集・未照合の箱・公開APIトークン・公開API。
   'GET /api/webhooks/outgoing/{id}',
   'POST /api/webhooks/incoming/{id}/test',
+  'POST /api/webhooks/incoming/{id}/restore',
+  'POST /api/webhooks/outgoing/{id}/restore',
   'GET /api/webhooks/incoming/{id}/unmatched',
   'POST /api/webhooks/unmatched/{id}/resolve',
   'GET /api/webhooks/api-tokens',
