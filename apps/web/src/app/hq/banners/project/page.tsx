@@ -38,6 +38,7 @@ import {
   type BannerImage,
   type BannerPreset,
   type BannerProject,
+  type BannerReferenceMode,
   type BannerUsage,
 } from '@/lib/hq-banners'
 
@@ -336,10 +337,10 @@ function ProjectInner() {
     return res.data
   }
 
-  /** 参照画像として使う。実体を手元に置き、パネルの入力に ID を入れる。 */
-  const applyReference = (image: BannerImage) => {
+  /** 参照画像として使う。実体を手元に置き、パネルの入力に ID と使い方を入れる。 */
+  const applyReference = (image: BannerImage, usage: BannerReferenceMode) => {
     setReferenceImage(image)
-    setInput((cur) => ({ ...cur, referenceImageId: image.id }))
+    setInput((cur) => ({ ...cur, referenceImageId: image.id, referenceMode: usage }))
     setPickerOpen(false)
   }
 
@@ -358,7 +359,7 @@ function ProjectInner() {
     try {
       const data = await readFileAsBase64(file)
       const uploaded = await upload({ filename: file.name, mimeType: file.type, data })
-      if (uploaded) applyReference(uploaded)
+      if (uploaded) applyReference(uploaded, input.referenceMode)
     } catch (caught) {
       setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした')
     } finally {
@@ -658,7 +659,7 @@ function ProjectInner() {
               : undefined
           }
           onUseAsReference={() => {
-            applyReference(openImage)
+            applyReference(openImage, input.referenceMode)
             setOpenImage(null)
             panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
           }}
@@ -671,6 +672,7 @@ function ProjectInner() {
         presets={presets}
         projects={allProjects.length > 0 ? allProjects : [project]}
         selectedId={input.referenceImageId}
+        initialUsage={input.referenceMode}
         onClose={() => setPickerOpen(false)}
         onPick={applyReference}
         onUpload={(file) => {

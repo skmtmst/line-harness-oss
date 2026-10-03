@@ -8,15 +8,16 @@ import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import { api } from '@/lib/api'
-import { imageMatchesQuery, tileCaption, type BannerImage, type BannerPreset, type BannerProject } from '@/lib/hq-banners'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { imageMatchesQuery, tileCaption, type BannerImage, type BannerPreset, type BannerProject, type BannerReferenceMode } from '@/lib/hq-banners'
 
 type Scope = 'all' | 'favorite' | 'project'
 
 /**
- * 参照画像をライブラリから選ぶ。Pencil 35-2-B `biOEb`（画面 `L5PMT`）。
+ * 参照画像をライブラリから選ぶ。★V8 `UcBQ5`。
  *
- * 1 枚だけ選ぶ。タイルを押すと選ばれ、「この画像を参照にする」で決まる。
- * 手元のファイルは「手元のファイルを選ぶ」から（親がプロジェクトへ取り込んで参照にする）。
+ * 1 枚だけ選ぶ。タイルを押すと選ばれ、使い方と一緒に「この画像を使う」で決まる。
+ * 手元のファイルは下の「ファイルを選ぶ」から（親がプロジェクトへ取り込んで参照にする）。
  */
 export default function ReferencePickerDialog({
   open,
@@ -24,6 +25,7 @@ export default function ReferencePickerDialog({
   presets,
   projects,
   selectedId,
+  initialUsage,
   onClose,
   onPick,
   onUpload,
@@ -33,10 +35,14 @@ export default function ReferencePickerDialog({
   presets: BannerPreset[]
   projects: BannerProject[]
   selectedId: string | null
+  /** 開いたときの使い方（親の入力の値）。無ければ「雰囲気を参考にする」。 */
+  initialUsage?: BannerReferenceMode | null
   onClose: () => void
-  onPick: (image: BannerImage) => void
+  onPick: (image: BannerImage, usage: BannerReferenceMode) => void
   onUpload: (file: File) => void
 }) {
+  const theme = useAdminTheme()
+  const v8 = theme === 'v8'
   const [images, setImages] = useState<BannerImage[] | null>(null)
   const [nextBefore, setNextBefore] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -44,6 +50,8 @@ export default function ReferencePickerDialog({
   const [scope, setScope] = useState<Scope>('all')
   const [query, setQuery] = useState('')
   const [picked, setPicked] = useState<BannerImage | null>(null)
+  /** 参照画像の使い方（UcBQ5）。選ぶときに親の入力へ一緒に入れる。 */
+  const [usage, setUsage] = useState<BannerReferenceMode>('inspire')
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -71,6 +79,11 @@ export default function ReferencePickerDialog({
     }
   }, [open])
 
+  // 開くたび使い方を親の値に戻す（取ってくる処理とは分ける）。
+  useEffect(() => {
+    if (open) setUsage(initialUsage ?? 'inspire')
+  }, [open, initialUsage])
+
   const loadMore = async () => {
     if (!nextBefore || loading) return
     setLoading(true)
@@ -92,7 +105,22 @@ export default function ReferencePickerDialog({
     setScope('all')
   }, [])
 
-  const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects])
+  /**
+ * 参照画像の名前と寸法（UcBQ5）。名前はファイル名から拡張子を落とし、
+ * 寸法は用途の指定寸法、無ければ画像自体の大きさを使う。
+ */
+function referenceName(image: BannerImage): string {
+  return image.media.filename.replace(/\.[a-z0-9]+$/i, '') || '画像'
+}
+
+function referenceSize(image: BannerImage, presets: BannerPreset[]): string {
+  const preset = image.generation ? presets.find((p) => p.key === image.generation?.presetKey) : null
+  const width = preset?.targetWidth ?? image.media.width
+  const height = preset?.targetHeight ?? image.media.height
+  return width && height ? `${width}×${height}` : '—'
+}
+
+const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects])
   const visible = useMemo(() => {
     const list = images ?? []
     return list.filter((image) => {
@@ -108,15 +136,15 @@ export default function ReferencePickerDialog({
     <Dialog
       open={open}
       title="参照画像を選ぶ"
-      description="ライブラリから 1 枚選びます。"
+      description={v8 ? 'ライブラリから 1 枚選びます。生成した画像や取り込んだ画像がここに並びます。手元のファイルを選ぶこともできます。' : 'ライブラリから 1 枚選びます。'}
       onCancel={onClose}
       error={error || undefined}
-      designNode="biOEb"
+      designNode="UcBQ5"
       footer={
         <div className="flex w-full flex-wrap items-center gap-2">
           <Button onClick={() => fileRef.current?.click()}>
             <Upload aria-hidden="true" className="h-4 w-4" />
-            手元のファイルを選ぶ
+            {v8 ? 'ファイルを選ぶ' : '手元のファイルを選ぶ'}
           </Button>
           <input
             ref={fileRef}
@@ -132,9 +160,9 @@ export default function ReferencePickerDialog({
           />
           <span className="flex-1" />
           <Button onClick={onClose}>キャンセル</Button>
-          <Button variant="primary" disabled={!current} onClick={() => current && onPick(current)}>
+          <Button variant="primary" disabled={!current} onClick={() => current && onPick(current, usage)}>
             <Check aria-hidden="true" className="h-4 w-4" />
-            この画像を参照にする
+            {v8 ? 'この画像を使う' : 'この画像を参照にする'}
           </Button>
         </div>
       }
@@ -168,6 +196,7 @@ export default function ReferencePickerDialog({
             )}
           </>
         ) : (
+          <>
           <div data-design-node="exeSo" role="listbox" aria-label="参照にする画像" className="grid max-h-160 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4">
             {visible.map((image) => {
               const selected = current?.id === image.id
@@ -191,17 +220,48 @@ export default function ReferencePickerDialog({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={image.media.url} alt="" className="h-full w-full object-cover" loading="lazy" />
                     {selected ? (
-                      <span className="absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-pill bg-accent-deep text-on-accent">
-                        <Check aria-hidden="true" className="h-3.5 w-3.5" />
-                      </span>
+                      v8 ? (
+                        <span className="absolute bottom-2 left-2 rounded-pill bg-accent-deep px-2 py-0.5 text-nano font-semibold text-on-accent">
+                          選んだ
+                        </span>
+                      ) : (
+                        <span className="absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-pill bg-accent-deep text-on-accent">
+                          <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                        </span>
+                      )
                     ) : null}
                   </span>
-                  <span className="truncate text-caption font-semibold text-ink">{projectNames.get(image.projectId) ?? '—'} #{image.sequence}</span>
-                  <span className="truncate text-nano text-ink-faint">{tileCaption(image, presets)}</span>
+                  {v8 ? (
+                    <>
+                      <span className="truncate text-caption font-semibold text-ink">{referenceName(image)}</span>
+                      <span className="truncate text-nano text-ink-faint tabular-nums">{referenceSize(image, presets)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="truncate text-caption font-semibold text-ink">{projectNames.get(image.projectId) ?? '—'} #{image.sequence}</span>
+                      <span className="truncate text-nano text-ink-faint">{tileCaption(image, presets)}</span>
+                    </>
+                  )}
                 </button>
               )
             })}
           </div>
+          {v8 ? (
+            <fieldset className="rounded-control bg-canvas-sunken p-3">
+              <legend className="px-1 text-label font-medium text-ink">参照画像の使い方</legend>
+              <div className="flex flex-wrap gap-4">
+                <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-caption text-ink">
+                  <input type="radio" name="reference-usage" className="h-4 w-4 accent-accent-deep" checked={usage === 'inspire'} onChange={() => setUsage('inspire')} />
+                  雰囲気を参考にする
+                </label>
+                <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-caption text-ink">
+                  <input type="radio" name="reference-usage" className="h-4 w-4 accent-accent-deep" checked={usage === 'edit'} onChange={() => setUsage('edit')} />
+                  土台に描き直す
+                </label>
+              </div>
+            </fieldset>
+          ) : null}
+          </>
         )}
         {nextBefore ? (
           <div className="flex justify-center">
