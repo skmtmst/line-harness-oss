@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { CheckCircle2, ChevronDown, Download, ListChecks, Timer } from 'lucide-react'
+import { CheckCircle2, Download, ListChecks, Timer } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
@@ -20,7 +20,7 @@ import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import BulkOpWizard from './bulk-op-wizard'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Pagination from '@/components/shared/pagination'
@@ -84,7 +84,8 @@ export default function ApprovalsTabV8({
   const [accountFilter, setAccountFilter] = useState<string>(APPROVAL_FILTER_ALL)
   const [bulkConfirm, setBulkConfirm] = useState<{ action: BulkOutcome; items: ConversionApprovalItem[] } | null>(null)
   const [bulkResult, setBulkResult] = useState<BulkResult | null>(null)
-  const [bulkMenuOpen, setBulkMenuOpen] = useState(false)
+  /* まとめて操作の手順窓（★V8-B `hadfk`）。浮き帯のメニューの代わりにここから選ぶ。 */
+  const [bulkWizard, setBulkWizard] = useState<ConversionApprovalItem[] | null>(null)
   const cancelledRef = useRef(false)
   useEffect(() => () => { cancelledRef.current = true }, [])
 
@@ -325,6 +326,14 @@ export default function ApprovalsTabV8({
     if (targets.length === 0) return
     setBulkResult(null)
     setBulkConfirm({ action, items: targets })
+  }, [actioning, accountItems, selected])
+
+  const openBulkWizard = useCallback(() => {
+    if (actioning) return
+    const targets = accountItems.filter((item) => selected.has(item.eventId) && item.approvalStatus === 'pending')
+    if (targets.length === 0) return
+    setBulkResult(null)
+    setBulkWizard(targets)
   }, [actioning, accountItems, selected])
 
   const exportCsv = useCallback(() => {
@@ -655,31 +664,9 @@ export default function ApprovalsTabV8({
           <span className={styles.bulkCount}>{formatNumber(selected.size)}</span>
           <span className={styles.bulkHint}>件を選択中　対象を確認してから操作を選んでください</span>
           <span className={styles.bulkActions}>
-            <span style={{ position: 'relative', display: 'inline-flex' }}>
-              <Button type="button" onClick={() => setBulkMenuOpen((v) => !v)} aria-expanded={bulkMenuOpen}>
-                ☰ 操作を選ぶ <ChevronDown size={14} aria-hidden="true" />
-              </Button>
-              <ActionMenu
-                open={bulkMenuOpen}
-                ariaLabel="まとめての操作"
-                onClose={() => setBulkMenuOpen(false)}
-                items={([
-                  {
-                    id: 'approve',
-                    label: `選んだ${formatNumber(selected.size)}件をまとめて認める`,
-                    onSelect: () => openBulkConfirm('approved'),
-                    disabled: actioning !== null,
-                  },
-                  {
-                    id: 'reject',
-                    label: 'まとめて却下する',
-                    tone: 'danger',
-                    onSelect: () => openBulkConfirm('rejected'),
-                    disabled: actioning !== null,
-                  },
-                ] satisfies ActionMenuItem[])}
-              />
-            </span>
+            <Button type="button" onClick={openBulkWizard}>
+              ☰ 操作を選ぶ
+            </Button>
           </span>
         </div>
       ) : null}
@@ -734,6 +721,23 @@ export default function ApprovalsTabV8({
           </dl>
           <AttributionSection eventId={detailItem.eventId} />
         </Dialog>
+      ) : null}
+
+      {/* まとめて操作の手順窓（★V8-B `hadfk`：手順1/3「操作を選ぶ」） */}
+      {bulkWizard ? (
+        <BulkOpWizard
+          open
+          targets={bulkWizard.map((item) => ({
+            id: item.eventId,
+            displayName: item.affiliateName
+              ? `${personNameText(item.friendName)}・${item.affiliateName}`
+              : personNameText(item.friendName),
+            amountYen: item.value ?? 0,
+          }))}
+          onReselect={() => { setBulkWizard(null) }}
+          onClose={() => { setBulkWizard(null) }}
+          onChoose={(action) => { setBulkWizard(null); openBulkConfirm(action) }}
+        />
       ) : null}
 
       {bulkConfirm ? (
