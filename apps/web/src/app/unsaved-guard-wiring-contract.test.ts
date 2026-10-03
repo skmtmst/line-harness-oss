@@ -81,6 +81,7 @@ const GUARDED = [
   'app/templates/editor-v8.tsx',
   'app/templates/questions/new/page.tsx',
   'app/webhooks/new/page.tsx',
+  'app/webhooks/new/new-v8.tsx',
   'app/webinars/edit/page.tsx',
   'app/webinars/new/new-v8.tsx',
   'app/webinars/new/page.tsx',
@@ -281,6 +282,8 @@ const UNTRIAGED: Record<string, string> = {
     's2: テンプレート編集の本体（app/templates/edit から載る）。V6R-S2-a（board#1066）で付ける',
   'app/webhooks/edit/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/webhooks/incoming-v8.tsx':
+    '★V8-B 外部連携のこちらで受け取る（gW0F2）。受け取り口の作る・直す・試すは確認窓（Dialog）の中で完結し、窓を閉じれば捨てられる小さな操作のため、画面離脱の番兵は要らない。一覧の開始・停止は押した直後に即時保存する',
   'app/webhooks/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/accounts/account-edit-modal.tsx':
