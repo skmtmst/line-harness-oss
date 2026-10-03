@@ -65,9 +65,9 @@ describe('点検で落ちた3画面の偽 API の形', () => {
     const response = await fetch(`${baseUrl}/api/booking/admin/staff-menus?account_id=visual-qa-account`)
     expect(response.status).toBe(200)
     const body = await response.json() as { staff?: Array<{ staff_id?: string; matrix?: unknown[] }> }
-    expect(Array.isArray(body.staff)).toBe(true)
-    expect(body.staff.length).toBeGreaterThan(0)
-    for (const entry of body.staff ?? []) {
+    const staff = Array.isArray(body.staff) ? body.staff : []
+    expect(staff.length).toBeGreaterThan(0)
+    for (const entry of staff) {
       expect(typeof entry.staff_id).toBe('string')
       expect(Array.isArray(entry.matrix)).toBe(true)
     }
