@@ -520,6 +520,9 @@
     "unresolved-classname": 34,
     "direct-th": 6
   },
+  "app/webhooks/samples-v8.tsx": {
+    "unresolved-classname": 23
+  },
   "app/webhooks/sheets-v8.tsx": {
     "direct-th": 4,
     "unresolved-classname": 48

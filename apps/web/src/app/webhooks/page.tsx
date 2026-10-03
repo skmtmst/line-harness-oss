@@ -25,6 +25,7 @@ import InteractionsV8Page from './interactions-v8'
 import IncomingV8Page from './incoming-v8'
 import ApiTokensV8Page from './apitokens-v8'
 import SheetsV8Page from './sheets-v8'
+import SamplesV8Page from './samples-v8'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 
@@ -1112,6 +1113,7 @@ function WebhooksPageHost() {
   if (theme === 'v8' && tab === 'incoming') return <IncomingV8Page />
   if (theme === 'v8' && tab === 'api-tokens') return <ApiTokensV8Page />
   if (theme === 'v8' && tab === 'sheets') return <SheetsV8Page />
+  if (theme === 'v8' && tab === 'notify') return <SamplesV8Page />
   if (tab === 'incoming' || tab === 'outgoing') return <WebhooksPageInner key={tab} tab={tab} />
   return (
     <div className="flex flex-col gap-4">
