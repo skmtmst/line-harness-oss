@@ -30,6 +30,7 @@ shared-button-importer app/automations/new/page.tsx
 shared-button-importer app/automations/page.tsx
 shared-button-importer app/automations/runs/page.tsx
 shared-button-importer app/booking/bookings/booking-calendar.tsx
+shared-button-importer app/booking/bookings/booking-detail-v8.tsx
 shared-button-importer app/booking/bookings/detail/page.tsx
 shared-button-importer app/booking/bookings/new/page.tsx
 shared-button-importer app/booking/bookings/page.tsx
@@ -363,6 +364,7 @@ shared-button-importer components/merged-person/merged-person-detail-v8.tsx
 shared-button-importer components/merged-person/merged-person-detail.tsx
 shared-button-importer components/merged-person/merged-person-sections.tsx
 shared-button-importer components/merged-person/merged-profile-dialog.tsx
+shared-button-importer components/ops/impersonation-bar.tsx
 shared-button-importer components/ops/knowledge-editor.tsx
 shared-button-importer components/ops/knowledge-list.tsx
 shared-button-importer components/ops/knowledge-ticket.tsx
