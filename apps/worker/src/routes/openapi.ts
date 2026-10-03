@@ -6199,13 +6199,26 @@ const spec = {
     '/api/booking/admin/friends/{friendId}/prepay': {
       post: {
         tags: ['Booking'],
-        summary: 'お客さまを手で前払いのみにする',
+        summary: 'お客さまを手で前払いのみにする・外す',
         parameters: [
           { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
           { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
         ],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  mode: { type: 'string', enum: ['manual_on', 'manual_off'] },
+                },
+              },
+            },
+          },
+        },
         responses: {
-          '200': { description: '前払いのみにした結果' },
+          '200': { description: '前払いのみにした・外した結果' },
           '400': { description: 'account_id 未指定' },
           '404': { description: '対象が見つからない' },
         },

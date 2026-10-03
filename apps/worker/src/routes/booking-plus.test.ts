@@ -29,6 +29,11 @@ function staffApp(route: Hono<Env>) {
 
 const env = () => ({ DB: db });
 
+const execCtx = {
+  waitUntil: () => undefined,
+  passThroughOnException: () => undefined,
+} as unknown as ExecutionContext;
+
 function seedBase() {
   sqlite.exec(`
     INSERT INTO line_accounts
@@ -162,9 +167,56 @@ describe('8 無断キャンセルの印と前払いのみ', () => {
     });
   });
 
-  // 実D1（Miniflare）でのみ動く再現試験。better-sqlite3 模擬は ?N 形の
-  // 束縛に対応していないため、ここでは skip（実D1で外して確認する）。
-  it.skip('前払いの人の代理登録は確定せず案内を付ける', async () => {
+  it('無断が多い人も店が手で許せる（manual_off）', async () => {
+    seedBase();
+    sqlite.exec(`
+      INSERT INTO bookings
+        (id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at,
+         block_ends_at, status, price_at_booking, requested_at)
+      VALUES
+        ('b-noshow-2', 'account-a', 'friend-a', 'staff-1', 'menu-a',
+          '2026-11-08T01:00:00.000Z', '2026-11-08T02:00:00.000Z', '2026-11-08T02:00:00.000Z',
+          'no_show', 8000, '2026-10-01'),
+        ('b-noshow-3', 'account-a', 'friend-a', 'staff-1', 'menu-a',
+          '2026-11-09T01:00:00.000Z', '2026-11-09T02:00:00.000Z', '2026-11-09T02:00:00.000Z',
+          'no_show', 8000, '2026-10-01'),
+        ('b-noshow-4', 'account-a', 'friend-a', 'staff-1', 'menu-a',
+          '2026-11-10T01:00:00.000Z', '2026-11-10T02:00:00.000Z', '2026-11-10T02:00:00.000Z',
+          'no_show', 8000, '2026-10-01');
+    `);
+    const instance = staffApp(bookingPlus);
+    const before = await instance.request(
+      '/api/booking/admin/friends/friend-a/noshow?account_id=account-a', {}, env(),
+    );
+    await expect(before.json()).resolves.toMatchObject({
+      success: true, data: { noshowCount: 4, prepayOnly: true, manual: false },
+    });
+    const forgiven = await instance.request(
+      '/api/booking/admin/friends/friend-a/prepay?account_id=account-a',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'manual_off' }),
+      },
+      env(),
+    );
+    await expect(forgiven.json()).resolves.toMatchObject({
+      success: true, data: { noshowCount: 4, prepayOnly: false, manual: true },
+    });
+    const bad = await instance.request(
+      '/api/booking/admin/friends/friend-a/prepay?account_id=account-a',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'auto' }),
+      },
+      env(),
+    );
+    expect(bad.status).toBe(400);
+  });
+
+  // 前払いの人の代理登録は確定せず案内を付ける。
+  it('前払いの人の代理登録は確定せず案内を付ける', async () => {
     seedBase();
     const plus = staffApp(bookingPlus);
     await plus.request(
@@ -190,6 +242,7 @@ describe('8 無断キャンセルの印と前払いのみ', () => {
         }),
       },
       { DB: db },
+      execCtx,
     );
     expect(created.status).toBe(201);
     const json = await created.json() as Record<string, unknown>;

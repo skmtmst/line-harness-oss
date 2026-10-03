@@ -105,7 +105,7 @@ bookingPlus.get(
   },
 );
 
-// POST /api/booking/admin/friends/:friendId/prepay — 店が手で前払いのみにする
+// POST /api/booking/admin/friends/:friendId/prepay — 店が手で前払いのみにする・外す
 bookingPlus.post(
   '/api/booking/admin/friends/:friendId/prepay',
   requireRole('owner', 'admin'),
@@ -118,7 +118,13 @@ bookingPlus.post(
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: '対象が見つかりません' }, 404);
     }
-    await setNoshowFlagMode(c.env.DB, accountId, friendId, 'manual_on');
+    // 体だけでも送れるよう、読めないときは付ける扱いにする。
+    const body = await c.req.json<{ mode?: unknown }>().catch(() => null);
+    const mode = body?.mode ?? 'manual_on';
+    if (mode !== 'manual_on' && mode !== 'manual_off') {
+      return c.json({ success: false, error: 'mode は manual_on か manual_off で指定してください' }, 400);
+    }
+    await setNoshowFlagMode(c.env.DB, accountId, friendId, mode);
     return c.json({ success: true, data: await decidePrepayOnly(c.env.DB, accountId, friendId) });
   },
 );
