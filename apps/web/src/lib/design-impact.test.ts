@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする61ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする62ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -90,6 +90,8 @@ describe('共通部品の影響範囲', () => {
       'app/contents/page.tsx',
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
       'app/contents/vars/impact-review.tsx',
+      // ★V8 共通情報の一覧（FM94M）。表の下にページ送りを置く。
+      'app/contents/vars/list-v8.tsx',
       'app/contents/vars/page.tsx',
       'app/conversions/page.tsx',
       // #1011 FRIEND-11: 重複候補が50件を超えると後ろの候補へ辿れなかった。
@@ -106,6 +108,8 @@ describe('共通部品の影響範囲', () => {
       // 2026-09-04: イベント一覧も自前のページ送りをやめて共通へ寄せた。
       // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
       'app/events/bookings/page.tsx',
+      // ★V8-B イベント一覧（Ih3xS）。表の下にページ送りを置く。
+      'app/events/events-list-v8.tsx',
       'app/events/page.tsx',
       // 2026-09-24(★V7 #701): 回答フォーム一覧の自前の「前へ／次へ」を共通へ寄せた。1ページだけのときは出さない。
       // ★V8 回答フォーム一覧（I3L41O）。表の下にページ送りを置く。
@@ -159,6 +163,10 @@ describe('共通部品の影響範囲', () => {
       'app/restaurant-test/google/google-profile.tsx',
       // #919: 予約台帳が増えても消えないよう、期間・状態の絞り込みと20件ずつのページ送りに寄せた。
       'app/restaurant-test/restaurant-console.tsx',
+      // ★V8-B Googleビジネス（j0Wcg）。口コミ一覧の表の下にページ送りを置く。
+      'app/restaurant-test/v8/google.tsx',
+      // ★V8-B 予約台帳 一覧（Z3FoM）。表の下にページ送りを置く。
+      'app/restaurant-test/v8/reservations.tsx',
       // ★V8 リッチメニュー一覧（rZEGN）。表の下にページ送りを置く。
       'app/rich-menus/list-v8.tsx',
       'app/rich-menus/page.tsx',
@@ -182,9 +190,14 @@ describe('共通部品の影響範囲', () => {
       'app/templates/list-v8.tsx',
       // ★V8 統合ユーザーの一覧（ADjK8）。20件ずつのページ送り。
       'app/users/users-v8.tsx',
+      // ★V8-B 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りがある。
+      'app/webhooks/interactions-v8.tsx',
+      // ★V8-B 外部連携の一覧（ZSbFY）。表の下にページ送りがある。
+      'app/webhooks/outgoing-v8.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
       // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。
+      'app/webinars/edit/participants-v8.tsx',
       'app/webinars/list-v8.tsx',
       'app/webinars/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',

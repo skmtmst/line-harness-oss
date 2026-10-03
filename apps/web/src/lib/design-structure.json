@@ -618,7 +618,7 @@
       }
     },
     "/booking/menus": {
-      "node": "QSLEH owaS3 P6EdLW yRPxl KRgTQ x1OZS6 VLEaj xCoDe",
+      "node": "QSLEH owaS3 P6EdLW C9fv7A yRPxl KRgTQ x1OZS6 VLEaj xCoDe",
       "name": "V8 予約設定（V6 28-1、v7 見た目併存）",
       "sections": [
         "Head",
@@ -895,10 +895,9 @@
       "implementationGaps": {
         "parts": [
           "マニュアル",
-          "フォルダを追加",
           "保存した条件"
         ],
-        "reason": "2026-09-24(★V7手直し): マニュアル・フォルダ・保存した条件は未実装のため、接続後の断り書きは出さない（今は出さなくてよいものは出さない）。口ができたら文言と一緒に戻す。"
+        "reason": "2026-09-24(★V7手直し): マニュアル・フォルダ・保存した条件は未実装のため、接続後の断り書きは出さない（今は出さなくてよいものは出さない）。口ができたら文言と一緒に戻す。2026-10-03(★V8-B #1213): フォルダは共通 FolderPanel・FolderAddDialog で実装したため gaps から外した。マニュアル・保存した条件は未実装のまま残す。"
       }
     },
     "/events/bookings": {

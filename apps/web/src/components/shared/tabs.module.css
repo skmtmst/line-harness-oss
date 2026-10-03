@@ -140,6 +140,31 @@
   font-weight: 600;
 }
 
+/*
+ * ★V8 仕上げ（M10）：選ばれている下線が滑って移る（120ms）。
+ * 測れたときだけ動く印を出し、枠線の下線は消す。
+ * 測れないときは枠線の下線が残る（tabs.tsx の data-sliding）。
+ */
+[data-theme='v8'] .items {
+  position: relative;
+}
+
+[data-theme='v8'] .indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: var(--radius-mini);
+  background: var(--color-ink);
+  transition:
+    transform var(--motion-fast) var(--motion-ease-out),
+    width var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .items[data-sliding='true'] .current {
+  border-bottom-color: transparent;
+}
+
 [data-theme='v8'] .current .count {
   color: var(--color-ink-faint);
 }
