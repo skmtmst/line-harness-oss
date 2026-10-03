@@ -597,6 +597,8 @@ export default function RichMenusListV8() {
   }
 
   /* ===== 数の帯 ===== */
+  // 月の集計が無い行は期間の集計で補う（v7 と同じ。集計自体が無ければ「—」）。
+  const tapsByGroup = new Map((tapStats?.byGroup ?? []).map((g) => [g.groupId, g.taps]))
   const topArea = tapStats?.byArea[0] ?? null
   const topAreaGroupName = topArea
     ? groups.find((g) => g.id === topArea.groupId)?.name ?? null
@@ -892,7 +894,11 @@ export default function RichMenusListV8() {
                 </td>
                 <td className={styles.countCell}>
                   <div className={styles.countMain}>
-                    {g.monthlyStats ? `${formatNumber(g.monthlyStats.taps)}回` : '—'}
+                    {g.monthlyStats
+                      ? `${formatNumber(g.monthlyStats.taps)}回`
+                      : tapStats
+                        ? `${formatNumber(tapsByGroup.get(g.id) ?? 0)}回`
+                        : '—'}
                   </div>
                   {g.monthlyStats?.uniqueAudience.value != null ? (
                     <div className={styles.countSub}>
