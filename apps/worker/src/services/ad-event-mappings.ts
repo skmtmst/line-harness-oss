@@ -45,11 +45,17 @@ function requiredEventName(value: unknown): string {
   return name;
 }
 
-/** 対応表を読む。左＝うちの成果地点、右＝広告側の名前。 */
+export interface AdEventMappingOptions {
+  mappings: AdEventMapping[];
+  points: Array<{ id: string; name: string }>;
+  platforms: Array<{ id: string; name: string }>;
+}
+
+/** 対応表を読む。左＝うちの成果地点、右＝広告側の名前。足すための選択肢も同梱する。 */
 export async function listAdEventMappings(
   db: D1Database,
   lineAccountId: string,
-): Promise<AdEventMapping[]> {
+): Promise<AdEventMappingOptions> {
   const rows = await db
     .prepare(
       `SELECT m.id, m.line_account_id, m.conversion_point_id, p.name AS conversion_point_name,
@@ -66,7 +72,7 @@ export async function listAdEventMappings(
       conversion_point_name: string; ad_platform_id: string;
       ad_platform_name: string; event_name: string;
     }>();
-  return rows.results.map((row) => ({
+  const mappings = rows.results.map((row) => ({
     id: row.id,
     lineAccountId: row.line_account_id,
     conversionPointId: row.conversion_point_id,
@@ -75,6 +81,14 @@ export async function listAdEventMappings(
     adPlatformName: row.ad_platform_name,
     eventName: row.event_name,
   }));
+  const [points, platforms] = await Promise.all([
+    db.prepare(`SELECT id, name FROM conversion_points WHERE line_account_id = ? ORDER BY name`)
+      .bind(lineAccountId).all<{ id: string; name: string }>(),
+    db.prepare(
+      `SELECT id, COALESCE(display_name, name) AS name FROM ad_platforms WHERE line_account_id = ? ORDER BY name`,
+    ).bind(lineAccountId).all<{ id: string; name: string }>(),
+  ]);
+  return { mappings, points: points.results, platforms: platforms.results };
 }
 
 /**
@@ -86,7 +100,7 @@ export async function saveAdEventMappings(
   lineAccountId: string,
   inputs: unknown,
   now = new Date().toISOString(),
-): Promise<AdEventMapping[]> {
+): Promise<AdEventMappingOptions> {
   if (!Array.isArray(inputs)) {
     throw new AdEventMappingError('invalid_mapping', '対応表の形が正しくありません');
   }

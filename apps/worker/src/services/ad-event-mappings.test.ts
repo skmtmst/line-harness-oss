@@ -44,11 +44,13 @@ describe('F-21 対応表の読み書き', () => {
     const saved = await saveAdEventMappings(db.db, 'account-1', [
       { conversionPointId: 'point-1', adPlatformId: 'platform-1', eventName: 'Purchase' },
     ]);
-    expect(saved).toHaveLength(1);
-    expect(saved[0]?.conversionPointName).toBe('購入');
-    expect(saved[0]?.eventName).toBe('Purchase');
+    expect(saved.mappings).toHaveLength(1);
+    expect(saved.mappings[0]?.conversionPointName).toBe('購入');
+    expect(saved.mappings[0]?.eventName).toBe('Purchase');
+    expect(saved.points).toEqual([{ id: 'point-1', name: '購入' }]);
+    expect(saved.platforms).toHaveLength(1);
     const listed = await listAdEventMappings(db.db, 'account-1');
-    expect(listed).toHaveLength(1);
+    expect(listed.mappings).toHaveLength(1);
   });
 
   it('空の名前・長い名前・重複は受け付けない', async () => {

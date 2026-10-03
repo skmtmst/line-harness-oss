@@ -1,8 +1,19 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { api } from '@/lib/api'
+import { api, fetchApi } from '@/lib/api'
 import type { AdConversionLog, AdPlatform } from '@/lib/api'
+
+/* F-21 対応表の1行。口の実データをそのまま出す。 */
+type AdEventMappingRow = {
+  conversionPointId: string
+  conversionPointName: string
+  adPlatformId: string
+  adPlatformName: string
+  eventName: string
+}
+
+type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 import type { EntryRoute } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -231,6 +242,19 @@ export default function AdIntegration({
   const [entryRoutes, setEntryRoutes] = useState<EntryRoute[]>([])
   const [importingId, setImportingId] = useState<string | null>(null)
   const [importError, setImportError] = useState('')
+  /* F-21 対応表。行の追加・名前の直し・削除は「保存する」でまとめて送る。 */
+  const [mappingRows, setMappingRows] = useState<AdEventMappingRow[]>([])
+  const [mappingPoints, setMappingPoints] = useState<Array<{ id: string; name: string }>>([])
+  const [mappingPlatforms, setMappingPlatforms] = useState<Array<{ id: string; name: string }>>([])
+  const [mappingState, setMappingState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [newPointId, setNewPointId] = useState('')
+  const [newPlatformId, setNewPlatformId] = useState('')
+  const [newEventName, setNewEventName] = useState('')
+  const [mappingBusy, setMappingBusy] = useState(false)
+  const [mappingError, setMappingError] = useState('')
+  /* F-22 やり直し。行ごとに1回だけ送る。 */
+  const [resendingId, setResendingId] = useState<string | null>(null)
+  const [resendError, setResendError] = useState('')
 
   const load = useCallback(async () => {
     const generation = ++loadGenerationRef.current
@@ -413,6 +437,113 @@ export default function AdIntegration({
     }
   }, [importingId, load])
 
+  /* F-21: 選んだLINEアカウントの対応表を読む。 */
+  const loadMappings = useCallback(async () => {
+    if (!selectedAccountId) {
+      setMappingState('idle')
+      return
+    }
+    setMappingState('loading')
+    try {
+      const res = await fetchApi<
+        ApiResponse<{
+          mappings: AdEventMappingRow[]
+          conversionPoints: Array<{ id: string; name: string }>
+          adPlatforms: Array<{ id: string; name: string }>
+        }>
+      >(`/api/ad-platforms/event-mappings?lineAccountId=${encodeURIComponent(selectedAccountId)}`)
+      if (res.success) {
+        setMappingRows(res.data.mappings)
+        setMappingPoints(res.data.conversionPoints)
+        setMappingPlatforms(res.data.adPlatforms)
+        setMappingState('ready')
+      } else {
+        setMappingState('error')
+      }
+    } catch {
+      setMappingState('error')
+    }
+  }, [selectedAccountId])
+
+  /* F-21: 接続の板を開いた時だけ対応表を読む。履歴の再読み込みでは読まない。 */
+  useEffect(() => {
+    if (view === 'connections' && selectedAccountId) void loadMappings()
+  }, [view, selectedAccountId, loadMappings])
+
+  /* F-21: 今の行をまとめて保存する(置き換え)。 */
+  const saveMappings = useCallback(async () => {
+    if (!selectedAccountId || mappingBusy) return
+    setMappingBusy(true)
+    setMappingError('')
+    try {
+      const res = await fetchApi<
+        ApiResponse<{ mappings: AdEventMappingRow[] }>
+      >(`/api/ad-platforms/event-mappings?lineAccountId=${encodeURIComponent(selectedAccountId)}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          mappings: mappingRows.map((row) => ({
+            conversionPointId: row.conversionPointId,
+            adPlatformId: row.adPlatformId,
+            eventName: row.eventName,
+          })),
+        }),
+      })
+      if (res.success) {
+        setMappingRows(res.data.mappings)
+      } else {
+        setMappingError(res.error || '保存できませんでした')
+      }
+    } catch {
+      setMappingError('保存できませんでした。通信を確かめて、もう一度お試しください。')
+    } finally {
+      setMappingBusy(false)
+    }
+  }, [selectedAccountId, mappingBusy, mappingRows])
+
+  /* F-21: 行を1件足す。重なりは口が弾くので、ここでは弾かない。 */
+  const addMappingRow = useCallback(() => {
+    if (!newPointId || !newPlatformId || !newEventName.trim()) return
+    const point = mappingPoints.find((item) => item.id === newPointId)
+    const platform = mappingPlatforms.find((item) => item.id === newPlatformId)
+    if (!point || !platform) return
+    setMappingRows((rows) => [
+      ...rows,
+      {
+        conversionPointId: point.id,
+        conversionPointName: point.name,
+        adPlatformId: platform.id,
+        adPlatformName: platform.name,
+        eventName: newEventName.trim(),
+      },
+    ])
+    setNewEventName('')
+  }, [newPointId, newPlatformId, newEventName, mappingPoints, mappingPlatforms])
+
+  /* F-22: 送信履歴からやり直しを送る。90日より前は口が409で弾く。 */
+  const resendLog = useCallback(
+    async (logId: string) => {
+      if (!selectedAccountId || resendingId) return
+      setResendingId(logId)
+      setResendError('')
+      try {
+        const res = await fetchApi<ApiResponse<unknown>>(
+          `/api/ad-platforms/logs/${encodeURIComponent(logId)}/resend?lineAccountId=${encodeURIComponent(selectedAccountId)}`,
+          { method: 'POST' },
+        )
+        if (res.success) {
+          void load()
+        } else {
+          setResendError(res.error || 'やり直しを送れませんでした')
+        }
+      } catch {
+        setResendError('やり直しを送れませんでした。通信を確かめて、もう一度お試しください。')
+      } finally {
+        setResendingId(null)
+      }
+    },
+    [selectedAccountId, resendingId, load],
+  )
+
   const exportLogs = () => {
     const blob = new Blob([`\uFEFF${safeCsv(visibleLogs)}`], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -532,7 +663,20 @@ export default function AdIntegration({
                       </td>
                       <td className="px-4 py-3 text-right">
                         {log.status === 'failed'
-                          ? <Button variant="secondary" onClick={() => setExpandedLogId(expanded ? null : log.id)}>{expanded ? '理由を閉じる' : '理由を見る'}</Button>
+                          ? (
+                            <span className="inline-flex flex-wrap justify-end gap-2">
+                              <Button variant="secondary" onClick={() => setExpandedLogId(expanded ? null : log.id)}>{expanded ? '理由を閉じる' : '理由を見る'}</Button>
+                              {canManage ? (
+                                <Button
+                                  variant="secondary"
+                                  disabled={resendingId === log.id}
+                                  onClick={() => void resendLog(log.id)}
+                                >
+                                  {resendingId === log.id ? '送信中' : 'やり直す'}
+                                </Button>
+                              ) : null}
+                            </span>
+                          )
                           : <span className="text-ink-faint">—</span>}
                       </td>
                     </tr>
@@ -558,6 +702,7 @@ export default function AdIntegration({
         <p className="text-xs leading-relaxed text-ink-faint">
           失敗理由を確認してからやり直します。成功した成果を重ねて送る操作は表示しません。
         </p>
+        {resendError ? <Notice tone="error" title="やり直しを送れませんでした">{resendError}</Notice> : null}
       </div>
     )
   }
@@ -620,8 +765,7 @@ export default function AdIntegration({
         </section>
 
         {/*
-          #514-13: 成果地点と広告名の対応表は口に無い。直書きの対応・件数と
-          効かない操作ボタンは出さず、未接続の旨にする。
+          F-21: 成果地点と広告名の対応表は口から読む。
         */}
         <section className="rounded-card border border-hairline bg-canvas p-4">
           <h3 className="text-sm font-bold text-ink">成果地点と、広告に返す名前の対応</h3>
@@ -629,12 +773,126 @@ export default function AdIntegration({
             左がうちの成果地点、右が広告側の名前です。対応が付いていないものは返せません。
           </p>
           <div className="mt-3">
-            <ListState
-              kind="empty"
-              title="対応表はまだ表示できません"
-              description="成果地点と広告側の名前の対応を取れていないため、件数は表示しません。対応が取れたらここに並びます。"
-            />
+            {mappingState === 'loading' ? (
+              <ListState kind="loading" title="名前の対応表を読み込んでいます" />
+            ) : mappingState === 'error' ? (
+              <ListState
+                kind="error"
+                title="名前の対応表を表示できませんでした"
+                description="対応表は消えていません。読み直して、もう一度お試しください。"
+                action={<Button onClick={() => void loadMappings()}>対応表を再読み込み</Button>}
+              />
+            ) : mappingRows.length === 0 ? (
+              <ListState
+                kind="empty"
+                title="広告側の名前の対応表はまだありません"
+                description="下の欄から1件ずつ足して、保存してください。"
+              />
+            ) : (
+              <div className="overflow-hidden rounded-card border border-hairline">
+                <table className="w-full table-fixed text-xs">
+                  <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
+                    <TableHeadRow>
+                      <Th>成果地点</Th>
+                      <Th>広告</Th>
+                      <Th>広告側の名前</Th>
+                      {canManage ? <Th align="right">操作</Th> : null}
+                    </TableHeadRow>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {mappingRows.map((row) => (
+                      <tr key={`${row.conversionPointId}:${row.adPlatformId}`}>
+                        <td className="px-4 py-3 text-ink">{row.conversionPointName}</td>
+                        <td className="px-4 py-3 text-ink-secondary">{row.adPlatformName}</td>
+                        <td className="px-4 py-3 text-ink-secondary">
+                          {canManage ? (
+                            <TextField
+                              aria-label={`${row.conversionPointName}の広告側の名前`}
+                              value={row.eventName}
+                              onChange={(event) => {
+                                const next = event.target.value
+                                setMappingRows((rows) =>
+                                  rows.map((item) =>
+                                    item.conversionPointId === row.conversionPointId &&
+                                    item.adPlatformId === row.adPlatformId
+                                      ? { ...item, eventName: next }
+                                      : item,
+                                  ),
+                                )
+                              }}
+                            />
+                          ) : (
+                            row.eventName
+                          )}
+                        </td>
+                        {canManage ? (
+                          <td className="px-4 py-3 text-right">
+                            <Button
+                              variant="secondary"
+                              onClick={() =>
+                                setMappingRows((rows) =>
+                                  rows.filter(
+                                    (item) =>
+                                      !(
+                                        item.conversionPointId === row.conversionPointId &&
+                                        item.adPlatformId === row.adPlatformId
+                                      ),
+                                  ),
+                                )
+                              }
+                            >
+                              消す
+                            </Button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
+          {canManage && mappingState === 'ready' ? (
+            <div className="mt-3 space-y-2">
+              <div className="flex flex-wrap items-end gap-2">
+                <Select
+                  aria-label="成果地点"
+                  value={newPointId}
+                  onChange={setNewPointId}
+                  options={[
+                    { value: '', label: '成果地点を選ぶ' },
+                    ...mappingPoints.map((item) => ({ value: item.id, label: item.name })),
+                  ]}
+                />
+                <Select
+                  aria-label="広告"
+                  value={newPlatformId}
+                  onChange={setNewPlatformId}
+                  options={[
+                    { value: '', label: '広告を選ぶ' },
+                    ...mappingPlatforms.map((item) => ({ value: item.id, label: item.name })),
+                  ]}
+                />
+                <TextField
+                  aria-label="広告側の名前"
+                  placeholder="広告側の名前"
+                  value={newEventName}
+                  onChange={(event) => setNewEventName(event.target.value)}
+                />
+                <Button
+                  variant="secondary"
+                  disabled={!newPointId || !newPlatformId || !newEventName.trim()}
+                  onClick={addMappingRow}
+                >
+                  足す
+                </Button>
+              </div>
+              {mappingError ? <Notice tone="error" title="対応表を保存できませんでした">{mappingError}</Notice> : null}
+              <Button disabled={mappingBusy} onClick={() => void saveMappings()}>
+                {mappingBusy ? '保存しています' : '対応表を保存する'}
+              </Button>
+            </div>
+          ) : null}
         </section>
         </div>
 
