@@ -121,6 +121,7 @@ function MembersInner() {
         const res = await api.staff.update(dialog.member.id, {
           role: value.role,
           isActive: value.isActive,
+          assignedLineAccountId: value.assignedLineAccountId,
           accountScope: value.accountScope,
           scopedLineAccountIds: value.scopedLineAccountIds,
           managementContext: 'hq',

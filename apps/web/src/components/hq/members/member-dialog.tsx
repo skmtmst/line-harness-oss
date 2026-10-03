@@ -91,7 +91,7 @@ export default function MemberDialog({
       open={open}
       title={member ? `${member.name}さんの権限を変える` : '権限者を招待'}
       description={member ? undefined : `招待メールは送った日から7日（${inviteExpiryLabel()}まで）有効です。メールの確認とLINEの連携が済むとログインできます。`}
-      designNode={member ? undefined : 'yLKwV'}
+      designNode={member ? 'BHEl9' : 'yLKwV'}
       confirmLabel={member ? '変更を保存' : '招待メールを送る'}
       busy={busy}
       error={localError || error}
@@ -132,20 +132,19 @@ export default function MemberDialog({
               ]}
             />
           </Field>
-          {!member ? (
-            <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
-              <Select
-                aria-label="最初に表示するアカウント"
-                size="full"
-                id={`${uid}-assigned`}
-                className="w-full"
-                value={value.assignedLineAccountId}
-                disabled={busy}
-                onChange={(value) => set('assignedLineAccountId', value)}
-                options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-              />
-            </Field>
-          ) : (
+          <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
+            <Select
+              aria-label="最初に表示するアカウント"
+              size="full"
+              id={`${uid}-assigned`}
+              className="w-full"
+              value={value.assignedLineAccountId}
+              disabled={busy}
+              onChange={(value) => set('assignedLineAccountId', value)}
+              options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+            />
+          </Field>
+          {member ? (
             <Field label="状態" htmlFor={`${uid}-active`} note={isSelf ? '自分の状態は変えられません' : undefined}>
               <Select
                 aria-label="状態"
@@ -161,7 +160,7 @@ export default function MemberDialog({
                 ]}
               />
             </Field>
-          )}
+          ) : null}
         </div>
 
         <fieldset className="flex flex-col gap-2" disabled={busy}>
