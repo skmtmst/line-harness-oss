@@ -19,6 +19,20 @@ export type MemberDialogValue = {
 }
 
 /**
+ * 板 `yLKwV`：招待メールは送った日から7日（実装 `staff-invite.ts` が7日で送る）。
+ * 「10/9（金）18:40」の形で出す。
+ */
+export function inviteExpiryLabel(now: Date = new Date()): string {
+  const at = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric',
+    weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(at)
+  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${pick('month')}/${pick('day')}（${pick('weekday')}） ${pick('hour')}:${pick('minute')}`
+}
+
+/**
  * 権限者を招待する／変更する。★V6 36-5 の「＋ 権限者を招待」と「変更」。
  *
  * 招待では名前・メール・役割・最初に表示するアカウント・担当範囲を聞く。
@@ -76,7 +90,9 @@ export default function MemberDialog({
     <Dialog
       open={open}
       title={member ? `${member.name}さんの権限を変える` : '権限者を招待'}
-      description={member ? undefined : '招待メールが届き、メールの確認と LINE の連携が済むとログインできます。招待メールの有効期限は48時間です。'}
+      description={member ? undefined : `招待メールは送った日から7日（${inviteExpiryLabel()}まで）有効です。メールの確認とLINEの連携が済むとログインできます。`}
+      /* 板 `ukPgd`：招待の入力の間違いは同じ窓の状態として印を付ける。 */
+      designNode={member ? 'BHEl9' : localError ? 'ukPgd' : 'yLKwV'}
       confirmLabel={member ? '変更を保存' : '招待メールを送る'}
       busy={busy}
       error={localError || error}
@@ -117,20 +133,19 @@ export default function MemberDialog({
               ]}
             />
           </Field>
-          {!member ? (
-            <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
-              <Select
-                aria-label="最初に表示するアカウント"
-                size="full"
-                id={`${uid}-assigned`}
-                className="w-full"
-                value={value.assignedLineAccountId}
-                disabled={busy}
-                onChange={(value) => set('assignedLineAccountId', value)}
-                options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-              />
-            </Field>
-          ) : (
+          <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
+            <Select
+              aria-label="最初に表示するアカウント"
+              size="full"
+              id={`${uid}-assigned`}
+              className="w-full"
+              value={value.assignedLineAccountId}
+              disabled={busy}
+              onChange={(value) => set('assignedLineAccountId', value)}
+              options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+            />
+          </Field>
+          {member ? (
             <Field label="状態" htmlFor={`${uid}-active`} note={isSelf ? '自分の状態は変えられません' : undefined}>
               <Select
                 aria-label="状態"
@@ -146,7 +161,7 @@ export default function MemberDialog({
                 ]}
               />
             </Field>
-          )}
+          ) : null}
         </div>
 
         <fieldset className="flex flex-col gap-2" disabled={busy}>

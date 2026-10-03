@@ -105,7 +105,7 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
               >
                 <Icon name="circle-check" className="h-9 w-9" />
               </span>
-              <p className="mt-4 text-[17px] font-bold text-ink">空きが出ました</p>
+              <p className="mt-4 text-xl font-bold text-ink">空きが出ました</p>
               <p className="mt-2 text-[13px] leading-6 text-pretty text-liff-sub">
                 下のボタンを押すと予約が確定します。
                 <br />
