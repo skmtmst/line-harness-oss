@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import VersionCompare from '@/components/shared/version-compare'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -241,7 +242,7 @@ function FeatureCardV8({ group, features, usageByItemId, usageByFeatureId, usage
 }
 
 /** 並び替えダイアログ（★V8-B `ztgRD`）。下書きの並びを動かし、確定で反映する。 */
-function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveItemInOrder }: {
+export function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveItemInOrder }: {
   groups: FeatureGroup[]
   initialOrder: MenuItemOrder
   onCancel: () => void
@@ -250,13 +251,17 @@ function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveItemInOrde
 }) {
   const [draft, setDraft] = useState<MenuItemOrder>(initialOrder)
   const draftGroups = useMemo(() => applyItemOrder(groups, draft), [groups, draft])
+  /* 手書きの窓にも共通の窓の振る舞い（Esc で閉じる・Tab の閉じ込め）を付ける。 */
+  const panelRef = useOverlayFocus(true, onCancel)
   return (
     <div className={styles.dialogOverlay} role="presentation" onClick={onCancel}>
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="左のメニューの並びを変える"
         className={styles.dialog}
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
         <div className={styles.dialogHead}>

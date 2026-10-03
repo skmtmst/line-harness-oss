@@ -1,0 +1,312 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8 共通情報を作る（板 `p82v9`）。
+ *
+ * v7 の登録画面（`page.tsx` 内の NewCommonVarInner）とは別の部品として持つ。
+ * データの口・入力検査・秘密値の守り・下書き保存は同じ。
+ * 違いは置き場と見せ方だけ——左に3枚のカード（名前と差し込み名・
+ * 種別と中身・使える期間）と社内メモ、右に秘密値の注意と差し込んだときの
+ * 見え方（スマホ）、下の帯にキャンセル・下書きを保存・保存して公開。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.backLink {
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.headTitle {
+  margin: 4px 0 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 閲覧のみの帯。見出しの下。 */
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 本体：左に入力のカード、右に案内（340〜380px）。 */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  align-items: start;
+  gap: 16px;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.cardNote {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fieldInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.fieldInputMono {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-family: var(--font-mono, monospace);
+}
+
+.fieldHint {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.fieldError {
+  margin: 4px 0 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.fieldCount {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.keyRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 種別のカード8枚。選ぶと枠が濃い緑＋地が薄い緑。 */
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.typeCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  cursor: pointer;
+  text-align: left;
+}
+
+.typeCard[aria-checked='true'] {
+  border: 1.5px solid var(--color-accent-deep);
+  background: var(--color-accent-soft);
+}
+
+.typeTile {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-tile-sm);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+}
+
+.typeLabel {
+  display: block;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.typeDesc {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 秘密値の注意（黄色のカード）。 */
+.secretCard {
+  padding: 16px;
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-status-warn-soft);
+}
+
+.secretTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.secretText {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.previewTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.previewBubble {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.previewMeta {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  text-align: right;
+}
+
+.formError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 秘密値の確認の窓の中身。 */
+.secretConfirm {
+  padding: 16px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-status-danger-soft);
+}
+
+.secretConfirmTitle {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.secretConfirmText {
+  margin: 8px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.secretConfirmActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* 板が狭いときは右の列を下へ畳む。 */
+@container (max-width: 1099px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .typeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fieldGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
