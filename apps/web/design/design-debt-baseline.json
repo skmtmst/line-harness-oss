@@ -126,7 +126,7 @@
     "arbitrary-value": 1
   },
   "app/broadcasts/detail-v8.tsx": {
-    "unresolved-classname": 75
+    "unresolved-classname": 78
   },
   "app/broadcasts/detail/page.tsx": {
     "direct-secondary-button": 1
@@ -237,7 +237,7 @@
     "direct-th": 7
   },
   "app/friends/detail/page.tsx": {
-    "unresolved-classname": 3,
+    "unresolved-classname": 4,
     "arbitrary-value": 5
   },
   "app/friends/friends-nav-v8.tsx": {
