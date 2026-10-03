@@ -1,0 +1,102 @@
+{
+  "version": 2,
+  "updated": "2026-10-04T03:30:00+09:00",
+  "note": "基準は3回中央値の実測（PR #1339・4回目CI）に更新。時間は基準より20%悪化、JSは1KB超の増加で落とす。targets は目標で未達は報告だけ。",
+  "targets": {
+    "showMs": 1000,
+    "lcpMs": 1000,
+    "pressMs": 100,
+    "longTaskMs": 50
+  },
+  "baselines": {
+    "dashboard": {
+      "route": "/",
+      "showMs": 1247,
+      "lcpMs": 660,
+      "pressMs": 69,
+      "longTaskMs": 51,
+      "jsBytes": 4403725
+    },
+    "inbox": {
+      "route": "/chats",
+      "showMs": 1043,
+      "lcpMs": 324,
+      "pressMs": 67,
+      "longTaskMs": 0,
+      "jsBytes": 3546855
+    },
+    "friends": {
+      "route": "/friends",
+      "showMs": 1146,
+      "lcpMs": 368,
+      "pressMs": 67,
+      "longTaskMs": 51,
+      "jsBytes": 3672266
+    },
+    "broadcasts": {
+      "route": "/broadcasts",
+      "showMs": 1104,
+      "lcpMs": 388,
+      "pressMs": 187,
+      "longTaskMs": 68,
+      "jsBytes": 3657189
+    },
+    "broadcast-new": {
+      "route": "/broadcasts/new",
+      "showMs": 1082,
+      "lcpMs": 440,
+      "pressMs": null,
+      "longTaskMs": 58,
+      "jsBytes": 3560040
+    },
+    "templates": {
+      "route": "/templates",
+      "showMs": 1119,
+      "lcpMs": 364,
+      "pressMs": 66,
+      "longTaskMs": 52,
+      "jsBytes": 3616118
+    },
+    "booking": {
+      "route": "/booking/bookings",
+      "showMs": 1052,
+      "lcpMs": 388,
+      "pressMs": 66,
+      "longTaskMs": 0,
+      "jsBytes": 3601168
+    },
+    "answers": {
+      "route": "/form-submissions",
+      "showMs": 1086,
+      "lcpMs": 348,
+      "pressMs": 84,
+      "longTaskMs": 51,
+      "jsBytes": 3700033
+    },
+    "tags": {
+      "route": "/tags",
+      "showMs": 1138,
+      "lcpMs": 376,
+      "pressMs": 67,
+      "longTaskMs": 56,
+      "jsBytes": 3691989
+    },
+    "settings": {
+      "route": "/settings",
+      "showMs": 1147,
+      "lcpMs": 296,
+      "pressMs": 106,
+      "longTaskMs": 67,
+      "jsBytes": 4274111
+    },
+    "friends-2000": {
+      "route": "/friends",
+      "showMs": 5472,
+      "lcpMs": 380,
+      "pressMs": null,
+      "longTaskMs": 905,
+      "jsBytes": 3672266,
+      "rows": 2000
+    }
+  }
+}
