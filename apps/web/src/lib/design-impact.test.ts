@@ -176,6 +176,8 @@ describe('共通部品の影響範囲', () => {
       'app/users/users-v8.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
+      // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。
+      'app/webinars/list-v8.tsx',
       'app/webinars/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',
       'components/friend-fields/tags-page-v4.tsx',
