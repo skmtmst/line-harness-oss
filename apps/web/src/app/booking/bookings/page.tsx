@@ -842,6 +842,7 @@ export default function BookingsPage() {
       )}
       <ConfirmDialog
         open={decideTarget !== null}
+        designNode={decideTarget?.action === 'cancel' ? 'iJdAi' : undefined}
         title={`この予約を「${decideTarget ? actionLabel[decideTarget.action] : ''}」にしますか？`}
         description={
           // N-390: LINE未連携の予約へ「届きます」と出すと事実と違う。
