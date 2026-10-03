@@ -1335,8 +1335,8 @@
 }
 
 .phoneCatNow {
-  background: var(--color-ink);
-  color: var(--color-canvas);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
 }
 
 /* 選ぶカード（メニュー・担当）。 */
