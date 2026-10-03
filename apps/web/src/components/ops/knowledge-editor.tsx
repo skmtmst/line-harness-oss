@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { api, type OpsKnowledgeArticle, type OpsKnowledgeInput } from '@/lib/api'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { opsCall } from './ops-ui'
 import { KNOWLEDGE_KINDS, knowledgeArticleKind, knowledgeTime } from './knowledge-format'
 import Button from '@/components/shared/button'
@@ -18,13 +19,19 @@ import Notice from '@/components/shared/notice'
 export default function KnowledgeEditor({ article: initial, onClose, onSaved }: {
   article: OpsKnowledgeArticle; onClose: () => void; onSaved: () => void
 }) {
+  const theme = useAdminTheme()
+  const v8 = theme === 'v8'
   const [article, setArticle] = useState(initial)
   const [form, setForm] = useState<OpsKnowledgeInput>({ title: initial.title, question: initial.question,
     answer: initial.answer, kind: initial.kind, keywords: initial.keywords })
   const [keywords, setKeywords] = useState(initial.keywords.join('、'))
   const [confirmed, setConfirmed] = useState(false)
+  // eSXxA: 元の問い合わせが「解決」になっていることの読み合わせ（V8だけ）。
+  // 裏側は承認時に版と元の更新を確かめる。ここは人の目での確認。
+  const [resolvedConfirmed, setResolvedConfirmed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const ticketLabel = article.ticketNo == null ? '元の問い合わせ' : `#MB-${String(article.ticketNo).padStart(4, '0')}`
   const editing = initial.reviewState === 'approved' && initial.sourceCurrent
   const eligible = article.sourceCurrent && (article.articleKind === 'verified'
     ? article.reviewState === 'pending' && article.evidence.length >= 2
@@ -33,10 +40,12 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
   const canApprove = eligible && Boolean(form.question.trim()) && Boolean(form.answer.trim())
   const input = () => ({ ...form, keywords: keywords.split(/[、,\n]/).map(v => v.trim()).filter(Boolean) })
   const change = <K extends keyof OpsKnowledgeInput>(key: K, value: OpsKnowledgeInput[K]) => {
-    setForm(f => ({ ...f, [key]: value })); setConfirmed(false)
+    setForm(f => ({ ...f, [key]: value })); setConfirmed(false); setResolvedConfirmed(false)
   }
   const save = async (approve = false) => {
     if (approve && (!confirmed || !eligible)) return
+    // eSXxA: 比べたうえでの保存。確認が揃うまで押させない（ボタンも無効）。
+    if (approve && v8 && !editing && !resolvedConfirmed) return
     const value = input()
     if (!value.title.trim() || (eligible && (!value.question.trim() || !value.answer.trim()))) {
       setError('題名・質問・答えを入力してください'); return
@@ -64,11 +73,11 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
     onSaved(); onClose()
   }
   return <Dialog open title={editing ? '記事を直す' : '下書きの内容を確認'}
-    designNode={editing ? 'ZAOc7' : 'DHdsw'} busy={busy} error={error} onCancel={onClose}
+    designNode={v8 && !editing ? 'eSXxA' : (editing ? 'ZAOc7' : 'DHdsw')} busy={busy} error={error} onCancel={onClose}
     footer={<div className={styles.footer}>
       <Button onClick={editing ? onClose : () => void dismiss()} disabled={busy}>{editing ? '保存せず閉じる' : '見送る'}</Button>
       <Button onClick={() => void save()} disabled={busy} variant={editing ? 'primary' : 'secondary'}>{editing ? '承認待ちで保存する' : '下書きを保存する'}</Button>
-      {!editing && <Button variant="primary" disabled={busy || !canApprove || !confirmed} onClick={() => void save(true)}>承認して有効にする</Button>}
+      {!editing && <Button variant="primary" disabled={busy || !canApprove || !confirmed || (v8 && !resolvedConfirmed)} onClick={() => void save(true)}>{v8 ? '保存して承認' : '承認して有効にする'}</Button>}
     </div>}>
     <div className={styles.editor}>
       {/* ★V7: 緑は「正常」だけ。説明の帯は枠なしの info の小さい帯にする。 */}
@@ -94,11 +103,19 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
       <label className={styles.field}><span>質問</span><TextArea className={styles.question} value={form.question} maxLength={1000} disabled={busy} onChange={e => change('question', e.target.value)} /></label>
       <label className={styles.field}><span>答え</span><TextArea className={styles.answer} value={form.answer} maxLength={12000} disabled={busy} onChange={e => change('answer', e.target.value)} /></label>
       {!form.answer.trim() && article.articleKind === 'answer_example' && <p data-design-node="aeEmptyAnswerNote" className={styles.emptyAnswerNote}>運営の回答がありません。答えを書いて承認できます</p>}
-      <label className={styles.field}><span>キーワード</span><TextField value={keywords} maxLength={480} disabled={busy} onChange={e => { setKeywords(e.target.value); setConfirmed(false) }} /></label>
+      <label className={styles.field}><span>キーワード</span><TextField value={keywords} maxLength={480} disabled={busy} onChange={e => { setKeywords(e.target.value); setConfirmed(false); setResolvedConfirmed(false) }} /></label>
       <label className={`${styles.field} ${styles.kind}`}><span>種類</span><Select aria-label="種類" options={KNOWLEDGE_KINDS} value={form.kind} disabled={busy} onChange={value => change('kind', value as OpsKnowledgeInput['kind'])} /></label>
       {!editing && <span data-design-node="xNNWI"><Checkbox checked={confirmed} disabled={busy || !eligible} onCheckedChange={setConfirmed}>{article.articleKind === 'verified'
         ? '解決策と結果を元のやり取りで確認しました'
         : '回答内容が正しいことを元のやり取りで確認しました'}</Checkbox></span>}
+      {v8 && !editing && (
+        <span>
+          <Checkbox checked={resolvedConfirmed} disabled={busy || !eligible} onCheckedChange={setResolvedConfirmed}>
+            {ticketLabel}が「解決」になっている
+          </Checkbox>
+          <span className={styles.resolveNote}>解決になっていないと、保存はできても承認は通りません。元のやり取りで確かめてください。</span>
+        </span>
+      )}
     </div>
   </Dialog>
 }

@@ -29,6 +29,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
  * 契約先アカウント詳細。★V6 37-4 `vhwld`。第 1 段は 概要／店舗／権限者／監査 のタブ。
@@ -62,6 +63,10 @@ function OpsTenantDetailContent() {
   const [error, setError] = useState('')
   const [statusDialog, setStatusDialog] = useState<StatusTarget | null>(null)
   const [busy, setBusy] = useState(false)
+  const theme = useAdminTheme()
+  const v8 = theme === 'v8'
+  // 代理ログインは影響の大きい操作。V8では始める前に確認の小窓を出す。
+  const [impersonateConfirm, setImpersonateConfirm] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) { setError('契約先が指定されていません'); return }
@@ -73,11 +78,13 @@ function OpsTenantDetailContent() {
   useEffect(() => { void load() }, [load])
 
   const impersonate = async () => {
-    if (!detail) return
+    if (!detail || busy) return
     setBusy(true)
+    // 二重押しの応答が戻るまで小窓は閉じない。失敗したら小窓の中で理由を出す。
     const res = await opsCall(api.ops.impersonation.start(detail.tenant.id))
     setBusy(false)
     if (!res.success) { setError(res.error || '代理ログインを始められませんでした'); return }
+    setImpersonateConfirm(false)
     window.location.assign('/hq')
   }
 
@@ -142,7 +149,7 @@ function OpsTenantDetailContent() {
         {tenantUseStatusChip(tenant.status)}
         {planStatusChip(tenant.plan_status)}
         <div className="flex-1" />
-        <Button onClick={() => void impersonate()} disabled={busy || tenant.status === 'archived'}>
+        <Button onClick={() => { if (v8) setImpersonateConfirm(true); else void impersonate() }} disabled={busy || tenant.status === 'archived'}>
           <Eye aria-hidden="true" className="h-4 w-4" />
           代理ログイン
         </Button>
@@ -288,6 +295,18 @@ function OpsTenantDetailContent() {
           tenantName={tenant.name}
           onClose={() => setStatusDialog(null)}
           onDone={() => { setStatusDialog(null); void load() }}
+        />
+      ) : null}
+      {v8 && impersonateConfirm ? (
+        <ConfirmDialog
+          open
+          title={`「${tenant.name}」に代理ログインする`}
+          description="閲覧のみで始まります。契約先のデータを扱います。操作はすべて記録されます。"
+          confirmLabel="代理ログインを始める"
+          busy={busy}
+          error={error || undefined}
+          onConfirm={() => void impersonate()}
+          onCancel={() => { if (!busy) setImpersonateConfirm(false) }}
         />
       ) : null}
     </div></ReadonlyDesignNode>
