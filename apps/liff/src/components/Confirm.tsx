@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { addMinutesHm, formatJpLong, jstStartsAtIso } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
+import { useWideViewport } from '../lib/use-wide-viewport.js';
 import Icon from './ui/Icon.js';
 import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
@@ -26,6 +27,8 @@ export default function Confirm({
   onBack: () => void;
   onSubmitted: () => void;
 }) {
+  // 414 幅の板（`uZqMA`）は板 ID だけを替える。中身は同じ。
+  const wide = useWideViewport();
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +62,7 @@ export default function Confirm({
   }
 
   return (
-    <div className="space-y-3.5" data-design-node="gLReL">
+    <div className="space-y-3.5" data-design-node={wide ? 'uZqMA' : 'gLReL'}>
       <h2 className="text-xl font-bold text-ink">内容を確かめてください</h2>
       <dl className="divide-y divide-liff-divider rounded-[14px] bg-canvas px-3.5 outline outline-1 -outline-offset-1 outline-liff-line">
         <Row label="メニュー" value={menu.name} />

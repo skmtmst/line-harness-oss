@@ -15,7 +15,9 @@ import Stepper from '@/components/shared/stepper'
 import TargetMissing from '@/components/shared/target-missing'
 import PageHeader from '@/components/shared/page-header'
 import { api, ApiError, type FriendAddRule } from '@/lib/api'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useAccount } from '@/contexts/account-context'
+import FriendAddDoneV8 from './done-v8'
 import {
   audienceText,
   blockedReason,
@@ -80,6 +82,7 @@ function routingVersionOf(rule: FriendAddRule): FriendAddRoutingVersion {
  */
 function FriendAddPublishInner() {
   const searchParams = useSearchParams()
+  const theme = useAdminTheme()
   const { selectedAccountId } = useAccount()
   // id が無いときは固定値で開かない。fixture の ID が無い環境で404・空画面になる。
   const ruleId = searchParams.get('id')
@@ -297,6 +300,21 @@ function FriendAddPublishInner() {
 
   /* 公開が返ってきたら完了の面（設計 `quhg6`）へ差し替える。 */
   if (published) return <PublishedView result={published} detail={ruleDetail} accountId={selectedAccountId ?? ''} />
+
+  /*
+   * ★V8：作る⑤の「有効にする」から来たとき（`?done=1`）は、読み直さず
+   * 公開したときの数で完了の面（板 `e0FD1J`）を出す。
+   */
+  if (searchParams.get('done') === '1' && theme === 'v8' && ruleDetail) {
+    return (
+      <FriendAddDoneV8
+        ruleName={ruleDetail.rule.name}
+        routeNames={ruleDetail.rule.routeNames}
+        priority={ruleDetail.rule.priority}
+        slackConnected={ruleDetail.staffNotification?.status === 'connected' ? true : ruleDetail.staffNotification?.status == null ? null : false}
+      />
+    )
+  }
 
   const blocked = blockedReason(validation)
   const ready = canPublish({ validation, busy })
