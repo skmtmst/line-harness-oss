@@ -287,6 +287,15 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'tiktok pnl sync',
+    classification: { kind: 'feature', featureId: 'external_integrations' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/tiktok-pnl.ts'],
+      markers: ["'external_integrations', 'tiktok pnl sync'"],
+    },
+  },
+  {
     name: 'media usage scan',
     classification: { kind: 'feature', featureId: 'media' },
     enforcement: {

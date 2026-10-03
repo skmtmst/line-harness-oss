@@ -177,6 +177,7 @@ import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
+import { tiktokPnl } from './routes/tiktok-pnl.js';
 import { runScheduledOperationHealthChecks } from './services/operations-health.js';
 import { observeOperationDispatcher } from './services/operation-dispatch-health.js';
 import { processOperationNotificationOutbox } from './services/operation-notifications.js';
@@ -596,6 +597,7 @@ app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);
 app.route('/', lineWebhookEvents);
 app.route('/', operations);
+app.route('/', tiktokPnl);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
@@ -1831,6 +1833,22 @@ async function runSixHourlyHeavyJobs(
         });
         if (result.imported + result.failed > 0) {
           console.log(JSON.stringify({ event: 'ad_cost_import', ...result }));
+        }
+      },
+    },
+    {
+      // TikTok利益計算: EC-CUBEの注文明細を取り込み、利益計算シートへ反映。
+      // 差分（sheet_dirty）だけ書くので6時間ごとの再実行は重くならない。
+      // 対象は tiktok_pnl_settings.enabled = 1 のアカウントだけ。管理画面の
+      // 手動同期を押すまで行ができないので、頼んでいないアカウントは動かない。
+      name: 'tiktok pnl sync',
+      run: async () => {
+        const { processTiktokPnlTick } = await import('./services/tiktok-pnl.js');
+        const result = await processTiktokPnlTick(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.createdSheets + result.importedOrders + result.wroteRows + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'tiktok_pnl_tick', ...result }));
         }
       },
     },
