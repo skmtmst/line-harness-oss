@@ -31,6 +31,7 @@ import {
   type SavedSearchUsageFilter,
 } from '@/components/friend-fields/saved-search-kpis'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
@@ -142,8 +143,14 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
       void load()
     } catch (reason) {
       setItems(previous)
-      setError(reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした')
+      const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
+      setError(message)
       setRetryOrder(next)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void applyOrder(next) },
+      })
     }
   }
 

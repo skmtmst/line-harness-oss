@@ -33,6 +33,7 @@ import {
   knownUsageCount,
 } from '@/components/friend-fields/field-list'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
+import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
@@ -164,8 +165,14 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
       await load()
     } catch (reason) {
       setItems(previous)
-      setActionError(reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした')
+      const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
+      setActionError(message)
       setRetryOrder(next)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void applyOrder(next) },
+      })
     }
   }
 
