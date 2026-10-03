@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
@@ -35,6 +37,7 @@ export default function HealthTab({
   onKpis: (kpis: NenHealthKpis) => void
   onOpenSummary: (petId: string) => void
 }) {
+  const theme = useAdminTheme()
   const [status, setStatus] = useState<ListStatus>('loading')
   const [data, setData] = useState<NenHealthListData | null>(null)
   const [draft, setDraft] = useState('')
@@ -133,7 +136,47 @@ export default function HealthTab({
 
       <section data-design="Table" data-design-node="health-table">
         {status === 'loading' && !data ? (
-          <ListState kind="loading" title="健康日記を読み込んでいます" />
+          theme === 'v8' ? (
+            <div aria-busy="true" aria-label="健康日記を読み込んでいます">
+              <DelayedSkeleton
+                loading
+                skeleton={(
+                  <div aria-hidden="true">
+                    <DataTable className="@container">
+                      <thead>
+                        <TableHeadRow>
+                          <Th className="w-56">ペット</Th>
+                          <Th className="w-36">飼い主</Th>
+                          <Th className="w-24">最終記録</Th>
+                          <Th className="w-24" align="right">30日の記録</Th>
+                          <Th className="w-40">体重の推移（8週）</Th>
+                          <Th className="w-36">便・食いつき</Th>
+                          <Th>気になる変化</Th>
+                          <Th className="w-28" align="right"><span className="sr-only">操作</span></Th>
+                        </TableHeadRow>
+                      </thead>
+                      <tbody>
+                        {[0, 1, 2, 3, 4].map((row) => (
+                          <Tr key={row}>
+                            <Td><Skeleton width="10ch" height="1em" /></Td>
+                            <Td><Skeleton width="8ch" height="1em" /></Td>
+                            <Td><Skeleton width="8ch" height="1em" /></Td>
+                            <Td><Skeleton width="6ch" height="1em" /></Td>
+                            <Td><Skeleton width="14ch" height="1em" /></Td>
+                            <Td><Skeleton width="8ch" height="1em" /></Td>
+                            <Td><Skeleton width="12ch" height="1em" /></Td>
+                            <Td><Skeleton width="6ch" height="1em" /></Td>
+                          </Tr>
+                        ))}
+                      </tbody>
+                    </DataTable>
+                  </div>
+                )}
+              />
+            </div>
+          ) : (
+            <ListState kind="loading" title="健康日記を読み込んでいます" />
+          )
         ) : status === 'forbidden' ? (
           <ListState kind="forbidden" />
         ) : status === 'error' ? (
