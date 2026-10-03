@@ -7,6 +7,7 @@ const ROOT = join(process.cwd(), 'src', 'app', 'booking', 'menus')
 const LIST = readFileSync(join(ROOT, 'page.tsx'), 'utf8')
 const CREATE = readFileSync(join(ROOT, 'new', 'page.tsx'), 'utf8')
 const SETTINGS_V8 = readFileSync(join(ROOT, 'settings-v8.tsx'), 'utf8')
+const SETTINGS_CSS = readFileSync(join(ROOT, 'settings-v8.module.css'), 'utf8')
 
 describe('V6 予約設定', () => {
   it('V6の一覧・状態・作成画面を実ノードへ結び付ける', () => {
@@ -146,6 +147,11 @@ describe('V6 予約設定', () => {
     expect(SETTINGS_V8).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
     expect(SETTINGS_V8).toContain('<Button variant="primary" disabled')
     expect(SETTINGS_V8).toContain("tab === 'menus' && !canEditMenus ? 'C9fv7A'")
+  })
+
+  it('P6EdLW: 1152ではメニュー表の担当・30日を畳む', () => {
+    expect(SETTINGS_CSS).toContain('@container (max-width: 1080px)')
+    expect(SETTINGS_CSS).toMatch(/\.colStaff,\s*\.colCount\s*\{\s*display:\s*none/)
   })
 })
 

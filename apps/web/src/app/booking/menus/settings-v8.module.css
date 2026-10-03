@@ -116,6 +116,13 @@
     padding: 16px;
   }
 
+  /* 板 P6EdLW（1152）：メニューの表は「担当」「30日」を畳み、
+     メニュー・時間・金額・状態だけにする。 */
+  .colStaff,
+  .colCount {
+    display: none;
+  }
+
   .sidePhone {
     display: none;
   }
