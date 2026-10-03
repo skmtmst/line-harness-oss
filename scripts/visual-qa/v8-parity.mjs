@@ -101,6 +101,8 @@ export const MEASURE_SCRIPT = `() => {
   for (const el of all) {
     if (!visible(el)) continue
     if (el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0) {
+      // 省略（…）は決まりどおり。はみ出しに数えない。
+      if (getComputedStyle(el).textOverflow === 'ellipsis') continue
       overflows.push({ path: path(el), clientWidth: el.clientWidth, scrollWidth: el.scrollWidth })
       if (overflows.length >= 50) break
     }
@@ -113,10 +115,18 @@ export const MEASURE_SCRIPT = `() => {
       if (viewportOverflows.length >= 50) break
     }
   }
-  // 単語の途中の改行：空白なしの短い文字が2行になっている。
+  // 単語の途中の改行：空白なしの短い文字が2行以上になっている。
+  // 行数は Range の四角の数で数える（高さ比べは余白で誤検知する）。
   const midWordBreaks = []
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+  const range = document.createRange()
   const seen = new Set()
+  const isCounted = (el) => {
+    if (!el || el === document.body) return true
+    // 見えない・v7だけ・読み飛ばしは数えない。
+    if (el.closest('.v7-only, [class*="skipLink"], a[href^="#"]')) return false
+    return getComputedStyle(el).display !== 'none'
+  }
   while (walker.nextNode()) {
     const node = walker.currentNode
     const text = (node.nodeValue || '').trim()
@@ -124,13 +134,15 @@ export const MEASURE_SCRIPT = `() => {
     const parent = node.parentElement
     if (!parent || seen.has(parent) || !visible(parent)) continue
     seen.add(parent)
-    const style = getComputedStyle(parent)
-    const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.4
-    if (parent.scrollHeight > lineHeight * 1.5 + 2) {
-      midWordBreaks.push({ path: path(parent), text: text.slice(0, 24), height: parent.scrollHeight, lineHeight: Math.round(lineHeight) })
+    if (!isCounted(parent)) continue
+    range.selectNodeContents(node)
+    const lines = range.getClientRects().length
+    if (lines > 1) {
+      midWordBreaks.push({ path: path(parent), text: text.slice(0, 24), lines })
       if (midWordBreaks.length >= 30) break
     }
   }
+  if (range.detach) range.detach()
   // 表の列のずれ：同じ表の行で列の左端が揃わない。
   const tableMisalignments = []
   for (const table of document.querySelectorAll('table')) {
@@ -192,6 +204,17 @@ export function refTexts(html) {
 }
 
 export const normalize = (text) => text.replace(/\s+/g, ' ').trim()
+
+/**
+ * 状態を開けない板（ダイアログ・確認・引き出し）。
+ * 元の画面を撮るだけではその状態が出ないので、drift の順位に入れず
+ * 別の表に分ける。種別 `小窓`か、名前で見分ける。
+ */
+export function isNoStateBoard(entry) {
+  if (!entry) return false
+  if (entry.kind === '小窓') return true
+  return /ダイアログ|確認|引き出し|ドロワー|小窓|確かめ|Dialog|Drawer|Confirm/i.test(entry.name ?? '')
+}
 
 /**
  * MEASURE_SCRIPT を呼ぶ形。`page.evaluate(文字列)` は文字列を式として

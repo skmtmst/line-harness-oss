@@ -5,6 +5,9 @@
  *    だけで呼ばれない。呼ばないまま渡すと関数の値が返って `measured`
  *    が `undefined` になる。呼ぶ形（MEASURE_CALL）で渡す。
  * 2. compareAndWrite は `measured` が無いときも落とさない。
+ * 3. 途中改行は Range の行数で数え、見えない・v7だけ・読み飛ばしは
+ *    除く。省略（…）ははみ出しに数えない。
+ * 4. 状態を開けない板（ダイアログ・確認・引き出し）は順位に入れない。
  */
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -12,7 +15,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
-import { MEASURE_CALL, MEASURE_SCRIPT, compareAndWrite } from './v8-parity.mjs'
+import { MEASURE_CALL, MEASURE_SCRIPT, compareAndWrite, isNoStateBoard } from './v8-parity.mjs'
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { encodePng } from './v8-png.mjs'
 
@@ -56,6 +59,21 @@ describe('v8-parity の測り', () => {
   it('page.evaluate へは呼ぶ形で渡す', () => {
     expect(MEASURE_CALL).toBe(`(${MEASURE_SCRIPT})()`)
   })
+
+  it('途中改行は高さ比べでなく行数で数える', () => {
+    expect(MEASURE_SCRIPT).toContain('getClientRects')
+    expect(MEASURE_SCRIPT).not.toContain('lineHeight')
+  })
+
+  it('見えない・v7だけ・読み飛ばしは数えない', () => {
+    expect(MEASURE_SCRIPT).toContain('.v7-only')
+    expect(MEASURE_SCRIPT).toContain('skipLink')
+    expect(MEASURE_SCRIPT).toContain('display')
+  })
+
+  it('省略（…）ははみ出しに数えない', () => {
+    expect(MEASURE_SCRIPT).toContain("textOverflow === 'ellipsis'")
+  })
 })
 
 describe('compareAndWrite は measured が無くても落ちない', () => {
@@ -84,5 +102,23 @@ describe('compareAndWrite は measured が無くても落ちない', () => {
     expect(metrics.keyElements).toBe(1)
     // 同じ絵同士で画素の差は 0。はみ出し10点＋書体2点だけ。
     expect(metrics.drift).toBe(12)
+  })
+})
+
+describe('状態を開けない板は順位に入れない', () => {
+  it('小窓は種別で分ける', () => {
+    expect(isNoStateBoard({ kind: '小窓', name: 'テンプレート 削除（使っていない） V8' })).toBe(true)
+  })
+
+  it('ダイアログ・確認・引き出しは名前で分ける', () => {
+    expect(isNoStateBoard({ kind: '画面', name: 'リマインダ 一時停止ダイアログ V8' })).toBe(true)
+    expect(isNoStateBoard({ kind: '画面', name: 'LIFF 予約 ⑤ 確認' })).toBe(true)
+    expect(isNoStateBoard({ kind: null, name: 'NEN配信 誕生日クーポンの決めごと（引き出し）V8' })).toBe(true)
+  })
+
+  it('ふつうの画面は順位に残す', () => {
+    expect(isNoStateBoard({ kind: '画面', name: '友だち一覧' })).toBe(false)
+    expect(isNoStateBoard({ kind: '画面', name: '' })).toBe(false)
+    expect(isNoStateBoard(null)).toBe(false)
   })
 })
