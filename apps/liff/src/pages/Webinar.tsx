@@ -393,13 +393,13 @@ export default function Webinar() {
     <div className="flex h-screen flex-col bg-night text-white" data-design-node="RpW2h">
       <div className="relative">
         <video ref={videoRef} className="w-full" playsInline />
-        <span className="absolute top-2 left-2 rounded bg-liff-sun px-2 py-0.5 text-xs font-bold text-white">
+        <span className="absolute top-2 left-2 rounded bg-liff-sun px-2 py-0.5 text-[11px] font-bold text-white">
           ● ライブ
         </span>
         {needsTap && (
           <button
             type="button"
-            className="absolute right-2 bottom-2 inline-flex min-h-11 items-center gap-1 rounded-full bg-night-soft px-3 text-xs font-bold text-white"
+            className="absolute right-2 bottom-2 inline-flex min-h-11 items-center gap-1 rounded-full bg-night-soft px-3 text-xs font-semibold text-white"
             onClick={() => {
               const v = videoRef.current;
               if (v) {
@@ -421,13 +421,13 @@ export default function Webinar() {
         </h1>
       </div>
 
-      <div ref={chatBoxRef} className="flex-1 overflow-y-auto p-3 text-sm">
+      <div ref={chatBoxRef} className="flex-1 overflow-y-auto p-3 text-[13px]">
         {chat.map((item) => (
           <div key={item.key} className="mb-2">
             <span className={item.mine ? 'font-bold text-night-mine' : 'font-bold text-night-name'}>
               {item.authorName}
             </span>{' '}
-            <span className="text-white">{item.body}</span>
+            <span className="text-night-body">{item.body}</span>
           </div>
         ))}
       </div>
@@ -436,7 +436,7 @@ export default function Webinar() {
         <button
           type="button"
           onClick={clickCta}
-          className="mx-3 mb-2 flex items-center justify-center gap-2 rounded-lg bg-accent-deep py-3 text-center text-sm font-bold text-white"
+          className="mx-3 mb-2 flex items-center justify-center gap-2 rounded-lg bg-accent-deep py-3 text-center text-[15px] font-bold text-white"
         >
           <Icon name="send" className="h-4 w-4" />
           {state.cta.label}
@@ -453,7 +453,7 @@ export default function Webinar() {
           placeholder="コメントを書く"
           maxLength={500}
           aria-label="コメントを書く"
-          className="min-h-11 flex-1 rounded-full bg-night-soft px-4 text-sm text-white placeholder-night-faint"
+          className="min-h-11 flex-1 rounded-full bg-night-soft px-4 text-[13px] text-white placeholder-night-dim"
         />
         <button
           type="button"
