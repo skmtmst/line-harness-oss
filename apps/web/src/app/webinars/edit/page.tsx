@@ -1,6 +1,7 @@
 'use client'
 
 import Disclosure from '@/components/shared/disclosure'
+import CommentsV8 from './comments-v8'
 import CtaV8 from './cta-v8'
 import ReviewV8 from './review-v8'
 import NotificationsV8 from './notifications-v8'
@@ -2728,7 +2729,15 @@ function EditWebinarInner() {
       )}
       {visitedPanes.has('comments') ? (
         <div hidden={pane !== 'comments'}>
-          <CommentsTab webinarId={webinar.id} />
+          {/*
+            ★V8 切替（コメント演出 `Omqd4`）。v7 の見た目は
+            data-theme="v8" が付くまで 1画素も変えない。
+          */}
+          {adminTheme === 'v8' ? (
+            <CommentsV8 webinarId={webinar.id} />
+          ) : (
+            <CommentsTab webinarId={webinar.id} />
+          )}
         </div>
       ) : null}
       {visitedPanes.has('actions') ? (

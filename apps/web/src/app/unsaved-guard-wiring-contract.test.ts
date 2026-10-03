@@ -100,6 +100,7 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'app/templates/questions/question-v8.tsx': 'app/templates/editor-v8.tsx',
   'components/webinars/webinar-form.tsx': 'app/webinars/edit/page.tsx',
   'components/webinars/webinar-notifications.tsx': 'app/webinars/edit/page.tsx',
+  'app/webinars/edit/comments-v8.tsx': 'app/webinars/edit/page.tsx',
   'app/webinars/edit/video-v8.tsx': 'app/webinars/edit/page.tsx',
   'app/webinars/edit/cta-v8.tsx': 'app/webinars/edit/page.tsx',
   'app/webinars/edit/notifications-v8.tsx': 'app/webinars/edit/page.tsx',
