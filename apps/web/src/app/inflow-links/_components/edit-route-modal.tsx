@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
-import { api, describeSaveFailure } from '@/lib/api'
+import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
@@ -110,6 +110,42 @@ export default function EditRouteModal({
   const [submitting, setSubmitting] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
   const [error, setError] = useState('')
+  /*
+   * 同時編集の見分け（板 E14GFm）。編集の PATCH は開いたときの更新日時を
+   * 送る。ほかの人が先に保存していたら409になり、今の中身で帯を出して
+   * 比べ直す。上書きはしない。送らなければ今までどおり通す。
+   */
+  const [baseline, setBaseline] = useState<string | null>(route?.updatedAt ?? null)
+  const [conflictLatest, setConflictLatest] = useState<EntryRoute | null>(null)
+  const [comparing, setComparing] = useState(false)
+  const [takenIn, setTakenIn] = useState(false)
+
+  /** 409 の data.latest を取り出す。形が違えば null（従来の失敗扱い）。 */
+  function readConflictLatest(err: unknown): EntryRoute | null {
+    if (!(err instanceof ApiError) || err.status !== 409) return null
+    const data = err.data as { latest?: unknown } | null | undefined
+    const latest = data?.latest as Record<string, unknown> | null | undefined
+    if (!latest || typeof latest !== 'object' || typeof latest.name !== 'string') return null
+    return latest as unknown as EntryRoute
+  }
+
+  /*
+   * 日時を「10/2 14:02」の形にする。口が返すのは JST の壁時計なので、
+   * 文字列から直接抜く（Date に通すと実行環境の時差でずれる）。
+   * 読めなければ空文字。
+   */
+  function formatSavedAt(value: string | null | undefined): string {
+    const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(value ?? '')
+    if (!m) return ''
+    return `${Number(m[2])}/${Number(m[3])} ${m[4]}:${m[5]}`
+  }
+
+  /** 最新を取り込んで直す。相手の保存を基準にし、入力（下書き）は残す。 */
+  function takeInLatest() {
+    if (!conflictLatest) return
+    if (typeof conflictLatest.updatedAt === 'string') setBaseline(conflictLatest.updatedAt)
+    setTakenIn(true)
+  }
 
   const validateBeforeSave = () => {
     const nothingDelivers =
@@ -134,10 +170,20 @@ export default function EditRouteModal({
       }
       const res = isNew
         ? await api.entryRoutes.create({ ...form, lineAccountId: accountId ?? null })
-        : await api.entryRoutes.update(route!.id, form)
-      if (res.success) onSaved(res.data, isNew)
-      else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+        : await api.entryRoutes.update(route!.id, { ...form, expectedUpdatedAt: baseline ?? undefined })
+      if (res.success) {
+        if (!isNew && typeof res.data.updatedAt === 'string') setBaseline(res.data.updatedAt)
+        onSaved(res.data, isNew)
+      } else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } catch (err) {
+      // 409 は同時編集。帯で今の中身を見せ、入力（下書き）は残す。
+      const latest = readConflictLatest(err)
+      if (latest) {
+        setConflictLatest(latest)
+        setComparing(false)
+        setTakenIn(false)
+        return
+      }
       // 400系はAPIの理由、403・5xxは運用の言葉へ写す（WRITE-01）。
       setError(describeSaveFailure(err))
     } finally {
@@ -168,6 +214,11 @@ export default function EditRouteModal({
           <Button onClick={onClose} disabled={submitting}>
             キャンセル
           </Button>
+          {!isNew && conflictLatest && !takenIn ? (
+            <Button onClick={takeInLatest} disabled={submitting}>
+              最新を取り込んで直す
+            </Button>
+          ) : null}
           <Button
             variant="primary"
             onClick={onSubmit}
@@ -178,6 +229,47 @@ export default function EditRouteModal({
       }
     >
       <div className="space-y-3">
+        {!isNew && conflictLatest ? (
+          <Notice tone="warn" data-design-part="edit-conflict-band">
+            {takenIn ? (
+              <p className="font-semibold">
+                最新の内容を取り込みました。あなたの入力は下書きのまま残っています。
+                保存し直すと、その日時で比べます。
+              </p>
+            ) : (
+              <p className="font-semibold">
+                {formatSavedAt(conflictLatest.updatedAt)
+                  ? `ほかの人が${formatSavedAt(conflictLatest.updatedAt)}にこの流入リンクを保存しました。`
+                  : 'ほかの人がこの流入リンクを保存しました。'}
+                このまま保存すると、その人の変更が消えます。
+              </p>
+            )}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={() => setComparing((v) => !v)}
+                aria-expanded={comparing}
+              >
+                {comparing ? '比べを閉じる' : '違いを比べる'}
+              </Button>
+              {!takenIn ? (
+                <Button type="button" onClick={takeInLatest} disabled={submitting}>
+                  最新を取り込んで直す
+                </Button>
+              ) : null}
+            </div>
+            {comparing ? (
+              <RouteConflictCompare
+                latest={conflictLatest}
+                draft={form}
+                tags={tags}
+                scenarios={scenarios}
+                templates={templates}
+                pools={pools}
+              />
+            ) : null}
+          </Notice>
+        ) : null}
         <Field label="フォルダ（任意）">
           <input
             list={genreLocked ? undefined : 'referral-genre-options'}
@@ -316,6 +408,73 @@ export default function EditRouteModal({
         )}
       </div>
     </Dialog>
+  )
+}
+
+/*
+ * 同時編集の比べ（板 E14GFm）。違う項目だけを「自分の変更（下書き）」と
+ * 「今の保存内容」で並べる。上書きはしない。
+ * この窓だけの部品（共通部品は変えない）。
+ */
+function RouteConflictCompare({
+  latest,
+  draft,
+  tags,
+  scenarios,
+  templates,
+  pools,
+}: {
+  latest: EntryRoute
+  draft: CreateEntryRouteInput
+  tags: Tag[]
+  scenarios: Scenario[]
+  templates: MessageTemplate[]
+  pools: TrafficPool[]
+}) {
+  const nameOf = (list: Array<{ id: string; name: string }>, id: string | null | undefined): string => {
+    if (id === null || id === undefined || id === '') return '未設定'
+    return list.find((item) => item.id === id)?.name ?? '未設定'
+  }
+  const rows: Array<{ label: string; mine: string; theirs: string }> = [
+    { label: '名前', mine: draft.name.trim() || '—', theirs: latest.name },
+    { label: 'フォルダ', mine: draft.genre?.trim() || '未分類', theirs: latest.genre?.trim() || '未分類' },
+    { label: '自動付与タグ', mine: nameOf(tags, draft.tagId), theirs: nameOf(tags, latest.tagId) },
+    { label: '起動シナリオ', mine: nameOf(scenarios, draft.scenarioId), theirs: nameOf(scenarios, latest.scenarioId) },
+    { label: '即時 push テンプレ', mine: nameOf(templates, draft.introTemplateId), theirs: nameOf(templates, latest.introTemplateId) },
+    { label: '送り先 Pool', mine: nameOf(pools, draft.poolId), theirs: nameOf(pools, latest.poolId) },
+    { label: '行き先 URL', mine: draft.redirectUrl?.trim() || '未設定', theirs: latest.redirectUrl?.trim() || '未設定' },
+    { label: '公開', mine: draft.isActive ? 'する' : 'しない', theirs: latest.isActive ? 'する' : 'しない' },
+  ].filter((row) => row.mine !== row.theirs)
+  return (
+    <div className="mt-2">
+      <p>
+        同じ流入リンクの、違う項目だけ並べています。
+        上書きはできません。「最新を取り込んで直す」を選ぶと、相手の保存を取り込み、
+        あなたの変更は下書きに残したまま直せます。
+      </p>
+      {rows.length === 0 ? (
+        <p className="mt-1">内容に違いはありません。最新の日時で保存し直せます。</p>
+      ) : (
+        <table className="mt-2 w-full table-fixed text-xs" data-design-part="edit-conflict-compare">
+          <thead>
+            <tr className="text-left text-ink-secondary">
+              <th className="w-28 py-1 pr-2 font-medium">項目</th>
+              <th className="py-1 pr-2 font-medium">自分の変更（下書き）</th>
+              <th className="py-1 font-medium">今の保存内容</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-hairline">
+            {rows.map((row) => (
+              <tr key={row.label}>
+                <th scope="row" className="py-1 pr-2 text-left font-medium text-ink-secondary">{row.label}</th>
+                <td className="truncate py-1 pr-2" title={row.mine}>{row.mine}</td>
+                <td className="truncate py-1" title={row.theirs}>{row.theirs}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
   )
 }
 

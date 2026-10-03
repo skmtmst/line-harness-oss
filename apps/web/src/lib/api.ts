@@ -13092,7 +13092,13 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Partial<CreateEntryRouteInput>) =>
+    update: (
+      id: string,
+      data: Partial<CreateEntryRouteInput> & {
+        /** 同時編集の見分け用。読んだときの更新日時。違えば409になる */
+        expectedUpdatedAt?: string | null
+      },
+    ) =>
       fetchApi<ApiResponse<EntryRoute>>(`/api/entry-routes/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
