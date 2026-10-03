@@ -160,7 +160,7 @@ export default function NewWebinarPage() {
                   id="webinar-title"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  placeholder="NEN活用スタートセミナー"
+                  placeholder="はじめての定期便セミナー"
                   className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                 />
               </div>

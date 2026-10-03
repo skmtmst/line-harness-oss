@@ -259,7 +259,7 @@ export const FRIEND_ATTRIBUTES_QA_GROUPS: TagGroup[] = [
 export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
   ['EC顧客連携済み', 'qa-purchase', 5, 10, 0, 12000],
   ['LINEログイン連携済み', 'qa-member', 5, 0, 0, null],
-  ['NEN会員', 'qa-member', 5, 10, 5, 15000],
+  ['定期便会員', 'qa-member', 5, 10, 5, 15000],
   ['商品到着確認対象', 'qa-purchase', 3, 1, 0, null],
   ['未契約', '', 3, 0, 0, null],
   ['誕生日クーポン対象', 'qa-vip', 0, 20, 0, null],

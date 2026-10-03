@@ -23,7 +23,7 @@ const TEMPLATE_OPTIONS: ComboboxOption[] = [
 ]
 
 const TAG_OPTIONS: MultiSelectOption[] = [
-  { value: 'nen', label: 'NEN会員', dot: 'green' },
+  { value: 'nen', label: '定期便会員', dot: 'green' },
   { value: 'regular', label: '定期便', dot: 'blue' },
   { value: 'proposal', label: '定期便提案対象', dot: 'amber' },
   { value: 'cancel', label: '定期便解約', dot: 'gray' },
