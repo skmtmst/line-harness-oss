@@ -26,7 +26,7 @@ const LIST_DESCRIPTIONS: Record<TemplateType, string> = {
   form: '回答フォームのひな形を作成し、各LINEアカウントへ配布します。',
 }
 const MODES: Record<DistributionMode, string> = { create: '新規作成', overwrite: '上書き', alias: '別名で作成' }
-const NODES = { list: 'rsyjI', edit: 'ZsLly', accounts: 'meBRB', duplicates: 'meBRB', result: 'FxHyL' }
+const NODES = { list: 'rsyjI', edit: 'X4JcOf', accounts: 'meBRB', duplicates: 'meBRB', result: 'FxHyL' }
 type Stage = keyof typeof NODES
 const STEPS: readonly { stage: Stage; label: string }[] = [
   { stage: 'list', label: '一覧' },
