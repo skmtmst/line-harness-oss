@@ -11,7 +11,7 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, Copy, Download, MoreHorizontal, Trash2 } from 'lucide-react'
+import { Check, Copy, Download, MoreHorizontal, RefreshCw, Trash2 } from 'lucide-react'
 import {
   api,
   type ApiBroadcast,
@@ -91,6 +91,12 @@ export interface BroadcastDetailV8Props {
   onExportCsv: () => void
   /** 集計の取り直し・状態の読み直し（reloadToken を進める）。 */
   onReload: () => void
+  /**
+   * ★V8 `Q28Gb`：ほかの人が更新したときだけ true。この画面は書き換えず、
+   * 帯で知らせて読み直しだけ受け付ける。名前・時刻は API に無いので出さない。
+   */
+  conflict?: boolean
+  onConflictReload?: () => void
   /** 閲覧のみ（夕18）：変える操作は押せない形にする。 */
   canEdit: boolean
   contentRef: React.RefObject<HTMLElement | null>
@@ -128,6 +134,8 @@ export default function BroadcastDetailV8({
   canEdit,
   contentRef,
   approval,
+  conflict = false,
+  onConflictReload,
 }: BroadcastDetailV8Props) {
   const router = useRouter()
   const { status: displayStatus, label: statusLabel } = displayStatusOf(broadcast)
@@ -281,6 +289,21 @@ export default function BroadcastDetailV8({
           )}
         </div>
       </header>
+
+      {conflict && (
+        <div className={styles.conflictBar} data-design-node="Q28Gb" role="alert">
+          <div>
+            <p className={styles.conflictTitle}>ほかの人がこの配信を更新しました</p>
+            <p className={styles.conflictBody}>
+              この画面は古い内容です。読み直すと最新の設定と見本が出ます（この画面では書き換えません）。
+            </p>
+          </div>
+          <Button size="field" variant="primary" onClick={onConflictReload}>
+            <RefreshCw size={14} aria-hidden="true" />
+            読み直す
+          </Button>
+        </div>
+      )}
 
       <Tabs
         label="配信の詳細"

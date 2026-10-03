@@ -32,6 +32,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { loadFailureKind } from './load-failure-kind'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 
@@ -436,6 +437,9 @@ function SupportMarkBadge({ status }: { status?: 'unread' | 'in_progress' | 'on_
 
 function FriendDetailInner() {
   usePageTitle('友だち詳細')
+  // ★V8 `Q5F2QE`：情報欄タブだけ2列・板ID。v7 はそのまま。
+  const adminTheme = useAdminTheme()
+  const v8 = adminTheme === 'v8'
   const params = useSearchParams()
   const friendId = params.get('id') ?? ''
   const rawTab = params.get('tab')
@@ -919,9 +923,23 @@ function FriendDetailInner() {
     if (!el) return
     const check = () => setTabsOverflowing(el.scrollWidth > el.clientWidth + 1)
     check()
+    /*
+     * ResizeObserver は「帯そのものの箱」が変わったときだけ動く。あとから
+     * 届いた本文フォントで中のタブ名だけが広がった場合は動かないため、
+     * 実際にはみ出しているのにフェードが出ないまま残る。読み込みが終わった
+     * 時点でもう一度測る（CI の画面見張りで、同じコードなのに撮る順で
+     * フェードの有無が変わる差分として出ていた）。
+     */
     const ro = new ResizeObserver(check)
     ro.observe(el)
-    return () => ro.disconnect()
+    let done = false
+    void document.fonts?.ready.then(() => {
+      if (!done) check()
+    })
+    return () => {
+      done = true
+      ro.disconnect()
+    }
   }, [visibleTabs.length])
 
   // PERF-13: フォーム回答も「回答フォーム」タブを開いたときにだけ取る。
@@ -1999,7 +2017,7 @@ function FriendDetailInner() {
 
             {tab === 'info' && !fieldsEnabled && <FeatureDisabledScreen featureId="friend_fields" />}
             {tab === 'info' && fieldsEnabled && (
-              <div className="bg-canvas rounded-card border-hairline border p-5">
+              <div className="bg-canvas rounded-card border-hairline border p-5" data-design-node={v8 ? 'Q5F2QE' : undefined}>
                 {/* 情報欄は独立して読み込む。取り損ねは0件と区別して再試行口を出す。 */}
                 {fieldsStatus === 'loading' || fieldsStatus === 'idle' ? (
                   <p className="text-ink-faint py-6 text-center text-sm">情報欄を読み込んでいます…</p>
@@ -2083,11 +2101,13 @@ function FriendDetailInner() {
                   </div>
                 ) : (
                   <>
+                    {/* ★V8 `Q5F2QE`：項目は2列に並べる。v7 は縦1列のまま。 */}
+                    <div className={v8 ? 'mb-4 grid gap-x-4 gap-y-4 sm:grid-cols-2' : undefined}>
                     {[...groupStarred, ...rest].map((field) => {
                       // FRIEND-22: 項目名ラベルと入力欄を結び付ける一意ID。
                       const inputId = `ff-${field.id}`
                       return (
-                      <div key={field.id} className="mb-4">
+                      <div key={field.id} className={v8 ? 'min-w-0' : 'mb-4'}>
                         <label htmlFor={inputId} id={`${inputId}-label`} className="text-ink-secondary mb-1 block text-sm font-medium">
                           {field.isStarred && <span className="text-warning mr-1">★</span>}
                           {field.name}
@@ -2116,6 +2136,7 @@ function FriendDetailInner() {
                       </div>
                       )
                     })}
+                    </div>
 
                     {hiddenPersonalCount > 0 && (
                       <p className="text-ink-faint bg-canvas-sunken rounded-control mb-4 px-3 py-2 text-xs">
