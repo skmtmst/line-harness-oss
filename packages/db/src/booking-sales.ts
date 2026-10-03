@@ -301,10 +301,20 @@ export interface SalesSummaryWeekday {
   revenue: number;
 }
 
+export interface SalesSummaryTotal {
+  bookings: number;
+  confirmed: number;
+  revenue: number;
+  cancelRate: number;
+  noshowRate: number;
+  cancelled: number;
+  noshow: number;
+}
+
 export interface SalesSummary {
   from: string;
   to: string;
-  total: { bookings: number; confirmed: number; revenue: number; cancelRate: number; noshowRate: number };
+  total: SalesSummaryTotal;
   menus: SalesSummaryMenu[];
   weekdays: SalesSummaryWeekday[];
   /** 直前の同じ長さの期間（「先月より」の表示用）。 */
@@ -373,7 +383,7 @@ function summarizeRows(
   rows: SalesRow[],
   paidRevenues?: PaidRevenue[],
 ): {
-  total: { bookings: number; confirmed: number; revenue: number; cancelRate: number; noshowRate: number };
+  total: SalesSummaryTotal;
   menus: SalesSummaryMenu[];
   weekdays: SalesSummaryWeekday[];
 } {
@@ -442,6 +452,7 @@ function summarizeRows(
     total: {
       bookings, confirmed, revenue,
       cancelRate: rate(cancelled), noshowRate: rate(noshow),
+      cancelled, noshow,
     },
     menus: [...byMenu.values()].map((menu) => ({
       menu_id: menu.menu_id,

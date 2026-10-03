@@ -86,7 +86,7 @@ describe('7 予約からの売上', () => {
     expect(response.status).toBe(200);
     const json = await response.json() as {
       data: {
-        total: { bookings: number; confirmed: number; revenue: number; cancelRate: number; noshowRate: number };
+        total: { bookings: number; confirmed: number; revenue: number; cancelRate: number; noshowRate: number; cancelled: number; noshow: number };
         menus: Array<{ menu_id: string; bookings: number; confirmed: number; revenue: number; cancelRate: number; noshowRate: number }>;
         weekdays: Array<{ weekday: number; bookings: number }>;
         revenueSource: string;
@@ -95,6 +95,7 @@ describe('7 予約からの売上', () => {
     };
     expect(json.data.total).toEqual({
       bookings: 4, confirmed: 2, revenue: 16000, cancelRate: 0.25, noshowRate: 0.25,
+      cancelled: 1, noshow: 1,
     });
     expect(json.data.menus).toHaveLength(1);
     expect(json.data.menus[0]).toMatchObject({ menu_id: 'menu-a', bookings: 4, confirmed: 2, revenue: 16000 });
