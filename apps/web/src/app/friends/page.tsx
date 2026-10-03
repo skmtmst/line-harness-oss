@@ -32,6 +32,8 @@ import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { FRIENDS_MERGED_TABS } from './friends-tabs'
 import { FriendsListHeadV8 } from './friends-nav-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { notifyToast } from '@/components/shared/toast'
 import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
 import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
@@ -68,6 +70,8 @@ function FriendsPageInner({
   onExportReady: (exporter: (() => void) | null) => void
 }) {
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  /* サクサク感 B は V8 のときだけ。v7 は動きも今のままにする。 */
+  const isV8Theme = useAdminTheme() === 'v8'
   /*
     保存した検索・対応マークは任意機能。オフのaccountではAPIを呼ばず、
     入口も出さない（呼ぶと 403 で画面全体が共通ゲートへ切り替わる）。
@@ -484,14 +488,57 @@ function FriendsPageInner({
     [exportCurrentPage, loadStatus, onExportReady],
   )
 
-  const toggleAttention = useCallback(async (friend: FriendListItem) => {
+  /*
+   * 注目（星）は V8 のときだけ先に画面を変えて裏で保存する（サクサク感 B）。
+   * 成功したら Toast の「元に戻す」（同じ口で戻せる）で取り消せる。
+   * 失敗したら戻して Toast で理由と「もう一度」。v7 は今のまま。
+   */
+  const toggleAttention = useCallback(async (friend: FriendListItem, options?: { silent?: boolean }) => {
     const current = String(friend.metadata?.__attention ?? '') === '1'
-    try {
+    const save = () => fetchApi<{ success: boolean; data: unknown }>(
       // N-040(#808): 読んだ改訂値を付けて送り、競合は上書きしない。
-      await fetchApi<{ success: boolean; data: unknown }>(
-        `/api/friends/${friend.id}/metadata?expectedUpdatedAt=${encodeURIComponent(friend.updatedAt)}`,
-        { method: 'PUT', body: JSON.stringify({ __attention: current ? null : '1' }) },
-      )
+      `/api/friends/${friend.id}/metadata?expectedUpdatedAt=${encodeURIComponent(friend.updatedAt)}`,
+      { method: 'PUT', body: JSON.stringify({ __attention: current ? null : '1' }) },
+    )
+    if (isV8Theme) {
+      setFriends((list) => list.map((item) => (
+        item.id === friend.id
+          ? { ...item, metadata: { ...item.metadata, __attention: current ? null : '1' } }
+          : item
+      )))
+      try {
+        await save()
+        await loadFriends()
+        if (!options?.silent) {
+          notifyToast(current ? '注目を外しました' : '注目にしました', {
+            actionLabel: '元に戻す',
+            onAction: () => void toggleAttention(
+              { ...friend, metadata: { ...friend.metadata, __attention: current ? '1' : null } },
+              { silent: true },
+            ),
+          })
+        }
+      } catch (error) {
+        setFriends((list) => list.map((item) => (
+          item.id === friend.id
+            ? { ...item, metadata: { ...item.metadata, __attention: current ? '1' : null } }
+            : item
+        )))
+        if (error instanceof ApiError && error.status === 409) {
+          await loadFriends()
+          onNotice({ title: '注目がほかの変更と重なりました', message: '最新の状態を読み直しました。確認してもう一度お試しください。' })
+        } else {
+          notifyToast('注目の変更に失敗しました', {
+            tone: 'error',
+            actionLabel: 'もう一度試す',
+            onAction: () => void toggleAttention(friend),
+          })
+        }
+      }
+      return
+    }
+    try {
+      await save()
       await loadFriends()
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
@@ -501,7 +548,7 @@ function FriendsPageInner({
         onNotice({ title: '注目の変更に失敗しました。通信を確かめて、もう一度お試しください。', message: '通信状態を確認して、もう一度お試しください。' })
       }
     }
-  }, [loadFriends, onNotice])
+  }, [isV8Theme, loadFriends, onNotice])
 
   return (
     <div data-friends-design="v6" className="flex flex-col gap-4">
@@ -914,9 +961,47 @@ function FriendsPageHost() {
   )
 }
 
+/*
+ * 一覧の読み込み枠（サクサク感 A）。V8 は頭・数の帯・表の形の骨組み、
+ * v7 は今の文のまま（1画素も変えない）。
+ */
+function FriendsSuspenseFallback() {
+  const isV8 = typeof document !== 'undefined' && document.documentElement.dataset.theme === 'v8'
+  if (!isV8) return <div className="p-6 text-sm text-ink-faint">読み込み中…</div>
+  return (
+    <DelayedSkeleton
+      loading
+      skeleton={(
+        <div className="flex flex-col gap-4" aria-hidden="true">
+          <Skeleton className="h-7 w-40" />
+          <div className="grid grid-cols-4 gap-3">
+            {[0, 1, 2, 3].map((n) => (
+              <div key={n} className="flex flex-col gap-2 rounded-card border border-hairline bg-canvas p-4">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-7 w-28" />
+              </div>
+            ))}
+          </div>
+          <div className="overflow-hidden rounded-card border border-hairline bg-canvas">
+            {[0, 1, 2, 3, 4].map((row) => (
+              <div key={row} className="flex items-center gap-3 border-b border-hairline px-3 py-3">
+                <Skeleton className="h-5 w-5 shrink-0" />
+                <Skeleton circle className="h-9 w-9 shrink-0" />
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-28" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    />
+  )
+}
+
 export default function FriendsPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>
+    <Suspense fallback={<FriendsSuspenseFallback />}>
       <FriendsPageHost />
     </Suspense>
   )

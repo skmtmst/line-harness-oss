@@ -15,6 +15,7 @@ import { useSearchParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import type { IdentityCandidateDecision } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
@@ -234,9 +235,51 @@ function FriendIdentityCandidatesV8Inner() {
   )
 }
 
+/*
+ * 結び付け候補の読み込み枠（サクサク感 A）。板・段・4列の表の形の骨組み。
+ * 光は共通 `Skeleton`。出す・消すの判定は `DelayedSkeleton` が持つ。
+ */
+function CandidatesSuspenseFallback() {
+  return (
+    <DelayedSkeleton
+      loading
+      skeleton={(
+        <div className={styles.board} aria-hidden="true">
+          <Skeleton width={200} height={24} />
+          <section className={styles.section}>
+            <Skeleton width={180} height={16} />
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>項目</th>
+                    <th>候補A</th>
+                    <th>候補B</th>
+                    <th>使う値</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[0, 1, 2, 3, 4].map((n) => (
+                    <tr key={n}>
+                      <td><Skeleton width="60%" height={13} /></td>
+                      <td><Skeleton width="70%" height={13} /></td>
+                      <td><Skeleton width="70%" height={13} /></td>
+                      <td><Skeleton width="60%" height={13} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      )}
+    />
+  )
+}
+
 export default function FriendIdentityCandidatesV8() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>
+    <Suspense fallback={<CandidatesSuspenseFallback />}>
       <FriendIdentityCandidatesV8Inner />
     </Suspense>
   )
