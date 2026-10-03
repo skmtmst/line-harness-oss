@@ -1,4 +1,7 @@
 {
+  "app/accounts/handover/handover-v8.tsx": {
+    "unresolved-classname": 48
+  },
   "app/accounts/new/page.tsx": {
     "arbitrary-value": 1
   },
@@ -9,11 +12,17 @@
     "unresolved-classname": 99,
     "direct-th": 8
   },
+  "app/affiliate-offers/new-offer-v8.tsx": {
+    "unresolved-classname": 53
+  },
   "app/affiliate-offers/new/page.tsx": {
     "unresolved-classname": 4
   },
   "app/affiliates/affiliates-v8.tsx": {
     "unresolved-classname": 7
+  },
+  "app/affiliates/new-affiliate-v8.tsx": {
+    "unresolved-classname": 82
   },
   "app/affiliates/new/page.tsx": {
     "unresolved-classname": 6
@@ -166,6 +175,9 @@
   "app/ec-commerce/connector-panel.tsx": {
     "unresolved-classname": 30
   },
+  "app/ec-commerce/ec-connector-v8.tsx": {
+    "unresolved-classname": 6
+  },
   "app/ec-commerce/identity-candidates/page.tsx": {
     "unresolved-classname": 11
   },
@@ -272,12 +284,12 @@
   "app/login/two-factor/setup/page.tsx": {
     "arbitrary-value": 1
   },
+  "app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx": {
+    "unresolved-classname": 60
+  },
   "app/mileage/earning-rules/new/page.tsx": {
     "direct-th": 3,
     "unresolved-classname": 2
-  },
-  "app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx": {
-    "unresolved-classname": 60
   },
   "app/mileage/earning-rules/new/v8-earning-rule-new.tsx": {
     "unresolved-classname": 83
@@ -336,6 +348,9 @@
     "unresolved-classname": 1
   },
   "app/pools/new/page.tsx": {
+    "unresolved-classname": 2
+  },
+  "app/pools/new/pool-new-v8.tsx": {
     "unresolved-classname": 2
   },
   "app/recipes/clone/page.tsx": {
@@ -973,31 +988,5 @@
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 8,
     "arbitrary-value": 2
-  },
-  "app/reminders/basics-form-v8.tsx": {
-    "unresolved-classname": 39
-  },
-  "app/reminders/detail/detail-v8.tsx": {
-    "unresolved-classname": 69,
-    "direct-th": 23
-  },
-  "app/reminders/edit/edit-v8.tsx": {
-    "unresolved-classname": 168,
-    "direct-th": 4
-  },
-  "app/reminders/new/new-v8.tsx": {
-    "unresolved-classname": 6
-  },
-  "app/reminders/wizard-v8-ui.tsx": {
-    "unresolved-classname": 33
-  },
-  "app/accounts/handover/handover-v8.tsx": {
-    "unresolved-classname": 48
-  },
-  "app/ec-commerce/ec-connector-v8.tsx": {
-    "unresolved-classname": 6
-  },
-  "app/pools/new/pool-new-v8.tsx": {
-    "unresolved-classname": 2
   }
 }

@@ -2,7 +2,9 @@
 
 import Select from '@/components/shared/select'
 import Checkbox from '@/components/shared/checkbox'
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { NewOfferV8 } from '../new-offer-v8'
 import type { Tag, Scenario } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -39,7 +41,23 @@ function rewardIntegerError(value: string, kind: 'amount' | 'miles'): string | n
  * タグとシナリオは**成果が確定したときに実行するもの**で、成果の条件ではない。
  * ここを取り違えると、紹介の成果がいつまでも確定しない設定ができてしまう。
  */
+/*
+ * ★V8-B の切り替え。v8 の器は別ファイル（new-offer-v8.tsx）に置き、
+ * v7 の器・動きはこの下の V7 のまま残す。
+ */
 export default function NewAffiliateOfferPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return (
+      <Suspense fallback={null}>
+        <NewOfferV8 />
+      </Suspense>
+    )
+  }
+  return <NewAffiliateOfferPageV7 />
+}
+
+function NewAffiliateOfferPageV7() {
   usePageTitle('案件を作る')
   const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
