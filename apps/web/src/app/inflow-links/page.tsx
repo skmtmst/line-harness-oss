@@ -1080,7 +1080,7 @@ function InflowLinksPageInner({
                     accountId={selectedAccountId}
                     orderStats={r.stats}
                   >
-                    <td className="px-5 py-[9px]" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-3 pr-2 pl-5" onClick={(e) => e.stopPropagation()}>
                       {r.entryRouteId ? (
                         <Checkbox
                           aria-label={`${r.name}をまとめて操作の対象にする`}
