@@ -917,5 +917,3 @@ function WebinarListV8Inner() {
     </div>
   )
 }
-
-
