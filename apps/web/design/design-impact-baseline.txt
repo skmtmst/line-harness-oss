@@ -181,6 +181,8 @@ shared-button-importer app/nen/pets/feeding-tab.tsx
 shared-button-importer app/nen/pets/page.tsx
 shared-button-importer app/nen/pets/pet-editor.tsx
 shared-button-importer app/nen/pets/pets-v8.tsx
+# ★V8 権限なし（O5tUeE）。403 の共通の板の戻る口に共通Button。
+shared-button-importer app/no-permission/no-permission-v8.tsx
 shared-button-importer app/not-found.tsx
 shared-button-importer app/notifications/page.tsx
 shared-button-importer app/ops/announcements/page.tsx

@@ -1048,12 +1048,7 @@ function MessagesStageV8({
                         <button type="button" className={styles.chip} onClick={() => insertToken('{{date}}')}>
                           <CalendarClock size={13} aria-hidden="true" />予約日時
                         </button>
-                        {/*
-                          * Meetの参加URLを差し込む契約は worker に無い（DEVIN-QUESTIONS）。
-                          * 実在しないトークンを入れると、そのまま相手に届いてしまうため
-                          * 押せない形で出す。
-                          */}
-                        <button type="button" className={styles.chip} disabled title="Google Meet の URL の差し込みはまだ対応していません">
+                        <button type="button" className={styles.chip} onClick={() => insertToken('{{meet_url}}')}>
                           <Video size={13} aria-hidden="true" />Google Meet の URL
                         </button>
                         <Select
