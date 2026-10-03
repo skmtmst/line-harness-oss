@@ -11,6 +11,8 @@ import type { LineAccount, StaffMember } from '@line-crm/shared'
 import MemberDialog, { type MemberDialogValue } from '@/components/hq/members/member-dialog'
 import StepUpPrompt from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
+import Chip from '@/components/shared/chip'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -70,6 +72,8 @@ function MembersInner() {
   const [resendingId, setResendingId] = useState<string | null>(null)
   /* 権限変更が STEP_UP_REQUIRED で止まったときの本人確認。通ったら grant を付けて同じ保存をやり直す。 */
   const [stepUp, setStepUp] = useState<null | { retry: (token: string) => Promise<void> }>(null)
+  /* 板 `M4jS9`「権限を変える確認」。変える前に変更前→変更後を見せる。 */
+  const [confirmChange, setConfirmChange] = useState<{ member: StaffMember; value: MemberDialogValue } | null>(null)
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -418,12 +422,33 @@ function MembersInner() {
             isSelf={dialog.member?.id === me?.id}
             busy={dialogBusy}
             error={dialogError}
-            onSubmit={(value) => void submitDialog(value)}
+            onSubmit={(value) => {
+              if (dialog.member) {
+                setConfirmChange({ member: dialog.member, value })
+              } else {
+                void submitDialog(value)
+              }
+            }}
             onCancel={() => {
               if (dialogBusy) return
               setDialog({ open: false, member: null })
             }}
           />
+          {confirmChange ? (
+            <MemberChangeConfirm
+              member={confirmChange.member}
+              value={confirmChange.value}
+              accountNames={accountNames}
+              busy={dialogBusy}
+              error={dialogError}
+              onCancel={() => { if (!dialogBusy) setConfirmChange(null) }}
+              onConfirm={() => {
+                const pending = confirmChange
+                setConfirmChange(null)
+                void submitDialog(pending.value)
+              }}
+            />
+          ) : null}
           {stepUp ? (
             <StepUpPrompt
               request={{ purpose: 'staff.permissions.change', action: 'メンバーの権限を変更する', retry: stepUp.retry }}
@@ -434,6 +459,64 @@ function MembersInner() {
         </>
       )}
     </div>
+  )
+}
+
+const ROLE_LABEL: Record<string, string> = { owner: '所有者', admin: '管理者', staff: 'スタッフ', viewer: '閲覧のみ' }
+
+/** 板 `M4jS9`「権限を変える確認」。変更前→変更後を並べてから変える。 */
+function MemberChangeConfirm({ member, value, accountNames, busy, error, onCancel, onConfirm }: {
+  member: StaffMember
+  value: MemberDialogValue
+  accountNames: Map<string, string>
+  busy: boolean
+  error: string
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const roleOf = (role: string) => ROLE_LABEL[role] ?? role
+  const scopeOf = (scope: 'all' | 'accounts', ids: string[]) => (
+    scope === 'all' ? 'すべてのアカウント' : ids.map((id) => accountNames.get(id) ?? id).join('・') || '（選択なし）'
+  )
+  const beforeScope = member.accountScope ?? 'all'
+  const beforeIds = member.scopedLineAccountIds ?? []
+  const rows = [
+    { label: '役割', before: roleOf(member.role), after: roleOf(value.role), changed: member.role !== value.role },
+    {
+      label: '担当範囲',
+      before: scopeOf(beforeScope, beforeIds),
+      after: scopeOf(value.accountScope, value.scopedLineAccountIds),
+      changed: beforeScope !== value.accountScope || beforeIds.join(',') !== value.scopedLineAccountIds.join(','),
+    },
+    {
+      label: '状態',
+      before: member.isActive ? '有効' : '停止中',
+      after: value.isActive ? '有効' : '停止中',
+      changed: member.isActive !== value.isActive,
+    },
+  ]
+  return (
+    <ConfirmDialog
+      open
+      title={`${member.name}さんの権限を変えますか？`}
+      description="変える内容を確かめてから変えてください。管理者が1人だけのときは、その管理者を外せません。"
+      confirmLabel="変える"
+      busy={busy}
+      error={error || undefined}
+      designNode="M4jS9"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    >
+      <dl className="grid gap-1.5">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center gap-3 border-b border-hairline pb-1.5">
+            <dt className="w-16 shrink-0 text-caption text-ink-faint">{row.label}</dt>
+            <dd className="min-w-0 flex-1 truncate text-caption text-ink">{row.before} → {row.after}</dd>
+            {row.changed ? <Chip tone="warn">変わる</Chip> : null}
+          </div>
+        ))}
+      </dl>
+    </ConfirmDialog>
   )
 }
 
