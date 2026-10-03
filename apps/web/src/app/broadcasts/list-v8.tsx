@@ -38,6 +38,9 @@ import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
@@ -165,6 +168,8 @@ export default function BroadcastListV8() {
   const [deleteError, setDeleteError] = useState('')
   /* 行の「…」メニュー。フォルダへ移すは同じメニューの2段目で選ぶ。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /* V8「サクサク感」C・E：行を押すと右の詳細パネル（↑↓で前後へ）。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
   const [menuMoveFor, setMenuMoveFor] = useState<string | null>(null)
   const [moving, setMoving] = useState(false)
   const [savedViews, setSavedViews] = useState<BroadcastSavedView[]>([])
@@ -293,11 +298,13 @@ export default function BroadcastListV8() {
       }
       if (tagsRes && tagsRes.success) setTags(tagsRes.data)
       if (scenariosRes && scenariosRes.success) {
-        setScenarios(scenariosRes.data.map((item) => ({ id: item.id, name: item.name })))
+        setScenarios((scenariosRes.data ?? []).map((item) => ({ id: item.id, name: item.name })))
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
-      else setError('データの読み込みに失敗しました。もう一度お試しください。')
+      else {
+        setError('データの読み込みに失敗しました。もう一度お試しください。')
+      }
     } finally {
       setLoading(false)
     }
@@ -609,6 +616,29 @@ export default function BroadcastListV8() {
     })
     return items
   }
+
+  /** V8「サクサク感」D：右クリックは「…」と同じ品ぞろえ。 */
+  const rowContextItems = (broadcast: ApiBroadcast): ContextMenuItem[] =>
+    rowMenuItems(broadcast).map((item) => ({
+      id: item.id,
+      label: item.label,
+      external: item.external,
+      dividerBefore: item.dividerBefore,
+      icon: item.icon,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      disabledReason: item.disabledReason,
+      onSelect: item.onSelect,
+    }))
+
+  const goDetail = (id: string) => {
+    withViewTransition(() => {
+      router.push(`/broadcasts/detail?id=${encodeURIComponent(id)}`)
+    })
+  }
+
+  const panelIndex = visibleBroadcasts.findIndex((b) => b.id === panelId)
+  const panelRow = panelIndex >= 0 ? visibleBroadcasts[panelIndex] : null
 
   return (
     <div className={styles.board} data-design-node="EML2F bIdqV">
@@ -929,12 +959,12 @@ export default function BroadcastListV8() {
                           key={broadcast.id}
                           className={styles.rowClick}
                           tabIndex={0}
-                          onClick={() => router.push(detailHref)}
+                          onClick={() => setPanelId(broadcast.id)}
                           onKeyDown={(event) => {
                             if (event.target !== event.currentTarget) return
                             if (event.key === 'Enter') {
                               event.preventDefault()
-                              router.push(detailHref)
+                              setPanelId(broadcast.id)
                             }
                           }}
                         >
@@ -944,7 +974,12 @@ export default function BroadcastListV8() {
                               href={detailHref}
                               className={styles.cellTitle}
                               title={broadcast.title}
-                              onClick={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                                event.preventDefault()
+                                goDetail(broadcast.id)
+                              }}
                             >
                               {broadcast.title}
                             </Link>
@@ -991,20 +1026,25 @@ export default function BroadcastListV8() {
                             )}
                           </td>
                           <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
-                            <button
-                              type="button"
-                              className={styles.menuButton}
-                              aria-label={`配信「${broadcast.title}」の操作`}
-                              aria-haspopup="menu"
-                              aria-expanded={openMenuId === broadcast.id}
-                              title={`配信「${broadcast.title}」の操作`}
-                              onClick={() => {
-                                setMenuMoveFor(null)
-                                setOpenMenuId((current) => (current === broadcast.id ? null : broadcast.id))
-                              }}
+                            <ContextMenu
+                              label={`配信「${broadcast.title}」の操作`}
+                              items={rowContextItems(broadcast)}
                             >
-                              <MoreHorizontal size={16} aria-hidden="true" />
-                            </button>
+                              <button
+                                type="button"
+                                className={styles.menuButton}
+                                aria-label={`配信「${broadcast.title}」の操作`}
+                                aria-haspopup="menu"
+                                aria-expanded={openMenuId === broadcast.id}
+                                title={`配信「${broadcast.title}」の操作`}
+                                onClick={() => {
+                                  setMenuMoveFor(null)
+                                  setOpenMenuId((current) => (current === broadcast.id ? null : broadcast.id))
+                                }}
+                              >
+                                <MoreHorizontal size={16} aria-hidden="true" />
+                              </button>
+                            </ContextMenu>
                             <ActionMenu
                               open={openMenuId === broadcast.id}
                               onClose={() => { setOpenMenuId(null); setMenuMoveFor(null) }}
@@ -1018,6 +1058,81 @@ export default function BroadcastListV8() {
                   </tbody>
                 </table>
               </div>
+
+              {/* 行の詳細パネル（V8「サクサク感」C①・E）。一覧は左に見えたまま。 */}
+              {panelRow &&
+                (() => {
+                  const audience = audienceSummary(panelRow, getTagName, getScenarioName)
+                  const insight = insights[panelRow.id] ?? summaryInsight(panelRow.insightSummary)
+                  const canResume = panelRow.status === 'draft' || panelRow.status === 'scheduled'
+                  return (
+                    <DetailPanel
+                      open
+                      title={panelRow.title}
+                      description={audience}
+                      onClose={() => setPanelId(null)}
+                      onPrev={panelIndex > 0 ? () => setPanelId(visibleBroadcasts[panelIndex - 1].id) : undefined}
+                      onNext={
+                        panelIndex < visibleBroadcasts.length - 1
+                          ? () => setPanelId(visibleBroadcasts[panelIndex + 1].id)
+                          : undefined
+                      }
+                      hasPrev={panelIndex > 0}
+                      hasNext={panelIndex < visibleBroadcasts.length - 1}
+                      footer={
+                        <>
+                          <Button variant="primary" onClick={() => goDetail(panelRow.id)}>
+                            開く
+                          </Button>
+                          {canResume && (
+                            <Button
+                              variant="secondary"
+                              disabled={!canEdit}
+                              onClick={() =>
+                                withViewTransition(() => {
+                                  router.push(`/broadcasts/new?draft=${encodeURIComponent(panelRow.id)}`)
+                                })
+                              }
+                            >
+                              編集を続ける
+                            </Button>
+                          )}
+                          <Button
+                            variant="secondary"
+                            disabled={!canEdit}
+                            onClick={() =>
+                              withViewTransition(() => {
+                                router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`)
+                              })
+                            }
+                          >
+                            複製する
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            disabled={!canEdit}
+                            onClick={() => {
+                              setDeleteError('')
+                              setDeleteTarget(panelRow)
+                              setPanelId(null)
+                            }}
+                          >
+                            削除する
+                          </Button>
+                        </>
+                      }
+                    >
+                      <p>
+                        {panelRow.status === 'sent'
+                          ? (panelRow.sentAt ? `送信済み：${formatDateTime(panelRow.sentAt)}` : '送信済み')
+                          : (panelRow.scheduledAt ? `予約：${formatDateTime(panelRow.scheduledAt)}` : '下書き')}
+                        {panelRow.status === 'sent'
+                          ? ` ／ ${formatNumber(insight?.delivered ?? panelRow.successCount)}人に届いた`
+                          : ''}
+                      </p>
+                    </DetailPanel>
+                  )
+                })()}
 
               {/* 件数とページ送り。1ページしか無いときは件数だけ出す。 */}
               <div className={styles.pagerRow}>
