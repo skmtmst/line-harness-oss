@@ -1,5 +1,6 @@
 # 共通Buttonを直接importする利用先。追加・削除したPRは該当行だけを変える。
 shared-button-importer app/accounts/detail/page.tsx
+shared-button-importer app/accounts/handover/handover-v8.tsx
 shared-button-importer app/accounts/handover/page.tsx
 shared-button-importer app/accounts/migration.tsx
 shared-button-importer app/accounts/new/page.tsx
