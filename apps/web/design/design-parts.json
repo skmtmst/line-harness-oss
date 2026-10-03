@@ -2975,6 +2975,35 @@
         }
       ]
     },
+    "command-palette": {
+      "name": "V8 どこからでも探す窓",
+      "pencilNodes": [],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/command-palette.tsx",
+      "cssModule": "src/components/shared/command-palette.module.css",
+      "components": [
+        "CommandPalette"
+      ],
+      "cssPrefix": "command-palette",
+      "pencilUsage": "⌘K／Ctrl+K の機能・友だち検索",
+      "lastCheckedAt": "2026-10-04",
+      "note": "⌘K・Ctrl+K で開く。機能は左メニューの見えているもの、友だちは友だち一覧の ?q= へ送る。帯に探す欄は置かない。",
+      "routes": {
+        "active": [],
+        "impact": "全管理画面（外枠に1つ）"
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1152
+        ],
+        "reason": "司令塔が録画で確かめる。"
+      },
+      "declarations": []
+    },
     "notice": {
       "name": "★V7 共通の帯（Notice）",
       "pencilNodes": [
