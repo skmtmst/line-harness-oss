@@ -3,7 +3,7 @@
 import React, { useEffect, useId, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { useOverlayFocus } from './overlay-utils'
+import { useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './drawer.module.css'
 
 export type DrawerDetail = { label: string; value: ReactNode }
@@ -41,9 +41,11 @@ export default function Drawer({
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
   const panelRef = useOverlayFocus(open && modal, onClose, busy)
+  /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
+  const leaving = useV8Leave(open)
 
   useEffect(() => setMounted(true), [])
-  if (!open) return null
+  if (!open && !leaving) return null
 
   const panel = (
     <aside
@@ -56,6 +58,7 @@ export default function Drawer({
       aria-busy={busy || undefined}
       data-dirty={dirty || undefined}
       tabIndex={-1}
+      data-closing={leaving || undefined}
       data-design-part="drawer"
       data-design-node="VJKAT"
     >
@@ -74,7 +77,7 @@ export default function Drawer({
     </aside>
   )
   if (!modal) return panel
-  const overlay = <div className={styles.overlay} role="presentation" onMouseDown={(event) => {
+  const overlay = <div className={styles.overlay} role="presentation" data-closing={leaving || undefined} onMouseDown={(event) => {
     if (!busy && event.target === event.currentTarget) onClose()
   }}>{panel}</div>
   return mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay

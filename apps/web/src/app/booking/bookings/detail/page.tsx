@@ -983,7 +983,7 @@ function BookingDetailInner() {
 
             {/* ---- 予約内容の変更 (N-389) ---- */}
             {editing ? (
-              <section className="bg-canvas rounded-card border-hairline border p-5">
+              <section className="bg-canvas rounded-card border-hairline border p-5" data-design-node="YXrF6">
                 <h2 className="text-ink mb-3 text-sm font-semibold">予約内容を変更する</h2>
                 <div className="grid gap-3 md:grid-cols-2">
                   <EditField label="予約メニュー">

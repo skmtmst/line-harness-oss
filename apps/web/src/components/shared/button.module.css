@@ -171,4 +171,22 @@
 [data-theme='v8'] .secondary {
   box-shadow: var(--shadow-board);
 }
+
+/*
+ * ★V8 仕上げ（M10）：押した沈みは 120ms（乗せた色変化と同じ速さ）。
+ * v7 は 80ms のまま。キーボードの印は action の 2px の輪
+ * （文字ボタン text-link と同じ色にそろえる）。
+ */
+[data-theme='v8'] .button {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    filter var(--motion-fast) var(--motion-ease-out),
+    scale var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .button:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
 }
