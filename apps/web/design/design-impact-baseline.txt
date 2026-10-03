@@ -1,5 +1,6 @@
 # 共通Buttonを直接importする利用先。追加・削除したPRは該当行だけを変える。
 shared-button-importer app/accounts/detail/page.tsx
+shared-button-importer app/accounts/handover/handover-v8.tsx
 shared-button-importer app/accounts/handover/page.tsx
 shared-button-importer app/accounts/migration.tsx
 shared-button-importer app/accounts/new/page.tsx
@@ -75,6 +76,7 @@ shared-button-importer app/conversions/page.tsx
 shared-button-importer app/duplicates/duplicates-v8.tsx
 shared-button-importer app/duplicates/page.tsx
 shared-button-importer app/ec-commerce/connector-panel.tsx
+shared-button-importer app/ec-commerce/ec-connector-v8.tsx
 shared-button-importer app/ec-commerce/identity-candidates/page.tsx
 shared-button-importer app/ec-commerce/order-detail-drawer.tsx
 shared-button-importer app/ec-commerce/page.tsx
@@ -180,6 +182,7 @@ shared-button-importer app/ops/two-factor/page.tsx
 shared-button-importer app/page.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
+shared-button-importer app/pools/new/pool-new-v8.tsx
 shared-button-importer app/pools/page.tsx
 shared-button-importer app/recipes/page.tsx
 shared-button-importer app/register/complete/page.tsx
