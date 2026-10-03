@@ -40,6 +40,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import DateField from '@/components/shared/date-field'
 import SearchField from '@/components/shared/search-field'
 import Pagination from '@/components/shared/pagination'
@@ -869,13 +870,10 @@ export default function BroadcastListV8() {
               ))}
             </div>
           ) : forbidden ? (
-            <div className={styles.stateCard}>
-              <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
-                <AlertCircle size={20} aria-hidden="true" />
-              </span>
-              <p className={styles.stateTitle}>配信を見る権限がありません</p>
-              <p className={styles.stateDesc}>見るには権限が要ります。オーナーか管理者に追加を依頼してください。</p>
-            </div>
+            <NoPermissionV8
+              featureName="一斉配信"
+              capabilitiesHref="/staff"
+            />
           ) : error ? (
             <div className={styles.stateCard}>
               <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
