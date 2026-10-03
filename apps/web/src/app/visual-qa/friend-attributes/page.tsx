@@ -21,7 +21,7 @@ import SampleScreenNotice from '@/components/ui/sample-screen-notice'
 const EXISTING_TAG = {
   ...FRIEND_ATTRIBUTES_QA_TAGS[2],
   id: 'qa-existing',
-  name: 'NEN会員（定期）',
+  name: '定期便会員（毎月）',
   groupId: 'qa-purchase',
   friendCount: 128,
   mileageReward: 10,
@@ -37,7 +37,7 @@ const EXISTING_TAG = {
  * 変更前の固定表示と同じ数(参照3件・自動1件・128人)にしている。
  */
 const QA_TAG_DEPENDENCIES: TagDependencies = {
-  tag: { id: 'qa-existing', name: 'NEN会員（定期）', version: 1, status: 'active' },
+  tag: { id: 'qa-existing', name: '定期便会員（毎月）', version: 1, status: 'active' },
   friendCount: 128,
   referenceCounts: {
     broadcasts: 2, forms: 1, scenarios: 1, autoReplies: 0, savedSearches: 0,
@@ -165,7 +165,7 @@ function VisualQaPageInner() {
       referenceDrawerState={state === 'drawer'}
       referenceRetroactiveState={state === 'retroactive'}
       initialValues={{
-        name: linked ? 'NEN会員（定期）' : '',
+        name: linked ? '定期便会員（毎月）' : '',
         groupId: 'qa-purchase',
         isStarred: false,
         linked,

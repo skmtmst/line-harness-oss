@@ -548,6 +548,9 @@ jobs:
     #   2. 統合先の版と PR の版を同じモックAPIで書き出して撮り、v7 の写真が同じこと
     #      （Mac と Linux で文字の描き方が違うので、手元の写真は基準にしない）
     # 道具は apps/web/scripts/v8-guard/。対照（わざと壊すと止まる）は各道具の頭に書いた。
+    # 2 は PRの題名・本文かコミットのことばに [v7の見た目を変える] と書いたときだけ
+    # 飛ばせる（製品名の言い換えなど、わざと v7 の文字を変えるとき）。書かなければ
+    # 今までどおり止まる。1（崩れの確認）は飛ばさない。
     env:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8788
     steps:
@@ -559,6 +562,8 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
@@ -566,6 +571,26 @@ jobs:
             echo "手動実行のため、崩れだけを見ます（v7 の比べる相手がありません）。"
             exit 0
           fi
+
+          # この見張りが止めたいのは「気づかずに v7 の見た目が変わる」ことで、
+          # 製品名の言い換えのように**わざと v7 の文字を変える**ことは別。
+          # [v7の見た目を変える] と書いたときだけ、写真の比べを飛ばす。
+          # 書かなければ今までどおり 1 画素でも違えば止まる。崩れの確認は
+          # 飛ばさない（崩れはどちらにしても直すべきもの）。
+          #
+          # 印は PRの題名・本文と、この PR のコミットのことばのどこでもよい。
+          # CIが見る PR本文は「CIが動いた時点の写し」なので、あとから本文に
+          # 印を足しても再実行では見えない。コミットのことばに書いておけば
+          # 再実行でも残るので、そちらを推奨する。
+          COMMIT_MSGS="$(git log --format=%B "$BASE_SHA..$HEAD_SHA")"
+          case "$PR_TITLE$PR_BODY$COMMIT_MSGS" in
+            *"[v7の見た目を変える]"*)
+              echo "run=true" >> "$GITHUB_OUTPUT"
+              echo "diff=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::[v7の見た目を変える] があるため、v7 の写真の比べを飛ばしました（崩れの確認は行います）。"
+              exit 0
+              ;;
+          esac
           if git diff --name-only "$BASE_SHA...$HEAD_SHA" \
             | grep -qE '^(apps/web/|packages/shared/|scripts/visual-qa/|pnpm-lock\.yaml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
