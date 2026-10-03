@@ -118,6 +118,24 @@ describe('NOTIFY-04 一覧の名前から編集画面へ戻る', () => {
     expect(prevented).toBe(false)
   })
 
+  it('v8 で行を右クリックすると操作と同じ自分にテスト・止めるが出る', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    try {
+      render(<OperatorNotificationRules lineAccountId="account-a" />)
+      await screen.findByRole('link', { name: '新しい予約が入りました' })
+      const row = document.querySelector('tbody tr')!
+      fireEvent.contextMenu(row, { clientX: 320, clientY: 180 })
+      const menu = await screen.findByRole('menu', { name: '運用者へのお知らせの操作' })
+      expect(menu.textContent).toContain('自分にテスト')
+      expect(menu.textContent).toContain('止める')
+      fireEvent.click(screen.getByRole('menuitem', { name: '自分にテスト' }))
+      expect(fixture.testSend).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('menu')).toBeNull()
+    } finally {
+      document.documentElement.removeAttribute('data-theme')
+    }
+  })
+
   it('別の行の名前も同じ形のリンクで、絞り込みタブと検索は動いたまま', async () => {
     fixture.operatorList.mockResolvedValue({
       success: true,
