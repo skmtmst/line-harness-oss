@@ -159,8 +159,8 @@ describe('#676 一覧の並び・件数・回答導線（N-172/N-173/N-180/N-181
 })
 
 describe('V6回答フォームの未実装3画面', () => {
-  it('vCqUj は14種の追加口・顧客プレビュー・作成元を表示する', () => {
-    expect(EDIT_PAGE).toContain('ブロックを追加する（14種）')
+  it('vCqUj は15種の追加口・顧客プレビュー・作成元を表示する', () => {
+    expect(EDIT_PAGE).toContain('ブロックを追加する（15種）')
     expect(EDIT_PAGE).toContain('お客さまに見える形')
     expect(EDIT_PAGE).toContain('実際にお客さまが見る画面です')
     expect(EDIT_PAGE).toContain('このフォームは {selectedAccount?.name')

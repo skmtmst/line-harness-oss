@@ -32,7 +32,7 @@ import {
   type FormTheme,
 } from '@line-crm/shared'
 import { normalizeSectionName } from '@/components/forms/section-name'
-import { api, ApiError, fetchApi } from '@/lib/api'
+import { api, ApiError, bookingApi, fetchApi, type BookingMenu } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
@@ -247,12 +247,18 @@ function FormEditInner() {
           ? `/api/tags?lineAccountId=${encodeURIComponent(selectedAccountId)}`
           : '/api/tags'
         const accountFilter = selectedAccountId ? { accountId: selectedAccountId } : undefined
-        const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
+        const [tagRes, ffRes, scenarioRes, reminderRes, templateRes, menuRes] = await Promise.all([
           fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(tagPath),
           selectedAccountId ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }) : Promise.resolve({ success: true as const, data: [] }),
           api.scenarios.list(accountFilter),
           api.reminders.list(accountFilter),
           api.templates.list(undefined, selectedAccountId ?? undefined),
+          // 「予約を入れる」欄のメニュー選び。予約を使わない店では空になる。
+          selectedAccountId
+            ? bookingApi
+              .listMenus(selectedAccountId)
+              .catch(() => ({ menus: [] as BookingMenu[] }))
+            : Promise.resolve({ menus: [] as BookingMenu[] }),
         ])
         setRefs({
           tags: tagRes.success ? tagRes.data.map((t) => ({ id: t.id, name: t.name })) : [],
@@ -268,6 +274,10 @@ function FormEditInner() {
           templates: templateRes.success
             ? templateRes.data.map((t) => ({ id: t.id, name: t.name, type: t.messageType }))
             : [],
+          bookingMenus: (menuRes.menus ?? [])
+            .filter((m) => m.is_active === 1)
+            .map((m) => ({ id: m.id, name: m.name, durationMinutes: m.duration_minutes })),
+          bookingMenuStaff: {},
         })
 
         const ok = await loadForm()
@@ -288,6 +298,43 @@ function FormEditInner() {
       }
     })()
   }, [id, loadForm, reloadKey, selectedAccountId])
+
+  // 「予約を入れる」欄の担当選び。欄のメニューが決まったものだけ読む。
+  // 読めなくても欄は置ける（だれでも扱い）。公開前にメニュー必須で止める。
+  useEffect(() => {
+    if (!selectedAccountId) return
+    const menuIds = new Set<string>()
+    for (const section of layout.sections) {
+      for (const b of section.blocks) {
+        if (b.kind === 'input' && b.type === 'booking' && b.booking?.menuId) {
+          menuIds.add(b.booking.menuId)
+        }
+      }
+    }
+    const missing = [...menuIds].filter((menuId) => refs.bookingMenuStaff?.[menuId] === undefined)
+    if (missing.length === 0) return
+    let cancelled = false
+    void (async () => {
+      const entries = await Promise.all(
+        missing.map(async (menuId) => {
+          try {
+            const res = await bookingApi.listMenuStaff(selectedAccountId, menuId)
+            return [menuId, res.staff.map((s) => ({ id: s.id, name: s.display_name }))] as const
+          } catch {
+            return [menuId, []] as const
+          }
+        }),
+      )
+      if (cancelled) return
+      setRefs((prev) => ({
+        ...prev,
+        bookingMenuStaff: { ...(prev.bookingMenuStaff ?? {}), ...Object.fromEntries(entries) },
+      }))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAccountId, layout, refs.bookingMenuStaff])
 
   // いま編集している並び（共通ヘッダ か セクション）
   const blocks = useMemo(
@@ -1121,7 +1168,7 @@ function FormEditInner() {
 
                   <div className="relative" data-design-node="WOPjZ">
                     <Button variant="primary" className="px-3 py-1.5 text-xs font-medium border-0 h-auto whitespace-normal" ref={addMenuButtonRef} onClick={() => setShowAddMenu((v) => !v)} aria-expanded={showAddMenu} aria-haspopup="menu">
-                      ＋ ブロックを追加する（14種）
+                      ＋ ブロックを追加する（15種）
                     </Button>
                     <ActionMenu
                       open={showAddMenu}

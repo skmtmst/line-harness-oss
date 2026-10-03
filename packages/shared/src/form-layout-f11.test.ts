@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  emptyLayout,
   fieldsToLayout,
   formatAddressValue,
   formatAnswerValue,
@@ -10,6 +11,7 @@ import {
   normalizePostalCodeDigits,
   normalizeRatingValue,
   validateAnswer,
+  validateFormBookingReady,
   type FormInputBlock,
 } from './form-layout.js';
 
@@ -195,6 +197,14 @@ describe('予約を入れる booking', () => {
       { menuId: 'm1', staffId: 's1', startsAt: '2026-10-20T04:00:00.000Z' },
     );
     expect(shown).toBe('10/20 13:00');
+  });
+
+  it('メニュー未定のまま公開しようとすると止める', () => {
+    const layout = emptyLayout();
+    layout.sections[0].blocks = [bookingBlock({ booking: null })];
+    expect(validateFormBookingReady(layout)).toBe('「来店予約」の予約メニューが選ばれていません');
+    layout.sections[0].blocks = [bookingBlock({ booking: { menuId: 'm1' } })];
+    expect(validateFormBookingReady(layout)).toBeNull();
   });
 
   it('bookingをfields↔layoutで落とさない', () => {

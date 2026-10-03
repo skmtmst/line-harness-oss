@@ -149,6 +149,7 @@ function PreviewBlock({ block, theme }: { block: FormBlock; theme: FormTheme }) 
       {block.type === 'prefecture' && <Box>{PREFECTURES[12]} など</Box>}
       {block.type === 'rating' && <Box>★★★★★ で選ぶ</Box>}
       {block.type === 'address' && <Box>〒123-4567 から自動入力</Box>}
+      {block.type === 'booking' && <Box>日時を選んで予約</Box>}
       {block.type === 'select' && (
         <Box>{choices.length ? choices.map((c) => c.label).join(' / ') : '選んでください'}</Box>
       )}

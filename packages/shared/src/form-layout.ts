@@ -1473,6 +1473,26 @@ export function validateFormForPublish(layout: FormLayout): string | null {
     validateFormActionsReady(layout) ??
     validateFormBranchGraph(layout) ??
     validateFormDefaultValues(layout) ??
+    validateFormBookingReady(layout) ??
     formThemeContrastError(normalizeFormTheme(layout.options?.theme))
   );
+}
+
+/**
+ * 「予約を入れる」ブロックはメニューが決まっていないと公開できない。
+ * 下書きの保存までは止めない。担当の指定が無ければ「だれでも」、
+ * 期間が無ければ14日として扱うので、止めるのはメニューだけ。
+ */
+export function validateFormBookingReady(layout: FormLayout): string | null {
+  const groups = [layout.header, ...layout.sections.map((section) => section.blocks)];
+  for (const blocks of groups) {
+    for (const block of blocks) {
+      if (block.kind !== "input" || block.type !== "booking") continue;
+      const at = `「${block.label.trim() || block.name}」`;
+      if (!block.booking?.menuId) {
+        return `${at}の予約メニューが選ばれていません`;
+      }
+    }
+  }
+  return null;
 }

@@ -6,16 +6,27 @@ import {
   collectInputs,
   isOtherFreeText,
   nextSectionIndex,
+  normalizeBookingValue,
   normalizeFormTheme,
   normalizeRatingValue,
   validateAnswer,
   type FormAddressValue,
   type FormBlock,
+  type FormBookingValue,
   type FormInputBlock,
   type FormLayout,
 } from '@line-crm/shared';
 import { submitButtonText } from '../lib/form-button-text.js';
-import { api, type PublicForm } from '../lib/api.js';
+import { api, type MenuItem, type PublicForm, type StaffItem } from '../lib/api.js';
+import {
+  addDays,
+  formatWeekday,
+  jstStartsAtIso,
+  jstToday,
+  utcToJstHm,
+  utcToJstMd,
+  utcToJstWeekday,
+} from '../lib/datetime.js';
 import {
   conflictMessage,
   decideFormSubmitStep,
@@ -371,6 +382,12 @@ export default function Form() {
   const [conflict, setConflict] = useState<
     null | { code: 'idempotency_content_mismatch' | 'idempotency_expired' }
   >(null);
+  /**
+   * 回答は保存できたが予約の確保に失敗したときの文言。空でなければ
+   * 終わり画面に直し方と送り直しを出す（回答自体は保存済みと伝える）。
+   */
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingRetrying, setBookingRetrying] = useState(false);
 
   const submitErrorText = (err: unknown): string => {
     const status = (err as { status?: number }).status;
@@ -380,6 +397,45 @@ export default function Form() {
     }
     // サーバが断った理由（期限切れ・1人1回・定員）はそのまま出す
     return body?.error ?? '送信できませんでした。時間をおいて試してください。';
+  };
+
+  /**
+   * 「予約を入れる」欄の枠を確保する。予約は「未承認」で入り、店が承認する。
+   * 枠の再確認と重なり防止は予約の受け口が担い、埋まっていれば断る。
+   * 試し回答では予約を入れない。失敗の文言を返し、空なら全件確保できた。
+   */
+  const ensureBookings = async (key: string): Promise<string | null> => {
+    if (testToken || !layout) return null;
+    const targets = collectInputs(layout)
+      .map((block) => ({ block, picked: normalizeBookingValue(answers[block.name]) }))
+      .filter((t) => t.block.type === 'booking' && t.picked !== null);
+    for (const { block, picked } of targets) {
+      const slot = picked as { menuId: string; staffId: string; startsAt: string };
+      try {
+        await api.createRequest(
+          { menu_id: slot.menuId, staff_id: slot.staffId, starts_at: slot.startsAt },
+          `${key}:booking:${block.id}`,
+        );
+      } catch (err) {
+        logFailure('form-booking-request', err);
+        const code = (err as { body?: { error?: string } }).body?.error;
+        if (code === 'slot_not_available') {
+          return '選んだ枠が埋まりました。日時を選び直してください。';
+        }
+        return '予約の確保に失敗しました。回答は保存されています。';
+      }
+    }
+    return null;
+  };
+
+  const retryBookings = async () => {
+    setBookingRetrying(true);
+    try {
+      const message = await ensureBookings(idemKey);
+      setBookingError(message);
+    } finally {
+      setBookingRetrying(false);
+    }
   };
 
   const sendFlow = async (key: string): Promise<void> => {
@@ -393,7 +449,10 @@ export default function Form() {
       }, current, testToken ?? undefined);
       const decision = decideFormSubmitStep(attempt);
       if (decision.action === 'done') {
-        const url = layout!.options?.thanksUrl;
+        // 回答の保存後に予約を確保する。予約だけ失敗しても回答は残す。
+        const bookingMessage = await ensureBookings(current);
+        setBookingError(bookingMessage);
+        const url = !bookingMessage ? layout!.options?.thanksUrl : undefined;
         if (url) {
           window.location.href = url;
           return;
@@ -439,6 +498,7 @@ export default function Form() {
     setSending(true);
     setError(null);
     setConflict(null);
+    setBookingError(null);
     try {
       await sendFlow(keyOverride ?? idemKey);
     } catch (err) {
@@ -503,6 +563,32 @@ export default function Form() {
               試しの回答のため、集計には入りません。
             </p>
           ) : null}
+          {bookingError && (
+            <div className="mx-6 mb-6 rounded-[10px] border border-liff-line-strong bg-canvas p-4">
+              <p className="text-sm font-bold text-ink">{bookingError}</p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void retryBookings()}
+                  disabled={bookingRetrying}
+                  className="min-h-11 flex-1 rounded-[10px] bg-liff-primary px-3 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  {bookingRetrying ? '確保中...' : '予約を取り直す'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBookingError(null);
+                    setDone(false);
+                    window.scrollTo({ top: 0 });
+                  }}
+                  className="min-h-11 flex-1 rounded-[10px] border border-liff-line-strong bg-canvas px-3 text-sm font-bold text-ink"
+                >
+                  日時を選び直す
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         <BottomBar>
           <Button variant="primary" onClick={() => liff.closeWindow()}>
@@ -839,6 +925,218 @@ export function AddressInput({
 }
 
 /**
+ * 「予約を入れる」ブロック。メニューは店の指定、担当は指定か選ぶ、
+ * 日にち→時刻の順に空き枠から選ぶ。選んだ枠は回答に入れ、送信後に
+ * 予約の受け口で確保する（枠の再確認と重なり防止はそちらが担う）。
+ */
+export function BookingSlotPicker({
+  block,
+  value,
+  onChange,
+}: {
+  block: FormInputBlock;
+  value: unknown;
+  onChange: (next: FormBookingValue | '') => void;
+}) {
+  const menuId = block.booking?.menuId ?? '';
+  const fixedStaffId = block.booking?.staffId ?? null;
+  const daysAhead = Math.min(60, Math.max(1, block.booking?.daysAhead ?? 14));
+  const picked = normalizeBookingValue(value);
+  const today = jstToday();
+  const lastDay = addDays(today, daysAhead - 1);
+
+  const [menu, setMenu] = useState<MenuItem | null>(null);
+  const [staffList, setStaffList] = useState<StaffItem[]>([]);
+  const [staffId, setStaffId] = useState<string>(fixedStaffId ?? '');
+  const [byDate, setByDate] = useState<Record<string, Array<{ start: string; open: boolean }>>>({});
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  // メニューと担当を読む。担当の指定が無いときは選べるように出す。
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setFailed(false);
+    Promise.all([
+      api.menus(),
+      fixedStaffId ? Promise.resolve(null) : api.staffOf(menuId).catch(() => null),
+    ])
+      .then(([menus, staff]) => {
+        if (cancelled || !menuId) return;
+        setMenu(menus.menus.find((m) => m.id === menuId) ?? null);
+        const list = staff?.staff ?? [];
+        setStaffList(list);
+        if (!fixedStaffId) setStaffId((prev) => prev || list[0]?.id || '');
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        logFailure('form-booking-menu', e);
+        setFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [menuId, fixedStaffId]);
+
+  // 選べる期間の空きを28日ずつに割って読む（口の上限に収める）。
+  useEffect(() => {
+    const activeStaff = fixedStaffId ?? staffId;
+    if (!menuId || !activeStaff) return;
+    let cancelled = false;
+    setLoading(true);
+    setFailed(false);
+    const chunks: Array<[string, string]> = [];
+    let head = today;
+    while (head <= lastDay) {
+      const tail = addDays(head, 27) <= lastDay ? addDays(head, 27) : lastDay;
+      chunks.push([head, tail]);
+      head = addDays(tail, 1);
+    }
+    Promise.all(chunks.map(([from, to]) => api.availability(menuId, activeStaff, from, to)))
+      .then((results) => {
+        if (cancelled) return;
+        const merged: Record<string, Array<{ start: string; open: boolean }>> = {};
+        for (const r of results) {
+          for (const bucket of r.by_staff ?? []) {
+            if (bucket.staff_id !== activeStaff) continue;
+            for (const s of bucket.slots ?? []) {
+              if (s.date < today || s.date > lastDay) continue;
+              const open = !((s.remaining ?? 1) <= 0 || s.state === 'full' || s.state === 'closed');
+              const list = (merged[s.date] ??= []);
+              if (!list.some((t) => t.start === s.start)) list.push({ start: s.start, open });
+              else if (open) list.find((t) => t.start === s.start)!.open = true;
+            }
+          }
+        }
+        for (const d of Object.keys(merged)) {
+          merged[d].sort((a, b) => (a.start < b.start ? -1 : 1));
+        }
+        setByDate(merged);
+        setSelectedDate((prev) => {
+          if (prev && merged[prev]?.some((t) => t.open)) return prev;
+          return Object.keys(merged).sort().find((d) => merged[d].some((t) => t.open)) ?? null;
+        });
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        logFailure('form-booking-availability', e);
+        setFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [menuId, fixedStaffId, staffId, today, lastDay]);
+
+  if (!menuId) {
+    return <p className="text-sm text-ink-secondary">予約のメニューが決まっていません。お店に確認してください。</p>;
+  }
+  if (loading && Object.keys(byDate).length === 0) {
+    return <p className="text-sm text-ink-faint">空き枠を読み込んでいます...</p>;
+  }
+  if (failed && Object.keys(byDate).length === 0) {
+    return <p className="text-sm text-ink-secondary">空き枠を読めませんでした。時間をおいて開き直してください。</p>;
+  }
+
+  const dates = Object.keys(byDate).sort().filter((d) => byDate[d].some((t) => t.open));
+  const daySlots = (selectedDate && byDate[selectedDate]) || [];
+
+  return (
+    <div className="space-y-2.5">
+      {menu && (
+        <p className="text-sm font-bold text-ink">
+          {menu.name}・{menu.duration_minutes}分
+        </p>
+      )}
+      {!fixedStaffId && staffList.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {staffList.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => {
+                // 担当を変えたら前の枠は捨てる（別の担当の枠で送らない）。
+                if (picked && picked.staffId !== s.id) onChange('');
+                setStaffId(s.id);
+              }}
+              aria-pressed={staffId === s.id}
+              className={`min-h-11 rounded-[10px] border px-3 text-sm ${
+                staffId === s.id
+                  ? 'border-liff-primary bg-liff-soft font-bold text-ink'
+                  : 'border-liff-line-strong bg-canvas text-ink'
+              }`}
+            >
+              {s.display_name}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {dates.map((d) => (
+          <button
+            key={d}
+            type="button"
+            onClick={() => setSelectedDate(d)}
+            aria-pressed={selectedDate === d}
+            className={`flex min-h-14 w-14 shrink-0 flex-col items-center justify-center rounded-[10px] border text-sm ${
+              selectedDate === d
+                ? 'border-liff-primary bg-liff-soft font-bold text-ink'
+                : 'border-liff-line-strong bg-canvas text-ink'
+            }`}
+          >
+            <span className="text-xs text-ink-faint">{formatWeekday(d)}</span>
+            <span>{Number(d.slice(8, 10))}</span>
+          </button>
+        ))}
+      </div>
+      {dates.length === 0 && (
+        <p className="text-sm text-ink-secondary">選べる期間に空きがありません。期間を変えてください。</p>
+      )}
+      {selectedDate && (
+        <div className="grid grid-cols-3 gap-2">
+          {daySlots.map((t) => {
+            const startsAt = jstStartsAtIso(selectedDate, t.start);
+            const active = picked?.startsAt === startsAt;
+            return (
+              <button
+                key={t.start}
+                type="button"
+                disabled={!t.open}
+                onClick={() =>
+                  onChange(active ? '' : { menuId, staffId: fixedStaffId ?? staffId, startsAt })
+                }
+                aria-pressed={active}
+                className={`min-h-11 rounded-[10px] border text-sm tabular-nums ${
+                  active
+                    ? 'border-liff-primary bg-liff-soft font-bold text-ink'
+                    : t.open
+                      ? 'border-liff-line-strong bg-canvas text-ink'
+                      : 'border-liff-line-strong bg-canvas text-ink-faint opacity-50'
+                }`}
+              >
+                {t.start}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {picked && (
+        <p className="text-sm font-bold text-ink">
+          {utcToJstMd(picked.startsAt)}（{utcToJstWeekday(picked.startsAt)}）
+          {utcToJstHm(picked.startsAt)}〜 を選んでいます
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
  * ブロック1つを描く。
  * 直し方 (error) は欄のすぐ下に出す (★V7 4-a)。枠の色も直しの色にする。
  */
@@ -1159,6 +1457,14 @@ function BlockView({
             value={value}
             onChange={(next) => onChange(block.name, next)}
             inputClass={inputClass}
+          />
+        )}
+
+        {block.type === 'booking' && (
+          <BookingSlotPicker
+            block={block}
+            value={value}
+            onChange={(next) => onChange(block.name, next)}
           />
         )}
 
