@@ -20,6 +20,7 @@ vi.mock('../lib/api.js', () => ({
     getEvent: vi.fn(),
     getEventSlots: vi.fn(),
     myEventBookings: vi.fn(),
+    liffConfig: vi.fn().mockResolvedValue({ success: true, data: {} }),
   },
 }));
 
