@@ -305,7 +305,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="例：然-NEN- はじめての定期便セミナー"
+            placeholder="例：はじめての定期便セミナー"
             className={inputClass}
           />
         </div>

@@ -41,7 +41,7 @@ export const FRIEND_ATTRIBUTES_V2_QA_FIXTURE: FriendAttributesV2Fixture = {
   items: [
     ['EC顧客連携済み', 4, 5, 10, 0, 12000, true],
     ['LINEログイン連携済み', 2, 5, 0, 0, null, true],
-    ['NEN会員', 2, 5, 10, 5, 15000, false],
+    ['定期便会員', 2, 5, 10, 5, 15000, false],
     ['商品到着確認対象', 4, 3, 3, 0, null, false],
     ['未契約', -1, 3, 0, 0, null, true],
     ['誕生日クーポン対象', 0, 0, 20, 0, null, false],

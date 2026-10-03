@@ -1529,7 +1529,7 @@ function PublishStep({
       <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-80">
         <AsideCard title="確定したときに届くメッセージ" note="プレビュー">
           <div className="bg-canvas-sunken rounded-card p-3">
-            <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
+            <p className="text-ink-faint mb-1 text-xs">LINE公式アカウント</p>
             <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
               {preview}
             </p>

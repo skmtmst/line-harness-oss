@@ -88,7 +88,8 @@ function defaultTitle(eventType: string): string {
     'ec.subscription.payment_failed': '定期便のお支払いをご確認ください',
     'ec.subscription.card_updated': 'カード変更・再決済結果のご案内',
     'ec.subscription.cancelled': '定期便の解約を受け付けました',
-  } as Record<string, string>)[eventType] || '然-NEN-からのお知らせ';
+    // 知らない種類のときの見出し。どの契約先でも使うので店名は書かない。
+  } as Record<string, string>)[eventType] || 'ショップからのお知らせ';
 }
 
 function destination(event: EcEvent, copy: EcNotificationCopy): string {

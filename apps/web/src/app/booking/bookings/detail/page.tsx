@@ -1376,7 +1376,7 @@ function BookingDetailInner() {
                 <h2 className="text-ink mb-1 text-sm font-semibold">承認したときの通知</h2>
                 <p className="text-ink-faint mb-3 text-xs">お客様に届く内容</p>
                 <div className="bg-canvas-sunken rounded-card p-3">
-                  <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
+                  <p className="text-ink-faint mb-1 text-xs">LINE公式アカウント</p>
                   <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
                     {approvedText({ menu_name: detail.menuName, staff_name: detail.staffName, starts_at: detail.startsAt })}
                   </p>
