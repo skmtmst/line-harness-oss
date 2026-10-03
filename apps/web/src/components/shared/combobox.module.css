@@ -143,6 +143,27 @@
   }
 }
 
+/*
+ * ★V8 仕上げ（M10）：候補は少し下から 200ms（窓・メニューと同じ速さ）。
+ * v7 は 120ms のまま。
+ */
+[data-theme='v8'] .popup {
+  animation-name: combobox-v8-in;
+  animation-duration: var(--motion-base);
+}
+
+@keyframes combobox-v8-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .list {
   display: flex;
   flex-direction: column;

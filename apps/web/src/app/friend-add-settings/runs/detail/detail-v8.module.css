@@ -1,0 +1,282 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8 友だち追加時の配信の実行の詳細（板 `N43uVX`）。
+ * 真ん中の段と右の「この追加について」で組む。
+ * 板が 1100px を切ったら右の列を真ん中の下へ畳む。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  container-type: inline-size;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.backLink {
+  align-self: flex-start;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.card {
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cardDesc {
+  margin: 6px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+/* 失敗の帯（赤の薄地＋右に緑の「もう一度」）。 */
+.failureBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-card);
+  background: var(--color-danger-bg);
+}
+
+.failureText {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--color-danger);
+}
+
+.failureText strong {
+  display: block;
+  font-size: 13px;
+}
+
+.failureText small {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.unknownBand {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-status-danger-border);
+  border-radius: var(--radius-control);
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 行ったことの段（番号・印・文・時刻）。 */
+.steps {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepOk,
+.stepNg,
+.stepWait {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.stepNg {
+  border-color: var(--color-status-danger-border);
+  background: var(--color-status-danger-soft);
+}
+
+.stepMark {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  flex-shrink: 0;
+}
+
+.stepNg .stepMark {
+  background: transparent;
+  color: var(--color-danger);
+}
+
+.stepWait .stepMark {
+  background: var(--color-canvas-sunken);
+}
+
+.stepDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-faint);
+}
+
+.stepIndex {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepText {
+  flex: 1;
+  min-width: 0;
+}
+
+.stepText strong {
+  display: block;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stepText small {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.stepNg .stepText small {
+  color: var(--color-danger);
+}
+
+.stepError {
+  color: var(--color-danger);
+}
+
+.notice {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 右の「この追加について」の行。 */
+.rows {
+  display: grid;
+  margin: 8px 0 0;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: 12px;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row dt {
+  color: var(--color-ink-faint);
+  flex-shrink: 0;
+}
+
+.row dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 600;
+  text-align: right;
+  text-overflow: ellipsis;
+}
+
+.mono {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: normal;
+}
+
+.sideActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.statusNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+@container (max-width: 1099px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

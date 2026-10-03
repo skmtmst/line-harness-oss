@@ -70,4 +70,20 @@
 [data-theme='v8'] .button:hover {
   background: var(--color-canvas-sunken);
 }
+
+/*
+ * ★V8 仕上げ（M10）：共通ボタンと同じ印・同じ速さ。
+ * 押した沈みは 120ms、キーボードの印は action の 2px の輪。
+ */
+[data-theme='v8'] .button {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    scale var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .button:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
 }
