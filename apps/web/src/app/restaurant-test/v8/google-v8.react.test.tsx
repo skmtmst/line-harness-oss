@@ -55,6 +55,7 @@ describe('j0Wcg GoogleビジネスのV8', () => {
   it('数4と表・足元の帯が出る', async () => {
     render(<GoogleV8 />)
     await screen.findByPlaceholderText('口コミを探す')
+    await screen.findByText('佐藤 S.')
     const board = document.querySelector('[data-design-node="j0Wcg"]')!
     for (const label of ['未返信', '平均の評価', '要確認', 'Google経由の予約']) {
       expect(board.textContent).toContain(label)

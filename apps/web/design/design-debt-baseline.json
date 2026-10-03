@@ -393,6 +393,9 @@
   "app/restaurant-test/v8/google.tsx": {
     "unresolved-classname": 23
   },
+  "app/restaurant-test/v8/inventory.tsx": {
+    "unresolved-classname": 46
+  },
   "app/restaurant-test/v8/menu.tsx": {
     "unresolved-classname": 24
   },
