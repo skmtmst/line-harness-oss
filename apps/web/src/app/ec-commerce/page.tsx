@@ -33,6 +33,7 @@ import {
   type EcOrder,
 } from '@/lib/api'
 import ConnectorPanel from './connector-panel'
+import EcConnectorV8 from './ec-connector-v8'
 import EcTabs from './ec-tabs-view'
 import SubscriptionsPanel from './subscriptions-panel'
 import OrderDetailDrawer from './order-detail-drawer'
@@ -570,7 +571,8 @@ function EcCommercePageInner() {
       <EcTabs accountId={selectedAccountId} active={tab as typeof EC_TABS[number]['key']} />
       {tab === 'events' ? <EventsPanel accountId={selectedAccountId} /> : null}
       {tab === 'subscriptions' ? <SubscriptionsPanel accountId={selectedAccountId} /> : null}
-      {tab === 'connector' ? <ConnectorPanel accountId={selectedAccountId} /> : null}
+      {/* ★V8-B（板 `iLJmw`）：つなぎ先だけ v8 の枠に切り替える。 */}
+      {tab === 'connector' ? (theme === 'v8' ? <EcConnectorV8 /> : <ConnectorPanel accountId={selectedAccountId} />) : null}
     </div>
   )
 }
