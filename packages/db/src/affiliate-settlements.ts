@@ -81,7 +81,8 @@ async function sha256Hex(value: string): Promise<string> {
 // 順に振り、作った時刻も残るため、記録時刻以前の最新版は「判断が残っていれば
 // 選ばれていた版」と一致する。新しい予約時刻・CAS・追加payloadは要らない。
 //
-// - 'version' … 不変の版で価格が決まる（判断の版か、記録時刻の版）
+// - 'version' … 不変の版で価格が決まる（判断の版か、記録時刻以前の最新版。
+//   ただし最新版が記録時刻と同時刻で他に候補があるときは確定不能として null）
 // - 'legacy-live' … 版管理前の昔の案件・汎用リンク・率の紹介者・古いスキーマ。
 //   旧来どおり今の案件額を使う（公開経路では版が必ずあるため実質変わらない）
 // - null … 版管理下の案件なのに記録時刻の版が無い（欠落・改ざん）。
@@ -96,24 +97,40 @@ export type ApprovalRewardBasis =
   | { kind: 'version'; version: ApprovalRewardVersionBasis }
   | { kind: 'legacy-live' };
 
-/** 記録時刻以前に作られた最新の版。無ければ null。 */
+/**
+ * 記録時刻以前に作られた最新の版。無ければ null。
+ *
+ * 最新の候補が記録時刻と同時刻で、他にも候補があるときは前後が決め
+ * られないため null を返す（同時刻で確定不能→呼び出し側が承認を拒む。
+ * jstNow はms精度のため、処理now採取→判断保存失敗→同じmsで新版保存
+ * という有限順序が実在する。F-23 独立SOURCE監査）。候補が1件だけの
+ * 同時刻はその版を使う（他に選びようが無い）。
+ */
 export async function getOfferVersionAtTime(
   db: D1Database,
   offerId: string,
   at: string,
 ): Promise<ApprovalRewardVersionBasis | null> {
-  const row = await db
+  const found = await db
     .prepare(
-      `SELECT reward_amount, reward_miles FROM affiliate_offer_versions
+      `SELECT reward_amount, reward_miles, created_at FROM affiliate_offer_versions
         WHERE offer_id = ?
           AND julianday(created_at) <= julianday(?)
         ORDER BY version_number DESC
-        LIMIT 1`,
+        LIMIT 2`,
     )
     .bind(offerId, at)
-    .first<{ reward_amount: number; reward_miles: number }>();
-  if (!row) return null;
-  return { rewardAmount: row.reward_amount, rewardMiles: row.reward_miles };
+    .all<{ reward_amount: number; reward_miles: number; created_at: string }>();
+  const top = found.results[0];
+  if (!top) return null;
+  if (found.results.length > 1) {
+    const sameInstant = await db
+      .prepare(`SELECT 1 AS same WHERE julianday(?) = julianday(?)`)
+      .bind(top.created_at, at)
+      .first<{ same: number }>();
+    if (sameInstant) return null;
+  }
+  return { rewardAmount: top.reward_amount, rewardMiles: top.reward_miles };
 }
 
 export async function resolveApprovalRewardBasis(
