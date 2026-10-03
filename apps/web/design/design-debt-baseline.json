@@ -97,7 +97,7 @@
     "unresolved-classname": 11
   },
   "app/booking/menus/settings-v8.tsx": {
-    "unresolved-classname": 207
+    "unresolved-classname": 208
   },
   "app/booking/menus/staff/assign-v8.tsx": {
     "unresolved-classname": 61,
@@ -425,6 +425,12 @@
   },
   "app/restaurant-test/v8/organization.tsx": {
     "unresolved-classname": 58
+  },
+  "app/restaurant-test/v8/reservation-phone.tsx": {
+    "unresolved-classname": 33
+  },
+  "app/restaurant-test/v8/reservations.tsx": {
+    "unresolved-classname": 46
   },
   "app/restaurant-test/v8/tables.tsx": {
     "unresolved-classname": 37

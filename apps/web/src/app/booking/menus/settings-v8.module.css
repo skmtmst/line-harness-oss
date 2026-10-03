@@ -95,6 +95,13 @@
   gap: 10px;
 }
 
+/* 板 VFxWU（1152）：畳んだスマホの代わりの「見え方」ボタン。
+   スマホが見えている広い板では出さない。 */
+.sidePhoneButton {
+  display: flex;
+  flex-direction: column;
+}
+
 .sideAction {
   display: flex;
 }
@@ -116,6 +123,13 @@
     padding: 16px;
   }
 
+  /* 板 P6EdLW（1152）：メニューの表は「担当」「30日」を畳み、
+     メニュー・時間・金額・状態だけにする。 */
+  .colStaff,
+  .colCount {
+    display: none;
+  }
+
   .sidePhone {
     display: none;
   }
@@ -127,6 +141,10 @@
 
 @container (min-width: 1081px) {
   .sideLineLink {
+    display: none;
+  }
+
+  .sidePhoneButton {
     display: none;
   }
 }
