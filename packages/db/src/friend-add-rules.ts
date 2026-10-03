@@ -5,9 +5,22 @@ export type FriendAddRuleStatus = 'draft' | 'published' | 'stopped' | 'archived'
 export type FriendAddRuleVersionStatus = 'draft' | 'published' | 'retired';
 
 export interface FriendAddRuleAction {
-  type: 'add_tag' | 'remove_tag' | 'start_scenario';
+  type:
+    | 'add_tag'
+    | 'remove_tag'
+    | 'start_scenario'
+    /* F9: 友だち情報を入れる・対応マークを付ける・マイルを渡す・共通情報を使う。 */
+    | 'set_friend_field'
+    | 'add_support_mark'
+    | 'grant_mileage'
+    | 'use_common_var';
   label: string;
   targetId?: string;
+  /** set_friend_field が入れる値・use_common_var が足し引きする数（文字）。 */
+  value?: string;
+  /** grant_mileage が渡すマイル数。use_common_var の足し引きの向き。 */
+  amount?: number;
+  op?: string;
 }
 
 export interface FriendAddRuleDefinition {

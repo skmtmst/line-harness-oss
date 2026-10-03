@@ -46,6 +46,11 @@ const ACTION_TYPES = new Set([
   'add_tag',
   'remove_tag',
   'start_scenario',
+  // F9: 友だち情報を入れる・対応マークを付ける・マイルを渡す・共通情報を使う。
+  'set_friend_field',
+  'add_support_mark',
+  'grant_mileage',
+  'use_common_var',
 ]);
 
 type RuleInput = {
@@ -275,6 +280,51 @@ function validateInput(body: RuleInput): string | null {
   if (!conditionAst.ok && conditionAst.error !== 'legacy_text') {
     return CONDITION_AST_MESSAGES[conditionAst.error];
   }
+  /*
+   * F9: 4つの操作は形が壊れていると実行時に黙って飛ぶだけになる。
+   * 保存の側で止める（下書きも含む。壊れた値を残すと公開前確認でも
+   * 理由が「参照先」だけになり、何が悪いか分からなくなる）。
+   */
+  const actions = body.definition?.actions;
+  if (actions != null) {
+    if (!Array.isArray(actions)) return 'することの指定が正しくありません';
+    for (const raw of actions) {
+      const action = (raw ?? {}) as { type?: unknown; targetId?: unknown; value?: unknown; amount?: unknown; op?: unknown };
+      switch (action.type) {
+        case 'set_friend_field':
+          if (typeof action.targetId !== 'string' || !action.targetId) {
+            return '入れる友だち情報の項目を選んでください';
+          }
+          if (typeof action.value !== 'string' || [...action.value].length > 2000) {
+            return '入れる値は2000文字までの文字で入力してください';
+          }
+          break;
+        case 'add_support_mark':
+          if (typeof action.targetId !== 'string' || !action.targetId) {
+            return '付ける対応マークを選んでください';
+          }
+          break;
+        case 'grant_mileage':
+          if (!Number.isInteger(action.amount) || (action.amount as number) < 1 || (action.amount as number) > 1000000) {
+            return '渡すマイルは1〜1000000の整数で入力してください';
+          }
+          break;
+        case 'use_common_var':
+          if (typeof action.targetId !== 'string' || !action.targetId) {
+            return '使う共通情報を選んでください';
+          }
+          if (action.op !== 'add' && action.op !== 'sub') {
+            return '共通情報の足し引きの向きを選んでください';
+          }
+          if (typeof action.value !== 'string' || !Number.isFinite(Number(action.value))) {
+            return '共通情報に足し引きする数は数字で入力してください';
+          }
+          break;
+        default:
+          break;
+      }
+    }
+  }
   return null;
 }
 
@@ -375,6 +425,54 @@ async function validateReferences(
         WHERE line_account_id = ? AND is_active = 1 AND id IN (${placeholders})`,
     ).bind(accountId, ...unique).all<{ id: string }>();
     if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えないシナリオが含まれています。');
+  }
+  /*
+   * F9: 4つの操作の参照先も、このアカウントの持ち物かを確かめる。
+   * 友だち情報欄は scopes の所属を見る（所属が無ければ共通。reminders と同じ形）。
+   * 対応マークに所属の置き場は無いので存在だけを見る。
+   * 共通情報は var_key と所属・未保管を見る（実行側と同じ条件）。
+   * マイルは金額だけなので参照先が無い（形は保存側の validateInput が見る）。
+   */
+  const actionFieldIds = definition.actions
+    .filter((action) => action.type === 'set_friend_field')
+    .map((action) => action.targetId)
+    .filter((id): id is string => typeof id === 'string' && Boolean(id));
+  if (actionFieldIds.length > 0) {
+    const unique = [...new Set(actionFieldIds)];
+    const placeholders = unique.map(() => '?').join(',');
+    const rows = await db.prepare(
+      `SELECT DISTINCT ff.id AS id FROM friend_fields ff
+         LEFT JOIN friend_field_scopes ffs ON ffs.field_id = ff.id
+        WHERE ff.id IN (${placeholders})
+          AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)`,
+    ).bind(...unique, accountId).all<{ id: string }>();
+    if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えない友だち情報の項目が含まれています。');
+  }
+  const actionMarkIds = definition.actions
+    .filter((action) => action.type === 'add_support_mark')
+    .map((action) => action.targetId)
+    .filter((id): id is string => typeof id === 'string' && Boolean(id));
+  if (actionMarkIds.length > 0) {
+    const unique = [...new Set(actionMarkIds)];
+    const placeholders = unique.map(() => '?').join(',');
+    const rows = await db.prepare(
+      `SELECT id FROM support_marks WHERE id IN (${placeholders})`,
+    ).bind(...unique).all<{ id: string }>();
+    if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えない対応マークが含まれています。');
+  }
+  const actionVarKeys = definition.actions
+    .filter((action) => action.type === 'use_common_var')
+    .map((action) => action.targetId)
+    .filter((id): id is string => typeof id === 'string' && Boolean(id));
+  if (actionVarKeys.length > 0) {
+    const unique = [...new Set(actionVarKeys)];
+    const placeholders = unique.map(() => '?').join(',');
+    const rows = await db.prepare(
+      `SELECT var_key FROM common_vars
+        WHERE var_key IN (${placeholders})
+          AND line_account_id = ? AND archived_at IS NULL`,
+    ).bind(...unique, accountId).all<{ var_key: string }>();
+    if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えない共通情報が含まれています。');
   }
   if (definition.activeFrom && definition.activeUntil && definition.activeFrom > definition.activeUntil) {
     push(friendKind, '有効期間の終了は開始より後にしてください。');
