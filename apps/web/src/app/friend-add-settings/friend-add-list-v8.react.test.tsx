@@ -271,6 +271,17 @@ test('v8 の閲覧のみは作る操作を押せない形にする（隠さな�
   expect(create!.disabled).toBe(true)
 })
 
+test('v8 の閲覧のみは見出しの下に閲覧のみの帯が出る（板 LEwkJ）', async () => {
+  staffRole = 'staff'
+  document.documentElement.dataset.theme = 'v8'
+  await act(async () => root.render(<FriendAddSettingsPage />))
+  await settle()
+  await eventually(() => {
+    expect(host.querySelector('[data-design-node="MRhef"]')).toBeTruthy()
+  })
+  expect(host.textContent).toContain('閲覧のみで見ています')
+})
+
 test('v7 の下では従来の一覧が出る（新しい一覧には切り替わらない）', async () => {
   await act(async () => root.render(<FriendAddSettingsPage />))
   await settle()
