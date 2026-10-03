@@ -26,14 +26,19 @@ import { bookingErrorMessage, bookingRulesErrorMessage } from './menu-validation
 import styles from './settings-v8.module.css'
 import photoStyles from './photos-v8.module.css'
 
+type StoreSlot = 'exterior' | 'interior' | 'waiting'
+const STORE_SLOTS: Array<{ key: StoreSlot, label: string, field: 'store_photo_media_id' | 'store_photo_interior_media_id' | 'store_photo_waiting_media_id' }> = [
+  { key: 'exterior', label: '外観', field: 'store_photo_media_id' },
+  { key: 'interior', label: '店内', field: 'store_photo_interior_media_id' },
+  { key: 'waiting', label: '待合', field: 'store_photo_waiting_media_id' },
+]
+
 type PickerTarget =
-  | { scope: 'store' }
+  | { scope: 'store', slot: StoreSlot, name: string }
   | { scope: 'menu', id: string, name: string, version: number | undefined }
   | { scope: 'staff', id: string, name: string }
 
-function targetName(target: PickerTarget, settings: BookingSettings | null): string {
-  if (target.scope === 'store') return 'お店'
-  if (target.scope === 'menu') return target.name
+function targetName(target: PickerTarget): string {
   return target.name
 }
 
@@ -119,9 +124,10 @@ export default function PhotosTabV8({
 
   const canEditAny = canEditMenus || canEditSettings
 
-  async function saveStorePhoto(mediaId: string | null) {
+  async function saveStorePhoto(slot: StoreSlot, mediaId: string | null) {
     if (!settings) return
-    setSavingKey('store')
+    const label = STORE_SLOTS.find((item) => item.key === slot)?.label ?? 'お店'
+    setSavingKey(`store:${slot}`)
     setSaveError(null)
     try {
       const response = await bookingApi.saveSettings(accountId, {
@@ -137,10 +143,10 @@ export default function PhotosTabV8({
         liffDateView: settings.liffDateView,
         reminderDayBeforeTime: settings.reminderDayBeforeTime,
         reminderHoursBefore: settings.reminderHoursBefore,
-        store_photo_media_id: mediaId,
+        [STORE_SLOTS.find((item) => item.key === slot)?.field ?? 'store_photo_media_id']: mediaId,
       })
       if (!response.success) throw new Error('booking_settings_save_failed')
-      notifyToast(mediaId ? 'お店の写真を付けました。' : 'お店の写真を外しました。')
+      notifyToast(mediaId ? `お店の写真（${label}）を付けました。` : `お店の写真（${label}）を外しました。`)
       onReload()
     } catch (cause) {
       setSaveError(bookingRulesErrorMessage(cause, '保存'))
@@ -194,7 +200,7 @@ export default function PhotosTabV8({
   }
 
   function saveTarget(target: PickerTarget, mediaId: string | null) {
-    if (target.scope === 'store') return saveStorePhoto(mediaId)
+    if (target.scope === 'store') return saveStorePhoto(target.slot, mediaId)
     if (target.scope === 'menu') {
       const menu = menus.find((item) => item.id === target.id)
       if (!menu) {
@@ -236,14 +242,28 @@ export default function PhotosTabV8({
             onRetry={onReload}
           />
         ) : (
-          <PhotoSlot
-            name="お店"
-            photoUrl={settings.store_photo_url ?? null}
-            canEdit={canEditSettings}
-            saving={savingKey === 'store'}
-            onChoose={() => setPicker({ scope: 'store' })}
-            onClear={() => void saveStorePhoto(null)}
-          />
+          <ul className={photoStyles.rows}>
+            {STORE_SLOTS.map((slot) => {
+              const url = slot.key === 'exterior'
+                ? settings.store_photo_url
+                : slot.key === 'interior'
+                  ? settings.store_photo_interior_url
+                  : settings.store_photo_waiting_url
+              return (
+                <li key={slot.key} className={photoStyles.row}>
+                  <span className={photoStyles.rowName}>{slot.label}</span>
+                  <PhotoSlot
+                    name={`お店（${slot.label}）`}
+                    photoUrl={url ?? null}
+                    canEdit={canEditSettings}
+                    saving={savingKey === `store:${slot.key}`}
+                    onChoose={() => setPicker({ scope: 'store', slot: slot.key, name: `お店（${slot.label}）` })}
+                    onClear={() => void saveStorePhoto(slot.key, null)}
+                  />
+                </li>
+              )
+            })}
+          </ul>
         )}
       </section>
 
@@ -315,11 +335,15 @@ export default function PhotosTabV8({
         )}
       </section>
 
+      <p className={photoStyles.footnote}>
+        使っている写真は、登録メディアから消そうとすると「ここで使っています」と出て止まります。
+      </p>
+
       <MediaPickerDialog
         open={picker !== null}
         accountId={accountId}
         kind="image"
-        title={picker ? `「${targetName(picker, settings)}」の写真を選ぶ` : '写真を選ぶ'}
+        title={picker ? `「${targetName(picker)}」の写真を選ぶ` : '写真を選ぶ'}
         onClose={() => setPicker(null)}
         onSelect={(item: MediaItem) => {
           const target = picker

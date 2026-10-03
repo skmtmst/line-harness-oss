@@ -275,6 +275,50 @@ describe('予約の写真（メニュー・スタッフ・お店に1枚ずつ）
     expect(usages('photo-a1')).toEqual([{ ref_kind: 'booking_settings', ref_id: createdBody.data.id }]);
   });
 
+  test('お店の写真3枠は同じ写真を使い回せて、全部外すと台帳から消える', async () => {
+    const { app, env } = makeApp();
+    const created = await app.request('/api/booking/admin/settings?account_id=account-a', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...SETTINGS_BODY,
+        expectedVersion: 0,
+        store_photo_media_id: 'photo-a1',
+        store_photo_interior_media_id: 'photo-a1',
+        store_photo_waiting_media_id: 'photo-a2',
+      }),
+    }, env);
+    expect(created.status).toBe(201);
+    const { id } = (await created.json() as { data: { id: string } }).data;
+    // 同じ写真を2枠で使っても台帳は1行（主キーが写真・種類・相手）。
+    expect(usages('photo-a1')).toEqual([{ ref_kind: 'booking_settings', ref_id: id }]);
+    expect(usages('photo-a2')).toEqual([{ ref_kind: 'booking_settings', ref_id: id }]);
+
+    // 外観だけ外しても、店内で使っているので台帳は残る。
+    const clearedOne = await app.request('/api/booking/admin/settings?account_id=account-a', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...SETTINGS_BODY, expectedVersion: 1, store_photo_media_id: null }),
+    }, env);
+    expect(clearedOne.status).toBe(200);
+    expect(usages('photo-a1')).toEqual([{ ref_kind: 'booking_settings', ref_id: id }]);
+
+    // 残りも外すと台帳から消える。
+    const clearedAll = await app.request('/api/booking/admin/settings?account_id=account-a', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...SETTINGS_BODY,
+        expectedVersion: 2,
+        store_photo_interior_media_id: null,
+        store_photo_waiting_media_id: null,
+      }),
+    }, env);
+    expect(clearedAll.status).toBe(200);
+    expect(usages('photo-a1')).toEqual([]);
+    expect(usages('photo-a2')).toEqual([]);
+  });
+
   test('使っている写真は削除の影響に予約の使用先が出る', async () => {
     const { app, env } = makeApp();
     const created = await app.request('/api/booking/admin/menus?account_id=account-a', {

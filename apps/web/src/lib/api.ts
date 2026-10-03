@@ -13758,10 +13758,18 @@ export interface BookingSettings {
   reminderDayBeforeTime: string | null;
   /** 当日お知らせを開始の何時間前に送るか。 */
   reminderHoursBefore: number;
-  /** お店の写真。登録メディアから1枚。無いときは null。 */
+  /** お店の写真（外観）。登録メディアから1枚。無いときは null。 */
   storePhotoMediaId: string | null;
-  /** お店の写真の宛先。無いときは null。 */
+  /** お店の写真（外観）の宛先。無いときは null。 */
   store_photo_url: string | null;
+  /** お店の写真（店内）。無いときは null。 */
+  storePhotoInteriorMediaId: string | null;
+  /** お店の写真（店内）の宛先。無いときは null。 */
+  store_photo_interior_url: string | null;
+  /** お店の写真（待合）。無いときは null。 */
+  storePhotoWaitingMediaId: string | null;
+  /** お店の写真（待合）の宛先。無いときは null。 */
+  store_photo_waiting_url: string | null;
   menuCount: number;
   activeMenuCount: number;
   inactiveMenuCount: number;
@@ -13793,8 +13801,10 @@ export type SaveBookingSettings = Pick<
   /** 当日お知らせを何時間前に送るか（1〜72）。null で従来の2時間前。 */
   reminderHoursBefore: number | null;
   businessHours?: BookingSettings['businessHours'];
-  /** お店の写真。省いたら今の値を保つ。null で外す。 */
+  /** お店の写真（外観・店内・待合）。省いたら今の値を保つ。null で外す。 */
   store_photo_media_id?: string | null;
+  store_photo_interior_media_id?: string | null;
+  store_photo_waiting_media_id?: string | null;
 };
 
 export interface BookingStaff {

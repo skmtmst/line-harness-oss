@@ -98,6 +98,10 @@ const settings: BookingSettings = {
   liffDateView: 'list',
   storePhotoMediaId: null,
   store_photo_url: null,
+  storePhotoInteriorMediaId: null,
+  store_photo_interior_url: null,
+  storePhotoWaitingMediaId: null,
+  store_photo_waiting_url: null,
 }
 
 let host: HTMLDivElement
@@ -161,8 +165,11 @@ describe('予約設定の写真タブ', () => {
     expect(host.textContent).toContain('お店の写真')
     expect(host.textContent).toContain('メニューの写真')
     expect(host.textContent).toContain('スタッフの写真')
-    // 空は3枠（お店・カラー・山田）。写真付きのカットには出ない。
-    expect(buttons('写真を選ぶ')).toHaveLength(3)
+    // お店は3枠（外観・店内・待合）。空は5枠（お店3・カラー・山田）。
+    expect(host.textContent).toContain('外観')
+    expect(host.textContent).toContain('店内')
+    expect(host.textContent).toContain('待合')
+    expect(buttons('写真を選ぶ')).toHaveLength(5)
     expect(host.querySelector('img[alt="カットの写真"]')).not.toBeNull()
   })
 
@@ -199,6 +206,28 @@ describe('予約設定の写真タブ', () => {
     expect(fixture.updateStaff).toHaveBeenCalledWith('account-a', 'staff-1', {
       photo_media_id: 'photo-used',
     })
+  })
+
+  it('お店（外観）の写真を選ぶと保存口へ外観の欄で送られる', async () => {
+    renderTab()
+    const choose = buttons('写真を選ぶ').find((button) =>
+      button.getAttribute('aria-label')?.includes('お店（外観）'),
+    )
+    expect(choose).toBeDefined()
+    await act(async () => {
+      choose!.click()
+    })
+    const pick = Array.from(
+      document.body.querySelectorAll('button[role="option"]'),
+    )[0] as HTMLButtonElement | undefined
+    expect(pick?.textContent).toContain('photo-used.png')
+    await act(async () => {
+      pick!.click()
+    })
+    expect(fixture.saveSettings).toHaveBeenCalledWith(
+      'account-a',
+      expect.objectContaining({ store_photo_media_id: 'photo-used' }),
+    )
   })
 
   it('写真付きの枠には『替える』『外す』が出て、外すと null が送られる', async () => {

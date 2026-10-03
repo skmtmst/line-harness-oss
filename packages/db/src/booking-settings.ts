@@ -64,8 +64,12 @@ export interface BookingAdminSettings {
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
   /** LIFF 予約「日時を選ぶ」段の最初の形。migration 前の行も 'list'。 */
   liffDateView: LiffDateView;
-  /** お店の写真。登録メディア(media.id)から1枚。無いときは null。 */
+  /** お店の写真（外観）。登録メディア(media.id)から1枚。無いときは null。 */
   storePhotoMediaId: string | null;
+  /** お店の写真（店内）。無いときは null。 */
+  storePhotoInteriorMediaId: string | null;
+  /** お店の写真（待合）。無いときは null。 */
+  storePhotoWaitingMediaId: string | null;
   /** 前日お知らせの送信時刻（店舗タイムゾーンの壁時刻）。null は予約24時間前。 */
   reminderDayBeforeTime: string | null;
   /** 当日お知らせを開始の何時間前に送るか。未設定の店舗は既定値。 */
@@ -96,10 +100,12 @@ export interface BookingAdminSettingsInput {
    */
   liffDateView?: LiffDateView;
   /**
-   * お店の写真。省いたときは今の値を保つ。null で外す。
+   * お店の写真（外観・店内・待合）。省いたときは今の値を保つ。null で外す。
    * 561より前のDBには列が無いので、保存時に列が無ければ書き込めない。
    */
   storePhotoMediaId?: string | null;
+  storePhotoInteriorMediaId?: string | null;
+  storePhotoWaitingMediaId?: string | null;
   businessHours?: Array<{ weekday: number; intervals: BookingInterval[] }>;
 }
 
@@ -197,6 +203,8 @@ export async function getBookingAdminSettings(
         reminder_hours_before: number | null;
         liff_date_view?: string | null;
         store_photo_media_id?: string | null;
+        store_photo_interior_media_id?: string | null;
+        store_photo_waiting_media_id?: string | null;
         business_hours_configured: number;
         version: number;
         updated_at: string;
@@ -253,6 +261,8 @@ export async function getBookingAdminSettings(
     liffDateView: normalizeLiffDateView(setting?.liff_date_view),
     // SELECT * で読むので、561より前の行（列が無い）でも null で返せる。
     storePhotoMediaId: setting?.store_photo_media_id ?? null,
+    storePhotoInteriorMediaId: setting?.store_photo_interior_media_id ?? null,
+    storePhotoWaitingMediaId: setting?.store_photo_waiting_media_id ?? null,
     menuCount,
     activeMenuCount,
     inactiveMenuCount: Math.max(0, menuCount - activeMenuCount),
@@ -284,8 +294,10 @@ export async function saveBookingAdminSettings(
 > {
   const now = jstNow();
   let changed = 0;
-  // お店の写真は送られたときだけ書く。送らなければ今の値を保つ。
+  // お店の写真（外観・店内・待合）は送られたものだけ書く。送らなければ今の値を保つ。
   const hasStorePhoto = input.storePhotoMediaId !== undefined;
+  const hasStorePhotoInterior = input.storePhotoInteriorMediaId !== undefined;
+  const hasStorePhotoWaiting = input.storePhotoWaitingMediaId !== undefined;
   if (input.expectedVersion === 0) {
     const settingsId = crypto.randomUUID();
     const create = db.prepare(`INSERT INTO booking_settings
@@ -294,9 +306,11 @@ export async function saveBookingAdminSettings(
        approval_mode, hold_minutes, slot_granularity_minutes,
        reminder_day_before_time, reminder_hours_before, liff_date_view,
        ${hasStorePhoto ? 'store_photo_media_id,' : ''}
+       ${hasStorePhotoInterior ? 'store_photo_interior_media_id,' : ''}
+       ${hasStorePhotoWaiting ? 'store_photo_waiting_media_id,' : ''}
        business_hours_configured,
        created_at, updated_at)
-      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${hasStorePhoto ? '?,' : ''} ?, ?, ?
+      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${hasStorePhoto ? '?,' : ''}${hasStorePhotoInterior ? '?,' : ''}${hasStorePhotoWaiting ? '?,' : ''} ?, ?, ?
       FROM line_accounts
       WHERE id = ?
       ON CONFLICT(line_account_id) DO NOTHING`)
@@ -314,6 +328,8 @@ export async function saveBookingAdminSettings(
         input.reminderHoursBefore,
         input.liffDateView ?? 'list',
         ...(hasStorePhoto ? [input.storePhotoMediaId] : []),
+        ...(hasStorePhotoInterior ? [input.storePhotoInteriorMediaId] : []),
+        ...(hasStorePhotoWaiting ? [input.storePhotoWaitingMediaId] : []),
         input.businessHours === undefined ? 0 : 1,
         now,
         now,
@@ -365,6 +381,8 @@ export async function saveBookingAdminSettings(
           reminder_day_before_time = ?, reminder_hours_before = ?,
           liff_date_view = COALESCE(?, liff_date_view),
           ${hasStorePhoto ? 'store_photo_media_id = ?,' : ''}
+          ${hasStorePhotoInterior ? 'store_photo_interior_media_id = ?,' : ''}
+          ${hasStorePhotoWaiting ? 'store_photo_waiting_media_id = ?,' : ''}
           business_hours_configured = 1, version = version + 1, updated_at = ?
       WHERE line_account_id = ? AND version = ?`)
       .bind(
@@ -380,6 +398,8 @@ export async function saveBookingAdminSettings(
         input.reminderHoursBefore,
         input.liffDateView ?? null,
         ...(hasStorePhoto ? [input.storePhotoMediaId] : []),
+        ...(hasStorePhotoInterior ? [input.storePhotoInteriorMediaId] : []),
+        ...(hasStorePhotoWaiting ? [input.storePhotoWaitingMediaId] : []),
         now,
         input.lineAccountId,
         input.expectedVersion,
@@ -394,6 +414,8 @@ export async function saveBookingAdminSettings(
           reminder_day_before_time = ?, reminder_hours_before = ?,
           liff_date_view = COALESCE(?, liff_date_view),
           ${hasStorePhoto ? 'store_photo_media_id = ?,' : ''}
+          ${hasStorePhotoInterior ? 'store_photo_interior_media_id = ?,' : ''}
+          ${hasStorePhotoWaiting ? 'store_photo_waiting_media_id = ?,' : ''}
           version = version + 1, updated_at = ?
       WHERE line_account_id = ? AND version = ?`)
       .bind(
@@ -409,6 +431,8 @@ export async function saveBookingAdminSettings(
         input.reminderHoursBefore,
         input.liffDateView ?? null,
         ...(hasStorePhoto ? [input.storePhotoMediaId] : []),
+        ...(hasStorePhotoInterior ? [input.storePhotoInteriorMediaId] : []),
+        ...(hasStorePhotoWaiting ? [input.storePhotoWaitingMediaId] : []),
         now,
         input.lineAccountId,
         input.expectedVersion,

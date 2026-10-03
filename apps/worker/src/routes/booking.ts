@@ -1867,6 +1867,8 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       reminderHoursBefore: number | null;
       liffDateView?: LiffDateView;
       storePhotoMediaId?: string | null;
+      storePhotoInteriorMediaId?: string | null;
+      storePhotoWaitingMediaId?: string | null;
       businessHours?: BookingBusinessHours;
     };
   }
@@ -1900,16 +1902,19 @@ function readBookingAdminSettings(input: Record<string, unknown>):
     : input.liffDateView === 'list' || input.liffDateView === 'calendar'
       ? input.liffDateView
       : 'invalid';
-  // お店の写真。省いたら今の値を保つ。null・空文字は外す。形が違えば拒否する。
-  const storePhotoMediaId = !Object.hasOwn(input, 'store_photo_media_id')
-    ? undefined
-    : input.store_photo_media_id === null || input.store_photo_media_id === ''
-      ? null
-      : typeof input.store_photo_media_id === 'string'
-        && input.store_photo_media_id.trim() !== ''
-        && input.store_photo_media_id.trim().length <= 200
-        ? input.store_photo_media_id.trim()
-        : 'invalid';
+  // お店の写真（外観・店内・待合）。省いたら今の値を保つ。
+  // null・空文字は外す。形が違えば拒否する。
+  const readStorePhoto = (field: string): string | null | undefined | 'invalid' => {
+    if (!Object.hasOwn(input, field)) return undefined;
+    const raw = input[field];
+    if (raw === null || raw === '') return null;
+    return typeof raw === 'string' && raw.trim() !== '' && raw.trim().length <= 200
+      ? raw.trim()
+      : 'invalid';
+  };
+  const storePhotoMediaId = readStorePhoto('store_photo_media_id');
+  const storePhotoInteriorMediaId = readStorePhoto('store_photo_interior_media_id');
+  const storePhotoWaitingMediaId = readStorePhoto('store_photo_waiting_media_id');
 
   if (expectedVersion === null) return { ok: false, error: 'expectedVersionが正しくありません' };
   if (!isValidTimeZone(timeZone)) return { ok: false, error: 'タイムゾーンが正しくありません' };
@@ -1934,7 +1939,9 @@ function readBookingAdminSettings(input: Record<string, unknown>):
   if (liffDateView === 'invalid') {
     return { ok: false, error: '日時を選ぶ画面の最初の形が正しくありません' };
   }
-  if (storePhotoMediaId === 'invalid') {
+  if (storePhotoMediaId === 'invalid'
+    || storePhotoInteriorMediaId === 'invalid'
+    || storePhotoWaitingMediaId === 'invalid') {
     return { ok: false, error: '写真は登録メディアから選んでください' };
   }
   if (businessHours && !businessHours.ok) return businessHours;
@@ -1954,6 +1961,8 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       reminderHoursBefore,
       ...(liffDateView !== undefined ? { liffDateView } : {}),
       ...(storePhotoMediaId !== undefined ? { storePhotoMediaId } : {}),
+      ...(storePhotoInteriorMediaId !== undefined ? { storePhotoInteriorMediaId } : {}),
+      ...(storePhotoWaitingMediaId !== undefined ? { storePhotoWaitingMediaId } : {}),
       ...(businessHours ? { businessHours: businessHours.value } : {}),
     },
   };
@@ -2165,6 +2174,8 @@ booking.get('/api/booking/admin/settings', async (c) => {
       data: {
         ...settings,
         store_photo_url: bookingPhotoUrl(c, settings.storePhotoMediaId),
+        store_photo_interior_url: bookingPhotoUrl(c, settings.storePhotoInteriorMediaId),
+        store_photo_waiting_url: bookingPhotoUrl(c, settings.storePhotoWaitingMediaId),
       },
     });
   } catch {
@@ -2181,10 +2192,16 @@ booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KE
     if (!body) return c.json({ success: false, error: 'invalid_json' }, 400);
     const parsed = readBookingAdminSettings(body);
     if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
-    // お店の写真は、同じアカウントの画像の登録メディアだけ受け付ける。
-    if (parsed.value.storePhotoMediaId) {
-      const photoError = await checkBookingPhotoMedia(c.env.DB, accountId, parsed.value.storePhotoMediaId);
-      if (photoError) return c.json({ success: false, error: photoError }, 400);
+    // お店の写真（外観・店内・待合）は、同じアカウントの画像の登録メディアだけ受け付ける。
+    for (const photoMediaId of [
+      parsed.value.storePhotoMediaId,
+      parsed.value.storePhotoInteriorMediaId,
+      parsed.value.storePhotoWaitingMediaId,
+    ]) {
+      if (photoMediaId) {
+        const photoError = await checkBookingPhotoMedia(c.env.DB, accountId, photoMediaId);
+        if (photoError) return c.json({ success: false, error: photoError }, 400);
+      }
     }
     const result = await saveBookingAdminSettings(c.env.DB, {
       lineAccountId: accountId,
@@ -2201,11 +2218,17 @@ booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KE
         data: { currentVersion: result.currentVersion },
       }, 409);
     }
-    // お店の写真を送られたときだけ、どの登録メディアを使っているかを台帳へ残す。
-    if (parsed.value.storePhotoMediaId !== undefined && result.item.id) {
-      await syncBookingPhotoUsage(
-        c.env.DB, 'booking_settings', result.item.id, parsed.value.storePhotoMediaId,
-      );
+    // お店の写真を1枠でも送られたときだけ、3枠ぜんぶの今の顔ぶれで台帳を書き直す。
+    // 同じ写真を何枠にも使えるので、枠ごとではなく写真ごとに1行へまとめる。
+    if ((parsed.value.storePhotoMediaId !== undefined
+      || parsed.value.storePhotoInteriorMediaId !== undefined
+      || parsed.value.storePhotoWaitingMediaId !== undefined)
+      && result.item.id) {
+      await syncBookingPhotoUsages(c.env.DB, 'booking_settings', result.item.id, [
+        result.item.storePhotoMediaId,
+        result.item.storePhotoInteriorMediaId,
+        result.item.storePhotoWaitingMediaId,
+      ]);
     }
     return c.json(
       {
@@ -2213,6 +2236,8 @@ booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KE
         data: {
           ...result.item,
           store_photo_url: bookingPhotoUrl(c, result.item.storePhotoMediaId),
+          store_photo_interior_url: bookingPhotoUrl(c, result.item.storePhotoInteriorMediaId),
+          store_photo_waiting_url: bookingPhotoUrl(c, result.item.storePhotoWaitingMediaId),
         },
       },
       result.status === 'created' ? 201 : 200,
@@ -2909,6 +2934,31 @@ async function checkBookingPhotoMedia(
   return null;
 }
 
+/**
+ * 写真の付け替え・取り外しを台帳へ残す。写真を送らなかったときは呼ばない。
+ *
+ * お店の写真は3枠（外観・店内・待合）で、同じ写真を何か所にも使える。
+ * 台帳の主キーは（写真・種類・相手）なので、同じ写真は1行にまとめる。
+ * どの枠にも使わなくなった写真だけ台帳から消える。
+ */
+async function syncBookingPhotoUsages(
+  db: D1Database,
+  refKind: BookingPhotoRefKind,
+  refId: string,
+  mediaIds: Array<string | null>,
+): Promise<void> {
+  const statements = [
+    db.prepare(`DELETE FROM media_usages WHERE ref_kind = ? AND ref_id = ?`)
+      .bind(refKind, refId),
+  ];
+  for (const mediaId of new Set(mediaIds.filter((id): id is string => !!id))) {
+    statements.push(db.prepare(
+      `INSERT INTO media_usages (media_id, ref_kind, ref_id) VALUES (?,?,?)`,
+    ).bind(mediaId, refKind, refId));
+  }
+  await db.batch(statements);
+}
+
 /** 写真の付け替え・取り外しを台帳へ残す。写真を送らなかったときは呼ばない。 */
 async function syncBookingPhotoUsage(
   db: D1Database,
@@ -2916,16 +2966,7 @@ async function syncBookingPhotoUsage(
   refId: string,
   mediaId: string | null,
 ): Promise<void> {
-  const statements = [
-    db.prepare(`DELETE FROM media_usages WHERE ref_kind = ? AND ref_id = ?`)
-      .bind(refKind, refId),
-  ];
-  if (mediaId) {
-    statements.push(db.prepare(
-      `INSERT INTO media_usages (media_id, ref_kind, ref_id) VALUES (?,?,?)`,
-    ).bind(mediaId, refKind, refId));
-  }
-  await db.batch(statements);
+  await syncBookingPhotoUsages(db, refKind, refId, [mediaId]);
 }
 
 /** お客さまの画面・管理画面へ返す写真の宛先。無いときは null。 */

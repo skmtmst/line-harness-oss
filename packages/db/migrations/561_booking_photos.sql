@@ -8,7 +8,11 @@
 -- media を先に消す順序とぶつかり、写真が残っているメニュー等で削除が止まる。
 ALTER TABLE menus ADD COLUMN photo_media_id TEXT;
 ALTER TABLE staff ADD COLUMN photo_media_id TEXT;
+-- お店の写真は3枠（B-1『店の写真』：外観・店内・待合）。外観が store_photo_media_id。
+-- 561はまだどのDBにも当てていないので、このファイルへ足す（562 は M3 が使う）。
 ALTER TABLE booking_settings ADD COLUMN store_photo_media_id TEXT;
+ALTER TABLE booking_settings ADD COLUMN store_photo_interior_media_id TEXT;
+ALTER TABLE booking_settings ADD COLUMN store_photo_waiting_media_id TEXT;
 
 CREATE TABLE media_usages_new (
   media_id   TEXT NOT NULL REFERENCES media(id) ON DELETE CASCADE,

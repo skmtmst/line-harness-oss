@@ -62,7 +62,7 @@ const SOURCES: Array<{
     refKind: 'booking_settings',
     table: 'booking_settings',
     idColumn: 'id',
-    columns: ['store_photo_media_id'],
+    columns: ['store_photo_media_id', 'store_photo_interior_media_id', 'store_photo_waiting_media_id'],
     match: 'exact',
   },
 ];

@@ -1341,21 +1341,28 @@ async function loadUsageContent(
     case 'booking_settings': {
       // 写真の列は登録メディアのIDそのもの。公開パスへ直してから
       // 状態判定へ渡す（561より前のDBでは列が無いので読めない）。
-      const photoColumn = usage.ref_kind === 'booking_settings'
-        ? 'store_photo_media_id'
-        : 'photo_media_id';
+      // お店の写真は3枠（外観・店内・待合）で、付いている分だけ渡す。
+      const photoColumns = usage.ref_kind === 'booking_menu'
+        ? ['photo_media_id']
+        : usage.ref_kind === 'booking_staff'
+          ? ['photo_media_id']
+          : ['store_photo_media_id', 'store_photo_interior_media_id', 'store_photo_waiting_media_id'];
       const photoTable = usage.ref_kind === 'booking_menu'
         ? 'menus'
         : usage.ref_kind === 'booking_staff' ? 'staff' : 'booking_settings';
       try {
         const row = await db.prepare(
-          `SELECT ${photoColumn} AS photo_media_id FROM ${photoTable} WHERE id = ? AND line_account_id = ?`,
-        ).bind(usage.ref_id, lineAccountId).first<{ photo_media_id: string | null }>();
-        if (!row?.photo_media_id) return null;
-        return {
-          shared: false,
-          columns: { [photoColumn]: mediaLiveContentPath(row.photo_media_id) },
-        };
+          `SELECT ${photoColumns.join(', ')} FROM ${photoTable} WHERE id = ? AND line_account_id = ?`,
+        ).bind(usage.ref_id, lineAccountId).first<Record<string, string | null>>();
+        if (!row) return null;
+        const columns: Record<string, string> = {};
+        for (const photoColumn of photoColumns) {
+          const photoId = row[photoColumn];
+          if (typeof photoId === 'string' && photoId) {
+            columns[photoColumn] = mediaLiveContentPath(photoId);
+          }
+        }
+        return Object.keys(columns).length > 0 ? { shared: false, columns } : null;
       } catch (err) {
         // 561より前のDBには写真の列が無い。その使用先は「未確認」に倒す。
         if (isMissingColumnError(err)) return null;

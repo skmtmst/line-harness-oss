@@ -1452,7 +1452,7 @@ CREATE TABLE booking_settings (
              AND substr(reminder_day_before_time, 1, 2) <= '23')), reminder_hours_before INTEGER
   CHECK (reminder_hours_before IS NULL
          OR reminder_hours_before BETWEEN 1 AND 72), liff_date_view TEXT NOT NULL DEFAULT 'list'
-  CHECK (liff_date_view IN ('list', 'calendar')), store_photo_media_id TEXT);
+  CHECK (liff_date_view IN ('list', 'calendar')), store_photo_media_id TEXT, store_photo_interior_media_id TEXT, store_photo_waiting_media_id TEXT);
 
 CREATE TABLE "bookings" (
   id                           TEXT PRIMARY KEY,
