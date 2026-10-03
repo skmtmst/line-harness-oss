@@ -18,6 +18,7 @@ import {
   rescheduleV6RemindersForSource,
   type CancelV6RemindersResult,
   type RescheduleV6RemindersResult,
+  type V6WriteGuard,
 } from '@line-crm/db';
 import { matchesCondition, parseCondition } from './segment-query.js';
 
@@ -142,6 +143,11 @@ export async function enrollByTrigger(
     eventId?: string | null;
     /** 必須。ルールと友だちがこの店舗のもの一致するときだけ登録する。 */
     lineAccountId: string;
+    /**
+     * 指定時は各書込みに AND で結び付ける。親が動いていたらその文は
+     * 0 件 (登録は V6_WRITE_GUARDED を投げて数えない)。省略時は従来どおり。
+     */
+    writeGuard?: V6WriteGuard;
   },
 ): Promise<number> {
   // 自動登録はテナント境界を越えない。友だちの所属と呼出元の店舗が違う
@@ -202,6 +208,7 @@ export async function enrollByTrigger(
       .first<{ 1: number }>();
     if (existing) continue;
 
+    const guard = input.writeGuard;
     try {
       await enrollFriendInReminder(db, {
         friendId: input.friendId,
@@ -210,8 +217,11 @@ export async function enrollByTrigger(
         sourceKind: input.sourceKind ?? input.triggerType,
         sourceId: input.sourceId ?? null,
         sourceEventId: input.sourceEventId ?? null,
+        writeGuard: guard,
       });
     } catch (error) {
+      // ガードで止められたらこのルールは数えず次へ (敗者は何も残さない)。
+      if (error instanceof Error && error.message === 'V6_WRITE_GUARDED') continue;
       // 取消後に同じ発生元で作り直したとき、cancelled の行が一意鍵
       // (reminder_id, friend_id, source_event_id) を塞いでいる。
       // その行を起こして新しい起点へ移す。再送の重なりでも1行のまま。
@@ -222,10 +232,16 @@ export async function enrollByTrigger(
               SET status = 'active', target_date = ?, cancel_reason = NULL,
                   completed_at = NULL, updated_at = ?
             WHERE reminder_id = ? AND friend_id = ? AND source_event_id = ?
-              AND status = 'cancelled'`,
+              AND status = 'cancelled'
+              ${guard ? `AND (${guard.sql})` : ''}`,
         )
-        .bind(anchor, new Date().toISOString(), rule.id, input.friendId, input.sourceEventId)
+        .bind(
+          anchor, new Date().toISOString(), rule.id, input.friendId, input.sourceEventId,
+          ...(guard ? guard.binds : []),
+        )
         .run();
+      // ガードつきで 0 件なら親が動いた敗者。起こさず次へ。
+      if ((revived.meta?.changes ?? 0) === 0 && guard) continue;
       if ((revived.meta?.changes ?? 0) === 0) throw error;
     }
     enrolled++;
@@ -257,6 +273,11 @@ export interface CancelByTriggerInput {
    * (利用者操作の取消用。呼び出し側は 409 で再試行させる)。
    */
   failOnSendInFlight?: boolean;
+  /**
+   * 指定時は cancelV6RemindersForSource の各書込みに AND で結び付ける。
+   * 親が動いていたらその文は 0 件になる。省略時は従来どおり。
+   */
+  writeGuard?: V6WriteGuard;
 }
 
 /**
@@ -281,6 +302,7 @@ export async function cancelByTrigger(
     allowLegacyFallback: input.allowLegacyFallback,
     now: input.now?.toISOString(),
     failOnSendInFlight: input.failOnSendInFlight,
+    writeGuard: input.writeGuard,
   });
 }
 
@@ -445,6 +467,11 @@ export interface ReconcileV6Input {
    * 友だち変更で「新規成功後に旧取消」の順序を作るための前段に使う。
    */
   leaveOtherFriends?: boolean;
+  /**
+   * 指定時は各書込みに AND で結び付ける。親が動いていたらその文は
+   * 0 件になり、古い操作が新版の通知予定を変えない。省略時は従来どおり。
+   */
+  writeGuard?: V6WriteGuard;
 }
 
 export interface ReconcileV6Result {
@@ -522,6 +549,9 @@ export async function reconcileV6ToStartsAt(
 
   const statements: D1PreparedStatement[] = [];
   const healReason = `${kind}_heal:${input.sourceEventId ?? input.sourceId}:by:system`;
+  const guard = input.writeGuard;
+  const guardSql = guard ? `AND (${guard.sql})` : '';
+  const guardBinds = guard ? guard.binds : [];
   const staleIds = input.leaveOtherFriends
     ? []
     : rows.filter((row) => row.friendId !== input.friendId).map((row) => row.id);
@@ -532,8 +562,9 @@ export async function reconcileV6ToStartsAt(
       db.prepare(
         `UPDATE friend_reminders
             SET status = 'cancelled', cancel_reason = ?, updated_at = ?
-          WHERE status = 'active' AND id IN (${placeholders})`,
-      ).bind(healReason, nowIso, ...chunk),
+          WHERE status = 'active' AND id IN (${placeholders})
+          ${guardSql}`,
+      ).bind(healReason, nowIso, ...chunk, ...guardBinds),
     );
   }
   const movedIds: string[] = [];
@@ -545,8 +576,9 @@ export async function reconcileV6ToStartsAt(
       db.prepare(
         `UPDATE friend_reminders
             SET target_date = ?, updated_at = ?
-          WHERE status = 'active' AND id = ?`,
-      ).bind(to, nowIso, row.id),
+          WHERE status = 'active' AND id = ?
+          ${guardSql}`,
+      ).bind(to, nowIso, row.id, ...guardBinds),
     );
     movedIds.push(row.id);
   }
@@ -559,8 +591,9 @@ export async function reconcileV6ToStartsAt(
       db.prepare(
         `UPDATE reminder_delivery_runs
             SET status = 'cancelled', completed_at = ?, updated_at = ?
-          WHERE status IN ('queued', 'retry_wait', 'claimed') AND friend_reminder_id IN (${placeholders})`,
-      ).bind(nowIso, nowIso, ...chunk),
+          WHERE status IN ('queued', 'retry_wait', 'claimed') AND friend_reminder_id IN (${placeholders})
+          ${guardSql}`,
+      ).bind(nowIso, nowIso, ...chunk, ...guardBinds),
     );
   }
   if (statements.length === 0) return empty;
