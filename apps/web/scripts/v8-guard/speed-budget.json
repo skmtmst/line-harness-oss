@@ -1,12 +1,24 @@
 {
   "version": 1,
-  "updated": "2026-10-04T00:00:00+09:00",
-  "note": "初版は予算だけ。基準が空の間は絶対値（表示1秒・反応100ms・長い作業50ms）だけで判定する。CIの実測を --update-baseline で記入すると、10%則とJSラチェットが効き始める。",
+  "updated": "2026-10-04T02:19:00+09:00",
+  "note": "CI初回実測（PR #1339・2回目・LCP修正後）を基準にした。以後は10%より悪いと落とす。JSは1バイトでも増えたら落とす。現状は予算（表示1秒・反応100ms・長い作業50ms）を超える画面があり、直すか予算を見直すかは別途決める。",
   "budgets": {
     "showMs": 1000,
     "lcpMs": 1000,
     "pressMs": 100,
     "longTaskMs": 50
   },
-  "baselines": {}
+  "baselines": {
+    "dashboard": { "route": "/", "showMs": 1177, "lcpMs": 588, "pressMs": 66, "longTaskMs": 0, "jsBytes": 4351333 },
+    "inbox": { "route": "/chats", "showMs": 930, "lcpMs": 240, "pressMs": 66, "longTaskMs": 0, "jsBytes": 3546763 },
+    "friends": { "route": "/friends", "showMs": 1006, "lcpMs": 288, "pressMs": 67, "longTaskMs": 0, "jsBytes": 3672177 },
+    "broadcasts": { "route": "/broadcasts", "showMs": 981, "lcpMs": 284, "pressMs": 134, "longTaskMs": 52, "jsBytes": 3657096 },
+    "broadcast-new": { "route": "/broadcasts/new", "showMs": 939, "lcpMs": 356, "pressMs": null, "longTaskMs": 0, "jsBytes": 3559946 },
+    "templates": { "route": "/templates", "showMs": 991, "lcpMs": 284, "pressMs": 66, "longTaskMs": 0, "jsBytes": 3617829 },
+    "booking": { "route": "/booking/bookings", "showMs": 929, "lcpMs": 304, "pressMs": 67, "longTaskMs": 0, "jsBytes": 3601075 },
+    "answers": { "route": "/form-submissions", "showMs": 946, "lcpMs": 284, "pressMs": 68, "longTaskMs": 0, "jsBytes": 3699944 },
+    "tags": { "route": "/tags", "showMs": 1007, "lcpMs": 316, "pressMs": 66, "longTaskMs": 0, "jsBytes": 3691905 },
+    "settings": { "route": "/settings", "showMs": 992, "lcpMs": 240, "pressMs": 83, "longTaskMs": 0, "jsBytes": 4264295 },
+    "friends-2000": { "route": "/friends", "showMs": 4980, "lcpMs": 300, "pressMs": null, "longTaskMs": 707, "jsBytes": 3672177, "rows": 2000 }
+  }
 }
