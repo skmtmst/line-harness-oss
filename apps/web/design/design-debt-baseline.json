@@ -192,22 +192,8 @@
     "unresolved-classname": 4,
     "arbitrary-value": 6
   },
-  "app/events/bookings/bookings-v8.tsx": {
-    "unresolved-classname": 45
-  },
   "app/events/bookings/page.tsx": {
     "direct-th": 6
-  },
-  "app/events/change-review/change-review-v8.tsx": {
-    "unresolved-classname": 31
-  },
-  "app/events/events-list-v8.tsx": {
-    "unresolved-classname": 48,
-    "arbitrary-value": 6,
-    "direct-th": 6
-  },
-  "app/events/new/events-new-v8.tsx": {
-    "unresolved-classname": 4
   },
   "app/events/page.tsx": {
     "direct-primary-button": 1
@@ -998,23 +984,6 @@
     "unresolved-classname": 8,
     "arbitrary-value": 2
   },
-  "app/reminders/basics-form-v8.tsx": {
-    "unresolved-classname": 39
-  },
-  "app/reminders/detail/detail-v8.tsx": {
-    "unresolved-classname": 69,
-    "direct-th": 23
-  },
-  "app/reminders/edit/edit-v8.tsx": {
-    "unresolved-classname": 168,
-    "direct-th": 4
-  },
-  "app/reminders/new/new-v8.tsx": {
-    "unresolved-classname": 6
-  },
-  "app/reminders/wizard-v8-ui.tsx": {
-    "unresolved-classname": 33
-  },
   "app/accounts/handover/handover-v8.tsx": {
     "unresolved-classname": 48
   },
@@ -1023,20 +992,28 @@
   },
   "app/pools/new/pool-new-v8.tsx": {
     "unresolved-classname": 2
+  },
   "app/conversions/conversion-points-v8.tsx": {
     "unresolved-classname": 101
+  },
   "app/conversions/new/conversion-create-v8.tsx": {
     "unresolved-classname": 90
+  },
   "app/inflow-links/_components/inflow-delete-dialog.tsx": {
     "direct-secondary-button": 1
+  },
   "app/inflow-links/ad-integration-v8.tsx": {
     "unresolved-classname": 141
+  },
   "app/inflow-links/detail/inflow-detail-v8.tsx": {
     "unresolved-classname": 99
+  },
   "app/inflow-links/inflow-list-v8.tsx": {
     "unresolved-classname": 75
+  },
   "app/inflow-links/new/inflow-create-v8.tsx": {
     "unresolved-classname": 75
+  },
   "components/inflow-links/site-script-v8.tsx": {
     "unresolved-classname": 104
   }
