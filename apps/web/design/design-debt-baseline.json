@@ -3,7 +3,7 @@
     "arbitrary-value": 1
   },
   "app/accounts/page.tsx": {
-    "arbitrary-value": 1
+    "arbitrary-value": 2
   },
   "app/accounts/uid-migration-v8.tsx": {
     "unresolved-classname": 99,
@@ -229,10 +229,10 @@
   },
   "app/friend-add-settings/list-v8.tsx": {
     "unresolved-classname": 80,
-    "direct-th": 6
+    "direct-th": 12
   },
   "app/friend-add-settings/editor-v8.tsx": {
-    "unresolved-classname": 189
+    "unresolved-classname": 190
   },
   "app/friend-add-settings/page.tsx": {
     "arbitrary-value": 2
@@ -258,14 +258,14 @@
     "unresolved-classname": 11
   },
   "app/friends/identity-candidates/identity-candidates-v8.tsx": {
-    "unresolved-classname": 18,
-    "direct-th": 4
+    "unresolved-classname": 22,
+    "direct-th": 8
   },
   "app/friends/identity-candidates/page.tsx": {
     "unresolved-classname": 6
   },
   "app/friends/migrations/migrations-v8.tsx": {
-    "unresolved-classname": 62,
+    "unresolved-classname": 65,
     "direct-th": 5
   },
   "app/friends/page.tsx": {
@@ -333,6 +333,10 @@
   "app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx": {
     "unresolved-classname": 51
   },
+  "app/mileage/mileage-table-skeleton.tsx": {
+    "unresolved-classname": 2,
+    "direct-th": 1
+  },
   "app/mileage/mileage-v8.tsx": {
     "unresolved-classname": 9
   },
@@ -373,7 +377,7 @@
     "arbitrary-value": 1
   },
   "app/nen/members/members-v8.tsx": {
-    "unresolved-classname": 61
+    "unresolved-classname": 65
   },
   "app/page.tsx": {
     "arbitrary-value": 8,
@@ -1086,7 +1090,7 @@
     "unresolved-classname": 33
   },
   "app/accounts/handover/handover-v8.tsx": {
-    "unresolved-classname": 48
+    "unresolved-classname": 49
   },
   "app/ec-commerce/ec-connector-v8.tsx": {
     "unresolved-classname": 6
