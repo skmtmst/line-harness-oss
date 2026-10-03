@@ -21,7 +21,7 @@ describe('一斉配信の細かい板', () => {
   })
 
   it('一覧の閲覧のみに板IDを付ける（NtCE3）', () => {
-    expect(LIST).toContain("data-design-node={canEdit ? undefined : 'NtCE3'}")
+    expect(LIST).toContain("data-design-node={canEdit ? 'EML2F bIdqV' : 'NtCE3'}")
   })
 
   it('予約の取り消しの確かめに板IDを付ける（BeNtj）', () => {

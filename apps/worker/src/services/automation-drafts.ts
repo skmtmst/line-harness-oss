@@ -5,7 +5,8 @@ export type AutomationDraftActionType =
   | 'add_tag'
   | 'start_scenario'
   | 'send_message'
-  | 'common_action';
+  | 'common_action'
+  | 'notify_staff';
 export type AutomationDraftTriggerType =
   | 'friend_add'
   | 'tag_change'
@@ -192,6 +193,96 @@ const TEMPLATES: readonly AutomationTemplateDefinition[] = [
     triggerType: 'tag_change',
     triggerConfig: { tagId: '', action: 'add' },
     actions: [{ id: 'step-1', type: 'start_scenario', params: { scenarioId: '' }, onFailure: 'stop' }],
+  },
+  {
+    key: 'first-order-thanks',
+    name: '初回購入のお礼',
+    description: '注文が確定した人へ、お礼のメッセージを送ります。',
+    triggerLabel: '注文が確定したとき',
+    actionLabel: 'メッセージを送る',
+    triggerType: 'ec.order.confirmed',
+    triggerConfig: {},
+    actions: [{ id: 'step-1', type: 'send_message', params: {}, onFailure: 'stop' }],
+  },
+  {
+    key: 'birthday-coupon',
+    name: '誕生月のクーポン',
+    description: '誕生月のタグが付いた人へ、クーポンのメッセージを送ります。',
+    triggerLabel: 'タグが付いたとき',
+    actionLabel: 'メッセージを送る',
+    triggerType: 'tag_change',
+    triggerConfig: { tagId: '', action: 'add' },
+    actions: [{ id: 'step-1', type: 'send_message', params: {}, onFailure: 'stop' }],
+  },
+  {
+    key: 'shipping-notice',
+    name: '発送のお知らせ',
+    description: '発送済みのタグが付いた人へ、発送のメッセージを送ります。',
+    triggerLabel: 'タグが付いたとき',
+    actionLabel: 'メッセージを送る',
+    triggerType: 'tag_change',
+    triggerConfig: { tagId: '', action: 'add' },
+    actions: [{ id: 'step-1', type: 'send_message', params: {}, onFailure: 'stop' }],
+  },
+  {
+    key: 'subscription-pause-guide',
+    name: '定期便の休止案内',
+    description: '休止を考えている人へ、休止ではなくお届け間隔の変更を案内します。',
+    triggerLabel: 'タグが付いたとき',
+    actionLabel: 'メッセージを送る',
+    triggerType: 'tag_change',
+    triggerConfig: { tagId: '', action: 'add' },
+    actions: [{ id: 'step-1', type: 'send_message', params: {}, onFailure: 'stop' }],
+  },
+  {
+    key: 'monthly-first',
+    name: '毎月1日のお知らせ',
+    description: '毎月1日になったら、決めた人へ今月のお知らせを送ります。日時と対象は選び直します。',
+    triggerLabel: '決めた時刻になったとき',
+    actionLabel: 'メッセージを送る',
+    triggerType: 'datetime',
+    triggerConfig: {},
+    actions: [{ id: 'step-1', type: 'send_message', params: {}, onFailure: 'stop' }],
+  },
+  {
+    key: 'form-thanks',
+    name: 'フォーム回答のお礼',
+    description: 'フォームに回答した人へ、お礼のメッセージを送ります。',
+    triggerLabel: 'フォームに回答したとき',
+    actionLabel: 'メッセージを送る',
+    triggerType: 'form_submitted',
+    triggerConfig: {},
+    actions: [{ id: 'step-1', type: 'send_message', params: {}, onFailure: 'stop' }],
+  },
+  {
+    key: 'booking-confirm',
+    name: '予約確定のお礼',
+    description: '予約が確定した人へ、確認のメッセージを送ります。',
+    triggerLabel: '予約が確定したとき',
+    actionLabel: 'メッセージを送る',
+    triggerType: 'calendar_booked',
+    triggerConfig: {},
+    actions: [{ id: 'step-1', type: 'send_message', params: {}, onFailure: 'stop' }],
+  },
+  {
+    key: 'link-interest-tag',
+    name: 'リンクを押した人へ',
+    description: '選んだリンクを押した人へ、興味のタグを付けます。',
+    triggerLabel: 'リンクが押されたとき',
+    actionLabel: 'タグを付ける',
+    triggerType: 'link_clicked',
+    triggerConfig: {},
+    actions: [{ id: 'step-1', type: 'add_tag', params: { tagId: '' }, onFailure: 'stop' }],
+  },
+  {
+    key: 'weekly-recommend',
+    name: '毎週のおすすめ',
+    description: '毎週決めた曜日に、決めた人へおすすめを送ります。対象は選び直します。',
+    triggerLabel: '毎週決まった曜日・時刻',
+    actionLabel: 'メッセージを送る',
+    triggerType: 'weekly',
+    triggerConfig: {},
+    actions: [{ id: 'step-1', type: 'send_message', params: {}, onFailure: 'stop' }],
   },
 ] as const;
 
@@ -794,7 +885,7 @@ export async function updateAutomationDraft(
   const commonActionBindings: Array<{ path: string; commonActionId: string; versionId: string }> = [];
   for (const [index, candidate] of input.actions.entries()) {
     const raw = candidate as Partial<AutomationDraftAction>;
-    if (!raw || !new Set(['add_tag', 'start_scenario', 'send_message', 'common_action']).has(String(raw.type))) {
+    if (!raw || !new Set(['add_tag', 'start_scenario', 'send_message', 'common_action', 'notify_staff']).has(String(raw.type))) {
       throw new AutomationDraftError('action_unsupported', 'この処理はまだ実行まで接続されていません', `actions.${index}`);
     }
     const params = raw.params && typeof raw.params === 'object' && !Array.isArray(raw.params)
@@ -829,6 +920,24 @@ export async function updateAutomationDraft(
         commonActionId,
         versionId: commonAction.current_published_version_id,
       });
+    } else if (raw.type === 'notify_staff') {
+      // F-14: 担当者通知のルールは、有効ないまの版をこの店の範囲で指す。
+      // 送り先・文面の初期値はルール側、追加のひと言はここで足す。
+      const notificationRuleId = requiredString(
+        params.notificationRuleId, `actions.${index}.notificationRuleId`, '担当者通知',
+      );
+      const rule = await db.prepare(
+        `SELECT id FROM notification_rules
+          WHERE id = ? AND line_account_id = ? AND is_active = 1 LIMIT 1`,
+      ).bind(notificationRuleId, input.lineAccountId).first<{ id: string }>();
+      if (!rule) {
+        throw new AutomationDraftError(
+          'resource_not_found', '担当者通知が見つからないか、別のLINE公式アカウントにあります',
+          `actions.${index}.notificationRuleId`,
+        );
+      }
+      params.notificationRuleId = notificationRuleId;
+      params.message = requiredString(params.message, `actions.${index}.message`, '通知文');
     } else {
       params.messageType = 'text';
       params.content = requiredString(params.content, `actions.${index}.content`, '送る文面');
