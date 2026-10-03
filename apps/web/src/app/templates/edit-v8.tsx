@@ -331,7 +331,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
         lead={id
           ? '保存は下書きの保存です。使っている場所へ届けるには「保存して公開」'
           : '保存しただけでは、どこにも送られません'}
-        designNode="u5YC6"
+        designNode="u5YC6 a1k3d"
         dirty={dirty}
         dirtySubject="テンプレートの変更"
         saving={saving}

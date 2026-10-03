@@ -368,7 +368,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
   // 外枠に板 ID を持たせる（見本と突き合わせる目印）。
   const designNode = v8stage === 'basics' ? 'VE1u5'
     : v8stage === 'target' ? 'YChR6'
-      : v8stage === 'messages' ? 'p5YuP'
+      : v8stage === 'messages' ? 'p5YuP r1l0bT'
         : v8stage === 'schedule' ? 'T0nis'
           : v8stage === 'confirm' ? 'ltAaq'
             : 'hjNpJ'

@@ -959,7 +959,7 @@ function StaffPageHost() {
     {v8 && tab === 'members' ? <StaffRoleGuide /> : null}
   </>)
   return v8 ? (
-    <div data-design-node={administrator ? 'nku0f' : 'A35Gh'} className="flex flex-col gap-4">{body}</div>
+    <div data-design-node={administrator ? 'nku0f wbDHy' : 'A35Gh wbDHy'} className="flex flex-col gap-4">{body}</div>
   ) : (
     <div data-design-node="e3jz3" className="flex flex-col gap-4">{body}</div>
   )
