@@ -1065,8 +1065,7 @@ export default function FormSubmissionsListV8() {
                       「—」だけ出す（0 とは言わない）。
                     */}
                     <p className={styles.answerSub}>
-                      今月 {form.monthlySubmitCount == null ? '—' : formatNumber(form.monthlySubmitCount)}
-                      ・完了 {form.monthlyCompletionRate == null ? '—' : `${formatNumber(form.monthlyCompletionRate)}%`}
+                      今月 {form.monthlySubmitCount == null ? '—' : formatNumber(form.monthlySubmitCount)}・完了 {form.monthlyCompletionRate == null ? '—' : `${formatNumber(form.monthlyCompletionRate)}%`}
                     </p>
                   </td>
                   <td>

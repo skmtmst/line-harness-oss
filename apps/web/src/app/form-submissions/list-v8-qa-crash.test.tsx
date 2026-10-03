@@ -97,6 +97,14 @@ describe('管理者確認の切り替え', () => {
     expect(host.textContent).toContain('通常の一覧に戻る')
   })
 
+  it('GrnO4 回答の2行目は見本どおり詰めて書く（1152幅のはみ出し防止）', async () => {
+    await act(async () => { root.render(<FormSubmissionsListV8 />) })
+    await flush()
+    // 見本「今月 186・完了 75%」。全角の空きを入れると1152幅で器からはみ出す。
+    expect(host.textContent).toContain('今月 5・完了 60%')
+    expect(host.textContent).not.toContain(' ・完了')
+  })
+
   it('配列の応答では未割り当ての行を出す', async () => {
     unassignedData = FORM_PAGE.items
     await act(async () => { root.render(<FormSubmissionsListV8 />) })
