@@ -322,7 +322,7 @@ function mileageSourceLabel(source: string): string {
 function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
   const { mileage, insights } = wallet;
   return (
-    <section aria-label="貯まったマイル" className="rounded-2xl bg-liff-deep p-[18px] text-white">
+    <section aria-label="貯まったマイル" className="rounded-2xl bg-[var(--liff-look-deep)] p-[18px] text-white">
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs text-white/70">使えるマイル</p>
         {mileage.pending > 0 && (
@@ -372,8 +372,8 @@ function OpportunityCta({ item, secondary = false }: { item: MileageOpportunity;
       href={item.url}
       className={
         secondary
-          ? 'mt-3 block rounded-lg border border-hairline bg-canvas py-2.5 text-center text-sm font-bold text-ink'
-          : 'mt-3 block rounded-lg bg-liff-primary py-3 text-center text-sm font-bold text-white'
+          ? 'mt-3 block rounded-lg border border-hairline bg-canvas py-2.5 text-center text-sm font-bold text-[var(--liff-look-ink)]'
+          : 'mt-3 block rounded-lg bg-[var(--liff-look-main)] py-3 text-center text-sm font-bold text-white'
       }
     >
       {item.ctaLabel}
@@ -425,7 +425,7 @@ function MileageOpportunities({ items }: { items: MileageOpportunity[] }) {
                       aria-valuemax={100}
                       aria-label={`${item.title}の視聴進捗`}
                     >
-                      <span className="block h-full rounded-full bg-liff-primary" style={{ width: `${item.progressPercent}%` }} />
+                      <span className="block h-full rounded-full bg-[var(--liff-look-main)]" style={{ width: `${item.progressPercent}%` }} />
                     </div>
                   </div>
                 )}
@@ -827,7 +827,11 @@ export default function Affiliate() {
 
   if (state.phase === 'not_registered') {
     return (
-      <div className="min-h-screen bg-ground" data-design-node="S3uBl">
+      <div
+        className="min-h-screen bg-ground"
+        data-design-node="S3uBl"
+        style={{ fontFamily: 'var(--liff-look-font-body)' }}
+      >
         <LiffHeader title="マイル・紹介" />
         <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-3 pb-12">
           {wallet && <MileageSummaryCard wallet={wallet} />}
@@ -840,7 +844,12 @@ export default function Affiliate() {
               <Icon name="share-2" className="h-7 w-7" />
             </span>
             <div>
-              <h2 className="text-sm font-bold text-ink">紹介リンクを使う</h2>
+              <h2
+                className="text-sm font-bold text-[var(--liff-look-ink)]"
+                style={{ fontFamily: 'var(--liff-look-font-heading)' }}
+              >
+                紹介リンクを使う
+              </h2>
               <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
                 無料で登録すると、案件ごと・SNSごとの紹介リンクを作れます。紹介した友だちが予約や購入へ進むと、マイルが増えます。
               </p>
@@ -898,7 +907,11 @@ export default function Affiliate() {
 
   // 並びは S3uBl のとおり「貯まった → 増やす → 紹介の成果」。
   return (
-    <div className="min-h-screen bg-ground" data-design-node="S3uBl">
+    <div
+      className="min-h-screen bg-ground"
+      data-design-node="S3uBl"
+      style={{ fontFamily: 'var(--liff-look-font-body)' }}
+    >
       <LiffHeader title="マイル・紹介" />
       <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-3 pb-12">
 
