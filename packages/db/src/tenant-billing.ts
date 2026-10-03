@@ -76,6 +76,18 @@ export async function updateTenantBilling(
   }
   if (sets.length === 0) return getTenantBilling(db, tenantId);
   const now = jstNow();
+  if (patch.plan_status === 'canceled') {
+    // 解約が反映された時刻を、顧客データの保存期限を数え始める起点にする。
+    // すでに起点があれば動かさない。解約後にも invoice.voided や期末の
+    // subscription.updated が届くので、その度に起点が後ろへずれると
+    // 削除がいつまでも始まらない。
+    sets.push('retention_anchor_at = COALESCE(retention_anchor_at, ?)');
+    values.push(now);
+  } else if (patch.plan_status !== undefined) {
+    // 契約が戻ったので削除の予定を取り消す。削除済みの印も消して、
+    // 次に解約した時にもう一度削除できるようにする（実績は監査表に残る）。
+    sets.push('retention_anchor_at = NULL', 'purge_requested_at = NULL', 'data_purged_at = NULL');
+  }
   sets.push('plan_updated_at = ?', 'updated_at = ?');
   values.push(now, now, tenantId);
   await db.prepare(`UPDATE tenants SET ${sets.join(', ')} WHERE id = ?`).bind(...values).run();
