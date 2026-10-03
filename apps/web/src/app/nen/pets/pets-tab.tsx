@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import { RowActions } from '@/components/shared/row-actions'
@@ -37,6 +39,7 @@ export default function PetsTab({
   onQueryChange: (next: PetsQuery) => void
   onTotal: (total: number | undefined) => void
 }) {
+  const theme = useAdminTheme()
   const [status, setStatus] = useState<ListStatus>('loading')
   const [data, setData] = useState<NenPetListData | null>(null)
   const [draft, setDraft] = useState(query.q)
@@ -142,7 +145,51 @@ export default function PetsTab({
 
       <section data-design="Table" data-design-node="pets-table">
         {status === 'loading' && !data ? (
-          <ListState kind="loading" title="ペットを読み込んでいます" />
+          theme === 'v8' ? (
+            <div aria-busy="true" aria-label="ペットを読み込んでいます">
+              <DelayedSkeleton
+                loading
+                skeleton={(
+                  <div aria-hidden="true">
+                    <DataTable className="@container">
+                      <thead>
+                        <TableHeadRow>
+                          <Th className="w-44">ペット</Th>
+                          <Th className="w-32">飼い主</Th>
+                          <Th className="w-20">年齢</Th>
+                          <Th className="w-20" align="right">体重</Th>
+                          <Th className="w-28">今日の目安</Th>
+                          <Th className="w-24">避妊去勢</Th>
+                          <Th className="cq-hide-below-1120 w-20">運動量</Th>
+                          <Th>主食</Th>
+                          <Th className="w-24">体重の更新</Th>
+                          <Th className="w-52" align="right"><span className="sr-only">操作</span></Th>
+                        </TableHeadRow>
+                      </thead>
+                      <tbody>
+                        {[0, 1, 2, 3, 4].map((row) => (
+                          <Tr key={row}>
+                            <Td><Skeleton width="10ch" height="1em" /></Td>
+                            <Td><Skeleton width="8ch" height="1em" /></Td>
+                            <Td><Skeleton width="5ch" height="1em" /></Td>
+                            <Td><Skeleton width="6ch" height="1em" /></Td>
+                            <Td><Skeleton width="8ch" height="1em" /></Td>
+                            <Td><Skeleton width="6ch" height="1em" /></Td>
+                            <Td><Skeleton width="5ch" height="1em" /></Td>
+                            <Td><Skeleton width="10ch" height="1em" /></Td>
+                            <Td><Skeleton width="8ch" height="1em" /></Td>
+                            <Td><Skeleton width="6ch" height="1em" /></Td>
+                          </Tr>
+                        ))}
+                      </tbody>
+                    </DataTable>
+                  </div>
+                )}
+              />
+            </div>
+          ) : (
+            <ListState kind="loading" title="ペットを読み込んでいます" />
+          )
         ) : status === 'forbidden' ? (
           <ListState kind="forbidden" />
         ) : status === 'error' ? (
