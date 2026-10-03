@@ -1026,6 +1026,8 @@ export interface FriendAddReferenceIds {
   routeIds: string[];
   formIds: string[];
   supportMarkIds: string[];
+  /** F9: 共通情報は var_key で指す。 */
+  commonVarKeys: string[];
 }
 
 function pushId(into: Set<string>, value: unknown): void {
@@ -1082,6 +1084,7 @@ export function collectFriendAddReferences(
   const routes = new Set<string>();
   const forms = new Set<string>();
   const marks = new Set<string>();
+  const vars = new Set<string>();
   pushId(scenarios, definition.scenarioId);
   if (Array.isArray(definition.routeIds)) for (const id of definition.routeIds) pushId(routes, id);
   if (Array.isArray(definition.actions)) {
@@ -1092,6 +1095,10 @@ export function collectFriendAddReferences(
       };
       if (type === 'add_tag' || type === 'remove_tag') pushId(tags, targetId);
       else if (type === 'start_scenario' || type === 'stop_scenario') pushId(scenarios, targetId);
+      // F9: 4つの操作の参照先も持ち物検査に載せる。
+      else if (type === 'set_friend_field') pushId(fields, targetId);
+      else if (type === 'add_support_mark') pushId(marks, targetId);
+      else if (type === 'use_common_var') pushId(vars, targetId);
       // 行アクション（保存形が config を持つ形）も同じ持ち物検査に載せる。
       const rowConfig = (config && typeof config === 'object' ? config : null) as
         | Record<string, unknown>
@@ -1122,6 +1129,7 @@ export function collectFriendAddReferences(
     routeIds: [...routes],
     formIds: [...forms],
     supportMarkIds: [...marks],
+    commonVarKeys: [...vars],
   };
 }
 
@@ -1156,7 +1164,7 @@ export async function findFriendAddUnusableReferences(
   refs: FriendAddReferenceIds,
 ): Promise<string[]> {
   const tenantOfAccount = '(SELECT tenant_id FROM line_accounts WHERE id = ?)';
-  const [tags, scenarios, fields, routes, forms, marks] = await Promise.all([
+  const [tags, scenarios, fields, routes, forms, marks, vars] = await Promise.all([
     selectIds(db, refs.tagIds, (p) => ({
       sql: `SELECT id FROM tags WHERE id IN (${p}) AND line_account_id = ?`,
       bindings: [...refs.tagIds, accountId],
@@ -1192,6 +1200,12 @@ export async function findFriendAddUnusableReferences(
       sql: `SELECT id FROM support_marks WHERE id IN (${p})`,
       bindings: [...refs.supportMarkIds],
     })),
+    // F9: 共通情報は var_key と所属・未保管を見る（実行側の applyCommonVar と同じ条件）。
+    selectIds(db, refs.commonVarKeys, (p) => ({
+      sql: `SELECT var_key AS id FROM common_vars
+             WHERE var_key IN (${p}) AND line_account_id = ? AND archived_at IS NULL`,
+      bindings: [...refs.commonVarKeys, accountId],
+    })),
   ]);
   return [
     ...refs.tagIds.filter((id) => !tags.has(id)),
@@ -1200,6 +1214,7 @@ export async function findFriendAddUnusableReferences(
     ...refs.routeIds.filter((id) => !routes.has(id)),
     ...refs.formIds.filter((id) => !forms.has(id)),
     ...refs.supportMarkIds.filter((id) => !marks.has(id)),
+    ...refs.commonVarKeys.filter((id) => !vars.has(id)),
   ];
 }
 
@@ -1576,6 +1591,8 @@ function ruleActions(value: unknown[]): FriendAddAction[] {
       targetId?: unknown;
       tagId?: unknown;
       amount?: unknown;
+      value?: unknown;
+      op?: unknown;
       kind?: unknown;
       actionType?: unknown;
       config?: Record<string, unknown>;
@@ -1600,6 +1617,32 @@ function ruleActions(value: unknown[]): FriendAddAction[] {
       actions.push({ kind: 'row', actionType: 'tag', config: { op: 'remove', tagIds: [targetId] } });
     } else if (action.type === 'start_scenario' && targetId) {
       actions.push({ kind: 'row', actionType: 'scenario', config: { op: 'start', scenarioId: targetId, restart: 'from_start' } });
+      /*
+       * F9: 4つの操作は、シナリオと同じ行アクションへ直して実行する。
+       * 実行そのものは scenario-actions が担うので、ここでは形を合わせるだけ。
+       * 壊れた値はここで落とす（保存側も止めるが、既存の公開版に混ざっていても
+       * 実行時には黙って飛ばさず、件数として残す）。
+       */
+    } else if (action.type === 'set_friend_field' && targetId
+      && typeof action.value === 'string') {
+      actions.push({
+        kind: 'row',
+        actionType: 'friend_field',
+        config: { fieldId: targetId, op: 'set', value: action.value },
+      });
+    } else if (action.type === 'add_support_mark' && targetId) {
+      actions.push({ kind: 'row', actionType: 'support_mark', config: { markId: targetId } });
+    } else if (action.type === 'grant_mileage'
+      && typeof action.amount === 'number' && Number.isFinite(action.amount) && action.amount > 0) {
+      actions.push({ kind: 'mile', amount: Math.floor(action.amount) });
+    } else if (action.type === 'use_common_var' && targetId
+      && (action.op === 'add' || action.op === 'sub')
+      && typeof action.value === 'string' && Number.isFinite(Number(action.value))) {
+      actions.push({
+        kind: 'row',
+        actionType: 'common_var',
+        config: { varKey: targetId, op: action.op, value: action.value },
+      });
     }
   }
   return actions;

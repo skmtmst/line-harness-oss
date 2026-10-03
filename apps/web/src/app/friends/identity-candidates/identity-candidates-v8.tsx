@@ -1,7 +1,8 @@
 'use client'
 
 /*
- * ★V8 重複候補の確認（Pencil `fcg2D`、採用版の流れは `sdbsQ` 板2）。
+ * ★V8 重複候補の確認（Pencil `fcg2D`、採用版の流れは `sdbsQ` 板2。
+ * 再撮の板 `p15At`（1152）を A/B の並びに付ける）。
  *
  * v7（InCDe）と同じ `useIdentityReview` を使う。違いは見せ方——
  * 頭に「← 重複検出へ」、A/B を同じ高さで並べ、判定は最下段の追従帯
@@ -116,8 +117,8 @@ function FriendIdentityCandidatesV8Inner() {
             2件の友だちは残したまま、同じ人として結び付けます。一斉配信は結び付けた人へ1通になります。
           </IdentityAssurance>
 
-          {/* A/B は同じ高さで並べる（fcg2D）。狭い板では縦に積む。 */}
-          <div className={styles.duoCards}>
+          {/* A/B は同じ高さで並べる（fcg2D）。狭い板では縦に積む（1152 は `p15At`）。 */}
+          <div className={styles.duoCards} data-design-node="p15At">
             <IdentitySubjectCard side="候補A" subject={detail.left} />
             <IdentitySubjectCard side="候補B" subject={detail.right} />
           </div>

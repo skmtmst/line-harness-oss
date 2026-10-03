@@ -1,508 +1,515 @@
 'use client'
 
 /*
- * ★V8-B ウェビナー②動画（板 `VWNaA`・`LPOe7`）。
+ * ★V8 動画と公開期間（`VWNaA`）・開催回（`LPOe7`）。
+ * v7 の見た目は 1画素も変えない。編集画面で data-theme="v8" のときだけ、
+ * 動画の段をこの部品で描く（V7 の VideoDesignStep は触らない）。
  *
- * 配信の形で中身が変わる。オンデマンドは配信枠（`VWNaA`）、日時指定は
- * 開催回（`LPOe7`）。動画・公開期間・視聴の数え方・右の見え方は共通。
- * 動画の準備の段（検査→準備完了）は、日時指定の版だけ出す（見本どおり）。
- *
- * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
- * - 動画の「16:9・自動再生なし」：結ぶ口が無いので出さない。再生時間だけ出す。
- * - 配信枠の「〜22:00・30分ごとに」：枠の決まりに終わり・間隔が無いので、
- *   始まりの時刻だけ出す。定員は単発の枠だけ開催回の口から出す。
- * - 開催回の追加・複製：枠を作る口が無いので、開催回の追加は日時と定員を
- *   直接入れる形にする。複製は出さない。
+ * 配信枠（毎日・毎週・単発）は Webinar.schedule の読み書き。
+ * 行ごとの定員・残りは開催回ごとの口にしか無いので出さない。
+ * 「まとめて作る」は単発の枠を日付の範囲でまとめて足す。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
-import RadioCard from '@/components/shared/radio-card'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { TextField } from '@/components/shared/text-field'
-import { RowActions } from '@/components/shared/row-actions'
-import StatusBadge from '@/components/shared/status-badge'
-import { ApiError, api, webinarApi, type Webinar, type WebinarEditor, type WebinarScheduleRule, type WebinarVideoAsset } from '@/lib/api'
-import VideoStages from './video-stages'
-import styles from './video-v8.module.css'
+import Notice from '@/components/shared/notice'
+import WebinarForm from '@/components/webinars/webinar-form'
+import Disclosure from '@/components/shared/disclosure'
+import {
+  webinarApi,
+  describeSaveFailure,
+  type Webinar,
+  type WebinarEditor,
+  type WebinarScheduleRule,
+} from '@/lib/api'
 
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
+const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
-function fmtSec(total: number): string {
-  if (!Number.isFinite(total) || total < 0) return '—'
+function formatMinutes(total: number): string {
   const minutes = Math.floor(total / 60)
-  const seconds = Math.round(total % 60)
-  if (minutes < 60) return `${minutes}分${seconds}秒`
-  return `${Math.floor(minutes / 60)}時間${minutes % 60}分`
+  const seconds = total % 60
+  return `${minutes}分${seconds}秒`
 }
 
-function basenameOf(prefix: string): string {
-  const trimmed = prefix.replace(/\/+$/, '')
-  const base = trimmed.split('/').pop() || trimmed
-  return base.includes('.') ? base : `${base}.mp4`
+function formatDateTime(value: string | null): string {
+  if (!value) return 'なし（いつでも）'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const week = WEEKDAY[date.getDay()]
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())}（${week}） ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-function ruleLabel(rule: WebinarScheduleRule): { when: string; note: string } {
-  if (rule.type === 'daily') return { when: '毎日', note: rule.time ? `${rule.time}〜` : '' }
+/** datetime-local の字面（`2026-10-01T10:00`）を JST の ISO にする。 */
+function toJstIso(local: string): string {
+  return `${local}:00+09:00`
+}
+
+function ruleSummary(rule: WebinarScheduleRule): { kind: string; detail: string } {
+  if (rule.type === 'daily') return { kind: '毎日', detail: rule.time ? `${rule.time}～` : '時刻未定' }
   if (rule.type === 'weekly') {
-    const days = (rule.days ?? []).map((day) => WEEKDAYS[day] ?? '').filter(Boolean).join('・')
-    return { when: '毎週', note: `${days}${days ? ' ' : ''}${rule.time ?? ''}`.trim() }
+    const days = (rule.days ?? []).map((d) => WEEKDAY[d] ?? '').join('・')
+    return { kind: '毎週', detail: `${days}${days ? ' ' : ''}${rule.time ?? ''}`.trim() || '曜日未定' }
   }
-  return { when: '単発', note: rule.at ?? '' }
+  return { kind: '単発', detail: rule.at ? formatDateTime(rule.at) : '日時未定' }
 }
 
-export default function VideoStepV8({ webinar: initial, editor, onWebinarChange, onEditorChange, onDirtyChange, registerSave, onConflict }: {
+export default function VideoV8({
+  webinar,
+  editor,
+  publicUrl,
+  canOpenPublicPage,
+  publicPageReason,
+  completionLabel,
+  onWebinarSaved,
+  onDirtyChange,
+  registerSave,
+  onEditVideo,
+}: {
   webinar: Webinar
   editor: WebinarEditor
-  onWebinarChange: (next: Webinar) => void
-  onEditorChange: (next: WebinarEditor) => void
-  onDirtyChange: (dirty: boolean) => void
-  registerSave: (save: (() => Promise<boolean>) | null) => void
-  onConflict: () => void
+  publicUrl: string | null
+  canOpenPublicPage: boolean
+  publicPageReason: string
+  completionLabel: string | null
+  onWebinarSaved: (next: Webinar) => void
+  onDirtyChange?: (dirty: boolean) => void
+  registerSave?: (save: (() => Promise<boolean>) | null) => void
+  onEditVideo: () => void
 }) {
-  const [webinar, setWebinar] = useState(initial)
-  useEffect(() => setWebinar(initial), [initial])
-  const [startsAt, setStartsAt] = useState(webinar.publicationStartsAt ?? '')
-  const [endsAt, setEndsAt] = useState(webinar.publicationEndsAt ?? '')
-  const [missingPolicy, setMissingPolicy] = useState(editor.actionPolicy.missingResultPolicy)
-  const [rules, setRules] = useState<WebinarScheduleRule[]>(webinar.schedule)
-  const [baseline, setBaseline] = useState(() => JSON.stringify({ startsAt: webinar.publicationStartsAt ?? '', endsAt: webinar.publicationEndsAt ?? '', missingPolicy: editor.actionPolicy.missingResultPolicy, rules: webinar.schedule }))
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState('')
-  const [videoName, setVideoName] = useState<string | null>(null)
-  const [replaceOpen, setReplaceOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [menuOpen, setMenuOpen] = useState<number | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [bulk, setBulk] = useState(false)
+  const [newKind, setNewKind] = useState<'daily' | 'weekly' | 'once'>('daily')
+  const [newTime, setNewTime] = useState('10:00')
+  const [newDays, setNewDays] = useState<number[]>([6])
+  const [newDate, setNewDate] = useState('')
+  const [bulkFrom, setBulkFrom] = useState('')
+  const [bulkTo, setBulkTo] = useState('')
+  const [bulkTime, setBulkTime] = useState('10:00')
+  const [startsAt, setStartsAt] = useState('')
+  const [endsAt, setEndsAt] = useState('')
+  const [noEnd, setNoEnd] = useState(!webinar.publicationEndsAt)
+  const [periodBusy, setPeriodBusy] = useState(false)
+  const [periodError, setPeriodError] = useState('')
+  const [policy, setPolicy] = useState(editor.actionPolicy.missingResultPolicy)
+  const [policyBusy, setPolicyBusy] = useState(false)
+  const [policyError, setPolicyError] = useState('')
 
-  const dirty = JSON.stringify({ startsAt, endsAt, missingPolicy, rules }) !== baseline
-  useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange])
-
-  const save = useCallback(async (): Promise<boolean> => {
-    setSaving(true)
-    setSaveError('')
+  const saveSchedule = async (schedule: WebinarScheduleRule[]): Promise<boolean> => {
+    setBusy(true)
+    setError('')
     try {
-      const updated = await webinarApi.update(webinar.id, {
-        publicationStartsAt: startsAt || null,
-        publicationEndsAt: endsAt || null,
-        schedule: rules,
+      const fresh = await webinarApi.editor(webinar.id)
+      const res = await webinarApi.update(webinar.id, {
+        schedule,
+        expectedVersion: fresh.data.version,
       })
-      const nextEditor = await webinarApi.saveEditor(webinar.id, { expectedVersion: editor.version, missingResultPolicy: missingPolicy })
-      setWebinar(updated.data)
-      onWebinarChange(updated.data)
-      onEditorChange(nextEditor.data)
-      setBaseline(JSON.stringify({ startsAt, endsAt, missingPolicy, rules }))
+      onWebinarSaved(res.data)
       return true
     } catch (cause) {
-      /* 他の人が先に保存したときは競合の帯を出す（板 `pvimJ`）。 */
-      if (cause instanceof ApiError && cause.status === 409) onConflict()
-      setSaveError('保存できませんでした。入力を見直してください。')
+      setError(describeSaveFailure(cause))
       return false
     } finally {
-      setSaving(false)
+      setBusy(false)
     }
-  }, [webinar.id, startsAt, endsAt, rules, editor.version, missingPolicy, onWebinarChange, onEditorChange, onConflict])
+  }
 
-  useEffect(() => {
-    registerSave(dirty ? save : null)
-    return () => registerSave(null)
-  }, [dirty, registerSave, save])
+  const removeRule = async (index: number) => {
+    setMenuOpen(null)
+    await saveSchedule(webinar.schedule.filter((_, i) => i !== index))
+  }
 
-  useEffect(() => {
-    let cancelled = false
-    if (webinar.videoMediaId && webinar.accountId) {
-      api.media.detail(webinar.videoMediaId, webinar.accountId)
-        .then((res) => { if (!cancelled && res.success) setVideoName(res.data.item.filename) })
-        .catch(() => {})
-    } else {
-      setVideoName(null)
+  const duplicateRule = async (index: number) => {
+    setMenuOpen(null)
+    const rules = [...webinar.schedule]
+    rules.splice(index + 1, 0, { ...webinar.schedule[index] })
+    await saveSchedule(rules)
+  }
+
+  const addRule = async () => {
+    const rule: WebinarScheduleRule | null =
+      newKind === 'daily'
+        ? { type: 'daily', time: newTime }
+        : newKind === 'weekly'
+          ? { type: 'weekly', days: [...newDays].sort(), time: newTime }
+          : newDate
+            ? { type: 'once', at: toJstIso(`${newDate}T${newTime}`) }
+            : null
+    if (!rule) {
+      setError('単発の枠は日付を入れてください。')
+      return
     }
-    return () => { cancelled = true }
-  }, [webinar.videoMediaId, webinar.accountId])
+    if (await saveSchedule([...webinar.schedule, rule])) setAdding(false)
+  }
 
-  const scheduled = editor.deliveryKind === 'scheduled'
-  const displayName = videoName ?? (webinar.videoPrefix ? basenameOf(webinar.videoPrefix) : '—（未設定）')
+  /** まとめて作る：日付の範囲に単発の枠を1日1つずつ足す。 */
+  const addBulk = async () => {
+    if (!bulkFrom || !bulkTo || bulkFrom > bulkTo) {
+      setError('まとめて作るには、始まりと終わりの日付を正しく入れてください。')
+      return
+    }
+    const rules: WebinarScheduleRule[] = []
+    const cursor = new Date(`${bulkFrom}T00:00:00+09:00`)
+    const end = new Date(`${bulkTo}T00:00:00+09:00`)
+    while (cursor <= end && rules.length < 31) {
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const day = `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}-${pad(cursor.getDate())}`
+      rules.push({ type: 'once', at: toJstIso(`${day}T${bulkTime}`) })
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    if (await saveSchedule([...webinar.schedule, ...rules])) setBulk(false)
+  }
+
+  const savePeriod = async () => {
+    setPeriodBusy(true)
+    setPeriodError('')
+    try {
+      const fresh = await webinarApi.editor(webinar.id)
+      const res = await webinarApi.update(webinar.id, {
+        publicationStartsAt: startsAt ? toJstIso(startsAt) : null,
+        publicationEndsAt: noEnd || !endsAt ? null : toJstIso(endsAt),
+        expectedVersion: fresh.data.version,
+      })
+      onWebinarSaved(res.data)
+    } catch (cause) {
+      setPeriodError(describeSaveFailure(cause))
+    } finally {
+      setPeriodBusy(false)
+    }
+  }
+
+  const savePolicy = async (next: 'escalate' | 'retry_next_day') => {
+    setPolicy(next)
+    setPolicyBusy(true)
+    setPolicyError('')
+    try {
+      await webinarApi.saveEditor(webinar.id, {
+        expectedVersion: editor.version,
+        missingResultPolicy: next,
+      })
+    } catch {
+      setPolicyError('保存できませんでした。時間をおいてもう一度お試しください。')
+    } finally {
+      setPolicyBusy(false)
+    }
+  }
+
+  const toggleDay = (day: number) => {
+    setNewDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
+  }
 
   return (
-    <div className={styles.columns}>
-      <div className={styles.main}>
-        <section className={styles.card} aria-label="動画">
-          <h2 className={styles.cardTitle}>動画</h2>
-          <div className={styles.videoRow}>
-            <span className={styles.videoThumb} aria-hidden="true">▶</span>
-            <div>
-              <p className={styles.videoName}>{displayName}</p>
-              <p className={styles.videoMeta}>{fmtSec(webinar.durationSeconds)}</p>
-            </div>
-            <span className={styles.videoReplace}>
-              <Button onClick={() => setReplaceOpen(true)}>差し替える</Button>
+    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="VWNaA">
+      <div className="min-w-0 flex-1 space-y-3">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="動画">
+          <h2 className="text-ink text-base font-bold">動画</h2>
+          <div className="bg-canvas-sunken mt-3 flex items-center gap-3 rounded-control p-3">
+            <span className="bg-ink flex h-12 w-20 shrink-0 items-center justify-center rounded-control" aria-hidden="true">
+              <span className="text-canvas text-lg">▶</span>
             </span>
-          </div>
-          <ReplaceVideoDialog
-            open={replaceOpen}
-            webinar={webinar}
-            onClose={() => setReplaceOpen(false)}
-            onReplaced={(next) => { setWebinar(next); onWebinarChange(next) }}
-          />
-        </section>
-        {scheduled ? (
-          <section className={styles.card} aria-label="動画の準備">
-            <h2 className={styles.cardTitle}>動画の準備</h2>
-            <VideoStages webinarId={webinar.id} hasVideo={Boolean(webinar.videoPrefix || webinar.videoMediaId)} />
-            <p className={styles.prepNote}>準備が済むまで公開できません（いま「配信の形」を作っています）</p>
-          </section>
-        ) : null}
-        <section className={styles.card} aria-label="公開期間">
-          <h2 className={styles.cardTitle}>公開期間</h2>
-          <div className={styles.periodGrid}>
-            <label className={styles.field}>公開の開始
-              <input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} className={styles.textInput} aria-label="公開の開始" />
-            </label>
-            <label className={styles.field}>公開の終了 <span className={styles.fieldNote}>任意</span>
-              <input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} placeholder="なし（いつでも）" className={styles.textInput} aria-label="公開の終了" />
-            </label>
+            <span className="min-w-0 flex-1">
+              <span className="text-ink block truncate text-sm font-semibold">
+                {webinar.videoPrefix ? webinar.videoPrefix.split('/').pop() : webinar.title}
+              </span>
+              <span className="text-ink-secondary mt-0.5 block text-xs">
+                {formatMinutes(webinar.durationSeconds)}
+                {webinar.videoPrefix ? '' : '・動画が選ばれていません'}
+              </span>
+            </span>
+            <Button variant="secondary" onClick={onEditVideo}>
+              差し替える
+            </Button>
           </div>
         </section>
-        {scheduled ? (
-          <SessionsCard webinarId={webinar.id} />
-        ) : (
-          <FramesCard rules={rules} webinarId={webinar.id} onChange={setRules} />
-        )}
-        <section className={styles.card} aria-label="視聴の数え方">
-          <h2 className={styles.cardTitle}>視聴の数え方</h2>
-          <div className={styles.periodGrid}>
-            <label className={styles.field}>視聴完了とみなす
-              <Select aria-label="視聴完了とみなす" value="fixed" onChange={() => {}} disabled options={[{ value: 'fixed', label: `${editor.viewingCondition.label}（変えられません）` }]} />
-            </label>
-            <label className={styles.field}>結果が取れないとき
-              <Select
-                aria-label="結果が取れないとき"
-                value={missingPolicy}
-                onChange={(value) => setMissingPolicy(value as 'escalate' | 'retry_next_day')}
-                options={[
-                  { value: 'retry_next_day', label: '翌日に取り直す' },
-                  { value: 'escalate', label: '要対応へ追加' },
-                ]}
+
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="公開期間">
+          <h2 className="text-ink text-base font-bold">公開期間</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-ink-secondary mb-1 block text-xs font-medium">公開の開始</span>
+              <input
+                type="datetime-local"
+                value={startsAt}
+                onChange={(e) => setStartsAt(e.target.value)}
+                placeholder={webinar.publicationStartsAt ? formatDateTime(webinar.publicationStartsAt) : '2026/10/01 10:00'}
+                className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
               />
             </label>
+            <div>
+              <span className="text-ink-secondary mb-1 block text-xs font-medium">
+                公開の終了 <span className="text-ink-faint">任意</span>
+              </span>
+              <input
+                type="datetime-local"
+                value={endsAt}
+                disabled={noEnd}
+                onChange={(e) => setEndsAt(e.target.value)}
+                placeholder={webinar.publicationEndsAt ? formatDateTime(webinar.publicationEndsAt) : 'なし（いつでも）'}
+                className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm disabled:opacity-50"
+              />
+              <Checkbox checked={noEnd} onCheckedChange={setNoEnd} className="mt-2 text-xs">
+                終わりを決めない（いつでも見られる）
+              </Checkbox>
+            </div>
+          </div>
+          {periodError ? <Notice tone="error" title="公開期間を保存できませんでした">{periodError}</Notice> : null}
+          <div className="mt-3">
+            <Button variant="secondary" busy={periodBusy} busyLabel="保存しています…" onClick={savePeriod}>
+              公開期間を保存する
+            </Button>
           </div>
         </section>
-        {saveError ? <Notice tone="danger">{saveError}</Notice> : null}
-      </div>
-      <div>
-        <h2 className={styles.previewTitle}>公開ページでの見え方</h2>
-        <div className={styles.previewCard}>
-          <p className={styles.previewHeading}>{webinar.title || '無題のウェビナー'}</p>
-          <div className={styles.previewScreen} aria-hidden="true">▶</div>
-          <p className={styles.previewCaption}>{scheduled ? '開催回ごとに決めた日時から' : 'いつでも見られます'}・{fmtSec(webinar.durationSeconds)}</p>
-        </div>
-        <div className={styles.previewButtons}>
-          <Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=preview`}>PCで見る</Button>
-          <Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=preview`}>スマホで見る</Button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
-function ReplaceVideoDialog({ open, webinar, onClose, onReplaced }: {
-  open: boolean
-  webinar: Webinar
-  onClose: () => void
-  onReplaced: (next: Webinar) => void
-}) {
-  const [choice, setChoice] = useState('')
-  const [external, setExternal] = useState('')
-  const [items, setItems] = useState<Array<{ id: string; filename: string }>>([])
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  useEffect(() => {
-    if (!open || !webinar.accountId) return
-    api.media.list(webinar.accountId, { kind: 'video', limit: 100 })
-      .then((res) => { if (res.success) setItems(res.data.items.map((item) => ({ id: item.id, filename: item.filename }))) })
-      .catch(() => setError('動画の一覧を読み込めませんでした。'))
-  }, [open, webinar.accountId])
-  const save = async () => {
-    setBusy(true)
-    setError('')
-    try {
-      const next = choice === '__external__'
-        ? await webinarApi.update(webinar.id, { videoPrefix: external.trim() || null })
-        : await webinarApi.update(webinar.id, { videoMediaId: choice || null })
-      onReplaced(next.data)
-      onClose()
-    } catch {
-      setError('差し替えできませんでした。')
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <Dialog open={open} onCancel={onClose} title="動画を差し替える" footer={<><Button onClick={onClose}>やめる</Button><Button variant="primary" disabled={busy} onClick={() => void save()}>差し替える</Button></>}>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {items.map((item) => (
-          <RadioCard
-            key={item.id}
-            name="webinar-video-choice"
-            value={item.id}
-            checked={choice === item.id}
-            onChange={() => setChoice(item.id)}
-            title={item.filename}
-          />
-        ))}
-        <RadioCard
-          name="webinar-video-choice"
-          value="__external__"
-          checked={choice === '__external__'}
-          onChange={() => setChoice('__external__')}
-          title="外部のURLを使う"
-        />
-        {choice === '__external__' ? <TextField value={external} onChange={(event) => setExternal(event.target.value)} placeholder="https://..." aria-label="外部の動画URL" /> : null}
-      </div>
-    </Dialog>
-  )
-}
-
-function FramesCard({ rules, webinarId, onChange }: { rules: WebinarScheduleRule[]; webinarId: string; onChange: (next: WebinarScheduleRule[]) => void }) {
-  const [adding, setAdding] = useState(false)
-  const [keepOpen, setKeepOpen] = useState(false)
-  const [sessions, setSessions] = useState<Record<string, { capacity: number | null; reserved: number }>>({})
-  useEffect(() => {
-    let cancelled = false
-    const onceRules = rules.filter((rule) => rule.type === 'once' && rule.at)
-    Promise.all(onceRules.map(async (rule) => {
-      try {
-        const startAt = Math.floor(new Date(rule.at as string).getTime() / 1000)
-        const res = await webinarApi.webinarSession(webinarId, startAt)
-        return [rule.at, { capacity: res.data.session?.capacity ?? null, reserved: res.data.session?.reservedCount ?? 0 }] as const
-      } catch {
-        return [rule.at, { capacity: null, reserved: 0 }] as const
-      }
-    })).then((entries) => { if (!cancelled) setSessions(Object.fromEntries(entries)) })
-    return () => { cancelled = true }
-  }, [rules, webinarId])
-  return (
-    <section className={styles.card} aria-label="配信枠">
-      <h2 className={styles.cardTitle}>配信枠 {rules.length}件</h2>
-      <p className={styles.cardDesc}>視聴できる時間の枠です。枠が0件だと公開できません。</p>
-      <ul className={styles.frameList}>
-        {rules.map((rule, index) => {
-          const label = ruleLabel(rule)
-          const session = rule.at ? sessions[rule.at] : undefined
-          return (
-            <li key={index} className={styles.frameRow}>
-              <span className={styles.frameWhen}>{label.when}</span>
-              <span className={styles.frameNote}>{label.note}</span>
-              <span className={styles.frameSide}>
-                {session && session.capacity !== null ? `残り${Math.max(0, session.capacity - session.reserved)}人` : '定員なし'}
-                <RowActions
-                  subjectName={`${label.when}の枠`}
-                  menuItems={[
-                    { id: 'delete', label: '削除', onSelect: () => onChange(rules.filter((_, i) => i !== index)) },
-                  ]}
-                />
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-      {adding ? (
-        <AddRuleForm
-          onAdd={(rule) => {
-            onChange([...rules, rule])
-            if (!keepOpen) setAdding(false)
-          }}
-          onCancel={() => setAdding(false)}
-        />
-      ) : (
-        <div className={styles.frameAddRow}>
-          <Button onClick={() => { setKeepOpen(false); setAdding(true) }}>＋ 枠を足す（毎日・毎週・単発）</Button>
-          <Button onClick={() => { setKeepOpen(true); setAdding(true) }}>まとめて作る</Button>
-        </div>
-      )}
-    </section>
-  )
-}
-
-function AddRuleForm({ onAdd, onCancel }: { onAdd: (rule: WebinarScheduleRule) => void; onCancel: () => void }) {
-  const [type, setType] = useState<'daily' | 'weekly' | 'once'>('daily')
-  const [time, setTime] = useState('10:00')
-  const [days, setDays] = useState<number[]>([6])
-  const [at, setAt] = useState('')
-  return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-      <Select aria-label="枠の種類" value={type} onChange={(value) => setType(value as 'daily' | 'weekly' | 'once')} options={[
-        { value: 'daily', label: '毎日' },
-        { value: 'weekly', label: '毎週' },
-        { value: 'once', label: '単発' },
-      ]} />
-      {type === 'once' ? (
-        <input type="datetime-local" value={at} onChange={(event) => setAt(event.target.value)} className={styles.textInput} style={{ maxWidth: 220 }} aria-label="単発の日時" />
-      ) : (
-        <input type="time" value={time} onChange={(event) => setTime(event.target.value)} className={styles.textInput} style={{ maxWidth: 140 }} aria-label="始まりの時刻" />
-      )}
-      {type === 'weekly' ? (
-        <div style={{ display: 'flex', gap: 4 }}>
-          {WEEKDAYS.map((name, day) => (
-            <Checkbox
-              key={day}
-              checked={days.includes(day)}
-              onCheckedChange={() => setDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day])}
-              aria-label={`${name}曜日`}
-            >
-              {name}
-            </Checkbox>
-          ))}
-        </div>
-      ) : null}
-      <Button variant="primary" onClick={() => {
-        if (type === 'once') {
-          if (!at) return
-          onAdd({ type, at })
-        } else {
-          onAdd({ type, time, ...(type === 'weekly' ? { days: [...days].sort() } : {}) })
-        }
-      }}>足す</Button>
-      <Button onClick={onCancel}>やめる</Button>
-    </div>
-  )
-}
-
-function SessionsCard({ webinarId }: { webinarId: string }) {
-  const [starts, setStarts] = useState<number[] | null>(null)
-  const [details, setDetails] = useState<Record<number, { capacity: number | null; reserved: number; state: string; remaining: number | null }>>({})
-  const [adding, setAdding] = useState(false)
-  const [newAt, setNewAt] = useState('')
-  const [newCapacity, setNewCapacity] = useState('')
-  const [capTarget, setCapTarget] = useState<number | null>(null)
-  const [capValue, setCapValue] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-
-  const loadStarts = useCallback(async () => {
-    try {
-      const res = await webinarApi.analytics(webinarId)
-      const upcoming = res.data.sessions.map((s) => s.sessionStartAt).filter((at) => at * 1000 >= Date.now() - 24 * 3600 * 1000).sort((a, b) => a - b)
-      setStarts(upcoming)
-    } catch {
-      setStarts([])
-    }
-  }, [webinarId])
-
-  useEffect(() => { void loadStarts() }, [loadStarts])
-
-  useEffect(() => {
-    if (!starts) return
-    let cancelled = false
-    Promise.all(starts.map(async (startAt) => {
-      try {
-        const res = await webinarApi.webinarSession(webinarId, startAt)
-        const s = res.data.session
-        return [startAt, { capacity: s?.capacity ?? null, reserved: s?.reservedCount ?? 0, state: s?.state ?? 'open', remaining: s?.remaining ?? null }] as const
-      } catch {
-        return [startAt, { capacity: null, reserved: 0, state: 'open', remaining: null }] as const
-      }
-    })).then((entries) => { if (!cancelled) setDetails(Object.fromEntries(entries)) })
-    return () => { cancelled = true }
-  }, [starts, webinarId])
-
-  const addSession = async () => {
-    const at = Math.floor(new Date(newAt).getTime() / 1000)
-    if (!Number.isFinite(at)) return
-    setBusy(true)
-    setError('')
-    try {
-      await webinarApi.setSessionCapacity(webinarId, at, newCapacity === '' ? null : Number(newCapacity))
-      setNewAt('')
-      setNewCapacity('')
-      setAdding(false)
-      await loadStarts()
-    } catch {
-      setError('枠を足せませんでした。')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const saveCapacity = async () => {
-    if (capTarget === null) return
-    setBusy(true)
-    setError('')
-    try {
-      await webinarApi.setSessionCapacity(webinarId, capTarget, capValue === '' ? null : Number(capValue))
-      setCapTarget(null)
-      await loadStarts()
-    } catch {
-      setError('定員を変えられませんでした。')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const dateLabel = (startAt: number) => {
-    const date = new Date(startAt * 1000)
-    return `${date.getMonth() + 1}/${date.getDate()}（${WEEKDAYS[date.getDay()]}） ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-  }
-
-  return (
-    <section className={styles.card} aria-label="開催回">
-      <h2 className={styles.cardTitle}>開催回</h2>
-      <p className={styles.cardDesc}>回ごとに日時と定員を決めます。定員を空にすると無制限</p>
-      {starts === null ? <div style={{ marginTop: 12 }}><ListState kind="loading" /></div> : (
-        <DataTable>
-          <TableHeadRow>
-            <Th>日時</Th>
-            <Th align="right">定員</Th>
-            <Th align="right">申込</Th>
-            <Th>状態</Th>
-            <Th align="right">操作</Th>
-          </TableHeadRow>
-          {starts.map((startAt) => {
-            const detail = details[startAt]
-            return (
-              <Tr key={startAt}>
-                <Td>{dateLabel(startAt)}</Td>
-                <Td align="right">{detail ? (detail.capacity === null ? '無制限' : `${detail.capacity}人`) : '—'}</Td>
-                <Td align="right">{detail ? `${detail.reserved}人` : '—'}</Td>
-                <Td>
-                  {detail ? (
-                    <StatusBadge tone={detail.state === 'open' && (detail.remaining ?? 1) > 0 ? 'info' : detail.state === 'full' ? 'danger' : 'neutral'}>
-                      {detail.state === 'full' ? '満席' : detail.state === 'closed' ? '受付前' : detail.remaining !== null ? `残り${detail.remaining}人` : '受付中'}
-                    </StatusBadge>
-                  ) : '—'}
-                </Td>
-                <Td align="right">
-                  <RowActions
-                    subjectName={`${dateLabel(startAt)}の回`}
-                    detail={{ label: '参加者を見る', href: `/webinars/edit?id=${encodeURIComponent(webinarId)}&pane=participants` }}
-                    menuItems={[
-                      { id: 'capacity', label: '定員を変える', onSelect: () => { setCapTarget(startAt); setCapValue(detail && detail.capacity !== null ? String(detail.capacity) : '') } },
-                    ]}
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="配信枠">
+          <h2 className="text-ink text-base font-bold">配信枠 {webinar.schedule.length}件</h2>
+          <p className="text-ink-faint mt-1 text-xs">視聴できる時間の枠です。枠が0だと公開できません。</p>
+          {error ? <Notice tone="error" title="配信枠を保存できませんでした">{error}</Notice> : null}
+          <ul className="divide-hairline mt-3 divide-y rounded-control border border-hairline">
+            {webinar.schedule.map((rule, index) => {
+              const summary = ruleSummary(rule)
+              return (
+                <li key={index} className="flex items-center gap-3 px-4 py-3">
+                  <span
+                    className="bg-accent-soft text-accent-deep inline-flex shrink-0 items-center gap-1 rounded-pill px-2 py-0.5 text-xs font-semibold"
+                    aria-hidden="true"
+                  >
+                    <span aria-hidden="true">●</span>
+                    {summary.kind}
+                  </span>
+                  <span className="text-ink min-w-0 flex-1 truncate text-sm">{summary.detail}</span>
+                  <span className="relative shrink-0">
+                    <Button
+                      variant="secondary"
+                      size="compact"
+                      aria-label={`枠${index + 1}の操作`}
+                      aria-expanded={menuOpen === index}
+                      onClick={() => setMenuOpen(menuOpen === index ? null : index)}
+                    >
+                      …
+                    </Button>
+                    {menuOpen === index ? (
+                      <span className="border-hairline bg-canvas absolute right-0 z-10 mt-1 flex w-28 flex-col rounded-control border py-1 shadow-card">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => duplicateRule(index)}
+                          className="text-ink px-3 py-2 text-left text-xs hover:bg-canvas-sunken"
+                        >
+                          複製する
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => removeRule(index)}
+                          className="text-danger px-3 py-2 text-left text-xs hover:bg-canvas-sunken"
+                        >
+                          消す
+                        </button>
+                      </span>
+                    ) : null}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+          {webinar.schedule.length === 0 ? (
+            <p className="text-ink-faint mt-3 text-xs">まだ枠がありません。下の「枠を足す」から足してください。</p>
+          ) : null}
+          {!adding && !bulk ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setAdding(true)}>
+                ＋ 枠を足す（毎日・毎週・単発）
+              </Button>
+              <Button variant="secondary" onClick={() => setBulk(true)}>
+                まとめて作る
+              </Button>
+            </div>
+          ) : null}
+          {adding ? (
+            <div className="border-hairline mt-3 space-y-3 rounded-control border p-3">
+              <Select
+                label="枠の種類"
+                aria-label="枠の種類"
+                value={newKind}
+                onChange={(value) => setNewKind(value as 'daily' | 'weekly' | 'once')}
+                options={[
+                  { value: 'daily', label: '毎日' },
+                  { value: 'weekly', label: '毎週' },
+                  { value: 'once', label: '単発' },
+                ]}
+              />
+              {newKind === 'weekly' ? (
+                <div>
+                  <span className="text-ink-secondary mb-1 block text-xs font-medium">曜日</span>
+                  <span className="flex flex-wrap gap-1">
+                    {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        aria-pressed={newDays.includes(day)}
+                        onClick={() => toggleDay(day)}
+                        className={
+                          newDays.includes(day)
+                            ? 'border-accent text-accent-deep h-9 w-9 rounded-control border-2 text-xs font-semibold'
+                            : 'border-ink-faint text-ink-secondary h-9 w-9 rounded-control border text-xs'
+                        }
+                      >
+                        {WEEKDAY[day]}
+                      </button>
+                    ))}
+                  </span>
+                </div>
+              ) : null}
+              {newKind === 'once' ? (
+                <label className="block">
+                  <span className="text-ink-secondary mb-1 block text-xs font-medium">日付</span>
+                  <input
+                    type="date"
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
                   />
-                </Td>
-              </Tr>
-            )
-          })}
-        </DataTable>
-      )}
-      {adding ? (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-          <input type="datetime-local" value={newAt} onChange={(event) => setNewAt(event.target.value)} className={styles.textInput} style={{ maxWidth: 220 }} aria-label="足す枠の日時" />
-          <input type="number" min={0} value={newCapacity} onChange={(event) => setNewCapacity(event.target.value)} placeholder="定員（空は無制限）" className={styles.textInput} style={{ maxWidth: 180 }} aria-label="足す枠の定員" />
-          <Button variant="primary" disabled={busy} onClick={() => void addSession()}>足す</Button>
-          <Button onClick={() => setAdding(false)}>やめる</Button>
+                </label>
+              ) : null}
+              <label className="block">
+                <span className="text-ink-secondary mb-1 block text-xs font-medium">時刻</span>
+                <input
+                  type="time"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <Button busy={busy} busyLabel="足しています…" onClick={addRule}>
+                  枠を足す
+                </Button>
+                <Button variant="secondary" onClick={() => setAdding(false)}>
+                  やめる
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {bulk ? (
+            <div className="border-hairline mt-3 space-y-3 rounded-control border p-3">
+              <p className="text-ink-secondary text-xs">日付の範囲に、単発の枠を1日1つずつ足します（31日まで）。</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="block">
+                  <span className="text-ink-secondary mb-1 block text-xs font-medium">始まり</span>
+                  <input
+                    type="date"
+                    value={bulkFrom}
+                    onChange={(e) => setBulkFrom(e.target.value)}
+                    className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-ink-secondary mb-1 block text-xs font-medium">終わり</span>
+                  <input
+                    type="date"
+                    value={bulkTo}
+                    onChange={(e) => setBulkTo(e.target.value)}
+                    className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-ink-secondary mb-1 block text-xs font-medium">時刻</span>
+                  <input
+                    type="time"
+                    value={bulkTime}
+                    onChange={(e) => setBulkTime(e.target.value)}
+                    className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button busy={busy} busyLabel="足しています…" onClick={addBulk}>
+                  まとめて足す
+                </Button>
+                <Button variant="secondary" onClick={() => setBulk(false)}>
+                  やめる
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </section>
+
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="視聴の数え方">
+          <h2 className="text-ink text-base font-bold">視聴の数え方</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <span className="text-ink-secondary mb-1 block text-xs font-medium">視聴完了とみなす</span>
+              <p className="text-ink text-sm">{completionLabel ?? '—'}</p>
+            </div>
+            <div>
+              <Select
+                label="結果が取れないとき"
+                aria-label="結果が取れないとき"
+                value={policy}
+                disabled={policyBusy}
+                onChange={(value) => savePolicy(value as 'escalate' | 'retry_next_day')}
+                options={[
+                  { value: 'retry_next_day', label: '翌日に取り直す' },
+                  { value: 'escalate', label: '担当へ上げる' },
+                ]}
+              />
+              {policyError ? <p className="text-danger mt-1 text-xs" role="alert">{policyError}</p> : null}
+            </div>
+          </div>
+        </section>
+
+        <Disclosure title="動画・公開の詳細を編集する">
+          <WebinarForm
+            key={`${webinar.id}-${webinar.updatedAt}`}
+            initial={webinar}
+            hideBar
+            onSaved={onWebinarSaved}
+            onDirtyChange={onDirtyChange}
+            registerSave={registerSave}
+          />
+        </Disclosure>
+      </div>
+
+      <aside className="w-full shrink-0 xl:w-95" aria-label="公開ページでの見え方">
+        <div className="border-hairline bg-canvas rounded-card border p-4 shadow-card xl:sticky xl:top-4">
+          <h2 className="text-ink text-base font-bold">公開ページでの見え方</h2>
+          <p className="text-ink mt-2 truncate text-sm font-semibold">{webinar.title}</p>
+          <span className="bg-ink mt-2 flex aspect-video w-full items-center justify-center rounded-control" aria-hidden="true">
+            <span className="text-canvas text-2xl">▶</span>
+          </span>
+          <p className="text-ink-faint mt-2 text-xs">
+            {webinar.publicationEndsAt ? '期間内だけ見られます' : 'いつでも見られます'}・{formatMinutes(webinar.durationSeconds)}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {publicUrl && canOpenPublicPage ? (
+              <>
+                <Button variant="secondary" href={publicUrl} title={publicPageReason}>
+                  PCで見る
+                </Button>
+                <Button variant="secondary" href={publicUrl} title={publicPageReason}>
+                  スマホで見る
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="secondary" disabled title={publicPageReason}>
+                  PCで見る
+                </Button>
+                <Button variant="secondary" disabled title={publicPageReason}>
+                  スマホで見る
+                </Button>
+              </>
+            )}
+          </div>
+          {!canOpenPublicPage && publicPageReason ? (
+            <p className="text-ink-faint mt-2 text-xs">{publicPageReason}</p>
+          ) : null}
         </div>
-      ) : (
-        <div style={{ marginTop: 12 }}>
-          <button type="button" className={styles.frameAddLink} onClick={() => setAdding(true)}>＋ 枠を足す（毎日・毎週・単発）</button>
-        </div>
-      )}
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      <Dialog open={capTarget !== null} onCancel={() => setCapTarget(null)} title="定員を変える" footer={<><Button onClick={() => setCapTarget(null)}>やめる</Button><Button variant="primary" disabled={busy} onClick={() => void saveCapacity()}>変える</Button></>}>
-        <input type="number" min={0} value={capValue} onChange={(event) => setCapValue(event.target.value)} placeholder="空は無制限" className={styles.textInput} aria-label="定員" />
-      </Dialog>
-    </section>
+      </aside>
+    </div>
   )
 }
