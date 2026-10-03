@@ -359,6 +359,7 @@ shared-button-importer components/merged-person/merged-person-detail-v8.tsx
 shared-button-importer components/merged-person/merged-person-detail.tsx
 shared-button-importer components/merged-person/merged-person-sections.tsx
 shared-button-importer components/merged-person/merged-profile-dialog.tsx
+shared-button-importer components/ops/impersonation-bar.tsx
 shared-button-importer components/ops/knowledge-editor.tsx
 shared-button-importer components/ops/knowledge-list.tsx
 shared-button-importer components/ops/knowledge-ticket.tsx
