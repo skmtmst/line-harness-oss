@@ -15,8 +15,14 @@ function stubBrowser(options: { fontsReady?: boolean } = {}) {
   const calls: string[] = []
   let initFn: ((arg: unknown) => void) | null = null
   let initArg: unknown = null
+  let fixedAt: unknown = null
   const page = {
-    clock: { setFixedTime: async () => {} },
+    clock: {
+      setFixedTime: async (when: unknown) => {
+        calls.push('setFixedTime')
+        fixedAt = when
+      },
+    },
     addInitScript: async (fn: (arg: unknown) => void, arg: unknown) => {
       calls.push('addInitScript')
       initFn = fn
@@ -39,6 +45,9 @@ function stubBrowser(options: { fontsReady?: boolean } = {}) {
   }
   return {
     calls,
+    fixedTime() {
+      return fixedAt instanceof Date ? fixedAt.toISOString() : fixedAt
+    },
     runInit(store: Record<string, string>) {
       if (!initFn) throw new Error('合言葉が置かれていない')
       const g = globalThis as Record<string, unknown>
@@ -81,5 +90,19 @@ describe('ガードの撮影準備', () => {
     const stub = stubBrowser({ fontsReady: false })
     const page = await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends', width: 1152, theme: 'v7', stable: true })
     expect(page).toBeTruthy()
+  })
+
+  it('時刻を決まった日時に固定する', async () => {
+    const stub = stubBrowser()
+    await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends/detail?id=f-1', width: 1440, theme: 'v7', stable: true })
+    expect(stub.calls).toContain('setFixedTime')
+    expect(stub.fixedTime()).toBe('2026-10-01T05:00:00.000Z')
+  })
+
+  it('安定化なしでは時計を触らない', async () => {
+    const stub = stubBrowser()
+    await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends', width: 1152, theme: 'v8' })
+    expect(stub.calls).not.toContain('setFixedTime')
+    expect(stub.calls).toContain('evaluate:fonts')
   })
 })
