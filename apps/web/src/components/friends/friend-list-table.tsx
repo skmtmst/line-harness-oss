@@ -1,18 +1,23 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import MenuPortal from '@/components/shared/menu-portal'
 import Pagination from '@/components/shared/pagination'
+import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import DetailPanel from '@/components/shared/detail-panel'
 import ListState from '@/components/shared/list-state'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { withViewTransition } from '@/components/shared/view-transition'
 import ListRange from '@/components/ui/list-range'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import FriendListRow, { FriendListCard } from './friend-list-row'
-import { formatNumber } from '@/lib/format'
+import FriendListRow, { FriendListCard, selectLastContactAt } from './friend-list-row'
+import { formatDay, formatNumber } from '@/lib/format'
 import './friend-list-table.css'
 
 export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
@@ -75,6 +80,22 @@ export default function FriendListTable({
   const [preferencesReady, setPreferencesReady] = useState(false)
   const [columnsOpen, setColumnsOpen] = useState(false)
   const columnsButtonRef = useRef<HTMLButtonElement>(null)
+  const router = useRouter()
+  /* 行の詳しい内容（V8「サクサク感」C①）。開いている友だちのID。v7 は使わない。 */
+  const isV8 = useAdminTheme() === 'v8'
+  const [panelFriendId, setPanelFriendId] = useState<string | null>(null)
+
+  /** 一覧→詳しい画面はつながる移り変わりで進む（V8「サクサク感」E）。 */
+  const goOpen = (href: string) => {
+    withViewTransition(() => {
+      router.push(href)
+    })
+  }
+
+  /* 行の詳しい内容（C①）。↑↓で次の行へ移る。 */
+  const panelIndex = panelFriendId === null ? -1 : friends.findIndex((friend) => friend.id === panelFriendId)
+  const panelFriend = panelIndex >= 0 ? friends[panelIndex] : null
+  const panelAttention = panelFriend ? String(panelFriend.metadata?.__attention ?? '') === '1' : false
   const selectedCount = friends.filter((friend) => selectedIds?.has(friend.id)).length
   const allSelected = friends.length > 0 && selectedCount === friends.length
 
@@ -217,6 +238,61 @@ export default function FriendListTable({
         {visible.has('last') ? <div className="truncate text-center">最終接触</div> : null}
       </div>
 
+      {/* 行の詳しい内容（V8「サクサク感」C①）。一覧は左に見えたまま、↑↓で次の行へ移る。 */}
+      {isV8 && panelFriend ? (
+        <DetailPanel
+          open
+          title={panelFriend.displayName || '（名前なし）'}
+          description={`担当：${panelFriend.operator?.name ?? '未割り当て'}`}
+          onClose={() => setPanelFriendId(null)}
+          onPrev={panelIndex > 0 ? () => setPanelFriendId(friends[panelIndex - 1].id) : undefined}
+          onNext={
+            panelIndex < friends.length - 1 ? () => setPanelFriendId(friends[panelIndex + 1].id) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < friends.length - 1}
+          footer={
+            <>
+              <Button
+                variant="primary"
+                onClick={() => goOpen(`/friends/detail?id=${panelFriend.id}`)}
+              >
+                詳細を開く
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => goOpen(`/chats?friend=${panelFriend.id}`)}
+              >
+                受信箱で開く
+              </Button>
+            </>
+          }
+        >
+          <p>
+            {panelFriend.chatStatus === 'unread' ? '未対応' : panelFriend.chatStatus === 'in_progress' ? '対応中' : panelFriend.chatStatus === 'on_hold' ? '保留' : '対応済み'}
+            {panelAttention ? ' ／ 注目中' : ''}
+          </p>
+          <p>
+            最終接触 {formatDay(selectLastContactAt(panelFriend))}
+          </p>
+          <p>{panelFriend.firstTrackedLinkName ? `流入元：${panelFriend.firstTrackedLinkName}` : '流入元：不明'}</p>
+          <p>
+            {panelFriend.tags.length ? `タグ：${panelFriend.tags.map((tag) => tag.name).join('・')}` : 'タグ：—'}
+          </p>
+          {onToggleAttention ? (
+            <p>
+              <Button
+                variant="secondary"
+                aria-pressed={panelAttention}
+                onClick={() => onToggleAttention(panelFriend)}
+              >
+                {panelAttention ? '注目を外す' : '注目を付ける'}
+              </Button>
+            </p>
+          ) : null}
+        </DetailPanel>
+      ) : null}
+
       <RefreshCover refreshing={refreshing}>
       <div>
         {status === 'loading' ? (
@@ -276,6 +352,8 @@ export default function FriendListTable({
                 onToggleSelect={() => onToggleSelect?.(friend.id)}
                 onToggleAttention={() => onToggleAttention?.(friend)}
                 visibleColumns={visible}
+                onSelect={(selected) => setPanelFriendId(selected.id)}
+                onOpenDetail={goOpen}
               />
             </div>
           </div>
