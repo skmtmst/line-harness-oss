@@ -21,6 +21,8 @@ import Checkbox from '@/components/shared/checkbox'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Select from '@/components/shared/select'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { TagFormSkeleton } from './tag-rows-skeleton'
 import StickyBar from '@/components/shared/sticky-bar'
 import SupportMarkRulesPanel from '@/components/friend-fields/support-mark-rules-panel'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -356,7 +358,9 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
     setConflict(null)
   }
 
-  if (loadState === 'loading') return <ListState kind="loading" />
+  if (loadState === 'loading') {
+    return <DelayedSkeleton loading skeleton={<TagFormSkeleton />} />
+  }
 
   return (
     <div className={styles.board}>
