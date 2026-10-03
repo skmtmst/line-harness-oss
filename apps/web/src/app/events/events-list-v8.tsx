@@ -74,24 +74,6 @@ function loadDetail(hasAccount: boolean, status: LoadStatus, readyDetail: string
   return readyDetail
 }
 
-type EventRowState = ReturnType<typeof eventRowState>
-
-function eventStatusLabel(state: EventRowState): string {
-  if (state === 'draft') return '下書き'
-  if (state === 'paused') return '一時停止'
-  if (state === 'cancelled') return '中止'
-  if (state === 'ended') return '終了'
-  if (state === 'full') return '満席'
-  return '公開中'
-}
-
-function eventStatusPillClass(state: EventRowState): string {
-  if (state === 'open') return 'bg-success-bg text-success rounded-pill px-2 py-0.5 text-xs'
-  if (state === 'full') return 'bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs'
-  if (state === 'paused') return 'bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs'
-  return 'bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs'
-}
-
 /*
  * 行の「…」の中身（右クリックでも同じものを出す。D）。
  * 2箇所で別々に書くとずれるので、ここで1つ作って両方へ渡す。
@@ -195,7 +177,11 @@ function EventFolderPanelForm({
               onClick={() => setColor(c)}
               aria-label={`色 ${c}`}
               aria-pressed={color === c}
-              className={`rounded-pill h-7 w-7 ${color === c ? 'ring-accent ring-2 ring-offset-2' : ''}`}
+              className={
+                color === c
+                  ? 'rounded-pill h-7 w-7 ring-accent ring-2 ring-offset-2'
+                  : 'rounded-pill h-7 w-7'
+              }
               style={{ backgroundColor: c }}
             />
           ))}
@@ -396,6 +382,7 @@ export default function EventsListV8() {
   /* C①・E：行→詳細パネル。開閉と↑↓の移動はつながる移り変わりで。 */
   const activeIndex = items.findIndex((e) => e.id === activeId)
   const active = activeIndex >= 0 ? items[activeIndex] : null
+  const activeState = active ? eventRowState(active) : null
   const openDetail = useCallback((id: string) => {
     withViewTransition(() => setActiveId(id))
   }, [])
@@ -685,8 +672,28 @@ export default function EventsListV8() {
                             )}
                           </td>
                           <td className="px-2 py-3">
-                            <span className={eventStatusPillClass(state)}>
-                              {eventStatusLabel(state)}
+                            <span
+                              className={
+                                state === 'open'
+                                  ? 'bg-success-bg text-success rounded-pill px-2 py-0.5 text-xs'
+                                  : state === 'full'
+                                    ? 'bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs'
+                                    : state === 'paused'
+                                      ? 'bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs'
+                                      : 'bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs'
+                              }
+                            >
+                              {state === 'draft'
+                                ? '下書き'
+                                : state === 'paused'
+                                  ? '一時停止'
+                                  : state === 'cancelled'
+                                    ? '中止'
+                                    : state === 'ended'
+                                      ? '終了'
+                                      : state === 'full'
+                                        ? '満席'
+                                        : '公開中'}
                             </span>
                             {state === 'open' && isLowApplication(e) ? (
                               <span className="bg-canvas-sunken text-ink-secondary rounded-pill mt-1 block w-fit px-2 py-0.5 text-xs">
@@ -779,7 +786,31 @@ export default function EventsListV8() {
               onSave={(next) => renameEvent(active, next)}
             />
             <p className="text-ink-secondary mb-1 mt-4 block text-xs font-medium">状態</p>
-            <p><span className={eventStatusPillClass(eventRowState(active))}>{eventStatusLabel(eventRowState(active))}</span></p>
+            <p>
+              <span
+                className={
+                  activeState === 'open'
+                    ? 'bg-success-bg text-success rounded-pill px-2 py-0.5 text-xs'
+                    : activeState === 'full'
+                      ? 'bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs'
+                      : activeState === 'paused'
+                        ? 'bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs'
+                        : 'bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs'
+                }
+              >
+                {activeState === 'draft'
+                  ? '下書き'
+                  : activeState === 'paused'
+                    ? '一時停止'
+                    : activeState === 'cancelled'
+                      ? '中止'
+                      : activeState === 'ended'
+                        ? '終了'
+                        : activeState === 'full'
+                          ? '満席'
+                          : '公開中'}
+              </span>
+            </p>
             <p className="text-ink-secondary mb-1 mt-4 block text-xs font-medium">予約・承認待ち</p>
             <p className="text-ink text-sm tabular-nums">
               予約 {active.total_active} / {active.total_capacity ?? '—'}　承認待ち {active.pending_count > 0 ? active.pending_count : '—'}

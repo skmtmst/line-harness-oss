@@ -665,7 +665,7 @@
     "unresolved-classname": 1
   },
   "app/webinars/list-v8.tsx": {
-    "unresolved-classname": 38
+    "unresolved-classname": 47
   },
   "app/webinars/new/new-v8.tsx": {
     "unresolved-classname": 41
