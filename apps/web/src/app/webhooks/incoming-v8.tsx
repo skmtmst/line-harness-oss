@@ -27,6 +27,8 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import InlineEdit from '@/components/shared/inline-edit'
+import { withViewTransition } from '@/components/shared/view-transition'
 import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -200,6 +202,35 @@ function IncomingV8Inner() {
   const selected = displayed.find((item) => item.id === selectedId) ?? displayed[0] ?? null
   const selectedDetailId = selected?.id ?? null
   const endpointUrl = (id: string) => `${API_BASE}/api/webhooks/incoming/${id}/receive`
+
+  // E. 行→詳細の移り変わりをつなげる（非対応・減らす設定では素通り）。
+  const selectInlet = (id: string) => {
+    withViewTransition(() => setSelectedId(id))
+  }
+
+  // C①. ↑↓で前・次の受け取り口へ（一覧は左に見えたまま）。
+  const moveSelection = (delta: -1 | 1) => {
+    if (displayed.length === 0) return
+    const current = selected ? displayed.findIndex((item) => item.id === selected.id) : -1
+    const next = current === -1
+      ? (delta === 1 ? 0 : displayed.length - 1)
+      : Math.min(displayed.length - 1, Math.max(0, current + delta))
+    const target = displayed[next]
+    if (target && target.id !== selected?.id) selectInlet(target.id)
+  }
+
+  // C②. 名前のその場の書き換え。失敗したら投げて元に戻す（共通部品の約束）。
+  const renameInlet = async (next: string) => {
+    const requestAccountId = selectedAccountId
+    const target = selected
+    if (!requestAccountId || !target) throw new Error('no target')
+    const trimmed = next.trim()
+    if (!trimmed) throw new Error('empty name')
+    const res = await api.webhooks.incoming.update(target.id, requestAccountId, { name: trimmed })
+    if (selectedAccountIdRef.current !== requestAccountId) throw new Error('stale account')
+    if (!res.success) throw new Error(res.error)
+    await load()
+  }
 
   const load = useCallback(async () => {
     const requestGeneration = ++loadGenerationRef.current
@@ -621,7 +652,16 @@ function IncomingV8Inner() {
       ))}
 
       <div className={styles.body}>
-        <div className={styles.inletCol}>
+        <div
+          className={styles.inletCol}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+            const target = event.target as HTMLElement | null
+            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return
+            event.preventDefault()
+            moveSelection(event.key === 'ArrowUp' ? -1 : 1)
+          }}
+        >
           {canManage
             ? <Button variant="primary" onClick={() => { setCreateFieldError({}); setShowCreate((open) => !open) }}>＋ 受け取り口を作る</Button>
             : <Button variant="primary" disabled title={manageReason}>＋ 受け取り口を作る</Button>}
@@ -714,7 +754,7 @@ function IncomingV8Inner() {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setSelectedId(item.id)}
+                onClick={() => selectInlet(item.id)}
                 className={`${styles.inletItem} ${isSelected ? styles.inletItemSelected : ''}`}
                 aria-current={isSelected || undefined}
                 aria-label={`受け取り口「${item.name}」を見る`}
@@ -741,7 +781,14 @@ function IncomingV8Inner() {
           ) : (
             <>
               <div className={styles.titleRow}>
-                <h2 className={styles.title}>{selected.name}</h2>
+                <h2 className={styles.title}>
+                  <InlineEdit
+                    value={selected.name}
+                    label="受け取り口の名前"
+                    onSave={renameInlet}
+                    disabled={!canManage}
+                  />
+                </h2>
                 <span className={`${styles.pill} ${selected.isActive ? styles.pillActive : styles.pillNeutral}`}>
                   ● {toggling(selected.id) ? '切り替え中' : selected.isActive ? '動いています' : '止めています'}
                 </span>
@@ -756,7 +803,7 @@ function IncomingV8Inner() {
                   </span>
                 ) : null}
               </div>
-              {!canManage ? <p className={styles.footNote}>止める・合言葉の更新・削除は統括だけができます。</p> : null}
+              {!canManage ? <p className={styles.footNote}>名前の変更・止める・合言葉の更新・削除は統括だけができます。</p> : null}
 
               <section className={styles.card} aria-labelledby="webhook-v8-receive-url">
                 <h3 className={styles.cardTitle} id="webhook-v8-receive-url">どこから受け取るか</h3>
