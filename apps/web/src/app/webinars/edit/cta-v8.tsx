@@ -15,6 +15,7 @@ import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor } from '@/lib/api'
 import { ctaCardProblems } from './cta-card-validation'
+import { extractEditConflict } from './webinar-edit-conflict-band'
 
 /* 申込フォームの候補（編集画面の CtaDesignStep と同じ形）。 */
 type FormCandidates = {
@@ -55,6 +56,7 @@ export default function CtaV8({
   editor,
   onEditorChange,
   onCtasReport,
+  onEditConflict,
 }: {
   webinarId: string
   accountId: string | null
@@ -62,6 +64,8 @@ export default function CtaV8({
   editor: WebinarEditor
   onEditorChange: (editor: WebinarEditor) => void
   onCtasReport?: (ctas: WebinarCtaCard[] | null) => void
+  /** 同時編集で 409 になったとき、帯を出すために最新を親へ渡す。 */
+  onEditConflict?: (latest: WebinarEditor | null) => void
 }) {
   const [ctas, setCtas] = useState<WebinarCtaCard[] | null>(null)
   const [times, setTimes] = useState<string[]>([])
@@ -178,11 +182,17 @@ export default function CtaV8({
     try {
       const response = await webinarApi.saveEditor(webinarId, {
         expectedVersion: editor.version,
+        ...(editor.updatedAt ? { expectedUpdatedAt: editor.updatedAt } : null),
         registrationFormId: selectedRegistrationFormId || null,
       })
       onEditorChange(response.data)
       setRegistrationNotice('申込フォームを保存しました。')
     } catch (cause) {
+      const conflict = extractEditConflict(cause)
+      if (conflict) {
+        onEditConflict?.(conflict.latest)
+        return
+      }
       setRegistrationError(
         cause instanceof Error ? cause.message : '申込フォームを保存できませんでした。開き直して試してください。',
       )

@@ -20,6 +20,7 @@ import {
 import RetentionSection from './retention-section'
 import SessionCapacityCell from './session-capacity-cell'
 import VideoStages from './video-stages'
+import WebinarEditConflictBand from './webinar-edit-conflict-band'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -2124,6 +2125,21 @@ function EditWebinarInner() {
   const [loadMissing, setLoadMissing] = useState<{ id: string } | null>(null)
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
+  /** 同時編集の帯（`pvimJ`）。409 で止まったら最新を読み込めるようにする。 */
+  const [conflict, setConflict] = useState<{ latest: WebinarEditor | null } | null>(null)
+  const [conflictReloading, setConflictReloading] = useState(false)
+
+  const reloadLatest = useCallback(async () => {
+    const latest = conflict?.latest
+    if (latest) setEditor(latest)
+    setConflict(null)
+    setConflictReloading(true)
+    try {
+      setReloadKey((key) => key + 1)
+    } finally {
+      setConflictReloading(false)
+    }
+  }, [conflict])
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [analyticsState, setAnalyticsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [analyticsId, setAnalyticsId] = useState<string | null>(null)
@@ -2506,6 +2522,15 @@ function EditWebinarInner() {
       {/* ★V7: 左右の余白は共通の枠が持つ。画面側で幅と横余白を足すと 24px ずれる。 */}
       <nav data-design="Crumb" className="text-action text-xs font-semibold"><Link href="/webinars" className="hover:underline">← ウェビナー一覧</Link></nav>
 
+      {conflict ? (
+        <WebinarEditConflictBand
+          message="ほかの人が先に保存しました。このまま保存すると、その変更が消えます。"
+          reloading={conflictReloading}
+          onReload={() => void reloadLatest()}
+          onClose={() => setConflict(null)}
+        />
+      ) : null}
+
       {showSteps ? (
         <ol data-design="Steps" className="border-hairline bg-canvas flex flex-wrap items-center gap-1 rounded-card border p-3 shadow-card">
           {STEPS.map((step) => {
@@ -2613,7 +2638,7 @@ function EditWebinarInner() {
             data-theme="v8" が付くまで 1画素も変えない。
           */}
           {adminTheme === 'v8' ? (
-            <CtaV8 webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} onEditorChange={setEditor} onCtasReport={handleCtasReport} />
+            <CtaV8 webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} onEditorChange={setEditor} onCtasReport={handleCtasReport} onEditConflict={(latest) => setConflict({ latest })} />
           ) : (
             <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} registrations={registrations} onEditorChange={setEditor} onCtasReport={handleCtasReport} />
           )}
