@@ -20,6 +20,13 @@ import GoogleSheetsPanel from './google-sheets-panel'
 import ApiTokensPanel from './api-tokens-panel'
 import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-overviews'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import OutgoingV8Page from './outgoing-v8'
+import InteractionsV8Page from './interactions-v8'
+import IncomingV8Page from './incoming-v8'
+import ApiTokensV8Page from './apitokens-v8'
+import SheetsV8Page from './sheets-v8'
+import SamplesV8Page from './samples-v8'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 
@@ -1093,7 +1100,18 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
 function WebhooksPageHost() {
   const tab = useMergedTab(MERGED_TABS)
+  const theme = useAdminTheme()
   usePageTitle('外部連携')
+  /*
+   * ★V8 切替（一覧 `ZSbFY`）。v7 の見た目は data-theme="v8" が付くまで
+   * 1画素も変えない。ほかのタブは v7 のまま（1タブずつV8化する）。
+   */
+  if (theme === 'v8' && tab === 'outgoing') return <OutgoingV8Page />
+  if (theme === 'v8' && tab === 'interactions') return <InteractionsV8Page />
+  if (theme === 'v8' && tab === 'incoming') return <IncomingV8Page />
+  if (theme === 'v8' && tab === 'api-tokens') return <ApiTokensV8Page />
+  if (theme === 'v8' && tab === 'sheets') return <SheetsV8Page />
+  if (theme === 'v8' && tab === 'notify') return <SamplesV8Page />
   if (tab === 'incoming' || tab === 'outgoing') return <WebhooksPageInner key={tab} tab={tab} />
   return (
     <div className="flex flex-col gap-4">
