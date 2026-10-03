@@ -1,0 +1,117 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * どこからでも探す窓（V8「サクサク感」F②）。
+ * 開く速さは窓と同じ（200ms ease-out）。帯には置かない。
+ * v7 の画面では使わない部品のため v7 側の規定は持たない。
+ */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+  background: color-mix(in srgb, var(--color-ink) 40%, transparent);
+  animation: palette-in var(--motion-base) var(--motion-ease-out);
+}
+
+.panel {
+  width: min(560px, 100%);
+  max-height: min(60dvh, 28rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-float);
+}
+
+.input {
+  height: 48px;
+  border: 0;
+  border-bottom: 1px solid var(--color-hairline);
+  background: transparent;
+  padding: 0 16px;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+
+.input:focus {
+  outline: 2px solid var(--color-action);
+  outline-offset: -2px;
+}
+
+.list {
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius-icon);
+  background: transparent;
+  padding: 6px 10px;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowActive {
+  background: var(--color-accent-soft);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: -2px;
+}
+
+.rowLabel {
+  overflow: hidden;
+  flex: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rowSection {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.empty {
+  padding: 16px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-body);
+  text-align: center;
+}
+
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop {
+    animation: none;
+  }
+}
+}
