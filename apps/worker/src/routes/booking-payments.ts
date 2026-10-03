@@ -15,6 +15,11 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
+  resolveAccountIdFromLiff,
+  resolveFriendId,
+  verifyCallerLineUserId,
+} from './booking.js';
+import {
   createStripeTestProvider,
   getPaymentProvider,
   registerPaymentProvider,
@@ -149,6 +154,77 @@ async function providerCheckout(
   return provider.startPayment(input);
 }
 
+interface StartBookingRow {
+  id: string;
+  line_account_id: string;
+  price_at_booking: number;
+  status: string;
+}
+
+/**
+ * 支払いを始める中身。担当者用とお客さま用で共用する。
+ * 同じ予約の送り直しは作り直さず、今の記録を返す。
+ */
+async function startBookingPayment(
+  db: D1Database,
+  env: Env['Bindings'],
+  booking: StartBookingRow,
+  idempotencyKey: string,
+): Promise<
+  | { ok: true; created: boolean; paymentId: string; checkoutUrl: string | null }
+  | { ok: false; error: string; status: 409 }
+> {
+  if (booking.status !== 'requested') {
+    return { ok: false, error: 'この予約は支払いの対象ではありません', status: 409 };
+  }
+  const bookingMenu = await db.prepare(
+    `SELECT menu_id FROM bookings WHERE id = ?`,
+  ).bind(booking.id).first<{ menu_id: string }>();
+  const config = await resolveBookingPaymentConfig(
+    db, booking.line_account_id, bookingMenu?.menu_id ?? '',
+  );
+  if (config.mode !== 'online') {
+    return { ok: false, error: 'この予約はオンライン支払いの対象ではありません', status: 409 };
+  }
+  if (!providerFor(env, config.provider)) {
+    return { ok: false, error: '支払いの準備ができていません', status: 409 };
+  }
+  const holdUntil = new Date(Date.now() + config.holdMinutes * 60_000).toISOString();
+  const record = await createBookingPayment(db, {
+    lineAccountId: booking.line_account_id,
+    bookingId: booking.id,
+    amount: Number(booking.price_at_booking ?? 0),
+    provider: config.provider,
+    idempotencyKey,
+    holdUntil,
+  });
+  if (record.status !== 'unpaid') {
+    return { ok: true, created: false, paymentId: record.id, checkoutUrl: null };
+  }
+  const started = await providerCheckout(env, config.provider, {
+    amount: record.amount,
+    currency: record.currency,
+    bookingId: booking.id,
+    idempotencyKey: record.idempotency_key,
+  });
+  if (started.providerPaymentId) {
+    await db.prepare(
+      `UPDATE booking_payments SET provider_payment_id = ?, status = 'pending', updated_at = ?
+        WHERE id = ? AND status = 'unpaid'`,
+    ).bind(started.providerPaymentId, new Date().toISOString(), record.id).run();
+  }
+  return { ok: true, created: true, paymentId: record.id, checkoutUrl: started.checkoutUrl };
+}
+
+async function bookingPaymentStatusPayload(
+  db: D1Database,
+  lineAccountId: string,
+  bookingId: string,
+) {
+  const record = await expireBookingPaymentIfHeld(db, lineAccountId, bookingId);
+  return { payment: record };
+}
+
 // POST /api/booking/payments/start — 支払いを始める（担当者用）
 bookingPayments.post(
   '/api/booking/payments/start',
@@ -159,59 +235,66 @@ bookingPayments.post(
     if (!bookingId) return c.json({ success: false, error: 'bookingId が必要です' }, 400);
     const booking = await c.env.DB.prepare(
       `SELECT id, line_account_id, price_at_booking, status FROM bookings WHERE id = ?`,
-    ).bind(bookingId).first<{
-      id: string; line_account_id: string; price_at_booking: number; status: string;
-    }>();
+    ).bind(bookingId).first<StartBookingRow>();
     if (!booking
       || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [booking.line_account_id])) {
       return c.json({ success: false, error: '対象が見つかりません' }, 404);
     }
-    if (booking.status !== 'requested') {
-      return c.json({ success: false, error: 'この予約は支払いの対象ではありません' }, 409);
-    }
-    const bookingMenu = await c.env.DB.prepare(
-      `SELECT menu_id FROM bookings WHERE id = ?`,
-    ).bind(bookingId).first<{ menu_id: string }>();
-    const config = await resolveBookingPaymentConfig(
-      c.env.DB, booking.line_account_id, bookingMenu?.menu_id ?? '',
-    );
-    if (config.mode !== 'online') {
-      return c.json({ success: false, error: 'この予約はオンライン支払いの対象ではありません' }, 409);
-    }
-    if (!providerFor(c.env, config.provider)) {
-      return c.json({ success: false, error: '支払いの準備ができていません' }, 409);
-    }
     const idempotencyKey = typeof body?.idempotencyKey === 'string' && body.idempotencyKey
       ? body.idempotencyKey.slice(0, 200)
       : `booking:${bookingId}`;
-    const holdUntil = new Date(Date.now() + config.holdMinutes * 60_000).toISOString();
-    const record = await createBookingPayment(c.env.DB, {
-      lineAccountId: booking.line_account_id,
-      bookingId,
-      amount: Number(booking.price_at_booking ?? 0),
-      provider: config.provider,
-      idempotencyKey,
-      holdUntil,
-    });
-    if (record.status !== 'unpaid') {
-      return c.json({ success: true, data: { payment: record, checkoutUrl: null, reused: true } });
-    }
-    const started = await providerCheckout(c.env, config.provider, {
-      amount: record.amount,
-      currency: record.currency,
-      bookingId,
-      idempotencyKey: record.idempotency_key,
-    });
-    if (started.providerPaymentId) {
-      await c.env.DB.prepare(
-        `UPDATE booking_payments SET provider_payment_id = ?, status = 'pending', updated_at = ?
-          WHERE id = ? AND status = 'unpaid'`,
-      ).bind(started.providerPaymentId, new Date().toISOString(), record.id).run();
-    }
+    const result = await startBookingPayment(c.env.DB, c.env, booking, idempotencyKey);
+    if (!result.ok) return c.json({ success: false, error: result.error }, result.status);
     const current = await getBookingPaymentByBooking(c.env.DB, booking.line_account_id, bookingId);
-    return c.json({ success: true, data: { payment: current, checkoutUrl: started.checkoutUrl } }, 201);
+    return c.json(
+      { success: true, data: { payment: current, checkoutUrl: result.checkoutUrl } },
+      result.created ? 201 : 200,
+    );
   },
 );
+
+// POST /api/liff/booking/payments/start — 支払いを始める（お客さま用）
+bookingPayments.post('/api/liff/booking/payments/start', async (c) => {
+  const accountId = await resolveAccountIdFromLiff(c);
+  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  const callerLineUserId = await verifyCallerLineUserId(c);
+  if (!callerLineUserId) return c.json({ error: 'unauthorized' }, 401);
+  const friendId = await resolveFriendId(c, callerLineUserId, accountId);
+  if (!friendId) return c.json({ error: 'friend_not_found' }, 404);
+  const body = await c.req.json<{ bookingId?: unknown }>().catch(() => null);
+  const bookingId = String(body?.bookingId ?? '');
+  if (!bookingId) return c.json({ error: 'bookingId が必要です' }, 400);
+  const booking = await c.env.DB.prepare(
+    `SELECT id, line_account_id, price_at_booking, status FROM bookings WHERE id = ? AND friend_id = ?`,
+  ).bind(bookingId, friendId).first<StartBookingRow>();
+  if (!booking || booking.line_account_id !== accountId) {
+    return c.json({ error: '対象が見つかりません' }, 404);
+  }
+  const result = await startBookingPayment(c.env.DB, c.env, booking, `booking:${bookingId}`);
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  const current = await getBookingPaymentByBooking(c.env.DB, accountId, bookingId);
+  return c.json(
+    { payment: current, checkoutUrl: result.checkoutUrl },
+    result.created ? 201 : 200,
+  );
+});
+
+// GET /api/liff/booking/payments/by-booking — 支払いの状態（お客さま用）
+bookingPayments.get('/api/liff/booking/payments/by-booking', async (c) => {
+  const accountId = await resolveAccountIdFromLiff(c);
+  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  const callerLineUserId = await verifyCallerLineUserId(c);
+  if (!callerLineUserId) return c.json({ error: 'unauthorized' }, 401);
+  const friendId = await resolveFriendId(c, callerLineUserId, accountId);
+  if (!friendId) return c.json({ error: 'friend_not_found' }, 404);
+  const bookingId = c.req.query('bookingId')?.trim();
+  if (!bookingId) return c.json({ error: 'bookingId が必要です' }, 400);
+  const booking = await c.env.DB.prepare(
+    `SELECT id FROM bookings WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
+  ).bind(bookingId, friendId, accountId).first<{ id: string }>();
+  if (!booking) return c.json({ error: '対象が見つかりません' }, 404);
+  return c.json(await bookingPaymentStatusPayload(c.env.DB, accountId, bookingId));
+});
 
 // GET /api/booking/payments/by-booking — 支払いの状態（仮押さえの期限切れもここで落とす）
 bookingPayments.get(
@@ -384,5 +467,22 @@ export async function applyPaidBookingPayment(
   }).catch(() => undefined);
   return { duplicate: false };
 }
+
+// DELETE /api/booking/admin/menus/:id/payment — メニューごとの上書きを消して店の既定に戻す
+bookingPayments.delete(
+  '/api/booking/admin/menus/:id/payment',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const accountId = c.req.query('account_id')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: '対象が見つかりません' }, 404);
+    }
+    await c.env.DB.prepare(
+      `DELETE FROM booking_payment_menu_settings WHERE menu_id = ? AND line_account_id = ?`,
+    ).bind(c.req.param('id'), accountId).run();
+    return c.json({ success: true, data: { cleared: true } });
+  },
+);
 
 export { bookingPayments };
