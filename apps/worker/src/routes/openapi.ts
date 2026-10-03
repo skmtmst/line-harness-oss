@@ -2390,6 +2390,13 @@ const spec = {
         },
       },
     },
+    '/api/reminders/{id}/restore': {
+      post: {
+        tags: ['Reminders'], summary: '削除したリマインダの定義を元に戻す（戻した直後は停止のまま。登録・配信予定は戻さない）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Reminder definition restored as stopped' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Reminder not found or not deleted' } },
+      },
+    },
     '/api/reminders/{id}/steps/{stepId}': {
       delete: {
         tags: ['Reminders'], summary: '指定したリマインダに属する通を削除',

@@ -504,6 +504,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/reminders/{id}/audience',
   'POST /api/reminders/{id}/registrants/{enrollmentId}/cancel',
   'POST /api/reminders/{id}/registrants/{enrollmentId}/resume',
+  'POST /api/reminders/{id}/restore',
   'POST /api/scenario-subscriptions/{subscriptionId}/move',
   'POST /api/scenario-subscriptions/{subscriptionId}/pause',
   'POST /api/scenario-subscriptions/{subscriptionId}/resume',
