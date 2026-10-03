@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge from '@/components/shared/status-badge'
@@ -316,6 +317,12 @@ export default function MenuFormV8() {
   const tagCandidates = tags.filter(
     (tag) => tag.lineAccountId === selectedAccountId && tag.status !== 'archived',
   )
+  /* タグが多いときの絞り込み（v7 と同じ操作）。 */
+  const [tagQuery, setTagQuery] = useState('')
+  const trimmedTagQuery = tagQuery.trim()
+  const visibleTagCandidates = trimmedTagQuery === ''
+    ? tagCandidates
+    : tagCandidates.filter((tag) => tag.name.includes(trimmedTagQuery))
 
   const assignedIds = [...assigned].filter((id) => staff.some((person) => person.id === id))
   const activeResources = resources.filter((item) => item.isActive)
@@ -992,16 +999,31 @@ export default function MenuFormV8() {
                 ) : tagCandidates.length === 0 ? (
                   <p className="text-ink-faint text-sm">このアカウントに使えるタグがありません。タグなしで保存できます。</p>
                 ) : (
-                  <Select
-                    size="full"
-                    aria-label="予約後に付けるタグ"
-                    value={autoTagId ?? ''}
-                    onChange={(value) => setAutoTagId(value === '' ? null : value)}
-                    options={[
-                      { value: '', label: '— なし —' },
-                      ...tagCandidates.map((tag) => ({ value: tag.id, label: tag.name })),
-                    ]}
-                  />
+                  <div className="space-y-2">
+                    <SearchField
+                      value={tagQuery}
+                      onChange={setTagQuery}
+                      onClear={() => setTagQuery('')}
+                      placeholder="タグを検索"
+                      maxLength={100}
+                      aria-label="タグを検索"
+                    />
+                    <Select
+                      size="full"
+                      aria-label="予約後に付けるタグ"
+                      value={autoTagId ?? ''}
+                      onChange={(value) => setAutoTagId(value === '' ? null : value)}
+                      options={[
+                        { value: '', label: '— なし —' },
+                        ...visibleTagCandidates.map((tag) => ({ value: tag.id, label: tag.name })),
+                      ]}
+                    />
+                    {trimmedTagQuery !== '' && visibleTagCandidates.length === 0 && (
+                      <p className="text-ink-faint text-xs">
+                        「{trimmedTagQuery}」に合うタグがありません。
+                      </p>
+                    )}
+                  </div>
                 )}
               </span>
               <div className={shell.toggleRow}>
