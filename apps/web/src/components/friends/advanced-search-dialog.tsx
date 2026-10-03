@@ -444,6 +444,7 @@ export default function AdvancedSearchDialog({
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-scrim p-4"
+      data-design-node="CYJ0L"
       onClick={onClose}
     >
       <div
