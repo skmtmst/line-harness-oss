@@ -88,10 +88,17 @@ function mockAvailability() {
   }));
 }
 
-function mockSettings(view: 'list' | 'calendar' = 'list', windowDays = 60) {
+function mockSettings(
+  view: 'list' | 'calendar' = 'list',
+  windowDays = 60,
+  mode?: string,
+  dots?: number,
+) {
   bookingSettings.mockResolvedValue({
     liff_date_view: view,
     booking_window_days: windowDays,
+    ...(mode === undefined ? {} : { liff_calendar_mode: mode }),
+    ...(dots === undefined ? {} : { liff_vacancy_dots: dots }),
   });
 }
 
@@ -508,10 +515,127 @@ describe('dayStateLabel', () => {
   it('「10月4日 満席」のように日付と状態を返す', () => {
     expect(dayStateLabel('2026-10-04', 'full')).toBe('10月4日 満席');
     expect(dayStateLabel('2026-10-01', 'open')).toBe('10月1日 空きあり');
+    expect(dayStateLabel('2026-10-22', 'few')).toBe('10月22日 残りわずか');
     expect(dayStateLabel('2026-10-07', 'closed')).toBe('10月7日 お休み');
     expect(dayStateLabel('2026-09-30', 'off')).toBe('9月30日 選択できません');
     expect(dayStateLabel('2026-10-14', 'past')).toBe('10月14日 過ぎた日');
     expect(dayStateLabel('2026-10-02', 'empty')).toBe('10月2日 空きなし');
+  });
+});
+
+describe('カレンダーの出し方4択 (店の設定)', () => {
+  it('月を先にするとカレンダーで開く (切り替えは残る)', async () => {
+    mockSettings('list', 60, 'month-first');
+    renderPicker();
+    const group = await screen.findByRole('radiogroup', { name: '表示の切り替え' });
+    expect(
+      within(group).getByRole('radio', { name: 'カレンダー' }).getAttribute('aria-checked'),
+    ).toBe('true');
+    expect(await screen.findByText('2026年10月')).toBeTruthy();
+  });
+
+  it('週だけでは切り替えが出ず、週で開く', async () => {
+    mockSettings('list', 60, 'week-only');
+    renderPicker();
+    expect(await screen.findByText('10月16日（金） の空き')).toBeTruthy();
+    expect(screen.queryByRole('radiogroup', { name: '表示の切り替え' })).toBeNull();
+  });
+
+  it('月だけでは切り替えが出ず、カレンダーで開く', async () => {
+    mockSettings('list', 60, 'month-only');
+    renderPicker();
+    expect(await screen.findByText('2026年10月')).toBeTruthy();
+    expect(screen.queryByRole('radiogroup', { name: '表示の切り替え' })).toBeNull();
+  });
+
+  it('週だけの店では端末の覚えがカレンダーでも週で開く', async () => {
+    window.localStorage.setItem('liff-booking-date-view', 'calendar');
+    mockSettings('list', 60, 'week-only');
+    renderPicker();
+    expect(await screen.findByText('10月16日（金） の空き')).toBeTruthy();
+    expect(screen.queryByRole('radiogroup', { name: '表示の切り替え' })).toBeNull();
+  });
+});
+
+describe('空きの点のオン／オフ (店の設定)', () => {
+  it('消すと点・印・見方が出ない (読み上げは残す)', async () => {
+    mockSettings('list', 60, undefined, 0);
+    await openCalendar();
+    const grid = await screen.findByLabelText('2026年10月の日付');
+    expect(grid.querySelector('.rounded-full')).toBeNull();
+    expect(screen.queryByText(/空きあり/)).toBeNull();
+    expect(screen.queryByText(/満席・休み/)).toBeNull();
+    // 読み上げは残す。
+    expect(await screen.findByRole('button', { name: '10月16日 空きあり' })).toBeTruthy();
+  });
+
+  it('点があるときは金の見方も出る', async () => {
+    await openCalendar();
+    await screen.findByLabelText('2026年10月の日付');
+    expect(screen.getByText(/残りわずか/)).toBeTruthy();
+  });
+});
+
+describe('残りわずか (金の印)', () => {
+  const LIMITED: Slot = {
+    date: '2026-10-22',
+    start: '10:00',
+    end: '11:00',
+    state: 'limited',
+  };
+
+  beforeEach(() => {
+    availability.mockImplementation(
+      async (_menuId: string, _staffId: string | undefined, from: string, to: string) => ({
+        by_staff: [
+          {
+            staff_id: 's1',
+            display_name: '担当A',
+            slots: [...MASTER_SLOTS, LIMITED].filter((s) => s.date >= from && s.date <= to),
+          },
+        ],
+        closed_dates: MASTER_CLOSED.filter((d) => d >= from && d <= to),
+      }),
+    );
+  });
+
+  it('わずかだけの日は金で「残りわずか」と読み、押せる', async () => {
+    await openCalendar();
+    const cell = await screen.findByRole('button', { name: '10月22日 残りわずか' });
+    expect(cell.hasAttribute('disabled')).toBe(false);
+    expect(cell.querySelector('.bg-liff-dot-few')).toBeTruthy();
+  });
+
+  it('週でも「わずか」の印が出て選べる', async () => {
+    renderPicker();
+    expect(await screen.findByText('10月16日（金） の空き')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '次の週' }));
+    const day = await screen.findByRole('button', { name: '10月22日 残りわずか' });
+    expect(day.hasAttribute('disabled')).toBe(false);
+    expect(day.textContent).toContain('わずか');
+  });
+
+  it('ふつうの空きと混ざった日は空き (緑) を優先する', async () => {
+    availability.mockImplementation(
+      async (_menuId: string, _staffId: string | undefined, from: string, to: string) => ({
+        by_staff: [
+          {
+            staff_id: 's1',
+            display_name: '担当A',
+            slots: [
+              ...MASTER_SLOTS,
+              { date: '2026-10-16', start: '12:00', end: '13:00', state: 'limited' } as Slot,
+            ].filter((s) => s.date >= from && s.date <= to),
+          },
+        ],
+        closed_dates: MASTER_CLOSED.filter((d) => d >= from && d <= to),
+      }),
+    );
+    await openCalendar();
+    // わずかが混ざっても「空きあり」のまま。金の点は出ない。
+    const cell = await screen.findByRole('button', { name: '10月16日 空きあり' });
+    expect(cell.querySelector('.bg-liff-dot-few')).toBeNull();
+    expect(cell.querySelector('.rounded-full')).toBeTruthy();
   });
 });
 
