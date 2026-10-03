@@ -14,6 +14,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -1289,7 +1290,35 @@ function LineNotificationsPage() {
     {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
     <section className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas">
-      {loadState === 'loading' ? <ListState kind="loading" title="顧客へのお知らせを読み込んでいます" />
+      {loadState === 'loading' ? (
+        <div aria-busy="true" aria-label="顧客へのお知らせを読み込んでいます">
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true">
+                <div style={{ display: 'flex', gap: 24, padding: '12px 16px' }}>
+                  <Skeleton height={12} width={80} />
+                  <Skeleton height={12} width={90} />
+                  <Skeleton height={12} width={50} />
+                  <Skeleton height={12} width={60} />
+                  <Skeleton height={12} width={90} />
+                  <Skeleton height={12} width={40} />
+                </div>
+                {[0, 1, 2, 3, 4].map((row) => (
+                  <div key={row} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderTop: '1px solid var(--color-hairline)' }}>
+                    <span style={{ flex: 1 }}><Skeleton height={14} width="50%" /></span>
+                    <Skeleton height={13} width={110} />
+                    <Skeleton height={13} width={60} />
+                    <Skeleton height={13} width={60} />
+                    <Skeleton height={20} width={76} />
+                    <Skeleton height={30} width={96} />
+                  </div>
+                ))}
+              </div>
+            )}
+          />
+        </div>
+      )
         : loadState === 'forbidden' ? <ListState kind="forbidden" />
         : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" error={customerLoadError ?? undefined} onRetry={() => void load()} />
         : settings.length === 0 ? <ListState kind="empty" title="顧客へのお知らせはまだありません" description="EC連携の取引イベントを接続すると、ここで種類ごとに管理できます。" />

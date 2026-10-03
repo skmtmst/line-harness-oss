@@ -46,6 +46,7 @@ import Select from '@/components/shared/select'
 import SortSelect from '@/components/ui/sort-select'
 import StatusBadge from '@/components/shared/status-badge'
 import BulkBar from '@/components/shared/bulk-bar'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import { classifyApiFailure, isForbidden } from '@/components/shared/api-error-message'
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars'
 import { formatNumber } from '@/lib/format'
@@ -1039,10 +1040,9 @@ function CommonVarsListV8Inner() {
               ) : error ? (
                 <div className={styles.stateCard}>
                   {isForbidden(listFailure) ? (
-                    <ListState
-                      kind="forbidden"
-                      title="共通情報を見る権限がありません"
-                      description={error}
+                    <NoPermissionV8
+                      featureName="共通情報"
+                      capabilitiesHref="/staff"
                     />
                   ) : (
                     <ListState

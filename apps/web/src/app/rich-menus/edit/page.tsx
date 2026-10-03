@@ -354,6 +354,7 @@ function Editor({
   const [tapsByArea, setTapsByArea] = useState<Map<string, RichMenuAreaTapCount>>(new Map())
 
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [unpublishing, setUnpublishing] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -766,10 +767,12 @@ function Editor({
 
   async function handleSave() {
     setSaving(true)
+    setSaved(false)
     setError(null)
     try {
       await persistDraft()
       await reload()
+      setSaved(true)
     } catch (e) {
       // WRITE-01: 権限不足・所属違い・機能オフの理由が見えるようにする。
       // 内部文（API error: 5xx 等）は画面へ出さない。
@@ -1729,8 +1732,8 @@ function Editor({
           >
             プレビュー
           </Checkbox>
-          <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" onClick={handleSave} disabled={saving || publishing || unpublishing || busy}>
-            {saving ? '保存中...' : '下書きを保存する'}
+          <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" onClick={handleSave} disabled={saving || publishing || unpublishing || busy} busy={saving} done={saved}>
+            下書きを保存する
           </Button>
           {/* #702: 共有Buttonのprimaryはaccent-deep＋白文字(5.44:1)。生のLINE緑だと2.78:1で落ちる。 */}
           <Button

@@ -206,8 +206,8 @@
     "unresolved-classname": 31
   },
   "app/events/events-list-v8.tsx": {
-    "unresolved-classname": 48,
-    "arbitrary-value": 6,
+    "unresolved-classname": 49,
+    "arbitrary-value": 7,
     "direct-th": 6
   },
   "app/events/new/events-new-v8.tsx": {
@@ -596,6 +596,9 @@
   "app/tags/tag-editor-v8.tsx": {
     "unresolved-classname": 113
   },
+  "app/tags/tag-rows-skeleton.tsx": {
+    "unresolved-classname": 5
+  },
   "app/tags/tags-tab-v8.tsx": {
     "unresolved-classname": 67
   },
@@ -685,7 +688,7 @@
     "unresolved-classname": 1
   },
   "app/webinars/list-v8.tsx": {
-    "unresolved-classname": 38
+    "unresolved-classname": 43
   },
   "app/webinars/new/new-v8.tsx": {
     "unresolved-classname": 41
@@ -1063,5 +1066,34 @@
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 8,
     "arbitrary-value": 1
+  },
+  "app/reminders/basics-form-v8.tsx": {
+    "unresolved-classname": 39
+  },
+  "app/reminders/detail/detail-v8.tsx": {
+    "unresolved-classname": 69,
+    "direct-th": 23
+  },
+  "app/reminders/edit/edit-v8.tsx": {
+    "unresolved-classname": 168,
+    "direct-th": 4
+  },
+  "app/reminders/new/new-v8.tsx": {
+    "unresolved-classname": 6
+  },
+  "app/reminders/wizard-v8-ui.tsx": {
+    "unresolved-classname": 33
+  },
+  "app/accounts/handover/handover-v8.tsx": {
+    "unresolved-classname": 48
+  },
+  "app/ec-commerce/ec-connector-v8.tsx": {
+    "unresolved-classname": 6
+  },
+  "app/pools/new/pool-new-v8.tsx": {
+    "unresolved-classname": 2
+  },
+  "app/no-permission/no-permission-v8.tsx": {
+    "unresolved-classname": 10
   }
 }
