@@ -16,8 +16,10 @@ const v8tsx = readFileSync(join(process.cwd(), 'src/app/events/events-list-v8.ts
 
 const fetchApi = vi.hoisted(() => vi.fn())
 const deleteEvent = vi.hoisted(() => vi.fn())
+const updateEvent = vi.hoisted(() => vi.fn())
 const staffMe = vi.hoisted(() => vi.fn())
 const foldersList = vi.hoisted(() => vi.fn())
+const foldersCreate = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -28,9 +30,9 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     api: {
       ...actual.api,
       staff: { ...actual.api.staff, me: staffMe },
-      folders: { ...actual.api.folders, list: foldersList },
+      folders: { ...actual.api.folders, list: foldersList, create: foldersCreate },
     },
-    eventsApi: { ...actual.eventsApi, deleteEvent },
+    eventsApi: { ...actual.eventsApi, deleteEvent, updateEvent },
   }
 })
 
@@ -113,9 +115,13 @@ beforeEach(() => {
   root = createRoot(host)
   fetchApi.mockReset()
   deleteEvent.mockReset()
+  updateEvent.mockReset()
   staffMe.mockReset()
   foldersList.mockReset()
+  foldersCreate.mockReset()
   routerPush.mockReset()
+  updateEvent.mockResolvedValue({ version: 2 })
+  foldersCreate.mockResolvedValue({ success: true, data: { id: 'f1', name: '教室' } })
   fetchApi.mockImplementation(async (url: string) => {
     if (url.includes('filter=pending')) return { items: [], total: 0 }
     return listPayload()
@@ -180,5 +186,74 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
     expect(v8css).not.toMatch(/box-shadow\s*:/)
     expect(v8tsx).toContain('data-design-node="e2ekFu"')
     expect(v8tsx).not.toContain('準備中')
+  })
+
+  it('行を押すと右の詳細パネルが開き↑↓で次の行へ移る', async () => {
+    fetchApi.mockImplementation(async (url: string) => {
+      if (url.includes('filter=pending')) return { items: [], total: 0 }
+      return { ...listPayload(), items: [item({ id: 'e1' }), item({ id: 'e2', name: '冬の体験会' }) ], total: 2 }
+    })
+    await renderList()
+    const first = document.querySelector<HTMLElement>('button[aria-label="「秋のしつけ教室（第1回）」の詳細を見る"]')
+    expect(first, '行名のボタンがある').toBeTruthy()
+    await act(async () => { first!.click() })
+    await flush()
+    const panel = document.querySelector('[data-design-part="detail-panel"]')
+    expect(panel, '詳細パネルが開く').toBeTruthy()
+    expect(panel?.textContent).toContain('秋のしつけ教室')
+    const next = [...panel!.querySelectorAll<HTMLElement>('button')].find((b) => b.getAttribute('aria-label') === '次の行')
+    await act(async () => { next!.click() })
+    await flush()
+    expect(document.querySelector('[data-design-part="detail-panel"]')?.textContent).toContain('冬の体験会')
+  })
+
+  it('行を右クリックすると「…」と同じ操作が出る', async () => {
+    await renderList()
+    const first = document.querySelector<HTMLElement>('button[aria-label="「秋のしつけ教室（第1回）」の詳細を見る"]')
+    await act(async () => {
+      first!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 60, clientY: 120 }))
+    })
+    await flush()
+    const menu = document.body.querySelector('[data-context-menu]')
+    expect(menu, '右クリックメニューが出る').toBeTruthy()
+    expect(menu?.textContent).toContain('申込者を見る')
+    expect(menu?.textContent).toContain('削除する')
+  })
+
+  it('詳細パネルの名前をその場で変えると更新口へ届く', async () => {
+    await renderList()
+    const first = document.querySelector<HTMLElement>('button[aria-label="「秋のしつけ教室（第1回）」の詳細を見る"]')
+    await act(async () => { first!.click() })
+    await flush()
+    const panel = document.querySelector('[data-design-part="detail-panel"]')
+    const edit = [...panel!.querySelectorAll<HTMLElement>('button')].find((b) => b.getAttribute('aria-label') === 'イベント名を変更する')
+    expect(edit, '名前の変更ボタンがある').toBeTruthy()
+    await act(async () => { edit!.click() })
+    await flush()
+    const input = document.querySelector<HTMLInputElement>('[data-design-part="detail-panel"] input[aria-label="イベント名"]')
+    expect(input, '入力欄が出る').toBeTruthy()
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(input!, '改名した教室')
+      input!.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    await flush()
+    expect(updateEvent, '更新口へ名前と版が届く').toHaveBeenCalledWith('acc-1', 'e1', { name: '改名した教室' }, 1)
+    expect(document.body.textContent).toContain('改名した教室')
+  })
+
+  it('フォルダの追加は真ん中の窓ではなく右のパネルで入れる', async () => {
+    await renderList()
+    const add = [...document.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent?.includes('フォルダを追加する'))
+    expect(add, 'フォルダ追加がある').toBeTruthy()
+    await act(async () => { add!.click() })
+    await flush()
+    const panel = document.querySelector('[data-design-part="detail-panel"]')
+    expect(panel, '右のパネルが開く').toBeTruthy()
+    expect(panel?.textContent).toContain('フォルダを追加')
+    expect(document.querySelector('.fixed.inset-0.z-50'), '真ん中の窓は出ない').toBeNull()
   })
 })

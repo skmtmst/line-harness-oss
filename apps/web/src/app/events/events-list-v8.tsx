@@ -27,10 +27,14 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ActionMenu from '@/components/shared/action-menu'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import IconButton from '@/components/shared/icon-button'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import DetailPanel from '@/components/shared/detail-panel'
+import InlineEdit from '@/components/shared/inline-edit'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import HelpTip from '@/components/shared/help-tip'
@@ -70,6 +74,143 @@ function loadDetail(hasAccount: boolean, status: LoadStatus, readyDetail: string
   return readyDetail
 }
 
+type EventRowState = ReturnType<typeof eventRowState>
+
+function eventStatusLabel(state: EventRowState): string {
+  if (state === 'draft') return '下書き'
+  if (state === 'paused') return '一時停止'
+  if (state === 'cancelled') return '中止'
+  if (state === 'ended') return '終了'
+  if (state === 'full') return '満席'
+  return '公開中'
+}
+
+function eventStatusPillClass(state: EventRowState): string {
+  if (state === 'open') return 'bg-success-bg text-success rounded-pill px-2 py-0.5 text-xs'
+  if (state === 'full') return 'bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs'
+  if (state === 'paused') return 'bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs'
+  return 'bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs'
+}
+
+/*
+ * 行の「…」の中身（右クリックでも同じものを出す。D）。
+ * 2箇所で別々に書くとずれるので、ここで1つ作って両方へ渡す。
+ */
+function eventRowMenuItems(
+  e: EventListItem,
+  canDelete: boolean,
+  router: { push: (href: string) => void },
+  onDeleteRequest: (target: EventListItem) => void,
+): ActionMenuItem[] {
+  return [
+    { id: 'detail', label: '中身を見る', onSelect: () => router.push(`/events/edit?id=${e.id}`) },
+    { id: 'applicants', label: '申込者を見る', onSelect: () => router.push(`/events/bookings?id=${e.id}`) },
+    { id: 'preview', label: 'プレビュー', onSelect: () => router.push(`/events/preview?id=${e.id}`) },
+    ...(canDelete
+      ? [{
+          id: 'delete-event',
+          label: '削除する',
+          tone: 'danger' as const,
+          dividerBefore: true,
+          onSelect: () => onDeleteRequest(e),
+        }]
+      : []),
+  ]
+}
+
+function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
+  return menuItems.map((item) => ({
+    id: item.id,
+    label: item.label,
+    danger: item.tone === 'danger',
+    disabled: item.disabled,
+    onSelect: () => item.onSelect(),
+  }))
+}
+
+/*
+ * フォルダの追加の入力（右の詳細パネルに入れる中身）。
+ * 以前は真ん中の窓（共有の FolderAddDialog）だったが、
+ * V8「サクサク感」の決まりで右のパネルへ移した。名前と色は同じ。
+ */
+function EventFolderPanelForm({
+  accountId,
+  onCancel,
+  onAdded,
+}: {
+  accountId: string
+  onCancel: () => void
+  onAdded: () => void
+}) {
+  const [name, setName] = useState('')
+  const [color, setColor] = useState(FOLDER_COLORS[0])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const add = async () => {
+    const trimmed = name.trim()
+    if (!trimmed || saving) return
+    setSaving(true)
+    setError('')
+    try {
+      const res = await api.folders.create({ kind: 'event', name: trimmed, color, accountId })
+      if (!res.success) {
+        setError(res.error)
+        return
+      }
+      onAdded()
+      onCancel()
+    } catch {
+      setError('フォルダを追加できませんでした')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-ink-faint mt-1 text-xs leading-relaxed">イベントを整理するフォルダです。</p>
+      <label className="mt-4 block">
+        <span className="text-ink-secondary mb-1 block text-xs font-medium">
+          フォルダ名 <span className="text-danger">*</span>
+        </span>
+        <input
+          type="text"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && name.trim()) void add()
+          }}
+          placeholder="例：教室"
+          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+        />
+      </label>
+      <div className="mt-3">
+        <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
+        <div className="flex flex-wrap gap-2">
+          {FOLDER_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(c)}
+              aria-label={`色 ${c}`}
+              aria-pressed={color === c}
+              className={`rounded-pill h-7 w-7 ${color === c ? 'ring-accent ring-2 ring-offset-2' : ''}`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>
+      </div>
+      {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
+      <div className="mt-5 flex justify-end gap-2">
+        <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
+        <Button variant="primary" onClick={() => void add()} disabled={!name.trim() || saving} busy={saving}>追加する</Button>
+      </div>
+      <p className="text-ink-faint mt-3 text-xs">フォルダを消しても、中のイベントは未分類に残ります。</p>
+    </div>
+  )
+}
+
 export default function EventsListV8() {
   usePageTitle('イベント予約')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -92,6 +233,8 @@ export default function EventsListV8() {
   /** 「承認待ちあり」の札に出す件数。`null` は数えていない。 */
   const [pendingTotal, setPendingTotal] = useState<number | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /* C①：右から出る詳細パネル。今開いている行の id だけ持つ。 */
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<EventListItem | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -250,16 +393,60 @@ export default function EventsListV8() {
   const dataReady = Boolean(selectedAccountId) && loadStatus === 'ready'
   const filterActive = Boolean(query.trim() || filter !== 'all' || folderFilter)
 
+  /* C①・E：行→詳細パネル。開閉と↑↓の移動はつながる移り変わりで。 */
+  const activeIndex = items.findIndex((e) => e.id === activeId)
+  const active = activeIndex >= 0 ? items[activeIndex] : null
+  const openDetail = useCallback((id: string) => {
+    withViewTransition(() => setActiveId(id))
+  }, [])
+  const closeDetail = useCallback(() => {
+    withViewTransition(() => setActiveId(null))
+  }, [])
+  const goDetail = (direction: -1 | 1) => {
+    const next = items[activeIndex + direction]
+    if (!next) return
+    withViewTransition(() => setActiveId(next.id))
+  }
+
+  /*
+   * C②：行の名前のその場の書き換え。更新口は送った項目だけ直すので、
+   * 名前と版だけ送る。版は行が持っている（楽観ロック）。
+   * 名前の変更は owner/admin だけ（更新口も同じ権限で閉じている）。
+   */
+  const renameEvent = async (target: EventListItem, next: string) => {
+    if (!selectedAccountId) throw new Error('no_account')
+    const trimmed = next.trim()
+    if (!trimmed) throw new Error('empty_name')
+    if (trimmed === target.name) return
+    const updated = await eventsApi.updateEvent(selectedAccountId, target.id, { name: trimmed }, target.version)
+    setItems((current) => current.map((e) => (
+      e.id === target.id
+        ? { ...e, name: trimmed, version: typeof updated?.version === 'number' ? updated.version : e.version }
+        : e
+    )))
+  }
+
+  const requestDelete = useCallback((target: EventListItem) => {
+    setDeleteError('')
+    setDeleteTarget(target)
+  }, [])
+
   return (
     <div className={styles.board} data-design-node="e2ekFu">
-      {folderDialogOpen ? (
-        <FolderAddDialog
-          kind="event"
-          note="イベントを整理するフォルダです。"
-          placeholder="例：教室"
-          onClose={() => setFolderDialogOpen(false)}
-          onAdded={() => void loadFolders()}
-        />
+      {folderDialogOpen && selectedAccountId ? (
+        <DetailPanel
+          open
+          title="フォルダを追加"
+          onClose={() => {
+            withViewTransition(() => setFolderDialogOpen(false))
+          }}
+        >
+          <EventFolderPanelForm
+            accountId={selectedAccountId}
+            onCancel={() => setFolderDialogOpen(false)}
+            onAdded={() => void loadFolders()}
+          />
+        </DetailPanel>
       ) : null}
       <div className={styles.head}>
         <div>
@@ -346,7 +533,7 @@ export default function EventsListV8() {
           <FolderPanel
             activeId={folderFilter}
             onSelect={setFolderFilter}
-            onAddFolder={() => setFolderDialogOpen(true)}
+            onAddFolder={() => { closeDetail(); setFolderDialogOpen(true) }}
             addFolderNote="フォルダを消しても、中のイベントは未分類に残ります"
             rows={[
               { id: '', label: 'すべて', count: listTotal },
@@ -462,16 +649,21 @@ export default function EventsListV8() {
                   <tbody className="divide-y divide-hairline">
                     {items.map((e) => {
                       const state = eventRowState(e)
+                      const menuItems = eventRowMenuItems(e, canDelete, router, requestDelete)
                       return (
-                        <tr key={e.id} className="group hover:bg-canvas-sunken">
+                        <tr key={e.id} data-row-id={e.id} className="group hover:bg-canvas-sunken">
                           <td className="px-4 py-3">
-                            <Link
-                              href={`/events/edit?id=${e.id}`}
-                              className="text-ink block truncate font-medium hover:underline"
-                              title={e.name}
-                            >
-                              {e.name}
-                            </Link>
+                            <ContextMenu label={`「${e.name}」の操作`} items={toContextMenuItems(menuItems)}>
+                              <button
+                                type="button"
+                                onClick={() => openDetail(e.id)}
+                                title={`${e.name}の詳細を見る`}
+                                aria-label={`「${e.name}」の詳細を見る`}
+                                className="text-ink block w-full truncate text-left font-medium hover:underline"
+                              >
+                                {e.name}
+                              </button>
+                            </ContextMenu>
                             {e.venue_name ? (
                               <span className={styles.venue} title={e.venue_name}>{e.venue_name}</span>
                             ) : null}
@@ -493,28 +685,8 @@ export default function EventsListV8() {
                             )}
                           </td>
                           <td className="px-2 py-3">
-                            <span
-                              className={
-                                state === 'open'
-                                  ? 'bg-success-bg text-success rounded-pill px-2 py-0.5 text-xs'
-                                  : state === 'full'
-                                    ? 'bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs'
-                                    : state === 'paused'
-                                      ? 'bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs'
-                                      : 'bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs'
-                              }
-                            >
-                              {state === 'draft'
-                                ? '下書き'
-                                : state === 'paused'
-                                  ? '一時停止'
-                                  : state === 'cancelled'
-                                    ? '中止'
-                                    : state === 'ended'
-                                      ? '終了'
-                                      : state === 'full'
-                                        ? '満席'
-                                        : '公開中'}
+                            <span className={eventStatusPillClass(state)}>
+                              {eventStatusLabel(state)}
                             </span>
                             {state === 'open' && isLowApplication(e) ? (
                               <span className="bg-canvas-sunken text-ink-secondary rounded-pill mt-1 block w-fit px-2 py-0.5 text-xs">
@@ -543,23 +715,7 @@ export default function EventsListV8() {
                               open={openMenuId === e.id}
                               ariaLabel={`${e.name}の操作`}
                               onClose={() => setOpenMenuId(null)}
-                              items={[
-                                { id: 'detail', label: '中身を見る', onSelect: () => router.push(`/events/edit?id=${e.id}`) },
-                                { id: 'applicants', label: '申込者を見る', onSelect: () => router.push(`/events/bookings?id=${e.id}`) },
-                                { id: 'preview', label: 'プレビュー', onSelect: () => router.push(`/events/preview?id=${e.id}`) },
-                                ...(canDelete
-                                  ? [{
-                                      id: 'delete-event',
-                                      label: '削除する',
-                                      tone: 'danger' as const,
-                                      dividerBefore: true,
-                                      onSelect: () => {
-                                        setDeleteError('')
-                                        setDeleteTarget(e)
-                                      },
-                                    }]
-                                  : []),
-                              ]}
+                              items={menuItems}
                             />
                           </td>
                         </tr>
@@ -572,7 +728,7 @@ export default function EventsListV8() {
           )}
 
           <p className={styles.footNote}>
-            行の「…」から中身を見る・申込者を見る・プレビュー・削除。申込中・キャンセル待ちがいるイベントは削除できません。
+            行を押すと右に詳細が出ます（↑↓で次の行へ）。右クリックでも「…」と同じ操作（中身を見る・申込者を見る・プレビュー・削除）が選べます。申込中・キャンセル待ちがいるイベントは削除できません。
           </p>
 
           <div className={styles.footer} data-design="tf">
@@ -590,6 +746,52 @@ export default function EventsListV8() {
         </div>
       </div>
 
+      <DetailPanel
+        open={active !== null}
+        title={active?.name ?? ''}
+        description={active ? `${formatJpDate(active.next_slot_starts_at)}${active.venue_name ? `・${active.venue_name}` : ''}` : undefined}
+        onClose={closeDetail}
+        hasPrev={activeIndex > 0}
+        hasNext={activeIndex >= 0 && activeIndex < items.length - 1}
+        onPrev={activeIndex > 0 ? () => goDetail(-1) : undefined}
+        onNext={activeIndex >= 0 && activeIndex < items.length - 1 ? () => goDetail(1) : undefined}
+        footer={active ? (
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button href={`/events/edit?id=${active.id}`}>中身を見る</Button>
+            {canDelete ? (
+              <Button
+                variant="danger"
+                onClick={() => { closeDetail(); requestDelete(active) }}
+              >
+                削除する
+              </Button>
+            ) : null}
+          </div>
+        ) : undefined}
+      >
+        {active ? (
+          <div>
+            <p className="text-ink-secondary mb-1 block text-xs font-medium">イベント名</p>
+            <InlineEdit
+              value={active.name}
+              label="イベント名"
+              disabled={!canDelete}
+              onSave={(next) => renameEvent(active, next)}
+            />
+            <p className="text-ink-secondary mb-1 mt-4 block text-xs font-medium">状態</p>
+            <p><span className={eventStatusPillClass(eventRowState(active))}>{eventStatusLabel(eventRowState(active))}</span></p>
+            <p className="text-ink-secondary mb-1 mt-4 block text-xs font-medium">予約・承認待ち</p>
+            <p className="text-ink text-sm tabular-nums">
+              予約 {active.total_active} / {active.total_capacity ?? '—'}　承認待ち {active.pending_count > 0 ? active.pending_count : '—'}
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              <Button variant="secondary" onClick={() => router.push(`/events/bookings?id=${active.id}`)}>申込者を見る</Button>
+              <Button variant="secondary" onClick={() => router.push(`/events/preview?id=${active.id}`)}>プレビュー</Button>
+            </div>
+            {!canDelete ? <p className="text-ink-faint mt-3 text-xs">名前の変更・削除にはオーナーか管理者の権限が要ります。</p> : null}
+          </div>
+        ) : null}
+      </DetailPanel>
       <ConfirmDialog
         open={deleteTarget !== null}
         destructive
