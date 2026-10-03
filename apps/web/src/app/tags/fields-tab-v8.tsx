@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ClipboardList, FileText, MoreHorizontal, RefreshCw, Users } from 'lucide-react'
+import { AlertCircle, ClipboardList, FileText, LockKeyhole, MoreHorizontal, RefreshCw, Users } from 'lucide-react'
 import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
@@ -504,6 +504,11 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                           </td>
                           <td className={styles.cellMuted}><span className={styles.cellTruncate} title={destinationLabel(field)}>{destinationLabel(field)}</span></td>
                           <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                            {field.isInherited ? (
+                              <span title="共通項目は直接削除できません" className="mr-1 inline-flex align-middle text-ink-faint">
+                                <LockKeyhole size={16} aria-label="共通項目のため削除できません" />
+                              </span>
+                            ) : null}
                             <button
                               type="button"
                               className={styles.menuButton}
@@ -541,6 +546,8 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                     onChange={(value) => setPageSize(Number(value) || 20)}
                     options={[
                       { value: '20', label: '20件表示' },
+                      { value: '30', label: '30件表示' },
+                      { value: '40', label: '40件表示' },
                       { value: '50', label: '50件表示' },
                       { value: '100', label: '100件表示' },
                     ]}
