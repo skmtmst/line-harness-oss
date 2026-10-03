@@ -5,7 +5,8 @@ export type AutomationDraftActionType =
   | 'add_tag'
   | 'start_scenario'
   | 'send_message'
-  | 'common_action';
+  | 'common_action'
+  | 'notify_staff';
 export type AutomationDraftTriggerType =
   | 'friend_add'
   | 'tag_change'
@@ -794,7 +795,7 @@ export async function updateAutomationDraft(
   const commonActionBindings: Array<{ path: string; commonActionId: string; versionId: string }> = [];
   for (const [index, candidate] of input.actions.entries()) {
     const raw = candidate as Partial<AutomationDraftAction>;
-    if (!raw || !new Set(['add_tag', 'start_scenario', 'send_message', 'common_action']).has(String(raw.type))) {
+    if (!raw || !new Set(['add_tag', 'start_scenario', 'send_message', 'common_action', 'notify_staff']).has(String(raw.type))) {
       throw new AutomationDraftError('action_unsupported', 'この処理はまだ実行まで接続されていません', `actions.${index}`);
     }
     const params = raw.params && typeof raw.params === 'object' && !Array.isArray(raw.params)
@@ -829,6 +830,24 @@ export async function updateAutomationDraft(
         commonActionId,
         versionId: commonAction.current_published_version_id,
       });
+    } else if (raw.type === 'notify_staff') {
+      // F-14: 担当者通知のルールは、有効ないまの版をこの店の範囲で指す。
+      // 送り先・文面の初期値はルール側、追加のひと言はここで足す。
+      const notificationRuleId = requiredString(
+        params.notificationRuleId, `actions.${index}.notificationRuleId`, '担当者通知',
+      );
+      const rule = await db.prepare(
+        `SELECT id FROM notification_rules
+          WHERE id = ? AND line_account_id = ? AND is_active = 1 LIMIT 1`,
+      ).bind(notificationRuleId, input.lineAccountId).first<{ id: string }>();
+      if (!rule) {
+        throw new AutomationDraftError(
+          'resource_not_found', '担当者通知が見つからないか、別のLINE公式アカウントにあります',
+          `actions.${index}.notificationRuleId`,
+        );
+      }
+      params.notificationRuleId = notificationRuleId;
+      params.message = requiredString(params.message, `actions.${index}.message`, '通知文');
     } else {
       params.messageType = 'text';
       params.content = requiredString(params.content, `actions.${index}.content`, '送る文面');

@@ -2052,6 +2052,7 @@ async function scheduled(
       const now = new Date(event.scheduledTime).toISOString();
       const executors = createAutomationActionExecutors({
         credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        operatorMailEnv: env,
       });
       const scheduledResult = await processScheduledAutomationTriggers(env.DB, {
         now, executors, limit: 100,
