@@ -58,17 +58,20 @@ node scripts/visual-qa/v8-parity-all.mjs                  # 全部撮って順�
 - 道具の動作確認：PR 検査の異常系（変更なし・撮影失敗）は終了符号0で報告だけ出すことを確認。
   比較パイプラインは実物の見本で確認（同じ絵で差0・塗った絵で差25.0%・赤枠つき）。
   測定スクリプトの構文も確認。ブラウザでの撮影だけ未確認（下の止まった所）。
+- 2026-10-03 23:33 の再確認（最新土台 e58eb9c71）：契約5本26試験・道具4本31試験
+  ぜんぶ合格、`npx tsc --noEmit` きれい、対応表の再生成は差分なし。
 
 ## SHA
 
-- 土台 `origin/codex/development` 392d94a735（merge 済み・競合なし）
+- 土台 `origin/codex/development` e58eb9c71（2026-10-03 23:33 に merge 済み・競合なし）
 - この枝の先端はコミット後に確定（下の `git log` を見る）
 
 ## 止まった所
 
 1. 全部の撮影とずれの順位づけができなかった。砂場が `listen` を止めている
-   （偽API・web が立てられない）うえ、Chromium が `SEGV` で落ちるため。
-   `.audit/v8-parity-report.md`（＝`/tmp/v8-parity-report.md`）に
+   （`next dev --port 3101` が `EPERM`。`require_escalated` は承認が切れていて使えない）
+   うえ、Chromium が `Target page, context or browser has been closed` で開けないため。
+   23:33 に再確認した。`.audit/v8-parity-report.md`（＝`/tmp/v8-parity-report.md`）に
    対象384板の一覧・見本の数の照合・再実行手順を書いた。NodeTerm の作業ツリーで
    `v8-parity-all.mjs` を回して、この2ファイルを上書きしてほしい。
 2. 原本 `design/v8/CODEX-V8-VISUAL-PARITY-RESULT.md` に書けなかった（作業場所の外）。

@@ -1,24 +1,31 @@
 # V8 見本比較（一括・報告だけ・落とさない）
 
-- 実行日: 2026-10-03 07:30（日本時間）
+- 実行日: 2026-10-03 23:33（日本時間・再確認）
 - 枝: `codex/muse-v8-visual-parity`
-- 土台: `origin/codex/development` 392d94a735（取り込み済み）
-- 道具: `scripts/visual-qa/v8-parity-all.mjs`（対応表 `v8-design-map.json` 504板）
+- 土台: `origin/codex/development` e58eb9c71（取り込み済み・前回 392d94a735 から更新）
+- 道具: `scripts/visual-qa/v8-parity-all.mjs`（対応表 `v8-design-map.json` 504板・再生成しても差分なし）
 
 ## 結論（drift の順位は付けられなかった）
 
 この作業場所（Muse の砂場）では撮影ができなかったので、ずれの大きい順の
-一覧は出せなかった。理由は2つ（どちらも道具ではなく場所の問題）。
+一覧は出せなかった。理由は2つ（どちらも道具ではなく場所の問題）。23:33 に再確認した。
 
-1. 偽API・web が立てられない: `listen EPERM: operation not permitted 127.0.0.1:8788`
-   （砂場が待ち受けを止めている。`mock-api-method-contract.test.ts` も同じ理由で動かない）
-2. ブラウザが落ちる: ダウンロードした Chromium が `signal 11 SEGV` で起動しない
-   （砂場の制限。置き場は `.playwright-browsers/` に変えて導入まではできた）
+1. 偽API・web が立てられない: `listen EPERM: operation not permitted 0.0.0.0:3101`
+   （砂場が待ち受けを止めている。`require_escalated` は承認が切れていて使えない）
+2. ブラウザが開けない: Chromium が `Target page, context or browser has been closed`
+   で起動しない（砂場の制限）
 
-動いた確認（ブラウザなしで済む範囲）は全部通した。
+動いた確認（ブラウザなしで済む範囲）は全部通した（下の表）。
 撮影つきの実行は、手元の NodeTerm（砂場なし）の作業ツリーで下の手順で回せる。
 出る一覧の形は `v8-parity-all.mjs` が決めていて、ずれの大きい順・上位30板の
 内訳・撮れなかったもの・対象外の数が入る。
+
+## 再確認で通したもの（2026-10-03 23:33）
+
+- 契約5本（unsaved-guard・error-wording・design-debt・direct-values・design-impact）26試験ぜんぶ合格
+- 道具の試験4本（v8-parity・v8-board-id-contract・pixel-diff・cited-shots）31試験ぜんぶ合格
+- `npx tsc --noEmit` きれい
+- 対応表の再生成：504板・場所つき384板で差分なし
 
 ## 見本の数の照合（文字で確認・撮影なし）
 
