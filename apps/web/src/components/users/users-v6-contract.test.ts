@@ -37,7 +37,7 @@ describe('統合ユーザーV6の画面契約', () => {
     // 設計 `friends-v6/r7eSi.png` はここに状態の言葉だけを置く。
     expect(ROW).not.toContain('shortenUid')
     expect(ROW).not.toContain('title={a.lineUserId}')
-    expect(ROW).toContain("label: expanded ? '閉じる' : '詳細を見る'")
+    expect(ROW).toContain("label: expanded ? '閉じる' : '開く'")
     expect(PAGE).not.toContain('画像トークン')
     expect(PAGE).not.toContain('worker キャッシュ')
     expect(FILTERS).toContain('UIDで検索')

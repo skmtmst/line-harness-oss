@@ -227,7 +227,7 @@ const STANDARD_CONDITION_AXES = [
 ] as const
 
 const BROADCAST_ONLY_CONDITION_AXES = [
-  '担当者', '流入経路', '配信状況', '予約状況', '購入履歴', 'ブロック状態',
+  '担当', '流入経路', '配信状況', '予約状況', '購入履歴', 'ブロック状態',
 ] as const
 
 /** 位置情報・音声・スタンプは、シナリオと同じ入力欄をそのまま使う。 */

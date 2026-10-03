@@ -393,7 +393,7 @@ function FriendAddListV8Inner() {
   const rowMenuItems = (rule: FriendAddRule): ActionMenuItem[] => [
     {
       id: 'edit',
-      label: '編集する',
+      label: '編集',
       icon: <Pencil size={15} />,
       disabled: !canEdit,
       disabledReason: canEdit ? undefined : readonlyReason,

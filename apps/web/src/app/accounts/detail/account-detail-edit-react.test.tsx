@@ -112,9 +112,9 @@ function clickButton(label: string) {
 }
 
 describe('R73 編集・差替えの入口', () => {
-  it('「編集する」で登録内容の入力窓が開く', async () => {
+  it('「編集」で登録内容の入力窓が開く', async () => {
     await renderPage()
-    clickButton('編集する')
+    clickButton('編集')
     expect(host.textContent).toContain('登録の内容を編集する')
     const nameInput = host.querySelector('input[value="然-NEN- TEST"]')
     expect(nameInput).toBeTruthy()

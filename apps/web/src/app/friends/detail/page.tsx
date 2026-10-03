@@ -1494,7 +1494,7 @@ function FriendDetailInner() {
                     </dd>
                   </div>
                   <div className="flex justify-between gap-2">
-                    <dt className="text-ink-faint">担当者</dt>
+                    <dt className="text-ink-faint">担当</dt>
                     <dd className="text-ink-secondary truncate">
                       {friend?.support?.operatorName ?? '未割り当て'}
                     </dd>

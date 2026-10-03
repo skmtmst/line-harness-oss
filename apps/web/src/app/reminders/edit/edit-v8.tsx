@@ -1557,7 +1557,7 @@ function ConfirmStageV8({
                       <span className={styles.checkNote}>{check.message}</span>
                     </span>
                     {check.status !== 'passed' ? (
-                      <Button variant="secondary" size="field" href={editHref(reminderId, checkStageFor(check.key))}>直す</Button>
+                      <Button variant="secondary" size="field" href={editHref(reminderId, checkStageFor(check.key))}>編集</Button>
                     ) : null}
                   </div>
                 ))}

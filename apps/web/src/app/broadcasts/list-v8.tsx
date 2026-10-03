@@ -584,7 +584,7 @@ export default function BroadcastListV8() {
     }
     items.push({
       id: 'duplicate',
-      label: '複製',
+      label: '複製する',
       external: true,
       icon: <Copy size={14} aria-hidden="true" />,
       disabled: readonly,

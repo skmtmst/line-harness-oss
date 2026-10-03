@@ -810,7 +810,7 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
                 disabled: !item.isActive && !canActivate,
                 disabledReason: !item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined,
               })
-              menuItems.push({ id: 'edit', label: '直す', external: true, onSelect: () => { setMenuId(null); onEdit(item.id) } })
+              menuItems.push({ id: 'edit', label: '編集', external: true, onSelect: () => { setMenuId(null); onEdit(item.id) } })
               menuItems.push({ id: 'secret', label: '合言葉を作り直す', onSelect: () => { setMenuId(null); onRotate(item) } })
               menuItems.push({ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuId(null); onDelete(item) } })
             }

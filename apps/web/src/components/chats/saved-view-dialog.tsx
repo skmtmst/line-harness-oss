@@ -265,7 +265,7 @@ export default function SavedViewDialog({
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
-                  <dt className="text-ink-secondary text-xs">担当者</dt>
+                  <dt className="text-ink-secondary text-xs">担当</dt>
                   <dd className="w-40">
                     <Combobox
                       aria-label="保存する担当者"

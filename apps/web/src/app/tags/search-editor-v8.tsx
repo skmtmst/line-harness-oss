@@ -61,7 +61,7 @@ const EDITABLE_KINDS: Array<{ value: SavedSearchConditionKind; label: string }> 
   { value: 'status_message', label: 'ステータスメッセージ' },
   { value: 'mark', label: '対応マーク' },
   { value: 'scenario', label: 'シナリオ' },
-  { value: 'assignee', label: '担当者' },
+  { value: 'assignee', label: '担当' },
   { value: 'event_booking', label: 'イベント予約' },
   { value: 'calendar_booking', label: 'カレンダー予約' },
   { value: 'form', label: '回答フォーム' },
@@ -155,7 +155,7 @@ function normalizeForEdit(search: SavedSearch): SavedSearchConditions {
     all: [...(search.conditions.all ?? [])],
     any: [...(search.conditions.any ?? [])],
     list: {
-      columns: search.conditions.list?.columns ?? ['名前', 'タグ', '担当者'],
+      columns: search.conditions.list?.columns ?? ['名前', 'タグ', '担当'],
       sort: search.conditions.list?.sort ?? 'recent',
       limit: search.conditions.list?.limit ?? 20,
     },
@@ -360,7 +360,7 @@ function ConditionControls({
             className="w-32"
           />
           <Select
-            aria-label="担当者"
+            aria-label="担当"
             value={rawValue}
             disabled={referenceErrors.operators}
             onChange={(value) => onChange({ ...condition, value })}

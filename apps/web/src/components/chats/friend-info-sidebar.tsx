@@ -741,7 +741,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 )}
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[11px] text-ink-faint">担当者</span>
+                <span className="text-[11px] text-ink-faint">担当</span>
                 <span className="text-xs text-ink-secondary">{operatorName || <span className="text-ink-faint">未割り当て</span>}</span>
               </div>
               <div>

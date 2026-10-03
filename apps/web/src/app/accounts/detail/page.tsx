@@ -290,7 +290,7 @@ function AccountDetail() {
               <div className="flex items-start justify-between gap-3">
                 <p className="text-ink text-base font-bold">登録の内容</p>
                 {canManage && (
-                  <Button type="button" onClick={() => setEditSection('basic')}>編集する</Button>
+                  <Button type="button" onClick={() => setEditSection('basic')}>編集</Button>
                 )}
               </div>
               <dl className="mt-3">

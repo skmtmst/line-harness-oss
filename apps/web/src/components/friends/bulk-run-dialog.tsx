@@ -423,7 +423,7 @@ export default function BulkRunDialog({
             <section className={styles.selectedPanel}>
               <div className={styles.selectedHead}><h3>選択した友だち</h3><strong>{friendIds.length}人</strong></div>
               <div className={styles.selectedTable}>
-                <div className={styles.selectedRowHead}><span>名前</span><span>流入元</span><span>担当者</span><span>現在のタグ</span></div>
+                <div className={styles.selectedRowHead}><span>名前</span><span>流入元</span><span>担当</span><span>現在のタグ</span></div>
                 {selectedFriends.map((friend) => (
                   <div className={styles.selectedRow} key={friend.id}>
                     <strong>{friend.displayName}</strong>

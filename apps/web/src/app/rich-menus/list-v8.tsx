@@ -655,7 +655,7 @@ export default function RichMenusListV8() {
     const items: ActionMenuItem[] = [
       {
         id: 'edit',
-        label: '編集する',
+        label: '編集',
         onSelect: () => router.push(`/rich-menus/edit?id=${g.id}`),
       },
     ]

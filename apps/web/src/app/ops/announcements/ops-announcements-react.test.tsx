@@ -115,7 +115,7 @@ describe('表記の決まり', () => {
 })
 
 describe('画面', () => {
-  it('一覧に状態・LINE送達・画面で既読が出て、下書きだけ直す／消すが出る', async () => {
+  it('一覧に状態・LINE送達・画面で既読が出て、下書きだけ編集／消すが出る', async () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
     const text = host.textContent ?? ''
@@ -126,7 +126,7 @@ describe('画面', () => {
     expect(text).toContain('5 / 24')
     expect(text).toContain('下書き')
     expect(text).toContain('12件の契約先・24人の権限者')
-    expect(Array.from(document.querySelectorAll('button')).filter((b) => b.textContent === '直す')).toHaveLength(1)
+    expect(Array.from(document.querySelectorAll('button')).filter((b) => b.textContent === '編集')).toHaveLength(1)
     expect(calls.some((c) => c.url.endsWith('/api/ops/announcements/preview') && c.method === 'POST')).toBe(true)
     expect(document.querySelector('[data-design-node="q2CokV"]')).not.toBeNull()
   })
@@ -283,11 +283,11 @@ describe('二重押しと同時保存（M512/M513）', () => {
     expect(post.headers['idempotency-key']).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
   })
 
-  it('M513: 直すときは開いたときの版を添え、競合時は入力を残したまま理由を出して読み直す', async () => {
+  it('M513: 編集するときは開いたときの版を添え、競合時は入力を残したまま理由を出して読み直す', async () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
-    // 下書きの「直す」を押して編集に入る。
-    await act(async () => { button('直す')!.click() })
+    // 下書きの「編集」を押して編集に入る。
+    await act(async () => { button('編集')!.click() })
     await flush()
     expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!.value).toContain('料金改定のご案内')
     await act(async () => {
