@@ -42,6 +42,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './staff-actions'
 import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft'
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
+import StaffHeadV8, { STAFF_TAB_KEYS } from './staff-head-v8'
 import OtpInput from '@/components/shared/otp-input'
 import { formatDateTime } from '@/lib/format'
 
@@ -76,10 +77,6 @@ const NOTIFICATIONS = [
  */
 const EDIT_PERMISSION_PATHS = ['/', '/chats', '/friends', '/tags', '/scenarios', '/broadcasts', '/reminders', '/auto-replies', '/templates', '/rich-menus', '/form-submissions', '/contents/vars', '/contents', '/analytics', '/automations', '/webhooks', '/booking/bookings', '/ec-commerce', '/line-notifications', '/nen-campaigns', '/nen-members'] as const
 const PERMISSIONS: Array<readonly [string, string]> = EDIT_PERMISSION_PATHS.map((path) => [path, PERMISSION_LABELS[path]] as const)
-const STAFF_TAB_KEYS = [
-  { key: 'members', label: 'いまいる人' }, { key: 'invited', label: '招待中' },
-  { key: 'audit', label: '入った記録' }, { key: 'roles', label: '権限のかたまり' },
-] as const
 
 const LIST_SORT_OPTIONS = [
   { value: 'recent', label: '最後に入った日が新しい順' },
@@ -885,16 +882,7 @@ function StaffPageHost() {
   }
   const body = (<>
     {v8 ? (
-      <div>
-        <h1 className="text-ink text-xl font-bold">ログインユーザー</h1>
-        <p className="text-ink-secondary mt-1 text-sm">管理画面に入る人と、その人ができることを決めます（管理者の設定はここ）</p>
-        <nav className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="ログインユーザーの切り替え">
-          {STAFF_TAB_KEYS.map((item) => (
-            <Link key={item.key} href={`/staff?tab=${item.key}`} aria-current={tab === item.key ? 'page' : undefined} className={tab === item.key ? 'border-b-2 border-ink pb-1 font-bold text-ink no-underline' : 'pb-1 text-ink-secondary no-underline hover:underline'}>{item.label}</Link>
-          ))}
-        </nav>
-        {!administrator ? <Notice tone="info" className="mt-3">閲覧のみで見ています。変える操作は管理者に頼んでください。</Notice> : null}
-      </div>
+      <StaffHeadV8 tab={tab} administrator={Boolean(administrator)} />
     ) : (
       <div><MergedTabs basePath="/staff" tabs={staffTabs} active={tab} defaultKey="members" actions={tabAction} /></div>
     )}

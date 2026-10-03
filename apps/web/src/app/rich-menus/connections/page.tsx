@@ -2,7 +2,6 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CircleCheck } from 'lucide-react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { RichMenuAreaResponse } from '@/lib/api'
 import { api, ApiError } from '@/lib/api'
@@ -15,9 +14,9 @@ import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
-import PageHeader from '@/components/shared/page-header'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { analyzeConnections, type ConnectionPage } from './connection-analysis'
+import ConnectionHeading from './connection-heading'
 
 type RichMenuGroup = {
   id: string
@@ -219,28 +218,6 @@ function ConnectionsContent() {
     <div data-design-node="wxIQ7" className="flex flex-col gap-4 pb-24">{body}</div>
   ) : (
     <div data-design-node="DIUbO" className="flex flex-col gap-4 pb-24">{body}</div>
-  )
-}
-
-function ConnectionHeading({ group, v8 }: { group: RichMenuGroup; v8: boolean }) {
-  if (v8) {
-    return (
-      <div className="px-1 pt-1">
-        <Link href="/rich-menus" className="text-action text-sm font-semibold no-underline hover:underline">← リッチメニューへ</Link>
-        <h1 className="text-ink mt-1 text-xl font-bold">切替のつながり：{group.name}</h1>
-        <p className="text-ink-secondary mt-1 text-sm">タブで行き来できるメニューの関係</p>
-      </div>
-    )
-  }
-  return (
-    <PageHeader
-      breadcrumb={[
-        { label: 'リッチメニュー', href: '/rich-menus' },
-        { label: group.name },
-      ]}
-      title="切替メニューのつながり"
-      description={`${group.name} の切替先と戻り道を確認します。`}
-    />
   )
 }
 
