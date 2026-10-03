@@ -41,6 +41,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
 import { canEditFeature } from '@/lib/staff-capability'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import {
   api,
   ApiError,
@@ -288,6 +289,12 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
 
   const canEditMenus = canEditFeature('/booking/menus')
   const canEditSettings = canEditFeature('booking.settings')
+  /*
+   * 狭い幅（1152）の板はメニューが `P6EdLW`・受付枠が `VFxWU`。
+   * 畳み込み自体は入れ物の問い合わせが担い、ここでは板 ID だけを替える。
+   */
+  const narrow = useNarrowViewport()
+  const tabNode = narrow && tab === 'menus' ? 'P6EdLW' : narrow && tab === 'hours' ? 'VFxWU' : V8_TAB_NODE[tab]
 
   const [menus, setMenus] = useState<BookingMenu[]>([])
   const [menusStatus, setMenusStatus] = useState<LoadStatus>('loading')
@@ -599,7 +606,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
         </header>
 
         <div className={styles.body} data-design="Body">
-          <div className={styles.main} data-design-node={V8_TAB_NODE[tab]}>
+          <div className={styles.main} data-design-node={tabNode}>
             {!accountId ? (
               <StateCard
                 icon={<AccountIcon />}
@@ -841,6 +848,13 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
   return (
     <div data-design="Table">
       <Band tone="hint">上から並んだ順に、お客さまの画面に出ます。つまみで並べ替えます。</Band>
+      {!canEdit ? (
+        <div className="border-accent bg-accent-soft rounded-card mt-3 border p-4" data-design-node="C9fv7A" role="note">
+          <p className="text-ink text-sm">
+            閲覧のみです。変更には予約設定の権限が必要です。
+          </p>
+        </div>
+      ) : null}
 
       <div className={styles.toolbar}>
         <div className={styles.searchBox}>
