@@ -41,7 +41,7 @@ beforeEach(() => {
   db = asD1(sqlite);
 });
 
-describe('556 F-21 対応表', () => {
+describe('557 F-21 対応表', () => {
   test('無い地点はnull、保存したら読める', async () => {
     expect(await getAdEventMapping(db, 'point-1')).toBeNull();
     const saved = await upsertAdEventMapping(db, 'point-1', 'Purchase');
@@ -62,7 +62,7 @@ describe('556 F-21 対応表', () => {
   });
 });
 
-describe('556 F-22 やり直し', () => {
+describe('557 F-22 やり直し', () => {
   const now = new Date(NOW_MS);
 
   test('失敗行を送り直しの列に戻し、冪等キーは変えない', async () => {

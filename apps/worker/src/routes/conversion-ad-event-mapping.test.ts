@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //   GET /api/conversions/points/:id/ad-event-mapping
 //   PUT /api/conversions/points/:id/ad-event-mapping
 // The db layer is mocked. Real persistence is covered against SQLite
-// in packages/db/test/556_ad_event_mappings.test.ts. Here we assert the
+// in packages/db/test/557_ad_event_mappings.test.ts. Here we assert the
 // visible-scope guard, serialization, and validation.
 const dbMocks = {
   getLineAccounts: vi.fn().mockResolvedValue([]),

@@ -503,7 +503,7 @@
     "553_meet_consultation_booking_link.sql",
     "554_meet_cancel_claim.sql",
     "555_tenant_data_retention.sql",
-    "556_ad_event_mappings.sql"
+    "557_ad_event_mappings.sql"
   ],
   "migrationCount": 504
 }
