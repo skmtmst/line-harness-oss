@@ -34,6 +34,7 @@ import {
   type PublishPlanInput,
 } from './publish-plan-draft'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { PublishHistorySection } from './publish-history'
 import { PublishProgressSection } from './publish-progress-section'
 import { PrepublishCheckSection } from './prepublish-check-section'
@@ -1995,6 +1996,8 @@ function PublishStep({
 }) {
   // N-162: ステップ移動は画面内の段階移動なので a[href] ではなく router.push で行う。
   const router = useRouter()
+  const adminTheme = useAdminTheme()
+  const v8 = adminTheme === 'v8'
   const { mode, startsAt, endsAt, restoreGroupId } = publish
   const [restoreMenus, setRestoreMenus] = useState<Array<{ id: string; name: string }>>([])
 
@@ -2097,8 +2100,7 @@ function PublishStep({
         ? '保存するとLINEに登録され、条件に当てはまる人の画面に出来事のタイミングで順次出ます'
         : 'LINEへの登録だけで、友だちの画面は変わりません。出す相手は一覧の「表示先」で決めてください'
 
-  return (
-    <div data-design-node="UMiJ9" className="pb-24">
+  const body = (<>
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
       <StepHeader active={3} groupId={group.id} />
       {/* R205: 下書き保存の結果はどの工程でも同じ位置に出す。 */}
@@ -2151,6 +2153,16 @@ function PublishStep({
 
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-semibold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}{previewUnsaved && !conditionEmpty ? <span className="text-ink-faint ml-1 font-normal">（未保存の条件）</span> : null}</dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
+          {v8 ? (
+            <section aria-label="いまの状態" className="border-hairline bg-canvas rounded-card border p-5">
+              <h2 className="text-ink text-sm font-semibold">いまの状態</h2>
+              <dl className="mt-4 space-y-3 text-xs">
+                <div className="flex items-baseline justify-between gap-3"><dt className="text-ink-faint">状態</dt><dd className="text-ink font-semibold">{group.status === 'published' ? '公開中' : '下書き'}</dd></div>
+                <div className="flex items-baseline justify-between gap-3"><dt className="text-ink-faint">出す相手</dt><dd className="text-ink text-right font-semibold">{isDefaultForAll ? 'すべての友だち' : targetingEnabled ? '条件に合う人' : '—'}</dd></div>
+                <div className="flex items-baseline justify-between gap-3"><dt className="text-ink-faint">出る人</dt><dd className="text-ink font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</dd></div>
+              </dl>
+            </section>
+          ) : null}
           {/*
             R204: 「公開」は LINE への登録。全員の画面が変わるのは
             isDefaultForAll（全員の既定）のときだけ。条件で出し分ける設定は、
@@ -2217,7 +2229,11 @@ function PublishStep({
       {canOperate ? <PublishHistorySection groupId={group.id} onChanged={onChanged} /> : null}
       {/* N-156: staff は公開・保存を押せない（サーバ側も 403 で止める）。 */}
       <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2">{canOperate ? <><Button onClick={onSave} disabled={saving || publishing}>下書きを保存する</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)} busy={publishing} busyLabel="公開中…">{mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></> : <span className="text-ink-faint text-xs">閲覧のみ（公開・保存は管理者の操作です）</span>}</div></div>} />
-    </div>
+    </>)
+  return v8 ? (
+    <div data-design-node="hKr8f" className="pb-24">{body}</div>
+  ) : (
+    <div data-design-node="UMiJ9" className="pb-24">{body}</div>
   )
 }
 

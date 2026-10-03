@@ -213,6 +213,8 @@ shared-button-importer app/restaurant-test/v8/google.tsx
 shared-button-importer app/restaurant-test/v8/inventory.tsx
 shared-button-importer app/restaurant-test/v8/menu.tsx
 shared-button-importer app/restaurant-test/v8/organization.tsx
+shared-button-importer app/restaurant-test/v8/reservation-phone.tsx
+shared-button-importer app/restaurant-test/v8/reservations.tsx
 shared-button-importer app/restaurant-test/v8/tables.tsx
 shared-button-importer app/rich-menus/connections/page.tsx
 shared-button-importer app/rich-menus/edit/page.tsx
@@ -278,7 +280,14 @@ shared-button-importer app/webhooks/api-tokens-panel.tsx
 shared-button-importer app/webhooks/edit/page.tsx
 shared-button-importer app/webhooks/google-sheets-panel.tsx
 shared-button-importer app/webhooks/new/page.tsx
+shared-button-importer app/webhooks/apitokens-v8.tsx
+shared-button-importer app/webhooks/incoming-v8.tsx
+shared-button-importer app/webhooks/interactions-v8.tsx
+shared-button-importer app/webhooks/new/new-v8.tsx
+shared-button-importer app/webhooks/outgoing-v8.tsx
 shared-button-importer app/webhooks/page.tsx
+shared-button-importer app/webhooks/samples-v8.tsx
+shared-button-importer app/webhooks/sheets-v8.tsx
 shared-button-importer app/webhooks/webhook-interactions.tsx
 shared-button-importer app/webhooks/webhook-overviews.tsx
 shared-button-importer app/webinars/edit/page.tsx
@@ -338,6 +347,7 @@ shared-button-importer components/hq/banners/generation-panel.tsx
 shared-button-importer components/hq/banners/image-detail-modal.tsx
 shared-button-importer components/hq/banners/library-section.tsx
 shared-button-importer components/hq/banners/limit-state.tsx
+shared-button-importer components/hq/banners/project-form-dialog.tsx
 shared-button-importer components/hq/banners/projects-section.tsx
 shared-button-importer components/hq/banners/reference-picker-dialog.tsx
 shared-button-importer components/hq/banners/upload-button.tsx
