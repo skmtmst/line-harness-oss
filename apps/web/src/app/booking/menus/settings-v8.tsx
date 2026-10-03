@@ -599,7 +599,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
         </header>
 
         <div className={styles.body} data-design="Body">
-          <div className={styles.main} data-design-node={V8_TAB_NODE[tab]}>
+          <div className={styles.main} data-design-node={tab === 'menus' && !canEditMenus ? 'C9fv7A' : V8_TAB_NODE[tab]}>
             {!accountId ? (
               <StateCard
                 icon={<AccountIcon />}
@@ -840,6 +840,9 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
 
   return (
     <div data-design="Table">
+      {!canEdit ? (
+        <Band tone="hint">閲覧のみで見ています。変える操作は管理者に頼んでください。</Band>
+      ) : null}
       <Band tone="hint">上から並んだ順に、お客さまの画面に出ます。つまみで並べ替えます。</Band>
 
       <div className={styles.toolbar}>
@@ -852,7 +855,11 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
           />
         </div>
         <span className={styles.toolbarSpacer} />
-        {canEdit ? <Button variant="primary" href="/booking/menus/new">＋ 予約メニューを作る</Button> : null}
+        {canEdit ? (
+          <Button variant="primary" href="/booking/menus/new">＋ 予約メニューを作る</Button>
+        ) : (
+          <Button variant="primary" disabled title="閲覧のみのため作れません">＋ 予約メニューを作る</Button>
+        )}
       </div>
 
       {reorderError ? <p className="text-danger mt-2 text-xs" role="alert">{reorderError}</p> : null}
