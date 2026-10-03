@@ -3,7 +3,7 @@
 import Select from '@/components/shared/select'
 import ListToolbar from '@/components/shared/list-toolbar'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { MoreHorizontal } from 'lucide-react'
@@ -32,6 +32,10 @@ import {
   type AutomationEventType,
 } from '@line-crm/shared'
 import { formatNumber } from '@/lib/format'
+import { Suspense } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { V8AutoShell, type AutoV8Counts } from './automations-v8'
+import { V8RulesTab, V8TemplatesTab } from './rules-v8'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -274,7 +278,44 @@ const MERGED_TABS = [
 /** 一覧の1ページぶん。口は全件返すので、ここで切り出す。 */
 const AUTOMATION_PAGE_SIZE = 6
 
+/*
+ * ★V8-B の切り替え。v8 の器は別ファイル（automations-v8.tsx・
+ * rules-v8.tsx）に置き、v7 の器・動きはこの下の V7 のまま残す。
+ */
 export default function AutomationsPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return (
+      <Suspense fallback={null}>
+        <AutomationsPageV8 />
+      </Suspense>
+    )
+  }
+  return <AutomationsPageV7 />
+}
+
+/*
+ * ★V8-B ルールの一覧（板 `LWQXd`）。
+ * 見本（板 `c7dxp`）は同じ道の ?tab=templates で外枠ごと切り替える。
+ */
+function AutomationsPageV8() {
+  const theme = useAdminTheme()
+  const searchParams = useSearchParams()
+  const [counts, setCounts] = useState<AutoV8Counts>({})
+  if (theme !== 'v8') return null
+  const showTemplates = searchParams.get('tab') === 'templates'
+  return (
+    <V8AutoShell
+      tab={showTemplates ? 'templates' : 'rules'}
+      counts={counts}
+      render={(model) => showTemplates
+        ? <V8TemplatesTab canManage={model.canManage} />
+        : <V8RulesTab model={model} onCounts={setCounts} />}
+    />
+  )
+}
+
+function AutomationsPageV7() {
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const tab = useMergedTab(MERGED_TABS)
