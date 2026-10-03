@@ -103,6 +103,7 @@ import {
   recordConversionSourceEvent,
 } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { listResponse } from '../lib/list-etag.js';
 import {
   claimBookingOperationForRetry,
   finishBookingOperation,
@@ -5973,7 +5974,8 @@ booking.get('/api/booking/admin/requests', async (c) => {
     c.env.DB.prepare(`SELECT COUNT(*) AS total ${BOOKING_LEDGER_JOINS} ${where}`)
       .bind(...values).first<{ total: number }>(),
   ]);
-  return c.json({ requests: rows.results, total: Number(count?.total ?? 0), limit, offset });
+  // 同じ中身なら304（list-etag）。
+  return listResponse(c, { requests: rows.results, total: Number(count?.total ?? 0), limit, offset });
 });
 
 // CSV の行上限。台帳は日々増えるので、上限を越える分は次の期間へ分けて
