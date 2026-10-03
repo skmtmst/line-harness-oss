@@ -45,6 +45,7 @@ import { parseBookingStaffInput, BOOKING_SETTINGS_KEY, BOOKING_STAFF_OWN_KEY, BO
 import type { Env } from '../index.js';
 import { requireRole, requirePermission, hasStaffPermission } from '../middleware/role-guard.js';
 import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt, rescheduleByTrigger } from '../services/reminder-trigger.js';
+import { cancelMeetConsultation, registerMeetConsultation } from '../services/meet-consultation-reminders.js';
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
 import { explainBookingSlot, getAccountTimeZone, getAvailability, getStoreCapacitySnapshot, tzDateStr, tzHHMM } from '../services/availability.js';
 import { STORE_CAPACITY_GUARD_EXCLUDE_SQL, STORE_CAPACITY_GUARD_SQL, STORE_SETTINGS_VERSION_GUARD_SQL } from '../services/booking-store-capacity.js';
@@ -427,6 +428,68 @@ async function verifyCallerLineUserId(c: Context<Env>): Promise<string | null> {
 
 async function resolveAccountIdAdmin(c: Context<Env>): Promise<string | null> {
   return c.req.query('account_id') ?? null;
+}
+
+// F6 本人操作の監査 actor。管理者 staff と区別し 'customer' で残す。
+function selfAuditActor(self: SelfBookingChange | undefined, c: Context<Env>) {
+  if (self) return { actorType: 'customer' as const, actorId: self.friendId, actorName: null };
+  return staffAuditActor(c);
+}
+
+// F6 本人操作の期限・締切 (menu→store)。defaults は一覧と同じ 1440 分。
+async function readSelfBookingRules(
+  db: D1Database,
+  accountId: string,
+  menuId: string,
+): Promise<{ cancelDeadlineMinutesBefore: number; cutoffMinutesBefore: number }> {
+  const row = await db
+    .prepare(
+      `SELECT m.cancel_deadline_hours_before AS menu_deadline_hours,
+              m.cutoff_hours_before AS menu_cutoff_hours,
+              COALESCE(bs.cancel_deadline_minutes_before, 1440) AS store_deadline_minutes,
+              COALESCE(bs.cutoff_minutes_before, 1440) AS store_cutoff_minutes
+         FROM menus m
+         LEFT JOIN booking_settings bs ON bs.line_account_id = m.line_account_id
+        WHERE m.id = ? AND m.line_account_id = ?`,
+    )
+    .bind(menuId, accountId)
+    .first<{
+      menu_deadline_hours: number | null;
+      menu_cutoff_hours: number | null;
+      store_deadline_minutes: number;
+      store_cutoff_minutes: number;
+    }>();
+  if (!row) return { cancelDeadlineMinutesBefore: 1440, cutoffMinutesBefore: 1440 };
+  return {
+    cancelDeadlineMinutesBefore: row.menu_deadline_hours == null
+      ? Number(row.store_deadline_minutes)
+      : Number(row.menu_deadline_hours) * 60,
+    cutoffMinutesBefore: row.menu_cutoff_hours == null
+      ? Number(row.store_cutoff_minutes)
+      : Number(row.menu_cutoff_hours) * 60,
+  };
+}
+
+// F6 本人認証: liffId→account、idToken→LINE userId→friend 所有。
+// 失敗時は { error, status } を返す。
+async function resolveSelfBookingCaller(
+  c: Context<Env>,
+): Promise<
+  | { ok: true; accountId: string; friendId: string; lineUserId: string }
+  | { ok: false; error: string; status: 401 | 403 | 404 }
+> {
+  const accountId = await resolveAccountIdFromLiff(c);
+  if (!accountId) return { ok: false, error: 'unknown_liff', status: 404 };
+  const lineUserId = await verifyCallerLineUserId(c);
+  if (!lineUserId) return { ok: false, error: 'unauthorized', status: 401 };
+  const friendId = await resolveFriendId(c, lineUserId, accountId);
+  if (!friendId) return { ok: false, error: 'friend_not_found', status: 404 };
+  const friend = await c.env.DB
+    .prepare(`SELECT is_following FROM friends WHERE id = ?`)
+    .bind(friendId)
+    .first<{ is_following: number }>();
+  if (!friend || friend.is_following === 0) return { ok: false, error: 'cannot_book', status: 403 };
+  return { ok: true, accountId, friendId, lineUserId };
 }
 
 /**
@@ -1017,6 +1080,287 @@ booking.post('/api/liff/booking/requests', async (c) => {
   });
   return c.json(responseBody, 201);
 });
+
+// ---- F6 本人日時変更・取消 (core)。待ち列は含まない ----
+
+// 本人変更後の Meet 相談連携。予約の外部予定IDに結び付く相談だけを動かす。
+// 一般予約 reminder と Meet reminder は別経路のため、ここでは Meet 側だけを触る。
+async function syncSelfBookingMeet(
+  c: Context<Env>,
+  self: SelfBookingChange,
+  bookingId: string,
+  oldEventId: string | null,
+): Promise<'updated' | 'recreated' | 'not_linked' | 'failed'> {
+  try {
+    if (!oldEventId) return 'not_linked';
+    const consult = await c.env.DB
+      .prepare(
+        `SELECT external_event_id, friend_id, title, meet_url
+           FROM meet_consultations WHERE external_event_id = ?`,
+      )
+      .bind(oldEventId)
+      .first<{ external_event_id: string; friend_id: string; title: string; meet_url: string }>();
+    if (!consult || consult.friend_id !== self.friendId) return 'not_linked';
+    const booking = await c.env.DB
+      .prepare(
+        `SELECT starts_at, ends_at, external_event_id
+           FROM bookings WHERE id = ? AND line_account_id = ?`,
+      )
+      .bind(bookingId, self.accountId)
+      .first<{ starts_at: string; ends_at: string; external_event_id: string | null }>();
+    if (!booking) return 'failed';
+    const newEventId = booking.external_event_id ?? oldEventId;
+    if (newEventId !== oldEventId) {
+      await cancelMeetConsultation(c.env.DB, oldEventId, new Date(), { failOnSendInFlight: true });
+    }
+    await registerMeetConsultation(c.env.DB, {
+      externalEventId: newEventId,
+      friendId: self.friendId,
+      title: consult.title,
+      startsAt: booking.starts_at,
+      endsAt: booking.ends_at,
+      meetUrl: consult.meet_url,
+    });
+    return newEventId !== oldEventId ? 'recreated' : 'updated';
+  } catch {
+    return 'failed';
+  }
+}
+
+booking.post('/api/liff/booking/:id/reschedule', async (c) => {
+  const caller = await resolveSelfBookingCaller(c);
+  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  const bookingId = c.req.param('id');
+  const body = await c.req.json<{
+    starts_at?: unknown;
+    lock_version?: unknown;
+    reason?: unknown;
+  }>().catch(() => null);
+  if (!body) return c.json({ error: 'invalid_json' }, 400);
+  if (!Number.isInteger(body.lock_version) || Number(body.lock_version) < 0) {
+    return c.json({ error: 'missing_lock_version' }, 400);
+  }
+  const self: SelfBookingChange = {
+    accountId: caller.accountId,
+    friendId: caller.friendId,
+    lineUserId: caller.lineUserId,
+  };
+  // Meet 連携のため変更前の外部予定IDを先に読む (Google 同期で変わることがある)。
+  const before = await c.env.DB
+    .prepare(`SELECT external_event_id FROM bookings WHERE id = ? AND line_account_id = ?`)
+    .bind(bookingId, caller.accountId)
+    .first<{ external_event_id: string | null }>();
+  const res = await updateAdminBooking(c, {
+    lock_version: body.lock_version,
+    starts_at: typeof body.starts_at === 'string' ? body.starts_at : undefined,
+    reason: typeof body.reason === 'string' ? body.reason : undefined,
+  }, self);
+  if (res.status !== 200) return res;
+  const after = await c.env.DB
+    .prepare(`SELECT external_event_id FROM bookings WHERE id = ? AND line_account_id = ?`)
+    .bind(bookingId, caller.accountId)
+    .first<{ external_event_id: string | null }>();
+  const meetSync = await syncSelfBookingMeet(
+    c, self, bookingId, before?.external_event_id ?? after?.external_event_id ?? null,
+  );
+  const out = await res.json<Record<string, unknown>>();
+  return c.json({ ...out, meet_sync: meetSync });
+});
+
+booking.post('/api/liff/booking/:id/cancel', async (c) => {
+  const caller = await resolveSelfBookingCaller(c);
+  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  const accountId = caller.accountId;
+  const bookingId = c.req.param('id');
+  const body = await c.req.json<{ lock_version?: unknown }>().catch(() => null);
+  if (!body || !Number.isInteger(body.lock_version) || Number(body.lock_version) < 0) {
+    return c.json({ error: 'missing_lock_version' }, 400);
+  }
+  const expectedVersion = Number(body.lock_version);
+  const row = await c.env.DB
+    .prepare(
+      `SELECT id, status, friend_id, lock_version, starts_at, menu_id,
+              decided_at, external_event_id
+         FROM bookings WHERE id = ? AND line_account_id = ?`,
+    )
+    .bind(bookingId, accountId)
+    .first<{
+      id: string;
+      status: BookingStatus;
+      friend_id: string | null;
+      lock_version: number;
+      starts_at: string;
+      menu_id: string;
+      decided_at: string | null;
+      external_event_id: string | null;
+    }>();
+  if (!row || row.friend_id !== caller.friendId) {
+    return c.json({ error: 'booking_not_found' }, 404);
+  }
+  const self: SelfBookingChange = {
+    accountId, friendId: caller.friendId, lineUserId: caller.lineUserId,
+  };
+  const cancelReason = `booking_cancelled:${bookingId}:by:self:${caller.lineUserId}`;
+  // 取消ずみの再送: 版が合えば副作用をそろえて 200 (冪等再送)。
+  if (row.status === 'cancelled' || row.status === 'expired') {
+    if (Number(row.lock_version) !== expectedVersion) {
+      return c.json({ error: 'version_conflict' }, 409);
+    }
+    // 送信中は 409 で再試行させる。未実施の副作用を適用対象外にしない。
+    try {
+      const retry = await runSelfBookingCancelSideEffects(c, self, row);
+      return c.json({
+        status: row.status,
+        lock_version: Number(row.lock_version),
+        retried: true,
+        ...retry,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+        return c.json({ error: 'send_in_flight_retry' }, 409);
+      }
+      throw error;
+    }
+  }
+  if (row.status !== 'requested' && row.status !== 'confirmed') {
+    return c.json({ error: 'not_editable' }, 409);
+  }
+  if (Number(row.lock_version) !== expectedVersion) {
+    return c.json({ error: 'version_conflict' }, 409);
+  }
+  const rules = await readSelfBookingRules(c.env.DB, accountId, row.menu_id);
+  if (Date.now() > new Date(row.starts_at).getTime() - rules.cancelDeadlineMinutesBefore * 60_000) {
+    return c.json({ error: 'self_deadline_passed' }, 403);
+  }
+  // 条件付き確定: 同時取消の race では片方だけが通る。副作用は通った方だけ走る。
+  const decidedAt = new Date().toISOString();
+  const updateResult = await c.env.DB
+    .prepare(
+      `UPDATE bookings SET status = 'cancelled', decided_at = ?,
+                            updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ? AND line_account_id = ?
+          AND lock_version = ? AND status IN ('requested','confirmed')`,
+    )
+    .bind(decidedAt, bookingId, accountId, expectedVersion)
+    .run();
+  if ((updateResult.meta?.changes ?? 0) === 0) {
+    const current = await c.env.DB
+      .prepare(`SELECT lock_version, status FROM bookings WHERE id = ? AND line_account_id = ?`)
+      .bind(bookingId, accountId)
+      .first<{ lock_version: number; status: string }>();
+    if (!current) return c.json({ error: 'booking_not_found' }, 404);
+    return c.json({ error: 'version_conflict' }, 409);
+  }
+  try {
+    await cancelByTrigger(c.env.DB, {
+      triggerType: 'booking',
+      sourceId: bookingId,
+      sourceEventId: bookingId,
+      friendId: row.friend_id,
+      startsAtIso: row.starts_at,
+      lineAccountId: accountId,
+      cancelReason,
+      failOnSendInFlight: true,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+      // 送信中の 409 では確定を取り消して再試行させる (取消確定後の送信を起こさない)。
+      await c.env.DB
+        .prepare(
+          `UPDATE bookings SET status = ?, decided_at = ?,
+                                updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+            WHERE id = ? AND status = ?`,
+        )
+        .bind(row.status, row.decided_at, bookingId, 'cancelled')
+        .run();
+      return c.json({ error: 'send_in_flight_retry' }, 409);
+    }
+    throw error;
+  }
+  await cancelLegacyBookingReminders(c.env.DB, bookingId);
+  await cancelObsoleteConfirmationRuns(c.env.DB, bookingId, accountId);
+  await enqueueCalendarDeleteOperation(c.env.DB, { bookingId, lineAccountId: accountId });
+  const calResult = await runCalendarDeleteOperation(c.env.DB, {
+    bookingId,
+    lineAccountId: accountId,
+    remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), bookingId),
+  });
+  const meetSync = await cancelSelfBookingMeet(c, self, row.external_event_id);
+  await recordBookingAudit(c.env.DB, {
+    bookingId,
+    lineAccountId: accountId,
+    action: 'status_changed',
+    before: { status: row.status },
+    after: { status: 'cancelled' },
+    reason: 'self_cancel',
+    actorType: 'customer',
+    actorId: caller.friendId,
+    actorName: null,
+    occurredAt: new Date().toISOString(),
+  });
+  return c.json({
+    status: 'cancelled',
+    lock_version: expectedVersion,
+    calendar_sync: calResult === 'succeeded' ? 'synced' : calResult === 'retry_wait' ? 'failed' : 'not_applicable',
+    meet_sync: meetSync,
+  });
+});
+
+// 本人取消の副作用 (初回・再送で共通)。管理者取消と同じ順番でそろえる。
+async function runSelfBookingCancelSideEffects(
+  c: Context<Env>,
+  self: SelfBookingChange,
+  row: { id: string; starts_at: string; friend_id: string | null; external_event_id: string | null },
+): Promise<{ calendar_sync: string; meet_sync: string }> {
+  const cancelReason = `booking_cancelled:${row.id}:by:self:${self.lineUserId}-retry`;
+  // 送信中の REMINDER_SEND_IN_FLIGHT は投げて 409 にする。
+  // cancelByTrigger が先に投げるため legacy/Calendar/Meet は未実施のまま残る。
+  await cancelByTrigger(c.env.DB, {
+    triggerType: 'booking',
+    sourceId: row.id,
+    sourceEventId: row.id,
+    friendId: row.friend_id,
+    startsAtIso: row.starts_at,
+    lineAccountId: self.accountId,
+    cancelReason,
+    failOnSendInFlight: true,
+  });
+  await cancelLegacyBookingReminders(c.env.DB, row.id);
+  await cancelObsoleteConfirmationRuns(c.env.DB, row.id, self.accountId);
+  await enqueueCalendarDeleteOperation(c.env.DB, { bookingId: row.id, lineAccountId: self.accountId });
+  const calResult = await runCalendarDeleteOperation(c.env.DB, {
+    bookingId: row.id,
+    lineAccountId: self.accountId,
+    remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), row.id),
+  });
+  const meetSync = await cancelSelfBookingMeet(c, self, row.external_event_id);
+  return {
+    calendar_sync: calResult === 'succeeded' ? 'synced' : calResult === 'retry_wait' ? 'failed' : 'not_applicable',
+    meet_sync: meetSync,
+  };
+}
+
+// 本人取消の Meet 連携。結び付きが無ければ何もしない (作らない)。
+async function cancelSelfBookingMeet(
+  c: Context<Env>,
+  self: SelfBookingChange,
+  externalEventId: string | null,
+): Promise<'cancelled' | 'not_linked' | 'failed'> {
+  try {
+    if (!externalEventId) return 'not_linked';
+    const consult = await c.env.DB
+      .prepare(`SELECT friend_id FROM meet_consultations WHERE external_event_id = ?`)
+      .bind(externalEventId)
+      .first<{ friend_id: string }>();
+    if (!consult || consult.friend_id !== self.friendId) return 'not_linked';
+    const cancelled = await cancelMeetConsultation(c.env.DB, externalEventId, new Date(), {
+      failOnSendInFlight: true,
+    });
+    return cancelled ? 'cancelled' : 'not_linked';
+  } catch {
+    return 'failed';
+  }
+}
 
 booking.get('/api/liff/booking/me', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
@@ -2820,8 +3164,16 @@ type AdminBookingPatch = {
   reason?: unknown;
 };
 
-async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch) {
-  const accountId = await resolveAccountIdAdmin(c);
+// F6 本人変更の呼び出し情報。管理者の account_id クエリ・staff 認証の代わりに
+// LIFF の idToken→account→friend 所有で渡す。本人口に BOOKING_SETTINGS_KEY は要求しない。
+type SelfBookingChange = {
+  accountId: string;
+  friendId: string;
+  lineUserId: string;
+};
+
+async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch, self?: SelfBookingChange) {
+  const accountId = self?.accountId ?? await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const bookingId = c.req.param('id')!;
   const body = override ?? await c.req.json<AdminBookingPatch>().catch(() => null);
@@ -2861,6 +3213,19 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch)
   }
   if (Number(row.lock_version) !== expectedVersion) {
     return c.json({ error: 'version_conflict' }, 409);
+  }
+  if (self) {
+    // 本人変更の境界: 所有・期限・項目制限。管理者キーは見ない。
+    if (row.friend_id !== self.friendId) return c.json({ error: 'booking_not_found' }, 404);
+    const selfForbidden = ['menu_id', 'staff_id', 'price', 'customer_note', 'internal_note', 'notification_policy', 'send_change_notification'];
+    if (selfForbidden.some((key) => Object.hasOwn(body, key))) {
+      return c.json({ error: 'invalid_params' }, 400);
+    }
+    if (body.starts_at === undefined) return c.json({ error: 'missing_starts_at' }, 400);
+    const rules = await readSelfBookingRules(c.env.DB, accountId, row.menu_id);
+    if (Date.now() > new Date(row.starts_at).getTime() - rules.cancelDeadlineMinutesBefore * 60_000) {
+      return c.json({ error: 'self_deadline_passed' }, 403);
+    }
   }
   const editable = ['menu_id', 'staff_id', 'starts_at', 'price', 'customer_note', 'internal_note', 'notification_policy'];
   if (!editable.some((key) => Object.hasOwn(body, key))) {
@@ -2904,6 +3269,35 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch)
   const newStartsAt = body.starts_at !== undefined ? new Date(String(body.starts_at)) : new Date(row.starts_at);
   if (Number.isNaN(newStartsAt.getTime())) {
     return c.json({ error: 'invalid_starts_at' }, 422);
+  }
+  if (self) {
+    // 受付締切 (menu→store)。過ぎた新日時は受け付けない。
+    const rules = await readSelfBookingRules(c.env.DB, accountId, row.menu_id);
+    if (newStartsAt.getTime() - Date.now() < rules.cutoffMinutesBefore * 60_000) {
+      return c.json({ error: 'past_cutoff' }, 422);
+    }
+    // 同じ日時の再送は成功のまま返す (二重更新しない)。
+    // 未完の副作用は同じ版・同じ冪等キーで回復する (二重予定・通知を作らない)。
+    if (newStartsAt.toISOString() === row.starts_at) {
+      const replaySync = await runBookingGoogleSync(c.env.DB, {
+        bookingId,
+        lineAccountId: accountId,
+        credentials: googleCredentials(c.env),
+      });
+      return c.json({
+        booking_id: bookingId,
+        lock_version: Number(row.lock_version),
+        status: row.status,
+        changed: false,
+        calendar_sync: replaySync === 'succeeded' ? 'synced'
+          : replaySync === 'retry_wait' ? 'failed'
+          : replaySync === 'skipped' ? 'not_configured' : 'not_applicable',
+        change_notification: 'not_applicable',
+        v6_sync: 'not_applicable',
+        reminders_created: 0,
+        meet_sync: 'unchanged',
+      });
+    }
   }
   // 過去チェックは「日時を実際に動かす指定」があるときだけ適用する。
   // 開始時刻の過ぎた予約でも料金・メモ・担当修正は必要になるため、
@@ -3046,7 +3440,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch)
     newCustomerNote,
     newInternalNote,
     newPolicyJson,
-    c.get('staff').id,
+    self ? null : c.get('staff').id,
     bookingId,
     accountId,
     expectedVersion,
@@ -3152,7 +3546,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch)
       before,
       after,
       reason: typeof body.reason === 'string' ? body.reason.slice(0, 200) : null,
-      ...staffAuditActor(c),
+      ...selfAuditActor(self, c),
       occurredAt: nowIso,
     }),
   );
@@ -3233,7 +3627,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch)
           // 新日時で探すと旧登録に一致しない。
           startsAtIso: row.starts_at,
           lineAccountId: accountId,
-          cancelReason: `booking_updated_notifications_off:${bookingId}:by:${c.get('staff')?.id ?? 'admin'}`,
+          cancelReason: `booking_updated_notifications_off:${bookingId}:by:${self ? `self:${self.lineUserId}` : (c.get('staff')?.id ?? 'admin')}`,
         });
       } catch (error) {
         console.error('reminder cancel (booking update) failed:', error);
@@ -3263,7 +3657,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch)
       before: { starts_at: newStartsAt.toISOString() },
       after: { outcome: 'pending_retry' },
       reason: 'booking_updated',
-      ...staffAuditActor(c),
+      ...selfAuditActor(self, c),
       occurredAt: new Date().toISOString(),
     });
   }

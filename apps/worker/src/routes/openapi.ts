@@ -5719,6 +5719,46 @@ const spec = {
         },
       },
     },
+    // ── LIFF Booking self change (F6 本人日時変更・取消) ─────────────────────
+    '/api/liff/booking/{id}/reschedule': {
+      post: {
+        tags: ['Booking'],
+        summary: '本人の予約日時を変更',
+        description: 'idToken→account→friend所有だけに許可。管理者キーは要求しない。期限・締切・空き・CASを検査し、Google同期とMeet連携の結果を返す。待ち列は含まない。',
+        security: [],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '変更成立（meet_sync 付き）・同日時再送は changed:false' },
+          '401': { description: 'idToken 検証失敗' },
+          '403': { description: '期限切れ' },
+          '404': { description: 'Unknown LIFF ID・友だち・予約なし' },
+          '409': { description: '版競合・枠なし' },
+          '422': { description: '不正な日時・締切切れ' },
+        },
+      },
+    },
+    '/api/liff/booking/{id}/cancel': {
+      post: {
+        tags: ['Booking'],
+        summary: '本人の予約を取消',
+        description: 'idToken→account→friend所有だけに許可。期限・CASを検査し、リマインダ停止・カレンダー削除・Meet取消の結果を返す。取消ずみ再送は副作用をそろえて 200。待ち列は含まない。',
+        security: [],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '取消成立（calendar_sync・meet_sync 付き）' },
+          '401': { description: 'idToken 検証失敗' },
+          '403': { description: '期限切れ' },
+          '404': { description: 'Unknown LIFF ID・友だち・予約なし' },
+          '409': { description: '版競合・送信中の再試行' },
+        },
+      },
+    },
     // ── Booking channels (V8-B) ──────────────────────────────────────────────
     '/api/booking/admin/channels': {
       get: {
