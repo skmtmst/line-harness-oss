@@ -234,6 +234,7 @@ export function PayoutStepUpDialog({
   return (
     <Dialog
       open={Boolean(batch)}
+      designNode="CVz5d"
       title={usePassword ? 'パスワードで本人確認' : '認証アプリで本人確認'}
       description={usePassword
         ? '口座情報を含む銀行用CSVは、パスワードで再認証したときだけ書き出せます。'
@@ -251,6 +252,11 @@ export function PayoutStepUpDialog({
         </div>
       )}
     >
+      {batch ? (
+        <p className="text-ink-secondary text-sm">
+          書き出す中身：{formatNumber(batch.lineCount)}件・{yen(batch.totalAmount)}
+        </p>
+      ) : null}
       {usePassword ? (
         <label className="text-ink block text-sm font-semibold" htmlFor="affiliate-payout-step-up">
           パスワード
