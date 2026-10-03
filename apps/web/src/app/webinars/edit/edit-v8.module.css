@@ -1,0 +1,87 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B ウェビナー編集の器（②〜⑤段）。
+ * 戻る・題・手順の帯・段の中身・下の固定帯を持つ。
+ */
+.backLink {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-action);
+}
+
+.title {
+  margin: 8px 0 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  padding: 4px 12px 4px 0;
+  font-size: 13px;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.stepNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill, 999px);
+  font-size: 12px;
+  font-weight: 500;
+  flex: none;
+}
+
+.stepDone .stepNum {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+}
+
+.stepCurrent {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.stepCurrent .stepNum {
+  border: 1.5px solid var(--color-accent-deep);
+  color: var(--color-accent-deep);
+}
+
+.stepLine {
+  width: 24px;
+  height: 1px;
+  background: var(--color-hairline);
+  margin-right: 12px;
+}
+
+.stepDesc {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.body {
+  margin-top: 16px;
+  padding-bottom: 96px;
+}

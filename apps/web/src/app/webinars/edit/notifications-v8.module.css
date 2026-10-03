@@ -1,0 +1,17 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B ウェビナー編集④通知（板 `E7iAYs`）の器。
+ * 中の部品の見た目は v7 と同じ。ここでは並びだけ決める。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 80rem) {
+  .body {
+    flex-direction: row;
+  }
+}

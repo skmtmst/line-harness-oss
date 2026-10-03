@@ -53,7 +53,9 @@ import {
   type WebinarParticipantClassification,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import EditV8Shell from './edit-v8'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
@@ -2398,6 +2400,8 @@ function EditWebinarInner() {
   }
   usePageTitle(paneTitle[pane])
 
+  const theme = useAdminTheme()
+
   useEffect(() => {
     if (!id) return
     const requestId = ++loadRequestId.current
@@ -2461,6 +2465,12 @@ function EditWebinarInner() {
     return () => { cancelled = true }
   }, [id, pane, analyticsId, analyticsState])
 
+  /*
+    ★V8 の編集②〜⑤と参加者・分析・コメント演出は別の器（EditV8Shell）で描く。
+    基本設定だけは V8 の対象外なので v7 のまま出す。読み込み前の中身なしは
+    器の中で読み込み中として扱う（v7 の TargetMissing・読み込み分の分岐は
+    そのまま残し、v7 の見た目は変えない）。
+  */
   if (!id) {
     /*
       U097: 「一覧から選び直すと表示できます」と言うだけでは戻れない。
@@ -2532,6 +2542,30 @@ function EditWebinarInner() {
           ? '公開すると、友だちが見るページを確認できます。'
           : ''
   const registrations = analytics?.summary.reservations ?? null
+
+  /*
+    ★V8 の編集②〜⑤は別の器（EditV8Shell）で描く。基本設定・参加者・
+    分析・コメント演出・視聴後アクション・プレビューは V8 の対象外なので
+    v7 のまま出す（v7 の見た目は変えない）。
+  */
+  if (theme === 'v8' && id && (pane === 'video' || pane === 'cta' || pane === 'notifications' || pane === 'review') && webinar && editor) {
+    return (
+      <EditV8Shell
+        webinarId={id}
+        pane={pane}
+        webinar={webinar}
+        editor={editor}
+        registrations={registrations}
+        publicUrl={publicUrl}
+        publicPageReason={publicPageReason}
+        ctaCount={ctaCount}
+        onWebinarChange={handleWebinarSaved}
+        onEditorChange={setEditor}
+        onCtasReport={handleCtasReport}
+      />
+    )
+  }
+
   const railPane: StepKey = pane === 'actions'
     ? 'notifications'
     : pane === 'preview'
