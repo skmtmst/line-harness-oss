@@ -898,7 +898,7 @@ export default function BroadcastListV8() {
                 </span>
                 <p className={styles.stateTitle}>まだ一斉配信はありません</p>
                 <p className={styles.stateDesc}>友だちにまとめてお知らせを送れます。</p>
-                <Button type="button" variant="primary" disabled={!canEdit} onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}>
+                <Button type="button" variant="secondary" disabled={!canEdit} onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}>
                   ＋ 配信を作る
                 </Button>
               </div>

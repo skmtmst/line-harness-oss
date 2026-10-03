@@ -647,7 +647,7 @@ function IncomingV8Inner() {
                 {createFieldError.secret ? <p className={styles.fieldError} role="alert">{createFieldError.secret}</p> : null}
               </div>
               <div>
-                <Button variant="primary" type="submit" disabled={creating} busy={creating}>受け取り口を作る</Button>
+                <Button variant="secondary" type="submit" disabled={creating} busy={creating}>受け取り口を作る</Button>
               </div>
             </form>
           ) : null}

@@ -767,11 +767,11 @@ export default function RichMenusListV8() {
           トーク画面の下にボタンのメニューを出せます。LINEにあるメニューを取り込むこともできます。
         </p>
         {canEdit ? (
-          <Button type="button" variant="primary" onClick={() => router.push('/rich-menus/new')}>
+          <Button type="button" variant="secondary" onClick={() => router.push('/rich-menus/new')}>
             ＋ メニューを作る
           </Button>
         ) : (
-          <Button type="button" variant="primary" disabled title={NO_MANAGE_NOTE}>
+          <Button type="button" variant="secondary" disabled title={NO_MANAGE_NOTE}>
             ＋ メニューを作る
           </Button>
         )}

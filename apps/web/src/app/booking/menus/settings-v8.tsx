@@ -880,7 +880,7 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
           icon={<AccountIcon />}
           title="メニューはまだありません"
           description="お客さまが予約するときに選ぶメニューを作ります。"
-          action={canEdit ? <Button variant="primary" href="/booking/menus/new">予約メニューを作る</Button> : undefined}
+          action={canEdit ? <Button variant="secondary" href="/booking/menus/new">予約メニューを作る</Button> : undefined}
         />
       ) : shown.length === 0 ? (
         <StateCard
@@ -2373,7 +2373,7 @@ function StaffTabV8({ accountId, staff, status, error, matrices, extras, members
           icon={<AccountIcon />}
           title="スタッフはまだいません"
           description="お客さまが予約するときに指名できる担当者を登録します。"
-          action={canEdit ? <Button variant="primary" onClick={() => setEditing(EMPTY_STAFF)}>スタッフを登録</Button> : undefined}
+          action={canEdit ? <Button variant="secondary" onClick={() => setEditing(EMPTY_STAFF)}>スタッフを登録</Button> : undefined}
         />
       ) : (
       <section className={styles.section}>
