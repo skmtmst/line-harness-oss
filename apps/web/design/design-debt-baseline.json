@@ -212,6 +212,9 @@
   "app/friend-add-settings/publish/page.tsx": {
     "unresolved-classname": 38
   },
+  "app/friend-add-settings/publish/done-v8.tsx": {
+    "unresolved-classname": 18
+  },
   "app/friends/detail/page.tsx": {
     "unresolved-classname": 3,
     "arbitrary-value": 5
