@@ -284,6 +284,7 @@ function MembersTabV8({
   const [chipPet, setChipPet] = useState(false)
   const [chipUnlinked, setChipUnlinked] = useState(false)
   const [rank, setRank] = useState('')
+  const [sort, setSort] = useState<NenMemberSort>('annual_desc')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const requestRef = useRef(0)
@@ -314,7 +315,7 @@ function MembersTabV8({
         ranks: chipTopRanks && topTwoKeyQuery ? topTwoKeyQuery.split(',') : undefined,
         link: chipUnlinked ? 'unlinked' : undefined,
         pet: chipPet ? 'with' : 'any',
-        sort: 'annual_desc' as NenMemberSort,
+        sort,
         page,
         pageSize,
       })
@@ -326,7 +327,7 @@ function MembersTabV8({
       if (request !== requestRef.current) return
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId, query, rank, chipTopRanks, chipPet, chipUnlinked, page, pageSize, topTwoKeyQuery])
+  }, [accountId, query, rank, chipTopRanks, chipPet, chipUnlinked, page, pageSize, sort, topTwoKeyQuery])
 
   useEffect(() => {
     void load()
@@ -393,6 +394,17 @@ function MembersTabV8({
             options={[
               { value: '', label: 'よく使う絞り込み' },
               ...(data?.ranks ?? settings?.ranks ?? []).map((r) => ({ value: r.key, label: `ランク：${r.name}` })),
+            ]}
+          />
+          <Select
+            aria-label="並び順"
+            value={sort}
+            onChange={(value) => { setSort(value as NenMemberSort); setPage(1) }}
+            options={[
+              { value: 'annual_desc', label: '通年が多い順' },
+              { value: 'lifetime_desc', label: 'ライフタイムが多い順' },
+              { value: 'balance_desc', label: 'マイル残高が多い順' },
+              { value: 'recent', label: '最終購入が新しい順' },
             ]}
           />
           <PageSizeSelect
