@@ -30,7 +30,8 @@ const PERMISSION_GROUPS = [
   { label: 'コンテンツ', items: [['/templates', 'テンプレート'], ['/rich-menus', 'リッチメニュー'], ['/form-submissions', '回答フォーム'], ['/contents/vars', '共通情報'], ['/contents', '登録メディア一覧']] },
   { label: '成果と分析', items: [['/conversions', '成果とアフィリエイト'], [CONVERSION_APPROVAL_EDIT_KEY, '成果を承認・却下する'], ['/mileage', 'マイル'], ['/inflow-links', '流入と計測'], ['/analytics', '分析']] },
   { label: '自動化・予約', items: [['/automations', 'オートメーション'], ['/webhooks', '外部連携'], ['/booking/bookings', '予約管理'], ['/booking/menus', '予約設定'], ['/events', 'イベント予約']] },
-  { label: 'NEN運用', items: [['/ec-commerce', 'ECデータ連携'], ['/line-notifications', 'LINE通知'], ['/nen-campaigns', 'フォロー配信'], ['/nen-members', '投稿写真審査']] },
+  // 共通メニュー（sidebar.tsx）と同じ見出しにする。特定の契約先の名前は出さない。
+  { label: '専用機能', items: [['/ec-commerce', 'ECデータ連携'], ['/line-notifications', 'LINE通知'], ['/nen-campaigns', 'フォロー配信'], ['/nen-members', '投稿写真審査']] },
 ] as const
 
 const NOTIFICATIONS = [
