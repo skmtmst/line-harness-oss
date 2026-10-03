@@ -7,10 +7,12 @@ import PageHeader from '@/components/shared/page-header'
 import ScrollableTabs from '@/components/layout/scrollable-tabs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { nenPetsApi, type NenHealthKpis, type NenHealthSummaryData } from '@/lib/nen-pets-api'
 import HealthTab from './health-tab'
 import ItemsTab from './items-tab'
 import SummaryDrawer, { SummarySheet } from './summary-drawer'
+import HealthPageV8 from './health-v8'
 
 export type HealthTabKey = 'logs' | 'concern' | 'items'
 export type SummaryStatus = 'loading' | 'ready' | 'error'
@@ -63,6 +65,15 @@ function HealthInner() {
   }
 
   const changeTab = (next: HealthTabKey) => router.replace(next === 'logs' ? '/nen/health' : `/nen/health?tab=${next}`)
+
+  /*
+   * ★V8-B：data-theme="v8" のときだけ新しい健康日記画面
+   * （mIwA4・BVuYh・z2tvtX）へ切り替える。v7 の見た目はそのまま。
+   */
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return <HealthPageV8 accountId={selectedAccountId} tab={tab} onChangeTab={changeTab} />
+  }
 
   const loadSummary = useCallback(async () => {
     if (!selectedAccountId || !summaryPetId) return

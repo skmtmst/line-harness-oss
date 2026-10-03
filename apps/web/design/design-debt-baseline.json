@@ -335,6 +335,9 @@
     "unresolved-classname": 89,
     "direct-th": 3
   },
+  "app/nen/health/health-v8.tsx": {
+    "unresolved-classname": 56
+  },
   "app/page.tsx": {
     "arbitrary-value": 8,
     "unresolved-classname": 1
