@@ -202,7 +202,11 @@ shared-button-importer app/restaurant-test/stores/new/page.tsx
 shared-button-importer app/restaurant-test/stores/new/terms-consent.tsx
 shared-button-importer app/restaurant-test/v8/approvals.tsx
 shared-button-importer app/restaurant-test/v8/dashboard.tsx
+shared-button-importer app/restaurant-test/v8/google.tsx
+shared-button-importer app/restaurant-test/v8/inventory.tsx
+shared-button-importer app/restaurant-test/v8/menu.tsx
 shared-button-importer app/restaurant-test/v8/organization.tsx
+shared-button-importer app/restaurant-test/v8/tables.tsx
 shared-button-importer app/rich-menus/connections/page.tsx
 shared-button-importer app/rich-menus/edit/page.tsx
 shared-button-importer app/rich-menus/edit/prepublish-check-section.tsx
