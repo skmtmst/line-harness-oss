@@ -299,7 +299,7 @@ export default function MessageKindFields({ kind, value, onChange }: MessageKind
           <input
             value={v.title}
             onChange={(e) => set({ title: e.target.value })}
-            placeholder="例：然-NEN- 本店"
+            placeholder="例：本店"
             className={inputClass}
           />
         </label>
