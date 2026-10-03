@@ -1002,6 +1002,180 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     await drainWaits();
   });
 
+  test('両者null読取の競合でも敗者は子操作へ進まない', async () => {
+    const { registerMeetConsultation } = await import(
+      '../services/meet-consultation-reminders.js'
+    );
+    // 勝者が行だけ先に書いた状態 (子pass未実施の交差)。敗者の既存確認は
+    // null を見るよう DB 呼出しを絞り、upsert の競合だけを実DBで起こす。
+    sqlite.prepare(
+      `INSERT INTO meet_consultations
+         (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url,
+          status, booking_id, booking_version)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`,
+    ).run(
+      'consult-w', 'evt-race', 'friend-self', '個別相談',
+      T2, T3, 'https://meet.google.com/aaa-bbbb-ccc', 'bk-race', 2,
+    );
+    const frBefore = (
+      sqlite.prepare('SELECT COUNT(*) AS n FROM friend_reminders').get() as { n: number }
+    ).n;
+    const riggedDb = {
+      ...(db as unknown as Record<string, unknown>),
+      prepare: (sql: string) =>
+        sql.includes('FROM meet_consultations WHERE external_event_id = ?')
+          ? {
+              bind: () => ({
+                first: async () => null,
+                all: async () => ({ results: [] }),
+                run: async () => ({ success: true, meta: { changes: 0 } }),
+                raw: async () => [],
+              }),
+            }
+          : (db as unknown as { prepare: (sql: string) => unknown }).prepare(sql),
+    } as unknown as D1Database;
+    const r = await registerMeetConsultation(riggedDb, {
+      externalEventId: 'evt-race',
+      friendId: 'friend-self',
+      title: '個別相談',
+      startsAt: T1,
+      endsAt: '2026-11-02T16:00:00.000Z',
+      meetUrl: 'https://meet.google.com/aaa-bbbb-ccc',
+      bookingId: 'bk-race',
+      bookingVersion: 1,
+    });
+    // upsert 0 件で敗者確定。子も V6 も書かない。
+    expect(r.updated).toBe(false);
+    const kept = sqlite.prepare(
+      'SELECT starts_at, booking_version, status FROM meet_consultations WHERE external_event_id = ?',
+    ).get('evt-race') as { starts_at: string; booking_version: number; status: string };
+    expect(kept).toEqual({ starts_at: T2, booking_version: 2, status: 'confirmed' });
+    const children = sqlite.prepare(
+      'SELECT COUNT(*) AS n FROM meet_consultation_reminders WHERE consultation_id = ?',
+    ).get('consult-w') as { n: number };
+    expect(children.n).toBe(0);
+    const frAfter = (
+      sqlite.prepare('SELECT COUNT(*) AS n FROM friend_reminders').get() as { n: number }
+    ).n;
+    expect(frAfter).toBe(frBefore);
+  });
+
+  test('linked相談の送信は版・日時・状態が一致するときだけ通す', async () => {
+    const { registerMeetConsultation, processDueMeetConsultationReminders } = await import(
+      '../services/meet-consultation-reminders.js'
+    );
+    const MEET = 'https://meet.google.com/aaa-bbbb-ccc';
+    const dueAt = '2026-10-20T11:00:00.000Z';
+    const dueify = (evt: string) => {
+      sqlite.prepare(
+        `UPDATE meet_consultation_reminders SET scheduled_at = ?
+          WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
+      ).run(dueAt, evt);
+    };
+    // 正当: 版・日時・状態が一致する linked 相談は送られる。
+    const liveId = await adminCreate('menu-ok', T2, 'due-linked-live');
+    sqlite.prepare('UPDATE bookings SET external_event_id = ? WHERE id = ?')
+      .run('evt-linked-live', liveId);
+    await registerMeetConsultation(db, {
+      externalEventId: 'evt-linked-live', friendId: 'friend-self', title: '個別相談',
+      startsAt: T2, endsAt: T3, meetUrl: MEET, bookingId: liveId, bookingVersion: 0,
+    });
+    dueify('evt-linked-live');
+    // 拒否: 予約が版1・新日時に進み、相談が版0・旧日時のまま。claim後の
+    // 古い送信内容を新日時へ再利用しない。(作成は別枠T1で重複を避ける)
+    const staleId = await adminCreate('menu-ok', T1, 'due-linked-stale');
+    sqlite.prepare('UPDATE bookings SET external_event_id = ? WHERE id = ?')
+      .run('evt-linked-stale', staleId);
+    await registerMeetConsultation(db, {
+      externalEventId: 'evt-linked-stale', friendId: 'friend-self', title: '個別相談',
+      startsAt: T1, endsAt: T2, meetUrl: MEET, bookingId: staleId, bookingVersion: 0,
+    });
+    sqlite.prepare('UPDATE bookings SET lock_version = 1, starts_at = ? WHERE id = ?')
+      .run(T3, staleId);
+    dueify('evt-linked-stale');
+    // 互換: 版なし旧相談は従来どおり送られる。
+    sqlite.prepare(
+      `INSERT INTO meet_consultations
+         (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed')`,
+    ).run(
+      'consult-legacy', 'evt-legacy', 'friend-other', '旧相談',
+      '2026-10-21T00:00:00.000Z', '2026-10-21T01:00:00.000Z', MEET,
+    );
+    sqlite.prepare(
+      `INSERT INTO meet_consultation_reminders
+         (id, consultation_id, kind, scheduled_at, status)
+       VALUES (?, ?, ?, ?, 'pending')`,
+    ).run('mr-legacy', 'consult-legacy', 'hour_before', dueAt);
+    const sent: Request[] = [];
+    const dispatch = vi.fn(async (request: Request) => {
+      sent.push(request);
+      return new Response('{}', { status: 200 });
+    });
+    const result = await processDueMeetConsultationReminders(db, {
+      now: new Date('2026-10-20T12:00:00.000Z'),
+      proxyBaseUrl: 'https://proxy.example.com',
+      proxyDispatch: dispatch,
+    });
+    // 正当な linked 2通 (両reminder)＋互換 1通。古い版は送らない。
+    expect(result.sent).toBe(3);
+    expect(dispatch).toHaveBeenCalledTimes(3);
+    const recipients = await Promise.all(
+      sent.map(async (request) => ((await request.json()) as { to: string }).to),
+    );
+    expect(recipients.sort()).toEqual(['U-other-1', 'U-self-1', 'U-self-1']);
+    expect(sent[0].headers.get('x-line-harness-source')).toBeNull();
+    // 古い版の通知は送られず pending のまま残る。
+    const stalePending = sqlite.prepare(
+      `SELECT COUNT(*) AS n FROM meet_consultation_reminders
+        WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
+          AND status IN ('pending','failed')`,
+    ).get('evt-linked-stale') as { n: number };
+    expect(stalePending.n).toBe(2);
+  });
+
+  test('貸出中の取消は409で何も変えず、送信後に再試行で取消せる', async () => {
+    mockSlots([D11]);
+    const id = await adminCreate('menu-ok', T1, 'cx-lease-restore');
+    const decidedBefore = bookingRow(id).decided_at;
+    sqlite.exec(`
+      INSERT INTO reminders
+        (id, name, line_account_id, is_active, trigger_type, delivery_mode, lifecycle_status)
+      VALUES ('rb-booking','予約','account-ny',1,'booking','countdown','published');
+      INSERT INTO friend_reminders
+        (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
+      VALUES ('FR-bk','friend-self','rb-booking','2026-11-02','active','booking','${id}','${id}');
+      INSERT INTO reminder_delivery_runs (
+        id, line_account_id, reminder_id, friend_reminder_id, friend_id,
+        reminder_step_id, scheduled_at, idempotency_key, line_retry_key,
+        status, lease_expires_at, created_at, updated_at
+      ) VALUES (
+        'RUN-bk','account-ny','rb-booking','FR-bk','friend-self',
+        'rb-step','2026-11-02T14:00:00.000Z','idem-bk','retry-bk',
+        'claimed','2099-01-01T00:00:00.000Z','2026-09-01T00:00:00.000Z','2026-09-01T00:00:00.000Z'
+      );
+    `);
+    // 貸出中は確定させず 409。予約は確定前に戻り、主張も残らない。
+    const res = await selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 });
+    expect(res.status).toBe(409);
+    expect((await res.json<Record<string, unknown>>()).error).toBe('send_in_flight_retry');
+    expect(bookingRow(id).status).toBe('confirmed');
+    expect(bookingRow(id).decided_at).toBe(decidedBefore);
+    expect(bookingRow(id).cancel_claim_id).toBeNull();
+    const active = sqlite.prepare(
+      "SELECT status FROM friend_reminders WHERE id = 'FR-bk'",
+    ).get() as { status: string };
+    expect(active.status).toBe('active');
+    // 送信が終われば再試行で取消せる (失敗truthを隠さない)。
+    sqlite.prepare(
+      "UPDATE reminder_delivery_runs SET status = 'succeeded', lease_expires_at = NULL WHERE id = 'RUN-bk'",
+    ).run();
+    const retry = await selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: 0 });
+    expect(retry.status).toBe(200);
+    expect(bookingRow(id).status).toBe('cancelled');
+    await drainWaits();
+  });
+
   test('補償の失敗は隠さず、取消再送で回収できる', async () => {
     mockSlots([D11, D12]);
     const id = await adminCreate('menu-ok', T1, 'race-comp-fail');
