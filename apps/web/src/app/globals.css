@@ -472,6 +472,13 @@
   --motion-fast: 120ms;
   --motion-base: 200ms;
   --motion-slow: 300ms;
+  /*
+   * ★V8 仕上げ（M10）：閉じる 150ms・引き出し 240ms。
+   * 開く 200ms の逆再生と、横から出る面だけ少しゆっくりの指定。
+   * `@theme` ではなく `:root` に置く（使われないと出力されないため）。
+   */
+  --motion-exit: 150ms;
+  --motion-panel: 240ms;
   /* 骨組みの明滅 1 周期（★V7 仕上げ §3）。transition ではなく animation の周期専用。 */
   --motion-pulse: 1.2s;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
