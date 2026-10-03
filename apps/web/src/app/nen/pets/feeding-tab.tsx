@@ -5,6 +5,8 @@ import Button from '@/components/shared/button'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import NoteBar from '@/components/shared/note-bar'
 import { DeleteAction } from '@/components/shared/row-actions'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -40,6 +42,7 @@ const FACTOR_ROWS: Array<{ label: string; dog: string; cat: string }> = [
  * 保存は下部追従バー（`docs/v6-common-rules.md` §1-6）。
  */
 export default function FeedingTab({ accountId }: { accountId: string }) {
+  const theme = useAdminTheme()
   const [status, setStatus] = useState<Status>('loading')
   const [data, setData] = useState<NenFeedingData | null>(null)
   const [drafts, setDrafts] = useState<Draft[]>([])
@@ -47,6 +50,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [justSaved, setJustSaved] = useState(false)
   const [treatLimit, setTreatLimit] = useState('10')
   /** 読み込みで捕まえた失敗。共通の失敗面へ渡し、403と429を言い分ける（M036）。 */
   const [loadError, setLoadError] = useState<unknown>(null)
@@ -168,6 +172,8 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
       setNotice(res.data.refreshedPets
         ? `主食を保存し、登録済みのペット ${formatNumber(res.data.refreshedPets)}頭の目安を計算し直しました。`
         : '主食を保存しました。')
+      setJustSaved(true)
+      window.setTimeout(() => setJustSaved(false), 3000)
     } catch (caught) {
       // M036: 生のまま出さず、共通の状態別案内へ渡す（403は権限・429は待ち案内）。
       setError(describeApiFailure(caught, '主食の保存', {
@@ -179,11 +185,59 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
   }
 
   const noticeEl = notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null
-  if (status === 'loading' && !data) return <>{noticeEl}<ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></>
+  if (status === 'loading' && !data) {
+    return (
+      <>
+        {noticeEl}
+        {theme === 'v8' ? (
+          <div aria-busy="true" aria-label="主食のカロリー表を読み込んでいます">
+            <DelayedSkeleton
+              loading
+              skeleton={(
+                <div aria-hidden="true">
+                  <Skeleton width="16ch" height="1.4em" />
+                  <Skeleton width="100%" height="0.9em" />
+                  <Skeleton width="100%" height="2.5em" />
+                  <Skeleton width="100%" height="2.5em" />
+                  <Skeleton width="100%" height="2.5em" />
+                </div>
+              )}
+            />
+          </div>
+        ) : (
+          <ListState kind="loading" title="主食のカロリー表を読み込んでいます" />
+        )}
+      </>
+    )
+  }
   if (status === 'forbidden') return <ListState kind="forbidden" />
   if (status === 'error') return <ListState kind="error" title="主食のカロリー表を読み込めませんでした" description={isForbiddenOrRateLimited(loadError) ? undefined : '通信の状態を確認して、もう一度お試しください。'} error={loadError ?? undefined} onRetry={() => void load()} />
   // アカウント切替直後：次の取得が終わるまで読み込み表示にする。旧アカウントの表は出さない。
-  if (!data) return <>{noticeEl}<ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></>
+  if (!data) {
+    return (
+      <>
+        {noticeEl}
+        {theme === 'v8' ? (
+          <div aria-busy="true" aria-label="主食のカロリー表を読み込んでいます">
+            <DelayedSkeleton
+              loading
+              skeleton={(
+                <div aria-hidden="true">
+                  <Skeleton width="16ch" height="1.4em" />
+                  <Skeleton width="100%" height="0.9em" />
+                  <Skeleton width="100%" height="2.5em" />
+                  <Skeleton width="100%" height="2.5em" />
+                  <Skeleton width="100%" height="2.5em" />
+                </div>
+              )}
+            />
+          </div>
+        ) : (
+          <ListState kind="loading" title="主食のカロリー表を読み込んでいます" />
+        )}
+      </>
+    )
+  }
 
   return (
     <>
@@ -265,7 +319,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
         actions={(
           <>
             <Button variant="secondary" onClick={cancel} disabled={busy || !dirty || status !== 'ready'}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty || status !== 'ready' || dataAccountId !== accountId}>保存する</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty || status !== 'ready' || dataAccountId !== accountId} busy={busy} busyLabel="保存中" done={justSaved}>保存する</Button>
           </>
         )}
       />

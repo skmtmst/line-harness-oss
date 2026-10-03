@@ -24,6 +24,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Chip from '@/components/shared/chip'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import NoteBar from '@/components/shared/note-bar'
 import { RowActions, DeleteAction } from '@/components/shared/row-actions'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -405,7 +406,45 @@ function MembersTabV8({
 
       <section>
         {status === 'loading' && !data ? (
-          <ListState kind="loading" title="会員を読み込んでいます" />
+          <div aria-busy="true" aria-label="会員を読み込んでいます">
+            <DelayedSkeleton
+              loading
+              skeleton={(
+                <div aria-hidden="true">
+                  <DataTable className="@container">
+                    <thead>
+                      <TableHeadRow>
+                        <Th className="w-64">会員</Th>
+                        <Th className="w-24">ランク</Th>
+                        <Th className="w-24" align="right">通年</Th>
+                        <Th className="w-28" align="right">ライフタイム</Th>
+                        <Th className="w-24" align="right">マイル残高</Th>
+                        <Th>ペット</Th>
+                        <Th className="w-20">最終購入</Th>
+                        <Th className="w-20" align="right">マイル還元</Th>
+                        <Th className="w-14" align="right">操作</Th>
+                      </TableHeadRow>
+                    </thead>
+                    <tbody>
+                      {[0, 1, 2, 3, 4].map((row) => (
+                        <Tr key={row}>
+                          <Td><Skeleton width="12ch" height="1em" /></Td>
+                          <Td><Skeleton width="6ch" height="1em" /></Td>
+                          <Td><Skeleton width="8ch" height="1em" /></Td>
+                          <Td><Skeleton width="8ch" height="1em" /></Td>
+                          <Td><Skeleton width="6ch" height="1em" /></Td>
+                          <Td><Skeleton width="8ch" height="1em" /></Td>
+                          <Td><Skeleton width="8ch" height="1em" /></Td>
+                          <Td><Skeleton width="6ch" height="1em" /></Td>
+                          <Td><Skeleton width="3ch" height="1em" /></Td>
+                        </Tr>
+                      ))}
+                    </tbody>
+                  </DataTable>
+                </div>
+              )}
+            />
+          </div>
         ) : status === 'forbidden' ? (
           <ListState kind="forbidden" />
         ) : status === 'error' ? (
@@ -559,6 +598,7 @@ function RankSettingsTabV8({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [justSaved, setJustSaved] = useState(false)
   /**
    * 競合（e5yBLx）：読み込んだあとにほかの人が保存した形。
    * latest はその時点で取り直した新しい設定。「違いを比べる」で見せる。
@@ -647,6 +687,8 @@ function RankSettingsTabV8({
       setNotice(res.data.sync?.status === 'synced'
         ? 'ランク設定を保存し、ECへ同期しました。友だち属性のタグも付け替えています。'
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
+      setJustSaved(true)
+      window.setTimeout(() => setJustSaved(false), 3000)
     } catch (caught) {
       setError(describeApiFailure(caught, 'ランク設定の保存', {
         forbidden: 'ランク設定を保存する権限がありません。権限を確認してください。',
@@ -722,10 +764,10 @@ function RankSettingsTabV8({
   }
 
   const noticeEl = notice ? <p className={styles.notice} role="status">{notice}</p> : null
-  if (status === 'loading' && !settings) return <>{noticeEl}<ListState kind="loading" title="ランク設定を読み込んでいます" /></>
+  if (status === 'loading' && !settings) return <>{noticeEl}<div aria-busy="true" aria-label="ランク設定を読み込んでいます"><DelayedSkeleton loading skeleton={(<div className={styles.card} aria-hidden="true"><Skeleton width="14ch" height="1.4em" /><Skeleton width="60%" height="0.9em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /></div>)} /></div></>
   if (status === 'forbidden') return <ListState kind="forbidden" />
   if (status === 'error') return <ListState kind="error" title="ランク設定を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
-  if (!settings) return <>{noticeEl}<ListState kind="loading" title="ランク設定を読み込んでいます" /></>
+  if (!settings) return <>{noticeEl}<div aria-busy="true" aria-label="ランク設定を読み込んでいます"><DelayedSkeleton loading skeleton={(<div className={styles.card} aria-hidden="true"><Skeleton width="14ch" height="1.4em" /><Skeleton width="60%" height="0.9em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /></div>)} /></div></>
 
   const rules = settings.rules
   const removeRow = removeTarget !== null ? drafts[removeTarget] : null
@@ -852,7 +894,7 @@ function RankSettingsTabV8({
         actions={(
           <>
             <Button variant="secondary" onClick={cancel} disabled={busy || !dirty}>キャンセル</Button>
-            <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || !dirty || readonly}>
+            <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || !dirty || readonly} busy={busy} busyLabel="保存中" done={justSaved}>
               {conflict ? '比べてから保存' : '保存して EC へ同期'}
             </Button>
           </>
@@ -957,6 +999,7 @@ function LifetimeTabV8({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [justSaved, setJustSaved] = useState(false)
   const [draftAccountId, setDraftAccountId] = useState(accountId)
 
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
@@ -998,6 +1041,8 @@ function LifetimeTabV8({
       setDirty(false)
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
+      setJustSaved(true)
+      window.setTimeout(() => setJustSaved(false), 3000)
     } catch (caught) {
       setError(describeApiFailure(caught, '節目の保存', {
         forbidden: '節目を保存する権限がありません。権限を確認してください。',
@@ -1008,10 +1053,10 @@ function LifetimeTabV8({
   }
 
   const noticeEl = notice ? <p className={styles.notice} role="status">{notice}</p> : null
-  if (status === 'loading' && !settings) return <>{noticeEl}<ListState kind="loading" title="ライフタイムを読み込んでいます" /></>
+  if (status === 'loading' && !settings) return <>{noticeEl}<div aria-busy="true" aria-label="ライフタイムを読み込んでいます"><DelayedSkeleton loading skeleton={(<div className={styles.card} aria-hidden="true"><Skeleton width="16ch" height="1.4em" /><Skeleton width="100%" height="0.9em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /></div>)} /></div></>
   if (status === 'forbidden') return <ListState kind="forbidden" />
   if (status === 'error') return <ListState kind="error" title="ライフタイムを読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
-  if (!settings) return <>{noticeEl}<ListState kind="loading" title="ライフタイムを読み込んでいます" /></>
+  if (!settings) return <>{noticeEl}<div aria-busy="true" aria-label="ライフタイムを読み込んでいます"><DelayedSkeleton loading skeleton={(<div className={styles.card} aria-hidden="true"><Skeleton width="16ch" height="1.4em" /><Skeleton width="100%" height="0.9em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /></div>)} /></div></>
 
   return (
     <>
@@ -1099,7 +1144,7 @@ function LifetimeTabV8({
         actions={(
           <>
             <Button variant="secondary" onClick={() => { setDirty(false); setError(''); if (settings) setDrafts(fromSettings(settings)) }} disabled={busy || !dirty}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty || readonly}>保存して EC へ同期する</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty || readonly} busy={busy} busyLabel="保存中" done={justSaved}>保存して EC へ同期する</Button>
           </>
         )}
       />
