@@ -197,6 +197,44 @@ export function WebhooksV8Head({ activeTab, outgoingCount, incomingCount }: {
   )
 }
 
+/*
+ * V8 の帯ぶんの読み出し（送り先の一覧・受け取り数・やり取りの集計）。
+ * API接続・Sheets・見本タブで使い回す。
+ */
+export function useV8BandData() {
+  const { selectedAccountId } = useAccount()
+  const [outgoingItems, setOutgoingItems] = useState<OutgoingWebhookOverview[] | null>(null)
+  const [incomingCount, setIncomingCount] = useState<number | null>(null)
+  const [summary, setSummary] = useState<WebhookInteractionSummary | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setOutgoingItems(null)
+    setIncomingCount(null)
+    setSummary(null)
+    if (!selectedAccountId) return () => { cancelled = true }
+    void Promise.allSettled([
+      api.webhooks.outgoing.list(selectedAccountId),
+      api.webhooks.incoming.list(selectedAccountId),
+      api.webhooks.interactions.list(selectedAccountId, { periodDays: 30, page: 1, limit: 1 }),
+    ]).then(([outgoingResult, incomingResult, interactionsResult]) => {
+      if (cancelled) return
+      if (outgoingResult.status === 'fulfilled' && outgoingResult.value.success) {
+        setOutgoingItems(outgoingResult.value.data)
+      }
+      if (incomingResult.status === 'fulfilled' && incomingResult.value.success) {
+        setIncomingCount(incomingResult.value.data.length)
+      }
+      if (interactionsResult.status === 'fulfilled' && interactionsResult.value.success && interactionsResult.value.data?.summary) {
+        setSummary(interactionsResult.value.data.summary)
+      }
+    })
+    return () => { cancelled = true }
+  }, [selectedAccountId])
+
+  return { outgoingItems, incomingCount, summary }
+}
+
 export function WebhooksV8Band({ cells, label }: {
   cells: V8KpiCell[]
   label?: string
