@@ -2,6 +2,7 @@
 
 import Disclosure from '@/components/shared/disclosure'
 import CtaV8 from './cta-v8'
+import ReviewV8 from './review-v8'
 import NotificationsV8 from './notifications-v8'
 import VideoV8 from './video-v8'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
@@ -2714,7 +2715,17 @@ function EditWebinarInner() {
           )}
         </div>
       ) : null}
-      {pane === 'review' && <ReviewStep webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onBack={goStep} onPublished={disarm} />}
+      {pane === 'review' && (
+        /*
+          ★V8 切替（確認 `XCUNf`）。v7 の見た目は
+          data-theme="v8" が付くまで 1画素も変えない。
+        */
+        adminTheme === 'v8' ? (
+          <ReviewV8 webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onPublished={disarm} onTestNotifications={() => goStep('notifications')} />
+        ) : (
+          <ReviewStep webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onBack={goStep} onPublished={disarm} />
+        )
+      )}
       {visitedPanes.has('comments') ? (
         <div hidden={pane !== 'comments'}>
           <CommentsTab webinarId={webinar.id} />
