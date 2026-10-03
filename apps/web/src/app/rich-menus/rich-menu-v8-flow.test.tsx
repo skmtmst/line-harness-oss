@@ -302,7 +302,9 @@ describe('V8 リッチメニューの通し：作る→押す所→保存→既�
     await waitFor(() => expect(screen.getAllByText('いつ公開するか').length).toBeGreaterThan(0))
 
     // LINE の検査と実機確認を通して公開する。
-    const lineCheckName = screen.getByText('LINE の検査')
+    // 確認の一覧は公開の口の応答を待ってから出る。決め打ちで掴むと、
+    // 遅い環境で読み込み中のまま落ちる（#1304 の CI 落ち）。
+    const lineCheckName = await screen.findByText('LINE の検査')
     const lineCheckRow = lineCheckName.closest('li') as HTMLElement
     fireEvent.click(within(lineCheckRow).getByRole('button', { name: '見直す' }))
     await waitFor(() => expect(screen.getByText('LINEの受付に通りました。')).toBeTruthy())
