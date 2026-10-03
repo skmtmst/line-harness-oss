@@ -7184,7 +7184,7 @@ export const NEN_PET_LIST = {
       breed: 'トイ・プードル', birthday: '2022-09-02', ageLabel: '4歳', weightKg: 3.2,
       neutered: 'yes', activityLevel: 'normal', activityLabel: 'ふつう', productName: '鹿肉ミンチ',
       feeding: { dailyKcal: 320, dailyGrams: 280, factorLabel: '避妊・去勢済み', stageLabel: '成犬', venisonGrams: 60, venisonKcal: 72, treatName: '鹿ジャーキー' },
-      imageUrl: null, updatedAt: '2026-09-06T10:00:00+09:00', weightStale: false,
+      imageUrl: null, updatedAt: '2026-09-06T10:00:00+09:00', weightUpdatedAt: '2026-09-06T10:00:00+09:00', weightStale: false,
       owner: { friendId: 'friend-1', name: '高橋 直人', pictureUrl: null, customerId: 'customer-1' },
     },
     {
@@ -7192,7 +7192,7 @@ export const NEN_PET_LIST = {
       breed: 'スコティッシュフォールド', birthday: '2024-08-28', ageLabel: '2歳', weightKg: 4.1,
       neutered: 'unknown', activityLevel: 'low', activityLabel: 'おだやか', productName: null,
       feeding: null,
-      imageUrl: null, updatedAt: '2026-08-20T10:00:00+09:00', weightStale: true,
+      imageUrl: null, updatedAt: '2026-08-20T10:00:00+09:00', weightUpdatedAt: '2026-08-20T10:00:00+09:00', weightStale: true,
       owner: { friendId: 'friend-2', name: '前田 さくら', pictureUrl: null, customerId: 'customer-2' },
     },
   ],

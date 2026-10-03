@@ -33,6 +33,7 @@ export const AUTOMATION_ACTION_LABELS: Record<string, string> = {
   add_mileage: "マイルを追加",
   common_action: "共通アクションを実行",
   wait: "指定時間まで待機",
+  notify_staff: "担当者通知",
 };
 
 export function automationTriggerLabel(eventType: AutomationEventType | string): string {
