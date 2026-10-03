@@ -12,6 +12,7 @@ import {
   formBelongsToLineAccount,
   createForm,
   updateForm,
+  formLiffAppearance,
   setFormFolder,
   publishFormVersion,
   type UpdateFormInput,
@@ -111,6 +112,14 @@ import {
   sortFormListItems,
   type FormListFilter,
   type FormListSort,
+} from '@line-crm/shared';
+import {
+  LIFF_HEADING_FONTS,
+  LIFF_THEMES,
+  normalizeLiffColor,
+  type LiffFormAppearanceMode,
+  type LiffHeadingFont,
+  type LiffTheme,
 } from '@line-crm/shared';
 
 const forms = new Hono<Env>();
@@ -365,6 +374,8 @@ function serializeForm(
     ogTitle: row.og_title,
     ogDescription: row.og_description,
     ogImageUrl: row.og_image_url,
+    // 見た目（M3）。既定は店の設定に合わせる。描画への適用は M5。
+    liffAppearance: formLiffAppearance(row),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastSubmittedAt: extra?.lastSubmittedAt ?? null,
@@ -1208,6 +1219,22 @@ forms.post('/api/forms/:id/duplicate', async (c) => {
       .catch(() => ({} as { name?: unknown }));
     const requestedName = typeof body.name === 'string' ? body.name.trim() : '';
     const name = (requestedName || `${source.name}の複製`).slice(0, 200);
+    // 見た目も引き継ぐ（デザインの一部）。inherit のままなら店の設定に合う。
+    // 既定値のままなら送らない（migration 562 未適用の DB でも複製できるよう）。
+    const sourceAppearance = formLiffAppearance(source);
+    const appearanceCarry = sourceAppearance.mode !== 'inherit'
+      || sourceAppearance.theme !== 'line'
+      || sourceAppearance.primaryColor !== null
+      || sourceAppearance.backgroundColor !== null
+      || sourceAppearance.headingFont !== 'default'
+      ? {
+        liffAppearanceMode: sourceAppearance.mode,
+        liffTheme: sourceAppearance.theme,
+        liffPrimaryColor: sourceAppearance.primaryColor,
+        liffBackgroundColor: sourceAppearance.backgroundColor,
+        liffHeadingFont: sourceAppearance.headingFont,
+      }
+      : {};
     const copy = await createForm(c.env.DB, {
       name,
       description: source.description,
@@ -1224,6 +1251,7 @@ forms.post('/api/forms/:id/duplicate', async (c) => {
       ogTitle: source.og_title,
       ogDescription: source.og_description,
       ogImageUrl: source.og_image_url,
+      ...appearanceCarry,
       // 公開中の写しを作らない。編集画面で中身を整えてから公開する。
       isActive: false,
       lineAccountIds: accountIds,
@@ -1247,6 +1275,68 @@ forms.post('/api/forms/:id/duplicate', async (c) => {
 });
 
 // PUT /api/forms/:id — update form
+/**
+ * 見た目の入力を読む（M3）。省いた項目は今の値を保つ。
+ * 形が違う値は 400 で断る。見やすさの注意は断らない（保存は止めない）。
+ */
+function readLiffAppearanceInput(raw: unknown):
+  | {
+    ok: true;
+    value: {
+      mode?: LiffFormAppearanceMode;
+      theme?: LiffTheme;
+      primaryColor?: string | null;
+      backgroundColor?: string | null;
+      headingFont?: LiffHeadingFont;
+    };
+  }
+  | { ok: false; error: string } {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, error: 'フォームの見た目の形が正しくありません' };
+  }
+  const input = raw as Record<string, unknown>;
+  const value: {
+    mode?: LiffFormAppearanceMode;
+    theme?: LiffTheme;
+    primaryColor?: string | null;
+    backgroundColor?: string | null;
+    headingFont?: LiffHeadingFont;
+  } = {};
+  if (input.mode !== undefined) {
+    if (input.mode !== 'inherit' && input.mode !== 'custom') {
+      return { ok: false, error: 'フォームの見た目の合わせ方が正しくありません' };
+    }
+    value.mode = input.mode;
+  }
+  if (input.theme !== undefined) {
+    if (typeof input.theme !== 'string' || !(LIFF_THEMES as string[]).includes(input.theme)) {
+      return { ok: false, error: 'フォームの見た目の型が正しくありません' };
+    }
+    value.theme = input.theme as LiffTheme;
+  }
+  if (input.primaryColor !== undefined) {
+    const color = normalizeLiffColor(input.primaryColor);
+    if (color === 'invalid') {
+      return { ok: false, error: 'フォームの主の色は # に続けて6桁の16進数で入れてください。型・店の色に戻すときは空にしてください' };
+    }
+    value.primaryColor = color;
+  }
+  if (input.backgroundColor !== undefined) {
+    const color = normalizeLiffColor(input.backgroundColor);
+    if (color === 'invalid') {
+      return { ok: false, error: 'フォームの地の色は # に続けて6桁の16進数で入れてください。型・店の色に戻すときは空にしてください' };
+    }
+    value.backgroundColor = color;
+  }
+  if (input.headingFont !== undefined) {
+    if (typeof input.headingFont !== 'string' || !(LIFF_HEADING_FONTS as string[]).includes(input.headingFont)) {
+      return { ok: false, error: 'フォームの見出しの書体が正しくありません' };
+    }
+    value.headingFont = input.headingFont as LiffHeadingFont;
+  }
+  return { ok: true, value };
+}
+
 forms.put('/api/forms/:id', async (c) => {
   try {
     const id = c.req.param('id');
@@ -1273,6 +1363,7 @@ forms.put('/api/forms/:id', async (c) => {
       ogTitle?: string | null;
       ogDescription?: string | null;
       ogImageUrl?: string | null;
+      liffAppearance?: unknown;
       expectedContentRevision?: unknown;
     }>();
 
@@ -1366,6 +1457,27 @@ forms.put('/api/forms/:id', async (c) => {
     if (body.ogTitle !== undefined) updates.ogTitle = body.ogTitle;
     if (body.ogDescription !== undefined) updates.ogDescription = body.ogDescription;
     if (body.ogImageUrl !== undefined) updates.ogImageUrl = body.ogImageUrl;
+    // 見た目（M3）。「店の設定に合わせる」か「このフォームだけ変える」か。
+    // 省いた項目は今の値を保つ。色の null・空文字は「型の色・店の色」。
+    if (body.liffAppearance !== undefined) {
+      const appearance = readLiffAppearanceInput(body.liffAppearance);
+      if (!appearance.ok) {
+        return c.json({ success: false, error: appearance.error }, 400);
+      }
+      if (appearance.value.mode !== undefined) {
+        updates.liffAppearanceMode = appearance.value.mode;
+      }
+      if (appearance.value.theme !== undefined) updates.liffTheme = appearance.value.theme;
+      if (appearance.value.primaryColor !== undefined) {
+        updates.liffPrimaryColor = appearance.value.primaryColor;
+      }
+      if (appearance.value.backgroundColor !== undefined) {
+        updates.liffBackgroundColor = appearance.value.backgroundColor;
+      }
+      if (appearance.value.headingFont !== undefined) {
+        updates.liffHeadingFont = appearance.value.headingFont;
+      }
+    }
 
     const updated = await updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision);
 
