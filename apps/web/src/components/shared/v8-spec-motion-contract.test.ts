@@ -30,6 +30,14 @@ describe('V8 仕上げ3回目の動き', () => {
     expect(button).toMatch(/busyLabel = '保存中…'/)
   })
 
+  it('④ 消える行は150msで薄くなる（leaving 受け口あり・渡さなければ不変）', () => {
+    const css = read('./data-table.module.css')
+    expect(css).toMatch(/\[data-theme='v8'\] \.row\[data-leaving='true'\] \{[^}]*opacity:\s*0/s)
+    expect(css).toMatch(/transition:\s*opacity var\(--motion-exit\) var\(--motion-ease-out\)/s)
+    const tsx = readFileSync(new URL('./table.tsx', import.meta.url), 'utf8')
+    expect(tsx).toMatch(/data-leaving=\{leaving \|\| undefined\}/)
+  })
+
   it('①④ 表の行は上から順に少しずつ（200ms・40msずらし・4行目以降同時）', () => {
     const css = read('../../app/globals.css')
     expect(css).toMatch(/\[data-theme="v8"\] tbody > tr \{\s*animation:\s*v8-content-in var\(--motion-base\)/s)
