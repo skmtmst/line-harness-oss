@@ -28,6 +28,22 @@ describe('useRowLeaving', () => {
     expect(finish).toHaveBeenCalledTimes(1)
   })
 
+  it('まとめて消すときは全部に印を付けてから外す', () => {
+    const finish = vi.fn()
+    const { result } = renderHook(() => useRowLeaving())
+    act(() => {
+      result.current.leaveMany(['row-1', 'row-2'], finish)
+    })
+    expect(result.current.isLeaving('row-1')).toBe(true)
+    expect(result.current.isLeaving('row-2')).toBe(true)
+    expect(result.current.isLeaving('row-3')).toBe(false)
+    act(() => {
+      vi.advanceTimersByTime(150)
+    })
+    expect(result.current.isLeaving('row-1')).toBe(false)
+    expect(finish).toHaveBeenCalledTimes(1)
+  })
+
   it('続けてもう一度呼ぶと前の待ちは捨てる', () => {
     const first = vi.fn()
     const second = vi.fn()
