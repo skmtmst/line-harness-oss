@@ -22,6 +22,7 @@ import { api, ApiError, type IntegrationApiTokenInfo } from '@/lib/api'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -347,10 +348,10 @@ function ApiTokensV8Inner() {
           />
         ) : null}
         {status === 'forbidden' ? (
-          <ListState
-            kind="forbidden"
-            title="この画面を開く権限がありません"
-            description="鍵の棚卸しは統括だけができます。必要なときは統括に頼んでください。"
+          <NoPermissionV8
+            featureName="API接続の鍵"
+            requiredRoleLabel="統括"
+            capabilitiesHref="/staff"
           />
         ) : null}
         {status === 'disabled' ? (
