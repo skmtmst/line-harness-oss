@@ -20,6 +20,8 @@ export interface BookingStaffSaveInput {
   is_active?: 0 | 1;
   /** N-411: 本人勤務の対象となるログインユーザー(staff_members.id)。null で解除。 */
   staff_member_id?: string | null;
+  /** 予約の写真。登録メディア(media.id)から1枚。null で外す。送らなければ今のまま。 */
+  photo_media_id?: string | null;
 }
 
 export type BookingStaffValidationResult =
@@ -172,6 +174,18 @@ export function parseBookingStaffInput(
       return { ok: false, field: 'staff_member_id', error: 'ログインユーザーの指定が正しくありません' };
     } else {
       value.staff_member_id = rawMember.trim();
+    }
+  }
+
+  // 写真は送られたときだけ扱う。送らなければ今の写真を保つ（上書きしない）。
+  if (own(body, 'photo_media_id')) {
+    const rawPhoto = body.photo_media_id;
+    if (rawPhoto === null || rawPhoto === '') {
+      value.photo_media_id = null;
+    } else if (typeof rawPhoto !== 'string' || rawPhoto.trim() === '' || rawPhoto.trim().length > 200) {
+      return { ok: false, field: 'photo_media_id', error: '写真は登録メディアから選んでください' };
+    } else {
+      value.photo_media_id = rawPhoto.trim();
     }
   }
 

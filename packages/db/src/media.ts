@@ -26,6 +26,12 @@ export function isMissingTableError(error: unknown): boolean {
   return message.includes('no such table');
 }
 
+/** 561より前のDBには予約の写真の列が無い。表が無いときと同じく「未確認」に倒す。 */
+export function isMissingColumnError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('no such column');
+}
+
 /**
  * メディアライブラリ。
  *
@@ -53,6 +59,9 @@ export const MEDIA_REF_KINDS = [
   'nen_column',
   'event',
   'webinar',
+  'booking_menu',
+  'booking_staff',
+  'booking_settings',
 ] as const;
 export type MediaRefKind = (typeof MEDIA_REF_KINDS)[number];
 
@@ -693,6 +702,31 @@ async function describeMediaUsageInner(
         href = `/webinars/edit?id=${encodeURIComponent(usage.ref_id)}`;
       }
       break;
+    case 'booking_menu':
+      row = await db.prepare(
+        `SELECT name, line_account_id AS account_id FROM menus WHERE id = ?`,
+      ).bind(usage.ref_id).first<NamedReference>();
+      if (row && belongsToAccount(row, lineAccountId)) {
+        href = `/booking/menus`;
+      }
+      break;
+    case 'booking_staff':
+      row = await db.prepare(
+        `SELECT display_name AS name, line_account_id AS account_id FROM staff WHERE id = ?`,
+      ).bind(usage.ref_id).first<NamedReference>();
+      if (row && belongsToAccount(row, lineAccountId)) {
+        href = `/booking/staff`;
+      }
+      break;
+    case 'booking_settings':
+      row = await db.prepare(
+        `SELECT la.name AS name, bs.line_account_id AS account_id
+           FROM booking_settings bs
+           JOIN line_accounts la ON la.id = bs.line_account_id
+          WHERE bs.id = ?`,
+      ).bind(usage.ref_id).first<NamedReference>();
+      // お店の写真の設定画面はまだ無いので、名前だけ出してリンクは付けない。
+      break;
     default:
       // DBのCHECKに無い値も、詳細不明の参照として削除を止める。
       break;
@@ -786,6 +820,16 @@ async function describeMediaReplacementUsage(
       replaceable: false,
       blocker: 'unsupported_reference',
       reason: 'ウェビナー動画は配信用の一式を持つため、このファイルだけを差し替えられません。',
+    };
+  }
+  if (usage.ref_kind === 'booking_menu'
+    || usage.ref_kind === 'booking_staff'
+    || usage.ref_kind === 'booking_settings') {
+    return {
+      ...described,
+      replaceable: false,
+      blocker: 'unsupported_reference',
+      reason: '予約の写真は登録メディアのIDで結び付けているため、この画面からは差し替えられません。',
     };
   }
   if (usage.ref_kind === 'broadcast' || usage.ref_kind === 'event') {
@@ -997,6 +1041,11 @@ const REPLACEMENT_TARGET_KINDS: Record<MediaRefKind, {
   // ウェビナー動画は配信用の一式を持つため対象外（describeMediaReplacementUsage
   // が必ず unsupported_reference を付けるので、ここへは到達しない）。
   webinar: null,
+  // 予約の写真は登録メディアのIDそのものを列に持つため、本文の文字列置換では
+  // 差し替えられない（describeMediaReplacementUsage が unsupported_reference を付ける）。
+  booking_menu: null,
+  booking_staff: null,
+  booking_settings: null,
 };
 
 /**
@@ -1287,6 +1336,32 @@ async function loadUsageContent(
       ).bind(usage.ref_id, lineAccountId).first<Record<string, unknown>>();
       return row ? { shared: false, columns: usageTextColumns(row, ['video_prefix']) } : null;
     }
+    case 'booking_menu':
+    case 'booking_staff':
+    case 'booking_settings': {
+      // 写真の列は登録メディアのIDそのもの。公開パスへ直してから
+      // 状態判定へ渡す（561より前のDBでは列が無いので読めない）。
+      const photoColumn = usage.ref_kind === 'booking_settings'
+        ? 'store_photo_media_id'
+        : 'photo_media_id';
+      const photoTable = usage.ref_kind === 'booking_menu'
+        ? 'menus'
+        : usage.ref_kind === 'booking_staff' ? 'staff' : 'booking_settings';
+      try {
+        const row = await db.prepare(
+          `SELECT ${photoColumn} AS photo_media_id FROM ${photoTable} WHERE id = ? AND line_account_id = ?`,
+        ).bind(usage.ref_id, lineAccountId).first<{ photo_media_id: string | null }>();
+        if (!row?.photo_media_id) return null;
+        return {
+          shared: false,
+          columns: { [photoColumn]: mediaLiveContentPath(row.photo_media_id) },
+        };
+      } catch (err) {
+        // 561より前のDBには写真の列が無い。その使用先は「未確認」に倒す。
+        if (isMissingColumnError(err)) return null;
+        throw err;
+      }
+    }
     default:
       return null;
   }
@@ -1374,7 +1449,10 @@ export async function retargetMediaUsageReference(
     mediaUpdate?: { filename?: string; folderId?: string | null };
   },
 ): Promise<{ changed: boolean; state: MediaUsageReferenceState }> {
-  if (input.refKind === 'webinar') {
+  if (input.refKind === 'webinar'
+    || input.refKind === 'booking_menu'
+    || input.refKind === 'booking_staff'
+    || input.refKind === 'booking_settings') {
     throw new MediaUsageReferenceError('media_reference_unsupported');
   }
   if (input.target.mode === 'live' && input.refKind === 'rich_menu') {
