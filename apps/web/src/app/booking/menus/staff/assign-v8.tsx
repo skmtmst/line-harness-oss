@@ -14,12 +14,13 @@
  * v7 の /booking/menus/staff と同じ。テーマが v7 のときはこのファイルは
  * 読まれず、従来の見た目が出る。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { Tabs } from '@/components/shared/tabs'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -54,6 +55,39 @@ function staffLabel(person: BookingStaff): string {
   return person.display_name || person.name
 }
 
+/** 升目表の読み込み待ちの骨組み（見出し行＋5行・メニュー列＋担当3列の形）。 */
+function MatrixSkeleton() {
+  return (
+    <section className={shell.section} data-design="Table" aria-hidden="true">
+      <div className={shell.sectionHead}>
+        <Skeleton width={200} height={18} />
+      </div>
+      <div className={styles.matrixWrap}>
+        <table className={styles.matrix}>
+          <thead>
+            <tr>
+              <th className={styles.matrixMenuHead} scope="col"><Skeleton width={80} height={14} /></th>
+              {[0, 1, 2].map((i) => (
+                <th key={i} className={styles.matrixStaffHead} scope="col"><Skeleton width={64} height={14} /></th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[0, 1, 2, 3, 4].map((row) => (
+              <tr key={row}>
+                <th scope="row" className={styles.matrixMenuCell}><Skeleton width="80%" height={15} /></th>
+                {[0, 1, 2].map((col) => (
+                  <td key={col} className={styles.matrixCell}><Skeleton width={18} height={18} /></td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
 export default function AssignMatrixV8() {
   usePageTitle('予約設定')
   const sp = useSearchParams()
@@ -66,8 +100,17 @@ export default function AssignMatrixV8() {
   const [grid, setGrid] = useState<Record<string, Record<string, StaffMenuMatrix>>>({})
   /* 保存済みの表を控えておき、差分が未保存と分かるようにする（v7 #975 U075 と同じ）。 */
   const [savedGrid, setSavedGrid] = useState<Record<string, Record<string, StaffMenuMatrix>> | null>(null)
+  /** 「元に戻す」が新しい書きかけを消さないための、今の表の写し。 */
+  const gridRef = useRef(grid)
+  gridRef.current = grid
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  /** 保存が終わった直後の1.2秒だけ、保存ボタンに完了（✓）を出す。 */
+  const [saveDone, setSaveDone] = useState(false)
+  const saveDoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (saveDoneTimerRef.current !== null) clearTimeout(saveDoneTimerRef.current)
+  }, [])
   const [error, setError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<unknown>(null)
   /** 升を押したあと、時間・料金を変える段が対象にする升。 */
@@ -147,31 +190,73 @@ export default function AssignMatrixV8() {
     }))
   }
 
+  /** 表1枚ぶんを一括の口へ流す。元に戻すときも同じ口を使う。 */
+  async function putGrid(next: Record<string, Record<string, StaffMenuMatrix>>) {
+    await bookingApi.putStaffMenusBulk(
+      selectedAccountId!,
+      staff.map((s) => ({
+        staff_id: s.id,
+        menus: menus.map((m) => {
+          const row = next[s.id]?.[m.id]
+          return {
+            menu_id: m.id,
+            is_offered: Boolean(row?.is_offered),
+            override_duration_minutes: row?.override_duration_minutes ?? null,
+            override_price: row?.override_price ?? null,
+          }
+        }),
+      })),
+    )
+  }
+
+  function flashDone() {
+    setSaveDone(true)
+    if (saveDoneTimerRef.current !== null) clearTimeout(saveDoneTimerRef.current)
+    saveDoneTimerRef.current = setTimeout(() => setSaveDone(false), 1600)
+  }
+
   async function saveAll() {
     if (!selectedAccountId) return
+    const before = savedGrid ?? grid
     setSaving(true)
+    setSaveDone(false)
     setError(null)
     try {
-      await bookingApi.putStaffMenusBulk(
-        selectedAccountId,
-        staff.map((s) => ({
-          staff_id: s.id,
-          menus: menus.map((m) => {
-            const row = grid[s.id]?.[m.id]
-            return {
-              menu_id: m.id,
-              is_offered: Boolean(row?.is_offered),
-              override_duration_minutes: row?.override_duration_minutes ?? null,
-              override_price: row?.override_price ?? null,
-            }
-          }),
-        })),
-      )
+      await putGrid(grid)
       setSavedGrid(grid)
-      notifyToast('保存しました')
+      flashDone()
+      notifyToast('保存しました', {
+        actionLabel: '元に戻す',
+        onAction: () => void undoSave(before, grid),
+      })
     } catch (e) {
       setError(
         `${describeSaveFailure(e)}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** 保存直後の「元に戻す」：保存前の表を同じ一括の口で入れ直す。 */
+  async function undoSave(before: Record<string, Record<string, StaffMenuMatrix>>, after: Record<string, Record<string, StaffMenuMatrix>>) {
+    if (!selectedAccountId) return
+    if (JSON.stringify(gridRef.current) !== JSON.stringify(after)) {
+      notifyToast('ほかの変更が入ったため、元に戻せませんでした')
+      return
+    }
+    setSaving(true)
+    setSaveDone(false)
+    setError(null)
+    try {
+      await putGrid(before)
+      setGrid(before)
+      setSavedGrid(before)
+      flashDone()
+      notifyToast('元に戻しました')
+    } catch (e) {
+      setError(
+        `${describeSaveFailure(e)}（元に戻せませんでした。画面を再読み込みして最新の状態を確認してください）`,
       )
     } finally {
       setSaving(false)
@@ -252,9 +337,9 @@ export default function AssignMatrixV8() {
               <p className={shell.stateDesc}>共通メニューで、予約設定を開くLINEアカウントを選んでください。</p>
             </div>
           ) : loading ? (
-            <div className={shell.stateCard}>
-              <p className={shell.stateTitle}>読み込み中</p>
-              <p className={shell.stateDesc}>メニューと担当スタッフを読み込んでいます。</p>
+            <div aria-busy="true">
+              <span className="sr-only" role="status">メニューと担当スタッフを読み込んでいます</span>
+              <DelayedSkeleton loading skeleton={<MatrixSkeleton />} />
             </div>
           ) : loadFailed ? (
             <div className={shell.stateCard}>
@@ -452,7 +537,7 @@ export default function AssignMatrixV8() {
         <div className={shell.side} aria-hidden="true" />
       </div>
 
-      {dirty && canEditMenus ? (
+      {(dirty || saveDone) && canEditMenus ? (
         <div className={styles.saveBar} data-design="Savebar">
           <Button
             onClick={() => setGrid(savedGrid ?? grid)}
@@ -465,6 +550,7 @@ export default function AssignMatrixV8() {
             onClick={() => void saveAll()}
             disabled={saving || !selectedAccountId || loading || Boolean(error)}
             busy={saving}
+            done={saveDone}
           >
             保存
           </Button>
