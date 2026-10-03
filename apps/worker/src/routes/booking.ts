@@ -20,6 +20,8 @@ import {
   createBookingAvailabilityException,
   getBookingAdminSettings,
   saveBookingAdminSettings,
+  createBookingPayment,
+  resolveBookingPaymentConfig,
   listBookingAdminResources,
   getBookingAvailabilityException,
   listBookingAvailabilityExceptions,
@@ -1068,7 +1070,33 @@ booking.post('/api/liff/booking/requests', async (c) => {
     );
   }
 
-  const responseBody = { booking_id: bookingId, status: 'requested' };
+  /*
+   * 決済の差し替え制。online の店・メニューだけ支払いの記録を作り、
+   * 仮押さえの期限を付ける。none／onsite では何も足さず、
+   * 今の予約の流れは一切変えない。
+   */
+  let bookingPayment: { id: string; status: string; holdUntil: string | null } | null = null;
+  try {
+    const paymentConfig = await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id);
+    if (paymentConfig.mode === 'online' && menuRow.price > 0) {
+      const holdUntil = new Date(Date.now() + paymentConfig.holdMinutes * 60_000).toISOString();
+      const record = await createBookingPayment(c.env.DB, {
+        lineAccountId: accountId,
+        bookingId,
+        amount: menuRow.price,
+        provider: paymentConfig.provider,
+        idempotencyKey: `booking:${bookingId}`,
+        holdUntil,
+      });
+      bookingPayment = { id: record.id, status: record.status, holdUntil: record.hold_until };
+    }
+  } catch (error) {
+    console.error('booking payment record failed:', error);
+  }
+
+  const responseBody = bookingPayment
+    ? { booking_id: bookingId, status: 'requested', payment: bookingPayment }
+    : { booking_id: bookingId, status: 'requested' };
   await saveIdempotencyResponse(c.env.DB, {
     key: idemKey,
     lineAccountId: accountId,
