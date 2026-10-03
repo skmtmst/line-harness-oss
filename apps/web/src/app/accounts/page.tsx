@@ -100,23 +100,27 @@ export default function AccountsPage() {
         {/* ★V7：上の帯の画面名と同じ1段だけのパンくずは出さない。 */}
         {theme === 'v8' ? <ReadonlyHeaderV8 title="LINEアカウント" description="統括内の全アカウントの接続・Webhook・友だち数を確認できます。" /> : <div />}
         <div className="flex flex-wrap gap-2">
-          <Button type="button" onClick={() => setOrderingOpen(true)}>
-            並び順と親子を変える
+          <Button type="button" onClick={() => setOrderingOpen((open) => !open)}>
+            {orderingOpen ? '並び順と親子を閉じる' : '並び順と親子を変える'}
           </Button>
           <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録する</Button>
         </div>
       </div>
 
-      {/* 板 `a7lUk`（LINEアカウントの並び順と親子を変える窓）。 */}
-      <Dialog
-        open={orderingOpen}
-        designNode="a7lUk"
-        title="LINEアカウント階層を編集"
-        description="カードの「…」から「最上位（親）にする」「○○の子にする」を選びます。上下に動かすと並び順が変わります。"
-        onCancel={() => setOrderingOpen(false)}
-      >
-        <AccountOrdering />
-      </Dialog>
+      {/* 板 `a7lUk`（LINEアカウントの並び順と親子を変える窓）。V8 のときだけ窓で開く。 */}
+      {theme === 'v8' ? (
+        <Dialog
+          open={orderingOpen}
+          designNode="a7lUk"
+          title="LINEアカウント階層を編集"
+          description="カードの「…」から「最上位（親）にする」「○○の子にする」を選びます。上下に動かすと並び順が変わります。"
+          onCancel={() => setOrderingOpen(false)}
+        >
+          <AccountOrdering />
+        </Dialog>
+      ) : (
+        <>{orderingOpen && <AccountOrdering />}</>
+      )}
 
       <div data-design="KPIs" data-ro-kpis="true" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {/* ★V7：「100%」の札は何の割合でもない固定の文字だったので外す。 */}
