@@ -137,6 +137,8 @@ const EXEMPTIONS: Record<string, string> = {
     'dirty管理なし（コメント中の「未保存」記述のみ）',
   'app/hq/templates/template-console.tsx':
     '多段ウィザード＋sessionStorage下書き。段の途中離脱の扱いは別途検討',
+  'app/hq/account-settings-dialogs.tsx':
+    '統括の3つの窓（HMpVx・D6ljr・HFsO9）。窓内の入力は閉じると戻る仕様で、画面に残る下書きを持たないため画面離脱ガードの対象外',
   'app/line-notifications/page.tsx':
     '入力を端末の下書きへ随時保存し、閉じる確認はエディタ内で済ませる設計。画面離脱への警告は要検討',
   'app/nen-campaigns/nen-overview.tsx':

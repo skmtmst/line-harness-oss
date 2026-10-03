@@ -288,10 +288,13 @@ export default function FormSubmissionsListV8() {
         const res = await fetchApi<{ success: boolean; data: Form[] }>(`/api/forms/unassigned?${account}`)
         if (!res.success) throw new Error('load_failed')
         if (request !== formRequest.current) return
-        setForms(res.data)
+        // 未割り当て口は配列で返す契約。通常一覧と同じく、配列でない応答では
+        // 一覧を空にして描く（`[...forms]` が `e is not iterable` で落ちる）。
+        const unassigned = Array.isArray(res.data) ? res.data : []
+        setForms(unassigned)
         setFolders([])
-        setFormTotal(res.data.length)
-        setFolderTotal(res.data.length)
+        setFormTotal(unassigned.length)
+        setFolderTotal(unassigned.length)
       } catch (error) {
         if (request !== formRequest.current) return
         // 権限が無い人（staff・制限付き・別テナント）は専用口が403/404を返す。
