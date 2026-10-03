@@ -3014,11 +3014,18 @@
           "resolved": "360px"
         },
         {
-          "pencil": "title 15/600",
+          "pencil": "VJKAT title fontSize: 15",
           "class": "title",
-          "prop": "font",
-          "source": "15px/600",
-          "resolved": "15px/600"
+          "prop": "font-size",
+          "source": "15px",
+          "resolved": "15px"
+        },
+        {
+          "pencil": "VJKAT title fontWeight: 600",
+          "class": "title",
+          "prop": "font-weight",
+          "source": "600",
+          "resolved": "600"
         },
         {
           "pencil": "radius card",
