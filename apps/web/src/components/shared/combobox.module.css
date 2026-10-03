@@ -189,6 +189,25 @@
   background: var(--color-canvas-sunken);
 }
 
+/*
+ * ★V8 仕上げ（M10-2）：探す欄の乗せた・候補の動き。
+ * 枠は 120ms で色が変わり、候補の行に乗せたときの薄い背景も 120ms。
+ * 開く動きは候補の箱が持つ。
+ */
+[data-theme='v8'] .field {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .field:hover {
+  background: var(--color-canvas-sunken);
+}
+
+[data-theme='v8'] .option {
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
 .option[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: 0.5;
