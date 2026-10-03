@@ -1385,8 +1385,23 @@ CREATE TABLE booking_noshow_flags (
 CREATE TABLE booking_noshow_thresholds (
   line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
   threshold INTEGER NOT NULL DEFAULT 3 CHECK (threshold BETWEEN 1 AND 100),
+  enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+  window_months INTEGER NOT NULL DEFAULT 6 CHECK (window_months BETWEEN 1 AND 120),
+  no_payment_mode TEXT NOT NULL DEFAULT 'notice_call'
+    CHECK (no_payment_mode IN ('notice', 'notice_call')),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
+);
+
+CREATE TABLE booking_noshow_flag_events (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  action TEXT NOT NULL CHECK (action IN ('manual_on', 'manual_off')),
+  reason TEXT,
+  staff_id TEXT,
+  staff_name TEXT,
+  created_at TEXT NOT NULL
 );
 
 CREATE TABLE booking_operation_runs (
@@ -7873,6 +7888,8 @@ CREATE INDEX idx_booking_menu_resources_resource
 
 CREATE INDEX idx_booking_noshow_flags_friend
   ON booking_noshow_flags(friend_id, line_account_id);
+CREATE INDEX idx_booking_noshow_flag_events_friend
+  ON booking_noshow_flag_events(line_account_id, friend_id, created_at DESC);
 
 CREATE INDEX idx_booking_operation_runs_booking
   ON booking_operation_runs(line_account_id, booking_id, created_at DESC);

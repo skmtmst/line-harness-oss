@@ -6146,18 +6146,18 @@ const spec = {
     '/api/booking/admin/noshow-settings': {
       get: {
         tags: ['Booking'],
-        summary: '無断キャンセルから前払いのみへの境目を見る',
+        summary: '無断キャンセルの数え方を見る',
         parameters: [
           { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
         ],
         responses: {
-          '200': { description: '何回で前払いのみか' },
+          '200': { description: 'オン／オフ・何回目から・数える期間・決済が無い店の扱い' },
           '400': { description: 'account_id 未指定' },
         },
       },
       put: {
         tags: ['Booking'],
-        summary: '無断キャンセルから前払いのみへの境目を保存',
+        summary: '無断キャンセルの数え方を保存',
         parameters: [
           { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
         ],
@@ -6167,16 +6167,18 @@ const spec = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['threshold'],
                 properties: {
+                  enabled: { type: 'boolean' },
                   threshold: { type: 'integer', minimum: 1, maximum: 100 },
+                  windowMonths: { type: 'integer', minimum: 1, maximum: 120 },
+                  noPaymentMode: { type: 'string', enum: ['notice', 'notice_call'] },
                 },
               },
             },
           },
         },
         responses: {
-          '200': { description: '保存した境目' },
+          '200': { description: '保存した数え方' },
           '400': { description: '入力が正しくない' },
         },
       },
@@ -6212,6 +6214,7 @@ const spec = {
                 type: 'object',
                 properties: {
                   mode: { type: 'string', enum: ['manual_on', 'manual_off'] },
+                  reason: { type: 'string', description: '印を外すときは必須の1行' },
                 },
               },
             },
@@ -6219,7 +6222,7 @@ const spec = {
         },
         responses: {
           '200': { description: '前払いのみにした・外した結果' },
-          '400': { description: 'account_id 未指定' },
+          '400': { description: 'account_id 未指定・印を外すとき理由が無い' },
           '404': { description: '対象が見つからない' },
         },
       },

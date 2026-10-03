@@ -504,7 +504,8 @@
     "554_meet_cancel_claim.sql",
     "555_tenant_data_retention.sql",
     "558_booking_payments.sql",
-    "560_booking_sales_noshow.sql"
+    "560_booking_sales_noshow.sql",
+    "565_booking_noshow_settings_reasons.sql"
   ],
-  "migrationCount": 505
+  "migrationCount": 506
 }
