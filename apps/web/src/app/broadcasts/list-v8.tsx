@@ -33,6 +33,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
 import { canEditFeature } from '@/lib/staff-capability'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
+import QuickSendDialog from './quick-send-dialog'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -139,6 +140,7 @@ export default function BroadcastListV8() {
   const [forbidden, setForbidden] = useState(false)
   const [statusFilter, setStatusFilter] = useState<StatusChipKey>('all')
   const [showCreate, setShowCreate] = useState(false)
+  const [quickSendOpen, setQuickSendOpen] = useState(false)
   const [openTemplatePicker, setOpenTemplatePicker] = useState(false)
   const [titleQuery, setTitleQuery] = useState('')
   const [savedViewId, setSavedViewId] = useState('')
@@ -610,7 +612,7 @@ export default function BroadcastListV8() {
   }
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node={canEdit ? undefined : 'NtCE3'}>
       {folderDialogOpen && (
         <FolderAddDialog
           kind="broadcast"
@@ -702,6 +704,14 @@ export default function BroadcastListV8() {
               onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
             >
               ＋ 配信を作る
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!canEdit}
+              onClick={() => setQuickSendOpen(true)}
+            >
+              かんたんに送る
             </Button>
             <div className={styles.folderSelectWrap}>
               <Select
@@ -854,6 +864,13 @@ export default function BroadcastListV8() {
               openTemplatePickerInitially={openTemplatePicker}
             />
           )}
+
+          <QuickSendDialog
+            open={quickSendOpen}
+            accountId={selectedAccountId}
+            onClose={() => setQuickSendOpen(false)}
+            onSent={() => { void load(); void loadFolders() }}
+          />
 
           {loading ? (
             <div className={styles.skeletonRows} role="status">
