@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 
 const FOCUSABLE = [
   'a[href]',
@@ -82,4 +82,28 @@ export function useOverlayFocus(
   }, [closeDisabled, open])
 
   return containerRef
+}
+
+/*
+ * ★V8 仕上げ（M10）：窓・引き出しの「閉じるときは逆再生」。
+ * V8 のときだけ閉じの印を残し（150ms の逆再生ぶん）、v7・試験
+ * （v8 でない）は今までどおり即時に外す。開き直したら印を消す。
+ */
+export function useV8Leave(open: boolean, ms = 160): boolean {
+  const [leaving, setLeaving] = useState(false)
+  const wasOpenRef = useRef(open)
+  useEffect(() => {
+    if (open) {
+      wasOpenRef.current = true
+      setLeaving(false)
+      return
+    }
+    if (!wasOpenRef.current) return
+    wasOpenRef.current = false
+    if (typeof document === 'undefined' || document.documentElement?.dataset?.theme !== 'v8') return
+    setLeaving(true)
+    const timer = setTimeout(() => setLeaving(false), ms)
+    return () => clearTimeout(timer)
+  }, [ms, open ])
+  return leaving
 }
