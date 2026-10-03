@@ -688,11 +688,11 @@ export default function TemplateAssetEditorV8({ kind, visual = false }: { kind: 
                       <button
                         type="button"
                         className={`${styles.toolButton} ${styles.toolButtonDanger}`}
-                        aria-label={`質問 ${index + 1} を消す`}
-                        title={questions.length <= 1 ? '質問は1つ必要です' : 'この質問を消す'}
+                        aria-label={`質問 ${index + 1} を削除`}
+                        title={questions.length <= 1 ? '質問は1つ必要です' : 'この質問を削除'}
                         disabled={questions.length <= 1}
                         onClick={() => removeQuestion(index)}
-                      >消す</button>
+                      >削除</button>
                     </div>
                   </div>
                   <Field label="質問文" htmlFor={`ta8-q-${question.key}`} required>
@@ -728,11 +728,11 @@ export default function TemplateAssetEditorV8({ kind, visual = false }: { kind: 
                             <button
                               type="button"
                               className={`${styles.toolButton} ${styles.toolButtonDanger} shrink-0`}
-                              aria-label={`質問 ${index + 1} の選択肢 ${choiceIndex + 1} を消す`}
+                              aria-label={`質問 ${index + 1} の選択肢 ${choiceIndex + 1} を削除`}
                               disabled={question.choices.length <= 1}
-                              title={question.choices.length <= 1 ? '選択肢は1つ必要です' : 'この選択肢を消す'}
+                              title={question.choices.length <= 1 ? '選択肢は1つ必要です' : 'この選択肢を削除'}
                               onClick={() => updateQuestion(index, { choices: question.choices.filter((_, i) => i !== choiceIndex) })}
-                            >消す</button>
+                            >削除</button>
                           </div>
                         ))}
                       </div>
