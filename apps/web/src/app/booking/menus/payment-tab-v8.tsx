@@ -5,6 +5,8 @@ import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { notifyToast } from '@/components/shared/toast'
 import { bookingApi, type BookingMenu, type BookingPaymentAdminConfig } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 type PayMode = 'none' | 'onsite' | 'online'
 type PayProvider = 'none' | 'onsite' | 'stripe'
@@ -36,6 +38,14 @@ export default function PaymentTabV8({ accountId, menus, canEdit }: {
   const [error, setError] = useState<string | null>(null)
   const [menuOverrides, setMenuOverrides] = useState<Record<string, PayMode>>({})
   const [menuSaving, setMenuSaving] = useState<string | null>(null)
+
+  // 店の既定の下書きが残っている間だけ、離れる前に確かめる。
+  const dirty = config !== null && (
+    draft.mode !== config.mode ||
+    draft.provider !== (config.provider === 'stripe' ? 'stripe' : config.provider === 'onsite' ? 'onsite' : 'none') ||
+    draft.holdMinutes !== config.holdMinutes
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   useEffect(() => {
     let alive = true
@@ -164,6 +174,12 @@ export default function PaymentTabV8({ accountId, menus, canEdit }: {
         <Button variant="primary" onClick={() => void submit()} disabled={!canEdit || saving}>
           {saving ? '保存中…' : '保存する'}
         </Button>
+        <UnsavedLeaveDialog
+          open={leaveTarget !== null}
+          subject="お支払いの設定の変更"
+          onConfirm={confirmLeave}
+          onCancel={cancelLeave}
+        />
       </section>
 
       <section aria-label="メニューごとの上書き">
