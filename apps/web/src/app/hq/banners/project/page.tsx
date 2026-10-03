@@ -481,11 +481,12 @@ function ProjectInner() {
       {actionError ? <p className="text-label text-danger" role="alert">{actionError}</p> : null}
       {project.description ? <p className="text-caption text-ink-faint">{project.description}</p> : null}
 
-      <div data-design-node="H2eb7f" className="flex flex-col gap-4 xl:flex-row xl:items-start">
+      <div data-design-node={theme === 'v8' ? 'iMnph' : 'H2eb7f'} className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <section data-design-node="ZwrHR" className="v8-ro-hq-generationGallery flex min-w-0 flex-1 flex-col rounded-card border border-hairline bg-canvas">
           <div className="flex flex-wrap items-center gap-2 px-4 py-3">
             <h2 className="text-body font-bold text-ink">このプロジェクトの画像</h2>
             <span className="text-caption text-ink-faint">{images.length}枚</span>
+            {theme === 'v8' ? <span className="text-micro text-ink-faint">画像を押すと詳細・アカウントへ渡す</span> : null}
             {running ? (
               <span className="inline-flex h-5 items-center gap-1 rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info" role="status">
                 <LoaderCircle aria-hidden="true" className="h-3 w-3 animate-spin" />
@@ -493,9 +494,9 @@ function ProjectInner() {
               </span>
             ) : null}
             <span className="flex-1" />
-            <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
-            <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り</FilterChip>
-            <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>アカウントへ渡し済み</FilterChip>
+            <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて{theme === 'v8' ? ` ${images.length}` : null}</FilterChip>
+            <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り{theme === 'v8' ? ` ${images.filter((image) => image.isFavorite).length}` : null}</FilterChip>
+            <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>アカウントへ渡し済み{theme === 'v8' ? ` ${images.filter((image) => image.deliveredAccountIds.length > 0).length}` : null}</FilterChip>
           </div>
           <div className="border-t border-hairline" />
           {generationError ? (

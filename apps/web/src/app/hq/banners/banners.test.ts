@@ -74,6 +74,14 @@ describe('統括 バナー生成', () => {
     expect(panel).not.toMatch(/生成する/)
   })
 
+  it('V8（iMnph）は外枠に板IDを付け、切り替えに件数を出す', () => {
+    expect(projectPage).toContain("'iMnph'")
+    expect(projectPage).toContain('画像を押すと詳細・アカウントへ渡す')
+    for (const label of ['すべて', 'お気に入り', 'アカウントへ渡し済み']) {
+      expect(projectPage).toContain(label)
+    }
+  })
+
   it('モーダルは全面1枚のオーバーレイで、幅は max-width（1920/1160 の固定幅を書かない）', () => {
     expect(modal).toContain('fixed inset-0')
     expect(modal).toContain('bg-scrim')
