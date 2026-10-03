@@ -20,6 +20,8 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
   'app/affiliate-offers/new/page.tsx',
+  'app/affiliate-offers/new-offer-v8.tsx',
+  'app/affiliates/new-affiliate-v8.tsx',
   'app/analytics/reports/new/page.tsx',
   'app/auto-replies/edit/wizard-v8.tsx',
   'app/booking/menus/new/menu-form-v8.tsx',
