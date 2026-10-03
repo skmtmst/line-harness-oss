@@ -101,6 +101,8 @@ export const MEASURE_SCRIPT = `() => {
   for (const el of all) {
     if (!visible(el)) continue
     if (el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0) {
+      // 省略（…）は決まりどおり。はみ出しに数えない。
+      if (getComputedStyle(el).textOverflow === 'ellipsis') continue
       overflows.push({ path: path(el), clientWidth: el.clientWidth, scrollWidth: el.scrollWidth })
       if (overflows.length >= 50) break
     }
@@ -113,10 +115,18 @@ export const MEASURE_SCRIPT = `() => {
       if (viewportOverflows.length >= 50) break
     }
   }
-  // 単語の途中の改行：空白なしの短い文字が2行になっている。
+  // 単語の途中の改行：空白なしの短い文字が2行以上になっている。
+  // 行数は Range の四角の数で数える（高さ比べは余白で誤検知する）。
   const midWordBreaks = []
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+  const range = document.createRange()
   const seen = new Set()
+  const isCounted = (el) => {
+    if (!el || el === document.body) return true
+    // 見えない・v7だけ・読み飛ばしは数えない。
+    if (el.closest('.v7-only, [class*="skipLink"], a[href^="#"]')) return false
+    return getComputedStyle(el).display !== 'none'
+  }
   while (walker.nextNode()) {
     const node = walker.currentNode
     const text = (node.nodeValue || '').trim()
@@ -124,13 +134,15 @@ export const MEASURE_SCRIPT = `() => {
     const parent = node.parentElement
     if (!parent || seen.has(parent) || !visible(parent)) continue
     seen.add(parent)
-    const style = getComputedStyle(parent)
-    const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.4
-    if (parent.scrollHeight > lineHeight * 1.5 + 2) {
-      midWordBreaks.push({ path: path(parent), text: text.slice(0, 24), height: parent.scrollHeight, lineHeight: Math.round(lineHeight) })
+    if (!isCounted(parent)) continue
+    range.selectNodeContents(node)
+    const lines = range.getClientRects().length
+    if (lines > 1) {
+      midWordBreaks.push({ path: path(parent), text: text.slice(0, 24), lines })
       if (midWordBreaks.length >= 30) break
     }
   }
+  if (range.detach) range.detach()
   // 表の列のずれ：同じ表の行で列の左端が揃わない。
   const tableMisalignments = []
   for (const table of document.querySelectorAll('table')) {
@@ -194,6 +206,24 @@ export function refTexts(html) {
 export const normalize = (text) => text.replace(/\s+/g, ' ').trim()
 
 /**
+ * 状態を開けない板（ダイアログ・確認・引き出し）。
+ * 元の画面を撮るだけではその状態が出ないので、drift の順位に入れず
+ * 別の表に分ける。種別 `小窓`か、名前で見分ける。
+ */
+export function isNoStateBoard(entry) {
+  if (!entry) return false
+  if (entry.kind === '小窓') return true
+  return /ダイアログ|確認|引き出し|ドロワー|小窓|確かめ|Dialog|Drawer|Confirm/i.test(entry.name ?? '')
+}
+
+/**
+ * MEASURE_SCRIPT を呼ぶ形。`page.evaluate(文字列)` は文字列を式として
+ * 評価するだけで、関数式のまま渡すと関数の値が返って呼ばれない
+ * （関数は送れないので `measured` が `undefined` になる）。
+ */
+export const MEASURE_CALL = `(${MEASURE_SCRIPT})()`
+
+/**
  * 1つの URL を開いて数え、撮る（ブラウザは呼び出し元が使い回す）。
  * 戻りは { measured, shotBuffer }。開けないときは throw。
  */
@@ -207,7 +237,7 @@ export async function shootUrl(browser, base, route, width) {
     }
     // 遅れて出る中身（表・数）を待つ。
     await page.waitForTimeout(1500)
-    const measured = await page.evaluate(MEASURE_SCRIPT)
+    const measured = await page.evaluate(MEASURE_CALL)
     const shotBuffer = await page.screenshot({ fullPage: true })
     return { measured, shotBuffer, url }
   } finally {
@@ -238,13 +268,21 @@ export function compareAndWrite({ board, route, width, url, refPng, refHtml, mea
   writeFileSync(join(outDir, 'side-by-side.png'), encodePng(sideBySide(scaleDown(refImage, 480), scaleDown(implImage, 480))))
   writeFileSync(join(outDir, 'diff.png'), encodePng(annotate(implImage, implBoxes)))
 
+  // 測れなかったときも落とさない（evaluate の失敗・測る前の画像だけの実行）。
+  const keys = measured?.keys ?? []
+  const overflows = measured?.overflows ?? []
+  const viewportOverflows = measured?.viewportOverflows ?? []
+  const midWordBreaks = measured?.midWordBreaks ?? []
+  const tableMisalignments = measured?.tableMisalignments ?? []
+  const fontIssues = measured?.fontIssues ?? []
+
   let refCount = 0
   let missingInImpl = []
   let extraInImpl = []
   if (refHtml) {
     const refs = refTexts(readFileSync(refHtml, 'utf8'))
     refCount = refs.size
-    const implTexts = new Set(measured.keys.map((key) => normalize(key.text)))
+    const implTexts = new Set(keys.map((key) => normalize(key.text)))
     // 見本の文字のうち、実装の主な要素に無いもの（部分一致も許す）。
     missingInImpl = [...refs].filter((text) => {
       const norm = normalize(text)
@@ -259,11 +297,11 @@ export function compareAndWrite({ board, route, width, url, refPng, refHtml, mea
 
   // 目安の点数（大きいほどずれている）。重みは仮決め。
   const drift =
-    measured.overflows.length * 10 +
-    measured.viewportOverflows.length * 10 +
-    measured.midWordBreaks.length * 5 +
-    measured.tableMisalignments.length * 8 +
-    measured.fontIssues.length * 2 +
+    overflows.length * 10 +
+    viewportOverflows.length * 10 +
+    midWordBreaks.length * 5 +
+    tableMisalignments.length * 8 +
+    fontIssues.length * 2 +
     missingInImpl.length * 3 +
     Math.round(fraction * 200)
 
@@ -277,18 +315,18 @@ export function compareAndWrite({ board, route, width, url, refPng, refHtml, mea
     drift,
     pixelDiffFraction: Number(fraction.toFixed(4)),
     diffBoxes: boxes.length,
-    overflows: measured.overflows,
-    viewportOverflows: measured.viewportOverflows,
-    midWordBreaks: measured.midWordBreaks,
-    tableMisalignments: measured.tableMisalignments,
-    fontIssues: measured.fontIssues,
+    overflows,
+    viewportOverflows,
+    midWordBreaks,
+    tableMisalignments,
+    fontIssues,
     refTexts: refCount,
     missingInImpl,
     extraInImpl,
-    keyElements: measured.keys.length,
+    keyElements: keys.length,
   }
   writeFileSync(join(outDir, 'metrics.json'), `${JSON.stringify(metrics, null, 2)}\n`)
-  console.log(`[v8-parity] ${board} ${width}px drift=${drift} 差=${(fraction * 100).toFixed(1)}% はみ出し=${measured.overflows.length} 右端越え=${measured.viewportOverflows.length} 途中改行=${measured.midWordBreaks.length} 列表れ=${measured.tableMisalignments.length} 書体=${measured.fontIssues.length} → ${outDir}`)
+  console.log(`[v8-parity] ${board} ${width}px drift=${drift} 差=${(fraction * 100).toFixed(1)}% はみ出し=${overflows.length} 右端越え=${viewportOverflows.length} 途中改行=${midWordBreaks.length} 列表れ=${tableMisalignments.length} 書体=${fontIssues.length} → ${outDir}`)
   return metrics
 }
 
