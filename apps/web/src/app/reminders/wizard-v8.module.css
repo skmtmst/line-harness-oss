@@ -492,8 +492,8 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
+  gap: 4px;
+  padding: 4px 10px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-pill);
   background: var(--color-canvas);
@@ -851,7 +851,7 @@
 .phoneStatusIcons {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 .phoneHeader {
   display: flex;

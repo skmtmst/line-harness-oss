@@ -253,7 +253,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 11px 6px;
+  padding: 12px 8px;
 }
 
 .tableHead {
@@ -419,7 +419,7 @@
 .statePill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   font-size: 12px;
@@ -1064,7 +1064,7 @@
 .linkState {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
   background: var(--color-v8-pill-off);
@@ -1159,7 +1159,7 @@
 .checkOk {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
   background: var(--color-success-bg);
@@ -1213,7 +1213,7 @@
 .phoneStatusIcons {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   margin-left: auto;
   color: var(--color-ink);
 }
