@@ -72,7 +72,7 @@ vi.mock('../services/meet-consultation-reminders.js', async (importOriginal) => 
     ...orig,
     registerMeetConsultation: async (...args: Parameters<typeof orig.registerMeetConsultation>) => {
       if (meetGate.hook) await meetGate.hook();
-      return (meetState.realRegister as (...a: never[]) => Promise<unknown>)(...args);
+      return (meetState.realRegister as (...a: unknown[]) => Promise<unknown>)(...args);
     },
   };
 });
@@ -780,7 +780,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     mockSlots([D11]);
     const id = await adminCreate('menu-ok', T1, 'race-rollback');
     let enteredFlag = false;
-    let gateResolve: (() => void) | null = null;
+    let gateResolve: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => { gateResolve = resolve; });
     let calls = 0;
     triggerMocks.cancelByTrigger.mockImplementation(async (...args: unknown[]) => {
@@ -810,7 +810,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(b.status).toBe(200);
     const decidedAfterB = (bookingRow(id) as Record<string, unknown>).decided_at;
     // 先行の rollback は後発の decided_at を消さない。
-    gateResolve?.();
+    gateResolve();
     const a = await Promise.race([aPromise, timeout]);
     expect(a.status).toBe(409);
     expect(bookingRow(id).status).toBe('cancelled');
