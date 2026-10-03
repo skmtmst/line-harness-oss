@@ -270,6 +270,8 @@ shared-button-importer app/templates/template-asset-editor.tsx
 shared-button-importer app/updates/page.tsx
 shared-button-importer app/users/page.tsx
 shared-button-importer app/users/users-v8.tsx
+shared-button-importer app/webhooks/_components/webhooks-v8-outgoing.tsx
+shared-button-importer app/webhooks/_components/webhooks-v8-shell.tsx
 shared-button-importer app/webhooks/api-tokens-panel.tsx
 shared-button-importer app/webhooks/edit/page.tsx
 shared-button-importer app/webhooks/google-sheets-panel.tsx

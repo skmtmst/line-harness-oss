@@ -22,6 +22,8 @@ import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-over
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { WebhooksV8Shell } from './_components/webhooks-v8-shell'
 
 type Tab = 'incoming' | 'outgoing'
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -1106,7 +1108,19 @@ function WebhooksPageHost() {
   )
 }
 
+/*
+ * ★V8-B の切り替え。v8 の器は別器（_components/webhooks-v8-*.tsx）に置き、
+ * v7 の器・動きはこの下の V7 のまま残す。
+ */
 export default function WebhooksPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return (
+      <Suspense fallback={null}>
+        <WebhooksV8Shell />
+      </Suspense>
+    )
+  }
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

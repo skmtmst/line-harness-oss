@@ -581,6 +581,12 @@
     "unresolved-classname": 55,
     "direct-th": 5
   },
+  "app/webhooks/_components/webhooks-v8-outgoing.tsx": {
+    "unresolved-classname": 84
+  },
+  "app/webhooks/_components/webhooks-v8-shell.tsx": {
+    "unresolved-classname": 7
+  },
   "app/webhooks/edit/page.tsx": {
     "unresolved-classname": 4
   },
