@@ -428,3 +428,7 @@ table-header-migration-target app/webhooks/webhook-interactions.tsx
 # 詳細内テーブルのため、直書きthを残す既知の例外。
 native-table-header-exception app/affiliates/tabs.tsx
 shared-button-importer app/analytics/conversion-report-v8.tsx
+# ★V8-B 緊急コントロール（OHwbU）。確認の窓・本人確認・記録の操作に共通Buttonを使う。
+shared-button-importer app/emergency/control-v8.tsx
+# ★V8-B 運用者へのお知らせを作る（gjUz3）。届き方の見本・公開前の確認の操作に共通Buttonを使う。
+shared-button-importer app/line-notifications/operator/new/operator-new-v8.tsx

@@ -178,6 +178,10 @@
   "app/ec-commerce/subscriptions-panel.tsx": {
     "unresolved-classname": 10
   },
+  "app/emergency/control-v8.tsx": {
+    "unresolved-classname": 79,
+    "direct-th": 6
+  },
   "app/emergency/page.tsx": {
     "unresolved-classname": 4,
     "arbitrary-value": 6
@@ -287,6 +291,9 @@
   },
   "app/layout.tsx": {
     "unresolved-classname": 1
+  },
+  "app/line-notifications/operator/new/operator-new-v8.tsx": {
+    "unresolved-classname": 58
   },
   "app/line-notifications/page.tsx": {
     "direct-primary-button": 1,
