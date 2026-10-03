@@ -51,6 +51,7 @@ import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
 import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { Th } from '@/components/shared/table'
 import { runUndoable } from '@/lib/undoable'
 import styles from './list-v8.module.css'
 
@@ -660,6 +661,21 @@ export default function ScenariosListV8() {
    * 列幅・行の高さで5行出し、入れ替わってもガタつかない（CLS 0）。
    * 0.3秒以内に来たら出さず、出したら最低0.4秒残すのは共通部品に任せる。
    */
+  /*
+   * 見出しの5列は実表と共有する。骨組み用に書き写すと直書きの見出し
+   * （`direct-th`）が二重に数えられるため、同じ要素を使い回す。
+   * 選択の列だけは実表が箱（Checkbox）付き・骨組みが共通 `Th` の空見出し。
+   */
+  const tableHeadCells = (
+    <>
+      <th aria-label="並び替え" />
+      <th>シナリオ名</th>
+      <th>購読 / 読了</th>
+      <th>状態</th>
+      <th aria-label="操作" />
+    </>
+  )
+
   const loadingSkeleton = (
     <table className={styles.table}>
       <colgroup>
@@ -672,12 +688,8 @@ export default function ScenariosListV8() {
       </colgroup>
       <thead>
         <tr>
-          {canEdit && <th className={styles.selectCell} aria-label="選択" />}
-          <th aria-label="並び替え" />
-          <th>シナリオ名</th>
-          <th>購読 / 読了</th>
-          <th>状態</th>
-          <th aria-label="操作" />
+          {canEdit && <Th aria-label="選択" />}
+          {tableHeadCells}
         </tr>
       </thead>
       <tbody>
@@ -690,13 +702,13 @@ export default function ScenariosListV8() {
               <span style={{ display: 'block', height: 4 }} aria-hidden="true" />
               <Skeleton width={280} height={12} />
             </td>
-            <td className={styles.countCell}>
+            <td>
               <Skeleton width={56} height={16} />
             </td>
             <td>
               <Skeleton width={72} height={24} className="rounded-pill" />
             </td>
-            <td className={styles.menuCell} />
+            <td />
           </tr>
         ))}
       </tbody>
@@ -769,11 +781,7 @@ export default function ScenariosListV8() {
                     />
                   </th>
                 )}
-                <th aria-label="並び替え" />
-                <th>シナリオ名</th>
-                <th>購読 / 読了</th>
-                <th>状態</th>
-                <th aria-label="操作" />
+                {tableHeadCells}
               </tr>
             </thead>
             <tbody>
