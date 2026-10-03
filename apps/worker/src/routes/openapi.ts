@@ -5932,6 +5932,311 @@ const spec = {
         },
       },
     },
+    // ── Booking payments（決済の差し替え制 #1318） ──────────────────────────
+    '/api/booking/admin/payment-config': {
+      get: {
+        tags: ['Booking'],
+        summary: '店のお支払い既定と鍵の有無を取得',
+        description: '鍵の値は返さず、有無だけ返す。テストモードの印を含む。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '店のお支払い既定' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '店のお支払い既定を保存',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['mode', 'provider', 'holdMinutes'],
+                properties: {
+                  mode: { type: 'string', enum: ['none', 'onsite', 'online'] },
+                  provider: { type: 'string', enum: ['none', 'onsite', 'stripe'] },
+                  holdMinutes: { type: 'integer', minimum: 5, maximum: 1440 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '保存した店のお支払い既定' },
+          '400': { description: '入力が正しくない' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
+    '/api/booking/admin/menus/{id}/payment': {
+      put: {
+        tags: ['Booking'],
+        summary: 'メニューのお支払いを上書き保存',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['mode', 'provider'],
+                properties: {
+                  mode: { type: 'string', enum: ['none', 'onsite', 'online'] },
+                  provider: { type: 'string', enum: ['none', 'onsite', 'stripe'] },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'メニューに効くお支払い設定' },
+          '400': { description: '入力が正しくない' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+      delete: {
+        tags: ['Booking'],
+        summary: 'メニューのお支払い上書きを消して店の既定に戻す',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '店の既定に戻した' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
+    '/api/booking/payments/start': {
+      post: {
+        tags: ['Booking'],
+        summary: '支払いを始める（担当者用）',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['bookingId'],
+                properties: {
+                  bookingId: { type: 'string' },
+                  idempotencyKey: { type: 'string', maxLength: 200 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: '支払いを始めた（決済画面のURL付き）' },
+          '200': { description: '既にある支払いを返した' },
+          '404': { description: '対象が見つからない' },
+          '409': { description: '支払いの対象でない・準備ができていない' },
+        },
+      },
+    },
+    '/api/booking/payments/by-booking': {
+      get: {
+        tags: ['Booking'],
+        summary: '支払いの状態を見る（担当者用、仮押さえ期限切れも落とす）',
+        parameters: [
+          { name: 'bookingId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '支払いの記録（無いときは null）' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
+    '/api/booking/payments/{id}/refund': {
+      post: {
+        tags: ['Booking'],
+        summary: '支払い済みを返金する',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '返金済みにした' },
+          '404': { description: '対象が見つからない' },
+          '409': { description: '支払い済みでない' },
+        },
+      },
+    },
+    '/api/booking/payments/webhook/{provider}': {
+      post: {
+        tags: ['Booking'],
+        summary: '支払い済みの知らせを受ける',
+        description: '署名を確かめ、二重の知らせは受け付け済みで返す。manual の店は承認待ちのまま、automatic の店は確定する。',
+        parameters: [
+          { name: 'provider', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '反映した（二重含む）' },
+          '401': { description: '署名が正しくない' },
+          '404': { description: '知らない決済サービス' },
+        },
+      },
+    },
+    '/api/liff/booking/payments/start': {
+      post: {
+        tags: ['Booking'],
+        summary: '支払いを始める（お客さま用）',
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['bookingId'],
+                properties: { bookingId: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: '支払いを始めた（決済画面のURL付き）' },
+          '200': { description: '既にある支払いを返した' },
+          '404': { description: '対象が見つからない' },
+          '409': { description: '支払いの対象でない' },
+        },
+      },
+    },
+    '/api/liff/booking/payments/by-booking': {
+      get: {
+        tags: ['Booking'],
+        summary: '支払いの状態を見る（お客さま用）',
+        security: [],
+        parameters: [
+          { name: 'bookingId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '自分の予約の支払いの記録' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
+    // ── Booking plus B: sales + noshow/prepay ───────────────────────────────
+    '/api/booking/admin/sales-summary': {
+      get: {
+        tags: ['Booking'],
+        summary: '予約からの売上集計を見る',
+        description: '確定のみ集計。無断キャンセルは売上に入れない。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'from', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'to', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '売上合計と件数' },
+          '400': { description: 'account_id 未指定' },
+        },
+      },
+    },
+    '/api/booking/admin/noshow-settings': {
+      get: {
+        tags: ['Booking'],
+        summary: '無断キャンセルから前払いのみへの境目を見る',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '何回で前払いのみか' },
+          '400': { description: 'account_id 未指定' },
+        },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '無断キャンセルから前払いのみへの境目を保存',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['threshold'],
+                properties: {
+                  threshold: { type: 'integer', minimum: 1, maximum: 100 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '保存した境目' },
+          '400': { description: '入力が正しくない' },
+        },
+      },
+    },
+    '/api/booking/admin/friends/{friendId}/noshow': {
+      get: {
+        tags: ['Booking'],
+        summary: 'お客さまの無断キャンセル回数を見る',
+        parameters: [
+          { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '無断キャンセル回数と前払いのみの有無' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
+    '/api/booking/admin/friends/{friendId}/prepay': {
+      post: {
+        tags: ['Booking'],
+        summary: 'お客さまを手で前払いのみにする・外す',
+        parameters: [
+          { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  mode: { type: 'string', enum: ['manual_on', 'manual_off'] },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '前払いのみにした・外した結果' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+      delete: {
+        tags: ['Booking'],
+        summary: 'お客さまの前払いのみを手で外す',
+        parameters: [
+          { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '前払いのみを外した結果' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
     // ── Booking settings (N-406 #754) ────────────────────────────────────────
     '/api/booking/admin/settings': {
       get: {
