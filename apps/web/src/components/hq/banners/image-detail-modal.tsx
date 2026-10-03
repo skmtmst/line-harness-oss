@@ -257,6 +257,7 @@ export default function ImageDetailModal({
           confirmLabel="一覧から外す"
           destructive
           busy={busy}
+          designNode="B24oNg"
           onConfirm={() => void onRemove().then(() => setConfirmRemove(false))}
           onCancel={() => setConfirmRemove(false)}
         />
