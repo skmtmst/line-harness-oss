@@ -44,7 +44,10 @@ import Select from '@/components/shared/select'
 import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
 import MileageTableSkeleton from './mileage-table-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import ActionMenu from '@/components/shared/action-menu'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import { notifyToast } from '@/components/shared/toast'
 import {
   api,
@@ -193,6 +196,8 @@ export default function V8EarningRulesTab({
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [menuId, setMenuId] = useState<string | null>(null)
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている決めごとのID。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [publishTarget, setPublishTarget] = useState<MileageEarningRuleV6 | null>(null)
@@ -500,6 +505,67 @@ export default function V8EarningRulesTab({
     setPage(1)
   }
 
+  /** 一覧→編集はつながる移り変わりで開く（V8「サクサク感」E）。 */
+  const goEdit = (id: string) => {
+    withViewTransition(() => {
+      router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(id)}`)
+    })
+  }
+
+  /* 行の「…」の中身。パネル・右クリックと共用する。 */
+  const rowMenuItems = (rule: MileageEarningRuleV6, active: boolean): ActionMenuItem[] => [
+    {
+      id: 'edit',
+      label: '下書きを編集',
+      external: true,
+      onSelect: () => goEdit(rule.id),
+    },
+    {
+      id: 'test',
+      label: 'この内容をテスト',
+      disabled: testBusy,
+      disabledReason: 'テストを実行しています',
+      onSelect: () => void runTest(rule),
+    },
+    {
+      id: 'toggle',
+      label: active ? '決めごとを停止' : '決めごとを再開',
+      disabled: savingId === rule.id,
+      disabledReason: '反映しています',
+      onSelect: () => void toggleRule(rule),
+    },
+    {
+      id: 'publish',
+      label: '公開して反映',
+      disabled: savingId !== null,
+      disabledReason: '別の決めごとを反映しています',
+      onSelect: () => { setPublishError(''); setPublishTarget(rule) },
+    },
+    ...(rule.publishedVersion == null ? [{
+      id: 'delete',
+      label: 'この決めごとを削除する',
+      tone: 'danger' as const,
+      dividerBefore: true,
+      disabled: savingId !== null,
+      disabledReason: 'ほかの操作を反映しています',
+      onSelect: () => { setDeleteError(''); setDeleteTarget(rule) },
+    }] : []),
+  ]
+
+  /** 右クリックは「…」と同じ項目をマウスの位置に出す（V8「サクサク感」D）。 */
+  const rowContextItems = (rule: MileageEarningRuleV6, active: boolean): ContextMenuItem[] =>
+    rowMenuItems(rule, active).map((item) => ({
+      id: item.id,
+      label: item.label,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      onSelect: () => item.onSelect(),
+    }))
+
+  /* 行の詳細パネル（V8「サクサク感」C①②）。↑↓で次の行へ移る。 */
+  const panelIndex = panelId === null ? -1 : visible.findIndex((rule) => rule.id === panelId)
+  const panelRule = panelIndex >= 0 ? visible[panelIndex] : null
+
   return (
     <>
       <div className={styles.kpis} role="group" aria-label="今の数">
@@ -717,7 +783,19 @@ export default function V8EarningRulesTab({
                     const orderIndex = ruleOrder.indexOf(rule.id)
                     const canMove = !readonly && folder === 'all' && !activeOnly && !pendingOnly && !search.trim() && sort === 'order'
                     return (
-                      <tr key={rule.id}>
+                      <tr
+                        key={rule.id}
+                        tabIndex={0}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setPanelId(rule.id)}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget) return
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            setPanelId(rule.id)
+                          }
+                        }}
+                      >
                         <td>
                           <p className={styles.cellMain} title={rule.draft.name}>{rule.draft.name}</p>
                           <p className={styles.cellSub}>
@@ -740,7 +818,7 @@ export default function V8EarningRulesTab({
                             ? <span className={`${styles.pill} ${styles.pillActive}`}>動いています</span>
                             : <span className={`${styles.pill} ${styles.pillStopped}`}>止めています</span>}
                         </td>
-                        <td>
+                        <td onClick={(event) => event.stopPropagation()}>
                           <span className={styles.rowActions}>
                             <IconButton
                               aria-label={`${rule.draft.name}を上へ`}
@@ -758,56 +836,24 @@ export default function V8EarningRulesTab({
                             >
                               <ArrowDown size={14} aria-hidden="true" />
                             </IconButton>
-                            <IconButton
-                              aria-label={`${rule.draft.name}のその他操作`}
-                              title="その他操作"
-                              disabled={readonly}
-                              onClick={() => setMenuId((current) => (current === rule.id ? null : rule.id))}
+                            <ContextMenu
+                              label={`${rule.draft.name}の操作`}
+                              items={rowContextItems(rule, active)}
                             >
-                              <MoreHorizontal size={14} aria-hidden="true" />
-                            </IconButton>
+                              <IconButton
+                                aria-label={`${rule.draft.name}のその他操作`}
+                                title="その他操作"
+                                disabled={readonly}
+                                onClick={() => setMenuId((current) => (current === rule.id ? null : rule.id))}
+                              >
+                                <MoreHorizontal size={14} aria-hidden="true" />
+                              </IconButton>
+                            </ContextMenu>
                             <ActionMenu
                               open={menuId === rule.id}
                               ariaLabel={`${rule.draft.name}の操作`}
                               onClose={() => setMenuId(null)}
-                              items={[
-                                {
-                                  id: 'edit',
-                                  label: '下書きを編集',
-                                  external: true,
-                                  onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
-                                },
-                                {
-                                  id: 'test',
-                                  label: 'この内容をテスト',
-                                  disabled: testBusy,
-                                  disabledReason: 'テストを実行しています',
-                                  onSelect: () => void runTest(rule),
-                                },
-                                {
-                                  id: 'toggle',
-                                  label: active ? '決めごとを停止' : '決めごとを再開',
-                                  disabled: savingId === rule.id,
-                                  disabledReason: '反映しています',
-                                  onSelect: () => void toggleRule(rule),
-                                },
-                                {
-                                  id: 'publish',
-                                  label: '公開して反映',
-                                  disabled: savingId !== null,
-                                  disabledReason: '別の決めごとを反映しています',
-                                  onSelect: () => { setPublishError(''); setPublishTarget(rule) },
-                                },
-                                ...(rule.publishedVersion == null ? [{
-                                  id: 'delete',
-                                  label: 'この決めごとを削除する',
-                                  tone: 'danger' as const,
-                                  dividerBefore: true,
-                                  disabled: savingId !== null,
-                                  disabledReason: 'ほかの操作を反映しています',
-                                  onSelect: () => { setDeleteError(''); setDeleteTarget(rule) },
-                                }] : []),
-                              ]}
+                              items={rowMenuItems(rule, active)}
                             />
                           </span>
                         </td>
@@ -835,6 +881,43 @@ export default function V8EarningRulesTab({
           ) : null}
         </div>
       </div>
+
+      {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+      {panelRule && (
+        <DetailPanel
+          open
+          title={panelRule.draft.name}
+          description={[
+            panelRule.published.status === 'published' ? '動いています' : '止めています',
+            `この30日 ${formatMileageNumber(grantedMiles30d(panelRule))}`,
+          ].join('・')}
+          onClose={() => setPanelId(null)}
+          onPrev={panelIndex > 0 ? () => setPanelId(visible[panelIndex - 1].id) : undefined}
+          onNext={
+            panelIndex < visible.length - 1 ? () => setPanelId(visible[panelIndex + 1].id) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < visible.length - 1}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => goEdit(panelRule.id)}>
+                下書きを編集
+              </Button>
+              <Button variant="secondary" onClick={() => void runTest(panelRule)}>
+                この内容をテスト
+              </Button>
+              <Button variant="secondary" onClick={() => void toggleRule(panelRule)}>
+                {panelRule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開'}
+              </Button>
+            </>
+          }
+        >
+          <p>
+            {ruleEventLabel(panelRule.draft.eventType, EVENT_LABELS)} ／ {formatMileageNumber(panelRule.draft.amount)}
+          </p>
+          <p>{validityText(panelRule)}</p>
+        </DetailPanel>
+      )}
 
       <ConfirmDialog
         open={publishTarget !== null}

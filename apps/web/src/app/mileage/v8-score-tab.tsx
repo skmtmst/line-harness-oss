@@ -23,7 +23,11 @@ import {
   Star,
   TrendingDown,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -37,7 +41,7 @@ import Select from '@/components/shared/select'
 import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
 import MileageTableSkeleton from './mileage-table-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import ActionMenu from '@/components/shared/action-menu'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import {
   ApiError,
   api,
@@ -117,8 +121,47 @@ export default function V8ScoreTab({
   readonly: boolean
   registerHeaderActions: (node: ReactNode) => void
 }) {
+  const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountId = selectedAccountId ?? ''
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている友だちのID。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
+
+  /** 一覧→友だちはつながる移り変わりで開く（V8「サクサク感」E）。 */
+  const goFriend = (friendId: string) => {
+    withViewTransition(() => {
+      router.push(`/friends/detail?id=${encodeURIComponent(friendId)}`)
+    })
+  }
+
+  /* 行の「…」の中身。パネル・右クリックと共用する（V8「サクサク感」D）。 */
+  const rowMenuItems = (item: FriendsItem): ActionMenuItem[] => [
+    {
+      id: 'history',
+      label: '点数の変化',
+      onSelect: () => setHistoryTarget(item),
+    },
+    ...(!readonly ? [{
+      id: 'adjust',
+      label: '点数を直す',
+      onSelect: () => setAdjustTarget(item),
+    }] : []),
+    {
+      id: 'friend',
+      label: 'この人を見る',
+      external: true,
+      onSelect: () => goFriend(item.friendId),
+    },
+  ]
+
+  /** 右クリックは「…」と同じ項目をマウスの位置に出す。 */
+  const rowContextItems = (item: FriendsItem): ContextMenuItem[] =>
+    rowMenuItems(item).map((menuItem) => ({
+      id: menuItem.id,
+      label: menuItem.label,
+      disabled: menuItem.disabled,
+      onSelect: () => menuItem.onSelect(),
+    }))
   const latestAccountRef = useRef(accountId)
   useEffect(() => {
     latestAccountRef.current = accountId
@@ -135,6 +178,11 @@ export default function V8ScoreTab({
   const [loadError, setLoadError] = useState(false)
   const [adjustTarget, setAdjustTarget] = useState<FriendsItem | null>(null)
   const [historyTarget, setHistoryTarget] = useState<FriendsItem | null>(null)
+
+  /* 行の詳細パネル（V8「サクサク感」C①②）。↑↓で次の行へ移る。 */
+  const panelItems = overview?.items ?? []
+  const panelIndex = panelId === null ? -1 : panelItems.findIndex((item) => item.friendId === panelId)
+  const panelItem = panelIndex >= 0 ? panelItems[panelIndex] : null
   /* できごとの決めごと。 */
   const [config, setConfig] = useState<ActionScoreRuleConfiguration | null>(null)
   const [rulesLoading, setRulesLoading] = useState(true)
@@ -545,7 +593,19 @@ export default function V8ScoreTab({
             </thead>
             <tbody>
               {overview.items.map((item) => (
-                <tr key={item.friendId}>
+                <tr
+                  key={item.friendId}
+                  tabIndex={0}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setPanelId(item.friendId)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      setPanelId(item.friendId)
+                    }
+                  }}
+                >
                   <td>
                     <p className={styles.cellMain} title={item.displayName}>{item.displayName}</p>
                   </td>
@@ -564,39 +624,29 @@ export default function V8ScoreTab({
                     </p>
                     <p className={styles.cellSub}>{formatMileageDate(item.lastChangedAt)}</p>
                   </td>
-                  <td>
-                    <span className={styles.rowActions}>
-                      <Button onClick={() => setHistoryTarget(item)}>点数の変化</Button>
-                      {!readonly ? (
-                        <>
-                          <IconButton
-                            aria-label={`${item.displayName}のその他操作`}
-                            title="その他の操作"
-                            onClick={() => setMenuId((current) => (current === item.friendId ? null : item.friendId))}
-                          >
-                            <MoreHorizontal size={14} aria-hidden="true" />
-                          </IconButton>
-                          <ActionMenu
-                            open={menuId === item.friendId}
-                            ariaLabel={`${item.displayName}の操作`}
-                            onClose={() => setMenuId(null)}
-                            items={[
-                              {
-                                id: 'adjust',
-                                label: '点数を直す',
-                                onSelect: () => setAdjustTarget(item),
-                              },
-                              {
-                                id: 'friend',
-                                label: 'この人を見る',
-                                external: true,
-                                onSelect: () => { window.location.href = `/friends/detail?id=${encodeURIComponent(item.friendId)}` },
-                              },
-                            ]}
-                          />
-                        </>
-                      ) : null}
-                    </span>
+                  <td onClick={(event) => event.stopPropagation()}>
+                    <ContextMenu label={`${item.displayName}の操作`} items={rowContextItems(item)}>
+                      <span className={styles.rowActions}>
+                        <Button onClick={() => setHistoryTarget(item)}>点数の変化</Button>
+                        {!readonly ? (
+                          <>
+                            <IconButton
+                              aria-label={`${item.displayName}のその他操作`}
+                              title="その他の操作"
+                              onClick={() => setMenuId((current) => (current === item.friendId ? null : item.friendId))}
+                            >
+                              <MoreHorizontal size={14} aria-hidden="true" />
+                            </IconButton>
+                            <ActionMenu
+                              open={menuId === item.friendId}
+                              ariaLabel={`${item.displayName}の操作`}
+                              onClose={() => setMenuId(null)}
+                              items={rowMenuItems(item).filter((menuItem) => menuItem.id !== 'history')}
+                            />
+                          </>
+                        ) : null}
+                      </span>
+                    </ContextMenu>
                   </td>
                 </tr>
               ))}
@@ -606,6 +656,45 @@ export default function V8ScoreTab({
       )}
         </DelayedSkeleton>
       </div>
+
+      {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+      {panelItem && (
+        <DetailPanel
+          open
+          title={panelItem.displayName}
+          description={[
+            `${formatMileageNumber(panelItem.currentScore)}点`,
+            BAND_LABELS[panelItem.band],
+          ].join('・')}
+          onClose={() => setPanelId(null)}
+          onPrev={panelIndex > 0 ? () => setPanelId(panelItems[panelIndex - 1].friendId) : undefined}
+          onNext={
+            panelIndex < panelItems.length - 1 ? () => setPanelId(panelItems[panelIndex + 1].friendId) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < panelItems.length - 1}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => setHistoryTarget(panelItem)}>
+                点数の変化
+              </Button>
+              {!readonly ? (
+                <Button variant="secondary" onClick={() => setAdjustTarget(panelItem)}>
+                  点数を直す
+                </Button>
+              ) : null}
+              <Button variant="secondary" onClick={() => goFriend(panelItem.friendId)}>
+                この人を見る
+              </Button>
+            </>
+          }
+        >
+          <p>
+            いまの点数 {formatMileageNumber(panelItem.currentScore)}点（{BAND_LABELS[panelItem.band]}）
+          </p>
+          <p>{actionScoreReasonLabel(panelItem.lastReason)}</p>
+        </DetailPanel>
+      )}
 
       {!loading && !loadError && total > 0 ? (
         <div className={styles.footer}>

@@ -14,8 +14,12 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { CalendarRange, Download, History, Plus, TrendingDown, TrendingUp } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -26,7 +30,7 @@ import Select from '@/components/shared/select'
 import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
 import MileageTableSkeleton from './mileage-table-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import ActionMenu from '@/components/shared/action-menu'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { MoreHorizontal } from 'lucide-react'
 import {
   ApiError,
@@ -84,7 +88,17 @@ export default function V8HistoryTab({
   readonly: boolean
   registerHeaderActions: (node: ReactNode) => void
 }) {
+  const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている履歴のID。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
+
+  /** 一覧→友だちはつながる移り変わりで開く（V8「サクサク感」E）。 */
+  const goFriend = (href: string) => {
+    withViewTransition(() => {
+      router.push(href)
+    })
+  }
   const requestRef = useRef(0)
   const [result, setResult] = useState<MileageAdminHistory | null>(null)
   const [pendingAction, setPendingAction] = useState<{ kind: 'confirm' | 'void'; item: MileageAdminHistoryItem } | null>(null)
@@ -167,6 +181,37 @@ export default function V8HistoryTab({
   }, [searchInput])
 
   const items = result?.items ?? []
+
+  /* 行の「…」の中身。パネル・右クリックと共用する（V8「サクサク感」D）。 */
+  const rowMenuItems = (item: MileageAdminHistoryItem, pending: boolean): ActionMenuItem[] => {
+    const friendHref = `/mileage/friends/detail?id=${encodeURIComponent(item.primaryFriendId)}`
+    return [
+      ...(pending ? [{
+        id: 'void',
+        label: '取り消す',
+        onSelect: () => { setPendingAction({ kind: 'void', item }); setPendingReason(''); setPendingError('') },
+      }] : []),
+      {
+        id: 'friend',
+        label: '友だちを見る',
+        external: true,
+        onSelect: () => goFriend(friendHref),
+      },
+    ]
+  }
+
+  /** 右クリックは「…」と同じ項目をマウスの位置に出す。 */
+  const rowContextItems = (item: MileageAdminHistoryItem, pending: boolean): ContextMenuItem[] =>
+    rowMenuItems(item, pending).map((menuItem) => ({
+      id: menuItem.id,
+      label: menuItem.label,
+      disabled: menuItem.disabled,
+      onSelect: () => menuItem.onSelect(),
+    }))
+
+  /* 行の詳細パネル（V8「サクサク感」C①②）。↑↓で次の行へ移る。 */
+  const panelIndex = panelId === null ? -1 : items.findIndex((item) => item.id === panelId)
+  const panelItem = panelIndex >= 0 ? items[panelIndex] : null
   const total = mileagePaginationTotal(result)
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
   const byType = result?.summary.byType ?? []
@@ -405,10 +450,33 @@ export default function V8HistoryTab({
                 const reversible = !readonly && item.entryType === 'grant' && item.status === 'available'
                 const friendHref = `/mileage/friends/detail?id=${encodeURIComponent(item.primaryFriendId)}`
                 return (
-                  <tr key={item.id}>
+                  <tr
+                    key={item.id}
+                    tabIndex={0}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setPanelId(item.id)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        setPanelId(item.id)
+                      }
+                    }}
+                  >
                     <td>
                       <p className={styles.cellMain} title={viewName(item)}>
-                        <Link href={friendHref} style={{ color: 'inherit', textDecoration: 'none' }}>{viewName(item)}</Link>
+                        <Link
+                          href={friendHref}
+                          style={{ color: 'inherit', textDecoration: 'none' }}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                            event.preventDefault()
+                            goFriend(friendHref)
+                          }}
+                        >
+                          {viewName(item)}
+                        </Link>
                       </p>
                       <p className={styles.cellSub}>
                         <time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time>
@@ -436,49 +504,48 @@ export default function V8HistoryTab({
                         {item.mode === 'manual' ? item.executedByStaffName ?? '担当者未取得' : item.entryType === 'spend' ? '本人' : '自動'}
                       </span>
                     </td>
-                    <td>
-                      <span className={styles.rowActions}>
-                        {pending ? (
-                          <Button onClick={() => { setPendingAction({ kind: 'confirm', item }); setPendingReason(''); setPendingError('') }}>
-                            確定する
-                          </Button>
-                        ) : reversible ? (
-                          <Button onClick={() => { setPendingAction({ kind: 'void', item }); setPendingReason(''); setPendingError('') }}>
-                            取り消す
-                          </Button>
-                        ) : (
-                          <Button href={friendHref}>友だちを見る</Button>
-                        )}
-                        {(pending || reversible) && (
-                          <>
-                            <IconButton
-                              aria-label="その他の操作"
-                              title="その他の操作"
-                              onClick={() => setMenuId((current) => (current === item.id ? null : item.id))}
+                    <td onClick={(event) => event.stopPropagation()}>
+                      <ContextMenu label="履歴の操作" items={rowContextItems(item, pending)}>
+                        <span className={styles.rowActions}>
+                          {pending ? (
+                            <Button onClick={() => { setPendingAction({ kind: 'confirm', item }); setPendingReason(''); setPendingError('') }}>
+                              確定する
+                            </Button>
+                          ) : reversible ? (
+                            <Button onClick={() => { setPendingAction({ kind: 'void', item }); setPendingReason(''); setPendingError('') }}>
+                              取り消す
+                            </Button>
+                          ) : (
+                            <Button
+                              href={friendHref}
+                              onClick={(event) => {
+                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                                event.preventDefault()
+                                goFriend(friendHref)
+                              }}
                             >
-                              <MoreHorizontal size={14} aria-hidden="true" />
-                            </IconButton>
-                            <ActionMenu
-                              open={menuId === item.id}
-                              ariaLabel="履歴の操作"
-                              onClose={() => setMenuId(null)}
-                              items={[
-                                ...(pending ? [{
-                                  id: 'void',
-                                  label: '取り消す',
-                                  onSelect: () => { setPendingAction({ kind: 'void', item }); setPendingReason(''); setPendingError('') },
-                                }] : []),
-                                {
-                                  id: 'friend',
-                                  label: '友だちを見る',
-                                  external: true,
-                                  onSelect: () => { window.location.href = friendHref },
-                                },
-                              ]}
-                            />
-                          </>
-                        )}
-                      </span>
+                              友だちを見る
+                            </Button>
+                          )}
+                          {(pending || reversible) && (
+                            <>
+                              <IconButton
+                                aria-label="その他の操作"
+                                title="その他の操作"
+                                onClick={() => setMenuId((current) => (current === item.id ? null : item.id))}
+                              >
+                                <MoreHorizontal size={14} aria-hidden="true" />
+                              </IconButton>
+                              <ActionMenu
+                                open={menuId === item.id}
+                                ariaLabel="履歴の操作"
+                                onClose={() => setMenuId(null)}
+                                items={rowMenuItems(item, pending)}
+                              />
+                            </>
+                          )}
+                        </span>
+                      </ContextMenu>
                     </td>
                   </tr>
                 )
@@ -499,8 +566,41 @@ export default function V8HistoryTab({
         </div>
       ) : null}
 
+      {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+      {panelItem && (
+        <DetailPanel
+          open
+          title={viewName(panelItem)}
+          description={[
+            `${formatMileageChange(panelItem.amount)}`,
+            mileageEntryTypeLabel(panelItem.entryType),
+          ].join('・')}
+          onClose={() => setPanelId(null)}
+          onPrev={panelIndex > 0 ? () => setPanelId(items[panelIndex - 1].id) : undefined}
+          onNext={
+            panelIndex < items.length - 1 ? () => setPanelId(items[panelIndex + 1].id) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < items.length - 1}
+          footer={
+            <Button
+              variant="primary"
+              onClick={() => goFriend(`/mileage/friends/detail?id=${encodeURIComponent(panelItem.primaryFriendId)}`)}
+            >
+              友だちを見る
+            </Button>
+          }
+        >
+          <p>{panelItem.reason}</p>
+          <p>
+            {mileageEntryTypeLabel(panelItem.entryType)}・{mileageStatusLabel(panelItem.status)}
+            {panelItem.balanceAfter == null ? '' : ` ／ 残高 ${formatNumber(panelItem.balanceAfter)}`}
+          </p>
+        </DetailPanel>
+      )}
+
       {!loading && !error && items.length > 0 ? (
-        <p className={styles.footnote}>行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。</p>
+        <p className={styles.footnote}>行を押すと右に詳しい内容。行の「友だちを見る」から、その人のマイルの詳細へ進めます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。</p>
       ) : null}
 
       <Dialog
