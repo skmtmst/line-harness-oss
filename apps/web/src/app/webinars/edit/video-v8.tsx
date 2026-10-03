@@ -16,7 +16,9 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
+import RadioCard from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -241,15 +243,22 @@ function ReplaceVideoDialog({ open, webinar, onClose, onReplaced }: {
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {items.map((item) => (
-          <label key={item.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
-            <input type="radio" name="webinar-video-choice" checked={choice === item.id} onChange={() => setChoice(item.id)} />
-            {item.filename}
-          </label>
+          <RadioCard
+            key={item.id}
+            name="webinar-video-choice"
+            value={item.id}
+            checked={choice === item.id}
+            onChange={() => setChoice(item.id)}
+            title={item.filename}
+          />
         ))}
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
-          <input type="radio" name="webinar-video-choice" checked={choice === '__external__'} onChange={() => setChoice('__external__')} />
-          外部のURLを使う
-        </label>
+        <RadioCard
+          name="webinar-video-choice"
+          value="__external__"
+          checked={choice === '__external__'}
+          onChange={() => setChoice('__external__')}
+          title="外部のURLを使う"
+        />
         {choice === '__external__' ? <TextField value={external} onChange={(event) => setExternal(event.target.value)} placeholder="https://..." aria-label="外部の動画URL" /> : null}
       </div>
     </Dialog>
@@ -337,10 +346,14 @@ function AddRuleForm({ onAdd, onCancel }: { onAdd: (rule: WebinarScheduleRule) =
       {type === 'weekly' ? (
         <div style={{ display: 'flex', gap: 4 }}>
           {WEEKDAYS.map((name, day) => (
-            <label key={day} style={{ display: 'flex', gap: 2, alignItems: 'center', fontSize: 12 }}>
-              <input type="checkbox" checked={days.includes(day)} onChange={() => setDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day])} />
+            <Checkbox
+              key={day}
+              checked={days.includes(day)}
+              onCheckedChange={() => setDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day])}
+              aria-label={`${name}曜日`}
+            >
               {name}
-            </label>
+            </Checkbox>
           ))}
         </div>
       ) : null}
