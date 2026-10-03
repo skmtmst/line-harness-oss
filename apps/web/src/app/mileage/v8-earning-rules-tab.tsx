@@ -662,7 +662,20 @@ export default function V8EarningRulesTab({
             </div>
           ) : (
             <div className={styles.tableWrap}>
-              <table className={styles.table}>
+              <table className={`${styles.table} ${styles.tableFit}`}>
+                {/*
+                  列幅は先頭だけ伸び縮み、残りは中身（見出し1行・札・3つの操作）が
+                  必ず入る幅を割合で渡す。合計 100 を超えると器からはみ出す。
+                */}
+                <colgroup>
+                  <col />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '17%' }} />
+                  <col style={{ width: '18%' }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th scope="col">何をしてくれたら</th>
