@@ -1,0 +1,536 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B マイペット（一覧 wTIej・一覧1152 t2SMXX・ごはんの目安 h7A2F・
+ * ペットの情報を直す eLjeQ・状態 dzx5D）。
+ * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+/* 見出しブロック：画面名＋一行の説明。右に「CSV で書き出す」。 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 数の帯：1枚の白い板を区切り線で4つに分ける（離したカードにしない）。 */
+.kpiBand {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  list-style: none;
+}
+
+.kpiCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 16px;
+}
+
+.kpiCell + .kpiCell {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.kpiHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.kpiIcon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-ink-faint);
+}
+
+.kpiLabel {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 数の帯の右上の「…」：由来の説明を title で見せるだけの印。 */
+.kpiHelp {
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: help;
+}
+
+.kpiValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 26px;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpiSub {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* 道具の段：探す＋4つの絞り込み。右端に「○件表示」。 */
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.searchGrow {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.toolsTail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.rangeLabel {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 表の外枠：狭い板では t2SMXX の決まりで列を隠す（横スクロールにしない）。 */
+.tableWrap {
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.listFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.listHint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* ペットの顔：写真か頭文字の丸。 */
+.petFace {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: 12px;
+  font-weight: 600;
+  object-fit: cover;
+}
+
+.petName {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.petSub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* ごはんの目安：左に節のカード2枚＋おやつの上限、右に計算のカード。 */
+.feedingGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.feedingMain {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cardDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 「＋足す」の文字ボタン。 */
+.addRow {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addRow:disabled {
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
+}
+
+.treatRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.treatInput {
+  width: 120px;
+}
+
+.treatNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+/* 右の計算カード：式4つ＋係数の表。 */
+.formulaList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.formulaLabel {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.formulaValue {
+  margin: 2px 0 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.factorTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.factorTable th,
+.factorTable td {
+  padding: 6px 4px;
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-ink-secondary);
+  text-align: left;
+}
+
+.factorTable th:last-child,
+.factorTable td:last-child,
+.factorTable th:nth-child(2),
+.factorTable td:nth-child(2) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.factorNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.notice {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.errorText {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+/* eLjeQ ペットの情報を直す：真ん中の小窓。 */
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--color-scrim);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-overlay);
+}
+
+.dialogHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dialogTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dialogDesc {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.dialogClose {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dialogPet {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+}
+
+.dialogPetName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dialogPetSub {
+  margin: 2px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fieldHint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+/* 種別・性別の丸つまみ：選んだものだけ緑の丸。 */
+.pillGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pillDot {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-canvas);
+}
+
+.pill[aria-pressed="true"] .pillDot {
+  border: 5px solid var(--color-success);
+  background: var(--color-canvas);
+}
+
+.dialogFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-hairline);
+}
+
+/* 板が狭いとき：数の帯は2×2、ごはんの目安は1列に畳む。 */
+@container (max-width: 900px) {
+  .kpiBand {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpiCell + .kpiCell {
+    border-left: 0;
+  }
+
+  .kpiCell:nth-child(even) {
+    border-left: 1px solid var(--color-hairline);
+  }
+
+  .kpiCell:nth-child(n + 3) {
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .feedingGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .toolsTail {
+    margin-left: 0;
+  }
+}
+
+/*
+ * t2SMXX（1152）：10列のうち 年齢・避妊去勢・運動量 を隠す
+ * （ペットの情報を直すで見られる）。道具は2段・横スクロールなし。
+ */
+@container (max-width: 1152px) {
+  .colAge,
+  .colNeutered,
+  .colActivity {
+    display: none;
+  }
+}
