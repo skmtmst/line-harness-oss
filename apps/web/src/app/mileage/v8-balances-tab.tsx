@@ -579,11 +579,11 @@ export default function V8BalancesTab({
         <label className={styles.cellSubDark} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           差し戻す理由
           <textarea
+            className={styles.dlgTextarea}
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
             placeholder="例：調整の根拠となる資料を確認できませんでした"
             rows={3}
-            style={{ border: '1px solid var(--color-hairline)', borderRadius: 'var(--radius-mini)', padding: '8px 12px', fontSize: 13 }}
           />
         </label>
       </Dialog>

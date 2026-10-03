@@ -379,7 +379,7 @@ export default function V8MileageAdjustDialog({
                 className={styles.dlgInput}
                 value={sourceReferenceId}
                 onChange={(event) => setSourceReferenceId(event.target.value)}
-                placeholder="#1042"
+                placeholder="例：注文番号など"
                 aria-label="問い合わせ・注文・調整元ID"
               />
             </div>

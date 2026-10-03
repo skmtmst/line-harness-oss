@@ -511,11 +511,11 @@ export default function V8HistoryTab({
         <label className={styles.cellSubDark} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           理由（必須）
           <textarea
+            className={styles.dlgTextarea}
             value={pendingReason}
             onChange={(event) => setPendingReason(event.target.value)}
             placeholder={pendingAction?.kind === 'confirm' ? '例：入金を確認しました' : '例：予約がキャンセルされました'}
             rows={3}
-            style={{ border: '1px solid var(--color-hairline)', borderRadius: 'var(--radius-mini)', padding: '8px 12px', fontSize: 13 }}
           />
         </label>
       </Dialog>

@@ -139,7 +139,7 @@
   width: 24px;
   height: 24px;
   flex: none;
-  border-radius: 7px;
+  border-radius: var(--radius-mini);
   background: var(--color-surface-pearl);
   color: var(--color-ink-secondary);
 }
@@ -327,7 +327,7 @@
   content: "";
   width: 6px;
   height: 6px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   background: currentColor;
   flex: none;
 }
@@ -482,7 +482,7 @@
   width: 28px;
   height: 28px;
   flex: none;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   background: var(--color-canvas-sunken);
 }
 
@@ -533,7 +533,7 @@
   width: 32px;
   height: 32px;
   flex: none;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   background: var(--color-status-info-soft);
   color: var(--color-status-info);
   font-size: 13px;
