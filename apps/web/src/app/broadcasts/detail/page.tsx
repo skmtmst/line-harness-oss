@@ -61,6 +61,12 @@ function BroadcastDetailInner() {
   const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading')
   const [reloadToken, setReloadToken] = useState(0)
+  /*
+   * ★V8 `Q28Gb`：ほかの人の更新に気づいたら帯で知らせる。
+   * この画面は書き換えない（読み直すまで古い内容のまま）。
+   */
+  const [conflict, setConflict] = useState(false)
+  const shownVersionRef = useRef<number | null>(null)
   // BROADCAST-15: 宛先の条件に出すタグ名・シナリオ名。配信本体とは別に取る。
   // 読み込めないことと、宛先が消えていることは分けて出す。
   const [audienceNameState, setAudienceNameState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -145,6 +151,9 @@ function BroadcastDetailInner() {
         }
 
         setBroadcast(detail.data)
+        // 今見せている版を覚える。ほかの人の更新は版のずれで見つける。
+        shownVersionRef.current = detail.data.version ?? null
+        setConflict(false)
         setLoadState('ready')
 
         // 二者承認の今の状態。取れなくても詳細は出す。
@@ -240,6 +249,8 @@ function BroadcastDetailInner() {
             setReloadToken((value) => value + 1)
           }
           setBroadcast((prev) => (prev && prev.id === id ? detail.data : prev))
+          // 送り途中は自分の進みで版が進む。ほかの人の更新と混ぜない。
+          shownVersionRef.current = detail.data.version ?? shownVersionRef.current
         } catch {
           // 失敗は数えず、次の周期で取り直す。
         }
@@ -250,6 +261,38 @@ function BroadcastDetailInner() {
       clearInterval(timer)
     }
   }, [id, broadcast?.status])
+
+  /*
+   * ★V8 `Q28Gb`：別のタブから戻ってきたら版だけ確かめる。
+   * ずれていたら帯を出すだけで、画面は書き換えない。
+   * v7 では付けない（通信も増やさない）。
+   */
+  useEffect(() => {
+    if (adminTheme !== 'v8' || !id || loadState !== 'ready') return
+    const recheck = () => {
+      if (document.visibilityState !== 'visible') return
+      void (async () => {
+        try {
+          const detail = await api.broadcasts.get(id)
+          if (!detail.success) return
+          const shown = shownVersionRef.current
+          const latest = detail.data.version ?? null
+          if (shown !== null && latest !== null && latest !== shown) {
+            setConflict(true)
+          }
+        } catch {
+          // 取れなくても今の画面は残す。次の機会に確かめる。
+        }
+      })()
+    }
+    const onVisible = () => recheck()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', recheck)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', recheck)
+    }
+  }, [adminTheme, id, loadState])
 
   if (!id) {
     return (
@@ -460,6 +503,11 @@ function BroadcastDetailInner() {
           onSelectTab={selectTab}
           onExportCsv={exportCsv}
           onReload={() => setReloadToken((value) => value + 1)}
+          conflict={conflict}
+          onConflictReload={() => {
+            setConflict(false)
+            setReloadToken((value) => value + 1)
+          }}
           canEdit={canEdit}
           contentRef={contentRef}
           approval={{

@@ -62,6 +62,7 @@ vi.mock('@/components/shared/select', () => ({
 }))
 
 import HqMembersPage from './page'
+import { inviteExpiryLabel } from '@/components/hq/members/member-dialog'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -108,6 +109,25 @@ async function flush() {
   for (let i = 0; i < 10; i += 1) await act(async () => { await Promise.resolve() })
 }
 
+describe('招待メールの期限は7日（板 yLKwV）', () => {
+  it('期限の日時は「月/日（曜） 時:分」の形になる', () => {
+    // 2026-10-02 18:40 JST の7日後は 10/9（金）18:40。
+    expect(inviteExpiryLabel(new Date('2026-10-02T18:40:00+09:00'))).toBe('10/9（金） 18:40')
+  })
+
+  it('招待の窓に7日の期限と板の目印が出る', async () => {
+    await act(async () => { root.render(<HqMembersPage />) })
+    await flush()
+    const invite = Array.from(host.querySelectorAll('button')).find((b) => (b.textContent ?? '').includes('権限者を招待'))
+    expect(invite, '招待ボタンがない').not.toBeUndefined()
+    await act(async () => { (invite as HTMLButtonElement).click() })
+    await flush()
+    const dialog = document.body.querySelector('[data-design-node="yLKwV"]')
+    expect(dialog, '招待の窓に目印がない').not.toBeNull()
+    expect(dialog?.textContent ?? '').toContain('送った日から7日')
+  })
+})
+
 describe('権限を変える確認（板 M4jS9）', () => {
   it('変える前に変更前→変更後を見せてから保存口へ送る', async () => {
     await act(async () => { root.render(<HqMembersPage />) })
@@ -139,5 +159,26 @@ describe('権限を変える確認（板 M4jS9）', () => {
     await flush()
     expect(mocks.update).toHaveBeenCalledTimes(1)
     expect(mocks.update.mock.calls[0][1]).toMatchObject({ role: 'viewer' })
+  })
+
+  it('変更の窓に最初に表示するアカウントが出て保存口へ送る（板 BHEl9）', async () => {
+    await act(async () => { root.render(<HqMembersPage />) })
+    await flush()
+    const change = host.querySelector('button[aria-label="佐藤 直人さんの権限を変更"]')
+    await act(async () => { (change as HTMLButtonElement).click() })
+    await flush()
+    const edit = document.body.querySelector('[data-design-node="BHEl9"]')
+    expect(edit, '変更の窓に目印がない').not.toBeNull()
+    expect(edit?.textContent ?? '').toContain('最初に表示するアカウント')
+    const save = Array.from(document.body.querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() === '変更を保存')
+    await act(async () => { (save as HTMLButtonElement).click() })
+    await flush()
+    // 確認を挟んでから送る。
+    const confirm = document.body.querySelector('[data-design-node="M4jS9"]')
+    const go = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => (b.textContent ?? '').trim() === '変える')
+    await act(async () => { (go as HTMLButtonElement).click() })
+    await flush()
+    expect(mocks.update).toHaveBeenCalledTimes(1)
+    expect(mocks.update.mock.calls[0][1]).toMatchObject({ assignedLineAccountId: expect.any(String) })
   })
 })
