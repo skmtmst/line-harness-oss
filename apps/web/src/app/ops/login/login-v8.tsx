@@ -2,10 +2,8 @@
 
 import { MessageCircle } from 'lucide-react'
 import Link from 'next/link'
-import { Suspense, useEffect, useState, type FormEvent } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import { OpsLoginV8 } from './login-v8'
-import AuthCard, { AuthField } from '@/components/auth/auth-card'
+import { useEffect, useState, type FormEvent } from 'react'
+import { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -13,6 +11,7 @@ import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession, adminSessionHeaders } from '@/lib/admin-session'
 import { authRequest, emailError, internalAuthFailureCopy } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
+import { OpsAuthOr, OpsAuthV8 } from '../auth-v8'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_token_failed',
@@ -30,22 +29,11 @@ const LINE_LOGIN_FAILURE_CODES = new Set([
  * /ops へ進める。新規登録の導線は出さない（運営は招待制）。
  */
 /*
- * ★V8-B の切り替え。v8 の器は別ファイル（login-v8.tsx）に置き、
- * v7 の器・動きはこの下の V7 のまま残す。
+ * ★V8-B 運営ログイン（板 `D9JALJ`）。
+ * v7（page.tsx の器）とは別の器。データの口・動きは v7 と同じ。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる。
  */
-export default function OpsLoginPage() {
-  const theme = useAdminTheme()
-  if (theme === 'v8') {
-    return (
-      <Suspense fallback={null}>
-        <OpsLoginV8 />
-      </Suspense>
-    )
-  }
-  return <OpsLoginPageV7 />
-}
-
-function OpsLoginPageV7() {
+export function OpsLoginV8() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
@@ -135,16 +123,11 @@ function OpsLoginPageV7() {
   }
 
   return (
-    <AuthCard
-      node="InTGF"
-      cardNode="aHJXA"
+    <OpsAuthV8
+      node="D9JALJ"
       title="ログイン"
-      description={
-        <>
-          <span className="mb-1 block text-caption font-medium text-ink-faint">運営コンソール</span>
-          メールアドレスとパスワードでログインします。LINE で登録した運営メンバーは LINE でログインしてください。
-        </>
-      }
+      description="メールアドレスとパスワードでログインします。LINE で登録した運営メンバーは LINE でログインしてください。"
+      footNote="この画面は運営メンバーだけが開けます。操作はすべて記録されます。"
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
@@ -165,28 +148,25 @@ function OpsLoginPageV7() {
         <AuthField label="パスワード" htmlFor="ops-login-password">
           <PasswordField id="ops-login-password" value={password} onChange={setPassword} autoComplete="current-password" />
         </AuthField>
-        <div className="flex justify-end">
-          <Link href="/password/forgot" className="text-caption font-semibold text-action hover:underline">
-            パスワードを忘れた方はこちら
-          </Link>
-        </div>
         <Button type="submit" variant="primary" disabled={busy !== null} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
         </Button>
       </form>
 
-      <div className="flex w-full items-center gap-3" aria-hidden="true">
-        <span className="h-px flex-1 bg-hairline" />
-        <span className="text-caption text-ink-faint">または</span>
-        <span className="h-px flex-1 bg-hairline" />
-      </div>
+      <OpsAuthOr />
 
       <Button onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
         <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />LINE でログイン
       </Button>
 
+      <div className="flex w-full justify-start">
+        <Link href="/password/forgot" className="text-caption font-semibold text-action hover:underline">
+          パスワードを忘れた方はこちら
+        </Link>
+      </div>
+
       <p className="text-center text-caption text-ink-faint">
         運営メンバーの招待を受けた方は、招待メールのリンクから設定してください
       </p>
-    </AuthCard>
+    </OpsAuthV8>
   )
 }
