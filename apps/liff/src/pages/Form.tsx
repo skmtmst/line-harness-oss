@@ -1048,7 +1048,7 @@ export function BookingSlotPicker({
   const daySlots = (selectedDate && byDate[selectedDate]) || [];
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2.5" data-design-node="g9osGN">
       {menu && (
         <p className="text-sm font-bold text-ink">
           {menu.name}・{menu.duration_minutes}分
