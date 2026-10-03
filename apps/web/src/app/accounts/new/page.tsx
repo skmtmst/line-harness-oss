@@ -14,6 +14,8 @@ import Notice from '@/components/shared/notice'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import { CHECK_STATE_LABEL, canSave, stoppedAt, toSteps } from '../connection-check-view'
 import { isDuplicateChannelError, matchRegisteredAccountId } from './account-recovery'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import RegisterV8 from './register-v8'
 
 const WIZARD_STEPS = [
   { number: 1, label: '基本情報', designNode: 'a8qMXX' },
@@ -50,6 +52,7 @@ export default function NewLineAccountPage() {
   // R523: 応答消失・重複で見つけた登録済みアカウント。詳細へ復帰するために持つ。
   const [recoveredAccountId, setRecoveredAccountId] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
+  const theme = useAdminTheme()
   const busyLock = useRef(false)
   const stepPanelRef = useRef<HTMLDivElement>(null)
 
@@ -231,6 +234,13 @@ export default function NewLineAccountPage() {
       <ReviewGroup title="LINE Login"><ReviewRow label="LoginチャネルID" value={form.loginChannelId.trim()} /><SecretReviewRow label="Loginチャネルシークレット" /></ReviewGroup>
     </div>
   )
+
+  /*
+   * ★V8-B: data-theme="v8" のときだけ新しい登録ウィザード
+   *（板 `xj3zz` `JYfda` `GwKE2` `v2KMj` `qw80E` `TvXII`）を出す。
+   * 下の v7 はそのまま残す。
+   */
+  if (theme === 'v8') return <RegisterV8 />
 
   return (
     <div data-design-node="b2NGxk" className="flex w-full flex-col gap-4 pb-24">
