@@ -640,6 +640,19 @@ html:not([data-theme="v8"]) .v8-only {
   }
 }
 
+/*
+ * ★V8 流入と計測 一覧（y1ztx）：1152幅で「最新追加」の日付（8月25日（火）・
+ * 約96px）が 8% 列（約85px）からはみ出す。1列目（流入元名）は伸び縮み・
+ * 日付は中身に合わせた幅にする。v7 は変えない。
+ */
+[data-theme="v8"] col.inflow-name-col {
+  width: auto;
+}
+
+[data-theme="v8"] col.inflow-date-col {
+  width: 7rem;
+}
+
 /* v8 では上の帯を 1024px から出す（v7 は 1280px から）。畳んだ左
    メニューと組むので、狭い PC 幅でも帯を畳まない。 */
 @media (min-width: 1024px) {
