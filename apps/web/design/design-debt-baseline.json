@@ -593,6 +593,9 @@
   "app/tags/tag-editor-v8.tsx": {
     "unresolved-classname": 113
   },
+  "app/tags/tag-rows-skeleton.tsx": {
+    "unresolved-classname": 5
+  },
   "app/tags/tags-tab-v8.tsx": {
     "unresolved-classname": 67
   },
