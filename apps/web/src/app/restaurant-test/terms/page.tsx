@@ -8,7 +8,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 export default function RestaurantTermsPage() {
   usePageTitle('利用規約')
 
-  return <div>
+  return <div data-design-node="VdKOK">
     <div className="mb-5 flex justify-end">
       <Link href="/restaurant-test/stores/new" className="text-sm font-semibold text-action">店舗追加へ戻る</Link>
     </div>

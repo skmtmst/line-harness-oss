@@ -622,6 +622,7 @@ function ProjectInner() {
           confirmLabel="アーカイブする"
           destructive
           busy={busy}
+          designNode="B24oNg"
           onConfirm={() => {
             void patchProject('アーカイブ', { archived: true }).then((updated) => {
               setArchiveConfirm(false)

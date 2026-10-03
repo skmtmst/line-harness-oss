@@ -1,0 +1,303 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B マイルの作る画面（たまる決めごとを作る `ctLwT`・
+ * 使い道を作る `L2Bzp`・競合 `BnrQp`）。
+ * 左に段のカード、右に試算・気をつけることの列（幅 380・左に細い線）、
+ * 下に追従の帯（キャンセル・主）。色・角丸・影は直接書かない。
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.description {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.conflict {
+  border: 1px solid var(--color-status-warn-deep);
+  border-radius: var(--radius-card);
+  background: var(--color-status-warn-soft);
+  padding: 12px 16px;
+}
+
+.conflictTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.conflictText {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.conflictActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.columns {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 0;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding-right: 24px;
+}
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 380px;
+  flex: none;
+  border-left: 1px solid var(--color-hairline);
+  padding-left: 24px;
+}
+
+.card {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: 20px 24px;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cardNote {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  min-width: 0;
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.required {
+  color: var(--color-danger);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.optional {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.hint {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.input {
+  height: 36px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  padding: 0 12px;
+  width: 100%;
+}
+
+.grid2 {
+  display: grid;
+  gap: 0 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.linkButton {
+  border: none;
+  background: none;
+  padding: 0;
+  margin-top: 12px;
+  color: var(--color-action);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+.conditionBox {
+  margin-top: 12px;
+  border-top: 1px solid var(--color-hairline);
+  padding-top: 12px;
+}
+
+/* 選ぶカード：選んだものは枠 1.5px 濃い緑＋地 accent-soft。 */
+.choice {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.choice[data-selected="true"] {
+  border: 1.5px solid var(--color-accent-deep);
+  background: var(--color-accent-soft);
+}
+
+.choiceTitle {
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.choiceNote {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.details {
+  margin-top: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  padding: 8px 12px;
+}
+
+.details summary {
+  cursor: pointer;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.detailsBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.inlineRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trialRows {
+  display: flex;
+  flex-direction: column;
+  margin: 12px 0;
+}
+
+.trialRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.trialRow dt {
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+.trialRow dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cautionList {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+/* 下の帯：画面の下に追従。 */
+.stickyBar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  padding: 12px 16px;
+}
+
+@container (max-width: 1100px) {
+  .columns {
+    flex-direction: column;
+  }
+
+  .main {
+    padding-right: 0;
+  }
+
+  .aside {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--color-hairline);
+    padding-left: 0;
+    padding-top: 16px;
+  }
+}

@@ -440,7 +440,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
       <p className={styles.muted}>成功済みアカウントは保持され、失敗分だけ再確認できます。別名はアカウント内で重複しない名前になります。</p>
       <footer className={styles.footer}><Button disabled={busy} onClick={() => { setPreflight(null); setStage('accounts') }}>戻る</Button>{expired && <Button disabled={busy} onClick={() => checkStores(selected)}>現在版を再確認</Button>}<Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={run}>この内容で{preflight.stores.length}アカウントへ配布</Button></footer>
     </>}
-    {stage === 'result' && <>
+    {stage === 'result' && <div data-design-node="dEvJM">
       <div className={styles.toolbar}><p className={styles.muted}>配布番号：{pendingRun}</p><Button disabled={busy} onClick={refreshResult}>結果を再確認</Button></div>
       {!result ? (theme === 'v8' ? (
         <section className={`${styles.panel} ${styles.progress}`} aria-label="配布の進み具合">
@@ -457,7 +457,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
         </section>)}</div><aside className={styles.panel}><h2>再実行の動作</h2><p>成功アカウントは再送せず、失敗アカウントの現在版を取得して重複確認へ戻ります。</p></aside></div>
       </>}
       <footer className={styles.footer}><Button disabled={busy} onClick={toList}>ひな形一覧へ</Button>{done && failures.length > 0 && <Button variant="primary" disabled={busy} onClick={() => { checkStores(failures.map(s => s.accountId)) }}>失敗{failures.length}アカウントを再確認</Button>}</footer>
-    </>}
+    </div>}
     <ConfirmDialog open={!!remove} title="ひな形を削除" description={`「${remove?.name ?? ''}」を削除します。配布済みのアカウントデータは残ります。`} destructive confirmLabel="削除する" busy={busy} onCancel={() => { if (!busy) setRemove(null) }} onConfirm={() => void perform(async () => { if (!remove) return; await hqTemplatesApi.remove(remove.id, remove.revision); setTemplates(current => current.filter(t => t.id !== remove.id)); setRemove(null); setMessage('ひな形を削除しました。') })} />
   </div>
 }

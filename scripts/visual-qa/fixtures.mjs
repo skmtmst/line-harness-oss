@@ -4138,6 +4138,23 @@ export const AD_PLATFORMS = [
 ]
 
 /*
+ * #818 流入元ごとの広告費の台帳。数は V8 の板（`qSTVR`・`ZxKL5`）にそろえる。
+ * この30日の広告費 ¥86,000（Google ¥54,000＋Meta ¥32,000）・
+ * 友だち追加 73 人（45＋28）・つないだ広告 2 件。
+ * 友だち1人あたりは ¥1,178（86,000÷73、四捨五入）で板と合う。
+ * 通貨は円（JPYは最小単位が円そのもの）。日時は固定。
+ */
+export const AD_COST_ROWS = [
+  { sourceLabel: 'Google広告', adPlatformId: 'ad-google', entryRouteId: 'g-ads-summer', source: 'import', totals: [{ currency: 'JPY', amountMinor: 54000 }], friendAdds: 45, costPerFriendMinor: 1200, lastImportedAt: '2026-10-01T06:00:00+09:00' },
+  { sourceLabel: 'Meta広告', adPlatformId: 'ad-meta', entryRouteId: 'summer-ig', source: 'import', totals: [{ currency: 'JPY', amountMinor: 32000 }], friendAdds: 28, costPerFriendMinor: 1143, lastImportedAt: '2026-10-01T06:00:00+09:00' },
+]
+
+export const AD_COST_PLATFORMS = [
+  { id: 'ad-google', name: 'google', displayName: 'Google広告', lastSuccessAt: '2026-10-01T06:00:00+09:00', lastRunStatus: 'success', lastRunAt: '2026-10-01T06:00:00+09:00', lastError: null },
+  { id: 'ad-meta', name: 'meta', displayName: 'Meta広告', lastSuccessAt: '2026-10-01T06:00:00+09:00', lastRunStatus: 'success', lastRunAt: '2026-10-01T06:00:00+09:00', lastError: null },
+]
+
+/*
   #514-8: 本番の口が返す形だけにする。friendName・conversionName・nextRetryAt は
   口が返さない(画面も読まない)。豊富な形を返すとずれを隠す。
 */
@@ -4815,11 +4832,15 @@ export const CONVERSION_EXPORT_CSV = `\uFEFF${[
   内訳の面が `Cannot read properties of undefined (reading 'toLocaleString')` で
   落ちる（実装が行の有無を確かめずに数を整形しているため。別途 Issue に出した）。
 */
+/*
+ * 今月の成果の合計は V8 の板（`nJlxX`）の 38 件にそろえる。
+ * 6人の並び・承認済み報酬の列は変えない（別の板が読む）。
+ */
 export const AFFILIATE_REPORT = [
-  { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', commissionRate: 10, totalClicks: 820, totalConversions: 24, totalRevenue: 860000, confirmedReward: 86000, linkCount: 3, friendAdds: 58 },
-  { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', commissionRate: 0, totalClicks: 1240, totalConversions: 16, totalRevenue: 0, confirmedReward: 144000, linkCount: 2, friendAdds: 86 },
-  { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', commissionRate: 15, totalClicks: 420, totalConversions: 9, totalRevenue: 620000, confirmedReward: 93000, linkCount: 1, friendAdds: 31 },
-  { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', commissionRate: 10, totalClicks: 260, totalConversions: 5, totalRevenue: 400000, confirmedReward: 40000, linkCount: 1, friendAdds: 18 },
+  { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', commissionRate: 10, totalClicks: 820, totalConversions: 16, totalRevenue: 860000, confirmedReward: 86000, linkCount: 3, friendAdds: 58 },
+  { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', commissionRate: 0, totalClicks: 1240, totalConversions: 12, totalRevenue: 0, confirmedReward: 144000, linkCount: 2, friendAdds: 86 },
+  { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', commissionRate: 15, totalClicks: 420, totalConversions: 6, totalRevenue: 620000, confirmedReward: 93000, linkCount: 1, friendAdds: 31 },
+  { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', commissionRate: 10, totalClicks: 260, totalConversions: 3, totalRevenue: 400000, confirmedReward: 40000, linkCount: 1, friendAdds: 18 },
   { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', commissionRate: 5, totalClicks: 90, totalConversions: 1, totalRevenue: 60000, confirmedReward: 3000, linkCount: 1, friendAdds: 4 },
   { /* 成果0の人。0と未取得を混ぜないため、0はきちんと0で返す。 */ affiliateId: 'af-6', affiliateName: '旧パートナーA', code: 'old-a', commissionRate: 10, totalClicks: 0, totalConversions: 0, totalRevenue: 0, confirmedReward: 0, linkCount: 1, friendAdds: 0 },
 ]
@@ -4849,18 +4870,22 @@ export const AFFILIATE_REPORT_DETAIL = {
   duplicateFlags: [{ friendId: 'friend-4', identityKey: 'ik-friend-4' }],
 }
 
-/** 機能16。成果を締め、振込データと明細を作る新しい実API契約。 */
+/*
+ * 機能16。成果を締め、振込データと明細を作る新しい実API契約。
+ * 今月の報酬の合計は V8 の板（`nJlxX`）の ¥70,400 にそろえる。
+ * 内訳3人の合計も 70,400 に合わせる（合計と内訳が違う絵にしない）。
+ */
 export const AFFILIATE_SETTLEMENT_PREVIEW = {
   lineAccountId: 'visual-qa-account',
   periodFrom: '2026-08-01T00:00:00.000Z',
   periodTo: '2026-08-31T23:59:59.999Z',
   currency: 'JPY',
-  totalAmount: 174000,
+  totalAmount: 70400,
   conversionCount: 36,
   affiliates: [
-    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', amount: 72000, conversionCount: 18, bankProfileRegistered: true },
-    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', amount: 62000, conversionCount: 12, bankProfileRegistered: true },
-    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', amount: 40000, conversionCount: 6, bankProfileRegistered: false },
+    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', amount: 30000, conversionCount: 18, bankProfileRegistered: true },
+    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', amount: 25000, conversionCount: 12, bankProfileRegistered: true },
+    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', amount: 15400, conversionCount: 6, bankProfileRegistered: false },
   ],
   previewVersion: '82e052367d36df0428262a3c69e38ec22e45b05de382deec83e924960f1aa13d',
 }
@@ -5003,10 +5028,15 @@ const automationRun = ({
   failureReason,
 })
 
+/*
+ * 動いた数の見本は V8 の板（`LWQXd`・`g98F9`）の数にそろえる。
+ * 今月動いた 2,988 回・条件に外れた 1,240 回・失敗 6 件。
+ * 明細の7行は見本の行（撮影用）で、集計の数とは別。
+ */
 export const AUTOMATION_RUNS = {
   summary: {
-    total: 9660,
-    executed: 8420,
+    total: 4234,
+    executed: 2988,
     skipped: 1240,
     failed: 6,
     mostRunName: '「予約」で予約画面を出す',
@@ -5021,7 +5051,7 @@ export const AUTOMATION_RUNS = {
     automationRun({ id: 'run-6', occurredAt: '2026-08-24T09:05:00+09:00', subject: '高橋 直人', accountLabel: 'LINE 本店', triggerLabel: '毎日決まった時刻', status: 'succeeded', detail: '対応マーク「気にかける」', durationMs: 300, automationId: 'au-inactive', automationName: '反応がない人を気にかける', domainStatus: 'success', successfulActions: ['対応マーク「気にかける」'] }),
     automationRun({ id: 'run-7', occurredAt: '2026-08-23T20:00:00+09:00', subject: '前田 さくら', accountLabel: 'LINE 本店', triggerLabel: '友だちが追加されたとき', status: 'skipped', detail: '対象条件に当てはまりませんでした', durationMs: null, automationId: 'au-welcome', automationName: '友だち追加から案内を始める', domainStatus: 'skipped_condition' }),
   ],
-  pagination: { total: 9660, limit: 20, offset: 0 },
+  pagination: { total: 4234, limit: 20, offset: 0 },
 }
 
 /** 設計 `WjYAC` と同じ12件。選択後に利用者の実データを選び直す見本。 */
