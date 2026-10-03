@@ -1670,6 +1670,18 @@ const RAW = {
   '/api/booking/admin/resources': { success: true, data: { resources: BOOKING_RESOURCES } },
   '/api/booking/admin/menus': { menus: BOOKING_MENUS },
   '/api/booking/admin/staff': { staff: BOOKING_STAFF },
+  /*
+    担当×メニューの一括表。実口（`booking.ts`）と同じ
+    `{staff: [{staff_id, matrix}]}` の形。`success` で包む・`staff` を
+    付けないと、設定画面の担当タブ・メニュー作成画面が
+    `c.value.staff is not iterable` で落ちる（2026-10-03 点検）。
+  */
+  '/api/booking/admin/staff-menus': {
+    staff: BOOKING_STAFF.map((staff) => ({
+      staff_id: staff.id,
+      matrix: BOOKING_STAFF_MENUS[staff.id] ?? [],
+    })),
+  },
   '/api/booking/admin/customer-context': { customer: BOOKING_CUSTOMER_CONTEXT },
   '/api/booking/admin/reminder-preview': BOOKING_REMINDER_PREVIEW,
   '/api/booking/admin/alternatives': BOOKING_CONFLICT_ALTERNATIVES,
@@ -2623,6 +2635,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (formDuplicate) {
     return { success: true, data: { id: 'form-duplicate-qa', isActive: false } }
   }
+  /*
+    管理者確認（担当未割り当て）の口。実口（`forms.ts`）と同じく配列で返す。
+    既定の `{items,total,…}` に落ちると、画面が配列として読めず
+    `e is not iterable` で落ちる（2026-10-03 点検）。
+    見本のフォームはすべて担当付きなので空が正しい。
+  */
+  if (pathname === '/api/forms/unassigned') {
+    return { success: true, data: [] }
+  }
   if (pathname === '/api/forms') {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
   }
@@ -2975,6 +2996,68 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/chats') return { success: true, data: CHATS }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
+  /*
+    メールの会話の中身。実口（`support-inbox.ts`）と同じ
+    `{thread, messages, …}` の形。無いと既定の `{items,total,…}` に落ち、
+    受信箱でメールを開くと `reading 'id'`（`detail.thread.id`）で落ちる
+    （2026-10-03 点検）。載っていない ID は実口と同じく失敗にする。
+  */
+  const emailThread = /^\/api\/support\/email\/threads\/([^/]+)$/.exec(pathname)
+  if (emailThread) {
+    const item = SUPPORT_EMAIL_ITEMS.find((mail) => mail.threadId === emailThread[1])
+    if (!item) return { success: false, error: 'Thread not found' }
+    const thread = {
+      id: item.threadId,
+      customer_email: item.customerIdentifier,
+      customer_name: item.customerName,
+      subject: item.subject,
+      status: item.status,
+      assigned_staff_id: item.assignedStaffId,
+      notes: null,
+      last_message_at: item.lastIncomingAt,
+      last_incoming_at: item.lastIncomingAt,
+      last_outgoing_at: null,
+      resolved_at: null,
+      revision: item.revision,
+    }
+    const messages = [
+      {
+        id: `${item.threadId}-msg-1`,
+        direction: 'incoming',
+        sender_email: item.customerIdentifier,
+        sender_name: item.customerName,
+        recipient_email: 'support@example.com',
+        subject: item.subject,
+        body_text: item.preview,
+        sent_by_staff_id: null,
+        sent_by_staff_name: null,
+        created_at: item.lastIncomingAt,
+      },
+      {
+        id: `${item.threadId}-msg-2`,
+        direction: 'outgoing',
+        sender_email: 'support@example.com',
+        sender_name: null,
+        recipient_email: item.customerIdentifier,
+        subject: `Re: ${item.subject}`,
+        body_text: 'ご連絡ありがとうございます。確認してご案内します。',
+        sent_by_staff_id: 'operator-kenta',
+        sent_by_staff_name: 'Kenta',
+        created_at: item.lastIncomingAt,
+      },
+    ]
+    return {
+      success: true,
+      data: {
+        thread,
+        messages,
+        total: messages.length,
+        hasMoreOlder: false,
+        oldestCursor: null,
+        newestCursor: null,
+      },
+    }
+  }
   if (pathname === '/api/support/inbox') {
     /*
       **同じ口を2つの画面が読む。返す形が違う。**
