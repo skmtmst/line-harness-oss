@@ -5,6 +5,7 @@ import { useBrand } from '@/lib/use-brand'
 import { loadAdminVersion } from '@/lib/admin-version-cache'
 import { isRealVersion } from '@/lib/deploy-info'
 import styles from './sidebar-identity.module.css'
+import { brandInitial } from './brand-initial'
 
 /**
  * 共通メニューのいちばん上。**アイコン ＋ 会社名 ＋ バージョン**だけ。
@@ -35,7 +36,8 @@ export default function SidebarIdentity() {
   }, [])
 
   const name = brand.name || '管理画面'
-  const initial = name === '株式会社 然' ? '然' : name.slice(0, 1)
+  // 1文字は会社名から出す。1社の名前を直接書くと別の会社でも同じ字が出る。
+  const initial = brandInitial(name)
 
   return (
     <div className={styles.root} data-design-node="J33xq/V2WbXF">

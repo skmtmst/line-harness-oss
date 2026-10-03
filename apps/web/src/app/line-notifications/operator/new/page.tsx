@@ -304,7 +304,9 @@ function NewOperatorNotificationInner() {
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-4">
             <div className="flex items-center gap-2"><Building2 aria-hidden="true" size={18} className="text-ink-faint" /><h2 className="text-sm font-semibold text-ink">お店の人にはこう届きます</h2></div>
-            <p className="mt-2 whitespace-pre-wrap text-xs text-ink-faint">文面はここで確かめられます。<br />【運用者へのお知らせ】{name.trim() || 'お知らせ名'}</p>
+            {/* 実際の件名と同じ形で見せる（operator-notification-dispatch の subject）。
+                ここだけ古い形のままだと、届いたメールと画面の見本が食い違う。 */}
+            <p className="mt-2 whitespace-pre-wrap text-xs text-ink-faint">文面はここで確かめられます。<br />【musubo】運用者へのお知らせ：{name.trim() || 'お知らせ名'}</p>
           </section>
           <Notice tone="warn">
             <h2 className="text-sm font-semibold">気をつけること</h2>

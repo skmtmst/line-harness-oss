@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, takeTwoFactorNextPath, storeAdminSession } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
+import { brandInitial } from '@/components/layout/brand-initial'
 import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
 
@@ -66,8 +67,8 @@ export default function TwoFactorLoginPage() {
   return <main className="flex min-h-[100svh] items-center justify-center bg-canvas-sunken px-4 py-8">
     <section className="w-full max-w-md rounded-card bg-canvas px-6 py-8 shadow-sm sm:px-10">
       <div className="flex items-center justify-center gap-3 text-sm font-semibold text-ink">
-        <span className="flex h-8 w-8 items-center justify-center rounded-control bg-accent-soft font-bold text-accent-deep">然</span>
-        {brand.name ?? '然-NEN- 公式'}
+        <span className="flex h-8 w-8 items-center justify-center rounded-control bg-accent-soft font-bold text-accent-deep">{brandInitial(brand.name ?? '') || 'm'}</span>
+        {brand.name ?? 'musubo'}
       </div>
       {/*
         320px では2列がはみ出す（監査 m18e）。狭い幅では1列に積む。

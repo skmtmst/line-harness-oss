@@ -1,6 +1,6 @@
 import { connect } from 'cloudflare:sockets';
 import PostalMime, { type Address } from 'postal-mime';
-import { NEN_FROM_NAME } from './mail-from-name.js';
+import { buildMailData, encodeBase64, safeHeader, type MailMimeInput } from './mail-mime.js';
 import { storeSupportEmail } from './support-email.js';
 
 const CONNECTION_TIMEOUT_MS = 15_000;
@@ -15,16 +15,8 @@ type XServerMailEnv = {
   XSERVER_MAIL_PASSWORD?: string;
 };
 
-type SendMailInput = {
-  to: string;
-  from: string;
-  subject: string;
-  body: string;
-  /** 差出人の表示名。省略時は 然-NEN- の窓口名。 */
-  fromName?: string;
-  inReplyTo?: string;
-  references?: string;
-};
+/** 中身の組み立ては mail-mime.ts が持つ。ここは送る手順だけを持つ。 */
+type SendMailInput = MailMimeInput;
 
 function requireConfig(env: XServerMailEnv): { host: string; user: string; password: string } {
   if (!env.XSERVER_MAIL_HOST || !env.XSERVER_MAIL_USER || !env.XSERVER_MAIL_PASSWORD) {
@@ -261,23 +253,6 @@ export async function syncXServerSupportMailbox(
   }
 }
 
-function encodeBase64(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  let binary = '';
-  for (let index = 0; index < bytes.length; index += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
-  }
-  return btoa(binary);
-}
-
-function foldBase64(value: string): string {
-  return value.match(/.{1,76}/g)?.join('\r\n') || '';
-}
-
-function safeHeader(value: string): string {
-  return value.replace(/[\r\n]+/g, ' ').trim();
-}
-
 async function smtpResponse(transport: MailSocket, expected: number): Promise<void> {
   const lines: string[] = [];
   let code = '';
@@ -302,6 +277,7 @@ export async function sendXServerMail(env: XServerMailEnv, input: SendMailInput)
     { secureTransport: 'starttls', allowHalfOpen: false },
   ));
   const messageId = `<${crypto.randomUUID()}@nen-petfood.com>`;
+  const boundary = `nen-${crypto.randomUUID()}`;
   let transport = plain;
   try {
     await smtpResponse(plain, 220);
@@ -315,20 +291,8 @@ export async function sendXServerMail(env: XServerMailEnv, input: SendMailInput)
     await smtpCommand(transport, `MAIL FROM:<${safeHeader(input.from)}>`, 250);
     await smtpCommand(transport, `RCPT TO:<${safeHeader(input.to)}>`, 250);
     await smtpCommand(transport, 'DATA', 354);
-    const headers = [
-      `Date: ${new Date().toUTCString()}`,
-      `Message-ID: ${messageId}`,
-      `From: =?UTF-8?B?${encodeBase64(safeHeader(input.fromName || NEN_FROM_NAME))}?= <${safeHeader(input.from)}>`,
-      `To: <${safeHeader(input.to)}>`,
-      `Reply-To: <${safeHeader(input.from)}>`,
-      `Subject: =?UTF-8?B?${encodeBase64(safeHeader(input.subject))}?=`,
-      ...(input.inReplyTo ? [`In-Reply-To: ${safeHeader(input.inReplyTo)}`] : []),
-      ...(input.references ? [`References: ${safeHeader(input.references)}`] : []),
-      'MIME-Version: 1.0',
-      'Content-Type: text/plain; charset=UTF-8',
-      'Content-Transfer-Encoding: base64',
-    ];
-    await transport.write(`${headers.join('\r\n')}\r\n\r\n${foldBase64(encodeBase64(input.body))}\r\n.\r\n`);
+    const data = buildMailData(input, { messageId, boundary, date: new Date().toUTCString() });
+    await transport.write(`${data}\r\n.\r\n`);
     await smtpResponse(transport, 250);
     await smtpCommand(transport, 'QUIT', 221).catch(() => undefined);
     return messageId;

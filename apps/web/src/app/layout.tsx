@@ -13,7 +13,7 @@ import ToastHost from '@/components/shared/toast'
  * ときの名前。以前は末尾に「TEST」を足して本番と見分けていたが、
  * 名前そのものを変えると利用者にもテスト用に見える。
  */
-const DEFAULT_TITLE = '然-NEN- LINE管理システム'
+const DEFAULT_TITLE = 'musubo LINE管理システム'
 
 export const metadata: Metadata = {
   title: DEFAULT_TITLE,

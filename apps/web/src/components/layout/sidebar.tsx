@@ -13,6 +13,7 @@ import { usePageChrome } from '@/components/shell/page-chrome'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import SidebarIdentity from './sidebar-identity'
 import SidebarVersion from './sidebar-version'
+import { brandInitial } from './brand-initial'
 import Notice from '@/components/shared/notice'
 import HqAccountMenu from '@/components/hq/account-menu'
 import {
@@ -514,10 +515,10 @@ export default function Sidebar({
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-xl object-cover" />
           ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-gray-900">{brand.name ?? '然-NEN- LINE管理システム'}</p>
+            <p className="truncate text-sm font-bold text-gray-900">{brand.name ?? 'musubo LINE管理システム'}</p>
             <p className="mt-0.5 text-micro font-medium text-ink-faint">管理メニュー</p>
           </div>
         </div>
@@ -676,7 +677,7 @@ export default function Sidebar({
             1280px 未満では PC のトップバー（画面の唯一の <h1>）を畳むので、
             現在地を h1 で持つのはここ（#734: 390px で全画面 h1 が消えていた）。 */}
         <h1 className={styles.mobileTitle} title={mobileTitle || brand.name || undefined}>
-          {mobileTitle || brand.name || '然-NEN- LINE管理システム'}
+          {mobileTitle || brand.name || 'musubo LINE管理システム'}
         </h1>
         {/* 公式アカウントの印。名前は画面名が持つので、ここはアイコンだけ。 */}
         <div className={styles.mobileBrand}>
@@ -684,7 +685,7 @@ export default function Sidebar({
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-lg object-cover" />
           ) : (
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
           )}
         </div>
       </div>
