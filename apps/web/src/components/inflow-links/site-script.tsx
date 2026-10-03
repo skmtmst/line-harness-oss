@@ -235,6 +235,7 @@ export default function SiteScript() {
   }
 
   return (
+    <div data-design-node="XjOte">
     <div className="space-y-4" data-design-node="IhSBB">
       <Notice tone="info">
         見ているページを数えるためのコードです。サイトに貼ると、どのページを見た人が友だちになったかが分かります。入力フォームの中身など、個人が特定できる情報は送りません。
@@ -606,6 +607,7 @@ export default function SiteScript() {
         onConfirm={() => void resumeSite()}
         onCancel={() => { if (!siteBusy) setResumeTarget(null) }}
       />
+    </div>
     </div>
   )
 }

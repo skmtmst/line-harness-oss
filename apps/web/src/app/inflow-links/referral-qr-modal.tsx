@@ -46,6 +46,7 @@ export default function ReferralQrModal({
     setTimeout(() => setCopied(false), 1500)
   }
   return (
+    <div data-design-node="GtI4Y" className="contents">
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
       <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-card bg-canvas p-6 shadow-overlay">
         <div className="flex items-start justify-between gap-4">
@@ -78,6 +79,7 @@ export default function ReferralQrModal({
           </>
         )}
       </div>
+    </div>
     </div>
   )
 }
