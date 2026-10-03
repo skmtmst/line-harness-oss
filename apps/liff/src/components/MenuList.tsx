@@ -110,13 +110,13 @@ export default function MenuList({
                     {m.name}
                   </span>
                   {m.description && (
-                    <span className="mt-0.5 block truncate text-[11.5px] text-liff-sub" title={m.description}>
+                    <span className="mt-[3px] block truncate text-[11.5px] text-liff-sub" title={m.description}>
                       {m.description}
                     </span>
                   )}
-                  <span className="mt-1 block text-xs">
+                  <span className="mt-[3px] block text-xs">
                     <span className="font-semibold text-ink">{m.duration_minutes}分</span>
-                    <span className="ml-1.5 font-bold text-liff-primary">
+                    <span className="ml-2 font-bold text-liff-primary">
                       {m.base_price === 0 ? '無料' : `¥${m.base_price.toLocaleString()}`}
                     </span>
                   </span>
