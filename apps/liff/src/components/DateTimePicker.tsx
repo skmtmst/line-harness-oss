@@ -599,7 +599,7 @@ export default function DateTimePicker({
         ) : weekLoading || !weekByDate || !loadedWins.has(winStart) ? (
           <LoadingView />
         ) : !weekHasOpen ? (
-          <div className="flex flex-col items-center px-6 py-10 text-center">
+          <div className="flex flex-col items-center px-6 py-10 text-center" data-design-node="ADutg">
             <span className="text-liff-idle" aria-hidden="true">
               <Icon name="calendar-x" className="h-10 w-10" />
             </span>
