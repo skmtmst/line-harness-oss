@@ -21,6 +21,7 @@ import { api, bookingApi, type BookingMenu, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -375,7 +376,19 @@ export default function StaffNewV8() {
               <p className={shell.sectionDesc}>チェックしたメニューだけ、このスタッフを指名できます。1つも選ばないと予約画面に出ません。</p>
             </div>
             {menusLoading ? (
-              <ListState kind="loading" title="メニューを読み込んでいます" />
+              <span className="inline-block w-full" aria-busy="true">
+                <span className="sr-only">メニューを読み込んでいます</span>
+                <DelayedSkeleton
+                  loading
+                  skeleton={
+                    <span className={styles.chipRow} aria-hidden="true">
+                      <Skeleton width={120} height={32} />
+                      <Skeleton width={96} height={32} />
+                      <Skeleton width={136} height={32} />
+                    </span>
+                  }
+                />
+              </span>
             ) : menusError !== null ? (
               <ListState
                 kind="error"
@@ -470,7 +483,13 @@ export default function StaffNewV8() {
               <p className={shell.sectionDesc}>ひも付けると、その人が左メニュー「自分の勤務」で、このスタッフのシフト・休憩・Google カレンダーを決められます。</p>
             </div>
             {membersLoading ? (
-              <ListState kind="loading" title="ログインユーザーを読み込んでいます" />
+              <span className="inline-block w-full" aria-busy="true">
+                <span className="sr-only">ログインユーザーを読み込んでいます</span>
+                <DelayedSkeleton
+                  loading
+                  skeleton={<Skeleton width="100%" height={32} />}
+                />
+              </span>
             ) : membersError !== null ? (
               <ListState
                 kind="error"
