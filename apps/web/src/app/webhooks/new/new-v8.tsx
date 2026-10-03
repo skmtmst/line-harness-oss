@@ -75,6 +75,21 @@ const V8_EVENT_GROUPS: ReadonlyArray<{
 
 const ALL_V8_EVENTS = V8_EVENT_GROUPS.flatMap((group) => group.events.map((event) => event.value))
 
+/* 1欄ぶんの確かめ。文は「何をすれば直るか」を1文で書く。 */
+function validateName(value: string): string | null {
+  return value.trim() ? null : '名前を入力してください'
+}
+
+function validateUrl(value: string): string | null {
+  return /^https:\/\//.test(value.trim()) ? null : 'URLは https:// で始めてください'
+}
+
+function validateSecret(value: string): string | null {
+  return value.length >= MIN_SECRET_LENGTH
+    ? null
+    : `シークレットは${MIN_SECRET_LENGTH}文字以上にしてください`
+}
+
 const RETRY_OPTIONS = [
   { value: '0', label: '送り直さない' },
   { value: '1', label: '1回まで' },
@@ -172,13 +187,36 @@ function NewOutgoingV8Inner() {
 
   const validate = (): Record<string, string> => {
     const errors: Record<string, string> = {}
-    if (!name.trim()) errors.name = '名前を入力してください'
-    if (!/^https:\/\//.test(url.trim())) errors.url = 'URLは https:// で始めてください'
-    if (secret.length < MIN_SECRET_LENGTH) errors.secret = `シークレットは${MIN_SECRET_LENGTH}文字以上にしてください`
+    const nameError = validateName(name)
+    if (nameError) errors.name = nameError
+    const urlError = validateUrl(url)
+    if (urlError) errors.url = urlError
+    const secretError = validateSecret(secret)
+    if (secretError) errors.secret = secretError
     if (!sendAllEvents && selectedEvents.length === 0 && !incomingSources.trim()) {
       errors.events = '送るものを選ぶか、「すべて送る」を選んでください'
     }
     return errors
+  }
+
+  /*
+   * 欄から離れたとき（blur）の確かめ。保存を押すまで赤くならないと
+   * 「どこが悪いか分からない」ので、触った欄だけその場で教える。
+   * 直したらその場で消える（onChange 側で消す）。
+   */
+  const blurField = (key: 'name' | 'url' | 'secret', value?: string) => {
+    const current = value ?? (key === 'name' ? name : key === 'url' ? url : secret)
+    const message =
+      key === 'name' ? validateName(current) : key === 'url' ? validateUrl(current) : validateSecret(current)
+    setFieldErrors((current) => {
+      if (!message) {
+        if (!(key in current)) return current
+        const next = { ...current }
+        delete next[key]
+        return next
+      }
+      return current[key] === message ? current : { ...current, [key]: message }
+    })
   }
 
   const toggleEvent = (value: string) => {
@@ -317,7 +355,12 @@ function NewOutgoingV8Inner() {
               <input
                 id="webhook-v8-name"
                 value={name}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {
+                  const next = event.target.value
+                  setName(next)
+                  if (fieldErrors.name && validateName(next) === null) blurField('name', next)
+                }}
+                onBlur={() => blurField('name')}
                 placeholder="顧客台帳（CRM）"
                 className={styles.input}
                 aria-invalid={fieldErrors.name ? true : undefined}
@@ -330,7 +373,12 @@ function NewOutgoingV8Inner() {
                 id="webhook-v8-url"
                 type="url"
                 value={url}
-                onChange={(event) => setUrl(event.target.value)}
+                onChange={(event) => {
+                  const next = event.target.value
+                  setUrl(next)
+                  if (fieldErrors.url && validateUrl(next) === null) blurField('url', next)
+                }}
+                onBlur={() => blurField('url')}
                 placeholder="https://crm.example.com/line/hook"
                 className={styles.input}
                 aria-invalid={fieldErrors.url ? true : undefined}
@@ -343,7 +391,12 @@ function NewOutgoingV8Inner() {
                 <input
                   id="webhook-v8-secret"
                   value={secret}
-                  onChange={(event) => setSecret(event.target.value)}
+                  onChange={(event) => {
+                    const next = event.target.value
+                    setSecret(next)
+                    if (fieldErrors.secret && validateSecret(next) === null) blurField('secret', next)
+                  }}
+                  onBlur={() => blurField('secret')}
                   className={styles.input}
                   aria-invalid={fieldErrors.secret ? true : undefined}
                 />
