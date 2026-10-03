@@ -2,11 +2,11 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { FORM_LOOK_DEFAULT, formLookVars } from './form-look.js';
+import { LIFF_LOOK_DEFAULT, applyLiffLook, liffLookVars } from './liff-look.js';
 import Form from '../pages/Form.js';
 
 /**
- * 回答フォームの見た目の型の受け口（M5 の下ごしらえ）。
+ * LIFF の見た目の型の受け口（M5 の下ごしらえ）。
  * 中身は⑤ LINE らしい（いまの見た目）と同じで、画面は変わらない。
  */
 
@@ -50,23 +50,40 @@ afterEach(() => {
 });
 
 describe('受け口の変数', () => {
-  it('7つの入れ物があり、中身はいまの見た目の色', () => {
-    const vars = formLookVars() as Record<string, string>;
-    expect(vars).toEqual({
-      '--form-look-main': '#03873a',
-      '--form-look-soft': '#f0fbf4',
-      '--form-look-line': '#e6e9ed',
-      '--form-look-line-strong': '#dfe3e8',
-      '--form-look-idle': '#b8bec6',
-      '--form-look-ink': '#1d1d1f',
-      '--form-look-sub': '#5f6670',
-    });
-    expect(FORM_LOOK_DEFAULT.main).toBe('#03873a');
+  it('入れ物があり、中身はいまの見た目の色・書体・角丸', () => {
+    const vars = liffLookVars() as Record<string, string>;
+    expect(vars['--liff-look-main']).toBe('#03873a');
+    expect(vars['--liff-look-soft']).toBe('#f0fbf4');
+    expect(vars['--liff-look-line']).toBe('#e6e9ed');
+    expect(vars['--liff-look-line-strong']).toBe('#dfe3e8');
+    expect(vars['--liff-look-idle']).toBe('#b8bec6');
+    expect(vars['--liff-look-ink']).toBe('#1d1d1f');
+    expect(vars['--liff-look-sub']).toBe('#5f6670');
+    expect(vars['--liff-look-chip']).toBe('#f1f3f5');
+    expect(vars['--liff-look-off-bg']).toBe('#f7f8f9');
+    expect(vars['--liff-look-ok-bg']).toBe('#e8f8ee');
+    expect(vars['--liff-look-ok-ink']).toBe('#0a7a3e');
+    expect(vars['--liff-look-wait-bg']).toBe('#fff6e5');
+    expect(vars['--liff-look-wait-ink']).toBe('#b26b00');
+    expect(vars['--liff-look-divider']).toBe('#eef0f2');
+    expect(vars['--liff-look-deep']).toBe('#0f3d24');
+    expect(vars['--liff-look-radius']).toBe('0.625rem');
+    expect(vars['--liff-look-font-body']).toContain('Noto Sans JP');
+    expect(vars['--liff-look-font-heading']).toContain('Noto Sans JP');
+    expect(LIFF_LOOK_DEFAULT.main).toBe('#03873a');
+  });
+
+  it('文書全体に18個の変数を置く', () => {
+    const setProperty = vi.fn();
+    applyLiffLook({ setProperty });
+    expect(setProperty).toHaveBeenCalledTimes(18);
+    expect(setProperty).toHaveBeenCalledWith('--liff-look-main', '#03873a');
+    expect(setProperty).toHaveBeenCalledWith('--liff-look-radius', '0.625rem');
   });
 });
 
 describe('回答フォームの箱に受け口を置く', () => {
-  it('箱に7つの変数が乗り、見た目の既定値になる', async () => {
+  it('箱に変数が乗り、見た目の既定値になる', async () => {
     render(
       <MemoryRouter initialEntries={['/forms/f1?liffId=test']}>
         <Routes>
@@ -80,8 +97,8 @@ describe('回答フォームの箱に受け口を置く', () => {
     const box = frame!.querySelector(':scope > div');
     expect(box).toBeTruthy();
     const style = (box as HTMLElement).style;
-    expect(style.getPropertyValue('--form-look-main')).toBe('#03873a');
-    expect(style.getPropertyValue('--form-look-soft')).toBe('#f0fbf4');
-    expect(style.getPropertyValue('--form-look-sub')).toBe('#5f6670');
+    expect(style.getPropertyValue('--liff-look-main')).toBe('#03873a');
+    expect(style.getPropertyValue('--liff-look-soft')).toBe('#f0fbf4');
+    expect(style.getPropertyValue('--liff-look-sub')).toBe('#5f6670');
   });
 });
