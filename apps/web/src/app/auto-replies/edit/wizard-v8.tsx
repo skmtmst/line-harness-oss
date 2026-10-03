@@ -30,6 +30,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { findConditionDraftIssue, type SegmentCondition } from '@/lib/segment-condition'
 import Stepper, { type StepperStep } from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -997,11 +998,11 @@ function AutoReplyWizardV8Inner() {
   }
   if (!canManage) {
     return (
-      <ListState
-        kind="forbidden"
-        title="自動応答の作成・変更はできません"
-        description="作成と変更はオーナーと管理者だけができます。必要なときはオーナーか管理者に頼んでください。"
-        action={<Button href="/auto-replies">自動応答の一覧へ戻る</Button>}
+      <NoPermissionV8
+        featureName="自動応答"
+        capabilitiesHref="/staff"
+        backLabel="自動応答の一覧へ戻る"
+        backHref="/auto-replies"
       />
     )
   }
