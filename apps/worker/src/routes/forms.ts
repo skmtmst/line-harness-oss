@@ -3412,7 +3412,7 @@ async function runFormPostEffects(input: {
           contents: [
             ...answerRows,
             { type: 'separator', margin: 'lg' },
-            { type: 'text', text: '他社サービスでは、フォームの回答内容に合わせたリアルタイム返信はできません。LINE Harnessだからこそ可能な体験です。', size: 'xs', color: '#06C755', weight: 'bold', wrap: true, margin: 'lg' },
+            { type: 'text', text: '他社サービスでは、フォームの回答内容に合わせたリアルタイム返信はできません。musubo だからこそ可能な体験です。', size: 'xs', color: '#06C755', weight: 'bold', wrap: true, margin: 'lg' },
           ],
           paddingAll: '20px',
         },

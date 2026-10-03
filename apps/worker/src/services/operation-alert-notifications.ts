@@ -1,6 +1,7 @@
 import { LineClient } from '@line-crm/line-sdk';
 
 import type { Env } from '../index.js';
+import { renderMailHtml } from './mail-html.js';
 import { sendOperationEmail } from './operation-notifications.js';
 
 type OutboxRow = {
@@ -83,8 +84,9 @@ export async function processOperationAlertNotificationOutbox(
         if (!row.email) throw new Error('alert_email_recipient_unavailable');
         await sendOperationEmail(env, {
           to: row.email,
-          subject: '【LINE Harness】運用状態の確認が必要です',
+          subject: '【musubo】運用状態の確認が必要です',
           body: text,
+          html: renderMailHtml({ heading: '運用状態の確認が必要です', paragraphs: [text] }),
         });
       }
       await env.DB.prepare(

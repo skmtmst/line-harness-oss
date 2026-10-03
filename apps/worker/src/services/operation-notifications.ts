@@ -1,6 +1,8 @@
 import { LineClient } from '@line-crm/line-sdk';
 
 import type { Env } from '../index.js';
+import { mailFromName } from './mail-from-name.js';
+import { renderMailHtml } from './mail-html.js';
 
 type OutboxRow = {
   id: string;
@@ -11,18 +13,26 @@ type OutboxRow = {
 
 type RecipientRow = { email: string | null; line_user_id: string | null };
 
+/*
+ * 運用の知らせを送る。
+ *
+ * 差出人の表示名は件名から決める（mail-from-name）。ここで渡さないと
+ * 【musubo】の件名でも「然-NEN- お客様窓口」から届いてしまう。
+ * html は飾り付きの本文。無ければ今までどおり文字だけで送る。
+ */
 export async function sendOperationEmail(
   env: Env['Bindings'],
-  input: { to: string; subject: string; body: string },
+  input: { to: string; subject: string; body: string; html?: string },
 ): Promise<void> {
+  const message = { ...input, fromName: mailFromName(input.subject) };
   if (env.XSERVER_RELAY_URL && env.XSERVER_RELAY_SECRET) {
     const { sendViaXServerRelay } = await import('./support-relay.js');
-    await sendViaXServerRelay(env.XSERVER_RELAY_URL, env.XSERVER_RELAY_SECRET, input);
+    await sendViaXServerRelay(env.XSERVER_RELAY_URL, env.XSERVER_RELAY_SECRET, message);
     return;
   }
   const { sendXServerMail } = await import('./xserver-mail.js');
   await sendXServerMail(env, {
-    ...input,
+    ...message,
     from: env.CONTACT_EMAIL || env.XSERVER_MAIL_USER || 'contact-shed@nen-petfood.com',
   });
 }
@@ -70,7 +80,14 @@ export async function processOperationNotificationOutbox(
         }
       } else {
         for (const recipient of recipients.results ?? []) {
-          if (recipient.email) await sendOperationEmail(env, { to: recipient.email, subject: '【然-NEN-】運用状態の重要なお知らせ', body: text });
+          if (recipient.email) {
+            await sendOperationEmail(env, {
+              to: recipient.email,
+              subject: '【musubo】運用状態の重要なお知らせ',
+              body: text,
+              html: renderMailHtml({ heading: '運用状態の重要なお知らせ', paragraphs: [text] }),
+            });
+          }
         }
       }
       await env.DB.prepare(

@@ -56,7 +56,12 @@ export async function sendViaXServerRelay(
   secret: string,
   // fromName は差出人の表示名。Xserver 側で許可した名前だけが使われ、
   // それ以外は中継の既定値（然-NEN- お客様窓口）に落ちる。
-  input: { to: string; subject: string; body: string; fromName?: string; inReplyTo?: string; references?: string },
+  // html は飾り付きの本文。中継PHPが html を受け取れる版でないと
+  // 無視されて body の文字だけが届く（落ちはしない）。
+  input: {
+    to: string; subject: string; body: string; html?: string;
+    fromName?: string; inReplyTo?: string; references?: string;
+  },
 ): Promise<string> {
   const body = JSON.stringify(input);
   const timestamp = String(Math.floor(Date.now() / 1000));

@@ -2057,7 +2057,7 @@ export default function BroadcastForm({
             */}
             <div>
               <h3 className="text-lg font-bold text-ink">メッセージを作成</h3>
-              <p className="mt-1 text-xs text-ink-faint">外部サービスの配信形式に加え、LINE Harnessの拡張形式も選択できます。</p>
+              <p className="mt-1 text-xs text-ink-faint">外部サービスの配信形式に加え、musubo の拡張形式も選択できます。</p>
             </div>
             <button
               type="button"

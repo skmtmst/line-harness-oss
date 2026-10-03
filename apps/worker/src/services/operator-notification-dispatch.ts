@@ -10,6 +10,7 @@ import {
   getActiveNotificationRulesByEvent,
   type NotificationRuleRow,
 } from '@line-crm/db';
+import { renderMailHtml } from './mail-html.js';
 import { sendOperationEmail } from './operation-notifications.js';
 import { isKnownOperatorEventType } from './operator-notification-registry.js';
 import {
@@ -527,6 +528,11 @@ async function sendEmailDelivery(
       to: input.to,
       subject: input.subject,
       body: input.text,
+      // 見出しは件名から【musubo】を外したもの。本文の正本は text のまま。
+      html: renderMailHtml({
+        heading: input.subject.replace(/^【[^】]*】/, '').trim() || input.subject,
+        paragraphs: [input.text],
+      }),
     });
     return finishOperatorDelivery(db, {
       id: input.deliveryId,
@@ -710,7 +716,7 @@ export async function dispatchOperatorRule(
           retryKey: claimed.retryKey,
           to: recipient.email,
           canUseEmail: preview.channels.email,
-          subject: `【運用者へのお知らせ】${rule.name}`,
+          subject: `【musubo】運用者へのお知らせ：${rule.name}`,
           text,
         });
       if (outcome === 'accepted') accepted += 1;
@@ -886,7 +892,7 @@ export async function sweepOperatorNotifications(
           retryKey: row.idempotency_key,
           to: recipient.email,
           canUseEmail: preview.channels.email,
-          subject: `【運用者へのお知らせ】${ruleName}`,
+          subject: `【musubo】運用者へのお知らせ：${ruleName}`,
           text,
         })
         : await finishOperatorDelivery(db, {

@@ -326,7 +326,7 @@ describe('運用者へのお知らせの送信と実行記録', () => {
       data: { rules: [{ ruleId: 'rule-1', accepted: 1, excluded: 0 }] },
     });
     expect(sendOperationEmail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      to: 'owner@example.test', subject: '【運用者へのお知らせ】新しい予約',
+      to: 'owner@example.test', subject: '【musubo】運用者へのお知らせ：新しい予約',
     }));
     expect(testDb.raw.prepare(`SELECT channel, status FROM notification_deliveries`).get()).toEqual({
       channel: 'email', status: 'provider_accepted',
