@@ -2888,6 +2888,44 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   return res.json() as Promise<T>
 }
 
+/**
+ * よく開く一覧の取り方（前のデータをすぐ出して裏で取り直す用）。
+ *
+ * - readCachedList：覚えている分だけすぐ返す（無いときは null）。画面はこちらを先に出す。
+ * - refreshCachedList：ETag を付けて取り直す。変わっていなければ 304 で覚えていた分を返す。
+ * 覚えるのは本文と ETag だけ。秘密値・個人情報を鍵や値に混ぜない（path をそのまま鍵にする）。
+ */
+const listCache = new Map<string, { etag: string | null; body: unknown }>()
+
+export function readCachedList<T>(path: string): T | null {
+  return (listCache.get(path)?.body ?? null) as T | null
+}
+
+export async function refreshCachedList<T>(path: string): Promise<T> {
+  const cached = listCache.get(path)
+  const headers: Record<string, string> = { ...adminSessionHeaders() }
+  if (cached?.etag) headers['If-None-Match'] = cached.etag
+  const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
+    credentials: 'include',
+    headers,
+  })
+  if (res.status === 304 && cached) return cached.body as T
+  if (!res.ok) {
+    const raw = await res.text()
+    throw new ApiError(
+      res.status,
+      extractApiErrorMessage(raw, res.status),
+      extractApiErrorCode(raw),
+      undefined,
+      extractApiErrorTrackingId(raw),
+      parseRetryAfterSeconds(res.headers.get('Retry-After')),
+    )
+  }
+  const body = (await res.json()) as T
+  listCache.set(path, { etag: res.headers.get('ETag'), body })
+  return body
+}
+
 async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
