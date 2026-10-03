@@ -72,6 +72,26 @@ export interface CreateBookingResponse {
   booking_id: string;
   status: string;
   payment?: { id: string; status: string; holdUntil: string | null } | null;
+  /** 無断キャンセルが続いている人への前払いのみの案内。対象のときだけ付く。 */
+  prepayNotice?: string;
+}
+
+/** 前回と同じで予約：本人の前回の予約。無い・使えないときは available=false。 */
+export interface LastBookingResponse {
+  available: boolean;
+  reason?: string;
+  booking?: {
+    id: string;
+    starts_at: string;
+    status: string;
+    menu: { id: string; name: string };
+    staff: { id: string; display_name: string; profile_image_url: string | null };
+  };
+}
+
+/** 自分のキャンセル待ち登録。無いときは entry: null。 */
+export interface WaitlistMineResponse {
+  entry: { id: string; status: string; created_at: string } | null;
 }
 
 /** お客さまが見る支払いの状態。 */
@@ -299,6 +319,29 @@ export const api = {
       `/api/liff/booking/payments/by-booking?bookingId=${encodeURIComponent(bookingId)}`,
     ),
   me: () => get<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] }>('/api/liff/booking/me'),
+  /** 前回と同じで予約：本人の前回の予約を返す。失敗・対象外は呼び側が黙って隠す。 */
+  lastBooking: () => get<LastBookingResponse>('/api/liff/booking/last-booking'),
+  /** 満席の枠に「空いたら知らせる」を登録する。 */
+  registerWaitlist: (body: { staff_id: string; menu_id: string; starts_at: string }) =>
+    post<{ id: string }>('/api/liff/booking/waitlist', body),
+  /** 枠を指定して自分の待ち登録を返す。 */
+  waitlistMine: (staffId: string, menuId: string, startsAt: string) => {
+    const qs = new URLSearchParams({ staff_id: staffId, menu_id: menuId, starts_at: startsAt });
+    return get<WaitlistMineResponse>(`/api/liff/booking/waitlist/mine?${qs}`);
+  },
+  /** 自分のキャンセル待ちを取り消す。 */
+  cancelWaitlist: (id: string) =>
+    fetch(`${BASE}/api/liff/booking/waitlist/${encodeURIComponent(id)}?liffId=${encodeURIComponent(getLiffId())}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const err = new Error(`API ${res.status}`) as Error & { status: number };
+        err.status = res.status;
+        throw err;
+      }
+      return res.json() as Promise<{ status: string }>;
+    }),
 
   // ===== Event booking =====
   getEvent: (id: string) => get<EventDetail>(`/api/liff/events/${id}`),

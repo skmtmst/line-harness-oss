@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MenuList from '../components/MenuList.js';
+import RepeatCard from '../components/RepeatCard.js';
 import StaffList from '../components/StaffList.js';
 import DateTimePicker, { type SlotPick } from '../components/DateTimePicker.js';
 import Confirm from '../components/Confirm.js';
@@ -72,7 +73,14 @@ export default function Booking() {
         {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
         <div key={step} className="liff-step">
         {step === 'menu' && (
-          <div data-design-node="IruGD">
+          <div data-design-node="IruGD" className="space-y-3.5">
+            <RepeatCard
+              onRepeat={(m, s) => {
+                pickMenu(m);
+                pickStaff(s);
+                setStep('datetime');
+              }}
+            />
             <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} onLoadState={setStepReady} />
           </div>
         )}
