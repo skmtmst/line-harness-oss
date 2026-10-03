@@ -35,6 +35,7 @@ const GUARDED = [
   'app/conversions/new/page.tsx',
   'app/ec-commerce/connector-panel.tsx',
   'app/form-submissions/edit/page.tsx',
+  'app/friend-add-settings/editor-v8.tsx',
   'app/friend-add-settings/friend-add-rule-editor.tsx',
   'app/inflow-links/new/page.tsx',
   'app/line-notifications/operator/new/page.tsx',

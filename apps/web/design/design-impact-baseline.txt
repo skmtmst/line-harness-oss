@@ -92,6 +92,7 @@ shared-button-importer app/form-submissions/edit/page.tsx
 shared-button-importer app/form-submissions/list-v8.tsx
 shared-button-importer app/form-submissions/page.tsx
 shared-button-importer app/form-submissions/responses/page.tsx
+shared-button-importer app/friend-add-settings/editor-v8.tsx
 shared-button-importer app/friend-add-settings/friend-add-rule-editor.tsx
 shared-button-importer app/friend-add-settings/list-v8.tsx
 shared-button-importer app/friend-add-settings/page.tsx
