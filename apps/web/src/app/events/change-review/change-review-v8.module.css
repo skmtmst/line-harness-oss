@@ -1,0 +1,169 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8-B イベント予約の「変更の確認」（板 `hmr2P`）。
+ *
+ * 処理は `change-review-model.ts` の useChangeReview で v7 と同じ。
+ * 違いは置き場と見せ方だけ——左に開催回と変える内容、右に影響の確認と
+ * 約束、下に追従する変える・やめるの帯。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.backLink {
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.headTitle {
+  margin: 8px 0 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 左（入力）と右（確認・約束）の2列。 */
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  padding: 16px;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cardNote {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+/* 影響の確認の黄色い帯。 */
+.impactBand {
+  margin-top: 12px;
+  background: var(--color-warning-bg);
+  border-radius: var(--radius-control, 8px);
+  padding: 12px;
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.impactBandTitle {
+  font-weight: 600;
+}
+
+/* 変える前→変えた後。 */
+.beforeAfter {
+  margin: 12px 0 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* LINE の文面の見本の吹き出し。 */
+.sampleBubble {
+  margin-top: 8px;
+  background: var(--color-canvas-sunken);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  padding: 12px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+/* 約束の箇条書き。 */
+.promiseList {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.promiseList li {
+  padding-left: 1em;
+  text-indent: -1em;
+}
+
+.promiseList li::before {
+  content: '・';
+}
+
+/* 下に追従する帯（やめる・変えてお知らせする）。 */
+.footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--color-canvas);
+  border-top: 1px solid var(--color-hairline);
+  padding: 12px 0;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* 板が 1100px を切ったら1列にする（V8 の決まり）。 */
+@container (max-width: 1099px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fieldGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

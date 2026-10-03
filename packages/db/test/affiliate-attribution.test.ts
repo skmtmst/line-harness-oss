@@ -404,10 +404,18 @@ describe('trackConversion + attribution integration', () => {
       createdAt: jstDaysAgo(2),
     });
 
-    const ev = (await trackConversion(db, {
-      conversionPointId: 'cp-1',
-      friendId: 'friend-x',
-    })) as ConversionEvent & {
+    // Pin conversion-clock to the same frozen NOW the touch is anchored to:
+    // trackConversion otherwise stamps with Date.now(), and the 2-day-old
+    // touch (2026-07-05) would fall outside the 90-day attribution window
+    // on any real clock past 2026-10-03, yielding null instead of aff-1.
+    const ev = (await trackConversion(
+      db,
+      {
+        conversionPointId: 'cp-1',
+        friendId: 'friend-x',
+      },
+      { now: new Date(NOW).getTime() },
+    )) as ConversionEvent & {
       affiliate_id: string | null;
       attributed_ref_code: string | null;
     };

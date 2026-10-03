@@ -121,6 +121,7 @@ function MembersInner() {
         const res = await api.staff.update(dialog.member.id, {
           role: value.role,
           isActive: value.isActive,
+          assignedLineAccountId: value.assignedLineAccountId,
           accountScope: value.accountScope,
           scopedLineAccountIds: value.scopedLineAccountIds,
           managementContext: 'hq',
@@ -211,7 +212,7 @@ function MembersInner() {
 
           <div data-design="Note" data-design-node="Y1EarL">
             <NoteBar tone="info" help="権限者は統括の管理画面に入れる人です" helpLabel="権限者の意味">
-              権限者は統括の管理画面に入れる人です。担当アカウントを限定すると、そのアカウントの管理画面だけが見えます。招待メールの有効期限は48時間です。
+              権限者は統括の管理画面に入れる人です。担当アカウントを限定すると、そのアカウントの管理画面だけが見えます。招待メールの有効期限は7日間です。
             </NoteBar>
           </div>
 

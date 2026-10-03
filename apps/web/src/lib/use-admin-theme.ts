@@ -22,10 +22,12 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
 export function useAdminTheme(): 'v7' | 'v8' {
   const [theme, setTheme] = useState<'v7' | 'v8'>('v7')
   useIsoLayoutEffect(() => {
-    const read = () => setTheme(document.documentElement.dataset.theme === 'v8' ? 'v8' : 'v7')
+    // 偽の document で描く試験（dataset が無い）では v7 に倒す。
+    const read = () => setTheme(document.documentElement.dataset?.theme === 'v8' ? 'v8' : 'v7')
     read()
-    window.addEventListener(ADMIN_THEME_CHANGED_EVENT, read)
-    return () => window.removeEventListener(ADMIN_THEME_CHANGED_EVENT, read)
+    // 偽の window で描く試験では聞き口が無いので付けない。
+    window.addEventListener?.(ADMIN_THEME_CHANGED_EVENT, read)
+    return () => window.removeEventListener?.(ADMIN_THEME_CHANGED_EVENT, read)
   }, [])
   return theme
 }
