@@ -856,6 +856,7 @@ export default function AdIntegration({
       <Dialog
         open={manualOpen}
         title="広告費を手で入れる"
+        designNode="ZxKL5"
         description="媒体から取り込めない分（チラシや看板など）を日ごとに記録します。同じ流入元・同じ日に入れ直すと上書きになります。"
         confirmLabel="記録する"
         busy={manualBusy}

@@ -225,12 +225,13 @@ export default function OpsMembersPage() {
         open={toggling !== null}
         title={toggling ? `${toggling.name} を${toggling.isActive ? '停止' : '再開'}しますか？` : ''}
         description={toggling?.isActive
-          ? '停止すると、この人は運営コンソールに入れなくなります。権限者としての登録は残ります。'
+          ? '停止すると、この人は運営コンソールに入れなくなります。あとで再開できます。'
           : '再開すると、この人はまた運営コンソールに入れるようになります。'}
         confirmLabel={toggling?.isActive ? '停止する' : '再開する'}
         destructive={Boolean(toggling?.isActive)}
         busy={busy}
         error={error}
+        designNode={toggling?.isActive ? 'VUyYu' : undefined}
         onConfirm={() => void toggle()}
         onCancel={() => { if (!busy) setToggling(null) }}
       />

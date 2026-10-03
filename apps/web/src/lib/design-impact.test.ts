@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする55ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする61ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -125,10 +125,18 @@ describe('共通部品の影響範囲', () => {
       // #291: 顧客へのお知らせ9種類を、設計どおり1ページ6件に区切る。
       'app/line-notifications/page.tsx',
       'app/mileage/action-score-tab.tsx',
+      // ★V8-B マイルの友だち詳細（R6kIG）。表の下にページ送りを置く。
+      'app/mileage/friends/detail/v8-friend-detail.tsx',
       'app/mileage/mileage-history-tab.tsx',
       // R365: 要対応の交換が21件以上あっても残りを出せるよう、20件ずつのページ送りに寄せた。
       'app/mileage/mileage-rewards-tab.tsx',
       'app/mileage/page.tsx',
+      // ★V8-B マイル5タブ（OC0gy・S35pO・CJlf4・oRbJi・IRPw8）。表の下にページ送りを置く。
+      'app/mileage/v8-balances-tab.tsx',
+      'app/mileage/v8-earning-rules-tab.tsx',
+      'app/mileage/v8-history-tab.tsx',
+      'app/mileage/v8-rewards-tab.tsx',
+      'app/mileage/v8-score-tab.tsx',
       // 2026-09-18: NEN配信のコラム一覧（★V6 37-6-A）。8本ずつのページ送り。
       'app/nen-campaigns/nen-overview.tsx',
       // 2026-09-16 採用: 然の健康日記（★V6 37-4）とマイペット（★V6 37-3）。20頭ずつのページ送り。
@@ -178,6 +186,8 @@ describe('共通部品の影響範囲', () => {
       'app/users/users-v8.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
+      // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。
+      'app/webinars/list-v8.tsx',
       'app/webinars/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',
       'components/friend-fields/tags-page-v4.tsx',

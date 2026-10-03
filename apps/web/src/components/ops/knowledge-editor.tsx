@@ -15,14 +15,19 @@ import styles from './knowledge.module.css'
 import Notice from '@/components/shared/notice'
 
 /** ★V6 37-11-A DHdsw / 37-11-B ZAOc7. Mount with key={article.id}. */
-export default function KnowledgeEditor({ article: initial, onClose, onSaved }: {
-  article: OpsKnowledgeArticle; onClose: () => void; onSaved: () => void
+export default function KnowledgeEditor({ article: initial, ticket, onClose, onSaved }: {
+  article: OpsKnowledgeArticle
+  /** 板 `eSXxA` の2つ目の確認と赤帯に使う元の問い合わせ。ないときは出さない。 */
+  ticket?: { label: string; resolved: boolean; stageLabel: string } | null
+  onClose: () => void; onSaved: () => void
 }) {
   const [article, setArticle] = useState(initial)
   const [form, setForm] = useState<OpsKnowledgeInput>({ title: initial.title, question: initial.question,
     answer: initial.answer, kind: initial.kind, keywords: initial.keywords })
   const [keywords, setKeywords] = useState(initial.keywords.join('、'))
-  const [confirmed, setConfirmed] = useState(false)
+  /* 板 `eSXxA`：承認する前に小窓で2つ確かめる。 */
+  const [approving, setApproving] = useState(false)
+  const [readChecked, setReadChecked] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const editing = initial.reviewState === 'approved' && initial.sourceCurrent
@@ -33,10 +38,11 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
   const canApprove = eligible && Boolean(form.question.trim()) && Boolean(form.answer.trim())
   const input = () => ({ ...form, keywords: keywords.split(/[、,\n]/).map(v => v.trim()).filter(Boolean) })
   const change = <K extends keyof OpsKnowledgeInput>(key: K, value: OpsKnowledgeInput[K]) => {
-    setForm(f => ({ ...f, [key]: value })); setConfirmed(false)
+    setForm(f => ({ ...f, [key]: value })); setReadChecked(false)
   }
+  const ticketBlocked = Boolean(ticket && !ticket.resolved)
   const save = async (approve = false) => {
-    if (approve && (!confirmed || !eligible)) return
+    if (approve && (!readChecked || !eligible || ticketBlocked)) return
     const value = input()
     if (!value.title.trim() || (eligible && (!value.question.trim() || !value.answer.trim()))) {
       setError('題名・質問・答えを入力してください'); return
@@ -50,7 +56,7 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
     if (approve) {
       const reviewed = await opsCall(api.ops.knowledge.review(article.id, { version: saved.data.version, action: 'approve', confirmed: true }))
       if (!reviewed.success) {
-        setConfirmed(false); setError(reviewed.error || '承認できませんでした。元のやり取りを確認してください')
+        setReadChecked(false); setError(reviewed.error || '承認できませんでした。元のやり取りを確認してください')
         setBusy(false); onSaved(); return
       }
     }
@@ -68,7 +74,7 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
     footer={<div className={styles.footer}>
       <Button onClick={editing ? onClose : () => void dismiss()} disabled={busy}>{editing ? '保存せず閉じる' : '見送る'}</Button>
       <Button onClick={() => void save()} disabled={busy} variant={editing ? 'primary' : 'secondary'}>{editing ? '承認待ちで保存する' : '下書きを保存する'}</Button>
-      {!editing && <Button variant="primary" disabled={busy || !canApprove || !confirmed} onClick={() => void save(true)}>承認して有効にする</Button>}
+      {!editing && <Button variant="primary" disabled={busy || !canApprove} onClick={() => { setError(''); setApproving(true) }}>承認して有効にする</Button>}
     </div>}>
     <div className={styles.editor}>
       {/* ★V7: 緑は「正常」だけ。説明の帯は枠なしの info の小さい帯にする。 */}
@@ -94,11 +100,55 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
       <label className={styles.field}><span>質問</span><TextArea className={styles.question} value={form.question} maxLength={1000} disabled={busy} onChange={e => change('question', e.target.value)} /></label>
       <label className={styles.field}><span>答え</span><TextArea className={styles.answer} value={form.answer} maxLength={12000} disabled={busy} onChange={e => change('answer', e.target.value)} /></label>
       {!form.answer.trim() && article.articleKind === 'answer_example' && <p data-design-node="aeEmptyAnswerNote" className={styles.emptyAnswerNote}>運営の回答がありません。答えを書いて承認できます</p>}
-      <label className={styles.field}><span>キーワード</span><TextField value={keywords} maxLength={480} disabled={busy} onChange={e => { setKeywords(e.target.value); setConfirmed(false) }} /></label>
+      <label className={styles.field}><span>キーワード</span><TextField value={keywords} maxLength={480} disabled={busy} onChange={e => { setKeywords(e.target.value); setReadChecked(false) }} /></label>
       <label className={`${styles.field} ${styles.kind}`}><span>種類</span><Select aria-label="種類" options={KNOWLEDGE_KINDS} value={form.kind} disabled={busy} onChange={value => change('kind', value as OpsKnowledgeInput['kind'])} /></label>
-      {!editing && <span data-design-node="xNNWI"><Checkbox checked={confirmed} disabled={busy || !eligible} onCheckedChange={setConfirmed}>{article.articleKind === 'verified'
-        ? '解決策と結果を元のやり取りで確認しました'
-        : '回答内容が正しいことを元のやり取りで確認しました'}</Checkbox></span>}
     </div>
+    {/* 板 `eSXxA`「記事を承認する前に」。2つ確かめてから保存して承認する。 */}
+    {!editing && (
+      <Dialog
+        open={approving}
+        title="記事を承認する前に"
+        designNode="eSXxA"
+        busy={busy}
+        error={error || undefined}
+        onCancel={() => { if (!busy) setApproving(false) }}
+        footer={(
+          <div className={styles.footer}>
+            <Button onClick={() => void save()} disabled={busy} variant="secondary">下書きで保存</Button>
+            <Button
+              variant="primary"
+              disabled={busy || !canApprove || !readChecked || ticketBlocked}
+              busy={busy}
+              busyLabel="処理中…"
+              onClick={() => void save(true)}
+            >
+              保存して承認
+            </Button>
+          </div>
+        )}
+      >
+        <div className={styles.editor}>
+          <p className={styles.source}>{form.title.trim() || '題名未入力'}</p>
+          <span data-design-node="xNNWI">
+            <Checkbox checked={readChecked} disabled={busy || !eligible} onCheckedChange={setReadChecked}>
+              本文と手順を読み、いまの作りと合っていることを確かめました
+            </Checkbox>
+          </span>
+          {ticket ? (
+            <Checkbox checked={ticket.resolved} disabled onCheckedChange={() => {}}>
+              元の問い合わせ {ticket.label} が「解決」になっている
+            </Checkbox>
+          ) : null}
+          {ticketBlocked ? (
+            <Notice tone="error">
+              元の問い合わせ {ticket?.label} がまだ「{ticket?.stageLabel}」です。解決にしてから承認できます。
+            </Notice>
+          ) : null}
+          <Notice tone="info">
+            承認すると、AIの返事の下書きにこの記事が使われます。保存だけ通って承認に失敗したときは、下書きのまま残ります。
+          </Notice>
+        </div>
+      </Dialog>
+    )}
   </Dialog>
 }

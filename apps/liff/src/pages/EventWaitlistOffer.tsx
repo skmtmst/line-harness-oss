@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import liff from '@line/liff';
 import { api } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
-import Card from '../components/ui/Card.js';
 import Button from '../components/ui/Button.js';
+import BottomBar from '../components/ui/BottomBar.js';
 import Icon from '../components/ui/Icon.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
 import StatusView from '../components/ui/StatusView.js';
 
 type State = 'ready' | 'submitting' | 'confirmed' | 'expired' | 'unavailable' | 'error';
@@ -41,7 +43,8 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-ground">
+    <div className="min-h-screen bg-ground" data-design-node="BjcuB">
+      <LiffHeader title="イベント" />
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
         {state === 'confirmed' ? (
           <div className="space-y-4">
@@ -94,15 +97,30 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
             </Button>
           </div>
         ) : (
-          <Card className="space-y-3 p-6">
-            <h1 className="text-base font-bold text-ink">キャンセル待ちの空きが出ました</h1>
-            <p className="text-sm leading-6 text-ink-secondary">
-              下のボタンを押すと予約が確定します。押すまでは予約になりません。
-            </p>
-            <Button variant="primary" onClick={accept} disabled={state === 'submitting'}>
-              {state === 'submitting' ? '予約を確定しています…' : 'この席を予約する'}
-            </Button>
-          </Card>
+          <div className="pb-28">
+            <div className="flex flex-col items-center px-6 py-10 text-center">
+              <span
+                className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-soft text-liff-primary"
+                aria-hidden="true"
+              >
+                <Icon name="circle-check" className="h-9 w-9" />
+              </span>
+              <p className="mt-4 text-[17px] font-bold text-ink">空きが出ました</p>
+              <p className="mt-2 text-[13px] leading-6 text-pretty text-liff-sub">
+                下のボタンを押すと予約が確定します。
+                <br />
+                押すまでは予約になりません。
+              </p>
+            </div>
+            <BottomBar>
+              <Button variant="primary" onClick={accept} disabled={state === 'submitting'}>
+                {state === 'submitting' ? '予約を確定しています…' : 'この席を取る'}
+              </Button>
+              <Button variant="secondary" onClick={() => liff.closeWindow()} disabled={state === 'submitting'}>
+                今回は見送る
+              </Button>
+            </BottomBar>
+          </div>
         )}
       </div>
     </div>

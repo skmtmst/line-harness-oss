@@ -186,7 +186,7 @@ export default function NewRestaurantStorePage() {
     }
   }
 
-  return <div className="flex flex-col gap-4">
+  return <div className="flex flex-col gap-4" data-design-node={step === STEP.TERMS ? 'ao15G' : step === STEP.BASICS ? 'faGn4' : undefined}>
     <div className="flex justify-end">
       <Link href="/hq" className="text-sm font-semibold text-action">統括へ戻る</Link>
     </div>

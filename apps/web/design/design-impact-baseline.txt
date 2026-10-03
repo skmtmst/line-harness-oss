@@ -137,6 +137,17 @@ shared-button-importer app/mileage/mileage-rewards-tab.tsx
 shared-button-importer app/mileage/page.tsx
 shared-button-importer app/mileage/rewards/edit/page.tsx
 shared-button-importer app/mileage/score-rules/page.tsx
+shared-button-importer app/mileage/mileage-v8.tsx
+shared-button-importer app/mileage/v8-balances-tab.tsx
+shared-button-importer app/mileage/v8-earning-rules-tab.tsx
+shared-button-importer app/mileage/v8-history-tab.tsx
+shared-button-importer app/mileage/v8-rewards-tab.tsx
+shared-button-importer app/mileage/v8-score-tab.tsx
+shared-button-importer app/mileage/earning-rules/new/v8-earning-rule-new.tsx
+shared-button-importer app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx
+shared-button-importer app/mileage/rewards/edit/v8-reward-edit.tsx
+shared-button-importer app/mileage/friends/detail/v8-friend-detail.tsx
+shared-button-importer app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx
 shared-button-importer app/nen-campaigns/columns/new/page.tsx
 shared-button-importer app/nen-campaigns/edit/campaign-editor.tsx
 shared-button-importer app/nen-campaigns/edit/page.tsx
@@ -262,6 +273,8 @@ shared-button-importer app/webhooks/webhook-overviews.tsx
 shared-button-importer app/webinars/edit/page.tsx
 shared-button-importer app/webinars/edit/session-capacity-cell.tsx
 shared-button-importer app/webinars/edit/video-stages.tsx
+shared-button-importer app/webinars/list-v8.tsx
+shared-button-importer app/webinars/new/new-v8.tsx
 shared-button-importer app/webinars/new/page.tsx
 shared-button-importer app/webinars/page.tsx
 shared-button-importer app/webinars/published/page.tsx

@@ -76,3 +76,9 @@ docs/design-reference/**/*.png
 # 手元で `capture.spec.mjs` を回すときは、その場で作り直す。
 scripts/visual-qa/capture.spec.mjs-snapshots/
 apps/liff/scripts/qa-shots-out/
+# V8 の見本の写し。`sync-v8-design-refs.mjs` で作り直せるので版に入れない。
+scripts/visual-qa/v8-design-refs/
+# V8 見本比較の出力。`v8-parity.mjs` で作り直せるので版に入れない。
+scripts/visual-qa/v8-parity-out/
+# Playwright のブラウザ置き場（砂場では ~/Library に書けないための作業場所）。
+.playwright-browsers/
