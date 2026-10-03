@@ -336,6 +336,67 @@ describe('F-23 ケース6: 帰属版の保存失敗→再送→報酬編集→�
     expect(rejected).toMatchObject({ outcome: 'updated', currentStatus: 'rejected' });
   });
 
+  test('同じmsで新版が並んだら旧額と断定せず承認しない（独立SOURCE監査の有限順序）', async () => {
+    // 有限順序：成果の処理now採取→v1判断→判断保存失敗→同じmsでv2保存→後の承認。
+    // 実入口（trackConversionへ処理時刻を固定）と既存関数（createOfferVersion）で再現する。
+    const v1 = await createOfferVersion(db, { offerId: 'offer-1', rewardAmount: 1000 });
+    backdateVersion(v1.id, BEFORE_MS - 2 * 86_400_000);
+    insertTouch('t1', 'ref-1', 'friend-1', BEFORE_MS - 86_400_000);
+    const event = await trackConversion(
+      db,
+      { conversionPointId: 'point-1', friendId: 'friend-1', idempotencyKey: 'f23-c6-samems' },
+      { now: BEFORE_MS },
+    );
+    expect((await getAttributionDecision(db, event.id))?.offer_version_id).toBe(v1.id);
+    const recordedAt = (sqlite.prepare(
+      `SELECT created_at FROM conversion_events WHERE id = ?`,
+    ).get(event.id) as { created_at: string }).created_at;
+
+    // 判断の保存だけ落ちた状態にする。
+    sqlite.prepare(`DELETE FROM affiliate_attribution_decisions WHERE conversion_event_id = ?`).run(event.id);
+
+    // 同じmsで新版が保存される（作成時刻を記録時刻と完全一致させる）。
+    const v2 = await createOfferVersion(db, { offerId: 'offer-1', rewardAmount: 2000 });
+    sqlite.prepare(`UPDATE affiliate_offer_versions SET created_at = ? WHERE id = ?`).run(recordedAt, v2.id);
+    await updateAffiliateOffer(db, 'offer-1', { reward_amount: 2000 });
+
+    // v2（新額2000）で固まってはならない。当時版は確定不能のため承認しない。
+    const decided = await decideConversionApproval(db, event.id, 'approved', 'pending');
+    expect(decided).toMatchObject({ outcome: 'unbillable', currentStatus: 'pending' });
+    const status = sqlite.prepare(
+      `SELECT approval_status, approval_fixed_reward FROM conversion_events WHERE id = ?`,
+    ).get(event.id) as { approval_status: string; approval_fixed_reward: number | null };
+    expect(status.approval_status).toBe('pending');
+    expect(status.approval_fixed_reward).toBeNull();
+    const calcs = sqlite.prepare(
+      `SELECT COUNT(*) AS n FROM affiliate_reward_calculations WHERE conversion_event_id = ?`,
+    ).get(event.id) as { n: number };
+    expect(calcs.n).toBe(0);
+  });
+
+  test('同時刻の版が1件だけならその版で旧額が決まる（過剰な拒否をしない）', async () => {
+    const v1 = await createOfferVersion(db, { offerId: 'offer-1', rewardAmount: 1000 });
+    insertTouch('t1', 'ref-1', 'friend-1', BEFORE_MS - 86_400_000);
+    const event = await trackConversion(
+      db,
+      { conversionPointId: 'point-1', friendId: 'friend-1', idempotencyKey: 'f23-c6-samems-single' },
+      { now: BEFORE_MS },
+    );
+    const recordedAt = (sqlite.prepare(
+      `SELECT created_at FROM conversion_events WHERE id = ?`,
+    ).get(event.id) as { created_at: string }).created_at;
+    // 判断を落とし、唯一の版の作成時刻を記録時刻と一致させる。
+    sqlite.prepare(`DELETE FROM affiliate_attribution_decisions WHERE conversion_event_id = ?`).run(event.id);
+    sqlite.prepare(`UPDATE affiliate_offer_versions SET created_at = ? WHERE id = ?`).run(recordedAt, v1.id);
+
+    // 報酬編集のあと承認する（新版は記録時刻より後）。
+    await createOfferVersion(db, { offerId: 'offer-1', rewardAmount: 2000 });
+    await updateAffiliateOffer(db, 'offer-1', { reward_amount: 2000 });
+    const decided = await decideConversionApproval(db, event.id, 'approved', 'pending');
+    expect(decided.outcome).toBe('updated');
+    expect(calcOf(event.id)).toMatchObject({ fixed_reward_snapshot: 1000, amount_minor: 1000 });
+  });
+
   test('setConversionApproval でも当時版未確定の承認は通さない', async () => {
     sqlite.prepare(
       `INSERT INTO conversion_events
