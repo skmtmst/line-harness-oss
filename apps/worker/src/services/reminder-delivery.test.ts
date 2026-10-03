@@ -1102,6 +1102,126 @@ describe('Meet個別相談のV6送信の最終関係フェンス', () => {
     ).get()).toEqual({ c: 0 })
   })
 
+  it('停止照会await中に実registerで両新版へ進めても旧payloadを送らない', async () => {
+    // A候補の日時は未来に置く (実registerは未来日時のみ受ける)。
+    const targetA = '2026-11-02T10:00:00.000Z'
+    const targetB = '2026-11-03T10:00:00.000Z'
+    const endB = '2026-11-03T11:00:00.000Z'
+    const { db, raw } = createTestD1()
+    seedMeetLinked(raw, targetA)
+    // 勝者の実再登録が V6 登録を動かすための予約ルール (published)。
+    // 登録-1をこのルールへ結び替える (製品のmeet V6登録と同じ所属)。
+    raw.prepare(
+      `INSERT INTO reminders
+         (id, name, line_account_id, is_active, trigger_type, delivery_mode, lifecycle_status)
+       VALUES ('rb-booking', '予約', 'account-1', 1, 'booking', 'countdown', 'published')`,
+    ).run()
+    raw.prepare(
+      `INSERT INTO reminder_steps
+         (id, reminder_id, offset_minutes, message_type, message_content)
+       VALUES ('step-b', 'rb-booking', -60, 'text', 'ご来店をお待ちしています')`,
+    ).run()
+    raw.prepare(
+      `UPDATE friend_reminders SET reminder_id = 'rb-booking' WHERE id = 'enrollment-1'`,
+    ).run()
+    // 新版へ再利用される前の子IDを先に固定する (旧senderが触らないことの対照)。
+    raw.prepare(
+      `INSERT INTO meet_consultation_reminders
+         (id, consultation_id, kind, scheduled_at, status, retry_count)
+       VALUES ('mcr-day-seed', 'consult-1', 'day_before', '2026-11-01T10:00:00.000Z', 'pending', 0),
+              ('mcr-hour-seed', 'consult-1', 'hour_before', '2026-11-02T09:00:00.000Z', 'pending', 0)`,
+    ).run()
+    const { registerMeetConsultation } = await import('./meet-consultation-reminders.js')
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: 'line-request-1' }
+    })
+    // 最終の停止照会awaitの中で勝者が動くよう、DBにシームを仕掛ける。
+    // beforePush (照合より前) では武装だけし、移動自体は停止照会の解決中に終える。
+    const arm = { current: false }
+    type MiniBound = {
+      all: (...a: unknown[]) => Promise<unknown>
+      first: (...a: unknown[]) => Promise<unknown>
+      run: (...a: unknown[]) => Promise<unknown>
+    }
+    const realPrepare = db.prepare.bind(db) as unknown as (sql: string) => {
+      bind: (...a: unknown[]) => MiniBound
+    }
+    const stopSeamDb = {
+      prepare: (sql: string) => {
+        if (!sql.includes('operation_control_sets')) return realPrepare(sql)
+        const realBind = realPrepare(sql).bind
+        return {
+          bind: (...a: unknown[]) => {
+            const bound = realBind(...a)
+            return {
+              ...bound,
+              all: async (...callArgs: unknown[]) => {
+                if (arm.current) {
+                  arm.current = false
+                  await db.prepare(
+                    `UPDATE bookings SET lock_version = 1, starts_at = ?, updated_at = ? WHERE id = 'booking-1'`,
+                  ).bind(targetB, '2026-11-02T09:00:00.000Z').run()
+                  const renewed = await registerMeetConsultation(db, {
+                    externalEventId: 'evt-1',
+                    friendId: 'friend-1',
+                    title: '個別相談',
+                    startsAt: targetB,
+                    endsAt: endB,
+                    meetUrl: 'https://meet.google.com/aaa-bbbb-ccc',
+                    bookingId: 'booking-1',
+                    bookingVersion: 1,
+                  })
+                  expect(renewed.updated).toBe(true)
+                }
+                return bound.all(...callArgs)
+              },
+            }
+          },
+        }
+      },
+      batch: db.batch.bind(db),
+    } as unknown as Parameters<typeof processReminderDeliveries>[0]
+
+    const result = await processReminderDeliveries(stopSeamDb, client, {
+      now: new Date('2026-11-02T09:00:00.000Z'),
+      pause: noPause,
+      resolveClient: async () => client,
+      beforePush: async () => {
+        arm.current = true
+      },
+    })
+
+    expect(pushes).toEqual([])
+    expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0, held: 0 })
+    // 実行行は勝者の reconcile で取消ずみ。旧senderは送らず、行にも触れない。
+    expect(raw.prepare(
+      `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-1'`,
+    ).get()).toEqual({ status: 'cancelled' })
+    // 勝者の新版通知は残る: 登録active・新対象日、相談版1・新日時、予約版1。
+    expect(raw.prepare(
+      `SELECT status, target_date FROM friend_reminders WHERE id = 'enrollment-1'`,
+    ).get()).toEqual({ status: 'active', target_date: targetB })
+    expect(raw.prepare(
+      `SELECT status, booking_version, starts_at FROM meet_consultations WHERE id = 'consult-1'`,
+    ).get()).toEqual({ status: 'confirmed', booking_version: 1, starts_at: targetB })
+    expect(raw.prepare(
+      `SELECT lock_version, starts_at FROM bookings WHERE id = 'booking-1'`,
+    ).get()).toEqual({ lock_version: 1, starts_at: targetB })
+    // 新版の子はpending・新予定日時・子ID不変。旧senderは作りも壊しもしない。
+    expect(raw.prepare(
+      `SELECT id, kind, status, scheduled_at FROM meet_consultation_reminders
+        WHERE consultation_id = 'consult-1' ORDER BY kind`,
+    ).all()).toEqual([
+      { id: 'mcr-day-seed', kind: 'day_before', status: 'pending', scheduled_at: '2026-11-02T10:00:00.000Z' },
+      { id: 'mcr-hour-seed', kind: 'hour_before', status: 'pending', scheduled_at: '2026-11-03T09:00:00.000Z' },
+    ])
+    expect(raw.prepare(
+      `SELECT COUNT(*) AS c FROM friend_reminder_deliveries WHERE friend_reminder_id = 'enrollment-1'`,
+    ).get()).toEqual({ c: 0 })
+  })
+
   it('送信権の取得後に相談が取消されても送らない (最終関係フェンス)', async () => {
     const { db, raw } = createTestD1()
     seedMeetLinked(raw)
