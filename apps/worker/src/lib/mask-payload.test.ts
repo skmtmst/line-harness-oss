@@ -49,8 +49,50 @@ describe('maskInteractionPayload', () => {
     }));
     const body = masked.body as Record<string, string>;
     expect(body.contact).toBe('***');
-    // 文の中に混ざった番号までは追わない（誤って消す側に倒さない）。
-    expect(body.memo).toBe('折り返し 03-1234-5678 まで');
+    // 文の中に混ざった番号も置き換える。
+    expect(body.memo).toBe('折り返し *** まで');
+  });
+
+  it('伏せる鍵の値が文字以外でも伏せる', () => {
+    const masked = maskInteractionPayload(JSON.stringify({
+      phone: 903334444,
+      emailVerified: false,
+      retryCount: 3,
+      active: true,
+    }));
+    expect(masked.body).toEqual({
+      phone: '***',
+      emailVerified: '***',
+      retryCount: 3,
+      active: true,
+    });
+  });
+
+  it('文の途中のメール・電話番号を置き換える', () => {
+    const masked = maskInteractionPayload(JSON.stringify({
+      memo: '連絡先 tanaka@example.com か 090-1234-5678 まで',
+    }));
+    const body = masked.body as Record<string, string>;
+    expect(body.memo).toBe('連絡先 *** か *** まで');
+    expect(body.memo).not.toContain('tanaka@example.com');
+    expect(body.memo).not.toContain('090-1234-5678');
+  });
+
+  it('LINE の userId・IP アドレス・生年月日の鍵を伏せる', () => {
+    const masked = maskInteractionPayload(JSON.stringify({
+      userId: 'Udeadbeefdeadbeefdeadbeefdeadbeef',
+      note: 'Udeadbeefdeadbeefdeadbeefdeadbeef から 192.168.1.10 で受信',
+      birthday: '1990-05-21',
+      birthplace: '東京',
+      orderDate: '2026-10-03',
+    }));
+    const body = masked.body as Record<string, string>;
+    expect(body.userId).toBe('***');
+    expect(body.note).toBe('*** から *** で受信');
+    expect(body.birthday).toBe('***');
+    expect(body.birthplace).toBe('***');
+    // 鍵の無い文中の日付は注文日と見分けられないため伏せない。
+    expect(body.orderDate).toBe('2026-10-03');
   });
 
   it('空・JSONでない本文は伏せようがなく null', () => {
