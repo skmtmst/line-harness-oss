@@ -4,16 +4,20 @@ import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8, { ReadonlyDesignNode } from '@/app/notifications/readonly-header-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import InlineEdit from '@/components/shared/inline-edit'
 import KpiCard from '@/components/shared/kpi-card'
 import StatusBadge from '@/components/shared/status-badge'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
+import { withViewTransition } from '@/components/shared/view-transition'
 import AccountOrdering from '@/components/accounts/account-ordering'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -44,12 +48,35 @@ type AccountWithStats = LineAccount & {
  */
 export default function AccountsPage() {
   const theme = useAdminTheme()
+  const isV8 = theme === 'v8'
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<AccountFilter>('all')
   const [orderingOpen, setOrderingOpen] = useState(false)
+  /* 行の詳しい内容（V8「サクサク感」C①）。開いているアカウントのID。v7 は使わない。 */
+  const [panelAccountId, setPanelAccountId] = useState<string | null>(null)
+
+  /** 一覧→詳しい画面はつながる移り変わりで進む（V8「サクサク感」E）。 */
+  const goOpen = (href: string) => {
+    withViewTransition(() => {
+      router.push(href)
+    })
+  }
+
+  /** 行の操作（V8「サクサク感」D）。右クリックでも詳細ボタンと同じ品ぞろえ。 */
+  const rowMenuItems = (account: AccountWithStats): ContextMenuItem[] => [
+    { id: 'detail', label: '詳細を開く', onSelect: () => goOpen(`/accounts/detail?id=${account.id}`) },
+  ]
+
+  /* その場の書き換え（V8「サクサク感」C②）。名前だけ送る分には追加の確認は要らない。 */
+  const saveAccountName = async (account: AccountWithStats, next: string) => {
+    const res = await api.lineAccounts.update(account.id, { name: next })
+    if (!res.success) throw new Error(res.error)
+    setAccounts((list) => list.map((item) => (item.id === account.id ? { ...item, name: next } : item)))
+  }
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -69,6 +96,30 @@ export default function AccountsPage() {
     () => accounts.filter((a) => matchesFilter(a, filter) && matchesQuery(a, query)),
     [accounts, filter, query],
   )
+
+  /* 行の詳しい内容（C①）。↑↓で次の行へ移る。見る並び（絞り込み後）に沿う。 */
+  const panelIndex = panelAccountId === null ? -1 : shown.findIndex((account) => account.id === panelAccountId)
+  const panelAccount = panelIndex >= 0 ? shown[panelIndex] : null
+
+  /* 行の詳細ボタン（V8 は移り変わりで進み、右クリックでも同じ品ぞろえ）。 */
+  const detailButton = (account: AccountWithStats) => {
+    const href = `/accounts/detail?id=${account.id}`
+    const button = isV8 ? (
+      <Button variant="secondary" onClick={() => goOpen(href)}>
+        詳細
+      </Button>
+    ) : (
+      <Button href={href} variant="secondary">
+        詳細
+      </Button>
+    )
+    if (!isV8) return button
+    return (
+      <ContextMenu label={`アカウント「${account.name}」の操作`} items={rowMenuItems(account)}>
+        {button}
+      </ContextMenu>
+    )
+  }
 
   // アーカイブは停止と重ねて数えず、4枚の帯を互いに読み違えないようにする。
   // R520: 未取得（読み込み中・取得失敗）を 0 件と出さない。成功した空一覧だけ 0。
@@ -242,13 +293,7 @@ export default function AccountsPage() {
                       </p>
                     </div>
                     {/* #641: カード表示でも行操作は同じ枠つきボタン */}
-                    <Button
-                      href={`/accounts/detail?id=${account.id}`}
-                      variant="secondary"
-                      className="shrink-0"
-                    >
-                      詳細
-                    </Button>
+                    <span className="shrink-0">{detailButton(account)}</span>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <StatusBadge tone={connection.tone}>{connection.label}</StatusBadge>
@@ -288,7 +333,20 @@ export default function AccountsPage() {
                 const connection = connectionLabel(account)
                 const webhook = webhookLabel(account)
                 return (
-                  <tr key={account.id} className="border-hairline hover:bg-canvas-sunken border-t align-middle">
+                  <tr
+                    key={account.id}
+                    className={`border-hairline hover:bg-canvas-sunken border-t align-middle${isV8 ? ' cursor-pointer' : ''}`}
+                    onClick={isV8 ? () => setPanelAccountId(account.id) : undefined}
+                    onKeyDown={isV8 ? (event) => {
+                      if (event.target !== event.currentTarget) return
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        setPanelAccountId(account.id)
+                      }
+                    } : undefined}
+                    tabIndex={isV8 ? 0 : undefined}
+                    aria-label={isV8 ? `${account.name}の詳しい内容を見る` : undefined}
+                  >
                     <td className="py-3 pr-4 pl-5">
                       <p className="text-ink text-sm font-semibold">{account.name}</p>
                       <p className="text-ink-faint mt-0.5 text-xs">
@@ -313,11 +371,9 @@ export default function AccountsPage() {
                     <td className="text-ink-secondary px-4 py-3 text-sm">
                       {parentName(account, accounts)}
                     </td>
-                    <td className="py-3 pr-5 pl-4 text-right whitespace-nowrap">
+                    <td className="py-3 pr-5 pl-4 text-right whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                       {/* #641: 行操作は枠つきボタンにそろえる。押せない「•••」の飾りは出さない */}
-                      <Button href={`/accounts/detail?id=${account.id}`} variant="secondary">
-                        詳細
-                      </Button>
+                      {detailButton(account)}
                     </td>
                   </tr>
                 )
@@ -327,6 +383,46 @@ export default function AccountsPage() {
           </div>
         </div>
       )}
+
+      {/* 行の詳しい内容（V8「サクサク感」C①②）。一覧は左に見えたまま、↑↓で次の行へ移る。 */}
+      {isV8 && panelAccount ? (
+        <DetailPanel
+          open
+          title={panelAccount.name || '（名前なし）'}
+          description={`チャネル ${panelAccount.channelId}`}
+          onClose={() => setPanelAccountId(null)}
+          onPrev={panelIndex > 0 ? () => setPanelAccountId(shown[panelIndex - 1].id) : undefined}
+          onNext={
+            panelIndex < shown.length - 1 ? () => setPanelAccountId(shown[panelIndex + 1].id) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < shown.length - 1}
+          footer={
+            <Button
+              variant="primary"
+              onClick={() => goOpen(`/accounts/detail?id=${panelAccount.id}`)}
+            >
+              詳細を開く
+            </Button>
+          }
+        >
+          <p>
+            {connectionLabel(panelAccount).label} ／ {webhookLabel(panelAccount).label}
+          </p>
+          <p>
+            友だち {panelAccount.stats ? `${formatNumber(panelAccount.stats.friendCount)}人` : '—'}
+            {panelAccount.isDefault ? ' ／ 既定' : ''}
+          </p>
+          <p>親アカウント：{parentName(panelAccount, accounts)}</p>
+          <p>
+            <InlineEdit
+              value={panelAccount.name}
+              label="アカウント名"
+              onSave={(next) => saveAccountName(panelAccount, next)}
+            />
+          </p>
+        </DetailPanel>
+      ) : null}
 
       {/*
         設計の締めの一言（`QT91v`）。**何を見ている画面かを、下に置く。**
