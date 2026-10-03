@@ -498,6 +498,14 @@
   "app/webhooks/edit/page.tsx": {
     "unresolved-classname": 4
   },
+  "app/webhooks/apitokens-v8.tsx": {
+    "direct-th": 6,
+    "unresolved-classname": 26
+  },
+  "app/webhooks/incoming-v8.tsx": {
+    "direct-th": 4,
+    "unresolved-classname": 84
+  },
   "app/webhooks/interactions-v8.tsx": {
     "unresolved-classname": 42,
     "direct-th": 6
@@ -511,6 +519,10 @@
   "app/webhooks/outgoing-v8.tsx": {
     "unresolved-classname": 34,
     "direct-th": 6
+  },
+  "app/webhooks/sheets-v8.tsx": {
+    "direct-th": 4,
+    "unresolved-classname": 48
   },
   "app/webhooks/webhook-interactions.tsx": {
     "unresolved-classname": 35

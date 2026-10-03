@@ -259,6 +259,7 @@ shared-button-importer app/webhooks/interactions-v8.tsx
 shared-button-importer app/webhooks/new/new-v8.tsx
 shared-button-importer app/webhooks/outgoing-v8.tsx
 shared-button-importer app/webhooks/page.tsx
+shared-button-importer app/webhooks/sheets-v8.tsx
 shared-button-importer app/webhooks/webhook-interactions.tsx
 shared-button-importer app/webhooks/webhook-overviews.tsx
 shared-button-importer app/webinars/edit/page.tsx
