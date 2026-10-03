@@ -503,9 +503,10 @@
     "553_meet_consultation_booking_link.sql",
     "554_meet_cancel_claim.sql",
     "555_tenant_data_retention.sql",
+    "556_f13_folder_kinds.sql",
     "558_booking_payments.sql",
     "560_booking_sales_noshow.sql",
     "565_booking_noshow_settings_reasons.sql"
   ],
-  "migrationCount": 506
+  "migrationCount": 507
 }
