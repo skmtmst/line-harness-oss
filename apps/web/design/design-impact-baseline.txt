@@ -75,6 +75,7 @@ shared-button-importer app/conversions/page.tsx
 shared-button-importer app/duplicates/duplicates-v8.tsx
 shared-button-importer app/duplicates/page.tsx
 shared-button-importer app/ec-commerce/connector-panel.tsx
+shared-button-importer app/ec-commerce/ec-connector-v8.tsx
 shared-button-importer app/ec-commerce/identity-candidates/page.tsx
 shared-button-importer app/ec-commerce/order-detail-drawer.tsx
 shared-button-importer app/ec-commerce/page.tsx

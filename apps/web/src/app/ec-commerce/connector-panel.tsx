@@ -58,7 +58,7 @@ function toForm(connector: EcConnector | null): Form {
   }
 }
 
-export default function ConnectorPanel({ accountId }: { accountId: string | null }) {
+export default function ConnectorPanel({ accountId, canEdit = true }: { accountId: string | null; canEdit?: boolean }) {
   const [data, setData] = useState<EcConnectorOverview | null>(null)
   const [form, setForm] = useState<Form>(EMPTY_FORM)
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
@@ -162,8 +162,19 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
     )
   }
 
+  /*
+   * 組③の閲覧のみ：つなぎ先の保存は owner/admin だけ（口側も同じ境目）。
+   * 見るだけの担当者には変える入口を出さず、理由を添える。
+   */
+  const readonlyReason = '見るだけの権限では設定を変えられません。変えるにはオーナーか管理者に頼んでください。'
+
   return (
     <>
+      {!canEdit ? (
+        <NoteBar tone="info">
+          {readonlyReason}いまの設定はこのまま見られます。
+        </NoteBar>
+      ) : null}
       <NoteBar tone={connector?.status === 'paused' ? 'warn' : 'info'}>
         {connector?.status === 'paused' ? '取り込みを止めています。保存済みの設定は残っています。' : connector ? `つながっています。最後にデータが届いたのは ${dateTime(data?.health.lastReceivedAt ?? null)} です。` : 'まだつながっていません。下の情報を入れて保存してください。'}
       </NoteBar>
@@ -181,25 +192,25 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
             <h2 className={styles.cardTitle}>つなぎ先の情報</h2>
             <p className={styles.cardNote}>鍵は保存後に読み戻せません。画面には最後の4文字だけを出します。</p>
             <div className={styles.fields}>
-              <label className={styles.field}>ネットショップの種類<Select aria-label="ネットショップの種類" value={form.provider} onChange={(value) => setForm({ ...form, provider: value as Form['provider'] })} options={[{ value: 'shopify', label: 'Shopify' }, { value: 'ec_cube', label: 'EC-CUBE' }]} size="full" /></label>
-              <label className={styles.field}>ショップのアドレス<input className={styles.input} value={form.shopDomain} onChange={(event) => setForm({ ...form, shopDomain: event.target.value })} placeholder="nen-store.myshopify.com" /></label>
-              <label className={styles.field}>つなぐための鍵<input className={styles.input} type="password" autoComplete="new-password" value={form.inboundSecret} onChange={(event) => setForm({ ...form, inboundSecret: event.target.value })} placeholder={connector?.secretConfigured ? `設定済み（末尾 ${connector.secretLastFour ?? '----'}）` : '32文字以上'} /><span className={styles.cardNote}>{connector?.secretUpdatedAt ? `${dateTime(connector.secretUpdatedAt)} に更新。鍵そのものは表示しません` : '鍵そのものは表示しません'}</span></label>
+              <label className={styles.field}>ネットショップの種類<Select aria-label="ネットショップの種類" value={form.provider} onChange={(value) => setForm({ ...form, provider: value as Form['provider'] })} options={[{ value: 'shopify', label: 'Shopify' }, { value: 'ec_cube', label: 'EC-CUBE' }]} size="full" disabled={!canEdit} title={!canEdit ? readonlyReason : undefined} /></label>
+              <label className={styles.field}>ショップのアドレス<input className={styles.input} value={form.shopDomain} onChange={(event) => setForm({ ...form, shopDomain: event.target.value })} placeholder="nen-store.myshopify.com" disabled={!canEdit} title={!canEdit ? readonlyReason : undefined} /></label>
+              <label className={styles.field}>つなぐための鍵<input className={styles.input} type="password" autoComplete="new-password" value={form.inboundSecret} onChange={(event) => setForm({ ...form, inboundSecret: event.target.value })} placeholder={connector?.secretConfigured ? `設定済み（末尾 ${connector.secretLastFour ?? '----'}）` : '32文字以上'} disabled={!canEdit} title={!canEdit ? readonlyReason : undefined} /><span className={styles.cardNote}>{connector?.secretUpdatedAt ? `${dateTime(connector.secretUpdatedAt)} に更新。鍵そのものは表示しません` : '鍵そのものは表示しません'}</span></label>
             </div>
           </section>
 
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>どこの出来事を取り込むか</h2>
             <p className={styles.cardNote}>チェックを外すと、その出来事を起点にした配信や集計も止まります。</p>
-            <div className={styles.checks}>{CONNECTOR_EVENT_TYPES.map((value) => <Checkbox key={value} checked={form.eventTypes.includes(value)} onCheckedChange={() => toggle('eventTypes', value)}>{EC_EVENT_LABELS[value]}</Checkbox>)}</div>
+            <div className={styles.checks}>{CONNECTOR_EVENT_TYPES.map((value) => <Checkbox key={value} checked={form.eventTypes.includes(value)} onCheckedChange={() => toggle('eventTypes', value)} disabled={!canEdit}>{EC_EVENT_LABELS[value]}</Checkbox>)}</div>
           </section>
 
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>どうやって人を見分けるか</h2>
             <p className={styles.cardNote}>上から照らし合わせます。名前だけで自動では結びつけません。</p>
-            <div className={styles.ruleList}>{IDENTITY_RULES.map(([value, label, note], index) => <Checkbox key={value} checked={form.identityRules.includes(value)} onCheckedChange={() => toggle('identityRules', value)} description={note}>{`順番${index + 1}：${label}`}</Checkbox>)}</div>
+            <div className={styles.ruleList}>{IDENTITY_RULES.map(([value, label, note], index) => <Checkbox key={value} checked={form.identityRules.includes(value)} onCheckedChange={() => toggle('identityRules', value)} description={note} disabled={!canEdit}>{`順番${index + 1}：${label}`}</Checkbox>)}</div>
             <div className={styles.actions}>
-              {connector ? <Button type="button" onClick={() => setForm({ ...form, status: form.status === 'paused' ? 'connected' : 'paused' })}>{form.status === 'paused' ? '取り込みを再開する' : '取り込みを止める'}</Button> : null}
-              <Button type="button" variant="primary" disabled={saving || !form.shopDomain || (!connector?.secretConfigured && form.inboundSecret.length < 32)} onClick={requestSave} busy={saving} busyLabel="保存しています…">設定を保存する</Button>
+              {connector ? <Button type="button" onClick={() => setForm({ ...form, status: form.status === 'paused' ? 'connected' : 'paused' })} disabled={!canEdit} title={!canEdit ? readonlyReason : undefined}>{form.status === 'paused' ? '取り込みを再開する' : '取り込みを止める'}</Button> : null}
+              <Button type="button" variant="primary" disabled={saving || !canEdit || !form.shopDomain || (!connector?.secretConfigured && form.inboundSecret.length < 32)} title={!canEdit ? readonlyReason : undefined} onClick={requestSave} busy={saving} busyLabel="保存しています…">設定を保存する</Button>
             </div>
             {saveBlockReason ? <p className="mt-1 text-caption leading-relaxed text-ink-faint" role="note">{saveBlockReason}</p> : null}
           </section>
