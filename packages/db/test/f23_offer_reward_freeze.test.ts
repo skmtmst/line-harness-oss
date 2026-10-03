@@ -183,7 +183,7 @@ describe('F-23 ケース4: 保存途中失敗の有限境界を正確に報告�
   });
 
   test('版番号は最大値の次を取り、(案件, 版番号)の二重登録はUNIQUEで止まる', async () => {
-    await createOfferVersion(db, { offerId: 'offer-1', rewardAmount: 1000 });
+    const first = await createOfferVersion(db, { offerId: 'offer-1', rewardAmount: 1000 });
     // 交差した書き込み手が版番号2を先に取った状態を直接作る。
     sqlite.prepare(
       `INSERT INTO affiliate_offer_versions (id, offer_id, version_number) VALUES ('rival-v2', 'offer-1', 2)`,
@@ -191,12 +191,21 @@ describe('F-23 ケース4: 保存途中失敗の有限境界を正確に報告�
     const next = await createOfferVersion(db, { offerId: 'offer-1', rewardAmount: 2000 });
     expect(next.version_number).toBe(3);
 
-    // 同じ (案件, 版番号) の直書きは通らない。
+    // 同じ (案件, 版番号) の直書きは通らない（負けた書き込みは残らず失敗する）。
     expect(() =>
       sqlite.prepare(
         `INSERT INTO affiliate_offer_versions (id, offer_id, version_number) VALUES ('dup-v3', 'offer-1', 3)`,
       ).run(),
     ).toThrow(/UNIQUE constraint failed/i);
+
+    // 先勝ちの版も旧版も書き換わらない。
+    const versions = await listOfferVersions(db, 'offer-1');
+    expect(versions.map((v) => [v.version_number, v.reward_amount])).toEqual([
+      [3, 2000],
+      [2, 0],
+      [1, 1000],
+    ]);
+    expect(versions.find((v) => v.version_number === 1)?.id).toBe(first.id);
   });
 });
 

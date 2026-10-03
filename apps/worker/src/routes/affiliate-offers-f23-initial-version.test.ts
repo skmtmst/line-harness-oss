@@ -244,6 +244,52 @@ describe('F-23 ケース2補足: 修正前の鍵なし初版を持つ案件の�
   });
 });
 
+describe('F-23 ケース4: 2要求の連続変更は両方成功し旧版を変えない', () => {
+  test('旧額作成→2回の報酬変更は版が1,2,3と増え、初版の中身は変わらない', async () => {
+    const { app, env } = makeApp(db, OWNER);
+    const created = await app.request('/api/affiliate-offers', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: '連続改定キャンペーン',
+        rewardAmount: 1000,
+        lineAccountId: ACCOUNT_A,
+        operationId: 'f23-sequential-edits-0001',
+      }),
+    }, env);
+    expect(created.status).toBe(201);
+    const createdJson = await created.json() as { data: { id: string } };
+    const offerId = createdJson.data.id;
+
+    // 既存APIでの2要求の競合（有限・直列）。両方成功する。
+    const edit1 = await app.request(`/api/affiliate-offers/${offerId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ rewardAmount: 2000 }),
+    }, env);
+    expect(edit1.status).toBe(200);
+    const edit2 = await app.request(`/api/affiliate-offers/${offerId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ rewardAmount: 3000 }),
+    }, env);
+    expect(edit2.status).toBe(200);
+
+    // 版は3件に増え、古い版の金額は書き換わらない。
+    expect(versionCountOf(offerId)).toBe(3);
+    expect(currentRewardOf(offerId)).toBe(3000);
+    const versions = sqlite.prepare(
+      `SELECT version_number, reward_amount FROM affiliate_offer_versions WHERE offer_id = ? ORDER BY version_number ASC`,
+    ).all(offerId) as Array<{ version_number: number; reward_amount: number }>;
+    expect(versions).toEqual([
+      { version_number: 1, reward_amount: 1000 },
+      { version_number: 2, reward_amount: 2000 },
+      { version_number: 3, reward_amount: 3000 },
+    ]);
+    const offerRow = sqlite.prepare(
+      `SELECT reward_amount FROM affiliate_offers WHERE id = ?`,
+    ).get(offerId) as { reward_amount: number };
+    expect(offerRow.reward_amount).toBe(3000);
+  });
+});
+
 describe('F-23 ケース5: 別accountの同operationIdは他店の行・版を回収しない', () => {
   test('同じ確認キーでも店ごとに案件行と報酬版が分かれる', async () => {
     const SHARED = 'f23-shared-operation-across-accounts';
