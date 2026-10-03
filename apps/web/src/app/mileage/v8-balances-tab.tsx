@@ -24,6 +24,8 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
+import MileageTableSkeleton from './mileage-table-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import {
   api,
@@ -76,6 +78,8 @@ export default function V8BalancesTab({
   const [grantedMiles, setGrantedMiles] = useState<number | null>(null)
   const [decreasedMiles, setDecreasedMiles] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  /* 数の帯の骨組み判定（0.3秒以内なら出さない・出したら最低0.4秒）。 */
+  const showKpiSkel = useDelayedSkeleton(loading)
   const [loadError, setLoadError] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -313,11 +317,10 @@ export default function V8BalancesTab({
             <span className={styles.kpiLabel}>友だち</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError || summary === null ? '—' : formatMileageNumber(summary.totalMembers)}
-            <span className={styles.kpiUnit}> 人</span>
+            {showKpiSkel ? <Skeleton width="5ch" height={24} /> : loading || loadError || summary === null ? '—' : (<>{formatMileageNumber(summary.totalMembers)}<span className={styles.kpiUnit}> 人</span></>)}
           </p>
           <p className={styles.kpiSub}>
-            {loading || loadError || summary === null
+            {showKpiSkel ? <Skeleton width="12ch" height={12} /> : loading || loadError || summary === null
               ? '—'
               : `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)}人`}
           </p>
@@ -327,9 +330,9 @@ export default function V8BalancesTab({
             <span className={styles.kpiIcon}><Users size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>残高の合計</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError || summary === null ? '—' : formatMileageNumber(summary.available)}</p>
+          <p className={styles.kpiValue}>{showKpiSkel ? <Skeleton width="7ch" height={24} /> : loading || loadError || summary === null ? '—' : formatMileageNumber(summary.available)}</p>
           <p className={styles.kpiSub}>
-            {loading || loadError || summary === null
+            {showKpiSkel ? <Skeleton width="8ch" height={12} /> : loading || loadError || summary === null
               ? '—'
               : `1人あたり ${formatMileageNumber(summary.totalMembers > 0 ? Math.round(summary.available / summary.totalMembers) : 0)}`}
           </p>
@@ -339,7 +342,7 @@ export default function V8BalancesTab({
             <span className={styles.kpiIcon}><TrendingUp size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>今月増えた</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(grantedMiles ?? 0)}</p>
+          <p className={styles.kpiValue}>{showKpiSkel ? <Skeleton width="7ch" height={24} /> : loading || loadError ? '—' : formatMileageNumber(grantedMiles ?? 0)}</p>
           <p className={styles.kpiSub}>この30日に付いた分</p>
         </div>
         <div className={styles.kpi}>
@@ -347,7 +350,7 @@ export default function V8BalancesTab({
             <span className={styles.kpiIcon}><TrendingDown size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>今月減った</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(decreasedMiles ?? 0)}</p>
+          <p className={styles.kpiValue}>{showKpiSkel ? <Skeleton width="7ch" height={24} /> : loading || loadError ? '—' : formatMileageNumber(decreasedMiles ?? 0)}</p>
           <p className={styles.kpiSub}>交換・取り消し</p>
         </div>
       </div>
@@ -452,19 +455,24 @@ export default function V8BalancesTab({
         </span>
       </div>
 
-      {loading ? (
-        <div className={styles.stateWrap} role="status" aria-label="読み込み中">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className={styles.skelRow} aria-hidden="true">
-              <span className={styles.skelDot} />
-              <span className={styles.skelBar} style={{ width: '22%' }} />
-              <span className={styles.skelBar} style={{ width: '14%' }} />
-              <span className={styles.skelBar} style={{ width: '18%' }} />
-              <span className={styles.skelBar} style={{ width: '10%', marginLeft: 'auto' }} />
-            </div>
-          ))}
-        </div>
-      ) : loadError ? (
+      <div aria-busy={loading}>
+        <DelayedSkeleton
+          loading={loading}
+          skeleton={(
+            <MileageTableSkeleton
+              columns={[
+                { header: '友だち', bar: '40%' },
+                { header: 'ランク', bar: '60%' },
+                { header: 'いまの残高', bar: '50%' },
+                { header: '今月の増減', bar: '50%' },
+                { header: '消える予定', bar: '60%' },
+                { header: '最終行動', bar: '60%' },
+                { header: '操作', bar: '80%' },
+              ]}
+            />
+          )}
+        >
+          {loadError ? (
         <div className={styles.stateWrap}>
           <div className={styles.errorBand} role="alert">
             マイルの残高を読み込めませんでした
@@ -543,6 +551,8 @@ export default function V8BalancesTab({
           </table>
         </div>
       )}
+        </DelayedSkeleton>
+      </div>
 
       {!loading && !loadError && members.length > 0 ? (
         <div className={styles.footer}>

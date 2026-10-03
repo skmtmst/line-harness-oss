@@ -23,6 +23,8 @@ import IconButton from '@/components/shared/icon-button'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
+import MileageTableSkeleton from './mileage-table-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreHorizontal } from 'lucide-react'
@@ -98,6 +100,8 @@ export default function V8HistoryTab({
   const [page, setPage] = useState(1)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  /* 数の帯の骨組み判定（0.3秒以内なら出さない・出したら最低0.4秒）。 */
+  const showKpiSkel = useDelayedSkeleton(loading)
   const [error, setError] = useState(false)
 
   const applyPreset = (value: string) => {
@@ -253,11 +257,10 @@ export default function V8HistoryTab({
             <span className={styles.kpiLabel}>今月の動き</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || error || total === null ? '—' : formatNumber(total)}
-            <span className={styles.kpiUnit}> 件</span>
+            {showKpiSkel ? <Skeleton width="4ch" height={24} /> : loading || error || total === null ? '—' : (<>{formatNumber(total)}<span className={styles.kpiUnit}> 件</span></>)}
           </p>
           <p className={styles.kpiSub}>
-            {loading || error ? '—' : `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}`}
+            {showKpiSkel ? <Skeleton width="14ch" height={12} /> : loading || error ? '—' : `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}`}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -265,7 +268,7 @@ export default function V8HistoryTab({
             <span className={styles.kpiIcon}><TrendingUp size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>付けた</span>
           </div>
-          <p className={styles.kpiValue}>{loading || error ? '—' : formatNumber(amountOf('grant'))}</p>
+          <p className={styles.kpiValue}>{showKpiSkel ? <Skeleton width="7ch" height={24} /> : loading || error ? '—' : formatNumber(amountOf('grant'))}</p>
           <p className={styles.kpiSub}>この期間に付けた合計</p>
         </div>
         <div className={styles.kpi}>
@@ -273,7 +276,7 @@ export default function V8HistoryTab({
             <span className={styles.kpiIcon}><TrendingDown size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>使った</span>
           </div>
-          <p className={styles.kpiValue}>{loading || error ? '—' : formatNumber(Math.abs(amountOf('spend')))}</p>
+          <p className={styles.kpiValue}>{showKpiSkel ? <Skeleton width="7ch" height={24} /> : loading || error ? '—' : formatNumber(Math.abs(amountOf('spend')))}</p>
           <p className={styles.kpiSub}>交換 {formatNumber(countOf('spend'))}件</p>
         </div>
         <div className={styles.kpi}>
@@ -282,8 +285,7 @@ export default function V8HistoryTab({
             <span className={styles.kpiLabel}>取り消し</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || error ? '—' : formatNumber(reversalCount)}
-            <span className={styles.kpiUnit}> 件</span>
+            {showKpiSkel ? <Skeleton width="4ch" height={24} /> : loading || error ? '—' : (<>{formatNumber(reversalCount)}<span className={styles.kpiUnit}> 件</span></>)}
           </p>
           <p className={styles.kpiSub}>注文の取り消しで引いた</p>
         </div>
@@ -340,19 +342,23 @@ export default function V8HistoryTab({
         </span>
       </div>
 
-      {loading ? (
-        <div className={styles.stateWrap} role="status" aria-label="読み込み中">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className={styles.skelRow} aria-hidden="true">
-              <span className={styles.skelDot} />
-              <span className={styles.skelBar} style={{ width: '22%' }} />
-              <span className={styles.skelBar} style={{ width: '14%' }} />
-              <span className={styles.skelBar} style={{ width: '18%' }} />
-              <span className={styles.skelBar} style={{ width: '10%', marginLeft: 'auto' }} />
-            </div>
-          ))}
-        </div>
-      ) : error ? (
+      <div aria-busy={loading}>
+        <DelayedSkeleton
+          loading={loading}
+          skeleton={(
+            <MileageTableSkeleton
+              columns={[
+                { header: 'いつ・だれに', bar: '45%' },
+                { header: '増減', bar: '55%' },
+                { header: 'なぜ', bar: '70%' },
+                { header: '残高', bar: '50%' },
+                { header: 'だれが', bar: '60%' },
+                { header: '操作', bar: '80%' },
+              ]}
+            />
+          )}
+        >
+          {error ? (
         <div className={styles.stateWrap}>
           <div className={styles.errorBand} role="alert">
             マイルの履歴を読み込めませんでした
@@ -481,6 +487,8 @@ export default function V8HistoryTab({
           </table>
         </div>
       )}
+        </DelayedSkeleton>
+      </div>
 
       {!loading && !error && items.length > 0 ? (
         <div className={styles.footer}>

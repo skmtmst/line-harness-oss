@@ -41,6 +41,8 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
+import MileageTableSkeleton from './mileage-table-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ActionMenu from '@/components/shared/action-menu'
 import {
@@ -178,6 +180,8 @@ export default function V8EarningRulesTab({
   const [balanceTotal, setBalanceTotal] = useState<number | null>(null)
   const [friendTotal, setFriendTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  /* 数の帯の骨組み判定（0.3秒以内なら出さない・出したら最低0.4秒）。 */
+  const showKpiSkel = useDelayedSkeleton(loading)
   const [loadError, setLoadError] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -476,11 +480,10 @@ export default function V8EarningRulesTab({
             <span className={styles.kpiLabel}>たまる決めごと</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError ? '—' : formatMileageNumber(rules.length)}
-            <span className={styles.kpiUnit}> 件</span>
+            {showKpiSkel ? <Skeleton width="4ch" height={24} /> : loading || loadError ? '—' : (<>{formatMileageNumber(rules.length)}<span className={styles.kpiUnit}> 件</span></>)}
           </p>
           <p className={styles.kpiSub}>
-            {loading || loadError ? '—' : `動いている ${formatMileageNumber(activeRules.length)}・止めている ${formatMileageNumber(rules.length - activeRules.length)}`}
+            {showKpiSkel ? <Skeleton width="12ch" height={12} /> : loading || loadError ? '—' : `動いている ${formatMileageNumber(activeRules.length)}・止めている ${formatMileageNumber(rules.length - activeRules.length)}`}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -488,9 +491,9 @@ export default function V8EarningRulesTab({
             <span className={styles.kpiIcon}><Coins size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>今月付けたマイル</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(grantedMiles ?? 0)}</p>
+          <p className={styles.kpiValue}>{showKpiSkel ? <Skeleton width="7ch" height={24} /> : loading || loadError ? '—' : formatMileageNumber(grantedMiles ?? 0)}</p>
           <p className={styles.kpiSub}>
-            {loading || loadError ? '—' : `${formatMileageNumber(grantedCount ?? 0)}人に`}
+            {showKpiSkel ? <Skeleton width="7ch" height={12} /> : loading || loadError ? '—' : `${formatMileageNumber(grantedCount ?? 0)}人に`}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -498,9 +501,9 @@ export default function V8EarningRulesTab({
             <span className={styles.kpiIcon}><Gift size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>今月使われたマイル</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(spentMiles ?? 0)}</p>
+          <p className={styles.kpiValue}>{showKpiSkel ? <Skeleton width="7ch" height={24} /> : loading || loadError ? '—' : formatMileageNumber(spentMiles ?? 0)}</p>
           <p className={styles.kpiSub}>
-            {loading || loadError ? '—' : `交換 ${formatMileageNumber(spentCount ?? 0)}件`}
+            {showKpiSkel ? <Skeleton width="7ch" height={12} /> : loading || loadError ? '—' : `交換 ${formatMileageNumber(spentCount ?? 0)}件`}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -508,9 +511,9 @@ export default function V8EarningRulesTab({
             <span className={styles.kpiIcon}><Wallet size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>残高の合計</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(balanceTotal ?? 0)}</p>
+          <p className={styles.kpiValue}>{showKpiSkel ? <Skeleton width="7ch" height={24} /> : loading || loadError ? '—' : formatMileageNumber(balanceTotal ?? 0)}</p>
           <p className={styles.kpiSub}>
-            {loading || loadError ? '—' : `友だち ${formatMileageNumber(friendTotal ?? 0)}人`}
+            {showKpiSkel ? <Skeleton width="7ch" height={12} /> : loading || loadError ? '—' : `友だち ${formatMileageNumber(friendTotal ?? 0)}人`}
           </p>
         </div>
       </div>
@@ -613,19 +616,24 @@ export default function V8EarningRulesTab({
             </span>
           </div>
 
-          {loading ? (
-            <div className={styles.stateWrap} role="status" aria-label="読み込み中">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className={styles.skelRow} aria-hidden="true">
-                  <span className={styles.skelDot} />
-                  <span className={styles.skelBar} style={{ width: '22%' }} />
-                  <span className={styles.skelBar} style={{ width: '14%' }} />
-                  <span className={styles.skelBar} style={{ width: '18%' }} />
-                  <span className={styles.skelBar} style={{ width: '10%', marginLeft: 'auto' }} />
-                </div>
-              ))}
-            </div>
-          ) : loadError ? (
+          <div aria-busy={loading}>
+            <DelayedSkeleton
+              loading={loading}
+              skeleton={(
+                <MileageTableSkeleton
+                  columns={[
+                    { header: '何をしてくれたら', bar: '40%' },
+                    { header: '対象の行動', bar: '70%' },
+                    { header: 'たまるマイル', bar: '40%' },
+                    { header: '有効期間・失効', bar: '80%' },
+                    { header: 'この30日', bar: '45%' },
+                    { header: '状態', bar: '70%' },
+                    { header: '操作', bar: '85%' },
+                  ]}
+                />
+              )}
+            >
+              {loadError ? (
             <div className={styles.stateWrap}>
               <div className={styles.errorBand} role="alert">
                 <Info size={16} aria-hidden="true" />
@@ -781,6 +789,8 @@ export default function V8EarningRulesTab({
               </table>
             </div>
           )}
+            </DelayedSkeleton>
+          </div>
 
           {!loading && !loadError && visible.length > 0 ? (
             <div className={styles.footer}>
