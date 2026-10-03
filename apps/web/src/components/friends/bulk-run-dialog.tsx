@@ -5,9 +5,12 @@ import { X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Combobox from '@/components/shared/combobox'
+import DateTimeField from '@/components/shared/date-time-field'
+import { TextArea } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
 import { ApiError, api } from '@/lib/api'
-import type { FriendListItem } from '@/lib/api'
+import type { CommonActionResources, FriendListItem } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import type {
   FriendBulkOperation,
@@ -60,6 +63,19 @@ export default function BulkRunDialog({
   const [phase, setPhase] = useState<Phase>('operation')
   const [operationKind, setOperationKind] = useState<FriendBulkOperation['kind']>('add_tag')
   const [tagId, setTagId] = useState('')
+  /* F-1: 7操作の入力。開き直したら空に戻す（下の世代切り替えで初期化）。 */
+  const [scenarioId, setScenarioId] = useState('')
+  const [operatorId, setOperatorId] = useState('')
+  const [supportStatus, setSupportStatus] = useState('')
+  const [supportMarkId, setSupportMarkId] = useState('')
+  const [reminderId, setReminderId] = useState('')
+  const [targetDate, setTargetDate] = useState('')
+  const [templateId, setTemplateId] = useState('')
+  const [messageContent, setMessageContent] = useState('')
+  const [commonActionId, setCommonActionId] = useState('')
+  const [resources, setResources] = useState<CommonActionResources | null>(null)
+  const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
+  const [resourcesState, setResourcesState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [preview, setPreview] = useState<FriendBulkPreview | null>(null)
   const [previewState, setPreviewState] = useState<'idle' | 'loading' | 'error' | 'forbidden'>('idle')
   const [detail, setDetail] = useState<FriendBulkRunDetail | null>(null)
@@ -91,13 +107,74 @@ export default function BulkRunDialog({
   )
   const chosen = OPERATIONS.find((o) => o.kind === operationKind)
   const reversible = preview?.reversible ?? chosen?.reversible ?? false
+  /* 選択肢の読み込みが終わるまで、担当者変更は作らせない。 */
+  const operatorsLoaded = resourcesState === 'ready'
+
+  /* 実行内容の1行まとめ。未入力のときは選び直しを促す。 */
+  const operationSummary = (() => {
+    if (operationKind === 'add_tag' || operationKind === 'remove_tag') {
+      return tags.find((tag) => tag.id === tagId)?.name ?? '選択してください'
+    }
+    if (operationKind === 'start_scenario' || operationKind === 'stop_scenario') {
+      return resources?.scenarios.find((scenario) => scenario.id === scenarioId)?.name ?? '選択してください'
+    }
+    if (operationKind === 'assign_operator') {
+      if (!operatorsLoaded) return '読み込んでいます'
+      return operatorId ? operators.find((operator) => operator.id === operatorId)?.name ?? '選択してください' : '割り当てなしに戻す'
+    }
+    if (operationKind === 'set_support') {
+      const statusLabel = { unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済み' }[supportStatus] ?? ''
+      const markName = resources?.supportMarks?.find((mark) => mark.id === supportMarkId)?.name ?? ''
+      return [statusLabel, markName].filter(Boolean).join('・') || '選択してください'
+    }
+    if (operationKind === 'set_reminder') {
+      const name = resources?.reminders?.find((reminder) => reminder.id === reminderId)?.name ?? ''
+      if (!name || !targetDate) return '選択してください'
+      return `${name}・${targetDate}`
+    }
+    if (operationKind === 'send_message') {
+      return resources?.templates?.find((template) => template.id === templateId)?.name
+        ?? (messageContent.trim() ? `直接入力（${messageContent.trim().length}文字）` : '選択してください')
+    }
+    if (operationKind === 'run_common_action') {
+      return resources?.commonActions?.find((action) => action.id === commonActionId)?.name ?? '選択してください'
+    }
+    return '選択してください'
+  })()
 
   const operation = useCallback((): FriendBulkOperation | null => {
     if (operationKind === 'add_tag' || operationKind === 'remove_tag') {
       return tagId ? { kind: operationKind, tagId } : null
     }
+    if (operationKind === 'start_scenario' || operationKind === 'stop_scenario') {
+      return scenarioId ? { kind: operationKind, scenarioId } : null
+    }
+    if (operationKind === 'assign_operator') {
+      // 空は「割り当てなし」に戻す。担当者未選択のままは作らない。
+      return operatorId === '' && !operatorsLoaded ? null : { kind: operationKind, operatorId: operatorId || null }
+    }
+    if (operationKind === 'set_support') {
+      if (!supportStatus && !supportMarkId) return null
+      return {
+        kind: operationKind,
+        ...(supportStatus ? { status: supportStatus as 'unread' | 'in_progress' | 'on_hold' | 'resolved' } : {}),
+        ...(supportMarkId ? { markId: supportMarkId } : {}),
+      }
+    }
+    if (operationKind === 'set_reminder') {
+      if (!reminderId || !targetDate) return null
+      return { kind: operationKind, reminderId, targetDate: new Date(`${targetDate}:00+09:00`).toISOString() }
+    }
+    if (operationKind === 'send_message') {
+      const content = messageContent.trim()
+      if (templateId) return { kind: operationKind, templateId }
+      return content ? { kind: operationKind, content, messageType: 'text' } : null
+    }
+    if (operationKind === 'run_common_action') {
+      return commonActionId ? { kind: operationKind, commonActionId } : null
+    }
     return null
-  }, [operationKind, tagId])
+  }, [operationKind, tagId, scenarioId, operatorId, operatorsLoaded, supportStatus, supportMarkId, reminderId, targetDate, templateId, messageContent, commonActionId])
 
   const loadPreview = useCallback(async () => {
     const op = operation()
@@ -174,6 +251,29 @@ export default function BulkRunDialog({
     }
   }, [])
 
+  /* F-1: 操作の選択肢（シナリオ・担当者・対応・リマインダ・文面・共通アクション）。 */
+  useEffect(() => {
+    if (!open || !accountId) return
+    let cancelled = false
+    setResourcesState('loading')
+    void Promise.all([
+      api.commonActions.resources(accountId),
+      api.operators.list(),
+    ]).then(([resourceResult, operatorResult]) => {
+      if (cancelled) return
+      if (!resourceResult.success || !operatorResult.success) {
+        setResourcesState('error')
+        return
+      }
+      setResources(resourceResult.data)
+      setOperators(operatorResult.data)
+      setResourcesState('ready')
+    }).catch(() => {
+      if (!cancelled) setResourcesState('error')
+    })
+    return () => { cancelled = true }
+  }, [open, accountId])
+
   useEffect(() => {
     /*
       閉じたときだけでなく、アカウントや対象が変わった瞬間に古い返事を無効にする。
@@ -181,6 +281,8 @@ export default function BulkRunDialog({
     */
     setPhase('operation'); setPreview(null); setDetail(null); setRunId(null)
     setFailure(null); setIrreversibleConfirmed(false); setPreviewState('idle')
+    setTagId(''); setScenarioId(''); setOperatorId(''); setSupportStatus(''); setSupportMarkId('')
+    setReminderId(''); setTargetDate(''); setTemplateId(''); setMessageContent(''); setCommonActionId('')
     setResultState('idle'); setResultAction('execute'); setBusy(false)
     requestRef.current = {
       accountId,
@@ -315,14 +417,14 @@ export default function BulkRunDialog({
   const resultComplete = detail ? isRunComplete(detail.status) : false
   const operationTiles = [
     { kind: 'add_tag', label: 'タグを付ける', note: '友だちを分類します', icon: '◇', available: true },
-    { kind: 'start_scenario', label: 'シナリオを開始', note: 'ステップ配信を開始します', icon: '▷', available: false },
-    { kind: 'assign_operator', label: '担当者を変更', note: '担当者をまとめて変更します', icon: '♙', available: false },
-    { kind: 'set_support', label: '対応マークを変更', note: '対応状況を更新します', icon: '✓', available: false },
-    { kind: 'set_reminder', label: 'リマインダーを設定', note: '指定日時に通知します', icon: '♧', available: false },
-    { kind: 'send_message', label: 'メッセージを送る', note: '同じ内容をまとめて送ります', icon: '□', available: false },
-    { kind: 'run_common_action', label: 'アクションを実行', note: '登録済みのアクションを実行します', icon: 'ϟ', available: false },
+    { kind: 'start_scenario', label: 'シナリオを開始', note: 'ステップ配信を開始します', icon: '▷', available: true },
+    { kind: 'assign_operator', label: '担当者を変更', note: '担当者をまとめて変更します', icon: '♙', available: true },
+    { kind: 'set_support', label: '対応マークを変更', note: '対応状況を更新します', icon: '✓', available: true },
+    { kind: 'set_reminder', label: 'リマインダーを設定', note: '指定日時に通知します', icon: '♧', available: true },
+    { kind: 'send_message', label: 'メッセージを送る', note: '同じ内容をまとめて送ります', icon: '□', available: true },
+    { kind: 'run_common_action', label: 'アクションを実行', note: '登録済みのアクションを実行します', icon: 'ϟ', available: true },
     { kind: 'remove_tag', label: 'タグを外す', note: '付いているタグをまとめて外します', icon: '◇', available: true },
-    { kind: 'stop_scenario', label: 'シナリオを停止', note: '進行中のステップ配信を止めます', icon: '▣', available: false },
+    { kind: 'stop_scenario', label: 'シナリオを停止', note: '進行中のステップ配信を止めます', icon: '▣', available: true },
   ] as const
 
   return (
@@ -381,18 +483,144 @@ export default function BulkRunDialog({
               <dl className={styles.executionSummary}>
                 <div><dt>対象</dt><dd>選択した友だち {friendIds.length}人</dd></div>
                 <div><dt>操作</dt><dd>{operationLabel(operationKind)}</dd></div>
-                <div><dt>タグ</dt><dd>{tags.find((tag) => tag.id === tagId)?.name ?? '選択してください'}</dd></div>
+                <div><dt>内容</dt><dd>{operationSummary}</dd></div>
               </dl>
-            <div className={styles.field}>
-              <span className={styles.label}>どのタグ</span>
-              <Combobox
-                aria-label="どのタグ"
-                placeholder="選んでください"
-                value={tagId}
-                onChange={setTagId}
-                options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
-              />
-            </div>
+            {(operationKind === 'add_tag' || operationKind === 'remove_tag') ? (
+              <div className={styles.field}>
+                <span className={styles.label}>どのタグ</span>
+                <Combobox
+                  aria-label="どのタグ"
+                  placeholder="選んでください"
+                  value={tagId}
+                  onChange={setTagId}
+                  options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+                />
+              </div>
+            ) : null}
+            {(operationKind === 'start_scenario' || operationKind === 'stop_scenario') ? (
+              <div className={styles.field}>
+                <span className={styles.label}>どのシナリオ</span>
+                <Combobox
+                  aria-label="どのシナリオ"
+                  placeholder={resourcesState === 'loading' ? '読み込んでいます' : '選んでください'}
+                  value={scenarioId}
+                  onChange={setScenarioId}
+                  disabled={resourcesState === 'loading'}
+                  options={(resources?.scenarios ?? []).map((scenario) => ({ value: scenario.id, label: scenario.name }))}
+                />
+              </div>
+            ) : null}
+            {operationKind === 'assign_operator' ? (
+              <div className={styles.field}>
+                <span className={styles.label}>どの担当者</span>
+                <Combobox
+                  aria-label="どの担当者"
+                  placeholder={resourcesState === 'loading' ? '読み込んでいます' : '選んでください'}
+                  value={operatorId}
+                  onChange={setOperatorId}
+                  disabled={resourcesState === 'loading'}
+                  options={[{ value: '', label: '割り当てなしに戻す' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))]}
+                />
+              </div>
+            ) : null}
+            {operationKind === 'set_support' ? (
+              <>
+                <div className={styles.field}>
+                  <span className={styles.label}>対応状況</span>
+                  <Select
+                    aria-label="対応状況"
+                    label="対応状況"
+                    value={supportStatus}
+                    onChange={setSupportStatus}
+                    options={[
+                      { value: '', label: '変えない' },
+                      { value: 'unread', label: '未対応' },
+                      { value: 'in_progress', label: '対応中' },
+                      { value: 'on_hold', label: '保留' },
+                      { value: 'resolved', label: '対応済み' },
+                    ]}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <span className={styles.label}>対応マーク</span>
+                  <Combobox
+                    aria-label="対応マーク"
+                    placeholder={resourcesState === 'loading' ? '読み込んでいます' : '変えない'}
+                    value={supportMarkId}
+                    onChange={setSupportMarkId}
+                    disabled={resourcesState === 'loading'}
+                    options={(resources?.supportMarks ?? []).map((mark) => ({ value: mark.id, label: mark.name }))}
+                  />
+                </div>
+              </>
+            ) : null}
+            {operationKind === 'set_reminder' ? (
+              <>
+                <div className={styles.field}>
+                  <span className={styles.label}>どのリマインダー</span>
+                  <Combobox
+                    aria-label="どのリマインダー"
+                    placeholder={resourcesState === 'loading' ? '読み込んでいます' : '選んでください'}
+                    value={reminderId}
+                    onChange={setReminderId}
+                    disabled={resourcesState === 'loading'}
+                    options={(resources?.reminders ?? []).map((reminder) => ({ value: reminder.id, label: reminder.name }))}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <span className={styles.label}>いつ知らせる</span>
+                  <DateTimeField
+                    aria-label="いつ知らせる"
+                    value={targetDate}
+                    onChange={setTargetDate}
+                  />
+                </div>
+              </>
+            ) : null}
+            {operationKind === 'send_message' ? (
+              <>
+                <div className={styles.field}>
+                  <span className={styles.label}>どの文面</span>
+                  <Combobox
+                    aria-label="どの文面"
+                    placeholder={resourcesState === 'loading' ? '読み込んでいます' : '直接入力する'}
+                    value={templateId}
+                    onChange={setTemplateId}
+                    disabled={resourcesState === 'loading'}
+                    options={(resources?.templates ?? []).map((template) => ({ value: template.id, label: template.name }))}
+                  />
+                </div>
+                {!templateId ? (
+                  <div className={styles.field}>
+                    <span className={styles.label}>送る内容</span>
+                    <TextArea
+                      aria-label="送る内容"
+                      placeholder="同じ内容をまとめて送ります"
+                      value={messageContent}
+                      onChange={(event) => setMessageContent(event.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                ) : null}
+                <p className={styles.executionHint}>ⓘ 1,000人以上への送信は承認が必要です。承認の案内は結果に出ます。</p>
+              </>
+            ) : null}
+            {operationKind === 'run_common_action' ? (
+              <div className={styles.field}>
+                <span className={styles.label}>どのアクション</span>
+                <Combobox
+                  aria-label="どのアクション"
+                  placeholder={resourcesState === 'loading' ? '読み込んでいます' : '選んでください'}
+                  value={commonActionId}
+                  onChange={setCommonActionId}
+                  disabled={resourcesState === 'loading'}
+                  options={(resources?.commonActions ?? []).map((action) => ({ value: action.id, label: action.name }))}
+                />
+              </div>
+            ) : null}
+            {resourcesState === 'error' && operationKind !== 'add_tag' && operationKind !== 'remove_tag' ? (
+              <p className={styles.executionHint}>ⓘ 選択肢を読み込めませんでした。開き直すと読み直します。</p>
+            ) : null}
             <p className={styles.executionHint}>ⓘ 実行前に対象と操作内容を確認できます。</p>
 
             {previewState === 'loading' ? <ListState kind="loading" title="対象を数えています" /> : null}
@@ -413,7 +641,7 @@ export default function BulkRunDialog({
             ) : null}
 
             <div className={styles.actions}>
-              <Button variant="primary" disabled={!tagId || previewState === 'loading'} onClick={() => void loadPreview()}>
+              <Button variant="primary" disabled={!operation() || previewState === 'loading'} onClick={() => void loadPreview()}>
                 実行内容を確認
               </Button>
             </div>

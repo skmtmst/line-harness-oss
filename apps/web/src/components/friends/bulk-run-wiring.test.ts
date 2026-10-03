@@ -132,3 +132,34 @@ describe('V6 友だち一括操作（IAf7j）の配線', () => {
     expect(DIALOG).not.toMatch(/>\{detail\.id\}/)
   })
 })
+
+/*
+ * F-1 一括操作を増やす。絵の9操作すべて押せること。
+ * 入力欄と実行の口をつながずに札だけ開けると、押してから失敗する。
+ */
+describe('F-1 一括操作の7種（CYJ0L）', () => {
+  it('9操作すべて利用可能にする', () => {
+    for (const kind of ['start_scenario', 'assign_operator', 'set_support', 'set_reminder', 'send_message', 'run_common_action', 'stop_scenario']) {
+      expect(DIALOG).toContain(`{ kind: '${kind}'`)
+    }
+    expect(DIALOG).not.toContain('available: false')
+  })
+
+  it('操作ごとに入力欄と組み立てを持つ', () => {
+    const builder = DIALOG.slice(DIALOG.indexOf('const operation = useCallback'), DIALOG.indexOf('const loadPreview'))
+    for (const kind of ['start_scenario', 'stop_scenario', 'assign_operator', 'set_support', 'set_reminder', 'send_message', 'run_common_action']) {
+      expect(builder, `${kind} の組み立てが無い`).toContain(`operationKind === '${kind}'`)
+    }
+    expect(DIALOG).toContain('aria-label="どのシナリオ"')
+    expect(DIALOG).toContain('aria-label="どの担当者"')
+    expect(DIALOG).toContain('aria-label="対応状況"')
+    expect(DIALOG).toContain('aria-label="いつ知らせる"')
+    expect(DIALOG).toContain('aria-label="送る内容"')
+    expect(DIALOG).toContain('aria-label="どのアクション"')
+  })
+
+  it('選択肢は開いたときに読みだけ取り、書き込みは押すまで呼ばない', () => {
+    expect(DIALOG).toContain('api.commonActions.resources(accountId)')
+    expect(DIALOG).toContain('api.operators.list()')
+  })
+})
