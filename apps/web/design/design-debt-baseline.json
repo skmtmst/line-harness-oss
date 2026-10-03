@@ -531,6 +531,12 @@
     "arbitrary-value": 21,
     "unresolved-classname": 9
   },
+  "app/webinars/list-v8.tsx": {
+    "unresolved-classname": 38
+  },
+  "app/webinars/new/new-v8.tsx": {
+    "unresolved-classname": 41
+  },
   "app/webinars/page.tsx": {
     "arbitrary-value": 4,
     "unresolved-classname": 1

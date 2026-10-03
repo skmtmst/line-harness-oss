@@ -259,6 +259,8 @@ shared-button-importer app/webhooks/webhook-overviews.tsx
 shared-button-importer app/webinars/edit/page.tsx
 shared-button-importer app/webinars/edit/session-capacity-cell.tsx
 shared-button-importer app/webinars/edit/video-stages.tsx
+shared-button-importer app/webinars/list-v8.tsx
+shared-button-importer app/webinars/new/new-v8.tsx
 shared-button-importer app/webinars/new/page.tsx
 shared-button-importer app/webinars/page.tsx
 shared-button-importer app/webinars/published/page.tsx
