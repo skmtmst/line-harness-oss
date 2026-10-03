@@ -91,7 +91,8 @@ export default function MemberDialog({
       open={open}
       title={member ? `${member.name}さんの権限を変える` : '権限者を招待'}
       description={member ? undefined : `招待メールは送った日から7日（${inviteExpiryLabel()}まで）有効です。メールの確認とLINEの連携が済むとログインできます。`}
-      designNode={member ? 'BHEl9' : 'yLKwV'}
+      /* 板 `ukPgd`：招待の入力の間違いは同じ窓の状態として印を付ける。 */
+      designNode={member ? 'BHEl9' : localError ? 'ukPgd' : 'yLKwV'}
       confirmLabel={member ? '変更を保存' : '招待メールを送る'}
       busy={busy}
       error={localError || error}
