@@ -153,6 +153,16 @@
   "app/contents/page.tsx": {
     "arbitrary-value": 5
   },
+  "app/contents/vars/edit/edit-v8.tsx": {
+    "unresolved-classname": 109
+  },
+  "app/contents/vars/list-v8.tsx": {
+    "unresolved-classname": 105,
+    "direct-th": 6
+  },
+  "app/contents/vars/new/new-v8.tsx": {
+    "unresolved-classname": 55
+  },
   "app/contents/vars/page.tsx": {
     "arbitrary-value": 3
   },
