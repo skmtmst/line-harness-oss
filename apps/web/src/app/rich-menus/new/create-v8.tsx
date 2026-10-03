@@ -43,6 +43,8 @@ import DateTimeField from '@/components/shared/date-time-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import VersionCompare from '@/components/shared/version-compare'
 import LinePreview from '@/components/shared/line-preview'
 import { CanvasEditor, areaDisplayName, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentLabelOf, intentOf } from '@/components/rich-menus/area-properties'
@@ -210,6 +212,26 @@ type PrepublishState = {
 }
 
 /* ---------- 補助（edit/page.tsx と同じ写し。page.tsx は部品を export できないため） ---------- */
+
+/*
+ * ★V8 `r8dGXT`「違いを比べる」の比べる文。版の本文ではなく設定の要約。
+ * 最新と入力中の2つを作り、VersionCompare（行ごとの比べる）へ渡す。
+ */
+function describeMenuSummary(input: {
+  name: string
+  chatBarText: string
+  audienceAll: boolean
+  pages: Array<{ areas: unknown[] }>
+}): string {
+  const areaCount = input.pages.reduce((total, page) => total + page.areas.length, 0)
+  return [
+    `名前：${input.name || '（未入力）'}`,
+    `言葉：${input.chatBarText || '（未入力）'}`,
+    `出す相手：${input.audienceAll ? 'みんな' : '条件あり'}`,
+    `面の数：${input.pages.length}`,
+    `ボタンの数：${areaCount}`,
+  ].join('\n')
+}
 
 /** 保存されている条件を読む。壊れた JSON は「条件なし」。 */
 function parseStoredCondition(raw: string | null): SegmentCondition | null {
@@ -435,6 +457,13 @@ export default function RichMenuCreateV8() {
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  /*
+   * ★V8 `r8dGXT`：なおし中にほかの人が先に保存した（409）。
+   * 入力は残したまま、帯で知らせる。名前・時刻は API に無いので出さない。
+   */
+  const [conflict, setConflict] = useState(false)
+  const [conflictLatest, setConflictLatest] = useState<Group | null>(null)
+  const [compareOpen, setCompareOpen] = useState(false)
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
   /** 画像の入れ先。手順①は既定ページ、手順②はいま見ているページ。 */
   const [imagePickTarget, setImagePickTarget] = useState<'default' | 'active'>('active')
@@ -762,6 +791,19 @@ export default function RichMenuCreateV8() {
       setNotice('下書きを保存しました。')
       return true
     } catch (e) {
+      // ★V8 `r8dGXT`：ほかの人が先に保存した（409）。入力は残したまま、
+      // 帯を出して最新を取り直す。比べる文に使う。
+      if (e instanceof ApiError && e.status === 409 && group) {
+        setConflict(true)
+        setCompareOpen(false)
+        try {
+          const latest = await api.richMenuGroups.get(group.id)
+          if (latest.success) setConflictLatest(latest.data as Group)
+        } catch {
+          // 取り直しに失敗しても帯は出す。比べる文は出さない。
+        }
+        return false
+      }
       const raw = e instanceof Error ? e.message : ''
       setError(
         /targetingPriority/.test(raw)
@@ -792,6 +834,31 @@ export default function RichMenuCreateV8() {
     setStep(key)
     setError(null)
   }
+
+  /** ★V8 `r8dGXT`「最新を読み込んで続ける」。最新で入力を置き換える。 */
+  function acceptLatestAndContinue() {
+    if (!conflictLatest) return
+    hydrate(conflictLatest)
+    setConflict(false)
+    setConflictLatest(null)
+    setCompareOpen(false)
+    setNotice('最新の内容を読み込みました。直していた所は最新の内容に置き換わっています。')
+  }
+
+  const currentSummary = describeMenuSummary({
+    name,
+    chatBarText,
+    audienceAll: audience === 'all',
+    pages,
+  })
+  const latestSummary = conflictLatest
+    ? describeMenuSummary({
+        name: conflictLatest.name,
+        chatBarText: conflictLatest.chatBarText,
+        audienceAll: conflictLatest.isDefaultForAll,
+        pages: conflictLatest.pages,
+      })
+    : ''
 
   /* ---------- ページ（切替タブ） ---------- */
 
@@ -1333,7 +1400,12 @@ export default function RichMenuCreateV8() {
   const busy = saving || publishing
 
   return (
-    <div className={styles.board} data-design-node="rich-menu-create-v8">
+    <div
+      className={styles.board}
+      data-design-node={
+        step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
+      }
+    >
       <Link href="/rich-menus" className={styles.backLink}>
         ← リッチメニューへ
       </Link>
@@ -1343,6 +1415,25 @@ export default function RichMenuCreateV8() {
         <Stepper label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} />
       </div>
       <p className={styles.subNote}>{headNote}</p>
+
+      {conflict && (
+        <div className={styles.conflictBar} data-design-node="r8dGXT" role="alert">
+          <div>
+            <p className={styles.conflictTitle}>ほかの人がこのメニューを更新しました</p>
+            <p className={styles.conflictBody}>
+              あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。
+            </p>
+          </div>
+          <div className={styles.conflictActions}>
+            <Button type="button" variant="secondary" onClick={() => setCompareOpen(true)} disabled={!conflictLatest}>
+              違いを比べる
+            </Button>
+            <Button type="button" variant="primary" onClick={acceptLatestAndContinue}>
+              最新を読み込んで続ける
+            </Button>
+          </div>
+        </div>
+      )}
 
       {error ? (
         <Notice
@@ -1496,6 +1587,22 @@ export default function RichMenuCreateV8() {
       </ConfirmDialog>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューの入力" onConfirm={confirmLeave} onCancel={cancelLeave} />
+
+      {/* ★V8 `r8dGXT`「違いを比べる」の窓。最新と入力中の設定の要約を比べる。 */}
+      <Dialog
+        open={compareOpen}
+        title="違いを比べる"
+        description="ほかの人が保存した最新の内容と、あなたが直している内容を比べます。"
+        cancelLabel="閉じる"
+        onCancel={() => setCompareOpen(false)}
+        footer={
+          <Button type="button" variant="primary" onClick={acceptLatestAndContinue}>
+            最新を読み込んで続ける
+          </Button>
+        }
+      >
+        <VersionCompare before={latestSummary} after={currentSummary} />
+      </Dialog>
     </div>
   )
 
