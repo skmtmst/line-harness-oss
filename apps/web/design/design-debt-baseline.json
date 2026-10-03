@@ -247,7 +247,7 @@
     "unresolved-classname": 5
   },
   "app/hq/templates/template-console.tsx": {
-    "unresolved-classname": 82
+    "unresolved-classname": 86
   },
   "app/hq/templates/template-definition-editor.tsx": {
     "unresolved-classname": 6
