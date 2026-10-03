@@ -14,7 +14,7 @@
  * export できないため（`form-conflict-message.ts` と同じ理由）。
  */
 
-import type { FormLayout } from '@line-crm/shared'
+import type { FormLayout, LiffFormAppearance } from '@line-crm/shared'
 
 export type FormSavedContent = {
   name: string
@@ -25,6 +25,8 @@ export type FormSavedContent = {
   ogTitle: string | null
   ogDescription: string | null
   ogImageUrl: string | null
+  /** 見た目（M3）。比べないと見た目だけの保存の再送を見分けられない。 */
+  liffAppearance: LiffFormAppearance
 }
 
 function canonicalize(value: unknown): string {

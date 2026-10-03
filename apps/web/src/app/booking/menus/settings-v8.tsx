@@ -27,6 +27,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import SearchField from '@/components/shared/search-field'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -55,6 +56,18 @@ import {
   type StaffMenuMatrix,
 } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
+import {
+  checkLiffColor,
+  LIFF_CALENDAR_MODE_META,
+  LIFF_CALENDAR_MODES,
+  LIFF_HEADING_FONT_META,
+  LIFF_HEADING_FONTS,
+  LIFF_NIGHT_COLORS,
+  LIFF_THEME_META,
+  LIFF_THEMES,
+  resolveLiffTextColor,
+  type LiffTheme,
+} from '@line-crm/shared'
 import { formatHoursBeforeHint, formatMinutesLengthHint } from '@/lib/format-duration'
 import { bookingWindowEnd, minutesBeforeLabel } from '../lib/format-time'
 import { menuPriceLabel } from '../lib/menu-price'
@@ -1995,6 +2008,179 @@ function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty,
   )
 }
 
+/* ==================== お客さまの予約画面の見た目（M3） ==================== */
+
+const LIFF_COLOR_PATTERN = /^#[0-9a-f]{6}$/i
+
+/** 店の色1つ（主の色・地の色）。null は「型の色」。入力途中は保持し、確定時だけ反映する。 */
+function LiffColorField({ label, note, value, onChange, disabled }: {
+  label: string
+  note: string
+  value: string | null
+  onChange: (value: string | null) => void
+  disabled: boolean
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const [invalid, setInvalid] = useState(false)
+  const shown = draft ?? value ?? ''
+  function commit(raw: string) {
+    const text = raw.trim()
+    if (text === '') {
+      setDraft(null)
+      setInvalid(false)
+      onChange(null)
+      return
+    }
+    if (LIFF_COLOR_PATTERN.test(text)) {
+      setDraft(null)
+      setInvalid(false)
+      onChange(text.toLowerCase())
+    } else {
+      setInvalid(true)
+    }
+  }
+  return (
+    <label className={styles.fieldLabel}>
+      {label}
+      <span className="mt-1 flex items-center gap-2">
+        <input
+          type="color"
+          aria-label={`${label}の色`}
+          value={value ?? '#ffffff'}
+          disabled={disabled}
+          onChange={(event) => {
+            setDraft(null)
+            setInvalid(false)
+            onChange(event.target.value.toLowerCase())
+          }}
+          className={styles.liffSwatchInput}
+        />
+        <input
+          aria-label={`${label}のカラーコード`}
+          value={shown}
+          disabled={disabled}
+          placeholder="型の色"
+          onChange={(event) => {
+            setDraft(event.target.value)
+            setInvalid(false)
+          }}
+          onBlur={(event) => commit(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              commit((event.target as HTMLInputElement).value)
+            }
+          }}
+          className={styles.numInput}
+        />
+        {!value ? <span className="text-ink-faint whitespace-nowrap text-xs">型の色</span> : null}
+      </span>
+      <span className="text-ink-faint mt-1 block text-xs">{note}</span>
+      {invalid ? (
+        <span role="alert" className="text-danger mt-1 block text-xs">
+          #に続けて6桁の16進数で入れてください（例: #123d2f）。型の色に戻すときは空にしてください。
+        </span>
+      ) : null}
+    </label>
+  )
+}
+
+/**
+ * 型の選択肢（5つ）。共通のラジオカードで出す。
+ * ④夜には深い紺の見本を付ける（黒は使わない）。
+ */
+function LiffThemeCards({ value, onChange, disabled }: {
+  value: LiffTheme
+  onChange: (value: LiffTheme) => void
+  disabled: boolean
+}) {
+  return (
+    <RadioCardGroup legend="お客さまの予約画面の型" className={styles.liffThemeGrid}>
+      {LIFF_THEMES.map((theme) => {
+        const meta = LIFF_THEME_META[theme]
+        return (
+          <RadioCard
+            key={theme}
+            name="liff-theme"
+            value={theme}
+            checked={value === theme}
+            disabled={disabled}
+            onChange={(next) => onChange(next as LiffTheme)}
+            title={meta.label}
+            note={
+              <span className={styles.liffThemeNote}>
+                <span
+                  aria-hidden
+                  className={styles.liffThemeDot}
+                  style={{ background: meta.swatch ?? 'var(--color-shell-gray)' }}
+                />
+                {meta.note}
+                {theme === 'night' ? (
+                  <span
+                    className={styles.liffNightChip}
+                    style={{
+                      background: LIFF_NIGHT_COLORS.ground,
+                      borderColor: LIFF_NIGHT_COLORS.border,
+                      color: LIFF_NIGHT_COLORS.text,
+                    }}
+                  >
+                    深い紺
+                  </span>
+                ) : null}
+              </span>
+            }
+          />
+        )
+      })}
+    </RadioCardGroup>
+  )
+}
+
+/**
+ * 白い字との見やすさ（4.5:1 以上）の注意。足りなくても保存は止めない。
+ * 足りない色には字を黒にすることと、濃い候補を出す。
+ */
+function LiffContrastNote({ primary, background }: {
+  primary: string | null
+  background: string | null
+}) {
+  const checks: Array<{ color: string; check: ReturnType<typeof checkLiffColor> }> = []
+  if (primary) checks.push({ color: primary, check: checkLiffColor(primary, '主の色') })
+  if (background) checks.push({ color: background, check: checkLiffColor(background, '地の色') })
+  if (checks.length === 0) {
+    return (
+      <p className={styles.noteText}>
+        店の色は型の色のままです。白い字との見やすさ（4.5:1以上）は、色を入れたときに自動で確かめます。
+      </p>
+    )
+  }
+  return (
+    <div className={styles.liffContrastBox}>
+      {checks.map((entry) => (
+        <p key={entry.color} className={styles.noteText}>
+          {entry.color}の字は{entry.check.textColor === '#ffffff' ? '白' : '黒'}にします
+          （白い字との見やすさ {entry.check.whiteRatio.toFixed(1)}:1・目安 4.5:1）。
+          {entry.check.textColor === '#ffffff' ? null : (
+            <>
+              <span
+                aria-hidden
+                className={styles.liffTextChip}
+                style={{ background: entry.color, color: resolveLiffTextColor(entry.color) }}
+              >
+                あ
+              </span>
+              {entry.check.darkerCandidates.length > 0 ? (
+                <>白い字のままにするなら、濃い候補があります：{entry.check.darkerCandidates.join('・')}</>
+              ) : null}
+            </>
+          )}
+        </p>
+      ))}
+      <p className={styles.noteText}>足りなくても保存はできます。</p>
+    </div>
+  )
+}
+
 function RulesTabV8({ accountId, settings, status, error, staff, staffReady, canEdit, onSaved, onReload }: {
   accountId: string
   settings: BookingSettings | null
@@ -2080,6 +2266,13 @@ function RulesTabV8({ accountId, settings, status, error, staff, staffReady, can
         holdMinutes: draft.holdMinutes,
         slotGranularityMinutes: draft.slotGranularityMinutes,
         liffDateView: draft.liffDateView ?? 'list',
+        // 見た目（M3）。色の null は「型の色」。
+        liffTheme: draft.liffTheme ?? 'line',
+        liffPrimaryColor: draft.liffPrimaryColor ?? null,
+        liffBackgroundColor: draft.liffBackgroundColor ?? null,
+        liffHeadingFont: draft.liffHeadingFont ?? 'default',
+        liffCalendarMode: draft.liffCalendarMode ?? 'week_first',
+        liffVacancyDots: draft.liffVacancyDots ?? true,
         reminderDayBeforeTime: draft.reminderDayBeforeTime || null,
         reminderHoursBefore: draft.reminderHoursBefore,
       })
@@ -2199,6 +2392,86 @@ function RulesTabV8({ accountId, settings, status, error, staff, staffReady, can
                 { value: 'list', label: '週で見る（日付の横ならび）' },
                 { value: 'calendar', label: 'カレンダー' },
               ]}
+            />
+          </div>
+        </section>
+
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
+            <h2 className={styles.sectionTitle}>お客さまの予約画面の見た目</h2>
+            <p className={styles.sectionDesc}>型・店の色・カレンダーの出し方・空きの点を決めます。型を選んでいない店は今の見た目のままです</p>
+          </div>
+          <LiffThemeCards
+            value={draft.liffTheme ?? 'line'}
+            onChange={(value) => set('liffTheme', value)}
+            disabled={!canEdit}
+          />
+          <div className={styles.ruleFields}>
+            <LiffColorField
+              label="主の色"
+              note="ボタンや見出しに使います。空のままなら型の色です"
+              value={draft.liffPrimaryColor ?? null}
+              onChange={(value) => set('liffPrimaryColor', value)}
+              disabled={!canEdit}
+            />
+            <LiffColorField
+              label="地の色"
+              note="画面の地に使います。空のままなら型の色です"
+              value={draft.liffBackgroundColor ?? null}
+              onChange={(value) => set('liffBackgroundColor', value)}
+              disabled={!canEdit}
+            />
+            <label className={styles.fieldLabel}>
+              見出しの書体
+              <Select
+                size="full"
+                aria-label="見出しの書体"
+                value={draft.liffHeadingFont ?? 'default'}
+                onChange={(value) => set('liffHeadingFont', value as BookingSettings['liffHeadingFont'])}
+                className="mt-1"
+                options={LIFF_HEADING_FONTS.map((font) => ({
+                  value: font,
+                  label: LIFF_HEADING_FONT_META[font].label,
+                }))}
+              />
+            </label>
+          </div>
+          <div className={styles.toggleRow}>
+            <span className={styles.toggleRowLabel}>
+              店の色を型の色に戻す
+              <span className="text-ink-faint block text-xs">主の色・地の色を空にします。型は変わりません。</span>
+            </span>
+            <Button
+              onClick={() => {
+                set('liffPrimaryColor', null)
+                set('liffBackgroundColor', null)
+              }}
+            >
+              型の色に戻す
+            </Button>
+          </div>
+          <LiffContrastNote primary={draft.liffPrimaryColor ?? null} background={draft.liffBackgroundColor ?? null} />
+          <div className={styles.toggleRow}>
+            <span className={styles.toggleRowLabel}>カレンダーの出し方</span>
+            <Select
+              aria-label="カレンダーの出し方"
+              value={draft.liffCalendarMode ?? 'week_first'}
+              onChange={(value) => set('liffCalendarMode', value as BookingSettings['liffCalendarMode'])}
+              options={LIFF_CALENDAR_MODES.map((mode) => ({
+                value: mode,
+                label: LIFF_CALENDAR_MODE_META[mode].label,
+              }))}
+            />
+          </div>
+          <div className={styles.toggleRow}>
+            <span className={styles.toggleRowLabel}>
+              空きの点を出す
+              <span className="text-ink-faint block text-xs">緑＝空き・金＝残りわずか。満席は押せません。</span>
+            </span>
+            <Toggle
+              label="空きの点を出す"
+              checked={draft.liffVacancyDots ?? true}
+              onChange={(next) => set('liffVacancyDots', next)}
             />
           </div>
         </section>

@@ -19,10 +19,16 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
+  checkLiffColor,
   emptyLayout,
   formThemeContrastError,
+  LIFF_HEADING_FONT_META,
+  LIFF_HEADING_FONTS,
+  LIFF_THEME_META,
+  LIFF_THEMES,
   newBlockId,
   normalizeFormTheme,
+  normalizeLiffFormAppearance,
   validateFormForPublish,
   type FormBlock,
   type FormInputType,
@@ -30,7 +36,9 @@ import {
   type FormOptions,
   type FormSection,
   type FormTheme,
+  type LiffFormAppearance,
 } from '@line-crm/shared'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { normalizeSectionName } from '@/components/forms/section-name'
 import { api, ApiError, fetchApi } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -38,6 +46,7 @@ import { Field, inputClass } from '@/components/shared/form-controls'
 import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
 import FormPreview from '@/components/forms/form-preview'
 import FormDesignSettings from './form-design-settings'
+import FormLiffAppearanceSection from './form-liff-appearance'
 import { ogImageUrlError, validateLayoutForSave } from './form-validate'
 import OptionsDialog from '@/components/forms/options-dialog'
 import { describeFormUpdates } from '@/components/forms/form-update-summary'
@@ -109,6 +118,12 @@ function FormEditInner() {
   const [ogDescription, setOgDescription] = useState('')
   const [ogImageUrl, setOgImageUrl] = useState('')
   const [layout, setLayoutState] = useState<FormLayout>(emptyLayout)
+  /**
+   * 見た目（M3）。既定は店の設定に合わせる。「このフォームだけ変える」の
+   * ときだけ型と色を使う。色の null は「型の色・店の色」。
+   */
+  const [liffAppearance, setLiffAppearance] = useState<LiffFormAppearance>(() =>
+    normalizeLiffFormAppearance(undefined))
   const [tab, setTab] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
@@ -198,6 +213,8 @@ function FormEditInner() {
     if (!res.success) return false
     // layout はサーバ側が必ず作って返す（古いフォームは fields から）
     const nextLayout = res.data.layout ?? emptyLayout()
+    // 見た目は古い応答には無いことがあるので既定（店の設定に合わせる）に倒す。
+    const nextAppearance = normalizeLiffFormAppearance(res.data.liffAppearance)
     const loaded = {
       name: res.data.name,
       description: res.data.description ?? '',
@@ -207,6 +224,7 @@ function FormEditInner() {
       ogDescription: res.data.ogDescription ?? '',
       ogImageUrl: res.data.ogImageUrl ?? '',
       layout: nextLayout,
+      liffAppearance: nextAppearance,
     }
     setName(loaded.name)
     setDescription(loaded.description)
@@ -217,6 +235,7 @@ function FormEditInner() {
     setOgDescription(loaded.ogDescription)
     setOgImageUrl(loaded.ogImageUrl)
     setLayoutState(nextLayout)
+    setLiffAppearance(nextAppearance)
     setContentRevision(res.data.contentRevision)
     setPublishedVersionId(res.data.publishedVersionId)
     setConflict(null)
@@ -458,6 +477,7 @@ function FormEditInner() {
     ogDescription,
     ogImageUrl,
     layout,
+    liffAppearance,
   })
   const dirty = savedSnapshot.current !== null && currentSnapshot !== savedSnapshot.current
 
@@ -480,6 +500,7 @@ function FormEditInner() {
       ogDescription: string
       ogImageUrl: string
       layout: FormLayout
+      liffAppearance?: LiffFormAppearance
     }
     setName(saved.name)
     setDescription(saved.description)
@@ -489,6 +510,7 @@ function FormEditInner() {
     setOgDescription(saved.ogDescription)
     setOgImageUrl(saved.ogImageUrl)
     setLayoutState(saved.layout)
+    setLiffAppearance(normalizeLiffFormAppearance(saved.liffAppearance))
     // 捨てたあとの「元に戻す」で破棄した変更が蘇らないよう、履歴も切る。
     undoStack.current = []
     redoStack.current = []
@@ -600,6 +622,7 @@ function FormEditInner() {
       ogTitle: ogTitle.trim() || null,
       ogDescription: ogDescription.trim() || null,
       ogImageUrl: ogImageUrl.trim() || null,
+      liffAppearance,
     }
     /*
      * M003：保存されている中身を読み直し、送った中身と同じなら
@@ -621,6 +644,7 @@ function FormEditInner() {
           ogTitle: current.data.ogTitle,
           ogDescription: current.data.ogDescription,
           ogImageUrl: current.data.ogImageUrl,
+          liffAppearance: normalizeLiffFormAppearance(current.data.liffAppearance),
         }
         return formSavedContentMatches(sentContent, actual) ? current.data.contentRevision : null
       } catch {
@@ -641,6 +665,13 @@ function FormEditInner() {
           ogTitle: sentContent.ogTitle,
           ogDescription: sentContent.ogDescription,
           ogImageUrl: sentContent.ogImageUrl,
+          liffAppearance: {
+            mode: liffAppearance.mode,
+            theme: liffAppearance.theme,
+            primaryColor: liffAppearance.primaryColor,
+            backgroundColor: liffAppearance.backgroundColor,
+            headingFont: liffAppearance.headingFont,
+          },
           expectedContentRevision: contentRevision,
         })
       } catch (updateError) {
@@ -675,7 +706,7 @@ function FormEditInner() {
       if (publishAfter) {
         savedSnapshot.current = JSON.stringify({
             name, description, isActive: true, onSubmitTagId,
-            ogTitle, ogDescription, ogImageUrl, layout,
+            ogTitle, ogDescription, ogImageUrl, layout, liffAppearance,
           })
       } else if (reconciledOwnSave) {
         // 再送で保存済みだったときは、送った姿を基準にする（前後の空白の差を残さない）。
@@ -688,6 +719,7 @@ function FormEditInner() {
             ogDescription: sentContent.ogDescription ?? '',
             ogImageUrl: sentContent.ogImageUrl ?? '',
             layout: sentContent.layout,
+            liffAppearance: sentContent.liffAppearance,
           })
       } else {
         savedSnapshot.current = currentSnapshot
@@ -933,6 +965,12 @@ function FormEditInner() {
               </p>
             </div>
           </div>
+
+          {/*
+           * 見た目（M3）。お客さまの回答画面の型と色。既定は店の設定に
+           * 合わせる。保存・破棄・未保存の確認はこの画面の仕組みに載る。
+           */}
+          <FormLiffAppearanceSection value={liffAppearance} onChange={setLiffAppearance} />
 
           {/*
             P（公開前の試し）：下書きをお客さま画面で試す。試しの回答は集計に
