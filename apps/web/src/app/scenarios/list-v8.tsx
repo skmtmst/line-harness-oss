@@ -50,6 +50,10 @@ import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
 import Pagination from '@/components/shared/pagination'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import InlineEdit from '@/components/shared/inline-edit'
+import { withViewTransition } from '@/components/shared/view-transition'
 import styles from './list-v8.module.css'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
@@ -154,6 +158,8 @@ export default function ScenariosListV8() {
 
   /* 行の「…」。開いている行のID。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている行のID。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
   /** キーボードで動かした結果を読み上げる（live 領域）。 */
@@ -603,7 +609,10 @@ export default function ScenariosListV8() {
     {
       id: 'results',
       label: '配信結果を見る',
-      onSelect: () => router.push(`/scenarios/results?id=${encodeURIComponent(s.id)}`),
+      onSelect: () =>
+        withViewTransition(() => {
+          router.push(`/scenarios/results?id=${encodeURIComponent(s.id)}`)
+        }),
     },
     {
       id: 'delete',
@@ -618,6 +627,36 @@ export default function ScenariosListV8() {
       },
     },
   ]
+
+  /* ===== 行の詳細パネル（V8「サクサク感」C①②・D・E） ===== */
+
+  /** 一覧の行→詳細はつながる移り変わりで開く。 */
+  const goDetail = (id: string) => {
+    withViewTransition(() => {
+      router.push(`/scenarios/detail?id=${id}`)
+    })
+  }
+
+  /** 右クリックは「…」と同じ項目をマウスの位置に出す。 */
+  const rowContextItems = (s: ScenarioRow): ContextMenuItem[] =>
+    rowMenuItems(s).map((item) => ({
+      id: item.id,
+      label: item.label,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      onSelect: () => item.onSelect(),
+    }))
+
+  const panelIndex = panelId === null ? -1 : scenarios.findIndex((s) => s.id === panelId)
+  const panelRow = panelIndex >= 0 ? scenarios[panelIndex] : null
+
+  /** パネル内の名前のその場の書き換え。失敗したら InlineEdit が戻す。 */
+  const renameScenario = async (id: string, next: string): Promise<unknown> => {
+    const res = await api.scenarios.update(id, { name: next })
+    if (!res.success) throw new Error(res.error)
+    await loadScenarios()
+    return res
+  }
 
   /* ===== 表 ===== */
 
@@ -715,12 +754,12 @@ export default function ScenariosListV8() {
                     key={s.id}
                     className={styles.rowClick}
                     tabIndex={0}
-                    onClick={() => router.push(`/scenarios/detail?id=${s.id}`)}
+                    onClick={() => setPanelId(s.id)}
                     onKeyDown={(event) => {
                       if (event.target !== event.currentTarget) return
                       if (event.key === 'Enter') {
                         event.preventDefault()
-                        router.push(`/scenarios/detail?id=${s.id}`)
+                        setPanelId(s.id)
                       }
                     }}
                   >
@@ -757,7 +796,12 @@ export default function ScenariosListV8() {
                           href={`/scenarios/detail?id=${s.id}`}
                           title={s.name}
                           className={styles.cellTitle}
-                          onClick={(event) => event.stopPropagation()}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                            event.preventDefault()
+                            goDetail(s.id)
+                          }}
                         >
                           {s.name}
                         </Link>
@@ -792,14 +836,19 @@ export default function ScenariosListV8() {
                       </span>
                     </td>
                     <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
-                      <button
-                        type="button"
-                        className={styles.menuButton}
-                        title={`シナリオ「${s.name}」の操作`}
-                        onClick={() => setOpenMenuId((current) => (current === s.id ? null : s.id))}
+                      <ContextMenu
+                        label={`シナリオ「${s.name}」の操作`}
+                        items={rowContextItems(s)}
                       >
-                        <MoreHorizontal size={16} aria-hidden="true" />
-                      </button>
+                        <button
+                          type="button"
+                          className={styles.menuButton}
+                          title={`シナリオ「${s.name}」の操作`}
+                          onClick={() => setOpenMenuId((current) => (current === s.id ? null : s.id))}
+                        >
+                          <MoreHorizontal size={16} aria-hidden="true" />
+                        </button>
+                      </ContextMenu>
                       <ActionMenu
                         open={openMenuId === s.id}
                         onClose={() => setOpenMenuId(null)}
@@ -912,6 +961,71 @@ export default function ScenariosListV8() {
           onClose={() => setFolderDialogOpen(false)}
           onAdded={() => void loadFolders()}
         />
+      )}
+
+      {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+      {panelRow && (
+        <DetailPanel
+          open
+          title={panelRow.name}
+          description={[
+            deliveryModeLabels[panelRow.deliveryMode ?? 'relative'],
+            panelRow.stepCount === undefined ? '—通' : `${panelRow.stepCount}通`,
+          ].join('・')}
+          onClose={() => setPanelId(null)}
+          onPrev={panelIndex > 0 ? () => setPanelId(scenarios[panelIndex - 1].id) : undefined}
+          onNext={
+            panelIndex < scenarios.length - 1 ? () => setPanelId(scenarios[panelIndex + 1].id) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < scenarios.length - 1}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => goDetail(panelRow.id)}>
+                開く
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  withViewTransition(() => {
+                    router.push(`/scenarios/results?id=${encodeURIComponent(panelRow.id)}`)
+                  })
+                }
+              >
+                配信結果を見る
+              </Button>
+              <Button variant="secondary" disabled={!canEdit} onClick={() => openDuplicate(panelRow)}>
+                複製する
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!canEdit}
+                onClick={() => {
+                  setDeleteError('')
+                  setDeleteTarget(panelRow)
+                  setPanelId(null)
+                }}
+              >
+                削除する
+              </Button>
+            </>
+          }
+        >
+          <p>
+            {panelRow.isActive ? '稼働中' : '停止中'} ／ 購読{' '}
+            {panelRow.subscriberCount === undefined ? '—' : formatNumber(panelRow.subscriberCount)}人 ／
+            読了 {formatNumber(panelRow.completedCount ?? 0)}人
+          </p>
+          {panelRow.description && <p>{panelRow.description}</p>}
+          {canEdit && (
+            <InlineEdit
+              value={panelRow.name}
+              label="シナリオ名"
+              onSave={(next) => renameScenario(panelRow.id, next)}
+              maxLength={80}
+            />
+          )}
+        </DetailPanel>
       )}
 
       {/* まとめて「止める」の確認。 */}
