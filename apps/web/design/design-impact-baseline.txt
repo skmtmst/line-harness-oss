@@ -311,6 +311,7 @@ shared-button-importer components/hq/banners/generation-panel.tsx
 shared-button-importer components/hq/banners/image-detail-modal.tsx
 shared-button-importer components/hq/banners/library-section.tsx
 shared-button-importer components/hq/banners/limit-state.tsx
+shared-button-importer components/hq/banners/project-form-dialog.tsx
 shared-button-importer components/hq/banners/projects-section.tsx
 shared-button-importer components/hq/banners/reference-picker-dialog.tsx
 shared-button-importer components/hq/banners/upload-button.tsx
