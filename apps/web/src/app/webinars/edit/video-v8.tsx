@@ -11,6 +11,7 @@
  */
 import { useState } from 'react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import WebinarForm from '@/components/webinars/webinar-form'
@@ -250,10 +251,9 @@ export default function VideoV8({
                 placeholder={webinar.publicationEndsAt ? formatDateTime(webinar.publicationEndsAt) : 'なし（いつでも）'}
                 className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm disabled:opacity-50"
               />
-              <label className="text-ink-secondary mt-2 flex items-center gap-2 text-xs">
-                <input type="checkbox" checked={noEnd} onChange={(e) => setNoEnd(e.target.checked)} />
+              <Checkbox checked={noEnd} onCheckedChange={setNoEnd} className="mt-2 text-xs">
                 終わりを決めない（いつでも見られる）
-              </label>
+              </Checkbox>
             </div>
           </div>
           {periodError ? <Notice tone="error" title="公開期間を保存できませんでした">{periodError}</Notice> : null}

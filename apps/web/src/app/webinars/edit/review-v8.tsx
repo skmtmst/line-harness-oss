@@ -159,7 +159,7 @@ export default function ReviewV8({
                   className={
                     check.status === 'passed'
                       ? 'bg-accent-soft text-accent-deep inline-flex shrink-0 items-center rounded-pill px-2 py-0.5 text-xs font-semibold'
-                      : 'bg-danger-soft text-danger inline-flex shrink-0 items-center rounded-pill px-2 py-0.5 text-xs font-semibold'
+                      : 'bg-danger-bg text-danger inline-flex shrink-0 items-center rounded-pill px-2 py-0.5 text-xs font-semibold'
                   }
                 >
                   {check.status === 'passed' ? 'できた' : 'まだ'}
