@@ -989,3 +989,96 @@ describe('監査の直し (R337・R339・R340・R341・R342・R344)', () => {
     expect(seenKeys[1]).toBe(seenKeys[0])
   })
 })
+
+describe('Meet個別相談のV6送信の最終関係フェンス', () => {
+  const NOW = new Date('2026-08-28T09:00:00.000Z')
+  const TARGET = '2026-08-28T10:00:00.000Z'
+
+  function seedMeetLinked(raw: import('better-sqlite3').Database): void {
+    seedReminder(raw)
+    raw.prepare(
+      `UPDATE friend_reminders
+          SET source_kind = 'meet', source_id = 'consult-1', source_event_id = 'evt-1'
+        WHERE id = 'enrollment-1'`,
+    ).run()
+    raw.prepare(
+      `INSERT INTO staff (id, line_account_id, name, display_name)
+       VALUES ('staff-1', 'account-1', '担当', '担当')`,
+    ).run()
+    raw.prepare(
+      `INSERT INTO menus (id, line_account_id, name, duration_minutes, buffer_after_minutes, base_price)
+       VALUES ('menu-1', 'account-1', '相談', 60, 0, 0)`,
+    ).run()
+    raw.prepare(
+      `INSERT INTO bookings
+         (id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at,
+          block_ends_at, status, price_at_booking, requested_at, lock_version)
+       VALUES ('booking-1', 'account-1', 'friend-1', 'staff-1', 'menu-1', ?, ?, ?, 'confirmed', 0, ?, 0)`,
+    ).run(TARGET, '2026-08-28T11:00:00.000Z', '2026-08-28T11:00:00.000Z', '2026-08-01T00:00:00.000Z')
+    raw.prepare(
+      `INSERT INTO meet_consultations
+         (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url,
+          status, booking_id, booking_version)
+       VALUES ('consult-1', 'evt-1', 'friend-1', '個別相談', ?, ?,
+         'https://meet.google.com/aaa-bbbb-ccc', 'confirmed', 'booking-1', 0)`,
+    ).run(TARGET, '2026-08-28T11:00:00.000Z')
+  }
+
+  it('関係が生きている通常候補は送る (対照)', async () => {
+    const { db, raw } = createTestD1()
+    seedMeetLinked(raw)
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: 'line-request-1' }
+    })
+
+    const result = await processReminderDeliveries(db, client, {
+      now: NOW,
+      pause: noPause,
+      resolveClient: async () => client,
+    })
+
+    expect(pushes).toEqual(['U-friend-1'])
+    expect(result).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0, held: 0 })
+  })
+
+  it('送信権の取得後に相談が取消されても送らない (最終関係フェンス)', async () => {
+    const { db, raw } = createTestD1()
+    seedMeetLinked(raw)
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: 'line-request-1' }
+    })
+
+    const result = await processReminderDeliveries(db, client, {
+      now: NOW,
+      pause: noPause,
+      resolveClient: async () => client,
+      // 最終送信権の直前に勝者が相談を取り消した想定。V6の登録・実行行は
+      // 生きたまま (共有取消が版ガードで止められた残差)。旧実装は送っていた。
+      beforePush: async () => {
+        await db.prepare(
+          `UPDATE meet_consultations SET status = 'cancelled', updated_at = ? WHERE id = 'consult-1'`,
+        ).bind('2026-08-28T09:00:00.000Z').run()
+      },
+    })
+
+    expect(pushes).toEqual([])
+    expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0, held: 0 })
+    // 実行行だけを取り消し、登録・相談・予約の新状態には触れない。
+    expect(raw.prepare(
+      `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-1'`,
+    ).get()).toEqual({ status: 'cancelled' })
+    expect(raw.prepare(
+      `SELECT status FROM friend_reminders WHERE id = 'enrollment-1'`,
+    ).get()).toEqual({ status: 'active' })
+    expect(raw.prepare(
+      `SELECT status, booking_version FROM meet_consultations WHERE id = 'consult-1'`,
+    ).get()).toEqual({ status: 'cancelled', booking_version: 0 })
+    expect(raw.prepare(
+      `SELECT COUNT(*) AS c FROM friend_reminder_deliveries WHERE friend_reminder_id = 'enrollment-1'`,
+    ).get()).toEqual({ c: 0 })
+  })
+})
