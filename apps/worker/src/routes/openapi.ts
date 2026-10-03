@@ -2483,6 +2483,39 @@ const spec = {
         },
       },
     },
+    '/api/friend-add-rules/order': {
+      put: {
+        tags: ['Webhook'],
+        summary: '友だち追加時の配信の優先順位を版つきで一括更新（F8）',
+        description:
+          '対象IDの全部・所属・区分・expectedVersion の4点を厳密に見る。並びの版は一覧の orderVersion（受け皿以外の lock_version 合計）。どれか1つでも合わなければ書かず 409 で読み直しを促す。',
+        parameters: [{ name: 'account_id', in: 'query', required: false, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['friendKind', 'ids', 'expectedVersion'],
+                properties: {
+                  accountId: { type: 'string', description: '対象のLINEアカウント（query の account_id でも可）' },
+                  friendKind: { type: 'string', enum: ['first_time', 'returning'] },
+                  ids: { type: 'array', items: { type: 'string' }, maxItems: 500, description: '受け皿以外の全設定の新しい順' },
+                  expectedVersion: { type: 'integer', minimum: 0, description: '一覧の orderVersion' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Order updated with new orderVersion' },
+          '400': { description: 'account_id / friendKind / ids / expectedVersion missing or invalid' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Account not in visible scope' },
+          '409': { description: 'ORDER_CHANGED or ORDER_VERSION_CONFLICT: reload and retry with currentVersion' },
+        },
+      },
+    },
     '/api/mileage/rules': {
       get: {
         tags: ['Mileage'], summary: 'LINEアカウント範囲内のマイル付与ルールを取得',

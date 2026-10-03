@@ -930,7 +930,7 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
   try {
     if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
     await ensureFriendAddFallbackRules(c.env.DB, accountId);
-    const [page, options, summary, ruleSummary, folderCounts] = await Promise.all([
+    const [page, options, summary, ruleSummary, folderCounts, orderVersion] = await Promise.all([
       listFriendAddRulesPage(c.env.DB, {
         lineAccountId: accountId,
         friendKind: kind,
@@ -974,6 +974,8 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
           WHERE line_account_id = ? AND friend_kind = ? AND archived_at IS NULL
           GROUP BY folder_name`,
       ).bind(accountId, kind).all<{ folder_name: string | null; count: number }>(),
+      // F8: 並びの版。PUT /order の expectedVersion に使う。
+      getFriendAddOrderVersion(c.env.DB, accountId, kind),
     ]);
     const rows = page.items;
     const routeNames = new Map(options.routes.map((route) => [route.id, route.name]));
@@ -984,6 +986,7 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
         items: rows.map((row) => toRule(row, routeNames, scenarioNames)),
         total: page.total,
         nextCursor: page.nextCursor,
+        orderVersion,
         folderCounts: (folderCounts.results ?? []).map((entry) => ({
           name: entry.folder_name,
           count: entry.count,
@@ -1008,6 +1011,26 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
     return c.json({ success: false, error: '友だち追加時の配信を取得できませんでした' }, 500);
   }
 });
+
+/*
+ * 並びの版。受け皿以外の生きている設定の lock_version の合計。
+ * 並べ替え・下書き保存・停止のたびにどれかが行の版を上げるので、
+ * 合計が変わる。行の増減はIDの集合で見る。合計と集合の両方で
+ * 並びの今の姿を掴み、PUT /order の expectedVersion と突き合わせる。
+ */
+async function getFriendAddOrderVersion(
+  db: D1Database,
+  lineAccountId: string,
+  friendKind: FriendAddRuleKind,
+): Promise<number> {
+  const row = await db.prepare(
+    `SELECT COALESCE(SUM(lock_version), 0) AS version
+       FROM friend_add_rules
+      WHERE line_account_id = ? AND friend_kind = ?
+        AND is_unknown_route_fallback = 0 AND archived_at IS NULL`,
+  ).bind(lineAccountId, friendKind).first<{ version: number | null }>();
+  return Number(row?.version ?? 0);
+}
 
 /*
  * PATCH /api/friend-add-rules/reorder — 一覧のつまみで動かした順を
@@ -1042,6 +1065,58 @@ friendAddRules.patch('/api/friend-add-rules/reorder', requireRole('owner', 'admi
     return c.json({ success: true, data: { updated: ids.length } });
   } catch (error) {
     console.error('PATCH /api/friend-add-rules/reorder error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/*
+ * PUT /api/friend-add-rules/order — F8: まとめて並べ替える口。
+ * 対象IDの全部・所属・区分・expectedVersion の4点を厳密に見る。
+ * - 所属: 見えるLINEアカウントだけ（canUseAccount）。
+ * - 区分: first_time / returning だけ。
+ * - 対象ID: その所属・区分の受け皿以外の全件とちょうど一致。
+ * - 版: 並びの版（lock_version の合計）が expectedVersion と一致。
+ * どれか1つでも合わなければ書かず 409 で読み直しを促す。
+ * PATCH /reorder は従来の画面が使うので残し、版は見ないままにする。
+ */
+friendAddRules.put('/api/friend-add-rules/order', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{
+      accountId?: string; friendKind?: FriendAddRuleKind; ids?: unknown; expectedVersion?: unknown;
+    }>();
+    const accountId = accountIdFrom(c, body);
+    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    const kind = body.friendKind;
+    if (!kind || !KINDS.has(kind)) return c.json({ success: false, error: 'friendKind が正しくありません' }, 400);
+    if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
+      return c.json({ success: false, error: 'ids must be an array of rule ids' }, 400);
+    }
+    const ids = body.ids as string[];
+    if (ids.length > 500 || new Set(ids).size !== ids.length) {
+      return c.json({ success: false, error: 'ids must be unique and at most 500' }, 400);
+    }
+    if (!Number.isInteger(body.expectedVersion) || (body.expectedVersion as number) < 0) {
+      return c.json({ success: false, error: 'expectedVersion は0以上の整数で指定してください' }, 400);
+    }
+    if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+    const current = await listFriendAddRuleOrderIds(c.env.DB, { lineAccountId: accountId, friendKind: kind });
+    if (current.length !== ids.length || !current.every((id) => ids.includes(id))) {
+      return c.json({ success: false, code: 'ORDER_CHANGED', error: 'ほかの画面で一覧が変わっています。読み直してから、もう一度お試しください' }, 409);
+    }
+    const currentVersion = await getFriendAddOrderVersion(c.env.DB, accountId, kind);
+    if (currentVersion !== body.expectedVersion) {
+      return c.json({
+        success: false,
+        code: 'ORDER_VERSION_CONFLICT',
+        error: 'ほかの画面で並びが変わっています。最新の状態を読み直してください',
+        data: { currentVersion },
+      }, 409);
+    }
+    await reorderFriendAddRulePriorities(c.env.DB, { lineAccountId: accountId, friendKind: kind, ids });
+    const orderVersion = await getFriendAddOrderVersion(c.env.DB, accountId, kind);
+    return c.json({ success: true, data: { updated: ids.length, orderVersion } });
+  } catch (error) {
+    console.error('PUT /api/friend-add-rules/order error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
