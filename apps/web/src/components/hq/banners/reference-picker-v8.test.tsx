@@ -93,7 +93,8 @@ describe('参照画像の選択 V8（UcBQ5）', () => {
     expect(screen.getByText('haru')).toBeTruthy()
     expect(screen.getByText('100×100')).toBeTruthy()
     // 親の使い方（土台に描き直す）を開いたときの値に戻す
-    expect((screen.getByRole('radio', { name: '土台に描き直す' }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByText('土台に描き直す')).toBeTruthy()
+    expect(screen.getByText('選択中')).toBeTruthy()
     fireEvent.click(screen.getByRole('option', { name: /haru/ }))
     expect(await screen.findByText('選んだ')).toBeTruthy()
     const use = screen.getByRole('button', { name: 'この画像を使う' }) as HTMLButtonElement
@@ -101,8 +102,8 @@ describe('参照画像の選択 V8（UcBQ5）', () => {
     fireEvent.click(use)
     expect(picked).toHaveLength(1)
     expect(picked[0].usage).toBe('edit')
-    // 使い方を変えて渡せる
-    fireEvent.click(screen.getByRole('radio', { name: '雰囲気を参考にする' }))
+    // 使い方を変えて渡せる（選ばれていない行の副ボタン）
+    fireEvent.click(screen.getByRole('button', { name: 'この使い方にする' }))
     fireEvent.click(screen.getByRole('button', { name: 'この画像を使う' }))
     expect(picked[1].usage).toBe('inspire')
   })

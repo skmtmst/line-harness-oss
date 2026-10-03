@@ -7,6 +7,7 @@ import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
+import StatusBadge from '@/components/shared/status-badge'
 import { api } from '@/lib/api'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { imageMatchesQuery, tileCaption, type BannerImage, type BannerPreset, type BannerProject, type BannerReferenceMode } from '@/lib/hq-banners'
@@ -247,19 +248,26 @@ const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])),
             })}
           </div>
           {v8 ? (
-            <fieldset className="rounded-control bg-canvas-sunken p-3">
-              <legend className="px-1 text-label font-medium text-ink">参照画像の使い方</legend>
-              <div className="flex flex-wrap gap-4">
-                <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-caption text-ink">
-                  <input type="radio" name="reference-usage" className="h-4 w-4 accent-accent-deep" checked={usage === 'inspire'} onChange={() => setUsage('inspire')} />
-                  雰囲気を参考にする
-                </label>
-                <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-caption text-ink">
-                  <input type="radio" name="reference-usage" className="h-4 w-4 accent-accent-deep" checked={usage === 'edit'} onChange={() => setUsage('edit')} />
-                  土台に描き直す
-                </label>
-              </div>
-            </fieldset>
+            <div className="rounded-control bg-canvas-sunken p-3">
+              <p className="px-1 text-label font-medium text-ink">参照画像の使い方</p>
+              <ul className="mt-1 flex flex-col">
+                {(
+                  [
+                    { value: 'inspire', label: '雰囲気を参考にする' },
+                    { value: 'edit', label: '土台に描き直す' },
+                  ] as { value: BannerReferenceMode; label: string }[]
+                ).map((option) => (
+                  <li key={option.value} className="flex min-h-11 items-center justify-between gap-2">
+                    <span className="text-caption text-ink">{option.label}</span>
+                    {usage === option.value ? (
+                      <StatusBadge tone="success">選択中</StatusBadge>
+                    ) : (
+                      <Button onClick={() => setUsage(option.value)}>この使い方にする</Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : null}
           </>
         )}
