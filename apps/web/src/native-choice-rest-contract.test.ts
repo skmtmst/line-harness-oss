@@ -25,6 +25,12 @@ const EXCEPTIONS = new Set([
    * 意味は保ったまま。★V8板（YChR6等）の見た目を守るために残す。
    */
   'app/reminders/wizard-v8-ui.tsx',
+  /*
+   * イベント変更確認V8の開催回選択は表の行内の単一選択。共通 RadioCard は
+   * カード型で表のセルに入らず、共通 Checkbox は複数選択の意味になる。
+   * 本物の input[type=radio]（name 群・aria-label 付き）で意味を保つ。
+   */
+  'app/events/change-review/change-review-v8.tsx',
 ])
 
 function walk(dir: string, out: string[] = []): string[] {
