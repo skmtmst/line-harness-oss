@@ -27,6 +27,7 @@ import { api, ApiError, type ScenarioRuns, type ScenarioTriggerItem } from '@/li
 import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
 import Dialog from '@/components/shared/dialog'
+import VersionCompare from '@/components/shared/version-compare'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { startChecklist } from '../start-checklist'
@@ -345,6 +346,15 @@ export default function ScenarioDetailV8({
   const [error, setError] = useState('')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [scenarioMissing, setScenarioMissing] = useState(false)
+  /*
+   * ★V8 `kz2B6`：ほかの人が先に保存したら帯で知らせる。
+   * この画面は書き換えない（読み直すまで古い内容のまま）。
+   * 名前・時刻は API に無いので出さない。
+   */
+  const [conflict, setConflict] = useState(false)
+  const [conflictLatest, setConflictLatest] = useState<ScenarioWithSteps | null>(null)
+  const [compareOpen, setCompareOpen] = useState(false)
+  const shownUpdatedAtRef = useRef<string | null>(null)
 
   const [, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true, allowConcurrent: true, folderId: '' })
@@ -523,6 +533,9 @@ export default function ScenarioDetailV8({
       const res = await scenarioReferenceData.scenario(id, fresh)
       if (res.success) {
         setScenario(res.data)
+        // 今見せている版を覚える。ほかの人の更新は更新日時のずれで見つける。
+        shownUpdatedAtRef.current = res.data.updatedAt ?? null
+        setConflict(false)
         setEditForm({
           name: res.data.name,
           description: res.data.description ?? '',
@@ -548,6 +561,38 @@ export default function ScenarioDetailV8({
   useEffect(() => {
     loadScenario()
   }, [loadScenario])
+
+  /*
+   * ★V8 `kz2B6`：別のタブから戻ってきたら更新日時だけ確かめる。
+   * ずれていたら帯を出すだけで、画面は書き換えない。
+   */
+  useEffect(() => {
+    if (loading || !scenario) return
+    const recheck = () => {
+      if (document.visibilityState !== 'visible') return
+      void (async () => {
+        try {
+          const detail = await api.scenarios.get(id)
+          if (!detail.success) return
+          const shown = shownUpdatedAtRef.current
+          const latest = detail.data.updatedAt ?? null
+          if (shown !== null && latest !== null && latest !== shown) {
+            setConflict(true)
+            setConflictLatest(detail.data)
+          }
+        } catch {
+          // 取れなくても今の画面は残す。次の機会に確かめる。
+        }
+      })()
+    }
+    const onVisible = () => recheck()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', recheck)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', recheck)
+    }
+  }, [id, loading, scenario])
 
   // 並列で stats / templates / tags を取得（リグレッションを起こさないよう失敗は無視）
   useEffect(() => {
@@ -953,6 +998,31 @@ export default function ScenarioDetailV8({
       setSaving(false)
     }
   }
+
+  /*
+   * ★V8 `kz2B6`「最新を読み込んで続ける」。最新で入力を置き換える。
+   * 比べる文は設定の要約（名前・状態・通の数）で作る。
+   */
+  const acceptLatestAndContinue = async () => {
+    setCompareOpen(false)
+    setConflict(false)
+    setConflictLatest(null)
+    await loadScenario(true)
+  }
+
+  const describeScenarioSummary = (input: { name: string; isActive: boolean; stepCount: number }): string =>
+    [
+      `名前：${input.name || '（未入力）'}`,
+      `状態：${input.isActive ? '稼働中' : '停止中'}`,
+      `通の数：${input.stepCount}`,
+    ].join('\n')
+
+  const currentSummary = scenario
+    ? describeScenarioSummary({ name: editForm.name, isActive: editForm.isActive, stepCount: scenario.steps.length })
+    : ''
+  const latestSummary = conflictLatest
+    ? describeScenarioSummary({ name: conflictLatest.name, isActive: conflictLatest.isActive, stepCount: conflictLatest.steps.length })
+    : ''
 
   /*
    * ★V8: 3 の箱の「配信を再開する」。開始前の確認（`F1LK4e`）で
@@ -2158,6 +2228,25 @@ export default function ScenarioDetailV8({
 
       {error ? <Notice tone="danger" message={error} /> : null}
 
+      {conflict && (
+        <div className={styles.conflictBar} data-design-node="kz2B6" role="alert">
+          <div>
+            <p className={styles.conflictTitle}>ほかの人がこのシナリオを更新しました</p>
+            <p className={styles.conflictBody}>
+              あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。
+            </p>
+          </div>
+          <div className={styles.conflictActions}>
+            <Button type="button" variant="secondary" onClick={() => setCompareOpen(true)} disabled={!conflictLatest}>
+              違いを比べる
+            </Button>
+            <Button type="button" variant="primary" onClick={() => void acceptLatestAndContinue()}>
+              最新を読み込んで続ける
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className={styles.split} data-design="Body">
         <div className={styles.main}>
           {/* 複製が途中で止まって残った作りかけの知らせ（SCENARIO-09）。 */}
@@ -2681,12 +2770,12 @@ export default function ScenarioDetailV8({
             </Button>
             <Button
               variant="primary"
-              onClick={() => void handleSaveScenario()}
-              disabled={!editDirty || saving || !canEdit}
+              onClick={() => { if (conflict) { setCompareOpen(true) } else { void handleSaveScenario() } }}
+              disabled={conflict ? !canEdit : (!editDirty || saving || !canEdit)}
               busy={saving}
-              title={!canEdit ? readonlyReason : !editDirty ? '変えたところがありません' : undefined}
+              title={!canEdit ? readonlyReason : !editDirty && !conflict ? '変えたところがありません' : undefined}
             >
-              保存する
+              {conflict ? '比べてから保存' : '保存する'}
             </Button>
           </>
         }
@@ -2777,6 +2866,22 @@ export default function ScenarioDetailV8({
             )}
           </div>
         </div>
+      </Dialog>
+
+      {/* ★V8 `kz2B6`「違いを比べる」の窓。最新と入力中の設定の要約を比べる。 */}
+      <Dialog
+        open={compareOpen}
+        title="違いを比べる"
+        description="ほかの人が保存した最新の内容と、あなたが直している内容を比べます。"
+        cancelLabel="閉じる"
+        onCancel={() => setCompareOpen(false)}
+        footer={
+          <Button type="button" variant="primary" onClick={() => void acceptLatestAndContinue()}>
+            最新を読み込んで続ける
+          </Button>
+        }
+      >
+        <VersionCompare before={latestSummary} after={currentSummary} />
       </Dialog>
 
       {/* 配信を始める前の確認（F1LK4e）。試算と運用記録は画面の持つ実データ。 */}

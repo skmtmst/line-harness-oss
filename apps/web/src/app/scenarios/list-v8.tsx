@@ -868,7 +868,7 @@ export default function ScenariosListV8() {
     )
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node={canEdit ? undefined : 'X0QrW0'}>
       <div data-design="Head">
         <div className={styles.head}>
           <div className={styles.headText}>
