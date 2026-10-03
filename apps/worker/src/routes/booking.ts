@@ -3729,9 +3729,24 @@ booking.get('/api/booking/admin/today', async (c) => {
   }
   const mode = c.req.query('mode')?.trim() === 'seat' ? 'seat'
     : c.req.query('mode')?.trim() === 'both' ? 'both' : 'staff';
+  // 週・月の席は期間で取る（from/to は店の暦日。無ければ date の1日）。
+  const rawFrom = c.req.query('from')?.trim() || null;
+  const rawTo = c.req.query('to')?.trim() || null;
+  const dayLike = /^\d{4}-\d{2}-\d{2}$/;
+  if ((rawFrom && !dayLike.test(rawFrom)) || (rawTo && !dayLike.test(rawTo))) {
+    return c.json({ error: 'invalid_date' }, 400);
+  }
+  const rangeStart = rawFrom ?? rawDate;
+  const rangeEndExclusive = rawTo ?? rawDate;
+  const startIso = new Date(`${rangeStart}T00:00:00+09:00`).toISOString();
+  const endIso = new Date(Date.parse(`${rangeEndExclusive}T00:00:00+09:00`) + 86_400_000).toISOString();
+  if (Date.parse(endIso) <= Date.parse(startIso)
+    || Date.parse(endIso) - Date.parse(startIso) > 35 * 86_400_000) {
+    return c.json({ error: 'invalid_date' }, 400);
+  }
   const conditions = ['b.line_account_id = ?', 'b.starts_at >= ?', 'b.starts_at < ?'];
-  const dayStart = new Date(`${rawDate}T00:00:00+09:00`).toISOString();
-  const dayEnd = new Date(Date.parse(dayStart) + 86_400_000).toISOString();
+  const dayStart = startIso;
+  const dayEnd = endIso;
   const values: unknown[] = [accountId, dayStart, dayEnd];
   const status = c.req.query('status')?.trim();
   if (status && ['requested', 'confirmed', 'completed', 'no_show', 'cancelled'].includes(status)) {
@@ -3818,9 +3833,16 @@ booking.get('/api/booking/admin/today', async (c) => {
   const timeline = [...staffTimeline, ...seatTimeline]
     .sort((a, b) => (a.starts_at < b.starts_at ? -1 : a.starts_at > b.starts_at ? 1 : 0))
     .slice(0, 200);
+  // 席の切り替えを出すか（結び付きのある店だけ）。
+  const seatStore = await c.env.DB
+    .prepare(`SELECT 1 AS ok FROM rt_stores
+      WHERE line_account_id = ? AND status = 'active' LIMIT 1`)
+    .bind(accountId)
+    .first<{ ok: number }>();
   return c.json({
     date: rawDate,
     mode,
+    has_seat_stores: Boolean(seatStore?.ok),
     bookings: staffTimeline,
     seats: seatTimeline,
     timeline,

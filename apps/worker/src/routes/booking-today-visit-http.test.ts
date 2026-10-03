@@ -200,6 +200,25 @@ describe('今日の予約', () => {
     expect(bothBody.timeline.map((row) => row.kind)).toEqual(['staff', 'seat']);
   });
 
+  test('期間で取れる（週・月用）・席の有無が分かる', async () => {
+    seedBooking('booking-1', '2026-11-10T00:00:00.000Z', 'confirmed');
+    seedBooking('booking-2', '2026-11-12T00:00:00.000Z', 'confirmed');
+    const { app, env } = makeApp(db, bookingRoute);
+    const res = await app.request(
+      '/api/booking/admin/today?account_id=account-a&from=2026-11-10&to=2026-11-12', {}, env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      bookings: Array<{ id: string }>; has_seat_stores: boolean;
+    };
+    expect(body.bookings.map((booking) => booking.id)).toEqual(['booking-1', 'booking-2']);
+    // 席の結び付きが無い店では席の切り替えを出さない。
+    expect(body.has_seat_stores).toBe(false);
+
+    const bad = await app.request(
+      '/api/booking/admin/today?account_id=account-a&from=あした', {}, env);
+    expect(bad.status).toBe(400);
+  });
+
   test('「来なかった」で無断になる', async () => {
     seedBooking('booking-1', '2026-11-10T00:00:00.000Z', 'confirmed');
     const { app, env } = makeApp(db, bookingRoute);
