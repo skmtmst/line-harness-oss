@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
+  createAffiliateOffer,
   createOfferVersion,
   getAffiliateOfferById,
   getCurrentOfferVersion,
@@ -76,6 +77,50 @@ function backdateVersion(versionId: string, atMs: number): void {
   sqlite.prepare(
     `UPDATE affiliate_offer_versions SET created_at = ? WHERE id = ?`,
   ).run(jstString(atMs), versionId);
+}
+
+/**
+ * 有限barrier付きDB：resolveの最後の読み取りが返った直後、次の
+ * 承認UPDATEが実行される前に、指定の割り込みを確実に差し込む。
+ * better-sqlite3は同期的だがawait境界で順序が割れるため、proxyで
+ * 「precheck→UPDATE→freeze」の別await境界そのものを再現する。
+ */
+function barrierDb(
+  realDb: D1Database,
+  shouldFire: (sql: string) => boolean,
+  fire: () => Promise<unknown>,
+): { db: D1Database; done: () => Promise<void> } {
+  let fired: Promise<unknown> | null = null;
+  const wrapStatement = (sql: string, stmt: Record<string, unknown>): Record<string, unknown> => ({
+    bind: (...args: unknown[]) =>
+      wrapStatement(sql, (stmt.bind as (...a: unknown[]) => Record<string, unknown>)(...args)),
+    first: async (...args: unknown[]) => {
+      const out = await (stmt.first as (...a: unknown[]) => Promise<unknown>)(...args);
+      if (!fired && shouldFire(sql)) {
+        // resolveの読み取りが返った直後に割り込みを開始する。
+        fired = fire();
+      }
+      return out;
+    },
+    all: async (...args: unknown[]) =>
+      (stmt.all as (...a: unknown[]) => Promise<unknown>)(...args),
+    run: async (...args: unknown[]) => {
+      // 承認UPDATEは割り込みの完了を待ってから実行する。
+      if (fired && sql.includes('UPDATE conversion_events') && sql.includes('approval_status')) {
+        await fired;
+      }
+      return (stmt.run as (...a: unknown[]) => Promise<unknown>)(...args);
+    },
+    raw: async (...args: unknown[]) =>
+      (stmt.raw as (...a: unknown[]) => Promise<unknown>)(...args),
+  });
+  const db = {
+    prepare: (sql: string) =>
+      wrapStatement(sql, realDb.prepare(sql) as unknown as Record<string, unknown>),
+    batch: (statements: D1PreparedStatement[]) =>
+      (realDb.batch as (s: D1PreparedStatement[]) => Promise<unknown>)(statements),
+  } as unknown as D1Database;
+  return { db, done: async () => { await fired; } };
 }
 
 const calcOf = (eventId: string) => (
@@ -416,5 +461,54 @@ describe('F-23 ケース6: 帰属版の保存失敗→再送→報酬編集→�
       `SELECT approval_status FROM conversion_events WHERE id = 'evt-undetermined-2'`,
     ).get() as { approval_status: string };
     expect(status.approval_status).toBe('pending');
+  });
+});
+
+describe('F-23 交差：precheck後のPOST回収で初版が生えても承認と凍結は同じ根拠を使う', () => {
+  test('有限barrier：resolve確定→POST同キー回収→承認UPDATE→凍結で旧額1000が一貫する', async () => {
+    // 案件行だけ通って初版保存に失敗した公開案件（POST回収前の姿）。
+    const offer = await createAffiliateOffer(db, {
+      name: '版なし公開案件',
+      rewardAmount: 1000,
+      lineAccountId: 'account-1',
+    });
+    expect(await getCurrentOfferVersion(db, offer.id)).toBeNull();
+    sqlite.prepare(
+      `INSERT INTO affiliate_links (id, affiliate_id, ref_code, line_account_id, offer_id, created_at)
+       VALUES ('link-race', 'aff-1', 'ref-race', 'account-1', ?, '2026-09-01T00:00:00.000+09:00')`,
+    ).run(offer.id);
+    insertTouch('t-race', 'ref-race', 'friend-1', BEFORE_MS - 86_400_000);
+    const event = await trackConversion(
+      db,
+      { conversionPointId: 'point-1', friendId: 'friend-1', idempotencyKey: 'f23-c6-race' },
+      { now: BEFORE_MS },
+    );
+    expect(event.affiliate_id).toBe('aff-1');
+
+    // precheckのresolveが版0を確認して返った直後、承認UPDATEの前に
+    // POST同キー再送の回収（初版2000）が割り込む。金額を変えてあるのは
+    // どの根拠（precheck時の現在額1000／生えた初版2000／未確定）が
+    // 使われたかを見分けるためで、仕様の追加ではない。
+    const { db: bdb, done } = barrierDb(
+      db,
+      (sql) => sql.includes('COUNT(*)') && sql.includes('FROM affiliate_offer_versions'),
+      () => createOfferVersion(db, { offerId: offer.id, rewardAmount: 2000 }),
+    );
+    const decided = await decideConversionApproval(bdb, event.id, 'approved', 'pending');
+    await done();
+    expect(decided.outcome).toBe('updated');
+
+    // 回収で生えた初版は2000だが、承認判断時の根拠（現在額1000）が
+    // 凍結と計算の両方に一貫して使われる。
+    const v1 = await getCurrentOfferVersion(db, offer.id);
+    expect(v1).toMatchObject({ version_number: 1, reward_amount: 2000 });
+    expect(calcOf(event.id)).toMatchObject({ fixed_reward_snapshot: 1000, amount_minor: 1000 });
+    const frozen = sqlite.prepare(
+      `SELECT approval_fixed_reward, approval_amount_minor FROM conversion_events WHERE id = ?`,
+    ).get(event.id) as { approval_fixed_reward: number; approval_amount_minor: number };
+    expect(frozen).toMatchObject({ approval_fixed_reward: 1000, approval_amount_minor: 1000 });
+
+    // 判断記録の事後補填はしない（付け方詳細の欠落は残る。金額は正しい）。
+    expect((await getAttributionDecision(db, event.id))?.offer_version_id).toBeNull();
   });
 });
