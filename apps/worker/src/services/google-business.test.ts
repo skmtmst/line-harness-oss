@@ -44,6 +44,12 @@ describe('Google Business OAuth', () => {
     expect(url.searchParams.get('scope')).toContain('business.manage');
   });
 
+  it('アカウント選択を求めるときは prompt に select_account を足す', async () => {
+    const challenge = await codeChallengeFor('verifier-value');
+    const url = new URL(buildAuthorizeUrl({ clientId: 'cid', redirectUri: client.redirectUri, state: 'st', codeChallenge: challenge, selectAccount: true }));
+    expect(url.searchParams.get('prompt')).toBe('select_account consent');
+  });
+
   it('認可コードをトークンに交換し、code_verifier を送る', async () => {
     const { fetch, calls } = fetchFrom(() => jsonResponse({ access_token: 'at', refresh_token: 'rt', expires_in: 3600 }));
     const tokens = await exchangeAuthorizationCode({ client, code: 'code1', codeVerifier: 'ver', fetch, nowMs: 1_000 });
