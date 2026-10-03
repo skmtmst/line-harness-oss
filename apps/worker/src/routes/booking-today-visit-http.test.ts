@@ -159,6 +159,47 @@ describe('今日の予約', () => {
     expect(missing.status).toBe(400);
   });
 
+  test('席の予約も返せる（つなげた卓は両方の名前）', async () => {
+    sqlite.prepare(`INSERT INTO rt_organizations (id, account_id, name)
+      VALUES ('org-a', 'account-a', 'A店')`).run();
+    sqlite.prepare(`INSERT INTO rt_stores
+      (id, organization_id, name, code, line_account_id, status)
+      VALUES ('store-a', 'org-a', 'A店', 'a', 'account-a', 'active')`).run();
+    sqlite.prepare(`INSERT INTO rt_tables
+      (id, store_id, code, label, seat_type, min_capacity, max_capacity, join_group, is_active)
+      VALUES ('table-4', 'store-a', 't4', 'テーブル4', 'table', 1, 4, 'g1', 1),
+             ('table-5', 'store-a', 't5', 'テーブル5', 'table', 1, 4, 'g1', 1)`).run();
+    sqlite.prepare(`INSERT INTO rt_reservations
+      (id, store_id, source, customer_name, guest_count, starts_at, ends_at, table_id, status)
+      VALUES ('rt-1', 'store-a', 'manual', '山本', 5, '2026-11-10T09:00:00.000Z',
+        '2026-11-10T11:00:00.000Z', 'table-4', 'confirmed')`).run();
+    seedBooking('booking-1', '2026-11-10T00:00:00.000Z', 'confirmed');
+    const { app, env } = makeApp(db, bookingRoute);
+    const seatOnly = await app.request(
+      '/api/booking/admin/today?account_id=account-a&date=2026-11-10&mode=seat', {}, env);
+    expect(seatOnly.status).toBe(200);
+    const seatBody = await seatOnly.json() as {
+      mode: string;
+      seats: Array<{ id: string; kind: string; customer_name: string; table_label: string }>;
+      timeline: Array<{ kind: string }>;
+    };
+    expect(seatBody.mode).toBe('seat');
+    expect(seatBody.seats).toHaveLength(1);
+    expect(seatBody.seats[0]).toMatchObject({
+      kind: 'seat', customer_name: '山本', table_label: 'テーブル4・テーブル5',
+    });
+
+    const both = await app.request(
+      '/api/booking/admin/today?account_id=account-a&date=2026-11-10&mode=both', {}, env);
+    const bothBody = await both.json() as {
+      mode: string; timeline: Array<{ kind: string; id: string }>;
+    };
+    expect(bothBody.mode).toBe('both');
+    // 時刻順に人と席が1本に並ぶ。
+    expect(bothBody.timeline.map((row) => row.id)).toEqual(['booking-1', 'rt-1']);
+    expect(bothBody.timeline.map((row) => row.kind)).toEqual(['staff', 'seat']);
+  });
+
   test('「来なかった」で無断になる', async () => {
     seedBooking('booking-1', '2026-11-10T00:00:00.000Z', 'confirmed');
     const { app, env } = makeApp(db, bookingRoute);

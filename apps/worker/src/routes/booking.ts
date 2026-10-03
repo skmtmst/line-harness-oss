@@ -3588,6 +3588,138 @@ booking.get('/api/liff/booking/waitlist', async (c) => {
  * date は店の暦日（YYYY-MM-DD、省いたら今日の日本日付）。
  * いまは日本時間（+09:00）固定で日の範囲を作る。
  */
+/**
+ * 席（卓）の予約の卓名。席をつなげる予約は同じつなぎ目の卓を両方出す
+ * （例：テーブル4・5）。止めている卓は出さない。
+ */
+async function seatTableLabels(
+  db: D1Database,
+  storeId: string,
+  tableId: string | null,
+): Promise<string | null> {
+  if (!tableId) return null;
+  const table = await db
+    .prepare(`SELECT label, join_group FROM rt_tables
+      WHERE id = ? AND store_id = ? AND is_active = 1`)
+    .bind(tableId, storeId)
+    .first<{ label: string; join_group: string | null }>();
+  if (!table) return null;
+  if (!table.join_group) return table.label;
+  const siblings = await db
+    .prepare(`SELECT label FROM rt_tables
+      WHERE store_id = ? AND is_active = 1 AND join_group = ?
+      ORDER BY code ASC, id ASC`)
+    .bind(storeId, table.join_group)
+    .all<{ label: string }>();
+  const labels = (siblings.results ?? []).map((row) => row.label);
+  return labels.length > 0 ? labels.join('・') : table.label;
+}
+
+interface TodaySeatRow {
+  kind: 'seat';
+  id: string;
+  store_id: string;
+  store_name: string;
+  starts_at: string;
+  ends_at: string;
+  status: string;
+  customer_name: string;
+  guest_count: number;
+  table_label: string | null;
+  course_name: string | null;
+  visit_mark: {
+    kind: string;
+    late_minutes: number | null;
+    marked_by_name: string | null;
+    marked_at: string;
+  } | null;
+}
+
+async function getTodaySeatReservations(
+  db: D1Database,
+  accountId: string,
+  dayStart: string,
+  dayEnd: string,
+  storeId: string | null,
+): Promise<TodaySeatRow[]> {
+  const stores = await db
+    .prepare(`SELECT id, name, timezone FROM rt_stores
+      WHERE line_account_id = ? AND status = 'active' AND (? IS NULL OR id = ?)`)
+    .bind(accountId, storeId, storeId)
+    .all<{ id: string; name: string; timezone: string }>();
+  const rows: TodaySeatRow[] = [];
+  for (const store of stores.results ?? []) {
+    const reservations = await db
+      .prepare(
+        `SELECT r.id, r.starts_at, r.ends_at, r.status, r.customer_name,
+                r.guest_count, r.table_id, m.name AS course_name
+           FROM rt_reservations r
+           LEFT JOIN rt_menu_items m ON m.id = r.course_id
+          WHERE r.store_id = ? AND r.starts_at >= ? AND r.starts_at < ?
+            AND r.status NOT IN ('cancelled')
+          ORDER BY r.starts_at ASC LIMIT 200`,
+      )
+      .bind(store.id, dayStart, dayEnd)
+      .all<{
+        id: string;
+        starts_at: string;
+        ends_at: string;
+        status: string;
+        customer_name: string;
+        guest_count: number;
+        table_id: string | null;
+        course_name: string | null;
+      }>();
+    const list = reservations.results ?? [];
+    const marks = new Map<string, NonNullable<TodaySeatRow['visit_mark']>>();
+    if (list.length > 0) {
+      const marksRows = await db
+        .prepare(
+          `SELECT reservation_id, kind, late_minutes, marked_by_name, marked_at
+             FROM rt_seat_visit_marks
+            WHERE store_id = ? AND reservation_id IN (${list.map(() => '?').join(',')})
+            ORDER BY marked_at DESC`,
+        )
+        .bind(store.id, ...list.map((reservation) => reservation.id))
+        .all<{
+          reservation_id: string;
+          kind: string;
+          late_minutes: number | null;
+          marked_by_name: string | null;
+          marked_at: string;
+        }>();
+      for (const mark of marksRows.results ?? []) {
+        if (!marks.has(mark.reservation_id)) {
+          marks.set(mark.reservation_id, {
+            kind: mark.kind,
+            late_minutes: mark.late_minutes,
+            marked_by_name: mark.marked_by_name,
+            marked_at: mark.marked_at,
+          });
+        }
+      }
+    }
+    for (const reservation of list) {
+      rows.push({
+        kind: 'seat',
+        id: reservation.id,
+        store_id: store.id,
+        store_name: store.name,
+        starts_at: reservation.starts_at,
+        ends_at: reservation.ends_at,
+        status: reservation.status,
+        customer_name: reservation.customer_name,
+        guest_count: reservation.guest_count,
+        table_label: await seatTableLabels(db, store.id, reservation.table_id),
+        course_name: reservation.course_name,
+        visit_mark: marks.get(reservation.id) ?? null,
+      });
+    }
+  }
+  rows.sort((a, b) => (a.starts_at < b.starts_at ? -1 : a.starts_at > b.starts_at ? 1 : 0));
+  return rows.slice(0, 200);
+}
+
 booking.get('/api/booking/admin/today', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
@@ -3595,6 +3727,8 @@ booking.get('/api/booking/admin/today', async (c) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(rawDate) || Number.isNaN(Date.parse(`${rawDate}T00:00:00+09:00`))) {
     return c.json({ error: 'invalid_date' }, 400);
   }
+  const mode = c.req.query('mode')?.trim() === 'seat' ? 'seat'
+    : c.req.query('mode')?.trim() === 'both' ? 'both' : 'staff';
   const conditions = ['b.line_account_id = ?', 'b.starts_at >= ?', 'b.starts_at < ?'];
   const dayStart = new Date(`${rawDate}T00:00:00+09:00`).toISOString();
   const dayEnd = new Date(Date.parse(dayStart) + 86_400_000).toISOString();
@@ -3608,7 +3742,7 @@ booking.get('/api/booking/admin/today', async (c) => {
   }
   const staffId = c.req.query('staff_id')?.trim();
   if (staffId) { conditions.push('b.staff_id = ?'); values.push(staffId); }
-  const rows = await c.env.DB
+  const rows = mode === 'seat' ? { results: [] } : await c.env.DB
     .prepare(
       `SELECT b.id, b.starts_at, b.ends_at, b.status, b.price_at_booking,
               b.friend_id, b.booking_customer_id,
@@ -3671,12 +3805,25 @@ booking.get('/api/booking/admin/today', async (c) => {
       }
     }
   }
+  const staffTimeline = bookings.map((booking) => ({
+    kind: 'staff' as const,
+    ...booking,
+    visit_mark: marks.get(booking.id) ?? null,
+  }));
+  // 席は飲食店の店だけ（結び付きが無ければ空）。
+  const storeId = c.req.query('store_id')?.trim() || null;
+  const seatTimeline = mode === 'staff'
+    ? []
+    : await getTodaySeatReservations(c.env.DB, accountId, dayStart, dayEnd, storeId);
+  const timeline = [...staffTimeline, ...seatTimeline]
+    .sort((a, b) => (a.starts_at < b.starts_at ? -1 : a.starts_at > b.starts_at ? 1 : 0))
+    .slice(0, 200);
   return c.json({
     date: rawDate,
-    bookings: bookings.map((booking) => ({
-      ...booking,
-      visit_mark: marks.get(booking.id) ?? null,
-    })),
+    mode,
+    bookings: staffTimeline,
+    seats: seatTimeline,
+    timeline,
   });
 });
 
