@@ -8,7 +8,7 @@ import LoadingView from '../components/LoadingView.js';
 import Icon from '../components/ui/Icon.js';
 import Button from '../components/ui/Button.js';
 import BottomBar from '../components/ui/BottomBar.js';
-import PageHeader from '../components/ui/PageHeader.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
 
 function nanoid(): string {
   return crypto.randomUUID();
@@ -150,8 +150,8 @@ export default function EventConfirm() {
   if (loadFailed || slotMissing || !event || !slot) {
     return (
       <div className="min-h-screen bg-ground">
+        <LiffHeader title="申し込みの確認" />
         <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
-          <PageHeader title="申し込みの確認" onBack={back} />
           {loadFailed ? (
             <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />
           ) : slotMissing ? (
@@ -176,9 +176,10 @@ export default function EventConfirm() {
     : 'キャンセルは期限まで「自分のイベント」からできます（期限はイベントごとに違います）。';
 
   return (
-    <div className="min-h-screen bg-ground">
-      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-28">
-        <PageHeader title="申し込みの確認" onBack={back} />
+    <div className="min-h-screen bg-ground" data-design-node="EscPA">
+      <LiffHeader title="申し込みの確認" />
+      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-28">
+        <h1 className="text-xl font-bold text-ink">内容を確かめてください</h1>
         <dl className="space-y-3 rounded-xl border border-hairline bg-canvas p-4 text-sm">
           <Row label="イベント" value={event.name} />
           <Row label="日時" value={formatJstEventAt(slot.starts_at)} />
@@ -231,7 +232,7 @@ export default function EventConfirm() {
                             name={`eq-${q.id}`}
                             checked={value === opt}
                             onChange={() => setAnswers((cur) => ({ ...cur, [q.id]: opt }))}
-                            className="h-4 w-4 accent-accent-deep"
+                            className="h-4 w-4 accent-liff-primary"
                           />
                           {opt}
                         </label>
@@ -254,7 +255,7 @@ export default function EventConfirm() {
                                   [q.id]: checked ? chosen.filter((x) => x !== opt) : [...chosen, opt],
                                 }))
                               }
-                              className="h-4 w-4 accent-accent-deep"
+                              className="h-4 w-4 accent-liff-primary"
                             />
                             {opt}
                           </label>
@@ -293,6 +294,13 @@ export default function EventConfirm() {
         <Button variant="primary" onClick={submit} disabled={submitting}>
           {submitting ? '送信中...' : '申し込む'}
         </Button>
+        <button
+          type="button"
+          onClick={back}
+          className="self-center px-4 py-1 text-xs text-ink-secondary focus-visible:outline-2 focus-visible:outline-ink"
+        >
+          ←戻る
+        </button>
       </BottomBar>
     </div>
   );

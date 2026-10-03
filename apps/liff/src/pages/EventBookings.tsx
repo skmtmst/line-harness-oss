@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api, type EventBookingMine, type EventSlot } from '../lib/api.js';
 import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
@@ -9,7 +10,7 @@ import Badge from '../components/ui/Badge.js';
 import Button from '../components/ui/Button.js';
 import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 import Icon from '../components/ui/Icon.js';
-import PageHeader from '../components/ui/PageHeader.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
 import StatusView from '../components/ui/StatusView.js';
 
 /** 札の文字は設計どおり (参加・承認待ち…)。意味は今の状態名のまま変えない。 */
@@ -36,6 +37,9 @@ function canCancel(b: EventBookingMine): boolean {
  * 見た目だけ ★V7 (日付の四角＋名前＋札＋補足)。
  */
 export default function EventBookings() {
+  const navigate = useNavigate();
+  // ?liffId=... を引き継ぐ (再読み込みで失わない)。
+  const { search } = useLocation();
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const [items, setItems] = useState<EventBookingMine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,9 +189,10 @@ export default function EventBookings() {
   }
 
   return (
-    <div className="min-h-screen bg-ground">
-      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
-        <PageHeader title="自分のイベント" />
+    <div className="min-h-screen bg-ground" data-design-node="y1bs9A">
+      <LiffHeader title="自分のイベント" />
+      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-10">
+        <h1 className="text-xl font-bold text-ink">自分のイベント</h1>
         {loading ? (
           <LoadingView />
         ) : loadFailed ? (
@@ -263,21 +268,32 @@ export default function EventBookings() {
                                 {b.venue_name}
                               </div>
                             )}
+                            <div className="mt-1">
+                              <Badge tone={meta.tone}>{meta.text}</Badge>
+                            </div>
                           </div>
-                          <Badge tone={meta.tone}>{meta.text}</Badge>
+                          <button
+                            type="button"
+                            aria-label={`${b.event_name}のイベントを見る`}
+                            onClick={() =>
+                              navigate({ pathname: `/events/${b.event_id}`, search })
+                            }
+                            className="flex h-11 w-8 shrink-0 items-center justify-center text-ink-faint focus-visible:outline-2 focus-visible:outline-ink"
+                          >
+                            <Icon name="chevron-right" className="h-5 w-5" />
+                          </button>
                         </div>
                         {canCancel(b) && (
-                          <div className="mt-2 flex items-center gap-4 text-left">
+                          <div className="mt-3 flex items-center gap-2">
                             <button
                               type="button"
                               onClick={() => {
                                 void openChange(b);
                               }}
                               disabled={busy}
-                              className="inline-flex min-h-11 items-center gap-0.5 text-sm font-semibold text-info-link focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-hairline bg-canvas px-3 text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
                             >
                               時間を変える
-                              <Icon name="chevron-right" className="h-4 w-4" />
                             </button>
                             <button
                               type="button"
@@ -286,10 +302,9 @@ export default function EventBookings() {
                                 setPendingCancel(b);
                               }}
                               disabled={busy}
-                              className="inline-flex min-h-11 items-center gap-0.5 text-sm font-semibold text-info-link focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-danger/30 bg-canvas px-3 text-sm font-semibold text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
                             >
                               キャンセルする
-                              <Icon name="chevron-right" className="h-4 w-4" />
                             </button>
                           </div>
                         )}
@@ -379,18 +394,18 @@ export default function EventBookings() {
                           disabled
                             ? 'border-hairline bg-shell-gray'
                             : selected
-                              ? 'border-accent-deep bg-ok-bg'
+                              ? 'border-liff-primary bg-liff-primary'
                               : 'border-hairline bg-canvas'
                         }`}
                       >
                         <span
-                          className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-ok-ink' : 'text-ink'}`}
+                          className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-white' : 'text-ink'}`}
                         >
                           {utcToJstMd(s.starts_at)} {utcToJstHm(s.starts_at)}〜
                           {utcToJstHm(s.ends_at)}
                         </span>
                         <span
-                          className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-ok-ink' : 'text-ink-secondary'}`}
+                          className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-white' : 'text-ink-secondary'}`}
                         >
                           {current ? '今の時間' : full ? '満席' : '空きあり'}
                         </span>
