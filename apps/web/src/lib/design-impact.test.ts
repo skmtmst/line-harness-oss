@@ -90,6 +90,8 @@ describe('共通部品の影響範囲', () => {
       'app/contents/page.tsx',
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
       'app/contents/vars/impact-review.tsx',
+      // ★V8 共通情報の一覧（FM94M）。表の下にページ送りを置く。
+      'app/contents/vars/list-v8.tsx',
       'app/contents/vars/page.tsx',
       'app/conversions/page.tsx',
       // #1011 FRIEND-11: 重複候補が50件を超えると後ろの候補へ辿れなかった。
