@@ -222,12 +222,14 @@ describe('FOLDER_ITEM_COUNT_TABLES(#631)', () => {
     )
   })
 
-  it('対応表に無い残り6種別(webinarを除く)は、理由コメント付きで意図して外している', () => {
+  it('対応表に無い残り9種別(webinarを除く)は、理由コメント付きで意図して外している', () => {
     const covered = new Set(Object.keys(FOLDER_ITEM_COUNT_TABLES))
     covered.add('webinar') // 別実装(getWebinarFolderCounts)でカバー済み
     const uncovered = FOLDER_KINDS.filter((kind) => !covered.has(kind))
     expect(uncovered.sort()).toEqual(
-      ['automation', 'entry_route', 'event', 'form', 'friend_field', 'mileage_rule'].sort(),
+      ['automation', 'common_action', 'conversion', 'entry_route', 'event', 'form', 'friend_field', 'mileage_rule', 'webhook'].sort(),
     )
+    // F-13 の3種別（common_action・webhook・conversion）は、中身の
+    // folder_id 列が無いので件数は「数えていない」（#730）。箱の種類だけ足す。
   })
 })

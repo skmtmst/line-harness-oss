@@ -1384,6 +1384,7 @@ function emptyCtaEditing(webinarId: string): CtaEditing {
 function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, onCtasLoaded }: { webinarId: string; durationSeconds: number; forms: Array<{ id: string; name: string }>; formsState: FormCandidateState; onRetryForms: () => void; onCtasLoaded?: (ctas: WebinarCtaCard[] | null) => void }) {
   const [editing, setEditing] = useState<CtaEditing>(() => emptyCtaEditing(webinarId))
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   /* 取得の世代印。切替後に遅れて届いた前のウェビナーの応答はここで捨てる。 */
   const ctaRequestId = useRef(0)
 
@@ -1455,9 +1456,11 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
       atSeconds: parseMinSec(times[i] ?? '') as number,
     }))
     setSaving(true)
+    setSaved(false)
     try {
       const sorted = [...merged].sort((a, b) => a.atSeconds - b.atSeconds)
       await webinarApi.saveCtas(webinarId, sorted)
+      setSaved(true)
       editCurrent((prev) => ({ ...prev, ctas: sorted, times: sorted.map((c) => fmtMinSec(c.atSeconds)) }))
       /* 保存した中身を親の概要段へ流す。取り直しの GET は要らない。 */
       onCtasLoaded?.(sorted)
@@ -1576,13 +1579,15 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
         >
           + CTAカード追加
         </button>
-        <button
+        <Button
+          variant="primary"
           onClick={() => void save()}
-          disabled={saving || !loaded}
-          className="rounded-mini bg-action px-4 py-1 text-sm text-on-action disabled:opacity-50"
+          disabled={!loaded}
+          busy={saving}
+          done={saved}
         >
-          {saving ? '保存中...' : '保存する'}
-        </button>
+          保存する
+        </Button>
         </>
       )} />
     </div>

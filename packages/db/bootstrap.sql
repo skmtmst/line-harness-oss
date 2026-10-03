@@ -1,5 +1,31 @@
 -- Generated from schema.sql + migrations by scripts/generate-bootstrap.mjs.
 -- Do not edit manually. Run `pnpm --dir packages/db generate:bootstrap`.
+CREATE TABLE _556_folders_backup_auto_replies (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_broadcasts (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_common_vars (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_forms (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_friend_fields (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_media (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_media_upload_sessions (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_reminders (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_rich_menu_groups (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_scenarios (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_tags (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_templates (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_webinars (id TEXT PRIMARY KEY, folder_id TEXT);
+
 CREATE TABLE account_handover_decisions (
   id              TEXT PRIMARY KEY,
   handover_id     TEXT NOT NULL REFERENCES account_handovers(id) ON DELETE CASCADE,
@@ -2528,14 +2554,16 @@ CREATE TABLE "folders" (
   kind          TEXT NOT NULL CHECK (kind IN (
                   'tag','template','scenario','reminder','auto_reply',
                   'rich_menu','webinar','form','media','common_var',
-                  'mileage_rule','automation','event','entry_route','broadcast')),
+                  'mileage_rule','automation','event','entry_route','broadcast',
+                  'friend_field','common_action','webhook','conversion')),
   name          TEXT NOT NULL,
   parent_id     TEXT REFERENCES folders(id) ON DELETE CASCADE,
   display_order INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
-  color         TEXT
-, account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+  color         TEXT,
+  account_id    TEXT REFERENCES line_accounts(id) ON DELETE CASCADE
+);
 
 CREATE TABLE form_accounts (
   form_id         TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
@@ -8148,9 +8176,9 @@ CREATE UNIQUE INDEX idx_field_migration_runs_idempotency
 CREATE INDEX idx_field_migration_runs_scope
   ON field_migration_runs(tenant_id, line_account_id, created_at DESC);
 
-CREATE INDEX idx_folders_kind_order ON folders(kind, display_order);
+CREATE INDEX idx_folders_kind_order_556 ON folders(kind, display_order);
 
-CREATE INDEX idx_folders_webinar_account_order_333
+CREATE INDEX idx_folders_webinar_account_order_556
   ON folders(kind, account_id, display_order, name);
 
 CREATE INDEX idx_form_accounts_account
