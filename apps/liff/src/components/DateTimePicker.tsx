@@ -192,7 +192,7 @@ function DaySlots({
                 onClick={() => onSelect({ date: day, start: t.start })}
                 disabled={!t.open}
                 aria-pressed={active}
-                className={`h-11 rounded-[10px] px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                className={`liff-press h-11 rounded-[10px] px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                   active
                     ? 'bg-liff-primary font-bold text-white'
                     : t.open
@@ -652,7 +652,7 @@ export default function DateTimePicker({
                       aria-pressed={active}
                       aria-label={dayStateLabel(d, state)}
                       title={dayStateLabel(d, state)}
-                      className={`flex flex-col items-center gap-0.5 rounded-[10px] py-2 outline -outline-offset-1 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                      className={`liff-press flex flex-col items-center gap-0.5 rounded-[10px] py-2 outline -outline-offset-1 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                         active
                           ? 'bg-liff-soft outline-2 outline-liff-primary'
                           : state === 'closed' || state === 'empty'
@@ -768,7 +768,7 @@ export default function DateTimePicker({
                         disabled={!selectable}
                         aria-pressed={active}
                         aria-label={dayStateLabel(d, state)}
-                        className={`flex h-11 flex-col items-center justify-center gap-0.5 rounded-[10px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                        className={`liff-press flex h-11 flex-col items-center justify-center gap-0.5 rounded-[10px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                           active
                             ? 'bg-liff-primary font-semibold text-white'
                             : selectable
