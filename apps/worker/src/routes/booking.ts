@@ -1875,6 +1875,7 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       maxActiveBookingsPerFriend: number;
       approvalMode: 'automatic' | 'manual';
       holdMinutes: number;
+      waitlistHoldMinutes?: number;
       slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
       reminderDayBeforeTime: string | null;
       reminderHoursBefore: number | null;
@@ -1891,6 +1892,10 @@ function readBookingAdminSettings(input: Record<string, unknown>):
   const maxActiveBookingsPerFriend = integerInRange(input.maxActiveBookingsPerFriend, 1, 100);
   const approvalMode = input.approvalMode;
   const holdMinutes = integerInRange(input.holdMinutes, 1, 1_440);
+  // キャンセル待ちの仮押さえ分数。省いたら今の値を保つ。あるのに形が違えば拒否する。
+  const waitlistHoldMinutes = input.waitlistHoldMinutes === undefined
+    ? undefined
+    : integerInRange(input.waitlistHoldMinutes, 1, 1_440);
   const slotGranularityMinutes = integerInRange(input.slotGranularityMinutes, 5, 60);
   const businessHours = Object.hasOwn(input, 'businessHours')
     ? readBookingBusinessHours(input.businessHours)
@@ -1923,6 +1928,9 @@ function readBookingAdminSettings(input: Record<string, unknown>):
     return { ok: false, error: '承認方式が正しくありません' };
   }
   if (holdMinutes === null) return { ok: false, error: '仮押さえ時間は1〜1440分で指定してください' };
+  if (waitlistHoldMinutes === null) {
+    return { ok: false, error: 'キャンセル待ちの仮押さえ時間は1〜1440分で指定してください' };
+  }
   if (slotGranularityMinutes === null
     || !BOOKING_SLOT_GRANULARITIES.has(slotGranularityMinutes as 5 | 10 | 15 | 30 | 60)) {
     return { ok: false, error: '予約枠の間隔が正しくありません' };
@@ -1948,6 +1956,7 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       maxActiveBookingsPerFriend,
       approvalMode: approvalMode as 'automatic' | 'manual',
       holdMinutes,
+      ...(waitlistHoldMinutes !== undefined ? { waitlistHoldMinutes } : {}),
       slotGranularityMinutes: slotGranularityMinutes as 5 | 10 | 15 | 30 | 60,
       reminderDayBeforeTime: reminderDayBeforeTime === 'invalid' ? null : reminderDayBeforeTime,
       reminderHoursBefore,

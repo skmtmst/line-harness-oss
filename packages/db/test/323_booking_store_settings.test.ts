@@ -220,6 +220,29 @@ describe('migration 323 店舗共通の予約設定', () => {
       .toEqual({ count: 2 });
   });
 
+  it('キャンセル待ちの仮押さえ分数は既定30・保存できる・省いたら今の値を保つ', async () => {
+    await expect(getBookingAdminSettings(db, 'account-a')).resolves.toMatchObject({
+      waitlistHoldMinutes: 30,
+    });
+    sqlite.prepare(`DELETE FROM booking_settings WHERE line_account_id = 'account-b'`).run();
+    const base = {
+      lineAccountId: 'account-b',
+      expectedVersion: 0,
+      timeZone: 'Asia/Tokyo',
+      bookingWindowDays: 60,
+      cutoffMinutesBefore: 1440,
+      cancelDeadlineMinutesBefore: 1440,
+      maxActiveBookingsPerFriend: 1,
+      approvalMode: 'automatic' as const,
+      holdMinutes: 15,
+      slotGranularityMinutes: 15 as const,
+    };
+    await expect(saveBookingAdminSettings(db, { ...base, waitlistHoldMinutes: 45 }))
+      .resolves.toMatchObject({ status: 'created', item: { waitlistHoldMinutes: 45 } });
+    await expect(saveBookingAdminSettings(db, { ...base, expectedVersion: 1 }))
+      .resolves.toMatchObject({ status: 'updated', item: { waitlistHoldMinutes: 45 } });
+  });
+
   it('行が無い実在店舗へ営業時間を初回作成し、明示設定済みにする', async () => {
     sqlite.prepare(`DELETE FROM booking_settings WHERE line_account_id = 'account-b'`).run();
     const result = await saveBookingAdminSettings(db, {
