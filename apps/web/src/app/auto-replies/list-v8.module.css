@@ -175,20 +175,7 @@
   min-width: 160px;
 }
 
-/* 一覧の上の案内の帯（上から順に1つだけ動く）。 */
-.noteBand {
-  margin: 0;
-  padding: 10px 14px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control, 8px);
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
 /* 見るだけの人への帯（`Q5lOCc`）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */
-
 /* 操作の失敗の帯。 */
 .errorBand {
   display: flex;
@@ -255,6 +242,10 @@
 
 .rowClick {
   cursor: pointer;
+}
+
+.rowClick td {
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .rowClick:hover td {

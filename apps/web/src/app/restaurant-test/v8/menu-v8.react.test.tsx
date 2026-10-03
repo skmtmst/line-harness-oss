@@ -67,4 +67,22 @@ describe('MJoJR メニュー管理のV8', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ name: '冬の鹿肉コース' })))
   })
+
+  it('変更の枠に板 NkmwU の印が付く', async () => {
+    render(<MenuV8 />)
+    await screen.findByText('メニュー一覧')
+    const row = screen.getByText('秋の鹿肉コース').closest('tr')!
+    fireEvent.click(within(row).getByRole('button', { name: /その他操作|操作/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
+    expect(document.querySelector('[data-design-node="NkmwU"]')).not.toBeNull()
+  })
+
+  it('停止の確認に板 MV5Os の印が付く', async () => {
+    render(<MenuV8 />)
+    await screen.findByText('メニュー一覧')
+    const row = screen.getByText('秋の鹿肉コース').closest('tr')!
+    fireEvent.click(within(row).getByRole('button', { name: /その他操作|操作/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
+    expect(document.querySelector('[data-design-node="MV5Os"]')).not.toBeNull()
+  })
 })

@@ -923,9 +923,23 @@ function FriendDetailInner() {
     if (!el) return
     const check = () => setTabsOverflowing(el.scrollWidth > el.clientWidth + 1)
     check()
+    /*
+     * ResizeObserver は「帯そのものの箱」が変わったときだけ動く。あとから
+     * 届いた本文フォントで中のタブ名だけが広がった場合は動かないため、
+     * 実際にはみ出しているのにフェードが出ないまま残る。読み込みが終わった
+     * 時点でもう一度測る（CI の画面見張りで、同じコードなのに撮る順で
+     * フェードの有無が変わる差分として出ていた）。
+     */
     const ro = new ResizeObserver(check)
     ro.observe(el)
-    return () => ro.disconnect()
+    let done = false
+    void document.fonts?.ready.then(() => {
+      if (!done) check()
+    })
+    return () => {
+      done = true
+      ro.disconnect()
+    }
   }, [visibleTabs.length])
 
   // PERF-13: フォーム回答も「回答フォーム」タブを開いたときにだけ取る。
@@ -1729,6 +1743,7 @@ function FriendDetailInner() {
               {tabsOverflowing ? (
                 <div
                   aria-hidden="true"
+                  data-tab-fade="right"
                   className="from-canvas-sunken pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l to-transparent"
                 />
               ) : null}

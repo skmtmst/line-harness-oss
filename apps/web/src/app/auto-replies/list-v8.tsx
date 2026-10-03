@@ -40,6 +40,7 @@ import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import HelpTip from '@/components/shared/help-tip'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -887,7 +888,7 @@ export default function AutoRepliesListV8() {
       <span className="sr-only" role="status" aria-live="polite">
         {moveNotice}
       </span>
-      <div className={styles.tableWrap}>
+      <div className={styles.tableWrap} data-content-in="">
         <table className={styles.table}>
           <colgroup>
             <col style={{ width: 40 }} />
@@ -1152,9 +1153,14 @@ export default function AutoRepliesListV8() {
       <div>
         <div className={styles.head}>
           <div className={styles.headText}>
-            <h2 className={styles.headTitle}>自動応答</h2>
+            <h2 className={styles.headTitle}>
+              自動応答{' '}
+              <HelpTip label="自動応答の動きの説明">
+                上にあるルールから順に見て、最初に当てはまった1つだけが動きます。時間帯や連投の設定で見送られたときは、その次のルールを見ます。並びは「評価順」のとき、行の左のつまみで入れ替えられます。
+              </HelpTip>
+            </h2>
             <p className={styles.headDescription}>
-              届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
+              届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。
             </p>
           </div>
         </div>
@@ -1167,11 +1173,10 @@ export default function AutoRepliesListV8() {
         </p>
       )}
 
-      {/* 一覧の上の案内の帯（ルールの動き方）。v7 の開閉帯と同じ内容。 */}
-      <p className={styles.noteBand}>
-        上にあるルールから順に見て、最初に当てはまった1つだけが動きます。時間帯や連投の設定で見送られたときは、その次のルールを見ます。並びは「評価順」のとき、行の左のつまみで入れ替えられます。
-      </p>
-
+      {/*
+        一覧の上の案内の帯は土台側で見出し横の「？」(HelpTip) へ移動済みのため置かない。
+        文面は上の HelpTip と同じ。
+      */}
       {/* 数の帯 4つ。 */}
       <div data-design="KPIs" className={styles.kpis}>
         {kpis.map((kpi) => (

@@ -200,12 +200,16 @@
 }
 
 /*
- * ★V8「数の帯」（bx1eN の分析型）：4枚のカードをやめ、1本の帯を
- * 縦線（divider）で4つに割る。各マスは上下10・左右16・数は 22px。
+ * ★V8「数の帯」（bx1eN の分析型）：4枚のカードをやめ、白い板の
+ * 左右いっぱい・区切り線で並べる1本の帯にする。帯の上下にも
+ * 細い線を引く。各マスは上下10・左右16・数は 22px。
  * `data-kpi-strip` は list-kpis.tsx が付ける印（v7 では何も変わらない）。
  */
 [data-theme='v8'] .strip {
   gap: 0;
+  border-top: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-canvas);
 }
 
 [data-theme='v8'] .strip > .card {
