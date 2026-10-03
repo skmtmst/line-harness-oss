@@ -21,6 +21,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import MultiSelect from '@/components/shared/multi-select'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
@@ -595,13 +596,10 @@ export default function TagsTabV8({
               ))}
             </div>
           ) : status === 'forbidden' ? (
-            <div className={styles.stateCard}>
-              <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
-                <AlertCircle size={20} aria-hidden="true" />
-              </span>
-              <p className={styles.stateTitle}>タグを見る権限がありません</p>
-              <p className={styles.stateDesc}>タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。</p>
-            </div>
+            <NoPermissionV8
+              featureName="タグ"
+              capabilitiesHref="/staff"
+            />
           ) : status === 'error' ? (
             <div className={styles.stateCard}>
               <span className={`${styles.stateIcon} ${styles.stateIconError}`}>

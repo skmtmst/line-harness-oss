@@ -14,6 +14,7 @@ import type { FriendField, FriendFieldType } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
@@ -391,11 +392,11 @@ export default function FieldMigrateV8() {
   */
   if (loadForbidden) {
     return (
-      <ListState
-        kind="forbidden"
-        title="友だち情報欄を見る権限がありません"
-        description="オーナーか管理者に確認してください。"
-        action={<Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>}
+      <NoPermissionV8
+        featureName="友だち情報欄"
+        capabilitiesHref="/staff"
+        backLabel="友だち情報欄の一覧へ戻る"
+        backHref="/tags?tab=fields"
       />
     )
   }

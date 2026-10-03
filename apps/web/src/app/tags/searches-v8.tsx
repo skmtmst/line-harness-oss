@@ -17,6 +17,7 @@ import { useAccount } from '@/contexts/account-context'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -303,13 +304,10 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
           </div>
         ) : !accountId ? null
         : forbidden ? (
-          <div className={styles.stateCard}>
-            <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
-              <AlertCircle size={20} aria-hidden="true" />
-            </span>
-            <p className={styles.stateTitle}>保存した検索を見る権限がありません</p>
-            <p className={styles.stateDesc}>オーナーか管理者に確認してください。</p>
-          </div>
+          <NoPermissionV8
+            featureName="保存した検索"
+            capabilitiesHref="/staff"
+          />
         ) : loadError ? (
           <div className={styles.stateCard}>
             <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
