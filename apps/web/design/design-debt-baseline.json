@@ -1093,5 +1093,8 @@
   },
   "app/pools/new/pool-new-v8.tsx": {
     "unresolved-classname": 2
+  },
+  "app/no-permission/no-permission-v8.tsx": {
+    "unresolved-classname": 10
   }
 }
