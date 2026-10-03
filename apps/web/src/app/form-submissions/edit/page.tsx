@@ -19,13 +19,8 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
-  checkLiffColor,
   emptyLayout,
   formThemeContrastError,
-  LIFF_HEADING_FONT_META,
-  LIFF_HEADING_FONTS,
-  LIFF_THEME_META,
-  LIFF_THEMES,
   newBlockId,
   normalizeFormTheme,
   normalizeLiffFormAppearance,
@@ -38,7 +33,6 @@ import {
   type FormTheme,
   type LiffFormAppearance,
 } from '@line-crm/shared'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { normalizeSectionName } from '@/components/forms/section-name'
 import { api, ApiError, fetchApi } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
