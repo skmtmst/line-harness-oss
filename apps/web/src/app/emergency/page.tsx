@@ -37,6 +37,7 @@ import { onlyWhenVisible } from '@/lib/visible-polling'
 import OtpInput from '@/components/shared/otp-input'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { operationControlSummary } from './control-summary'
+import EmergencyControlV8, { type EmergencyControlV8Handle } from './control-v8'
 import {
   CAPABILITY_LABEL as RESTORE_DRIFT_CAPABILITY_LABEL,
   describeRestoreBlockers,
@@ -1441,10 +1442,20 @@ function EmergencyPageInner() {
     : tab === 'control'
       ? '止める配信を選び、理由を入力して緊急停止します。'
       : 'エラー、緊急停止、システム更新、設定変更を時間順に確認できます。'
+  const controlV8Ref = useRef<EmergencyControlV8Handle>(null)
   const headerAction = tab === 'health'
     ? <Button variant="primary" className="min-h-9 px-3 text-xs hover:brightness-90 disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy}>{manualBusy ? '↻ 確認中…' : '↻ いますぐ確かめる'}</Button>
-    : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
-  return <div className={`flex flex-col gap-4 ${tab === 'control' ? '' : 'v8-ro-notifications-page'}`} data-design-node={theme === 'v8' && tab !== 'control' ? (tab === 'health' ? 'Y4LkX1' : 'I2V65v') : undefined}>{theme === 'v8' && tab !== 'control' && <ReadonlyHeaderV8 title="運用状態" description="自動確認の結果と、止めた・戻した記録、管理画面の更新を確認します。" />}<OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-semibold text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-semibold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} onManualRunSettled={settleManualRun} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
+    : tab === 'control' && theme === 'v8'
+      ? <Button variant="danger" type="button" onClick={() => controlV8Ref.current?.openStop()}>緊急停止する</Button>
+      : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
+  return <div className={`flex flex-col gap-4 ${tab === 'control' ? '' : 'v8-ro-notifications-page'}`} data-design-node={theme === 'v8' && tab !== 'control' ? (tab === 'health' ? 'Y4LkX1' : 'I2V65v') : undefined}>{theme === 'v8' && tab !== 'control' && <ReadonlyHeaderV8 title="運用状態" description="自動確認の結果と、止めた・戻した記録、管理画面の更新を確認します。" />}<OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-semibold text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-semibold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} onManualRunSettled={settleManualRun} />}{
+            /*
+             * ★V8-B: data-theme="v8" のときだけ新しい制御タブ（`OHwbU`）を出す。
+             * v7 の見た目は EmergencyControlPanel のまま変えない。
+             */
+            tab === 'control' && (theme === 'v8'
+              ? <EmergencyControlV8 ref={controlV8Ref} accounts={accounts} />
+              : <EmergencyControlPanel accounts={accounts} />)}{tab === 'history' && <HistoryPanel />}</div>
 }
 
 function EmergencyPage() {
