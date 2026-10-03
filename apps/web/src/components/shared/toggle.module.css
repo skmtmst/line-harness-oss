@@ -76,4 +76,23 @@
 [data-theme='v8'] .locked {
   background: var(--color-hairline);
 }
+
+/*
+ * ★V8 仕上げ（M10-2）：トグルの乗せた・押した動き。
+ * 乗せたときは地を少し濃く、押したときはほんの少し沈む（明るさで）。
+ * どちらも 120ms。押せない項目（locked）は動かさない。
+ */
+[data-theme='v8'] .toggle {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    filter var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .toggle:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+[data-theme='v8'] .toggle:active:not(:disabled) {
+  filter: brightness(0.88);
+}
 }

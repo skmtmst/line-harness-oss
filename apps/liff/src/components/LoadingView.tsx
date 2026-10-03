@@ -7,7 +7,14 @@ import { LOADING_LABEL } from '../lib/user-message.js';
  */
 export default function LoadingView({ label = LOADING_LABEL }: { label?: string }) {
   return (
-    <div className="space-y-3" role="status" aria-live="polite" aria-busy="true" aria-label={label}>
+    <div
+      className="space-y-3"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      aria-label={label}
+      data-design-node="AcTHQ"
+    >
       <div className="animate-pulse space-y-3.5" aria-hidden="true">
         <div className="h-6 w-1/2 rounded-md bg-liff-chip" />
         <div className="h-3.5 w-4/5 rounded-md bg-liff-chip" />
