@@ -6568,6 +6568,25 @@ const spec = {
         },
       },
     },
+    '/api/forms/{id}/unarchive': {
+      post: {
+        tags: ['Forms'],
+        summary: '保管した回答フォームを元に戻す（戻した直後は受付停止のまま）',
+        description: '保管中の行だけ現行へ戻す。確認した版（expectedRevision）がずれたら409で読み直しを促す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision'], properties: { expectedRevision: { type: 'number' } } } } } },
+        responses: {
+          '200': { description: '現行へ戻した（status, revision, isActive）' },
+          '400': { description: '確認した版が必要' },
+          '403': { description: 'フォームの編集権限が無い' },
+          '404': { description: 'フォームが無い、または権限範囲外' },
+          '409': { description: '保管されていない、または版が変わった' },
+        },
+      },
+    },
     '/api/forms/{id}/test-token': {
       post: {
         tags: ['Forms'],

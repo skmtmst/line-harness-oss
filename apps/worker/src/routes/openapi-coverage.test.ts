@@ -420,6 +420,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/forms/{id}/publish',
   'POST /api/forms/{id}/submissions/{submissionId}/retry-effects',
   'POST /api/forms/{id}/test-token',
+  'POST /api/forms/{id}/unarchive',
   'POST /api/hq/banners/generations/{id}/cancel',
   'POST /api/hq/banners/generations/{id}/run',
   'POST /api/hq/banners/images/{id}/deliver',

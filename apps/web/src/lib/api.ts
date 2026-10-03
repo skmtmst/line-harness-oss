@@ -7476,6 +7476,19 @@ export const api = {
         }`,
         { method: 'DELETE' },
       ),
+    /*
+     * B 元に戻す: 保管の取り消し。戻した直後は受付停止のまま。
+     * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+     */
+    unarchive: (id: string, accountId: string, expectedRevision: number) =>
+      fetchApi<ApiResponse<{
+        status: 'active'
+        revision: number
+        isActive: boolean
+      }>>(`/api/forms/${id}/unarchive?account_id=${encodeURIComponent(accountId)}`, {
+        method: 'POST',
+        body: JSON.stringify({ expectedRevision }),
+      }),
   },
   /** サイトスクリプト。自社サイトの行動を友だちに紐づける。 */
   siteTracking: {
