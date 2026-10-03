@@ -416,6 +416,23 @@
   max-width: 128px;
 }
 
+/*
+ * ★V8 1152 の帯（parity 1003-2106：1152 の 29/31 板で札が 20px に
+ * 潰れて見えなくなっていた）。札は縮めない（長い名前は 128px の
+ * 「…」で受ける）。代わりにパンくずと自分の名前が縮む（どちらも
+ * 「…」持ち）。v7 は今までどおり。
+ */
+[data-theme='v8'] .accountPill {
+  flex-shrink: 0;
+}
+
+[data-theme='v8'] .crumbCurrent,
+[data-theme='v8'] .crumbFrom,
+[data-theme='v8'] .crumbFromLink,
+[data-theme='v8'] .user {
+  min-width: 0;
+}
+
 [data-theme="v8"] .user {
   max-width: 104px;
 }

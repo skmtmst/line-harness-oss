@@ -362,11 +362,20 @@
     "unresolved-classname": 131,
     "direct-th": 14
   },
+  "app/nen-campaigns/columns/new/column-new-v8.tsx": {
+    "unresolved-classname": 47
+  },
   "app/nen-campaigns/columns/new/page.tsx": {
     "unresolved-classname": 36
   },
+  "app/nen-campaigns/edit/campaign-editor-v8.tsx": {
+    "unresolved-classname": 65
+  },
   "app/nen-campaigns/edit/campaign-editor.tsx": {
     "unresolved-classname": 5
+  },
+  "app/nen-campaigns/nen-campaigns-v8.tsx": {
+    "unresolved-classname": 58
   },
   "app/nen-members/page.tsx": {
     "unresolved-classname": 13,
@@ -374,6 +383,16 @@
   },
   "app/nen/members/members-v8.tsx": {
     "unresolved-classname": 61
+  },
+  "app/nen/pets/pets-v8.tsx": {
+    "unresolved-classname": 89,
+    "direct-th": 3
+  },
+  "app/nen/health/health-v8.tsx": {
+    "unresolved-classname": 56
+  },
+  "app/nen-members/photo-review-v8.tsx": {
+    "unresolved-classname": 85
   },
   "app/page.tsx": {
     "arbitrary-value": 4,

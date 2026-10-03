@@ -968,11 +968,11 @@ function LineNotificationsPage() {
   const update = (eventType: string, patch: Partial<EcNotificationSetting>) => setSettings((current) => current.map((setting) => setting.eventType === eventType ? { ...setting, ...patch } : setting))
   const renderKpiCard = (kpi: CustomerNotificationKpi) => {
     const { label, value, unit, note, href } = kpi
-    return <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
-      <p className="text-ink-faint text-xs">{label}</p>
-      <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+    return <div key={label} className="bg-canvas rounded-card border-hairline border p-3.5">
+      <p className="text-ink-faint text-micro font-semibold">{label}</p>
+      <p className="text-ink text-title mt-1 font-semibold tabular-nums">
         {value === null ? '—' : value}
-        {value === null || unit === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>}
+        {value === null || unit === null ? null : <span className="text-ink-faint text-micro ml-1 font-normal">{unit}</span>}
       </p>
       <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
       {/* 0件のときは押し口を出さない。押しても何も無い。 */}
@@ -1301,14 +1301,14 @@ function LineNotificationsPage() {
         {visiblePage.map((setting) => <article key={setting.eventType} className="border-b border-hairline last:border-b-0">
           <div className="line-notification-v6-row">
             <div className="min-w-0">
-              <h2 className="truncate font-bold text-ink" title={setting.title?.trim() || setting.label}>{setting.title?.trim() || setting.label}</h2>
+              <h2 className="truncate text-caption font-semibold text-ink" title={setting.title?.trim() || setting.label}>{setting.title?.trim() || setting.label}</h2>
               <p className="mt-0.5 truncate text-xs text-ink-faint" title={triggerLabel(setting)}>{categoryLabel(setting.category)}・{triggerLabel(setting)}</p>
               <p className="mt-0.5 truncate text-xs text-ink-faint">{formatUpdatedAt(setting.updatedAt)}</p>
             </div>
-            <span className="text-sm text-ink-secondary">{timingLabel(setting)}</span>
-            <span className="text-sm tabular-nums text-ink-secondary">{sendCountsFailed ? '取得失敗' : `${sentCountOf(setting.eventType) ?? '—'}通`}</span>
-            <span className="text-sm tabular-nums text-ink-secondary">{sendCountsFailed ? '取得失敗' : `${sent30dOf(setting.eventType) ?? '—'}通`}</span>
-            <span className="text-sm text-ink-faint">{(() => {
+            <span className="text-caption text-ink-secondary">{timingLabel(setting)}</span>
+            <span className="text-caption tabular-nums text-ink-secondary">{sendCountsFailed ? '取得失敗' : `${sentCountOf(setting.eventType) ?? '—'}通`}</span>
+            <span className="text-caption tabular-nums text-ink-secondary">{sendCountsFailed ? '取得失敗' : `${sent30dOf(setting.eventType) ?? '—'}通`}</span>
+            <span className="text-caption text-ink-faint">{(() => {
               const displayed = metricByEvent.get(setting.eventType)?.displayed
               if (!displayed || displayed.value === null) return displayed?.state === 'pending' ? '集計待ち' : '— 未取得'
               return `${displayed.value}人`
