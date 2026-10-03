@@ -318,11 +318,20 @@
     "unresolved-classname": 131,
     "direct-th": 14
   },
+  "app/nen-campaigns/columns/new/column-new-v8.tsx": {
+    "unresolved-classname": 47
+  },
   "app/nen-campaigns/columns/new/page.tsx": {
     "unresolved-classname": 36
   },
+  "app/nen-campaigns/edit/campaign-editor-v8.tsx": {
+    "unresolved-classname": 65
+  },
   "app/nen-campaigns/edit/campaign-editor.tsx": {
     "unresolved-classname": 5
+  },
+  "app/nen-campaigns/nen-campaigns-v8.tsx": {
+    "unresolved-classname": 58
   },
   "app/nen-members/page.tsx": {
     "unresolved-classname": 13,

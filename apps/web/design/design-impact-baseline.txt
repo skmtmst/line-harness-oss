@@ -145,9 +145,12 @@ shared-button-importer app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx
 shared-button-importer app/mileage/rewards/edit/v8-reward-edit.tsx
 shared-button-importer app/mileage/friends/detail/v8-friend-detail.tsx
 shared-button-importer app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx
+shared-button-importer app/nen-campaigns/columns/new/column-new-v8.tsx
 shared-button-importer app/nen-campaigns/columns/new/page.tsx
+shared-button-importer app/nen-campaigns/edit/campaign-editor-v8.tsx
 shared-button-importer app/nen-campaigns/edit/campaign-editor.tsx
 shared-button-importer app/nen-campaigns/edit/page.tsx
+shared-button-importer app/nen-campaigns/nen-campaigns-v8.tsx
 shared-button-importer app/nen-campaigns/nen-overview.tsx
 shared-button-importer app/nen-campaigns/page.tsx
 shared-button-importer app/nen-members/page.tsx

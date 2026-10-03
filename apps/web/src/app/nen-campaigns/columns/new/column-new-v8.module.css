@@ -1,0 +1,145 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B コラムを書く（yRDwW）。左に節のカード、右に LINE の見え方。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.crumb {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.crumb a {
+  color: var(--color-action);
+  text-decoration: none;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.linkAction {
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.errorText {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tips {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+/* 板が狭いときは1列に畳む。 */
+@container (max-width: 900px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .row2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
