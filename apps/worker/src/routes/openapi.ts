@@ -2516,6 +2516,27 @@ const spec = {
         },
       },
     },
+    '/api/friend-add-rules/{id}/test-send': {
+      post: {
+        tags: ['Webhook'],
+        summary: '友だち追加時の配信を操作者本人だけへテスト送信（F12）',
+        description:
+          '保存済み版のテキスト本文で固定し、送り先は操作者のLINEだけ。本文・引数での送り先指定は受け付けない。手動扱いとして delivery_type=test・source=manual で記録する。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Test sent to self with fixed version' },
+          '400': { description: 'account_id or Idempotency-Key missing or invalid' },
+          '403': { description: 'Role or permission required' },
+          '404': { description: 'Rule or account not in visible scope' },
+          '409': { description: 'Operator LINE not found among friends' },
+          '422': { description: 'Saved version has no text body' },
+          '429': { description: 'Repeated too quickly; retry after 10 seconds' },
+        },
+      },
+    },
     '/api/mileage/rules': {
       get: {
         tags: ['Mileage'], summary: 'LINEアカウント範囲内のマイル付与ルールを取得',

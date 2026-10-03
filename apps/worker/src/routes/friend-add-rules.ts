@@ -5,6 +5,9 @@ import {
   createFriendAddRuleDraft,
   ensureFriendAddFallbackRules,
   getFriendAddRule,
+  getFriendByLineUserIdForAccount,
+  getLineAccountById,
+  jstNow,
   listFriendAddRuleOrderIds,
   listFriendAddRules,
   listFriendAddRulesPage,
@@ -17,6 +20,7 @@ import {
   type FriendAddRuleKind,
   type FriendAddRuleRow,
 } from '@line-crm/db';
+import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -1486,6 +1490,102 @@ friendAddRules.post('/api/friend-add-rules/:id/test', requireRole('owner', 'admi
     expectedAt: body.expectedAt ?? null,
     friendId: body.friendId ?? null,
   });
+});
+
+/*
+ * POST /api/friend-add-rules/:id/test-send — F12: 保存済みの本文・版で固定し、
+ * 操作した本人だけへテスト送信する。
+ * - 送る本文は要求ではなく保存済み版の snapshot（版も応答に返す）。
+ * - 送り先は操作者のLINEだけ。本文・引数での送り先指定は受け付けない。
+ * - 手動の扱いとして messages_log へ source='manual'・delivery_type='test' で記録する。
+ *   ヘッダ X-Line-Harness-Source: manual 自体はプロキシ経路の印なので付けない。
+ *   既存の手動契約（手動1:1は緊急停止の対象外・手動として記録）に新しい例外は作らない。
+ * - 実顧客へは送らない。短時間の二度押しは 429 で止める。
+ */
+friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = accountIdFrom(c);
+  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  try {
+    if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+    const staff = c.get('staff');
+    if (staff.role === 'staff' && !staff.permissionKeys?.includes('/friend-add-settings')) {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
+    const idempotencyKey = c.req.header('Idempotency-Key');
+    if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) {
+      return c.json({ success: false, error: 'テスト送信には有効な冪等キーが必要です' }, 400);
+    }
+    const row = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
+    if (!row || !row.definition_snapshot) return c.json({ success: false, error: '設定が見つかりません' }, 404);
+    const definition = parseSnapshot(row.definition_snapshot);
+    if (definition.messageType !== 'text' || !definition.messageText.trim()) {
+      return c.json({ success: false, error: 'テスト送信できるのはテキストの本文がある版だけです' }, 422);
+    }
+    // 送り先は操作者本人だけ。staff の LINE 連携からこのアカウントの友だちを引く。
+    const staffRow = await c.env.DB.prepare(
+      `SELECT line_user_id FROM staff_members WHERE id = ? AND is_active = 1`,
+    ).bind(staff.id).first<{ line_user_id: string | null }>();
+    const friend = staffRow?.line_user_id
+      ? await getFriendByLineUserIdForAccount(c.env.DB, staffRow.line_user_id, accountId)
+      : null;
+    if (!friend || friend.line_account_id !== accountId || !friend.is_following) {
+      return c.json({
+        success: false,
+        error: 'あなたのLINEがこのアカウントの友だちに見つかりません。先に友だち追加してブロックを解除してください',
+      }, 409);
+    }
+    // 短時間の二度押しは送らず止める（一斉配信のテスト送信と同じ形）。
+    const claim = await c.env.DB.prepare(
+      `INSERT INTO operation_audit (id, target_kind, target_id, action, actor_id, detail_json)
+       SELECT ?, 'friend_add_rule', ?, 'test_send', ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM operation_audit
+          WHERE target_kind = 'friend_add_rule' AND target_id = ?
+            AND action = 'test_send' AND actor_id = ?
+            AND datetime(created_at) >= datetime('now', '+9 hours', '-10 seconds')
+       )`,
+    ).bind(
+      crypto.randomUUID(),
+      row.id,
+      staff.id,
+      JSON.stringify({ versionId: row.version_id }),
+      row.id,
+      staff.id,
+    ).run();
+    if ((claim.meta.changes ?? 0) !== 1) {
+      return c.json(
+        { success: false, error: '短時間に繰り返し送信しています。10秒待ってからやり直してください' },
+        { status: 429, headers: { 'Retry-After': '10' } },
+      );
+    }
+    const account = await getLineAccountById(c.env.DB, accountId);
+    if (!account) return c.json({ success: false, error: 'LINEアカウントが見つかりません' }, 400);
+    const text = `【テスト配信】\n${definition.messageText}`;
+    try {
+      await new LineClient(account.channel_access_token)
+        .pushMessage(friend.line_user_id, [{ type: 'text', text }], idempotencyKey);
+    } catch (error) {
+      console.error('POST /api/friend-add-rules/:id/test-send push failed:', error);
+      return c.json({ success: false, error: 'LINEへ送信できませんでした' }, 502);
+    }
+    await c.env.DB.prepare(
+      `INSERT INTO messages_log
+         (id, friend_id, direction, message_type, content, delivery_type, source, line_account_id, created_at)
+       VALUES (?, ?, 'outgoing', 'text', ?, 'test', 'manual', ?, ?)`,
+    ).bind(crypto.randomUUID(), friend.id, text, accountId, jstNow()).run();
+    return c.json({
+      success: true,
+      data: {
+        sent: 1,
+        versionId: row.version_id,
+        versionNumber: row.version_number,
+        recipientKind: 'self',
+      },
+    });
+  } catch (error) {
+    console.error('POST /api/friend-add-rules/:id/test-send error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
 });
 
 friendAddRules.post('/api/friend-add-rules/:id/publish', requireRole('owner', 'admin'), async (c) => {
