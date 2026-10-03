@@ -20,7 +20,9 @@
  * 判定は「悪くなったら落とす」だけ（2026-10-04 司令塔決定）。
  *   時間（表示・LCP・反応・長い作業）… 1画面3回測って真ん中の値で比べ、
  *     基準より 20% を超えて悪くなったら落ちる
- *   JS jsBytes … 基準より 1KB を超えて増えたら落ちる
+ *   JS jsBytes … 基準より 1KB を超えて増えたら落ちる。
+ *     ただし同じ PR で speed-budget.json の基準を更新していれば通す
+ *     （機能を足すと JS は増えるため。理由は PR に書くこと）
  * 良くなったら --update-baseline で基準を更新する（人が意図して回す）。
  *
  * 目標（表示1秒・反応100ms・長い作業50ms）は別の表 `targets` に残す。
@@ -289,10 +291,20 @@ function judge(measured, baselines) {
     }
     if (typeof m.jsBytes === 'number' && typeof base.jsBytes === 'number'
       && m.jsBytes > base.jsBytes + JS_SLACK_BYTES) {
-      failures.push(`${m.name} jsBytes=${m.jsBytes} が基準 ${base.jsBytes} より1KBを超えて増えた`)
+      failures.push(`${m.name} jsBytes=${m.jsBytes} が基準 ${base.jsBytes} より1KBを超えて増えた（機能追加で増える場合は同じPRで基準を更新し理由をPRに書く）`)
     }
   }
   return failures
+}
+
+/* 同じ PR で基準を更新済みなら JS 超過は通す（理由は PR に書くこと）。
+   時間の悪化は通さない。判定の数値（20%・1KB）は変えない。 */
+export function applyJsBaselineAllowance(failures, allowed) {
+  if (!allowed) return { failures, notices: [] }
+  return {
+    failures: failures.filter((f) => !f.includes('jsBytes=')),
+    notices: failures.filter((f) => f.includes('jsBytes=')),
+  }
 }
 
 /* 目標に届いていない画面。結果に出すだけで、落とさない（司令塔決定②）。 */
@@ -400,10 +412,16 @@ if (isMain) {
     console.log(`${m.name} ${m.showMs} ${m.lcpMs ?? '-'} ${m.pressMs ?? '-'} ${m.longTaskMs} ${m.jsBytes}`)
   }
 
-  const failures = updateBaseline ? [] : judge(measured, budget.baselines)
+  /* 同じ PR で基準を更新済みなら JS 超過は通す。CI が環境変数で教える。 */
+  const allowJs = process.env.ALLOW_JS_BASELINE_UPDATE === '1'
+  const judged = updateBaseline ? { failures: [], notices: [] } : applyJsBaselineAllowance(judge(measured, budget.baselines), allowJs)
+  const failures = judged.failures
   /* 目標に届いていない画面は出すだけ。落とさない（司令塔決定②）。 */
   for (const miss of targetMisses(measured, budget.targets ?? {})) {
     console.log(`目標未達: ${miss}`)
+  }
+  for (const notice of judged.notices) {
+    console.log(`基準更新あり: ${notice}`)
   }
   if (failures.length) {
     for (const f of failures) console.log(`予算超過: ${f}`)
