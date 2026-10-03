@@ -130,6 +130,8 @@ const EXEMPTIONS: Record<string, string> = {
     '「未保存の追加情報を破棄して一覧へ戻る」明示フロー。dirty管理ではなく部分保存の案内',
   'app/automations/new/page.tsx':
     'サーバーへ下書き保存する多段ウィザード。段またぎ・店ごとの退避があり離脱の扱いは別途検討',
+  'app/automations/drafts/draft-v8.tsx':
+    '見本から作った下書きの仕上げ面。保存は下書き保存・つくって動かすの明示操作でサーバーへ送り、離脱の扱いは new と同じく別途検討',
   'app/accounts/new/page.tsx':
     '登録ウィザードでdirty管理なし（コメント中の「未保存」記述のみ。R523の復帰案内の文言）',
   'app/booking/bookings/new/page.tsx':
