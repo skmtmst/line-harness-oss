@@ -36,4 +36,11 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     expect(css).toMatch(/\.compact\s*\{[^}]*height:\s*32px/s)
     expect(read('./icon-button.module.css')).toMatch(/\[data-theme='v8'\] \.button \{[^}]*height:\s*36px/s)
   })
+
+  it('余白の段：板の頭の題と説明の間は正規5段の 4', () => {
+    const css = read('./page-header.module.css')
+    expect(css).toMatch(/\[data-theme='v8'\] \.heading \{[^}]*gap:\s*4px/s)
+    // v7 の 5 は変えない。
+    expect(css).toMatch(/\.heading \{[^}]*gap:\s*5px/s)
+  })
 })
