@@ -390,6 +390,9 @@
   "app/restaurant-test/v8/dashboard.tsx": {
     "unresolved-classname": 7
   },
+  "app/restaurant-test/v8/menu.tsx": {
+    "unresolved-classname": 24
+  },
   "app/restaurant-test/v8/organization.tsx": {
     "unresolved-classname": 58
   },
