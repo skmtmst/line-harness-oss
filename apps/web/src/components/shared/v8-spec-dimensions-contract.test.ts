@@ -18,4 +18,14 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     // v7（52 の前身 58px の行）は変えない。
     expect(css).not.toMatch(/^\.name \{[^}]*line-height/m)
   })
+
+  it('数の帯（小）：上下 10・左右 16・題と数の間 4・数 22', () => {
+    const css = read('./kpi-card.module.css')
+    const cell = css.match(/\[data-theme='v8'\] \.strip > \.card \{([^}]*)\}/s)?.[1]
+    expect(cell).toBeDefined()
+    expect(cell).toMatch(/padding:\s*10px 16px/)
+    expect(cell).toMatch(/gap:\s*4px/)
+    // 数は 22 の段（--text-metric）のまま。見本の例の数は書かない。
+    expect(read('../../app/globals.css')).toMatch(/--text-metric:\s*22px/)
+  })
 })
