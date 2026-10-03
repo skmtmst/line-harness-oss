@@ -1260,10 +1260,10 @@ function MediaLibraryInner() {
                       <p className="text-danger text-xs" role="alert">{renameError}</p>
                     )}
                     <div className="flex justify-end gap-1">
-                      <Button variant="secondary" className="text-ink-secondary rounded-mini px-2 py-1 text-[11px] h-auto whitespace-normal" onClick={() => setRenaming(null)} disabled={renamingBusy}>
+                      <Button variant="secondary" className="text-ink-secondary rounded-mini px-2 py-1 text-micro h-auto whitespace-normal" onClick={() => setRenaming(null)} disabled={renamingBusy}>
                         キャンセル
                       </Button>
-                      <Button variant="primary" className="rounded-mini px-2 py-1 text-[11px] disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void rename()} disabled={renamingBusy}>
+                      <Button variant="primary" className="rounded-mini px-2 py-1 text-micro disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void rename()} disabled={renamingBusy}>
                         {renamingBusy ? '保存中…' : '保存する'}
                       </Button>
                     </div>
@@ -1295,12 +1295,12 @@ function MediaLibraryInner() {
                           }
                         />
                       ) : null}
-                      <span className="bg-ink-secondary text-on-accent rounded-mini px-1 py-0.5 text-[10px] leading-none">
+                      <span className="bg-ink-secondary text-on-accent rounded-mini px-1 py-0.5 text-nano leading-none">
                         {KINDS.find((k) => k.key === item.kind)?.label ?? 'ファイル'}
                       </span>
                       {item.archivedAt ? (
                         <span
-                          className="bg-canvas-sunken text-ink-secondary rounded-mini px-1 py-0.5 text-[10px] leading-none"
+                          className="bg-canvas-sunken text-ink-secondary rounded-mini px-1 py-0.5 text-nano leading-none"
                           title={item.archiveReason ? `退避の理由：${item.archiveReason}` : '退避済み'}
                         >
                           退避済み

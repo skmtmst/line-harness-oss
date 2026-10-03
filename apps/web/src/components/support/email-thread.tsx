@@ -666,7 +666,7 @@ export default function EmailThread({
               }`}
             >
               <p className="text-sm leading-6 break-words whitespace-pre-wrap">{message.body_text}</p>
-              <p className="mt-2 text-right text-[10px] text-ink-faint">
+              <p className="mt-2 text-right text-nano text-ink-faint">
                 {dateTime(message.created_at)}
                 {message.direction === 'outgoing' ? ' ・ 送信済み' : ''}
               </p>
@@ -674,7 +674,7 @@ export default function EmailThread({
             {message.direction === 'outgoing' && (
               <div className="flex w-12 shrink-0 flex-col items-center">
                 <div
-                  className="bg-action text-on-action flex h-8 w-8 items-center justify-center rounded-pill text-[11px] font-bold"
+                  className="bg-action text-on-action flex h-8 w-8 items-center justify-center rounded-pill text-micro font-bold"
                   title={message.sent_by_staff_name ?? '担当者情報なし'}
                 >
                   {(message.sent_by_staff_name ?? '担').charAt(0)}

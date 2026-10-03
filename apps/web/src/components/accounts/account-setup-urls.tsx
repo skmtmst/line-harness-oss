@@ -75,7 +75,7 @@ function UrlRow({ label, hint, url }: { label: string; hint: string; url: string
     <div>
       <div className="mb-1 flex flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-xs font-medium text-ink-secondary">{label}</span>
-        <span className="text-[10px] text-ink-faint">{hint}</span>
+        <span className="text-nano text-ink-faint">{hint}</span>
       </div>
       <div className="flex min-w-0 items-stretch gap-1">
         <input

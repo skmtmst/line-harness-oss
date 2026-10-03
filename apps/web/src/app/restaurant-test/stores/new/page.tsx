@@ -71,7 +71,7 @@ function Field({
     })
     : children
   return <div>
-    <div className="mb-2 flex items-center gap-2"><label htmlFor={inputId} className="text-sm font-semibold text-ink">{label}</label><span className={`rounded-pill px-2 py-1 text-[10px] font-semibold ${required ? 'bg-danger-bg text-danger' : 'bg-canvas-sunken text-ink-secondary'}`}>{required ? '必須' : '任意'}</span></div>
+    <div className="mb-2 flex items-center gap-2"><label htmlFor={inputId} className="text-sm font-semibold text-ink">{label}</label><span className={`rounded-pill px-2 py-1 text-nano font-semibold ${required ? 'bg-danger-bg text-danger' : 'bg-canvas-sunken text-ink-secondary'}`}>{required ? '必須' : '任意'}</span></div>
     {field}
     <p id={helpId} className="mt-2 text-xs leading-5 text-ink-secondary">{help}</p>
     {error && <p id={errorId} role="alert" className="mt-1 text-xs font-semibold text-danger">{error}</p>}

@@ -724,7 +724,7 @@
 .drawerTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 17px;
+  font-size: var(--text-lead);
   font-weight: 700;
 }
 

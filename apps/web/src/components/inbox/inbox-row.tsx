@@ -100,11 +100,11 @@ export default function InboxRow({ row }: Props) {
           <span className="truncate text-sm font-medium text-ink">
             {row.displayName || '(名前なし)'}
           </span>
-          <span className="rounded-pill bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-success">
+          <span className="rounded-pill bg-accent-soft px-2 py-0.5 text-nano font-medium text-success">
             {row.accountName}
           </span>
           {machineAfterIncoming && (
-            <span className="rounded-pill bg-info-bg px-2 py-0.5 text-[10px] font-medium text-info">
+            <span className="rounded-pill bg-info-bg px-2 py-0.5 text-nano font-medium text-info">
               auto 返答済
             </span>
           )}

@@ -383,7 +383,7 @@ function UserCommentsSection({ webinarId }: { webinarId: string }) {
           return (
             <Link key={c.id} href={`/chats?friend=${c.friendId}`} className="flex gap-3 rounded-card border border-divider-soft bg-canvas-sunken p-3 hover:border-info hover:bg-action-soft">
               <ParticipantAvatar name={name} pictureUrl={c.pictureUrl} />
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-ink">{name}</span><span className="text-[10px] text-ink-faint">{fmtSec(c.atSeconds)}</span></div><p className="mt-1 text-sm leading-6 text-ink-secondary">{c.body}</p></div>
+              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-ink">{name}</span><span className="text-nano text-ink-faint">{fmtSec(c.atSeconds)}</span></div><p className="mt-1 text-sm leading-6 text-ink-secondary">{c.body}</p></div>
             </Link>
           )
         })}
@@ -539,7 +539,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                 : operational?.staffIntegrationStatus === 'completed' || rate >= 90
                   ? '成功'
                   : '分析待ち'
-              return <div key={participant.friendId} className="grid gap-3 px-4 py-3 text-sm md:grid-cols-5 md:items-center"><div className="flex min-w-0 items-center gap-3"><ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} /><span className="truncate font-semibold">{name}</span></div><span className="text-ink-secondary">{state}{joinKindLabel(participant)}</span><span className="text-ink-secondary" title={operational?.errorDetail ?? undefined}>{action}</span><span className={`rounded-pill w-fit px-2 py-1 text-[11px] font-semibold ${status === '成功' ? 'bg-success-bg text-success' : status === 'エラー' ? 'bg-danger-bg text-danger' : 'bg-warning-bg text-warning'}`}>{status}</span><time className="text-ink-faint text-xs">{participant.latestJoinedAt ? compactDateTime(participant.latestJoinedAt).split(' ').at(-1) : '—'}</time></div>
+              return <div key={participant.friendId} className="grid gap-3 px-4 py-3 text-sm md:grid-cols-5 md:items-center"><div className="flex min-w-0 items-center gap-3"><ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} /><span className="truncate font-semibold">{name}</span></div><span className="text-ink-secondary">{state}{joinKindLabel(participant)}</span><span className="text-ink-secondary" title={operational?.errorDetail ?? undefined}>{action}</span><span className={`rounded-pill w-fit px-2 py-1 text-micro font-semibold ${status === '成功' ? 'bg-success-bg text-success' : status === 'エラー' ? 'bg-danger-bg text-danger' : 'bg-warning-bg text-warning'}`}>{status}</span><time className="text-ink-faint text-xs">{participant.latestJoinedAt ? compactDateTime(participant.latestJoinedAt).split(' ').at(-1) : '—'}</time></div>
             })}</div>
             {/* まだ続きがあるときだけ「次の頁」を出す。9人目以降もここから辿れる。 */}
             {participantsState === 'ready' && (nextCursor || moreError) ? (
@@ -801,7 +801,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
               <div key={stage.label} className="rounded-card border border-divider-soft bg-canvas-sunken p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-ink-secondary">{stage.label}</span>
-                  <span className="text-[11px] text-ink-faint">
+                  <span className="text-micro text-ink-faint">
                     {index === 0 ? '起点' : percent(stage.value, previous)}
                   </span>
                 </div>
@@ -842,7 +842,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
               <h3 className="font-bold text-ink">参加ファネル</h3>
               <p className="mt-1 text-xs text-ink-secondary">どこで人数が減っているか</p>
             </div>
-            <span className="rounded-pill bg-canvas-sunken px-2.5 py-1 text-[11px] font-medium text-ink-secondary">全期間</span>
+            <span className="rounded-pill bg-canvas-sunken px-2.5 py-1 text-micro font-medium text-ink-secondary">全期間</span>
           </div>
           <div className="mt-5 space-y-4">
             {funnel.map((stage) => (
@@ -862,11 +862,11 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           </div>
           <div className="mt-5 grid grid-cols-2 gap-3 border-t border-divider-soft pt-4">
             <div>
-              <div className="text-[11px] text-ink-secondary">15分以上視聴</div>
+              <div className="text-micro text-ink-secondary">15分以上視聴</div>
               <div className="mt-1 text-lg font-bold text-ink">{summary.watched15m}人</div>
             </div>
             <div>
-              <div className="text-[11px] text-ink-secondary">CTA → フォーム</div>
+              <div className="text-micro text-ink-secondary">CTA → フォーム</div>
               <div className="mt-1 text-lg font-bold text-ink">{percent(summary.formSubmissions, summary.ctaClicks)}</div>
             </div>
           </div>
@@ -878,7 +878,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
               <h3 className="font-bold text-ink">日別の参加ペース</h3>
               <p className="mt-1 text-xs text-ink-secondary">直近14日・日ごとのユニーク人数</p>
             </div>
-            <div className="flex flex-wrap gap-3 text-[11px] text-ink-secondary">
+            <div className="flex flex-wrap gap-3 text-micro text-ink-secondary">
               <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-pill bg-hairline" />予約</span>
               <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-pill bg-action" />参加</span>
               <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-pill bg-info" />CTA</span>
@@ -895,7 +895,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                   <div className="w-2 rounded-t-mini bg-action" style={{ height: `${Math.max(day.viewers > 0 ? 3 : 0, (day.viewers / maxDaily) * 100)}%` }} />
                   <div className="w-2 rounded-t-mini bg-info" style={{ height: `${Math.max(day.ctaClicks > 0 ? 3 : 0, (day.ctaClicks / maxDaily) * 100)}%` }} />
                   <div className="w-2 rounded-t-mini bg-success" style={{ height: `${Math.max(day.formSubmissions > 0 ? 3 : 0, (day.formSubmissions / maxDaily) * 100)}%` }} />
-                  <span className="absolute -bottom-6 whitespace-nowrap text-[10px] text-ink-faint">
+                  <span className="absolute -bottom-6 whitespace-nowrap text-nano text-ink-faint">
                     {formatDay(`${day.date}T00:00:00+09:00`)}
                   </span>
                 </div>
@@ -939,13 +939,13 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                             <ParticipantAvatar name={name} pictureUrl={p.pictureUrl} size="lg" />
                             <div className="min-w-0">
                               <div className="max-w-48 truncate font-semibold text-ink" title={name}>{name}</div>
-                              <div className="mt-0.5 text-[11px] text-ink-faint">{p.sessions > 1 ? `${p.sessions}回参加` : p.registered ? '予約から参加' : '直接参加'}</div>
+                              <div className="mt-0.5 text-micro text-ink-faint">{p.sessions > 1 ? `${p.sessions}回参加` : p.registered ? '予約から参加' : '直接参加'}</div>
                             </div>
                           </div>
                         </Td>
                         <Td className="text-xs text-ink-secondary">{compactDateTime(p.latestJoinedAt)}</Td>
                         <Td>
-                          <div className="flex items-center justify-between text-[11px] text-ink-secondary">
+                          <div className="flex items-center justify-between text-micro text-ink-secondary">
                             <span>{fmtSec(p.maxWatchedSeconds)}</span><span>{watchedRate}%</span>
                           </div>
                           <div className="mt-1.5 h-1.5 overflow-hidden rounded-pill bg-canvas-sunken">
@@ -955,11 +955,11 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                         <Td>
                           <div className="flex flex-wrap gap-1.5">
                             {p.formSubmittedAt ? (
-                              <span className="rounded-pill bg-success-bg px-2 py-1 text-[10px] font-semibold text-success">フォーム送信</span>
+                              <span className="rounded-pill bg-success-bg px-2 py-1 text-nano font-semibold text-success">フォーム送信</span>
                             ) : p.ctaClickedAt ? (
-                              <span className="rounded-pill bg-info-bg px-2 py-1 text-[10px] font-semibold text-info">CTAクリック</span>
+                              <span className="rounded-pill bg-info-bg px-2 py-1 text-nano font-semibold text-info">CTAクリック</span>
                             ) : (
-                              <span className="rounded-pill bg-canvas-sunken px-2 py-1 text-[10px] font-medium text-ink-secondary">視聴のみ</span>
+                              <span className="rounded-pill bg-canvas-sunken px-2 py-1 text-nano font-medium text-ink-secondary">視聴のみ</span>
                             )}
                           </div>
                         </Td>
@@ -980,7 +980,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                     <ParticipantAvatar name={name} pictureUrl={p.pictureUrl} size="lg" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold text-ink">{name}</div>
-                      <div className="mt-1 text-[11px] text-ink-secondary">{compactDateTime(p.latestJoinedAt)} · {fmtSec(p.maxWatchedSeconds)}視聴</div>
+                      <div className="mt-1 text-micro text-ink-secondary">{compactDateTime(p.latestJoinedAt)} · {fmtSec(p.maxWatchedSeconds)}視聴</div>
                     </div>
                     <span className={`h-2.5 w-2.5 rounded-pill ${p.formSubmittedAt ? 'bg-success' : p.ctaClickedAt ? 'bg-info' : 'bg-hairline'}`} />
                   </Link>

@@ -135,7 +135,7 @@ export default function BlockEditor({
           <span className="bg-accent-deep text-on-accent rounded-control inline-block px-2 py-0.5 text-xs font-medium tabular-nums">
             {index + 1}
           </span>
-          <span className="text-ink-faint mt-1 block text-[11px] leading-tight whitespace-nowrap">
+          <span className="text-ink-faint mt-1 block text-micro leading-tight whitespace-nowrap">
             {blockTypeLabel(block)}
           </span>
         </div>

@@ -25,7 +25,7 @@ function Label({ text, required, theme }: { text: string; required?: boolean; th
     <p className="text-sm font-medium" style={{ color: theme.text }}>
       {text || '（タイトル未設定）'}
       {required && (
-        <span className="bg-danger-bg text-danger rounded-pill ml-1.5 px-1.5 py-0.5 text-[10px]">
+        <span className="bg-danger-bg text-danger rounded-pill ml-1.5 px-1.5 py-0.5 text-nano">
           必須
         </span>
       )}
@@ -76,7 +76,7 @@ function PreviewImage({ block }: { block: FormBlock & { kind: 'image' } }) {
   return (
     <div>
       {status === 'loading' && (
-        <p className="text-ink-faint mb-1 text-center text-[11px]">画像を読み込んでいます</p>
+        <p className="text-ink-faint mb-1 text-center text-micro">画像を読み込んでいます</p>
       )}
       {/* 外部URLをそのまま出すため next/image は使わない（プレビュー用途） */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -138,7 +138,7 @@ function PreviewBlock({ block, theme }: { block: FormBlock; theme: FormTheme }) 
     <div>
       <Label text={block.label} required={block.required} theme={theme} />
       {block.description && (
-        <p className="text-ink-faint mt-0.5 text-[11px]">{block.description}</p>
+        <p className="text-ink-faint mt-0.5 text-micro">{block.description}</p>
       )}
 
       {block.type === 'textarea' && <Box>{block.placeholder}</Box>}
@@ -179,7 +179,7 @@ function PreviewBlock({ block, theme }: { block: FormBlock; theme: FormTheme }) 
                 />
                 {choice.label}
                 {choice.isOther && (
-                  <span className="border-hairline bg-canvas text-ink-faint inline-block w-16 border-b text-[10px] leading-4">
+                  <span className="border-hairline bg-canvas text-ink-faint inline-block w-16 border-b text-nano leading-4">
                     自由記入
                   </span>
                 )}

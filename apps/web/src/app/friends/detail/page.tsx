@@ -429,7 +429,7 @@ function SupportMarkBadge({ status }: { status?: 'unread' | 'in_progress' | 'on_
   } as const
   const s = map[status]
   return (
-    <span className={`rounded-pill px-2 py-0.5 text-[11px] font-medium ${s.className}`}>
+    <span className={`rounded-pill px-2 py-0.5 text-micro font-medium ${s.className}`}>
       {s.label}
     </span>
   )
@@ -1589,7 +1589,7 @@ function FriendDetailInner() {
                   ) : (
                     <span className="text-ink-faint text-xs">タグはありません</span>
                   )}
-                  <Button variant="secondary" className="text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] h-auto whitespace-normal" href={inboxHrefForFriend(friendId)}>
+                  <Button variant="secondary" className="text-ink-secondary rounded-pill px-2 py-0.5 text-micro h-auto whitespace-normal" href={inboxHrefForFriend(friendId)}>
                     ＋ 追加
                   </Button>
                 </div>
@@ -2116,7 +2116,7 @@ function FriendDetailInner() {
                             {FIELD_TYPE_LABELS[field.type] ?? field.type}
                           </span>
                           {field.isPersonal && (
-                            <span className="bg-warning-bg text-warning rounded-pill ml-1.5 px-1.5 py-0.5 text-[10px]">
+                            <span className="bg-warning-bg text-warning rounded-pill ml-1.5 px-1.5 py-0.5 text-nano">
                               個人情報
                             </span>
                           )}

@@ -175,7 +175,7 @@ export default function SavedViewDialog({
                   検索名 <span className="text-ink-faint font-normal">（必須）</span>
                 </label>
                 {/* 残りではなく「11 / 40文字」。上限が何文字かが分かる。 */}
-                <span className="text-ink-faint text-[11px] tabular-nums">{name.length} / {NAME_LIMIT}文字</span>
+                <span className="text-ink-faint text-micro tabular-nums">{name.length} / {NAME_LIMIT}文字</span>
               </div>
               <input
                 id="saved-view-name"

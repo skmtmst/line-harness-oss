@@ -161,7 +161,7 @@ function TodayTaskCard({
         {period ? <span className="text-ink-faint whitespace-nowrap text-xs font-normal">{period}</span> : null}
       </div>
       <div className="mt-2 flex min-w-0 items-baseline gap-2">
-        <p className="text-ink text-[28px] leading-none font-bold tabular-nums" aria-busy={loading || undefined}>
+        <p className="text-ink text-hero leading-none font-bold tabular-nums" aria-busy={loading || undefined}>
           {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
           <DelayedSkeleton
             loading={loading}
@@ -293,7 +293,7 @@ function FriendAddLinkCard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex min-w-[220px] items-center gap-2">
-            <span className="text-ink-faint shrink-0 text-[10px] font-medium">発行中</span>
+            <span className="text-ink-faint shrink-0 text-nano font-medium">発行中</span>
             <Select
               value={routeId}
               onChange={(value) => setRouteId(value)}
@@ -442,7 +442,7 @@ function LiveDataCard({
         <div className="flex min-w-0 items-center gap-1">
           <h2 className="text-ink min-w-0 truncate text-sm font-semibold" title={title}>{title}</h2>
           {help ? <HelpTip label={`${title}の説明`}>{help}</HelpTip> : null}
-          {period ? <span className="text-ink-faint shrink-0 text-[11px] font-normal whitespace-nowrap">{period}</span> : null}
+          {period ? <span className="text-ink-faint shrink-0 text-micro font-normal whitespace-nowrap">{period}</span> : null}
         </div>
         {/*
           行き先リンクは CardHeader の action（actionTone="info"）と
@@ -621,7 +621,7 @@ function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, upda
     <div className="flex items-baseline justify-between gap-3">
       <h2 className="text-ink min-w-0 truncate text-base font-bold" title="接続状態">接続状態</h2>
       {/* 現在時点の状態（IDEA-01）。 */}
-      <span className="text-ink-faint flex-1 whitespace-nowrap text-[11px] font-normal">現在</span>
+      <span className="text-ink-faint flex-1 whitespace-nowrap text-micro font-normal">現在</span>
       {dashboardLocalUpdatedAt(updatedAt) ? (
         <span className="text-ink-faint shrink-0 text-xs font-medium">{dashboardLocalUpdatedAt(updatedAt)}</span>
       ) : null}

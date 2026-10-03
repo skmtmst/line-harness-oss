@@ -1079,7 +1079,7 @@ function FormSubmissionsPageV7() {
               回答データやURLは変わりませんが、回答者に表示されるフォーム名も変わります。
             </p>
             <p className="mt-1 text-xs text-ink-faint">推奨：サービス名｜目的（対象・導線）</p>
-            <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-ink-faint">
+            <div className="mt-3 flex flex-wrap gap-1.5 text-micro text-ink-faint">
               <span className="rounded-mini bg-shell px-2 py-1">質問 {editingForm.fields.length}項目</span>
               {editingForm.usedByAccounts.map((account) => (
                 <span key={account.id} className="rounded-mini bg-shell px-2 py-1">

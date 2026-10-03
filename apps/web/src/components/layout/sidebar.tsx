@@ -651,12 +651,12 @@ export default function Sidebar({
         </div>
       ) : preview ? (
         <div className={`px-[13px] pb-[9px] pt-[18px] ${styles.collapseHide}`}>
-          <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
+          <p className="mb-[11px] text-caption font-normal text-ink-faint">現在のLINEアカウント</p>
           <div className="flex h-[66px] items-center rounded-card border border-hairline bg-canvas px-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-[14px] font-semibold text-accent-deep">サ</div>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-body font-semibold text-accent-deep">サ</div>
             <div className="ml-3 min-w-0 flex-1">
               {/* デザイン確認用の見本。特定の利用者の名前は書かない。 */}
-              <p className="truncate text-[14px] font-semibold text-ink">サンプルアカウント</p>
+              <p className="truncate text-body font-semibold text-ink">サンプルアカウント</p>
               <p className="mt-0.5 truncate text-micro text-ink-faint">コミュニケーション</p>
             </div>
           </div>
@@ -745,7 +745,7 @@ export default function Sidebar({
                     なって一覧の中でそこだけ浮き、目が先にそこへ行く。
                     印は「いまここ」を示せれば足りる。
                   */
-                  className={`${styles.item} ${attrV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} border border-transparent text-[13px]` : ''} ${
+                  className={`${styles.item} ${attrV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} border border-transparent text-label` : ''} ${
                     active
                       ? isDanger
                         ? `${styles.active} ${styles.danger}`

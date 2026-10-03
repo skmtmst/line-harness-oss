@@ -154,7 +154,7 @@ function StickerMessageImage({ content }: { content: string }) {
           <button
             type="button"
             onClick={() => { setFailed(false); setRetryKey((key) => key + 1) }}
-            className="text-action text-[11px] font-semibold underline underline-offset-2"
+            className="text-action text-micro font-semibold underline underline-offset-2"
           >
             画像を読み込み直す
           </button>
@@ -2458,7 +2458,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         名前だけだと、`未対応・期限超過` と `河野担当の未対応` の
                         どちらを押せばいいのかが、名前の付け方頼みになる。
                       */}
-                      <span className="text-ink-faint mt-0.5 block truncate text-[11px] font-normal">
+                      <span className="text-ink-faint mt-0.5 block truncate text-micro font-normal">
                         {savedViewSummary(normalizeSavedViewConditions(view.conditions), operatorNames)}
                       </span>
                     </button>
@@ -2618,7 +2618,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
               プルダウンが自分で名乗るため、外の字は置かない。
             */}
-            <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-ink-secondary">
+            <label className="mt-2 flex items-center gap-2 text-micro font-semibold text-ink-secondary">
               <span className="min-w-0 flex-1">
                 {/*
                   未読数は集計の口から渡す。**画面に見えている行から数えない**
@@ -2645,7 +2645,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   aria-label={item.label}
                   title={item.label}
                   aria-pressed={channel === item.key}
-                  className={`inline-flex shrink-0 items-center justify-center rounded-mini px-1.5 py-1.5 text-[11px] font-semibold whitespace-nowrap ${channel === item.key ? 'bg-accent-soft text-accent-deep' : 'text-ink hover:bg-shell'}`}
+                  className={`inline-flex shrink-0 items-center justify-center rounded-mini px-1.5 py-1.5 text-micro font-semibold whitespace-nowrap ${channel === item.key ? 'bg-accent-soft text-accent-deep' : 'text-ink hover:bg-shell'}`}
                 >
                   {item.key === 'line' && <ChannelBadge channel="line" />}
                   {item.key === 'email' && <ChannelBadge channel="email" />}
@@ -2654,7 +2654,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               ))}
               <span
                 data-inbox-sort="fixed"
-                className="text-ink-secondary ml-auto shrink-0 text-[11px] font-semibold whitespace-nowrap"
+                className="text-ink-secondary ml-auto shrink-0 text-micro font-semibold whitespace-nowrap"
               >
                 並び順：未読が先・新しい順
               </span>
@@ -3256,13 +3256,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         <div key={msg.id}>
                           {showDateSep && (
                             <div className="my-3 flex justify-center">
-                              <span className="bg-ink/20 text-on-accent/85 rounded-pill px-2.5 py-0.5 text-[11px]">
+                              <span className="bg-ink/20 text-on-accent/85 rounded-pill px-2.5 py-0.5 text-micro">
                                 {formatYmdSlash(msg.createdAt)}
                               </span>
                             </div>
                           )}
                           <div className="my-2 flex items-center justify-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 rounded-pill bg-canvas/90 px-3 py-1 text-[11px] font-semibold text-action shadow-card">
+                            <span className="inline-flex items-center gap-1 rounded-pill bg-canvas/90 px-3 py-1 text-micro font-semibold text-action shadow-card">
                               <Link2 aria-hidden="true" size={13} />
                               シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始
                             </span>
@@ -3276,7 +3276,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <div key={msg.id}>
                         {showDateSep && (
                           <div className="flex justify-center my-3">
-                            <span className="text-[11px] text-on-accent/85 bg-ink/20 px-2.5 py-0.5 rounded-pill">
+                            <span className="text-micro text-on-accent/85 bg-ink/20 px-2.5 py-0.5 rounded-pill">
                               {formatYmdSlash(msg.createdAt)}
                             </span>
                           </div>
@@ -3357,14 +3357,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                 />
                               ) : (
                                 <div
-                                  className="border-canvas flex h-9 w-9 items-center justify-center rounded-pill border-2 bg-accent-soft text-[12px] font-bold text-accent-deep"
+                                  className="border-canvas flex h-9 w-9 items-center justify-center rounded-pill border-2 bg-accent-soft text-caption font-bold text-accent-deep"
                                   title={selectedAccount?.displayName ?? selectedAccount?.name ?? '送信アカウント'}
                                 >
                                   {(selectedAccount?.displayName ?? selectedAccount?.name ?? '送').charAt(0)}
                                 </div>
                               )}
                               <div
-                                className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-pill border px-2 py-0.5 text-[10px] font-semibold shadow-card"
+                                className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-pill border px-2 py-0.5 text-nano font-semibold shadow-card"
                                 title={msg.sentByStaffName ?? '担当者情報なし'}
                               >
                                 <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-pill text-micro font-medium">
@@ -3935,10 +3935,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <div className="flex-1 overflow-y-auto divide-y divide-hairline">
                       <section className="flex flex-col items-center px-5 py-5 text-center">
                         <div className="bg-canvas-sunken border-hairline flex h-14 w-14 items-center justify-center rounded-pill border">
-                          <span className="text-ink-secondary text-[11px] font-bold">MAIL</span>
+                          <span className="text-ink-secondary text-micro font-bold">MAIL</span>
                         </div>
                         <p className="text-ink mt-2 max-w-full truncate text-sm font-bold">{mail?.customerName ?? '—'}</p>
-                        <p className="text-ink-faint mt-0.5 max-w-full break-all text-[11px]">
+                        <p className="text-ink-faint mt-0.5 max-w-full break-all text-micro">
                           {mail?.customerIdentifier ?? 'メールアドレス未登録'}
                         </p>
                       </section>

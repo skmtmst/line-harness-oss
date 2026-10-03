@@ -732,7 +732,7 @@ export default function EditDialog({
             <div className={page ? 'grid items-start gap-3 xl:grid-cols-4' : ''}>
             <label className={page ? 'block xl:col-span-2' : 'mb-3 block'}>
               <span className="text-ink-secondary text-xs">自動応答名</span>
-              <span className="text-ink-faint block text-[11px]">
+              <span className="text-ink-faint block text-micro">
                 {page
                   ? '一覧に出る名前です。友だちには見えません。'
                   : '一覧に出る名前です。友だちには見えません。空にすると、キーワードが名前の代わりに出ます。'}
@@ -988,7 +988,7 @@ export default function EditDialog({
                 </button>
               ))}
             </div>
-            <p className="text-ink-faint mb-3 text-[11px] leading-relaxed">
+            <p className="text-ink-faint mb-3 text-micro leading-relaxed">
               「すべて」は絞り込みに使います。「予約」と「キャンセル」の両方が入った文にだけ
               返す、という形です。片方だけの問い合わせには返しません。
             </p>
@@ -1087,13 +1087,13 @@ export default function EditDialog({
                   )
                 })}
               </div>
-              <p className="text-ink-faint mt-1 text-[11px]">
+              <p className="text-ink-faint mt-1 text-micro">
                 {weekdays.length === 0
                   ? 'すべての曜日で応答します。'
                   : `${weekdays.map((d) => WEEKDAY_LABELS[d]).join('・')}曜だけ応答します。`}
               </p>
               {weekdayNotice ? (
-                <p role="status" className="text-ink-secondary mt-1 text-[11px]">
+                <p role="status" className="text-ink-secondary mt-1 text-micro">
                   {weekdayNotice}
                 </p>
               ) : null}
@@ -1157,7 +1157,7 @@ export default function EditDialog({
                 </div>
               </div>}
             </div>
-            <p className="text-ink-faint text-[11px] leading-relaxed">
+            <p className="text-ink-faint text-micro leading-relaxed">
               時間帯を空にすると、いつでも返します。22:00〜06:00 のように日をまたぐ指定もできます
               （開始を含み、終了は含みません）。<br />
               「連投を防ぐ」は、その相手へ自動応答を返してからこの分数のあいだ、どのルールでも返さない設定です。
@@ -1187,7 +1187,7 @@ export default function EditDialog({
                   )
                 })}
               </div>
-              <p className="text-ink-faint mt-1 text-[11px]">
+              <p className="text-ink-faint mt-1 text-micro">
                 すべて選んだ状態と、1つも選ばない状態は同じ意味です（種別で絞りません）。
               </p>
             </div>}
