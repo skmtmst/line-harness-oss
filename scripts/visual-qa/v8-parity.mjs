@@ -194,6 +194,13 @@ export function refTexts(html) {
 export const normalize = (text) => text.replace(/\s+/g, ' ').trim()
 
 /**
+ * MEASURE_SCRIPT を呼ぶ形。`page.evaluate(文字列)` は文字列を式として
+ * 評価するだけで、関数式のまま渡すと関数の値が返って呼ばれない
+ * （関数は送れないので `measured` が `undefined` になる）。
+ */
+export const MEASURE_CALL = `(${MEASURE_SCRIPT})()`
+
+/**
  * 1つの URL を開いて数え、撮る（ブラウザは呼び出し元が使い回す）。
  * 戻りは { measured, shotBuffer }。開けないときは throw。
  */
@@ -207,7 +214,7 @@ export async function shootUrl(browser, base, route, width) {
     }
     // 遅れて出る中身（表・数）を待つ。
     await page.waitForTimeout(1500)
-    const measured = await page.evaluate(MEASURE_SCRIPT)
+    const measured = await page.evaluate(MEASURE_CALL)
     const shotBuffer = await page.screenshot({ fullPage: true })
     return { measured, shotBuffer, url }
   } finally {
@@ -238,13 +245,21 @@ export function compareAndWrite({ board, route, width, url, refPng, refHtml, mea
   writeFileSync(join(outDir, 'side-by-side.png'), encodePng(sideBySide(scaleDown(refImage, 480), scaleDown(implImage, 480))))
   writeFileSync(join(outDir, 'diff.png'), encodePng(annotate(implImage, implBoxes)))
 
+  // 測れなかったときも落とさない（evaluate の失敗・測る前の画像だけの実行）。
+  const keys = measured?.keys ?? []
+  const overflows = measured?.overflows ?? []
+  const viewportOverflows = measured?.viewportOverflows ?? []
+  const midWordBreaks = measured?.midWordBreaks ?? []
+  const tableMisalignments = measured?.tableMisalignments ?? []
+  const fontIssues = measured?.fontIssues ?? []
+
   let refCount = 0
   let missingInImpl = []
   let extraInImpl = []
   if (refHtml) {
     const refs = refTexts(readFileSync(refHtml, 'utf8'))
     refCount = refs.size
-    const implTexts = new Set(measured.keys.map((key) => normalize(key.text)))
+    const implTexts = new Set(keys.map((key) => normalize(key.text)))
     // 見本の文字のうち、実装の主な要素に無いもの（部分一致も許す）。
     missingInImpl = [...refs].filter((text) => {
       const norm = normalize(text)
@@ -259,11 +274,11 @@ export function compareAndWrite({ board, route, width, url, refPng, refHtml, mea
 
   // 目安の点数（大きいほどずれている）。重みは仮決め。
   const drift =
-    measured.overflows.length * 10 +
-    measured.viewportOverflows.length * 10 +
-    measured.midWordBreaks.length * 5 +
-    measured.tableMisalignments.length * 8 +
-    measured.fontIssues.length * 2 +
+    overflows.length * 10 +
+    viewportOverflows.length * 10 +
+    midWordBreaks.length * 5 +
+    tableMisalignments.length * 8 +
+    fontIssues.length * 2 +
     missingInImpl.length * 3 +
     Math.round(fraction * 200)
 
@@ -277,18 +292,18 @@ export function compareAndWrite({ board, route, width, url, refPng, refHtml, mea
     drift,
     pixelDiffFraction: Number(fraction.toFixed(4)),
     diffBoxes: boxes.length,
-    overflows: measured.overflows,
-    viewportOverflows: measured.viewportOverflows,
-    midWordBreaks: measured.midWordBreaks,
-    tableMisalignments: measured.tableMisalignments,
-    fontIssues: measured.fontIssues,
+    overflows,
+    viewportOverflows,
+    midWordBreaks,
+    tableMisalignments,
+    fontIssues,
     refTexts: refCount,
     missingInImpl,
     extraInImpl,
-    keyElements: measured.keys.length,
+    keyElements: keys.length,
   }
   writeFileSync(join(outDir, 'metrics.json'), `${JSON.stringify(metrics, null, 2)}\n`)
-  console.log(`[v8-parity] ${board} ${width}px drift=${drift} 差=${(fraction * 100).toFixed(1)}% はみ出し=${measured.overflows.length} 右端越え=${measured.viewportOverflows.length} 途中改行=${measured.midWordBreaks.length} 列表れ=${measured.tableMisalignments.length} 書体=${measured.fontIssues.length} → ${outDir}`)
+  console.log(`[v8-parity] ${board} ${width}px drift=${drift} 差=${(fraction * 100).toFixed(1)}% はみ出し=${overflows.length} 右端越え=${viewportOverflows.length} 途中改行=${midWordBreaks.length} 列表れ=${tableMisalignments.length} 書体=${fontIssues.length} → ${outDir}`)
   return metrics
 }
 
