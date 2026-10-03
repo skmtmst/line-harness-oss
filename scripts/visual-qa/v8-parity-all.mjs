@@ -27,6 +27,7 @@ import {
   HERE,
   VISUAL_QA_BASE,
   compareAndWrite,
+  isNoStateBoard,
   loadMap,
   refPaths,
   resolveTarget,
@@ -137,24 +138,38 @@ for (const target of runTargets) {
   results.push({ ...target, metrics })
 }
 
-results.sort((a, b) => b.metrics.drift - a.metrics.drift)
+// 状態を開けない板（ダイアログ・確認・引き出し）は元の画面だけでは
+// その状態が出ないので、drift の順位に入れず別の表に分ける。
+const noStateBoards = results.filter((result) => isNoStateBoard(result.entry))
+const ranked = results.filter((result) => !isNoStateBoard(result.entry))
+ranked.sort((a, b) => b.metrics.drift - a.metrics.drift)
+
+const rowOf = (result, rank) => {
+  const m = result.metrics
+  return `| ${rank} | ${result.board} | ${result.entry.name} | ${result.width} | ${m.drift} | ${(m.pixelDiffFraction * 100).toFixed(1)}% | ${m.overflows.length} | ${m.viewportOverflows.length} | ${m.midWordBreaks.length} | ${m.tableMisalignments.length} | ${m.fontIssues.length} | ${m.missingInImpl.length} |`
+}
 
 const lines = []
 lines.push('# V8 見本比較（一括・報告だけ・落とさない）')
 lines.push('')
-lines.push(`対象 ${runTargets.length} 板・撮影できた ${results.length} 板・できなかった ${failures.length} 件・対象外 ${skipped.length} 板。`)
+lines.push(`対象 ${runTargets.length} 板・撮影できた ${results.length} 板（順位 ${ranked.length}・状態を開けない板 ${noStateBoards.length}）・できなかった ${failures.length} 件・対象外 ${skipped.length} 板。`)
 lines.push('`drift` は目安の点数（大きいほどずれている。重みは仮決め）。画素の差は幅・DPR を縮めて比べた粗い目安。')
 lines.push('')
 lines.push('| 順位 | 板 | 画面 | 幅 | drift | 画素の差 | はみ出し | 右端越え | 途中改行 | 列表れ | 書体 | 見本の文字不足 |')
 lines.push('|---|---|---|---|---|---|---|---|---|---|---|---|')
-results.forEach((result, index) => {
-  const m = result.metrics
-  lines.push(
-    `| ${index + 1} | ${result.board} | ${result.entry.name} | ${result.width} | ${m.drift} | ${(m.pixelDiffFraction * 100).toFixed(1)}% | ${m.overflows.length} | ${m.viewportOverflows.length} | ${m.midWordBreaks.length} | ${m.tableMisalignments.length} | ${m.fontIssues.length} | ${m.missingInImpl.length} |`,
-  )
+ranked.forEach((result, index) => {
+  lines.push(rowOf(result, index + 1))
 })
 lines.push('')
-for (const result of results.slice(0, 30)) {
+lines.push('## 状態を開けない板（元の画面だけでは状態が出ない・順位外）')
+lines.push('')
+lines.push('| 順位 | 板 | 画面 | 幅 | drift | 画素の差 | はみ出し | 右端越え | 途中改行 | 列表れ | 書体 | 見本の文字不足 |')
+lines.push('|---|---|---|---|---|---|---|---|---|---|---|---|')
+for (const result of noStateBoards) {
+  lines.push(rowOf(result, '—'))
+}
+lines.push('')
+for (const result of ranked.slice(0, 30)) {
   const m = result.metrics
   lines.push(`## ${result.board} ${result.entry.name}（drift ${m.drift}）`)
   lines.push('')
