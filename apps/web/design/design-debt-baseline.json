@@ -276,8 +276,47 @@
     "direct-th": 3,
     "unresolved-classname": 2
   },
+  "app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx": {
+    "unresolved-classname": 60
+  },
+  "app/mileage/earning-rules/new/v8-earning-rule-new.tsx": {
+    "unresolved-classname": 83
+  },
+  "app/mileage/friends/detail/v8-friend-detail.tsx": {
+    "unresolved-classname": 67,
+    "direct-th": 7
+  },
+  "app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx": {
+    "unresolved-classname": 51
+  },
+  "app/mileage/mileage-v8.tsx": {
+    "unresolved-classname": 9
+  },
   "app/mileage/page.tsx": {
     "arbitrary-value": 7
+  },
+  "app/mileage/rewards/edit/v8-reward-edit.tsx": {
+    "unresolved-classname": 54
+  },
+  "app/mileage/v8-balances-tab.tsx": {
+    "unresolved-classname": 73,
+    "direct-th": 7
+  },
+  "app/mileage/v8-earning-rules-tab.tsx": {
+    "unresolved-classname": 73,
+    "direct-th": 7
+  },
+  "app/mileage/v8-history-tab.tsx": {
+    "unresolved-classname": 61,
+    "direct-th": 6
+  },
+  "app/mileage/v8-rewards-tab.tsx": {
+    "unresolved-classname": 87,
+    "direct-th": 12
+  },
+  "app/mileage/v8-score-tab.tsx": {
+    "unresolved-classname": 131,
+    "direct-th": 14
   },
   "app/nen-campaigns/columns/new/page.tsx": {
     "unresolved-classname": 36
