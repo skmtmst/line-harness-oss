@@ -110,7 +110,8 @@ export default function TwoFactorLoginPage() {
         : error ? <Notice tone="danger" message={error} id="two-factor-error" className="mt-5" /> : null}
       <p id="two-factor-code-label" className="mt-6 block text-xs font-semibold text-ink">認証コード</p>
       {/* ★V7 共通 認証コード入力（xHzFK）。貼り付け・自動入力も6マスへ振り分ける。 */}
-      <div className="mt-2 flex justify-center">
+      {/* V8-B `tOPeY`「6桁の確認」：6マスへの入力がこの板の中身。 */}
+      <div className="mt-2 flex justify-center" data-design-node="tOPeY">
         <OtpInput
           key={attempt}
           value={code}

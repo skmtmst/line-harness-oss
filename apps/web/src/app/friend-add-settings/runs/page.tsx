@@ -9,7 +9,9 @@ import type {
   FriendAddEventRoutingStatus,
 } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, type FriendAddRunList } from '@/lib/api'
+import FriendAddRunsV8 from './runs-v8'
 import { describeFriendAddFailure } from '../friend-add-failure'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { csvCell } from './csv'
@@ -615,7 +617,15 @@ export default function FriendAddRunsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <FriendAddRunsInner />
+      <FriendAddRunsSwitch />
     </Suspense>
   )
+}
+
+function FriendAddRunsSwitch() {
+  /*
+   * ★V8 分岐：実行結果（板 `REIxB`）を `data-theme="v8"` の下で積み替える。
+   */
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <FriendAddRunsV8 /> : <FriendAddRunsInner />
 }

@@ -1,7 +1,8 @@
 'use client'
 
 /*
- * ★V8 一斉配信の詳細（絵 `cgiGB` 下書き・`pNiUk` 承認待ち・`F3X1Mo` 送信済み）。
+ * ★V8 一斉配信の詳細（絵 `cgiGB` 下書き・`pNiUk` 承認待ち・`F3X1Mo` 送信済み。
+ * 再撮の板 `dK1aE`（下書き）・`wfHIE`（承認待ち）・`tPm3e`（送った後）は同じ画面の状態として外枠に付ける）。
  *
  * v7 の詳細（detail/page.tsx）とは置き場が違うだけで、読む口・操作の中身は
  * 同じものを受け取る。並びは 見出し（題＋札＋1行説明＋操作）→ 進みの帯
@@ -11,7 +12,7 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, Copy, Download, MoreHorizontal, Trash2 } from 'lucide-react'
+import { Check, Copy, Download, MoreHorizontal, RefreshCw, Trash2 } from 'lucide-react'
 import {
   api,
   type ApiBroadcast,
@@ -91,6 +92,12 @@ export interface BroadcastDetailV8Props {
   onExportCsv: () => void
   /** 集計の取り直し・状態の読み直し（reloadToken を進める）。 */
   onReload: () => void
+  /**
+   * ★V8 `Q28Gb`：ほかの人が更新したときだけ true。この画面は書き換えず、
+   * 帯で知らせて読み直しだけ受け付ける。名前・時刻は API に無いので出さない。
+   */
+  conflict?: boolean
+  onConflictReload?: () => void
   /** 閲覧のみ（夕18）：変える操作は押せない形にする。 */
   canEdit: boolean
   contentRef: React.RefObject<HTMLElement | null>
@@ -128,6 +135,8 @@ export default function BroadcastDetailV8({
   canEdit,
   contentRef,
   approval,
+  conflict = false,
+  onConflictReload,
 }: BroadcastDetailV8Props) {
   const router = useRouter()
   const { status: displayStatus, label: statusLabel } = displayStatusOf(broadcast)
@@ -221,7 +230,7 @@ export default function BroadcastDetailV8({
   const bubbleCount = broadcast.messageBubbles?.length ?? (broadcast.messageContent ? 1 : 0)
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node="dK1aE wfHIE tPm3e">
       {/* 見出し：題＋状態の札＋1行の説明＋進みの帯。右に操作。 */}
       <header className={styles.header}>
         <div className={styles.headerMain}>
@@ -281,6 +290,21 @@ export default function BroadcastDetailV8({
           )}
         </div>
       </header>
+
+      {conflict && (
+        <div className={styles.conflictBar} data-design-node="Q28Gb" role="alert">
+          <div>
+            <p className={styles.conflictTitle}>ほかの人がこの配信を更新しました</p>
+            <p className={styles.conflictBody}>
+              この画面は古い内容です。読み直すと最新の設定と見本が出ます（この画面では書き換えません）。
+            </p>
+          </div>
+          <Button size="field" variant="primary" onClick={onConflictReload}>
+            <RefreshCw size={14} aria-hidden="true" />
+            読み直す
+          </Button>
+        </div>
+      )}
 
       <Tabs
         label="配信の詳細"

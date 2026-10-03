@@ -155,4 +155,24 @@
 [data-theme='v8'] .box {
   border-color: var(--color-control-border);
 }
+
+/*
+ * ★V8 仕上げ（M10-2）：箱の乗せた・押した動き。
+ * 乗せたときは選んでいない箱だけ地を少し沈め、押したときは
+ * ほんの少し縮む。印の一筆描き・消え方は今までどおり。
+ */
+[data-theme='v8'] .box {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    scale var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .line:hover .input:not(:checked, :indeterminate) + .box {
+  background: var(--color-canvas-sunken);
+}
+
+[data-theme='v8'] .line:active .box {
+  scale: 0.92;
+}
 }

@@ -11,6 +11,9 @@
  * - 行の「申請中」の札：承認と品目を結ぶ口が無いので出さない。要承認の数は
  *   帯に出す。承認側に結びができたら札を付ける。
  * - 下書きの「削除」：「…」の決まりに書いてあるが、削除の口が無いので出さない。
+ * - 板 `NkmwU`（追加・変更）：見本は窓だが、共通の窓部品への置き換えは
+ *   仕上げ係 M10 の範囲なので、今の作りの枠のまま外枠に印だけ付ける。
+ *   価格の開始日・承認への申請文言は今の口の範囲で出さない。
  * v7 を直す必要が出たら向こうも同じ判断を入れる（V8 完成までの二重管理）。
  */
 import { FormEvent, useState } from 'react'
@@ -112,6 +115,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
       </div>
       <p className={styles.legend}>「…」の中身：有効＝変更・停止／保管済み＝変更・再開／一度も公開していない下書き＝変更・削除</p>
       {showForm ? (
+        <div data-design-node="NkmwU">
         <Panel title="新しいメニュー">
           <form onSubmit={submit} className={styles.formGrid}>
             <label className={styles.field}>種類
@@ -134,8 +138,10 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
             </div>
           </form>
         </Panel>
+        </div>
       ) : null}
       {editing ? (
+        <div data-design-node="NkmwU">
         <Panel title={`${editing.name}を変更`}>
           <form key={editing.id} onSubmit={(event) => void submitEdit(event)} className={styles.formGrid}>
             <label className={styles.field}>種類
@@ -165,12 +171,14 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
             </div>
           </form>
         </Panel>
+        </div>
       ) : null}
       <ConfirmDialog
         open={Boolean(stopping)}
         title="このメニューを停止しますか？"
         description="メニューは保管され、予約履歴の参照は残ります。後で再開できます。"
         confirmLabel="停止する"
+        designNode="MV5Os"
         busy={busy}
         onCancel={() => setStopId('')}
         onConfirm={() => { if (stopping) stop(stopping) }}

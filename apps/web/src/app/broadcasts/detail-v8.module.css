@@ -454,6 +454,32 @@
   margin-top: 8px;
 }
 
+/* 競合の帯（`Q28Gb`）：ほかの人の更新を知らせる。書き換えはしない。 */
+.conflictBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-warning-bg);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-warning-bg);
+}
+
+.conflictTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.conflictBody {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
 /* 注意の地（送る前に確かめること）。 */
 .warnCard {
   padding: 16px 20px;
