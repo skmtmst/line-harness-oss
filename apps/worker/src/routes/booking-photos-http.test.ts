@@ -291,6 +291,34 @@ describe('予約の写真（メニュー・スタッフ・お店に1枚ずつ）
     expect(usages('photo-a1')).toEqual([{ ref_kind: 'booking_menu', ref_id: id }]);
   });
 
+  test('長いR2キーの写真も走査で見つかり、削除が止まる（#1308の決まり）', async () => {
+    // #1308: LIKE '%長いキー%' はD1で「pattern too complex」になるため、
+    // 使っている所の照合はワイルドカードなし（instr・IDの完全一致）で行う。
+    // 写真の列はIDそのものなので、長いキーでも落ちずに拾える。
+    const longKey = `media/${'k'.repeat(80)}.png`;
+    expect(longKey.length).toBeGreaterThan(80);
+    sqlite.prepare(`INSERT INTO media
+      (id,line_account_id,kind,filename,mime_type,size_bytes,r2_key,created_at)
+      VALUES ('photo-long','account-a','image','長い.png','image/png',100,?,'2026-09-01T10:00:00.000')`)
+      .run(longKey);
+    const { app, env } = makeApp();
+    const created = await app.request('/api/booking/admin/menus?account_id=account-a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'カット', duration_minutes: 60, base_price: 5000, photo_media_id: 'photo-long' }),
+    }, env);
+    expect(created.status).toBe(201);
+
+    const result = await scanSingleMediaUsage(
+      db, '2026-10-03T10:00:00.000+09:00', { id: 'photo-long', r2_key: longKey },
+    );
+    expect(result.matched).toBe(1);
+    expect(usages('photo-long')).toHaveLength(1);
+    const snapshot = await getMediaDeleteImpactSnapshot(db, 'photo-long', 'account-a', '2026-10-03T10:00:00.000+09:00');
+    expect(snapshot?.impact.canDelete).toBe(false);
+    expect(snapshot?.impact.references).toMatchObject([{ kind: 'booking_menu', name: 'カット' }]);
+  });
+
   test('走査は直接書いた写真を見つけて台帳へ戻す', async () => {
     sqlite.prepare(`INSERT INTO menus
       (id,line_account_id,name,duration_minutes,base_price,photo_media_id)

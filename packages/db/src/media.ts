@@ -1050,7 +1050,7 @@ const REPLACEMENT_TARGET_KINDS: Record<MediaRefKind, {
 
 /**
  * 1文あたりの対象使用先IDの上限。
- * 版数が多いと本文置き換え文のbindが 48(置換対) + 24(LIKE) + scope に
+ * 版数が多いと本文置き換え文のbindが 48(置換対) + 24(含有判定) + scope に
  * なるため、IDは20件ずつに分けても最悪ケースで100 bindを超えない。
  */
 const USAGE_TARGET_ID_CHUNK = 20;

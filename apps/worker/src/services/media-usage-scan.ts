@@ -83,7 +83,7 @@ type MediaToScan = { id: string; r2_key: string };
 const MAX_SOURCE_ROWS = 4_000;
 const MAX_USAGE_WRITES = 4_000;
 const MAX_PRUNE_ROWS = 1_000;
-/** LIKEのbind数が上限を超えないよう、1問い合わせのトークン数を絞る。 */
+/** 含有判定のbind数が上限を超えないよう、1問い合わせのトークン数を絞る。 */
 const MATCH_TOKEN_CHUNK = 24;
 
 function isMissingSourceTable(error: unknown, table: string): boolean {
@@ -104,8 +104,10 @@ function isMissingPhotoColumn(error: unknown): boolean {
  * メディアを指す本文中の文字列。
  *
  * 固定参照は版ごとのr2_key（旧版を指すものも使用中）、ライブ参照は
- * メディアIDの公開パス `/media/<id>/content`。どちらもr2_key基準の
- * 走査と同じ LIKE 照合で拾えるよう、トークンとしてまとめて渡す。
+ * メディアIDの公開パス `/media/<id>/content`。どちらも走査と同じ
+ * 含有判定（instr、ワイルドカードなし）で拾えるよう、トークンとして
+ * まとめて渡す。写真の列は登録メディアのIDそのものなので、そちらは
+ * トークンではなくIDの完全一致で引く。
  */
 function usageMatchTokens(item: MediaToScan, versionTokens: string[]): string[] {
   return [...new Set([item.r2_key, ...versionTokens])].filter((token) => token.length > 0);
