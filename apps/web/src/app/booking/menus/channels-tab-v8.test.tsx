@@ -57,6 +57,26 @@ describe('予約経路タブ', () => {
     expect(screen.queryByText('重なりを解消する')).toBeNull()
   })
 
+  it('受け取っていない経路に準備中と書かない', async () => {
+    api.channels.mockResolvedValue({
+      success: true,
+      data: {
+        ...channelsData,
+        channels: [
+          { key: 'line', status: 'active', todayCount: 1 },
+          { key: 'google_reserve', status: 'preparing', todayCount: null },
+          { key: 'epark', status: 'preparing', todayCount: null },
+        ],
+      },
+    })
+    api.conflicts.mockResolvedValue({ success: true, data: { conflicts: [] } })
+    render(<ChannelsTabV8 accountId="account-a" canEdit />)
+    await screen.findByRole('heading', { name: '予約経路' })
+    // 実データの状態（preparing）は出すが、画面に「準備中」は置かない。
+    expect(document.body.textContent ?? '').not.toContain('準備中')
+    expect(screen.getAllByText('まだ届いていない')).toHaveLength(2)
+  })
+
   it('重なりがあると知らせと窓を出す', async () => {
     api.channels.mockResolvedValue({ success: true, data: channelsData })
     api.conflicts.mockResolvedValue({

@@ -26,8 +26,8 @@ const CHANNEL_LABEL: Record<string, { name: string; sub: string; how: string }> 
   line: { name: 'LINE（musubo の予約）', sub: '予約ページ・リッチメニュー', how: 'そのまま予約管理へ' },
   manual: { name: '電話・店頭', sub: 'スタッフが入れる', how: '予約管理で手入力' },
   hot_pepper_beauty: { name: 'Hot Pepper Beauty', sub: 'SALON BOARD', how: 'Google カレンダー経由（SALON BOARD が書き出せる場合・確認中）' },
-  google_reserve: { name: 'Google で予約', sub: 'Google ビジネス プロフィール', how: '予約通知メールを読む（準備中）' },
-  epark: { name: 'EPARK', sub: '予約通知メール', how: '予約通知メールを読む（準備中）' },
+  google_reserve: { name: 'Google で予約', sub: 'Google ビジネス プロフィール', how: '予約通知メールを読む' },
+  epark: { name: 'EPARK', sub: '予約通知メール', how: '予約通知メールを読む' },
 }
 
 function formatReadAt(value: string | null): string {
@@ -54,7 +54,8 @@ function StaffStatusChip({ status }: { status: BookingChannelStaff['status'] }) 
 function ChannelStatusChip({ channel }: { channel: BookingChannel }) {
   if (channel.status === 'active') return <Chip tone="ok">使っている</Chip>
   if (channel.status === 'confirm') return <Chip tone="warn">確認中</Chip>
-  return <Chip tone="neutral">準備中</Chip>
+  // 口が返す `preparing`（まだ何も届いていない）。「準備中」とは書かない。
+  return <Chip tone="neutral">まだ届いていない</Chip>
 }
 
 /** Google カレンダーをつなぐ窓（カレンダー ID を入れて確かめる）。 */
