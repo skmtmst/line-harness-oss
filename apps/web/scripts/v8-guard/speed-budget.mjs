@@ -85,8 +85,6 @@ async function newPage(browser) {
 
 async function readPageMetrics(page) {
   return page.evaluate(() => {
-    const lcpEntries = performance.getEntriesByType('largest-contentful-paint')
-    const last = lcpEntries[lcpEntries.length - 1]
     /* 運び方（http・file）で変わらない、圧縮前の JS の大きさで比べる。 */
     const jsBytes = performance
       .getEntriesByType('resource')
@@ -94,26 +92,57 @@ async function readPageMetrics(page) {
       .reduce((sum, r) => sum + (r.decodedBodySize || r.encodedBodySize || r.transferSize || 0), 0)
     const longTasks = Array.isArray(window.__lt) ? window.__lt : []
     return {
-      lcpMs: last ? Math.round(last.renderTime || last.startTime) : null,
       jsBytes: Math.round(jsBytes),
       longTaskMs: longTasks.length ? Math.round(Math.max(...longTasks)) : 0,
     }
   })
 }
 
+/* LCP は溜めた記録から読む。直接読むと空のことがある（CI初回で全画面 null になった）。 */
+async function readLcpMs(page) {
+  return page.evaluate(() => new Promise((resolve) => {
+    const pick = (list) => {
+      const last = list[list.length - 1]
+      return last ? Math.round(last.renderTime || last.startTime) : null
+    }
+    let value = null
+    try {
+      value = pick(performance.getEntriesByType('largest-contentful-paint'))
+      const po = new PerformanceObserver((entries) => {
+        const next = pick(entries.getEntries())
+        if (next != null) value = next
+      })
+      po.observe({ type: 'largest-contentful-paint', buffered: true })
+      setTimeout(() => {
+        try {
+          po.disconnect()
+        } catch {
+          /* 止められなくても答えは返す */
+        }
+        resolve(value)
+      }, 800)
+    } catch {
+      resolve(value)
+    }
+  }))
+}
+
 /* 最初の押せるボタンを押して、次の描画までの時間を測る（INP の代わり）。 */
 async function measurePress(page) {
   const button = page.locator('main button:enabled').first()
-  if ((await button.count()) > 0) {
-    await button.scrollIntoViewIfNeeded().catch(() => {})
-    const start = Date.now()
-    await button.click({ timeout: 5000 }).catch(() => {})
-    await page.evaluate(() => new Promise((done) => {
-      requestAnimationFrame(() => requestAnimationFrame(done))
-    })).catch(() => {})
-    return Date.now() - start
-  }
-  return null
+  if ((await button.count()) === 0) return null
+  await button.scrollIntoViewIfNeeded().catch(() => {})
+  const start = Date.now()
+  /* 押せなかったとき（CI初回は作成画面で5秒待った）は測らず null。 */
+  let clicked = false
+  await button.click({ timeout: 5000 }).then(() => {
+    clicked = true
+  }).catch(() => {})
+  if (!clicked) return null
+  await page.evaluate(() => new Promise((done) => {
+    requestAnimationFrame(() => requestAnimationFrame(done))
+  })).catch(() => {})
+  return Date.now() - start
 }
 
 /* 偽APIの答えをそのまま運ぶ（待ち受けなし方式の差し替え）。 */
@@ -144,10 +173,21 @@ async function measureScreen(browser, target, name, route) {
   await page.locator('main').first().waitFor({ state: 'visible', timeout: 15000 })
   if (SLOW_MS) await page.waitForTimeout(SLOW_MS)
   const showMs = Date.now() - start
+  /* 押す前の落ち着いた状態で LCP と JS を読む。長い作業は押した後も足す。 */
+  const lcpMs = await readLcpMs(page)
+  const before = await readPageMetrics(page)
   const pressMs = await measurePress(page)
-  const rest = await readPageMetrics(page)
+  const after = await readPageMetrics(page)
   await page.close()
-  return { name, route, showMs, pressMs, ...rest }
+  return {
+    name,
+    route,
+    showMs,
+    pressMs,
+    lcpMs,
+    jsBytes: before.jsBytes,
+    longTaskMs: Math.max(before.longTaskMs, after.longTaskMs),
+  }
 }
 
 /* 2,000 行に膨らませる（運び方で取り方だけ変える。中身は本物の1行目）。 */
@@ -213,9 +253,10 @@ async function measureStress(browser, target) {
     window.scrollTo(0, 0)
     if (scroller !== document.scrollingElement) scroller.scrollTop = 0
   })
+  const lcpMs = await readLcpMs(page)
   const rest = await readPageMetrics(page)
   await page.close()
-  return { name: 'friends-2000', route: '/friends', showMs, pressMs: null, ...rest, rows: 2000 }
+  return { name: 'friends-2000', route: '/friends', showMs, pressMs: null, lcpMs, ...rest, rows: 2000 }
 }
 
 function judge(measured, budgets, baselines) {
