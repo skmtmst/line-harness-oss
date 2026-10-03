@@ -32,6 +32,8 @@ import {
   type WebinarListResponse,
   type WebinarOverview,
 } from '@/lib/api'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import WebinarListV8 from './list-v8'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import KpiCard from '@/components/shared/kpi-card'
 import { overviewCards } from './overview-view'
@@ -942,7 +944,17 @@ function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
   )
 }
 
-const WebinarsPageWithTestSupport = Object.assign(WebinarsPage, {
+/*
+ * ★V8 切替（一覧 `UyUMw`）。v7 の見た目は data-theme="v8" が付くまで
+ * 1画素も変えない。作る・編集は v7 のまま（5段の板は別PR）。
+ */
+function WebinarsPageThemed() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <WebinarListV8 />
+  return <WebinarsPage />
+}
+
+const WebinarsPageWithTestSupport = Object.assign(WebinarsPageThemed, {
   __testing: {
     WEBINAR_SEARCH_DEBOUNCE_MS,
     WebinarArchiveConfirm,
