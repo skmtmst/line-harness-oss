@@ -117,27 +117,7 @@
   margin-top: 12px;
 }
 
-.modeRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 12px;
-}
-
-.modeOption {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--color-ink);
-  cursor: pointer;
-}
-
-.modeOption input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--color-success);
-}
+/* 送る範囲の1つ選びは、向きと同じ選ぶカード（RadioCard）で出す。 */
 
 .eventGroup {
   margin-top: 12px;

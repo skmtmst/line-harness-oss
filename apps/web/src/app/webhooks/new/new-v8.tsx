@@ -356,16 +356,22 @@ function NewOutgoingV8Inner() {
           <section className={styles.card} aria-labelledby="webhook-v8-when">
             <h2 className={styles.cardTitle} id="webhook-v8-when">いつ送りますか</h2>
             <p className={styles.cardNote}>選んだできごとが起きるたびに送ります</p>
-            <div className={styles.modeRow} role="radiogroup" aria-label="送る範囲">
-              <label className={styles.modeOption}>
-                <input type="radio" name="webhook-v8-mode" checked={sendAllEvents} onChange={() => setSendAllEvents(true)} />
-                すべて送る
-              </label>
-              <label className={styles.modeOption}>
-                <input type="radio" name="webhook-v8-mode" checked={!sendAllEvents} onChange={() => setSendAllEvents(false)} />
-                選んだものだけ送る
-              </label>
-            </div>
+            <RadioCardGroup legend="送る範囲" className={styles.radioRow}>
+              <RadioCard
+                name="webhook-v8-mode"
+                value="all"
+                checked={sendAllEvents}
+                onChange={() => setSendAllEvents(true)}
+                title="すべて送る"
+              />
+              <RadioCard
+                name="webhook-v8-mode"
+                value="selected"
+                checked={!sendAllEvents}
+                onChange={() => setSendAllEvents(false)}
+                title="選んだものだけ送る"
+              />
+            </RadioCardGroup>
             {fieldErrors.events ? <p className={styles.fieldError} role="alert">{fieldErrors.events}</p> : null}
             {!sendAllEvents ? (
               <>
