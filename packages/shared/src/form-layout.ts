@@ -33,7 +33,8 @@ export type FormInputType =
   | "date" // 日付
   | "prefecture" // 都道府県
   | "rating" // 5段階評価（F11）
-  | "address"; // 住所（F11・郵便番号から補完）
+  | "address" // 住所（F11・郵便番号から補完）
+  | "booking"; // 予約を入れる（フォームの中で空き枠を選ぶ）
 
 /** 単一行の入力制限。空欄や「指定なし」は検証しない。 */
 export type FormInputFormat =
@@ -114,6 +115,31 @@ export type FormAction =
   | { kind: "scenario"; op: "start" | "stop"; scenarioId: string }
   | { kind: "reminder"; reminderId: string };
 
+/**
+ * 「予約を入れる」ブロックの設定。
+ *
+ * メニューは1つに決める（複数メニューの同時受付はしない）。
+ * 担当が空なら「だれでも」（予約側の自動割り当てに任せる）。
+ * 選べる期間は今日から daysAhead 日後まで。空なら14日。
+ * 予約は「未承認」で入り、店が承認する（すぐ確定は作らない）。
+ */
+export interface FormBookingConfig {
+  menuId: string;
+  staffId?: string | null;
+  daysAhead?: number;
+}
+
+/**
+ * 「予約を入れる」ブロックの回答の形。予約の確保は回答の送信後に
+ * 予約の受け口で行い、枠の再確認と重なりの防止はそちらが担う。
+ * ここでは「どの枠を選んだか」だけを持ち、形だけを検査する。
+ */
+export interface FormBookingValue {
+  menuId: string;
+  staffId: string;
+  startsAt: string;
+}
+
 /** 入力欄のブロック。 */
 export interface FormInputBlock {
   id: string;
@@ -148,6 +174,8 @@ export interface FormInputBlock {
   reminder?: { reminderId: string; time: string } | null;
   /** ファイルの種類。いまは画像だけ */
   fileKind?: "image";
+  /** type = 'booking' のときの「予約を入れる」の設定 */
+  booking?: FormBookingConfig | null;
 }
 
 /** 飾りのブロック（入力欄ではないもの）。 */
@@ -441,6 +469,7 @@ function compatType(block: FormInputBlock): string {
   if (block.type === "file") return "file";
   if (block.type === "rating") return "rating";
   if (block.type === "address") return "address";
+  if (block.type === "booking") return "booking";
   return block.type;
 }
 
@@ -519,6 +548,8 @@ function liftType(type: string): FormInputType {
       return "rating";
     case "address":
       return "address";
+    case "booking":
+      return "booking";
     default:
       // text / email / tel / number は単一行＋入力制限へ寄せる
       return "text";
@@ -827,6 +858,10 @@ export function formatAnswerValue(block: FormInputBlock, value: unknown): string
     return n === null ? "" : String(n);
   }
   if (block.type === "address") return formatAddressValue(value);
+  if (block.type === "booking") {
+    const booking = normalizeBookingValue(value);
+    return booking === null ? "" : formatBookingStartsAt(booking.startsAt);
+  }
   if (Array.isArray(value)) return value.map(String).join(", ");
   return String(value);
 }
@@ -857,6 +892,32 @@ export function trimAsciiSpaces(value: string): string {
 /** ASCII空白だけからなる文字列か（ratingの未入力判定用）。 */
 export function isAsciiBlank(value: string): boolean {
   return /^ *$/.test(value);
+}
+
+/**
+ * 「予約を入れる」の回答の形か。menuId・staffId・startsAt（ISO日時）の
+ * 3つが文字列で揃っていれば通す。枠が今も空いているかの再確認は
+ * 予約の受け口（確保の直前）が担い、ここでは形だけを見る。
+ */
+export function normalizeBookingValue(value: unknown): FormBookingValue | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.menuId !== "string" || v.menuId.trim() === "") return null;
+  if (typeof v.staffId !== "string" || v.staffId.trim() === "") return null;
+  if (typeof v.startsAt !== "string" || Number.isNaN(Date.parse(v.startsAt))) return null;
+  return { menuId: v.menuId, staffId: v.staffId, startsAt: v.startsAt };
+}
+
+/** ISO日時を「M/D H:mm」（日本時間）にする。壊れた日時はそのまま返す。 */
+export function formatBookingStartsAt(startsAt: string): string {
+  const time = Date.parse(startsAt);
+  if (Number.isNaN(time)) return startsAt;
+  const jst = new Date(time + 9 * 60 * 60 * 1000);
+  const month = jst.getUTCMonth() + 1;
+  const day = jst.getUTCDate();
+  const hour = String(jst.getUTCHours()).padStart(2, "0");
+  const minute = String(jst.getUTCMinutes()).padStart(2, "0");
+  return `${month}/${day} ${hour}:${minute}`;
 }
 
 /**
@@ -943,6 +1004,16 @@ export function validateAnswer(
     for (const [key, label] of Object.entries(names)) {
       const problem = checkText(key, label, 255);
       if (problem !== null) return problem;
+    }
+    return null;
+  }
+
+  if (block.type === "booking") {
+    const empty = isFormAnswerEmpty(value);
+    if (block.required && empty) return `${block.label} は必須項目です`;
+    if (empty) return null;
+    if (normalizeBookingValue(value) === null) {
+      return `${block.label} は日時を選び直してください`;
     }
     return null;
   }

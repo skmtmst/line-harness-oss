@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   fieldsToLayout,
   formatAddressValue,
+  formatAnswerValue,
+  formatBookingStartsAt,
   formatPostalCode,
   layoutToFields,
+  normalizeBookingValue,
   normalizePostalCodeDigits,
   normalizeRatingValue,
   validateAnswer,
@@ -155,5 +158,52 @@ describe('F11 roundtrip', () => {
       .filter((b) => b.kind === 'input')
       .map((b) => (b as FormInputBlock).type);
     expect(backTypes).toEqual(['rating', 'address']);
+  });
+});
+
+describe('予約を入れる booking', () => {
+  const bookingBlock = (overrides: Partial<FormInputBlock> = {}): FormInputBlock => ({
+    id: 'b9',
+    kind: 'input',
+    type: 'booking',
+    name: 'visit',
+    label: '来店予約',
+    required: true,
+    ...overrides,
+  });
+
+  it('menuId・staffId・startsAtの3つが揃った形だけ通す', () => {
+    expect(normalizeBookingValue({
+      menuId: 'm1', staffId: 's1', startsAt: '2026-10-20T04:00:00.000Z',
+    })).toEqual({ menuId: 'm1', staffId: 's1', startsAt: '2026-10-20T04:00:00.000Z' });
+    expect(normalizeBookingValue({ menuId: 'm1', staffId: 's1' })).toBeNull();
+    expect(normalizeBookingValue({ menuId: 'm1', staffId: 's1', startsAt: 'あした' })).toBeNull();
+    expect(normalizeBookingValue('2026-10-20')).toBeNull();
+  });
+
+  it('必須の空欄は必須文言、形違いは選び直しを出す', () => {
+    expect(validateAnswer(bookingBlock(), undefined)).toBe('来店予約 は必須項目です');
+    expect(validateAnswer(bookingBlock(), {})).toBe('来店予約 は必須項目です');
+    expect(validateAnswer(bookingBlock(), { menuId: 'm1' })).toBe('来店予約 は日時を選び直してください');
+    expect(validateAnswer(bookingBlock({ required: false }), undefined)).toBeNull();
+  });
+
+  it('回答表示は日本時間の月日時刻にする', () => {
+    expect(formatBookingStartsAt('2026-10-20T04:00:00.000Z')).toBe('10/20 13:00');
+    const shown = formatAnswerValue(
+      bookingBlock(),
+      { menuId: 'm1', staffId: 's1', startsAt: '2026-10-20T04:00:00.000Z' },
+    );
+    expect(shown).toBe('10/20 13:00');
+  });
+
+  it('bookingをfields↔layoutで落とさない', () => {
+    const layout = fieldsToLayout([{ name: 'v', label: '来店予約', type: 'booking', required: true }]);
+    const types = layout.sections[0].blocks
+      .filter((b) => b.kind === 'input')
+      .map((b) => (b as FormInputBlock).type);
+    expect(types).toEqual(['booking']);
+    const fields = layoutToFields(layout);
+    expect(fields.map((f) => f.type)).toEqual(['booking']);
   });
 });

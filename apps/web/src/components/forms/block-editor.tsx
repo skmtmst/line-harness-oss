@@ -56,6 +56,7 @@ const INPUT_TYPE_LABEL: Record<FormInputType, string> = {
   // 入力メニューへの追加・編集欄・見た目の変更は今回しない。
   address: '住所',
   rating: '5段階評価',
+  booking: '予約を入れる',
 }
 
 const FORMATS: { value: FormInputFormat; label: string }[] = [
