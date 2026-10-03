@@ -206,6 +206,8 @@ function NewAffiliatePageV7() {
     : friends
 
   return (
+    /* ★V8-B `RaMf3`（アフィリエイターを作る）：中身はこの画面そのもの。V6 の印は残す。 */
+    <div data-design-node="RaMf3">
     <CreatePage
       title="アフィリエイターを登録する"
       description="紹介してくれる方に専用のリンクを渡し、成果と報酬を記録します。"
@@ -629,5 +631,6 @@ function NewAffiliatePageV7() {
         </div>
       </FormSection>
     </CreatePage>
+    </div>
   )
 }

@@ -1,5 +1,31 @@
 -- Generated from schema.sql + migrations by scripts/generate-bootstrap.mjs.
 -- Do not edit manually. Run `pnpm --dir packages/db generate:bootstrap`.
+CREATE TABLE _556_folders_backup_auto_replies (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_broadcasts (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_common_vars (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_forms (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_friend_fields (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_media (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_media_upload_sessions (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_reminders (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_rich_menu_groups (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_scenarios (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_tags (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_templates (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_webinars (id TEXT PRIMARY KEY, folder_id TEXT);
+
 CREATE TABLE account_handover_decisions (
   id              TEXT PRIMARY KEY,
   handover_id     TEXT NOT NULL REFERENCES account_handovers(id) ON DELETE CASCADE,
@@ -1483,7 +1509,7 @@ CREATE TABLE "bookings" (
   cancelled_at                 TEXT,
   completed_at                 TEXT,
   created_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)),
+  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)), cancel_claim_id TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),
@@ -2528,14 +2554,16 @@ CREATE TABLE "folders" (
   kind          TEXT NOT NULL CHECK (kind IN (
                   'tag','template','scenario','reminder','auto_reply',
                   'rich_menu','webinar','form','media','common_var',
-                  'mileage_rule','automation','event','entry_route','broadcast')),
+                  'mileage_rule','automation','event','entry_route','broadcast',
+                  'friend_field','common_action','webhook','conversion')),
   name          TEXT NOT NULL,
   parent_id     TEXT REFERENCES folders(id) ON DELETE CASCADE,
   display_order INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
-  color         TEXT
-, account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+  color         TEXT,
+  account_id    TEXT REFERENCES line_accounts(id) ON DELETE CASCADE
+);
 
 CREATE TABLE form_accounts (
   form_id         TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
@@ -3919,7 +3947,7 @@ CREATE TABLE meet_consultations (
                     CHECK (status IN ('confirmed', 'cancelled', 'completed')),
   created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, booking_id TEXT, booking_version INTEGER, cancel_claim_id TEXT);
 
 CREATE TABLE menu_versions (
   id TEXT PRIMARY KEY,
@@ -6900,6 +6928,24 @@ CREATE TABLE templates (
   CHECK (draft_question_json IS NULL OR json_valid(draft_question_json)), draft_question_status TEXT
   CHECK (draft_question_status IS NULL OR draft_question_status IN ('draft', 'published')), publish_idempotency_key TEXT, draft_revision INTEGER NOT NULL DEFAULT 0);
 
+CREATE TABLE tenant_data_purge_audit (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  -- immediate: 早期削除の要請による削除 / expired: 保存期限の満了による削除
+  reason TEXT NOT NULL,
+  -- 保存起点。どの時点から数えて期限が切れたのかを後から確かめられるようにする。
+  retention_anchor_at TEXT,
+  started_at TEXT NOT NULL,
+  -- 全ての表を消し終えた回だけ入る。途中で上限に達した回は空のままにする。
+  finished_at TEXT,
+  -- この回に消した行数の合計と、表ごとの内訳 {"friends": 12, ...}
+  deleted_rows INTEGER NOT NULL DEFAULT 0,
+  deleted_rows_by_table TEXT NOT NULL DEFAULT '{}',
+  -- この回に消した画像(R2)の数
+  deleted_objects INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE tenants (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -6907,7 +6953,7 @@ CREATE TABLE tenants (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , feature_packs TEXT NOT NULL DEFAULT '[]', plan_key TEXT, plan_status TEXT NOT NULL DEFAULT 'exempt'
-  CHECK (plan_status IN ('exempt', 'trialing', 'active', 'past_due', 'canceled')), trial_ends_at TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT, current_period_ends_at TEXT, plan_updated_at TEXT, signup_device_marker TEXT);
+  CHECK (plan_status IN ('exempt', 'trialing', 'active', 'past_due', 'canceled')), trial_ends_at TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT, current_period_ends_at TEXT, plan_updated_at TEXT, signup_device_marker TEXT, retention_anchor_at TEXT, purge_requested_at TEXT, data_purged_at TEXT);
 
 CREATE TABLE tiktok_pnl_order_lines (
   -- `<TikTok注文ID>:<行番号>`。シートのキー列（A列）にもこの値を使う。
@@ -8129,9 +8175,9 @@ CREATE UNIQUE INDEX idx_field_migration_runs_idempotency
 CREATE INDEX idx_field_migration_runs_scope
   ON field_migration_runs(tenant_id, line_account_id, created_at DESC);
 
-CREATE INDEX idx_folders_kind_order ON folders(kind, display_order);
+CREATE INDEX idx_folders_kind_order_556 ON folders(kind, display_order);
 
-CREATE INDEX idx_folders_webinar_account_order_333
+CREATE INDEX idx_folders_webinar_account_order_556
   ON folders(kind, account_id, display_order, name);
 
 CREATE INDEX idx_form_accounts_account
@@ -9288,6 +9334,13 @@ CREATE INDEX idx_templates_line_account
   ON templates(line_account_id, display_order, id);
 
 CREATE INDEX idx_templates_publish_key ON templates (publish_idempotency_key);
+
+CREATE INDEX idx_tenant_data_purge_audit_tenant
+  ON tenant_data_purge_audit (tenant_id, created_at DESC);
+
+CREATE INDEX idx_tenants_retention_pending
+  ON tenants (retention_anchor_at)
+  WHERE data_purged_at IS NULL;
 
 CREATE INDEX idx_tenants_signup_device_marker
   ON tenants(signup_device_marker) WHERE signup_device_marker IS NOT NULL;

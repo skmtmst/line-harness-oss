@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import type { KeyboardEvent, ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import styles from './tabs.module.css'
 
 export interface TabItem {
@@ -63,15 +63,57 @@ export function Tabs({
     tabs[next]?.focus()
   }
 
+  /*
+   * ★V8 仕上げ（M10）：選ばれている下線が滑って移る（120ms）。
+   * V8 のときだけ、今のタブの下に動く印を置く。測れないとき
+   * （v7・サーバ描画・タブ無し）は今までどおり枠線の下線が出る。
+   */
+  const itemsRef = useRef<HTMLSpanElement>(null)
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null)
+  const currentKey = items.findIndex((item) => item.current)
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (typeof document === 'undefined' || document.documentElement?.dataset?.theme !== 'v8') {
+        setIndicator(null)
+        return
+      }
+      const list = itemsRef.current
+      const current = list?.querySelector<HTMLElement>('[aria-selected="true"]')
+      if (!list || !current) {
+        setIndicator(null)
+        return
+      }
+      const listBox = list.getBoundingClientRect()
+      const tabBox = current.getBoundingClientRect()
+      const next = { left: tabBox.left - listBox.left, width: tabBox.width }
+      setIndicator((prev) => (
+        prev && prev.left === next.left && prev.width === next.width ? prev : next
+      ))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [currentKey, items.length])
+  const sliding = indicator !== null
+
   return (
     <nav className={[styles.list, className].filter(Boolean).join(' ')}>
       <span
+        ref={itemsRef}
         className={styles.items}
         role="tablist"
         aria-label={label}
         aria-orientation="horizontal"
+        data-sliding={sliding || undefined}
         onKeyDown={moveFocus}
       >
+        {sliding ? (
+          <span
+            aria-hidden="true"
+            className={styles.indicator}
+            style={{ width: indicator.width, transform: `translateX(${indicator.left}px)` }}
+          />
+        ) : null}
         {items.map((item, index) => (
           // 選択中のタブに Tab キーで入れるようにする（roving tabindex）。
           // どれも選ばれていないときは先頭が入口になる。

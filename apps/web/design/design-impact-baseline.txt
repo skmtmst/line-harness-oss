@@ -9,6 +9,7 @@ shared-button-importer app/accounts/uid-migration-v8.tsx
 shared-button-importer app/affiliate-offers/new-offer-v8.tsx
 shared-button-importer app/affiliates/action-dialogs.tsx
 shared-button-importer app/affiliates/new-affiliate-v8.tsx
+shared-button-importer app/affiliates/bulk-op-wizard.tsx
 shared-button-importer app/affiliates/new/page.tsx
 shared-button-importer app/affiliates/payment-tab.tsx
 shared-button-importer app/affiliates/tabs.tsx
@@ -32,6 +33,7 @@ shared-button-importer app/automations/new/page.tsx
 shared-button-importer app/automations/page.tsx
 shared-button-importer app/automations/runs/page.tsx
 shared-button-importer app/booking/bookings/booking-calendar.tsx
+shared-button-importer app/booking/bookings/booking-detail-v8.tsx
 shared-button-importer app/booking/bookings/detail/page.tsx
 shared-button-importer app/booking/bookings/new/page.tsx
 shared-button-importer app/booking/bookings/page.tsx
@@ -84,9 +86,12 @@ shared-button-importer app/ec-commerce/order-detail-drawer.tsx
 shared-button-importer app/ec-commerce/page.tsx
 shared-button-importer app/ec-commerce/subscriptions-panel.tsx
 shared-button-importer app/emergency/page.tsx
+shared-button-importer app/events/bookings/bookings-v8.tsx
 shared-button-importer app/events/bookings/page.tsx
+shared-button-importer app/events/change-review/change-review-v8.tsx
 shared-button-importer app/events/change-review/page.tsx
 shared-button-importer app/events/edit/page.tsx
+shared-button-importer app/events/events-list-v8.tsx
 shared-button-importer app/events/page.tsx
 shared-button-importer app/events/preview/page.tsx
 shared-button-importer app/form-submissions/edit/form-design-settings.tsx
@@ -94,12 +99,16 @@ shared-button-importer app/form-submissions/edit/page.tsx
 shared-button-importer app/form-submissions/list-v8.tsx
 shared-button-importer app/form-submissions/page.tsx
 shared-button-importer app/form-submissions/responses/page.tsx
+shared-button-importer app/friend-add-settings/editor-v8.tsx
 shared-button-importer app/friend-add-settings/friend-add-rule-editor.tsx
 shared-button-importer app/friend-add-settings/list-v8.tsx
 shared-button-importer app/friend-add-settings/page.tsx
+shared-button-importer app/friend-add-settings/publish/done-v8.tsx
 shared-button-importer app/friend-add-settings/publish/page.tsx
+shared-button-importer app/friend-add-settings/runs/detail/detail-v8.tsx
 shared-button-importer app/friend-add-settings/runs/detail/page.tsx
 shared-button-importer app/friend-add-settings/runs/page.tsx
+shared-button-importer app/friend-add-settings/runs/runs-v8.tsx
 shared-button-importer app/friends/detail/page.tsx
 shared-button-importer app/friends/friends-nav-v8.tsx
 shared-button-importer app/friends/identity-candidates/identity-candidates-v8.tsx
@@ -110,6 +119,7 @@ shared-button-importer app/friends/page.tsx
 shared-button-importer app/getting-started/feature-set-card.tsx
 shared-button-importer app/health/page.tsx
 shared-button-importer app/hq/account-browser-v8.tsx
+shared-button-importer app/hq/account-settings-dialogs.tsx
 shared-button-importer app/hq/banners/project/page.tsx
 shared-button-importer app/hq/billing/page.tsx
 shared-button-importer app/hq/members/page.tsx
@@ -149,15 +159,20 @@ shared-button-importer app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx
 shared-button-importer app/mileage/rewards/edit/v8-reward-edit.tsx
 shared-button-importer app/mileage/friends/detail/v8-friend-detail.tsx
 shared-button-importer app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx
+shared-button-importer app/nen-campaigns/columns/new/column-new-v8.tsx
 shared-button-importer app/nen-campaigns/columns/new/page.tsx
+shared-button-importer app/nen-campaigns/edit/campaign-editor-v8.tsx
 shared-button-importer app/nen-campaigns/edit/campaign-editor.tsx
 shared-button-importer app/nen-campaigns/edit/page.tsx
+shared-button-importer app/nen-campaigns/nen-campaigns-v8.tsx
 shared-button-importer app/nen-campaigns/nen-overview.tsx
 shared-button-importer app/nen-campaigns/page.tsx
 shared-button-importer app/nen-members/page.tsx
 shared-button-importer app/nen-members/photo-publications.tsx
 shared-button-importer app/nen-members/photo-review-detail.tsx
+shared-button-importer app/nen-members/photo-review-v8.tsx
 shared-button-importer app/nen-members/photo-reward-policy.tsx
+shared-button-importer app/nen/health/health-v8.tsx
 shared-button-importer app/nen/health/page.tsx
 shared-button-importer app/nen/health/summary-drawer.tsx
 shared-button-importer app/nen/members/lifetime-tab.tsx
@@ -166,6 +181,7 @@ shared-button-importer app/nen/members/rank-settings-tab.tsx
 shared-button-importer app/nen/pets/feeding-tab.tsx
 shared-button-importer app/nen/pets/page.tsx
 shared-button-importer app/nen/pets/pet-editor.tsx
+shared-button-importer app/nen/pets/pets-v8.tsx
 shared-button-importer app/not-found.tsx
 shared-button-importer app/notifications/page.tsx
 shared-button-importer app/ops/announcements/page.tsx
@@ -204,7 +220,13 @@ shared-button-importer app/restaurant-test/stores/new/page.tsx
 shared-button-importer app/restaurant-test/stores/new/terms-consent.tsx
 shared-button-importer app/restaurant-test/v8/approvals.tsx
 shared-button-importer app/restaurant-test/v8/dashboard.tsx
+shared-button-importer app/restaurant-test/v8/google.tsx
+shared-button-importer app/restaurant-test/v8/inventory.tsx
+shared-button-importer app/restaurant-test/v8/menu.tsx
 shared-button-importer app/restaurant-test/v8/organization.tsx
+shared-button-importer app/restaurant-test/v8/reservation-phone.tsx
+shared-button-importer app/restaurant-test/v8/reservations.tsx
+shared-button-importer app/restaurant-test/v8/tables.tsx
 shared-button-importer app/rich-menus/connections/page.tsx
 shared-button-importer app/rich-menus/edit/page.tsx
 shared-button-importer app/rich-menus/edit/prepublish-check-section.tsx
@@ -269,12 +291,25 @@ shared-button-importer app/webhooks/api-tokens-panel.tsx
 shared-button-importer app/webhooks/edit/page.tsx
 shared-button-importer app/webhooks/google-sheets-panel.tsx
 shared-button-importer app/webhooks/new/page.tsx
+shared-button-importer app/webhooks/apitokens-v8.tsx
+shared-button-importer app/webhooks/incoming-v8.tsx
+shared-button-importer app/webhooks/interactions-v8.tsx
+shared-button-importer app/webhooks/new/new-v8.tsx
+shared-button-importer app/webhooks/outgoing-v8.tsx
 shared-button-importer app/webhooks/page.tsx
+shared-button-importer app/webhooks/samples-v8.tsx
+shared-button-importer app/webhooks/sheets-v8.tsx
 shared-button-importer app/webhooks/webhook-interactions.tsx
 shared-button-importer app/webhooks/webhook-overviews.tsx
 shared-button-importer app/webinars/edit/page.tsx
 shared-button-importer app/webinars/edit/session-capacity-cell.tsx
+shared-button-importer app/webinars/edit/comments-v8.tsx
+shared-button-importer app/webinars/edit/cta-v8.tsx
+shared-button-importer app/webinars/edit/notifications-v8.tsx
+shared-button-importer app/webinars/edit/participants-v8.tsx
+shared-button-importer app/webinars/edit/review-v8.tsx
 shared-button-importer app/webinars/edit/video-stages.tsx
+shared-button-importer app/webinars/edit/video-v8.tsx
 shared-button-importer app/webinars/list-v8.tsx
 shared-button-importer app/webinars/new/new-v8.tsx
 shared-button-importer app/webinars/new/page.tsx
@@ -329,6 +364,7 @@ shared-button-importer components/hq/banners/generation-panel.tsx
 shared-button-importer components/hq/banners/image-detail-modal.tsx
 shared-button-importer components/hq/banners/library-section.tsx
 shared-button-importer components/hq/banners/limit-state.tsx
+shared-button-importer components/hq/banners/project-form-dialog.tsx
 shared-button-importer components/hq/banners/projects-section.tsx
 shared-button-importer components/hq/banners/reference-picker-dialog.tsx
 shared-button-importer components/hq/banners/upload-button.tsx
@@ -344,6 +380,7 @@ shared-button-importer components/merged-person/merged-person-detail-v8.tsx
 shared-button-importer components/merged-person/merged-person-detail.tsx
 shared-button-importer components/merged-person/merged-person-sections.tsx
 shared-button-importer components/merged-person/merged-profile-dialog.tsx
+shared-button-importer components/ops/impersonation-bar.tsx
 shared-button-importer components/ops/knowledge-editor.tsx
 shared-button-importer components/ops/knowledge-list.tsx
 shared-button-importer components/ops/knowledge-ticket.tsx
@@ -411,3 +448,11 @@ table-header-migration-target app/webhooks/webhook-interactions.tsx
 # 詳細内テーブルのため、直書きthを残す既知の例外。
 native-table-header-exception app/affiliates/tabs.tsx
 shared-button-importer app/analytics/conversion-report-v8.tsx
+# ★V8-B 緊急コントロール（OHwbU）。確認の窓・本人確認・記録の操作に共通Buttonを使う。
+shared-button-importer app/emergency/control-v8.tsx
+# ★V8-B 運用者へのお知らせを作る（gjUz3）。届き方の見本・公開前の確認の操作に共通Buttonを使う。
+shared-button-importer app/line-notifications/operator/new/operator-new-v8.tsx
+# ★V8 共通情報の一覧（FM94M）。表の下にページ送りは共通Pagination、操作は共通Button。
+shared-button-importer app/contents/vars/list-v8.tsx
+shared-button-importer app/contents/vars/new/new-v8.tsx
+shared-button-importer app/contents/vars/edit/edit-v8.tsx

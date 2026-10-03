@@ -10,6 +10,7 @@ import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession, adminSessionHeaders } from '@/lib/admin-session'
 import { authRequest, emailError, internalAuthFailureCopy } from '@/lib/auth-email'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
@@ -28,6 +29,8 @@ const LINE_LOGIN_FAILURE_CODES = new Set([
  * /ops へ進める。新規登録の導線は出さない（運営は招待制）。
  */
 export default function OpsLoginPage() {
+  const theme = useAdminTheme()
+  const v8 = theme === 'v8'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
@@ -118,12 +121,12 @@ export default function OpsLoginPage() {
 
   return (
     <AuthCard
-      node="InTGF"
+      node={v8 ? 'D9JALJ' : 'InTGF'}
       cardNode="aHJXA"
       title="ログイン"
       description={
         <>
-          <span className="mb-1 block text-caption font-medium text-ink-faint">運営コンソール</span>
+          <span className="mb-1 block text-micro text-ink-secondary">運営コンソール</span>
           メールアドレスとパスワードでログインします。LINE で登録した運営メンバーは LINE でログインしてください。
         </>
       }
@@ -156,11 +159,17 @@ export default function OpsLoginPage() {
         </Button>
       </form>
 
-      <div className="flex w-full items-center gap-3" aria-hidden="true">
-        <span className="h-px flex-1 bg-hairline" />
-        <span className="text-caption text-ink-faint">または</span>
-        <span className="h-px flex-1 bg-hairline" />
-      </div>
+      {v8 ? (
+        <p className="w-full text-center text-caption text-ink-faint">
+          ログインの次に、認証アプリの6桁の数字を入れます
+        </p>
+      ) : (
+        <div className="flex w-full items-center gap-3" aria-hidden="true">
+          <span className="h-px flex-1 bg-hairline" />
+          <span className="text-caption text-ink-faint">または</span>
+          <span className="h-px flex-1 bg-hairline" />
+        </div>
+      )}
 
       <Button onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
         <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />LINE でログイン

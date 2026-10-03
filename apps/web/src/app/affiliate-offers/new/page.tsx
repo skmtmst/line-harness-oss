@@ -157,6 +157,8 @@ function NewAffiliateOfferPageV7() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   return (
+    /* ★V8-B `Td4TN`（案件を作る）：中身はこの画面そのもの。V6 の印は残す。 */
+    <div data-design-node="Td4TN">
     <CreatePage
       title="案件を作る"
       description="何を成果として数え、いくら払うかを決めます。"
@@ -451,5 +453,6 @@ function NewAffiliateOfferPageV7() {
       </FormSection>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した案件" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
+    </div>
   )
 }
