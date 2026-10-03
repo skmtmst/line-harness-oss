@@ -679,11 +679,11 @@ export default function HandoverV8() {
       </div>
 
       {canManage && Object.keys(decisionEdits).length > 0 && (
-        <div className={styles.unsavedBand}>
+        <div className={styles.pendingBand}>
           {decisionError
             ? <p role="alert" className="text-danger text-xs">{decisionError}</p>
-            : <p className={styles.unsavedText}>{Object.keys(decisionEdits).length}件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
-          <div className={styles.unsavedActions}>
+            : <p className={styles.pendingText}>{Object.keys(decisionEdits).length}件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
+          <div className={styles.pendingActions}>
             <Button type="button" variant="secondary" disabled={refreshing || !countsAreComplete} onClick={() => void rerunPreview()} busy={refreshing} busyLabel="確認中…">
               事前確認をやり直す
             </Button>

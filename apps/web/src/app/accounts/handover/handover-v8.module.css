@@ -74,7 +74,7 @@
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--color-surface-pearl);
   font-size: 12px;
   font-weight: 600;
@@ -128,7 +128,7 @@
 }
 
 /* 未保存の帯（黄色）。 */
-.unsavedBand {
+.pendingBand {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -139,14 +139,14 @@
   padding: 12px 16px;
 }
 
-.unsavedText {
+.pendingText {
   margin: 0;
   color: var(--color-ink);
   font-size: 13px;
   font-weight: 600;
 }
 
-.unsavedActions {
+.pendingActions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;

@@ -922,5 +922,14 @@
   },
   "app/reminders/wizard-v8-ui.tsx": {
     "unresolved-classname": 33
+  },
+  "app/accounts/handover/handover-v8.tsx": {
+    "unresolved-classname": 48
+  },
+  "app/ec-commerce/ec-connector-v8.tsx": {
+    "unresolved-classname": 6
+  },
+  "app/pools/new/pool-new-v8.tsx": {
+    "unresolved-classname": 2
   }
 }
