@@ -683,7 +683,7 @@
     }
   },
   "booking_payments": {
-    "category": "purge",
+    "category": "retain",
     "scope": {
       "by": "lineAccount",
       "column": "line_account_id"
