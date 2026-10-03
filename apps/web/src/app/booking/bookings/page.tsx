@@ -1039,7 +1039,7 @@ export default function BookingsPage() {
         </nav>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold">予約管理</h1>
+        <h2 className="text-xl font-semibold">予約管理</h2>
         {view === 'day' ? (
           <span className="inline-flex items-center gap-1" aria-label="日の移動">
             <button type="button" className="rounded-control px-2 py-1 text-sm hover:bg-canvas-sunken" onClick={() => setCalendarAnchor(moveDay(calendarAnchor, -1))} aria-label="前の日">〈</button>
