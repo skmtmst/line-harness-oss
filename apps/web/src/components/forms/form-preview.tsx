@@ -150,6 +150,36 @@ function PreviewBlock({ block, theme }: { block: FormBlock; theme: FormTheme }) 
       {block.type === 'select' && (
         <Box>{choices.length ? choices.map((c) => c.label).join(' / ') : '選んでください'}</Box>
       )}
+      {/*
+        F-11：5段階評価は★5つ（初期値の数だけ塗る）。
+        見た目だけで、押しても何も起きない（この画面の決まり）。
+      */}
+      {block.type === 'rating' && (
+        <p className="mt-1 text-lg leading-none tracking-wider" aria-hidden>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <span
+              key={n}
+              style={
+                n <= Number(block.defaultValue) && block.defaultValue
+                  ? { color: theme.main }
+                  : { color: theme.text, opacity: 0.35 }
+              }
+            >
+              ★
+            </span>
+          ))}
+        </p>
+      )}
+      {/*
+        F-11：住所は郵便番号の箱と住所の箱。お客さまは郵便番号を入れると
+        都道府県・市区町村まで自動で入る（町名以降は手入力）。
+      */}
+      {block.type === 'address' && (
+        <div className="space-y-1.5">
+          <Box>〒 ___-____</Box>
+          <Box>都道府県・市区町村・番地・建物名</Box>
+        </div>
+      )}
 
       {(block.type === 'radio' || block.type === 'checkbox') && (
         <div className={`mt-1 gap-2 ${block.inline ? 'flex flex-wrap' : 'space-y-1'}`}>
