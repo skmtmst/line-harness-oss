@@ -1,0 +1,12 @@
+@layer properties, theme, base, components, utilities;
+
+/* 消える札は薄くなってから外す（150ms。動きを減らす設定では一瞬）。 */
+@media (prefers-reduced-motion: no-preference) {
+  .card {
+    transition: opacity var(--motion-exit) var(--motion-ease-out);
+  }
+
+  .card[data-leaving='true'] {
+    opacity: 0;
+  }
+}

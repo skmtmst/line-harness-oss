@@ -17,6 +17,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
+import styles from './leaving.module.css'
 import MediaPreviewOverlay from './media-preview-overlay'
 import Dialog from '@/components/shared/dialog'
 import {
@@ -1227,7 +1228,7 @@ function MediaLibraryInner() {
             <div
               key={item.id}
               data-leaving={isLeaving(item.id) || undefined}
-              className={`bg-canvas rounded-card border-hairline overflow-hidden border motion-safe:transition-opacity motion-safe:duration-[var(--motion-exit)] motion-safe:ease-[var(--motion-ease-out)] data-[leaving=true]:opacity-0 ${
+              className={`bg-canvas rounded-card border-hairline overflow-hidden border ${styles.card} ${
                 view === 'grid' ? 'flex flex-col' : 'flex flex-row items-center gap-3'
               }`}
             >
