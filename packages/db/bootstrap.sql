@@ -1400,6 +1400,21 @@ CREATE TABLE "booking_menu_resources" (
   PRIMARY KEY (menu_id, resource_id)
 );
 
+CREATE TABLE booking_noshow_flags (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL DEFAULT 'auto' CHECK (mode IN ('auto', 'manual_on', 'manual_off')),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (line_account_id, friend_id)
+);
+
+CREATE TABLE booking_noshow_thresholds (
+  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  threshold INTEGER NOT NULL DEFAULT 3 CHECK (threshold BETWEEN 1 AND 100),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE booking_operation_runs (
   id              TEXT PRIMARY KEY,
   booking_id      TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -1420,6 +1435,44 @@ CREATE TABLE booking_operation_runs (
   idempotency_key TEXT NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now')),
+  UNIQUE (line_account_id, idempotency_key)
+);
+
+CREATE TABLE booking_payment_configs (
+  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL DEFAULT 'none'
+    CHECK (mode IN ('none', 'onsite', 'online')),
+  -- プロバイダ名は差し替えのために絞らない。新しいサービスは登録表へ足すだけ。
+  provider TEXT NOT NULL DEFAULT 'none',
+  hold_minutes INTEGER NOT NULL DEFAULT 30 CHECK (hold_minutes BETWEEN 5 AND 1440),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE booking_payment_menu_settings (
+  menu_id TEXT PRIMARY KEY REFERENCES menus(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL CHECK (mode IN ('none', 'onsite', 'online')),
+  provider TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE booking_payments (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL CHECK (amount >= 0),
+  currency TEXT NOT NULL DEFAULT 'JPY',
+  status TEXT NOT NULL DEFAULT 'unpaid'
+    CHECK (status IN ('unpaid', 'pending', 'paid', 'failed', 'refunded', 'expired')),
+  provider TEXT NOT NULL,
+  provider_payment_id TEXT,
+  idempotency_key TEXT NOT NULL,
+  hold_until TEXT,
+  paid_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
   UNIQUE (line_account_id, idempotency_key)
 );
 
@@ -7891,11 +7944,20 @@ CREATE INDEX idx_booking_exceptions_account_dates
 CREATE INDEX idx_booking_menu_resources_resource
   ON booking_menu_resources(resource_id, menu_id);
 
+CREATE INDEX idx_booking_noshow_flags_friend
+  ON booking_noshow_flags(friend_id, line_account_id);
+
 CREATE INDEX idx_booking_operation_runs_booking
   ON booking_operation_runs(line_account_id, booking_id, created_at DESC);
 
 CREATE INDEX idx_booking_operation_runs_status
   ON booking_operation_runs(status, scheduled_at);
+
+CREATE INDEX idx_booking_payments_booking
+  ON booking_payments(booking_id, created_at DESC);
+
+CREATE INDEX idx_booking_payments_status_hold
+  ON booking_payments(line_account_id, status, hold_until);
 
 CREATE INDEX idx_booking_reminders_v298_status_scheduled
   ON booking_reminders(status, scheduled_at);

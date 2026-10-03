@@ -24,6 +24,7 @@ const GUARDED = [
   'app/auto-replies/edit/wizard-v8.tsx',
   'app/booking/menus/new/menu-form-v8.tsx',
   'app/booking/menus/new/page.tsx',
+  'app/booking/menus/payment-tab-v8.tsx',
   'app/booking/menus/settings-v8.tsx',
   'app/booking/menus/staff/assign-v8.tsx',
   'app/booking/menus/staff/page.tsx',

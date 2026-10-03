@@ -20,6 +20,9 @@ import {
   createBookingAvailabilityException,
   getBookingAdminSettings,
   saveBookingAdminSettings,
+  createBookingPayment,
+  decidePrepayOnly,
+  resolveBookingPaymentConfig,
   listBookingAdminResources,
   getBookingAvailabilityException,
   listBookingAvailabilityExceptions,
@@ -345,7 +348,7 @@ export function jstDayWindowUtc(jstDate: string): { startUtc: string; endUtc: st
   };
 }
 
-async function resolveAccountIdFromLiff(c: Context<Env>): Promise<string | null> {
+export async function resolveAccountIdFromLiff(c: Context<Env>): Promise<string | null> {
   const liffId = c.req.query('liffId');
   if (!liffId) return null;
   const acc = await c.env.DB
@@ -365,7 +368,7 @@ async function resolveAccountIdFromLiff(c: Context<Env>): Promise<string | null>
 //      ではなく Messaging channel に紐付けてる構成への保険
 //   4. id_token の aud claim を base64 デコードして直接抽出 — どの DB 値とも
 //      一致しない場合の最後の手段（LIFF が独自に発行する場合）
-async function verifyCallerLineUserId(c: Context<Env>): Promise<string | null> {
+export async function verifyCallerLineUserId(c: Context<Env>): Promise<string | null> {
   const auth = c.req.header('Authorization');
   if (!auth || !auth.startsWith('Bearer ')) return null;
   const idToken = auth.slice('Bearer '.length).trim();
@@ -538,7 +541,7 @@ async function assertStaffInAccount(
 // マルチアカウント環境で、別 tenant の friend 行を再利用しないようにする。
 // line_account_id が NULL の旧データ（multi-account 化前）は account 一致が判定できないので
 // 安全側として除外（必要なら個別にバックフィルする）。
-async function resolveFriendId(
+export async function resolveFriendId(
   c: Context<Env>,
   lineUserId: string,
   accountId: string,
@@ -1069,7 +1072,47 @@ booking.post('/api/liff/booking/requests', async (c) => {
     );
   }
 
-  const responseBody = { booking_id: bookingId, status: 'requested' };
+  /*
+   * 決済の差し替え制。online の店・メニューだけ支払いの記録を作り、
+   * 仮押さえの期限を付ける。none／onsite では何も足さず、
+   * 今の予約の流れは一切変えない。
+   */
+  let bookingPayment: { id: string; status: string; holdUntil: string | null } | null = null;
+  try {
+    const paymentConfig = await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id);
+    if (paymentConfig.mode === 'online' && menuRow.price > 0) {
+      const holdUntil = new Date(Date.now() + paymentConfig.holdMinutes * 60_000).toISOString();
+      const record = await createBookingPayment(c.env.DB, {
+        lineAccountId: accountId,
+        bookingId,
+        amount: menuRow.price,
+        provider: paymentConfig.provider,
+        idempotencyKey: `booking:${bookingId}`,
+        holdUntil,
+      });
+      bookingPayment = { id: record.id, status: record.status, holdUntil: record.hold_until };
+    }
+  } catch (error) {
+    console.error('booking payment record failed:', error);
+  }
+  // 無断キャンセルの前払いのみ。前払いの人は案内を付ける（予約自体は仮押さえのまま）。
+  let selfPrepayOnly = false;
+  try {
+    selfPrepayOnly = (await decidePrepayOnly(c.env.DB, accountId, friendId)).prepayOnly;
+  } catch (error) {
+    console.error('prepay decision failed:', error);
+  }
+
+  const responseBody = {
+    booking_id: bookingId,
+    status: 'requested',
+    ...(bookingPayment ? { payment: bookingPayment } : {}),
+    ...(selfPrepayOnly
+      ? {
+          prepayNotice: '無断キャンセルが続いているため、この予約は前払いのみです。お支払いが終わるまで確定しません。',
+        }
+      : {}),
+  };
   await saveIdempotencyResponse(c.env.DB, {
     key: idemKey,
     lineAccountId: accountId,
@@ -5085,6 +5128,17 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     day_before: sendDayBefore,
     hours_before: sendHoursBefore,
   });
+  // 無断キャンセルの前払いのみ。前払いの人（友だち登録があるときだけ判定）は
+  // ここでは確定させず、支払い済みの知らせで確定させる。
+  let adminPrepayOnly = false;
+  if (friendId) {
+    try {
+      adminPrepayOnly = (await decidePrepayOnly(c.env.DB, accountId, friendId)).prepayOnly;
+    } catch (error) {
+      console.error('prepay decision failed:', error);
+    }
+  }
+  const initialStatus = (adminPrepayOnly ? 'requested' : 'confirmed') satisfies BookingStatus;
   // 予約した時点の内容（値段・時間）の写しを持つ（T）。
   const menuSnapshot = buildMenuSnapshot(menuRow);
   const bookingInsert = c.env.DB.prepare(
@@ -5128,7 +5182,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       startsAt.toISOString(),
       endsAt.toISOString(),
       blockEndsAt.toISOString(),
-      'confirmed' satisfies BookingStatus,
+      initialStatus,
       body.customer_note ?? null,
       menuRow.price,
       nowIso,
@@ -5197,7 +5251,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   // 予約の確定を成果計測へ接続する(#648)。ここは代理登録で、入った時点で
   // 確定(confirmed)なので、この1か所が「確定した」の起点になる。
   // 友だちが紐づかない電話予約は数えない(成果は友だちに結びつける)。
-  if (friendId) {
+  // 前払いの人は支払い済みまで確定しないので、ここでは数えない。
+  if (friendId && initialStatus === 'confirmed') {
     try {
       await recordConversionSourceEvent(c.env.DB, {
         sourceType: 'reservation_confirmed',
@@ -5367,10 +5422,37 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       bookingCustomerId,
     }),
   ]);
+  // 前払いの人は支払いの記録を作る（online の店だけ）。none の店では印だけ付けて案内を出す。
+  let adminPrepayPayment: { id: string; status: string; holdUntil: string | null } | null = null;
+  if (adminPrepayOnly && initialStatus === 'requested') {
+    try {
+      const paymentConfig = await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id);
+      if (paymentConfig.mode === 'online' && menuRow.price > 0) {
+        const holdUntil = new Date(Date.now() + paymentConfig.holdMinutes * 60_000).toISOString();
+        const record = await createBookingPayment(c.env.DB, {
+          lineAccountId: accountId,
+          bookingId,
+          amount: menuRow.price,
+          provider: paymentConfig.provider,
+          idempotencyKey: `booking:${bookingId}`,
+          holdUntil,
+        });
+        adminPrepayPayment = { id: record.id, status: record.status, holdUntil: record.hold_until };
+      }
+    } catch (error) {
+      console.error('prepay payment record failed:', error);
+    }
+  }
   const response = {
     booking_id: bookingId,
     booking_customer_id: bookingCustomerId,
-    status: 'confirmed',
+    status: initialStatus,
+    ...(adminPrepayOnly
+      ? {
+          prepayNotice: '無断キャンセルが続いているため、この予約は前払いのみです。お支払いが終わるまで確定しません。',
+          payment: adminPrepayPayment,
+        }
+      : {}),
     calendar_sync: calendarSync,
     line_notification: sendLineConfirmation ? 'queued' : 'not_applicable',
     reminders: (reminderRows.results ?? []).map((row) => ({
