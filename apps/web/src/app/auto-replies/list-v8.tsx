@@ -38,6 +38,7 @@ import { formatNumber } from '@/lib/format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import Checkbox from '@/components/shared/checkbox'
 import HelpTip from '@/components/shared/help-tip'
 import Select from '@/components/shared/select'
@@ -828,24 +829,25 @@ export default function AutoRepliesListV8() {
         </div>
       ))}
     </div>
-  ) : visibleLoadState === 'error' || visibleLoadState === 'forbidden' ? (
+  ) : visibleLoadState === 'forbidden' ? (
+    <NoPermissionV8
+      featureName="自動応答"
+      capabilitiesHref="/staff"
+    />
+  ) : visibleLoadState === 'error' ? (
     <div className={styles.stateCard}>
       <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
         <TriangleAlert size={18} aria-hidden="true" />
       </span>
       <p className={styles.stateTitle}>
-        {visibleLoadState === 'forbidden' ? LOAD_STATE_WORDS.forbidden.label : '自動応答を読み込めませんでした'}
+        自動応答を読み込めませんでした
       </p>
       <p className={styles.stateDesc}>
-        {visibleLoadState === 'forbidden'
-          ? LOAD_STATE_WORDS.forbidden.note
-          : isForbiddenOrRateLimited(loadError)
-            ? LOAD_STATE_WORDS.error.note
-            : '登録したルールは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
+        {isForbiddenOrRateLimited(loadError)
+          ? LOAD_STATE_WORDS.error.note
+          : '登録したルールは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
       </p>
-      {visibleLoadState === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度試す</Button>
-      )}
+      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
     </div>
   ) : sortedItems.length === 0 ? (
     filterActive ? (
