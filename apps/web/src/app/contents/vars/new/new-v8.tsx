@@ -119,6 +119,15 @@ function validateVarKey(value: string): string | null {
     : '差し込み名は半角の英小文字で始め、英小文字・数字・下線だけで32文字までにしてください'
 }
 
+/*
+ * 欄の下の赤い1行。4欄で同じ形にするため1か所にまとめる。
+ * 直書きの className を欄ごとに増やさない（design-debt の計数）。
+ */
+function VarFieldError({ message }: { message: string }) {
+  if (!message) return null
+  return <p className={styles.fieldError} role="alert">{message}</p>
+}
+
 function suggestKey(name: string): string {
   const ascii = name
     .trim()
@@ -420,7 +429,7 @@ export default function NewCommonVarV8() {
                   className={styles.fieldInput}
                   aria-invalid={nameFieldError ? true : undefined}
                 />
-                {nameFieldError ? <p className={styles.fieldError} role="alert">{nameFieldError}</p> : null}
+                <VarFieldError message={nameFieldError} />
                 <p className={styles.fieldCount}>{name.length}/{NAME_MAX}</p>
               </div>
               <div>
@@ -464,7 +473,7 @@ export default function NewCommonVarV8() {
                   className={styles.fieldInputMono}
                   aria-invalid={keyFieldError ? true : undefined}
                 />
-                {keyFieldError ? <p className={styles.fieldError} role="alert">{keyFieldError}</p> : null}
+                <VarFieldError message={keyFieldError} />
                 {varKey.trim() ? (
                   <CopyTextButton
                     value={`{{var.${varKey.trim()}}}`}
@@ -549,7 +558,7 @@ export default function NewCommonVarV8() {
                   className={styles.fieldInput}
                 />
               )}
-              {valueFieldError ? <p className={styles.fieldError} role="alert">{valueFieldError}</p> : null}
+              <VarFieldError message={valueFieldError} />
               {type !== 'number' && type !== 'boolean' && (
                 <p className={styles.fieldCount}>{value.length}/{type === 'long_text' ? 10000 : VALUE_MAX}</p>
               )}
@@ -591,7 +600,7 @@ export default function NewCommonVarV8() {
                     className={styles.fieldInput}
                   />
                 )}
-                {fallbackFieldError ? <p className={styles.fieldError} role="alert">{fallbackFieldError}</p> : null}
+                <VarFieldError message={fallbackFieldError} />
               </div>
             )}
           </section>
