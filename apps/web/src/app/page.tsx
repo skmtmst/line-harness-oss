@@ -641,6 +641,7 @@ function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, upda
 /*
  * V8 だけ：編集パネル（dnd-kit を含む重い部品）は開くまで読まない。
  * v7 は今までどおり静的に読む（動きを変えない）。
+ * v7 も遅延化を試したが、開いてすぐ出る既存の試験が赤になるため戻した。
  */
 const DashboardEditorDynamic = dynamic(() => import('@/components/dashboard/dashboard-editor').then((module) => module.default), {
   loading: () => <p className="text-ink-faint text-sm">編集パネルを読み込んでいます</p>,
