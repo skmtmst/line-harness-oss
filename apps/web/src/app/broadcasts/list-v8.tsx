@@ -904,7 +904,7 @@ export default function BroadcastListV8() {
             )
           ) : (
             <>
-              <div className={styles.tableWrap}>
+              <div className={styles.tableWrap} data-content-in="">
                 <table className={styles.table}>
                   <thead>
                     <TableHeadRow>
