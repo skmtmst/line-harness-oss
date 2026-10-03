@@ -484,6 +484,7 @@ export default function NewAffiliatePage() {
       }
     >
       {conflictLatest ? (
+        <div data-design-node="Gqve5">
         <Notice tone="warn" data-design-part="edit-conflict-band">
           <p className="font-semibold">
             {formatSavedAt(conflictLatest.updatedAt)
@@ -528,6 +529,7 @@ export default function NewAffiliatePage() {
             }}
           /> : null}
         </Notice>
+        </div>
       ) : null}
       <FormSection step={1} label="だれを登録するか">
         {partialSave && createdId ? (

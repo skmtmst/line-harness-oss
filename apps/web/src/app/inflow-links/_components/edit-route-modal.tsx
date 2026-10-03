@@ -230,6 +230,7 @@ export default function EditRouteModal({
     >
       <div className="space-y-3">
         {!isNew && conflictLatest ? (
+          <div data-design-node="E14GFm">
           <Notice tone="warn" data-design-part="edit-conflict-band">
             {takenIn ? (
               <p className="font-semibold">
@@ -269,6 +270,7 @@ export default function EditRouteModal({
               />
             ) : null}
           </Notice>
+          </div>
         ) : null}
         <Field label="フォルダ（任意）">
           <input
