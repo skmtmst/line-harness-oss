@@ -1,0 +1,251 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B NEN配信（自動配信 `MuhWR`・コラムを書く `yRDwW`・コラム `Jxmqh`・
+ * 送った履歴 `Tj7n4`・配信を直す `w5pwG`・クーポンの決めごと `oqSJP`・状態 `dzx5D`）。
+ * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+/* 見出しブロック：画面名＋一行の説明。右に操作ボタン。 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 数の帯：1枚の白い板を区切り線で4つに分ける（離したカードにしない）。 */
+.kpiBand {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  list-style: none;
+}
+
+.kpiCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 16px;
+}
+
+.kpiCell + .kpiCell {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.kpiHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.kpiIcon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-ink-faint);
+}
+
+.kpiLabel {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 数の帯の右上の「…」：由来の説明を title で見せるだけの印。 */
+.kpiHelp {
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: help;
+}
+
+.kpiValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 26px;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpiSub {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* 道具の段：探す＋よく使う札。右端に「○件表示」。 */
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.searchGrow {
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: 320px;
+}
+
+.toolsTail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.rangeLabel {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tableWrap {
+  min-width: 0;
+}
+
+.listFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.listHint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* 選んだコラム：表の下のカード。紹介文・相手・日時をここで決める。 */
+.selectPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.selectTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.selectDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.selectGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.selectFoot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* 板が狭いとき：数の帯は2×2、選んだコラムは1列に畳む。 */
+@container (max-width: 900px) {
+  .kpiBand {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpiCell + .kpiCell {
+    border-left: 0;
+  }
+
+  .kpiCell:nth-child(even) {
+    border-left: 1px solid var(--color-hairline);
+  }
+
+  .kpiCell:nth-child(n + 3) {
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .selectGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .toolsTail {
+    margin-left: 0;
+  }
+}

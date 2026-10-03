@@ -82,7 +82,7 @@ export type ColumnDeliveryPlan = {
 
 export type FriendOption = { id: string; displayName: string | null }
 
-const statusLabel: Record<string, string> = {
+export const statusLabel: Record<string, string> = {
   pending: 'これから送ります',
   processing: '送信中',
   sent: '送りました',
@@ -91,7 +91,7 @@ const statusLabel: Record<string, string> = {
   cancelled: '取り消し済み',
 }
 
-const columnStatusLabel: Record<NenColumn['deliveryStatus'], string> = {
+export const columnStatusLabel: Record<NenColumn['deliveryStatus'], string> = {
   draft: '未配信',
   scheduled: '予約',
   queued: '配信待ち',
@@ -119,14 +119,14 @@ const skippedFixableReasons = new Set(['line_account_unavailable', 'campaign_dis
 
 // #733: 再送できるのは上限まで失敗した記録と、直せる理由で止まった記録だけ。
 // ボタンを出しても最終判断はサーバが行い、前提が直っていなければ409で止める。
-function canRetryDelivery(delivery: { status: string; attempts: number; unmetReasonCode: string | null }): boolean {
+export function canRetryDelivery(delivery: { status: string; attempts: number; unmetReasonCode: string | null }): boolean {
   if (delivery.status === 'failed') return delivery.attempts >= 5
   if (delivery.status !== 'skipped') return false
   return delivery.unmetReasonCode !== null && skippedFixableReasons.has(delivery.unmetReasonCode)
 }
 
 // #733: 直せない理由はボタンを出さず、理由別の説明だけ出す。
-const skippedNoRetryNote: Record<string, string> = {
+export const skippedNoRetryNote: Record<string, string> = {
   friend_unavailable: '友だち側の事情のため、この記録は再送できません。',
   campaign_snapshot_missing: '予約内容が残っていないため、この記録は再送できません。',
   line_account_mismatch: 'アカウントが一致しないため、この記録は再送できません。',
@@ -136,7 +136,7 @@ const skippedNoRetryNote: Record<string, string> = {
   order_refunded: '注文が返金になったため、この記録は再送しません。注文の状態は「EC連携」の取り込みの記録で確認できます。',
 }
 
-function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined): string | null {
+export function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined): string | null {
   if (!skippedReasons) return null
   const entries = Object.entries(skippedReasons).filter(([, count]) => count > 0)
   if (entries.length === 0) return null
@@ -149,7 +149,7 @@ function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined
   return `送らなかった内訳 ${breakdown}(うち直せる ${fixable})`
 }
 
-function num(value: number | null | undefined): string {
+export function num(value: number | null | undefined): string {
   return value == null ? '—' : formatNumber(value)
 }
 
@@ -172,7 +172,7 @@ function CampaignIcon({ campaignKey }: { campaignKey: string }) {
  * テスト送信先の選択。候補は「設定 › アカウント › テスト送信先」に登録した人だけ。
  * 誰も登録されていなければ、選ばせる代わりに登録先へ案内する（押しても届かない状態を作らない）。
  */
-function TestRecipientPicker({ friends, value, onChange, accountId }: {
+export function TestRecipientPicker({ friends, value, onChange, accountId }: {
   friends: FriendOption[]
   value: string
   onChange: (id: string) => void
@@ -633,7 +633,7 @@ function AutoPanel({
 
 /* ───────────── 誕生日クーポンの決めごと ───────────── */
 
-function CouponDrawer({ open, coupon, saving, onClose, onChange, onSave }: {
+export function CouponDrawer({ open, coupon, saving, onClose, onChange, onSave }: {
   open: boolean
   coupon: NenCoupon
   saving: boolean
@@ -684,7 +684,7 @@ function CouponDrawer({ open, coupon, saving, onClose, onChange, onSave }: {
 
 type ColumnDeliveryFilter = '' | 'draft' | 'scheduled' | 'sent'
 
-function columnDeliveryBadge(column: NenColumn) {
+export function columnDeliveryBadge(column: NenColumn) {
   if (column.deliveryStatus === 'sent') return <StatusBadge tone="success" size="compact">配信済み {jstShortDate(column.deliveryAt)}</StatusBadge>
   if (column.deliveryStatus === 'scheduled') return <StatusBadge tone="warning" size="compact">予約 {jstShortDateTime(column.deliveryAt)}</StatusBadge>
   if (column.deliveryStatus === 'queued') return <StatusBadge tone="info" size="compact">配信待ち {jstShortDateTime(column.deliveryAt)}</StatusBadge>
@@ -1214,7 +1214,7 @@ function deliveryViewStatus(filter: HistoryFilter): string | undefined {
   return filter
 }
 
-function deliveryTriggerLabel(campaignKey: string) {
+export function deliveryTriggerLabel(campaignKey: string) {
   const labels: Record<string, string> = {
     order_confirmed: '注文が確定', shipping_confirmed: '発送を登録', arrival_check: '発送後の到着確認',
     review_request: '発送後の口コミ依頼', cross_sell: '発送後のご案内', column: 'コラムの予約', birthday_coupon: 'ペットの誕生日',
