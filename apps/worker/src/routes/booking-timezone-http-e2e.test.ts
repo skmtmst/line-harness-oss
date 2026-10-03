@@ -134,8 +134,8 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
       INSERT INTO line_accounts
         (id, channel_id, name, channel_access_token, channel_secret, liff_id, timezone)
       VALUES ('account-ny', 'channel-ny', 'NY店', 'token-ny', 'secret-ny', 'liff-ny-1', '${NY}');
-      INSERT INTO booking_settings (id, line_account_id, timezone)
-      VALUES ('settings-ny', 'account-ny', '${NY}');
+      INSERT INTO booking_settings (id, line_account_id, timezone, approval_mode)
+      VALUES ('settings-ny', 'account-ny', '${NY}', 'manual');
       INSERT INTO menus (id, line_account_id, name, duration_minutes, buffer_after_minutes, base_price)
       VALUES
         ('menu-ny', 'account-ny', '相談', 60, 0, 8000),

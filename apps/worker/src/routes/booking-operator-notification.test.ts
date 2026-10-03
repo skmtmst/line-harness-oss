@@ -144,9 +144,9 @@ describe('N-327 #663 予約の受付から運用者通知を自動発火する',
       VALUES
         ('${ACCOUNT}', 'channel-a', 'A店', 'token-a', 'secret-a', 'liff-a-1', 'Asia/Tokyo'),
         ('${OTHER_ACCOUNT}', 'channel-b', 'B店', 'token-b', 'secret-b', 'liff-b-1', 'Asia/Tokyo');
-      INSERT INTO booking_settings (id, line_account_id, timezone)
-      VALUES ('settings-a', '${ACCOUNT}', 'Asia/Tokyo'),
-             ('settings-b', '${OTHER_ACCOUNT}', 'Asia/Tokyo');
+      INSERT INTO booking_settings (id, line_account_id, timezone, approval_mode)
+      VALUES ('settings-a', '${ACCOUNT}', 'Asia/Tokyo', 'manual'),
+             ('settings-b', '${OTHER_ACCOUNT}', 'Asia/Tokyo', 'manual');
 
       INSERT INTO staff (id, line_account_id, name, display_name)
       VALUES ('staff-a', '${ACCOUNT}', '担当A', '担当A'),
