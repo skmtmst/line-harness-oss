@@ -661,6 +661,20 @@
       "column": "line_account_id"
     }
   },
+  "booking_visit_marks": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_waitlist": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "bookings": {
     "category": "purge",
     "scope": {
