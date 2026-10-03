@@ -64,7 +64,7 @@ export default function Confirm({
   return (
     <div className="space-y-3.5" data-design-node={wide ? 'uZqMA' : 'gLReL'}>
       <h2 className="text-xl font-bold text-ink">内容を確かめてください</h2>
-      <dl className="divide-y divide-liff-divider rounded-[14px] bg-canvas px-3.5 outline outline-1 -outline-offset-1 outline-liff-line">
+      <dl className="divide-y divide-liff-divider rounded-[14px] bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
         <Row label="メニュー" value={menu.name} />
         <Row
           label="日時"
@@ -83,7 +83,7 @@ export default function Confirm({
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="mt-1.5 min-h-18 w-full rounded-[10px] bg-canvas p-3 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-liff-line placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
+          className="mt-1.5 min-h-18 w-full rounded-[10px] bg-canvas px-3.5 py-3 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
           rows={3}
           placeholder="例：前髪は短めにしたい"
         />
@@ -120,7 +120,7 @@ export default function Confirm({
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline gap-4 py-3">
+    <div className="flex items-baseline gap-2 py-2.5">
       <dt className="w-18 shrink-0 text-xs text-liff-sub">{label}</dt>
       <dd className="min-w-0 flex-1 truncate text-sm font-semibold text-ink" title={value}>
         {value}
