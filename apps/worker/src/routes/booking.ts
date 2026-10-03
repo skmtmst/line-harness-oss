@@ -3513,6 +3513,197 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
   return c.json({ error: 'not_found' }, 404);
 });
 
+/**
+ * 今日の予約を1画面で：その日の予約を時刻順に返す。
+ *
+ * date は店の暦日（YYYY-MM-DD、省いたら今日の日本日付）。
+ * いまは日本時間（+09:00）固定で日の範囲を作る。
+ */
+booking.get('/api/booking/admin/today', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const rawDate = c.req.query('date')?.trim() || jstDateString(new Date());
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(rawDate) || Number.isNaN(Date.parse(`${rawDate}T00:00:00+09:00`))) {
+    return c.json({ error: 'invalid_date' }, 400);
+  }
+  const conditions = ['b.line_account_id = ?', 'b.starts_at >= ?', 'b.starts_at < ?'];
+  const dayStart = new Date(`${rawDate}T00:00:00+09:00`).toISOString();
+  const dayEnd = new Date(Date.parse(dayStart) + 86_400_000).toISOString();
+  const values: unknown[] = [accountId, dayStart, dayEnd];
+  const status = c.req.query('status')?.trim();
+  if (status && ['requested', 'confirmed', 'completed', 'no_show', 'cancelled'].includes(status)) {
+    conditions.push('b.status = ?');
+    values.push(status);
+  } else if (!status) {
+    conditions.push(`b.status NOT IN ('cancelled', 'rejected', 'expired')`);
+  }
+  const staffId = c.req.query('staff_id')?.trim();
+  if (staffId) { conditions.push('b.staff_id = ?'); values.push(staffId); }
+  const rows = await c.env.DB
+    .prepare(
+      `SELECT b.id, b.starts_at, b.ends_at, b.status, b.price_at_booking,
+              b.friend_id, b.booking_customer_id,
+              m.id AS menu_id, m.name AS menu_name,
+              s.id AS staff_id, s.display_name AS staff_name,
+              COALESCE(f.display_name, bc.display_name) AS customer_name
+         FROM bookings b
+         INNER JOIN menus m ON m.id = b.menu_id
+         INNER JOIN staff s ON s.id = b.staff_id
+         LEFT JOIN friends f ON f.id = b.friend_id
+         LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY b.starts_at ASC LIMIT 200`,
+    )
+    .bind(...values)
+    .all<{
+      id: string;
+      starts_at: string;
+      ends_at: string;
+      status: string;
+      price_at_booking: number;
+      friend_id: string | null;
+      booking_customer_id: string | null;
+      menu_id: string;
+      menu_name: string;
+      staff_id: string;
+      staff_name: string;
+      customer_name: string | null;
+    }>();
+  const bookings = rows.results ?? [];
+  // 最新の印を1件ずつ付ける（だれがいつ付けたか）。
+  const marks = new Map<string, {
+    kind: string; late_minutes: number | null;
+    marked_by_name: string | null; marked_at: string;
+  }>();
+  if (bookings.length > 0) {
+    const marksRows = await c.env.DB
+      .prepare(
+        `SELECT booking_id, kind, late_minutes, marked_by_name, marked_at
+           FROM booking_visit_marks
+          WHERE line_account_id = ? AND booking_id IN (${bookings.map(() => '?').join(',')})
+          ORDER BY marked_at DESC`,
+      )
+      .bind(accountId, ...bookings.map((booking) => booking.id))
+      .all<{
+        booking_id: string;
+        kind: string;
+        late_minutes: number | null;
+        marked_by_name: string | null;
+        marked_at: string;
+      }>();
+    for (const mark of marksRows.results ?? []) {
+      if (!marks.has(mark.booking_id)) {
+        marks.set(mark.booking_id, {
+          kind: mark.kind,
+          late_minutes: mark.late_minutes,
+          marked_by_name: mark.marked_by_name,
+          marked_at: mark.marked_at,
+        });
+      }
+    }
+  }
+  return c.json({
+    date: rawDate,
+    bookings: bookings.map((booking) => ({
+      ...booking,
+      visit_mark: marks.get(booking.id) ?? null,
+    })),
+  });
+});
+
+function jstDateString(now: Date): string {
+  const jst = new Date(now.getTime() + 9 * 3600_000);
+  return jst.toISOString().slice(0, 10);
+}
+
+const VISIT_KINDS = ['visited', 'late', 'no_show'] as const;
+type VisitKind = (typeof VISIT_KINDS)[number];
+
+/**
+ * 今日の予約に印を付ける。「来店した」→完了、「来なかった」→無断、
+ * 「遅れる」→状態は変えず遅れ分数だけ残す。だれがいつ付けたか残す。
+ */
+booking.post('/api/booking/admin/bookings/:id/visit', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const id = c.req.param('id');
+  const body = await c.req.json<{ kind?: unknown; late_minutes?: unknown }>().catch(() => null);
+  const kind = typeof body?.kind === 'string' && (VISIT_KINDS as readonly string[]).includes(body.kind)
+    ? (body.kind as VisitKind)
+    : null;
+  if (!kind) return c.json({ error: 'invalid_kind' }, 400);
+  const lateMinutes = body?.late_minutes === undefined || body?.late_minutes === null
+    ? null
+    : Number(body.late_minutes);
+  if (kind === 'late') {
+    if (!Number.isInteger(lateMinutes) || (lateMinutes as number) < 1 || (lateMinutes as number) > 1440) {
+      return c.json({ error: 'invalid_late_minutes' }, 400);
+    }
+  } else if (lateMinutes !== null) {
+    return c.json({ error: 'late_minutes_not_needed' }, 400);
+  }
+  const row = await c.env.DB
+    .prepare(`SELECT id, status FROM bookings WHERE id = ? AND line_account_id = ?`)
+    .bind(id, accountId)
+    .first<{ id: string; status: BookingStatus }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+  const action = kind === 'visited' ? 'complete' : kind === 'no_show' ? 'no_show' : null;
+  let next = row.status;
+  if (action) {
+    if (!canTransition(row.status, action)) {
+      return c.json({ error: 'invalid_transition' }, 409);
+    }
+    next = nextStatus(row.status, action);
+    const updated = await c.env.DB
+      .prepare(`UPDATE bookings SET status = ?, decided_at = ?,
+                    updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ? AND status = ?`)
+      .bind(next, new Date().toISOString(), id, row.status)
+      .run();
+    if ((updated.meta?.changes ?? 0) === 0) {
+      return c.json({ error: 'concurrent_update' }, 409);
+    }
+  } else if (row.status === 'cancelled' || row.status === 'rejected' || row.status === 'expired'
+    || row.status === 'completed' || row.status === 'no_show') {
+    return c.json({ error: 'already_closed' }, 409);
+  }
+  const me = c.get('staff') as { id?: string; name?: string } | undefined;
+  const markedAt = new Date().toISOString();
+  const markId = crypto.randomUUID();
+  await c.env.DB
+    .prepare(`INSERT INTO booking_visit_marks
+      (id, booking_id, line_account_id, kind, late_minutes,
+       marked_by_staff_id, marked_by_name, marked_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(id, id, accountId, kind, lateMinutes,
+      typeof me?.id === 'string' ? me.id : null,
+      typeof me?.name === 'string' ? me.name : null,
+      markedAt)
+    .run();
+  await recordBookingAudit(c.env.DB, {
+    bookingId: id,
+    lineAccountId: accountId,
+    action: 'visit_marked',
+    before: { status: row.status },
+    after: { status: next, visit_kind: kind, late_minutes: lateMinutes },
+    reason: 'today_visit_mark',
+    actorType: 'staff',
+    actorId: typeof me?.id === 'string' ? me.id : null,
+    actorName: typeof me?.name === 'string' ? me.name : null,
+    occurredAt: markedAt,
+  });
+  return c.json({
+    status: next,
+    visit_mark: {
+      id: markId,
+      kind,
+      late_minutes: lateMinutes,
+      marked_by_name: typeof me?.name === 'string' ? me.name : null,
+      marked_at: markedAt,
+    },
+  });
+});
+
 booking.get('/api/booking/admin/reminder-preview', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);

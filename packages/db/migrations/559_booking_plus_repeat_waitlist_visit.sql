@@ -51,7 +51,10 @@ CREATE TABLE IF NOT EXISTS booking_visit_marks (
   kind                  TEXT NOT NULL CHECK (kind IN ('visited', 'late', 'no_show')),
   -- late のときだけ必須の遅れ分数。
   late_minutes          INTEGER CHECK (late_minutes IS NULL OR (late_minutes BETWEEN 1 AND 1440)),
-  marked_by_staff_id    TEXT REFERENCES staff(id),
+  -- 付けた人（ログイン利用者）。予約の担当表とは別物なので外部キーは付けない
+  -- （監査の actor と同じ考え方）。表示名も一緒に残す。
+  marked_by_staff_id    TEXT,
+  marked_by_name        TEXT,
   -- UTC ISO8601。付けた時刻。
   marked_at             TEXT NOT NULL,
   created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
