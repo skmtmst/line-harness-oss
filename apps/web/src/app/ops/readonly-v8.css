@@ -55,3 +55,10 @@
 @media (max-width: 767px) { [data-theme='v8'] .v8-ro-ops-dashboard { grid-template-columns: minmax(0,1fr); } }
 [data-theme='v8'] .v8-ro-ops-metrics > div:not(:last-child) { border-right: 1px solid var(--color-hairline); }
 [data-theme='v8'] .v8-ro-ops-dashboard .v8-ro-ops-metrics > [data-design-node='BaoAQ'] { order: -1; }
+
+/*
+ * 契約先一覧：1152幅で表が器からはみ出す。統括名は伸び縮み（省略＋title 済み）・
+ * 利用/請求と操作は中身に合わせた幅へ。v7 は変えない。
+ */
+[data-theme='v8'] th.tenants-use-col { width: 8rem; }
+[data-theme='v8'] th.tenants-op-col { width: 8rem; }
