@@ -525,7 +525,8 @@ function AutoPanel({
             options={[{ value: 'sent_desc', label: `並び：${monthLabel}の送信が多い順` }, { value: 'name', label: '並び：名前順' }]}
           />
         </div>
-        <span className="ml-auto text-caption font-semibold text-ink-faint">{shown.length}件</span>
+        {/* 読み込み中・失敗中は数を持たない。「0件」は「1つも無い」という別の意味になる。 */}
+        <span className="ml-auto text-caption font-semibold text-ink-faint">{loading || tabError ? '—' : `${shown.length}件`}</span>
       </div>
 
       {/* 開封の列は「—」しか並ばないので置かず、理由だけここに残す。 */}
@@ -829,8 +830,9 @@ function ColumnsPanel({
               onChange={(value) => { setDelivery(value === 'draft' || value === 'scheduled' || value === 'sent' ? value : ''); setPage(1) }}
               options={[{ value: '', label: '配信：すべて' }, { value: 'draft', label: '配信：未配信' }, { value: 'scheduled', label: '配信：予約' }, { value: 'sent', label: '配信：配信済み' }]}
             />
+            {/* 読み込み中・失敗中は数を持たない。「0本」は「1つも無い」という別の意味になる。 */}
             <span className="ml-auto text-caption font-semibold text-ink-faint">
-              {columnsTruncated ? `${shown.length}本（全体 ${num(columnsTotal)}本）` : `${shown.length}本`}
+              {loading || tabError ? '—' : (columnsTruncated ? `${shown.length}本（全体 ${num(columnsTotal)}本）` : `${shown.length}本`)}
             </span>
           </div>
 
@@ -1189,15 +1191,18 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
           </DataTable>
         )}
       </section>
+      {/* 一覧が無い（読み込み中・失敗中）の間は件数を持たない。「全0記録」は「1つも無い」という別の意味になる。 */}
+      {!deliveryList || tabError ? null : (
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <ListRange label="記録" total={deliveryList?.pagination.total ?? 0} first={shown.length === 0 ? 0 : cursor + 1} last={shown.length === 0 ? 0 : cursor + shown.length} />
-        {deliveryList && (cursor > 0 || deliveryList.pagination.nextCursor) ? (
+        <ListRange label="記録" total={deliveryList.pagination.total} first={shown.length === 0 ? 0 : cursor + 1} last={shown.length === 0 ? 0 : cursor + shown.length} />
+        {(cursor > 0 || deliveryList.pagination.nextCursor) ? (
           <div className="flex gap-2" aria-label="送った履歴のページ送り">
             <Button type="button" disabled={cursor === 0} onClick={() => onChangeView(deliveryViewStatus(filter), String(Math.max(0, cursor - limit)), appliedQuery)}>前へ</Button>
             <Button type="button" disabled={!deliveryList.pagination.nextCursor} onClick={() => onChangeView(deliveryViewStatus(filter), deliveryList.pagination.nextCursor ?? undefined, appliedQuery)}>次へ</Button>
           </div>
         ) : null}
       </div>
+      )}
     </>
   )
 }
