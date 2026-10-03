@@ -213,4 +213,25 @@
   color: var(--color-ink-faint);
   font-size: var(--text-label);
 }
+
+/*
+ * ★V8 仕上げ（M10-2）：棒のふきだしの開く動き。
+ * 選んだ日の白いふきだしは少し下からふっと出る
+ * （小さいふきだしなので 120ms）。横の位置合わせは変えない。
+ */
+[data-theme='v8'] [aria-pressed='true'] .tooltip {
+  animation: bar-chart-v8-tooltip-in var(--motion-fast) var(--motion-ease-out);
+}
+
+@keyframes bar-chart-v8-tooltip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
 }
