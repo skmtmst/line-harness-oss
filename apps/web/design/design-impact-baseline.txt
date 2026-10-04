@@ -4,6 +4,7 @@ shared-button-importer app/accounts/handover/handover-v8.tsx
 shared-button-importer app/accounts/handover/page.tsx
 shared-button-importer app/accounts/migration.tsx
 shared-button-importer app/accounts/new/page.tsx
+shared-button-importer app/accounts/new/register-v8.tsx
 shared-button-importer app/accounts/page.tsx
 shared-button-importer app/accounts/uid-migration-v8.tsx
 shared-button-importer app/affiliate-offers/new-offer-v8.tsx
