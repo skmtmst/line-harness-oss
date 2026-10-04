@@ -105,7 +105,7 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).not.toContain('{item.label}\n                </button>')
     expect(PAGE).toContain('data-inbox-sort="fixed"')
     // V8の画面では「未読」を運用者向けの「未対応」と表示する。
-    expect(PAGE).toContain('並び順：未対応が先・新しい順')
+    expect(PAGE).toContain('並び順：未読が先・新しい順')
     expect(PAGE).not.toContain('aria-label="並び順"')
     expect(PAGE).not.toContain('defaultValue="newest"')
     expect(PAGE).toContain('shrink-0 items-center')
