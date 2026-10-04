@@ -3793,7 +3793,7 @@ CREATE TABLE measurement_sites (
   label           TEXT NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at      TEXT
-, stopped_at TEXT, stopped_reason TEXT);
+, stopped_at TEXT, stopped_reason TEXT, last_received_at TEXT);
 
 CREATE TABLE media (
   id          TEXT PRIMARY KEY,

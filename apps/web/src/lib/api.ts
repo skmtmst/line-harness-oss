@@ -1451,7 +1451,7 @@ export type ConversionDefinitionEvent = {
 }
 
 /** #819: 計測サイト。公開ID・許可ドメイン・許可外ドメインの拒否集計。 */
-export type MeasurementSite = {
+export type MeasurementSite = Partial<import('@line-crm/shared').MeasurementSiteReceipt> & {
   id: string
   label: string
   domains: string[]

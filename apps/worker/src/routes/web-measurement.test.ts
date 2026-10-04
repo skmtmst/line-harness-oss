@@ -472,3 +472,19 @@ describe('成果の取消・取消の取消', () => {
     expect(noReason.status).toBe(400);
   });
 });
+
+it('サイトごとの同意済み受信時刻を返し、対象外送信では書き換えない', async () => {
+ const testDb = createTestD1();
+ try {
+  seed(testDb); const siteId = seedSite(testDb);
+  const read = () => testDb.raw.prepare('SELECT last_received_at FROM measurement_sites WHERE id=?').get(siteId) as {last_received_at:string|null};
+  await postConversion(testDb,{siteId,host:'example.com',path:'/not-a-conversion',consent:'granted'});
+  const accepted = read().last_received_at;
+  expect(accepted).toBeTruthy();
+  await postConversion(testDb,{siteId,host:'bad.example.org',consent:'granted'});
+  await postConversion(testDb,{siteId,host:'example.com',consent:'declined'});
+  expect(read().last_received_at).toBe(accepted);
+  const list = await req(app(staff('owner-1','tenant-1')),testDb,'/api/measurement-sites?accountId=a1');
+  expect((await list.json() as any).data[0].lastReceivedAt).toBe(accepted);
+ } finally { testDb.raw.close(); }
+});

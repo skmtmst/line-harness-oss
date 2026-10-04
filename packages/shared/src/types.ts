@@ -2567,3 +2567,6 @@ export interface EventApplicationPreview {
   questions: Array<{ id: string; label: string; required: boolean; type: string }>;
   previewOnly: true;
 }
+
+/** サイトごとの同意済み最終受信。まだ受け取っていなければnull。 */
+export interface MeasurementSiteReceipt { lastReceivedAt: string | null }
