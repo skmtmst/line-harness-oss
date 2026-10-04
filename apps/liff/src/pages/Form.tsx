@@ -7,13 +7,14 @@ import {
   isOtherFreeText,
   nextSectionIndex,
   normalizeFormTheme,
+  normalizeRatingValue,
   validateAnswer,
   type FormBlock,
   type FormInputBlock,
   type FormLayout,
 } from '@line-crm/shared';
 import { submitButtonText } from '../lib/form-button-text.js';
-import { api, type PublicForm } from '../lib/api.js';
+import { api, type PostalCodeCandidate, type PublicForm } from '../lib/api.js';
 import {
   conflictMessage,
   decideFormSubmitStep,
@@ -644,6 +645,205 @@ export default function Form() {
 }
 
 /**
+ * F-11：5段階評価は★5つで答える。触る場所は44px以上にする。
+ * 値は 1〜5 の数で回答に入る（保存・平均の数え方と合わせる）。
+ */
+function RatingStars({
+  name,
+  current,
+  onChange,
+}: {
+  name: string;
+  current: number | null;
+  onChange: (name: string, value: unknown) => void;
+}) {
+  return (
+    <div role="radiogroup" aria-label="5段階評価" className="mt-1 flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          role="radio"
+          aria-checked={current === n}
+          aria-label={`星${n}つ`}
+          onClick={() => onChange(name, n)}
+          className={`flex min-h-11 min-w-11 items-center justify-center text-3xl leading-none ${
+            current != null && n <= current ? 'text-liff-star' : 'text-liff-idle'
+          }`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** 回答の住所の形。空欄は空文字に寄せる（未入力判定と一致させるため）。 */
+type AddressDraft = {
+  postalCode: string;
+  prefecture: string;
+  city: string;
+  addressLine1: string;
+  addressLine2: string;
+};
+
+function toAddressDraft(value: unknown): AddressDraft {
+  const empty: AddressDraft = { postalCode: '', prefecture: '', city: '', addressLine1: '', addressLine2: '' };
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return empty;
+  const v = value as Record<string, unknown>;
+  const text = (key: string): string => (typeof v[key] === 'string' ? (v[key] as string) : '');
+  return {
+    postalCode: text('postalCode'),
+    prefecture: text('prefecture'),
+    city: text('city'),
+    addressLine1: text('addressLine1'),
+    addressLine2: text('addressLine2'),
+  };
+}
+
+/**
+ * F-11：住所は郵便番号→自動補完＋手入力。候補が複数の番号は選んでもらう。
+ * 選ばなければ手入力の住所はそのまま残す（上書きは選んだときだけ）。
+ */
+function AddressFields({
+  name,
+  draft,
+  onChange,
+  inputClass,
+}: {
+  name: string;
+  draft: AddressDraft;
+  onChange: (name: string, value: unknown) => void;
+  inputClass: string;
+}) {
+  const [candidates, setCandidates] = useState<PostalCodeCandidate[]>([]);
+  const [looking, setLooking] = useState(false);
+  const [lookupMessage, setLookupMessage] = useState<string | null>(null);
+
+  const patch = (next: AddressDraft) => onChange(name, next);
+
+  const applyCandidate = (c: PostalCodeCandidate) => {
+    patch({
+      ...draft,
+      postalCode: draft.postalCode,
+      prefecture: c.prefecture,
+      city: c.city,
+      // 町名は番地欄が空のときだけ入れる。書いた番地は消さない。
+      addressLine1: draft.addressLine1 || c.town,
+    });
+    setCandidates([]);
+    setLookupMessage(null);
+  };
+
+  const lookup = async () => {
+    setLooking(true);
+    setLookupMessage(null);
+    try {
+      const res = await api.postalCodeSearch(draft.postalCode);
+      const data = res.data;
+      if (data.status === 'matched' && data.candidates.length === 1) {
+        applyCandidate(data.candidates[0]);
+        return;
+      }
+      if (data.status === 'multiple') {
+        setCandidates(data.candidates);
+        return;
+      }
+      setCandidates([]);
+      setLookupMessage(
+        data.status === 'invalid'
+          ? '郵便番号は 123-4567 のように入力してください'
+          : 'その郵便番号の住所が見つかりません。下の欄へ直接入力してください',
+      );
+    } catch {
+      setCandidates([]);
+      setLookupMessage('住所を調べられませんでした。下の欄へ直接入力してください');
+    } finally {
+      setLooking(false);
+    }
+  };
+
+  return (
+    <div className="mt-1 space-y-2">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={draft.postalCode}
+          placeholder="123-4567"
+          aria-label="郵便番号"
+          onChange={(e) => patch({ ...draft, postalCode: e.target.value })}
+          className={inputClass}
+        />
+        <button
+          type="button"
+          onClick={() => void lookup()}
+          disabled={looking}
+          className="min-h-11 shrink-0 rounded-[10px] border border-liff-line-strong bg-canvas px-3 text-sm font-bold text-ink disabled:opacity-50"
+        >
+          {looking ? '調べています...' : '住所を自動入力'}
+        </button>
+      </div>
+      {candidates.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs text-ink-faint">候補が複数あります。選んでください</p>
+          {candidates.map((c) => (
+            <button
+              key={`${c.postalCode}-${c.town}`}
+              type="button"
+              onClick={() => applyCandidate(c)}
+              className="block w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3 py-2 text-left text-sm text-ink"
+            >
+              {c.prefecture}
+              {c.city}
+              {c.town}
+            </button>
+          ))}
+        </div>
+      )}
+      {lookupMessage && <p className="text-xs text-ink-faint">{lookupMessage}</p>}
+      <select
+        value={draft.prefecture}
+        aria-label="都道府県"
+        onChange={(e) => patch({ ...draft, prefecture: e.target.value })}
+        className={inputClass}
+      >
+        <option value="">都道府県を選択</option>
+        {PREFECTURES.map((p) => (
+          <option key={p} value={p}>
+            {p}
+          </option>
+        ))}
+      </select>
+      <input
+        type="text"
+        value={draft.city}
+        placeholder="市区町村（例：千代田区）"
+        aria-label="市区町村"
+        onChange={(e) => patch({ ...draft, city: e.target.value })}
+        className={inputClass}
+      />
+      <input
+        type="text"
+        value={draft.addressLine1}
+        placeholder="番地（例：1-1）"
+        aria-label="番地"
+        onChange={(e) => patch({ ...draft, addressLine1: e.target.value })}
+        className={inputClass}
+      />
+      <input
+        type="text"
+        value={draft.addressLine2}
+        placeholder="建物名・部屋番号（任意）"
+        aria-label="建物名"
+        onChange={(e) => patch({ ...draft, addressLine2: e.target.value })}
+        className={inputClass}
+      />
+    </div>
+  );
+}
+
+/**
  * ブロック1つを描く。
  * 直し方 (error) は欄のすぐ下に出す (★V7 4-a)。枠の色も直しの色にする。
  */
@@ -924,6 +1124,28 @@ function BlockView({
               );
             })}
           </div>
+        )}
+
+        {/*
+          F-11：5段階評価は★で答える。初期値は「3」などの文字でも来るため
+          数に直してから塗る（直せない文字は未選択として出す）。
+        */}
+        {block.type === 'rating' && (
+          <RatingStars
+            name={block.name}
+            current={normalizeRatingValue(value)}
+            onChange={onChange}
+          />
+        )}
+
+        {/* F-11：住所は郵便番号から自動補完。手入力も残す。 */}
+        {block.type === 'address' && (
+          <AddressFields
+            name={block.name}
+            draft={toAddressDraft(value)}
+            onChange={onChange}
+            inputClass={inputClass}
+          />
         )}
 
         {block.type === 'file' && (

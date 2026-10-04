@@ -28,6 +28,7 @@ import {
   nextVisitPeople,
   postActionsNeedRetry,
   postActionsText,
+  ratingAverageText,
   type DestinationWrite,
   type FormSubmissionSummary,
   type SubmissionPostActions,
@@ -652,6 +653,19 @@ function FormResponsesInner() {
         <ListState kind="empty" title="まだ回答がありません" description="フォームが回答されると、ここに1件ずつ並びます。" />
       ) : view === 'summary' ? (
         <div className="grid gap-3 md:grid-cols-2">
+          {/*
+            F-11：5段階評価の平均（全回答から集計）。下の質問ごとの集計は
+            表示中の回答だけだが、平均は選んだ店舗の全回答で出す。
+          */}
+          {(summary?.ratingFields ?? []).map((field) => (
+            <section key={`rating-${field.key}`} className="bg-canvas rounded-card border-hairline border p-4">
+              <h2 className="text-ink text-sm font-semibold">集まった回答：{field.label}</h2>
+              <p className="text-ink mt-1 text-sm tabular-nums">
+                平均{ratingAverageText(field.average)}（★）
+                <span className="text-ink-faint ml-2 text-xs">{formatNumber(field.answered)}件の回答から集計</span>
+              </p>
+            </section>
+          ))}
           {summaries.map((summary) => (
             <section key={summary.key} className="bg-canvas rounded-card border-hairline border p-4">
               <h2 className="text-ink text-sm font-semibold">{labels[summary.key] ?? summary.key}</h2>

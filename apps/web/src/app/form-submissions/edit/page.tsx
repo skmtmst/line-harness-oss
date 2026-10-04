@@ -1429,7 +1429,7 @@ function FormEditInner() {
                 onOgImageUrlChange={setOgImageUrl}
               />
             ) : (
-            <section className="flex min-w-0 flex-col gap-4">
+            <section data-design-node="m1cWEy" className="flex min-w-0 flex-col gap-4">
               {/* タブ */}
               <div className="border-hairline flex flex-wrap items-center gap-1 border-b pb-2">
                 <button
@@ -1537,9 +1537,9 @@ function FormEditInner() {
                     削除する
                   </button>
 
-                  <div className="relative">
+                  <div className="relative" data-design-node="WOPjZ">
                     <Button variant="primary" className="px-3 py-1.5 text-xs font-medium border-0 h-auto whitespace-normal" ref={addMenuButtonRef} onClick={() => setShowAddMenu((v) => !v)} aria-expanded={showAddMenu} aria-haspopup="menu">
-                      ＋ ブロックを追加する（12種）
+                      ＋ ブロックを追加する（14種）
                     </Button>
                     <ActionMenu
                       open={showAddMenu}
