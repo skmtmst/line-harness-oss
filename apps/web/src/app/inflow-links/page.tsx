@@ -7,6 +7,8 @@ import { useSearchParams } from 'next/navigation'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { tagTextColor } from '@/lib/presentation'
 import KpiCard from '@/components/shared/kpi-card'
+import kpiStyles from '@/components/shared/kpi-card.module.css'
+import styles from './inflow-links-v8.module.css'
 import { useAccount } from '@/contexts/account-context'
 import type { ApiResponse, EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
 import EditRouteModal from './_components/edit-route-modal'
@@ -768,12 +770,17 @@ function InflowLinksPageInner({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col gap-4 ${styles.board}`} data-design-node="y1ztx xbHxg EMUl9 URzvC">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <p data-design="Head" className="text-sm text-ink-faint">
         どこから友だちが来たかを計測します。発行したURLごとにクリック・友だち追加・その後の成果まで追えます。
       </p>
-      <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/*
+        ★V8（`y1ztx` 1152）：数の帯は区切り線で並べる1本の帯にする。
+        共有の帯の組立て（`kpi-card.module.css` の strip・v8 の下だけ効く）を
+        借り、v8 の狭い幅では4列にする。v7 の見た目は変えない。
+      */}
+      <div data-design="KPIs" data-kpi-strip className={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 ${kpiStyles.strip} ${styles.kpis}`}>
         <KpiCard
           title="流入元"
           value={routeCountAvailable ? accountRouteCount : null}
@@ -841,7 +848,8 @@ function InflowLinksPageInner({
 
       <div className="flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクを作る</Button><div className="flex gap-2"><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
 
-      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className={`grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)] ${styles.railGrid}`}>
+        <div className={styles.railCol}>
         <FolderPanel
           total={`${accountFilteredRows.length}件`}
           activeId={selectedGenre}
@@ -858,6 +866,7 @@ function InflowLinksPageInner({
             ...(hasUncategorized ? [{ id: UNCATEGORIZED, label: '未分類', count: accountFilteredRows.filter((row) => !row.genre).length }] : []),
           ]}
         />
+        </div>
 
         <section className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4 shadow-card lg:flex-row lg:items-center lg:justify-between">
@@ -903,6 +912,28 @@ function InflowLinksPageInner({
                     {label}
                   </FilterChip>
                 ))}
+                {/*
+                  ★V8（`y1ztx` 1152）：板が狭いときは左のフォルダの列を畳む
+                  ので、ここでフォルダを選ぶ。ふだんは畳む（v7 に出さない）。
+                  札の後ろに置く（札の文言とぶつけない）。見た目は先頭に寄せる。
+                */}
+                <div className={`${styles.railSelect} order-first w-full sm:w-56`}>
+                  <Select
+                    aria-label="フォルダ"
+                    label="フォルダ"
+                    size="full"
+                    value={selectedGenre}
+                    options={[
+                      { value: '', label: 'すべて' },
+                      ...availableGenres.map((genre) => ({ value: genre.name, label: genre.name })),
+                      ...(hasUncategorized ? [{ value: UNCATEGORIZED, label: '未分類' }] : []),
+                    ]}
+                    onChange={(value) => {
+                      setSelectedGenre(value)
+                      setPage(1)
+                    }}
+                  />
+                </div>
               </div>
             }
             trailing={
