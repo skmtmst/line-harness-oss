@@ -45,10 +45,8 @@ import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { notifyToast } from '@/components/shared/toast'
-import { useRowLeaving } from '@/components/shared/row-leaving'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
@@ -60,8 +58,10 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
-import { runUndoable } from '@/lib/undoable'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import InlineEdit from '@/components/shared/inline-edit'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import { Tabs } from '@/components/shared/tabs'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import StaffAssetList from './staff-asset-list'
@@ -167,7 +167,7 @@ const KIND_CARDS: Array<{
     icon: GalleryHorizontalEnd,
     desc: '横にめくるカードを最大10枚',
     useFor: '商品の紹介に',
-    cannot: 'できない：1枚の画像を面に分ける（→ リッチ）',
+    cannot: 'できない：1枚の画像を面に分ける（→ リッチメッセージ）',
     href: '/templates/carousel',
   },
   {
@@ -203,7 +203,7 @@ const KIND_CARDS: Array<{
     icon: ClipboardList,
     desc: 'いくつかの質問にまとめて答えてもらう',
     useFor: '満足度調査に',
-    cannot: 'できない：答えですぐタグを付ける（→ 質問）',
+    cannot: 'できない：答えごとにタグを付ける（→ 質問）',
     href: '/templates/edit?kind=research',
   },
 ]
@@ -315,9 +315,6 @@ export default function TemplatesListV8() {
    */
   const [canMutateTemplates] = useState(() =>
     typeof window === 'undefined' ? true : isOwnerOrAdmin())
-  // 1152の板（`L7zA7C`）。折り畳みはCSSのコンテナ問い合わせが担い、
-  // ここでは板IDだけを切り替える。
-  const narrow = useNarrowViewport()
 
   const [activeSection, setActiveSection] = useState<Section>('message')
   const [templates, setTemplates] = useState<Template[]>([])
@@ -360,7 +357,7 @@ export default function TemplatesListV8() {
 
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
-
+  const [moving, setMoving] = useState(false)
   const [moveError, setMoveError] = useState('')
   /* 右から出る詳細パネル（C①）。URL に今の行を残す。 */
   const [activeId, setActiveId] = useDetailPanelUrl('row')
@@ -713,8 +710,6 @@ export default function TemplatesListV8() {
     }
   }
 
-  const { isLeaving, fadeOut } = useRowLeaving()
-
   // 押しただけでは消さない。窓を開くだけ。使用中なら「使っている所」の窓へ。
   const handleDelete = (t: Template) => {
     setDeleteError('')
@@ -740,8 +735,7 @@ export default function TemplatesListV8() {
       if (!res.success) throw new Error(res.error)
       setPendingDelete(null)
       // R195: 件数（未分類・フォルダ別）はフォルダ側の集計が持つので両方読み直す。
-      // 消えた行は 150ms 薄くしてから読み直す（V8 の動き §8）。
-      await fadeOut([target.id], () => Promise.all([load(), loadFolders()]))
+      await Promise.all([load(), loadFolders()])
     } catch {
       // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
       setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -757,47 +751,35 @@ export default function TemplatesListV8() {
     setMoveDraft('')
     setMoveError('')
   }
-  /*
-   * フォルダへ移す（1件でもまとめてでも同じ窓）。窓を閉じた瞬間に画面へ
-   * 映し、保存は5秒後に送る。「元に戻す」で止めたら送らない。
-   */
-  const runMove = () => {
+  const runMove = async () => {
     if (!moveIds) return
-    const targetIds = moveIds
-    const targetFolderId = moveDraft === '' ? null : moveDraft
-    const previousFolders = new Map(templates.map((t) => [t.id, t.folderId]))
-    const folderName = targetFolderId === null
-      ? '未分類'
-      : (folders.find((f) => f.id === targetFolderId)?.name ?? 'フォルダ')
-    setTemplates((rows) =>
-      rows.map((t) => (targetIds.includes(t.id) ? { ...t, folderId: targetFolderId } : t)),
-    )
-    setMoveIds(null)
-    setSelectedIds(new Set())
+    setMoving(true)
     setMoveError('')
-    const restore = () => {
-      setTemplates((rows) =>
-        rows.map((t) => (previousFolders.has(t.id) ? { ...t, folderId: previousFolders.get(t.id) ?? null } : t)),
+    try {
+      let failed = 0
+      for (const id of moveIds) {
+        const result = await api.templates.update(id, { folderId: moveDraft === '' ? null : moveDraft })
+        if (!result.success) failed += 1
+      }
+      if (failed > 0) {
+        setMoveError(`${failed}件を移動できませんでした。状態を読み直してからお試しください。`)
+        await Promise.all([load(), loadFolders()])
+        return
+      }
+      setMoveIds(null)
+      setPanelMove(false)
+      setSelectedIds(new Set())
+      notifyToast('フォルダへ移しました', { tone: 'success' })
+      await Promise.all([load(), loadFolders()])
+    } catch (reason) {
+      setMoveError(
+        reason instanceof ApiError && reason.status === 403
+          ? 'テンプレートを移すには権限が要ります。オーナーか管理者に頼んでください。'
+          : 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
       )
+    } finally {
+      setMoving(false)
     }
-    runUndoable({
-      message: `${targetIds.length}件を「${folderName}」へ移しました`,
-      commit: async () => {
-        for (const id of targetIds) {
-          const result = await api.templates.update(id, { folderId: targetFolderId })
-          if (!result.success) throw new Error(result.error ?? 'move_failed')
-        }
-      },
-      undo: restore,
-      onCommitError: () => {
-        restore()
-        void Promise.all([load(), loadFolders()])
-      },
-      failureMessage: 'フォルダへ移せませんでした。元のフォルダに戻しています。',
-      onCommitted: () => {
-        void Promise.all([load(), loadFolders()])
-      },
-    })
   }
 
   /*
@@ -858,11 +840,7 @@ export default function TemplatesListV8() {
       setPendingBulkDelete(null)
       setSelectedIds(new Set())
       notifyToast(`${pendingBulkDelete.length}件のテンプレートを削除しました`, { tone: 'success' })
-      // 消えた行は 150ms 薄くしてから読み直す（V8 の動き §8）。
-      await fadeOut(
-        pendingBulkDelete.map((t) => t.id),
-        () => Promise.all([load(), loadFolders()]),
-      )
+      await Promise.all([load(), loadFolders()])
     } catch (reason) {
       setBulkDeleteError(
         reason instanceof ApiError && reason.status === 403
@@ -880,7 +858,7 @@ export default function TemplatesListV8() {
     const items: ActionMenuItem[] = [
       {
         id: 'edit',
-        label: '編集',
+        label: '編集する',
         disabled: readonly,
         disabledReason: readonly ? NO_MANAGE_NOTE : undefined,
         onSelect: () => withViewTransition(() => router.push(editHref(t))),
@@ -1035,73 +1013,17 @@ export default function TemplatesListV8() {
 
   /* ===== 一覧の中身（`susGP`：読込中・読み込めない・空・0件を分ける） ===== */
   const sectionWord = activeSection === 'question' ? '質問のテンプレート' : 'メッセージのテンプレート'
-  /* 見出しは本物と骨組みで同じものを出す（二重に書かない）。 */
-  const templateTableColumns = (
-    <colgroup>
-      <col style={{ width: 64 }} />
-      <col />
-      <col style={{ width: 120 }} />
-      <col style={{ width: 160 }} />
-      <col style={{ width: 144 }} />
-      <col style={{ width: 136 }} />
-      <col style={{ width: 120 }} />
-      <col style={{ width: 76 }} />
-    </colgroup>
-  )
-  const templateTableHead = (
-    <thead>
-      <tr>
-        <th className={styles.selectCell} aria-label="選択">
-          <Checkbox
-            checked={allOnPageSelected}
-            indeterminate={!allOnPageSelected && selectedCount > 0}
-            onCheckedChange={() => toggleAllOnPage()}
-            aria-label="このページのテンプレートをすべて選択"
-          />
-        </th>
-        <th>テンプレート</th>
-        <th>種類</th>
-        <th>公開</th>
-        <th>使っている所</th>
-        <th>今月送った数</th>
-        <th>更新</th>
-        <th aria-label="操作" />
-      </tr>
-    </thead>
-  )
-  /* 出来上がりの表と同じ幅・高さの骨組み。入れ替わってもガタつかない。 */
-  const tableSkeleton = (
-    <div className={styles.tableWrap} aria-hidden="true">
-      <table className={styles.table}>
-        {templateTableColumns}
-        {templateTableHead}
-        <tbody>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <tr key={i}>
-              <td><Skeleton width={18} height={18} /></td>
-              <td>
-                <span className="block">
-                  <Skeleton width="70%" height={14} />
-                </span>
-                <span className="mt-1 block">
-                  <Skeleton width="100%" height={12} />
-                </span>
-              </td>
-              <td><Skeleton width={64} height={22} /></td>
-              <td><Skeleton width={72} height={22} /></td>
-              <td><Skeleton width="100%" height={14} /></td>
-              <td><Skeleton width={56} height={14} /></td>
-              <td><Skeleton width="100%" height={14} /></td>
-              <td><Skeleton width={20} height={20} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+  const listBody = accountLoading || view === 'loading' ? (
+    <div className={styles.skeletonRows} aria-label="読み込み中">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className={styles.skeletonRow}>
+          <span className={styles.skeletonDot} />
+          <span className={styles.skeletonBar} />
+          <span className={styles.skeletonBar} style={{ flex: 0.6 }} />
+          <span className={styles.skeletonBar} style={{ flex: 0.4 }} />
+        </div>
+      ))}
     </div>
-  )
-  const listLoading = (accountLoading || view === 'loading') && templates.length === 0 && view !== 'error' && view !== 'forbidden'
-  const listBody = listLoading ? (
-    <DelayedSkeleton loading skeleton={tableSkeleton} />
   ) : !selectedAccountId ? (
     <div className={styles.stateCard}>
       <span className={styles.stateIcon}>
@@ -1114,7 +1036,7 @@ export default function TemplatesListV8() {
       </p>
     </div>
   ) : view === 'forbidden' || view === 'error' ? (
-    <div className={styles.stateCard} data-design-node="susGP">
+    <div className={styles.stateCard}>
       <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
         <TriangleAlert size={18} aria-hidden="true" />
       </span>
@@ -1132,7 +1054,7 @@ export default function TemplatesListV8() {
     </div>
   ) : filteredTemplates.length === 0 ? (
     filterActive ? (
-      <div className={styles.stateCard} data-design-node="susGP">
+      <div className={styles.stateCard}>
         <span className={styles.stateIcon}>
           <SearchIcon size={18} aria-hidden="true" />
         </span>
@@ -1146,7 +1068,7 @@ export default function TemplatesListV8() {
         </Button>
       </div>
     ) : (
-      <div className={styles.stateCard} data-design-node="susGP">
+      <div className={styles.stateCard}>
         <span className={styles.stateIcon}>
           <FileText size={18} aria-hidden="true" />
         </span>
@@ -1176,8 +1098,35 @@ export default function TemplatesListV8() {
       >
       <div className={styles.tableWrap}>
         <table className={styles.table}>
-          {templateTableColumns}
-          {templateTableHead}
+          <colgroup>
+            <col style={{ width: 64 }} />
+            <col />
+            <col style={{ width: 120 }} />
+            <col style={{ width: 160 }} />
+            <col style={{ width: 144 }} />
+            <col style={{ width: 136 }} />
+            <col style={{ width: 120 }} />
+            <col style={{ width: 76 }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th className={styles.selectCell} aria-label="選択">
+                <Checkbox
+                  checked={allOnPageSelected}
+                  indeterminate={!allOnPageSelected && selectedCount > 0}
+                  onCheckedChange={() => toggleAllOnPage()}
+                  aria-label="このページのテンプレートをすべて選択"
+                />
+              </th>
+              <th>テンプレート</th>
+              <th>種類</th>
+              <th>公開</th>
+              <th>使っている所</th>
+              <th>今月送った数</th>
+              <th>更新</th>
+              <th aria-label="操作" />
+            </tr>
+          </thead>
           <tbody>
             {shownItems.map((t) => {
               const publish = publishStateOf(t)
@@ -1187,7 +1136,6 @@ export default function TemplatesListV8() {
                   key={t.id}
                   data-row-id={t.id}
                   className={styles.rowClick}
-                  data-leaving={isLeaving(t.id) || undefined}
                   tabIndex={0}
                   onClick={() => setActiveId(t.id)}
                   onContextMenuCapture={() => setContextId(t.id)}
@@ -1296,7 +1244,7 @@ export default function TemplatesListV8() {
           <Button
             type="button"
             variant="secondary"
-            disabled={!canMutateTemplates}
+            disabled={!canMutateTemplates || moving}
             title={!canMutateTemplates ? NO_MANAGE_NOTE : undefined}
             onClick={() => openMove([...selectedIds])}
           >
@@ -1346,12 +1294,11 @@ export default function TemplatesListV8() {
   const isTemplateSection = activeSection === 'message' || activeSection === 'question'
 
   return (
-    <div className={styles.board} data-design-node="L7zA7C">
+    <div className={styles.board}>
       {/*
         骨格の印（data-design）は v7 の page.tsx 側が担う。ここへ別の節名を
         足すと、設計と画面の対を調べる design-structure の検査が
         V7＋V8 の和集合で見えてしまい、どちらの設計とも一致しなくなる。
-        板の印（data-design-node）は同じ面への追記なので足せる。
       */}
       <div className={styles.head}>
         <div className={styles.headText}>
@@ -1366,13 +1313,6 @@ export default function TemplatesListV8() {
           閲覧のみで見ています。変える操作は管理者に頼んでください。
         </p>
       ) : null}
-
-      {/* 見るだけの人への帯（`hEDTK`）。操作は押せない形のまま置く。 */}
-      {!canMutateTemplates && (
-        <p className="border-info bg-info-bg text-ink rounded-control border px-3 py-2 text-sm" data-design-node="hEDTK">
-          閲覧のみで見ています。変える操作は管理者に頼んでください。
-        </p>
-      )}
 
       {/* 種類のタブ（件数つき）。資産タブはそれぞれの素材一覧を出す。 */}
       <Tabs
@@ -1517,9 +1457,7 @@ export default function TemplatesListV8() {
                 />
               </div>
 
-              <div aria-busy={listLoading || undefined}>
-                {listBody}
-              </div>
+              {listBody}
             </div>
             {activeTemplate ? (
               <DetailPanel
@@ -1699,7 +1637,6 @@ export default function TemplatesListV8() {
       {/* 削除の確認窓（`V6JFnd`：使っていないテンプレート）。 */}
       <ConfirmDialog
         open={pendingDelete !== null}
-        designNode="V6JFnd"
         title={`テンプレート「${pendingDelete?.item.name ?? ''}」を削除しますか？`}
         description={templateDeleteDescription(pendingDelete?.item.usageCount ?? 0)}
         confirmLabel="削除する"
@@ -1805,10 +1742,12 @@ export default function TemplatesListV8() {
             : `${moveIds?.length ?? 0}件のテンプレートをフォルダへ移す`
         }
         description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
-        confirmLabel="移動する"
+        confirmLabel={moving ? '移動中…' : '移動する'}
+        busy={moving}
         error={moveError}
-        onConfirm={() => runMove()}
+        onConfirm={() => void runMove()}
         onCancel={() => {
+          if (moving) return
           setMoveIds(null)
           setMoveError('')
         }}
@@ -1820,6 +1759,7 @@ export default function TemplatesListV8() {
             size="full"
             value={moveDraft}
             onChange={(value) => setMoveDraft(value)}
+            disabled={moving}
             options={[
               { value: '', label: '未分類' },
               ...folders.map((folder) => ({ value: folder.id, label: folder.name })),

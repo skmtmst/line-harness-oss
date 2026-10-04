@@ -40,8 +40,6 @@ import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import NotificationPanel from '@/components/shared/notification-panel'
 import KpiCollapse from '@/components/ui/kpi-collapse'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import HelpTip from '@/components/shared/help-tip'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
@@ -134,10 +132,6 @@ function TodayTaskCard({
   status,
   statusTone = 'success',
   loading = false,
-  expanded = false,
-  onToggle,
-  detailContent,
-  detailId,
 }: {
   title: string
   /*
@@ -158,66 +152,34 @@ function TodayTaskCard({
   statusTone?: 'success' | 'muted' | 'danger'
   /* true の間は件数の場所に骨組みを出す。失敗・未取得は「—」のまま（#673）。 */
   loading?: boolean
-  /* V8 のみ：広がっているとき真。onToggle が無いときは畳んだまま。 */
-  expanded?: boolean
-  /* V8 のみ：数の押しで広げる・畳む。無いときは従来どおり押せない。 */
-  onToggle?: (() => void) | null
-  /* V8 のみ：広げたときに出す内訳。実データだけを渡す。 */
-  detailContent?: ReactNode
-  /* V8 のみ：広げた領域の id（数のボタンの aria-controls 用）。 */
-  detailId?: string
 }) {
-  const numberContent = (
-    <>
-      {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
-      <DelayedSkeleton
-        loading={loading}
-        skeleton={
-          <>
-            <Skeleton className="h-7 w-16" />
-            <span className="sr-only">{STATE_TEXT.loading}</span>
-          </>
-        }
-      >
-        {value === null ? '—' : formatNumber(value)}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
-      </DelayedSkeleton>
-    </>
-  )
   return (
     /*
      * ★V7「ダッシュボードの見せ方」（V7 文書 fyR7V）。数字をいちばん大きく、状態は数字の横、
      * 操作は右下に1つ（→付き）。以前は右上の操作・数字・補足2つの3段で、目が上下に散っていた。
      */
-    <Card layout="vertical" padding="default" className={expanded && onToggle ? 'min-w-0' : 'h-[116px] min-w-0'}>
+    <Card layout="vertical" padding="default" className="h-[116px] min-w-0">
       <div className="flex min-w-0 items-baseline gap-2">
         <h3 className="text-ink-secondary min-w-0 truncate text-sm font-semibold" title={title}>{title}</h3>
         {period ? <span className="text-ink-faint whitespace-nowrap text-xs font-normal">{period}</span> : null}
       </div>
-      <div className="relative mt-2 flex min-w-0 items-baseline gap-2">
+      <div className="mt-2 flex min-w-0 items-baseline gap-2">
         <p className="text-ink text-[28px] leading-none font-bold tabular-nums" aria-busy={loading || undefined}>
-          {numberContent}
+          {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
+          <DelayedSkeleton
+            loading={loading}
+            skeleton={
+              <>
+                <Skeleton className="h-7 w-16" />
+                <span className="sr-only">{STATE_TEXT.loading}</span>
+              </>
+            }
+          >
+            {value === null ? '—' : formatNumber(value)}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
+          </DelayedSkeleton>
         </p>
         <span className={`${statusTone === 'muted' ? 'text-ink-faint' : statusTone === 'danger' ? 'text-danger' : 'text-success'} shrink-0 whitespace-nowrap text-xs font-semibold`}>{status}</span>
-        {/*
-          V8 のみ：数の上に透明な押しを重ねる。数そのものの描き方は
-          v7 と同じにし、押すとタイルが広がって内訳へ開く。
-        */}
-        {onToggle ? (
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-expanded={expanded}
-            aria-controls={detailId}
-            aria-label={`${title}の内訳を${expanded ? '閉じる' : '開く'}`}
-            className="absolute inset-0 rounded-card focus-visible:outline-2 focus-visible:outline-ink"
-          />
-        ) : null}
       </div>
-      {onToggle && expanded && detailContent ? (
-        <div id={detailId} role="region" aria-label={`${title}の内訳`} className="border-hairline mt-2 min-w-0 border-t pt-2">
-          {detailContent}
-        </div>
-      ) : null}
       {/*
         配置は右下のまま（★V7「ダッシュボードの見せ方」fyR7V）。
         見た目だけ CardHeader の action（actionTone="info"）にそろえる。
@@ -334,7 +296,7 @@ function FriendAddLinkCard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex min-w-[220px] items-center gap-2">
-            <span className="text-ink-faint shrink-0 text-nano font-medium">発行中</span>
+            <span className="text-ink-faint shrink-0 text-[10px] font-medium">発行中</span>
             <Select
               value={routeId}
               onChange={(value) => setRouteId(value)}
@@ -483,7 +445,7 @@ function LiveDataCard({
         <div className="flex min-w-0 items-center gap-1">
           <h2 className="text-ink min-w-0 truncate text-sm font-semibold" title={title}>{title}</h2>
           {help ? <HelpTip label={`${title}の説明`}>{help}</HelpTip> : null}
-          {period ? <span className="text-ink-faint shrink-0 text-micro font-normal whitespace-nowrap">{period}</span> : null}
+          {period ? <span className="text-ink-faint shrink-0 text-[11px] font-normal whitespace-nowrap">{period}</span> : null}
         </div>
         {/*
           行き先リンクは CardHeader の action（actionTone="info"）と
@@ -662,7 +624,7 @@ function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, upda
     <div className="flex items-baseline justify-between gap-3">
       <h2 className="text-ink min-w-0 truncate text-base font-bold" title="接続状態">接続状態</h2>
       {/* 現在時点の状態（IDEA-01）。 */}
-      <span className="text-ink-faint flex-1 whitespace-nowrap text-micro font-normal">現在</span>
+      <span className="text-ink-faint flex-1 whitespace-nowrap text-[11px] font-normal">現在</span>
       {dashboardLocalUpdatedAt(updatedAt) ? (
         <span className="text-ink-faint shrink-0 text-xs font-medium">{dashboardLocalUpdatedAt(updatedAt)}</span>
       ) : null}
@@ -853,25 +815,6 @@ function DashboardPageInner() {
     .filter((item) => item.visible)
     .filter((item) => item.id !== 'support-mark-status' || supportMarksEnabled)
   const visibleToday = preferences.today.filter((item) => item.visible)
-  /*
-   * V8 のみ：数のタイルを押すと、そのタイルが広がって内訳へ（共通
-   * view-transition でつながる移り変わり）。v7 は押せないまま。
-   */
-  const theme = useAdminTheme()
-  const [expandedTodayId, setExpandedTodayId] = useState<DashboardCardId | null>(null)
-  const toggleTodayExpand = (id: DashboardCardId) => {
-    withViewTransition(() => {
-      setExpandedTodayId((prev) => (prev === id ? null : id))
-    })
-  }
-  const todayExpandProps = (id: DashboardCardId) =>
-    theme === 'v8'
-      ? {
-        expanded: expandedTodayId === id,
-        onToggle: () => toggleTodayExpand(id),
-        detailId: `today-detail-${id}`,
-      }
-      : { expanded: false as const, onToggle: undefined, detailId: undefined }
   const needsPhotos = visibleToday.some((item) => item.id === 'today-photo-review')
   const needsBookings = visibleToday.some((item) => item.id === 'today-bookings')
     || visibleRight.some((item) => item.id === 'upcoming')
@@ -1442,19 +1385,6 @@ function DashboardPageInner() {
         : pendingOldest !== null ? `最長 ${formatWaitRough(pendingOldest)}` : '—'}
       /* 待っている人がいる時の「最長 ○日前」は注意の色。緑は「問題なし」に読める（★V7）。 */
       statusTone={pendingTotal === null ? 'muted' : pendingTotal > 0 ? 'danger' : 'success'}
-      {...todayExpandProps(id)}
-      detailContent={
-        <ul className="text-ink-secondary space-y-1 text-xs">
-          <li className="flex items-baseline justify-between gap-2">
-            <span>LINEの未対応</span>
-            <span className="tabular-nums">{lineUnread === null ? '未取得' : `${formatNumber(lineUnread)}件`}</span>
-          </li>
-          <li className="flex items-baseline justify-between gap-2">
-            <span>メールの未対応</span>
-            <span className="tabular-nums">{mailUnread === null ? '未取得' : `${formatNumber(mailUnread)}件`}</span>
-          </li>
-        </ul>
-      }
     />
     if (id === 'today-photo-review') {
       const override = reference?.pendingPhotos
@@ -1481,16 +1411,6 @@ function DashboardPageInner() {
         loading={state === 'loading'}
         status={forbidden ? '権限なし' : state === 'ready' ? 'ポイント付与あり' : '確認待ち'}
         statusTone={state === 'ready' ? 'success' : 'muted'}
-        {...todayExpandProps(id)}
-        detailContent={
-          <p className="text-ink-secondary text-xs leading-relaxed">
-            {forbidden
-              ? '写真を見る権限がありません。権限を確認してください。'
-              : state === 'ready' && value !== null && value > 0
-                ? `確認待ちが${formatNumber(value)}件あります。審査するとポイントが付きます。`
-                : detail}
-          </p>
-        }
       />
     }
     /*
@@ -1520,23 +1440,6 @@ function DashboardPageInner() {
           : bookings === null ? '確認中'
             : upcomingBookings.length > 0 ? nextBookingLabel(upcomingBookings[0].starts_at, today) : '次回予定なし'}
         statusTone={bookingsFailed ? 'muted' : 'success'}
-        {...todayExpandProps(id)}
-        detailContent={
-          upcomingBookings.length === 0 ? (
-            <p className="text-ink-secondary text-xs leading-relaxed">
-              {bookingsFailed ? STATE_TEXT.error : '直近の予約はありません。'}
-            </p>
-          ) : (
-            <ul className="text-ink-secondary space-y-1 text-xs">
-              {upcomingBookings.slice(0, 3).map((booking) => (
-                <li key={booking.id} className="flex min-w-0 items-baseline gap-2">
-                  <span className="shrink-0 tabular-nums">{formatTime(booking.starts_at)}</span>
-                  <span className="min-w-0 truncate" title={booking.menu_name}>{booking.menu_name}</span>
-                </li>
-              ))}
-            </ul>
-          )
-        }
       />
     }
     if (id === 'today-shipments') return <TodayTaskCard
@@ -1557,25 +1460,6 @@ function DashboardPageInner() {
        */
       status={reference?.shipmentStatus ?? (shipmentState === 'error' ? '未取得' : shipmentState === 'ready' ? `今日・明日 ${shipmentSummary?.soon ?? 0}件` : '確認中')}
       statusTone={shipmentState === 'error' ? 'muted' : 'success'}
-      {...todayExpandProps(id)}
-      detailContent={
-        shipmentState !== 'ready' || !shipmentSummary ? (
-          <p className="text-ink-secondary text-xs leading-relaxed">
-            {shipmentState === 'error' ? STATE_TEXT.error : STATE_TEXT.loading}
-          </p>
-        ) : (
-          <ul className="text-ink-secondary space-y-1 text-xs">
-            <li className="flex items-baseline justify-between gap-2">
-              <span>今日の出荷</span>
-              <span className="tabular-nums">{`${formatNumber(shipmentSummary.today)}件`}</span>
-            </li>
-            <li className="flex items-baseline justify-between gap-2">
-              <span>今日・明日の出荷</span>
-              <span className="tabular-nums">{`${formatNumber(shipmentSummary.soon)}件`}</span>
-            </li>
-          </ul>
-        )
-      }
     />
     return null
   }
@@ -1645,7 +1529,7 @@ function DashboardPageInner() {
      * ★V7 仕上げ `z97zZN` §1: 最初に開いたときだけ、段ごとに下から8px・
      * 200ms・40ms ずつずらして出す。`.v7-stagger` は globals.css の共通規定。
      */
-    <div className="v7-stagger flex flex-col gap-4" data-design-node="d8X09">
+    <div className="v7-stagger flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/* V6 `vUXKb/vwcM6`: 画面名は共通トップバーだけ。本文には操作だけを置く。 */}
       {/*

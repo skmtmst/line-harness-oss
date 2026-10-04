@@ -49,7 +49,6 @@ import {
   type WebinarNotificationSettings,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
@@ -515,30 +514,6 @@ function EditWebinarInner() {
   const [loadMissing, setLoadMissing] = useState<{ id: string } | null>(null)
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
-  /** 同時編集の帯（`pvimJ`）。409 で止まったら最新を読み込めるようにする。 */
-  const [conflict, setConflict] = useState<{ latest: WebinarEditor | null; compare: { mine: CompareMine; theirsFormName: string } | null } | null>(null)
-  const [conflictReloading, setConflictReloading] = useState(false)
-  /** 見比べの窓。自分のまま保存するときの処理中にも使う。 */
-  const [compareOpen, setCompareOpen] = useState(false)
-  const [compareWorking, setCompareWorking] = useState(false)
-  const [compareError, setCompareError] = useState('')
-
-  const reloadLatest = useCallback(async () => {
-    const latest = conflict?.latest
-    if (latest) setEditor(latest)
-    setConflict(null)
-    setConflictReloading(true)
-    try {
-      setReloadKey((key) => key + 1)
-    } finally {
-      setConflictReloading(false)
-    }
-  }, [conflict])
-
-  const useTheirs = useCallback(() => {
-    setCompareOpen(false)
-    void reloadLatest()
-  }, [reloadLatest])
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [analyticsState, setAnalyticsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [analyticsId, setAnalyticsId] = useState<string | null>(null)
@@ -556,32 +531,6 @@ function EditWebinarInner() {
   const setEditor = useCallback((next: WebinarEditor) => {
     setLoadedWebinar((prev) => (prev && prev.id === id ? { ...prev, editor: next } : prev))
   }, [id])
-  /*
-   * 見比べで「自分のまま保存する」。相手の最新の版を見たうえで送り直すので
-   * 相手の変更は上書きされる。カードは版が無いのでそのまま全置換する。
-   */
-  const keepMine = useCallback(async () => {
-    const snapshot = conflict?.compare
-    const latest = conflict?.latest
-    if (!snapshot || !latest || !webinar) return
-    setCompareWorking(true)
-    setCompareError('')
-    try {
-      const response = await webinarApi.saveEditor(webinar.id, {
-        expectedVersion: latest.version,
-        registrationFormId: snapshot.mine.formId,
-      })
-      await webinarApi.saveCtas(webinar.id, snapshot.mine.cards)
-      setEditor(response.data)
-      setConflict(null)
-      setCompareOpen(false)
-      setReloadKey((key) => key + 1)
-    } catch {
-      setCompareError('自分のまま保存できませんでした。開き直して試してください。')
-    } finally {
-      setCompareWorking(false)
-    }
-  }, [conflict, webinar, setEditor])
   /*
     **編集画面なので、開いた直後は設定の1段目**。前は「概要・分析」を先頭に
     置いていたので、直しに来た人が結果の画面から始めることになっていた。
@@ -763,8 +712,6 @@ function EditWebinarInner() {
   }
   usePageTitle(paneTitle[pane])
 
-  const theme = useAdminTheme()
-
   useEffect(() => {
     if (!id) return
     const requestId = ++loadRequestId.current
@@ -828,10 +775,6 @@ function EditWebinarInner() {
     return () => { cancelled = true }
   }, [id, pane, analyticsId, analyticsState])
 
-  /*
-    ★V8 の編集②〜⑤と参加者・分析・コメント演出はこの画面で直接描く。
-    基本設定だけは V8 の対象外なので v7 のまま出す（v7 の見た目は変えない）。
-  */
   if (!id) {
     /*
       U097: 「一覧から選び直すと表示できます」と言うだけでは戻れない。
@@ -903,7 +846,6 @@ function EditWebinarInner() {
           ? '公開すると、友だちが見るページを確認できます。'
           : ''
   const registrations = analytics?.summary.reservations ?? null
-
   const railPane: StepKey = pane === 'actions'
     ? 'notifications'
     : pane === 'preview'
@@ -939,29 +881,6 @@ function EditWebinarInner() {
       <div className="flex items-center justify-between gap-3"><h1 className="text-ink min-w-0 truncate text-xl font-semibold" title={showSteps ? paneTitle[pane] : webinar.title}>{showSteps ? paneTitle[pane] : webinar.title}</h1>{(pane === 'participants' || pane === 'analytics') && participantExport?.available ? <Button onClick={participantExport.download} disabled={participantExport.busy} busy={participantExport.busy} busyLabel="書き出しています…">CSVで書き出す</Button> : null}</div>
 
       {!showSteps ? <p className="text-ink-secondary text-xs">{editor.deliveryKind === 'on_demand' ? 'オンデマンド・いつでも視聴' : '日時指定'}・{webinarStatusLabel(webinar.status)}（版 {editor.version}）</p> : null}
-
-      {conflict ? (
-        <WebinarEditConflictBand
-          message="ほかの人が先に保存しました。このまま保存すると、その変更が消えます。"
-          reloading={conflictReloading}
-          onReload={() => void reloadLatest()}
-          onCompare={conflict.latest && conflict.compare ? () => setCompareOpen(true) : undefined}
-          onClose={() => setConflict(null)}
-        />
-      ) : null}
-      {conflict?.compare ? (
-        <WebinarEditCompareDialog
-          open={compareOpen}
-          webinarId={webinar.id}
-          mine={conflict.compare.mine}
-          theirsFormName={conflict.compare.theirsFormName}
-          onKeepMine={() => void keepMine()}
-          onUseTheirs={useTheirs}
-          onClose={() => setCompareOpen(false)}
-          working={compareWorking}
-          error={compareError || undefined}
-        />
-      ) : null}
 
       {showSteps ? (
         <ol data-design="Steps" className="flex" data-webinar-steps="true">

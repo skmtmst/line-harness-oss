@@ -8,8 +8,6 @@ import { runOptimistic, runUndoable } from '@/lib/undoable'
 import DateTimeField from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
-import { TextArea } from '@/components/shared/text-field'
 
 /**
  * 1人だけ選んだときの操作（設計 `BulkBar` の6つ）。
@@ -36,7 +34,6 @@ export type FriendAction =
   | 'tag'
   | 'field'
   | 'reminder'
-  | 'schedule'
 
 const LABELS: Record<FriendAction, string> = {
   status: '対応状況を変える',
@@ -46,7 +43,6 @@ const LABELS: Record<FriendAction, string> = {
   tag: 'タグを付ける・外す',
   field: '友だち情報を書き換える',
   reminder: 'リマインダを開始',
-  schedule: '予約して送る',
 }
 
 export default function SingleFriendActions({
@@ -143,20 +139,6 @@ export default function SingleFriendActions({
           {open === 'field' && <FieldPanel friendId={friendId} busy={busy} run={run} />}
           {open === 'reminder' && <ReminderPanel friendId={friendId} busy={busy} run={run} />}
         </div>
-      )}
-
-      {/*
-       * ★V8 `MyJP7` 予約して送るの小窓。受信箱を開かずに予約できる。
-       * 文と日時だけ送る（画像の予約送信の口が無いため画像は付けない）。
-       */}
-      {open === 'schedule' && (
-        <ScheduleDialog
-          friendId={friendId}
-          friendName={friendName}
-          accountId={accountId}
-          onClose={() => setOpen(null)}
-          onReserved={() => { setMessage('予約しました'); onDone() }}
-        />
       )}
     </div>
   )

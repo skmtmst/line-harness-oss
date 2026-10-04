@@ -4,7 +4,7 @@
  * ★V8-B 統括のアカウントの3つの窓（板 `HMpVx`・`D6ljr`・`HFsO9`）。
  * 統括ホーム（`hq/page.tsx`）のカードの「設定」・「戻す」から開く。
  * 名前・保存・復帰は今の口（`api.lineAccounts`）だけを使う。
- * タグの付け外しは `PUT /api/line-accounts/:id/tags` を使う。
+ * タグの付け外しは口が無いため入れない。
  * 本人確認は6桁コード（認証アプリ）を窓の中で受け、用途
  * `line_account.archive` で取り直した鍵を付けて送る。
  */
@@ -17,12 +17,6 @@ import { TextField } from '@/components/shared/text-field'
 import { api, type LineAccountTag } from '@/lib/api'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { Plus, TrendingUp, Users } from 'lucide-react'
-
-export interface AccountTagOption {
-  id: string
-  name: string
-  color: string | null
-}
 
 /* 6桁コードの升。貼り付けに対応し、動きは付けない（HANDOFF §8）。 */
 function CodeBoxes({ value, onChange, disabled, label }: {
@@ -79,13 +73,11 @@ async function stepUpToken(code: string): Promise<string> {
   return res.data.token
 }
 
-/* 板 `HMpVx`：アカウントの設定（名前・親・タグ・ほかの設定・アーカイブ）。 */
-export function AccountSettingsDialog({ account, accounts, archived, accountTags, onClose, onSaved, onArchive, onShowDetails }: {
+/* 板 `HMpVx`：アカウントの設定（名前・親・ほかの設定・アーカイブ）。 */
+export function AccountSettingsDialog({ account, accounts, archived, onClose, onSaved, onArchive, onShowDetails }: {
   account: AccountWithStats
   accounts: AccountWithStats[]
   archived: boolean
-  /* このアカウントに付いているタグ（付け外しの初期値）。 */
-  accountTags?: AccountTagOption[]
   onClose: () => void
   onSaved: () => void
   onArchive: () => void

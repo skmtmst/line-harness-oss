@@ -1,7 +1,6 @@
 'use client'
 
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import ActionMenu from '@/components/shared/action-menu'
 import IconButton from '@/components/shared/icon-button'
 import { MoreHorizontal } from 'lucide-react'
 
@@ -144,56 +143,6 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       setNotice({ text: error instanceof ApiError ? error.message : 'CSVを書き出せませんでした。', error: true })
     } finally { setBusy(null) }
   }
-
-  // D. 行の操作（V8）と同じ中身（右クリックでも出す。V8 のときだけ）。
-  const ruleMenuItemsFor = (rule: OperatorNotificationRule): ActionMenuItem[] => [
-    { id: 'test', label: '自分にテスト', disabled: busy === rule.id, onSelect: () => { setOpenMenuId(null); void testSend(rule) } },
-    rule.status === 'draft'
-      ? { id: 'publish', label: '公開', disabled: busy === rule.id || rule.recipientCount === 0, disabledReason: rule.recipientCount === 0 ? '受け取る人を決めてください' : undefined, onSelect: () => { setOpenMenuId(null); void publish(rule) } }
-      : { id: 'stop', label: '止める', disabled: busy === rule.id, onSelect: () => { setOpenMenuId(null); void stop(rule) } },
-  ]
-  // 右クリックされた行。まだ無ければ先頭の行（Shift+F10 の押し口）。
-  const [ctxId, setCtxId] = useState<string | null>(null)
-  const ctxRule = visible.find((rule) => rule.id === ctxId) ?? visible[0] ?? null
-  const ctxMenuItems: ContextMenuItem[] = ctxRule
-    ? ruleMenuItemsFor(ctxRule).map((menuItem) => ({
-      id: menuItem.id,
-      label: menuItem.label,
-      disabled: menuItem.disabled,
-      onSelect: () => menuItem.onSelect(),
-    }))
-    : []
-
-  const rows = visible.map((rule) => (
-    <Tr key={rule.id} data-ctx-row={rule.id}>
-      {/* NOTIFY-04: 名前から編集画面へ戻れる。保存したお知らせを開き直して
-          直せないと、直すたびに作り直しになる。 */}
-      <NameCell name={<Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className="text-action hover:underline" title={rule.name}>{rule.name}</Link>} sub={channelLabel(rule.channels)} />
-      <Td>{operatorEventLabel(rule.eventType)}</Td>
-      <Td><span className={rule.recipientCount > 0 ? 'text-ink-secondary' : 'font-semibold text-warning'}>{rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし'}</span></Td>
-      <Td>{conditionsOf(rule).scheduleLabel ?? 'いつでも'}</Td>
-      <Td>{rule.occurredToday > 0 ? `${rule.occurredToday}件` : '—'}</Td>
-      <Td>{theme === 'v8' ? <><IconButton aria-label={`${rule.name}の操作`} aria-haspopup="menu" aria-expanded={openMenuId === rule.id} onClick={() => setOpenMenuId(openMenuId === rule.id ? null : rule.id)}><MoreHorizontal aria-hidden="true" size={16} /></IconButton><ActionMenu open={openMenuId === rule.id} onClose={() => setOpenMenuId(null)} ariaLabel={`${rule.name}の操作`} items={ruleMenuItemsFor(rule)} /></> : <div className="flex flex-wrap items-center gap-2"><Button onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>{rule.status === 'draft' ? <Button variant="secondary" onClick={() => void publish(rule)} disabled={busy === rule.id || rule.recipientCount === 0}>{rule.recipientCount === 0 ? '受け取る人を決める' : '公開'}</Button> : <Button onClick={() => void stop(rule)} disabled={busy === rule.id}>止める</Button>}</div>}</Td>
-    </Tr>
-  ))
-  const table = (
-    <DataTable><thead><tr><Th>お知らせ</Th><Th>きっかけ</Th><Th>受け取る人</Th><Th>送る時間</Th><Th>今日</Th><Th>操作</Th></tr></thead><tbody>{rows}</tbody></DataTable>
-  )
-  // D. V8 のときだけ表を右クリックの包みに入れる（v7 の描画は変えない）。
-  const tableBody = theme === 'v8' ? (
-    <ContextMenu
-      label="運用者へのお知らせの操作"
-      items={ctxMenuItems}
-      shouldOpen={(event) => {
-        const row = (event.target as HTMLElement).closest('tr[data-ctx-row]')
-        if (!row) return false
-        setCtxId(row.getAttribute('data-ctx-row'))
-        return true
-      }}
-    >
-      {table}
-    </ContextMenu>
-  ) : table
 
   const listState = !lineAccountId ? 'account-required' : state === 'ready' && rules.length === 0 ? 'empty' : state === 'ready' && visible.length === 0 ? 'filtered-empty' : state
 

@@ -222,7 +222,6 @@ export default function ReservedV8({
 
       <Dialog
         open={cancelOpen}
-        designNode="BeNtj"
         title={`「${broadcast.title}」の予約を取り消しますか？`}
         description="予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。送信が始まったあとは取り消せません。"
         designNode="BeNtj"

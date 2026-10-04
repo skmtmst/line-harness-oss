@@ -38,7 +38,6 @@ import { onlyWhenVisible } from '@/lib/visible-polling'
 import OtpInput from '@/components/shared/otp-input'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import EmergencyControlV8, { type EmergencyControlV8Handle } from './control-v8'
-import { SendPathCoveragePanel } from './send-path-coverage-panel'
 import {
   CAPABILITY_LABEL as RESTORE_DRIFT_CAPABILITY_LABEL,
   describeRestoreBlockers,
@@ -366,7 +365,7 @@ function mostSevere(items: HealthCheckItem[]): OperationSeverity {
 function SummaryCard({ label, value, note }: { label: string; value: string; note: string }) {
   return (
     <div className="border-hairline rounded-card border bg-canvas p-4">
-      <p className="text-ink-faint text-micro font-semibold">{label}</p>
+      <p className="text-ink-faint text-[11px] font-semibold">{label}</p>
       <p className="text-ink mt-1 text-base font-bold">{value}</p>
       <p className="text-ink-faint mt-1 text-xs">{note}</p>
     </div>
@@ -878,6 +877,101 @@ function HealthPanel({
       </div>
     </div>
   )
+}
+
+const SEND_PATH_KIND_LABEL: Record<OperationSendPath['kind'], string> = {
+  manual: '手の操作',
+  auto: '自動',
+  scheduled: '予約',
+  proxy: 'プロキシ経由',
+  external: '外部へ送信',
+}
+
+/*
+ * 停止ボタンが届く経路の一覧 (#1050)。
+ *
+ * 「止める」と押したとき実際にどの送信経路が止まるか、口が返す台帳
+ * (`GET /api/operations/send-paths`) をそのまま見せる。対象外の経路も
+ * 理由付きで出し、「表示されているのに止まらない」事故を防ぐ。
+ * 台帳と実装がずれているとき(problems)は警告として先頭に出す。
+ */
+function SendPathCoveragePanel({ accountId, revision }: { accountId: string | null; revision: number }) {
+  const [data, setData] = useState<OperationSendPathsResponse | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setData(null)
+    setFailed(false)
+    api.operations.sendPaths(accountId)
+      .then((response) => {
+        if (cancelled) return
+        if (!response.success) {
+          setFailed(true)
+          return
+        }
+        /*
+         * 形の違う応答は置かない。そのまま回すと `capabilities` で
+         * 画面ごと落ちる（全ルート監査 A1、2026-09-25）。
+         */
+        const data = response.data as unknown as { capabilities?: unknown; paths?: unknown } | null
+        if (data && Array.isArray(data.capabilities) && Array.isArray(data.paths)) {
+          setData(response.data)
+        } else {
+          setFailed(true)
+        }
+      })
+      .catch(() => { if (!cancelled) setFailed(true) })
+    return () => { cancelled = true }
+  }, [accountId, revision])
+
+  if (failed) {
+    return <Notice tone="warn">
+      送信経路の台帳を取得できませんでした。停止の届く範囲が確認できないため、経路の網羅は保証できません。時間をおいて読み直してください。
+    </Notice>
+  }
+  if (!data) {
+    return <section className="border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint">送信経路の台帳を読み込んでいます…</section>
+  }
+
+  const groups: Array<{ title: string; stopped: boolean; excluded: boolean; paths: OperationSendPath[] }> = []
+  for (const capability of data.capabilities) {
+    const paths = data.paths.filter((path) => path.capability === capability)
+    if (paths.length === 0) continue
+    groups.push({
+      title: CAPABILITY_LABEL[capability],
+      stopped: paths.some((path) => path.state === 'stopped'),
+      excluded: false,
+      paths,
+    })
+  }
+  const excluded = data.paths.filter((path) => path.capability === null)
+  if (excluded.length > 0) groups.push({ title: '対象外（止まりません）', stopped: false, excluded: true, paths: excluded })
+
+  return <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
+    <div className="border-hairline border-b px-4 py-3">
+      <h2 className="text-base font-bold text-ink">停止が届く送信経路</h2>
+      <p className="mt-0.5 text-xs text-ink-faint">緊急停止が実際に届く経路と、対象外の経路の一覧です。{formatOperationDate(data.evaluatedAt)}時点</p>
+      {(data.problems ?? []).length > 0 && <Notice tone="warn" className="mt-2">台帳と実装がずれています: {(data.problems ?? []).join(' / ')}</Notice>}
+    </div>
+    <div className="divide-y divide-hairline">
+      {groups.map((group) => <div key={group.title} className="px-4 py-3">
+        <p className={`text-xs font-medium ${group.excluded ? 'text-ink-faint' : group.stopped ? 'text-danger' : 'text-ink-secondary'}`}>
+          {group.title}{group.stopped ? '（停止中）' : ''}
+        </p>
+        <ul className="mt-2 space-y-1.5">
+          {group.paths.map((path) => <li key={path.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
+            <span className={`shrink-0 rounded-pill px-2 py-0.5 font-bold ${path.state === 'stopped' ? 'bg-danger-bg text-danger' : path.state === 'running' ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>
+              {path.state === 'stopped' ? '停止中' : path.state === 'running' ? '稼働中' : '対象外'}
+            </span>
+            <span className="min-w-0 font-bold text-ink">{path.label}</span>
+            <span className="text-ink-faint">{SEND_PATH_KIND_LABEL[path.kind]}</span>
+            <span className="min-w-0 flex-1 text-ink-faint" title={path.excludedReason ?? path.note ?? undefined}>{path.excludedReason ?? path.note}</span>
+          </li>)}
+        </ul>
+      </div>)}
+    </div>
+  </section>
 }
 
 function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
@@ -1397,7 +1491,7 @@ function HistoryPanel() {
       item.reason,
       item.resolvedAt ?? '',
     ])
-    const blob = new Blob([`\uFEFF${[['いつ・だれが', 'スタッフ', '止めたもの', '対象', '理由', '戻した'], ...rows].map((row) => row.map(quote).join(',')).join('\n')}`], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob([`\uFEFF${[['いつ・だれが', '担当者', '止めたもの', '対象', '理由', '戻した'], ...rows].map((row) => row.map(quote).join(',')).join('\n')}`], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url; anchor.download = 'operation-history.csv'; anchor.click(); URL.revokeObjectURL(url)
@@ -1421,11 +1515,11 @@ function HistoryPanel() {
         <div className="min-w-0 flex-1 space-y-4">
           <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
             <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">止めた・戻した記録</h2><p className="mt-0.5 text-xs text-ink-faint">だれが・いつ・何を・なぜ。サーバーに追記して残します</p>{unreadableEntries.length > 0 ? <p className="mt-1 text-xs font-semibold text-warning">日付が読めない記録が{unreadableEntries.length}件あり、期間の絞り込みから外しています。履歴なしとは扱いません。</p> : null}</div>
-            {state === 'loading' ? <p className="p-8 text-center text-xs text-ink-faint">記録を読み込んでいます…</p> : state === 'error' ? <p className="bg-warning-bg px-4 py-4 text-xs font-medium text-warning">緊急操作の履歴を取得できませんでした。履歴なしとは扱いません。</p> : entries.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">この期間の記録はありません。</p> : <><div className="hidden grid-cols-[170px_1.2fr_1fr_1fr_100px] gap-3 bg-canvas-sunken px-4 py-3 text-micro font-semibold text-ink-faint md:grid"><span>いつ・だれが</span><span>止めたもの</span><span>対象</span><span>理由</span><span>戻した</span></div><div className="divide-y divide-hairline">{entries.map((entry) => <div key={entry.id} className="grid gap-3 px-4 py-4 md:grid-cols-[170px_1.2fr_1fr_1fr_100px] md:items-center"><div><time className="text-sm font-semibold text-ink">{formatOperationDate(entry.createdAt)}</time><p className="mt-1 truncate text-xs text-ink-faint" title={entry.actorId}>{entry.actorId}</p></div><p className="text-xs font-medium text-ink-secondary">{entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')}</p><p className="text-xs text-ink-secondary">{entry.lineAccountId ?? 'すべてのアカウント'}</p><div><p className="text-xs font-medium text-ink-secondary">{entry.reason}</p>{entry.detail && <p className="mt-1 text-xs text-ink-faint">{entry.detail}</p>}</div><p className={`text-xs font-medium ${entry.resolvedAt ? 'text-success' : entry.status === 'failed' ? 'text-danger' : 'text-ink-faint'}`}>{entry.resolvedAt ? formatOperationDate(entry.resolvedAt) : entry.status === 'failed' ? '失敗' : '停止中'}</p></div>)}</div></>}
+            {state === 'loading' ? <p className="p-8 text-center text-xs text-ink-faint">記録を読み込んでいます…</p> : state === 'error' ? <p className="bg-warning-bg px-4 py-4 text-xs font-medium text-warning">緊急操作の履歴を取得できませんでした。履歴なしとは扱いません。</p> : entries.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">この期間の記録はありません。</p> : <><div className="hidden grid-cols-[170px_1.2fr_1fr_1fr_100px] gap-3 bg-canvas-sunken px-4 py-3 text-[11px] font-semibold text-ink-faint md:grid"><span>いつ・だれが</span><span>止めたもの</span><span>対象</span><span>理由</span><span>戻した</span></div><div className="divide-y divide-hairline">{entries.map((entry) => <div key={entry.id} className="grid gap-3 px-4 py-4 md:grid-cols-[170px_1.2fr_1fr_1fr_100px] md:items-center"><div><time className="text-sm font-semibold text-ink">{formatOperationDate(entry.createdAt)}</time><p className="mt-1 truncate text-xs text-ink-faint" title={entry.actorId}>{entry.actorId}</p></div><p className="text-xs font-medium text-ink-secondary">{entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')}</p><p className="text-xs text-ink-secondary">{entry.lineAccountId ?? 'すべてのアカウント'}</p><div><p className="text-xs font-medium text-ink-secondary">{entry.reason}</p>{entry.detail && <p className="mt-1 text-xs text-ink-faint">{entry.detail}</p>}</div><p className={`text-xs font-medium ${entry.resolvedAt ? 'text-success' : entry.status === 'failed' ? 'text-danger' : 'text-ink-faint'}`}>{entry.resolvedAt ? formatOperationDate(entry.resolvedAt) : entry.status === 'failed' ? '失敗' : '停止中'}</p></div>)}</div></>}
           </section>
           <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
             <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">管理画面の更新</h2><p className="mt-0.5 text-xs text-ink-faint">管理画面へ入った変更のうち、新しい{RECENT_UPDATES_LIMIT}件を表示します</p></div>
-            {recentUpdates.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">更新の記録はありません。</p> : <div className="divide-y divide-hairline">{recentUpdates.map((entry, index) => <div key={`${entry.version}-${entry.pr ?? index}-${entry.at ?? index}`} className="grid gap-2 px-4 py-3 md:grid-cols-[140px_minmax(0,1fr)_90px] md:items-center"><div><time className="text-xs font-medium text-ink-secondary">{formatOperationDate(entry.at ?? entry.released)}</time><p className="mt-1 text-micro text-ink-faint">{entry.version}</p></div><p className="line-clamp-2 text-xs leading-relaxed text-ink-secondary" title={entry.text}>{entry.text}</p><p className="text-xs font-medium text-ink-faint">{entry.by ?? '自動'}{entry.pr ? ` #${entry.pr}` : ''}</p></div>)}</div>}
+            {recentUpdates.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">更新の記録はありません。</p> : <div className="divide-y divide-hairline">{recentUpdates.map((entry, index) => <div key={`${entry.version}-${entry.pr ?? index}-${entry.at ?? index}`} className="grid gap-2 px-4 py-3 md:grid-cols-[140px_minmax(0,1fr)_90px] md:items-center"><div><time className="text-xs font-medium text-ink-secondary">{formatOperationDate(entry.at ?? entry.released)}</time><p className="mt-1 text-[11px] text-ink-faint">{entry.version}</p></div><p className="line-clamp-2 text-xs leading-relaxed text-ink-secondary" title={entry.text}>{entry.text}</p><p className="text-xs font-medium text-ink-faint">{entry.by ?? '自動'}{entry.pr ? ` #${entry.pr}` : ''}</p></div>)}</div>}
             {(hiddenUpdateCount > 0 || pendingUpdateCount > 0) && <div className="border-hairline space-y-1 border-t px-4 py-3 text-xs text-ink-faint">
               {hiddenUpdateCount > 0 && <p>続きが{hiddenUpdateCount}件あります。この欄では新しい{RECENT_UPDATES_LIMIT}件までを表示します。</p>}
               {pendingUpdateCount > 0 && <p>まだ画面に入っていない変更が{pendingUpdateCount}件あります。更新回数には含めていません。</p>}

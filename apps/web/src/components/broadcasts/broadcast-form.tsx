@@ -188,8 +188,8 @@ const MESSAGE_TYPE_TABS = [
  */
 const VALIDATION_STEP_LABEL: Record<'basic' | 'audience' | 'message', string> = {
   basic: '基本設定',
-  audience: '配信対象',
-  message: 'メッセージを作成',
+  audience: '対象者',
+  message: 'メッセージ',
 }
 
 export function moveMessageTypeTabFocus(
@@ -228,7 +228,7 @@ const STANDARD_CONDITION_AXES = [
 ] as const
 
 const BROADCAST_ONLY_CONDITION_AXES = [
-  '担当', '流入経路', '配信状況', '予約状況', '購入履歴', 'ブロック状態',
+  '担当者', '流入経路', '配信状況', '予約状況', '購入履歴', 'ブロック状態',
 ] as const
 
 /** 位置情報・音声・スタンプは、シナリオと同じ入力欄をそのまま使う。 */
@@ -279,7 +279,7 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
   if (bubble.type === 'text') return <div className="max-w-[82%]">
-    <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-label shadow-card">{text || 'テキストを入力すると表示されます'}</div>
+    <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-[13px] shadow-card">{text || 'テキストを入力すると表示されます'}</div>
     {buttons.map((button) => <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 truncate rounded-control px-3 py-2 text-center text-xs font-medium" title={button.value}>{button.label || 'ボタン'}</div>)}
   </div>
   if (bubble.type === 'sticker') {
@@ -290,16 +290,16 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   }
   if (bubble.type === 'location') {
     const loc = (bubble.content.state as MessageKindState | undefined)?.location
-    return <div className="bg-canvas w-[82%] rounded-card p-3 text-label shadow-card">
+    return <div className="bg-canvas w-[82%] rounded-card p-3 text-[13px] shadow-card">
       <p className="text-ink font-bold">{loc?.title || '場所'}</p>
-      <p className="text-ink-faint mt-0.5 text-micro">{loc?.address || '住所を入れると出ます'}</p>
+      <p className="text-ink-faint mt-0.5 text-[11px]">{loc?.address || '住所を入れると出ます'}</p>
     </div>
   }
   if (bubble.type === 'audio') {
     const au = (bubble.content.state as MessageKindState | undefined)?.audio
-    return <div className="bg-canvas flex w-[82%] items-center gap-2 rounded-card p-3 text-label shadow-card">
+    return <div className="bg-canvas flex w-[82%] items-center gap-2 rounded-card p-3 text-[13px] shadow-card">
       <span className="text-lg">▶</span>
-      <span className="text-ink-faint text-micro">{au?.duration ? `${au.duration} 秒` : '音声'}</span>
+      <span className="text-ink-faint text-[11px]">{au?.duration ? `${au.duration} 秒` : '音声'}</span>
     </div>
   }
   if (bubble.type === 'carousel') {
@@ -312,13 +312,13 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
     </div>
   }
   if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
-  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-card"><p className="text-xs font-medium text-info">Flexテンプレート</p><p className="mt-1 truncate text-micro text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
+  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-card"><p className="text-xs font-medium text-info">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow-card">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><Button variant="primary" className="mt-2 w-full rounded-mini px-0 py-1 text-nano border-0 h-auto whitespace-normal">{String(card.actionLabel ?? '詳しく見る')}</Button></div>)}</div>
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow-card">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><Button variant="primary" className="mt-2 w-full rounded-mini px-0 py-1 text-[10px] border-0 h-auto whitespace-normal">{String(card.actionLabel ?? '詳しく見る')}</Button></div>)}</div>
   }
-  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-card">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-medium">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-micro text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
+  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-card">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-medium">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
 
 function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, onChange, onMove, onDelete }: {
@@ -1551,9 +1551,6 @@ export default function BroadcastForm({
     if (cleanFingerprintRef.current === null) cleanFingerprintRef.current = formFingerprint
   })
   const dirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
-  useEffect(() => {
-    if (dirty) setSaveDone(false)
-  }, [dirty])
   const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving })
   const leaveTargetRef = useRef(leaveTarget)
   leaveTargetRef.current = leaveTarget
@@ -1673,7 +1670,6 @@ export default function BroadcastForm({
       if (saved) {
         cleanFingerprintRef.current = fingerprintAtSave
         setDraftSavedAt(Date.now())
-        setSaveDone(true)
         notifyToast('下書きを保存しました。')
         // BROADCAST-16: フォームは閉じない保存なので、背後の一覧と
         // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
@@ -2217,16 +2213,10 @@ export default function BroadcastForm({
               </p>
             </div>
           )}
-          {/* 板 `FU2aU`：ブロック中の人を除く札。数は口で数えたものだけ出す。 */}
-          <div className="bg-accent-soft rounded-card mt-3 p-3">
-            <p className="text-ink text-sm font-bold">ブロック中の人を除く</p>
-            <p className="text-ink-secondary mt-1 text-xs">
-              {preflight?.exclusions
-                ? `ブロック・非表示の ${formatNumber((preflight.exclusions.blocked ?? 0) + (preflight.exclusions.hidden ?? 0))}人には送りません`
-                : '人数を数えています…'}
-            </p>
-          </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            {/* ブロック中の人は countRules の is_following=true で外れている。
+                外していることを書かないと、人数が合わないように見える。 */}
+            <p className="text-ink-faint text-xs">ブロック中の友だちを自動で除外しています</p>
             <Button variant="secondary" className="text-ink-secondary px-3 py-1 text-xs h-auto whitespace-normal" href="/friends">
               対象を一覧で見る
             </Button>
@@ -2535,7 +2525,7 @@ export default function BroadcastForm({
           <div className="border-hairline mt-4 border-t pt-4">
       <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-medium">
         時間を分散して送る
-        <span className="bg-success-bg text-success rounded-pill ml-2 px-2 py-0.5 text-micro font-normal">
+        <span className="bg-success-bg text-success rounded-pill ml-2 px-2 py-0.5 text-[11px] font-normal">
           推奨
         </span>
       </label>
@@ -2671,7 +2661,7 @@ export default function BroadcastForm({
         <>
           <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => guarded(onCancel)}>キャンセル</Button>
           {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()}>{testSending ? '送信中…' : 'テストを送る'}</Button>}
-          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? 'この内容で予約する' : '下書きを保存する'}</Button>
+          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
         </>
       )}
       </>

@@ -1,7 +1,7 @@
 'use client'
 
 import ReadonlyHeader from './readonly-header-v8'
-import AccountBrowser, { type HqBrowserAccount } from './account-browser-v8'
+import AccountBrowser from './account-browser-v8'
 import './readonly-v8.css'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -25,15 +25,14 @@ export default function HqPage() {
   usePageTitle('アカウント')
   const router = useRouter()
   const { setSelectedAccountId, refreshAccounts } = useAccount()
-  /* 一覧APIは tags・archivedAt・parentLineAccountId まで付けて返す。 */
-  const [accounts, setAccounts] = useState<HqBrowserAccount[]>([])
+  const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [loading, setLoading] = useState(true)
   // M021：捕まえた失敗を持ち、共通部品へ渡す（403 は権限の案内になる）。
   const [loadError, setLoadError] = useState<unknown>(null)
-  const [editingAccount, setEditingAccount] = useState<HqBrowserAccount | null>(null)
+  const [editingAccount, setEditingAccount] = useState<AccountWithStats | null>(null)
   /* 板 `HMpVx`・`D6ljr`・`HFsO9`：カードの「設定」から開く3つの窓。 */
-  const [settingsAccount, setSettingsAccount] = useState<HqBrowserAccount | null>(null)
-  const [archiveTarget, setArchiveTarget] = useState<{ account: HqBrowserAccount; mode: 'archive' | 'restore' } | null>(null)
+  const [settingsAccount, setSettingsAccount] = useState<AccountWithStats | null>(null)
+  const [archiveTarget, setArchiveTarget] = useState<{ account: AccountWithStats; mode: 'archive' | 'restore' } | null>(null)
   const [checkingConnections, setCheckingConnections] = useState(false)
   const [connectionProgress, setConnectionProgress] = useState('')
   const [connectionResult, setConnectionResult] = useState('')
@@ -43,7 +42,7 @@ export default function HqPage() {
     setLoadError(null)
     const accountResponse = await api.lineAccounts.list()
     if (!accountResponse.success) throw new Error(accountResponse.error)
-    setAccounts(accountResponse.data as unknown as HqBrowserAccount[])
+    setAccounts(accountResponse.data as AccountWithStats[])
   }, [])
 
   useEffect(() => {
@@ -60,30 +59,6 @@ export default function HqPage() {
 
   const reloadAfterSave = async () => {
     await Promise.all([load(), refreshAccounts()])
-  }
-
-  /* 板 `JKjsE`：要確認カードの「更新する」はその1件だけ確かめ直す。 */
-  const refreshSingleAccount = async (account: HqBrowserAccount) => {
-    setConnectionProgress(`「${account.displayName || account.name}」の接続情報を更新中`)
-    setConnectionResult('')
-    try {
-      const expectedRevision = account.revision
-      if (typeof expectedRevision !== 'number' || !Number.isInteger(expectedRevision) || expectedRevision < 1) {
-        setConnectionResult('接続情報を更新できませんでした。')
-        return
-      }
-      await fetchApi(`/api/line-accounts/${encodeURIComponent(account.id)}/connection-checks`, {
-        method: 'POST',
-        headers: { 'Idempotency-Key': `hq-check-${account.id}-${crypto.randomUUID()}` },
-        body: JSON.stringify({ expectedRevision }),
-      })
-      await Promise.all([load(), refreshAccounts()])
-      setConnectionResult('LINE IDと接続状態を更新しました。')
-    } catch {
-      setConnectionResult('接続情報を更新できませんでした。')
-    } finally {
-      setConnectionProgress('')
-    }
   }
 
   const refreshConnectionInfo = async () => {
@@ -186,12 +161,12 @@ export default function HqPage() {
 
       {!loadError && !loading ? (
         <>
-          {/* 板 `JKjsE`：数のタイルは角丸の4枚のカード（単位は数の下）。 */}
-          <KpiCollapse data-ro-kpis data-design="KPIs" data-design-node="w7yY6" className="v8-ro-hq-tiles" gridClassName="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard variant="v6" title="アカウント" value={accounts.length} unit="" detail="件" />
-            <KpiCard variant="v6" title="友だち合計" value={totals.friends} unit="" detail="人・全アカウントの合計" />
-            <KpiCard variant="v6" title="今月の配信" value={totals.messages} unit="" detail="通" help={`${month}/1 から今日までの配信です`} />
-            <KpiCard variant="v6" title="接続に問題" value={totals.warnings} unit="" detail="件" valueTone="warning" />
+          {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
+          <KpiCollapse data-ro-kpis data-design="KPIs" data-design-node="w7yY6" gridClassName="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard variant="v6" title="アカウント" value={accounts.length} unit="件" detail={`有効 ${totals.active}・停止中 ${accounts.length - totals.active}`} />
+            <KpiCard variant="v6" title="友だち合計" value={totals.friends} unit="人" detail="" help="全アカウントの合計です" />
+            <KpiCard variant="v6" title="今月の配信" value={totals.messages} unit="通" detail="" help={`${month}/1 から今日までの配信です`} />
+            <KpiCard variant="v6" title="要確認" value={totals.warnings} unit="件" detail="接続に問題があるアカウント" valueTone="warning" />
           </KpiCollapse>
         </>
       ) : null}
@@ -219,25 +194,21 @@ export default function HqPage() {
         />
       ) : null}
 
-      {/*
-        運営が書き込みを伴う操作をしたときだけ出る（★V6 37-5）。
-        V8 の板 `JKjsE` に無いので V8 では出さない（v7 は今のまま）。
-      */}
-      {theme !== 'v8' && <OperatorHistory />}
+      {/* 運営が書き込みを伴う操作をしたときだけ出る（★V6 37-5）。 */}
+      <OperatorHistory />
 
       {settingsAccount ? (
         <AccountSettingsDialog
           account={settingsAccount}
           accounts={accounts}
-          archived={Boolean(settingsAccount.archivedAt)}
-          accountTags={settingsAccount.tags ?? []}
+          archived={Boolean((settingsAccount as { archivedAt?: string | null }).archivedAt)}
           onClose={() => setSettingsAccount(null)}
           onSaved={() => {
             setSettingsAccount(null)
             void reloadAfterSave()
           }}
           onArchive={() => {
-            setArchiveTarget({ account: settingsAccount, mode: settingsAccount.archivedAt ? 'restore' : 'archive' })
+            setArchiveTarget({ account: settingsAccount, mode: (settingsAccount as { archivedAt?: string | null }).archivedAt ? 'restore' : 'archive' })
             setSettingsAccount(null)
           }}
           onShowDetails={() => {
