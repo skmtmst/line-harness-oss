@@ -77,6 +77,9 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin' }))
+vi.mock('@/lib/staff-capability', () => ({ canEditFeature: () => true }))
+
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: mocks.accountId, selectedAccount: null, loading: false }),
 }))
