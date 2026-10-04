@@ -1,4 +1,4 @@
-import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -9,18 +9,17 @@ const TARGETS = [
   'affiliates/tabs.tsx',
   'booking/menus/page.tsx',
   'broadcasts/page.tsx',
-  'form-submissions/page.tsx',
   'friend-add-settings/publish/page.tsx',
-  'friends/page.tsx',
+  '../components/friends/friend-list-table.tsx',
   'line-notifications/page.tsx',
   'line-notifications/operator-notification-rules.tsx',
   'mileage/action-score-tab.tsx',
   'mileage/page.tsx',
-  'nen-members/page.tsx',
+  'nen-members/photo-review-v8.tsx',
   'rich-menus/connections/page.tsx',
-  /* 完全切り替え：v7 page は捨てた。V8 の list-v8 は自前の1枚で読み直す。 */
+  // 失敗表示を持つ本体を指定し、別の詳細画面・ダイアログは取り込まない。
   'scenarios/results/page.tsx',
-  'tags/marks/edit/page.tsx',
+  'tags/mark-editor-v8.tsx',
   '../components/broadcasts/segment-preset-controls.tsx',
   '../components/friend-fields/field-list.tsx',
   '../components/friend-fields/mark-list.tsx',
@@ -31,48 +30,47 @@ const TARGETS = [
 ] as const
 
 function failureDisplays(source: string) {
-  // 取得失敗の面は ListState か ★V7 TargetMissing のどちらか。どちらも
-  // 再読み込み口（onRetry）を持ち、古い個別ボタン（action）は持たない。
+  // 一覧・対象取得の本体だけを読み、共通の失敗表示の再読み込み口を確認する。
   const tags = [
     ...source.matchAll(/<ListState\b[\s\S]*?\/>/g),
     ...source.matchAll(/<TargetMissing\b[\s\S]*?\/>/g),
+    ...source.matchAll(/<TableStateRow\b[\s\S]*?\/>/g),
   ].map(([tag]) => tag)
   return tags.filter((tag) => tag.includes('kind="error"'))
 }
 
 describe('一覧の取得失敗からその場で読み直せる契約', () => {
   it('対象画面の取得失敗には、共通の再読み込み口を渡す', () => {
-    let errorCount = 0
-
     for (const target of TARGETS) {
       const source = readFileSync(join(HERE, target), 'utf8')
       const errors = failureDisplays(source)
-      errorCount += errors.length
+      expect(errors.length, `${target} の取得失敗表示が検査から消えています`).toBeGreaterThan(0)
 
       for (const errorState of errors) {
         expect(errorState, `${target} の取得失敗`).toContain('onRetry=')
         expect(errorState, `${target} に古い個別ボタンが残っています`).not.toContain('action=')
       }
     }
+  })
 
-    // 友だち一覧の状態表示を FriendListTable へ集約した後の実測値。
-    // #543: 回答フォーム一覧の到達不能な回答表（M2削除）にあった失敗表示ぶん1減。
-    // #1014: 項目・対応マーク・タグの一覧に、取得失敗とは別の
-    //        読み込み直し口（ListState kind="error" + onRetry）を足して3増。
-    // SCENARIO-10: シナリオ結果の購読一覧に、取得失敗専用の再読み込み口を足して1増。
-    // NOTIFY-04: どこからも使われていない古い運用者一覧（名前がリンクでない
-    //        置き忘れの写し）を消したぶん1減。生きている一覧は
-    //        app/line-notifications/operator-notification-rules.tsx。
-    // #634: 一斉配信の失敗表示へ再読み込み口を足し（1増）、既に onRetry を
-    //        持っていた LINE通知の2画面も契約の対象へ加えた（2増）。
-    // #772: 統合ユーザー表の失敗表示を ListState から TableStateRow へ
-    //        移したぶん1減。再読み込み口は TableStateRow の onRetry に
-    //        そのまま残し、数だけが減る。
-    // V7 TargetMissing: 追加設定の公開・つながり・シナリオ結果の本体の
-    //        失敗表示を TargetMissing の error へ寄せた（ListState 23＋
-    //        TargetMissing 3で合計は変わらない）。
-    // 2026-10-04 完全切り替え：シナリオ一覧の v7 ListState ぶん1減。
-    expect(errorCount).toBe(25)
+  it('V8の専用失敗表示も、その場で一覧を読み直せる', () => {
+    for (const [target, message, retry] of [
+      ['broadcasts/list-v8.tsx', '一斉配信を読み込めませんでした', 'onClick={() => void loadList((page - 1) * pageSize)}'],
+      ['form-submissions/list-v8.tsx', '回答フォームを読み込めませんでした', 'onClick={() => void loadForms()}'],
+      ['scenarios/list-v8.tsx', 'シナリオを読み込めませんでした', 'onClick={() => void loadScenarios()}'],
+      ['reminders/list-v8.tsx', 'リマインダを読み込めませんでした', 'onClick={reminderList.retry}'],
+    ]) {
+      const source = readFileSync(join(HERE, target), 'utf8')
+      const failureAt = source.lastIndexOf(message)
+      expect(failureAt, `${target} の取得失敗表示`).toBeGreaterThan(-1)
+      // 失敗表示の中で、押したら読み直すボタンにつながっていることを確認する。
+      expect(source.slice(failureAt, failureAt + 1200), target).toContain(retry)
+    }
+    const forms = readFileSync(join(HERE, 'form-submissions/list-v8.tsx'), 'utf8')
+    expect(forms).toContain('const forbidden = isForbidden(loadFailure)')
+    expect(forms).toContain('{!forbidden ? (')
+    const friends = readFileSync(join(HERE, 'friends/page.tsx'), 'utf8')
+    expect(friends).toContain('onRetry={() => void loadFriends()}')
   })
 
   it('URLだけでは対象を特定できない状態に、直らない再読み込みを出さない', () => {

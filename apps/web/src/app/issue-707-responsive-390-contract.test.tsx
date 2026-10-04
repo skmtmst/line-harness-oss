@@ -21,6 +21,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const SRC = join(HERE, '..')
 const NEN_OVERVIEW = readFileSync(join(HERE, 'nen-campaigns', 'nen-overview.tsx'), 'utf8')
 const SETTINGS_PAGE_SRC = readFileSync(join(HERE, 'settings', 'page.tsx'), 'utf8')
+const SETTINGS_CSS = readFileSync(join(HERE, 'settings', 'settings-v8.module.css'), 'utf8')
 const BOOKING_MENUS_SRC = readFileSync(join(HERE, 'booking', 'menus', 'page.tsx'), 'utf8')
 const SCROLLABLE_TABS_SRC = readFileSync(join(SRC, 'components', 'layout', 'scrollable-tabs.tsx'), 'utf8')
 const DATA_TABLE_CSS = readFileSync(join(SRC, 'components', 'shared', 'data-table.module.css'), 'utf8')
@@ -131,16 +132,19 @@ describe('21: 表は外枠で切り落とさず横スクロールで届く', () 
 })
 
 describe('32: 狭幅で1列へ落ち、スイッチが域内に残る', () => {
-  it('機能の一覧は基底grid-cols-1＋min-w-0（xl以上は3列のまま）', () => {
-    expect(SETTINGS_PAGE_SRC).toContain('grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-3')
-    expect(SETTINGS_PAGE_SRC).toContain('min-w-0 space-y-3')
+  it('V8の機能の一覧は縦1列で縮められる', () => {
+    expect(SETTINGS_PAGE_SRC).toContain('className={styles.cardCol} data-design="機能の一覧"')
+    const column = SETTINGS_CSS.match(/\.cardCol\s*\{[^}]*\}/)?.[0]
+    expect(column).toContain('display: flex;')
+    expect(column).toContain('flex-direction: column;')
+    expect(column).toContain('min-width: 0;')
   })
 
   it('本物の設定ページを描き、スイッチとまとめて切替がDOMに残る', async () => {
     await mount(<SettingsPage />)
     const list = host.querySelector('[data-design="機能の一覧"]')
     expect(list).not.toBeNull()
-    expect(list!.className).toContain('grid-cols-1')
+    expect(list!.className).toContain('cardCol')
     // 切替スイッチは狭幅でも描かれ、押せる状態で残る。
     const switches = [...host.querySelectorAll('[role="switch"]')]
     expect(switches.length).toBeGreaterThan(0)

@@ -12,7 +12,15 @@ const tsx = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 
 describe('流入と計測の一覧の行は板 xbHxg の余白どおり', () => {
   it('行のセルは左右 20・上下 9', () => {
-    expect(tsx).not.toMatch(/<td className="[^"]*px-2 py-3/)
-    expect(tsx).toContain('px-5 py-[9px]')
+    const tbody = tsx.slice(tsx.indexOf('<tbody'), tsx.indexOf('</tbody>'))
+    // 選択欄と操作欄を除くデータセル。文字列・テンプレート文字列の両方を見る。
+    const cells = [...tbody.matchAll(/<td className=(?:"([^"\n]*)"|\{`([^`\n]*)`\})/g)]
+      .map((match) => match[1] ?? match[2])
+      .filter((classes) => !classes.includes('pl-5') && !classes.includes('text-right'))
+    expect(cells).toHaveLength(8)
+    for (const classes of cells) {
+      expect(classes).toContain('px-5 py-[9px]')
+      expect(classes).not.toContain('px-2 py-3')
+    }
   })
 })

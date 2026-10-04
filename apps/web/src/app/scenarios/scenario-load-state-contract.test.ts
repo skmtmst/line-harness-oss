@@ -30,8 +30,13 @@ describe('V6 シナリオ一覧の読込状態', () => {
 
   it('操作失敗は内部エラーを出さず一覧読込失敗と分ける', () => {
     expect(PAGE).toContain("const [actionError, setActionError] = useState('')")
-    expect(PAGE).toContain('件の停止ができませんでした')
-    expect(PAGE).toContain('件の開始ができませんでした')
+    // V8のまとめて操作は先に表示を変え、失敗時は共通の知らせに出す。
+    expect(PAGE).toContain('runUndoable({')
+    expect(PAGE).toContain('配信を始められませんでした。')
+    expect(PAGE).toContain('停止できませんでした。')
+    expect(PAGE).toContain('results.filter((res) => !res || !res.success)')
+    expect(PAGE).toContain('if (failed > 0) throw new Error')
+    expect(PAGE).toContain('undo: () => setOptimisticRows(null)')
     expect(PAGE).toContain('フォルダを移動できませんでした')
     expect(PAGE).toContain('このシナリオを削除できませんでした')
     expect(PAGE).toContain('{actionError}')

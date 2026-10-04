@@ -35,6 +35,8 @@ describe('シナリオ一覧の絵どおり（m21p・V8）', () => {
     expect(LIST).toContain('<Th>購読中・読み終えた</Th>')
     expect(LIST).toContain('<Th>状態</Th>')
     expect(LIST).not.toContain('<Th>シナリオ名</Th>')
-    expect(LIST).not.toContain('購読 / 読了')
+    // 読込中のスケルトンを除き、実際の一覧表の見出しを確認する。
+    const table = LIST.slice(LIST.indexOf('<div className={styles.tableWrap}>'))
+    expect(table).not.toContain('購読 / 読了')
   })
 })

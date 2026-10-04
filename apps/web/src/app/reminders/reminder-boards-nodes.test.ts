@@ -13,9 +13,13 @@ const EDIT = readFileSync(join(HERE, 'edit', 'edit-v8.tsx'), 'utf8')
  * ここでは板IDの結び付けだけを見る。
  */
 describe('リマインダの残りの板ID', () => {
-  it('状態の4場面に RrYYJ が付く', () => {
+  it('失敗・絞り込み0件・未作成にRrYYJ、読込中はスケルトンを出す', () => {
     const count = LIST.split('data-design-node="RrYYJ"').length - 1
-    expect(count).toBe(4)
+    expect(count).toBe(3)
+    expect(LIST).toContain('reminderList.loading && reminders.length === 0')
+    expect(LIST).toContain('<DelayedSkeleton loading skeleton={loadingSkeleton} />')
+    expect(LIST).toContain('onClick={reminderList.retry}')
+    expect(LIST).toContain('条件を外す')
   })
 
   it('見るだけの人に a5C1p の帯が出る', () => {

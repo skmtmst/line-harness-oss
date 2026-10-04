@@ -13,9 +13,11 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
  * v7 は変えない。
  */
 describe('友だち詳細の残りタブ（Q5F2QE）', () => {
-  it('概要・履歴・回答フォーム・情報欄に板IDを付ける（V8だけ）', () => {
-    const hits = PAGE.match(/data-design-node=\{v8 \? 'Q5F2QE' : undefined\}/g) ?? []
-    expect(hits.length).toBe(4)
+  it('V8の詳細全体に板IDを付け、4タブを切り替えられる', () => {
+    expect(PAGE).toContain('data-friends-detail-design="v8" data-design-node="Q5F2QE"')
+    for (const tab of ['timeline', 'history', 'forms', 'info']) {
+      expect(PAGE).toContain(`tab === '${tab}'`)
+    }
   })
 
   it('3タブの見せ場はそのまま', () => {
