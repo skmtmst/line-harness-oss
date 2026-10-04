@@ -32,7 +32,7 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain('成果地点を読み込めませんでした')
-    expect(PAGE).toContain('成果地点を再読み込み')
+    expect(PAGE).toContain('もう一度試す')
     expect(PAGE).toContain('const [loadFailed, setLoadFailed] = useState(false)')
   })
 

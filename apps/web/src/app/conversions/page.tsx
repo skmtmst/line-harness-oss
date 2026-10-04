@@ -1087,7 +1087,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
           action={
             <Button variant="secondary" onClick={() => void load()}>
-              成果地点を再読み込み
+              もう一度試す
             </Button>
           }
         />
@@ -1100,6 +1100,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               ? '検索の言葉を変えてください。'
               : '上の「＋ 成果地点を作る」から登録すると、ここに出ます。'
           }
+          action={query ? (
+            <Button variant="secondary" onClick={() => setQuery('')}>
+              条件を外す
+            </Button>
+          ) : undefined}
         />
       ) : (
         <>
