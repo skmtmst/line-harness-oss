@@ -59,6 +59,7 @@
 | 32 | 運用状態 | [詳細](./v6-32-operations-status-requirements-draft.md) | server監視、kill switch、復旧、追記履歴 |
 | 33 | アカウント設定 | [詳細](./v6-33-account-settings-requirements-draft.md) | LINE公式アカウントの登録・検証・切替、Webhook URL突合、Lステップからの乗り換え |
 | 34 | はじめの設定と案内 | [詳細](./v6-34-onboarding-guidance-requirements-draft.md) | 初回セットアップの順路、レシピ、マニュアル導線、エラー文面 |
+| 37 | マスター（運営）コンソール | [詳細](./v6-37-master-console-requirements-draft.md) | 運営社の階層、LINEログイン、契約先アカウント、代理ログイン、チケット、AIの下書き（サブスク方式）、お知らせ、監査ログ |
 
 ## 3. 実装判断
 
