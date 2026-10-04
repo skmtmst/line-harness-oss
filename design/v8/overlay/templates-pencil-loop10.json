@@ -1,0 +1,352 @@
+{
+  "loop": 10,
+  "source": "/Users/kentakenta/Downloads/LINE-Harness-V8.pen",
+  "method": "Pencil MCP Get with resolved variables/instances, read only",
+  "geometry": [
+    {
+      "screen": "I1E7Bt",
+      "nodes": [
+        {
+          "id": "h6pjk",
+          "name": "白い板",
+          "type": "frame",
+          "width": "fill_container",
+          "height": "fill_container",
+          "bounds": {
+            "x": 0,
+            "y": 60,
+            "width": 1188,
+            "height": 928
+          }
+        },
+        {
+          "id": "R5lpAb",
+          "name": "板の頭",
+          "type": "frame",
+          "width": "fill_container",
+          "padding": [
+            20,
+            24,
+            12,
+            24
+          ],
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1188,
+            "height": 87
+          }
+        },
+        {
+          "id": "BLEjW",
+          "name": "タブの段",
+          "type": "frame",
+          "width": "fill_container",
+          "padding": [
+            0,
+            24
+          ],
+          "bounds": {
+            "x": 0,
+            "y": 87,
+            "width": 1188,
+            "height": 31
+          }
+        },
+        {
+          "id": "fjxOZ",
+          "name": "タブ タグ",
+          "type": "frame",
+          "padding": [
+            0,
+            0,
+            12,
+            0
+          ],
+          "bounds": {
+            "x": 24,
+            "y": 0,
+            "width": 27,
+            "height": 31
+          }
+        },
+        {
+          "id": "Li7yf",
+          "name": "数の帯",
+          "type": "frame",
+          "width": "fill_container",
+          "bounds": {
+            "x": 0,
+            "y": 118,
+            "width": 1188,
+            "height": 116
+          }
+        },
+        {
+          "id": "G0VNB",
+          "name": "本文",
+          "type": "frame",
+          "width": "fill_container",
+          "height": "fill_container",
+          "bounds": {
+            "x": 0,
+            "y": 234,
+            "width": 1188,
+            "height": 694
+          }
+        },
+        {
+          "id": "QHnUk",
+          "name": "フォルダの列",
+          "type": "frame",
+          "width": 200,
+          "height": "fill_container",
+          "padding": [
+            16,
+            12
+          ],
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 200,
+            "height": 694
+          }
+        }
+      ]
+    },
+    {
+      "screen": "iychL",
+      "nodes": [
+        {
+          "id": "iychL/K64j9",
+          "name": "白い板",
+          "type": "frame",
+          "width": "fill_container",
+          "height": "fill_container",
+          "bounds": {
+            "x": 0,
+            "y": 60,
+            "width": 1188,
+            "height": 928
+          }
+        },
+        {
+          "id": "Seelk",
+          "name": "板の頭（手順）",
+          "type": "frame",
+          "width": "fill_container",
+          "padding": [
+            16,
+            24
+          ],
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1188,
+            "height": 76
+          }
+        },
+        {
+          "id": "D5zjll",
+          "name": "中身",
+          "type": "frame",
+          "width": "fill_container",
+          "height": "fill_container",
+          "bounds": {
+            "x": 0,
+            "y": 76,
+            "width": 1188,
+            "height": 852
+          }
+        },
+        {
+          "id": "SQUbs",
+          "name": "LINE の見え方",
+          "type": "frame",
+          "width": 380,
+          "height": "fill_container",
+          "padding": [
+            24,
+            32
+          ],
+          "bounds": {
+            "x": 808,
+            "y": 0,
+            "width": 380,
+            "height": 852
+          }
+        }
+      ]
+    },
+    {
+      "screen": "R2ojn",
+      "nodes": [
+        {
+          "id": "Q8aOBj",
+          "name": "白い板",
+          "type": "frame",
+          "width": "fill_container",
+          "height": "fill_container",
+          "bounds": {
+            "x": 0,
+            "y": 60,
+            "width": 1188,
+            "height": 928
+          }
+        },
+        {
+          "id": "vzj8o",
+          "name": "板の頭",
+          "type": "frame",
+          "width": "fill_container",
+          "padding": [
+            20,
+            24
+          ],
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1188,
+            "height": 89
+          }
+        },
+        {
+          "id": "KRmlH",
+          "name": "中身",
+          "type": "frame",
+          "width": "fill_container",
+          "height": "fill_container",
+          "padding": [
+            8,
+            24,
+            24,
+            24
+          ],
+          "bounds": {
+            "x": 0,
+            "y": 89,
+            "width": 1188,
+            "height": 779
+          }
+        },
+        {
+          "id": "Cu78y",
+          "name": "設定の欄（最大720）",
+          "type": "frame",
+          "width": "fill_container",
+          "bounds": {
+            "x": 256,
+            "y": 8,
+            "width": 908,
+            "height": 691
+          }
+        },
+        {
+          "id": "zT2lj",
+          "name": "保存していない変更の帯（下に固定）",
+          "type": "frame",
+          "width": "fill_container",
+          "padding": [
+            12,
+            24
+          ],
+          "bounds": {
+            "x": 0,
+            "y": 868,
+            "width": 1188,
+            "height": 60
+          }
+        }
+      ]
+    },
+    {
+      "screen": "bx1eN",
+      "nodes": [
+        {
+          "id": "qnSPM",
+          "name": "白い板",
+          "type": "frame",
+          "width": "fill_container",
+          "height": "fill_container",
+          "bounds": {
+            "x": 0,
+            "y": 60,
+            "width": 1188,
+            "height": 928
+          }
+        },
+        {
+          "id": "v6m9i8",
+          "name": "板の頭",
+          "type": "frame",
+          "width": "fill_container",
+          "padding": [
+            20,
+            24
+          ],
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1188,
+            "height": 89
+          }
+        },
+        {
+          "id": "PFBH9",
+          "name": "期間の行",
+          "type": "frame",
+          "width": "fill_container",
+          "padding": [
+            12,
+            24
+          ],
+          "bounds": {
+            "x": 0,
+            "y": 89,
+            "width": 1188,
+            "height": 60
+          }
+        },
+        {
+          "id": "mWKY4",
+          "name": "数の帯",
+          "type": "frame",
+          "width": "fill_container",
+          "bounds": {
+            "x": 0,
+            "y": 149,
+            "width": 1188,
+            "height": 122
+          }
+        },
+        {
+          "id": "JciTr",
+          "name": "下",
+          "type": "frame",
+          "width": "fill_container",
+          "height": "fill_container",
+          "bounds": {
+            "x": 0,
+            "y": 271,
+            "width": 1188,
+            "height": 657
+          }
+        },
+        {
+          "id": "y0C9j",
+          "name": "右の列（300）",
+          "type": "frame",
+          "width": 300,
+          "height": "fill_container",
+          "padding": 20,
+          "bounds": {
+            "x": 888,
+            "y": 0,
+            "width": 300,
+            "height": 657
+          }
+        }
+      ]
+    }
+  ]
+}

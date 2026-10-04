@@ -1,0 +1,71 @@
+{
+  "loop": 10,
+  "auditedAtJST": "2026-10-05 03:27",
+  "auditedCommit": "112c9db31724836a362eddcd4c0fea93b4c6008e",
+  "status": "CONTINUE",
+  "sourceHashes": {
+    "components-NbomF.html": "c0027b531927e28e3c5108a73bf18a185b90ad49a05953710c066fcbb12a9bfa",
+    "components-x6BDY.html": "91e9a3b3612d021fd077a6755174bc7c28b162b056c2283b6533722af3f84ea1",
+    "d8X09.html": "2894269e478de6c5aad42cc951d9cfc3e8a911401f4d7eed018c3e38adcf3e54",
+    "I1E7Bt.html": "f3ea7f46f656b612af4f330ad999806716d8fd8c8bd695e2de7236af48dceb73"
+  },
+  "sourceHashesMatchFixture": true,
+  "sourcesChangedSinceLoop9": false,
+  "codeHashes": {
+    "apps/web/src/components/templates/create-page.tsx": "ca313397f1dbea2fcac3fd838ec65afdcce75405a8988c4d4ea2c06ba9fa44a6",
+    "apps/web/src/components/templates/page-templates.module.css": "43ea3aed7187ed376530459de8d282b7bbc161ae763cea14e5dc8e57abc25248"
+  },
+  "codeHashesMatchLoop9": true,
+  "pencilReadOnly": true,
+  "pencilGeometry": "templates-pencil-loop10.json",
+  "temporaryExportDirectory": "/tmp/templates-loop10-export",
+  "temporaryExportHashes": {
+    "components-x6BDY.html": "91e9a3b3612d021fd077a6755174bc7c28b162b056c2283b6533722af3f84ea1",
+    "components-NbomF.html": "c0027b531927e28e3c5108a73bf18a185b90ad49a05953710c066fcbb12a9bfa",
+    "I1E7Bt.html": "124498b06f3138d97f53a51c6e3be9a802568182dd9978b3f7ce407eb3675fec"
+  },
+  "relevantExportStylesUnchanged": [
+    "components-NbomF.html",
+    "components-x6BDY.html",
+    "I1E7Bt.html"
+  ],
+  "boardMap": {
+    "count": 496,
+    "sameOrder": true,
+    "duplicates": 0
+  },
+  "previousVisualComparison": {
+    "loop": 9,
+    "passed": 4,
+    "total": 8,
+    "over4px": 248,
+    "unmatched": 1
+  },
+  "checksThisLoop": {
+    "doctorLocal": "PASS",
+    "sourceHashCheck": "PASS",
+    "boardMap": "PASS",
+    "pencilGeometryAudit": "DONE",
+    "freshPencilExportAudit": "DONE"
+  },
+  "notRerun": [
+    "visual comparison",
+    "responsive captures",
+    "vitest",
+    "typecheck",
+    "production build",
+    "V7 screenshot regression",
+    "representative screen screenshots"
+  ],
+  "remainingGate": "HTML書き出しの幅・枠・余白の不整合を修正し、Pencilで作成の保存帯と設定の720px制約を確定する。正本・部品の担当による修正または所有範囲の例外許可が必要。",
+  "externalActions": {
+    "push": false,
+    "merge": false,
+    "deploy": false,
+    "db": false,
+    "slack": false,
+    "pencilMutation": false,
+    "referenceHtmlMutation": false,
+    "sharedComponentMutation": false
+  }
+}
