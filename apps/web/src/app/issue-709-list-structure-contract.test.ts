@@ -58,7 +58,7 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
   })
 
   it('フォームはフォーム総件数を出す', () => {
-    const src = read('form-submissions/page.tsx')
+    const src = read('form-submissions/list-v8.tsx')
     // R12: 総数は「すべて」の行に出し、見出しには重ねて出さない。
     // R602補足: 未取得・読込中・取得失敗の総数は不明なので出さない
     // （null は数を出さない約束。偽ゼロにしない）。
@@ -83,9 +83,11 @@ describe('Issue #709: 一覧表は1440pxの初期表示に操作列まで収め�
   })
 
   it('フォーム一覧は最小幅を実効幅内に収める', () => {
-    const src = read('form-submissions/page.tsx')
-    const minWidth = src.match(/min-w-\[(\d+)px\]/)
-    expect(minWidth, 'min-w が付いている').toBeTruthy()
+    const styles = read('form-submissions/list-v8.module.css')
+    expect(styles).toMatch(/\.table\s*\{[^}]*width:\s*100%/)
+    expect(styles).toMatch(/\.table\s*\{[^}]*table-layout:\s*fixed/)
+    const minWidth = styles.match(/\.table\s*\{[^}]*min-width:\s*(\d+)px/)
+    expect(minWidth).toBeTruthy()
     expect(Number(minWidth![1])).toBeLessThanOrEqual(800)
   })
 })
@@ -107,12 +109,12 @@ describe('Issue #709: リッチメニューの状態表示は共有StatusBadge�
  */
 describe('Issue #709: フォームのフォルダ追加は止まっている理由を常時表示する', () => {
   it('止めずにつなぐ。押せない飾りの口は置かない', () => {
-    const src = read('form-submissions/page.tsx')
+    const src = read('form-submissions/list-v8.tsx')
     expect(src).toContain('onAddFolder=')
     expect(src).not.toContain('addFolderDisabled')
     expect(src).not.toContain('フォルダ保存先はまだ接続されていません')
     // 消す前の注意（中身は未分類に残る）は常時表示の文で伝える。
-    expect(src).toContain('フォルダを消しても、入っていたフォームは未分類として残ります。')
+    expect(src).toContain('フォルダを消しても、中のフォームは未分類に残ります。')
   })
 })
 

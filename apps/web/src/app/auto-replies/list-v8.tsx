@@ -1751,7 +1751,7 @@ export default function AutoRepliesListV8() {
                 重なりあり
               </FilterChip>
             ) : null}
-            <span className={styles.toolbarSpacer} />
+            <span className="flex-1" />
             <span className={styles.toolbarLabel}>並び</span>
             <Select
               aria-label="並び順"

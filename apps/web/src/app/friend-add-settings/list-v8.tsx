@@ -630,12 +630,12 @@ function FriendAddListV8Inner() {
                     {rule.name}
                   </Link>
                   <p className={styles.cellSub} title={rule.routeNames.join('、') || '未選択'}>
-                    <Link2 size={11} aria-hidden="true" className={styles.cellSubIcon} />
+                    <Link2 size={11} aria-hidden="true" className="shrink-0 text-ink-faint" />
                     {rule.routeNames.join('、') || '未選択'}
                   </p>
                 </td>
                 <td>
-                  <span className={styles.countMain}>{firstSendLabel(rule)}</span>
+                  <span className="text-ink tabular-nums">{firstSendLabel(rule)}</span>
                   {actionLines(rule).map((line) => (
                     <p key={line} className={styles.cellSub}>{line}</p>
                   ))}
@@ -647,7 +647,7 @@ function FriendAddListV8Inner() {
                   </span>
                 </td>
                 <td className={`${styles.countCell} ${styles.recentCol}`}>
-                  <span className={styles.countMain}>
+                  <span className="text-ink tabular-nums">
                     {rule.status === 'draft' ? '—' : countText(rule.matchedLast7Days, '人')}
                   </span>
                 </td>
@@ -685,12 +685,12 @@ function FriendAddListV8Inner() {
                     {sinkRule.name}
                   </Link>
                   <p className={styles.cellSub}>
-                    <Route size={11} aria-hidden="true" className={styles.cellSubIcon} />
+                    <Route size={11} aria-hidden="true" className="shrink-0 text-ink-faint" />
                     基本の追加URL・素のQR・検索など｜いちばん最後に動く・消せない
                   </p>
                 </td>
                 <td>
-                  <span className={styles.countMain}>{firstSendLabel(sinkRule)}</span>
+                  <span className="text-ink tabular-nums">{firstSendLabel(sinkRule)}</span>
                   {actionLines(sinkRule).map((line) => (
                     <p key={line} className={styles.cellSub}>{line}</p>
                   ))}
@@ -702,7 +702,7 @@ function FriendAddListV8Inner() {
                   </span>
                 </td>
                 <td className={`${styles.countCell} ${styles.recentCol}`}>
-                  <span className={styles.countMain}>{countText(sinkRule.matchedLast7Days, '人')}</span>
+                  <span className="text-ink tabular-nums">{countText(sinkRule.matchedLast7Days, '人')}</span>
                 </td>
                 <td
                   className={styles.menuCell}

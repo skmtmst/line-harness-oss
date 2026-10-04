@@ -104,8 +104,8 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain('options={CHANNELS.map')
     expect(PAGE).not.toContain('{item.label}\n                </button>')
     expect(PAGE).toContain('data-inbox-sort="fixed"')
-    // オーナー指示 (m13d)：未読の会話を先に並べる。文言で固定していた旧表示は新表示へ。
-    expect(PAGE).toContain('並び順：未読が先・新しい順')
+    // V8の画面では「未読」を運用者向けの「未対応」と表示する。
+    expect(PAGE).toContain('並び順：未対応が先・新しい順')
     expect(PAGE).not.toContain('aria-label="並び順"')
     expect(PAGE).not.toContain('defaultValue="newest"')
     expect(PAGE).toContain('shrink-0 items-center')

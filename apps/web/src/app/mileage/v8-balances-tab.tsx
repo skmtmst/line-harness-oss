@@ -480,7 +480,7 @@ export default function V8BalancesTab({
         <div className={styles.stateWrap}>
           <div className={styles.errorBand} role="alert">
             マイルの残高を読み込めませんでした
-            <span className={styles.errorRetry}>
+            <span className="ml-auto flex-none">
               <Button type="button" onClick={() => void reloadAll()}>もう一度試す</Button>
             </span>
           </div>

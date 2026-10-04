@@ -548,7 +548,7 @@ function FriendAddRunsV8Inner() {
                         <span className={styles.cellSub} title={action}>{action}</span>
                       </td>
                       <td className={styles.countCell}>{elapsedText(item.receivedAt, item.processedAt)}</td>
-                      <td className={styles.menuCell}>
+                      <td className="text-right">
                         <Link
                           href={detailHref(item.id)}
                           className={styles.menuButton}
@@ -565,11 +565,11 @@ function FriendAddRunsV8Inner() {
             </table>
           </div>
           <div className={styles.pagerRow}>
-            <span className={styles.pagerCount}>
+            <span className="text-ink-faint text-xs">
               {formatNumber(data.total)}件中 {(cursorPage - 1) * perPage + 1}〜{(cursorPage - 1) * perPage + data.items.length}件
             </span>
             {(canPrev || Boolean(data.nextCursor)) && (
-              <div className={styles.pagerButtons} aria-label="実行結果のページ送り">
+              <div className="flex gap-2" aria-label="実行結果のページ送り">
                 <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
                 <Button disabled={!data.nextCursor || loading} onClick={() => data.nextCursor && goNext(data.nextCursor)}>次へ</Button>
               </div>

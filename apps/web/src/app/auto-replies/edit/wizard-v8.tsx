@@ -1100,11 +1100,11 @@ function AutoReplyWizardV8Inner() {
           </p>
           <dl className={`${styles.kvList} ${styles.doneRows}`}>
             <div className={styles.kvRow}>
-              <dt className={styles.kvKey}>動く順番</dt>
+              <dt className="text-ink-faint text-xs">動く順番</dt>
               <dd className={styles.kvVal}>{myPositionLabel}</dd>
             </div>
             <div className={styles.kvRow}>
-              <dt className={styles.kvKey}>反応する言葉</dt>
+              <dt className="text-ink-faint text-xs">反応する言葉</dt>
               <dd className={styles.kvVal}>
                 {form.respondToAll
                   ? 'すべてのメッセージ'
@@ -2130,15 +2130,15 @@ function AutoReplyWizardV8Inner() {
               <h2 className={styles.cardTitle}>設定内容</h2>
               <dl className={styles.kvList}>
                 <div className={styles.kvRow}>
-                  <dt className={styles.kvKey}>状態</dt>
+                  <dt className="text-ink-faint text-xs">状態</dt>
                   <dd className={styles.kvVal}>停止中として作ります</dd>
                 </div>
                 <div className={styles.kvRow}>
-                  <dt className={styles.kvKey}>動く順番</dt>
+                  <dt className="text-ink-faint text-xs">動く順番</dt>
                   <dd className={styles.kvVal}>いちばん下（足されます）</dd>
                 </div>
                 <div className={styles.kvRow}>
-                  <dt className={styles.kvKey}>同時に当たるルール</dt>
+                  <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
                   <dd className={styles.kvVal}>手順4で確かめます</dd>
                 </div>
               </dl>
@@ -2157,7 +2157,7 @@ function AutoReplyWizardV8Inner() {
                 </p>
                 <dl className={styles.kvList}>
                   <div className={styles.kvRow}>
-                    <dt className={styles.kvKey}>当たった受信（過去28日）</dt>
+                    <dt className="text-ink-faint text-xs">当たった受信（過去28日）</dt>
                     <dd className={styles.kvVal}>
                       {matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件`}
                     </dd>
@@ -2183,7 +2183,7 @@ function AutoReplyWizardV8Inner() {
                 <h2 className={styles.cardTitle}>送るものの確認</h2>
                 <dl className={styles.kvList}>
                   <div className={styles.kvRow}>
-                    <dt className={styles.kvKey}>返すもの</dt>
+                    <dt className="text-ink-faint text-xs">返すもの</dt>
                     <dd className={styles.kvVal}>
                       {form.mode === 'silent'
                         ? '返信しない'
@@ -2197,7 +2197,7 @@ function AutoReplyWizardV8Inner() {
                     </dd>
                   </div>
                   <div className={styles.kvRow}>
-                    <dt className={styles.kvKey}>後の処理</dt>
+                    <dt className="text-ink-faint text-xs">後の処理</dt>
                     <dd className={styles.kvVal}>{form.actions.length > 0 ? `${form.actions.length}つ` : 'なし'}</dd>
                   </div>
                 </dl>
@@ -2257,17 +2257,17 @@ function AutoReplyWizardV8Inner() {
                 )}
                 <dl className={styles.kvList}>
                   <div className={styles.kvRow}>
-                    <dt className={styles.kvKey}>同時に当たるルール</dt>
+                    <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
                     <dd className={styles.kvVal}>{conflicts.length > 0 ? `${conflicts.length}つ` : 'なし'}</dd>
                   </div>
                   <div className={styles.kvRow}>
-                    <dt className={styles.kvKey}>当たる受信（過去28日）</dt>
+                    <dt className="text-ink-faint text-xs">当たる受信（過去28日）</dt>
                     <dd className={styles.kvVal}>
                       {matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件`}
                     </dd>
                   </div>
                   <div className={styles.kvRow}>
-                    <dt className={styles.kvKey}>試した結果</dt>
+                    <dt className="text-ink-faint text-xs">試した結果</dt>
                     <dd className={styles.kvVal}>
                       {dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません'}
                     </dd>
@@ -2296,17 +2296,17 @@ function AutoReplyWizardV8Inner() {
                 <h2 className={styles.cardTitle}>設定内容</h2>
                 <dl className={styles.kvList}>
                   <div className={styles.kvRow}>
-                    <dt className={styles.kvKey}>状態</dt>
+                    <dt className="text-ink-faint text-xs">状態</dt>
                     <dd className={styles.kvVal}>
                       {isActive ? '有効のまま更新' : '停止中 → 有効にします'}
                     </dd>
                   </div>
                   <div className={styles.kvRow}>
-                    <dt className={styles.kvKey}>動く順番</dt>
+                    <dt className="text-ink-faint text-xs">動く順番</dt>
                     <dd className={styles.kvVal}>{myPositionLabel}</dd>
                   </div>
                   <div className={styles.kvRow}>
-                    <dt className={styles.kvKey}>同時に当たるルール</dt>
+                    <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
                     <dd className={styles.kvVal}>
                       {conflicts.length > 0 ? `${conflicts.length}つ` : 'なし'}
                     </dd>

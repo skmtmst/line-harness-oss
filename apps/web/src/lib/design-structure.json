@@ -2470,44 +2470,6 @@
         "気をつけること"
       ]
     },
-    "/form-submissions": {
-      "node": "EMBIK",
-      "name": "V6 13-1 回答フォーム",
-      "sections": [
-        "Bar",
-        "Saved"
-      ],
-      "parts": [
-        "フォーム",
-        "フォルダを追加",
-        "公開中",
-        "フォームを作る",
-        "集まった回答を見る",
-        "フォーム名・質問文で検索",
-        "保存した検索",
-        "回答の保存先",
-        "回答数",
-        "更新",
-        "操作",
-        "まだフォームがありません",
-        "最初の1つを作ると、集まった回答もここから見られます。",
-        "表示できませんでした",
-        "条件に合うフォームはありません"
-      ],
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "EMBIK",
-          "ZOPyc",
-          "v9tYhl"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "Claudeの設計画像・実装画像比較待ち"
-      }
-    },
     "/mileage": {
       "node": "s98Vfw",
       "name": "V6 17-1 マイル・友だちの残高",
