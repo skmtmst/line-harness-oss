@@ -4,10 +4,11 @@
 import React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Circle, Star } from 'lucide-react'
+import { Circle } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import type { FriendListColumn } from './friend-list-table'
 import Avatar from '@/components/shared/avatar'
+import AttentionStar from '@/components/shared/attention-star'
 import Checkbox from '@/components/shared/checkbox'
 import { formatDay } from '@/lib/format'
 
@@ -88,19 +89,11 @@ export default function FriendListRow({
         />
       </div>
 
-      <button
-        type="button"
-        data-part="attention-star"
-        aria-pressed={attention}
-        aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
-        onClick={(event) => {
-          event.stopPropagation()
-          onToggleAttention?.()
-        }}
-        className={`rounded-mini p-1 ${attention ? 'text-status-warn-deep' : 'text-ink-faint'} hover:bg-status-warn-soft hover:text-status-warn-deep`}
-      >
-        <Star aria-hidden="true" className={`h-4 w-4 ${attention ? 'fill-current' : ''}`} />
-      </button>
+      <AttentionStar
+        pressed={attention}
+        label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
+        onToggle={onToggleAttention}
+      />
 
       <div className="flex min-w-0 items-center gap-3 overflow-hidden">
         {/* アバターは設計 `PhxG6` の 40x40 / r=18。真円（r=20）にしない。 */}
@@ -289,19 +282,12 @@ export function FriendListCard({
             aria-label={`${friend.displayName}を選ぶ`}
           />
         </div>
-        <button
-          type="button"
-          data-part="attention-star"
-          aria-pressed={attention}
-          aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
-          onClick={(event) => {
-            event.stopPropagation()
-            onToggleAttention?.()
-          }}
-          className={`rounded-mini p-1 pt-1.5 ${attention ? 'text-status-warn-deep' : 'text-ink-faint'} hover:bg-status-warn-soft hover:text-status-warn-deep`}
-        >
-          <Star aria-hidden="true" className={`h-4 w-4 ${attention ? 'fill-current' : ''}`} />
-        </button>
+        <AttentionStar
+          pressed={attention}
+          label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
+          onToggle={onToggleAttention}
+          className="pt-1.5"
+        />
         <Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />
         <div className="min-w-0 flex-1">
           <Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className="block min-h-6 truncate text-sm font-bold text-ink hover:text-action hover:underline">

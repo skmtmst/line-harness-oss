@@ -951,6 +951,9 @@
   "components/shared/activity-item.tsx": {
     "unresolved-classname": 8
   },
+  "components/shared/attention-star.tsx": {
+    "unresolved-classname": 1
+  },
   "components/shared/avatar.tsx": {
     "unresolved-classname": 2
   },

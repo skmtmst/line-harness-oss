@@ -185,8 +185,10 @@ describe('V8 移行 — 注目の星（選ぶと黄色）', () => {
     expect(rule![1]).toContain('stroke: var(--color-star-on-edge)')
   })
 
-  it('使う側（友だち一覧の行・カードの両方）に data-part="attention-star" が付く', () => {
-    expect(friendRow.match(/data-part="attention-star"/g)?.length).toBe(2)
+  it('使う側（友だち一覧の行・カードの両方）が共通部品 AttentionStar を使い、部品に data-part="attention-star" が付く', () => {
+    expect(friendRow.match(/<AttentionStar/g)?.length).toBe(2)
+    const star = readFileSync(join(WEB, 'src/components/shared/attention-star.tsx'), 'utf8')
+    expect(star).toContain('data-part="attention-star"')
   })
 
   it('オンになった瞬間、星がふくらんで戻る（動きを減らす設定では止まる）', () => {
