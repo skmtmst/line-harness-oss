@@ -209,7 +209,7 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     // 板が競合になり、帯が出る。入力は残る（最新の名前で上書きしない）。
     expect(container.querySelector('[data-design-node="G83vi"]')).toBeTruthy()
     expect(container.textContent).toContain('ほかの人がこのレポートを先に保存しました')
-    expect(container.textContent).toContain('このまま保存すると、相手の変更が消えます')
+    expect(container.textContent).toContain('入力は残っています。相手の変更を確認してから保存してください。')
     expect((container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('わたしの入力')
     // 下の帯の主ボタンは比べる向きになる
     expect(buttonByText('比べてから保存')).toBeTruthy()
