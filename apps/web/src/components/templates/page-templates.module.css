@@ -95,6 +95,7 @@
 :global([data-theme='v8']) [data-page-template='detail'] .actions { gap: 14px; }
 :global([data-theme='v8']) .createContent,
 :global([data-theme='v8']) .detailContent,
+:global([data-theme='v8']) .settingsContent,
 :global([data-theme='v8']) .settingsNav { align-self: flex-start; }
 :global([data-theme='v8']) .messages { display: flex; flex-direction: column; }
 
