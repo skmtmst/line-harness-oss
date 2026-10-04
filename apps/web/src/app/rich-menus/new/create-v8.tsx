@@ -1369,9 +1369,9 @@ export default function RichMenuCreateV8() {
 
       <div className={styles.grid}>
         <div className={styles.stack}>
-          {step === 'shape' ? renderShape() : null}
+          {step === 'shape' ? <div data-design-node="JeINq">{renderShape()}</div> : null}
           {step === 'buttons' ? renderButtons() : null}
-          {step === 'audience' ? renderAudience() : null}
+          {step === 'audience' ? <div data-design-node="OxEMM">{renderAudience()}</div> : null}
           {step === 'publish' ? renderPublish() : null}
         </div>
 
