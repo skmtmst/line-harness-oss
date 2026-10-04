@@ -226,7 +226,6 @@ shared-button-importer app/mileage/v8-history-tab.tsx
 shared-button-importer app/mileage/v8-rewards-tab.tsx
 shared-button-importer app/mileage/v8-score-tab.tsx
 shared-button-importer app/nen-campaigns/columns/new/column-new-v8.tsx
-shared-button-importer app/nen-campaigns/columns/new/page.tsx
 shared-button-importer app/nen-campaigns/edit/campaign-editor-v8.tsx
 shared-button-importer app/nen-campaigns/edit/campaign-editor.tsx
 shared-button-importer app/nen-campaigns/edit/page.tsx

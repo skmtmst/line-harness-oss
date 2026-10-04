@@ -31,6 +31,7 @@ import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -1105,6 +1106,7 @@ function V8ScoreHistoryDialog({
   const [detail, setDetail] = useState<FriendScoreDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [retry, setRetry] = useState(0)
 
   useEffect(() => {
     let current = true
@@ -1126,7 +1128,7 @@ function V8ScoreHistoryDialog({
         if (current) setLoading(false)
       })
     return () => { current = false }
-  }, [friendId])
+  }, [friendId, retry])
 
   const items = useMemo(
     () => [...(detail?.history ?? [])].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)),
@@ -1136,10 +1138,10 @@ function V8ScoreHistoryDialog({
   return (
     <Dialog
       open
+      designNode="R8NNi"
       title="点数の変化の明細"
       description="いつ・何で点数が変わったかを新しい順に並べています。スコアは配信や対応の順番を決める目安で、お客様には見えず、マイル残高は増えも減りもしません。"
-      confirmLabel="閉じる"
-      onConfirm={onCancel}
+      footer={<div className="flex justify-end"><Button variant="secondary" onClick={onCancel}>閉じる</Button></div>}
       onCancel={onCancel}
       busy={loading}
     >
@@ -1148,7 +1150,7 @@ function V8ScoreHistoryDialog({
         <div>
           <p className={styles.dlgPersonName}>{friendName}</p>
           <p className={styles.dlgPersonSub}>
-            いま {formatMileageNumber(detail?.currentScore ?? currentScore ?? 0)}点・{bandName(band, highMin, normalMin)}
+            いま {detail?.currentScore != null || currentScore != null ? formatMileageNumber(detail?.currentScore ?? currentScore!) : '—'}点・{bandName(band, highMin, normalMin)}
           </p>
         </div>
       </div>
@@ -1156,7 +1158,7 @@ function V8ScoreHistoryDialog({
       {loading ? (
         <ListState kind="loading" title="点数の変化を読み込んでいます" />
       ) : error ? (
-        <ListState kind="error" title="点数の明細を表示できませんでした" description="画面を閉じて、もう一度開き直してください。" />
+        <ListState kind="error" title="点数の明細を表示できませんでした" description="登録した点数は変わっていません。" onRetry={() => setRetry((value) => value + 1)} />
       ) : items.length === 0 ? (
         <ListState
           kind="empty"
@@ -1164,14 +1166,9 @@ function V8ScoreHistoryDialog({
           description="メッセージへの返信やリンクのクリックなど、決めたきっかけがあると記録されます。"
         />
       ) : (
-        <table className={styles.miniTable} style={{ marginTop: 16 }}>
+        <table className={`${styles.miniTable} ${styles.scoreHistoryTable}`}>
           <thead>
-            <tr>
-              <th scope="col">いつ</th>
-              <th scope="col">できごと</th>
-              <th scope="col">点</th>
-              <th scope="col">合計</th>
-            </tr>
+            <TableHeadRow><Th>いつ</Th><Th>できごと</Th><Th align="right">点</Th><Th align="right">合計</Th></TableHeadRow>
           </thead>
           <tbody>
             {items.map((item) => (
@@ -1181,7 +1178,7 @@ function V8ScoreHistoryDialog({
                 </td>
                 <td>{actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}</td>
                 <td>
-                  <span className={styles.num}>
+                  <span className={styles.num} data-score-delta={item.scoreChange > 0 ? 'positive' : item.scoreChange < 0 ? 'negative' : 'zero'}>
                     {item.scoreChange > 0 ? `+${formatMileageNumber(item.scoreChange)}` : `${formatMileageNumber(item.scoreChange)}`}
                   </span>
                 </td>

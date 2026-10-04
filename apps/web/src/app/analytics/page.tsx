@@ -1,15 +1,18 @@
 'use client'
 
 import './readonly-v8.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
 import AnalyticsNavigationV8 from './navigation-v8'
 import ConversionReportV8 from './conversion-report-v8'
 
 import ReadonlyHeaderV8 from './readonly-header-v8'
 import Select from '@/components/shared/select'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import SegmentedControl from '@/components/shared/segmented'
+import { RowActions } from '@/components/shared/row-actions'
+import SearchField from '@/components/shared/search-field'
+import { Suspense, createContext, useContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { Download, Plus } from 'lucide-react'
 import type { FriendField } from '@line-crm/shared'
 import {
   api,
@@ -39,12 +42,11 @@ import {
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import MetricValue from '@/components/ui/metric-value'
-import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { useMergedTab } from '@/components/layout/merged-tabs'
 import { useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
-import Breadcrumb from '@/components/shared/breadcrumb'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -126,12 +128,19 @@ function AnalyticsNotice({ children }: { children: ReactNode }) {
   return <Notice tone="info">{children}</Notice>
 }
 
-function AnalyticsExportButton({ onClick, disabled, label }: { onClick: () => void; disabled: boolean; label?: string }) {
-  return (
-    <Button onClick={onClick} disabled={disabled} variant="secondary">
-      {label ?? 'CSVで書き出す'}
-    </Button>
-  )
+type ExportAction = { onClick: () => void; disabled: boolean }
+const AnalyticsExportContext = createContext<((action: ExportAction | null) => void) | null>(null)
+
+function AnalyticsExportButton({ onClick, disabled, label, headerOnly = false }: { onClick: () => void; disabled: boolean; label?: string; headerOnly?: boolean }) {
+  const register = useContext(AnalyticsExportContext)
+  const action = useRef(onClick)
+  action.current = onClick
+  useEffect(() => {
+    register?.({ onClick: () => action.current(), disabled })
+    return () => register?.(null)
+  }, [register, disabled])
+  if (headerOnly) return null
+  return <Button onClick={onClick} disabled={disabled} variant="secondary"><Download size={14} aria-hidden="true" />{label ?? 'CSV で書き出す'}</Button>
 }
 
 function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
@@ -144,17 +153,7 @@ function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
 const RANGES = [7, 30, 90]
 
 function RangePicker({ days, onChange }: { days: number; onChange: (days: number) => void }) {
-  return (
-    // どの期間が選ばれているかは見た目の色だけだった。role="group"と
-    // aria-pressedで、読み上げにも同じ選択状態を伝える。
-    <div className="flex gap-1" role="group" aria-label="集計期間">
-      {RANGES.map((range) => (
-        <Button variant="primary" className={(`rounded-control px-3 py-2 text-xs font-medium ${days === range ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary'}`) + ' border-0 h-auto whitespace-normal'} type="button" key={range} onClick={() => onChange(range)} aria-pressed={days === range}>
-          {range}日
-        </Button>
-      ))}
-    </div>
-  )
+  return <SegmentedControl aria-label="集計期間" options={RANGES.map((range) => ({ value: String(range), label: `${range}日` }))} value={String(days)} onChange={(value) => onChange(Number(value))} />
 }
 
 function AnalyticsPeriodControl({ days, onChange }: { days: number; onChange: (days: number) => void }) {
@@ -1415,11 +1414,42 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
   }
 
   return (
-    <div data-design-node="C2I7ry" className="flex flex-col gap-4">
-      <div className="flex justify-end"><AnalyticsExportButton onClick={exportFunnel} disabled={!result} /></div>
-      <AnalyticsNotice>段は上から順に見ます。同じ人が同じ段を2回通っても1回として数えます。判定できる期間は、最初の段から設定した日数です。まだ途中の人は完了した人に含めません。</AnalyticsNotice>
-      <p className="text-sm text-ink-secondary">友だちがどこまで進んで、どこで離れたかを段階ごとに見ます。段を自由に組み替えられるので、配信の流れでも購入の流れでも作れます。</p>
+    <div data-design-node="DkRDE" className="flex flex-col gap-4 v8-ro-analytics-funnel">
+      <AnalyticsExportButton headerOnly onClick={exportFunnel} disabled={!result} />
 
+
+      {!creating && !editTarget && funnels.length > 0 && (
+          <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              title="入口"
+              value={overall?.entry ?? null}
+              unit="人"
+              detail={measurable ? (overall?.entryLabel ?? '—') : run ? '判定不能' : '—'}
+            />
+            <KpiCard
+              title="最後まで"
+              value={overall?.last ?? null}
+              unit="人"
+              detail={measurable
+                ? (overall?.rate != null ? `通過率 ${overall.rate}%` : '—')
+                : run ? '判定不能' : '—'}
+            />
+            <KpiCard
+              title="いちばん落ちる段"
+              value={worst ? -Math.round(worst.rate * 100) : null}
+              unit="%"
+              detail={
+                worst && result
+                  ? `${result[worst.index - 1].label} → ${result[worst.index].label}`
+                  : run && !measurable ? '判定不能' : '—'
+              }
+            />
+            {/* 段ごとの到達日時を持っていない。ファネルの集計は「通ったか」
+                だけを見ていて、いつ通ったかを残していない。 */}
+            <KpiCard title="平均の到達日数" value={null} unit="日" detail="未取得" description="段に到達した日時が集計結果にないため、平均の日数は未取得です" />
+
+          </div>
+      )}
       {creating || editTarget ? (
         <FunnelForm
           accountId={accountId}
@@ -1462,39 +1492,19 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
         </p>
       ) : (
         <>
-          <section className="bg-canvas rounded-card border-hairline border p-4">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="text-ink text-sm font-semibold">段の並び</h3>
-                <p className="text-ink-faint mt-0.5 text-xs">
-                  上から順に通った人だけを数えます。
-                </p>
-              </div>
+          <section className="v8-ro-analytics-funnelControls">
+            <div className="v8-ro-analytics-funnelControlActions">
               <div className="flex flex-wrap gap-2">
-                <RangePicker
-                  days={funnelDays}
-                  onChange={(days) => {
-                    setFunnelDays(days)
-                    setPicked(null)
-                    setFunnelAudience(null)
-                    setRunning(false)
-                  }}
-                />
-                <Button
-                  onClick={() => void runNow()}
-                  disabled={running || selectedFunnel?.status !== 'active'}
-                  variant="secondary" busy={running} busyLabel="再集計中">
-                  {`この${funnelDays}日を再集計`}
-                </Button>
                 {canManage && (
                   <Button variant="secondary" className="text-ink-secondary text-label px-3 py-1.5 font-semibold h-auto whitespace-normal" onClick={() => setCreating(true)}>
-                    ＋ 段を足す
+                    ファネルを作る
                   </Button>
                 )}
+                <Button variant="secondary" disabled={running} onClick={() => setRunReload((n) => n + 1)}>最新の結果をもう一度読む</Button>
               </div>
             </div>
 
-            <div className="mt-3">
+            <div className="v8-ro-analytics-funnelSelectRow"><div>
               <label htmlFor="funnel-select" className="text-ink-secondary mb-1 block text-xs font-medium">
                 ファネル
               </label>
@@ -1503,7 +1513,6 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                 value={selected}
                 onChange={(value) => setSelected(value)}
                 aria-label="ファネル"
-                className="border-hairline rounded-control w-full border px-3 py-2 text-sm sm:w-72"
                 size="full"
                 options={
                   funnels.some((funnel) => funnel.status === 'active' || funnel.id === selected)
@@ -1518,6 +1527,42 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                     : [{ value: '', label: '使えるファネルがありません' }]
                 }
               />
+</div><div><label className="mb-1 block text-xs font-medium">何日以内の通過で数えるか</label><Select aria-label="何日以内の通過で数えるか" disabled onChange={() => {}} value={String(selectedFunnel?.windowDays ?? '')} options={[{ value: String(selectedFunnel?.windowDays ?? ''), label: selectedFunnel ? `${selectedFunnel.windowDays}日以内` : '未取得' }]} /></div>            {run && (
+              <div className="min-w-0">
+                <label htmlFor="funnel-group" className="text-ink-secondary mb-1 block text-xs font-medium">比較する条件</label>
+                <Select
+                  id="funnel-group"
+                  value={groupKey}
+                  onChange={(value) => { setGroupKey(value); setPicked(null); setFunnelAudience(null) }}
+                  aria-label="比較する条件"
+                  className="v6-select w-full"
+                  size="full"
+                  options={run.groups.map((group) => ({
+                    value: group.key,
+                    label: `${group.label}（入口 ${group.entrants}人）`,
+                  }))}
+                />
+              </div>
+            )}
+</div>
+            <Disclosure title="定義の操作と集計の詳細" size="compact">
+              <p className="mb-2 text-xs">集計対象の期間</p><div className="flex flex-wrap gap-2">                <RangePicker
+                  days={funnelDays}
+                  onChange={(days) => {
+                    setFunnelDays(days)
+                    setPicked(null)
+                    setFunnelAudience(null)
+                    setRunning(false)
+                  }}
+                />
+                <Button
+                  onClick={() => void runNow()}
+                  disabled={running || selectedFunnel?.status !== 'active'}
+                  variant="secondary" busy={running} busyLabel="再集計中">
+                  {`この${funnelDays}日を再集計`}
+                </Button>
+</div>
+
               {selectedFunnel && (
                 <p className="text-ink-faint mt-1 text-xs">
                   {selectedFunnel.windowDays}日以内に通った人を数えます。
@@ -1569,20 +1614,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   )}
                 </div>
               )}
-            </div>
-
-            {result && result.length > 0 && (
-              <ol className="mt-3 flex flex-wrap gap-1.5">
-                {result.map((step) => (
-                  <li
-                    key={step.stepOrder}
-                    className="border-hairline text-ink-secondary rounded-pill border px-3 py-1 text-xs"
-                  >
-                    {step.label}
-                  </li>
-                ))}
-              </ol>
-            )}
+            </Disclosure>
 
             {/* 条件ごとに通過率を並べる仕組みが無い。ファネルの定義が1本の
                 段の列だけで、条件で分ける口を持っていない。 */}
@@ -1604,9 +1636,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <p className="text-danger text-xs">{runError}</p>
                 {/* 最新結果の読み取りに失敗しただけなら、再集計せず読み直せる */}
-                {!run && !noRun && !running && (
-                  <Button variant="secondary" onClick={() => setRunReload((n) => n + 1)}>最新の結果をもう一度読む</Button>
-                )}
+
               </div>
             )}
             {noRun && !run && <p className="text-ink-faint mt-2 text-xs">まだ集計がありません。「この{funnelDays}日を再集計」を押してください</p>}
@@ -1624,148 +1654,36 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                 {run.stateReason ?? '一部の期間・種類のデータが無いため、実際より少なく数えている可能性があります。'}
               </p>
             )}
-            {run && run.groups.length > 1 && (
-              <div className="mt-3 max-w-xs">
-                <label htmlFor="funnel-group" className="text-ink-secondary mb-1 block text-xs font-medium">比較する条件</label>
-                <Select
-                  id="funnel-group"
-                  value={groupKey}
-                  onChange={(value) => setGroupKey(value)}
-                  aria-label="比較する条件"
-                  className="v6-select w-full"
-                  size="full"
-                  options={run.groups.map((group) => ({
-                    value: group.key,
-                    label: `${group.label}（入口 ${group.entrants}人）`,
-                  }))}
-                />
-              </div>
-            )}
+
           </section>
 
-          <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <KpiCard
-              title="入口"
-              value={overall?.entry ?? null}
-              unit="人"
-              detail={measurable ? (overall?.entryLabel ?? '—') : run ? '判定不能' : '—'}
-            />
-            <KpiCard
-              title="最後まで"
-              value={overall?.last ?? null}
-              unit="人"
-              detail={measurable
-                ? (overall?.rate != null ? `通過率 ${overall.rate}%` : '—')
-                : run ? '判定不能' : '—'}
-            />
-            <KpiCard
-              title="いちばん落ちる段"
-              value={worst ? Math.round(worst.rate * 100) : null}
-              unit="%"
-              detail={
-                worst && result
-                  ? `${result[worst.index - 1].label} → ${result[worst.index].label}`
-                  : run && !measurable ? '判定不能' : '—'
-              }
-            />
-            {/* 段ごとの到達日時を持っていない。ファネルの集計は「通ったか」
-                だけを見ていて、いつ通ったかを残していない。 */}
-            <KpiCard title="平均の到達日数" value={null} unit="日" detail="" help="入口から最後までの日数です" />
-            <KpiCard
-              title="比較で差が大きい段"
-              value={comparisonGap}
-              unit="pt"
-              detail={run && run.groups.length > 1 ? `${run.groups.length}条件を比較` : '比較条件なし'}
-            />
-          </div>
+
 
           {result && (
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <div className="v8-ro-analytics-funnelBody"><section className="v8-ro-analytics-funnelFlow">
               <h3 className="text-ink text-sm font-semibold">全体の流れ</h3>
               <p className="text-ink-faint mt-0.5 mb-3 text-xs">
-                かっこ内はひとつ前の段からの通過率
+                順番どおりに通った人だけを数えます。飛ばした人は含みません。
               </p>
-              <div className="space-y-3">
-                {result.map((step, i) => {
-                  // 「まだ途中の人」を止まった人に混ぜない（ANALYTICS-04）。
-                  // 止まった人数は口が数えた droppedAfter をそのまま使う。
-                  const prev = i > 0 ? result[i - 1] : null
-                  const lost = prev?.droppedAfter ?? 0
-                  const inProgress = prev?.inProgressAfter ?? 0
-                  const prevReached = prev?.reached ?? 0
-                  const isWorst = worst?.index === i
-                  return (
-                    <div key={step.stepOrder}>
-                      <div className="mb-1 flex items-baseline justify-between gap-2">
-                        <p className="text-ink text-caption font-medium">
-                          {i + 1}. {step.label}
-                        </p>
-                        <p className="text-ink-secondary text-caption tabular-nums" id={`funnel-step-${step.stepOrder}-value`}>
-                          {measurable ? `${formatNumber(step.reached)} 人` : '—'}
-                          {measurable && i > 0 && (
-                            <span className="text-ink-faint ml-2 text-xs">
-                              （{step.conversionFromPrevious == null ? '—' : `${Math.round(step.conversionFromPrevious * 1000) / 10}%`}）
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                      {/* 棒は押すとその段を選ぶ。段名だけでは人数が読めないので、
-                          上の数値行をaria-describedbyで紐づける。判定不能の
-                          結果では対象者を作れないので、選べない形にする。 */}
-                      <button
-                        onClick={() => {
-                          if (!measurable) return
-                          setFunnelAudience(null)
-                          setPicked(i)
-                        }}
-                        className="bg-canvas-sunken block h-6 w-full overflow-hidden rounded-mini text-left"
-                        aria-label={`${step.label}の段`}
-                        aria-describedby={`funnel-step-${step.stepOrder}-value`}
-                      >
-                        <span
-                          className={`block h-full ${isWorst ? 'bg-warning' : 'bg-accent'}`}
-                          style={{ width: top > 0 ? `${(step.reached / top) * 100}%` : '0%' }}
-                        />
-                      </button>
-                      {/* 落ちた人数と割合は数えられる。「案内が届いていない
-                          可能性があります」のような原因は、運用を知らないと
-                          書けないので出さない。 */}
-                      {measurable && prev != null && lost > 0 && (
-                        <p className={`mt-1 text-xs ${isWorst ? 'text-warning' : 'text-ink-faint'}`}>
-                          {formatNumber(lost)}人（
-                          {Math.round((lost / prevReached) * 1000) / 10}%）がここで止まっています。
-                          {inProgress > 0 ? ` ほかに${formatNumber(inProgress)}人はまだ途中です。` : ''}
-                          {isWorst && ' この分析でいちばん落ちる段です。'}
-                        </p>
-                      )}
-                      {measurable && prev != null && lost === 0 && inProgress > 0 && (
-                        <p className="text-ink-faint mt-1 text-xs">
-                          {formatNumber(inProgress)}人はまだ途中です。期限までに次の段へ進むと数が変わります。
-                        </p>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+              <div className="v8-ro-analytics-funnelSteps">{result.map((step, i) => {
+                const previous = i > 0 ? result[i - 1] : null
+                const dropRate = previous && previous.reached > 0 ? previous.droppedAfter / previous.reached * 100 : null
+                return <div key={step.stepOrder} className="v8-ro-analytics-funnelStep" data-worst={worst?.index === i || undefined} data-selected={picked === i || undefined}>
+                  <span className="v8-ro-analytics-funnelNumber">{i + 1}</span><p className="text-ink text-caption font-medium" title={step.label}>{step.label}</p>
+                  <button onClick={() => { if (!measurable) return; setFunnelAudience(null); setPicked(i) }} className="v8-ro-analytics-funnelBar" aria-label={`${step.label}の段`} aria-describedby={`funnel-step-${step.stepOrder}-value`} disabled={!measurable}><span style={{ width: top > 0 && measurable ? `${step.reached / top * 100}%` : '0%' }} /></button>
+                  <p className="text-ink-secondary text-caption tabular-nums" id={`funnel-step-${step.stepOrder}-value`}>{measurable ? `${formatNumber(step.reached)} 人` : '—'}</p><span className="text-xs text-ink-faint" title={previous ? `止まった ${previous.droppedAfter}人・進行中 ${previous.inProgressAfter}人` : undefined}>{measurable && dropRate !== null ? `−${dropRate.toFixed(0)}%` : '—'}</span>
+                </div>
+              })}</div>
+            </section><aside className="v8-ro-analytics-funnelSelected"><h3 className="text-sm font-semibold">{picked != null && result[picked] ? `${picked + 1} ${result[picked].label}（選んだ段）` : '段を選んで対象者を確認'}</h3>
+              <div className="mt-3">
 
-              <div className="border-hairline mt-4 border-t pt-3">
                 {picked != null && result[picked] && measurable ? (
                   selectedFunnel?.status === 'active' ? (
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="space-y-2">
-                        <Select
-                          id="funnel-audience-selection"
-                          value={audienceSelection}
-                          onChange={(value) => setAudienceSelection(value as 'reached' | 'stopped' | 'in_progress')}
-                          aria-label="対象者の種類"
-                          className="v6-select w-full sm:w-64"
-                          size="full"
-                          options={[
-                            { value: 'reached', label: 'この段まで到達した人' },
-                            { value: 'stopped', label: 'この段で止まった人' },
-                            { value: 'in_progress', label: 'この段で進行中の人' },
-                          ]}
-                        />
+                        <SegmentedControl aria-label="対象者の種類" value={audienceSelection} onChange={(value) => { setAudienceSelection(value); setFunnelAudience(null) }} options={[{ value: 'reached', label: '到達した人' }, { value: 'stopped', label: '止まった人' }, { value: 'in_progress', label: '進行中の人' }]} />
+
+                        <p className="text-sm font-semibold">{audienceSelection === 'stopped' ? 'この段で止まった人' : audienceSelection === 'reached' ? '到達した人' : '進行中の人'} {formatNumber(audienceSelection === 'stopped' ? result[picked].droppedAfter : audienceSelection === 'reached' ? result[picked].reached : result[picked].inProgressAfter)}人</p>
                         <p className="text-ink text-sm">
                           {audienceSelection === 'stopped'
                             ? `「${result[picked].label}で止まった人」を選択中`
@@ -1797,29 +1715,29 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   </Notice>
                 )}
               </div>
-            </section>
+              {run && run.groups.length > 1 && <section className="mt-4"><h3 className="text-sm font-semibold">比較</h3><ul className="mt-2 space-y-2 text-xs">{run.groups.map((group) => <li key={group.key} className="flex justify-between gap-2"><span>{group.label}</span><span>通過率 {measurable && group.entrants > 0 ? `${(group.completed / group.entrants * 100).toFixed(1)}%` : '—'}</span></li>)}</ul><p className="mt-2 text-xs text-ink-faint">比較で差が大きい段 {comparisonGap === null ? '—' : `${comparisonGap}pt`}</p></section>}
+            </aside></div>
           )}
 
           {run?.runId && canManage && (
-            <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
+            <Disclosure title="この結果を保存する" size="compact">
               <SaveAnalysisAction
                 accountId={accountId}
                 sourceKind="funnel"
                 sourceResultId={run.runId}
                 defaultName={selectedFunnel?.name ?? 'ファネル分析'}
               />
-            </section>
+            </Disclosure>
           )}
 
-          <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
-            <h3 className="text-ink text-sm font-semibold">段の作り方</h3>
+          <Disclosure title="段の作り方" size="compact">
             <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
               <li>・段には {FUNNEL_STEP_KIND_OPTIONS.map((item) => item.label).join('・')} を置けます</li>
               <li>・順番どおりに通った人だけを数えます。飛ばした人は含みません</li>
               <li>・比較条件を定義版に含めると、最大3群の通過率を同じ結果で比べられます</li>
               <li>・再集計すると新しい結果を作り、前の結果は書き換えません</li>
             </ul>
-          </section>
+          </Disclosure>
         </>
       )}
 
@@ -1869,6 +1787,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
           </ul>
         </section>
       )}
+      <AnalyticsNotice>段は上から順に見ます。同じ人が同じ段を2回通っても1回として数えます。判定できる期間は、最初の段から設定した日数です。まだ途中の人は完了した人に含めません。</AnalyticsNotice>
       <ConfirmDialog
         open={statusTarget !== null}
         title={
@@ -2326,22 +2245,19 @@ function OverviewState({ loading, error, onRetry }: { loading: boolean; error: s
 // 概要が出てから描かれるので、この関数の読み込みは概要の後に始まる。
 // 取得中は表の場所だけ読み込み表示にする。
 function RouteBreakdown({ accountId, from, to }: { accountId: string; from: string; to: string }) {
-  const theme = useAdminTheme()
   const routeState = useOverview<AnalyticsRoutesOverview>(
     () => api.analytics.routesOverview(accountId, { from, to }),
     `${accountId}:${from}:${to}:friends-routes`,
   )
   if (!routeState.data) return <OverviewState loading={routeState.loading} error={routeState.error} onRetry={routeState.retry} />
-  if (theme === 'v8') {
+  {
     const routes = routeState.data.data.routes
     const max = Math.max(1, ...routes.map((route) => shownValue(route.friendAdds) ?? 0))
     return <ul className="v8-ro-analytics-routeBars">{routes.map((route) => <li key={route.id}><div><span title={route.name}>{route.name}</span><strong>{metricText(route.friendAdds)}人</strong></div><div className="v8-ro-analytics-routeBar" title={`現在 ${metricText(route.currentFriends)}人・1人あたり ${metricText(route.costPerFriend)}円`}><span style={{ width: `${(shownValue(route.friendAdds) ?? 0) / max * 100}%` }} /></div></li>)}</ul>
   }
-  return <table className="w-full table-fixed"><thead><TableHeadRow><Th>経路</Th><Th align="right">増えた友だち</Th><Th align="right">現在つながっている</Th><Th align="right">1人追加あたり費用</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{routeState.data.data.routes.map((route) => <tr key={route.id} className="text-sm"><td className="px-4 py-3"><p className="truncate font-medium" title={route.name}>{route.name}</p><p className="mt-1 truncate text-xs text-ink-faint">{route.refCode ? `ref=${route.refCode}` : '参照コードなし'}</p></td><td className="px-4 py-3 text-right"><MetricCell metric={route.friendAdds} /></td><td className="px-4 py-3 text-right"><MetricCell metric={route.currentFriends} /></td><td className="px-4 py-3 text-right"><MetricCell metric={route.costPerFriend} currency /></td></tr>)}</tbody></table>
 }
 
 function FriendsOverviewTab({ accountId }: { accountId: string }) {
-  const theme = useAdminTheme()
   const [days, setDays] = useState(30)
   const range = useMemo(() => rangeFor(days - 1), [days])
   const [selectedDate, setSelectedDate] = useState('')
@@ -2356,96 +2272,31 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
   // 差し引きは増加と減少から導いた値。元の2つが出せないなら、差し引きも出せない。
   // ここを道連れにしないと「増えた —／減った —／差し引き 0人」という読めない並びになる。
   const netValue = addedValue === null || removedValue === null ? null : shownValue(overview.metrics.net)
-  const remainingRate = addedValue && removedValue !== null
-    ? Math.max(0, ((addedValue - removedValue) / addedValue) * 100)
-    : null
   const pendingReason = overview.stateReason ?? '日ごとの集計がまだありません'
-  /* 全体が「実測できた」でないときのカードは、短い状態＋理由全文の説明に分ける。 */
-  const pendingCard: KpiCardState = {
-    detail: METRIC_STATE_TEXT[overview.state] || '未取得',
-    description: pendingReason,
-  }
-  // 日ごとの表は行ごとの状態を持たない。全体の状態が「実測できた」でないときは、
-  // 0 が並んだ30行を出さずに理由を1行で出す。
   const daysShown = overview.state === 'available' || overview.state === 'partial'
   // 上の帯が理由全文を既に出しているとき、図側で繰り返さない(#670 20)。
   const reasonShownInBanner = overview.state !== 'available' && Boolean(overview.stateReason)
   const selectedDay = overview.days.find((day) => day.date === selectedDate) ?? overview.days.at(-1) ?? null
   const selectedCampaigns = overview.campaigns.filter((item) => item.date === selectedDay?.date)
-  if (theme === 'v8') return <div className="v8-ro-analytics-friends">
+  return <div className="v8-ro-analytics-friends">
     <div className="v8-ro-analytics-kpis">
       <KpiCard title="増えた" value={addedValue} unit="人" {...metricCardState(overview.metrics.added, { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)}人` }, state.retry)} />
       <KpiCard title="減った" value={removedValue} unit="人" help="ブロックと友だち解除を合わせた人数です" {...metricCardState(overview.metrics.removed, { detail: `この${days}日` }, state.retry)} />
       <KpiCard title="差し引き" value={netValue} unit="人" {...metricCardState(overview.metrics.net, { detail: `現在つながっている ${metricText(overview.metrics.currentFriends)}人` }, state.retry)} />
-      <KpiCard title="残っている割合" value={remainingRate} unit="%" detail="増えた人数から減った人数を引いた割合" help="この期間の差し引きを増えた人数で割った値です。ブロック率とは異なります" />
+      <KpiCard title="ブロック率" value={null} unit="%" detail="未取得" description="ブロックだけの人数を取得できないため、割合は計算できません" />
     </div>
     {overview.state !== 'available' && overview.stateReason && <Notice tone="warn">{overview.stateReason}</Notice>}
     <div className="v8-ro-analytics-friendsBody">
       <section className="v8-ro-analytics-trend">
         <div className="v8-ro-analytics-sectionHead"><h2>日ごとの増減（この{days}日）</h2><RangePicker days={days} onChange={setDays} /></div>
-        <div className="v8-ro-analytics-legend"><span>増えた</span><span>減った</span><span>配信・シナリオの日は棒を選ぶと確認できます</span></div>
-        {daysShown ? <BarChart items={toBarChartItems(overview.days, { campaigns: overview.campaigns, formatTitle: (date) => `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日（${analyticsWeekday(date)}）` }).map((item) => ({ ...item, axisLabel: `${item.axisLabel}（${analyticsWeekday(item.key)}）` }))} selectedKey={selectedDate} onSelect={setSelectedDate} /> : <div className="v8-ro-analytics-state" role="status">{pendingReason}</div>}
+        <div className="v8-ro-analytics-legend"><span>配信・シナリオの日は棒を選ぶと確認できます</span></div>
+        {daysShown ? <BarChart items={toBarChartItems(overview.days, { campaigns: overview.campaigns, formatTitle: (date) => `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日（${analyticsWeekday(date)}）` })} selectedKey={selectedDate} onSelect={setSelectedDate} /> : <div className="v8-ro-analytics-state" role="status"><p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] || '未取得') : pendingReason}</p>{overview.state === 'pending' && <p>日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p>}</div>}
         {daysShown && selectedDay && <p className="v8-ro-analytics-selection">{selectedDay.date}（{analyticsWeekday(selectedDay.date)}）　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net}人　{selectedCampaigns.map((item) => item.name).join('、') || '施策なし'}</p>}
-        <div className="v8-ro-analytics-campaigns">{overview.campaigns.map((item) => <p key={item.id}>{formatAnalyticsDate(item.date)} {item.name}</p>)}</div>
-        <div className="v8-ro-analytics-chartFooter"><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /><AnalyticsExportButton disabled={!daysShown} onClick={() => downloadCsv('analytics-friends.csv', [['日付', '増えた', '減った', '差し引き'], ...overview.days.map((day) => [day.date, day.added, day.removed, day.net])])} /></div>
+        {daysShown && overview.campaigns.length > 0 && <div className="v8-ro-analytics-campaigns">{overview.campaigns.map((item) => <p key={item.id}>{formatAnalyticsDate(item.date)} {item.name}</p>)}</div>}
+        <div className="v8-ro-analytics-chartFooter"><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /><AnalyticsExportButton headerOnly disabled={!daysShown} onClick={() => downloadCsv('analytics-friends.csv', [['日付', '増えた', '減った', '差し引き'], ...overview.days.map((day) => [day.date, day.added, day.removed, day.net])])} /></div>
       </section>
       <aside className="v8-ro-analytics-friendsAside"><section className="v8-ro-analytics-breakdown"><h2>どこから増えたか</h2><p>流入リンクごと・この{days}日</p><RouteBreakdown accountId={accountId} from={range.from} to={range.to} /><Link href="/inflow-links">流入と計測で詳しく見る →</Link></section><section className="v8-ro-analytics-breakdown"><h2>減った友だち</h2><p>ブロック・友だち解除の合計</p><strong>{metricText(overview.metrics.removed)}人</strong><p>ブロックの内訳は未取得です。現在の集計では、ブロック・友だち解除の合計を表示します。</p></section></aside>
     </div>
-  </div>
-  return <div data-design-node="Zxezb" className="space-y-4">
-    <AnalyticsPeriodControl days={days} onChange={setDays} />
-    {overview.state !== 'available' && overview.stateReason && <Notice tone="warn">{overview.stateReason}</Notice>}
-    {/* #1005: 理由文は description（説明アイコン）へ。detail は短い状態だけ。 */}
-    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title="現在つながっている" value={shownValue(overview.metrics.currentFriends)} unit="人" {...metricCardState(overview.metrics.currentFriends, netValue === null ? pendingCard : { detail: `この${days}日の差し引き ${netValue > 0 ? '+' : ''}${netValue}人` }, state.retry)} />
-      <KpiCard title="増えた友だち" value={addedValue} unit="人" {...metricCardState(overview.metrics.added, addedValue === null ? pendingCard : { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)}人` }, state.retry)} />
-      <KpiCard title="減った友だち" value={removedValue} unit="人" help="ブロックと友だち解除を合わせた人数です" {...metricCardState(overview.metrics.removed, removedValue === null ? pendingCard : { detail: `この${days}日` }, state.retry)} />
-      <KpiCard title="差し引き" value={netValue} unit="人" help="増えた人数から減った人数を引いた数です" {...metricCardState(overview.metrics.net, remainingRate === null ? pendingCard : { detail: `残っている割合 ${remainingRate.toFixed(1)}%` }, state.retry)} />
-    </div>
-    {/* ★V7：グラフの小見出しと同じことを繰り返していた説明の帯は外した。配信との照らし合わせは凡例の横に出ている。 */}
-    <section className="bg-canvas rounded-card border-hairline border p-4">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-        <div><h2 className="font-semibold text-ink">日ごとの増減（この{days}日）</h2><p className="mt-1 text-xs text-ink-faint">左が増えた人、右が減った人です。</p></div>
-        <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
-      </div>
-      {!daysShown ? (
-        <div className="p-8 text-center text-sm text-ink-faint">
-          {/*
-            #670 20: 理由全文は上の帯が既に出しているときは繰り返さない。
-            同じ文が帯と図の両方に出ると二重に読める。図側は短い状態だけにし、
-            帯が無いとき(理由なし)だけ全文を出す。
-          */}
-          <p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] || '未取得') : pendingReason}</p>
-          {/* 集計待ちの間は「0人」とも「次はいつ」とも言えない。更新の周期と
-              変わらない場合の戻り方だけを伝える(点検ANALYTICS-01)。 */}
-          {overview.state === 'pending' && (
-            <p className="mt-2 text-xs">日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p>
-          )}
-        </div>
-      ) : (
-        <BarChart
-          items={toBarChartItems(overview.days, {
-            campaigns: overview.campaigns,
-            formatTitle: (date) =>
-              `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日（${analyticsWeekday(date)}）`,
-          })}
-          selectedKey={selectedDate}
-          onSelect={setSelectedDate}
-        />
-      )}
-      {/* グラフを出せない間は施策名も選択日の詳細も出さない。出すと
-          「増加0人・施策なし」という未取得の0が確定値に見える(点検ANALYTICS-01)。 */}
-      {daysShown && overview.campaigns.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-4 text-xs text-ink-secondary">{overview.campaigns.map((item) => <span key={item.id}>{item.date.slice(5).replace('-', '/')} {item.name}</span>)}</div>
-      )}
-      {daysShown && selectedDay && (
-        <div className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary"><strong className="text-ink">{selectedDay.date}（{analyticsWeekday(selectedDay.date)}）</strong>　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net > 0 ? '+' : ''}{selectedDay.net}人　施策 {selectedCampaigns.length ? selectedCampaigns.map((item) => item.name).join('、') : 'なし'}</div>
-      )}
-    </section>
-    <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
-      <div className="border-b border-hairline px-4 py-3"><h2 className="font-semibold text-ink">どこから増えたか</h2><p className="mt-1 text-xs text-ink-faint">「経路と成果」に接続された経路ごとの、この{days}日の実測です。</p></div>
-      <RouteBreakdown accountId={accountId} from={range.from} to={range.to} />
-    </section>
   </div>
 }
 
@@ -2489,16 +2340,26 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
     // 書き出した表だけを見た人に全件のように見える。
     ...(truncationNote ? [[`※${truncationNote}までを表示（それより古い配信は含みません）`]] : []),
   ])
-  return <div data-design-node="J6Inc" className="space-y-4 v8-ro-analytics-reactions">
-    <AnalyticsPeriodControl days={days} onChange={setDays} />
+  return <div data-design-node="yvOtn" className="space-y-4 v8-ro-analytics-reactions">
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title={`この${days}日に送った`} value={overview.campaigns.length} unit="回" detail="" help="一覧に取得できた配信の回数です" />
+      <KpiCard title="配信" value={overview.campaigns.length} unit="件" detail={`一斉配信 ${broadcastShown}・シナリオ ${scenarioShown}`} help="一覧に取得できた配信の回数です" />
       <KpiCard title="届いた人" value={delivered} unit="人" help="一斉配信の到達数の合計です。シナリオは届いた人数が取れないため含みません" {...metricCardState(overview.metrics.delivered, { detail: '' }, state.retry)} />
-      <KpiCard title="押された割合" value={clickRate} unit="%" detail="" help={clickHelp} description={clickReason} />
+      <KpiCard title="押された割合" value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" help={clickHelp} description={clickReason} />
       <KpiCard title="取得できない配信" value={shownValue(overview.metrics.unavailableCampaigns)} unit="件" help="開封などを取得できない配信の件数です" {...metricCardState(overview.metrics.unavailableCampaigns, { detail: '' }, state.retry)} />
+    </div>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <RangePicker days={days} onChange={setDays} />
+      <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
+      <AnalyticsExportButton onClick={exportCampaigns} disabled={overview.campaigns.length === 0} />
     </div>
     <AnalyticsNotice>配信ごとの開かれ方・押され方です。20人未満など取得できない数は、0ではなく「—」と理由で示します。</AnalyticsNotice>
     {truncationNote && <AnalyticsNotice>{truncationNote}までを表示しています。それより古い配信は一覧にもCSVの書き出しにも入りません。</AnalyticsNotice>}
+
+
+    <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
+      <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right" help="一斉配信で届いた人数です。シナリオは届いた人数が取れないため「—」です">到達</Th><Th align="right" help="開いた人数です。20人未満など取得できない数は「—」で示します">開封</Th><Th align="right" help="こちらで作った中継URLを押した人数です">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
+      <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{formatAnalyticsDateTime(item.sentAt)}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} />{item.kind === 'scenario' && <p className="mt-1 text-xs text-ink-faint">送信 <MetricCell metric={item.sentMessages} />通</p>}</td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
+    </table></div>
     <section className="bg-canvas rounded-card border-hairline border p-4 v8-ro-analytics-hours">
       {/* 監査 R71: 集計はクリックされた時刻の時間帯。送った時刻ではないので名前を実態に合わせる。 */}
       <h2 className="font-semibold text-ink">押された時間帯ごとの回数</h2>
@@ -2507,18 +2368,10 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
         {Array.from({ length: 24 }, (_, hour) => {
           const clicks = overview.trackedClickHours.find((item) => item.hour === hour)?.clicks ?? 0
           // 高さだけの棒は読み上げに届かない。1本ごとに時間と回数を名前にする。
-          return <div key={hour} role="img" aria-label={`${hour}時台 ${clicks}回`} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${hour}時台 ${clicks}回`}><span className="w-full rounded-t-mini bg-accent" style={{ height: `${Math.max(2, clicks / maxHourly * 96)}px` }} />{hour % 3 === 0 && <span className="whitespace-nowrap text-nano text-ink-faint">{hour}時</span>}</div>
+          return <div key={hour} role="img" aria-label={`${hour}時台 ${clicks}回`} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${hour}時台 ${clicks}回`}><span className="w-full rounded-t-mini bg-accent" style={{ height: `${clicks / maxHourly * 96}px` }} /><span aria-hidden="true" className="h-3 whitespace-nowrap text-[10px] leading-3 text-ink-faint">{hour % 3 === 0 ? `${hour}時` : ''}</span></div>
         })}
       </div>
     </section>
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
-      <AnalyticsExportButton onClick={exportCampaigns} disabled={overview.campaigns.length === 0} />
-    </div>
-    <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
-      <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right" help="一斉配信で届いた人数です。シナリオは届いた人数が取れないため「—」です">到達</Th><Th align="right" help="開いた人数です。20人未満など取得できない数は「—」で示します">開封</Th><Th align="right" help="こちらで作った中継URLを押した人数です">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
-      <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{formatAnalyticsDateTime(item.sentAt)}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} />{item.kind === 'scenario' && <p className="mt-1 text-xs text-ink-faint">送信 <MetricCell metric={item.sentMessages} />通</p>}</td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
-    </table></div>
   </div>
 }
 
@@ -2539,32 +2392,35 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
   const adCost = metricSum(overview.routes.map((item) => item.adCost))
   const profit = metricSum(overview.routes.map((item) => item.profitAfterAdCost))
   const stages = [
-    { label: 'リンクを見た', value: clicks },
+    { label: 'リンクを押した', value: clicks },
     { label: '友だちになった', value: friends },
     { label: '1回でも反応した', value: reactions },
     { label: '成果になった', value: conversions },
   ]
-  return <div data-design-node="YBGtm" className="space-y-4">
-    <AnalyticsPeriodControl days={days} onChange={setDays} />
+  const exportRoutes = () => downloadCsv('analytics-routes.csv', [
+    ['経路', '友だち', '反応', '成果', '売上', 'かかった費用', '差し引き'],
+    ...overview.routes.map((item) => [item.name, shownValue(item.friendAdds), shownValue(item.reactionPeople), shownValue(item.conversions.approved), shownValue(item.conversions.revenue), shownValue(item.adCost), shownValue(item.profitAfterAdCost)]),
+  ])
+  return <div data-design-node="PFe9c" className="space-y-4">
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title={`この${days}日の成果`} value={conversions} unit="件" detail={revenue === null ? '売上は未取得です' : `売上 ${formatNumber(revenue)}円`} />
-      <KpiCard title="かかった広告費" value={adCost} unit="円" detail="" help="接続済みの経路の広告費を合計した金額です" />
+      <KpiCard title="友だちになった" value={friends} unit="人" detail={clicks === null ? 'クリックは未取得です' : `リンクを押した ${formatNumber(clicks)}回から`} />
+      <KpiCard title="成果" value={conversions} unit="件" detail={revenue === null ? '売上は未取得です' : `売上 ${formatNumber(revenue)}円`} />
+      <KpiCard title="かかった広告費" value={adCost} unit="円" detail={`費用を取れない経路 ${overview.routes.filter((item) => shownValue(item.adCost) === null).length}`} help="接続済みの経路の広告費を合計した金額です" />
       <KpiCard title="差し引き" value={profit} unit="円" detail="" help="売上から広告費を引いた残りです" />
-      <KpiCard title="費用を取得できない経路" value={overview.routes.filter((item) => shownValue(item.adCost) === null).length} unit="件" detail="" help="0円として計算していません" />
+
     </div>
-    <AnalyticsNotice><span>経路ごとに、かかった費用と出た成果を差し引きまで出します。帰属方式は「{overview.attributionLabel}」です。</span> <Link href={overview.searchConsoleHref} className="font-medium text-action hover:underline">Search Consoleを見る</Link>
-      <p className="mt-1"><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /></p>
-    </AnalyticsNotice>
-    <div className="grid grid-cols-4 overflow-hidden rounded-card border border-hairline bg-canvas">{stages.map((stage, index) => {
+    <div className="v8-ro-analytics-toolbar"><RangePicker days={days} onChange={setDays} /><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /><Link href={overview.searchConsoleHref} className="text-action">Search Consoleを見る</Link><AnalyticsExportButton onClick={exportRoutes} disabled={overview.routes.length === 0} /></div>
+    <div className="v8-ro-analytics-routesBody"><section className="v8-ro-analytics-routesFlow"><h2 className="text-sm font-semibold">全体の流れ</h2><div className="v8-ro-analytics-routesStages">{stages.map((stage, index) => {
       const previous = index > 0 ? stages[index - 1].value : null
       const rate = previous && stage.value !== null ? stage.value / previous * 100 : null
       // 監査6 #674: 段ごとの数は MetricValue で単位小・3状態を揃える
-      return <div key={stage.label} className="border-r border-hairline px-4 py-3 last:border-r-0"><p className="text-xs text-ink-faint">{stage.label}</p><p className="mt-1 text-lg font-semibold text-ink"><MetricValue value={stage.value} unit={index === 0 ? '回' : index === 3 ? '件' : '人'} /></p>{index > 0 && <p className="text-xs text-ink-secondary">前段の {rate === null ? '—' : `${rate.toFixed(1)}%`}</p>}</div>
-    })}</div>
-    <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
+      return <div key={stage.label}><div className="v8-ro-analytics-routeStageHead"><p className="text-xs text-ink-faint">{stage.label}</p><p className="text-sm font-semibold text-ink"><MetricValue value={stage.value} unit={index === 0 ? '回' : index === 3 ? '件' : '人'} /></p></div><div className="v8-ro-analytics-routeBar" aria-hidden="true"><span style={{ width: stage.value !== null && clicks ? `${Math.min(100, stage.value / clicks * 100)}%` : '0%' }} /></div>{index > 0 && <p className="mt-1 text-xs text-ink-secondary">前段の {rate === null ? '—' : `${rate.toFixed(1)}%`}</p>}</div>
+    })}</div></section>
+    <div className="v8-ro-analytics-routesTable"><div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>経路</Th><Th align="right">友だち</Th><Th align="right">反応</Th><Th align="right">成果</Th><Th align="right">売上</Th><Th align="right">かかった費用</Th><Th align="right">差し引き</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.routes.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間に集計できる経路はありません</td></tr> : overview.routes.map((item) => <tr key={item.id} className="text-sm"><td className="px-3 py-3 font-medium"><p className="truncate" title={item.name}>{item.name}</p><p className="mt-1 truncate text-xs font-normal text-ink-faint">{item.refCode ? `流入と計測 ／ ref=${item.refCode}` : '参照コードなし'} ／ クリック <MetricCell metric={item.clicks} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.friendAdds} /><p className="mt-1 text-xs text-ink-faint">現在 <MetricCell metric={item.currentFriends} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.reactionPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.approved} /><p className="mt-1 text-xs text-ink-faint">保留 <MetricCell metric={item.conversions.pending} />・却下 <MetricCell metric={item.conversions.rejected} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.revenue} currency /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.adCost} currency /><p className="mt-1 text-xs text-ink-faint">友だち1人 <MetricCell metric={item.costPerFriend} currency />・成果1件 <MetricCell metric={item.costPerConversion} currency /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.profitAfterAdCost} currency /></td></tr>)}</tbody>
     </table></div>
+    <p className="mt-2 text-xs text-ink-faint">「—」は費用や成果を取得できない経路です。0として差し引きを計算していません。帰属方式は「{overview.attributionLabel}」です。</p></div></div>
   </div>
 }
 
@@ -2600,27 +2456,17 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
     || overview.summary.estimatedHoursSaved.state === 'partial'
     ? overview.summary.estimatedHoursSaved.value
     : null
-  return <div data-design-node="QQ1SR" className="space-y-4">
-    <AnalyticsPeriodControl days={days} onChange={setDays} />
+  const exportUsage = () => downloadCsv('analytics-usage.csv', [
+    ['機能', '作成', '利用中', '未使用', '最終利用', '気づいたこと', '参照の状態'],
+    ...overview.categories.map((item) => [item.label, shownValue(item.created), shownValue(item.inUse), shownValue(item.unused), item.lastUsedAt.value, usageObservation(item).text, referenceHealthText(item.brokenReferences)]),
+  ])
+  return <div data-design-node="N8ZrUl" className="space-y-4">
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <KpiCard
         title="使っている機能"
         value={menuFeatures?.enabled ?? null}
         unit={menuFeatures ? ` / ${menuFeatures.total}` : ''}
         detail={menuFeaturesError || 'メニューに出している機能のうち'}
-      />
-      <KpiCard
-        title="作ったのに使っていない"
-        value={shownValue(overview.summary.unusedItems)}
-        unit="個"
-        {...metricCardState(overview.summary.unusedItems, { detail: '8分類の利用状況から集計' }, state.retry)}
-        action={(shownValue(overview.summary.unusedItems) ?? 0) > 0 ? { label: '片づける', href: '#usage-items' } : undefined}
-      />
-      <KpiCard
-        title="確認できた参照切れ"
-        value={shownValue(overview.summary.brokenReferences)}
-        unit="件"
-        {...metricCardState(overview.summary.brokenReferences, { detail: '対応済みの参照をすべて確認' }, state.retry)}
       />
       <KpiCard
         title="自動で動いた回数"
@@ -2636,6 +2482,12 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
         description={overview.summary.estimatedHoursSaved.reason ?? undefined}
         onRetry={overview.summary.estimatedHoursSaved.state === 'failed' ? state.retry : undefined}
       />
+      <KpiCard
+        title="作ったのに使っていない"
+        value={shownValue(overview.summary.unusedItems)}
+        unit="個"
+        {...metricCardState(overview.summary.unusedItems, { detail: `参照切れ ${metricText(overview.summary.brokenReferences)}件`, description: overview.summary.brokenReferences.reason ?? undefined }, state.retry)}
+      />
     </div>
     {overview.stateReason ? <Notice tone="warn">{overview.stateReason}</Notice> : <AnalyticsNotice>項目が多いほど良い、ではありません。使っていないものは使用先を確かめてから、下の「片づける」で整理できます。</AnalyticsNotice>}
     {menuFeaturesError && (
@@ -2646,13 +2498,18 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
         {menuFeaturesError}
       </Notice>
     )}
-    <div id="usage-items" className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
-      <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th>気づいたこと</Th><Th align="right">操作</Th></TableHeadRow></thead>
+    <div className="v8-ro-analytics-usageBody"><div id="usage-items" className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
+      <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th>最終利用</Th><Th align="right">操作</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.categories.map((item) => {
-        const observation = usageObservation(item)
-        return <tr key={item.key} className="text-sm"><td className="px-4 py-3"><p className="font-semibold">{item.label}</p><p className="text-ink-faint mt-1 truncate text-xs">最終利用 <DateTimeMetricCell metric={item.lastUsedAt} /></p></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3"><p className={`truncate ${observation.tone === 'warning' ? 'text-warning' : observation.tone === 'unknown' ? 'text-ink-faint' : 'text-success'}`} title={observation.text}>{observation.text}</p><p className="text-ink-faint mt-1 truncate text-xs" title={item.brokenReferences.reason ?? undefined}>{referenceHealthText(item.brokenReferences)}</p></td><td className="px-3 py-2"><div className="v8-ro-analytics-legacyActions"><div className="flex justify-end gap-2 whitespace-nowrap"><Button href={item.href} variant="secondary">中身を見る</Button>{canTidyUsage(item) && <Button href={item.href} variant="secondary" className="border-warning text-warning">片づける</Button>}</div></div><details className="v8-ro-analytics-rowMenu"><summary aria-label={`${item.label}の操作`}>…</summary><Link href={item.href}>中身を見る</Link>{canTidyUsage(item) && <Link href={item.href}>片づける</Link>}</details></td></tr>
+        return <tr key={item.key} className="text-sm"><td className="px-4 py-3"><p className="font-semibold" title={item.label}>{item.label}</p></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3"><DateTimeMetricCell metric={item.lastUsedAt} /></td><td className="px-3 py-2"><RowActions subjectName={item.label} detail={{ label: '中身を見る', href: item.href }} menuItems={canTidyUsage(item) ? [{ id: 'tidy', label: '片づける', onSelect: () => window.location.assign(item.href) }] : []} /></td></tr>
       })}</tbody>
     </table></div>
+    <aside className="v8-ro-analytics-observations"><h2 className="text-sm font-semibold">気づいたこと</h2><p className="mt-2 text-xs">確認できた参照切れ <MetricCell metric={overview.summary.brokenReferences} />件</p><ul>{overview.categories.filter((item) => usageObservation(item).tone !== 'normal').slice(0, 3).map((item) => <li key={item.key}>{item.label}：{usageObservation(item).text}</li>)}</ul><Button variant="secondary" onClick={() => { state.retry(); setMenuReload((value) => value + 1) }}>もう一度確認</Button><Disclosure title="機能ごとの確認結果" size="compact"><ul>{overview.categories.map((item) => {
+      const observation = usageObservation(item)
+      return <li key={item.key}><span>{item.label}：{observation.text}</span><span title={item.brokenReferences.reason ?? undefined}> ／ {referenceHealthText(item.brokenReferences)}</span></li>
+    })}</ul></Disclosure></aside></div>
+    <Disclosure title="集計期間を変える" hint={`この${days}日`} size="compact"><AnalyticsPeriodControl days={days} onChange={setDays} /></Disclosure>
+    <AnalyticsExportButton headerOnly onClick={exportUsage} disabled={overview.categories.length === 0} />
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
       <p className="text-ink-faint">未使用の項目は自動で削除しません。各機能の使用先を確認してから停止・削除します。</p>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -2664,12 +2521,12 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
 }
 
 function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
-  const theme = useAdminTheme()
   const [pageSize, setPageSize] = useState(10)
   const [page, setPage] = useState(0)
   const [days, setDays] = useState(30)
   const range = useMemo(() => rangeFor(days - 1), [days])
   const [query, setQuery] = useState('')
+  const [status, setStatus] = useState('all')
   // 監査 R72: 検索語はAPIへ渡し、200件を超えたURLにも届くようにする。
   const [debouncedQuery, setDebouncedQuery] = useState('')
   useEffect(() => {
@@ -2680,41 +2537,46 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
     () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200, query: debouncedQuery || undefined }),
     `${accountId}:${range.from}:${range.to}:${debouncedQuery}:url-clicks`,
   )
-  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} onRetry={state.retry} /></div>
-  const overview = state.data.data
-  const lastPage = Math.max(0, Math.ceil(overview.links.length / pageSize) - 1)
+  const links = (state.data?.data.links ?? []).filter((item) => status === 'all' || item.isActive === (status === 'active'))
+  const lastPage = Math.max(0, Math.ceil(links.length / pageSize) - 1)
   const currentPage = Math.min(page, lastPage)
-  const visibleLinks = theme === 'v8' ? overview.links.slice(currentPage * pageSize, (currentPage + 1) * pageSize) : overview.links
-  const clicks = metricSum(overview.links.map((item) => item.clicks))
-  const people = metricSum(overview.links.map((item) => item.knownClickPeople))
-  const zeroLinks = overview.links.filter((item) => shownValue(item.clicks) === 0).length
+  const visibleLinks = links.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+  const clicks = metricSum(links.map((item) => item.clicks))
+  const people = metricSum(links.map((item) => item.knownClickPeople))
+  const zeroLinks = links.filter((item) => shownValue(item.clicks) === 0).length
   const exportRows = () => downloadCsv('analytics-url-clicks.csv', [
     ['リンク名', 'URL', '押された回数', '押した人', '使われた場所'],
-    ...overview.links.map((item) => [item.name, item.originalUrl, shownValue(item.clicks), shownValue(item.knownClickPeople), item.usageLocations.join('、')]),
+    ...links.map((item) => [item.name, item.originalUrl, shownValue(item.clicks), shownValue(item.knownClickPeople), item.usageLocations.join('、')]),
   ])
-  return <div data-design-node="Fh2Qj" className="space-y-4">
-    <AnalyticsPeriodControl days={days} onChange={setDays} />
+  const toolbar = <div key="url-toolbar" className="v8-ro-analytics-toolbar">
+    <SearchField id="url-click-search" aria-label="URL・配信名・リンク名で探す" value={query} onChange={(value) => { setQuery(value); setPage(0) }} onClear={() => { setQuery(''); setPage(0) }} placeholder="URL・配信名・リンク名で探す" loading={state.loading} className="v8-ro-analytics-search" />
+    <Select id="url-state" aria-label="URLの状態" value={status} options={[{ value: 'all', label: 'すべての状態' }, { value: 'active', label: '計測中' }, { value: 'stopped', label: '停止中' }]} onChange={(value) => { setStatus(value); setPage(0) }} />
+    <RangePicker days={days} onChange={setDays} />
+    <AnalyticsExportButton onClick={exportRows} disabled={!state.data || visibleLinks.length === 0} />
+  </div>
+  if (!state.data) return <div data-design-node="iK4cQ" className="space-y-4">{toolbar}<OverviewState loading={state.loading} error={state.error} onRetry={state.retry} /></div>
+  const overview = state.data.data
+  return <div data-design-node="iK4cQ" className="space-y-4">
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
       <KpiCard title="押された回数" value={clicks} unit="回" detail={`この${days}日の中継URL`} />
       <KpiCard title="押した人（URLごとの合計）" value={people} unit="人" detail="URLをまたぐ重複は除けません" />
-      <KpiCard title="計測中のURL" value={overview.links.filter((item) => item.isActive).length} unit="件" detail="この画面に取得できたもの" />
+      <KpiCard title="計測中のURL" value={links.filter((item) => item.isActive).length} unit="件" detail="この画面に取得できたもの" />
       <KpiCard title="押されていないURL" value={zeroLinks} unit="件" detail="実測できたURLのうち" />
     </div>
-    <AnalyticsNotice>数えているのは、こちらで作った中継URLだけです。直接貼ったURLは数えられません。同じURLを同じ人が何度押しても「押した人」は1人と数えます。</AnalyticsNotice>
+
+    {toolbar}
     {overview.stateReason && <Notice tone="warn">{overview.stateReason}</Notice>}
     {overview.hasMore && <AnalyticsNotice>条件に合うもののうち200件までを表示しています。探す言葉で絞るとこの中だけではなく全体から探します。CSVの書き出しも、表示している範囲だけが入ります。</AnalyticsNotice>}
+    {status !== 'all' && <p className="text-xs text-ink-faint">取得した範囲から{status === 'active' ? '計測中' : '停止中'}を表示しています。上の件数とCSVも同じ状態で絞り込んでいます。</p>}
     {debouncedQuery && <p className="text-ink-faint text-xs">「{debouncedQuery}」で絞り込んでいます。上の件数とCSVの書き出しは、この絞り込みの結果が対象です。</p>}
-    <div className="flex flex-wrap items-center gap-2">
-      <label htmlFor="url-click-search" className="sr-only">URL・配信名・リンク名で探す</label>
-      <input id="url-click-search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(0) }} placeholder="URL・配信名・リンク名で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
-      <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
-      <AnalyticsExportButton onClick={exportRows} disabled={visibleLinks.length === 0} />
-    </div>
+
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>リンク名・リンク先URL</Th><Th>どこから</Th><Th align="right">押された回数</Th><Th align="right">押した人</Th><Th align="right">クリック率</Th><Th>状態</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{visibleLinks.length === 0 ? <tr><td colSpan={6} className="text-ink-faint p-8 text-center text-sm">条件に合うURLはありません</td></tr> : visibleLinks.map((item) => <tr key={item.trackedLinkId} className="text-sm"><td className="px-3 py-3"><p className="truncate font-medium" title={item.name}>{item.name}</p><p className="mt-1 truncate text-xs text-ink-faint" title={item.originalUrl}>{item.originalUrl}</p><p className="mt-1 truncate text-micro text-ink-faint">最初 {item.firstClickedAt ? <DateTimeMetricCell metric={item.firstClickedAt} /> : '—'} ／ 最後 {item.lastClickedAt ? <DateTimeMetricCell metric={item.lastClickedAt} /> : '—'}</p></td><td className="text-ink-secondary truncate px-3 py-3" title={item.usageLocations.join('、')}>{item.usageLocations.length ? item.usageLocations.join('、') : '—'}</td><td className="px-2 py-3 text-right"><MetricCell metric={item.clicks} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.knownClickPeople} /><p className="mt-1 text-xs text-ink-faint">届いた人数 <MetricCell metric={item.deliveredPeople} /></p></td><td className="px-2 py-3 text-right">{shownValue(item.clickRate) === null ? <span className="text-ink-faint" title={item.clickRate.reason ?? undefined}>—</span> : <span>{shownValue(item.clickRate)}%</span>}</td><td className="px-3 py-3"><Chip tone={item.isActive ? 'ok' : 'neutral'}>{item.isActive ? '計測中' : '停止中'}</Chip>{(item.actions?.tagName || item.actions?.scenarioName) && <p className="mt-1 truncate text-xs text-ink-faint" title={[item.actions.tagName, item.actions.scenarioName].filter(Boolean).join('、')}>{[item.actions.tagName, item.actions.scenarioName].filter(Boolean).join('・')}</p>}</td></tr>)}</tbody>
     </table></div>
-    {theme === 'v8' && <div className="v8-ro-analytics-pagination"><span>{overview.links.length}件中 {overview.links.length ? currentPage * pageSize + 1 : 0}〜{Math.min((currentPage + 1) * pageSize, overview.links.length)}件（取得した範囲）</span><Select aria-label="表示件数" value={String(pageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}件` }))} onChange={(value) => { setPageSize(Number(value)); setPage(0) }} /><Button variant="secondary" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>前へ</Button><Button variant="secondary" disabled={currentPage === lastPage} onClick={() => setPage(currentPage + 1)}>次へ</Button></div>}
+    <div className="v8-ro-analytics-pagination"><span>{links.length}件中 {links.length ? currentPage * pageSize + 1 : 0}〜{Math.min((currentPage + 1) * pageSize, links.length)}件（取得した範囲）</span><Select aria-label="表示件数" value={String(pageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}件` }))} onChange={(value) => { setPageSize(Number(value)); setPage(0) }} /><Button variant="secondary" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>前へ</Button><Button variant="secondary" disabled={currentPage === lastPage} onClick={() => setPage(currentPage + 1)}>次へ</Button></div>
+    <AnalyticsNotice>数えているのは、こちらで作った中継URLだけです。直接貼ったURLは数えられません。同じURLを同じ人が何度押しても「押した人」は1人と数えます。</AnalyticsNotice>
+    <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
     <p className="text-ink-faint text-xs">{overview.clickRateDefinition}</p>
   </div>
 }
@@ -3363,16 +3225,18 @@ function AnalyticsInner() {
    * ファネル作成へ引き渡す。`?tab=funnel&conversionPointId=…` が入口。
    */
   const params = useSearchParams()
-  const theme = useAdminTheme()
-  const tab = theme === 'v8' && params.get('view') === 'conversion-report' ? 'conversion-report' : legacyTab
-  usePageTitle(theme === 'v8' ? '分析' : null)
-  usePageCrumbs(theme === 'v8' ? [{ label: 'ホーム', href: '/' }] : null)
+  const tab = params.get('view') === 'conversion-report' ? 'conversion-report' : legacyTab
+  usePageTitle('分析')
+  usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const presetConversionId = params.get('conversionPointId')
   const presetConversionName = params.get('conversionPointName') ?? ''
   const presetConversion = presetConversionId
     ? { id: presetConversionId, name: presetConversionName }
     : null
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const scope = `${selectedAccountId}:${tab}`
+  const [exportAction, setExportAction] = useState<(ExportAction & { scope: string }) | null>(null)
+  const registerExport = useCallback((action: ExportAction | null) => setExportAction(action ? { ...action, scope } : null), [scope])
   const [canManage, setCanManage] = useState(false)
   const [narrow, setNarrow] = useState(false)
   useEffect(() => {
@@ -3403,28 +3267,15 @@ function AnalyticsInner() {
   if (!selectedAccountId) {
     return <div className="text-ink-faint p-8 text-center text-sm">LINE公式アカウントを選んでください</div>
   }
-  const currentLabel = TABS.find((item) => item.key === tab)?.label ?? '分析'
-  const displayTabs = TABS.map((item) => item.key === 'saved' && savedCount !== null
-    ? { ...item, label: `${item.label} ${savedCount}` }
-    : item)
   return (
-    <div data-analytics-design="v6" className="v8-ro-analytics-page" data-design-node={theme === 'v8' ? (tab === 'friends' ? (canManage ? (narrow ? 'eEhYU' : 'ws9wt') : 'L4Uov') : ({ reactions: 'yvOtn', routes: 'PFe9c', usage: 'N8ZrUl', cross: 'u5CuB8', funnel: 'DkRDE', 'url-clicks': 'iK4cQ', saved: 'bglah', 'conversion-report': 'AzrZq' } as Record<string, string>)[tab]) : undefined}>
-      {theme === 'v8' && <><ReadonlyHeaderV8 title="分析" description="友だちの増減・配信の反応・経路と成果を、期間を決めて見ます。気になる見かたは保存して、レポートで毎週届けられます。" actions={canManage ? <Button href="/analytics/reports/new">＋ レポートを作る</Button> : <Button disabled title="閲覧のみのため、レポートは作れません">＋ レポートを作る</Button>} /><AnalyticsNavigationV8 active={tab} savedCount={savedCount} />{!canManage && <div className="v8-ro-analytics-readOnly" role="status">閲覧のみです。分析・CSVの書き出しはできます。作成や変更はできません。</div>}</>}
-      <div className="v8-ro-analytics-legacyHead">
-      <Breadcrumb
-        items={tab === 'friends'
-          ? [{ label: '成果と分析' }, { label: '分析' }]
-          : [{ label: '分析', href: '/analytics?tab=friends' }, { label: currentLabel }]}
-        className="mb-3"
-      />
-      <MergedTabs basePath="/analytics" tabs={displayTabs} active={tab} />
-      </div>
-      <div className="v8-ro-analytics-content">
+    <div data-analytics-design="v6" className="v8-ro-analytics-page" data-design-node={tab === 'friends' ? (canManage ? (narrow ? 'eEhYU' : 'ws9wt') : 'L4Uov') : ({ reactions: 'yvOtn', routes: 'PFe9c', usage: 'N8ZrUl', cross: 'u5CuB8', funnel: 'DkRDE', 'url-clicks': 'iK4cQ', saved: 'bglah', 'conversion-report': 'AzrZq' } as Record<string, string>)[tab]}>
+      <ReadonlyHeaderV8 titleDisplay={['cross', 'saved', 'conversion-report'].includes(tab) ? 'auto' : 'always'} title="分析" description="友だちの増減・配信の反応・経路と成果を、期間を決めて見ます。気になる見かたは保存して、レポートで毎週届けられます。" actions={<><Button variant="secondary" disabled={!exportAction || exportAction.scope !== scope || exportAction.disabled} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={14} aria-hidden="true" />CSV で書き出す</Button>{canManage ? <Button variant="primary" href="/analytics/reports/new"><Plus size={14} aria-hidden="true" />レポートを作る</Button> : <Button disabled title="閲覧のみのため、レポートは作れません">レポートを作る</Button>}</>} /><AnalyticsNavigationV8 active={tab} savedCount={savedCount} />{!canManage && <div className="v8-ro-analytics-readOnly" role="status">閲覧のみです。分析・CSVの書き出しはできます。作成や変更はできません。</div>}
+      <AnalyticsExportContext.Provider value={registerExport}><div className="v8-ro-analytics-content">
       {tab === 'conversion-report' && <ConversionReportV8 accountId={selectedAccountId} />}
-      {tab === 'friends' && <FriendsOverviewTab accountId={selectedAccountId} />}
-      {tab === 'reactions' && <ReactionsOverviewTab accountId={selectedAccountId} />}
-      {tab === 'routes' && <RoutesOverviewTab accountId={selectedAccountId} />}
-      {tab === 'usage' && <UsageOverviewTab accountId={selectedAccountId} />}
+      {tab === 'friends' && <FriendsOverviewTab key={selectedAccountId} accountId={selectedAccountId} />}
+      {tab === 'reactions' && <ReactionsOverviewTab key={selectedAccountId} accountId={selectedAccountId} />}
+      {tab === 'routes' && <RoutesOverviewTab key={selectedAccountId} accountId={selectedAccountId} />}
+      {tab === 'usage' && <UsageOverviewTab key={selectedAccountId} accountId={selectedAccountId} />}
       {/*
         アカウントを切り替えたらクロス分析は作り直す(key)。前のアカウントへ投げた
         通信が後から返っても、その応答を受け取る画面はもう無い。中の世代fenceと
@@ -3436,9 +3287,9 @@ function AnalyticsInner() {
       {tab === 'funnel' && (
         <FunnelTab accountId={selectedAccountId} canManage={canManage} presetConversion={presetConversion} />
       )}
-      {tab === 'url-clicks' && <UrlClicksOverviewTab accountId={selectedAccountId} />}
+      {tab === 'url-clicks' && <UrlClicksOverviewTab key={selectedAccountId} accountId={selectedAccountId} />}
       {tab === 'saved' && <SavedAnalyticsTab accountId={selectedAccountId} onCountChange={setSavedCount} canManage={canManage} />}
-      </div>
+      </div></AnalyticsExportContext.Provider>
     </div>
   )
 }

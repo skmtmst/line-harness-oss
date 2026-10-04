@@ -413,13 +413,13 @@
     "direct-th": 14
   },
   "app/nen-campaigns/columns/new/column-new-v8.tsx": {
-    "unresolved-classname": 47
+    "unresolved-classname": 50
   },
   "app/nen-campaigns/columns/new/page.tsx": {
     "unresolved-classname": 36
   },
   "app/nen-campaigns/edit/campaign-editor-v8.tsx": {
-    "unresolved-classname": 65
+    "unresolved-classname": 66
   },
   "app/nen-campaigns/edit/campaign-editor.tsx": {
     "unresolved-classname": 5
@@ -585,7 +585,8 @@
     "unresolved-classname": 46
   },
   "app/search-console/page.tsx": {
-    "arbitrary-value": 2
+    "arbitrary-value": 2,
+    "unresolved-classname": 14
   },
   "app/settings/feature-settings-v8.tsx": {
     "unresolved-classname": 64
