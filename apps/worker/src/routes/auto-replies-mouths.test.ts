@@ -105,6 +105,20 @@ describe('V6 自動応答の一覧・競合・下書き保存口', () => {
     insertRule(testDb.raw, 'rule-2', '予約変更', 2);
   });
 
+  it('通知先が未選択なら下書きを残せるが公開できず、別所属の通知を保存しない',async()=>{
+    const target=app(testDb.db);
+    const config={notificationRuleId:'',notificationRuleVersion:0,message:'受信箱を確認してください'};
+    const created=await target.instance.request('/api/auto-replies/drafts',request('POST',settings({actions:[{actionType:'notify_staff',config,onFailure:'stop'}]})),target.bindings);
+    expect(created.status).toBe(201);
+    const body=await created.json() as any;
+    const id=body.data.id ?? body.data.autoReplyId;
+    const validation=await target.instance.request(`/api/auto-replies/${id}/validate`,{method:'POST'},target.bindings);
+    expect((await validation.json() as any).data).toMatchObject({valid:false,errors:expect.arrayContaining(['担当者通知の通知先を選んでください'])});
+    testDb.raw.exec(`INSERT INTO notification_rules(id,name,event_type,conditions,channels,line_account_id,is_active,version) VALUES('other-rule','notify','message_received','{}','["dashboard"]','account-2',1,1)`);
+    const invalid=await target.instance.request('/api/auto-replies/drafts',request('POST',settings({actions:[{actionType:'notify_staff',config:{...config,notificationRuleId:'other-rule',notificationRuleVersion:1}}]})),target.bindings);
+    expect(invalid.status).toBe(400);
+  });
+
   it('一覧へ成功アクション数と要確認の競合数を実測で返す', async () => {
     testDb.raw.prepare(
       `INSERT INTO auto_reply_evaluations

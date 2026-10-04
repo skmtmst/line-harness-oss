@@ -338,6 +338,7 @@ autoReplyRuns.post(
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       const outcome = await retryAutoReplyActionRuns(c.env.DB, {
         evaluationId: c.req.param('id'),
+        operatorMailEnv: c.env,
         allowedAccountIds: scope.allowedAccountIds,
         canSeeUnassigned: scope.canSeeUnassigned,
       });

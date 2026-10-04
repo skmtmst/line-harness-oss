@@ -1688,6 +1688,7 @@ export interface Chat {
 // -----------------------------------------------------------------------------
 
 export interface NotificationRule {
+  version?: number;
   id: string;
   name: string;
   eventType: string;
@@ -2582,3 +2583,5 @@ export interface LineAccountRegistrationTags { tagIds?: string[] }
 export interface LineAccountRegistrationTag { id: string; name: string; color: string | null }
 
 export interface AdPlatformConnectResult { id: string; connected: true; verifiedAt: string }
+
+export interface AutoReplyOperatorNotificationConfig { notificationRuleId: string; notificationRuleVersion: number; message: string }
