@@ -9,6 +9,7 @@ import Icon from '../components/ui/Icon.js';
 import Button from '../components/ui/Button.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 
 function nanoid(): string {
   return crypto.randomUUID();
@@ -149,7 +150,7 @@ export default function EventConfirm() {
 
   if (loadFailed || slotMissing || !event || !slot) {
     return (
-      <div className="min-h-screen bg-ground">
+      <LiffLookScope className="min-h-screen bg-ground">
         <LiffHeader title="申し込みの確認" />
         <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
           {loadFailed ? (
@@ -167,7 +168,7 @@ export default function EventConfirm() {
             <LoadingView />
           )}
         </div>
-      </div>
+      </LiffLookScope>
     );
   }
 
@@ -176,11 +177,11 @@ export default function EventConfirm() {
     : 'キャンセルは期限まで「自分のイベント」からできます（期限はイベントごとに違います）。';
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node="EscPA">
+    <LiffLookScope className="min-h-screen bg-ground" designNode="EscPA">
       <LiffHeader title="申し込みの確認" />
       <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-28">
         <h1 className="text-xl font-bold text-ink">内容を確かめてください</h1>
-        <dl className="divide-y divide-liff-divider rounded-[14px] bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
+        <dl className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
           <Row label="イベント" value={event.name} />
           <Row label="日時" value={formatJstEventAt(slot.starts_at)} />
           {event.venue_name && <Row label="場所" value={event.venue_name} />}
@@ -302,7 +303,7 @@ export default function EventConfirm() {
           ←戻る
         </button>
       </BottomBar>
-    </div>
+    </LiffLookScope>
   );
 }
 

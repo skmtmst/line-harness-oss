@@ -236,7 +236,7 @@ describe('画面', () => {
     // 板 `GgP2d`「この返事を送りますか？」を見てから送る。
     const confirm = document.body.querySelector('[data-design-node="GgP2d"]')
     expect(confirm, '返事の確認の窓が出ない').not.toBeNull()
-    for (const row of ['この返事を送りますか？', '宛先', '状態', '優先度', '下書きを消す', '戻って直す', '送って解決にする']) {
+    for (const row of ['この返事を送りますか？', '宛先', '状態', '優先度', '下書きを削除', '戻って直す', '送って解決にする']) {
       expect(confirm?.textContent ?? '', `「${row}」がない`).toContain(row)
     }
     const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.includes('送って解決にする')) as HTMLButtonElement

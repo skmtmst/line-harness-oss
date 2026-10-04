@@ -46,4 +46,10 @@ describe('U094 運営コンソールの外枠', () => {
     expect(HEADER).toContain('min-h-14')
     expect(HEADER).not.toContain('flex h-14')
   })
+
+  it('利用者メニューは矢印キーで項目を移動できる', () => {
+    expect(SHELL).toContain("role=\"menu\"")
+    expect(SHELL).toContain("querySelectorAll<HTMLElement>('[role=\"menuitem\"]:not([disabled])')")
+    expect(SHELL).toContain("onKeyDown={(event: ReactKeyboardEvent<HTMLElement>)")
+  })
 })
