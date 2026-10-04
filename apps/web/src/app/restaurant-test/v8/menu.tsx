@@ -1,21 +1,5 @@
 'use client'
 
-/*
- * ★V8-B メニュー管理（板 `MJoJR`）。
- *
- * v7（restaurant-console.tsx の Menu）と同じ口・同じ集計で、板の形に置く：
- * 数5（全メニュー・コース・単品・要承認・アレルギー登録）→「…」の決まりの帯
- * → メニュー一覧の表（行末は「…」・保管済みだけ再開ボタン）。
- *
- * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
- * - 行の「申請中」の札：承認と品目を結ぶ口が無いので出さない。要承認の数は
- *   帯に出す。承認側に結びができたら札を付ける。
- * - 下書きの「削除」：「…」の決まりに書いてあるが、削除の口が無いので出さない。
- * - 板 `NkmwU`（追加・変更）：見本は窓だが、共通の窓部品への置き換えは
- *   仕上げ係 M10 の範囲なので、今の作りの枠のまま外枠に印だけ付ける。
- *   価格の開始日・承認への申請文言は今の口の範囲で出さない。
- * v7 を直す必要が出たら向こうも同じ判断を入れる（V8 完成までの二重管理）。
- */
 import { FormEvent, useState } from 'react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -63,6 +47,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         kind: fd.get('kind'),
         name: fd.get('name'),
         price: Number(fd.get('price')),
+        effectiveAt: fd.get('effectiveAt') ? new Date(String(fd.get('effectiveAt'))).toISOString() : null,
         allergens: String(fd.get('allergens') || '').split(',').map((part) => part.trim()).filter(Boolean),
         servicePeriods: [fd.get('period')],
       }),
@@ -80,10 +65,11 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         kind: fd.get('kind'),
         name: fd.get('name'),
         price: Number(fd.get('price')),
+        effectiveAt: fd.get('effectiveAt') ? new Date(String(fd.get('effectiveAt'))).toISOString() : null,
         allergens: String(fd.get('allergens') || '').split(',').map((part) => part.trim()).filter(Boolean),
         servicePeriods: period === 'both' ? ['lunch', 'dinner'] : [period],
       }),
-      'メニューを更新しました。',
+      Number(fd.get('price')) !== editing.price ? '価格変更を承認待ちとして申請しました。現在の価格は変わりません。' : 'メニューを更新しました。',
     )
     if (ok) setEditingId('')
   }
@@ -152,6 +138,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
             </label>
             <label className={styles.field}>メニュー名<TextField name="name" defaultValue={editing.name} required aria-label="メニュー名" /></label>
             <label className={styles.field}>価格（税込）<input name="price" type="number" defaultValue={String(editing.price)} required aria-label="価格（税込）" className={styles.numberInput} /></label>
+            <label className={styles.field}>新価格の開始日時<input type="datetime-local" name="effectiveAt" aria-label="新価格の開始日時" className={styles.numberInput} /><span>空欄なら承認後すぐに反映します。</span></label>
             <label className={styles.field}>アレルギー（カンマ区切り）<TextField name="allergens" defaultValue={safeArray(editing.allergens_json).join(', ')} aria-label="アレルギー（カンマ区切り）" /></label>
             <label className={styles.field}>提供時間
               <select
@@ -210,7 +197,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                 <Td>{periodLabel(safeArray(item.service_periods_json))}</Td>
                 <Td>{item.duration_minutes ? `${item.duration_minutes}分` : '—'}</Td>
                 <Td>{safeArray(item.allergens_json).join('・') || 'なし'}</Td>
-                <Td><Status value={archived ? 'archived' : 'active'} /></Td>
+                <Td>{item.pendingPrice != null ? <span><span>{item.priceChangeStatus === 'approved' ? '承認済・開始待ち' : '申請中'}</span><br />新価格 {formatYen(item.pendingPrice)}{item.pendingEffectiveAt ? <><br />{new Date(item.pendingEffectiveAt).toLocaleString('ja-JP')}</> : null}</span> : <Status value={archived ? 'archived' : item.status === 'draft' ? 'draft' : 'active'} />}</Td>
                 <Td align="right">
                   <span className={styles.rowActions}>
                     {archived ? <Button size="compact" disabled={busy} onClick={() => resume(item)}>再開</Button> : null}

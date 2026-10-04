@@ -38,3 +38,11 @@ export function restaurantCivilTime(date: string, minute: number, timezone: stri
   }
   return new Date(utc).toISOString();
 }
+
+/** 承認済みの開始待ちだけを適用。書込トリガーで基準価格も照合する。 */
+export async function applyDueRestaurantMenuPrices(db: D1Database, organizationId?: string, storeId?: string): Promise<void> {
+  await db.prepare(`UPDATE rt_menu_change_requests SET status='approved'
+    WHERE status='approved' AND effective_at IS NOT NULL AND datetime(effective_at)<=datetime('now')
+      AND (? IS NULL OR store_id IN (SELECT id FROM rt_stores WHERE organization_id=?))
+      AND (? IS NULL OR store_id=?)`).bind(organizationId??null,organizationId??null,storeId??null,storeId??null).run();
+}

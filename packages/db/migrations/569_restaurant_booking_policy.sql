@@ -1,0 +1,10 @@
+-- 価格は承認され、指定した開始日時になってから反映する。
+ALTER TABLE rt_menu_change_requests ADD COLUMN effective_at TEXT;
+DROP TRIGGER rt_menu_change_apply;
+CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_requests WHEN OLD.status IN ('pending','approved') AND NEW.status='approved' AND (NEW.effective_at IS NULL OR datetime(NEW.effective_at)<=datetime('now')) BEGIN UPDATE rt_menu_items SET price=NEW.after_price,updated_at=datetime('now') WHERE id=NEW.menu_id AND store_id=NEW.store_id AND price=NEW.before_price; UPDATE rt_menu_change_requests SET status=CASE WHEN changes()=1 THEN 'applied' ELSE 'failed' END,failure_reason=CASE WHEN changes()=1 THEN NULL ELSE 'メニューが変更または削除されています。再申請してください' END,updated_at=datetime('now') WHERE id=NEW.id; END;
+
+-- 名簿と既存のログインメンバーの対応。秘密値・ログイン用の鍵は持たない。
+ALTER TABLE rt_memberships ADD COLUMN staff_id TEXT REFERENCES staff_members(id) ON DELETE SET NULL;
+CREATE UNIQUE INDEX idx_rt_membership_login ON rt_memberships(organization_id,staff_id) WHERE staff_id IS NOT NULL;
+-- ログインの役割・利用状態を正本にし、外側のメンバー設定で変更しても一致させる。
+CREATE TRIGGER rt_membership_login_policy AFTER UPDATE OF role,is_active,invite_status ON staff_members BEGIN UPDATE rt_memberships SET role=CASE NEW.role WHEN 'owner' THEN 'super_admin' WHEN 'admin' THEN 'store_manager' ELSE 'staff' END,status=CASE WHEN NEW.is_active=0 THEN 'suspended' WHEN NEW.invite_status='active' THEN 'active' ELSE 'invited' END,updated_at=datetime('now') WHERE staff_id=NEW.id; END;

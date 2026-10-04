@@ -1435,3 +1435,25 @@ describe('V8 枠の自動生成と全枠の競合', () => {
     expect((await res.json() as any).data.generated).toBe(4);
   });
 });
+
+describe('V8 新価格の開始日時',()=>{
+ it('承認されても未来の開始日時までは現行価格を保つ',async()=>{
+  seedRestaurantFixture();
+  const res=await requestWithMethod('/api/restaurant-test/menu/menu-ginza?account_id=account-1','PATCH',{price:9900,effectiveAt:'2099-10-10T00:00:00Z'});
+  const change=(await res.json() as any).data;
+  expect((await requestWithMethod(`/api/restaurant-test/approvals/${change.approvalId}?account_id=account-1`,'PATCH',{action:'approve'})).status).toBe(200);
+  expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id='menu-ginza'").get()).toEqual({price:8800});
+  const snap=await request('/api/restaurant-test/snapshot?account_id=account-1');
+  expect((await snap.json() as any).data.menuItems[0]).toMatchObject({pendingPrice:9900,priceChangeStatus:'approved'});
+  testDb.raw.prepare("UPDATE rt_menu_change_requests SET effective_at='2000-01-01T00:00:00Z' WHERE id=?").run(change.requestId);
+  await request('/api/restaurant-test/snapshot?account_id=account-1');
+  expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id='menu-ginza'").get()).toEqual({price:9900});
+  await request('/api/restaurant-test/snapshot?account_id=account-1');
+  expect(testDb.raw.prepare('SELECT status FROM rt_menu_change_requests WHERE id=?').get(change.requestId)).toEqual({status:'applied'});
+ });
+ it('価格の開始日時の入力不正では申請を作らない',async()=>{
+  seedRestaurantFixture();
+  expect((await requestWithMethod('/api/restaurant-test/menu/menu-ginza?account_id=account-1','PATCH',{price:9900,effectiveAt:'bad'})).status).toBe(400);
+  expect(testDb.raw.prepare('SELECT COUNT(*) AS total FROM rt_menu_change_requests').get()).toEqual({total:0});
+ });
+});

@@ -30,7 +30,7 @@ import {
 import { fetchBotProfile } from '../lib/bot-profile.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { restaurantTableCapacity, validateRestaurantOpeningHours } from '../services/restaurant-inventory.js';
-import { expireRestaurantHolds, validateRestaurantHold, validRestaurantDate, restaurantCivilTime } from '../services/restaurant-booking.js';
+import { applyDueRestaurantMenuPrices, expireRestaurantHolds, validateRestaurantHold, validRestaurantDate, restaurantCivilTime } from '../services/restaurant-booking.js';
 import { DEFAULT_STAY_MINUTES } from '../services/restaurant-reservation-email.js';
 import { restaurantChannelState, restaurantDayBounds } from '../services/restaurant-channels.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
@@ -562,6 +562,7 @@ restaurantTest.get('/api/restaurant-test/snapshot', requireRole('owner', 'admin'
   }
 
   await expireRestaurantHolds(dbFor(c.env), undefined, organization.scopedStoreId ?? undefined, organization.id);
+  await applyDueRestaurantMenuPrices(dbFor(c.env), organization.id, organization.scopedStoreId ?? undefined);
   const orgId = organization.id;
   const scopedStoreId = organization.scopedStoreId;
   // R103: 予約台帳の絞り込み（期間・状態）とページ切替。既定は従来どおり先頭300件。
@@ -596,7 +597,7 @@ restaurantTest.get('/api/restaurant-test/snapshot', requireRole('owner', 'admin'
     dbFor(c.env).prepare(`SELECT i.* FROM rt_inventory_slots i JOIN rt_stores s ON s.id = i.store_id
       WHERE s.organization_id = ? AND (? IS NULL OR s.id = ?)
       ORDER BY i.starts_at LIMIT 300`).bind(orgId, scopedStoreId, scopedStoreId).all(),
-    dbFor(c.env).prepare(`SELECT m.*, (SELECT after_price FROM rt_menu_change_requests r WHERE r.menu_id = m.id AND r.status = 'pending') AS pendingPrice FROM rt_menu_items m JOIN rt_stores s ON s.id = m.store_id
+    dbFor(c.env).prepare(`SELECT m.*, (SELECT after_price FROM rt_menu_change_requests r WHERE r.menu_id = m.id AND r.status IN ('pending','approved')) AS pendingPrice, (SELECT effective_at FROM rt_menu_change_requests r WHERE r.menu_id=m.id AND r.status IN ('pending','approved')) AS pendingEffectiveAt, (SELECT status FROM rt_menu_change_requests r WHERE r.menu_id=m.id AND r.status IN ('pending','approved')) AS priceChangeStatus FROM rt_menu_items m JOIN rt_stores s ON s.id = m.store_id
       WHERE s.organization_id = ? AND (? IS NULL OR s.id = ?)
       ORDER BY m.kind, m.name`).bind(orgId, scopedStoreId, scopedStoreId).all(),
     dbFor(c.env).prepare(`SELECT x.* FROM rt_connector_status x JOIN rt_stores s ON s.id = x.store_id
@@ -1499,9 +1500,9 @@ restaurantTest.patch('/api/restaurant-test/memberships/:id', requireRole('owner'
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const current = await dbFor(c.env).prepare(`SELECT * FROM rt_memberships WHERE id = ? AND organization_id = ? AND (? IS NULL OR store_id = ?)`)
     .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
-    .first<{ store_id: string | null; staff_name: string; email: string | null; role: string; line_uid: string | null; google_email: string | null; status: string }>();
+    .first<{ store_id: string | null; staff_name: string; email: string | null; role: string; line_uid: string | null; google_email: string | null; status: string; staff_id: string | null }>();
   if (!current) return c.json({ success: false, error: '所属ユーザーが見つかりません' }, 404);
-  const body = await c.req.json<{ storeId?: string | null; staffName?: string; email?: string | null; role?: string; lineUid?: string | null; googleEmail?: string | null; status?: string }>();
+  const body = await c.req.json<{ storeId?: string | null; staffName?: string; email?: string | null; role?: string; lineUid?: string | null; googleEmail?: string | null; status?: string; expectedPolicyVersion?: number; idempotencyKey?: string }>();
   const storeId = body.storeId === undefined ? current.store_id : body.storeId === '' ? null : body.storeId;
   const name = body.staffName === undefined ? current.staff_name : body.staffName;
   const role = body.role === undefined ? current.role : body.role;
@@ -1531,7 +1532,7 @@ const updateRestaurantMenu = async (c: Context<Env>) => {
     .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
     .first<{ store_id: string; kind: string; name: string; price: number; allergens_json: string; service_periods_json: string; status: string }>();
   if (!current) return c.json({ success: false, error: 'メニューが見つかりません' }, 404);
-  const body = await c.req.json<{ kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[]; status?: string }>();
+  const body = await c.req.json<{ kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[]; status?: string; effectiveAt?: string | null }>();
   const kind = body.kind === undefined ? current.kind : body.kind;
   const name = body.name === undefined ? current.name : body.name;
   const price = body.price === undefined ? current.price : body.price;
@@ -1542,6 +1543,8 @@ const updateRestaurantMenu = async (c: Context<Env>) => {
     || (body.servicePeriods !== undefined && (!Array.isArray(body.servicePeriods) || body.servicePeriods.some((item) => !['lunch', 'dinner'].includes(item))))) {
     return c.json({ success: false, error: 'メニューの入力内容が正しくありません' }, 400);
   }
+  if (body.effectiveAt !== undefined && body.effectiveAt !== null && (typeof body.effectiveAt !== 'string' || !Number.isFinite(Date.parse(body.effectiveAt)))) return c.json({ success:false,error:'価格の開始日時を確認してください' },400);
+  const effectiveAt = body.effectiveAt ? new Date(body.effectiveAt).toISOString() : null;
   const db = dbFor(c.env, current.store_id);
   const approvalId = price !== current.price ? crypto.randomUUID() : null;
   const requestId = approvalId ? crypto.randomUUID() : null;
@@ -1551,9 +1554,9 @@ const updateRestaurantMenu = async (c: Context<Env>) => {
     const requester = c.get('staff')?.id || '管理者';
     writes.push(db.prepare(`INSERT INTO rt_approval_requests (id, organization_id, store_id, kind, title, status, payload_json, requested_by)
       VALUES (?, ?, ?, 'menu_change', ?, 'pending', ?, ?)`).bind(approvalId, organization.id, current.store_id,
-      `${name.trim()}の価格変更`, JSON.stringify({ menuId: c.req.param('id'), beforePrice: current.price, afterPrice: price }), requester));
-    writes.push(db.prepare(`INSERT INTO rt_menu_change_requests (id, approval_id, menu_id, store_id, before_price, after_price, requested_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`).bind(requestId, approvalId, c.req.param('id'), current.store_id, current.price, price, requester));
+      `${name.trim()}の価格変更`, JSON.stringify({ menuId: c.req.param('id'), beforePrice: current.price, afterPrice: price, effectiveAt }), requester));
+    writes.push(db.prepare(`INSERT INTO rt_menu_change_requests (id, approval_id, menu_id, store_id, before_price, after_price, requested_by, effective_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).bind(requestId, approvalId, c.req.param('id'), current.store_id, current.price, price, requester, effectiveAt));
   }
   try {
     await db.batch(writes);
@@ -1671,10 +1674,11 @@ restaurantTest.get('/api/restaurant-test/menus', requireRole('owner', 'admin', '
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  await applyDueRestaurantMenuPrices(dbFor(c.env), organization.id, organization.scopedStoreId ?? undefined);
   const storeId = c.req.query('storeId') || null;
   if (storeId && !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
   const rows = await dbFor(c.env, storeId).prepare(`SELECT m.*,
-    (SELECT after_price FROM rt_menu_change_requests r WHERE r.menu_id = m.id AND r.status = 'pending') AS pendingPrice
+    (SELECT after_price FROM rt_menu_change_requests r WHERE r.menu_id = m.id AND r.status IN ('pending','approved')) AS pendingPrice, (SELECT effective_at FROM rt_menu_change_requests r WHERE r.menu_id=m.id AND r.status IN ('pending','approved')) AS pendingEffectiveAt, (SELECT status FROM rt_menu_change_requests r WHERE r.menu_id=m.id AND r.status IN ('pending','approved')) AS priceChangeStatus
     FROM rt_menu_items m JOIN rt_stores s ON s.id = m.store_id
     WHERE s.organization_id = ? AND (? IS NULL OR m.store_id = ?) AND (? IS NULL OR m.store_id = ?)
     ORDER BY m.kind, m.name`).bind(organization.id, organization.scopedStoreId, organization.scopedStoreId, storeId, storeId).all();
@@ -1906,4 +1910,3 @@ restaurantTest.post('/api/restaurant-test/inventory/generate', requireRole('owne
     return c.json({ success: true, data: { generated: results.reduce((sum,r)=>sum+r.meta.changes,0), slotMinutes: 30 } });
   } finally { await releaseLock(db,key,owner); }
 });
-

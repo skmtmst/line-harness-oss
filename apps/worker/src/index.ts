@@ -1655,8 +1655,9 @@ async function runFrequentHeavyJobs(
     jobs.push({
       name: 'restaurant hold expiry',
       run: async () => {
-        const { expireRestaurantHolds } = await import('./services/restaurant-booking.js');
+        const { expireRestaurantHolds, applyDueRestaurantMenuPrices } = await import('./services/restaurant-booking.js');
         await expireRestaurantHolds(dbFor(env), new Date(event.scheduledTime).toISOString());
+        await applyDueRestaurantMenuPrices(dbFor(env));
       },
     });
     jobs.push({
