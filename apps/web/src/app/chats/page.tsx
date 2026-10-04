@@ -44,7 +44,7 @@ import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
-import { CheckCircle2, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Star, X } from 'lucide-react'
+import { CheckCircle2, FileText, Image as ImageIcon, Link2, NotebookPen, PanelRightClose, PanelRightOpen, SlidersHorizontal, Star, X } from 'lucide-react'
 
 type Chat = ChatListItem
 
@@ -2656,7 +2656,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 data-inbox-sort="fixed"
                 className="text-ink-secondary ml-auto shrink-0 text-[11px] font-semibold whitespace-nowrap"
               >
-                並び順：未読が先・新しい順
+                並び順：未対応が先・新しい順
               </span>
             </div>
           </div>
@@ -3434,10 +3434,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     {/* 設計 2-1-1。選ぶと本文が入力欄に入る。 */}
                     <Button variant="secondary" className="v7:h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => setShowTemplatePicker(true)}>
-                      ▧ テンプレートを選択
+                      <FileText aria-hidden="true" size={14} />
+                      テンプレートを選択
                     </Button>
                     <Button variant="secondary" className="v7:h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => setShowComposerOptions((v) => !v)}>
-                      ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
+                      <SlidersHorizontal aria-hidden="true" size={14} />
+                      {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
+                    </Button>
+                    <Button variant="secondary" className="v7:h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading} title="画像を選ぶ" aria-label="画像を選ぶ">
+                      <ImageIcon aria-hidden="true" size={14} />
+                      画像
                     </Button>
                     {/*
                       設計 `B7CER8` は、開いている間このボタン自体が
@@ -3722,7 +3728,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       {messageOverLimit ? ' ・ 文字数が上限を超えています' : ''}
                     </span>
                     <span className="text-ink-faint shrink-0">
-                      {sendMode === 'enter' ? 'Shift + Enter で改行' : 'Enter で改行'}
+                      {sendMode === 'enter' ? 'Enter で送る・Shift + Enter で改行' : 'Shift + Enter で送る・Enter で改行'}
                     </span>
                   </p>
 
@@ -3751,18 +3757,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         if (file) void handlePickImage(file)
                       }}
                     />
-                    <button
-                      type="button"
-                      onClick={() => imageInputRef.current?.click()}
-                      disabled={imageUploading}
-                      title="画像を選ぶ"
-                      aria-label="画像を選ぶ"
-                      className="rounded-mini px-2 py-1 text-sm text-ink-faint hover:bg-shell disabled:opacity-50"
-                    >
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2m0 0 4-4a2 2 0 0 1 3 0l5 5M14 10h.01" />
-                      </svg>
-                    </button>
                     {/*
                       INBOX-31: 状態を分けて伝える。
                       - 読み込み中 …「画像を読み込み中」(まだ何も送っていない)
@@ -3771,13 +3765,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     */}
                     <span
                       className={`min-w-0 truncate text-xs ${imageError ? 'text-danger' : 'text-ink-faint'}`}
-                      title={imageError || '画像は JPEG / PNG、1枚 1MB まで'}
+                      title={imageError || 'JPEG / PNG・1枚 1MB まで'}
                     >
                       {imageError
                         ? imageError
                         : imageUploading
                           ? '画像を読み込み中…'
-                          : '画像は JPEG / PNG、1枚 1MB まで'}
+                          : 'JPEG / PNG・1枚 1MB まで'}
                     </span>
                   </span>
                   <span className="ml-auto flex shrink-0 items-center gap-2">
@@ -3790,7 +3784,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       予約{scheduledSends.length > 0 ? `(${scheduledSends.length})` : ''}
                     </Button>
                     <Button variant="primary" className="shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto" onClick={handleSendMessage} disabled={sending || messageOverLimit || (!messageContent.trim() && !pendingImage)}>
-                      {sending ? '送信中...' : '送信'}
+                      {sending ? '送っています…' : '送信'}
                     </Button>
                   </span>
 
