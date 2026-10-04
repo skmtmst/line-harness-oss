@@ -39,4 +39,13 @@ describe('V6共通トップバー', () => {
     expect(appTopBar).toContain("pathname === '/hq' || pathname.startsWith('/hq/')")
     expect(appTopBar).toContain('showAccountSwitcher={!isHq}')
   })
+
+  it('V8 の 1152 の帯：札は潰さない・パンくずと自分の名前が縮む', () => {
+    expect(css).toMatch(/\[data-theme='v8'\] \.accountPill \{[^}]*flex-shrink:\s*0/s)
+    expect(css).toMatch(/\[data-theme=(["'])v8\1\] \.accountName \{\s*max-width:\s*128px/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.crumbCurrent/s)
+    expect(css).toMatch(/min-width:\s*0/)
+    // v7 の札（縮む側）は変えない。
+    expect(css).not.toMatch(/^\.accountPill \{[^}]*flex-shrink/m)
+  })
 })
