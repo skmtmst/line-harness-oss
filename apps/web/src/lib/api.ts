@@ -2892,6 +2892,44 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   return res.json() as Promise<T>
 }
 
+/**
+ * よく開く一覧の取り方（前のデータをすぐ出して裏で取り直す用）。
+ *
+ * - readCachedList：覚えている分だけすぐ返す（無いときは null）。画面はこちらを先に出す。
+ * - refreshCachedList：ETag を付けて取り直す。変わっていなければ 304 で覚えていた分を返す。
+ * 覚えるのは本文と ETag だけ。秘密値・個人情報を鍵や値に混ぜない（path をそのまま鍵にする）。
+ */
+const listCache = new Map<string, { etag: string | null; body: unknown }>()
+
+export function readCachedList<T>(path: string): T | null {
+  return (listCache.get(path)?.body ?? null) as T | null
+}
+
+export async function refreshCachedList<T>(path: string): Promise<T> {
+  const cached = listCache.get(path)
+  const headers: Record<string, string> = { ...adminSessionHeaders() }
+  if (cached?.etag) headers['If-None-Match'] = cached.etag
+  const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
+    credentials: 'include',
+    headers,
+  })
+  if (res.status === 304 && cached) return cached.body as T
+  if (!res.ok) {
+    const raw = await res.text()
+    throw new ApiError(
+      res.status,
+      extractApiErrorMessage(raw, res.status),
+      extractApiErrorCode(raw),
+      undefined,
+      extractApiErrorTrackingId(raw),
+      parseRetryAfterSeconds(res.headers.get('Retry-After')),
+    )
+  }
+  const body = (await res.json()) as T
+  listCache.set(path, { etag: res.headers.get('ETag'), body })
+  return body
+}
+
 async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
@@ -14254,7 +14292,38 @@ function withAccount(path: string, accountId: string): string {
   return `${path}${path.includes('?') ? '&' : '?'}account_id=${encodeURIComponent(accountId)}`;
 }
 
+/** 前払いのみの印を付け外しした記録（理由は店だけが見る）。 */
+export interface BookingNoshowFlagEvent {
+  action: 'manual_on' | 'manual_off';
+  reason: string | null;
+  staffId: string | null;
+  staffName: string | null;
+  at: string;
+}
+
+/** 友だちの無断キャンセルから決めた前払いのみの判定。 */
+export interface BookingPrepayDecision {
+  noshowCount: number;
+  threshold: number;
+  enabled: boolean;
+  windowMonths: number;
+  noPaymentMode: 'notice' | 'notice_call';
+  prepayOnly: boolean;
+  manual: boolean;
+  recentDates: string[];
+  lastEvent: BookingNoshowFlagEvent | null;
+}
+
 export const bookingApi = {
+  getFriendNoshow: (accountId: string, friendId: string) =>
+    fetchApi<{ success: true; data: BookingPrepayDecision }>(
+      withAccount(`/api/booking/admin/friends/${encodeURIComponent(friendId)}/noshow`, accountId),
+    ),
+  setFriendPrepay: (accountId: string, friendId: string, body: { mode: 'manual_on' | 'manual_off'; reason?: string }) =>
+    fetchApi<{ success: true; data: BookingPrepayDecision }>(
+      withAccount(`/api/booking/admin/friends/${encodeURIComponent(friendId)}/prepay`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   previewReminders: (accountId: string, startsAt: string) => {
     const params = new URLSearchParams({ account_id: accountId, starts_at: startsAt });
     return fetchApi<{ reminders: Array<{ kind: 'day_before' | 'hours_before'; scheduledAt: string }> }>(
