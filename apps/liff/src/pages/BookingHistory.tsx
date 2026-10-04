@@ -6,6 +6,7 @@ import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import HistoryCard from '../components/HistoryCard.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
@@ -38,18 +39,13 @@ export default function BookingHistory() {
   }, [reloadKey]);
 
   return (
-    <div className="min-h-screen bg-canvas" style={{ fontFamily: 'var(--liff-look-font-body)' }}>
+    <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="予約の履歴" />
       <div
         data-design-node="YvTJ3"
         className="mx-auto w-full max-w-md space-y-3.5 px-4 pt-3 pb-40"
       >
-        <h1
-          className="text-xl font-bold text-[var(--liff-look-ink)]"
-          style={{ fontFamily: 'var(--liff-look-font-heading)' }}
-        >
-          予約の履歴
-        </h1>
+        <h1 className="text-xl font-bold text-ink">予約の履歴</h1>
         {failed ? (
           <LoadErrorView note="予約はなくなっていません。" onRetry={() => setReloadKey((k) => k + 1)} />
         ) : !data ? (
@@ -57,7 +53,7 @@ export default function BookingHistory() {
         ) : (
           <>
             <div
-              className="flex rounded-[var(--liff-look-radius)] bg-[var(--liff-look-chip)] p-[3px]"
+              className="flex rounded-(--liff-radius) bg-liff-chip p-[3px]"
               role="tablist"
               aria-label="予約の期間"
             >
@@ -75,8 +71,8 @@ export default function BookingHistory() {
                   onClick={() => setTab(t.key)}
                   className={`flex h-8 flex-1 items-center justify-center rounded-lg text-xs focus-visible:outline-2 focus-visible:outline-ink ${
                     tab === t.key
-                      ? 'bg-canvas font-bold text-[var(--liff-look-ink)]'
-                      : 'font-semibold text-[var(--liff-look-sub)]'
+                      ? 'bg-canvas font-bold text-ink'
+                      : 'font-semibold text-liff-sub'
                   }`}
                 >
                   {t.label}
@@ -100,7 +96,7 @@ export default function BookingHistory() {
                 ))}
               </ul>
             )}
-            <p className="flex gap-1.5 text-[11.5px] leading-[17px] text-[var(--liff-look-sub)]">
+            <p className="flex gap-1.5 text-[11.5px] leading-[17px] text-liff-sub">
               <Icon name="message-circle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>予定の変更・キャンセルは、お店に LINE でご連絡ください。</span>
             </p>
@@ -117,6 +113,6 @@ export default function BookingHistory() {
           </Button>
         </BottomBar>
       )}
-    </div>
+    </LiffLookScope>
   );
 }

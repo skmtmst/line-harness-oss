@@ -1,118 +1,210 @@
-import type { CSSProperties } from 'react';
-
 /**
- * LIFF の見た目の型の受け口（M5 の下ごしらえ）。
+ * LIFF の見た目の型 (V8.pen 修正案 L-2・L-3。M2)。
+ * 5つの型は CSS 変数の組で持ち (index.css の [data-liff-theme])、
+ * 店の色はその上に重ねる。型を替えても店の色は残る。
  *
- * 大学生向けの言い換え: あとから来る5つの型（ナチュラル・モダン・やさしい・
- * 夜・LINE らしい）が色・書体・角丸を流し込むための「入れ物」。入れ物だけ先に
- * 作り、中身はいまの見た目（⑤ LINE らしい）と同じ値を入れておくので、
- * 画面の見た目は1ピクセルも変わらない。
- *
- * 値は `main.tsx` で文書全体に1回だけ置く（`applyLiffLook`）。画面ごとの
- * ばらまきは要らない。M2 の5型が来たら、このファイルの値を選ぶ分岐を足し、
- * 店ごとの上書き（主の色・地の色・見出しの書体）の読み方を M3 の API に
- * 合わせるだけで、全画面に型が当たる。
- *
- * 受け口と次に埋める係の対応表:
- * - main: 進み具合の棒・選んだ枠・ボタン型・添付・CTA・進み具合（店の主の色は M2）
- * - soft / waitBg / waitInk / okBg / okInk: 選んだ地・待ち・確定の札と印（型の淡色は M2）
- * - line / lineStrong / divider: 枠・線・区切り（型ごとに M2）
- * - chip / offBg: 切り替えの地・日付の四角・骨組み（型ごとに M2）
- * - idle / ink / sub: 薄い文字・見出しと本文・説明（見出しの書体と一緒に M2）
- * - deep: マイルの貯まった箱の深い緑（型ごとに M2）
- * - fontBody / fontHeading: 本文・見出しの書体（いまは本文と同じ。やさしい型の丸ゴシック等は M2）
- * - radius: よく押す角丸（10px の所だけ。8px・14px・丸は今のまま。統一は M2）
- *
- * 型の対象外（今のまま固定。変数にしない）:
- * - 必須の赤い札・入力の失敗の赤・危ない操作の赤（意味の色）
- * - 押せない満席の灰色・上限お知らせの info の帯（契約テストが文面で固定）
- * - 送信ボタン（フォームの theme.main で済み）・主ボタンの部品（契約テストが固定）
- * - ウェビナーの暗い地（別画面の決まり）
+ * 設定の読み口は /api/liff/booking/settings (M3 が型・店の色・
+ * カレンダーの出し方・空きの点を足す)。無い欄は既定に倒すので、
+ * M3 の適用前も今の見た目 (⑤ LINE らしい) のまま動く。
  */
-export const LIFF_LOOK_DEFAULT = {
-  main: '#03873a',
-  soft: '#f0fbf4',
-  line: '#e6e9ed',
-  lineStrong: '#dfe3e8',
-  idle: '#b8bec6',
-  ink: '#1d1d1f',
-  sub: '#5f6670',
-  chip: '#f1f3f5',
-  offBg: '#f7f8f9',
-  okBg: '#e8f8ee',
-  okInk: '#0a7a3e',
-  waitBg: '#fff6e5',
-  waitInk: '#b26b00',
-  divider: '#eef0f2',
-  deep: '#0f3d24',
-  fontBody:
-    '"Inter", "Noto Sans JP", system-ui, -apple-system, "BlinkMacSystemFont", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif',
-  fontHeading:
-    '"Inter", "Noto Sans JP", system-ui, -apple-system, "BlinkMacSystemFont", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif',
-  radius: '0.625rem',
-} as const;
 
-/** 受け口の変数名。文書全体に効く。 */
-export type LiffLookVarName =
-  | '--liff-look-main'
-  | '--liff-look-soft'
-  | '--liff-look-line'
-  | '--liff-look-line-strong'
-  | '--liff-look-idle'
-  | '--liff-look-ink'
-  | '--liff-look-sub'
-  | '--liff-look-chip'
-  | '--liff-look-off-bg'
-  | '--liff-look-ok-bg'
-  | '--liff-look-ok-ink'
-  | '--liff-look-wait-bg'
-  | '--liff-look-wait-ink'
-  | '--liff-look-divider'
-  | '--liff-look-deep'
-  | '--liff-look-font-body'
-  | '--liff-look-font-heading'
-  | '--liff-look-radius';
+/** 見た目の型。⑤ LINE らしい (今の見た目) が既定。 */
+export const LIFF_THEMES = ['natural', 'modern', 'gentle', 'night', 'line'] as const;
+export type LiffThemeId = (typeof LIFF_THEMES)[number];
 
-/**
- * 入れ物の中身。いまは既定値（⑤ LINE らしい）だけを返す。
- * 引数を取らないのは、値を選び分ける型・店の色の読み方が M2・M3 待ちのため。
- * 5型を足すときは引数と分岐をここに足す。
- */
-export function liffLookVars(): CSSProperties {
-  const d = LIFF_LOOK_DEFAULT;
-  return {
-    '--liff-look-main': d.main,
-    '--liff-look-soft': d.soft,
-    '--liff-look-line': d.line,
-    '--liff-look-line-strong': d.lineStrong,
-    '--liff-look-idle': d.idle,
-    '--liff-look-ink': d.ink,
-    '--liff-look-sub': d.sub,
-    '--liff-look-chip': d.chip,
-    '--liff-look-off-bg': d.offBg,
-    '--liff-look-ok-bg': d.okBg,
-    '--liff-look-ok-ink': d.okInk,
-    '--liff-look-wait-bg': d.waitBg,
-    '--liff-look-wait-ink': d.waitInk,
-    '--liff-look-divider': d.divider,
-    '--liff-look-deep': d.deep,
-    '--liff-look-font-body': d.fontBody,
-    '--liff-look-font-heading': d.fontHeading,
-    '--liff-look-radius': d.radius,
-  } as CSSProperties;
+/** カレンダーの出し方。週を先に開くのが既定。 */
+export const LIFF_CALENDAR_MODES = [
+  'week-first',
+  'month-first',
+  'week-only',
+  'month-only',
+] as const;
+export type LiffCalendarMode = (typeof LIFF_CALENDAR_MODES)[number];
+
+/** 店が選ぶ見出しの書体。 */
+export const LIFF_HEADING_FONTS = ['default', 'mincho', 'marugothic', 'sans'] as const;
+export type LiffHeadingFont = (typeof LIFF_HEADING_FONTS)[number];
+
+/** 見出しの書体の重ね (index.css の --liff-font-heading に渡す)。 */
+export const HEADING_STACKS: Record<Exclude<LiffHeadingFont, 'default'>, string> = {
+  mincho: '"Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif',
+  marugothic: '"Zen Maru Gothic", "Hiragino Maru Gothic ProN", sans-serif',
+  sans: '"Inter", "Noto Sans JP", sans-serif',
+};
+
+/** API が返す見た目の欄 (M3 が足す)。来ない欄があってもよい。 */
+export interface LiffLookApiSettings {
+  liff_theme?: unknown;
+  shop_primary_color?: unknown;
+  shop_background_color?: unknown;
+  shop_heading_font?: unknown;
+  liff_calendar_mode?: unknown;
+  liff_vacancy_dots?: unknown;
+  /** 旧い欄。liff_calendar_mode が無いときだけ最初の形に使う。 */
+  liff_date_view?: unknown;
+}
+
+/** 画面が使う見た目 (既定まで倒した形)。 */
+export interface LiffLook {
+  theme: LiffThemeId;
+  primaryColor: string | null;
+  backgroundColor: string | null;
+  headingFont: LiffHeadingFont;
+  calendarMode: LiffCalendarMode;
+  vacancyDots: boolean;
+}
+
+export const DEFAULT_LOOK: LiffLook = {
+  theme: 'line',
+  primaryColor: null,
+  backgroundColor: null,
+  headingFont: 'default',
+  calendarMode: 'week-first',
+  vacancyDots: true,
+};
+
+function isTheme(value: unknown): value is LiffThemeId {
+  return typeof value === 'string' && (LIFF_THEMES as readonly string[]).includes(value);
+}
+
+function isCalendarMode(value: unknown): value is LiffCalendarMode {
+  return (
+    typeof value === 'string' && (LIFF_CALENDAR_MODES as readonly string[]).includes(value)
+  );
+}
+
+function isHeadingFont(value: unknown): value is LiffHeadingFont {
+  return (
+    typeof value === 'string' && (LIFF_HEADING_FONTS as readonly string[]).includes(value)
+  );
+}
+
+/** #rgb・#rrggbb だけ受け、小文字の #rrggbb に直す。それ以外は null。 */
+export function normalizeHex(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const m = value.trim().match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+  if (!m) return null;
+  const h = m[1].toLowerCase();
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  return `#${full}`;
 }
 
 /**
- * 文書全体に受け口を置く。`main.tsx` で起動時に1回だけ呼ぶ。
- * 予約・ウェビナーなど M2 作業中の画面も含め、全部の画面に既定値が効く。
+ * 設定を画面の形に倒す。変な値は既定に戻し、止めない。
+ * 型を選んでいない店は ⑤ LINE らしい＝今の見た目のまま。
  */
-export function applyLiffLook(
-  target?: { setProperty(name: string, value: string): void },
-): void {
-  const style =
-    target ?? (typeof document !== 'undefined' ? document.documentElement.style : undefined);
-  if (!style) return;
-  for (const [name, value] of Object.entries(liffLookVars())) {
-    style.setProperty(name, value as string);
+export function resolveLook(raw: LiffLookApiSettings | null | undefined): LiffLook {
+  if (!raw) return { ...DEFAULT_LOOK };
+  let calendarMode: LiffCalendarMode = DEFAULT_LOOK.calendarMode;
+  if (isCalendarMode(raw.liff_calendar_mode)) {
+    calendarMode = raw.liff_calendar_mode;
+  } else if (raw.liff_date_view === 'calendar') {
+    calendarMode = 'month-first';
+  } else if (raw.liff_date_view === 'list') {
+    calendarMode = 'week-first';
   }
+  return {
+    theme: isTheme(raw.liff_theme) ? raw.liff_theme : DEFAULT_LOOK.theme,
+    primaryColor: normalizeHex(raw.shop_primary_color),
+    backgroundColor: normalizeHex(raw.shop_background_color),
+    headingFont: isHeadingFont(raw.shop_heading_font)
+      ? raw.shop_heading_font
+      : DEFAULT_LOOK.headingFont,
+    calendarMode,
+    // 0・'0'・false だけ消す。来なければ付ける (今どおり)。
+    vacancyDots: raw.liff_vacancy_dots === false ||
+      raw.liff_vacancy_dots === 0 ||
+      raw.liff_vacancy_dots === '0'
+      ? false
+      : true,
+  };
+}
+
+export interface Rgb {
+  r: number;
+  g: number;
+  b: number;
+}
+
+/** #rrggbb を 0〜255 に割る。変な値は null。 */
+export function hexToRgb(hex: string): Rgb | null {
+  const full = normalizeHex(hex);
+  if (!full) return null;
+  return {
+    r: parseInt(full.slice(1, 3), 16),
+    g: parseInt(full.slice(3, 5), 16),
+    b: parseInt(full.slice(5, 7), 16),
+  };
+}
+
+function channelToLinear(channel: number): number {
+  const c = channel / 255;
+  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+/** WCAG の相対輝度 (0〜1)。 */
+export function relativeLuminance({ r, g, b }: Rgb): number {
+  return (
+    0.2126 * channelToLinear(r) +
+    0.7152 * channelToLinear(g) +
+    0.0722 * channelToLinear(b)
+  );
+}
+
+/** 2色の見やすさの比 (1〜21。WCAG の contrast ratio)。 */
+export function contrastRatio(a: Rgb, b: Rgb): number {
+  const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** 白 (#ffffff) との比。主の色の上の白字が読めるかの判定に使う。 */
+export function contrastWithWhite(bgHex: string): number | null {
+  const bg = hexToRgb(bgHex);
+  if (!bg) return null;
+  return contrastRatio(bg, { r: 255, g: 255, b: 255 });
+}
+
+/**
+ * 主の色の上の字。白との比が 4.5 以上なら白、足りなければ濃い字。
+ * 保存は止めない。LIFF 側で字だけ替える (見やすさの自動の確かめ)。
+ * 変な色が来たら白のまま (今どおり)。
+ */
+export function textOnColor(
+  bgHex: string,
+  light = '#ffffff',
+  dark = '#1d1d1f',
+): string {
+  const ratio = contrastWithWhite(bgHex);
+  if (ratio === null) return light;
+  return ratio >= 4.5 ? light : dark;
+}
+
+/** 白に寄せる (主の色から選んだときの薄い地に使う)。ratio は 0〜1。 */
+export function soften(hex: string, ratio = 0.9): string | null {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return null;
+  const mix = (c: number) => Math.round(c + (255 - c) * ratio);
+  const toHex = (c: number) => mix(c).toString(16).padStart(2, '0');
+  return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
+}
+
+/**
+ * 店の色の重ね (包みの div の style に渡す CSS 変数)。
+ * 型の変数の上に置くので、型を替えても店の色は残る。
+ */
+export function lookStyleVars(look: LiffLook): Record<string, string> {
+  const vars: Record<string, string> = {};
+  if (look.primaryColor) {
+    vars['--color-liff-primary'] = look.primaryColor;
+    const soft = soften(look.primaryColor);
+    if (soft) vars['--color-liff-soft'] = soft;
+    vars['--liff-on-primary'] = textOnColor(look.primaryColor);
+  }
+  if (look.backgroundColor) {
+    vars['--color-canvas'] = look.backgroundColor;
+  }
+  if (look.headingFont !== 'default') {
+    vars['--liff-font-heading'] = HEADING_STACKS[look.headingFont];
+  }
+  return vars;
 }

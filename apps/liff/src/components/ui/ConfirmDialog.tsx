@@ -126,7 +126,7 @@ export default function ConfirmDialog({
               <Icon name="alert-triangle" className="h-5 w-5" />
             </span>
           ) : null}
-          <p className="min-w-0 flex-1 text-sm font-bold leading-6 text-[var(--liff-look-ink)] [word-break:auto-phrase]">
+          <p className="min-w-0 flex-1 text-sm font-bold leading-6 text-ink [word-break:auto-phrase]">
             {title}
           </p>
         </div>

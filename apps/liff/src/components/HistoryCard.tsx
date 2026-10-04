@@ -13,14 +13,14 @@ export default function HistoryCard({ booking }: { booking: BookingHistoryItem }
   return (
     <li>
       <Card className="flex items-center gap-3 p-3.5">
-        <div className="flex w-14 shrink-0 flex-col items-center rounded-[var(--liff-look-radius)] bg-[var(--liff-look-off-bg)] py-1.5">
-          <span className="text-xs font-semibold whitespace-nowrap text-[var(--liff-look-ink)]">
+        <div className="flex w-14 shrink-0 flex-col items-center rounded-(--liff-radius) bg-liff-off-bg py-1.5">
+          <span className="text-xs font-semibold whitespace-nowrap text-ink">
             {utcToJstMd(booking.starts_at)}
           </span>
-          <span className="text-[11px] text-[var(--liff-look-sub)]">{utcToJstHm(booking.starts_at)}</span>
+          <span className="text-[11px] text-liff-sub">{utcToJstHm(booking.starts_at)}</span>
         </div>
         <div className="min-w-0 flex-1 space-y-[3px]">
-          <div className="truncate text-sm font-bold text-[var(--liff-look-ink)]" title={booking.menu_name}>
+          <div className="truncate text-sm font-bold text-ink" title={booking.menu_name}>
             {booking.menu_name}
           </div>
           <Badge tone={meta.tone}>{meta.label}</Badge>

@@ -26,10 +26,10 @@ export default function LoadingView({ label = LOADING_LABEL }: { label?: string 
       data-design-node="AcTHQ"
     >
       <div className="space-y-3.5" aria-hidden="true">
-        <div className="liff-shimmer-bone h-6 w-1/2 rounded-md bg-[var(--liff-look-chip)]" />
-        <div className="liff-shimmer-bone h-3.5 w-4/5 rounded-md bg-[var(--liff-look-chip)]" />
+        <div className="liff-shimmer-bone h-6 w-1/2 rounded-md bg-liff-chip" />
+        <div className="liff-shimmer-bone h-3.5 w-4/5 rounded-md bg-liff-chip" />
         {[0, 1, 2].map((i) => (
-          <div key={i} className="liff-shimmer-bone h-[84px] rounded-[14px] bg-[var(--liff-look-off-bg)]" />
+          <div key={i} className="liff-shimmer-bone h-[84px] rounded-[14px] bg-liff-off-bg" />
         ))}
       </div>
     </div>

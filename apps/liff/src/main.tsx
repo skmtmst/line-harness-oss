@@ -3,13 +3,10 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.js';
 import { initLiff } from './lib/liff-auth.js';
-import { applyLiffLook } from './lib/liff-look.js';
 import './index.css';
 
 (async () => {
   try {
-    // 見た目の型の受け口を文書全体に置く（中身は今の見た目と同じ）。
-    applyLiffLook();
     await initLiff();
     createRoot(document.getElementById('root')!).render(
       <StrictMode>

@@ -17,12 +17,7 @@ export default function PageHeader({ title, onBack }: { title: string; onBack?: 
           <Icon name="chevron-left" className="h-6 w-6" />
         </button>
       )}
-      <h1
-        className="text-base font-bold text-[var(--liff-look-ink)]"
-        style={{ fontFamily: 'var(--liff-look-font-heading)' }}
-      >
-        {title}
-      </h1>
+      <h1 className="text-base font-bold text-ink">{title}</h1>
     </div>
   );
 }

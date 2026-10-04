@@ -12,16 +12,12 @@ export default function Stepper({ steps, current }: { steps: string[]; current: 
         return (
           <li key={label} className="min-w-0 flex-1">
             <span
-              className={`block h-[3px] rounded-full ${done || now ? 'bg-[var(--liff-look-main)]' : 'bg-[var(--liff-look-line)]'}`}
+              className={`block h-[3px] rounded-full ${done || now ? 'bg-liff-primary' : 'bg-liff-line'}`}
               aria-hidden="true"
             />
             <span
               className={`mt-1 block truncate text-[10px] whitespace-nowrap ${
-                now
-                  ? 'font-bold text-[var(--liff-look-ink)]'
-                  : done
-                    ? 'font-medium text-[var(--liff-look-sub)]'
-                    : 'font-medium text-[var(--liff-look-idle)]'
+                now ? 'font-bold text-ink' : done ? 'font-medium text-liff-sub' : 'font-medium text-liff-idle'
               }`}
               aria-current={now ? 'step' : undefined}
             >

@@ -11,10 +11,10 @@ export default function Badge({
 }) {
   const cls =
     tone === 'confirmed'
-      ? 'bg-[var(--liff-look-ok-bg)] text-[var(--liff-look-ok-ink)]'
+      ? 'bg-liff-ok-bg text-liff-ok-ink'
       : tone === 'pending'
-        ? 'bg-[var(--liff-look-wait-bg)] text-[var(--liff-look-wait-ink)]'
-        : 'bg-[var(--liff-look-chip)] text-[var(--liff-look-sub)]';
+        ? 'bg-liff-wait-bg text-liff-wait-ink'
+        : 'bg-liff-chip text-liff-sub';
   return (
     <span
       className={`inline-block h-fit w-fit shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold whitespace-nowrap ${cls}`}

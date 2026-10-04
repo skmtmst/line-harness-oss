@@ -9,6 +9,7 @@ import Icon from '../components/ui/Icon.js';
 import Button from '../components/ui/Button.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 
 function nanoid(): string {
   return crypto.randomUUID();
@@ -149,7 +150,7 @@ export default function EventConfirm() {
 
   if (loadFailed || slotMissing || !event || !slot) {
     return (
-      <div className="min-h-screen bg-ground">
+      <LiffLookScope className="min-h-screen bg-ground">
         <LiffHeader title="申し込みの確認" />
         <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
           {loadFailed ? (
@@ -167,7 +168,7 @@ export default function EventConfirm() {
             <LoadingView />
           )}
         </div>
-      </div>
+      </LiffLookScope>
     );
   }
 
@@ -176,20 +177,11 @@ export default function EventConfirm() {
     : 'キャンセルは期限まで「自分のイベント」からできます（期限はイベントごとに違います）。';
 
   return (
-    <div
-      className="min-h-screen bg-ground"
-      data-design-node="EscPA"
-      style={{ fontFamily: 'var(--liff-look-font-body)' }}
-    >
+    <LiffLookScope className="min-h-screen bg-ground" designNode="EscPA">
       <LiffHeader title="申し込みの確認" />
       <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-28">
-        <h1
-          className="text-xl font-bold text-[var(--liff-look-ink)]"
-          style={{ fontFamily: 'var(--liff-look-font-heading)' }}
-        >
-          内容を確かめてください
-        </h1>
-        <dl className="divide-y divide-[var(--liff-look-divider)] rounded-[14px] bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-[var(--liff-look-line)]">
+        <h1 className="text-xl font-bold text-ink">内容を確かめてください</h1>
+        <dl className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
           <Row label="イベント" value={event.name} />
           <Row label="日時" value={formatJstEventAt(slot.starts_at)} />
           {event.venue_name && <Row label="場所" value={event.venue_name} />}
@@ -206,7 +198,7 @@ export default function EventConfirm() {
               const value = answers[q.id];
               return (
                 <div key={q.id}>
-                  <span className="mb-1 block text-sm text-[var(--liff-look-ink)]" id={`eq-label-${q.id}`}>
+                  <span className="mb-1 block text-sm text-ink" id={`eq-label-${q.id}`}>
                     {q.label}
                     {q.required ? (
                       <span className="ml-1 text-danger" aria-label="必須">*</span>
@@ -220,7 +212,7 @@ export default function EventConfirm() {
                       aria-labelledby={`eq-label-${q.id}`}
                       value={typeof value === 'string' ? value : ''}
                       onChange={(e) => setAnswers((cur) => ({ ...cur, [q.id]: e.target.value }))}
-                      className="w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-[var(--liff-look-ink)] focus-visible:outline-2 focus-visible:outline-ink"
+                      className="w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-ink"
                     />
                   )}
                   {q.type === 'textarea' && (
@@ -229,19 +221,19 @@ export default function EventConfirm() {
                       value={typeof value === 'string' ? value : ''}
                       onChange={(e) => setAnswers((cur) => ({ ...cur, [q.id]: e.target.value }))}
                       rows={3}
-                      className="w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-[var(--liff-look-ink)] focus-visible:outline-2 focus-visible:outline-ink"
+                      className="w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-ink"
                     />
                   )}
                   {q.type === 'radio' && (
                     <div className="space-y-1" role="radiogroup" aria-labelledby={`eq-label-${q.id}`}>
                       {(q.options ?? []).map((opt) => (
-                        <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-[var(--liff-look-ink)]">
+                        <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-ink">
                           <input
                             type="radio"
                             name={`eq-${q.id}`}
                             checked={value === opt}
                             onChange={() => setAnswers((cur) => ({ ...cur, [q.id]: opt }))}
-                            className="h-4 w-4 accent-[var(--liff-look-main)]"
+                            className="h-4 w-4 accent-liff-primary"
                           />
                           {opt}
                         </label>
@@ -254,7 +246,7 @@ export default function EventConfirm() {
                         const chosen = Array.isArray(value) ? value : [];
                         const checked = chosen.includes(opt);
                         return (
-                          <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-[var(--liff-look-ink)]">
+                          <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-ink">
                             <input
                               type="checkbox"
                               checked={checked}
@@ -264,7 +256,7 @@ export default function EventConfirm() {
                                   [q.id]: checked ? chosen.filter((x) => x !== opt) : [...chosen, opt],
                                 }))
                               }
-                              className="h-4 w-4 accent-[var(--liff-look-main)]"
+                              className="h-4 w-4 accent-liff-primary"
                             />
                             {opt}
                           </label>
@@ -279,8 +271,8 @@ export default function EventConfirm() {
         )}
 
         <label className="block">
-          <span className="text-sm font-bold text-[var(--liff-look-ink)]">
-            備考 <span className="text-[11px] font-normal text-[var(--liff-look-sub)]">任意</span>
+          <span className="text-sm font-bold text-ink">
+            備考 <span className="text-[11px] font-normal text-liff-sub">任意</span>
           </span>
           <textarea
             value={note}
@@ -288,7 +280,7 @@ export default function EventConfirm() {
             rows={4}
             maxLength={5000}
             placeholder="質問や伝えたいことがあれば..."
-            className="mt-1 min-h-24 w-full rounded-[var(--liff-look-radius)] border border-[var(--liff-look-line-strong)] bg-canvas px-3.5 py-3 text-sm text-[var(--liff-look-ink)] placeholder:text-[var(--liff-look-idle)] focus-visible:outline-2 focus-visible:outline-ink"
+            className="mt-1 min-h-24 w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3.5 py-3 text-sm text-ink placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
           />
         </label>
         <p className="text-right text-xs text-ink-faint">{note.length} / 5000</p>
@@ -306,20 +298,20 @@ export default function EventConfirm() {
         <button
           type="button"
           onClick={back}
-          className="self-center px-4 py-1 text-xs text-[var(--liff-look-sub)] focus-visible:outline-2 focus-visible:outline-ink"
+          className="self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
         >
           ←戻る
         </button>
       </BottomBar>
-    </div>
+    </LiffLookScope>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-2 py-2.5">
-      <dt className="w-18 shrink-0 text-xs text-[var(--liff-look-sub)]">{label}</dt>
-      <dd className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--liff-look-ink)]" title={value}>
+      <dt className="w-18 shrink-0 text-xs text-liff-sub">{label}</dt>
+      <dd className="min-w-0 flex-1 truncate text-sm font-semibold text-ink" title={value}>
         {value}
       </dd>
     </div>
