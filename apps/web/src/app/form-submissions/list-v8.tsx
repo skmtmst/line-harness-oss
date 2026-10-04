@@ -1410,7 +1410,11 @@ export default function FormSubmissionsListV8() {
   const showPager = !loading && !loadError && visibleForms.length > 0
 
   return (
-    <div data-design-node={narrow ? 'GrnO4' : 'I3L41O'} className={styles.board}>
+    <div
+      data-design-node={narrow ? 'GrnO4' : 'I3L41O'}
+      data-list-state={accountLoading || loading ? 'loading' : loadError ? 'error' : visibleForms.length === 0 ? 'empty' : 'ready'}
+      className={styles.board}
+    >
       {/* 見出し：画面名＋一行の説明。右に管理者確認の切り替え（i2ZAS）。 */}
       <div className={styles.head}>
         <div className={styles.headText}>
