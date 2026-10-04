@@ -84,12 +84,11 @@ test('一覧口の403は1枚の案内になり読み直しの口が残る', asyn
   await act(async () => root.render(<ScenariosPage />))
   await settle()
   await eventually(() => {
-    expect(host.textContent).toContain('表示できませんでした')
+    expect(host.textContent).toContain('シナリオを読み込めませんでした')
   })
-  expect(host.textContent).toContain('登録したシナリオは消えていません')
   expect(host.textContent).not.toContain('API error')
   const retry = [...host.querySelectorAll('button')]
-    .find((item) => item.textContent?.trim() === '読み直す')
+    .find((item) => item.textContent?.trim() === 'もう一度試す')
   expect(retry).toBeTruthy()
 })
 
@@ -103,9 +102,9 @@ test('一覧口の429は1枚の案内になり読み直しの口が残る', asyn
   await act(async () => root.render(<ScenariosPage />))
   await settle()
   await eventually(() => {
-    expect(host.textContent).toContain('表示できませんでした')
+    expect(host.textContent).toContain('シナリオを読み込めませんでした')
   })
   const retry = [...host.querySelectorAll('button')]
-    .find((item) => item.textContent?.trim() === '読み直す')
+    .find((item) => item.textContent?.trim() === 'もう一度試す')
   expect(retry).toBeTruthy()
 })

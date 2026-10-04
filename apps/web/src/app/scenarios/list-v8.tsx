@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation'
 import {
   AlertCircle,
   Copy,
+  Eye,
   Folder as FolderIcon,
   ListVideo,
   MoreHorizontal,
@@ -638,33 +639,31 @@ export default function ScenariosListV8() {
         ))}
       </div>
     ) : scenarioList.error ? (
-      <div className={styles.stateCard}>
-        <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
-          <AlertCircle size={18} aria-hidden="true" />
-        </span>
-        <p className={styles.stateTitle}>表示できませんでした</p>
-        <p className={styles.stateDesc}>
-          登録したシナリオは消えていません。再読み込みしても直らないときは、エラー報告へお知らせください。
-        </p>
-        <Button type="button" onClick={() => void loadScenarios()}>読み直す</Button>
-      </div>
+      /* 板 `BxGhV`「読み込めなかった」：表の場所に出る細い帯。数の帯は「—」のまま。 */
+      <p className={styles.errorBand} role="alert" data-design-node="BxGhV">
+        <AlertCircle size={14} aria-hidden="true" />
+        シナリオを読み込めませんでした
+        <button type="button" onClick={() => void loadScenarios()}>もう一度試す</button>
+      </p>
     ) : scenarios.length === 0 ? (
       scenarioFilterActive ? (
-        <div className={styles.stateCard}>
+        /* 板 `BxGhV`「絞り込みで0件」。 */
+        <div className={styles.stateCard} data-design-node="BxGhV">
           <span className={styles.stateIcon}>
             <SearchIcon size={18} aria-hidden="true" />
           </span>
-          <p className={styles.stateTitle}>条件に合うシナリオがありません</p>
-          <p className={styles.stateDesc}>検索・絞り込み・フォルダの条件を変えるか、条件を外してください。</p>
-          <Button type="button" variant="secondary" onClick={clearScenarioFilters}>条件をクリア</Button>
+          <p className={styles.stateTitle}>条件に合うシナリオはありません</p>
+          <p className={styles.stateDesc}>「停止中のみ」「今月作った」や検索を外すと、すべて出ます</p>
+          <Button type="button" variant="secondary" onClick={clearScenarioFilters}>条件を外す</Button>
         </div>
       ) : (
-        <div className={styles.stateCard}>
+        /* 板 `BxGhV`「まだシナリオが無い」。 */
+        <div className={styles.stateCard} data-design-node="BxGhV">
           <span className={styles.stateIcon}>
             <ListVideo size={18} aria-hidden="true" />
           </span>
-          <p className={styles.stateTitle}>まだシナリオがありません</p>
-          <p className={styles.stateDesc}>1つ作ると、順番に届く配信をここで管理できます。</p>
+          <p className={styles.stateTitle}>まだシナリオはありません</p>
+          <p className={styles.stateDesc}>友だち追加のあと7日間の案内などを、自動で順に送れます</p>
           {canEdit ? (
             <Button type="button" variant="primary" onClick={handleCreate}>＋ シナリオを作る</Button>
           ) : null}
@@ -876,7 +875,7 @@ export default function ScenariosListV8() {
     )
 
   return (
-    <div className={styles.board} data-design-node="axFrW">
+    <div className={styles.board} data-design-node={canEdit ? 'axFrW' : 'X0QrW0'}>
       <div data-design="Head">
         <div className={styles.head}>
           <div className={styles.headText}>
@@ -887,6 +886,14 @@ export default function ScenariosListV8() {
           </div>
         </div>
       </div>
+
+      {/* 板 `X0QrW0`：閲覧のみの帯。変えられないときだけ頭のすぐ下に出す。 */}
+      {canEdit ? null : (
+        <div className={styles.roBand} role="status">
+          <Eye size={16} aria-hidden="true" />
+          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+        </div>
+      )}
 
       {/* 一覧の上の案内の帯（板 `axFrW`：作っただけでは送れない＋始め方への口）。 */}
       <p className={styles.noteBand}>
