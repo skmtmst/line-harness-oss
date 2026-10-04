@@ -241,17 +241,21 @@ function formFromSettings(s: AutoReplyDraftInput): WizardForm {
   }
 }
 
-/** 手順1「ひな形から作る」。選ぶと名前と条件の下書きまで入る。 */
+/**
+ * 手順1「ひな形から作る」。選ぶと名前と条件の下書きまで入る。
+ * `lines` は札に並べる中身の説明で、`apply` が実際に入れる内容と一致させる
+ * （入れない後の処理は書かない）。
+ */
 const STARTER_TEMPLATES: Array<{
   key: string
   name: string
-  description: string
+  lines: string[]
   apply: (form: WizardForm) => WizardForm
 }> = [
   {
     key: 'off-hours',
     name: '営業時間外の自動返信',
-    description: '毎日21:00〜09:00に受信したメッセージへ、テキストで返します。',
+    lines: ['毎日21:00〜09:00に受信', 'テキストで返す'],
     apply: (form) => ({
       ...form,
       ruleName: '営業時間外の自動返信',
@@ -266,7 +270,7 @@ const STARTER_TEMPLATES: Array<{
   {
     key: 'booking-change',
     name: '予約変更の受付',
-    description: '「予約変更」「日程変更」を含むメッセージへ、テンプレートで返します。',
+    lines: ['「予約変更」「日程変更」を含む', 'テンプレートで返す'],
     apply: (form) => ({
       ...form,
       ruleName: '予約変更の受付',
@@ -282,7 +286,7 @@ const STARTER_TEMPLATES: Array<{
   {
     key: 'faq',
     name: 'よくある質問への回答',
-    description: '「営業時間」「場所」「料金」を含むメッセージへ、テンプレートで返します。',
+    lines: ['「営業時間」「場所」「料金」を含む', 'テンプレートで返す'],
     apply: (form) => ({
       ...form,
       ruleName: 'よくある質問への回答',
@@ -297,6 +301,21 @@ const STARTER_TEMPLATES: Array<{
     }),
   },
 ]
+
+/**
+ * 曜日のまとめ（`A0pDt`：つながりは「月〜金に反応」、ばらばらは「月・水・金に反応」）。
+ * 日曜はじまりの番号のまま見る。土日（[0, 6]）はつながりにせず並べる。
+ */
+function weekdaySummary(days: number[]): string {
+  const sorted = days.slice().sort((a, b) => a - b)
+  if (sorted.length === 0 || sorted.length === 7) return '毎日反応する'
+  const consecutive = sorted.length > 1
+    && sorted.every((day, index) => index === 0 || day === sorted[index - 1] + 1)
+  if (consecutive) {
+    return `${WEEKDAY_LABELS[sorted[0]]}〜${WEEKDAY_LABELS[sorted[sorted.length - 1]]}に反応`
+  }
+  return `${sorted.map((day) => WEEKDAY_LABELS[day]).join('・')}に反応`
+}
 
 /** 差し込みに使える札。本文の末尾へトークンを足す。 */
 const INSERT_CHIPS = [
@@ -1116,32 +1135,35 @@ function AutoReplyWizardV8Inner() {
             <>
               <section className={styles.card}>
                 <h2 className={styles.cardTitle}>名前とフォルダ</h2>
-                <div className={styles.field}>
-                  <label htmlFor="wiz-name" className={styles.label}>
-                    ルール名
-                  </label>
-                  <input
-                    id="wiz-name"
-                    className={styles.input}
-                    value={form.ruleName}
-                    onChange={(e) => patch({ ruleName: e.target.value })}
-                    placeholder="例：予約の日程変更"
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label htmlFor="wiz-folder" className={styles.label}>
-                    フォルダ
-                  </label>
-                  <Select
-                    id="wiz-folder"
-                    aria-label="フォルダ"
-                    value={form.folderId}
-                    onChange={(value) => patch({ folderId: value })}
-                    options={[
-                      { value: '', label: '分けない' },
-                      ...folders.map((f) => ({ value: f.id, label: f.name })),
-                    ]}
-                  />
+                <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
+                <div className={styles.fieldPair}>
+                  <div className={styles.field}>
+                    <label htmlFor="wiz-name" className={styles.label}>
+                      ルール名
+                    </label>
+                    <input
+                      id="wiz-name"
+                      className={styles.input}
+                      value={form.ruleName}
+                      onChange={(e) => patch({ ruleName: e.target.value })}
+                      placeholder="例：予約の日程変更"
+                    />
+                  </div>
+                  <div className={styles.field}>
+                    <label htmlFor="wiz-folder" className={styles.label}>
+                      フォルダ
+                    </label>
+                    <Select
+                      id="wiz-folder"
+                      aria-label="フォルダ"
+                      value={form.folderId}
+                      onChange={(value) => patch({ folderId: value })}
+                      options={[
+                        { value: '', label: '分けない' },
+                        ...folders.map((f) => ({ value: f.id, label: f.name })),
+                      ]}
+                    />
+                  </div>
                 </div>
                 <div className={styles.field}>
                   <label htmlFor="wiz-memo" className={styles.label}>
@@ -1163,11 +1185,14 @@ function AutoReplyWizardV8Inner() {
 
               <section className={styles.card}>
                 <h2 className={styles.cardTitle}>ひな形から作る（任意）</h2>
+                <p className={styles.cardNote}>選ぶと、条件と返信がまとめて入ります。あとから全部変えられます。</p>
                 <div className={styles.tplGrid}>
                   {STARTER_TEMPLATES.map((tpl) => (
                     <div key={tpl.key} className={styles.tplCard}>
                       <p className={styles.tplName}>{tpl.name}</p>
-                      <p className={styles.tplDesc}>{tpl.description}</p>
+                      {tpl.lines.map((line) => (
+                        <p key={line} className={styles.tplDesc}>{line}</p>
+                      ))}
                       <Button
                         type="button"
                         onClick={() => {
@@ -1198,7 +1223,7 @@ function AutoReplyWizardV8Inner() {
                     checked={!form.respondToAll}
                     onChange={() => patch({ respondToAll: false })}
                     title="言葉で反応する"
-                    note="決めた言葉が入っていたら返します"
+                    note="決めた言葉が入っていたら返す"
                   />
                   <RadioCard
                     name="trigger-kind"
@@ -1206,7 +1231,7 @@ function AutoReplyWizardV8Inner() {
                     checked={form.respondToAll}
                     onChange={() => patch({ respondToAll: true })}
                     title="すべてのメッセージ"
-                    note="届いたものすべてに返します"
+                    note="届いたものすべてに返す"
                   />
                 </RadioCardGroup>
 
@@ -1412,13 +1437,7 @@ function AutoReplyWizardV8Inner() {
                       </button>
                     ))}
                     <span className={styles.weekdayNow}>
-                      {form.weekdays.length === 0 || form.weekdays.length === 7
-                        ? 'いまは毎日反応します'
-                        : `いまは${form.weekdays
-                            .slice()
-                            .sort((a, b) => a - b)
-                            .map((d) => WEEKDAY_LABELS[d])
-                            .join('・')}曜に反応します`}
+                      {weekdaySummary(form.weekdays)}
                     </span>
                   </div>
                   {weekdayNotice ? <p className={styles.hint}>{weekdayNotice}</p> : null}
@@ -1451,7 +1470,16 @@ function AutoReplyWizardV8Inner() {
                     <button
                       type="button"
                       className={styles.segBtn}
-                      aria-pressed={form.timeMode === 'custom'}
+                      aria-pressed={form.timeMode === 'custom' && form.activeFrom === '21:00' && form.activeUntil === '09:00'}
+                      onClick={() => patch({ timeMode: 'custom', activeFrom: '21:00', activeUntil: '09:00' })}
+                      title="夜21時から朝9時まで。時刻はあとから変えられます"
+                    >
+                      営業時間外だけ
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.segBtn}
+                      aria-pressed={form.timeMode === 'custom' && !(form.activeFrom === '21:00' && form.activeUntil === '09:00')}
                       onClick={() => patch({ timeMode: 'custom', activeFrom: form.activeFrom || '09:00', activeUntil: form.activeUntil || '18:00' })}
                     >
                       時刻を決める
@@ -1484,7 +1512,7 @@ function AutoReplyWizardV8Inner() {
                     checked={form.friendTarget === 'all'}
                     onChange={() => patch({ friendTarget: 'all' })}
                     title="すべての友だち"
-                    note="届いた人みんなに返します"
+                    note="届いた人みんなに返す"
                   />
                   <RadioCard
                     name="friend-target"
@@ -1492,7 +1520,7 @@ function AutoReplyWizardV8Inner() {
                     checked={form.friendTarget === 'filtered'}
                     onChange={() => patch({ friendTarget: 'filtered' })}
                     title="条件に合う友だち"
-                    note="タグ・友だち情報・予約などで絞ります"
+                    note="タグ・友だち情報・予約などで絞る"
                   />
                 </RadioCardGroup>
                 {form.friendTarget === 'filtered' ? (
@@ -1519,7 +1547,7 @@ function AutoReplyWizardV8Inner() {
                       ['template', 'テンプレートから'],
                       ['inline-flex', 'カード'],
                       ['inline-image', '画像'],
-                      ['silent', '返信しない（後処理だけ）'],
+                      ['silent', '返信しない（後の処理だけ）'],
                     ] as Array<[ResponseMode, string]>
                   ).map(([value, label]) => (
                     <button
@@ -1632,6 +1660,7 @@ function AutoReplyWizardV8Inner() {
 
               <section className={styles.card}>
                 <h2 className={styles.cardTitle}>返したあとに行うこと</h2>
+                <p className={styles.cardNote}>上から順に動きます。失敗したときの動きも決められます。</p>
                 <InlineActionList
                   actions={form.actions}
                   onChange={(next) => patch({ actions: next })}
@@ -1954,7 +1983,7 @@ function AutoReplyWizardV8Inner() {
                   </SummaryRow>
                   <SummaryRow label="返すもの" onEdit={() => goToStep('response')}>
                     {form.mode === 'silent'
-                      ? '返信しない（後処理だけ）'
+                      ? '返信しない（後の処理だけ）'
                       : form.mode === 'template'
                         ? selectedTemplate
                           ? `テンプレート「${selectedTemplate.name}」`
@@ -2056,9 +2085,9 @@ function AutoReplyWizardV8Inner() {
           {step === 'trigger' && (
             <>
               <section className={styles.card}>
-                <h2 className={styles.cardTitle}>保存したあとに</h2>
+                <h2 className={styles.cardTitle}>保存したあとに、過去28日で当たった数が出ます</h2>
                 <p className={styles.hint}>
-                  過去28日で当たった数がここに出ます。いまの作りでは、保存する前の条件は数えられません。
+                  いまの作りでは、保存する前の条件は数えられません。保存すると、このルールが動いた回数がここに出ます。
                 </p>
                 <dl className={styles.kvList}>
                   <div className={styles.kvRow}>
@@ -2129,6 +2158,7 @@ function AutoReplyWizardV8Inner() {
             <>
               <section className={styles.card}>
                 <h2 className={styles.cardTitle}>重なりを1件ずつ確かめる</h2>
+                <p className={styles.cardNote}>すべてにチェックを付けるまで、⑤で有効にできません。</p>
                 {conflicts.length === 0 ? (
                   <p className={styles.hint}>同時に当たるルールはありません。</p>
                 ) : (
@@ -2163,6 +2193,12 @@ function AutoReplyWizardV8Inner() {
                   <div className={styles.kvRow}>
                     <dt className={styles.kvKey}>同時に当たるルール</dt>
                     <dd className={styles.kvVal}>{conflicts.length > 0 ? `${conflicts.length}つ` : 'なし'}</dd>
+                  </div>
+                  <div className={styles.kvRow}>
+                    <dt className={styles.kvKey}>当たる受信（過去28日）</dt>
+                    <dd className={styles.kvVal}>
+                      {matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件`}
+                    </dd>
                   </div>
                   <div className={styles.kvRow}>
                     <dt className={styles.kvKey}>試した結果</dt>
