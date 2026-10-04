@@ -355,3 +355,6 @@
 [data-theme='v8'] .content { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 [data-theme='v8'] .content > * { flex-shrink: 0; }
 [data-theme='v8'] .designButton[data-dialog-action='primary'] { box-shadow: var(--v8-parts-primary-shadow); }
+
+/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+[data-theme='v8'] .panel { -webkit-font-smoothing: auto; }
