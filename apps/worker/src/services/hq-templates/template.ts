@@ -1,3 +1,4 @@
+import { parseHqMessageCard, composeHqMessageCard, type HqMessageCard } from '@line-crm/shared';
 import type { HqTemplateBinding, HqTemplateStatement } from '@line-crm/db';
 import {
   VERSION_CONFLICT_MESSAGE,
@@ -39,6 +40,7 @@ export type MessageTemplateMediaDefinition = Readonly<{
 }>;
 
 export type MessageTemplateDefinition = Readonly<{
+  card?: HqMessageCard;
   schemaVersion: 1;
   template: Readonly<{
     id: string;
@@ -123,6 +125,8 @@ export type MessageTemplatePreflightItem = Readonly<{
 }>;
 
 export interface MessageTemplateAdapterDependencies {
+  /** Trusted runtime resolutions of card references, checked against the preflight snapshot. */
+  cardTargets?: Readonly<Record<string, string>>;
   /** Must resolve by tenant + source account + immutable version id in one authoritative DB lookup. */
   resolveSourceVersion(input: Readonly<{
     authority: MessageTemplateSourceAuthority;
@@ -256,7 +260,7 @@ export async function readMessageTemplateSourceBytes(
 /** The version payload stored in hq_template_versions.definition_json. */
 export function parseMessageTemplateDefinition(value: unknown): MessageTemplateDefinition {
   const root = object(value);
-  const template = object(root.template);
+  const template = { ...object(root.template) };
   if (root.schemaVersion !== 1 || !Array.isArray(root.media) || root.media.length > 50) {
     throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
   }
@@ -304,7 +308,16 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
     || new Set(media.map((item) => item.r2Key)).size !== media.length) {
     throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
   }
+  let card: HqMessageCard | undefined;
+  if (root.card !== undefined) {
+    try { card = parseHqMessageCard(root.card); }
+    catch { throw new TemplateHqTemplateError('INVALID_DEFINITION', 422); }
+    const image = card.imageMediaId ? media.find(item => item.id === card!.imageMediaId) : undefined;
+    if (card.imageMediaId && (!image || image.kind !== 'image' || !image.publicUrl)) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+    Object.assign(template, composeHqMessageCard(card, requiredText(template.id, 100), image?.publicUrl ?? undefined));
+  }
   const parsed: MessageTemplateDefinition = {
+    ...(card?{card}:{}),
     schemaVersion: 1,
     template: {
       id: requiredText(template.id, 100),
@@ -756,7 +769,12 @@ export async function planMessageTemplateDistribution(input: {
   const rootResolution = requireResolution(rootItem, context.resolutions);
   const targetTemplateId = idMap[rootItem.sourceId]!;
   const rootName = resolved[0]?.aliasName ?? definition.template.name;
-  const template = definition.template;
+  let template = definition.template;
+  if (definition.card) {
+    for (const button of definition.card.buttons) if (['form', 'scenario'].includes(button.action) && !dependencies.cardTargets?.[`${button.action}:${button.value}`]) throw new TemplateHqTemplateError('REFERENCE_UNAVAILABLE', 422);
+    const image = definition.media.find(item => item.id === definition.card!.imageMediaId);
+    template = { ...template, ...composeHqMessageCard(definition.card, targetTemplateId, image?.publicUrl ?? undefined, dependencies.cardTargets) };
+  }
   const messageContent = replaceExactLocators(template.messageContent, replacements)!;
   const carouselActionsJson = replaceExactLocators(template.carouselActionsJson, replacements);
   const carouselTapLimitText = replaceExactLocators(template.carouselTapLimitText, replacements);

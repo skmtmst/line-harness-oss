@@ -9105,16 +9105,19 @@ export const api = {
         }),
     },
     images: {
-      list: (params?: { projectId?: string; favorite?: boolean; preset?: string; q?: string; before?: string; limit?: number }) => {
+      list: (params?: import("@line-crm/shared").HqBannerImageQuery) => {
         const q = new URLSearchParams()
         if (params?.projectId) q.set('projectId', params.projectId)
         if (params?.favorite) q.set('favorite', '1')
+        if (params?.delivered !== undefined) q.set('delivered', params.delivered ? '1' : '0')
+        if (params?.shape) q.set('shape', params.shape)
+        if (params?.withCounts) q.set('withCounts', '1')
         if (params?.preset) q.set('preset', params.preset)
         if (params?.q) q.set('q', params.q)
         if (params?.before) q.set('before', params.before)
         if (params?.limit) q.set('limit', String(params.limit))
         const query = q.toString()
-        return fetchApi<ApiResponse<BannerImage[]> & { nextBefore?: string | null }>(
+        return fetchApi<ApiResponse<BannerImage[]> & { nextBefore?: string | null; counts?: import("@line-crm/shared").HqBannerImageCounts }>(
           `/api/hq/banners/images${query ? `?${query}` : ''}`,
         )
       },
@@ -9373,10 +9376,10 @@ export const api = {
       ),
 
     list: () => fetchApi<ApiResponse<LineAccountTag[]>>('/api/line-account-tags'),
-    create: (name: string) =>
+    create: (input: string | import('@line-crm/shared').LineAccountTagInput) =>
       fetchApi<ApiResponse<LineAccountTag>>('/api/line-account-tags', {
         method: 'POST',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify(typeof input === 'string' ? { name: input } : input),
       }),
     remove: (id: string) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: 'DELETE' }),
@@ -9385,6 +9388,7 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ tagIds }),
       }),
+    update: (id: string, input: Partial<import("@line-crm/shared").LineAccountTagInput>) => fetchApi<ApiResponse<import("@line-crm/shared").LineAccountTagSummary>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
   },
   lineAccounts: {
     list: (live = false) =>
@@ -9416,22 +9420,10 @@ export const api = {
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
       }),
-    connectCheck: (data: {
-      name?: string
-      channelId: string
-      channelSecret: string
-      loginChannelId: string
-      loginChannelSecret: string
-    }) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect/check', {
+    connectCheck: (data: import('@line-crm/shared').LineAccountConnectInput) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect/check', {
       method: 'POST', body: JSON.stringify(data),
     }),
-    connect: (data: {
-      name?: string
-      channelId: string
-      channelSecret: string
-      loginChannelId: string
-      loginChannelSecret: string
-    }, stepUpToken?: string) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
+    connect: (data: import('@line-crm/shared').LineAccountConnectInput, stepUpToken?: string) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
       method: 'POST',
       headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
       body: JSON.stringify(data),

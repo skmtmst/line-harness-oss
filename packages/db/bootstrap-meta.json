@@ -507,7 +507,10 @@
     "564_form_versions_purge_delete.sql",
     "567_restaurant_reservation_holds.sql",
     "568_restaurant_inventory_occupancy.sql",
-    "569_restaurant_booking_policy.sql"
+    "569_restaurant_booking_policy.sql",
+    "570_hq_template_folders.sql",
+    "571_hq_scenario_templates.sql",
+    "572_hq_template_text_overrides.sql"
   ],
-  "migrationCount": 508
+  "migrationCount": 511
 }

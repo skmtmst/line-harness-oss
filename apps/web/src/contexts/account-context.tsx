@@ -7,6 +7,7 @@ import { loadLineAccounts } from '@/lib/line-accounts-cache'
 const STORAGE_KEY = 'lh_selected_account'
 
 export interface AccountWithStats {
+  tags?: import("@line-crm/shared").LineAccountTagSummary[]
   id: string
   revision?: number
   channelId: string

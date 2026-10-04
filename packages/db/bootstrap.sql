@@ -3310,6 +3310,17 @@ CREATE TABLE hq_template_distribution_runs (
     REFERENCES hq_template_versions(id, template_id, tenant_id)
 );
 
+CREATE TABLE hq_template_folders (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+  revision INTEGER NOT NULL DEFAULT 1,
+  archived_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  UNIQUE(id, tenant_id)
+);
+
 CREATE TABLE hq_template_owned_r2_keys (
   run_id TEXT NOT NULL,
   tenant_id TEXT NOT NULL,
@@ -3364,7 +3375,8 @@ CREATE TABLE hq_template_preflights (
   status TEXT NOT NULL CHECK (status IN ('ready', 'blocked', 'expired', 'consumed')),
   created_by TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  expires_at TEXT,
+  expires_at TEXT, text_override TEXT
+  CHECK (text_override IS NULL OR length(trim(text_override)) BETWEEN 1 AND 5000),
   PRIMARY KEY (id, tenant_id),
   UNIQUE (tenant_id, target_account_id, idempotency_fingerprint),
   UNIQUE (
@@ -3404,7 +3416,7 @@ CREATE TABLE hq_templates (
   created_by TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  archived_at TEXT,
+  archived_at TEXT, folder_id TEXT, extended_type TEXT CHECK (extended_type IS NULL OR extended_type='scenario'),
   PRIMARY KEY (id, tenant_id),
   FOREIGN KEY (current_version_id, id, tenant_id)
     REFERENCES hq_template_versions(id, template_id, tenant_id)
@@ -8401,6 +8413,8 @@ CREATE INDEX idx_handover_decisions_handover
 
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
 
+CREATE UNIQUE INDEX idx_hq_folder_name ON hq_template_folders(tenant_id, name) WHERE archived_at IS NULL;
+
 CREATE INDEX idx_hq_support_messages_request
   ON hq_support_messages(request_id, created_at);
 
@@ -8430,6 +8444,8 @@ CREATE INDEX idx_hq_template_runs_template
 
 CREATE INDEX idx_hq_template_versions_template
   ON hq_template_versions(tenant_id, template_id, version DESC);
+
+CREATE INDEX idx_hq_templates_folder ON hq_templates(tenant_id, folder_id, archived_at);
 
 CREATE INDEX idx_hq_templates_tenant_type
   ON hq_templates(tenant_id, template_type, archived_at, updated_at);
@@ -9537,6 +9553,22 @@ WHEN NEW.id != OLD.id
   OR NEW.template_type != OLD.template_type
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_BINDING_IMMUTABLE'); END;
 
+CREATE TRIGGER hq_template_extended_type_insert BEFORE INSERT ON hq_templates
+WHEN NEW.extended_type IS NOT NULL AND NEW.template_type!='template'
+BEGIN SELECT RAISE(ABORT,'HQ_TYPE_INVALID'); END;
+
+CREATE TRIGGER hq_template_extended_type_update BEFORE UPDATE OF extended_type ON hq_templates
+WHEN NEW.extended_type IS NOT OLD.extended_type
+BEGIN SELECT RAISE(ABORT,'HQ_TYPE_IMMUTABLE'); END;
+
+CREATE TRIGGER hq_template_folder_insert BEFORE INSERT ON hq_templates
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_template_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND archived_at IS NULL)
+BEGIN SELECT RAISE(ABORT, 'HQ_FOLDER_SCOPE_INVALID'); END;
+
+CREATE TRIGGER hq_template_folder_update BEFORE UPDATE OF folder_id, tenant_id ON hq_templates
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_template_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND archived_at IS NULL)
+BEGIN SELECT RAISE(ABORT, 'HQ_FOLDER_SCOPE_INVALID'); END;
+
 CREATE TRIGGER hq_template_logical_archive_only
 BEFORE DELETE ON hq_templates
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_USE_LOGICAL_ARCHIVE'); END;
@@ -9622,6 +9654,10 @@ CREATE TRIGGER hq_template_run_terminal_guard
 BEFORE UPDATE OF status ON hq_template_distribution_runs
 WHEN OLD.status != 'running' AND NEW.status != OLD.status
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RUN_TERMINAL'); END;
+
+CREATE TRIGGER hq_template_text_override_immutable BEFORE UPDATE OF text_override ON hq_template_preflights
+WHEN NEW.text_override IS NOT OLD.text_override
+BEGIN SELECT RAISE(ABORT,'HQ_TEXT_OVERRIDE_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_version_binding_guard
 BEFORE UPDATE ON hq_template_versions

@@ -32,3 +32,4 @@ export * from "./form-list-summary";
 export * from "./google-sheets";
 
 export * from "./restaurant-booking";
+export * from "./hq-message-card";

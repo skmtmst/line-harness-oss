@@ -1091,7 +1091,17 @@ export interface User {
 // LINE アカウント (LineAccount) — マルチアカウント管理
 // -----------------------------------------------------------------------------
 
+export interface LineAccountTagSummary {
+  id: string; name: string; color: string | null; displayOrder?: number
+}
+
+export interface LineAccountTagInput {
+  name: string; color?: string | null; displayOrder?: number
+}
+
 export interface LineAccount {
+  /** 統括内での分類。友だちタグとは別。 */
+  tags?: LineAccountTagSummary[];
   /** 主キー (UUIDv4) */
   id: string;
   /** LINE Channel ID (Messaging API) */
@@ -2544,4 +2554,26 @@ export interface AutoReplyRunsResponse {
     limit: number;
     offset: number;
   };
+}
+
+export interface HqBannerImageQuery {
+  projectId?: string; favorite?: boolean; delivered?: boolean; preset?: string;
+  shape?: 'square' | 'landscape' | 'portrait' | 'rich_menu';
+  q?: string; before?: string; limit?: number; withCounts?: boolean;
+}
+export interface HqBannerImageCounts { all: number; favorite: number; delivered: number; unused: number }
+
+export interface HqTemplateFolder { id: string; name: string; revision: number }
+
+export interface HqScenarioDefinition {
+  schemaVersion: 1
+  scenario: { name: string; description: string | null }
+  steps: Array<{ id: string; delayMinutes: number; messageType: 'text' | 'flex'; messageContent: string }>
+}
+
+export interface HqTemplateTextOverride { accountId: string; text: string }
+
+export interface LineAccountConnectInput {
+ name?: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string
+ tagIds?: string[]; parentLineAccountId?: string | null; staffIds?: string[]; liffId?: string
 }
