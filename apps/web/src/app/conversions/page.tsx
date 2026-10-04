@@ -23,6 +23,9 @@ import ConditionBuilder from '@/components/shared/condition-builder'
 import KpiCard from '@/components/shared/kpi-card'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import styles from './list-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ConversionPointsV8 from './conversion-points-v8'
+import { ConversionDetailDialog, ConversionEditDialog, ConversionReversalDialog } from './_components/conversion-dialogs'
 
 /**
  * 数え方を運用者の言葉にする。既定（manual）も省略せずに出す。
@@ -322,7 +325,7 @@ const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> =
   'name': 'name_asc',
 }
 
-function ConversionsPageInner({ accountId }: { accountId: string | null }) {
+function ConversionsPageInner({ accountId, v8 }: { accountId: string | null; v8: boolean }) {
   /*
    * N-264: 作成画面が `?highlight=<作った行のID>` で戻ってくる。
    * 読み込んだ一覧の中でその行を見つけ、帯を出し・その頁へ移し・
@@ -407,7 +410,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    * N-270: 外部受信の操作状態。平文の鍵は発行の応答でだけ返るため、
    * 一度だけ表示して閉じると二度と見えない。
    */
-  const [ingestBusy, setIngestBusy] = useState('')
+  const [ingestBusy, setIngestBusy] = useState<'' | 'issue' | 'toggle'>('')
   const [issuedSecret, setIssuedSecret] = useState('')
   const [ingestError, setIngestError] = useState('')
   const [ingestEvents, setIngestEvents] = useState<ConversionIngestionEvent[]>([])
@@ -789,14 +792,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     }
   }
 
-  const openStop = async (target: ConversionDefinitionListItem) => {
+  const openStop = async (target: ConversionDefinitionListItem, action: 'stop' | 'replace' | 'delete' = 'stop') => {
     if (!canReverse) return
     setStopReason('')
     setDetailTarget(null)
     setStopTarget(target)
     setStopImpact(null)
     setStopError('')
-    setStopAction('stop')
+    setStopAction(action)
     setReplacementId('')
     setStopImpactLoading(true)
     try {
@@ -945,6 +948,118 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       ] : []),
     ] : []),
   ]
+
+  // 共用の窓への受け渡し（v7 の描画と V8 で同じものを使う）。
+  const detailDialogProps = {
+    detailTarget,
+    setDetailTarget,
+    publishing,
+    publishDraft: (target: ConversionDefinitionListItem) => void publishDraft(target),
+    openEdit,
+    openStop: (target: ConversionDefinitionListItem) => void openStop(target),
+    issueIngest: (target: ConversionDefinitionListItem) => void issueIngest(target),
+    toggleIngest: (target: ConversionDefinitionListItem) => void toggleIngest(target),
+    ingestBusy,
+    ingestError,
+    issuedSecret,
+    ingestEvents,
+    definitionEvents,
+    eventsFailed,
+    canReverse,
+    openReversal,
+  }
+  const reversalDialogProps = {
+    reversalTarget,
+    reversalKind,
+    reversalBusy,
+    reversalError,
+    reversalReason,
+    setReversalTarget,
+    setReversalReason,
+    submitReversal: () => void submitReversal(),
+  }
+  const editDialogProps = {
+    editTarget,
+    setEditTarget,
+    editForm,
+    setEditForm,
+    editValueModeNotice,
+    setEditValueModeNotice,
+    editSaving,
+    editError,
+    submitEdit: () => void submitEdit(),
+  }
+
+  // ★V8-B コンバージョンの一覧（`r6dJFy`）。止める窓は表の下の小窓で、
+  // 共用の止める窓（`ConversionStopDialog`）は V8 では開かない。
+  if (v8) {
+    return (
+      <>
+        <ConversionPointsV8
+          model={{
+            loading,
+            loadFailed,
+            points,
+            shown,
+            total: definitions?.pagination.total ?? null,
+            stateCounts: definitions?.stateCounts ?? null,
+            listTruncated,
+            query,
+            onQueryChange: (value) => {
+              setQuery(value)
+              setPage(1)
+            },
+            status,
+            onStatusChange: (value) => {
+              setStatus(value)
+              setPage(1)
+            },
+            onReload: () => void load(),
+            onExportCsv: () => void exportCsv(),
+            exporting,
+            exportError,
+            highlightedId: highlightId,
+            publishing,
+            onOpenDetail: (point) => setDetailTarget(point),
+            onOpenEdit: openEdit,
+            onOpenStop: (point, action) => void openStop(point, action),
+            onPublishDraft: (point) => void publishDraft(point),
+            stopTarget,
+            stopImpact,
+            stopImpactLoading,
+            stopAction,
+            onStopActionChange: setStopAction,
+            replacementId,
+            onReplacementIdChange: setReplacementId,
+            stopReason,
+            onStopReasonChange: setStopReason,
+            stopping,
+            stopError,
+            onConfirmStop: () => void runStop(),
+            onCancelStop: () => {
+              if (stopping) return
+              setStopTarget(null)
+              setStopImpact(null)
+              setStopError('')
+              setStopReason('')
+            },
+            detailDialog: detailDialogProps,
+            editDialog: editDialogProps,
+            reversalDialog: reversalDialogProps,
+            onIssueIngest: (point) => void issueIngest(point),
+            onToggleIngest: (point) => void toggleIngest(point),
+            ingestBusy,
+            ingestError,
+            issuedSecret,
+            onClearIssuedSecret: () => setIssuedSecret(''),
+          }}
+        />
+        <ConversionDetailDialog {...detailDialogProps} />
+        <ConversionReversalDialog {...reversalDialogProps} />
+        <ConversionEditDialog {...editDialogProps} />
+      </>
+    )
+  }
 
   return (
     <div data-conversion-points-design="v8" className={styles.root}>
@@ -1790,11 +1905,12 @@ function ConversionsPageHost() {
   const params = useSearchParams()
   const { selectedAccountId } = useAccount()
   const router = useRouter()
+  const theme = useAdminTheme()
   usePageTitle('コンバージョン')
   const target = AFFILIATE_TABS.has(tab) ? `/affiliates?${params.toString()}` : null
   useEffect(() => { if (target) router.replace(target) }, [target, router])
   if (target) return <ListState kind="loading" title="成果とアフィリエイトへ移動しています" />
-  return <div data-design-node="r6dJFy"><ConversionsPageInner accountId={selectedAccountId} /></div>
+  return <div data-design-node="r6dJFy"><ConversionsPageInner accountId={selectedAccountId} v8={theme === 'v8'} /></div>
 }
 
 export default function ConversionsPage() {

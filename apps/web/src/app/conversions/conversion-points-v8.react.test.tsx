@@ -35,6 +35,7 @@ vi.mock('@/lib/staff-role', async (importOriginal) => {
 let root: Root
 let host: HTMLDivElement
 let posted: string[] = []
+let stopBodies: unknown[] = []
 const response = (data: unknown, status = 200) => new Response(
   JSON.stringify(data),
   { status, headers: { 'Content-Type': 'application/json' } },
@@ -112,7 +113,7 @@ const reportPayload = {
   byDefinition: [], daily: [], byRoute: [],
 }
 
-function base(url: URL, init?: { method?: string }) {
+function base(url: URL, init?: RequestInit) {
   if (url.pathname === '/api/conversions/definitions') {
     return response({ success: true, data: listPayload })
   }
@@ -137,6 +138,7 @@ function base(url: URL, init?: { method?: string }) {
   }
   if (url.pathname === '/api/conversions/definitions/cv-buy/stop' && init?.method === 'POST') {
     posted.push(url.pathname)
+    stopBodies.push(JSON.parse(String(init.body)))
     return response({ success: true, data: { id: 'cv-buy', status: 'stopped', version: 4, stoppedAt: '2026-10-03T00:00:00+09:00' } })
   }
   return response({ success: false, error: 'not mocked', data: null })
@@ -166,10 +168,11 @@ function typeInto(input: HTMLInputElement, value: string) {
 beforeEach(() => {
   staffRole = 'admin'
   posted = []
+  stopBodies = []
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
-    return base(url, { method: init?.method })
+    return base(url, init)
   }))
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -235,6 +238,7 @@ test('v8 で行を選ぶと詳細の小窓が出て、止める小窓は理由�
   const confirmButton = [...stopPanel!.querySelectorAll('button')].find((button) =>
     button.textContent === '止める')
   expect(confirmButton?.hasAttribute('disabled')).toBe(true)
+  expect(posted).toEqual([])
   const reason = host.querySelector('input[aria-label="止める理由"]') as HTMLInputElement
   expect(reason).toBeTruthy()
   await act(async () => { typeInto(reason, '計測の仕方を変えるため') })
@@ -245,6 +249,7 @@ test('v8 で行を選ぶと詳細の小窓が出て、止める小窓は理由�
   await eventually(() => {
     expect(posted).toContain('/api/conversions/definitions/cv-buy/stop')
   })
+  expect(stopBodies).toEqual([expect.objectContaining({ reason: '計測の仕方を変えるため', expectedVersion: 3 })])
 })
 
 test('v8 の閲覧のみでは帯が出て作る操作が押せない形になる', async () => {
@@ -258,4 +263,6 @@ test('v8 の閲覧のみでは帯が出て作る操作が押せない形にな�
   expect(host.textContent).toContain('閲覧のみで見ています')
   const createButton = host.querySelector('button[disabled][title="この操作にはオーナーか管理者の権限が要ります"]')
   expect(createButton?.textContent).toContain('成果地点を作る')
+  await act(async () => { (createButton as HTMLButtonElement).click() })
+  expect(posted).toEqual([])
 })
