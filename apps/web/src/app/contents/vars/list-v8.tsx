@@ -40,6 +40,10 @@ import ListRange from '@/components/ui/list-range'
 import ListState from '@/components/shared/list-state'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import Pagination from '@/components/shared/pagination'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import InlineEdit from '@/components/shared/inline-edit'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import { RowActions } from '@/components/shared/row-actions'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -360,8 +364,15 @@ function CommonVarsListV8Inner() {
   const [statusReason, setStatusReason] = useState('')
   const [statusBusy, setStatusBusy] = useState(false)
   const [statusError, setStatusError] = useState('')
+  /* 右から出る詳細パネル（C①）。URL に今の行を残す。 */
+  const [activeId, setActiveId] = useDetailPanelUrl('row')
+  /* パネルを開いている1件の止める・再開は、窓ではなくパネルの中で聞く。 */
+  const [panelStatus, setPanelStatus] = useState(false)
+  /* 右クリックされた行（「…」と同じ項目を出す）。 */
+  const [contextId, setContextId] = useState<string | null>(null)
 
   const openStatusDialog = (item: CommonVar, action: 'stop' | 'resume') => {
+    setPanelStatus(item.id === activeId)
     setStatusTarget(item)
     setStatusAction(action)
     setStatusReason('')
@@ -394,6 +405,7 @@ function CommonVarsListV8Inner() {
         return
       }
       setStatusTarget(null)
+      setPanelStatus(false)
       setStatusReason('')
       await load()
     } catch (e) {
@@ -665,6 +677,78 @@ function CommonVarsListV8Inner() {
   const [deleteBatchError, setDeleteBatchError] = useState('')
   const batchRequestRef = useRef({ accountId: selectedAccountId, generation: 0 })
 
+  /* 行の「…」の中身。右クリック（D）でも同じものを出す。 */
+  const rowMenus = (item: CommonVar, stopped: boolean) => ({
+    items: [
+      {
+        id: 'edit',
+        label: '編集',
+        disabled: !canWrite,
+        disabledReason: canWrite ? undefined : '閲覧のみのため編集できません。',
+        onSelect: () => withViewTransition(() => router.push(`/contents/vars/edit?id=${item.id}`)),
+      },
+      stopped ? {
+        id: 'resume',
+        label: '再開する',
+        disabled: !canWrite,
+        disabledReason: canWrite ? undefined : '閲覧のみのため再開できません。',
+        onSelect: () => openStatusDialog(item, 'resume'),
+      } : {
+        id: 'stop',
+        label: '止める',
+        disabled: !canWrite,
+        disabledReason: canWrite ? undefined : '閲覧のみのため止められません。',
+        onSelect: () => openStatusDialog(item, 'stop'),
+      },
+    ],
+    destructiveItem: {
+      id: 'delete',
+      label: '削除する',
+      qaOpen: 'xxKtW',
+      disabled: !canWrite,
+      disabledReason: canWrite ? undefined : '閲覧のみのため削除できません。',
+      onSelect: () => void openDelete(item),
+    },
+  })
+
+  /* 右から出る詳細パネルの今の行（C①）。 */
+  const activeItem = activeId ? (items.find((v) => v.id === activeId) ?? null) : null
+  const activeIndex = activeItem ? current.findIndex((v) => v.id === activeItem.id) : -1
+  const activeStopped = (activeItem?.status ?? 'active') === 'stopped'
+
+  /* 名前のその場の書き換え（C②）。Enter で保存・Esc でやめる。 */
+  const renameVar = async (item: CommonVar, next: string) => {
+    const accountId = selectedAccountId
+    if (!accountId) return
+    const name = next.trim()
+    if (!name || name === item.name) return
+    const res = await api.commonVars.update(item.id, accountId, { name })
+    if (!res.success) throw new Error(res.error ?? 'rename_failed')
+    setItems((rows) => rows.map((v) => (v.id === item.id ? { ...v, name } : v)))
+  }
+
+  /* 右クリックは「…」と同じ項目（D）。消す操作は赤くする。 */
+  const contextItem = contextId ? (items.find((v) => v.id === contextId) ?? null) : null
+  const contextStopped = (contextItem?.status ?? 'active') === 'stopped'
+  const contextMenus = contextItem ? rowMenus(contextItem, contextStopped) : null
+  const contextMenuItems: ContextMenuItem[] = contextMenus
+    ? [
+      ...contextMenus.items.map((entry) => ({
+        id: entry.id,
+        label: entry.label,
+        disabled: entry.disabled,
+        onSelect: () => entry.onSelect(),
+      })),
+      {
+        id: contextMenus.destructiveItem.id,
+        label: contextMenus.destructiveItem.label,
+        danger: true,
+        disabled: contextMenus.destructiveItem.disabled,
+        onSelect: () => contextMenus.destructiveItem.onSelect(),
+      },
+    ]
+    : []
+
   const prepareRemoveSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
     if (selected.size > MAX_BATCH_DELETE_COUNT) {
@@ -929,7 +1013,7 @@ function CommonVarsListV8Inner() {
             </div>
           ) : null}
 
-          <div className={styles.split}>
+          <div className={activeItem ? `${styles.split} ${styles.splitWithPanel}` : styles.split}>
             <div className={styles.folderCol}>
               {createButton}
               <div>
@@ -1071,6 +1155,13 @@ function CommonVarsListV8Inner() {
                   />
                 </div>
               ) : (
+                <ContextMenu
+                  label={contextItem ? `共通情報「${contextItem.name}」の操作` : '共通情報の操作'}
+                  items={contextMenuItems}
+                  shouldOpen={(event) =>
+                    Boolean((event.target as HTMLElement | null)?.closest?.('tr[data-row-id]'))
+                  }
+                >
                 <div className={styles.tableWrap}>
                   <table className={styles.table}>
                     <thead>
@@ -1107,10 +1198,25 @@ function CommonVarsListV8Inner() {
                         const badge = stateBadge(item)
                         const valueText = formatVarValue(item.type, item.value)
                         const stopped = (item.status ?? 'active') === 'stopped'
+                        const menus = rowMenus(item, stopped)
                         return (
-                          <tr key={item.id}>
+                          <tr
+                            key={item.id}
+                            data-row-id={item.id}
+                            className={styles.rowClick}
+                            tabIndex={0}
+                            onClick={() => setActiveId(item.id)}
+                            onContextMenuCapture={() => setContextId(item.id)}
+                            onKeyDown={(event) => {
+                              if (event.target !== event.currentTarget) return
+                              if (event.key === 'Enter') {
+                                event.preventDefault()
+                                setActiveId(item.id)
+                              }
+                            }}
+                          >
                             {canWrite ? (
-                              <td className={styles.cellCheck}>
+                              <td className={styles.cellCheck} onClick={(event) => event.stopPropagation()}>
                                 <Checkbox
                                   checked={selected.has(item.id)}
                                   onCheckedChange={() => toggle(item.id)}
@@ -1118,7 +1224,7 @@ function CommonVarsListV8Inner() {
                                 />
                               </td>
                             ) : null}
-                            <td>
+                            <td onClick={(event) => event.stopPropagation()}>
                               <Link
                                 href={`/contents/vars/edit?id=${item.id}`}
                                 title={item.name}
@@ -1142,7 +1248,7 @@ function CommonVarsListV8Inner() {
                             <td>
                               <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
                             </td>
-                            <td>
+                            <td onClick={(event) => event.stopPropagation()}>
                               {item.usageCount === undefined ? (
                                 <span className={styles.usageNone} title="使われている場所（未取得）">—（未取得）</span>
                               ) : item.usageCount === 0 ? (
@@ -1157,40 +1263,12 @@ function CommonVarsListV8Inner() {
                                 </Link>
                               )}
                             </td>
-                            <td className={styles.cellMenu}>
+                            <td className={styles.cellMenu} onClick={(event) => event.stopPropagation()}>
                               <RowActions
                                 subjectName={item.name}
                                 menuNote={canWrite ? undefined : '閲覧のみのため、変える操作は使えません。'}
-                                menuItems={[
-                                  {
-                                    id: 'edit',
-                                    label: '編集',
-                                    disabled: !canWrite,
-                                    disabledReason: canWrite ? undefined : '閲覧のみのため編集できません。',
-                                    onSelect: () => router.push(`/contents/vars/edit?id=${item.id}`),
-                                  },
-                                  stopped ? {
-                                    id: 'resume',
-                                    label: '再開する',
-                                    disabled: !canWrite,
-                                    disabledReason: canWrite ? undefined : '閲覧のみのため再開できません。',
-                                    onSelect: () => openStatusDialog(item, 'resume'),
-                                  } : {
-                                    id: 'stop',
-                                    label: '止める',
-                                    disabled: !canWrite,
-                                    disabledReason: canWrite ? undefined : '閲覧のみのため止められません。',
-                                    onSelect: () => openStatusDialog(item, 'stop'),
-                                  },
-                                ]}
-                                destructiveItem={{
-                                  id: 'delete',
-                                  label: '削除する',
-                                  qaOpen: 'xxKtW',
-                                  disabled: !canWrite,
-                                  disabledReason: canWrite ? undefined : '閲覧のみのため削除できません。',
-                                  onSelect: () => void openDelete(item),
-                                }}
+                                menuItems={menus.items}
+                                destructiveItem={menus.destructiveItem}
                               />
                             </td>
                           </tr>
@@ -1199,6 +1277,7 @@ function CommonVarsListV8Inner() {
                     </tbody>
                   </table>
                 </div>
+                </ContextMenu>
               )}
 
               {listFailed ? null : (
@@ -1222,13 +1301,112 @@ function CommonVarsListV8Inner() {
                 </BulkBar>
               ) : null}
             </div>
+            {activeItem ? (
+              <DetailPanel
+                open
+                title={activeItem.name}
+                description={placeholderText(activeItem.varKey)}
+                onClose={() => {
+                  setActiveId(null)
+                  setPanelStatus(false)
+                }}
+                hasPrev={activeIndex > 0}
+                hasNext={activeIndex >= 0 && activeIndex < current.length - 1}
+                onPrev={() => setActiveId(current[activeIndex - 1]?.id ?? null)}
+                onNext={() => setActiveId(current[activeIndex + 1]?.id ?? null)}
+                footer={
+                  <div className={styles.panelActions}>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={() => withViewTransition(() => router.push(`/contents/vars/edit?id=${activeItem.id}`))}
+                    >
+                      編集する
+                    </Button>
+                    {canWrite ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => openStatusDialog(activeItem, activeStopped ? 'resume' : 'stop')}
+                      >
+                        {activeStopped ? '再開する' : '止める'}
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="danger"
+                      disabled={!canWrite}
+                      onClick={() => void openDelete(activeItem)}
+                    >
+                      削除する
+                    </Button>
+                  </div>
+                }
+              >
+                <div className={styles.panelBody}>
+                  <p className={styles.panelLabel}>名前</p>
+                  <InlineEdit
+                    value={activeItem.name}
+                    label="共通情報の名前"
+                    disabled={!canWrite}
+                    maxLength={100}
+                    onSave={(next) => renameVar(activeItem, next)}
+                  />
+                  <p className={styles.panelLabel}>中身</p>
+                  <p className={styles.panelText}>
+                    {formatVarValue(activeItem.type, activeItem.value) || '（空）'}
+                  </p>
+                  <p className={styles.panelLabel}>状態</p>
+                  <p className={styles.panelText}>
+                    {activeStopped ? '止めている' : (activeItem.status ?? 'active') === 'draft' ? '下書き' : '使用中'}
+                  </p>
+                  <p className={styles.panelLabel}>使っている所</p>
+                  <p className={styles.panelText}>
+                    {activeItem.usageCount === undefined
+                      ? '—（未取得）'
+                      : activeItem.usageCount === 0
+                        ? 'なし'
+                        : `${formatNumber(activeItem.usageCount)}か所`}
+                  </p>
+                  {panelStatus && statusTarget?.id === activeItem.id ? (
+                    <>
+                      <p className={styles.panelLabel}>
+                        {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
+                      </p>
+                      <div className={styles.panelBody}>
+                        <input
+                          value={statusReason}
+                          onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
+                          placeholder={statusAction === 'stop' ? '例：キャンペーンが終わったため' : '例：新しい期間の案内を始めるため'}
+                          aria-label={statusAction === 'stop' ? '止める理由' : '再開する理由'}
+                          disabled={statusBusy}
+                          className={styles.dialogInput}
+                        />
+                        <Button
+                          type="button"
+                          variant="primary"
+                          disabled={statusBusy}
+                          busy={statusBusy}
+                          onClick={() => void applyStatus()}
+                        >
+                          {statusBusy
+                            ? (statusAction === 'stop' ? '止めています…' : '再開しています…')
+                            : (statusAction === 'stop' ? '止める' : '再開する')}
+                        </Button>
+                      </div>
+                      {statusError ? <p className={styles.panelError} role="alert">{statusError}</p> : null}
+                    </>
+                  ) : null}
+                </div>
+              </DetailPanel>
+            ) : null}
           </div>
         </>
       )}
 
       {/* 止める窓（板 `Hhl9M`）。下の窓を隠すため、削除の窓とは同時に出さない。 */}
       <Dialog
-        open={statusTarget !== null && deleteTarget === null}
+        open={statusTarget !== null && deleteTarget === null && !panelStatus}
         designNode="Hhl9M"
         title={statusTarget ? `「${statusTarget.name}」を${statusAction === 'stop' ? '止める' : '再開する'}` : ''}
         description={

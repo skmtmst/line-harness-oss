@@ -8,6 +8,8 @@
  * 3. 途中改行は Range の行数で数え、見えない・v7だけ・読み飛ばしは
  *    除く。省略（…）ははみ出しに数えない。
  * 4. 状態を開けない板（ダイアログ・確認・引き出し）は順位に入れない。
+ * 5. 撮る前に context へ V8 テーマ＋偽ログインを置き、撮った絵が V8
+ *    でなければ比べずに落とす。
  */
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -15,7 +17,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
-import { MEASURE_CALL, MEASURE_SCRIPT, compareAndWrite, isNoStateBoard } from './v8-parity.mjs'
+import { MEASURE_CALL, MEASURE_SCRIPT, PARITY_INIT, assertV8Theme, compareAndWrite, isNoStateBoard, shootUrl } from './v8-parity.mjs'
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { encodePng } from './v8-png.mjs'
 
@@ -120,5 +122,102 @@ describe('状態を開けない板は順位に入れない', () => {
     expect(isNoStateBoard({ kind: '画面', name: '友だち一覧' })).toBe(false)
     expect(isNoStateBoard({ kind: '画面', name: '' })).toBe(false)
     expect(isNoStateBoard(null)).toBe(false)
+  })
+})
+
+/*
+ * 本物のブラウザの代わりの stub。合言葉の置き場と V8 の確かめだけを見る。
+ * 測り（MEASURE_CALL の文字列）はそのまま測り値を返す。
+ */
+function stubBrowser(theme: string | undefined, measured: unknown) {
+  const calls: string[] = []
+  let initFn: ((arg: unknown) => void) | null = null
+  let initArg: unknown = null
+  const page = {
+    goto: async () => ({ status: () => 200 }),
+    waitForTimeout: async () => {},
+    evaluate: async (fnOrString: unknown) => {
+      if (typeof fnOrString === 'function') {
+        const g = globalThis as Record<string, unknown>
+        const prev = g['document']
+        g['document'] = { documentElement: { dataset: { theme } } }
+        try {
+          return (fnOrString as () => unknown)()
+        } finally {
+          g['document'] = prev
+        }
+      }
+      return measured
+    },
+    screenshot: async () => Buffer.from([1, 2, 3]),
+    close: async () => {},
+  }
+  const context = {
+    addInitScript: async (fn: (arg: unknown) => void, arg: unknown) => {
+      calls.push('addInitScript')
+      initFn = fn
+      initArg = arg
+    },
+    newPage: async () => {
+      calls.push('newPage')
+      return page
+    },
+    close: async () => {},
+  }
+  return {
+    calls,
+    runInit(store: Record<string, string>) {
+      if (!initFn) throw new Error('合言葉が置かれていない')
+      const g = globalThis as Record<string, unknown>
+      const prev = g['localStorage']
+      g['localStorage'] = { setItem: (k: string, v: string) => { store[k] = v } }
+      try {
+        initFn(initArg)
+      } finally {
+        g['localStorage'] = prev
+      }
+    },
+    browser: {
+      newContext: async () => {
+        calls.push('newContext')
+        return context
+      },
+      newPage: async () => {
+        calls.push('browser.newPage')
+        return page
+      },
+    },
+  }
+}
+
+describe('撮る前に V8 テーマ＋偽ログインを置く', () => {
+  it('合言葉に 8 つの鍵がある', () => {
+    expect(PARITY_INIT).toEqual({
+      'lh-admin-theme': 'v8',
+      lh_csrf: 'visual-qa-csrf',
+      lh_staff_role: 'owner',
+      lh_staff_name: 'K',
+      lh_staff_permissions: '[]',
+      lh_staff_view_permissions: '[]',
+      lh_selected_account: 'visual-qa-account',
+      lh_auth_selection_cleared: '1',
+    })
+  })
+
+  it('context へ置いてから開く（browser 直開きはしない）', async () => {
+    const stub = stubBrowser('v8', { keys: [] })
+    const got = await shootUrl(stub.browser, 'http://localhost:3101', '/friends', 1440)
+    expect(stub.calls).toEqual(['newContext', 'addInitScript', 'newPage'])
+    expect(got.url).toBe('http://localhost:3101/friends')
+    const store: Record<string, string> = {}
+    stub.runInit(store)
+    expect(store).toMatchObject(PARITY_INIT)
+  })
+
+  it('V8 でなければ比べずに落とす', async () => {
+    expect(() => assertV8Theme('v8')).not.toThrow()
+    expect(() => assertV8Theme('v7')).toThrow(/V8 で撮れていない/)
+    expect(() => assertV8Theme(undefined)).toThrow(/V8 で撮れていない/)
+    await expect(shootUrl(stubBrowser('v7', { keys: [] }).browser, 'http://localhost:3101', '/friends', 1440)).rejects.toThrow(/V8 で撮れていない/)
   })
 })
