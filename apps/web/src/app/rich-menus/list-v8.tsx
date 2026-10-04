@@ -45,6 +45,10 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import InlineEdit from '@/components/shared/inline-edit'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import {
@@ -656,7 +660,7 @@ export default function RichMenusListV8() {
       {
         id: 'edit',
         label: '編集する',
-        onSelect: () => router.push(`/rich-menus/edit?id=${g.id}`),
+        onSelect: () => withViewTransition(() => router.push(`/rich-menus/edit?id=${g.id}`)),
       },
     ]
     if (g.status === 'published') {
@@ -671,7 +675,7 @@ export default function RichMenusListV8() {
     items.push({
       id: 'connections',
       label: '切替のつながりを見る',
-      onSelect: () => router.push(`/rich-menus/connections?id=${encodeURIComponent(g.id)}`),
+      onSelect: () => withViewTransition(() => router.push(`/rich-menus/connections?id=${encodeURIComponent(g.id)}`)),
     })
     items.push({
       id: 'duplicate',
@@ -694,6 +698,42 @@ export default function RichMenusListV8() {
     })
     return items
   }
+
+  /* 右から出る詳細パネル（C①）。URL に今の行を残す。 */
+  const [activeId, setActiveId] = useDetailPanelUrl('row')
+  /* 右クリックされた行（「…」と同じ項目を出す）。 */
+  const [contextId, setContextId] = useState<string | null>(null)
+  /* パネルは今のページの行を追う。ページを変えたら閉じる。 */
+  const activeGroup = activeId ? (groups.find((g) => g.id === activeId) ?? null) : null
+  const activeIndex = activeGroup ? groups.findIndex((g) => g.id === activeGroup.id) : -1
+  const activeFolderName = activeGroup
+    ? (activeGroup.folderId === null
+      ? '未分類'
+      : (folders.find((f) => f.id === activeGroup.folderId)?.name ?? null))
+    : null
+
+  /* 名前のその場の書き換え（C②）。Enter で保存・Esc でやめる。 */
+  const renameGroup = async (g: RichMenuGroupListItem, next: string) => {
+    const name = next.trim()
+    if (!name || name === g.name) return
+    const got = await api.richMenuGroups.get(g.id)
+    if (!got.success) throw new Error(got.error ?? 'load_failed')
+    const res = await api.richMenuGroups.update(g.id, { expectedVersion: got.data.version, name })
+    if (!res.success) throw new Error(res.error ?? 'rename_failed')
+    setGroups((rows) => rows.map((row) => (row.id === g.id ? { ...row, name } : row)))
+  }
+
+  /* 右クリックは「…」と同じ項目（D）。 */
+  const contextGroup = contextId ? (groups.find((g) => g.id === contextId) ?? null) : null
+  const contextMenuItems: ContextMenuItem[] = contextGroup
+    ? rowMenuItems(contextGroup).map((item) => ({
+      id: item.id,
+      label: item.label,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      onSelect: () => item.onSelect(),
+    }))
+    : []
 
   /* ===== フォルダの列 ===== */
   const folderRows: FolderPanelRow[] = [
@@ -782,6 +822,13 @@ export default function RichMenusListV8() {
       <span className="sr-only" role="status" aria-live="polite">
         {moveNotice}
       </span>
+      <ContextMenu
+        label={contextGroup ? `メニュー「${contextGroup.name}」の操作` : 'メニューの操作'}
+        items={contextMenuItems}
+        shouldOpen={(event) =>
+          Boolean((event.target as HTMLElement | null)?.closest?.('tr[data-row-id]'))
+        }
+      >
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <colgroup>
@@ -806,14 +853,16 @@ export default function RichMenusListV8() {
             {groups.map((g) => (
               <tr
                 key={g.id}
+                data-row-id={g.id}
                 className={styles.rowClick}
                 tabIndex={0}
-                onClick={() => router.push(`/rich-menus/edit?id=${g.id}`)}
+                onClick={() => setActiveId(g.id)}
+                onContextMenuCapture={() => setContextId(g.id)}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return
                   if (event.key === 'Enter') {
                     event.preventDefault()
-                    router.push(`/rich-menus/edit?id=${g.id}`)
+                    setActiveId(g.id)
                   }
                 }}
               >
@@ -923,6 +972,7 @@ export default function RichMenusListV8() {
           </tbody>
         </table>
       </div>
+      </ContextMenu>
 
       {pageCount > 1 ? (
         <div className={styles.pagerRow}>
@@ -1026,7 +1076,7 @@ export default function RichMenusListV8() {
           <p className={styles.stateDesc}>LINEアカウントを選ぶと表示します。</p>
         </div>
       ) : (
-        <div className={styles.split}>
+        <div className={activeGroup ? `${styles.split} ${styles.splitWithPanel}` : styles.split}>
           {/* 左のフォルダの列。いちばん上は「メニューを作る」。 */}
           <div className={styles.folderCol}>
             {canEdit ? (
@@ -1142,6 +1192,91 @@ export default function RichMenusListV8() {
 
             {listBody}
           </div>
+          {activeGroup ? (
+            <DetailPanel
+              open
+              title={activeGroup.name}
+              description={activeFolderName ?? undefined}
+              onClose={() => setActiveId(null)}
+              hasPrev={activeIndex > 0}
+              hasNext={activeIndex >= 0 && activeIndex < groups.length - 1}
+              onPrev={() => setActiveId(groups[activeIndex - 1]?.id ?? null)}
+              onNext={() => setActiveId(groups[activeIndex + 1]?.id ?? null)}
+              footer={
+                <div className={styles.panelActions}>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={() => withViewTransition(() => router.push(`/rich-menus/edit?id=${activeGroup.id}`))}
+                  >
+                    編集する
+                  </Button>
+                  {activeGroup.status === 'published' ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={!canEdit}
+                      onClick={() => setApplyTo(activeGroup)}
+                    >
+                      表示先を変える
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => withViewTransition(() => router.push(`/rich-menus/connections?id=${encodeURIComponent(activeGroup.id)}`))}
+                  >
+                    切替のつながりを見る
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={!canEdit}
+                    onClick={() => {
+                      setDuplicateError(null)
+                      setDuplicateTarget(activeGroup)
+                    }}
+                  >
+                    複製する
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    disabled={!canEdit}
+                    onClick={() => handleDelete(activeGroup)}
+                  >
+                    {activeGroup.status === 'published' ? '取り下げ・削除する' : '削除する'}
+                  </Button>
+                </div>
+              }
+            >
+              <div className={styles.panelBody}>
+                <p className={styles.panelLabel}>名前</p>
+                <InlineEdit
+                  value={activeGroup.name}
+                  label="メニューの名前"
+                  disabled={!canEdit}
+                  maxLength={100}
+                  onSave={(next) => renameGroup(activeGroup, next)}
+                />
+                <p className={styles.panelLabel}>誰に出すか</p>
+                <p className={styles.panelText}>{audienceMainText(activeGroup, tagNameById)}</p>
+                {audienceSubText(activeGroup) ? (
+                  <p className={styles.panelText}>{audienceSubText(activeGroup)}</p>
+                ) : null}
+                <p className={styles.panelLabel}>状態</p>
+                <p className={styles.panelText}>
+                  {activeGroup.publishingAt
+                    ? `${formatDay(activeGroup.publishingAt)} 公開`
+                    : activeGroup.status === 'published' ? '公開中' : '下書き'}
+                </p>
+                <p className={styles.panelLabel}>今月押された</p>
+                <p className={styles.panelText}>
+                  {activeGroup.monthlyStats ? `${formatNumber(activeGroup.monthlyStats.taps)}回` : '—'}
+                </p>
+              </div>
+            </DetailPanel>
+          ) : null}
         </div>
       )}
 

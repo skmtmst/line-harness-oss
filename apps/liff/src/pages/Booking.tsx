@@ -12,7 +12,7 @@ import LiffLookScope from '../components/LiffLookScope.js';
 import Stepper from '../components/ui/Stepper.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
-import type { MenuItem, StaffItem } from '../lib/api.js';
+import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 
 type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'payment' | 'done';
 
@@ -35,6 +35,23 @@ export default function Booking() {
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [paymentDue, setPaymentDue] = useState(false);
   const [prepayNotice, setPrepayNotice] = useState<string | null>(null);
+  const [doneStatus, setDoneStatus] = useState('requested');
+  // 予約のルール「お店が承認してから確定する」。読めなければ承認あり扱い。
+  const [autoConfirm, setAutoConfirm] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    api
+      .bookingSettings()
+      .then((r) => {
+        if (alive) setAutoConfirm(r.approval_mode === 'automatic');
+      })
+      .catch(() => {
+        if (alive) setAutoConfirm(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
   // 読み込み中・失敗の間は下の帯を出さない (押せないボタンの飾りを置かない)。
   const [stepReady, setStepReady] = useState(false);
   useEffect(() => {
@@ -114,9 +131,11 @@ export default function Booking() {
             menu={menu}
             staff={staff}
             slot={slot}
+            autoConfirm={autoConfirm}
             onBack={() => setStep('datetime')}
             onSubmitted={(result) => {
               setBookingId(result.bookingId);
+              setDoneStatus(result.status);
               // お支払いありのときだけ支払いの段へ。なしの店では今までどおり完了へ。
               // 前払いのみの案内があるときは完了の段で案内と支払いへのボタンを出す。
               setPaymentDue(Boolean(result.payment));
@@ -139,6 +158,7 @@ export default function Booking() {
             menuName={menu.name}
             slot={slot}
             durationMinutes={staff.duration_minutes}
+            status={doneStatus}
             bookingId={bookingId}
             prepayNotice={prepayNotice}
           />

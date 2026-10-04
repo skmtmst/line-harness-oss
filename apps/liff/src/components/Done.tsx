@@ -18,12 +18,15 @@ export default function Done({
   menuName,
   slot,
   durationMinutes,
+  status,
   bookingId,
   prepayNotice,
 }: {
   menuName: string;
   slot: SlotPick;
   durationMinutes: number;
+  /** 作られた予約の状態。confirmed なら未承認の表示を出さない。 */
+  status: string;
   /** 予約ID（前払いのみの案内があるときだけ使う）。 */
   bookingId?: string | null;
   /** 無断キャンセルが続いている人への前払いのみの案内。無いときは出さない。 */
@@ -62,11 +65,23 @@ export default function Done({
         >
           <Icon name="check" className="h-9 w-9" />
         </span>
-        <p className="mt-4 text-xl font-bold text-ink">リクエストを受け付けました</p>
+        <p className="mt-4 text-xl font-bold text-ink">
+          {status === 'confirmed' ? '予約が確定しました' : 'リクエストを受け付けました'}
+        </p>
         <p className="mt-2 text-[13px] leading-6 text-pretty text-liff-sub">
-          お店が確かめたら、LINEでお知らせします。
-          <br />
-          この画面は閉じてかまいません。
+          {status === 'confirmed' ? (
+            <>
+              変更・キャンセルはお店へご連絡ください。
+              <br />
+              この画面は閉じてかまいません。
+            </>
+          ) : (
+            <>
+              お店が確かめたら、LINEでお知らせします。
+              <br />
+              この画面は閉じてかまいません。
+            </>
+          )}
         </p>
       </div>
       <dl className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
@@ -84,7 +99,9 @@ export default function Done({
         </div>
         <div className="flex items-baseline gap-2 py-2.5">
           <dt className="w-18 shrink-0 text-xs text-liff-sub">状態</dt>
-          <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">お店の確認待ち</dd>
+          <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">
+            {status === 'confirmed' ? '確定' : 'お店の確認待ち'}
+          </dd>
         </div>
       </dl>
       {prepayNotice && (

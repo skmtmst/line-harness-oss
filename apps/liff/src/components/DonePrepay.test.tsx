@@ -47,7 +47,7 @@ afterEach(() => {
 
 describe('Done の事前のお支払い', () => {
   it('案内が無いときは何も出さない', () => {
-    render(<Done menuName="カット" slot={SLOT} durationMinutes={60} />);
+    render(<Done menuName="カット" slot={SLOT} durationMinutes={60} status="requested" />);
     expect(screen.queryByText('事前のお支払いをお願いしています')).toBeNull();
     expect(screen.queryByRole('button', { name: 'お支払いへ進む' })).toBeNull();
   });
@@ -60,6 +60,7 @@ describe('Done の事前のお支払い', () => {
         menuName="カット"
         slot={SLOT}
         durationMinutes={60}
+        status="requested"
         bookingId="b1"
         prepayNotice="無断キャンセルが続いているため、この予約は前払いのみです。"
       />,
@@ -79,6 +80,7 @@ describe('Done の事前のお支払い', () => {
         menuName="カット"
         slot={SLOT}
         durationMinutes={60}
+        status="requested"
         bookingId="b1"
         prepayNotice="無断キャンセルが続いているため、この予約は前払いのみです。"
       />,

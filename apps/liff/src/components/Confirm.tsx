@@ -17,17 +17,21 @@ export default function Confirm({
   menu,
   staff,
   slot,
+  autoConfirm,
   onBack,
   onSubmitted,
 }: {
   menu: MenuItem;
   staff: StaffItem;
   slot: SlotPick;
+  /** 予約のルールが承認なし確定のとき真。未承認の案内を出さない。 */
+  autoConfirm: boolean;
   /** 「← 日時を選び直す」。日時の段へ戻る。 */
   onBack: () => void;
-  /** 予約ができたら予約IDと支払い(お支払いありのときだけ付く)を渡す。前払いのみの案内も付く。 */
+  /** 予約ができたら予約ID・状態・支払い(お支払いありのときだけ付く)を渡す。前払いのみの案内も付く。 */
   onSubmitted: (result: {
     bookingId: string;
+    status: string;
     payment: CreateBookingResponse['payment'];
     prepayNotice: string | null;
   }) => void;
@@ -54,6 +58,7 @@ export default function Confirm({
       );
       onSubmitted({
         bookingId: created.booking_id,
+        status: created.status,
         payment: created.payment ?? null,
         prepayNotice: created.prepayNotice ?? null,
       });
@@ -105,7 +110,9 @@ export default function Confirm({
       <div className="flex gap-2 rounded-(--liff-radius) bg-liff-note p-3 text-xs leading-5 text-ink">
         <Icon name="info" className="h-4 w-4 shrink-0 text-liff-sub" />
         <p>
-          まだ確定ではありません。お店が確かめたら、LINEでお知らせします。
+          {autoConfirm
+            ? '送るとその場で確定します。確定のお知らせをLINEで送ります。'
+            : 'まだ確定ではありません。お店が確かめたら、LINEでお知らせします。'}
           {menu.cancel_deadline_hours_before != null &&
             `キャンセルは${menu.cancel_deadline_hours_before}時間前まで。`}
         </p>
@@ -113,7 +120,7 @@ export default function Confirm({
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
         <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
-          {submitting ? '送信中...' : 'この内容で予約をリクエスト'}
+          {submitting ? '送信中...' : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエスト'}
         </Button>
         <button
           type="button"
