@@ -15,6 +15,7 @@ import {
   getVisibleLineAccountScope,
 } from '../services/account-access.js';
 import { sendRestaurantLineConfirmation, type RestaurantLineNotice } from '../services/restaurant-line-confirmation.js';
+import { promoteSeatWaitlist } from '../services/restaurant-seat-waitlist.js';
 import { dbFor } from '../services/db-router.js';
 import {
   issueRestaurantIntakeAddress,
@@ -1312,7 +1313,371 @@ restaurantTest.patch('/api/restaurant-test/reservations/:id', requireRole('owner
     { starts_at: current.starts_at, guest_count: current.guest_count, status: current.status },
     { starts_at: next.starts_at, guest_count: next.guest_count, status: next.status },
   );
+  if (next.status === 'cancelled' && next.table_id) {
+    // 席の空き待ち：空いた卓に入る組の早い順で1組に知らせる。
+    // 知らせの失敗で取り消し自体を失敗させない。
+    try {
+      await promoteSeatWaitlist(dbFor(c.env, current.store_id), {
+        storeId: current.store_id,
+        startsAt: next.starts_at,
+        tableId: next.table_id,
+      }, undefined, c.env.LIFF_URL ?? '');
+    } catch {
+      console.error(JSON.stringify({ event: 'seat_waitlist_promote_failed', reservationId: current.id }));
+    }
+  }
   return c.json({ success: true, data: { id: current.id } });
+});
+
+/**
+ * 席の空き待ちの登録の共通処理。
+ *
+ * 開始時刻は UTC ISO (Z) にそろえる（取り消し時の突き合わせ用）。
+ * 満席の判定は空き照会の表示側で行い、登録口は受け付ける。
+ */
+async function insertSeatWaitlistEntry(
+  db: D1Database,
+  input: {
+    storeId: string;
+    startsAt: string;
+    guestCount: number;
+    customerName: string;
+    customerPhone: string | null;
+    lineUid: string | null;
+  },
+): Promise<
+  | { ok: true; id: string }
+  | { ok: false; error: 'invalid_slot' | 'invalid_party' | 'invalid_starts_at' | 'starts_at_in_past' | 'missing_customer' | 'already_waiting' }
+> {
+  const startsAtMs = Date.parse(input.startsAt);
+  if (Number.isNaN(startsAtMs)) return { ok: false, error: 'invalid_starts_at' };
+  if (startsAtMs <= Date.now()) return { ok: false, error: 'starts_at_in_past' };
+  if (!Number.isInteger(input.guestCount) || input.guestCount < 1 || input.guestCount > 100) {
+    return { ok: false, error: 'invalid_party' };
+  }
+  const customerName = input.customerName.trim();
+  if (!customerName) return { ok: false, error: 'missing_customer' };
+  const startsAt = new Date(startsAtMs).toISOString();
+  const identityKey = input.lineUid
+    ? `line:${input.lineUid}`
+    : input.customerPhone
+      ? `phone:${input.customerPhone}`
+      : `name:${customerName}`;
+  const existing = await db
+    .prepare(`SELECT id FROM rt_seat_waitlist
+      WHERE store_id = ? AND starts_at = ? AND identity_key = ?
+        AND status IN ('waiting', 'invited')`)
+    .bind(input.storeId, startsAt, identityKey)
+    .first<{ id: string }>();
+  if (existing) return { ok: false, error: 'already_waiting' };
+  const id = crypto.randomUUID();
+  try {
+    await db
+      .prepare(`INSERT INTO rt_seat_waitlist
+        (id, store_id, starts_at, guest_count, customer_name, customer_phone,
+         line_uid, identity_key)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, input.storeId, startsAt, input.guestCount, customerName,
+        input.customerPhone, input.lineUid, identityKey)
+      .run();
+  } catch (error) {
+    // 同時登録の race は部分一致キーが止める。
+    if (error instanceof Error && /UNIQUE/i.test(error.message)) {
+      return { ok: false, error: 'already_waiting' };
+    }
+    throw error;
+  }
+  return { ok: true, id };
+}
+
+const SEAT_WAITLIST_ERROR_STATUS: Record<string, number> = {
+  invalid_slot: 400,
+  invalid_party: 400,
+  invalid_starts_at: 400,
+  starts_at_in_past: 400,
+  missing_customer: 400,
+  already_waiting: 409,
+};
+
+/** 店舗が組織のものか確かめる。違えば null。 */
+async function storeInOrganization(
+  c: Context<Env>,
+  organizationId: string,
+  storeId: string,
+): Promise<{ id: string; timezone: string } | null> {
+  const row = await dbFor(c.env).prepare(
+    `SELECT id, timezone FROM rt_stores WHERE id = ? AND organization_id = ? AND status != 'archived'`,
+  ).bind(storeId, organizationId).first<{ id: string; timezone: string }>();
+  return row ?? null;
+}
+
+restaurantTest.post('/api/restaurant-test/seat-waitlist', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  if (!body) return c.json({ success: false, error: 'invalid_json' }, 400);
+  const storeId = typeof body.storeId === 'string' ? body.storeId : '';
+  if (!storeId || !await storeBelongsTo(c, organization.id, storeId)) {
+    return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  }
+  const result = await insertSeatWaitlistEntry(dbFor(c.env, storeId), {
+    storeId,
+    startsAt: typeof body.startsAt === 'string' ? body.startsAt : '',
+    guestCount: Number(body.guestCount),
+    customerName: typeof body.customerName === 'string' ? body.customerName : '',
+    customerPhone: typeof body.customerPhone === 'string' && body.customerPhone.trim()
+      ? body.customerPhone.trim() : null,
+    lineUid: typeof body.lineUid === 'string' && body.lineUid.trim() ? body.lineUid.trim() : null,
+  });
+  if (!result.ok) {
+    return c.json(
+      { success: false, error: result.error },
+      SEAT_WAITLIST_ERROR_STATUS[result.error] as 400 | 409,
+    );
+  }
+  return c.json({ success: true, data: { id: result.id } }, 201);
+});
+
+restaurantTest.get('/api/restaurant-test/seat-waitlist', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const storeId = c.req.query('storeId')?.trim() ?? '';
+  const store = storeId ? await storeInOrganization(c, organization.id, storeId) : null;
+  if (!store) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  const conditions = ['w.store_id = ?'];
+  const values: unknown[] = [store.id];
+  const startsAt = c.req.query('startsAt')?.trim();
+  if (startsAt) {
+    const startsAtMs = Date.parse(startsAt);
+    if (Number.isNaN(startsAtMs)) return c.json({ success: false, error: '日時の指定が正しくありません' }, 400);
+    conditions.push('w.starts_at = ?');
+    values.push(new Date(startsAtMs).toISOString());
+  }
+  const status = c.req.query('status')?.trim();
+  if (status && ['waiting', 'invited', 'converted', 'cancelled'].includes(status)) {
+    conditions.push('w.status = ?');
+    values.push(status);
+  }
+  const rows = await dbFor(c.env, store.id)
+    .prepare(
+      `SELECT w.*, t.label AS table_label
+         FROM rt_seat_waitlist w
+         LEFT JOIN rt_tables t ON t.id = w.table_id
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY w.starts_at ASC, w.created_at ASC, w.rowid ASC LIMIT 100`,
+    )
+    .bind(...values)
+    .all();
+  return c.json({ success: true, data: { waitlist: rows.results } });
+});
+
+restaurantTest.delete('/api/restaurant-test/seat-waitlist/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const id = c.req.param('id');
+  const entry = await dbFor(c.env).prepare(
+    `SELECT w.store_id, w.starts_at, w.status, w.table_id FROM rt_seat_waitlist w
+       JOIN rt_stores s ON s.id = w.store_id
+      WHERE w.id = ? AND s.organization_id = ?
+        AND (? IS NULL OR s.id = ?)`,
+  ).bind(id, organization.id, organization.scopedStoreId, organization.scopedStoreId)
+    .first<{ store_id: string; starts_at: string; status: string; table_id: string | null }>();
+  if (!entry) return c.json({ success: false, error: '見つかりません' }, 404);
+  if (entry.status !== 'waiting' && entry.status !== 'invited') {
+    return c.json({ success: false, error: 'すでに終わっています' }, 409);
+  }
+  const wasInvited = entry.status === 'invited';
+  const updated = await dbFor(c.env, entry.store_id).prepare(
+    `UPDATE rt_seat_waitlist SET status = 'cancelled', updated_at = datetime('now')
+      WHERE id = ? AND status IN ('waiting', 'invited')`,
+  ).bind(id).run();
+  if ((updated.meta?.changes ?? 0) === 0) {
+    return c.json({ success: false, error: 'すでに終わっています' }, 409);
+  }
+  if (wasInvited && entry.table_id) {
+    // 見送りで仮押さえが空いたら、その卓に入る次の組へすぐ回す。
+    try {
+      await promoteSeatWaitlist(dbFor(c.env, entry.store_id), {
+        storeId: entry.store_id,
+        startsAt: entry.starts_at,
+        tableId: entry.table_id,
+      }, undefined, c.env.LIFF_URL ?? '');
+    } catch {
+      console.error(JSON.stringify({ event: 'seat_waitlist_promote_failed', waitlistId: id }));
+    }
+  }
+  return c.json({ success: true, data: { status: 'cancelled' } });
+});
+
+/**
+ * 招待ずみの組が予約を取ったとき、待ちを「予約になった」へ進める。
+ * 同じ店・同じ開始時刻・同じ組の予約だけ受け付ける。
+ */
+restaurantTest.post('/api/restaurant-test/seat-waitlist/:id/convert', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const id = c.req.param('id');
+  const body = await c.req.json<{ reservationId?: unknown }>().catch(() => null);
+  const reservationId = typeof body?.reservationId === 'string' ? body.reservationId : '';
+  if (!reservationId) return c.json({ success: false, error: '予約が必要です' }, 400);
+  const entry = await dbFor(c.env).prepare(
+    `SELECT w.* FROM rt_seat_waitlist w
+       JOIN rt_stores s ON s.id = w.store_id
+      WHERE w.id = ? AND s.organization_id = ?
+        AND (? IS NULL OR s.id = ?)`,
+  ).bind(id, organization.id, organization.scopedStoreId, organization.scopedStoreId)
+    .first<SeatWaitlistEntryLike>();
+  if (!entry) return c.json({ success: false, error: '見つかりません' }, 404);
+  if (entry.status !== 'waiting' && entry.status !== 'invited') {
+    return c.json({ success: false, error: 'すでに終わっています' }, 409);
+  }
+  const reservation = await dbFor(c.env, entry.store_id).prepare(
+    `SELECT store_id, starts_at, guest_count, status FROM rt_reservations
+      WHERE id = ? AND store_id = ? AND status NOT IN ('cancelled')`,
+  ).bind(reservationId, entry.store_id)
+    .first<{ store_id: string; starts_at: string; guest_count: number; status: string }>();
+  if (!reservation
+    || reservation.starts_at !== entry.starts_at
+    || reservation.guest_count !== entry.guest_count) {
+    return c.json({ success: false, error: '予約が待ちと合いません' }, 409);
+  }
+  await dbFor(c.env, entry.store_id).prepare(
+    `UPDATE rt_seat_waitlist SET status = 'converted', updated_at = datetime('now')
+      WHERE id = ? AND status IN ('waiting', 'invited')`,
+  ).bind(id).run();
+  return c.json({ success: true, data: { status: 'converted' } });
+});
+
+interface SeatWaitlistEntryLike {
+  store_id: string;
+  starts_at: string;
+  guest_count: number;
+  status: string;
+}
+
+const SEAT_VISIT_KINDS = ['visited', 'late', 'no_show'] as const;
+
+/**
+ * 席の予約に印を付ける。「来店した」→案内済み、「来なかった」→無断、
+ * 「遅れる」→状態は変えず遅れ分数だけ残す。だれがいつ付けたか残す。
+ */
+restaurantTest.post('/api/restaurant-test/reservations/:id/visit', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const id = c.req.param('id');
+  const current = await dbFor(c.env).prepare(
+    `SELECT r.id, r.store_id, r.status FROM rt_reservations r
+       JOIN rt_stores s ON s.id = r.store_id
+      WHERE r.id = ? AND s.organization_id = ?
+        AND (? IS NULL OR s.id = ?)`,
+  ).bind(id, organization.id, organization.scopedStoreId, organization.scopedStoreId)
+    .first<{ id: string; store_id: string; status: string }>();
+  if (!current) return c.json({ success: false, error: '予約が見つかりません' }, 404);
+  const body = await c.req.json<{ kind?: unknown; lateMinutes?: unknown }>().catch(() => null);
+  const kind = typeof body?.kind === 'string' && (SEAT_VISIT_KINDS as readonly string[]).includes(body.kind)
+    ? body.kind as 'visited' | 'late' | 'no_show'
+    : null;
+  if (!kind) return c.json({ success: false, error: '印の種類が正しくありません' }, 400);
+  const lateMinutes = body?.lateMinutes === undefined || body?.lateMinutes === null
+    ? null
+    : Number(body.lateMinutes);
+  if (kind === 'late') {
+    if (!Number.isInteger(lateMinutes) || (lateMinutes as number) < 1 || (lateMinutes as number) > 1440) {
+      return c.json({ success: false, error: '遅れ分数は1〜1440で指定してください' }, 400);
+    }
+  } else if (lateMinutes !== null) {
+    return c.json({ success: false, error: '遅れ分数は遅れるのときだけ指定してください' }, 400);
+  }
+  const next = kind === 'visited' ? 'seated' : kind === 'no_show' ? 'no_show' : current.status;
+  if (next !== current.status) {
+    if ((kind === 'visited' && !['pending', 'confirmed'].includes(current.status))
+      || (kind === 'no_show' && !['pending', 'confirmed', 'seated'].includes(current.status))) {
+      return c.json({ success: false, error: 'この状態からは付けられません' }, 409);
+    }
+    const updated = await dbFor(c.env, current.store_id).prepare(
+      `UPDATE rt_reservations SET status = ?, updated_at = datetime('now')
+        WHERE id = ? AND status = ?`,
+    ).bind(next, id, current.status).run();
+    if ((updated.meta?.changes ?? 0) === 0) {
+      return c.json({ success: false, error: 'ほかの担当者が先に変えました' }, 409);
+    }
+  } else if (!['pending', 'confirmed', 'seated'].includes(current.status)) {
+    return c.json({ success: false, error: 'すでに終わっています' }, 409);
+  }
+  const me = c.get('staff') as { id?: string; name?: string } | undefined;
+  const markedAt = new Date().toISOString();
+  const markId = crypto.randomUUID();
+  await dbFor(c.env, current.store_id).prepare(
+    `INSERT INTO rt_seat_visit_marks
+      (id, reservation_id, store_id, kind, late_minutes,
+       marked_by_staff_id, marked_by_name, marked_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(markId, id, current.store_id, kind, lateMinutes,
+    typeof me?.id === 'string' ? me.id : null,
+    typeof me?.name === 'string' ? me.name : null,
+    markedAt).run();
+  return c.json({
+    success: true,
+    data: {
+      status: next,
+      visit_mark: {
+        id: markId,
+        kind,
+        late_minutes: lateMinutes,
+        marked_by_name: typeof me?.name === 'string' ? me.name : null,
+        marked_at: markedAt,
+      },
+    },
+  });
+});
+
+/**
+ * 席の予約の印を取り消す。最新の印を1件消し、状態を変えていた
+ * （来店→案内済み・来なかった→無断）ときは確定へ戻す。
+ */
+restaurantTest.delete('/api/restaurant-test/reservations/:id/visit', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const id = c.req.param('id');
+  const current = await dbFor(c.env).prepare(
+    `SELECT r.id, r.store_id, r.status FROM rt_reservations r
+       JOIN rt_stores s ON s.id = r.store_id
+      WHERE r.id = ? AND s.organization_id = ?
+        AND (? IS NULL OR s.id = ?)`,
+  ).bind(id, organization.id, organization.scopedStoreId, organization.scopedStoreId)
+    .first<{ id: string; store_id: string; status: string }>();
+  if (!current) return c.json({ success: false, error: '予約が見つかりません' }, 404);
+  const mark = await dbFor(c.env, current.store_id).prepare(
+    `SELECT id, kind FROM rt_seat_visit_marks
+      WHERE reservation_id = ? AND store_id = ?
+      ORDER BY marked_at DESC LIMIT 1`,
+  ).bind(id, current.store_id).first<{ id: string; kind: string }>();
+  if (!mark) return c.json({ success: false, error: '印がありません' }, 404);
+  let next = current.status;
+  if (mark.kind === 'visited' && current.status === 'seated') next = 'confirmed';
+  else if (mark.kind === 'no_show' && current.status === 'no_show') next = 'confirmed';
+  else if (mark.kind !== 'late') {
+    return c.json({ success: false, error: '状態が変わっているため戻せません' }, 409);
+  }
+  if (next !== current.status) {
+    const updated = await dbFor(c.env, current.store_id).prepare(
+      `UPDATE rt_reservations SET status = ?, updated_at = datetime('now')
+        WHERE id = ? AND status = ?`,
+    ).bind(next, id, current.status).run();
+    if ((updated.meta?.changes ?? 0) === 0) {
+      return c.json({ success: false, error: 'ほかの担当者が先に変えました' }, 409);
+    }
+  }
+  await dbFor(c.env, current.store_id).prepare(
+    `DELETE FROM rt_seat_visit_marks WHERE id = ?`,
+  ).bind(mark.id).run();
+  return c.json({ success: true, data: { status: next } });
 });
 
 /**

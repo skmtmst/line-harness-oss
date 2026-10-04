@@ -35,6 +35,9 @@ describe('migration 559 予約の追加機能の表', () => {
         line_account_id TEXT NOT NULL UNIQUE,
         version INTEGER NOT NULL DEFAULT 1
       );
+      CREATE TABLE rt_stores (id TEXT PRIMARY KEY);
+      CREATE TABLE rt_tables (id TEXT PRIMARY KEY);
+      CREATE TABLE rt_reservations (id TEXT PRIMARY KEY);
       INSERT INTO line_accounts (id, name, created_at) VALUES ('account-a', '本店', '2026-10-04');
       INSERT INTO staff (id, line_account_id) VALUES ('staff-a', 'account-a');
       INSERT INTO menus (id, line_account_id) VALUES ('menu-a', 'account-a');

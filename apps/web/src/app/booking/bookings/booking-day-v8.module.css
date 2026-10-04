@@ -1,0 +1,242 @@
+/* 予約管理の「日」（時刻順）。V8 のときだけ使う。 */
+
+.root {
+  display: block;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tile {
+  background: var(--color-surface-pearl);
+  border-radius: var(--radius-card);
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tileTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+}
+
+.tileNum {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cols {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.timeline {
+  flex: 1;
+  min-width: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  padding: 12px 16px;
+}
+
+.row.isLate {
+  border-color: var(--color-warning);
+}
+
+.time {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kind {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-mini);
+  padding: 0 5px;
+  vertical-align: 1px;
+}
+
+.sub {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ops {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.pill {
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+
+.isDone {
+  color: var(--color-success);
+  background: var(--color-success-bg);
+}
+
+.isLatePill {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+}
+
+.isMiss {
+  color: var(--color-ink-secondary);
+  background: var(--color-surface-pearl);
+}
+
+.undo {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.undo:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.menuwrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-danger);
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.now::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--color-danger);
+}
+
+.wait {
+  width: 340px;
+  flex-shrink: 0;
+  background: var(--color-surface-pearl);
+  border-radius: var(--radius-card);
+  padding: 16px;
+}
+
+.wait h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.waitCount {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-ink-secondary);
+  margin-left: 6px;
+}
+
+.wait ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.waitRow {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile);
+  padding: 10px 12px;
+}
+
+.waitTitle {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+
+.waitSub {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  margin: 0;
+}
+
+.waitEmpty {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  margin: 0 0 8px;
+}
+
+.waitNote {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  margin: 12px 0 0;
+  line-height: 1.6;
+}

@@ -1474,7 +1474,7 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
       lineAccountId: accountId,
       staffId: row.staff_id,
       startsAt: row.starts_at,
-    });
+    }, undefined, c.env.LIFF_URL ?? '');
   } catch (error) {
     console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId }));
   }
@@ -1520,7 +1520,7 @@ async function runSelfBookingCancelSideEffects(
       lineAccountId: self.accountId,
       staffId: row.staff_id,
       startsAt: row.starts_at,
-    });
+    }, undefined, c.env.LIFF_URL ?? '');
   } catch {
     console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId: row.id }));
   }
@@ -3470,19 +3470,35 @@ booking.delete('/api/booking/admin/waitlist/:id', requireRole('owner', 'admin', 
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const id = c.req.param('id');
+  const entry = await c.env.DB
+    .prepare(`SELECT staff_id, starts_at, status FROM booking_waitlist
+      WHERE id = ? AND line_account_id = ?`)
+    .bind(id, accountId)
+    .first<{ staff_id: string; starts_at: string; status: string }>();
+  if (!entry) return c.json({ error: 'not_found' }, 404);
+  if (entry.status !== 'waiting' && entry.status !== 'invited') {
+    return c.json({ error: 'already_closed' }, 409);
+  }
+  const wasInvited = entry.status === 'invited';
   const updated = await c.env.DB
     .prepare(`UPDATE booking_waitlist SET status = 'cancelled',
                   updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-      WHERE id = ? AND line_account_id = ? AND status IN ('waiting', 'invited')`)
-    .bind(id, accountId)
+      WHERE id = ? AND status IN ('waiting', 'invited')`)
+    .bind(id)
     .run();
-  if ((updated.meta?.changes ?? 0) > 0) return c.json({ status: 'cancelled' });
-  const row = await c.env.DB
-    .prepare(`SELECT id FROM booking_waitlist WHERE id = ? AND line_account_id = ?`)
-    .bind(id, accountId)
-    .first<{ id: string }>();
-  if (!row) return c.json({ error: 'not_found' }, 404);
-  return c.json({ error: 'already_closed' }, 409);
+  if ((updated.meta?.changes ?? 0) === 0) return c.json({ error: 'already_closed' }, 409);
+  if (wasInvited) {
+    try {
+      await promoteBookingWaitlist(c.env.DB, {
+        lineAccountId: accountId,
+        staffId: entry.staff_id,
+        startsAt: entry.starts_at,
+      }, undefined, c.env.LIFF_URL ?? '');
+    } catch {
+      console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', waitlistId: id }));
+    }
+  }
+  return c.json({ status: 'cancelled' });
 });
 
 /**
@@ -3554,15 +3570,59 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
   const caller = await resolveSelfBookingCaller(c);
   if (!caller.ok) return c.json({ error: caller.error }, caller.status);
   const id = c.req.param('id');
+  const entry = await c.env.DB
+    .prepare(`SELECT staff_id, starts_at, status FROM booking_waitlist
+      WHERE id = ? AND line_account_id = ? AND friend_id = ?`)
+    .bind(id, caller.accountId, caller.friendId)
+    .first<{ staff_id: string; starts_at: string; status: string }>();
+  if (!entry || (entry.status !== 'waiting' && entry.status !== 'invited')) {
+    return c.json({ error: 'not_found' }, 404);
+  }
+  const wasInvited = entry.status === 'invited';
   const updated = await c.env.DB
     .prepare(`UPDATE booking_waitlist SET status = 'cancelled',
                   updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-      WHERE id = ? AND line_account_id = ? AND friend_id = ?
-        AND status IN ('waiting', 'invited')`)
-    .bind(id, caller.accountId, caller.friendId)
+      WHERE id = ? AND status IN ('waiting', 'invited')`)
+    .bind(id)
     .run();
-  if ((updated.meta?.changes ?? 0) > 0) return c.json({ status: 'cancelled' });
-  return c.json({ error: 'not_found' }, 404);
+  if ((updated.meta?.changes ?? 0) === 0) return c.json({ error: 'not_found' }, 404);
+  if (wasInvited) {
+    // 見送りで仮押さえが空いたら、次の人へすぐ回す。
+    try {
+      await promoteBookingWaitlist(c.env.DB, {
+        lineAccountId: caller.accountId,
+        staffId: entry.staff_id,
+        startsAt: entry.starts_at,
+      }, undefined, c.env.LIFF_URL ?? '');
+    } catch {
+      console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', waitlistId: id }));
+    }
+  }
+  return c.json({ status: 'cancelled' });
+});
+
+/**
+ * 自分のキャンセル待ち一覧（お客さまの予約画面用）。
+ * M6 の LIFF 画面が「空き枠入りで開く」「取り消しの確認」に使う。
+ */
+booking.get('/api/liff/booking/waitlist', async (c) => {
+  const caller = await resolveSelfBookingCaller(c);
+  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  const rows = await c.env.DB
+    .prepare(
+      `SELECT w.id, w.staff_id, w.menu_id, w.starts_at, w.status,
+              w.hold_minutes, w.invited_at, w.hold_expires_at, w.created_at,
+              m.name AS menu_name, s.display_name AS staff_name
+         FROM booking_waitlist w
+         INNER JOIN menus m ON m.id = w.menu_id
+         INNER JOIN staff s ON s.id = w.staff_id
+        WHERE w.line_account_id = ? AND w.friend_id = ?
+          AND w.status IN ('waiting', 'invited')
+        ORDER BY w.starts_at ASC, w.created_at ASC LIMIT 50`,
+    )
+    .bind(caller.accountId, caller.friendId)
+    .all();
+  return c.json({ waitlist: rows.results });
 });
 
 /**
@@ -3664,6 +3724,138 @@ booking.get('/api/liff/booking/waitlist/mine', async (c) => {
  * date は店の暦日（YYYY-MM-DD、省いたら今日の日本日付）。
  * いまは日本時間（+09:00）固定で日の範囲を作る。
  */
+/**
+ * 席（卓）の予約の卓名。席をつなげる予約は同じつなぎ目の卓を両方出す
+ * （例：テーブル4・5）。止めている卓は出さない。
+ */
+async function seatTableLabels(
+  db: D1Database,
+  storeId: string,
+  tableId: string | null,
+): Promise<string | null> {
+  if (!tableId) return null;
+  const table = await db
+    .prepare(`SELECT label, join_group FROM rt_tables
+      WHERE id = ? AND store_id = ? AND is_active = 1`)
+    .bind(tableId, storeId)
+    .first<{ label: string; join_group: string | null }>();
+  if (!table) return null;
+  if (!table.join_group) return table.label;
+  const siblings = await db
+    .prepare(`SELECT label FROM rt_tables
+      WHERE store_id = ? AND is_active = 1 AND join_group = ?
+      ORDER BY code ASC, id ASC`)
+    .bind(storeId, table.join_group)
+    .all<{ label: string }>();
+  const labels = (siblings.results ?? []).map((row) => row.label);
+  return labels.length > 0 ? labels.join('・') : table.label;
+}
+
+interface TodaySeatRow {
+  kind: 'seat';
+  id: string;
+  store_id: string;
+  store_name: string;
+  starts_at: string;
+  ends_at: string;
+  status: string;
+  customer_name: string;
+  guest_count: number;
+  table_label: string | null;
+  course_name: string | null;
+  visit_mark: {
+    kind: string;
+    late_minutes: number | null;
+    marked_by_name: string | null;
+    marked_at: string;
+  } | null;
+}
+
+async function getTodaySeatReservations(
+  db: D1Database,
+  accountId: string,
+  dayStart: string,
+  dayEnd: string,
+  storeId: string | null,
+): Promise<TodaySeatRow[]> {
+  const stores = await db
+    .prepare(`SELECT id, name, timezone FROM rt_stores
+      WHERE line_account_id = ? AND status = 'active' AND (? IS NULL OR id = ?)`)
+    .bind(accountId, storeId, storeId)
+    .all<{ id: string; name: string; timezone: string }>();
+  const rows: TodaySeatRow[] = [];
+  for (const store of stores.results ?? []) {
+    const reservations = await db
+      .prepare(
+        `SELECT r.id, r.starts_at, r.ends_at, r.status, r.customer_name,
+                r.guest_count, r.table_id, m.name AS course_name
+           FROM rt_reservations r
+           LEFT JOIN rt_menu_items m ON m.id = r.course_id
+          WHERE r.store_id = ? AND r.starts_at >= ? AND r.starts_at < ?
+            AND r.status NOT IN ('cancelled')
+          ORDER BY r.starts_at ASC LIMIT 200`,
+      )
+      .bind(store.id, dayStart, dayEnd)
+      .all<{
+        id: string;
+        starts_at: string;
+        ends_at: string;
+        status: string;
+        customer_name: string;
+        guest_count: number;
+        table_id: string | null;
+        course_name: string | null;
+      }>();
+    const list = reservations.results ?? [];
+    const marks = new Map<string, NonNullable<TodaySeatRow['visit_mark']>>();
+    if (list.length > 0) {
+      const marksRows = await db
+        .prepare(
+          `SELECT reservation_id, kind, late_minutes, marked_by_name, marked_at
+             FROM rt_seat_visit_marks
+            WHERE store_id = ? AND reservation_id IN (${list.map(() => '?').join(',')})
+            ORDER BY marked_at DESC`,
+        )
+        .bind(store.id, ...list.map((reservation) => reservation.id))
+        .all<{
+          reservation_id: string;
+          kind: string;
+          late_minutes: number | null;
+          marked_by_name: string | null;
+          marked_at: string;
+        }>();
+      for (const mark of marksRows.results ?? []) {
+        if (!marks.has(mark.reservation_id)) {
+          marks.set(mark.reservation_id, {
+            kind: mark.kind,
+            late_minutes: mark.late_minutes,
+            marked_by_name: mark.marked_by_name,
+            marked_at: mark.marked_at,
+          });
+        }
+      }
+    }
+    for (const reservation of list) {
+      rows.push({
+        kind: 'seat',
+        id: reservation.id,
+        store_id: store.id,
+        store_name: store.name,
+        starts_at: reservation.starts_at,
+        ends_at: reservation.ends_at,
+        status: reservation.status,
+        customer_name: reservation.customer_name,
+        guest_count: reservation.guest_count,
+        table_label: await seatTableLabels(db, store.id, reservation.table_id),
+        course_name: reservation.course_name,
+        visit_mark: marks.get(reservation.id) ?? null,
+      });
+    }
+  }
+  rows.sort((a, b) => (a.starts_at < b.starts_at ? -1 : a.starts_at > b.starts_at ? 1 : 0));
+  return rows.slice(0, 200);
+}
+
 booking.get('/api/booking/admin/today', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
@@ -3671,9 +3863,26 @@ booking.get('/api/booking/admin/today', async (c) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(rawDate) || Number.isNaN(Date.parse(`${rawDate}T00:00:00+09:00`))) {
     return c.json({ error: 'invalid_date' }, 400);
   }
+  const mode = c.req.query('mode')?.trim() === 'seat' ? 'seat'
+    : c.req.query('mode')?.trim() === 'both' ? 'both' : 'staff';
+  // 週・月の席は期間で取る（from/to は店の暦日。無ければ date の1日）。
+  const rawFrom = c.req.query('from')?.trim() || null;
+  const rawTo = c.req.query('to')?.trim() || null;
+  const dayLike = /^\d{4}-\d{2}-\d{2}$/;
+  if ((rawFrom && !dayLike.test(rawFrom)) || (rawTo && !dayLike.test(rawTo))) {
+    return c.json({ error: 'invalid_date' }, 400);
+  }
+  const rangeStart = rawFrom ?? rawDate;
+  const rangeEndExclusive = rawTo ?? rawDate;
+  const startIso = new Date(`${rangeStart}T00:00:00+09:00`).toISOString();
+  const endIso = new Date(Date.parse(`${rangeEndExclusive}T00:00:00+09:00`) + 86_400_000).toISOString();
+  if (Date.parse(endIso) <= Date.parse(startIso)
+    || Date.parse(endIso) - Date.parse(startIso) > 35 * 86_400_000) {
+    return c.json({ error: 'invalid_date' }, 400);
+  }
   const conditions = ['b.line_account_id = ?', 'b.starts_at >= ?', 'b.starts_at < ?'];
-  const dayStart = new Date(`${rawDate}T00:00:00+09:00`).toISOString();
-  const dayEnd = new Date(Date.parse(dayStart) + 86_400_000).toISOString();
+  const dayStart = startIso;
+  const dayEnd = endIso;
   const values: unknown[] = [accountId, dayStart, dayEnd];
   const status = c.req.query('status')?.trim();
   if (status && ['requested', 'confirmed', 'completed', 'no_show', 'cancelled'].includes(status)) {
@@ -3684,7 +3893,7 @@ booking.get('/api/booking/admin/today', async (c) => {
   }
   const staffId = c.req.query('staff_id')?.trim();
   if (staffId) { conditions.push('b.staff_id = ?'); values.push(staffId); }
-  const rows = await c.env.DB
+  const rows = mode === 'seat' ? { results: [] } : await c.env.DB
     .prepare(
       `SELECT b.id, b.starts_at, b.ends_at, b.status, b.price_at_booking,
               b.friend_id, b.booking_customer_id,
@@ -3747,12 +3956,32 @@ booking.get('/api/booking/admin/today', async (c) => {
       }
     }
   }
+  const staffTimeline = bookings.map((booking) => ({
+    kind: 'staff' as const,
+    ...booking,
+    visit_mark: marks.get(booking.id) ?? null,
+  }));
+  // 席は飲食店の店だけ（結び付きが無ければ空）。
+  const storeId = c.req.query('store_id')?.trim() || null;
+  const seatTimeline = mode === 'staff'
+    ? []
+    : await getTodaySeatReservations(c.env.DB, accountId, dayStart, dayEnd, storeId);
+  const timeline = [...staffTimeline, ...seatTimeline]
+    .sort((a, b) => (a.starts_at < b.starts_at ? -1 : a.starts_at > b.starts_at ? 1 : 0))
+    .slice(0, 200);
+  // 席の切り替えを出すか（結び付きのある店だけ）。
+  const seatStore = await c.env.DB
+    .prepare(`SELECT 1 AS ok FROM rt_stores
+      WHERE line_account_id = ? AND status = 'active' LIMIT 1`)
+    .bind(accountId)
+    .first<{ ok: number }>();
   return c.json({
     date: rawDate,
-    bookings: bookings.map((booking) => ({
-      ...booking,
-      visit_mark: marks.get(booking.id) ?? null,
-    })),
+    mode,
+    has_seat_stores: Boolean(seatStore?.ok),
+    bookings: staffTimeline,
+    seats: seatTimeline,
+    timeline,
   });
 });
 
@@ -3847,6 +4076,63 @@ booking.post('/api/booking/admin/bookings/:id/visit', requireRole('owner', 'admi
       marked_at: markedAt,
     },
   });
+});
+
+/**
+ * 今日の予約の印を取り消す（「取り消す」・知らせの「元に戻す」）。
+ *
+ * 最新の印を1件消す。印が状態を変えていた（来店→完了・来なかった→無断）
+ * ときは確定へ戻す。遅れるは印を消すだけ。
+ */
+booking.delete('/api/booking/admin/bookings/:id/visit', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const id = c.req.param('id');
+  const mark = await c.env.DB
+    .prepare(`SELECT id, kind FROM booking_visit_marks
+      WHERE booking_id = ? AND line_account_id = ?
+      ORDER BY marked_at DESC LIMIT 1`)
+    .bind(id, accountId)
+    .first<{ id: string; kind: string }>();
+  if (!mark) return c.json({ error: 'not_found' }, 404);
+  const row = await c.env.DB
+    .prepare(`SELECT status FROM bookings WHERE id = ? AND line_account_id = ?`)
+    .bind(id, accountId)
+    .first<{ status: BookingStatus }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+  let next = row.status;
+  if (mark.kind === 'visited' && row.status === 'completed') next = 'confirmed';
+  else if (mark.kind === 'no_show' && row.status === 'no_show') next = 'confirmed';
+  else if (mark.kind !== 'late') return c.json({ error: 'status_changed' }, 409);
+  if (next !== row.status) {
+    const updated = await c.env.DB
+      .prepare(`UPDATE bookings SET status = ?,
+                    updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ? AND status = ?`)
+      .bind(next, id, row.status)
+      .run();
+    if ((updated.meta?.changes ?? 0) === 0) {
+      return c.json({ error: 'concurrent_update' }, 409);
+    }
+  }
+  await c.env.DB
+    .prepare(`DELETE FROM booking_visit_marks WHERE id = ?`)
+    .bind(mark.id)
+    .run();
+  const me = c.get('staff') as { id?: string; name?: string } | undefined;
+  await recordBookingAudit(c.env.DB, {
+    bookingId: id,
+    lineAccountId: accountId,
+    action: 'visit_unmarked',
+    before: { status: row.status, visit_kind: mark.kind },
+    after: { status: next },
+    reason: 'today_visit_unmark',
+    actorType: 'staff',
+    actorId: typeof me?.id === 'string' ? me.id : null,
+    actorName: typeof me?.name === 'string' ? me.name : null,
+    occurredAt: new Date().toISOString(),
+  });
+  return c.json({ status: next });
 });
 
 booking.get('/api/booking/admin/reminder-preview', async (c) => {
@@ -7192,7 +7478,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         lineAccountId: accountId,
         staffId: row.staff_id,
         startsAt: row.starts_at,
-      });
+      }, undefined, c.env.LIFF_URL ?? '');
     } catch {
       console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId: id }));
     }

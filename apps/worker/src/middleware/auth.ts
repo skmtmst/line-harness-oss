@@ -400,6 +400,9 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/menus'],
   ['GET', '/api/restaurant-test/channels'],
   ['POST', '/api/restaurant-test/reservations/manual'],
+  // 席の空き待ち（booking-plus 席版）：担当者も日の帯から印を付ける。
+  ['GET', '/api/restaurant-test/seat-waitlist'],
+  ['POST', '/api/restaurant-test/seat-waitlist'],
   // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
   ['GET', '/api/restaurant-test/google/connection'],
   ['GET', '/api/restaurant-test/google/reviews'],
@@ -428,6 +431,11 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
   ['PATCH', /^\/api\/restaurant-test\/reservations\/[^/]+$/],
+  // 席の空き待ちの取り消し・繰り上げ・来店の印（booking-plus 席版）。
+  ['DELETE', /^\/api\/restaurant-test\/seat-waitlist\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/seat-waitlist\/[^/]+\/convert$/],
+  ['POST', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
+  ['DELETE', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
   ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],

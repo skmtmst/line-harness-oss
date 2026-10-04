@@ -8,14 +8,20 @@
  *
  * 個人情報はログに出さない（件数とIDだけ）。
  */
-import type {
-  BookingNotificationSender,
-} from './booking-notifier.js';
 import {
   formatStartsAtForStore,
   notificationTiming,
   sendBookingNotification,
 } from './booking-notifier.js';
+import {
+  buildWaitlistInviteBubble,
+  formatSlotHeadline,
+  sendWaitlistInviteCard,
+  waitlistBookUrl,
+  waitlistDeclineUrl,
+  type WaitlistInviteSender,
+} from './booking-waitlist-card.js';
+import { tzHHMM } from './availability.js';
 import { resolveLineCredential } from '@line-crm/db';
 
 export const DEFAULT_WAITLIST_HOLD_MINUTES = 30;
@@ -77,7 +83,8 @@ export type PromoteResult =
 export async function promoteBookingWaitlist(
   db: D1Database,
   slot: WaitlistSlot,
-  sender: BookingNotificationSender = sendBookingNotification,
+  sender: WaitlistInviteSender = sendWaitlistInviteCard,
+  liffBaseUrl = '',
 ): Promise<PromoteResult> {
   const now = new Date();
   const nowIso = now.toISOString();
@@ -172,19 +179,39 @@ export async function promoteBookingWaitlist(
           { lineAccountId: slot.lineAccountId, field: 'channel_access_token' },
         );
         const timeZone = target.timezone ?? 'Asia/Tokyo';
-        const timing = notificationTiming(slot.startsAt, timeZone, now);
-        await sender({
-          channelAccessToken: accessToken,
-          toLineUserId: target.line_user_id,
-          kind: 'waitlist_invite',
-          ctx: {
-            menuName: target.menu_name,
-            staffName: target.staff_name,
-            startsAt: formatStartsAtForStore(slot.startsAt, timeZone),
-            ...timing,
-            holdMinutes,
-          },
-        });
+        const headline = formatSlotHeadline(slot.startsAt, timeZone);
+        const detail = `${target.menu_name}・担当 ${target.staff_name}`;
+        const holdEnd = tzHHMM(timeZone, new Date(holdExpiresAt));
+        if (liffBaseUrl) {
+          const bubble = buildWaitlistInviteBubble({
+            headline,
+            detail,
+            holdLine: `${holdEnd} まではこちらだけが予約できます。`,
+            bookUrl: waitlistBookUrl(liffBaseUrl, entry.id),
+            declineUrl: waitlistDeclineUrl(liffBaseUrl, entry.id),
+          });
+          await sender({
+            channelAccessToken: accessToken,
+            toLineUserId: target.line_user_id,
+            bubble,
+            altText: `${headline} に空きが出ました`,
+          });
+        } else {
+          // LIFF の置き場が無い店では従来の文面だけ送る。
+          const timing = notificationTiming(slot.startsAt, timeZone, now);
+          await sendBookingNotification({
+            channelAccessToken: accessToken,
+            toLineUserId: target.line_user_id,
+            kind: 'waitlist_invite',
+            ctx: {
+              menuName: target.menu_name,
+              staffName: target.staff_name,
+              startsAt: formatStartsAtForStore(slot.startsAt, timeZone),
+              ...timing,
+              holdMinutes,
+            },
+          });
+        }
         await db
           .prepare(`UPDATE booking_waitlist SET notified_at = ? WHERE id = ?`)
           .bind(nowIso, entry.id)
