@@ -1998,6 +1998,8 @@ export default function BroadcastForm({
         }
       }
       setConfirmOpen(false)
+      // 単頁の保存でも知らせを出す。予約の申込みは遷移先が状態を出すので出さない。
+      if (!scheduledAtIso()) notifyToast('下書きを保存しました。')
       onSuccess(saved)
     } catch {
       // R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。

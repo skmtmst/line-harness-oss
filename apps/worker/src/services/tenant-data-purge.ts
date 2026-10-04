@@ -97,6 +97,22 @@ interface OneTenantResult {
   finished: boolean;
 }
 
+/**
+ * 回答フォームだけの消す条件。表の分類どおり利用アカウント（form_accounts）
+ * をたどるが、それだけでは統括をまたいで使い回している物まで消してしまう。
+ * 別の統括の店に紐づいている物は、どちらの統括の削除でも消さない。
+ * 所属の決まっていない店（tenant_id が空）の紐づけも「別」扱いにして消さない。
+ */
+function formsPurgeCondition(): string {
+  return `${tenantScopeCondition('forms')} AND NOT EXISTS (
+    SELECT 1 FROM form_accounts fa_other
+    WHERE fa_other.form_id = forms.id
+      AND fa_other.line_account_id IN (
+        SELECT id FROM line_accounts WHERE tenant_id IS NULL OR tenant_id <> ?
+      )
+  )`;
+}
+
 async function purgeOneTenant(
   env: TenantDataPurgeEnv,
   tenant: TenantRetention,
@@ -119,7 +135,10 @@ async function purgeOneTenant(
       out.finished = false;
       break;
     }
-    const condition = tenantScopeCondition(table);
+    // 回答フォームだけ統括またぎの使い回しを守る条件にする（? が1つ増える）。
+    const sharedForm = table === 'forms';
+    const condition = sharedForm ? formsPurgeCondition() : tenantScopeCondition(table);
+    const tenantParams = sharedForm ? [tenant.id, tenant.id] : [tenant.id];
     const keyColumns = R2_KEY_COLUMNS_BY_TABLE[table] ?? [];
 
     for (;;) {
@@ -144,7 +163,7 @@ async function purgeOneTenant(
               SELECT ${table}.rowid FROM ${table} WHERE ${condition} ORDER BY ${table}.rowid LIMIT ?
             )`,
         )
-        .bind(tenant.id, chunk)
+        .bind(...tenantParams, chunk)
         .run();
       const changes = deleted.meta?.changes ?? 0;
       if (changes > 0) {

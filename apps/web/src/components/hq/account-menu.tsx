@@ -3,7 +3,7 @@
 import { ChevronsUpDown, CreditCard, LogOut, MessageCircleQuestion, Users } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { StaffMember } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { billingChip, trialDaysLabel, type BillingSummary } from '@/lib/hq-billing'
@@ -93,6 +93,15 @@ export default function HqAccountMenu() {
           aria-label="アカウントメニュー"
           data-design-node="bfhe6"
           className="absolute bottom-full left-0 z-30 mb-2 flex w-full flex-col rounded-panel border border-hairline bg-canvas shadow-card"
+          onKeyDown={(event: ReactKeyboardEvent<HTMLElement>) => {
+            if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+            const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])'))
+            if (items.length === 0) return
+            event.preventDefault()
+            const current = items.indexOf(document.activeElement as HTMLElement)
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : event.key === 'ArrowDown' ? (current + 1) % items.length : (current - 1 + items.length) % items.length
+            items[next].focus()
+          }}
         >
           <div className="flex flex-col gap-1 px-4 pb-3 pt-4">
             <p className="text-body font-bold text-ink">{name}</p>

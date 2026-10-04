@@ -13,8 +13,8 @@ export default function HistoryCard({ booking }: { booking: BookingHistoryItem }
   return (
     <li>
       <Card className="flex items-center gap-3 p-3.5">
-        <div className="flex w-14 shrink-0 flex-col items-center rounded-[10px] bg-liff-off-bg py-1.5">
-          <span className="text-[15px] font-bold whitespace-nowrap text-ink">
+        <div className="flex w-14 shrink-0 flex-col items-center rounded-(--liff-radius) bg-liff-off-bg py-1.5">
+          <span className="text-xs font-semibold whitespace-nowrap text-ink">
             {utcToJstMd(booking.starts_at)}
           </span>
           <span className="text-[11px] text-liff-sub">{utcToJstHm(booking.starts_at)}</span>

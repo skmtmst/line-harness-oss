@@ -1405,7 +1405,7 @@ export default function ScenarioDetailClient({
             }
             options={[
               { value: 'continue', label: '送信後：次のステップへ進む' },
-              { value: 'pause', label: '送信後：ここで一時停止する' },
+              { value: 'pause', label: '送信後：ここで止める' },
             ]}
             size="full"
           />
@@ -2074,7 +2074,7 @@ export default function ScenarioDetailClient({
                       ? `${latestStartedLabel} 開始`
                       : '開始日時を取得できませんでした'
                     : scenario.isActive
-                      ? '配信を一時停止する'
+                      ? '配信を止める'
                       : '配信を再開する'}
                 </p>
                 {/*

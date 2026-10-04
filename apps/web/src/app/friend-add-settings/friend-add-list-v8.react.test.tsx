@@ -226,9 +226,9 @@ test('v8 の受け皿は一番下・操作に「削除する」がなく消せ�
     expect(labels).toContain('編集')
     expect(labels).toContain('実行結果を見る')
     expect(labels).toContain('テストを送る')
-    expect(labels).toContain('一時停止する')
+    expect(labels).toContain('止める')
     expect(labels).not.toContain('削除する')
-    expect(menu!.textContent).toContain('この設定は消せません')
+    expect(menu!.textContent).toContain('この設定は削除できません')
   })
 })
 
@@ -247,7 +247,7 @@ test('v8 の受け皿を止める選択は「止められない」確かめの�
     expect(document.querySelector('[role="menu"]')).toBeTruthy()
   })
   const stop = [...document.querySelectorAll('[role="menuitem"]')]
-    .find((item) => item.textContent?.includes('一時停止する')) as HTMLElement
+    .find((item) => item.textContent?.includes('止める')) as HTMLElement
   await act(async () => { stop.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   await eventually(() => {
     // 板 cFo2p：止められない確かめ

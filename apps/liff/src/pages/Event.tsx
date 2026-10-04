@@ -15,6 +15,7 @@ import Icon from '../components/ui/Icon.js';
 import Button from '../components/ui/Button.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 
 /**
  * 表示してよいURLか。保存時に弾き切れない古い行もあるため、表示側でも
@@ -106,7 +107,7 @@ export default function Event() {
 
   if (loading || failed || !event) {
     return (
-      <div className="min-h-screen bg-ground">
+      <LiffLookScope className="min-h-screen bg-ground">
         <LiffHeader title="イベント" />
         <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
           {failed ? (
@@ -115,7 +116,7 @@ export default function Event() {
             <LoadingView />
           )}
         </div>
-      </div>
+      </LiffLookScope>
     );
   }
 
@@ -155,14 +156,14 @@ export default function Event() {
   }
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node="gVjiC">
+    <LiffLookScope className="min-h-screen bg-ground" designNode="gVjiC">
       <LiffHeader title="イベント" />
       <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-28">
         {isHttpsUrl(event.image_url) ? (
           <img
             src={event.image_url}
             alt=""
-            className="h-48 w-full rounded-xl border border-hairline object-cover"
+            className="h-40 w-full rounded-xl border border-hairline object-cover"
           />
         ) : (
           <div
@@ -175,20 +176,20 @@ export default function Event() {
         <div className="space-y-2">
           <h2 className="text-xl font-bold text-ink">{event.name}</h2>
           {span && (
-            <p className="flex items-start gap-2 text-sm text-ink">
+            <p className="flex items-start gap-2 text-[13px] text-ink">
               <Icon name="calendar" className="mt-0.5 h-4 w-4 shrink-0 text-ink-secondary" />
               <span>{span}</span>
             </p>
           )}
           {event.venue_name && (
-            <p className="flex items-start gap-2 text-sm text-ink">
+            <p className="flex items-start gap-2 text-[13px] text-ink">
               <Icon name="map-pin" className="mt-0.5 h-4 w-4 shrink-0 text-ink-secondary" />
               <span className="min-w-0 flex-1 truncate" title={event.venue_name}>
                 {event.venue_name}
               </span>
             </p>
           )}
-          <p className="flex items-start gap-2 text-sm">
+          <p className="flex items-start gap-2 text-[13px]">
             <Icon name="users" className="mt-0.5 h-4 w-4 shrink-0 text-ink-secondary" />
             <span className={hasSeats ? 'font-bold text-liff-wait-ink' : 'text-ink'}>{seats}</span>
           </p>
@@ -206,7 +207,7 @@ export default function Event() {
         </div>
         {event.description && (
           <p
-            className={`text-sm leading-6 whitespace-pre-wrap text-ink ${event.description_centered === 1 ? 'text-center' : ''}`}
+            className={`text-xs leading-6 whitespace-pre-wrap text-liff-sub ${event.description_centered === 1 ? 'text-center' : ''}`}
           >
             {event.description}
           </p>
@@ -245,16 +246,16 @@ export default function Event() {
                       aria-label={full ? `${timeText} 満席` : undefined}
                       onClick={() => setSelectedId(s.id)}
                       title={formatJstEventAt(s.starts_at)}
-                      className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${tone}`}
+                      className={`flex min-h-[42px] w-full items-center justify-between gap-3 rounded-(--liff-radius) border px-4 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${tone}`}
                     >
                       <span
-                        className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-white' : 'text-ink'}`}
+                        className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-(--liff-on-primary)' : 'text-ink'}`}
                       >
                         {utcToJstMd(s.starts_at)}({utcToJstWeekday(s.starts_at)}) {utcToJstHm(s.starts_at)}〜
                         {utcToJstHm(s.ends_at)}
                       </span>
                       <span
-                        className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-white' : full && !disabled ? 'font-bold text-liff-wait-ink' : 'text-ink-secondary'}`}
+                        className={`shrink-0 text-xs font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-(--liff-on-primary)' : full && !disabled ? 'text-liff-wait-ink' : 'text-ink-secondary'}`}
                       >
                         {fullLabel}
                       </span>
@@ -299,6 +300,6 @@ export default function Event() {
                 : '時間を選んでください'}
         </Button>
       </BottomBar>
-    </div>
+    </LiffLookScope>
   );
 }
