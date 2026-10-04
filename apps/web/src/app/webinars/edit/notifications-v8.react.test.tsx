@@ -4,6 +4,7 @@
  * 差し替えるのは通信だけ。入り切りの段・実績・視聴後の段が実在する。
  */
 import React, { act } from 'react'
+import { fireEvent } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -186,5 +187,30 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
     expect(apiMocks.saveEditor).not.toHaveBeenCalled()
     expect(apiMocks.testNotifications).not.toHaveBeenCalled()
   })
+
+  it('通知保存後の読み直しが失敗しても、通知を再保存せず最新版でメッセージを保存する', async () => {
+    apiMocks.editor.mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ data: { ...EDITOR, version: 3 } })
+    apiMocks.saveEditor.mockResolvedValueOnce({ data: { ...EDITOR, version: 4 } })
+    const host = render()
+    await act(async () => undefined)
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button[role="switch"][aria-label="申込のお礼"]')!.click()
+      fireEvent.change(host.querySelector('textarea')!, { target: { value: '見てくれてありがとう' } })
+    })
+    const save = [...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存')!
+    await act(async () => { save.click() })
+    expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
+    expect(apiMocks.saveEditor).not.toHaveBeenCalled()
+    expect(host.querySelector('textarea')!.value).toBe('見てくれてありがとう')
+    await act(async () => { save.click() })
+    expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
+    expect(apiMocks.editor).toHaveBeenCalledTimes(2)
+    expect(apiMocks.saveEditor).toHaveBeenCalledWith('webinar-1', {
+      expectedVersion: 3, actionTemplateBody: '見てくれてありがとう', missingResultPolicy: 'escalate',
+    })
+  })
+
+
 
 })

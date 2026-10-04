@@ -35,7 +35,13 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
   const [policy, setPolicy] = useState<WebinarEditor['actionPolicy']['missingResultPolicy']>(editor.actionPolicy?.missingResultPolicy ?? 'escalate')
   const [baseline, setBaseline] = useState({ templateBody: editor.actionPolicy?.templateBody ?? '', policy: editor.actionPolicy?.missingResultPolicy ?? 'escalate' })
   const policyDirty = templateBody !== baseline.templateBody || policy !== baseline.policy
-  const dirty = notificationDirty || policyDirty
+  const currentPolicyDirty = useRef(policyDirty)
+  currentPolicyDirty.current = policyDirty
+  const [editorRefreshPending, setEditorRefreshPending] = useState(false)
+  const refreshPending = useRef(false)
+  const version = useRef(editor.version)
+  useEffect(() => { version.current = editor.version }, [editor.version])
+  const dirty = notificationDirty || policyDirty || editorRefreshPending
   const [saving, setSaving] = useState(false)
   const saveLock = useRef(false)
   const [error, setError] = useState('')
@@ -52,7 +58,7 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
     return () => { current = false }
   }, [webinarId, actionAttempt])
   useEffect(() => {
-    if (policyDirty) return
+    if (currentPolicyDirty.current) return
     const next = { templateBody: editor.actionPolicy?.templateBody ?? '', policy: editor.actionPolicy?.missingResultPolicy ?? 'escalate' }
     setTemplateBody(next.templateBody); setPolicy(next.policy); setBaseline(next)
   }, [editor.actionPolicy?.templateBody, editor.actionPolicy?.missingResultPolicy])
@@ -63,15 +69,22 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
     if (!canEdit || saveLock.current || (!settingsReady && !dirty)) return false
     saveLock.current = true; setSaving(true); setError('')
     try {
-      let version = editor.version
       if (notificationDirty) {
         if (!notificationSave.current || !await notificationSave.current()) return false
+        refreshPending.current = true
+        setEditorRefreshPending(true)
+      }
+      // 通知だけ保存済みなら再保存しない。読み直しが失敗しても、次の試行で版を取得する。
+      if (refreshPending.current) {
         const refreshed = await webinarApi.editor(webinarId)
-        version = refreshed.data.version
+        version.current = refreshed.data.version
         onEditorChange?.(refreshed.data)
+        refreshPending.current = false
+        setEditorRefreshPending(false)
       }
       if (policyDirty) {
-        const res = await webinarApi.saveEditor(webinarId, { expectedVersion: version, actionTemplateBody: templateBody, missingResultPolicy: policy })
+        const res = await webinarApi.saveEditor(webinarId, { expectedVersion: version.current, actionTemplateBody: templateBody, missingResultPolicy: policy })
+        version.current = res.data.version
         setBaseline({ templateBody, policy }); onEditorChange?.(res.data)
       }
       return true
