@@ -176,4 +176,16 @@ describe('R23横展開 流入リンク作成の候補は選択accountで絞る',
     await settle()
     expect(host.textContent).not.toContain('今のアカウントにないため外しました')
   })
+  it('切り替え後も使える候補は選択を残し、不要な選び直しを求めない', async () => {
+    api.tagsList.mockResolvedValue({ success: true, data: [{ id: 'shared-tag', name: '共通のタグ' }] })
+    await act(async () => { root.render(React.createElement(NewInflowLinkPage)) })
+    await settle()
+    await chooseOption('ir-tag', '共通のタグ')
+    fixture.accountId = 'account-2'
+    await act(async () => { root.render(React.createElement(NewInflowLinkPage)) })
+    await settle(100)
+    expect(triggerById('ir-tag').textContent).toContain('共通のタグ')
+    expect(host.textContent).not.toContain('今のアカウントにないため外しました')
+  })
+
 })

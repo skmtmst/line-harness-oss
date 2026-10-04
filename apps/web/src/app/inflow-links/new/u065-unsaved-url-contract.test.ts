@@ -5,13 +5,13 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
 /**
  * #975 U065: 未入力でも「/r/summer-ig」のURLとQRが出て発行済みに見えた。
- * 未入力は例示、入力中は未発行の見本、と分ける。
+ * 未入力は案内だけ、入力中は未発行の見本、と分ける。
  */
 describe('流入URLの保存前表示（#975 U065）', () => {
-  it('REFが未入力のときは例のURLだけを出し、見本URLは作らない', () => {
+  it('REFが未入力のときは入力を案内し、見本URLは作らない', () => {
     expect(PAGE).toContain("const previewUrl = validRef ? `${workerBase}/r/${refCode}` : ''")
     expect(PAGE).not.toContain("refCode || 'summer-ig'")
-    expect(PAGE).toContain('例: {workerBase}/r/summer-ig')
+    expect(PAGE).toContain('見分けるための文字を決めると URL ができます')
     expect(PAGE).toContain('まだ発行されていません')
   })
 
