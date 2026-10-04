@@ -1209,42 +1209,25 @@
       ]
     },
     "/inflow-links": {
-      "node": "Q4bkTg IhSBB v0HaI BuVDB Im2b1",
+      "node": "xbHxg IhSBB qSTVR FDBsG p0kA3",
       "visualVerification": {
-        "status": "verified",
+        "status": "unverified",
         "referenceNodeIds": [
-          "Q4bkTg",
+          "xbHxg",
           "IhSBB",
-          "v0HaI",
-          "BuVDB",
-          "Im2b1"
+          "qSTVR",
+          "FDBsG",
+          "p0kA3"
         ],
         "requiredViewports": [
+          1152,
+          1280,
           1440,
           1920
         ],
-        "referenceScreenshots": [
-          "docs/design-reference/inflow-v6/Q4bkTg.png",
-          "docs/design-reference/inflow-v6/IhSBB.png",
-          "docs/design-reference/inflow-v6/v0HaI.png",
-          "docs/design-reference/inflow-v6/BuVDB.png",
-          "docs/design-reference/inflow-v6/Im2b1.png"
-        ],
-        "implementationScreenshots": [
-          "docs/design-qa/inflow-v6/Q4bkTg-1440.png",
-          "docs/design-qa/inflow-v6/Q4bkTg-1920.png",
-          "docs/design-qa/inflow-v6/IhSBB-1440.png",
-          "docs/design-qa/inflow-v6/IhSBB-1920.png",
-          "docs/design-qa/inflow-v6/v0HaI-1440.png",
-          "docs/design-qa/inflow-v6/v0HaI-1920.png",
-          "docs/design-qa/inflow-v6/BuVDB-1440.png",
-          "docs/design-qa/inflow-v6/BuVDB-1920.png",
-          "docs/design-qa/inflow-v6/Im2b1-1440.png",
-          "docs/design-qa/inflow-v6/Im2b1-1920.png"
-        ],
-        "checkedAt": "2026-09-06T20:00:00+09:00"
+        "reason": "2026-10-04: 広告の3画面をV8へ移行。幅別の撮影と比較は司令塔が実施する。"
       },
-      "name": "V6 18 流入と計測（4タブ）",
+      "name": "V8 流入と計測・広告連携（サイトスクリプトは移行前）",
       "sections": [
         "Head",
         "KPIs",
@@ -1289,10 +1272,6 @@
         "1. LINEから開いた場合",
         "2. あとからLINEを追加した場合",
         "3. 結びつかない場合",
-        "今月の広告費",
-        "Yahoo!広告",
-        "広告のまとまり",
-        "成果地点と、広告に返す名前の対応",
         "クリックの目印",
         "広告への送信履歴",
         "送った件数",
@@ -1305,17 +1284,16 @@
         "流入リンクを作る",
         "累計。そのうち経路が分かる人",
         "経路の名前・URLで探す",
-        "同時配信なし"
+        "同時配信なし",
+        "この30日の広告費",
+        "流入元ごとの費用"
       ],
       "implementationGaps": {
         "parts": [
           "保存した条件",
-          "知らないドメインが1つあります",
-          "今月の広告費",
-          "Yahoo!広告",
-          "広告のまとまり"
+          "知らないドメインが1つあります"
         ],
-        "reason": "2026-09-08(#514-14・#565): 計測の口はパスだけ返すため、ドメインの抜き出しと「知らないドメイン」判定は本番で死んでいる。ホスト列を返す口ができたら、警告と一緒に戻す。 ／ 2026-09-24(★V7 #701): 「保存した条件」は保存の口が無く「まだ繋がっていません」と出すだけの行だったので、節（Saved）ごと出さない。条件の保存ができたら節と一緒に戻す。 ／ 2026-09-27(#818): 「今月の広告費」は期間の違う台帳の「この30日の広告費」に、「Yahoo!広告」は対応媒体タイル（Meta/Google/X/TikTok）に、「広告のまとまり」の空節は実データの「流入元ごとの費用」表に置き換えた。"
+        "reason": "2026-10-04: 広告3画面の配置と言葉をV8へ更新。旧版の広告費・媒体・未接続の対応表の空箱を契約から外した。実際の保存・取消・権限・計測鍵・再取得の動作試験は維持。成果と広告名の対応、再送操作、流入元と次回送信時刻はAPIと保存仕様の追加が必要。"
       }
     },
     "/inflow-links/new": {

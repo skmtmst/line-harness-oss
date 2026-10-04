@@ -6,6 +6,15 @@ import type { AdConversionLog, AdPlatform } from '@/lib/api'
 import type { EntryRoute } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import Chip from '@/components/shared/chip'
+import Disclosure from '@/components/shared/disclosure'
+import KpiCard from '@/components/shared/kpi-card'
+import PageHeader from '@/components/shared/page-header'
+import SectionHeader from '@/components/shared/section-header'
+import ActionMenu from '@/components/shared/action-menu'
+import { MoreAction } from '@/components/shared/row-actions'
+import { RefreshCw } from 'lucide-react'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -23,10 +32,10 @@ type AdView = 'metrics' | 'connections' | 'history'
 const LOG_PAGE_SIZE = 20
 
 const PROVIDERS = [
-  { key: 'meta', label: 'Meta広告', clickId: 'fbclid' },
   { key: 'google', label: 'Google広告', clickId: 'gclid' },
-  { key: 'x', label: 'X（旧Twitter）', clickId: 'twclid' },
+  { key: 'meta', label: 'Meta広告', clickId: 'fbclid' },
   { key: 'tiktok', label: 'TikTok', clickId: 'ttclid' },
+  { key: 'x', label: 'X（旧Twitter）', clickId: 'twclid' },
 ] as const
 
 const STATUS_LABEL: Record<string, string> = {
@@ -101,7 +110,7 @@ function shortDateTime(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(date)
 }
 
 function currencyCode(platform: AdPlatform): string | null {
@@ -134,14 +143,6 @@ function accountLabel(platform: AdPlatform): string | null {
   return null
 }
 
-function configNumber(platforms: AdPlatform[], key: string): number | null {
-  for (const platform of platforms) {
-    const value = platform.config[key]
-    if (typeof value === 'number' && Number.isFinite(value)) return value
-  }
-  return null
-}
-
 /**
  * #514-8: 送信履歴の口が返すのは id・adPlatformId・friendId・eventName・
  * clickId(clickIdType)・status・errorMessage・createdAt だけ。口の返さない
@@ -152,7 +153,7 @@ function syncLabel(platform: AdPlatform): string | null {
   if (typeof syncedAt !== 'string' || !syncedAt) return null
   const date = new Date(syncedAt)
   if (Number.isNaN(date.getTime())) return null
-  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(date)
 }
 
 /** #514-8: 次の予定は口に無い。取れない時刻は書かず状態だけ出す。 */
@@ -160,12 +161,6 @@ function nextScheduleText(log: AdConversionLog): string {
   if (log.status === 'pending') return '送信待ちです'
   if (log.status === 'failed') return '予定はありません'
   return '—'
-}
-
-function matchesStatus(log: AdConversionLog, status: string): boolean {
-  if (status === 'all') return true
-  if (status === 'sent') return log.status === 'sent' || log.status === 'success'
-  return log.status === status
 }
 
 function safeCsv(logs: AdConversionLog[]): string {
@@ -200,12 +195,14 @@ export default function AdIntegration({
   const [logs, setLogs] = useState<AdConversionLog[]>([])
   const [logTotal, setLogTotal] = useState(0)
   // R278: 30日の送信結果は一覧の口が返す集計を使う。ページ・絞り込みで
-  // 変わらない全アカウント範囲の数で、口が返さない時だけ従来の推測へ戻る。
+  // 変わらない全アカウント範囲の数で、口が返さない時は「—」とし、表示中の行から推測しない。
   const [logSummary, setLogSummary] = useState<{ sentLast30Days: number; pendingLast30Days: number; failedLast30Days: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
+  const [platformFilter, setPlatformFilter] = useState<{ accountId: string | null; id: string }>({ accountId: selectedAccountId, id: '' })
+  const adPlatformId = platformFilter.accountId === selectedAccountId ? platformFilter.id : ''
   // #514-6: 媒体横断の共通一覧口から20件ずつ取得する。
   const [logPage, setLogPage] = useState(1)
   // #514-13: 失敗理由は口の errorMessage を開いて見せる(「理由を見る」を効かせる)。
@@ -231,6 +228,7 @@ export default function AdIntegration({
   const [entryRoutes, setEntryRoutes] = useState<EntryRoute[]>([])
   const [importingId, setImportingId] = useState<string | null>(null)
   const [importError, setImportError] = useState('')
+  const [manualMenuId, setManualMenuId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const generation = ++loadGenerationRef.current
@@ -252,7 +250,7 @@ export default function AdIntegration({
     try {
       const [platformResponse, logResponse, costResponse] = await Promise.all([
         api.adPlatforms.list(accountAtRequest),
-        api.adPlatforms.logsPage({ page: logPage, limit: LOG_PAGE_SIZE, status, query, lineAccountId: accountAtRequest }),
+        api.adPlatforms.logsPage({ page: logPage, limit: LOG_PAGE_SIZE, status, query, lineAccountId: accountAtRequest, adPlatformId }),
         api.adCosts.list({ accountId: accountAtRequest }),
       ])
       if (!isCurrent()) return
@@ -281,7 +279,7 @@ export default function AdIntegration({
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [logPage, query, selectedAccountId, status])
+  }, [adPlatformId, logPage, query, selectedAccountId, status])
 
   useEffect(() => {
     // 切替直後は前accountの金額を残さず、遅れて届いた旧応答もgenerationで捨てる。
@@ -345,11 +343,11 @@ export default function AdIntegration({
           },
     )
   }, [onPlatformCountsChange, loading, failed, selectedAccountId, platforms])
-  const sentCount = logSummary?.sentLast30Days ?? configNumber(platforms, 'sent_count') ?? logs.filter((log) => matchesStatus(log, 'sent')).length
-  const pendingCount = logSummary?.pendingLast30Days ?? configNumber(platforms, 'pending_count') ?? logs.filter((log) => log.status === 'pending').length
-  const failedCount = logSummary?.failedLast30Days ?? configNumber(platforms, 'failed_count') ?? logs.filter((log) => log.status === 'failed').length
-  // #514-13: 取れない数を 0 と書かない。retry_success_count が無ければ「—」。
-  const retrySuccessCount = configNumber(platforms, 'retry_success_count')
+  const sentCount = logSummary?.sentLast30Days ?? null
+  const pendingCount = logSummary?.pendingLast30Days ?? null
+  const failedCount = logSummary?.failedLast30Days ?? null
+  // 再送成功数の集計は口が返さない。設定値や表示中の行から推測しない。
+  const retrySuccessCount = null
   const visibleLogs = logs
   const logPageCount = Math.max(1, Math.ceil(logTotal / LOG_PAGE_SIZE))
   const safeLogPage = Math.min(logPage, logPageCount)
@@ -443,41 +441,18 @@ export default function AdIntegration({
         kind="error"
         title="広告との接続状況を表示できませんでした"
         description="接続設定は消えていません。状態を読み直して、もう一度お試しください。"
-        action={<Button onClick={() => void load()}>広告の状態を再読み込み</Button>}
+        action={<Button variant="secondary" onClick={() => void load()}>広告の状態を再読み込み</Button>}
       />
     )
   }
 
   if (view === 'history') {
     return (
-      <div className="space-y-4" data-design-node="Im2b1">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs text-ink-faint">広告とのつなぎ</p>
-            <h2 className="text-lg font-bold text-ink">広告への送信履歴</h2>
-          </div>
-          <Button href="/inflow-links?tab=connections">広告とのつなぎへ戻る</Button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Metric label="送った件数" value={sentCount} detail="この30日" />
-          <Metric label="待っている" value={pendingCount} detail="送信処理を待っています" />
-          <Metric label="断られた" value={failedCount} detail="理由を確認してください" tone={failedCount > 0 ? 'danger' : 'default'} />
-          <Metric label="やり直して成功" value={retrySuccessCount} detail="二重にはなっていません" />
-        </div>
-
-        <Notice tone="info">
-          送るのは、成果と広告のクリックが結びついたものだけです。結びつかないものは送りません。
-        </Notice>
-
-        {/*
-          #514-13: まとめてやり直す口は無い。効かないボタンは出さない。
-          書き出し(CSV)は口から取った行をそのまま出すので残す。
-        */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-ink-faint">失敗した送信のやり直しは、口ができたらここに足します。</p>
-          <Button onClick={exportLogs} disabled={visibleLogs.length === 0}>CSVで書き出す</Button>
-        </div>
+      <div className="space-y-4" data-design-node="p0kA3">
+        <PageHeader title="広告への送信履歴" titleDisplay="always"
+          breadcrumb={[{ label: '← 広告とのつなぎへ戻る', href: '/inflow-links?tab=connections' }]}
+          description="成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。"
+          actions={<Button variant="secondary" onClick={exportLogs} disabled={visibleLogs.length === 0}>CSVで書き出す</Button>} />
         <div className="flex flex-wrap items-center gap-2">
           <SearchField
             value={query}
@@ -488,6 +463,8 @@ export default function AdIntegration({
             className="w-full sm:w-80"
           />
           <Select value={status} onChange={(value) => { setStatus(value); setLogPage(1) }} options={STATUS_OPTIONS} aria-label="送信状態" />
+          <Select value={adPlatformId} onChange={(id) => { setPlatformFilter({ accountId: selectedAccountId, id }); setLogPage(1) }} options={[{ value: '', label: 'すべての媒体' }, ...platforms.map((platform) => ({ value: platform.id, label: platformLabel(platform) }))]} aria-label="媒体" />
+          <span className="ml-auto text-xs tabular-nums text-ink-secondary">{formatNumber(logTotal)}件中 {formatNumber(visibleLogs.length)}件</span>
         </div>
 
         {visibleLogs.length === 0 ? (
@@ -499,11 +476,12 @@ export default function AdIntegration({
         ) : (
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
             <table className="w-full table-fixed text-xs">
+              <colgroup><col /><col className="w-1/6" /><col className="w-1/6" /><col className="w-28" /><col className="w-28" /><col className="w-32" /></colgroup>
               <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
                 <TableHeadRow>
                   <Th>いつ・何の成果</Th>
                   <Th>媒体</Th>
-                  <Th>成果の名前</Th>
+                  <Th>流入元</Th>
                   <Th>状態</Th>
                   <Th>次の予定</Th>
                   <Th align="right">操作</Th>
@@ -517,15 +495,13 @@ export default function AdIntegration({
                     <Fragment key={log.id}>
                     <tr>
                       <td className="px-4 py-3 text-ink">
-                        <span className="block font-semibold">{log.eventName}</span>
-                        <span className="mt-0.5 block text-ink-faint">目印 {log.clickIdType ?? '—'}</span>
+                        <span className="block truncate font-semibold" title={log.eventName}>{log.eventName}</span>
+                        <span className="mt-0.5 block whitespace-nowrap text-ink-faint">{shortDateTime(log.createdAt)}</span>
                       </td>
-                      <td className="px-4 py-3 text-ink-secondary">{platform ? platformLabel(platform) : '—'}</td>
-                      <td className="px-4 py-3 text-ink-secondary">{log.eventName}</td>
+                      <td className="truncate px-4 py-3 text-ink-secondary" title={platform ? platformLabel(platform) : undefined}>{platform ? platformLabel(platform) : '—'}</td>
+                      <td className="px-4 py-3 text-ink-secondary">—</td>
                       <td className="px-4 py-3">
-                        <span className={log.status === 'failed' ? 'font-semibold text-danger' : 'text-ink-secondary'}>
-                          {STATUS_LABEL[log.status] ?? '状態不明'}
-                        </span>
+                        <Chip tone={log.status === 'failed' ? 'danger' : log.status === 'pending' ? 'info' : log.status === 'sent' || log.status === 'success' ? 'ok' : 'neutral'}>{STATUS_LABEL[log.status] ?? '状態不明'}</Chip>
                       </td>
                       <td className="px-4 py-3 text-ink-faint">
                         {nextScheduleText(log)}
@@ -555,33 +531,33 @@ export default function AdIntegration({
           </section>
         )}
 
-        <p className="text-xs leading-relaxed text-ink-faint">
-          失敗理由を確認してからやり直します。成功した成果を重ねて送る操作は表示しません。
-        </p>
       </div>
     )
   }
 
   if (view === 'connections') {
     return (
-      <div className="space-y-4" data-design-node="BuVDB">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs text-ink-faint">流入と計測</p>
-            <h2 className="text-lg font-bold text-ink">広告とのつなぎ</h2>
-          </div>
-          <Button href="/inflow-links?tab=connections&view=history">送信履歴を見る</Button>
+      <div className="space-y-4" data-design-node="FDBsG">
+        <PageHeader title="広告とのつなぎ" titleDisplay="always"
+          breadcrumb={[{ label: '← 流入と計測へ', href: '/inflow-links' }]}
+          description="LINEで出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。"
+          actions={<Button variant="secondary" href="/inflow-links?tab=connections&view=history">送信履歴を見る</Button>} />
+        <SectionHeader title="返すしくみ" />
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {[
+            ['1', 'クリックの目印を持ち帰る', '中継リンクを通った人だけ広告と結びつきます。'],
+            ['2', '成果が出たら順に送る', '成果地点で数えたら、待ち行列に入れてから広告へ送ります。'],
+            ['3', '同じ成果は2回送らない', 'やり直しても同じ目印を使います。広告側で二重に数えられません。'],
+          ].map(([step, title, description]) => <Card key={step} padding="default"><SectionHeader title={`${step}. ${title}`} /><p className="mt-2 text-xs text-ink-secondary">{description}</p></Card>)}
         </div>
-
-        <Notice tone="info">
-          広告をつながなくても流入リンクの計測は使えます。つなぐと、成果を広告側へ安全に返せるようになります。
-        </Notice>
-
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-        <div className="space-y-4">
-        <section className="rounded-card border border-hairline bg-canvas p-4">
-          <h3 className="text-sm font-bold text-ink">つないでいる広告</h3>
-          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="送った件数" value={sentCount} detail="この30日" />
+          <Metric label="待っている" value={pendingCount} detail="送信処理を待っています" />
+          <Metric label="断られた" value={failedCount} detail="理由を確認してください" />
+          <Metric label="やり直して成功" value={retrySuccessCount} detail="同じ成果は二重に数えません" />
+        </div>
+        <Disclosure title="つないでいる広告" size="compact">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {PROVIDERS.map((provider) => {
               const platform = platforms.find((item) => item.name === provider.key)
               const active = platform?.isActive === true
@@ -617,46 +593,7 @@ export default function AdIntegration({
               )
             })}
           </div>
-        </section>
-
-        {/*
-          #514-13: 成果地点と広告名の対応表は口に無い。直書きの対応・件数と
-          効かない操作ボタンは出さず、未接続の旨にする。
-        */}
-        <section className="rounded-card border border-hairline bg-canvas p-4">
-          <h3 className="text-sm font-bold text-ink">成果地点と、広告に返す名前の対応</h3>
-          <p className="mt-1 text-xs leading-relaxed text-ink-faint">
-            左がうちの成果地点、右が広告側の名前です。対応が付いていないものは返せません。
-          </p>
-          <div className="mt-3">
-            <ListState
-              kind="empty"
-              title="対応表はまだ表示できません"
-              description="成果地点と広告側の名前の対応を取れていないため、件数は表示しません。対応が取れたらここに並びます。"
-            />
-          </div>
-        </section>
-        </div>
-
-        <aside className="space-y-4">
-          <section className="rounded-card border border-hairline bg-canvas p-4">
-            <h3 className="text-sm font-bold text-ink">返すしくみ</h3>
-            <ol className="mt-3 space-y-2 text-xs leading-relaxed text-ink-secondary">
-              <li><strong>1. クリックの目印を持ち帰る</strong><br />中継リンクを通った人だけ広告と結びつきます。</li>
-              <li><strong>2. 成果が出たら順に送る</strong><br />待ち行列に入れてから送ります。</li>
-              <li><strong>3. 同じ成果は2回送らない</strong><br />やり直しても同じ目印を使います。</li>
-            </ol>
-          </section>
-          <section className="rounded-card border border-hairline bg-canvas p-4">
-            <h3 className="text-sm font-bold text-ink">気をつけること</h3>
-            <ul className="mt-3 space-y-2 text-xs leading-relaxed text-ink-secondary">
-              <li>中継リンクを通らないと広告と結びつきません。</li>
-              <li>秘密の鍵は画面に表示しません。</li>
-              <li>お客様の名前やメールアドレスは広告へ送りません。</li>
-            </ul>
-          </section>
-        </aside>
-        </div>
+        </Disclosure>
       </div>
     )
   }
@@ -679,62 +616,39 @@ export default function AdIntegration({
   const avgCostPerFriend = linkedFriendAdds > 0 ? Math.round(linkedJpyCost / linkedFriendAdds) : null
 
   return (
-    <div className="space-y-4" data-design-node="v0HaI">
-      <Notice tone="info">
-        広告の管理画面では「クリック数」までしか分かりません。ここでは、かかった費用と友だち追加がつながって見えます。
-      </Notice>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="つないだ広告" value={connected.length} detail={connected.length > 0 ? connected.map(platformLabel).join('・') : 'まだ接続がありません'} />
-        <Metric
-          label="この30日の広告費"
-          value={totalCostByCurrency.size > 0
-            ? <span className="flex flex-wrap gap-x-2">{[...totalCostByCurrency].map(([currency, amount]) => <span key={currency}>{formatMinor(amount, currency)}</span>)}</span>
-            : '—'}
-          detail={totalCostByCurrency.size > 0 ? '取込分と手入力分の合計です' : 'まだ費用の記録がありません'}
-        />
-        <Metric label="友だち1人あたり" value={avgCostPerFriend} detail="経路がある円の費用だけを合計し、同じ経路の追加人数は1回だけ数えます。経路なし・追加0人・他通貨は計算に含めません" prefix="¥" />
-        <Metric label="成果1件あたり" value={null} detail="認めた成果の件数は未接続のため表示できません" prefix="¥" />
+    <div className="space-y-4" data-design-node="qSTVR">
+      <PageHeader
+        title="広告連携" titleDisplay="always"
+        breadcrumb={[{ label: '← 流入と計測へ', href: '/inflow-links' }]}
+        description="広告をつなぐと毎日自動で費用を取り込みます。取り込めない分は「費用を手で入れる」から足せます。"
+        actions={canManage ? <Button variant="secondary" onClick={openManualEntry}>費用を手で入れる</Button> : undefined}
+      />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard title="この30日の広告費" value={null} unit="" valueText={costFailed ? '—' : [...totalCostByCurrency].map(([currency, amount]) => formatMinor(amount, currency)).join('・') || '—'} detail={costFailed ? '広告費を読み込めませんでした' : '選んだLINEアカウントの分だけ'} help="取込分と手入力分の合計です。通貨ごとに分け、換算せずに表示します。" />
+        <KpiCard title="つないだ広告" value={connected.length} unit="件" detail={connected.length > 0 ? connected.map(platformLabel).join('・') : 'まだ接続がありません'} />
+        <KpiCard title="友だち1人あたり" value={null} unit="" valueText={costFailed || avgCostPerFriend == null ? '—' : `¥${formatNumber(avgCostPerFriend)}`} detail={costFailed ? '広告費を読み込めませんでした' : `友だち追加 ${formatNumber(linkedFriendAdds)}人`} help="経路がある円の費用だけを合計し、同じ経路の追加人数は1回だけ数えます。経路なし・追加0人・他通貨は計算に含めません。" />
+        <KpiCard title="成果1件あたり" value={null} unit="" detail="成果件数を取得できません" help="同じ期間の広告費を、認めた成果の件数で割った額です。" />
       </div>
-
-      {/*
-        N-251: 媒体ごとの予算(月額)は設定した通貨のまま出す。
-        通貨を推測・混合しない。実績の費用は下の台帳を見る。
-      */}
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="広告の接続状態">
         {PROVIDERS.map((provider) => {
           const platform = platforms.find((item) => item.name === provider.key)
-          const synced = platform ? syncLabel(platform) : null
-          return (
-            <div key={provider.key} className="rounded-card border border-hairline bg-canvas p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-ink">{provider.label}</p>
-                  <p className="text-xs text-ink-faint">
-                    {platform?.isActive
-                      ? synced
-                        ? `つながっています ／ ${synced} に取り込みました`
-                        : 'つながっています ／ 取り込み日時は取得できません'
-                      : 'つないでいません'}
-                  </p>
-                </div>
-                <span className="whitespace-nowrap font-bold text-ink" title={platform ? `月額予算: ${platformCost(platform)}` : undefined}>
-                  {platformCost(platform)}
-                </span>
-              </div>
+          const costPlatform = platform ? costPlatforms.find((item) => item.id === platform.id) : undefined
+          const synced = costPlatform?.lastSuccessAt ? shortDateTime(costPlatform.lastSuccessAt) : platform ? syncLabel(platform) : null
+          return <Card key={provider.key} padding="default">
+            <div className="flex items-center justify-between gap-2">
+              <span className="min-w-0 truncate text-sm font-semibold text-ink" title={provider.label}>{provider.label}</span>
+              <Chip tone={platform?.isActive ? 'ok' : 'neutral'}>{platform?.isActive ? 'つないでいる' : '未接続'}</Chip>
             </div>
-          )
+            <p className="mt-2 text-xs text-ink-secondary">{platform?.isActive ? synced ? `最後の取り込み ${synced}` : '取り込み日時は取得できません' : 'つなぐと費用とクリックを取り込みます'}</p>
+            {platform?.isActive && canManage ? <Button className="mt-2" variant="secondary" disabled={importingId !== null} busy={importingId === platform.id} busyLabel="取り込んでいます…" onClick={() => void runImportNow(platform.id)}><RefreshCw className="h-4 w-4" aria-hidden="true" />広告の状態を再読み込み</Button> : null}
+            {costPlatform?.lastRunStatus === 'failed' ? <p className="mt-2 text-xs text-ink-secondary">直近は取り込めませんでした。{costPlatform.lastError}</p> : null}
+            <Disclosure title="月額予算" size="compact" className="mt-2"><span className="text-xs text-ink-secondary">{platformCost(platform)}</span></Disclosure>
+          </Card>
         })}
       </section>
-
+      {importError ? <Notice tone="warn" message={importError} /> : null}
       <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-4 py-3">
-          <div>
-            <h3 className="text-sm font-bold text-ink">流入元ごとの費用</h3>
-            <p className="mt-1 text-xs text-ink-faint">取り込んだ費用と手入力の分です。取れない日は「—」になります。</p>
-          </div>
-          <Button variant="secondary" onClick={openManualEntry}>費用を手で入れる</Button>
-        </div>
+        <div className="px-4 py-3"><SectionHeader title="流入元ごとの費用" help="取り込んだ費用と手入力分です。費用を取得できない日は「—」になります。" helpLabel="流入元ごとの費用の説明" /></div>
         {costFailed ? (
           <ListState
             kind="error"
@@ -750,33 +664,28 @@ export default function AdIntegration({
           />
         ) : (
           <table className="w-full table-fixed text-xs">
-            <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
-              <TableHeadRow>
-                <Th>流入元</Th>
-                <Th align="right">友だち追加</Th>
-                <Th align="right">費用</Th>
-                <Th align="right">1人あたり</Th>
-                <Th>取り込み</Th>
-              </TableHeadRow>
-            </thead>
+            <colgroup><col /><col className="w-1/6" /><col className="w-1/6" /><col className="w-1/6" /><col className="w-24" /><col className="w-24" /><col className="w-24" /></colgroup>
+            <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow>
+              <Th>流入元</Th><Th>媒体</Th><Th>計測リンク</Th><Th align="right">この30日の費用</Th><Th align="right">友だち追加</Th><Th align="right">1人あたり</Th><Th>取り込み</Th>
+            </TableHeadRow></thead>
             <tbody className="divide-y divide-hairline">
               {costRows.map((row) => (
                 <tr key={`${row.sourceLabel}|${row.adPlatformId ?? ''}|${row.entryRouteId ?? ''}`}>
                   <td className="truncate px-4 py-3 font-semibold text-ink" title={row.sourceLabel}>
                     {row.sourceLabel}
-                    {row.source === 'manual' && (
-                      <span className="ml-2 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-semibold text-ink-faint">手入力</span>
-                    )}
                   </td>
+                  <td className="truncate px-4 py-3 text-ink-secondary" title={row.source === 'manual' ? '手入力' : platforms.find((item) => item.id === row.adPlatformId)?.displayName ?? '—'}>{row.source === 'manual' ? '手入力' : platforms.find((item) => item.id === row.adPlatformId) ? platformLabel(platforms.find((item) => item.id === row.adPlatformId)!) : '—'}</td>
+                  <td className="px-4 py-3">{row.entryRouteId ? <Button variant="secondary" href={`/inflow-links/detail?id=${encodeURIComponent(row.entryRouteId)}`}>リンクを見る</Button> : '—'}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-ink">{formatCostTotals(row.totals)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">
                     {row.friendAdds == null ? '—' : `${formatNumber(row.friendAdds)}人`}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-ink">{formatCostTotals(row.totals)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">
                     {row.costPerFriendMinor == null ? '—' : formatMinor(row.costPerFriendMinor, row.totals[0]?.currency ?? 'JPY')}
                   </td>
-                  <td className="px-4 py-3 text-ink-faint">
-                    {row.source === 'manual' ? '手入力' : `最終 ${shortDateTime(row.lastImportedAt)}`}
+                  <td className="px-4 py-3 text-ink-faint" title={row.source === 'manual' ? '手入力' : `最終 ${shortDateTime(row.lastImportedAt)}`}>
+                    <Chip tone={row.source === 'manual' ? 'neutral' : 'ok'}>{row.source === 'manual' ? '手入力' : '自動'}</Chip>
+                    <span className="sr-only">{shortDateTime(row.lastImportedAt)}</span>
                   </td>
                 </tr>
               ))}
@@ -806,9 +715,10 @@ export default function AdIntegration({
                       ) : null}
                     </div>
                     {!cancelled && canManage ? (
-                      <Button variant="secondary" onClick={() => openCancelDialog(entry)}>
-                        取り消す
-                      </Button>
+                      <div className="relative">
+                        <MoreAction label={`${entry.sourceLabel}の費用の操作`} onClick={() => setManualMenuId(manualMenuId === entry.id ? null : entry.id)} />
+                        <ActionMenu open={manualMenuId === entry.id} onClose={() => setManualMenuId(null)} items={[{ id: 'cancel', label: '取り消す', onSelect: () => { setManualMenuId(null); openCancelDialog(entry) } }]} />
+                      </div>
                     ) : null}
                   </li>
                 )
@@ -817,41 +727,6 @@ export default function AdIntegration({
           </div>
         )}
       </section>
-
-      {costPlatforms.length > 0 && (
-        <section className="rounded-card border border-hairline bg-canvas p-4">
-          <h3 className="text-sm font-bold text-ink">広告からの取り込み</h3>
-          <p className="mt-1 text-xs leading-relaxed text-ink-faint">
-            つないだ広告から前日分までを毎日取り込みます。取り込めない日は費用が「—」のままになります。
-          </p>
-          {importError && <p className="mt-2 text-xs text-danger">{importError}</p>}
-          <ul className="mt-3 divide-y divide-hairline">
-            {costPlatforms.map((platform) => (
-              <li key={platform.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-ink">
-                    {PROVIDERS.find((provider) => provider.key === platform.name)?.label
-                      ?? platform.displayName ?? platform.name}
-                  </p>
-                  <p className="mt-0.5 text-xs text-ink-faint">
-                    {platform.lastSuccessAt
-                      ? `最後に取り込んだのは ${shortDateTime(platform.lastSuccessAt)} です`
-                      : 'まだ一度も取り込めていません'}
-                    {platform.lastRunStatus === 'failed' && platform.lastError
-                      ? ` ／ 直近は取り込めませんでした（${platform.lastError}）`
-                      : ''}
-                  </p>
-                </div>
-                <Button
-                  variant="secondary"
-                  disabled={importingId === platform.id}
-                  onClick={() => void runImportNow(platform.id)} busy={importingId === platform.id} busyLabel="取り込んでいます…">いま取り込む
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       <Dialog
         open={manualOpen}
@@ -942,26 +817,6 @@ export default function AdIntegration({
   )
 }
 
-function Metric({
-  label,
-  value,
-  detail,
-  tone = 'default',
-  prefix = '',
-}: {
-  label: string
-  value: number | ReactNode | null
-  detail: string
-  tone?: 'default' | 'danger'
-  prefix?: string
-}) {
-  return (
-    <div className="rounded-card border border-hairline bg-canvas p-4">
-      <p className="text-xs text-ink-faint">{label}</p>
-      <p className={`mt-1 text-2xl font-bold tabular-nums ${tone === 'danger' ? 'text-danger' : 'text-ink'}`}>
-        {value == null ? '—' : typeof value === 'number' ? `${prefix}${formatNumber(value)}` : value}
-      </p>
-      <p className="mt-1 text-xs leading-relaxed text-ink-faint">{detail}</p>
-    </div>
-  )
+function Metric({ label, value, detail }: { label: string; value: number | null; detail: string }) {
+  return <KpiCard title={label} value={value} unit="件" detail={detail} />
 }

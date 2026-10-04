@@ -415,6 +415,7 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
     const limit = listLimit(c.req.query('limit'), 50);
     const status = c.req.query('status')?.trim();
     const query = c.req.query('query')?.trim();
+    const adPlatformId = c.req.query('adPlatformId')?.trim();
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
@@ -439,6 +440,14 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
 
     const clauses = [...scopeClauses];
     const bindings = [...scopeBindings];
+
+    if (adPlatformId) {
+      if (adPlatformId.length > 128) {
+        return c.json({ success: false, error: 'adPlatformId is invalid' }, 400);
+      }
+      clauses.push('ad_platform_id = ?');
+      bindings.push(adPlatformId);
+    }
 
     if (status && status !== 'all') {
       if (!['sent', 'pending', 'failed'].includes(status)) {

@@ -88,6 +88,57 @@ afterEach(async () => {
 })
 
 describe('N-251 広告費の通貨表示とaccount切替', () => {
+  it('媒体の選択をAPIへ送り、アカウントを替えたら前の媒体で絞らない', async () => {
+    handler = async (path) => {
+      if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'staff' } }
+      if (path.startsWith('/api/ad-platforms/logs')) return logs()
+      if (path.startsWith('/api/ad-costs')) return { success: true, data: { rows: [], platforms: [] } }
+      return { success: true, data: [platform('google', 100, 'JPY', fixture.accountId!)] }
+    }
+    await act(async () => { root.render(<AdIntegration view="history" />) })
+    await settle()
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="媒体"]')!.click() })
+    await act(async () => { Array.from(document.querySelectorAll('[role="option"] button')).find((button) => button.textContent === 'Google広告')!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await settle()
+    expect(requestedUrls.some((url) => url.includes('adPlatformId=account-a-google'))).toBe(true)
+    fixture.accountId = 'account-b'
+    await act(async () => { root.render(<AdIntegration view="history" />) })
+    await settle()
+    const nextAccountCalls = requestedUrls.filter((url) => url.includes('/logs?') && url.includes('lineAccountId=account-b'))
+    expect(nextAccountCalls.length).toBeGreaterThan(0)
+    expect(nextAccountCalls.every((url) => !url.includes('adPlatformId='))).toBe(true)
+  })
+  it('閲覧だけの担当者には費用の記録・取り込み・取消を出さない', async () => {
+    handler = async (path) => {
+      if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'staff' } }
+      if (path.startsWith('/api/ad-platforms/logs')) return logs()
+      if (path.startsWith('/api/ad-costs')) return { success: true, data: { rows: [], platforms: [], manualEntries: [{ id: 'entry', sourceLabel: 'チラシ', day: '2026-09-20', amountMinor: 100, currency: 'JPY', cancelledAt: null }] } }
+      return { success: true, data: [platform('google', 100, 'JPY')] }
+    }
+    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await settle()
+    const buttons = Array.from(host.querySelectorAll('button')).map((button) => button.textContent)
+    expect(buttons).not.toContain('費用を手で入れる')
+    expect(buttons).not.toContain('広告の状態を再読み込み')
+    expect(host.querySelector('[aria-label="チラシの費用の操作"]')).toBeNull()
+  })
+
+  it('送信履歴の日時と失敗理由を実データで表示し、再送や次回予定を作らない', async () => {
+    handler = async (path) => {
+      if (path.startsWith('/api/ad-platforms/logs')) return { success: true, data: { items: [{ id: 'log-1', adPlatformId: 'p-1', eventName: 'Purchase', clickIdType: 'gclid', status: 'failed', errorMessage: 'クリックの期限切れ', createdAt: '2026-10-01T12:14:00+09:00' }], total: 1, page: 1, limit: 20 } }
+      if (path.startsWith('/api/ad-costs')) return { success: true, data: { rows: [], platforms: [] } }
+      return { success: true, data: [] }
+    }
+    await act(async () => { root.render(<AdIntegration view="history" />) })
+    await settle()
+    expect(host.textContent).toContain('Purchase')
+    expect(host.textContent).toContain('10/1')
+    expect(host.textContent).toContain('1件中 1件')
+    await act(async () => { Array.from(host.querySelectorAll('button')).find((button) => button.textContent === '理由を見る')!.click() })
+    expect(host.textContent).toContain('クリックの期限切れ')
+    expect(host.textContent).toContain('予定はありません')
+    expect(Array.from(host.querySelectorAll('button')).some((button) => button.textContent === 'やり直す')).toBe(false)
+  })
   it('JPY/USDを分け、0・未設定・通貨不明を混同しない', async () => {
     handler = async (path) => {
       if (path.startsWith('/api/ad-platforms/logs')) return logs()
@@ -192,8 +243,10 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
     }
     await act(async () => { root.render(<AdIntegration view="metrics" />) })
     await settle()
-    expect(host.textContent).toContain('友だち1人あたり¥1,500')
-    expect(host.textContent).toContain('経路がある円の費用')
+    expect(host.textContent).toContain('友だち1人あたり')
+    expect(host.textContent).toContain('¥1,500')
+    await act(async () => { Array.from(host.querySelectorAll('button')).find((button) => button.getAttribute('aria-label') === '友だち1人あたりの説明')!.click() })
+    expect(document.body.textContent).toContain('経路がある円の費用')
   })
 
   it('R278: 30日の送信数はAPIの集計を使い、設定値や表示中の行で変わらない', async () => {
@@ -216,17 +269,18 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
       if (path.startsWith('/api/ad-costs')) return { success: true, data: { rows: [], platforms: [] } }
       return { success: true, data: [trap] }
     }
-    await act(async () => { root.render(<AdIntegration view="history" />) })
+    await act(async () => { root.render(<AdIntegration view="connections" />) })
     await settle()
     const metricValue = (label: string) =>
-      Array.from(host.querySelectorAll('p')).find((p) => p.textContent === label)?.nextElementSibling?.textContent ?? ''
-    expect(metricValue('送った件数')).toBe('8')
-    expect(metricValue('待っている')).toBe('1')
-    expect(metricValue('断られた')).toBe('1')
+      Array.from(host.querySelectorAll('p')).find((p) => p.textContent === label)?.closest('[data-design-version]')?.querySelectorAll('p')[1]?.textContent ?? ''
+    expect(metricValue('送った件数')).toBe('8件')
+    expect(metricValue('待っている')).toBe('1件')
+    expect(metricValue('断られた')).toBe('1件')
   })
 
   it('R276: 広告費の空欄・空白は送信せず、明示的な0円だけ送る', async () => {
     handler = async (path) => {
+      if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'owner' } }
       if (path.startsWith('/api/ad-platforms/logs')) return logs()
       if (path.startsWith('/api/ad-costs')) return { success: true, data: { rows: [], platforms: [] } }
       return { success: true, data: [] }
@@ -269,6 +323,7 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
     const button = (label: string) => Array.from(document.querySelectorAll('button')).find((item) => item.textContent?.trim() === label)!
 
     expect(host.textContent).toContain('手で入れた費用')
+    await act(async () => { document.querySelector<HTMLButtonElement>('[aria-label="チラシの費用の操作"]')!.click() })
     await act(async () => { button('取り消す').click() })
     // 窓の確定ボタンは一覧の同名ボタンと分ける（窓は最後に描かれる）。
     const confirmButton = Array.from(document.querySelectorAll('button'))

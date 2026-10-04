@@ -128,6 +128,7 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/ad-platforms/logs',
   'DELETE /api/affiliates/{id}',
   'DELETE /api/auth/sessions/{tokenHash}',
   'DELETE /api/booking/admin/exceptions/{id}',
@@ -866,7 +867,6 @@ const ALLOWLIST = new Set<string>([
   'DELETE /api/webhooks/incoming/{id}',
   'DELETE /api/webhooks/outgoing/{id}',
   'GET /api/ad-platforms',
-  'GET /api/ad-platforms/logs',
   'GET /api/ad-platforms/{id}/logs',
   'GET /api/integrations/google-calendar',
   'GET /api/integrations/google-calendar/bookings',

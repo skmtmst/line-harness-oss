@@ -1269,6 +1269,26 @@ const spec = {
       },
     },
     // ── 広告費 (#818) ────────────────────────────────────────────────────
+    '/api/ad-platforms/logs': {
+      get: {
+        summary: 'List ad conversion delivery history',
+        description: 'Filters apply to the paginated history and total. The last-30-day summary always covers the visible LINE account scope, independently of the history filters.',
+        tags: ['Ads'],
+        parameters: [
+          { name: 'lineAccountId', in: 'query', schema: { type: 'string' } },
+          { name: 'adPlatformId', in: 'query', schema: { type: 'string', maxLength: 128 } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['sent', 'pending', 'failed'] } },
+          { name: 'query', in: 'query', schema: { type: 'string' } },
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 } },
+        ],
+        responses: {
+          '200': { description: 'Paginated delivery history, total, and last-30-day summary' },
+          '400': { description: 'Invalid status or platform filter' },
+          '403': { description: 'LINE account access denied' },
+        },
+      },
+    },
     '/api/ad-costs': {
       get: {
         tags: ['Ads'], summary: '流入元ごとの広告費と取込状況（期間指定は日付。手入力分は source=manual）',
