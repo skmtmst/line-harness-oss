@@ -84,8 +84,11 @@ describe('Issue #709: 一覧表は1440pxの初期表示に操作列まで収め�
 
   it('フォーム一覧は最小幅を実効幅内に収める', () => {
     const src = read('form-submissions/page.tsx')
-    const minWidth = src.match(/min-w-\[(\d+)px\]/)
-    expect(minWidth, 'min-w が付いている').toBeTruthy()
+    const css = read('form-submissions/list-v8.module.css')
+    expect(src).toContain('className={styles.table}')
+    const table = css.match(/\.table\s*\{[^}]*\}/)?.[0]
+    const minWidth = table?.match(/min-width:\s*(\d+)px/)
+    expect(minWidth, '表の最小幅が付いている').toBeTruthy()
     expect(Number(minWidth![1])).toBeLessThanOrEqual(800)
   })
 })
@@ -112,7 +115,7 @@ describe('Issue #709: フォームのフォルダ追加は止まっている理�
     expect(src).not.toContain('addFolderDisabled')
     expect(src).not.toContain('フォルダ保存先はまだ接続されていません')
     // 消す前の注意（中身は未分類に残る）は常時表示の文で伝える。
-    expect(src).toContain('フォルダを消しても、入っていたフォームは未分類として残ります。')
+    expect(src).toContain('フォルダを消しても、中のフォームは未分類に残ります。')
   })
 })
 
