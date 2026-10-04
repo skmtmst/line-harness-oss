@@ -431,7 +431,7 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
         </div>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>承認待ち</span>
-          <span className={styles.kpiValue}>{applicantsStatus === 'ready' ? requestedSeats : '—'}</span>
+          <span className={requestedSeats > 0 ? `${styles.kpiValue} ${styles.kpiValueWarn}` : styles.kpiValue}>{applicantsStatus === 'ready' ? requestedSeats : '—'}</span>
           <span className={styles.kpiDetail}>件</span>
         </div>
         <div className={styles.kpi}>
