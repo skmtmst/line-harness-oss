@@ -100,8 +100,8 @@ describe('投稿 V8', () => {
     const { container } = render(<PhotoReviewV8 accountId="account-a" />)
     await screen.findByText('散歩のあと', { exact: false })
     expect(container.querySelector('[data-design-node="TkA4D"]')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '✓ 採用する' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '× 見送る' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'こむぎの写真を採用する' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'こむぎの写真を見送る' })).toBeTruthy()
     expect(screen.getByText('報酬の決まり')).toBeTruthy()
     expect(screen.getByText('見送り理由の内訳（今月）')).toBeTruthy()
   })
@@ -112,7 +112,7 @@ describe('投稿 V8', () => {
     const { container } = render(<PhotoReviewV8 accountId="account-a" />)
     await screen.findByText('散歩のあと', { exact: false })
     expect(container.querySelector('[data-design-node="Jn95h"]')).toBeTruthy()
-    expect((screen.getByRole('button', { name: '✓ 採用する' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'こむぎの写真を採用する' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('見送るを押すと ujcar の窓が開く', async () => {
@@ -120,7 +120,7 @@ describe('投稿 V8', () => {
     mockAll()
     const { container } = render(<PhotoReviewV8 accountId="account-a" />)
     await screen.findByText('散歩のあと', { exact: false })
-    fireEvent.click(screen.getByRole('button', { name: '× 見送る' }))
+    fireEvent.click(screen.getByRole('button', { name: 'こむぎの写真を見送る' }))
     expect(await screen.findByText('この写真を見送りますか？')).toBeTruthy()
     expect(container.querySelector('[data-design-node="ujcar"]')).toBeTruthy()
     expect(screen.getByText('見送った理由')).toBeTruthy()

@@ -629,3 +629,7 @@
  .reviewGrid > .rail { grid-column: 1; grid-row: 3; flex-direction: row; flex-wrap: wrap; }
  .railCard { flex: 1 1 230px; }
 }
+
+.readonly { padding-block: 12px; }
+.deliveryFailures { padding: 12px; border-block: 1px solid var(--color-hairline); font-size: 13px; }
+.deliveryFailures > div { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; }

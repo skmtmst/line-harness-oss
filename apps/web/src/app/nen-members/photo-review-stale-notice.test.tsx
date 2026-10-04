@@ -49,6 +49,7 @@ function installFetch() {
   vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
+    if (path === '/api/staff/me') return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     const method = init?.method ?? 'GET'
     if (path.startsWith('/api/nen-members/photos/review-metrics')) {
       return jsonResponse({ success: true, data: METRICS }, 200)
