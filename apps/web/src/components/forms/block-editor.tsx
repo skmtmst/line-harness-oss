@@ -39,6 +39,9 @@ export const BLOCK_MENU: { kind: string; type?: FormInputType; label: string; gr
   { kind: 'input', type: 'file', label: 'ファイル', group: '入力' },
   { kind: 'input', type: 'date', label: '日付', group: '入力' },
   { kind: 'input', type: 'prefecture', label: '都道府県', group: '入力' },
+  // F-11：5段階評価（★で答える）・住所（郵便番号から自動で）。
+  { kind: 'input', type: 'rating', label: '5段階の評価', group: '入力' },
+  { kind: 'input', type: 'address', label: '住所', group: '入力' },
 ]
 
 const INPUT_TYPE_LABEL: Record<FormInputType, string> = {
@@ -51,7 +54,6 @@ const INPUT_TYPE_LABEL: Record<FormInputType, string> = {
   date: '日付',
   prefecture: '都道府県',
   // F11で shared の FormInputType に足された種類。名称は shared の型注釈に合わせる。
-  // 入力メニューへの追加・編集欄・見た目の変更は今回しない。
   address: '住所',
   rating: '5段階評価',
 }
@@ -330,6 +332,7 @@ export default function BlockEditor({
                     />
                   </label>
                 )}
+
               </div>
 
               {/* 回答の登録先 */}
@@ -501,6 +504,31 @@ export default function BlockEditor({
                       ]}
                     />
                   </label>
+                ) : block.type === 'rating' ? (
+                  // F-11：5段階評価の初期値。1〜5のちょうどの数だけ
+                  // （"3.0" は保存・平均の数え方と合わないため入れない）。
+                  <label className="block">
+                    <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
+                    <Select
+                      aria-label="初期値"
+                      value={block.defaultValue ?? ''}
+                      onChange={(value) => patchInput({ defaultValue: value })}
+                      options={[
+                        { value: '', label: '— 入れない —' },
+                        { value: '1', label: '★1' },
+                        { value: '2', label: '★2' },
+                        { value: '3', label: '★3' },
+                        { value: '4', label: '★4' },
+                        { value: '5', label: '★5' },
+                      ]}
+                    />
+                  </label>
+                ) : block.type === 'address' ? (
+                  // F-11：住所の初期値は入れない。文字列の初期値を置くと
+                  // 回答側で文字列が入り、検証で弾かれてしまうため。
+                  <p className="text-ink-faint text-xs">
+                    初期値は入れられません。お客さまが郵便番号から入力します。
+                  </p>
                 ) : (
                   <label className="block">
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
