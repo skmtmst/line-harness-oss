@@ -121,6 +121,18 @@
   flex-direction: column;
   gap: 6px;
 }
+
+/* ルール名＋フォルダの2列（`K7HWG`）。狭い板では縦に積む。 */
+.fieldPair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .fieldPair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .label {
   color: var(--color-ink);
   font-size: 13px;

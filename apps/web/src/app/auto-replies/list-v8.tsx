@@ -19,6 +19,7 @@ import {
   CircleCheck,
   Copy,
   Folder as FolderIcon,
+  ListOrdered,
   MessageSquare,
   MoreHorizontal,
   Search as SearchIcon,
@@ -43,7 +44,6 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import HelpTip from '@/components/shared/help-tip'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -1109,7 +1109,12 @@ export default function AutoRepliesListV8() {
                   aria-label="このページのルールをすべて選択"
                 />
               </th>
-              {tableHeadCells}
+              <th aria-label="並び替え" />
+              <th>ルール（どんなときに動くか）</th>
+              <th>返すもの</th>
+              <th>今月動いた回数</th>
+              <th>状態</th>
+              <th aria-label="操作" />
             </tr>
           </thead>
           <tbody>
@@ -1434,14 +1439,9 @@ export default function AutoRepliesListV8() {
       <div>
         <div className={styles.head}>
           <div className={styles.headText}>
-            <h2 className={styles.headTitle}>
-              自動応答{' '}
-              <HelpTip label="自動応答の動きの説明">
-                上にあるルールから順に見て、最初に当てはまった1つだけが動きます。時間帯や連投の設定で見送られたときは、その次のルールを見ます。並びは「評価順」のとき、行の左のつまみで入れ替えられます。
-              </HelpTip>
-            </h2>
+            <h2 className={styles.headTitle}>自動応答</h2>
             <p className={styles.headDescription}>
-              届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。
+              届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
             </p>
           </div>
         </div>
@@ -1694,6 +1694,10 @@ export default function AutoRepliesListV8() {
         </div>
 
         <div className={styles.listCol}>
+          <p className={styles.ruleBanner}>
+            <ListOrdered size={14} aria-hidden="true" />
+            上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。
+          </p>
           {/* 道具の段：検索・札 3 つ・並び・よく使う絞り込み・件数。
               狭い板では「作る」とフォルダ選びがここへ畳まれる。 */}
           <div className={styles.toolbar}>

@@ -568,7 +568,7 @@ export default function BroadcastListV8() {
       label: '予約中',
       icon: CalendarClock,
       value: listKpis === undefined ? null : (listKpis?.scheduled ?? null),
-      unit: '件',
+      unit: ' 件',
       detail: '今日 —（未取得）',
     },
     {
@@ -576,7 +576,7 @@ export default function BroadcastListV8() {
       label: '今月の送信枠',
       icon: Gauge,
       value: quotaRemaining,
-      unit: '通残り',
+      unit: ' 通 残り',
       detail: quota?.limit != null && quota?.used != null
         ? `${formatNumber(quota.limit)}通のうち ${formatNumber(quota.used)}通使用`
         : '送信枠を確認できません',
@@ -586,15 +586,15 @@ export default function BroadcastListV8() {
       label: '今月の配信',
       icon: Send,
       value: listKpis === undefined ? null : (listKpis?.thisMonth ?? null),
-      unit: '件',
+      unit: ' 件',
       detail: `${listKpis?.delivered == null ? '—' : `${formatNumber(listKpis.delivered)}人`}に届いた`,
     },
     {
       key: 'openRate',
-      label: '平均開封率',
+      label: '平均の開封率',
       icon: MailOpen,
       value: listKpis === undefined ? null : (listKpis?.openRate ?? null),
-      unit: '%',
+      unit: ' %',
       detail: '過去28日',
     },
   ]
