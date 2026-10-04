@@ -5423,6 +5423,8 @@ export type PhotoBulkReviewResult = {
 }
 
 export type AdPlatform = {
+  secretKeys?: string[]
+  verifiedAt?: string | null
   id: string
   /** meta / x / google / tiktok */
   name: string
@@ -13636,6 +13638,9 @@ export const api = {
       ),
   },
   adPlatforms: {
+    create: (data: {name: string;displayName?: string;lineAccountId: string;config: Record<string,unknown>}) => fetchApi<ApiResponse<AdPlatform>>('/api/ad-platforms',{method:'POST',body:JSON.stringify(data)}),
+    update: (id: string,data: {config?: Record<string,unknown>;displayName?: string;isActive?: boolean}) => fetchApi<ApiResponse<AdPlatform>>(`/api/ad-platforms/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(data)}),
+    connect: (id: string) => fetchApi<ApiResponse<import('@line-crm/shared').AdPlatformConnectResult>>(`/api/ad-platforms/${encodeURIComponent(id)}/connect`,{method:'POST'}),
     list: (lineAccountId?: string | null) =>
       fetchApi<ApiResponse<AdPlatform[]>>(`/api/ad-platforms${lineAccountId ? `?lineAccountId=${encodeURIComponent(lineAccountId)}` : ''}`),
     logsPage: (params?: { page?: number; limit?: number; status?: string; query?: string; lineAccountId?: string | null }) => {

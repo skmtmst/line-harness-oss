@@ -2580,3 +2580,5 @@ export interface AdConversionCostSummary {
 
 export interface LineAccountRegistrationTags { tagIds?: string[] }
 export interface LineAccountRegistrationTag { id: string; name: string; color: string | null }
+
+export interface AdPlatformConnectResult { id: string; connected: true; verifiedAt: string }

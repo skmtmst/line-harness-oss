@@ -17,6 +17,7 @@ import DateField from '@/components/shared/date-field'
 import { TextField } from '@/components/shared/text-field'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { formatNumber } from '@/lib/format'
+import AdConnectionDialog from './ad-connection-dialog'
 
 type AdView = 'metrics' | 'connections' | 'history'
 
@@ -220,6 +221,9 @@ export default function AdIntegration({
   // R275: 手で入れた費用を1行ずつ持つ。間違えた記録はここから取消す。
   const [manualEntries, setManualEntries] = useState<ManualCostEntry[]>([])
   const [canManage, setCanManage] = useState(false)
+  const [canConnect, setCanConnect] = useState(false)
+  const [connectionTarget, setConnectionTarget] = useState<(typeof PROVIDERS)[number] | null>(null)
+  useEffect(() => { setConnectionTarget(null); setCanConnect(false) }, [selectedAccountId])
   const [cancelTarget, setCancelTarget] = useState<ManualCostEntry | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelBusy, setCancelBusy] = useState(false)
@@ -307,6 +311,7 @@ export default function AdIntegration({
     void api.staff.me().then((response) => {
       if (!active) return
       setCanManage(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
+      setCanConnect(response.success && response.data.role === 'owner')
     }).catch(() => undefined)
     return () => { active = false }
   }, [selectedAccountId])
@@ -579,6 +584,8 @@ export default function AdIntegration({
           <Button href="/inflow-links?tab=connections&view=history">送信履歴を見る</Button>
         </div>
 
+        {theme === 'v8' && connectionTarget && selectedAccountId && <AdConnectionDialog key={`${selectedAccountId}:${connectionTarget.key}`} provider={connectionTarget} platform={platforms.find(p=>p.name===connectionTarget.key)} accountId={selectedAccountId} onClose={()=>setConnectionTarget(null)} onSaved={load}/>}
+        {theme === 'v8' && importError && <p role="alert">{importError}</p>}
         <Notice tone="info">
           広告をつながなくても流入リンクの計測は使えます。つなぐと、成果を広告側へ安全に返せるようになります。
         </Notice>
@@ -612,10 +619,10 @@ export default function AdIntegration({
                       まだ接続されていません。
                     </p>
                   )}
-                  {/*
-                    #514-13: 設定・接続の操作画面は無い。効かないボタンは出さず、
-                    状態の文だけにする。
-                  */}
+                  {theme === 'v8' && <div className="mt-3 flex gap-2">
+                    {canConnect && <Button variant="secondary" onClick={()=>setConnectionTarget(provider)}>{platform ? '設定・つなぎ直す' : 'つなぐ'}</Button>}
+                    {canManage && platform?.isActive && <Button variant="secondary" disabled={importingId!==null} onClick={()=>void runImportNow(platform.id)}>再読み込み</Button>}
+                  </div>}
                   <div className="mt-3 flex items-center justify-between gap-2 text-xs text-ink-faint">
                     <span>{active ? (synced ? `${synced} に同期` : '同期日時は取得できません') : platform?.config.connection_error === '権限が足りません' ? 'もう一度つなぎ直してください' : '接続すると成果を返せます'}</span>
                   </div>

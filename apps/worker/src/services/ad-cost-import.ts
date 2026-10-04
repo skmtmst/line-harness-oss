@@ -23,6 +23,9 @@ import { buildXOAuth1Header } from './ad-conversion.js';
 import { GOOGLE_ADS_API_VERSION } from './ad-conversion.js';
 
 /** 小数点以下を持たない通貨。この中の通貨は 最小通貨単位 = 表示単位。 */
+function boundedAdCostFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(input, { ...init, redirect: 'error', signal: AbortSignal.timeout(12_000) });
+}
 const ZERO_DECIMAL_CURRENCIES = new Set([
   'BIF', 'CLP', 'DJF', 'GNF', 'ISK', 'JPY', 'KMF', 'KRW',
   'PYG', 'RWF', 'UGX', 'UYI', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
@@ -75,11 +78,12 @@ async function fetchMetaCost(config: AdPlatformConfig, day: string): Promise<Fet
   const url = `https://graph.facebook.com/v21.0/act_${accountId}/insights`
     + `?fields=spend&level=account&time_range=${timeRange}`
     + `&access_token=${encodeURIComponent(String(config.access_token))}`;
-  const response = await fetch(url);
+  const response = await boundedAdCostFetch(url);
   if (!response.ok) {
-    throw new Error(`Meta API error: ${response.status} ${(await response.text()).slice(0, 200)}`);
+    throw new Error(`Meta API error: ${response.status}`);
   }
   const payload = await response.json() as { data?: Array<{ spend?: string }> };
+  if (!Array.isArray(payload.data)) throw new Error('AD_READ_INVALID_RESPONSE');
   const spend = Number(payload.data?.[0]?.spend ?? 0);
   if (!Number.isFinite(spend)) throw new Error('Meta API の応答に費用がありません');
   return { amountMinor: toMinorUnits(spend, currency), currency };
@@ -89,7 +93,7 @@ async function fetchGoogleCost(config: AdPlatformConfig, day: string): Promise<F
   const customerId = String(config.customer_id).replace(/-/g, '');
   const url = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`
     + `/customers/${encodeURIComponent(customerId)}/googleAds:searchStream`;
-  const response = await fetch(url, {
+  const response = await boundedAdCostFetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -102,7 +106,7 @@ async function fetchGoogleCost(config: AdPlatformConfig, day: string): Promise<F
     }),
   });
   if (!response.ok) {
-    throw new Error(`Google Ads API error: ${response.status} ${(await response.text()).slice(0, 200)}`);
+    throw new Error(`Google Ads API error: ${response.status}`);
   }
   const batches = await response.json() as Array<{
     results?: Array<{ metrics?: { costMicros?: string }; customer?: { currencyCode?: string } }>;
@@ -133,13 +137,14 @@ async function fetchXCost(config: AdPlatformConfig, day: string): Promise<Fetche
     token: typeof config.x_oauth_token === 'string' ? config.x_oauth_token : undefined,
     tokenSecret: typeof config.x_oauth_token_secret === 'string' ? config.x_oauth_token_secret : undefined,
   });
-  const response = await fetch(url, { headers: { Authorization: authorization } });
+  const response = await boundedAdCostFetch(url, { headers: { Authorization: authorization } });
   if (!response.ok) {
-    throw new Error(`X Ads API error: ${response.status} ${(await response.text()).slice(0, 200)}`);
+    throw new Error(`X Ads API error: ${response.status}`);
   }
   const payload = await response.json() as {
     data?: Array<{ id_data?: Array<{ metrics?: { billed_charge_local_micro?: number[] } }> }>;
   };
+  if (!Array.isArray(payload.data)) throw new Error('AD_READ_INVALID_RESPONSE');
   const micros = Number(payload.data?.[0]?.id_data?.[0]?.metrics?.billed_charge_local_micro?.[0] ?? 0);
   if (!Number.isFinite(micros)) throw new Error('X Ads API の応答に費用がありません');
   return { amountMinor: microsToMinorUnits(micros, currency), currency };
@@ -158,11 +163,11 @@ async function fetchTikTokCost(config: AdPlatformConfig, day: string): Promise<F
     page_size: '10',
   });
   const url = `https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/?${params}`;
-  const response = await fetch(url, {
+  const response = await boundedAdCostFetch(url, {
     headers: { 'Access-Token': String(config.access_token) },
   });
   if (!response.ok) {
-    throw new Error(`TikTok API error: ${response.status} ${(await response.text()).slice(0, 200)}`);
+    throw new Error(`TikTok API error: ${response.status}`);
   }
   const payload = await response.json() as {
     code?: number;
@@ -170,8 +175,9 @@ async function fetchTikTokCost(config: AdPlatformConfig, day: string): Promise<F
     data?: { list?: Array<{ metrics?: { spend?: string } }> };
   };
   if (payload.code !== undefined && payload.code !== 0) {
-    throw new Error(`TikTok API error: ${payload.message ?? `code=${payload.code}`}`);
+    throw new Error(`TikTok API error: code=${payload.code}`);
   }
+  if (payload.code !== 0 || !Array.isArray(payload.data?.list)) throw new Error('AD_READ_INVALID_RESPONSE');
   const spend = Number(payload.data?.list?.[0]?.metrics?.spend ?? 0);
   if (!Number.isFinite(spend)) throw new Error('TikTok API の応答に費用がありません');
   return { amountMinor: toMinorUnits(spend, currency), currency };
@@ -270,4 +276,15 @@ export async function importAdCostNow(
   if (!platform) return { status: 'failed', error: '連携が見つかりません' };
   // 媒体側の数値は確定まで変わることがあるので、手動では同じ日を取り直せる。
   return importAdCostForPlatform(db, platform, { ...opts, force: true });
+}
+
+/** 疎通確認は媒体の前日費用の読み取りだけ。顧客の成果は送らない。 */
+export async function verifyAdPlatformReadAccess(platform: AdPlatform, credentialKey?: string): Promise<void> {
+  const config = await resolveAdPlatformConfig(platform, credentialKey);
+  if (!config || missingConfigKey(platform, config)) throw new Error('AD_READ_CONFIG_MISSING');
+  const required: Record<string, string[]> = {meta:['pixel_id'],google:['conversion_action_id'],tiktok:['pixel_code'],x:['conversion_id','x_oauth_token','x_oauth_token_secret']};
+  if (!required[platform.name] || required[platform.name].some(key => typeof (config as Record<string, unknown>)[key] !== 'string' || !(config as Record<string, unknown>)[key])) throw new Error('AD_SEND_CONFIG_MISSING');
+  const day = new Date(Date.now() - 24 * 3600_000 + 9 * 3600_000).toISOString().slice(0,10);
+  const cost = await FETCHERS[platform.name](config, day);
+  if (!Number.isSafeInteger(cost.amountMinor) || cost.amountMinor < 0) throw new Error('AD_READ_INVALID_RESPONSE');
 }
