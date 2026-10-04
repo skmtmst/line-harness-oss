@@ -1185,9 +1185,9 @@ function CommonVarsListV8Inner() {
                           </th>
                         ) : null}
                         <th scope="col">共通情報（差し込み名）</th>
-                        <th scope="col">中身</th>
-                        <th scope="col">状態</th>
-                        <th scope="col">使っている所</th>
+                        <th scope="col" className={styles.cellValue}>中身</th>
+                        <th scope="col" className={styles.cellStatus}>状態</th>
+                        <th scope="col" className={styles.cellUsage}>使っている所</th>
                         <th scope="col" className={styles.cellMenu}>
                           <span className="sr-only">操作</span>
                         </th>

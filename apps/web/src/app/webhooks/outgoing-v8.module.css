@@ -58,12 +58,13 @@
   border-bottom: 1px solid var(--color-hairline);
 }
 
+/* 数の帯のマス（板 `AsfFB`「数」：余白 16/20・間 8）。 */
 .kpiCell {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
-  padding: 10px 16px;
+  padding: 16px 20px;
 }
 
 .kpiCell + .kpiCell {
@@ -89,12 +90,14 @@
   color: var(--color-ink-secondary);
 }
 
+/* 数の帯の題（板 `AsfFB`「題」：12・500・ink・行18）。 */
 .kpiLabel {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
+  line-height: 1.5;
   color: var(--color-ink);
 }
 
@@ -138,9 +141,11 @@
   gap: 8px 12px;
 }
 
+/* 探す欄の幅（板 `AsfFB`「検索」：幅 240・高さは共有部品）。 */
 .searchWrap {
-  flex: 1 1 200px;
-  max-width: 320px;
+  flex: 0 0 auto;
+  width: 240px;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -167,8 +172,9 @@
   table-layout: fixed;
 }
 
+/* 表の見出しの地（板 `AsfFB`「表の見出し」：#fafafb＝table-head）。文字 12/500/secondary は合っている。 */
 .table thead th {
-  background: var(--color-canvas-sunken);
+  background: var(--color-table-head);
   border-bottom: 1px solid var(--color-hairline);
   padding: 13px 16px;
   font-size: 12px;
