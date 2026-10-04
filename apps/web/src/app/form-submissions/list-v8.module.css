@@ -633,6 +633,12 @@
     display: none;
   }
 
+  /* 板 GrnO4（1152）：表の「保存先」を畳む。 */
+  .colDest,
+  .destCell {
+    display: none;
+  }
+
   .toolbarCreate {
     display: inline-flex;
   }

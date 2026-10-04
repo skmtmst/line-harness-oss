@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const LIST_V8 = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
+const LIST_V8_CSS = readFileSync(join(HERE, 'list-v8.module.css'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const DESIGN_SETTINGS = readFileSync(join(HERE, 'edit', 'form-design-settings.tsx'), 'utf8')
 const RESPONSES_PAGE = readFileSync(join(HERE, 'responses', 'page.tsx'), 'utf8')
@@ -364,5 +366,20 @@ describe('#578 ページ名の変更（#503 L3）', () => {
     expect(EDIT_PAGE).toContain('if (!current) return')
     expect(EDIT_PAGE).toContain('normalizeSectionName(next)')
     expect(EDIT_PAGE).toContain('空のページ名は作らせない')
+  })
+})
+
+describe('V8回答フォーム一覧の派生板', () => {
+  it('JV2oR: 閲覧のみは帯と押せない作るボタンと目印を出す', () => {
+    expect(LIST_V8).toContain("canEditFeature('/form-submissions')")
+    expect(LIST_V8).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
+    expect(LIST_V8).toContain('disabled={creating || !canEditForms}')
+    expect(LIST_V8).toContain("canEditForms ? 'I3L41O' : 'JV2oR'")
+    expect(LIST_V8).toContain('if (!canEditForms) return [viewItem]')
+  })
+
+  it('GrnO4: 1152では表の保存先を畳む', () => {
+    expect(LIST_V8_CSS).toContain('@container (max-width: 1099px)')
+    expect(LIST_V8_CSS).toMatch(/\.colDest,\s*\.destCell\s*\{[^}]*display:\s*none/)
   })
 })
