@@ -34,6 +34,7 @@ import {
 } from '@/lib/api'
 import { isMileageFriendsV6Overview } from './friends-overview-guard'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
+import type { MileageV8TabKey } from './mileage-v8'
 import { mileagePaginationTotal } from './mileage-response-state'
 import { csvCell } from '@/lib/presentation'
 import styles from './mileage-v8.module.css'
@@ -62,9 +63,11 @@ function rankLabel(rank: string | null) {
 export default function V8BalancesTab({
   readonly,
   registerHeaderActions,
+  registerTabCount,
 }: {
   readonly: boolean
   registerHeaderActions: (node: ReactNode) => void
+  registerTabCount: (key: MileageV8TabKey, text: string | null) => void
 }) {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
@@ -295,6 +298,14 @@ export default function V8BalancesTab({
     )
     return () => registerHeaderActions(null)
   }, [exportCsv, loading, members.length, registerHeaderActions, reloadAll])
+
+  /* タブの名の横の件数。読み直し中・失敗時は消す。 */
+  useEffect(() => {
+    registerTabCount(
+      'balances',
+      loading || loadError || overview === null ? null : formatMileageNumber(overview.summary.totalMembers),
+    )
+  }, [loadError, loading, overview, registerTabCount])
 
   const resetAll = () => {
     setSearchInput('')

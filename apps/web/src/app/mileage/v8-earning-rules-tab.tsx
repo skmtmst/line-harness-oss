@@ -54,6 +54,7 @@ import {
 import { isMileageFriendsV6Overview } from './friends-overview-guard'
 import { ruleEventLabel } from './earning-rule-view'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
+import type { MileageV8TabKey } from './mileage-v8'
 import { describeMileageCsvExportFailure } from './mileage-response-state'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -160,9 +161,11 @@ const PRESETS: Array<{ value: string; label: string; active: boolean; pending: b
 export default function V8EarningRulesTab({
   readonly,
   registerHeaderActions,
+  registerTabCount,
 }: {
   readonly: boolean
   registerHeaderActions: (node: ReactNode) => void
+  registerTabCount: (key: MileageV8TabKey, text: string | null) => void
 }) {
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -322,6 +325,11 @@ export default function V8EarningRulesTab({
     )
     return () => registerHeaderActions(null)
   }, [exportCsv, exporting, registerHeaderActions, rules.length])
+
+  /* タブの名の横の件数。読み直し中・失敗時は消す。 */
+  useEffect(() => {
+    registerTabCount('earning-rules', loading || loadError ? null : formatMileageNumber(rules.length))
+  }, [loading, loadError, registerTabCount, rules.length])
 
   const activeRules = useMemo(() => rules.filter((rule) => rule.published.status === 'published'), [rules])
   const pendingRules = useMemo(() => rules.filter((rule) => rule.draft.initialStatus === 'pending'), [rules])

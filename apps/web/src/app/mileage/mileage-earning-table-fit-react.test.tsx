@@ -9,6 +9,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountProvider } from '@/contexts/account-context'
 import MileagePage from './page'
+import V8BalancesTab from './v8-balances-tab'
+import V8RewardsTab from './v8-rewards-tab'
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
 vi.mock('next/navigation', () => ({
@@ -49,6 +51,28 @@ function ruleFixture() {
     draftUpdatedAt: '2026-09-10T01:00:00.000Z',
     publishedVersion: 1,
     metrics30d: { eligible: 10, granted: 8, grantedMiles: 800, excluded: 2 },
+  }
+}
+
+function rewardFixture(id: string) {
+  return {
+    id,
+    lineAccountId: 'account-1',
+    programId: 'program-1',
+    name: `使い道${id}`,
+    description: null,
+    imageUrl: null,
+    rewardKind: 'coupon' as const,
+    status: 'published' as const,
+    sortOrder: 0,
+    currentDraftVersionId: null,
+    currentPublishedVersionId: null,
+    currentVersion: null,
+    exchangedThisMonth: 0,
+    availableCodeCount: null,
+    benefitName: null,
+    createdAt: '2026-09-10T00:00:00.000Z',
+    updatedAt: '2026-09-10T00:00:00.000Z',
   }
 }
 
@@ -94,6 +118,12 @@ function stubFetch() {
           pagination: { total: 1, limit: 1, offset: 0 },
           measuredAt: '2026-09-10T00:00:00.000Z',
         },
+      }), { status: 200 })
+    }
+    if (url.includes('/api/mileage/rewards')) {
+      return new Response(JSON.stringify({
+        success: true,
+        data: { rewards: [rewardFixture('reward-1'), rewardFixture('reward-2')] },
       }), { status: 200 })
     }
     if (url.includes('/api/staff/me')) {
@@ -180,5 +210,63 @@ describe('たまる決めごとの表の器収め', () => {
     const total = widths.reduce((sum, width) => sum + Number.parseFloat(width), 0)
     /* 100 を超えると器からはみ出す。 */
     expect(total).toBeLessThanOrEqual(100)
+  })
+})
+
+/*
+ * タブの名の横の件数（板 `OC0gy`：たまる決めごと・使い道・
+ * 友だちの残高）。数は各タブの読み物から来る。読み直し中・失敗時は出さない。
+ */
+async function waitForTabCount(calls: Array<{ key: string; text: string | null }>, key: string, text: string) {
+  for (let i = 0; i < 60; i += 1) {
+    await act(async () => { await Promise.resolve() })
+    if (calls.some((call) => call.key === key && call.text === text)) return
+  }
+  throw new Error(`タブの件数が出ませんでした: ${key} ${text}`)
+}
+
+describe('タブの名の横の件数', () => {
+  it('たまる決めごとは読み物の件数が殻のタブに出る', async () => {
+    await act(async () => {
+      root.render(<AccountProvider><MileagePage /></AccountProvider>)
+    })
+    await waitForTable()
+    /* 見本1件 → 「たまる決めごと 1」。 */
+    const nav = container.querySelector('nav')
+    expect(nav?.textContent).toContain('たまる決めごと 1')
+  })
+
+  it('使い道は読み物の件数を殻へ載せる', async () => {
+    const calls: Array<{ key: string; text: string | null }> = []
+    await act(async () => {
+      root.render(
+        <AccountProvider>
+          <V8RewardsTab
+            readonly={false}
+            registerHeaderActions={() => {}}
+            registerTabCount={(key, text) => { calls.push({ key, text }) }}
+          />
+        </AccountProvider>,
+      )
+    })
+    /* 見本2件 → 「使い道 2」。 */
+    await waitForTabCount(calls, 'rewards', '2')
+  })
+
+  it('友だちの残高は人数を殻へ載せる', async () => {
+    const calls: Array<{ key: string; text: string | null }> = []
+    await act(async () => {
+      root.render(
+        <AccountProvider>
+          <V8BalancesTab
+            readonly={false}
+            registerHeaderActions={() => {}}
+            registerTabCount={(key, text) => { calls.push({ key, text }) }}
+          />
+        </AccountProvider>,
+      )
+    })
+    /* 見本の人数1 → 「友だちの残高 1」。 */
+    await waitForTabCount(calls, 'balances', '1')
   })
 })
