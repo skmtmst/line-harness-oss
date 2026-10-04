@@ -56,7 +56,7 @@ const webinar = {
   id: 'webinar-5',
   title: '旧機能説明会',
   slug: 'old-feature-briefing',
-  status: 'archived',
+  status: 'draft',
   publicationState: 'ended',
   publicationStartsAt: null,
   publicationEndsAt: null,

@@ -31,6 +31,6 @@ export async function webinarListCsv(args: {
     if (data.items.length === 0) throw new Error('incomplete')
   }
   const rows: unknown[][] = [['ウェビナー名', '公開URLの名前', '状態', '申込人数', '視聴開始人数', '公開開始', '公開終了']]
-  for (const item of items) rows.push([item.title, item.slug, item.publicationState === 'scheduled' ? '公開予定' : item.publicationState === 'ended' ? '終了' : item.status === 'active' ? '公開中' : item.status === 'draft' ? '下書き' : 'アーカイブ', item.registrationCount, item.viewerCount, item.publicationStartsAt, item.publicationEndsAt])
+  for (const item of items) rows.push([item.title, item.slug, item.status === 'archived' ? 'アーカイブ' : item.publicationState === 'scheduled' ? '公開予定' : item.publicationState === 'ended' ? '終了' : item.status === 'active' ? '公開中' : item.status === 'draft' ? '下書き' : 'アーカイブ', item.registrationCount, item.viewerCount, item.publicationStartsAt, item.publicationEndsAt])
   return '\uFEFF' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n'
 }

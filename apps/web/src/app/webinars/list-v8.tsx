@@ -47,7 +47,7 @@ import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-fail
 import styles from './list-v8.module.css'
 
 type SortKey = 'updated' | 'created' | 'name'
-type SavedFilter = '' | 'active' | 'draft'
+type SavedFilter = '' | 'active' | 'draft' | 'archived'
 
 const UNFILED = '__unfiled__'
 
@@ -100,14 +100,15 @@ function publicationSummary(webinar: WebinarListItem): string {
  * 使わない。公開の予定は「公開予定」にそろえる。
  */
 function statusLabelV8(webinar: WebinarListItem): string {
+  if (webinar.status === 'archived') return 'アーカイブ'
   if (webinar.publicationState === 'scheduled') return '公開予定'
   if (webinar.publicationState === 'ended') return '終了'
   if (webinar.status === 'draft') return '下書き'
-  if (webinar.status === 'archived') return 'アーカイブ'
   return '公開中'
 }
 
 function statusPillClass(webinar: WebinarListItem): string {
+  if (webinar.status === 'archived') return `${styles.pill} ${styles.pillNeutral}`
   if (webinar.publicationState === 'scheduled') return `${styles.pill} ${styles.pillScheduled}`
   if (webinar.status === 'active' && webinar.publicationState !== 'ended') return `${styles.pill} ${styles.pillActive}`
   return `${styles.pill} ${styles.pillNeutral}`
@@ -242,26 +243,27 @@ export function WebinarArchiveConfirmV8({
   onConfirm: () => void
 }) {
   const blocked = target.status === 'active'
+  const restoring = target.status === 'archived'
   return (
     <ConfirmDialog
       open
       designNode="VXZ6T"
-      title="ウェビナーをアーカイブしますか？"
-      description="アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。"
-      confirmLabel="アーカイブする"
-      destructive
+      title={restoring ? 'ウェビナーを下書きに戻しますか？' : 'ウェビナーをアーカイブしますか？'}
+      description={restoring ? '通常の一覧に戻します。公開するまでは、新しい申込は受け付けません。' : 'アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。'}
+      confirmLabel={restoring ? '下書きに戻す' : 'アーカイブする'}
+      destructive={!restoring}
       busy={busy}
       error={error}
       onCancel={onCancel}
       onConfirm={blocked ? undefined : onConfirm}
     >
-      <p className={styles.archiveTarget}>アーカイブの対象</p>
+      <p className={styles.archiveTarget}>{restoring ? '下書きに戻す対象' : 'アーカイブの対象'}</p>
       <p className={styles.archiveTargetSub}>{target.title}（{publicationSummary(target)}）</p>
-      <ul className={styles.archiveAfter}>
+      {restoring ? <p className={styles.archiveAfter}>参加者・視聴の記録・分析はそのまま残ります。</p> : <ul className={styles.archiveAfter}>
         <li>・参加者・視聴の記録・分析はそのまま見られます</li>
         <li>・公開ページは閉じ、新しい申込は受け付けません</li>
-        <li>・「アーカイブ」のフォルダで確認できます</li>
-      </ul>
+        <li>・絞り込みの「アーカイブ済み」から確認し、下書きに戻せます</li>
+      </ul>}
       {blocked ? (
         <Notice tone="warn">
           公開中のウェビナーは、このままではアーカイブできません。先に公開を停止してから、もう一度アーカイブしてください。
@@ -347,7 +349,7 @@ export function WebinarListTableV8({
         </thead>
         <tbody>
           {items.map((w) => {
-            const unpublished = isUnpublished(w)
+            const unpublished = w.status !== 'archived' && isUnpublished(w)
             const viewStarted = unpublished ? '—' : peopleText(w.viewerCount)
             const period = publicationSummary(w)
             return (
@@ -379,7 +381,7 @@ export function WebinarListTableV8({
                         { id: 'comments', label: 'コメント演出を開く', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=comments`) },
                         {
                           id: 'archive',
-                          label: 'アーカイブする',
+                          label: w.status === 'archived' ? '下書きに戻す' : 'アーカイブする',
                           onSelect: () => onArchive(w),
                           disabled: !canEdit,
                           disabledReason: canEdit ? undefined : readonlyReason,
@@ -735,13 +737,19 @@ function WebinarListV8Inner() {
     setArchiving(true)
     setArchiveError('')
     try {
-      await webinarApi.archive(archiveTarget.id)
+      if (archiveTarget.status === 'archived') {
+        await webinarApi.update(archiveTarget.id, { status: 'draft' })
+      } else {
+        await webinarApi.archive(archiveTarget.id)
+      }
       setArchiveTarget(null)
       await Promise.all([refresh(), refreshOverview(), refreshGrandTotal()])
     } catch (error) {
       setArchiveError(error instanceof ApiError && error.status === 409
         ? '公開中のウェビナーは、先に公開を停止してください。'
-        : 'アーカイブできませんでした。状態を読み直して、もう一度お試しください。')
+        : archiveTarget.status === 'archived'
+          ? '下書きに戻せませんでした。もう一度お試しください。'
+          : 'アーカイブできませんでした。状態を読み直して、もう一度お試しください。')
     } finally {
       setArchiving(false)
     }
@@ -882,6 +890,7 @@ function WebinarListV8Inner() {
                   { value: '', label: 'よく使う絞り込み' },
                   { value: 'active', label: '公開中のみ' },
                   { value: 'draft', label: '下書きのみ' },
+                  { value: 'archived', label: 'アーカイブ済み' },
                 ]}
               />
               <SortSelect

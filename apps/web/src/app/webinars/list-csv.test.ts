@@ -18,4 +18,11 @@ describe('条件に合う全ウェビナーのCSV', () => {
     list.mockResolvedValueOnce({ data: { items: [item('1', '前のアカウント')], total: 1 } })
     await expect(webinarListCsv({ accountId: 'a', params: {}, list, isCurrent: () => false })).resolves.toBeNull()
   })
+  it('アーカイブ済みの条件と状態をCSVへ引き継ぐ', async () => {
+    const archived = { ...item('old', '旧版'), status: 'archived', publicationState: 'ended', registrationCount: 12 } as WebinarListItem
+    const list = vi.fn().mockResolvedValue({ data: { items: [archived], total: 1 } })
+    const csv = await webinarListCsv({ accountId: 'a', params: { status: 'archived' }, list, isCurrent: () => true })
+    expect(list).toHaveBeenCalledWith('a', expect.objectContaining({ status: 'archived' }))
+    expect(csv).toContain('"アーカイブ","12"')
+  })
 })
