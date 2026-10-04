@@ -12,6 +12,9 @@ import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import AutomationListV8 from './list-v8'
+import AutomationTemplatesV8 from './templates-v8'
 import AutomationTemplateGallery from '@/components/automations/automation-template-gallery'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import Chip from '@/components/shared/chip'
@@ -278,6 +281,7 @@ export default function AutomationsPage() {
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const tab = useMergedTab(MERGED_TABS)
+  const theme = useAdminTheme()
   usePageTitle(tab === 'templates' ? '見本から作る' : 'オートメーション')
   const canManageAutomations = useCanManageAutomations()
   /* 監査 R128: 正本表に登録があるときだけ出す。無ければボタン自体を出さない。 */
@@ -509,6 +513,13 @@ export default function AutomationsPage() {
       )
     }
   }
+
+  /*
+   * ★V8 切替（`LWQXd`・`c7dxp`）。全部のフックの後ろで枝分けするので、
+   * フックの順番は v7 と同じ。v7 の見た目は1画素も変えない。
+   */
+  if (theme === 'v8' && tab === 'templates') return <AutomationTemplatesV8 />
+  if (theme === 'v8') return <AutomationListV8 />
 
   if (tab === 'templates') {
     const activeCount = loadStatus === 'ready' ? automations.filter((item) => item.isActive).length : null

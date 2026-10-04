@@ -30,11 +30,14 @@ shared-button-importer app/auto-replies/runs/page.tsx
 shared-button-importer app/auto-replies/runs/runs-v8.tsx
 shared-button-importer app/automations/automations-v8.tsx
 shared-button-importer app/automations/new/new-v8.tsx
+shared-button-importer app/automations/drafts/draft-v8.tsx
+shared-button-importer app/automations/list-v8.tsx
 shared-button-importer app/automations/new/friend-multi-select.tsx
 shared-button-importer app/automations/new/page.tsx
 shared-button-importer app/automations/page.tsx
 shared-button-importer app/automations/runs-v8.tsx
 shared-button-importer app/automations/runs/page.tsx
+shared-button-importer app/automations/templates-v8.tsx
 shared-button-importer app/booking/bookings/booking-calendar.tsx
 shared-button-importer app/booking/bookings/booking-detail-v8.tsx
 shared-button-importer app/booking/bookings/detail/page.tsx

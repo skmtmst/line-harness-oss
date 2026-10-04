@@ -87,6 +87,12 @@
   "app/automations/automations-v8.tsx": {
     "unresolved-classname": 9
   },
+  "app/automations/drafts/draft-v8.tsx": {
+    "unresolved-classname": 35
+  },
+  "app/automations/list-v8.tsx": {
+    "unresolved-classname": 24
+  },
   "app/automations/new/new-v8.tsx": {
     "unresolved-classname": 140
   },
@@ -99,6 +105,9 @@
   "app/automations/runs-v8.tsx": {
     "unresolved-classname": 90,
     "direct-th": 6
+  },
+  "app/automations/templates-v8.tsx": {
+    "unresolved-classname": 14
   },
   "app/booking/bookings/detail/page.tsx": {
     "unresolved-classname": 1
