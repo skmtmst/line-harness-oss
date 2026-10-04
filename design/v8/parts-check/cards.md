@@ -4,29 +4,33 @@
 
 正本は `/Users/kentakenta/lh-work/design/v8/parts/<ID>.html`。実装は `/v8-parts/`。正本ファイルは変更していません。
 
-数値は差が1px以下、色・影は完全一致で合格。枠がoutlineで描かれているため、borderとoutlineの両方を測っています。文字だけを比較する行は寸法欄を省きます。
+数値は差が1px以下、色・影は完全一致で合格。位置は部品の左上から測定。画像の輪郭（隣接画素のRGB差16以上）を両方向で比べ、4pxを超えて離れた輪郭が0なら重ね比較合格。生の画素差も隠さず記録します。0pxと1pxずらした対照は合格、5pxずらした対照は不合格になることを毎回確かめています。
 
-|部品ID|測定要素|最大寸法差|不一致項目|数値判定|画像の判定|
-|---|---:|---:|---:|---|---|
-|fNPdg|5|0.000px|0|合格|司令塔の確認待ち|
-|r3xz1W|5|0.000px|0|合格|司令塔の確認待ち|
-|w6uYMd|5|1.000px|0|合格|司令塔の確認待ち|
-|RRxK5|5|1.000px|0|合格|司令塔の確認待ち|
-|Q6cQB|4|0.000px|0|合格|司令塔の確認待ち|
-|tnWX9|4|0.000px|0|合格|司令塔の確認待ち|
-|f6zwfs|2|0.000px|0|合格|司令塔の確認待ち|
-|ThDed|3|0.000px|0|合格|司令塔の確認待ち|
-|q3DPdz|19|0.000px|0|合格|司令塔の確認待ち|
-|hNXm7|6|0.000px|0|合格|司令塔の確認待ち|
-|jr5Nl|6|0.000px|0|合格|司令塔の確認待ち|
-|cfVyj|30|0.828px|0|合格|司令塔の確認待ち|
+枠がoutlineで描かれているため、borderとoutlineの両方を測っています。文字だけを比較する行は寸法欄を省きます。
+
+|部品ID|測定要素|最大寸法差|不一致項目|最大位置差|余白4px超|重ね差4px超|生の画素差|数値・重ね判定|画像の判定|
+|---|---:|---:|---:|---:|---:|---:|---:|---|---|
+|fNPdg|5|0.000px|0|0.000px|0|0|154|合格|Codex目視合格・司令塔最終確認待ち|
+|r3xz1W|5|0.000px|0|0.000px|0|0|149|合格|Codex目視合格・司令塔最終確認待ち|
+|w6uYMd|6|1.000px|0|1.000px|0|0|1023|合格|Codex目視合格・司令塔最終確認待ち|
+|RRxK5|5|1.000px|0|1.000px|0|0|1013|合格|Codex目視合格・司令塔最終確認待ち|
+|Q6cQB|4|0.000px|0|0.000px|0|0|115|合格|Codex目視合格・司令塔最終確認待ち|
+|tnWX9|4|0.000px|0|0.000px|0|0|110|合格|Codex目視合格・司令塔最終確認待ち|
+|f6zwfs|2|0.000px|0|0.000px|0|0|8|合格|Codex目視合格・司令塔最終確認待ち|
+|ThDed|3|0.000px|0|0.000px|0|0|107|合格|Codex目視合格・司令塔最終確認待ち|
+|q3DPdz|26|0.125px|0|0.125px|0|0|446|合格|Codex目視合格・司令塔最終確認待ち|
+|hNXm7|6|0.000px|0|0.000px|0|0|184|合格|Codex目視合格・司令塔最終確認待ち|
+|jr5Nl|6|0.000px|0|0.000px|0|0|2|合格|Codex目視合格・司令塔最終確認待ち|
+|cfVyj|49|0.828px|0|0.828px|0|0|1384|合格|Codex目視合格・司令塔最終確認待ち|
 
 ## fNPdg
 
-画像： [fNPdg.png](./fNPdg.png)
+画像： [左右の比較](./fNPdg.png)・[50%重ね](./fNPdg-overlay.png)・[生の差](./fNPdg-diff.png)
 
 |要素（正本のID）|項目|正本|実装|差|判定|
 |---|---|---|---|---|---|
+|本体 (fNPdg)|x|0|0|0.000px|合格|
+|本体 (fNPdg)|y|0|0|0.000px|合格|
 |本体 (fNPdg)|width|220|220|0.000px|合格|
 |本体 (fNPdg)|height|98|98|0.000px|合格|
 |本体 (fNPdg)|paddingTop|14px|14px|0.000px|合格|
@@ -48,6 +52,8 @@
 |本体 (fNPdg)|outlineWidth|1px|1px|0.000px|合格|
 |本体 (fNPdg)|outlineColor|rgb(8, 122, 62)|rgb(8, 122, 62)|完全一致で比較|合格|
 |本体 (fNPdg)|outlineOffset|-1px|-1px|0.000px|合格|
+|印 (QzCDJ)|x|14|14|0.000px|合格|
+|印 (QzCDJ)|y|14|14|0.000px|合格|
 |印 (QzCDJ)|width|16|16|0.000px|合格|
 |印 (QzCDJ)|height|16|16|0.000px|合格|
 |印 (QzCDJ)|paddingTop|0px|0px|0.000px|合格|
@@ -68,6 +74,8 @@
 |印 (QzCDJ)|boxShadow|none|none|完全一致で比較|合格|
 |印 (QzCDJ)|outlineWidth|0px|0px|0.000px|合格|
 |印 (QzCDJ)|印の色|rgb(8, 122, 62)|rgb(8, 122, 62)|完全一致で比較|合格|
+|丸 (d4R6IM)|x|190|190|0.000px|合格|
+|丸 (d4R6IM)|y|14|14|0.000px|合格|
 |丸 (d4R6IM)|width|16|16|0.000px|合格|
 |丸 (d4R6IM)|height|16|16|0.000px|合格|
 |丸 (d4R6IM)|paddingTop|0px|0px|0.000px|合格|
@@ -89,6 +97,8 @@
 |丸 (d4R6IM)|outlineWidth|5px|5px|0.000px|合格|
 |丸 (d4R6IM)|outlineColor|rgb(8, 122, 62)|rgb(8, 122, 62)|完全一致で比較|合格|
 |丸 (d4R6IM)|outlineOffset|-2px|-2px|0.000px|合格|
+|題 (mNkIc)|x|14|14|0.000px|合格|
+|題 (mNkIc)|y|38|38|0.000px|合格|
 |題 (mNkIc)|width|192|192|0.000px|合格|
 |題 (mNkIc)|height|20|20|0.000px|合格|
 |題 (mNkIc)|paddingTop|0px|0px|0.000px|合格|
@@ -112,6 +122,9 @@
 |題 (mNkIc)|fontWeight|600|600|完全一致で比較|合格|
 |題 (mNkIc)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |題 (mNkIc)|lineHeight|20px|20px|0.000px|合格|
+|題 (mNkIc)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|説明 (c0iJ8)|x|14|14|0.000px|合格|
+|説明 (c0iJ8)|y|66|66|0.000px|合格|
 |説明 (c0iJ8)|width|192|192|0.000px|合格|
 |説明 (c0iJ8)|height|18|18|0.000px|合格|
 |説明 (c0iJ8)|paddingTop|0px|0px|0.000px|合格|
@@ -135,13 +148,16 @@
 |説明 (c0iJ8)|fontWeight|400|400|完全一致で比較|合格|
 |説明 (c0iJ8)|color|rgb(74, 85, 101)|rgb(74, 85, 101)|完全一致で比較|合格|
 |説明 (c0iJ8)|lineHeight|18px|18px|0.000px|合格|
+|説明 (c0iJ8)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
 
 ## r3xz1W
 
-画像： [r3xz1W.png](./r3xz1W.png)
+画像： [左右の比較](./r3xz1W.png)・[50%重ね](./r3xz1W-overlay.png)・[生の差](./r3xz1W-diff.png)
 
 |要素（正本のID）|項目|正本|実装|差|判定|
 |---|---|---|---|---|---|
+|本体 (r3xz1W)|x|0|0|0.000px|合格|
+|本体 (r3xz1W)|y|0|0|0.000px|合格|
 |本体 (r3xz1W)|width|220|220|0.000px|合格|
 |本体 (r3xz1W)|height|98|98|0.000px|合格|
 |本体 (r3xz1W)|paddingTop|14px|14px|0.000px|合格|
@@ -163,6 +179,8 @@
 |本体 (r3xz1W)|outlineWidth|1px|1px|0.000px|合格|
 |本体 (r3xz1W)|outlineColor|rgb(218, 221, 226)|rgb(218, 221, 226)|完全一致で比較|合格|
 |本体 (r3xz1W)|outlineOffset|-1px|-1px|0.000px|合格|
+|印 (b7bAM)|x|14|14|0.000px|合格|
+|印 (b7bAM)|y|14|14|0.000px|合格|
 |印 (b7bAM)|width|16|16|0.000px|合格|
 |印 (b7bAM)|height|16|16|0.000px|合格|
 |印 (b7bAM)|paddingTop|0px|0px|0.000px|合格|
@@ -183,6 +201,8 @@
 |印 (b7bAM)|boxShadow|none|none|完全一致で比較|合格|
 |印 (b7bAM)|outlineWidth|0px|0px|0.000px|合格|
 |印 (b7bAM)|印の色|rgb(74, 85, 101)|rgb(74, 85, 101)|完全一致で比較|合格|
+|丸 (I2GcbZ)|x|190|190|0.000px|合格|
+|丸 (I2GcbZ)|y|14|14|0.000px|合格|
 |丸 (I2GcbZ)|width|16|16|0.000px|合格|
 |丸 (I2GcbZ)|height|16|16|0.000px|合格|
 |丸 (I2GcbZ)|paddingTop|0px|0px|0.000px|合格|
@@ -204,6 +224,8 @@
 |丸 (I2GcbZ)|outlineWidth|1px|1px|0.000px|合格|
 |丸 (I2GcbZ)|outlineColor|rgb(201, 206, 214)|rgb(201, 206, 214)|完全一致で比較|合格|
 |丸 (I2GcbZ)|outlineOffset|-1px|-1px|0.000px|合格|
+|題 (C55SBF)|x|14|14|0.000px|合格|
+|題 (C55SBF)|y|38|38|0.000px|合格|
 |題 (C55SBF)|width|192|192|0.000px|合格|
 |題 (C55SBF)|height|20|20|0.000px|合格|
 |題 (C55SBF)|paddingTop|0px|0px|0.000px|合格|
@@ -227,6 +249,9 @@
 |題 (C55SBF)|fontWeight|600|600|完全一致で比較|合格|
 |題 (C55SBF)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |題 (C55SBF)|lineHeight|20px|20px|0.000px|合格|
+|題 (C55SBF)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|説明 (HAxCy)|x|14|14|0.000px|合格|
+|説明 (HAxCy)|y|66|66|0.000px|合格|
 |説明 (HAxCy)|width|192|192|0.000px|合格|
 |説明 (HAxCy)|height|18|18|0.000px|合格|
 |説明 (HAxCy)|paddingTop|0px|0px|0.000px|合格|
@@ -250,13 +275,16 @@
 |説明 (HAxCy)|fontWeight|400|400|完全一致で比較|合格|
 |説明 (HAxCy)|color|rgb(74, 85, 101)|rgb(74, 85, 101)|完全一致で比較|合格|
 |説明 (HAxCy)|lineHeight|18px|18px|0.000px|合格|
+|説明 (HAxCy)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
 
 ## w6uYMd
 
-画像： [w6uYMd.png](./w6uYMd.png)
+画像： [左右の比較](./w6uYMd.png)・[50%重ね](./w6uYMd-overlay.png)・[生の差](./w6uYMd-diff.png)
 
 |要素（正本のID）|項目|正本|実装|差|判定|
 |---|---|---|---|---|---|
+|本体 (w6uYMd)|x|0|0|0.000px|合格|
+|本体 (w6uYMd)|y|0|0|0.000px|合格|
 |本体 (w6uYMd)|width|420|420|0.000px|合格|
 |本体 (w6uYMd)|height|68|69|1.000px|合格|
 |本体 (w6uYMd)|paddingTop|14px|14px|0.000px|合格|
@@ -278,6 +306,8 @@
 |本体 (w6uYMd)|outlineWidth|1px|1px|0.000px|合格|
 |本体 (w6uYMd)|outlineColor|rgb(8, 122, 62)|rgb(8, 122, 62)|完全一致で比較|合格|
 |本体 (w6uYMd)|outlineOffset|-1px|-1px|0.000px|合格|
+|箱 (q2oJt0)|x|14|14|0.000px|合格|
+|箱 (q2oJt0)|y|14|15|1.000px|合格|
 |箱 (q2oJt0)|width|18|18|0.000px|合格|
 |箱 (q2oJt0)|height|18|18|0.000px|合格|
 |箱 (q2oJt0)|paddingTop|0px|0px|0.000px|合格|
@@ -299,6 +329,8 @@
 |箱 (q2oJt0)|outlineWidth|1px|1px|0.000px|合格|
 |箱 (q2oJt0)|outlineColor|rgb(8, 122, 62)|rgb(8, 122, 62)|完全一致で比較|合格|
 |箱 (q2oJt0)|outlineOffset|-1px|-1px|0.000px|合格|
+|文の列 (j1e0TQ)|x|44|44|0.000px|合格|
+|文の列 (j1e0TQ)|y|14|14|0.000px|合格|
 |文の列 (j1e0TQ)|width|362|362|0.000px|合格|
 |文の列 (j1e0TQ)|height|41|41|0.000px|合格|
 |文の列 (j1e0TQ)|paddingTop|0px|0px|0.000px|合格|
@@ -318,6 +350,8 @@
 |文の列 (j1e0TQ)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |文の列 (j1e0TQ)|boxShadow|none|none|完全一致で比較|合格|
 |文の列 (j1e0TQ)|outlineWidth|0px|0px|0.000px|合格|
+|題 (H8ot4G)|x|44|44|0.000px|合格|
+|題 (H8ot4G)|y|14|14|0.000px|合格|
 |題 (H8ot4G)|width|140|140|0.000px|合格|
 |題 (H8ot4G)|height|21|21|0.000px|合格|
 |題 (H8ot4G)|paddingTop|0px|0px|0.000px|合格|
@@ -341,6 +375,9 @@
 |題 (H8ot4G)|fontWeight|500|500|完全一致で比較|合格|
 |題 (H8ot4G)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |題 (H8ot4G)|lineHeight|21px|21px|0.000px|合格|
+|題 (H8ot4G)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|説明 (Ti0Gf)|x|44|44|0.000px|合格|
+|説明 (Ti0Gf)|y|37|37|0.000px|合格|
 |説明 (Ti0Gf)|width|362|362|0.000px|合格|
 |説明 (Ti0Gf)|height|18|18|0.000px|合格|
 |説明 (Ti0Gf)|paddingTop|0px|0px|0.000px|合格|
@@ -364,13 +401,38 @@
 |説明 (Ti0Gf)|fontWeight|400|400|完全一致で比較|合格|
 |説明 (Ti0Gf)|color|rgb(74, 85, 101)|rgb(74, 85, 101)|完全一致で比較|合格|
 |説明 (Ti0Gf)|lineHeight|18px|18px|0.000px|合格|
+|説明 (Ti0Gf)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|チェック印 (ufmr0)|x|17|17|0.000px|合格|
+|チェック印 (ufmr0)|y|17|17|0.000px|合格|
+|チェック印 (ufmr0)|width|12|12|0.000px|合格|
+|チェック印 (ufmr0)|height|12|12|0.000px|合格|
+|チェック印 (ufmr0)|paddingTop|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|paddingRight|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|paddingBottom|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|paddingLeft|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|rowGap|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|columnGap|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|borderTopWidth|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|borderRightWidth|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|borderBottomWidth|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|borderLeftWidth|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|borderTopRightRadius|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|チェック印 (ufmr0)|boxShadow|none|none|完全一致で比較|合格|
+|チェック印 (ufmr0)|outlineWidth|0px|0px|0.000px|合格|
+|チェック印 (ufmr0)|印の色|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
 
 ## RRxK5
 
-画像： [RRxK5.png](./RRxK5.png)
+画像： [左右の比較](./RRxK5.png)・[50%重ね](./RRxK5-overlay.png)・[生の差](./RRxK5-diff.png)
 
 |要素（正本のID）|項目|正本|実装|差|判定|
 |---|---|---|---|---|---|
+|本体 (RRxK5)|x|0|0|0.000px|合格|
+|本体 (RRxK5)|y|0|0|0.000px|合格|
 |本体 (RRxK5)|width|420|420|0.000px|合格|
 |本体 (RRxK5)|height|68|69|1.000px|合格|
 |本体 (RRxK5)|paddingTop|14px|14px|0.000px|合格|
@@ -392,6 +454,8 @@
 |本体 (RRxK5)|outlineWidth|1px|1px|0.000px|合格|
 |本体 (RRxK5)|outlineColor|rgb(218, 221, 226)|rgb(218, 221, 226)|完全一致で比較|合格|
 |本体 (RRxK5)|outlineOffset|-1px|-1px|0.000px|合格|
+|箱 (PFJ0E)|x|14|14|0.000px|合格|
+|箱 (PFJ0E)|y|14|15|1.000px|合格|
 |箱 (PFJ0E)|width|18|18|0.000px|合格|
 |箱 (PFJ0E)|height|18|18|0.000px|合格|
 |箱 (PFJ0E)|paddingTop|0px|0px|0.000px|合格|
@@ -413,6 +477,8 @@
 |箱 (PFJ0E)|outlineWidth|1px|1px|0.000px|合格|
 |箱 (PFJ0E)|outlineColor|rgb(201, 206, 214)|rgb(201, 206, 214)|完全一致で比較|合格|
 |箱 (PFJ0E)|outlineOffset|-1px|-1px|0.000px|合格|
+|文の列 (Q4KBy)|x|44|44|0.000px|合格|
+|文の列 (Q4KBy)|y|14|14|0.000px|合格|
 |文の列 (Q4KBy)|width|362|362|0.000px|合格|
 |文の列 (Q4KBy)|height|41|41|0.000px|合格|
 |文の列 (Q4KBy)|paddingTop|0px|0px|0.000px|合格|
@@ -432,6 +498,8 @@
 |文の列 (Q4KBy)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |文の列 (Q4KBy)|boxShadow|none|none|完全一致で比較|合格|
 |文の列 (Q4KBy)|outlineWidth|0px|0px|0.000px|合格|
+|題 (IL2sk)|x|44|44|0.000px|合格|
+|題 (IL2sk)|y|14|14|0.000px|合格|
 |題 (IL2sk)|width|140|140|0.000px|合格|
 |題 (IL2sk)|height|21|21|0.000px|合格|
 |題 (IL2sk)|paddingTop|0px|0px|0.000px|合格|
@@ -455,6 +523,9 @@
 |題 (IL2sk)|fontWeight|500|500|完全一致で比較|合格|
 |題 (IL2sk)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |題 (IL2sk)|lineHeight|21px|21px|0.000px|合格|
+|題 (IL2sk)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|説明 (G1dUJ3)|x|44|44|0.000px|合格|
+|説明 (G1dUJ3)|y|37|37|0.000px|合格|
 |説明 (G1dUJ3)|width|362|362|0.000px|合格|
 |説明 (G1dUJ3)|height|18|18|0.000px|合格|
 |説明 (G1dUJ3)|paddingTop|0px|0px|0.000px|合格|
@@ -478,13 +549,16 @@
 |説明 (G1dUJ3)|fontWeight|400|400|完全一致で比較|合格|
 |説明 (G1dUJ3)|color|rgb(74, 85, 101)|rgb(74, 85, 101)|完全一致で比較|合格|
 |説明 (G1dUJ3)|lineHeight|18px|18px|0.000px|合格|
+|説明 (G1dUJ3)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
 
 ## Q6cQB
 
-画像： [Q6cQB.png](./Q6cQB.png)
+画像： [左右の比較](./Q6cQB.png)・[50%重ね](./Q6cQB-overlay.png)・[生の差](./Q6cQB-diff.png)
 
 |要素（正本のID）|項目|正本|実装|差|判定|
 |---|---|---|---|---|---|
+|本体 (Q6cQB)|x|0|0|0.000px|合格|
+|本体 (Q6cQB)|y|0|0|0.000px|合格|
 |本体 (Q6cQB)|width|380|380|0.000px|合格|
 |本体 (Q6cQB)|height|44|44|0.000px|合格|
 |本体 (Q6cQB)|paddingTop|12px|12px|0.000px|合格|
@@ -506,6 +580,8 @@
 |本体 (Q6cQB)|outlineWidth|1px|1px|0.000px|合格|
 |本体 (Q6cQB)|outlineColor|rgb(218, 221, 226)|rgb(218, 221, 226)|完全一致で比較|合格|
 |本体 (Q6cQB)|outlineOffset|-1px|-1px|0.000px|合格|
+|印 (ubrRt)|x|14|14|0.000px|合格|
+|印 (ubrRt)|y|14|14|0.000px|合格|
 |印 (ubrRt)|width|16|16|0.000px|合格|
 |印 (ubrRt)|height|16|16|0.000px|合格|
 |印 (ubrRt)|paddingTop|0px|0px|0.000px|合格|
@@ -526,6 +602,8 @@
 |印 (ubrRt)|boxShadow|none|none|完全一致で比較|合格|
 |印 (ubrRt)|outlineWidth|0px|0px|0.000px|合格|
 |印 (ubrRt)|印の色|rgb(4, 120, 51)|rgb(4, 120, 51)|完全一致で比較|合格|
+|文 (Lg4uy)|x|40|40|0.000px|合格|
+|文 (Lg4uy)|y|12|12|0.000px|合格|
 |文 (Lg4uy)|width|264|264|0.000px|合格|
 |文 (Lg4uy)|height|20|20|0.000px|合格|
 |文 (Lg4uy)|paddingTop|0px|0px|0.000px|合格|
@@ -549,6 +627,9 @@
 |文 (Lg4uy)|fontWeight|400|400|完全一致で比較|合格|
 |文 (Lg4uy)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |文 (Lg4uy)|lineHeight|20px|20px|0.000px|合格|
+|文 (Lg4uy)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|操作 (g02lP)|x|314|314|0.000px|合格|
+|操作 (g02lP)|y|12|12|0.000px|合格|
 |操作 (g02lP)|width|52|52|0.000px|合格|
 |操作 (g02lP)|height|20|20|0.000px|合格|
 |操作 (g02lP)|paddingTop|0px|0px|0.000px|合格|
@@ -572,13 +653,16 @@
 |操作 (g02lP)|fontWeight|600|600|完全一致で比較|合格|
 |操作 (g02lP)|color|rgb(8, 122, 62)|rgb(8, 122, 62)|完全一致で比較|合格|
 |操作 (g02lP)|lineHeight|20px|20px|0.000px|合格|
+|操作 (g02lP)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
 
 ## tnWX9
 
-画像： [tnWX9.png](./tnWX9.png)
+画像： [左右の比較](./tnWX9.png)・[50%重ね](./tnWX9-overlay.png)・[生の差](./tnWX9-diff.png)
 
 |要素（正本のID）|項目|正本|実装|差|判定|
 |---|---|---|---|---|---|
+|本体 (tnWX9)|x|0|0|0.000px|合格|
+|本体 (tnWX9)|y|0|0|0.000px|合格|
 |本体 (tnWX9)|width|380|380|0.000px|合格|
 |本体 (tnWX9)|height|44|44|0.000px|合格|
 |本体 (tnWX9)|paddingTop|12px|12px|0.000px|合格|
@@ -600,6 +684,8 @@
 |本体 (tnWX9)|outlineWidth|1px|1px|0.000px|合格|
 |本体 (tnWX9)|outlineColor|rgb(218, 221, 226)|rgb(218, 221, 226)|完全一致で比較|合格|
 |本体 (tnWX9)|outlineOffset|-1px|-1px|0.000px|合格|
+|印 (EOVld)|x|14|14|0.000px|合格|
+|印 (EOVld)|y|14|14|0.000px|合格|
 |印 (EOVld)|width|16|16|0.000px|合格|
 |印 (EOVld)|height|16|16|0.000px|合格|
 |印 (EOVld)|paddingTop|0px|0px|0.000px|合格|
@@ -620,6 +706,8 @@
 |印 (EOVld)|boxShadow|none|none|完全一致で比較|合格|
 |印 (EOVld)|outlineWidth|0px|0px|0.000px|合格|
 |印 (EOVld)|印の色|rgb(179, 38, 30)|rgb(179, 38, 30)|完全一致で比較|合格|
+|文 (AQWgl)|x|40|40|0.000px|合格|
+|文 (AQWgl)|y|12|12|0.000px|合格|
 |文 (AQWgl)|width|264.375|264.375|0.000px|合格|
 |文 (AQWgl)|height|20|20|0.000px|合格|
 |文 (AQWgl)|paddingTop|0px|0px|0.000px|合格|
@@ -643,6 +731,9 @@
 |文 (AQWgl)|fontWeight|400|400|完全一致で比較|合格|
 |文 (AQWgl)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |文 (AQWgl)|lineHeight|20px|20px|0.000px|合格|
+|文 (AQWgl)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|操作 (uleC1)|x|314.375|314.375|0.000px|合格|
+|操作 (uleC1)|y|12|12|0.000px|合格|
 |操作 (uleC1)|width|51.625|51.625|0.000px|合格|
 |操作 (uleC1)|height|20|20|0.000px|合格|
 |操作 (uleC1)|paddingTop|0px|0px|0.000px|合格|
@@ -666,13 +757,16 @@
 |操作 (uleC1)|fontWeight|600|600|完全一致で比較|合格|
 |操作 (uleC1)|color|rgb(8, 122, 62)|rgb(8, 122, 62)|完全一致で比較|合格|
 |操作 (uleC1)|lineHeight|20px|20px|0.000px|合格|
+|操作 (uleC1)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
 
 ## f6zwfs
 
-画像： [f6zwfs.png](./f6zwfs.png)
+画像： [左右の比較](./f6zwfs.png)・[50%重ね](./f6zwfs-overlay.png)・[生の差](./f6zwfs-diff.png)
 
 |要素（正本のID）|項目|正本|実装|差|判定|
 |---|---|---|---|---|---|
+|本体 (f6zwfs)|x|0|0|0.000px|合格|
+|本体 (f6zwfs)|y|0|0|0.000px|合格|
 |本体 (f6zwfs)|width|168.640625|168.640625|0.000px|合格|
 |本体 (f6zwfs)|height|30|30|0.000px|合格|
 |本体 (f6zwfs)|paddingTop|6px|6px|0.000px|合格|
@@ -692,17 +786,22 @@
 |本体 (f6zwfs)|backgroundColor|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |本体 (f6zwfs)|boxShadow|none|none|完全一致で比較|合格|
 |本体 (f6zwfs)|outlineWidth|0px|0px|0.000px|合格|
+|文 (OYVVm)|x|10|10|0.000px|合格|
+|文 (OYVVm)|y|6|6|0.000px|合格|
 |文 (OYVVm)|fontSize|12px|12px|0.000px|合格|
 |文 (OYVVm)|fontWeight|400|400|完全一致で比較|合格|
 |文 (OYVVm)|color|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
 |文 (OYVVm)|lineHeight|18px|18px|0.000px|合格|
+|文 (OYVVm)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
 
 ## ThDed
 
-画像： [ThDed.png](./ThDed.png)
+画像： [左右の比較](./ThDed.png)・[50%重ね](./ThDed-overlay.png)・[生の差](./ThDed-diff.png)
 
 |要素（正本のID）|項目|正本|実装|差|判定|
 |---|---|---|---|---|---|
+|本体 (ThDed)|x|0|0|0.000px|合格|
+|本体 (ThDed)|y|0|0|0.000px|合格|
 |本体 (ThDed)|width|520|520|0.000px|合格|
 |本体 (ThDed)|height|40|40|0.000px|合格|
 |本体 (ThDed)|paddingTop|10px|10px|0.000px|合格|
@@ -722,6 +821,8 @@
 |本体 (ThDed)|backgroundColor|rgb(233, 241, 255)|rgb(233, 241, 255)|完全一致で比較|合格|
 |本体 (ThDed)|boxShadow|none|none|完全一致で比較|合格|
 |本体 (ThDed)|outlineWidth|0px|0px|0.000px|合格|
+|印 (vopYf)|x|14|14|0.000px|合格|
+|印 (vopYf)|y|12|12|0.000px|合格|
 |印 (vopYf)|width|16|16|0.000px|合格|
 |印 (vopYf)|height|16|16|0.000px|合格|
 |印 (vopYf)|paddingTop|0px|0px|0.000px|合格|
@@ -742,6 +843,8 @@
 |印 (vopYf)|boxShadow|none|none|完全一致で比較|合格|
 |印 (vopYf)|outlineWidth|0px|0px|0.000px|合格|
 |印 (vopYf)|印の色|rgb(11, 99, 206)|rgb(11, 99, 206)|完全一致で比較|合格|
+|文 (L4Lb4P)|x|40|40|0.000px|合格|
+|文 (L4Lb4P)|y|10|10|0.000px|合格|
 |文 (L4Lb4P)|width|466|466|0.000px|合格|
 |文 (L4Lb4P)|height|20|20|0.000px|合格|
 |文 (L4Lb4P)|paddingTop|0px|0px|0.000px|合格|
@@ -765,13 +868,16 @@
 |文 (L4Lb4P)|fontWeight|400|400|完全一致で比較|合格|
 |文 (L4Lb4P)|color|rgb(74, 85, 101)|rgb(74, 85, 101)|完全一致で比較|合格|
 |文 (L4Lb4P)|lineHeight|20px|20px|0.000px|合格|
+|文 (L4Lb4P)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
 
 ## q3DPdz
 
-画像： [q3DPdz.png](./q3DPdz.png)
+画像： [左右の比較](./q3DPdz.png)・[50%重ね](./q3DPdz-overlay.png)・[生の差](./q3DPdz-diff.png)
 
 |要素（正本のID）|項目|正本|実装|差|判定|
 |---|---|---|---|---|---|
+|本体 (q3DPdz)|x|0|0|0.000px|合格|
+|本体 (q3DPdz)|y|0|0|0.000px|合格|
 |本体 (q3DPdz)|width|560|560|0.000px|合格|
 |本体 (q3DPdz)|height|343|343|0.000px|合格|
 |本体 (q3DPdz)|paddingTop|0px|0px|0.000px|合格|
@@ -793,6 +899,8 @@
 |本体 (q3DPdz)|outlineWidth|1px|1px|0.000px|合格|
 |本体 (q3DPdz)|outlineColor|rgba(29, 29, 31, 0.08)|rgba(29, 29, 31, 0.08)|完全一致で比較|合格|
 |本体 (q3DPdz)|outlineOffset|-1px|-1px|0.000px|合格|
+|頭 (I89Hu)|x|0|0|0.000px|合格|
+|頭 (I89Hu)|y|0|0|0.000px|合格|
 |頭 (I89Hu)|width|560|560|0.000px|合格|
 |頭 (I89Hu)|height|74|74|0.000px|合格|
 |頭 (I89Hu)|paddingTop|20px|20px|0.000px|合格|
@@ -812,6 +920,8 @@
 |頭 (I89Hu)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |頭 (I89Hu)|boxShadow|none|none|完全一致で比較|合格|
 |頭 (I89Hu)|outlineWidth|0px|0px|0.000px|合格|
+|題と説明 (VNQUe)|x|24|24|0.000px|合格|
+|題と説明 (VNQUe)|y|20|20|0.000px|合格|
 |題と説明 (VNQUe)|width|464|464|0.000px|合格|
 |題と説明 (VNQUe)|height|46|46|0.000px|合格|
 |題と説明 (VNQUe)|paddingTop|0px|0px|0.000px|合格|
@@ -831,6 +941,8 @@
 |題と説明 (VNQUe)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |題と説明 (VNQUe)|boxShadow|none|none|完全一致で比較|合格|
 |題と説明 (VNQUe)|outlineWidth|0px|0px|0.000px|合格|
+|題 (q2ooth)|x|24|24|0.000px|合格|
+|題 (q2ooth)|y|20|20|0.000px|合格|
 |題 (q2ooth)|width|144|144|0.000px|合格|
 |題 (q2ooth)|height|24|24|0.000px|合格|
 |題 (q2ooth)|paddingTop|0px|0px|0.000px|合格|
@@ -854,6 +966,9 @@
 |題 (q2ooth)|fontWeight|600|600|完全一致で比較|合格|
 |題 (q2ooth)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |題 (q2ooth)|lineHeight|24px|24px|0.000px|合格|
+|題 (q2ooth)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|説明 (O4ahMq)|x|24|24|0.000px|合格|
+|説明 (O4ahMq)|y|46|46|0.000px|合格|
 |説明 (O4ahMq)|width|207.359375|207.359375|0.000px|合格|
 |説明 (O4ahMq)|height|20|20|0.000px|合格|
 |説明 (O4ahMq)|paddingTop|0px|0px|0.000px|合格|
@@ -877,6 +992,9 @@
 |説明 (O4ahMq)|fontWeight|400|400|完全一致で比較|合格|
 |説明 (O4ahMq)|color|rgb(74, 85, 101)|rgb(74, 85, 101)|完全一致で比較|合格|
 |説明 (O4ahMq)|lineHeight|20px|20px|0.000px|合格|
+|説明 (O4ahMq)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|閉じる (Crlsc)|x|500|500|0.000px|合格|
+|閉じる (Crlsc)|y|20|20|0.000px|合格|
 |閉じる (Crlsc)|width|36|36|0.000px|合格|
 |閉じる (Crlsc)|height|36|36|0.000px|合格|
 |閉じる (Crlsc)|paddingTop|0px|0px|0.000px|合格|
@@ -898,6 +1016,8 @@
 |閉じる (Crlsc)|outlineWidth|1px|1px|0.000px|合格|
 |閉じる (Crlsc)|outlineColor|rgb(218, 221, 226)|rgb(218, 221, 226)|完全一致で比較|合格|
 |閉じる (Crlsc)|outlineOffset|-1px|-1px|0.000px|合格|
+|閉じる印 (ynkuu)|x|510|510|0.000px|合格|
+|閉じる印 (ynkuu)|y|30|30|0.000px|合格|
 |閉じる印 (ynkuu)|width|16|16|0.000px|合格|
 |閉じる印 (ynkuu)|height|16|16|0.000px|合格|
 |閉じる印 (ynkuu)|paddingTop|0px|0px|0.000px|合格|
@@ -918,6 +1038,8 @@
 |閉じる印 (ynkuu)|boxShadow|none|none|完全一致で比較|合格|
 |閉じる印 (ynkuu)|outlineWidth|0px|0px|0.000px|合格|
 |閉じる印 (ynkuu)|印の色|rgb(74, 85, 101)|rgb(74, 85, 101)|完全一致で比較|合格|
+|手順帯 (NUOgw)|x|0|0|0.000px|合格|
+|手順帯 (NUOgw)|y|74|74|0.000px|合格|
 |手順帯 (NUOgw)|width|560|560|0.000px|合格|
 |手順帯 (NUOgw)|height|44|44|0.000px|合格|
 |手順帯 (NUOgw)|paddingTop|10px|10px|0.000px|合格|
@@ -939,6 +1061,8 @@
 |手順帯 (NUOgw)|backgroundColor|rgb(250, 250, 252)|rgb(250, 250, 252)|完全一致で比較|合格|
 |手順帯 (NUOgw)|boxShadow|none|none|完全一致で比較|合格|
 |手順帯 (NUOgw)|outlineWidth|0px|0px|0.000px|合格|
+|済み丸 (bRFUB)|x|24|24|0.000px|合格|
+|済み丸 (bRFUB)|y|85|85|0.000px|合格|
 |済み丸 (bRFUB)|width|22|22|0.000px|合格|
 |済み丸 (bRFUB)|height|22|22|0.000px|合格|
 |済み丸 (bRFUB)|paddingTop|0px|0px|0.000px|合格|
@@ -958,6 +1082,8 @@
 |済み丸 (bRFUB)|backgroundColor|rgb(8, 122, 62)|rgb(8, 122, 62)|完全一致で比較|合格|
 |済み丸 (bRFUB)|boxShadow|none|none|完全一致で比較|合格|
 |済み丸 (bRFUB)|outlineWidth|0px|0px|0.000px|合格|
+|現在丸 (KAdEm)|x|117|117|0.000px|合格|
+|現在丸 (KAdEm)|y|85|85|0.000px|合格|
 |現在丸 (KAdEm)|width|22|22|0.000px|合格|
 |現在丸 (KAdEm)|height|22|22|0.000px|合格|
 |現在丸 (KAdEm)|paddingTop|0px|0px|0.000px|合格|
@@ -977,6 +1103,8 @@
 |現在丸 (KAdEm)|backgroundColor|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |現在丸 (KAdEm)|boxShadow|none|none|完全一致で比較|合格|
 |現在丸 (KAdEm)|outlineWidth|0px|0px|0.000px|合格|
+|接続線 (P85G5)|x|79|79|0.000px|合格|
+|接続線 (P85G5)|y|95.25|95.25|0.000px|合格|
 |接続線 (P85G5)|width|28|28|0.000px|合格|
 |接続線 (P85G5)|height|1.5|1.5|0.000px|合格|
 |接続線 (P85G5)|paddingTop|0px|0px|0.000px|合格|
@@ -996,6 +1124,8 @@
 |接続線 (P85G5)|backgroundColor|rgb(8, 122, 62)|rgb(8, 122, 62)|完全一致で比較|合格|
 |接続線 (P85G5)|boxShadow|none|none|完全一致で比較|合格|
 |接続線 (P85G5)|outlineWidth|0px|0px|0.000px|合格|
+|中身 (kliPY)|x|0|0|0.000px|合格|
+|中身 (kliPY)|y|118|118|0.000px|合格|
 |中身 (kliPY)|width|560|560|0.000px|合格|
 |中身 (kliPY)|height|160|160|0.000px|合格|
 |中身 (kliPY)|paddingTop|24px|24px|0.000px|合格|
@@ -1015,6 +1145,8 @@
 |中身 (kliPY)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |中身 (kliPY)|boxShadow|none|none|完全一致で比較|合格|
 |中身 (kliPY)|outlineWidth|0px|0px|0.000px|合格|
+|役割の欄 (TsAMR)|x|24|24|0.000px|合格|
+|役割の欄 (TsAMR)|y|142|142|0.000px|合格|
 |役割の欄 (TsAMR)|width|512|512|0.000px|合格|
 |役割の欄 (TsAMR)|height|62|62|0.000px|合格|
 |役割の欄 (TsAMR)|paddingTop|0px|0px|0.000px|合格|
@@ -1034,10 +1166,15 @@
 |役割の欄 (TsAMR)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |役割の欄 (TsAMR)|boxShadow|none|none|完全一致で比較|合格|
 |役割の欄 (TsAMR)|outlineWidth|0px|0px|0.000px|合格|
+|役割ラベル (ASL77)|x|24|24|0.000px|合格|
+|役割ラベル (ASL77)|y|142|142|0.000px|合格|
 |役割ラベル (ASL77)|fontSize|13px|13px|0.000px|合格|
 |役割ラベル (ASL77)|fontWeight|500|500|完全一致で比較|合格|
 |役割ラベル (ASL77)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |役割ラベル (ASL77)|lineHeight|20px|20px|0.000px|合格|
+|役割ラベル (ASL77)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|役割の入力 (WTAO4)|x|24|24|0.000px|合格|
+|役割の入力 (WTAO4)|y|168|168|0.000px|合格|
 |役割の入力 (WTAO4)|width|512|512|0.000px|合格|
 |役割の入力 (WTAO4)|height|36|36|0.000px|合格|
 |役割の入力 (WTAO4)|paddingTop|0px|0px|0.000px|合格|
@@ -1059,6 +1196,8 @@
 |役割の入力 (WTAO4)|outlineWidth|1px|1px|0.000px|合格|
 |役割の入力 (WTAO4)|outlineColor|rgb(201, 206, 214)|rgb(201, 206, 214)|完全一致で比較|合格|
 |役割の入力 (WTAO4)|outlineOffset|-1px|-1px|0.000px|合格|
+|下 (taAJ0)|x|0|0|0.000px|合格|
+|下 (taAJ0)|y|278|278|0.000px|合格|
 |下 (taAJ0)|width|560|560|0.000px|合格|
 |下 (taAJ0)|height|65|65|0.000px|合格|
 |下 (taAJ0)|paddingTop|14px|14px|0.000px|合格|
@@ -1079,6 +1218,8 @@
 |下 (taAJ0)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |下 (taAJ0)|boxShadow|none|none|完全一致で比較|合格|
 |下 (taAJ0)|outlineWidth|0px|0px|0.000px|合格|
+|手順数 (jqCi3)|x|24|24|0.000px|合格|
+|手順数 (jqCi3)|y|301|301|0.000px|合格|
 |手順数 (jqCi3)|width|328|328|0.000px|合格|
 |手順数 (jqCi3)|height|20|20|0.000px|合格|
 |手順数 (jqCi3)|paddingTop|0px|0px|0.000px|合格|
@@ -1102,6 +1243,9 @@
 |手順数 (jqCi3)|fontWeight|400|400|完全一致で比較|合格|
 |手順数 (jqCi3)|color|rgb(98, 106, 115)|rgb(98, 106, 115)|完全一致で比較|合格|
 |手順数 (jqCi3)|lineHeight|20px|20px|0.000px|合格|
+|手順数 (jqCi3)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|戻る (n2caJ)|x|360|360|0.000px|合格|
+|戻る (n2caJ)|y|293|293|0.000px|合格|
 |戻る (n2caJ)|width|54|54|0.000px|合格|
 |戻る (n2caJ)|height|36|36|0.000px|合格|
 |戻る (n2caJ)|paddingTop|0px|0px|0.000px|合格|
@@ -1123,6 +1267,8 @@
 |戻る (n2caJ)|outlineWidth|1px|1px|0.000px|合格|
 |戻る (n2caJ)|outlineColor|rgb(218, 221, 226)|rgb(218, 221, 226)|完全一致で比較|合格|
 |戻る (n2caJ)|outlineOffset|-1px|-1px|0.000px|合格|
+|送る (ecLyt)|x|422|422|0.000px|合格|
+|送る (ecLyt)|y|293|293|0.000px|合格|
 |送る (ecLyt)|width|114|114|0.000px|合格|
 |送る (ecLyt)|height|36|36|0.000px|合格|
 |送る (ecLyt)|paddingTop|0px|0px|0.000px|合格|
@@ -1142,13 +1288,132 @@
 |送る (ecLyt)|backgroundColor|rgb(8, 122, 62)|rgb(8, 122, 62)|完全一致で比較|合格|
 |送る (ecLyt)|boxShadow|rgba(8, 122, 62, 0.25) 0px 1px 2px 0px, rgba(255, 255, 255, 0.15) 0px 1px 0px 0px|rgba(8, 122, 62, 0.25) 0px 1px 2px 0px, rgba(255, 255, 255, 0.15) 0px 1px 0px 0px|完全一致で比較|合格|
 |送る (ecLyt)|outlineWidth|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|x|29|29|0.000px|合格|
+|済み印 (F6zh1)|y|90|90|0.000px|合格|
+|済み印 (F6zh1)|width|12|12|0.000px|合格|
+|済み印 (F6zh1)|height|12|12|0.000px|合格|
+|済み印 (F6zh1)|paddingTop|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|paddingRight|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|paddingBottom|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|paddingLeft|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|rowGap|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|columnGap|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|borderTopWidth|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|borderRightWidth|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|borderBottomWidth|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|borderLeftWidth|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|borderTopRightRadius|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|済み印 (F6zh1)|boxShadow|none|none|完全一致で比較|合格|
+|済み印 (F6zh1)|outlineWidth|0px|0px|0.000px|合格|
+|済み印 (F6zh1)|印の色|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
+|前の手順名 (l8KPYV)|x|56|56|0.000px|合格|
+|前の手順名 (l8KPYV)|y|86|86|0.000px|合格|
+|前の手順名 (l8KPYV)|width|13|13|0.000px|合格|
+|前の手順名 (l8KPYV)|height|20|20|0.000px|合格|
+|前の手順名 (l8KPYV)|paddingTop|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|paddingRight|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|paddingBottom|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|paddingLeft|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|rowGap|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|columnGap|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|borderTopWidth|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|borderRightWidth|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|borderBottomWidth|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|borderLeftWidth|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|borderTopRightRadius|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|前の手順名 (l8KPYV)|boxShadow|none|none|完全一致で比較|合格|
+|前の手順名 (l8KPYV)|outlineWidth|0px|0px|0.000px|合格|
+|前の手順名 (l8KPYV)|fontSize|13px|13px|0.000px|合格|
+|前の手順名 (l8KPYV)|fontWeight|600|600|完全一致で比較|合格|
+|前の手順名 (l8KPYV)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
+|前の手順名 (l8KPYV)|lineHeight|20px|20px|0.000px|合格|
+|前の手順名 (l8KPYV)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|今の手順数 (Idz9X)|x|124.5625|124.4375|0.125px|合格|
+|今の手順数 (Idz9X)|y|88.5|88.5|0.000px|合格|
+|今の手順数 (Idz9X)|fontSize|11px|11px|0.000px|合格|
+|今の手順数 (Idz9X)|fontWeight|600|600|完全一致で比較|合格|
+|今の手順数 (Idz9X)|color|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
+|今の手順数 (Idz9X)|lineHeight|17px|17px|0.000px|合格|
+|今の手順数 (Idz9X)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|今の手順名 (sqaJY)|x|149|149|0.000px|合格|
+|今の手順名 (sqaJY)|y|86|86|0.000px|合格|
+|今の手順名 (sqaJY)|width|103.625|103.625|0.000px|合格|
+|今の手順名 (sqaJY)|height|20|20|0.000px|合格|
+|今の手順名 (sqaJY)|paddingTop|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|paddingRight|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|paddingBottom|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|paddingLeft|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|rowGap|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|columnGap|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|borderTopWidth|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|borderRightWidth|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|borderBottomWidth|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|borderLeftWidth|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|borderTopRightRadius|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|今の手順名 (sqaJY)|boxShadow|none|none|完全一致で比較|合格|
+|今の手順名 (sqaJY)|outlineWidth|0px|0px|0.000px|合格|
+|今の手順名 (sqaJY)|fontSize|13px|13px|0.000px|合格|
+|今の手順名 (sqaJY)|fontWeight|600|600|完全一致で比較|合格|
+|今の手順名 (sqaJY)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
+|今の手順名 (sqaJY)|lineHeight|20px|20px|0.000px|合格|
+|今の手順名 (sqaJY)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|送る印 (J02D70)|x|436|436|0.000px|合格|
+|送る印 (J02D70)|y|303.5|303.5|0.000px|合格|
+|送る印 (J02D70)|width|15|15|0.000px|合格|
+|送る印 (J02D70)|height|15|15|0.000px|合格|
+|送る印 (J02D70)|paddingTop|0px|0px|0.000px|合格|
+|送る印 (J02D70)|paddingRight|0px|0px|0.000px|合格|
+|送る印 (J02D70)|paddingBottom|0px|0px|0.000px|合格|
+|送る印 (J02D70)|paddingLeft|0px|0px|0.000px|合格|
+|送る印 (J02D70)|rowGap|0px|0px|0.000px|合格|
+|送る印 (J02D70)|columnGap|0px|0px|0.000px|合格|
+|送る印 (J02D70)|borderTopWidth|0px|0px|0.000px|合格|
+|送る印 (J02D70)|borderRightWidth|0px|0px|0.000px|合格|
+|送る印 (J02D70)|borderBottomWidth|0px|0px|0.000px|合格|
+|送る印 (J02D70)|borderLeftWidth|0px|0px|0.000px|合格|
+|送る印 (J02D70)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|送る印 (J02D70)|borderTopRightRadius|0px|0px|0.000px|合格|
+|送る印 (J02D70)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|送る印 (J02D70)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|送る印 (J02D70)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|送る印 (J02D70)|boxShadow|none|none|完全一致で比較|合格|
+|送る印 (J02D70)|outlineWidth|0px|0px|0.000px|合格|
+|送る印 (J02D70)|印の色|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
+|戻る文字 (aw1Ey)|x|374|374|0.000px|合格|
+|戻る文字 (aw1Ey)|y|301|301|0.000px|合格|
+|戻る文字 (aw1Ey)|fontSize|13px|13px|0.000px|合格|
+|戻る文字 (aw1Ey)|fontWeight|600|600|完全一致で比較|合格|
+|戻る文字 (aw1Ey)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
+|戻る文字 (aw1Ey)|lineHeight|20px|20px|0.000px|合格|
+|戻る文字 (aw1Ey)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|送る文字 (EgasS)|x|457|457|0.000px|合格|
+|送る文字 (EgasS)|y|301|301|0.000px|合格|
+|送る文字 (EgasS)|fontSize|13px|13px|0.000px|合格|
+|送る文字 (EgasS)|fontWeight|600|600|完全一致で比較|合格|
+|送る文字 (EgasS)|color|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
+|送る文字 (EgasS)|lineHeight|20px|20px|0.000px|合格|
+|送る文字 (EgasS)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
 
 ## hNXm7
 
-画像： [hNXm7.png](./hNXm7.png)
+画像： [左右の比較](./hNXm7.png)・[50%重ね](./hNXm7-overlay.png)・[生の差](./hNXm7-diff.png)
 
 |要素（正本のID）|項目|正本|実装|差|判定|
 |---|---|---|---|---|---|
+|本体 (hNXm7)|x|0|0|0.000px|合格|
+|本体 (hNXm7)|y|0|0|0.000px|合格|
 |本体 (hNXm7)|width|420|420|0.000px|合格|
 |本体 (hNXm7)|height|187|187|0.000px|合格|
 |本体 (hNXm7)|paddingTop|28px|28px|0.000px|合格|
@@ -1170,6 +1435,8 @@
 |本体 (hNXm7)|outlineWidth|1px|1px|0.000px|合格|
 |本体 (hNXm7)|outlineColor|rgb(218, 221, 226)|rgb(218, 221, 226)|完全一致で比較|合格|
 |本体 (hNXm7)|outlineOffset|-1px|-1px|0.000px|合格|
+|印の箱 (zeOcV)|x|194|194|0.000px|合格|
+|印の箱 (zeOcV)|y|28|28|0.000px|合格|
 |印の箱 (zeOcV)|width|32|32|0.000px|合格|
 |印の箱 (zeOcV)|height|32|32|0.000px|合格|
 |印の箱 (zeOcV)|paddingTop|0px|0px|0.000px|合格|
@@ -1191,6 +1458,8 @@
 |印の箱 (zeOcV)|outlineWidth|1px|1px|0.000px|合格|
 |印の箱 (zeOcV)|outlineColor|rgb(218, 221, 226)|rgb(218, 221, 226)|完全一致で比較|合格|
 |印の箱 (zeOcV)|outlineOffset|-1px|-1px|0.000px|合格|
+|印 (sRYyy)|x|201.5|201.5|0.000px|合格|
+|印 (sRYyy)|y|35.5|35.5|0.000px|合格|
 |印 (sRYyy)|width|17|17|0.000px|合格|
 |印 (sRYyy)|height|17|17|0.000px|合格|
 |印 (sRYyy)|paddingTop|0px|0px|0.000px|合格|
@@ -1211,6 +1480,8 @@
 |印 (sRYyy)|boxShadow|none|none|完全一致で比較|合格|
 |印 (sRYyy)|outlineWidth|0px|0px|0.000px|合格|
 |印 (sRYyy)|印の色|rgb(74, 85, 101)|rgb(74, 85, 101)|完全一致で比較|合格|
+|題 (iKaqt)|x|24|24|0.000px|合格|
+|題 (iKaqt)|y|68|68|0.000px|合格|
 |題 (iKaqt)|width|372|372|0.000px|合格|
 |題 (iKaqt)|height|21|21|0.000px|合格|
 |題 (iKaqt)|paddingTop|0px|0px|0.000px|合格|
@@ -1234,6 +1505,9 @@
 |題 (iKaqt)|fontWeight|600|600|完全一致で比較|合格|
 |題 (iKaqt)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |題 (iKaqt)|lineHeight|21px|21px|0.000px|合格|
+|題 (iKaqt)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|説明 (s1oJq2)|x|24|24|0.000px|合格|
+|説明 (s1oJq2)|y|97|97|0.000px|合格|
 |説明 (s1oJq2)|width|372|372|0.000px|合格|
 |説明 (s1oJq2)|height|18|18|0.000px|合格|
 |説明 (s1oJq2)|paddingTop|0px|0px|0.000px|合格|
@@ -1257,6 +1531,9 @@
 |説明 (s1oJq2)|fontWeight|400|400|完全一致で比較|合格|
 |説明 (s1oJq2)|color|rgb(74, 85, 101)|rgb(74, 85, 101)|完全一致で比較|合格|
 |説明 (s1oJq2)|lineHeight|18px|18px|0.000px|合格|
+|説明 (s1oJq2)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|作る (wygj0)|x|153|153|0.000px|合格|
+|作る (wygj0)|y|123|123|0.000px|合格|
 |作る (wygj0)|width|114|114|0.000px|合格|
 |作る (wygj0)|height|36|36|0.000px|合格|
 |作る (wygj0)|paddingTop|0px|0px|0.000px|合格|
@@ -1279,10 +1556,12 @@
 
 ## jr5Nl
 
-画像： [jr5Nl.png](./jr5Nl.png)
+画像： [左右の比較](./jr5Nl.png)・[50%重ね](./jr5Nl-overlay.png)・[生の差](./jr5Nl-diff.png)
 
 |要素（正本のID）|項目|正本|実装|差|判定|
 |---|---|---|---|---|---|
+|本体 (jr5Nl)|x|0|0|0.000px|合格|
+|本体 (jr5Nl)|y|0|0|0.000px|合格|
 |本体 (jr5Nl)|width|600|600|0.000px|合格|
 |本体 (jr5Nl)|height|61|61|0.000px|合格|
 |本体 (jr5Nl)|paddingTop|14px|14px|0.000px|合格|
@@ -1303,6 +1582,8 @@
 |本体 (jr5Nl)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |本体 (jr5Nl)|boxShadow|none|none|完全一致で比較|合格|
 |本体 (jr5Nl)|outlineWidth|0px|0px|0.000px|合格|
+|顔 (g2FeM)|x|24|24|0.000px|合格|
+|顔 (g2FeM)|y|14|14|0.000px|合格|
 |顔 (g2FeM)|width|32|32|0.000px|合格|
 |顔 (g2FeM)|height|32|32|0.000px|合格|
 |顔 (g2FeM)|paddingTop|0px|0px|0.000px|合格|
@@ -1322,6 +1603,8 @@
 |顔 (g2FeM)|backgroundColor|rgb(235, 237, 241)|rgb(235, 237, 241)|完全一致で比較|合格|
 |顔 (g2FeM)|boxShadow|none|none|完全一致で比較|合格|
 |顔 (g2FeM)|outlineWidth|0px|0px|0.000px|合格|
+|骨1 (Ae4T8)|x|72|72|0.000px|合格|
+|骨1 (Ae4T8)|y|25|25|0.000px|合格|
 |骨1 (Ae4T8)|width|168|168|0.000px|合格|
 |骨1 (Ae4T8)|height|10|10|0.000px|合格|
 |骨1 (Ae4T8)|paddingTop|0px|0px|0.000px|合格|
@@ -1341,6 +1624,8 @@
 |骨1 (Ae4T8)|backgroundColor|rgb(235, 237, 241)|rgb(235, 237, 241)|完全一致で比較|合格|
 |骨1 (Ae4T8)|boxShadow|none|none|完全一致で比較|合格|
 |骨1 (Ae4T8)|outlineWidth|0px|0px|0.000px|合格|
+|骨2 (ube7D)|x|256|256|0.000px|合格|
+|骨2 (ube7D)|y|25|25|0.000px|合格|
 |骨2 (ube7D)|width|70|70|0.000px|合格|
 |骨2 (ube7D)|height|10|10|0.000px|合格|
 |骨2 (ube7D)|paddingTop|0px|0px|0.000px|合格|
@@ -1360,6 +1645,8 @@
 |骨2 (ube7D)|backgroundColor|rgb(235, 237, 241)|rgb(235, 237, 241)|完全一致で比較|合格|
 |骨2 (ube7D)|boxShadow|none|none|完全一致で比較|合格|
 |骨2 (ube7D)|outlineWidth|0px|0px|0.000px|合格|
+|骨3 (pCu4O)|x|342|342|0.000px|合格|
+|骨3 (pCu4O)|y|25|25|0.000px|合格|
 |骨3 (pCu4O)|width|168|168|0.000px|合格|
 |骨3 (pCu4O)|height|10|10|0.000px|合格|
 |骨3 (pCu4O)|paddingTop|0px|0px|0.000px|合格|
@@ -1379,6 +1666,8 @@
 |骨3 (pCu4O)|backgroundColor|rgb(235, 237, 241)|rgb(235, 237, 241)|完全一致で比較|合格|
 |骨3 (pCu4O)|boxShadow|none|none|完全一致で比較|合格|
 |骨3 (pCu4O)|outlineWidth|0px|0px|0.000px|合格|
+|骨4 (pROzS)|x|526|526|0.000px|合格|
+|骨4 (pROzS)|y|25|25|0.000px|合格|
 |骨4 (pROzS)|width|50|50|0.000px|合格|
 |骨4 (pROzS)|height|10|10|0.000px|合格|
 |骨4 (pROzS)|paddingTop|0px|0px|0.000px|合格|
@@ -1401,10 +1690,12 @@
 
 ## cfVyj
 
-画像： [cfVyj.png](./cfVyj.png)
+画像： [左右の比較](./cfVyj.png)・[50%重ね](./cfVyj-overlay.png)・[生の差](./cfVyj-diff.png)
 
 |要素（正本のID）|項目|正本|実装|差|判定|
 |---|---|---|---|---|---|
+|本体 (cfVyj)|x|0|0|0.000px|合格|
+|本体 (cfVyj)|y|0|0|0.000px|合格|
 |本体 (cfVyj)|width|330|330|0.000px|合格|
 |本体 (cfVyj)|height|690|690|0.000px|合格|
 |本体 (cfVyj)|paddingTop|10px|10px|0.000px|合格|
@@ -1426,6 +1717,8 @@
 |本体 (cfVyj)|outlineWidth|2px|2px|0.000px|合格|
 |本体 (cfVyj)|outlineColor|rgb(58, 59, 63)|rgb(58, 59, 63)|完全一致で比較|合格|
 |本体 (cfVyj)|outlineOffset|-1px|-1px|0.000px|合格|
+|画面 (zkvpQ)|x|10|10|0.000px|合格|
+|画面 (zkvpQ)|y|10|10|0.000px|合格|
 |画面 (zkvpQ)|width|310|310|0.000px|合格|
 |画面 (zkvpQ)|height|670|670|0.000px|合格|
 |画面 (zkvpQ)|paddingTop|0px|0px|0.000px|合格|
@@ -1445,6 +1738,8 @@
 |画面 (zkvpQ)|backgroundColor|rgb(140, 171, 217)|rgb(140, 171, 217)|完全一致で比較|合格|
 |画面 (zkvpQ)|boxShadow|none|none|完全一致で比較|合格|
 |画面 (zkvpQ)|outlineWidth|0px|0px|0.000px|合格|
+|上の帯 (p7Ynu)|x|10|10|0.000px|合格|
+|上の帯 (p7Ynu)|y|10|10|0.000px|合格|
 |上の帯 (p7Ynu)|width|310|310|0.000px|合格|
 |上の帯 (p7Ynu)|height|44|44|0.000px|合格|
 |上の帯 (p7Ynu)|paddingTop|14px|14px|0.000px|合格|
@@ -1464,6 +1759,8 @@
 |上の帯 (p7Ynu)|backgroundColor|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
 |上の帯 (p7Ynu)|boxShadow|none|none|完全一致で比較|合格|
 |上の帯 (p7Ynu)|outlineWidth|0px|0px|0.000px|合格|
+|時刻 (lTwzw)|x|40|40|0.000px|合格|
+|時刻 (lTwzw)|y|24|24|0.000px|合格|
 |時刻 (lTwzw)|width|30.25|30.25|0.000px|合格|
 |時刻 (lTwzw)|height|18|18|0.000px|合格|
 |時刻 (lTwzw)|paddingTop|0px|0px|0.000px|合格|
@@ -1487,6 +1784,10 @@
 |時刻 (lTwzw)|fontWeight|600|600|完全一致で比較|合格|
 |時刻 (lTwzw)|color|rgb(0, 0, 0)|rgb(0, 0, 0)|完全一致で比較|合格|
 |時刻 (lTwzw)|lineHeight|18px|18px|0.000px|合格|
+|時刻 (lTwzw)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|時刻 (lTwzw)|fontVariantNumeric|normal|normal|完全一致で比較|合格|
+|島 (SOUTw)|x|107|107|0.000px|合格|
+|島 (SOUTw)|y|18|18|0.000px|合格|
 |島 (SOUTw)|width|96|96|0.000px|合格|
 |島 (SOUTw)|height|28|28|0.000px|合格|
 |島 (SOUTw)|paddingTop|0px|0px|0.000px|合格|
@@ -1506,6 +1807,8 @@
 |島 (SOUTw)|backgroundColor|rgb(0, 0, 0)|rgb(0, 0, 0)|完全一致で比較|合格|
 |島 (SOUTw)|boxShadow|none|none|完全一致で比較|合格|
 |島 (SOUTw)|outlineWidth|0px|0px|0.000px|合格|
+|電波と電池 (nQvSg)|x|234|234|0.000px|合格|
+|電波と電池 (nQvSg)|y|24|24|0.000px|合格|
 |電波と電池 (nQvSg)|width|60|60|0.000px|合格|
 |電波と電池 (nQvSg)|height|20|20|0.000px|合格|
 |電波と電池 (nQvSg)|paddingTop|0px|0px|0.000px|合格|
@@ -1525,6 +1828,8 @@
 |電波と電池 (nQvSg)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |電波と電池 (nQvSg)|boxShadow|none|none|完全一致で比較|合格|
 |電波と電池 (nQvSg)|outlineWidth|0px|0px|0.000px|合格|
+|トーク頭 (gwnlQ)|x|10|10|0.000px|合格|
+|トーク頭 (gwnlQ)|y|54|54|0.000px|合格|
 |トーク頭 (gwnlQ)|width|310|310|0.000px|合格|
 |トーク頭 (gwnlQ)|height|44|44|0.000px|合格|
 |トーク頭 (gwnlQ)|paddingTop|0px|0px|0.000px|合格|
@@ -1545,6 +1850,8 @@
 |トーク頭 (gwnlQ)|backgroundColor|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
 |トーク頭 (gwnlQ)|boxShadow|none|none|完全一致で比較|合格|
 |トーク頭 (gwnlQ)|outlineWidth|0px|0px|0.000px|合格|
+|名 (ehRqF)|x|52|52|0.000px|合格|
+|名 (ehRqF)|y|65|65|0.000px|合格|
 |名 (ehRqF)|width|175|175|0.000px|合格|
 |名 (ehRqF)|height|21|21|0.000px|合格|
 |名 (ehRqF)|paddingTop|0px|0px|0.000px|合格|
@@ -1568,6 +1875,9 @@
 |名 (ehRqF)|fontWeight|700|700|完全一致で比較|合格|
 |名 (ehRqF)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |名 (ehRqF)|lineHeight|21px|21px|0.000px|合格|
+|名 (ehRqF)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|トーク (zj6OU)|x|10|10|0.000px|合格|
+|トーク (zj6OU)|y|98|98|0.000px|合格|
 |トーク (zj6OU)|width|310|310|0.000px|合格|
 |トーク (zj6OU)|height|538|538|0.000px|合格|
 |トーク (zj6OU)|paddingTop|10px|10px|0.000px|合格|
@@ -1587,6 +1897,8 @@
 |トーク (zj6OU)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |トーク (zj6OU)|boxShadow|none|none|完全一致で比較|合格|
 |トーク (zj6OU)|outlineWidth|0px|0px|0.000px|合格|
+|日付 (IJIYr)|x|20|20|0.000px|合格|
+|日付 (IJIYr)|y|108|108|0.000px|合格|
 |日付 (IJIYr)|width|290|290|0.000px|合格|
 |日付 (IJIYr)|height|19|19|0.000px|合格|
 |日付 (IJIYr)|paddingTop|0px|0px|0.000px|合格|
@@ -1606,6 +1918,8 @@
 |日付 (IJIYr)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |日付 (IJIYr)|boxShadow|none|none|完全一致で比較|合格|
 |日付 (IJIYr)|outlineWidth|0px|0px|0.000px|合格|
+|日付札 (CaJ04)|x|145|145|0.000px|合格|
+|日付札 (CaJ04)|y|108|108|0.000px|合格|
 |日付札 (CaJ04)|width|40|40|0.000px|合格|
 |日付札 (CaJ04)|height|19|19|0.000px|合格|
 |日付札 (CaJ04)|paddingTop|2px|2px|0.000px|合格|
@@ -1625,10 +1939,15 @@
 |日付札 (CaJ04)|backgroundColor|rgba(0, 0, 0, 0.15)|rgba(0, 0, 0, 0.15)|完全一致で比較|合格|
 |日付札 (CaJ04)|boxShadow|none|none|完全一致で比較|合格|
 |日付札 (CaJ04)|outlineWidth|0px|0px|0.000px|合格|
+|日付文 (L6XkF7)|x|155|155|0.000px|合格|
+|日付文 (L6XkF7)|y|110|110|0.000px|合格|
 |日付文 (L6XkF7)|fontSize|10px|10px|0.000px|合格|
 |日付文 (L6XkF7)|fontWeight|600|600|完全一致で比較|合格|
 |日付文 (L6XkF7)|color|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
 |日付文 (L6XkF7)|lineHeight|15px|15px|0.000px|合格|
+|日付文 (L6XkF7)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|受信行 (DleVe)|x|20|20|0.000px|合格|
+|受信行 (DleVe)|y|133|133|0.000px|合格|
 |受信行 (DleVe)|width|290|290|0.000px|合格|
 |受信行 (DleVe)|height|112|112|0.000px|合格|
 |受信行 (DleVe)|paddingTop|0px|0px|0.000px|合格|
@@ -1648,6 +1967,8 @@
 |受信行 (DleVe)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |受信行 (DleVe)|boxShadow|none|none|完全一致で比較|合格|
 |受信行 (DleVe)|outlineWidth|0px|0px|0.000px|合格|
+|顔 (KgEuz)|x|20|20|0.000px|合格|
+|顔 (KgEuz)|y|133|133|0.000px|合格|
 |顔 (KgEuz)|width|34|34|0.000px|合格|
 |顔 (KgEuz)|height|34|34|0.000px|合格|
 |顔 (KgEuz)|paddingTop|0px|0px|0.000px|合格|
@@ -1667,6 +1988,8 @@
 |顔 (KgEuz)|backgroundColor|rgb(8, 122, 62)|rgb(8, 122, 62)|完全一致で比較|合格|
 |顔 (KgEuz)|boxShadow|none|none|完全一致で比較|合格|
 |顔 (KgEuz)|outlineWidth|0px|0px|0.000px|合格|
+|送り主 (ANUCc)|x|60|60|0.000px|合格|
+|送り主 (ANUCc)|y|133|133|0.000px|合格|
 |送り主 (ANUCc)|width|43.984375|43.984375|0.000px|合格|
 |送り主 (ANUCc)|height|15|15|0.000px|合格|
 |送り主 (ANUCc)|paddingTop|0px|0px|0.000px|合格|
@@ -1690,6 +2013,9 @@
 |送り主 (ANUCc)|fontWeight|400|400|完全一致で比較|合格|
 |送り主 (ANUCc)|color|rgba(255, 255, 255, 0.9)|rgba(255, 255, 255, 0.9)|完全一致で比較|合格|
 |送り主 (ANUCc)|lineHeight|15px|15px|0.000px|合格|
+|送り主 (ANUCc)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|吹き出し (xLemo)|x|60|60|0.000px|合格|
+|吹き出し (xLemo)|y|151|151|0.000px|合格|
 |吹き出し (xLemo)|width|176|176|0.000px|合格|
 |吹き出し (xLemo)|height|94|94|0.000px|合格|
 |吹き出し (xLemo)|paddingTop|0px|0px|0.000px|合格|
@@ -1709,6 +2035,8 @@
 |吹き出し (xLemo)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |吹き出し (xLemo)|boxShadow|none|none|完全一致で比較|合格|
 |吹き出し (xLemo)|outlineWidth|0px|0px|0.000px|合格|
+|吹き出し本体 (Z8qID)|x|60|60|0.000px|合格|
+|吹き出し本体 (Z8qID)|y|151|151|0.000px|合格|
 |吹き出し本体 (Z8qID)|width|176|176|0.000px|合格|
 |吹き出し本体 (Z8qID)|height|94|94|0.000px|合格|
 |吹き出し本体 (Z8qID)|paddingTop|8px|8px|0.000px|合格|
@@ -1728,6 +2056,8 @@
 |吹き出し本体 (Z8qID)|backgroundColor|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
 |吹き出し本体 (Z8qID)|boxShadow|none|none|完全一致で比較|合格|
 |吹き出し本体 (Z8qID)|outlineWidth|0px|0px|0.000px|合格|
+|本文 (Tw20v)|x|71|71|0.000px|合格|
+|本文 (Tw20v)|y|159|159|0.000px|合格|
 |本文 (Tw20v)|width|154|154|0.000px|合格|
 |本文 (Tw20v)|height|72|72|0.000px|合格|
 |本文 (Tw20v)|paddingTop|0px|0px|0.000px|合格|
@@ -1751,6 +2081,9 @@
 |本文 (Tw20v)|fontWeight|400|400|完全一致で比較|合格|
 |本文 (Tw20v)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |本文 (Tw20v)|lineHeight|18px|18px|0.000px|合格|
+|本文 (Tw20v)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|商品行 (r9AXSM)|x|20|20|0.000px|合格|
+|商品行 (r9AXSM)|y|251|251|0.000px|合格|
 |商品行 (r9AXSM)|width|290|290|0.000px|合格|
 |商品行 (r9AXSM)|height|252|252|0.000px|合格|
 |商品行 (r9AXSM)|paddingTop|0px|0px|0.000px|合格|
@@ -1770,6 +2103,8 @@
 |商品行 (r9AXSM)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |商品行 (r9AXSM)|boxShadow|none|none|完全一致で比較|合格|
 |商品行 (r9AXSM)|outlineWidth|0px|0px|0.000px|合格|
+|商品 (jPMZd)|x|60|60|0.000px|合格|
+|商品 (jPMZd)|y|251|251|0.000px|合格|
 |商品 (jPMZd)|width|186|186|0.000px|合格|
 |商品 (jPMZd)|height|252|252|0.000px|合格|
 |商品 (jPMZd)|paddingTop|0px|0px|0.000px|合格|
@@ -1789,6 +2124,8 @@
 |商品 (jPMZd)|backgroundColor|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
 |商品 (jPMZd)|boxShadow|none|none|完全一致で比較|合格|
 |商品 (jPMZd)|outlineWidth|0px|0px|0.000px|合格|
+|写真 (P08lo)|x|60|60|0.000px|合格|
+|写真 (P08lo)|y|251|251|0.000px|合格|
 |写真 (P08lo)|width|186|186|0.000px|合格|
 |写真 (P08lo)|height|104|104|0.000px|合格|
 |写真 (P08lo)|paddingTop|0px|0px|0.000px|合格|
@@ -1808,6 +2145,8 @@
 |写真 (P08lo)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |写真 (P08lo)|boxShadow|none|none|完全一致で比較|合格|
 |写真 (P08lo)|outlineWidth|0px|0px|0.000px|合格|
+|商品文 (o74OXs)|x|60|60|0.000px|合格|
+|商品文 (o74OXs)|y|355|355|0.000px|合格|
 |商品文 (o74OXs)|width|186|186|0.000px|合格|
 |商品文 (o74OXs)|height|80|80|0.000px|合格|
 |商品文 (o74OXs)|paddingTop|9px|9px|0.000px|合格|
@@ -1827,6 +2166,8 @@
 |商品文 (o74OXs)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |商品文 (o74OXs)|boxShadow|none|none|完全一致で比較|合格|
 |商品文 (o74OXs)|outlineWidth|0px|0px|0.000px|合格|
+|商品題 (IrUHy)|x|71|71|0.000px|合格|
+|商品題 (IrUHy)|y|364|364|0.000px|合格|
 |商品題 (IrUHy)|width|85.21875|85.21875|0.000px|合格|
 |商品題 (IrUHy)|height|19|19|0.000px|合格|
 |商品題 (IrUHy)|paddingTop|0px|0px|0.000px|合格|
@@ -1850,6 +2191,9 @@
 |商品題 (IrUHy)|fontWeight|700|700|完全一致で比較|合格|
 |商品題 (IrUHy)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |商品題 (IrUHy)|lineHeight|19px|19px|0.000px|合格|
+|商品題 (IrUHy)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|商品説明 (D9hGC)|x|71|71|0.000px|合格|
+|商品説明 (D9hGC)|y|385|385|0.000px|合格|
 |商品説明 (D9hGC)|width|167.1875|167.1875|0.000px|合格|
 |商品説明 (D9hGC)|height|16|16|0.000px|合格|
 |商品説明 (D9hGC)|paddingTop|0px|0px|0.000px|合格|
@@ -1873,6 +2217,9 @@
 |商品説明 (D9hGC)|fontWeight|400|400|完全一致で比較|合格|
 |商品説明 (D9hGC)|color|rgb(138, 138, 142)|rgb(138, 138, 142)|完全一致で比較|合格|
 |商品説明 (D9hGC)|lineHeight|16px|16px|0.000px|合格|
+|商品説明 (D9hGC)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|値段行 (sFzLa)|x|71|71|0.000px|合格|
+|値段行 (sFzLa)|y|403|403|0.000px|合格|
 |値段行 (sFzLa)|width|71.78125|70.953125|0.828px|合格|
 |値段行 (sFzLa)|height|24|24|0.000px|合格|
 |値段行 (sFzLa)|paddingTop|3px|3px|0.000px|合格|
@@ -1892,6 +2239,8 @@
 |値段行 (sFzLa)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
 |値段行 (sFzLa)|boxShadow|none|none|完全一致で比較|合格|
 |値段行 (sFzLa)|outlineWidth|0px|0px|0.000px|合格|
+|値段 (PpjOn)|x|71|71|0.000px|合格|
+|値段 (PpjOn)|y|406|406|0.000px|合格|
 |値段 (PpjOn)|width|48.78125|47.953125|0.828px|合格|
 |値段 (PpjOn)|height|21|21|0.000px|合格|
 |値段 (PpjOn)|paddingTop|0px|0px|0.000px|合格|
@@ -1915,6 +2264,9 @@
 |値段 (PpjOn)|fontWeight|700|700|完全一致で比較|合格|
 |値段 (PpjOn)|color|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
 |値段 (PpjOn)|lineHeight|21px|21px|0.000px|合格|
+|値段 (PpjOn)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|税 (I9260x)|x|123.78125|122.953125|0.828px|合格|
+|税 (I9260x)|y|413|413|0.000px|合格|
 |税 (I9260x)|width|19|19|0.000px|合格|
 |税 (I9260x)|height|14|14|0.000px|合格|
 |税 (I9260x)|paddingTop|0px|0px|0.000px|合格|
@@ -1938,6 +2290,9 @@
 |税 (I9260x)|fontWeight|400|400|完全一致で比較|合格|
 |税 (I9260x)|color|rgb(138, 138, 142)|rgb(138, 138, 142)|完全一致で比較|合格|
 |税 (I9260x)|lineHeight|14px|14px|0.000px|合格|
+|税 (I9260x)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|メニュー帯 (hRhzO)|x|10|10|0.000px|合格|
+|メニュー帯 (hRhzO)|y|636|636|0.000px|合格|
 |メニュー帯 (hRhzO)|width|310|310|0.000px|合格|
 |メニュー帯 (hRhzO)|height|30|30|0.000px|合格|
 |メニュー帯 (hRhzO)|paddingTop|0px|0px|0.000px|合格|
@@ -1958,6 +2313,8 @@
 |メニュー帯 (hRhzO)|backgroundColor|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
 |メニュー帯 (hRhzO)|boxShadow|none|none|完全一致で比較|合格|
 |メニュー帯 (hRhzO)|outlineWidth|0px|0px|0.000px|合格|
+|ホーム帯 (A3L7G)|x|10|10|0.000px|合格|
+|ホーム帯 (A3L7G)|y|666|666|0.000px|合格|
 |ホーム帯 (A3L7G)|width|310|310|0.000px|合格|
 |ホーム帯 (A3L7G)|height|14|14|0.000px|合格|
 |ホーム帯 (A3L7G)|paddingTop|0px|0px|0.000px|合格|
@@ -1977,6 +2334,8 @@
 |ホーム帯 (A3L7G)|backgroundColor|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
 |ホーム帯 (A3L7G)|boxShadow|none|none|完全一致で比較|合格|
 |ホーム帯 (A3L7G)|outlineWidth|0px|0px|0.000px|合格|
+|ホーム線 (i9fd4)|x|105|105|0.000px|合格|
+|ホーム線 (i9fd4)|y|666|666|0.000px|合格|
 |ホーム線 (i9fd4)|width|120|120|0.000px|合格|
 |ホーム線 (i9fd4)|height|5|5|0.000px|合格|
 |ホーム線 (i9fd4)|paddingTop|0px|0px|0.000px|合格|
@@ -1996,37 +2355,400 @@
 |ホーム線 (i9fd4)|backgroundColor|rgb(17, 17, 17)|rgb(17, 17, 17)|完全一致で比較|合格|
 |ホーム線 (i9fd4)|boxShadow|none|none|完全一致で比較|合格|
 |ホーム線 (i9fd4)|outlineWidth|0px|0px|0.000px|合格|
+|電波 (CWRIN)|x|234|234|0.000px|合格|
+|電波 (CWRIN)|y|26.5|26.5|0.000px|合格|
+|電波 (CWRIN)|width|15|15|0.000px|合格|
+|電波 (CWRIN)|height|15|15|0.000px|合格|
+|電波 (CWRIN)|paddingTop|0px|0px|0.000px|合格|
+|電波 (CWRIN)|paddingRight|0px|0px|0.000px|合格|
+|電波 (CWRIN)|paddingBottom|0px|0px|0.000px|合格|
+|電波 (CWRIN)|paddingLeft|0px|0px|0.000px|合格|
+|電波 (CWRIN)|rowGap|0px|0px|0.000px|合格|
+|電波 (CWRIN)|columnGap|0px|0px|0.000px|合格|
+|電波 (CWRIN)|borderTopWidth|0px|0px|0.000px|合格|
+|電波 (CWRIN)|borderRightWidth|0px|0px|0.000px|合格|
+|電波 (CWRIN)|borderBottomWidth|0px|0px|0.000px|合格|
+|電波 (CWRIN)|borderLeftWidth|0px|0px|0.000px|合格|
+|電波 (CWRIN)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|電波 (CWRIN)|borderTopRightRadius|0px|0px|0.000px|合格|
+|電波 (CWRIN)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|電波 (CWRIN)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|電波 (CWRIN)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|電波 (CWRIN)|boxShadow|none|none|完全一致で比較|合格|
+|電波 (CWRIN)|outlineWidth|0px|0px|0.000px|合格|
+|電波 (CWRIN)|印の色|rgb(0, 0, 0)|rgb(0, 0, 0)|完全一致で比較|合格|
+|WiFi (PXIpL)|x|254|254|0.000px|合格|
+|WiFi (PXIpL)|y|26.5|26.5|0.000px|合格|
+|WiFi (PXIpL)|width|15|15|0.000px|合格|
+|WiFi (PXIpL)|height|15|15|0.000px|合格|
+|WiFi (PXIpL)|paddingTop|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|paddingRight|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|paddingBottom|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|paddingLeft|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|rowGap|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|columnGap|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|borderTopWidth|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|borderRightWidth|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|borderBottomWidth|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|borderLeftWidth|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|borderTopRightRadius|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|WiFi (PXIpL)|boxShadow|none|none|完全一致で比較|合格|
+|WiFi (PXIpL)|outlineWidth|0px|0px|0.000px|合格|
+|WiFi (PXIpL)|印の色|rgb(0, 0, 0)|rgb(0, 0, 0)|完全一致で比較|合格|
+|電池 (qtCoH)|x|274|274|0.000px|合格|
+|電池 (qtCoH)|y|24|24|0.000px|合格|
+|電池 (qtCoH)|width|20|20|0.000px|合格|
+|電池 (qtCoH)|height|20|20|0.000px|合格|
+|電池 (qtCoH)|paddingTop|0px|0px|0.000px|合格|
+|電池 (qtCoH)|paddingRight|0px|0px|0.000px|合格|
+|電池 (qtCoH)|paddingBottom|0px|0px|0.000px|合格|
+|電池 (qtCoH)|paddingLeft|0px|0px|0.000px|合格|
+|電池 (qtCoH)|rowGap|0px|0px|0.000px|合格|
+|電池 (qtCoH)|columnGap|0px|0px|0.000px|合格|
+|電池 (qtCoH)|borderTopWidth|0px|0px|0.000px|合格|
+|電池 (qtCoH)|borderRightWidth|0px|0px|0.000px|合格|
+|電池 (qtCoH)|borderBottomWidth|0px|0px|0.000px|合格|
+|電池 (qtCoH)|borderLeftWidth|0px|0px|0.000px|合格|
+|電池 (qtCoH)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|電池 (qtCoH)|borderTopRightRadius|0px|0px|0.000px|合格|
+|電池 (qtCoH)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|電池 (qtCoH)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|電池 (qtCoH)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|電池 (qtCoH)|boxShadow|none|none|完全一致で比較|合格|
+|電池 (qtCoH)|outlineWidth|0px|0px|0.000px|合格|
+|電池 (qtCoH)|印の色|rgb(0, 0, 0)|rgb(0, 0, 0)|完全一致で比較|合格|
+|戻る印 (Msy7Q)|x|22|22|0.000px|合格|
+|戻る印 (Msy7Q)|y|65.5|65.5|0.000px|合格|
+|戻る印 (Msy7Q)|width|20|20|0.000px|合格|
+|戻る印 (Msy7Q)|height|20|20|0.000px|合格|
+|戻る印 (Msy7Q)|paddingTop|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|paddingRight|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|paddingBottom|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|paddingLeft|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|rowGap|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|columnGap|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|borderTopWidth|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|borderRightWidth|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|borderBottomWidth|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|borderLeftWidth|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|borderTopRightRadius|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|戻る印 (Msy7Q)|boxShadow|none|none|完全一致で比較|合格|
+|戻る印 (Msy7Q)|outlineWidth|0px|0px|0.000px|合格|
+|戻る印 (Msy7Q)|印の色|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
+|検索印 (Savrs)|x|237|237|0.000px|合格|
+|検索印 (Savrs)|y|67|67|0.000px|合格|
+|検索印 (Savrs)|width|17|17|0.000px|合格|
+|検索印 (Savrs)|height|17|17|0.000px|合格|
+|検索印 (Savrs)|paddingTop|0px|0px|0.000px|合格|
+|検索印 (Savrs)|paddingRight|0px|0px|0.000px|合格|
+|検索印 (Savrs)|paddingBottom|0px|0px|0.000px|合格|
+|検索印 (Savrs)|paddingLeft|0px|0px|0.000px|合格|
+|検索印 (Savrs)|rowGap|0px|0px|0.000px|合格|
+|検索印 (Savrs)|columnGap|0px|0px|0.000px|合格|
+|検索印 (Savrs)|borderTopWidth|0px|0px|0.000px|合格|
+|検索印 (Savrs)|borderRightWidth|0px|0px|0.000px|合格|
+|検索印 (Savrs)|borderBottomWidth|0px|0px|0.000px|合格|
+|検索印 (Savrs)|borderLeftWidth|0px|0px|0.000px|合格|
+|検索印 (Savrs)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|検索印 (Savrs)|borderTopRightRadius|0px|0px|0.000px|合格|
+|検索印 (Savrs)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|検索印 (Savrs)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|検索印 (Savrs)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|検索印 (Savrs)|boxShadow|none|none|完全一致で比較|合格|
+|検索印 (Savrs)|outlineWidth|0px|0px|0.000px|合格|
+|検索印 (Savrs)|印の色|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
+|電話印 (HyC3S)|x|264|264|0.000px|合格|
+|電話印 (HyC3S)|y|67|67|0.000px|合格|
+|電話印 (HyC3S)|width|17|17|0.000px|合格|
+|電話印 (HyC3S)|height|17|17|0.000px|合格|
+|電話印 (HyC3S)|paddingTop|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|paddingRight|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|paddingBottom|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|paddingLeft|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|rowGap|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|columnGap|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|borderTopWidth|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|borderRightWidth|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|borderBottomWidth|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|borderLeftWidth|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|borderTopRightRadius|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|電話印 (HyC3S)|boxShadow|none|none|完全一致で比較|合格|
+|電話印 (HyC3S)|outlineWidth|0px|0px|0.000px|合格|
+|電話印 (HyC3S)|印の色|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
+|メニュー印 (bzFau)|x|291|291|0.000px|合格|
+|メニュー印 (bzFau)|y|67|67|0.000px|合格|
+|メニュー印 (bzFau)|width|17|17|0.000px|合格|
+|メニュー印 (bzFau)|height|17|17|0.000px|合格|
+|メニュー印 (bzFau)|paddingTop|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|paddingRight|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|paddingBottom|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|paddingLeft|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|rowGap|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|columnGap|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|borderTopWidth|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|borderRightWidth|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|borderBottomWidth|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|borderLeftWidth|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|borderTopRightRadius|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|メニュー印 (bzFau)|boxShadow|none|none|完全一致で比較|合格|
+|メニュー印 (bzFau)|outlineWidth|0px|0px|0.000px|合格|
+|メニュー印 (bzFau)|印の色|rgb(29, 29, 31)|rgb(29, 29, 31)|完全一致で比較|合格|
+|顔の文字 (F9F9cM)|x|30.5|30.5|0.000px|合格|
+|顔の文字 (F9F9cM)|y|140|140|0.000px|合格|
+|顔の文字 (F9F9cM)|fontSize|13px|13px|0.000px|合格|
+|顔の文字 (F9F9cM)|fontWeight|700|700|完全一致で比較|合格|
+|顔の文字 (F9F9cM)|color|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
+|顔の文字 (F9F9cM)|lineHeight|20px|20px|0.000px|合格|
+|顔の文字 (F9F9cM)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|名と本文 (DYnP0)|x|60|60|0.000px|合格|
+|名と本文 (DYnP0)|y|133|133|0.000px|合格|
+|名と本文 (DYnP0)|width|203.296875|203.296875|0.000px|合格|
+|名と本文 (DYnP0)|height|112|112|0.000px|合格|
+|名と本文 (DYnP0)|paddingTop|0px|0px|0.000px|合格|
+|名と本文 (DYnP0)|paddingRight|0px|0px|0.000px|合格|
+|名と本文 (DYnP0)|paddingBottom|0px|0px|0.000px|合格|
+|名と本文 (DYnP0)|paddingLeft|0px|0px|0.000px|合格|
+|名と本文 (DYnP0)|rowGap|3px|3px|0.000px|合格|
+|名と本文 (DYnP0)|columnGap|3px|3px|0.000px|合格|
+|名と本文 (DYnP0)|borderTopWidth|0px|0px|0.000px|合格|
+|名と本文 (DYnP0)|borderRightWidth|0px|0px|0.000px|合格|
+|名と本文 (DYnP0)|borderBottomWidth|0px|0px|0.000px|合格|
+|名と本文 (DYnP0)|borderLeftWidth|0px|0px|0.000px|合格|
+|名と本文 (DYnP0)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|名と本文 (DYnP0)|borderTopRightRadius|0px|0px|0.000px|合格|
+|名と本文 (DYnP0)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|名と本文 (DYnP0)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|名と本文 (DYnP0)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|名と本文 (DYnP0)|boxShadow|none|none|完全一致で比較|合格|
+|名と本文 (DYnP0)|outlineWidth|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|x|60|60|0.000px|合格|
+|本文と時刻 (aZ0E1)|y|151|151|0.000px|合格|
+|本文と時刻 (aZ0E1)|width|203.296875|203.296875|0.000px|合格|
+|本文と時刻 (aZ0E1)|height|94|94|0.000px|合格|
+|本文と時刻 (aZ0E1)|paddingTop|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|paddingRight|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|paddingBottom|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|paddingLeft|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|rowGap|4px|4px|0.000px|合格|
+|本文と時刻 (aZ0E1)|columnGap|4px|4px|0.000px|合格|
+|本文と時刻 (aZ0E1)|borderTopWidth|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|borderRightWidth|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|borderBottomWidth|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|borderLeftWidth|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|borderTopRightRadius|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|本文と時刻 (aZ0E1)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|本文と時刻 (aZ0E1)|boxShadow|none|none|完全一致で比較|合格|
+|本文と時刻 (aZ0E1)|outlineWidth|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|x|55|55|0.000px|合格|
+|吹き出しの尾 (iS9ug)|y|153|153|0.000px|合格|
+|吹き出しの尾 (iS9ug)|width|10|10|0.000px|合格|
+|吹き出しの尾 (iS9ug)|height|8|8|0.000px|合格|
+|吹き出しの尾 (iS9ug)|paddingTop|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|paddingRight|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|paddingBottom|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|paddingLeft|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|rowGap|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|columnGap|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|borderTopWidth|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|borderRightWidth|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|borderBottomWidth|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|borderLeftWidth|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|borderTopRightRadius|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|吹き出しの尾 (iS9ug)|boxShadow|none|none|完全一致で比較|合格|
+|吹き出しの尾 (iS9ug)|outlineWidth|0px|0px|0.000px|合格|
+|吹き出しの尾 (iS9ug)|印の色|rgb(255, 255, 255)|rgb(255, 255, 255)|完全一致で比較|合格|
+|受信時刻 (XGCxC)|x|240|240|0.000px|合格|
+|受信時刻 (XGCxC)|y|231|231|0.000px|合格|
+|受信時刻 (XGCxC)|width|23.296875|23.296875|0.000px|合格|
+|受信時刻 (XGCxC)|height|14|14|0.000px|合格|
+|受信時刻 (XGCxC)|paddingTop|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|paddingRight|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|paddingBottom|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|paddingLeft|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|rowGap|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|columnGap|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|borderTopWidth|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|borderRightWidth|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|borderBottomWidth|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|borderLeftWidth|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|borderTopRightRadius|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|受信時刻 (XGCxC)|boxShadow|none|none|完全一致で比較|合格|
+|受信時刻 (XGCxC)|outlineWidth|0px|0px|0.000px|合格|
+|受信時刻 (XGCxC)|fontSize|9px|9px|0.000px|合格|
+|受信時刻 (XGCxC)|fontWeight|400|400|完全一致で比較|合格|
+|受信時刻 (XGCxC)|color|rgba(255, 255, 255, 0.85)|rgba(255, 255, 255, 0.85)|完全一致で比較|合格|
+|受信時刻 (XGCxC)|lineHeight|14px|14px|0.000px|合格|
+|受信時刻 (XGCxC)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|受信時刻 (XGCxC)|fontVariantNumeric|normal|normal|完全一致で比較|合格|
+|商品を見る (azxqN)|x|60|60|0.000px|合格|
+|商品を見る (azxqN)|y|435|435|0.000px|合格|
+|商品を見る (azxqN)|width|186|186|0.000px|合格|
+|商品を見る (azxqN)|height|34|34|0.000px|合格|
+|商品を見る (azxqN)|paddingTop|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|paddingRight|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|paddingBottom|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|paddingLeft|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|rowGap|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|columnGap|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|borderTopWidth|1px|1px|0.000px|合格|
+|商品を見る (azxqN)|borderRightWidth|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|borderBottomWidth|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|borderLeftWidth|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|borderTopColor|rgb(229, 229, 234)|rgb(229, 229, 234)|完全一致で比較|合格|
+|商品を見る (azxqN)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|borderTopRightRadius|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|商品を見る (azxqN)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|商品を見る (azxqN)|boxShadow|none|none|完全一致で比較|合格|
+|商品を見る (azxqN)|outlineWidth|0px|0px|0.000px|合格|
+|商品を見る文字 (gjO9S)|x|123|123|0.000px|合格|
+|商品を見る文字 (gjO9S)|y|443.5|443.5|0.000px|合格|
+|商品を見る文字 (gjO9S)|fontSize|12px|12px|0.000px|合格|
+|商品を見る文字 (gjO9S)|fontWeight|700|700|完全一致で比較|合格|
+|商品を見る文字 (gjO9S)|color|rgb(6, 199, 85)|rgb(6, 199, 85)|完全一致で比較|合格|
+|商品を見る文字 (gjO9S)|lineHeight|18px|18px|0.000px|合格|
+|商品を見る文字 (gjO9S)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|追加する (xTADk)|x|60|60|0.000px|合格|
+|追加する (xTADk)|y|469|469|0.000px|合格|
+|追加する (xTADk)|width|186|186|0.000px|合格|
+|追加する (xTADk)|height|34|34|0.000px|合格|
+|追加する (xTADk)|paddingTop|0px|0px|0.000px|合格|
+|追加する (xTADk)|paddingRight|0px|0px|0.000px|合格|
+|追加する (xTADk)|paddingBottom|0px|0px|0.000px|合格|
+|追加する (xTADk)|paddingLeft|0px|0px|0.000px|合格|
+|追加する (xTADk)|rowGap|0px|0px|0.000px|合格|
+|追加する (xTADk)|columnGap|0px|0px|0.000px|合格|
+|追加する (xTADk)|borderTopWidth|1px|1px|0.000px|合格|
+|追加する (xTADk)|borderRightWidth|0px|0px|0.000px|合格|
+|追加する (xTADk)|borderBottomWidth|0px|0px|0.000px|合格|
+|追加する (xTADk)|borderLeftWidth|0px|0px|0.000px|合格|
+|追加する (xTADk)|borderTopColor|rgb(229, 229, 234)|rgb(229, 229, 234)|完全一致で比較|合格|
+|追加する (xTADk)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|追加する (xTADk)|borderTopRightRadius|0px|0px|0.000px|合格|
+|追加する (xTADk)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|追加する (xTADk)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|追加する (xTADk)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|追加する (xTADk)|boxShadow|none|none|完全一致で比較|合格|
+|追加する (xTADk)|outlineWidth|0px|0px|0.000px|合格|
+|追加する文字 (hD1LD)|x|117|117|0.000px|合格|
+|追加する文字 (hD1LD)|y|477.5|477.5|0.000px|合格|
+|追加する文字 (hD1LD)|fontSize|12px|12px|0.000px|合格|
+|追加する文字 (hD1LD)|fontWeight|700|700|完全一致で比較|合格|
+|追加する文字 (hD1LD)|color|rgb(11, 99, 206)|rgb(11, 99, 206)|完全一致で比較|合格|
+|追加する文字 (hD1LD)|lineHeight|18px|18px|0.000px|合格|
+|追加する文字 (hD1LD)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|商品時刻 (S0V1CD)|x|250|250|0.000px|合格|
+|商品時刻 (S0V1CD)|y|489|489|0.000px|合格|
+|商品時刻 (S0V1CD)|width|23.296875|23.296875|0.000px|合格|
+|商品時刻 (S0V1CD)|height|14|14|0.000px|合格|
+|商品時刻 (S0V1CD)|paddingTop|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|paddingRight|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|paddingBottom|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|paddingLeft|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|rowGap|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|columnGap|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|borderTopWidth|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|borderRightWidth|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|borderBottomWidth|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|borderLeftWidth|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|borderTopRightRadius|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|商品時刻 (S0V1CD)|boxShadow|none|none|完全一致で比較|合格|
+|商品時刻 (S0V1CD)|outlineWidth|0px|0px|0.000px|合格|
+|商品時刻 (S0V1CD)|fontSize|9px|9px|0.000px|合格|
+|商品時刻 (S0V1CD)|fontWeight|400|400|完全一致で比較|合格|
+|商品時刻 (S0V1CD)|color|rgba(255, 255, 255, 0.85)|rgba(255, 255, 255, 0.85)|完全一致で比較|合格|
+|商品時刻 (S0V1CD)|lineHeight|14px|14px|0.000px|合格|
+|商品時刻 (S0V1CD)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|商品時刻 (S0V1CD)|fontVariantNumeric|normal|normal|完全一致で比較|合格|
+|メニュー文字 (A48iPs)|x|135|135|0.000px|合格|
+|メニュー文字 (A48iPs)|y|643|643|0.000px|合格|
+|メニュー文字 (A48iPs)|width|44|44|0.000px|合格|
+|メニュー文字 (A48iPs)|height|17|17|0.000px|合格|
+|メニュー文字 (A48iPs)|paddingTop|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|paddingRight|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|paddingBottom|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|paddingLeft|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|rowGap|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|columnGap|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|borderTopWidth|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|borderRightWidth|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|borderBottomWidth|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|borderLeftWidth|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|borderTopRightRadius|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|メニュー文字 (A48iPs)|boxShadow|none|none|完全一致で比較|合格|
+|メニュー文字 (A48iPs)|outlineWidth|0px|0px|0.000px|合格|
+|メニュー文字 (A48iPs)|fontSize|11px|11px|0.000px|合格|
+|メニュー文字 (A48iPs)|fontWeight|600|600|完全一致で比較|合格|
+|メニュー文字 (A48iPs)|color|rgb(68, 68, 68)|rgb(68, 68, 68)|完全一致で比較|合格|
+|メニュー文字 (A48iPs)|lineHeight|17px|17px|0.000px|合格|
+|メニュー文字 (A48iPs)|webkitFontSmoothing|auto|auto|完全一致で比較|合格|
+|開く印 (U6uCax)|x|183|183|0.000px|合格|
+|開く印 (U6uCax)|y|645.5|645.5|0.000px|合格|
+|開く印 (U6uCax)|width|12|12|0.000px|合格|
+|開く印 (U6uCax)|height|12|12|0.000px|合格|
+|開く印 (U6uCax)|paddingTop|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|paddingRight|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|paddingBottom|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|paddingLeft|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|rowGap|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|columnGap|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|borderTopWidth|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|borderRightWidth|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|borderBottomWidth|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|borderLeftWidth|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|borderTopLeftRadius|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|borderTopRightRadius|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|borderBottomLeftRadius|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|borderBottomRightRadius|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|backgroundColor|rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)|完全一致で比較|合格|
+|開く印 (U6uCax)|boxShadow|none|none|完全一致で比較|合格|
+|開く印 (U6uCax)|outlineWidth|0px|0px|0.000px|合格|
+|開く印 (U6uCax)|印の色|rgb(68, 68, 68)|rgb(68, 68, 68)|完全一致で比較|合格|
 
 ## 操作の確認
 
 本番ページでラジオの切り替え、チェックの解除、元に戻す、再試行、ふきだしのEscape、窓の閉じる・開く・実行、LINEの商品操作を確認しました。実データは送信していません。
 
-## 渡すものと確認結果
+## 最後の確認
 
-- 開始前の診断：合格。開始時の作業ツリーはクリーン、画面ファイルの戻しは不要でした。
-- テスト前に取得した `origin/codex/development`：`4b1cd841318a66b265a6fb64dbe25baa4106b1b6`（開始時HEADと同じ）。
-- 共通部品の Vitest：98ファイル・615件合格（`NEXT_PUBLIC_API_URL=http://worker.test`）。V7比較用の手動試験：1件合格。
-- `apps/web` の tsc・本番ビルド・`git diff --check`：合格。
-- V7：基準コミットと現在のSSRを、同じ書体・CSS層・1440幅で撮影。変更画素 **0**（[比較画像](./v7-cards.png)、[記録](./v7-cards.json)）。対象は選ぶカード、チェックのカード、成功/失敗の知らせ、閉じた補足、案内、空、窓、LINE枠。
-- 古い文字色契約は、V8正本 `cfVyj` のLINE商品操作だけを例外にしました。管理画面・V7の文字色検査は維持しています。
-- `design-debt-baseline.json`・機能の画面・docs/brain・docs/v6-* は変更していません。push・統合・配備・DB更新・Slack投稿は行っていません。
-- 手書きの候補一覧：[handmade-cards.md](./handmade-cards.md)。743行（選ぶ/チェック65、知らせ/案内323、窓/空341、骨格4、LINE独自枠10）。置き換えは画面担当の作業です。
-- 数値の生データ：[cards-values.json](./cards-values.json)。見た目の最終合否は司令塔が画像を見て決めます。
+2026-10-05 02:01（日本時間）。実装コミット `7668f5bbe` の本番ビルドで121要素を測定。12部品すべて数値・重ね比較に合格し、左右の比較画像もCodexが目視しました。司令塔による最終画像判定は別に行ってください。
 
-枠を描かない `outline-style: none` の既定幅は、描画上の0pxとして記録しています。文字を持たないコンテナの未指定の書体、0px枠の色は判定対象に含めません。LINEのプレビューは実際のサービスの画面を写すため、正本の700の太さとLINE色を維持しています。正本HTMLの外側の背景はそのままです。
+共通部品のvitest 615件、時刻の修正後の関連vitest 10件、V7比較用vitest 1件、apps/webのtsc、本番ビルド、git diff --checkは合格。V7の変更画素は0。既知の5pxのずれは64画素を不一致として検出しています。
 
-再実行の手順：[確認ページのREADME](../../../apps/web/src/app/v8-parts/README.md)。
-
-## 部品ごとのコミット
-
-|部品|コミット|
-|---|---|
-|選ぶカード|`469efb6fb`|
-|チェックのカード|`84113fec0`|
-|知らせ|`a1784ac3b`|
-|ふきだし|`b8b51c23d`|
-|案内の帯|`81fb6ab35`|
-|ダイアログ|`4d382b778`|
-|空の表示|`62c23defa`|
-|骨格の行|`97886ae82`|
-|LINEの見え方|`b1c30cfe5`|
+手書き候補は[handmade-cards.md](./handmade-cards.md)の743行です。機能の画面、design-debt-baseline、docs/brain、docs/v6-*は変更していません。push・マージ・rebase・stash・Slack投稿・配備は行っていません。
