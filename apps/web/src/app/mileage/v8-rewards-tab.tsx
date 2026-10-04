@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { AlertCircle, ArrowLeftRight, Gift, Info, Plus, Star } from 'lucide-react'
+import { AlertCircle, ArrowLeftRight, Download, Gift, Info, Plus, Star } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import FolderPanel from '@/components/shared/folder-panel'
@@ -36,6 +36,7 @@ import {
 import type { ApiResponse } from '@line-crm/shared'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
 import { formatNumber } from '@/lib/format'
+import { csvCell } from '@/lib/presentation'
 import { V8CreateButton } from './mileage-v8'
 import styles from './mileage-v8.module.css'
 
@@ -132,6 +133,7 @@ export default function V8RewardsTab({
   const [popularName, setPopularName] = useState<string | null>(null)
   const [popularCount, setPopularCount] = useState<number | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [failed, setFailed] = useState<FailedRedemption[]>([])
@@ -179,6 +181,7 @@ export default function V8RewardsTab({
       setPopularName(redeemedCount ? (overviewSummary?.mostRedeemedRewardName ?? null) : null)
       setPopularCount(redeemedCount)
       setReachMetrics(Array.isArray(response.data.reachMetrics) ? response.data.reachMetrics : [])
+      setLoadedAccountId(accountId)
       setStatus('ready')
     } catch (reason) {
       if (request !== requestRef.current) return
@@ -301,10 +304,44 @@ export default function V8RewardsTab({
     }
   }
 
+  const canExport = !accountLoading && !!accountId && loadedAccountId === accountId
+    && status === 'ready' && rewards.length > 0
+  const exportCsv = useCallback(() => {
+    if (!canExport) return
+    setActionError('')
+    try {
+      const rows = rewards.map((reward) => [
+        reward.name,
+        KIND_LABEL[reward.rewardKind],
+        reward.currentVersion?.requiredMiles,
+        reward.benefitName,
+        reward.exchangedThisMonth,
+        statusPill(reward.status).text,
+        reward.currentVersion?.startsAt,
+        reward.currentVersion?.endsAt,
+      ])
+      const csv = [['使い道', '種類', '必要なマイル', '交換すると渡るもの', '今月 交換された', '状態', '開始日時', '終了日時'], ...rows]
+        .map((row) => row.map((value) => csvCell(value)).join(','))
+        .join('\n')
+      const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `mileage-rewards-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setActionError('CSVを書き出せませんでした。もう一度お試しください。')
+    }
+  }, [canExport, rewards])
+
   useEffect(() => {
-    registerHeaderActions(null)
+    registerHeaderActions(
+      <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
+        <Download size={14} aria-hidden="true" /> CSV で書き出す
+      </Button>,
+    )
     return () => registerHeaderActions(null)
-  }, [registerHeaderActions])
+  }, [canExport, exportCsv, registerHeaderActions])
 
   const publishedCount = rewards.filter((r) => r.status === 'published').length
   const draftCount = rewards.filter((r) => r.status === 'draft').length
@@ -376,7 +413,7 @@ export default function V8RewardsTab({
         <div className={styles.kpi}>
           <div className={styles.kpiTop}>
             <span className={styles.kpiIcon}><ArrowLeftRight size={14} aria-hidden="true" /></span>
-            <span className={styles.kpiLabel}>今月交換</span>
+            <span className={styles.kpiLabel}>今月 交換</span>
           </div>
           <p className={styles.kpiValue}>
             {status !== 'ready' ? '—' : formatMileageNumber(exchangedCount ?? 0)}
