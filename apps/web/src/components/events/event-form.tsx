@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import StickyBar from '@/components/shared/sticky-bar'
 
 import { useEffect, useState } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useRouter } from 'next/navigation'
 import { api, ApiError, EventSlotsPartialError, eventsApi, type EventDetail, type EventSlot, type EventSlotInput } from '@/lib/api'
 import ImageUploader from '@/components/shared/image-uploader'
@@ -223,6 +224,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       const payload: Partial<EventDetail> = {
         name: draft.name,
         venue_name: draft.venue_name,
+        venue_address: draft.venue_address,
         venue_url: draft.venue_url,
         image_url: draft.image_url,
         description: draft.description,
@@ -533,6 +535,7 @@ function OverviewTab({
   accounts: Array<{ id: string; name: string; country: string | null; isActive: boolean }>
   currentAccountId: string
 }) {
+  const theme = useAdminTheme()
   const descLen = (draft.description ?? '').length
   /* 保存前に欄を離れたとき出す直し方（文は保存時と同じ）。 */
   const [nameError, setNameError] = useState<string | null>(null)
@@ -593,6 +596,7 @@ function OverviewTab({
           />
         </div>
       </div>
+      {theme === 'v8' && <Field label="会場の住所"><TextInput value={draft.venue_address ?? ''} maxLength={1000} onChange={(e) => update('venue_address', e.target.value || null)} /></Field>}
       <div>
         <ImageUploader
           mode="url"

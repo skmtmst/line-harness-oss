@@ -14909,6 +14909,7 @@ export interface EventQuestion {
 }
 
 export interface EventDetail {
+  venue_address?: string | null;
   id: string;
   name: string;
   venue_name: string | null;
@@ -15229,6 +15230,8 @@ export interface EventLifecycleResult {
 }
 
 export const eventsApi = {
+  applicationPreview: (accountId: string, body: Partial<EventDetail> & { slot: { starts_at: string; ends_at: string; capacity: number } }) =>
+    fetchApi<import('@line-crm/shared').EventApplicationPreview>(withAccount('/api/events/admin/application-preview', accountId), { method: 'POST', body: JSON.stringify(body) }),
   listEvents: (
     accountId: string,
     options: { page?: number; limit?: number; q?: string; filter?: 'all' | 'open' | 'pending' | 'full'; sort?: 'soon' | 'name' } = {},

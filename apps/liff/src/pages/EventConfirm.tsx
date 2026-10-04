@@ -185,6 +185,7 @@ export default function EventConfirm() {
           <Row label="イベント" value={event.name} />
           <Row label="日時" value={formatJstEventAt(slot.starts_at)} />
           {event.venue_name && <Row label="場所" value={event.venue_name} />}
+          {event.venue_address && <Row label="住所" value={event.venue_address} />}
         </dl>
 
         <div className="flex gap-2 rounded-lg bg-info-bg p-3 text-xs leading-5 text-ink">

@@ -2490,7 +2490,7 @@ CREATE TABLE events (
   CHECK (approval_deadline_hours IN (2, 24, 72)), questions_json TEXT CHECK (
     questions_json IS NULL OR json_valid(questions_json)
   ), lifecycle_status TEXT NOT NULL DEFAULT 'draft'
-  CHECK (lifecycle_status IN ('draft', 'published', 'paused', 'ended', 'cancelled')), lifecycle_changed_at TEXT, lifecycle_change_reason TEXT,
+  CHECK (lifecycle_status IN ('draft', 'published', 'paused', 'ended', 'cancelled')), lifecycle_changed_at TEXT, lifecycle_change_reason TEXT, venue_address TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 
