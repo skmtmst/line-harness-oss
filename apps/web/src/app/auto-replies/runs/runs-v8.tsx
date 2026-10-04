@@ -16,6 +16,7 @@ import { ArrowLeft, Download, Pause, Pencil, RotateCcw, Search, TriangleAlert } 
 import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Avatar from '@/components/shared/avatar'
+import DateField from '@/components/shared/date-field'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -105,6 +106,8 @@ export default function AutoReplyRunsV8() {
   const requestedRuleId = searchParams.get('id') ?? ''
   const staffRole = useStaffRole()
   const canManage = staffRole === null || canManageRole(staffRole)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [data, setData] = useState<AutoReplyRunsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -138,6 +141,8 @@ export default function AutoReplyRunsV8() {
     setError('')
     try {
       const response = await api.autoReplies.runs({
+        from: dateFrom || undefined,
+        to: dateTo || undefined,
         ruleId: requestedRuleId || undefined,
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
@@ -156,7 +161,7 @@ export default function AutoReplyRunsV8() {
     } finally {
       if (loadSeqRef.current === seq) setLoading(false)
     }
-  }, [page, requestedRuleId])
+  }, [page, requestedRuleId, dateFrom, dateTo])
 
   useEffect(() => { void load() }, [load])
 
@@ -250,7 +255,7 @@ export default function AutoReplyRunsV8() {
       let capped = false
       for (;;) {
         if (exportCancelledRef.current) throw new Error('csv_cancelled')
-        const response = await api.autoReplies.runs({ ruleId: requestedRuleId || undefined, limit: 100, offset })
+        const response = await api.autoReplies.runs({ ruleId: requestedRuleId || undefined, from: dateFrom || undefined, to: dateTo || undefined, limit: 100, offset })
         if (!response.success) throw new Error(response.error)
         const room = MAX_CSV_ROWS - items.length
         items.push(...response.data.items.slice(0, room))
@@ -406,6 +411,8 @@ export default function AutoReplyRunsV8() {
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>実行の記録</h2>
           <div className={styles.cardTools}>
+            <DateField value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} max={dateTo || undefined} aria-label="実行日（開始）" />
+            <DateField value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} min={dateFrom || undefined} aria-label="実行日（終了）" />
             <div className={styles.filterChips} role="group" aria-label="結果で絞り込む">
               {FILTERS.map((f) => (
                 <button

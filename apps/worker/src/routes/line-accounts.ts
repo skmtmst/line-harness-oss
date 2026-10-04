@@ -9,6 +9,8 @@ import {
   getLineAccountById,
   getLineAccountCredentialHealth,
   createLineAccount,
+  listLineAccountTags,
+  attachLineAccountRegistrationTags,
   updateLineAccount,
   updateLineAccountFields,
   updateLineAccountOrder,
@@ -1163,7 +1165,7 @@ type ConnectBody = {
 };
 
 function readConnectBody(body: ConnectBody):
-  | { ok: true; value: { name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string; tagIds?: string[]; staffIds?: string[]; parentLineAccountId?: string | null; liffId?: string } }
+  | { ok: true; value: { name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string; tagIds: string[]; staffIds?: string[]; parentLineAccountId?: string | null; liffId?: string } }
   | { ok: false; error: string } {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const channelId = typeof body.channelId === 'string' ? body.channelId.trim() : '';
@@ -1179,12 +1181,17 @@ function readConnectBody(body: ConnectBody):
   for(const value of [body.tagIds,body.staffIds]) if(value!==undefined && (!Array.isArray(value)||value.length>50||value.some(v=>!id(v))||new Set(value).size!==value.length)) return {ok:false,error:'タグ・担当者の指定を確認してください'};
   if(body.parentLineAccountId!==undefined && body.parentLineAccountId!==null && !id(body.parentLineAccountId)) return {ok:false,error:'親アカウントを確認してください'};
   if(body.liffId!==undefined && (typeof body.liffId!=='string'||!/^\d+-[A-Za-z0-9_-]+$/.test(body.liffId))) return {ok:false,error:'LIFF IDを確認してください'};
-  return { ok: true, value: { name, channelId, channelSecret, loginChannelId, loginChannelSecret, tagIds:body.tagIds as string[]|undefined,staffIds:body.staffIds as string[]|undefined,parentLineAccountId:body.parentLineAccountId as string|null|undefined,liffId:body.liffId as string|undefined } };
+  return { ok: true, value: { name, channelId, channelSecret, loginChannelId, loginChannelSecret, tagIds:(body.tagIds ?? []) as string[],staffIds:body.staffIds as string[]|undefined,parentLineAccountId:body.parentLineAccountId as string|null|undefined,liffId:body.liffId as string|undefined } };
 }
 
 async function readConnectRequest(c: Context<Env>) {
   try {
-    return readConnectBody(await c.req.json<ConnectBody>());
+    const parsed = readConnectBody(await c.req.json<ConnectBody>());
+    if (parsed.ok && parsed.value.tagIds.length) {
+      const tags = await listLineAccountTags(c.env.DB, c.get('staff').tenantId ?? DEFAULT_TENANT_ID);
+      if (!parsed.value.tagIds.every(id => tags.some(tag => tag.id === id))) return { ok: false as const, error: '指定した登録前のタグが見つかりません' };
+    }
+    return parsed;
   } catch {
     return { ok: false as const, error: 'request body must be valid JSON' };
   }
@@ -1357,6 +1364,8 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
       lineBasicId: prepared.bot.basicId ?? null,
       lineProfileSyncedAt: jstNow(),
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+
+    if (parsed.value.tagIds.length) await attachLineAccountRegistrationTags(c.env.DB, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, account.id, parsed.value.tagIds);
 
     const followerState = await detectFollowerImportCapability(
       c.env.DB,

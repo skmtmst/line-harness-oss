@@ -513,7 +513,10 @@
     "572_hq_template_text_overrides.sql",
     "573_ad_event_mappings.sql",
     "574_operator_notification_teams.sql",
-    "575_photo_publication_daily_views.sql"
+    "575_photo_publication_daily_views.sql",
+    "576_v8_event_venue_address.sql",
+    "577_v8_site_receipt.sql",
+    "578_v8_photo_publication_rewards.sql"
   ],
-  "migrationCount": 514
+  "migrationCount": 517
 }

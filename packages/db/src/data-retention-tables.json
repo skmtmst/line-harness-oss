@@ -2274,6 +2274,13 @@
       "column": "line_account_id"
     }
   },
+  "nen_photo_publication_reward_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "nen_photo_publications": {
     "category": "purge",
     "scope": {

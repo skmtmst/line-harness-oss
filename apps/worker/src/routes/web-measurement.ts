@@ -8,6 +8,7 @@ import {
   recordAnonymousConversionDay,
   recordDomainRejection,
   recordSiteConsentDecision,
+  recordMeasurementSiteReceipt,
   resumeMeasurementSite,
   siteAllowsHost,
   stopMeasurementSite,
@@ -100,6 +101,8 @@ webMeasurement.post('/api/public/web-conversions', async (c) => {
     if (body.consent !== 'granted') {
       return c.body(null, 204, corsHeaders());
     }
+
+    await recordMeasurementSiteReceipt(c.env.DB, site.id, site.line_account_id);
 
     // R282: パラメータ（?以降）とページ内位置（#以降）は判定に使わない。
     // 照合自体も getUrlReachConversionPoints 側で同じ形へ直して比べる。
@@ -195,6 +198,7 @@ webMeasurement.get(
           rejectedCount: s.rejectedTotal,
           lastRejectedHost: s.lastRejectedHost,
           lastRejectedAt: s.lastRejectedAt,
+          lastReceivedAt: s.last_received_at ?? null,
           stoppedAt: s.stopped_at,
           stoppedReason: s.stopped_reason,
         })),

@@ -9,6 +9,8 @@ import {
   getFriendByLineUserIdForAccount,
   getPhotoNotificationState,
   jstNow,
+  publishPhoto,
+  savePhotoPublicationOrder,
   nextVersionToken,
   resolveLineCredential,
   findOrCreateGlobalTag,
@@ -767,7 +769,7 @@ nenMembers.get('/api/public/nen/adopted-photos', async (c) => {
            AND placement.active = 1
            AND placement.removed_at IS NULL
       )
-    ORDER BY ps.reviewed_at DESC, ps.created_at DESC LIMIT 24`)
+    ORDER BY (SELECT sort_order FROM nen_photo_publications WHERE photo_id=ps.id), ps.reviewed_at DESC, ps.created_at DESC LIMIT 24`)
     .bind(lineAccountId, lineAccountId).all<Record<string, unknown>>();
   const origin = c.req.header('Origin') || '';
   const allowed = new Set(['https://stg.nen-petfood.com', 'https://nen-petfood.com', 'https://www.nen-petfood.com']);
@@ -1497,7 +1499,9 @@ nenMembers.get(
     const staleCutoff = toJstString(new Date(Date.now() - PHOTO_REWARD_STALE_MS));
     const rows = await c.env.DB.prepare(
       `SELECT pub.id, pub.photo_id, pub.status, pub.show_owner_name, pub.view_count,
-              pub.version, pub.published_at, ps.public_image_url AS image_url,
+              pub.version, pub.sort_order, pub.reward_points AS publication_points,
+              (SELECT status FROM nen_photo_publication_reward_outbox pr WHERE pr.photo_id=ps.id) AS publication_point_sync_status,
+              pub.published_at, ps.public_image_url AS image_url,
               ps.publication_consent_at, ps.publication_consent_version,
               ps.awarded_points, ps.reviewed_at, ps.reviewed_by_name,
               p.name AS pet_name,
@@ -1511,7 +1515,7 @@ nenMembers.get(
         WHERE pub.line_account_id = ? AND pub.status = 'published'
           AND ps.status = 'adopted' AND ps.publication_consent_at IS NOT NULL
           AND ps.publication_withdrawn_at IS NULL
-        ORDER BY pub.published_at DESC LIMIT 200`,
+        ORDER BY pub.sort_order, pub.published_at DESC, pub.id LIMIT 200`,
     ).bind(staleCutoff, accountId).all<Record<string, unknown>>();
     /*
      * 公開中ではない掲載も同じ画面で追う（Issue #1040 IDEA-22）。
@@ -1605,6 +1609,59 @@ nenMembers.get(
     } });
   },
 );
+
+// 順序編集は通常一覧の200件上限を越えて全掲載のIDと版を取得する。
+nenMembers.get('/api/nen-members/photos/publications/order', requirePhotoPermission('photo.publication.manage'), async (c) => {
+  const accountId = c.req.query('accountId')?.trim();
+  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  const rows = await c.env.DB.prepare(`SELECT pub.id,pub.version,p.name AS pet_name
+    FROM nen_photo_publications pub JOIN nen_photo_submissions ps ON ps.id=pub.photo_id AND ps.line_account_id=pub.line_account_id
+    JOIN nen_pet_profiles p ON p.id=ps.pet_id
+    WHERE pub.line_account_id=? AND pub.status='published' AND ps.status='adopted'
+      AND ps.publication_consent_at IS NOT NULL AND ps.publication_withdrawn_at IS NULL
+    ORDER BY pub.sort_order,pub.published_at DESC,pub.id`).bind(accountId).all();
+  return c.json({ success: true, data: { items: rows.results } });
+});
+
+nenMembers.put('/api/nen-members/photos/publications/order', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), async (c) => {
+  if (c.get('staff').readOnly) return c.json({ success: false, error: '閲覧のみの権限です' }, 403);
+  const body = await c.req.json<import('@line-crm/shared').PhotoPublicationOrderInput>().catch(() => null);
+  if (!body || typeof body.accountId !== 'string' || !body.accountId.trim()
+    || !Array.isArray(body.items) || body.items.length === 0 || body.items.length > 5000
+    || body.items.some(item => !item || typeof item.id !== 'string' || !item.id.trim()
+      || !Number.isInteger(item.expectedVersion) || item.expectedVersion < 1)
+    || new Set(body.items.map(item => item.id)).size !== body.items.length) {
+    return c.json({ success: false, error: '掲載IDと確認した版を重複なく指定してください' }, 400);
+  }
+  body.accountId = body.accountId.trim();
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  if (!await savePhotoPublicationOrder(c.env.DB, body)) {
+    return c.json({ success: false, error: '掲載の集合か版が変わりました。全件を読み直してください' }, 409);
+  }
+  return c.json({ success: true, data: { items: body.items.map((item, sortOrder) => ({ id: item.id, version: item.expectedVersion+1, sortOrder })) } });
+});
+
+nenMembers.post('/api/nen-members/photos/:id/publish', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), async (c) => {
+  if (c.get('staff').readOnly) return c.json({ success: false, error: '閲覧のみの権限です' }, 403);
+  const body = await c.req.json<{accountId?: unknown; expectedVersion?: unknown}>().catch(() => null);
+  const key = c.req.header('Idempotency-Key')?.trim();
+  if (!body || typeof body.accountId !== 'string' || !body.accountId.trim()
+    || typeof body.expectedVersion !== 'number' || !Number.isInteger(body.expectedVersion) || body.expectedVersion < 0
+    || !key || key.length < 8 || key.length > 100) {
+    return c.json({ success: false, error: 'accountId、expectedVersion、Idempotency-Keyを確認してください' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId.trim()])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const result = await publishPhoto(c.env.DB, { photoId: c.req.param('id'), accountId: body.accountId.trim(), expectedVersion: body.expectedVersion, idempotencyKey: key });
+  if (result.kind === 'missing') return c.json({ success: false, error: '写真が見つかりません' }, 404);
+  if (result.kind === 'ineligible') return c.json({ success: false, error: '採用・現在の公開同意・公開用画像を確認してください' }, 422);
+  if (result.kind === 'conflict') return c.json({ success: false, error: '掲載状態が変わりました。読み直してください' }, 409);
+  return c.json({ success: true, data: { id: result.id, version: result.version, status: 'published' as const } });
+});
 
 // 公開の撤回・掲載先の変更は、審査とは別の上位権限だけでできるようにする（#931 N-311）。
 // 「審査できる人なら公開範囲も変えられる」状態を止め、掲載管理の権限を明示的に分ける。

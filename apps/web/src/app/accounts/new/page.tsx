@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import type { LineAccountTagSummary, StaffMember } from '@line-crm/shared'
 import Image from 'next/image'
 import { ArrowLeft, ArrowRight, Check, CircleHelp, Lock } from 'lucide-react'
@@ -140,6 +139,7 @@ export default function NewLineAccountPage() {
 
   const input = () => ({
     name: form.name.trim() || undefined,
+    ...(theme === 'v8' ? {tagIds} : {}),
     channelId: form.channelId.trim(),
     channelSecret: form.channelSecret,
     loginChannelId: form.loginChannelId.trim(),

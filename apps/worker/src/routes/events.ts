@@ -1,3 +1,4 @@
+import type { EventApplicationPreview } from '@line-crm/shared';
 // Event booking feature HTTP routes.
 //
 // LIFF endpoints:    /api/liff/events/*           (account resolved from liffId)
@@ -163,6 +164,7 @@ type EventSnapshotSource = {
   image_url?: string | null;
   description?: string | null;
   venue_name?: string | null;
+  venue_address?: string | null;
   venue_url?: string | null;
   cancel_deadline_hours_before?: number | null;
   confirmation_message_extra?: string | null;
@@ -180,6 +182,7 @@ function eventDefinitionSnapshot(event: EventSnapshotSource): Record<string, unk
     eventImageUrl: event.image_url ?? null,
     eventDescription: event.description ?? null,
     venueName: event.venue_name ?? null,
+    venueAddress: event.venue_address ?? null,
     venueUrl: event.venue_url ?? null,
     cancelDeadlineHoursBefore: event.cancel_deadline_hours_before ?? null,
     confirmationMessageExtra: event.confirmation_message_extra ?? null,
@@ -329,6 +332,7 @@ async function resolveAccountIdFromLiff(c: Context<Env>): Promise<string | null>
 interface EventInput {
   name?: string;
   venue_name?: string | null;
+  venue_address?: string | null;
   venue_url?: string | null;
   image_url?: string | null;
   description?: string | null;
@@ -363,6 +367,8 @@ function validateEventInput(
       return { ok: false, code: 'invalid_description' };
     }
   }
+  if (has('venue_name') && body.venue_name != null && (typeof body.venue_name !== 'string' || body.venue_name.length > 255)) return { ok: false, code: 'invalid_venue_name' };
+  if (has('venue_address') && body.venue_address != null && (typeof body.venue_address !== 'string' || body.venue_address.length > 1000)) return { ok: false, code: 'invalid_venue_address' };
   // LIFF側はURLをそのまま出している。空は許すが、中身があるときは
   // http(s)だけにする。javascript: などが保存されると友だち側で
   // 想定外の動きになる。LIFF側の表示がわりは別票の範囲。
@@ -444,6 +450,29 @@ function validateEventInput(
 // Admin: events CRUD
 // ============================================================
 
+events.post('/api/events/admin/application-preview', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  if (!body) return bad(c, 'invalid_body', 400);
+  const validation = validateEventInput(body, true);
+  if (!validation.ok) return bad(c, validation.code, 422);
+  const slot = body.slot as { starts_at?: unknown; ends_at?: unknown; capacity?: unknown } | undefined;
+  if (!slot || typeof slot.starts_at !== 'string' || typeof slot.ends_at !== 'string'
+    || !Number.isFinite(Date.parse(slot.starts_at)) || !Number.isFinite(Date.parse(slot.ends_at))
+    || Date.parse(slot.ends_at) <= Date.parse(slot.starts_at)
+    || !Number.isSafeInteger(slot.capacity) || Number(slot.capacity) < 1) return bad(c, 'invalid_slot', 422);
+  const questions = body.questions;
+  if (questions != null && (!Array.isArray(questions) || questions.length > 50 || questions.some((q: unknown) => !q || typeof q !== 'object' || typeof (q as Record<string, unknown>).label !== 'string'))) return bad(c, 'invalid_questions', 422);
+  const data: EventApplicationPreview = {
+    name: String(body.name), description: body.description as string | null ?? null,
+    venueName: body.venue_name as string | null ?? null, venueAddress: body.venue_address as string | null ?? null,
+    venueUrl: body.venue_url as string | null ?? null, startsAt: slot.starts_at, endsAt: slot.ends_at,
+    capacity: Number(slot.capacity), requiresApproval: body.requires_approval === 1,
+    questions: ((questions ?? []) as Array<Record<string, unknown>>).map((q) => ({ id: String(q.id ?? ''), label: String(q.label), required: q.required === true, type: String(q.type ?? 'text') })),
+    previewOnly: true,
+  };
+  return c.json(data);
+});
+
 events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
@@ -475,6 +504,7 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
     image_url: (body.image_url as string | null | undefined) ?? null,
     description: (body.description as string | null | undefined) ?? null,
     venue_name: (body.venue_name as string | null | undefined) ?? null,
+    venue_address: (body.venue_address as string | null | undefined) ?? null,
     venue_url: (body.venue_url as string | null | undefined) ?? null,
     cancel_deadline_hours_before: (body.cancel_deadline_hours_before as number | null | undefined) ?? null,
     confirmation_message_extra: (body.confirmation_message_extra as string | null | undefined) ?? null,
@@ -494,8 +524,8 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
          visible_tag_id, waitlist_enabled, entry_cutoff_hours_before,
          questions_json,
          current_published_version_id,
-         lifecycle_status, lifecycle_changed_at, folder_id
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         lifecycle_status, lifecycle_changed_at, folder_id, venue_address
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -534,6 +564,7 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
       isPublished ? 'published' : 'draft',
       new Date().toISOString(),
       body.folderId ?? null,
+      (body.venue_address as string | null | undefined) ?? null,
     );
   if (publishedVersionId) {
     await c.env.DB.batch([
@@ -850,6 +881,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
   const updatable = [
     'name',
     'venue_name',
+    'venue_address',
     'venue_url',
     'image_url',
     'description',
@@ -971,6 +1003,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
     image_url: nextEvent.image_url as string | null | undefined,
     description: nextEvent.description as string | null | undefined,
     venue_name: nextEvent.venue_name as string | null | undefined,
+    venue_address: nextEvent.venue_address as string | null | undefined,
     venue_url: nextEvent.venue_url as string | null | undefined,
     cancel_deadline_hours_before: nextEvent.cancel_deadline_hours_before as number | null | undefined,
     confirmation_message_extra: nextEvent.confirmation_message_extra as string | null | undefined,
@@ -2119,6 +2152,7 @@ events.get('/api/liff/events/me', async (c) => {
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventImageUrl') ELSE e.image_url END AS event_image_url,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueAddress') ELSE e.venue_address END AS venue_address,
                 CASE WHEN b.status = 'confirmed' THEN CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END ELSE NULL END AS venue_url,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at,
@@ -2135,6 +2169,7 @@ events.get('/api/liff/events/me', async (c) => {
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventImageUrl') ELSE e.image_url END AS event_image_url,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueAddress') ELSE e.venue_address END AS venue_address,
                 CASE WHEN b.status = 'confirmed' THEN CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END ELSE NULL END AS venue_url,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at,
@@ -2170,6 +2205,7 @@ events.get('/api/liff/events/me/:bookingId', async (c) => {
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventImageUrl') ELSE e.image_url END AS event_image_url,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueAddress') ELSE e.venue_address END AS venue_address,
               CASE WHEN b.status = 'confirmed' THEN CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END ELSE NULL END AS venue_url,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventDescription') ELSE e.description END AS event_description,
@@ -2406,7 +2442,7 @@ events.post('/api/events/liff/bookings/:id/change', async (c) => {
 
     const event = await c.env.DB
       .prepare(
-        `SELECT id, name, image_url, description, venue_name, venue_url,
+        `SELECT id, name, image_url, description, venue_name, venue_address, venue_url,
                 confirmation_message_extra, cancel_deadline_hours_before,
                 requires_approval, approval_deadline_hours, current_published_version_id,
                 max_bookings_per_friend,
@@ -2702,6 +2738,7 @@ events.get('/api/liff/events/:id/slots', async (c) => {
 interface EventDbRow {
   id: string;
   name: string;
+  venue_address: string | null;
   venue_name: string | null;
   venue_url: string | null;
   requires_approval: number;
@@ -2912,7 +2949,7 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
 
   const event = await c.env.DB
     .prepare(
-      `SELECT id, name, image_url, description, venue_name, venue_url,
+      `SELECT id, name, image_url, description, venue_name, venue_address, venue_url,
               confirmation_message_extra, cancel_deadline_hours_before,
               requires_approval, approval_deadline_hours, current_published_version_id,
               max_bookings_per_friend,

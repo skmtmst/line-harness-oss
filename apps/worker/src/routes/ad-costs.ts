@@ -3,6 +3,7 @@ import {
   cancelAdCostEntry,
   getAdCostImportStatus,
   getAdCostSummary,
+  getConfirmedConversionCount,
   getAdPlatforms,
   getAdPlatformById,
   isValidCostDay,
@@ -58,15 +59,16 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
     const to = c.req.query('to') ?? jstDay(today);
     const from = c.req.query('from')
       ?? jstDay(new Date(today.getTime() - DEFAULT_RANGE_DAYS * 24 * 3600_000));
-    if (!isValidCostDay(from) || !isValidCostDay(to)) {
+    if (!isValidCostDay(from) || !isValidCostDay(to) || from > to) {
       return c.json({ success: false, error: '期間は 2026-08-01 の形で指定してください' }, 400);
     }
 
-    const [rows, platforms, manualEntries] = await Promise.all([
+    const [rows, platforms, manualEntries, confirmedConversionCount] = await Promise.all([
       getAdCostSummary(c.env.DB, { lineAccountId: accountId, from, to }),
       getAdPlatforms(c.env.DB),
       // R275: 手入力の記録は取消できるよう1行ずつ返す(取消済みも履歴として返す)。
       listManualAdCostEntries(c.env.DB, { lineAccountId: accountId, from, to }),
+      getConfirmedConversionCount(c.env.DB, { lineAccountId: accountId, from, to }),
     ]);
     const ownPlatforms = platforms.filter((p) => p.line_account_id === accountId && p.is_active === 1);
     const statusByPlatform = await getAdCostImportStatus(
@@ -74,9 +76,17 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
       ownPlatforms.map((p) => p.id),
     );
 
+    const totals = rows.flatMap(row => row.totals);
+    const jpyOnly = totals.length > 0 && totals.every(total => total.currency === 'JPY');
+    const conversionCost: import('@line-crm/shared').AdConversionCostSummary = {
+      from, to, confirmedConversionCount, currency: jpyOnly ? 'JPY' : null,
+      costPerConversionMinor: jpyOnly && confirmedConversionCount > 0
+        ? Math.round(totals.reduce((sum, total) => sum + total.amountMinor, 0) / confirmedConversionCount) : null,
+    };
     return c.json({
       success: true,
       data: {
+        conversionCost,
         rows: rows.map((row) => ({
           sourceLabel: row.sourceLabel,
           adPlatformId: row.adPlatformId,

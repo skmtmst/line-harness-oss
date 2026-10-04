@@ -298,6 +298,8 @@ export default function BroadcastListV8() {
         displayStatus: chip && chip.query !== '' ? chip.query : undefined,
         folderId: folderFilter === UNFILED ? 'unfiled' : folderFilter || undefined,
         sort: sortKey,
+        from: dateFrom || undefined,
+        to: dateTo || undefined,
       })
       if (broadcastsRes.success) {
         setBroadcasts(broadcastsRes.data)
@@ -315,7 +317,7 @@ export default function BroadcastListV8() {
     } finally {
       setLoading(false)
     }
-  }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter])
+  }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter, dateFrom, dateTo])
 
   /*
    * 速さ：タグ・シナリオは宛先の名前解決にだけ使う。条件では変わらない
@@ -536,13 +538,7 @@ export default function BroadcastListV8() {
     if (folderFilter && folderFilter !== UNFILED && b.folderId !== folderFilter) return false
     const query = titleQuery.trim().toLowerCase()
     if (query && !`${b.title} ${b.messageContent}`.toLowerCase().includes(query)) return false
-    if (dateFrom || dateTo) {
-      const iso = b.status === 'sent' ? b.sentAt : b.scheduledAt
-      if (!iso) return false
-      const ymd = formatYmd(iso)
-      if (dateFrom && ymd < dateFrom) return false
-      if (dateTo && ymd > dateTo) return false
-    }
+
     return true
   })
 

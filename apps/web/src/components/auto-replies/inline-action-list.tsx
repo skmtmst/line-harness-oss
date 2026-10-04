@@ -10,6 +10,7 @@ import { newActionKey, type InlineAction } from './draft-fields'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import Button from '@/components/shared/button'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
  * 応答したときに行うことの並び。
@@ -22,6 +23,7 @@ import Button from '@/components/shared/button'
 type Option = { id: string; name: string }
 
 export interface ActionOptions {
+  notificationRules?: Array<Option & {version:number}>
   tags: Option[]
   fields: Option[]
   marks: Option[]
@@ -52,16 +54,18 @@ export function useActionOptions(): ActionOptions {
       return () => { cancelled = true }
     }
     void (async () => {
-      const [tags, fields, marks, scenarios, vars] = await Promise.allSettled([
+      const [tags, fields, marks, scenarios, vars, notifications] = await Promise.allSettled([
         // R23横展開: タグ・シナリオの候補は今のアカウントだけ（別アカウント混入防止）。
         api.tags.list({ accountId: selectedAccountId }),
         api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }),
         api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }),
         api.scenarios.list({ accountId: selectedAccountId }),
         api.commonVars.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }),
+        Promise.resolve().then(() => api.notifications.operatorRules.list(selectedAccountId)),
       ])
       if (cancelled) return
       setOptions({
+        notificationRules: notifications.status === 'fulfilled' && notifications.value.success ? notifications.value.data.items.filter(r=>r.isActive&&r.status==='published').map(r=>({id:r.id,name:r.name,version:r.version??1})) : [],
         tags:
           tags.status === 'fulfilled' && tags.value.success
             ? tags.value.data.map((t) => ({ id: t.id, name: t.name }))
@@ -105,11 +109,13 @@ export default function InlineActionList({
   marks,
   scenarios,
   vars,
+  notificationRules = [],
 }: Props) {
   const { selectedAccountId } = useAccount()
+  const theme = useAdminTheme()
   // 任意機能の動作種は、そのaccountで機能がオフなら追加口ごと出さない。
   const actionFeatureVisibility = useFeatureVisibility(selectedAccountId)
-  function add(actionType: ScenarioActionType) {
+  function add(actionType: InlineAction['actionType']) {
     const kind = ACTION_KINDS.find((k) => k.type === actionType)
     // 失敗したときは続けるが既定（いまの動き）。止めたい人だけ変える。
     onChange([...actions, { key: newActionKey(), actionType, config: kind?.make() ?? {}, onFailure: 'continue' as const }])
@@ -155,7 +161,7 @@ export default function InlineActionList({
         <div key={action.key} className="border-hairline rounded-control border p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-ink text-xs font-semibold">
-              {index + 1}. {ACTION_KINDS.find((k) => k.type === action.actionType)?.label ?? action.actionType}
+              {index + 1}. {action.actionType === 'notify_staff' ? '担当者へ通知' : ACTION_KINDS.find((k) => k.type === action.actionType)?.label ?? action.actionType}
             </span>
             <div className="flex items-center gap-2 text-xs">
               <button
@@ -199,7 +205,11 @@ export default function InlineActionList({
                 ]}
               />
             </label>
-            <ActionConfigEditor
+            {action.actionType === 'notify_staff' ? <div className="space-y-2">
+              <label className="block text-xs">通知先<Select aria-label="通知先" value={String((action.config as Record<string,unknown>)?.notificationRuleId??'')} options={[{value:'',label:'選んでください'},...notificationRules.map(r=>({value:r.id,label:r.name}))]} onChange={value=>{const rule=notificationRules.find(r=>r.id===value);update(action.key,{...(action.config as object),notificationRuleId:value,notificationRuleVersion:rule?.version??0})}}/></label>
+              <label className="block text-xs">通知の本文<textarea aria-label="通知の本文" maxLength={2000} className="w-full border border-hairline rounded-control p-2" value={String((action.config as Record<string,unknown>)?.message??'')} onChange={e=>update(action.key,{...(action.config as object),message:e.target.value})}/></label>
+              {notificationRules.length===0&&<p className="text-xs text-ink-faint">公開済みの担当者通知を先に設定してください</p>}
+            </div> : <ActionConfigEditor
               action={{
                 // ActionConfigEditor は中身と種別しか見ない。行として保存しないので、
                 // それ以外は形を合わせるためだけの値。
@@ -220,7 +230,7 @@ export default function InlineActionList({
               scenarios={scenarios}
               vars={vars}
               onChange={(config) => update(action.key, config)}
-            />
+            />}
             {incompleteReason ? (
               <p className="mt-2">
                 <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 font-medium" style={{ fontSize: 10 }}>
@@ -234,6 +244,7 @@ export default function InlineActionList({
       })}
 
       <div className="flex flex-wrap gap-1.5">
+        {theme === 'v8' && <Button variant="secondary" onClick={()=>add('notify_staff')}>＋ 担当者へ通知</Button>}
         {ACTION_KINDS.filter((kind) => !kind.feature || actionFeatureVisibility.enabled(kind.feature)).map((kind) => (
           <Button variant="secondary" className="text-ink-secondary px-2.5 py-1 text-xs h-auto whitespace-normal" key={kind.type} type="button" onClick={() => add(kind.type)}>
             ＋ {kind.label}

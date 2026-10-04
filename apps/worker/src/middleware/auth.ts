@@ -281,6 +281,7 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   // 公開の撤回・掲載先の変更は審査権限ではなく掲載管理の上位権限（#931 N-311）。
   // 一覧の表示（GET publications）は審査と同じ閲覧権限のままにする。
   [/^\/api\/nen-members\/photos\/publications\/[^/]+\/(?:withdraw|placements)(?:\/|$)/, 'photo.publication.manage'],
+  [/^\/api\/nen-members\/photos\/(?:publications\/order|[^/]+\/publish)(?:\/|$)/, 'photo.publication.manage'],
   [/^\/api\/nen-members\/photos(?:\/|$)/, 'photo.submission.view'],
   [/^\/api\/friends\/[^/]+\/messages(?:\/|$)/, '/chats'],
   [/^\/api\/friends\/[^/]+\/fields(?:\/|$)/, '/tags'],

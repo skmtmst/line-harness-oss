@@ -1713,6 +1713,7 @@ export interface Chat {
 // -----------------------------------------------------------------------------
 
 export interface NotificationRule {
+  version?: number;
   id: string;
   name: string;
   eventType: string;
@@ -2657,3 +2658,48 @@ export interface SaveAdEventMappingRequest {
   googleActionId?: string | null;
   expectedVersion: number;
 }
+/** 有効友だちの比較。記録が欠けている場合は推定せずnull。 */
+export interface FriendActiveMonthComparison {
+  activeLastMonth: number | null;
+  activeMonthDelta: number | null;
+  activeComparisonDate: string;
+}
+
+/** 保存前のイベント申込ページ。予約や公開を行わない。 */
+export interface EventApplicationPreview {
+  name: string;
+  description: string | null;
+  venueName: string | null;
+  venueAddress: string | null;
+  venueUrl: string | null;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+  requiresApproval: boolean;
+  questions: Array<{ id: string; label: string; required: boolean; type: string }>;
+  previewOnly: true;
+}
+
+/** サイトごとの同意済み最終受信。まだ受け取っていなければnull。 */
+export interface MeasurementSiteReceipt { lastReceivedAt: string | null }
+
+export interface AdConversionCostSummary {
+  from: string; to: string;
+  confirmedConversionCount: number;
+  costPerConversionMinor: number | null;
+  currency: 'JPY' | null;
+}
+
+export interface LineAccountRegistrationTags { tagIds?: string[] }
+export interface LineAccountRegistrationTag { id: string; name: string; color: string | null }
+
+export interface AdPlatformConnectResult { id: string; connected: true; verifiedAt: string }
+
+export interface AutoReplyOperatorNotificationConfig { notificationRuleId: string; notificationRuleVersion: number; message: string }
+
+/** V8: 全掲載の順序と、読み込んだ時点の版。 */
+export type PhotoPublicationOrderInput = {
+  accountId: string;
+  items: Array<{ id: string; expectedVersion: number }>;
+};
+export type PhotoPublicationPublishResult = { id: string; version: number; status: 'published' };

@@ -1456,7 +1456,7 @@ export type ConversionDefinitionEvent = {
 }
 
 /** #819: 計測サイト。公開ID・許可ドメイン・許可外ドメインの拒否集計。 */
-export type MeasurementSite = {
+export type MeasurementSite = Partial<import('@line-crm/shared').MeasurementSiteReceipt> & {
   id: string
   label: string
   domains: string[]
@@ -4410,6 +4410,9 @@ export type BroadcastListKpis = Pick<
 
 /** 友だち画面の上部に出す数（設計 `V2 2-2 友だち`）。 */
 export type FriendStats = {
+  activeLastMonth?: number | null
+  activeMonthDelta?: number | null
+  activeComparisonDate?: string
   active: number
   total: number
   blockedByThem: number
@@ -5344,6 +5347,7 @@ export type NenPhotoDetail = Record<string, unknown> & {
 
 /** #817: 報酬の決まりの版の1行。 */
 export type PhotoRewardPolicyVersion = {
+  publicationPoints?: number
   versionNumber: number
   policyKey: string
   points: number
@@ -5438,6 +5442,8 @@ export type PhotoBulkReviewResult = {
 }
 
 export type AdPlatform = {
+  secretKeys?: string[]
+  verifiedAt?: string | null
   id: string
   /** meta / x / google / tiktok */
   name: string
@@ -8395,6 +8401,8 @@ export const api = {
       }),
     list: (params?: {
       accountId?: string
+      from?: string
+      to?: string
       limit?: number
       cursor?: string | number
       status?: string
@@ -8408,6 +8416,8 @@ export const api = {
       sort?: 'newest' | 'oldest'
     }) => {
       const query = new URLSearchParams()
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.cursor !== undefined && params.cursor !== '') query.set('cursor', String(params.cursor))
@@ -10240,8 +10250,10 @@ export const api = {
      * **どのルールが、いつ、誰へ、どう返したか。** 設定だけ見ても、
      * 実際に返したのかは分からない。
      */
-    runs: (params?: { ruleId?: string; limit?: number; offset?: number }) => {
+    runs: (params?: { ruleId?: string; limit?: number; offset?: number; from?: string; to?: string }) => {
       const query = new URLSearchParams()
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
       if (params?.ruleId) query.set('rule_id', params.ruleId)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.offset !== undefined) query.set('offset', String(params.offset))
@@ -11471,6 +11483,19 @@ export const api = {
     photoPublications: (accountId: string) => fetchApi<ApiResponse<NenPhotoPublicationList>>(
       `/api/nen-members/photos/publications?accountId=${encodeURIComponent(accountId)}`,
     ),
+    photoPublicationOrder: (accountId: string) =>
+      fetchApi<ApiResponse<{ items: Array<{id: string; version: number; pet_name: string}> }>>(
+        `/api/nen-members/photos/publications/order?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    savePhotoPublicationOrder: (data: import('@line-crm/shared').PhotoPublicationOrderInput) =>
+      fetchApi<ApiResponse<{ items: Array<{id: string; version: number; sortOrder: number}> }>>(
+        '/api/nen-members/photos/publications/order', { method: 'PUT', body: JSON.stringify(data) },
+      ),
+    publishPhoto: (id: string, data: { accountId: string; expectedVersion: number }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<import('@line-crm/shared').PhotoPublicationPublishResult>>(
+        `/api/nen-members/photos/${encodeURIComponent(id)}/publish`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
+      ),
     withdrawPhotoPublication: (id: string, data: { accountId: string; expectedVersion: number }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ status: 'withdrawn'; version: number }>>(
         `/api/nen-members/photos/publications/${encodeURIComponent(id)}/withdraw`,
@@ -11515,6 +11540,7 @@ export const api = {
       '/api/nen-members/photo-reward-policy/versions',
     ),
     createPhotoRewardPolicyVersion: (data: {
+      publicationPoints?: number
       points: number
       summary?: string
       effectiveFrom?: string | null
@@ -13678,6 +13704,9 @@ export const api = {
   adPlatforms: {
     mappings: (accountId: string) => fetchApi<ApiResponse<import('@line-crm/shared').AdEventMapping[]>>(`/api/ad-platforms/mappings?account_id=${encodeURIComponent(accountId)}`),
     saveMapping: (pointId: string, data: import('@line-crm/shared').SaveAdEventMappingRequest) => fetchApi<ApiResponse<import('@line-crm/shared').AdEventMapping>>(`/api/ad-platforms/mappings/${encodeURIComponent(pointId)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    create: (data: {name: string;displayName?: string;lineAccountId: string;config: Record<string,unknown>}) => fetchApi<ApiResponse<AdPlatform>>('/api/ad-platforms',{method:'POST',body:JSON.stringify(data)}),
+    update: (id: string,data: {config?: Record<string,unknown>;displayName?: string;isActive?: boolean}) => fetchApi<ApiResponse<AdPlatform>>(`/api/ad-platforms/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(data)}),
+    connect: (id: string) => fetchApi<ApiResponse<import('@line-crm/shared').AdPlatformConnectResult>>(`/api/ad-platforms/${encodeURIComponent(id)}/connect`,{method:'POST'}),
     list: (lineAccountId?: string | null) =>
       fetchApi<ApiResponse<AdPlatform[]>>(`/api/ad-platforms${lineAccountId ? `?lineAccountId=${encodeURIComponent(lineAccountId)}` : ''}`),
     logsPage: (params?: { page?: number; limit?: number; status?: string; query?: string; lineAccountId?: string | null }) => {
@@ -13721,6 +13750,7 @@ export const api = {
       if (params?.to) query.set('to', params.to)
       const suffix = query.size > 0 ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<{
+        conversionCost?: import('@line-crm/shared').AdConversionCostSummary
         rows: Array<{
           sourceLabel: string
           adPlatformId: string | null
@@ -14956,6 +14986,7 @@ export interface EventQuestion {
 }
 
 export interface EventDetail {
+  venue_address?: string | null;
   id: string;
   name: string;
   venue_name: string | null;
@@ -15276,6 +15307,8 @@ export interface EventLifecycleResult {
 }
 
 export const eventsApi = {
+  applicationPreview: (accountId: string, body: Partial<EventDetail> & { slot: { starts_at: string; ends_at: string; capacity: number } }) =>
+    fetchApi<import('@line-crm/shared').EventApplicationPreview>(withAccount('/api/events/admin/application-preview', accountId), { method: 'POST', body: JSON.stringify(body) }),
   listEvents: (
     accountId: string,
     options: { page?: number; limit?: number; q?: string; filter?: 'all' | 'open' | 'pending' | 'full'; sort?: 'soon' | 'name' } = {},

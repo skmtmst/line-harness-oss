@@ -147,6 +147,7 @@ export interface EventDetail {
   id: string;
   name: string;
   venue_name: string | null;
+  venue_address?: string | null;
   venue_url: string | null;
   image_url: string | null;
   description: string | null;
@@ -189,6 +190,7 @@ export interface EventBookingMine {
   event_name: string;
   event_image_url: string | null;
   venue_name: string | null;
+  venue_address?: string | null;
   venue_url: string | null;
   cancel_deadline_hours_before: number | null;
   slot_starts_at: string;
