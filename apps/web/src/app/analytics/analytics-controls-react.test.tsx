@@ -262,7 +262,7 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     await act(async () => { firstStage?.click(); await Promise.resolve() })
 
     for (const selection of ['reached', 'stopped', 'in_progress'] as const) {
-      await select('funnel-audience-selection', selection)
+      await click({ reached: '到達した人', stopped: '止まった人', in_progress: '進行中の人' }[selection])
       await click('友だち一覧で見る')
       const request = net.calls.filter((call) => call.path.startsWith('/api/analytics/results/run-1/audiences?')).at(-1)
       expect(request, JSON.stringify(net.calls)).toBeDefined()
@@ -274,7 +274,7 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     const secondStage = host.querySelector('button[aria-label="申込の段"]') as HTMLButtonElement | null
     expect(secondStage).not.toBeNull()
     await act(async () => { secondStage?.click(); await Promise.resolve() })
-    await select('funnel-audience-selection', 'stopped')
+    await click('止まった人')
     await click('友だち一覧で見る')
     const secondRequest = net.calls.filter((call) => call.path.startsWith('/api/analytics/results/run-1/audiences?')).at(-1)
     expect(JSON.parse(String(secondRequest?.init?.body))).toMatchObject({ stepOrder: 2, selection: 'stopped' })

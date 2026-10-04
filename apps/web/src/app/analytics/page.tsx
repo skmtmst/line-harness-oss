@@ -1413,11 +1413,42 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
   }
 
   return (
-    <div data-design-node="C2I7ry" className="flex flex-col gap-4">
-      <div className="flex justify-end"><AnalyticsExportButton onClick={exportFunnel} disabled={!result} /></div>
-      <AnalyticsNotice>段は上から順に見ます。同じ人が同じ段を2回通っても1回として数えます。判定できる期間は、最初の段から設定した日数です。まだ途中の人は完了した人に含めません。</AnalyticsNotice>
-      <p className="text-sm text-ink-secondary">友だちがどこまで進んで、どこで離れたかを段階ごとに見ます。段を自由に組み替えられるので、配信の流れでも購入の流れでも作れます。</p>
+    <div data-design-node="DkRDE" className="flex flex-col gap-4 v8-ro-analytics-funnel">
+      <AnalyticsExportButton headerOnly onClick={exportFunnel} disabled={!result} />
 
+
+      {!creating && !editTarget && funnels.length > 0 && (
+          <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              title="入口"
+              value={overall?.entry ?? null}
+              unit="人"
+              detail={measurable ? (overall?.entryLabel ?? '—') : run ? '判定不能' : '—'}
+            />
+            <KpiCard
+              title="最後まで"
+              value={overall?.last ?? null}
+              unit="人"
+              detail={measurable
+                ? (overall?.rate != null ? `通過率 ${overall.rate}%` : '—')
+                : run ? '判定不能' : '—'}
+            />
+            <KpiCard
+              title="いちばん落ちる段"
+              value={worst ? -Math.round(worst.rate * 100) : null}
+              unit="%"
+              detail={
+                worst && result
+                  ? `${result[worst.index - 1].label} → ${result[worst.index].label}`
+                  : run && !measurable ? '判定不能' : '—'
+              }
+            />
+            {/* 段ごとの到達日時を持っていない。ファネルの集計は「通ったか」
+                だけを見ていて、いつ通ったかを残していない。 */}
+            <KpiCard title="平均の到達日数" value={null} unit="日" detail="未取得" description="段に到達した日時が集計結果にないため、平均の日数を取得できません" />
+
+          </div>
+      )}
       {creating || editTarget ? (
         <FunnelForm
           accountId={accountId}
@@ -1460,39 +1491,19 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
         </p>
       ) : (
         <>
-          <section className="bg-canvas rounded-card border-hairline border p-4">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="text-ink text-sm font-semibold">段の並び</h3>
-                <p className="text-ink-faint mt-0.5 text-xs">
-                  上から順に通った人だけを数えます。
-                </p>
-              </div>
+          <section className="v8-ro-analytics-funnelControls">
+            <div className="v8-ro-analytics-funnelControlActions">
               <div className="flex flex-wrap gap-2">
-                <RangePicker
-                  days={funnelDays}
-                  onChange={(days) => {
-                    setFunnelDays(days)
-                    setPicked(null)
-                    setFunnelAudience(null)
-                    setRunning(false)
-                  }}
-                />
-                <Button
-                  onClick={() => void runNow()}
-                  disabled={running || selectedFunnel?.status !== 'active'}
-                  variant="secondary" busy={running} busyLabel="再集計中">
-                  {`この${funnelDays}日を再集計`}
-                </Button>
                 {canManage && (
                   <Button variant="secondary" className="text-ink-secondary text-label px-3 py-1.5 font-semibold h-auto whitespace-normal" onClick={() => setCreating(true)}>
-                    ＋ 段を足す
+                    ファネルを作る
                   </Button>
                 )}
+                <Button variant="secondary" disabled={running} onClick={() => setRunReload((n) => n + 1)}>最新の結果をもう一度読む</Button>
               </div>
             </div>
 
-            <div className="mt-3">
+            <div className="v8-ro-analytics-funnelSelectRow"><div>
               <label htmlFor="funnel-select" className="text-ink-secondary mb-1 block text-xs font-medium">
                 ファネル
               </label>
@@ -1516,6 +1527,42 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                     : [{ value: '', label: '使えるファネルがありません' }]
                 }
               />
+</div><div><label className="mb-1 block text-xs font-medium">何日以内の通過で数えるか</label><Select aria-label="何日以内の通過で数えるか" disabled onChange={() => {}} value={String(selectedFunnel?.windowDays ?? '')} options={[{ value: String(selectedFunnel?.windowDays ?? ''), label: selectedFunnel ? `${selectedFunnel.windowDays}日以内` : '未取得' }]} /></div>            {run && (
+              <div className="min-w-0">
+                <label htmlFor="funnel-group" className="text-ink-secondary mb-1 block text-xs font-medium">比較する条件</label>
+                <Select
+                  id="funnel-group"
+                  value={groupKey}
+                  onChange={(value) => { setGroupKey(value); setPicked(null); setFunnelAudience(null) }}
+                  aria-label="比較する条件"
+                  className="v6-select w-full"
+                  size="full"
+                  options={run.groups.map((group) => ({
+                    value: group.key,
+                    label: `${group.label}（入口 ${group.entrants}人）`,
+                  }))}
+                />
+              </div>
+            )}
+</div>
+            <Disclosure title="定義の操作と集計の詳細" size="compact">
+              <p className="mb-2 text-xs">集計対象の期間</p><div className="flex flex-wrap gap-2">                <RangePicker
+                  days={funnelDays}
+                  onChange={(days) => {
+                    setFunnelDays(days)
+                    setPicked(null)
+                    setFunnelAudience(null)
+                    setRunning(false)
+                  }}
+                />
+                <Button
+                  onClick={() => void runNow()}
+                  disabled={running || selectedFunnel?.status !== 'active'}
+                  variant="secondary" busy={running} busyLabel="再集計中">
+                  {`この${funnelDays}日を再集計`}
+                </Button>
+</div>
+
               {selectedFunnel && (
                 <p className="text-ink-faint mt-1 text-xs">
                   {selectedFunnel.windowDays}日以内に通った人を数えます。
@@ -1567,20 +1614,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   )}
                 </div>
               )}
-            </div>
-
-            {result && result.length > 0 && (
-              <ol className="mt-3 flex flex-wrap gap-1.5">
-                {result.map((step) => (
-                  <li
-                    key={step.stepOrder}
-                    className="border-hairline text-ink-secondary rounded-pill border px-3 py-1 text-xs"
-                  >
-                    {step.label}
-                  </li>
-                ))}
-              </ol>
-            )}
+            </Disclosure>
 
             {/* 条件ごとに通過率を並べる仕組みが無い。ファネルの定義が1本の
                 段の列だけで、条件で分ける口を持っていない。 */}
@@ -1602,9 +1636,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <p className="text-danger text-xs">{runError}</p>
                 {/* 最新結果の読み取りに失敗しただけなら、再集計せず読み直せる */}
-                {!run && !noRun && !running && (
-                  <Button variant="secondary" onClick={() => setRunReload((n) => n + 1)}>最新の結果をもう一度読む</Button>
-                )}
+
               </div>
             )}
             {noRun && !run && <p className="text-ink-faint mt-2 text-xs">まだ集計がありません。「この{funnelDays}日を再集計」を押してください</p>}
@@ -1622,148 +1654,36 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                 {run.stateReason ?? '一部の期間・種類のデータが無いため、実際より少なく数えている可能性があります。'}
               </p>
             )}
-            {run && run.groups.length > 1 && (
-              <div className="mt-3 max-w-xs">
-                <label htmlFor="funnel-group" className="text-ink-secondary mb-1 block text-xs font-medium">比較する条件</label>
-                <Select
-                  id="funnel-group"
-                  value={groupKey}
-                  onChange={(value) => setGroupKey(value)}
-                  aria-label="比較する条件"
-                  className="v6-select w-full"
-                  size="full"
-                  options={run.groups.map((group) => ({
-                    value: group.key,
-                    label: `${group.label}（入口 ${group.entrants}人）`,
-                  }))}
-                />
-              </div>
-            )}
+
           </section>
 
-          <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <KpiCard
-              title="入口"
-              value={overall?.entry ?? null}
-              unit="人"
-              detail={measurable ? (overall?.entryLabel ?? '—') : run ? '判定不能' : '—'}
-            />
-            <KpiCard
-              title="最後まで"
-              value={overall?.last ?? null}
-              unit="人"
-              detail={measurable
-                ? (overall?.rate != null ? `通過率 ${overall.rate}%` : '—')
-                : run ? '判定不能' : '—'}
-            />
-            <KpiCard
-              title="いちばん落ちる段"
-              value={worst ? Math.round(worst.rate * 100) : null}
-              unit="%"
-              detail={
-                worst && result
-                  ? `${result[worst.index - 1].label} → ${result[worst.index].label}`
-                  : run && !measurable ? '判定不能' : '—'
-              }
-            />
-            {/* 段ごとの到達日時を持っていない。ファネルの集計は「通ったか」
-                だけを見ていて、いつ通ったかを残していない。 */}
-            <KpiCard title="平均の到達日数" value={null} unit="日" detail="" help="入口から最後までの日数です" />
-            <KpiCard
-              title="比較で差が大きい段"
-              value={comparisonGap}
-              unit="pt"
-              detail={run && run.groups.length > 1 ? `${run.groups.length}条件を比較` : '比較条件なし'}
-            />
-          </div>
+
 
           {result && (
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <div className="v8-ro-analytics-funnelBody"><section className="v8-ro-analytics-funnelFlow">
               <h3 className="text-ink text-sm font-semibold">全体の流れ</h3>
               <p className="text-ink-faint mt-0.5 mb-3 text-xs">
-                かっこ内はひとつ前の段からの通過率
+                順番どおりに通った人だけを数えます。飛ばした人は含みません。
               </p>
-              <div className="space-y-3">
-                {result.map((step, i) => {
-                  // 「まだ途中の人」を止まった人に混ぜない（ANALYTICS-04）。
-                  // 止まった人数は口が数えた droppedAfter をそのまま使う。
-                  const prev = i > 0 ? result[i - 1] : null
-                  const lost = prev?.droppedAfter ?? 0
-                  const inProgress = prev?.inProgressAfter ?? 0
-                  const prevReached = prev?.reached ?? 0
-                  const isWorst = worst?.index === i
-                  return (
-                    <div key={step.stepOrder}>
-                      <div className="mb-1 flex items-baseline justify-between gap-2">
-                        <p className="text-ink text-caption font-medium">
-                          {i + 1}. {step.label}
-                        </p>
-                        <p className="text-ink-secondary text-caption tabular-nums" id={`funnel-step-${step.stepOrder}-value`}>
-                          {measurable ? `${formatNumber(step.reached)} 人` : '—'}
-                          {measurable && i > 0 && (
-                            <span className="text-ink-faint ml-2 text-xs">
-                              （{step.conversionFromPrevious == null ? '—' : `${Math.round(step.conversionFromPrevious * 1000) / 10}%`}）
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                      {/* 棒は押すとその段を選ぶ。段名だけでは人数が読めないので、
-                          上の数値行をaria-describedbyで紐づける。判定不能の
-                          結果では対象者を作れないので、選べない形にする。 */}
-                      <button
-                        onClick={() => {
-                          if (!measurable) return
-                          setFunnelAudience(null)
-                          setPicked(i)
-                        }}
-                        className="bg-canvas-sunken block h-6 w-full overflow-hidden rounded-mini text-left"
-                        aria-label={`${step.label}の段`}
-                        aria-describedby={`funnel-step-${step.stepOrder}-value`}
-                      >
-                        <span
-                          className={`block h-full ${isWorst ? 'bg-warning' : 'bg-accent'}`}
-                          style={{ width: top > 0 ? `${(step.reached / top) * 100}%` : '0%' }}
-                        />
-                      </button>
-                      {/* 落ちた人数と割合は数えられる。「案内が届いていない
-                          可能性があります」のような原因は、運用を知らないと
-                          書けないので出さない。 */}
-                      {measurable && prev != null && lost > 0 && (
-                        <p className={`mt-1 text-xs ${isWorst ? 'text-warning' : 'text-ink-faint'}`}>
-                          {formatNumber(lost)}人（
-                          {Math.round((lost / prevReached) * 1000) / 10}%）がここで止まっています。
-                          {inProgress > 0 ? ` ほかに${formatNumber(inProgress)}人はまだ途中です。` : ''}
-                          {isWorst && ' この分析でいちばん落ちる段です。'}
-                        </p>
-                      )}
-                      {measurable && prev != null && lost === 0 && inProgress > 0 && (
-                        <p className="text-ink-faint mt-1 text-xs">
-                          {formatNumber(inProgress)}人はまだ途中です。期限までに次の段へ進むと数が変わります。
-                        </p>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+              <div className="v8-ro-analytics-funnelSteps">{result.map((step, i) => {
+                const previous = i > 0 ? result[i - 1] : null
+                const dropRate = previous && previous.reached > 0 ? previous.droppedAfter / previous.reached * 100 : null
+                return <div key={step.stepOrder} className="v8-ro-analytics-funnelStep" data-selected={picked === i || undefined}>
+                  <span className="v8-ro-analytics-funnelNumber">{i + 1}</span><p className="text-ink text-caption font-medium" title={step.label}>{step.label}</p>
+                  <button onClick={() => { if (!measurable) return; setFunnelAudience(null); setPicked(i) }} className="v8-ro-analytics-funnelBar" aria-label={`${step.label}の段`} aria-describedby={`funnel-step-${step.stepOrder}-value`} disabled={!measurable}><span style={{ width: top > 0 && measurable ? `${step.reached / top * 100}%` : '0%' }} /></button>
+                  <p className="text-ink-secondary text-caption tabular-nums" id={`funnel-step-${step.stepOrder}-value`}>{measurable ? `${formatNumber(step.reached)} 人` : '—'}</p><span className="text-xs text-ink-faint" title={previous ? `止まった ${previous.droppedAfter}人・進行中 ${previous.inProgressAfter}人` : undefined}>{measurable && dropRate !== null ? `−${dropRate.toFixed(0)}%` : '—'}</span>
+                </div>
+              })}</div>
+            </section><aside className="v8-ro-analytics-funnelSelected"><h3 className="text-sm font-semibold">{picked != null && result[picked] ? `${picked + 1} ${result[picked].label}（選んだ段）` : '段を選んで対象者を確認'}</h3>
+              <div className="mt-3">
 
-              <div className="border-hairline mt-4 border-t pt-3">
                 {picked != null && result[picked] && measurable ? (
                   selectedFunnel?.status === 'active' ? (
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="space-y-2">
-                        <Select
-                          id="funnel-audience-selection"
-                          value={audienceSelection}
-                          onChange={(value) => setAudienceSelection(value as 'reached' | 'stopped' | 'in_progress')}
-                          aria-label="対象者の種類"
-                          className="v6-select w-full sm:w-64"
-                          size="full"
-                          options={[
-                            { value: 'reached', label: 'この段まで到達した人' },
-                            { value: 'stopped', label: 'この段で止まった人' },
-                            { value: 'in_progress', label: 'この段で進行中の人' },
-                          ]}
-                        />
+                        <SegmentedControl aria-label="対象者の種類" value={audienceSelection} onChange={(value) => { setAudienceSelection(value); setFunnelAudience(null) }} options={[{ value: 'reached', label: '到達した人' }, { value: 'stopped', label: '止まった人' }, { value: 'in_progress', label: '進行中の人' }]} />
+
+                        <p className="text-sm font-semibold">{audienceSelection === 'stopped' ? 'この段で止まった人' : audienceSelection === 'reached' ? '到達した人' : '進行中の人'} {formatNumber(audienceSelection === 'stopped' ? result[picked].droppedAfter : audienceSelection === 'reached' ? result[picked].reached : result[picked].inProgressAfter)}人</p>
                         <p className="text-ink text-sm">
                           {audienceSelection === 'stopped'
                             ? `「${result[picked].label}で止まった人」を選択中`
@@ -1795,29 +1715,29 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   </Notice>
                 )}
               </div>
-            </section>
+              {run && run.groups.length > 1 && <section className="mt-4"><h3 className="text-sm font-semibold">比較</h3><ul className="mt-2 space-y-2 text-xs">{run.groups.map((group) => <li key={group.key} className="flex justify-between gap-2"><span>{group.label}</span><span>通過率 {measurable && group.entrants > 0 ? `${(group.completed / group.entrants * 100).toFixed(1)}%` : '—'}</span></li>)}</ul><p className="mt-2 text-xs text-ink-faint">比較で差が大きい段 {comparisonGap === null ? '—' : `${comparisonGap}pt`}</p></section>}
+            </aside></div>
           )}
 
           {run?.runId && canManage && (
-            <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
+            <Disclosure title="この結果を保存する" size="compact">
               <SaveAnalysisAction
                 accountId={accountId}
                 sourceKind="funnel"
                 sourceResultId={run.runId}
                 defaultName={selectedFunnel?.name ?? 'ファネル分析'}
               />
-            </section>
+            </Disclosure>
           )}
 
-          <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
-            <h3 className="text-ink text-sm font-semibold">段の作り方</h3>
+          <Disclosure title="段の作り方" size="compact">
             <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
               <li>・段には {FUNNEL_STEP_KIND_OPTIONS.map((item) => item.label).join('・')} を置けます</li>
               <li>・順番どおりに通った人だけを数えます。飛ばした人は含みません</li>
               <li>・比較条件を定義版に含めると、最大3群の通過率を同じ結果で比べられます</li>
               <li>・再集計すると新しい結果を作り、前の結果は書き換えません</li>
             </ul>
-          </section>
+          </Disclosure>
         </>
       )}
 
@@ -1867,6 +1787,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
           </ul>
         </section>
       )}
+      <AnalyticsNotice>段は上から順に見ます。同じ人が同じ段を2回通っても1回として数えます。判定できる期間は、最初の段から設定した日数です。まだ途中の人は完了した人に含めません。</AnalyticsNotice>
       <ConfirmDialog
         open={statusTarget !== null}
         title={
