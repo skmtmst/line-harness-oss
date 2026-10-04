@@ -400,7 +400,7 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), '秋の紹介キャンペーン')
     await type(byId<HTMLInputElement>('of-amount'), '1.5')
-    await click(buttonByText('公開する'))
+    await click(buttonByText('保存して公開'))
 
     expect(hasText('報酬額は小数ではなく、1円単位の整数で入力してください')).toBe(true)
     expect(offersCreate).not.toHaveBeenCalled()
@@ -415,8 +415,7 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), '秋の紹介キャンペーン')
     await type(byId<HTMLInputElement>('of-amount'), '100')
-    await click(container.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!)
-    await click(buttonByText('下書きを保存する'))
+    await click(buttonByText('保存して続けて作る'))
 
     /*
      * 「公開で作ってから止める」2段階は途中失敗で公開中の案件が残る。
@@ -429,7 +428,7 @@ describe('案件登録の実操作（#686）', () => {
     })
     expect(typeof offersCreate.mock.calls[0][0].operationId).toBe('string')
     expect(offersUpdate).not.toHaveBeenCalled()
-    expect(pushed[0]).toContain('highlight=offer-1')
+    expect(hasText('下書きに保存しました。続けて作れます。')).toBe(true)
   })
 
   it('作成応答が読めなくても、押し直しは同じ操作UUIDで案件を増やさない', async () => {
@@ -440,20 +439,19 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), '最初の案件名')
     await type(byId<HTMLInputElement>('of-amount'), '100')
-    await click(container.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!)
-    await click(buttonByText('下書きを保存する'))
+    await click(buttonByText('保存して続けて作る'))
 
     expect(offersCreate).toHaveBeenCalledTimes(1)
     expect(hasText('一時的に応答を読めません')).toBe(true)
     expect(pushed).toHaveLength(0)
 
-    await click(buttonByText('下書きを保存する'))
+    await click(buttonByText('保存して続けて作る'))
     expect(offersCreate).toHaveBeenCalledTimes(2)
     // 同じ操作UUIDで再送するので、サーバ側は先に作った行を回収できる。
     expect(offersCreate.mock.calls[1][0].operationId)
       .toBe(offersCreate.mock.calls[0][0].operationId)
     expect(offersCreate.mock.calls[1][0]).toMatchObject({ isActive: false })
-    expect(pushed[0]).toContain('highlight=offer-1')
+    expect(hasText('下書きに保存しました。続けて作れます。')).toBe(true)
   })
 
   it('再送で回収した行の公開状態が画面と違うときは、明示した状態へ1回だけ直す', async () => {
@@ -463,15 +461,14 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), '秋の紹介キャンペーン')
     await type(byId<HTMLInputElement>('of-amount'), '100')
-    await click(container.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!)
-    await click(buttonByText('下書きを保存する'))
+    await click(buttonByText('保存して続けて作る'))
 
     expect(offersCreate).toHaveBeenCalledTimes(1)
     // 回収した行は公開中のまま返るため、画面の「下書きに保存」へ合わせる。
     expect(offersUpdate).toHaveBeenCalledTimes(1)
     expect(offersUpdate.mock.calls[0][0]).toBe('offer-1')
     expect(offersUpdate.mock.calls[0][1]).toEqual({ isActive: false })
-    expect(pushed[0]).toContain('highlight=offer-1')
+    expect(hasText('下書きに保存しました。続けて作れます。')).toBe(true)
   })
 
   it('作成だけ済んだ状態でLINEアカウントを切り替えたら、前の店の案件を更新しない', async () => {
@@ -487,8 +484,7 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), 'A店の案件')
     await type(byId<HTMLInputElement>('of-amount'), '100')
-    await click(container.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!)
-    await click(buttonByText('下書きを保存する'))
+    await click(buttonByText('保存して続けて作る'))
     // 状態を直すPUTが落ちたエラーが出て、作成済みの身元(createdId)は残る。
     expect(hasText('一時的に保存できません')).toBe(true)
     const operationA = offersCreate.mock.calls[0][0].operationId
@@ -503,7 +499,7 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), 'B店の案件')
     await type(byId<HTMLInputElement>('of-amount'), '200')
-    await click(buttonByText('下書きを保存する'))
+    await click(buttonByText('保存して続けて作る'))
 
     // 切替のあと、A店の案件(offer-1)へ PUT していない。
     expect(offersUpdate.mock.calls.slice(offerUpdatesBeforeSwitch).map((call) => call[0]))

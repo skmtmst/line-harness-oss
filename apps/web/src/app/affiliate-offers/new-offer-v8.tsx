@@ -1,15 +1,6 @@
 'use client'
 
-/*
- * ★V8-B 案件を作る（板 `Td4TN`）。
- *
- * v7（affiliate-offers/new/page.tsx の器）とは別の器。データの口・動きは
- * v7 と同じ（作成・途中保存の更新・候補の取り直し・離脱の番兵）。
- * 何を成果として数えるか（成果地点）は口が無いので見た目だけ持つ
- * （選んだ値は送らない。API待ち）。
- * 変える操作は器の外（共通の部品・API）へ触らない。
- * v7 を直す必要が出たら new/page.tsx 側も同じ判断を入れる。
- */
+/** ★V8-B 案件を作る（Td4TN）。成果地点の紐付けはAPI未対応。 */
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -53,6 +44,8 @@ export function NewOfferV8() {
   const [rewardMiles, setRewardMiles] = useState('')
   const [tagId, setTagId] = useState('')
   const [scenarioId, setScenarioId] = useState('')
+  const [tagEnabled, setTagEnabled] = useState(false)
+  const [scenarioEnabled, setScenarioEnabled] = useState(false)
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
@@ -72,6 +65,8 @@ export function NewOfferV8() {
     setOperationId(crypto.randomUUID())
     setTagId('')
     setScenarioId('')
+    setTagEnabled(false)
+    setScenarioEnabled(false)
   }, [selectedAccountId])
 
   useEffect(() => {
@@ -121,6 +116,8 @@ export function NewOfferV8() {
     if (tagsFetch === 'failed' || scenariosFetch === 'failed') {
       return 'タグまたはシナリオの候補を読み込めませんでした。「もう一度読み込む」で取り直してから保存してください'
     }
+    if (tagEnabled && !tagId) return '付けるタグを選んでください'
+    if (scenarioEnabled && !scenarioId) return '開始するシナリオを選んでください'
     if (!rewardAmount && !rewardMiles) return '報酬（円かマイル）のどちらかを入れてください'
     const amountError = rewardIntegerError(rewardAmount, 'amount')
     if (amountError) return amountError
@@ -136,6 +133,8 @@ export function NewOfferV8() {
     setRewardMiles('')
     setTagId('')
     setScenarioId('')
+    setTagEnabled(false)
+    setScenarioEnabled(false)
     setCreatedId(null)
     setOperationId(crypto.randomUUID())
   }
@@ -204,7 +203,7 @@ export function NewOfferV8() {
     }
   }
 
-  const dirty = Boolean(name || description || rewardAmount || rewardMiles || tagId || scenarioId)
+  const dirty = Boolean(name || description || rewardAmount || rewardMiles || tagId || scenarioId || tagEnabled || scenarioEnabled)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const tagName = tags.find((tag) => tag.id === tagId)?.name ?? null
@@ -223,20 +222,20 @@ export function NewOfferV8() {
           <section className={styles.card} aria-label="どんな案件か">
             <h2 className={styles.cardTitle}>どんな案件か</h2>
             <p className={styles.cardNote}>アフィリエイターの画面に出ます</p>
-            <label className={styles.fieldLabel} htmlFor="v8-offer-name">
+            <label className={styles.fieldLabel} htmlFor="of-name">
               案件名
               <TextField
-                id="v8-offer-name"
+                id="of-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：定期便の初回"
                 maxLength={120}
               />
             </label>
-            <label className={styles.fieldLabel} htmlFor="v8-offer-description">
+            <label className={styles.fieldLabel} htmlFor="of-description">
               説明 任意
               <TextArea
-                id="v8-offer-description"
+                id="of-description"
                 rows={3}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
@@ -272,10 +271,10 @@ export function NewOfferV8() {
             <h2 className={styles.cardTitle}>いくら払うか</h2>
             <p className={styles.cardNote}>アフィリエイター側の決まりが「定額」のときにこの額を使います</p>
             <div className={styles.grid2}>
-              <label className={styles.fieldLabel} htmlFor="v8-offer-amount">
+              <label className={styles.fieldLabel} htmlFor="of-amount">
                 報酬額（円）
                 <TextField
-                  id="v8-offer-amount"
+                  id="of-amount"
                   type="number"
                   min={0}
                   step={1}
@@ -284,10 +283,10 @@ export function NewOfferV8() {
                   placeholder="2000"
                 />
               </label>
-              <label className={styles.fieldLabel} htmlFor="v8-offer-miles">
+              <label className={styles.fieldLabel} htmlFor="of-miles">
                 マイル（任意） 任意
                 <TextField
-                  id="v8-offer-miles"
+                  id="of-miles"
                   type="number"
                   min={0}
                   step={1}
@@ -309,12 +308,13 @@ export function NewOfferV8() {
             <h2 className={styles.cardTitle}>成果を認めたときにすること</h2>
             <p className={styles.cardNote}>任意</p>
             <div className={styles.switchRow}>
-              <Toggle checked={tagId !== ''} label="タグを付ける" onChange={(next) => { if (!next) setTagId('') }} />
+              <Toggle checked={tagEnabled} label="タグを付ける" onChange={(next) => { setTagEnabled(next); if (!next) setTagId('') }} />
               <div className={styles.switchBody}>
                 <p className={styles.switchName}>タグを付ける</p>
                 <p className={styles.switchNote}>{tagName ?? 'まだ決めていません'}</p>
-                {tagId !== '' || tags.length > 0 ? (
+                {tagEnabled ? (
                   <Select
+                    id="of-tag"
                     aria-label="付けるタグ"
                     value={tagId}
                     onChange={(value) => setTagId(value)}
@@ -337,12 +337,13 @@ export function NewOfferV8() {
               </div>
             </div>
             <div className={styles.switchRow}>
-              <Toggle checked={scenarioId !== ''} label="シナリオ配信を始める" onChange={(next) => { if (!next) setScenarioId('') }} />
+              <Toggle checked={scenarioEnabled} label="シナリオ配信を始める" onChange={(next) => { setScenarioEnabled(next); if (!next) setScenarioId('') }} />
               <div className={styles.switchBody}>
                 <p className={styles.switchName}>シナリオ配信を始める</p>
                 <p className={styles.switchNote}>{scenarioName ?? 'まだ決めていません'}</p>
-                {scenarioId !== '' || scenarios.length > 0 ? (
+                {scenarioEnabled ? (
                   <Select
+                    id="of-scenario"
                     aria-label="開始するシナリオ"
                     value={scenarioId}
                     onChange={(value) => setScenarioId(value)}

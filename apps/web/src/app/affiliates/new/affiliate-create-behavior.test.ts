@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const AFFILIATE = readFileSync(new URL('../new-affiliate-v8.tsx', import.meta.url), 'utf8')
-const OFFER = readFileSync(new URL('../../affiliate-offers/new/page.tsx', import.meta.url), 'utf8')
+const OFFER = readFileSync(new URL('../../affiliate-offers/new-offer-v8.tsx', import.meta.url), 'utf8')
 
 describe('アフィリエイト登録の入力と検索', () => {
   it('友だちを20件ずつ検索し、2ページ目は21件目から取得する', () => {

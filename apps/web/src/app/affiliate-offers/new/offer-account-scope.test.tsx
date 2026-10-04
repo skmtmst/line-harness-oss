@@ -102,7 +102,10 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
     await settle(100)
 
     const optionLabels = async (buttonId: string) => {
-      const button = host.querySelector<HTMLButtonElement>(`#${buttonId}`)
+      const switchName = buttonId === 'of-tag' ? 'タグを付ける' : 'シナリオ配信を始める'
+  const toggle = host.querySelector<HTMLButtonElement>(`[role=switch][aria-label="${switchName}"]`)
+  if (toggle?.getAttribute('aria-checked') === 'false') await act(async () => { toggle.click() })
+  const button = host.querySelector<HTMLButtonElement>(`#${buttonId}`)
       expect(button).toBeTruthy()
       await act(async () => { button!.click() })
       // 選択肢は最上層（portal）に出るので document 側を見る。
