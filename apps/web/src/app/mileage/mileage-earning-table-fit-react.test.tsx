@@ -76,9 +76,19 @@ function rewardFixture(id: string) {
   }
 }
 
+const createdRulePayloads: Array<unknown> = []
+
 function stubFetch() {
-  globalThis.fetch = (async (input: unknown) => {
+  globalThis.fetch = (async (input: unknown, init?: { method?: string; body?: string }) => {
     const url = String(input)
+    const method = init?.method ?? 'GET'
+    if (url.endsWith('/api/mileage/rules') && method === 'POST') {
+      createdRulePayloads.push(JSON.parse(String(init?.body ?? '{}')))
+      return new Response(JSON.stringify({ success: true, data: { id: 'rule-new' } }), { status: 200 })
+    }
+    if (url.includes('/api/mileage/earning-rules/') && url.includes('/draft') && method !== 'GET') {
+      return new Response(JSON.stringify({ success: true, data: { ruleId: 'rule-new' } }), { status: 200 })
+    }
     if (url.includes('/api/mileage/earning-rules')) {
       return new Response(JSON.stringify({
         success: true,
@@ -170,6 +180,7 @@ beforeEach(() => {
   globalThis.localStorage.setItem('lh_selected_account', 'account-1')
   /* V8 の器で描く（`useAdminTheme` は `<html data-theme>` を読む）。 */
   document.documentElement.dataset.theme = 'v8'
+  createdRulePayloads.length = 0
   stubFetch()
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -224,6 +235,43 @@ async function waitForTabCount(calls: Array<{ key: string; text: string | null }
   }
   throw new Error(`タブの件数が出ませんでした: ${key} ${text}`)
 }
+
+describe('行の「…」（板 `OC0gy`）', () => {
+  it('編集・止める・複製が並び、複製は止めた状態で写しを作る', async () => {
+    await act(async () => {
+      root.render(<AccountProvider><MileagePage /></AccountProvider>)
+    })
+    await waitForTable()
+    const menuButton = [...container.querySelectorAll('button')].find(
+      (element) => element.getAttribute('aria-label') === 'あいさつでたまるのその他操作',
+    )
+    if (!(menuButton instanceof HTMLButtonElement)) throw new Error('その他操作のボタンがありません')
+    await act(async () => { menuButton.click() })
+    const menu = document.body.textContent ?? ''
+    expect(menu).toContain('編集')
+    /* 動いている見本なので止める側が出る。 */
+    expect(menu).toContain('止める')
+    expect(menu).toContain('複製')
+    const duplicate = [...document.body.querySelectorAll('button')].find(
+      (element) => element.textContent === '複製',
+    )
+    if (!(duplicate instanceof HTMLButtonElement)) throw new Error('複製の項目がありません')
+    await act(async () => { duplicate.click() })
+    for (let i = 0; i < 60; i += 1) {
+      await act(async () => { await Promise.resolve() })
+      if (createdRulePayloads.length > 0) break
+    }
+    expect(createdRulePayloads).toHaveLength(1)
+    const payload = createdRulePayloads[0] as { name: string; isActive: boolean }
+    expect(payload.name).toContain('のコピー')
+    expect(payload.isActive).toBe(false)
+    for (let i = 0; i < 60; i += 1) {
+      await act(async () => { await Promise.resolve() })
+      if ((container.textContent ?? '').includes('止めた状態で作りました')) break
+    }
+    expect(container.textContent ?? '').toContain('止めた状態で作りました')
+  })
+})
 
 describe('タブの名の横の件数', () => {
   it('たまる決めごとは読み物の件数が殻のタブに出る', async () => {

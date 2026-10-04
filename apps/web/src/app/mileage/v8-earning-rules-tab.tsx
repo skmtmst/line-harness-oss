@@ -194,6 +194,7 @@ export default function V8EarningRulesTab({
   const [menuId, setMenuId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
+  const [menuNotice, setMenuNotice] = useState('')
   const [publishTarget, setPublishTarget] = useState<MileageEarningRuleV6 | null>(null)
   const [publishError, setPublishError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<MileageEarningRuleV6 | null>(null)
@@ -449,6 +450,45 @@ export default function V8EarningRulesTab({
     }
   }
 
+  /*
+   * 行の「…」の「複製」。今の決めごとの写しを止めた状態で1つ作る
+   * （作りかけの口と写しの口を続けて叩く。公開はしない）。
+   */
+  const duplicateRule = async (rule: MileageEarningRuleV6) => {
+    if (readonly || !selectedAccountId || savingId !== null) return
+    setSavingId(rule.id)
+    setActionError('')
+    setMenuNotice('')
+    try {
+      const name = `${rule.draft.name} のコピー`
+      const created = await api.mileage.createRule({
+        name,
+        eventType: rule.draft.eventType,
+        source: rule.draft.source,
+        amount: rule.draft.amount,
+        initialStatus: rule.draft.initialStatus,
+        lineAccountId: selectedAccountId,
+        conditions: {},
+        validFrom: rule.draft.validFrom,
+        validUntil: rule.draft.validUntil,
+        isActive: false,
+      })
+      if (!created.success) throw new Error(created.error)
+      const drafted = await api.mileage.saveEarningRuleDraft(created.data.id, {
+        accountId: selectedAccountId,
+        expectedVersion: 0,
+        draft: { ...rule.draft, name },
+      })
+      if (!drafted.success) throw new Error(drafted.error)
+      setMenuNotice(`「${name}」を止めた状態で作りました。`)
+      await load()
+    } catch {
+      setActionError('複製できませんでした。もう一度お試しください。')
+    } finally {
+      setSavingId(null)
+    }
+  }
+
   const runTest = async (rule: MileageEarningRuleV6) => {
     if (readonly || !selectedAccountId || testBusy) return
     setTestTarget(rule)
@@ -495,7 +535,7 @@ export default function V8EarningRulesTab({
         <div className={styles.kpi}>
           <div className={styles.kpiTop}>
             <span className={styles.kpiIcon}><Coins size={14} aria-hidden="true" /></span>
-            <span className={styles.kpiLabel}>今月付けたマイル</span>
+            <span className={styles.kpiLabel}>今月 付けたマイル</span>
           </div>
           <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(grantedMiles ?? 0)}</p>
           <p className={styles.kpiSub}>
@@ -505,7 +545,7 @@ export default function V8EarningRulesTab({
         <div className={styles.kpi}>
           <div className={styles.kpiTop}>
             <span className={styles.kpiIcon}><Gift size={14} aria-hidden="true" /></span>
-            <span className={styles.kpiLabel}>今月使われたマイル</span>
+            <span className={styles.kpiLabel}>今月 使われたマイル</span>
           </div>
           <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(spentMiles ?? 0)}</p>
           <p className={styles.kpiSub}>
@@ -525,6 +565,7 @@ export default function V8EarningRulesTab({
       </div>
 
       {actionError ? <Notice tone="danger" message={actionError} /> : null}
+      {menuNotice ? <Notice tone="success" message={menuNotice} /> : null}
       {orderDirty && !readonly ? (
         <Notice tone="warn" message={`並び順を変えています。保存するまでこの画面の並びは仮のままです。${savingOrder ? '保存しています…' : ''}`} />
       ) : null}
@@ -756,7 +797,7 @@ export default function V8EarningRulesTab({
                               items={[
                                 {
                                   id: 'edit',
-                                  label: '下書きを編集',
+                                  label: '編集',
                                   external: true,
                                   onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
                                 },
@@ -769,7 +810,7 @@ export default function V8EarningRulesTab({
                                 },
                                 {
                                   id: 'toggle',
-                                  label: active ? '決めごとを停止' : '決めごとを再開',
+                                  label: active ? '止める' : '再開する',
                                   disabled: savingId === rule.id,
                                   disabledReason: '反映しています',
                                   onSelect: () => void toggleRule(rule),
@@ -780,6 +821,13 @@ export default function V8EarningRulesTab({
                                   disabled: savingId !== null,
                                   disabledReason: '別の決めごとを反映しています',
                                   onSelect: () => { setPublishError(''); setPublishTarget(rule) },
+                                },
+                                {
+                                  id: 'duplicate',
+                                  label: '複製',
+                                  disabled: savingId !== null,
+                                  disabledReason: 'ほかの操作を反映しています',
+                                  onSelect: () => void duplicateRule(rule),
                                 },
                                 ...(rule.publishedVersion == null ? [{
                                   id: 'delete',
@@ -812,7 +860,7 @@ export default function V8EarningRulesTab({
           ) : null}
 
           {!loading && !loadError && rules.length > 0 ? (
-            <p className={styles.footnote}>行の「…」から 下書きを編集・テスト・停止／再開・公開・削除ができます。</p>
+            <p className={styles.footnote}>行の「…」から 編集・テスト・止める・公開・複製・削除ができます。</p>
           ) : null}
         </div>
       </div>
