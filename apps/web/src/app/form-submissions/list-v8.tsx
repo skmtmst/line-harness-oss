@@ -1,16 +1,12 @@
 'use client'
 
 /*
- * ★V8 回答フォームの一覧（Pencil「★V8 画面の地図」の回答フォームの行：
- * 一覧 `I3L41O`、アーカイブ・削除の窓 `GVizd`、状態の板 `i2ZAS`）。
- *
- * v7 の一覧（app/form-submissions/page.tsx 内の FormSubmissionsPageV7）とは
- * 別の部品として持つ。データの口は同じ。違いは置き場と見せ方だけ——
- * 上に4枚の数の帯（公開中／今月の回答／答え終えた割合／後処理の未完）、
- * 「フォームを作る」は左のフォルダの列の上、行の右端は「…」メニュー
- * （編集・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・
- * 削除）。アーカイブと削除は `GVizd` の1枚の窓にまとめる。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ * 回答フォームの一覧（板 `I3L41O`、アーカイブ・削除の窓 `GVizd`）。
+ * V8 だけで書く（v7 は捨てた）。上に4枚の数の帯（公開中／今月の回答／
+ * 答え終えた割合／後処理の未完）、「フォームを作る」は左のフォルダの列の上、
+ * 行の右端は「…」メニュー（編集・集まった回答・複製・受付を止める・
+ * フォルダへ移す・アーカイブ・削除）。アーカイブと削除は `GVizd` の
+ * 1枚の窓にまとめる。
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
@@ -46,7 +42,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListRange from '@/components/ui/list-range'
 import { notifyToast } from '@/components/shared/toast'
 import { runUndoable } from '@/lib/undoable'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { loadFailureCopy } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
 import styles from './list-v8.module.css'
@@ -299,7 +295,7 @@ export default function FormSubmissionsListV8() {
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
-  /* 行の名前を変更。保存は編集保存と同じ口を通すので版を添える（v7 と同じ）。 */
+  /* 行の名前を変更。保存は編集保存と同じ口を通すので版を添える。 */
   const [renameTarget, setRenameTarget] = useState<Form | null>(null)
   const [renameName, setRenameName] = useState('')
   const [renameRevision, setRenameRevision] = useState<number | null>(null)
@@ -649,7 +645,7 @@ export default function FormSubmissionsListV8() {
 
   /* 「受付を止める」の窓を開く。止める保存には編集の版が要るので影響口で読む。 */
   /*
-   * R27: 名前の変更は「…」の中の操作（v7 と同じ）。保存は編集保存と同じ口を
+   * R27: 名前の変更は「…」の中の操作。保存は編集保存と同じ口を
    * 通るので、確認した編集の版を添える。一覧は版を持っていないため、窓を
    * 開くときに1件取得で読む。版なしで送ると口が 400 にする（#723）。
    */
@@ -1076,18 +1072,21 @@ export default function FormSubmissionsListV8() {
   } else if (loading) {
     listBody = <FormListSkeleton label="回答フォームの一覧を読み込んでいます" />
   } else if (loadError) {
+    /*
+     * 読み込み失敗の1枚は共通の案内文（m23m）。403 は押しても直らないので
+     * 再試行を出さない。429 は待てば直るので再試行を残す（R539）。
+     */
+    const failure = loadFailureCopy(loadFailure, '回答フォーム')
     listBody = (
       <div className={styles.stateCard}>
         <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={20} aria-hidden="true" /></span>
         <p className={styles.stateTitle}>
-          {isForbiddenOrRateLimited(loadFailure) ? 'この一覧を見る権限がありません' : '回答フォームを読み込めませんでした'}
+          {failure.title}
         </p>
         <p className={styles.stateDesc}>
-          {isForbiddenOrRateLimited(loadFailure)
-            ? 'アカウントの担当・役割の設定を確認してください。'
-            : '再読み込みしても直らないときは、エラー報告へお知らせください。'}
+          {failure.description}
         </p>
-        {!isForbiddenOrRateLimited(loadFailure) ? (
+        {failure.retryable ? (
           <Button type="button" variant="secondary" onClick={() => void loadForms()}>もう一度読み込む</Button>
         ) : null}
       </div>
@@ -1270,6 +1269,7 @@ export default function FormSubmissionsListV8() {
               <span className={`${styles.kpiLabel} ${kpi.warn ? styles.kpiLabelWarn : ''}`}>
                 <kpi.icon size={14} aria-hidden="true" />
                 {kpi.title}
+                <MoreHorizontal size={14} aria-hidden="true" className={styles.kpiDots} />
               </span>
               <p className={styles.kpiValue}>
                 {kpi.value === null ? '—' : formatNumber(kpi.value)}
@@ -1322,7 +1322,7 @@ export default function FormSubmissionsListV8() {
         ) : null}
 
         <div className={styles.listCol}>
-          {/* 道具の段：検索・絞り込みの札・並び順・件数。狭い板では「作る」とフォルダ選びがここへ畳まれる。 */}
+          {/* 道具の段1：狭い板では「作る」とフォルダ選びがここへ畳まれる。 */}
           <div className={styles.toolbar}>
             {createButton(styles.toolbarCreate)}
             <div className={styles.folderSelectWrap}>
@@ -1345,6 +1345,20 @@ export default function FormSubmissionsListV8() {
                 onClear={() => updateListState({ query: '', page: 1 })}
               />
             </div>
+            <span className={styles.toolbarSpacer} />
+            <label className="flex min-w-0 items-center gap-2">
+              <Select
+                aria-label="表示件数"
+                size="page-size"
+                value={String(pageSize)}
+                options={FORM_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+                onChange={(value) => updateListState({ pageSize: Number(value), page: 1 })}
+              />
+            </label>
+          </div>
+
+          {/* 道具の段2：絞り込みの札・並び順（板 I3L41O の2段目）。 */}
+          <div className={styles.chipRow}>
             {([
               ['published', '公開中'],
               ['draft', '下書き'],
@@ -1383,15 +1397,6 @@ export default function FormSubmissionsListV8() {
                   { value: 'name', label: '名前順' },
                 ]}
                 onChange={(value) => updateListState({ sort: value as FormSort, page: 1 })}
-              />
-            </label>
-            <label className="flex min-w-0 items-center gap-2">
-              <Select
-                aria-label="表示件数"
-                size="page-size"
-                value={String(pageSize)}
-                options={FORM_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
-                onChange={(value) => updateListState({ pageSize: Number(value), page: 1 })}
               />
             </label>
           </div>
@@ -1638,7 +1643,7 @@ export default function FormSubmissionsListV8() {
       </Dialog>
 
       {/*
-       * 行の名前を変更（v7 と同じ操作）。回答データやURLは変わらない。
+       * 行の名前を変更。回答データやURLは変わらない。
        */}
       <Dialog
         open={renameTarget !== null}
