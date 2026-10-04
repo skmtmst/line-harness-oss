@@ -18,6 +18,9 @@ const DEFAULT_TITLE = 'musubo LINE管理システム'
 export const metadata: Metadata = {
   title: DEFAULT_TITLE,
   description: DEFAULT_TITLE,
+  icons: {
+    icon: '/icon.svg',
+  },
   openGraph: {
     title: DEFAULT_TITLE,
     description: DEFAULT_TITLE,
