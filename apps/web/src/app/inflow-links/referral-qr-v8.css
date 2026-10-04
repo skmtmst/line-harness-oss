@@ -1,0 +1,24 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/* 板 GtI4Y：480幅・24余白・14の間。窓と操作は共通部品を使う。 */
+[data-design-node='GtI4Y'] [data-design-part='dialog'][role='dialog'] {
+  width: min(30rem, 100%);
+  padding: calc(var(--spacing) * 6);
+  gap: calc(var(--spacing) * 3.5);
+}
+[data-design-node='GtI4Y'] h2 {
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inflowQrContent { display: flex; flex-direction: column; gap: calc(var(--spacing) * 3.5); min-width: 0; }
+.inflowQrQr { display: flex; justify-content: center; padding-block: calc(var(--spacing) * 3); }
+.inflowQrQr img { width: 13.75rem; height: 13.75rem; max-width: 100%; object-fit: contain; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); }
+.inflowQrUrlRow { display: flex; align-items: center; gap: calc(var(--spacing) * 2); padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3); border-radius: var(--radius-mini); background: var(--color-surface-pearl); }
+.inflowQrUrl { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-secondary); font-size: 0.8125rem; }
+.inflowQrPrintNote, .inflowQrFallback { color: var(--color-ink-secondary); font-size: 0.75rem; line-height: 1.5; }
+.inflowQrFallback, .inflowQrImageFailure { display: flex; flex-direction: column; gap: calc(var(--spacing) * 2); }
+.inflowQrImageFailure { justify-content: center; align-items: center; min-height: 13.75rem; font-size: 0.8125rem; color: var(--color-ink-secondary); }
+.inflowQrActions { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--spacing) * 2); padding-top: calc(var(--spacing) * 1.5); }
+}

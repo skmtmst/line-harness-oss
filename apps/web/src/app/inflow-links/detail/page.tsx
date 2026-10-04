@@ -828,7 +828,7 @@ function InflowLinkDetailPageContent() {
       </>}
       {qrOpen && route && url ? (
         <ReferralQrModal
-          route={{ refCode: route.refCode, name: route.name, genre: route.genre, isActive: route.isActive }}
+          route={{ id: route.id, refCode: route.refCode, name: route.name, genre: route.genre, isActive: route.isActive }}
           onClose={() => setQrOpen(false)}
         />
       ) : null}

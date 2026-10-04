@@ -762,7 +762,7 @@ function InflowLinksPageInner({
         label: 'QRコードを表示',
         onSelect: () => {
           setOpenMenuRefCode(null)
-          setQrRoute({ refCode: row.refCode, name: row.name, genre: row.genre, isActive: row.isActive })
+          setQrRoute({ id: row.entryRouteId, refCode: row.refCode, name: row.name, genre: row.genre, isActive: row.isActive })
         },
       })
     }
@@ -1226,7 +1226,7 @@ function InflowLinksPageInner({
                           </button>
                           <button
                             type="button"
-                            onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre, isActive: r.isActive })}
+                            onClick={() => setQrRoute({ id: r.entryRouteId, refCode: r.refCode, name: r.name, genre: r.genre, isActive: r.isActive })}
                             className={styles.linkButton}
                             aria-label={`${r.name}のQRコードを表示`}
                           >
@@ -1326,7 +1326,7 @@ function InflowLinksPageInner({
           onSaved={(savedRoute, created) => {
             setEditing(null)
             load()
-            if (created) setQrRoute({ refCode: savedRoute.refCode, name: savedRoute.name, genre: savedRoute.genre, isActive: savedRoute.isActive })
+            if (created) setQrRoute({ id: savedRoute.id, refCode: savedRoute.refCode, name: savedRoute.name, genre: savedRoute.genre, isActive: savedRoute.isActive })
           }}
         />
       )}

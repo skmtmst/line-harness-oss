@@ -1,83 +1,143 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Copy, Download } from 'lucide-react'
+import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Dialog from '@/components/shared/dialog'
+import { TextField } from '@/components/shared/text-field'
+import './referral-qr-v8.css'
 
-const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
-
-const referralUrl = (refCode: string) => `${WORKER_BASE.replace(/\/$/, '')}/r/${encodeURIComponent(refCode)}`
+const WORKER_BASE = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
 export interface ReferralQrRoute {
+  /** 未登録の紹介コードには経路IDがない。印刷用PDFは登録済みの経路だけ。 */
+  id?: string | null
   refCode: string
   name: string
   genre: string | null
-  /**
-   * 経路が有効かどうか。`false`（停止中）のときは QR を出さない。
-   * `null` は未登録 ref など有効・無効の概念が無い行で、従来どおり出す。
-   */
   isActive: boolean | null
 }
 
-/**
- * 流入経路の QR コード表示。
- *
- * 停止中の経路の QR を配ると、読み取っても友だち追加できない（worker の
- * 解決は `is_active = 1` のみ拾う）。停止中は QR・コピー・ダウンロードを
- * 出さず、選び直しの案内だけを出す。
- */
-export default function ReferralQrModal({
-  route,
-  onClose,
-}: {
+/** 板 GtI4Y。停止した経路はコードの取得・コピー・保存をすべて止める。 */
+export default function ReferralQrModal({ route, onClose }: {
   route: ReferralQrRoute
   onClose: () => void
 }) {
   const [copied, setCopied] = useState(false)
-  const titleId = useId()
-  const panelRef = useOverlayFocus(true, onClose)
+  const [copyFailed, setCopyFailed] = useState(false)
+  const [imageFailed, setImageFailed] = useState(false)
+  const [imageAttempt, setImageAttempt] = useState(0)
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfError, setPdfError] = useState('')
+  const [canPrint, setCanPrint] = useState(false)
+  const generationRef = useRef(0)
   const stopped = route.isActive === false
-  const url = referralUrl(route.refCode)
-  const qrBase = `${WORKER_BASE.replace(/\/$/, '')}/api/qr?size=320x320&data=${encodeURIComponent(url)}`
+  const url = `${WORKER_BASE}/r/${encodeURIComponent(route.refCode)}`
+  const qrBase = `${WORKER_BASE}/api/qr?size=320x320&data=${encodeURIComponent(url)}`
   const downloadUrl = `${qrBase}&download=1&filename=${encodeURIComponent(`referral-${route.refCode}`)}`
+
+  useEffect(() => {
+    const generation = ++generationRef.current
+    setCopied(false)
+    setCopyFailed(false)
+    setImageFailed(false)
+    setImageAttempt(0)
+    setPdfBusy(false)
+    setPdfError('')
+    setCanPrint(false)
+    if (route.id && !stopped) {
+      void api.staff.me().then((result) => {
+        if (generationRef.current !== generation || !result.success) return
+        const staff = result.data
+        setCanPrint(staff.role === 'owner' || staff.role === 'admin'
+          || (staff.role === 'staff' && !!staff.permissionKeys?.includes('/inflow-links')))
+      }).catch(() => { /* 確かめられなかった権限では印刷APIを呼ばない。 */ })
+    }
+    return () => { generationRef.current = generation + 1 }
+  }, [route.id, route.refCode, stopped])
+
   const copy = async () => {
-    await navigator.clipboard.writeText(url)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    if (stopped) return
+    const generation = generationRef.current
+    setCopied(false)
+    try {
+      await navigator.clipboard.writeText(url)
+      if (generationRef.current !== generation) return
+      setCopied(true)
+      setCopyFailed(false)
+    } catch {
+      if (generationRef.current === generation) setCopyFailed(true)
+    }
   }
+
+  const downloadPdf = async () => {
+    if (!route.id || stopped || !canPrint || pdfBusy) return
+    const generation = generationRef.current
+    setPdfBusy(true)
+    setPdfError('')
+    try {
+      const blob = await api.entryRoutes.qrPdf(route.id)
+      if (generationRef.current !== generation) return
+      const objectUrl = URL.createObjectURL(blob)
+      try {
+        const anchor = document.createElement('a')
+        anchor.href = objectUrl
+        anchor.download = `qr-${route.refCode}.pdf`
+        anchor.click()
+      } finally {
+        URL.revokeObjectURL(objectUrl)
+      }
+    } catch {
+      if (generationRef.current === generation) {
+        setPdfError('印刷用PDFを作れませんでした。もう一度「印刷用PDF」を押してください。')
+      }
+    } finally {
+      if (generationRef.current === generation) setPdfBusy(false)
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-card bg-canvas p-6 shadow-overlay">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium text-ink-faint">リファラルリンク・QRコード</p>
-            <h2 id={titleId} className="mt-1 text-lg font-bold text-ink">{route.name}</h2>
-            <p className="mt-1 text-sm text-ink-faint">{route.genre ?? '未分類'}</p>
-          </div>
-          <button onClick={onClose} className="text-2xl leading-none text-ink-faint" aria-label="閉じる">×</button>
-        </div>
+    <Dialog open title={`${route.name} の QR コード`} onCancel={onClose} designNode="GtI4Y" busy={pdfBusy}>
+      <div className="inflowQrContent">
         {stopped ? (
-          <p role="alert" className="mt-5 rounded-card bg-canvas-sunken p-4 text-sm leading-relaxed text-ink-secondary">
-            この経路は停止中のため、QRコードは表示できません。読み取っても友だち追加できないQRを配らないよう、出す口自体を止めています。有効な経路を選び直してください。
+          <p role="alert" className="text-sm text-ink-secondary">
+            この経路は停止中のため、QRコードは表示できません。有効な経路を選び直してください。
           </p>
         ) : (
           <>
-            <div className="mt-5 rounded-card bg-canvas-sunken p-3">
-              <p className="break-all font-mono text-xs text-ink-secondary">{url}</p>
-              <Button variant="secondary" onClick={copy} className="mt-3 w-full">
-                {copied ? 'コピーしました' : 'URLをコピー'}
+            <div className="inflowQrQr">
+              {imageFailed ? (
+                <div role="alert" className="inflowQrImageFailure">
+                  <p>QRコードを読み込めませんでした。</p>
+                  <Button onClick={() => { setImageFailed(false); setImageAttempt((value) => value + 1) }}>もう一度読み込む</Button>
+                </div>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- Workerが生成する経路ごとのQR
+                <img key={imageAttempt} src={`${qrBase}${imageAttempt ? `&retry=${imageAttempt}` : ''}`} alt={`${route.name}のQRコード`} width={220} height={220} onError={() => setImageFailed(true)} />
+              )}
+            </div>
+            <div className="inflowQrUrlRow">
+              <span className="inflowQrUrl" title={url}>{url}</span>
+              <Button variant="secondary" aria-label="URLをコピー" done={copied} doneLabel="コピーしました" onClick={() => void copy()}>
+                <Copy size={15} aria-hidden="true" />コピー
               </Button>
             </div>
-            <div className="mt-5 text-center">
-              {/* eslint-disable-next-line @next/next/no-img-element -- Workerが動的生成するQRコード */}
-              <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-card border border-hairline bg-canvas p-2" />
-              <Button variant="primary" href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 w-full">
-                QRコードをダウンロード
-              </Button>
+            {copyFailed ? (
+              <div className="inflowQrFallback">
+                <p role="alert">コピーできませんでした。下のURLを選んでコピーしてください。</p>
+                <TextField aria-label="コピーするURL" value={url} readOnly onFocus={(event) => event.currentTarget.select()} />
+              </div>
+            ) : null}
+            <p className="inflowQrPrintNote">チラシ・POPでは、QRコードを3cm以上の大きさにして印刷してください。</p>
+            {pdfError ? <p role="alert" className="text-xs text-ink-secondary">{pdfError}</p> : null}
+            <div className="inflowQrActions">
+              {canPrint ? <Button variant="secondary" busy={pdfBusy} busyLabel="PDFを作っています…" onClick={() => void downloadPdf()}><Download size={15} aria-hidden="true" />印刷用PDF</Button> : null}
+              <Button variant="primary" href={downloadUrl} download={`referral-${route.refCode}.png`}><Download size={15} aria-hidden="true" />PNGを保存</Button>
             </div>
           </>
         )}
       </div>
-    </div>
+    </Dialog>
   )
 }
