@@ -13,17 +13,19 @@ function relatedBox(): string {
 }
 
 describe('流入リンク詳細の監査対応（R272・R273・R274）', () => {
-  it('R272: つながる先の5項目は実際のリンクにする', () => {
+  it('R272: つながる先は実データの件数と設定を出す', () => {
     const box = relatedBox()
     expect(box, 'つながる先の箱が見つからない').not.toBe('')
-    for (const href of ['/scenarios', '/friends', '/conversions?tab=affiliates', '/conversions', '/analytics']) {
-      expect(box, `${href} へのリンクが無い`).toContain(`<Link href="${href}">`)
-    }
-    expect(box, 'リンクになっていない項目がある').not.toMatch(/<li>→ /)
+    expect(box).toContain('コンバージョン')
+    expect(box).toContain('formatNumber(funnel.cv_count)')
+    expect(box).toContain('シナリオ配信')
+    expect(box).toContain('マイル')
   })
 
-  it('R273: 詳細の頭に受付中・停止中の印を出す', () => {
-    expect(PAGE).toContain("{route.isActive ? '受付中' : '停止中'}")
+  it('R273: 止まっている経路は受付の再開と分かる', () => {
+    expect(PAGE).toContain('受付を再開する')
+    expect(PAGE).toContain("openDelete('stop')")
+    expect(PAGE).toContain('止める')
   })
 
   it('R274: 削除の操作を変えたら前の操作のエラーを消す', () => {

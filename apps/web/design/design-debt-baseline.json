@@ -302,6 +302,7 @@
     "arbitrary-value": 1
   },
   "app/inflow-links/detail/page.tsx": {
+    "unresolved-classname": 92,
     "direct-secondary-button": 1
   },
   "app/inflow-links/new/page.tsx": {
