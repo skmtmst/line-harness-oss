@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする63ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする61ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -129,7 +129,6 @@ describe('共通部品の影響範囲', () => {
       // 2026-09-24(★V7 #701): 回答フォーム一覧の自前の「前へ／次へ」を共通へ寄せた。1ページだけのときは出さない。
       // ★V8 回答フォーム一覧（I3L41O）。表の下にページ送りを置く。
       'app/form-submissions/list-v8.tsx',
-      'app/form-submissions/page.tsx',
       // #543: 一覧の到達不能な回答表（M2削除）と共に共通Paginationの利用を外した。
       'app/form-submissions/responses/page.tsx',
       'app/hq/account-browser-v8.tsx',

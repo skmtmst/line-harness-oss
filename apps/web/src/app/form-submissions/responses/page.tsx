@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
 import { postActionStepLabel } from './response-summary'
 import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -641,8 +642,8 @@ function FormResponsesInner() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <label className="text-ink-secondary text-xs" htmlFor="form-response-filter">名前・回答内容で検索（全件から探す）</label>
-        <input id="form-response-filter" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・回答内容で検索" className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm sm:w-72" />
+        <label className="text-ink-secondary text-xs" htmlFor="form-response-filter">名前・答えで探す（全件から）</label>
+        <input id="form-response-filter" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・答えで探す（全件から）" className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm sm:w-72" />
       </div>
       {exportError && <p className="text-danger text-sm">{exportError}</p>}
       {exporting && exportProgress && (
@@ -686,7 +687,7 @@ function FormResponsesInner() {
               <tbody className="divide-hairline divide-y">
                 {shown.map((item) => (
                   <tr key={item.id} className="hover:bg-canvas-sunken cursor-pointer" onClick={() => setSelected(item)}>
-                    <td className="px-3 py-3"><p className="text-ink truncate text-sm font-semibold" title={item.friendName ?? '不明'}>{item.friendName ?? '不明'}</p><p className="text-ink-faint mt-1 truncate text-xs" title={valueText(Object.values(item.data as Record<string, unknown>)[0])}>{valueText(Object.values(item.data as Record<string, unknown>)[0])}</p>{postActionsNeedRetry(item.postActions) && <p className="text-danger mt-1 text-xs">後処理に未完があります</p>}</td>
+                    <td className="px-3 py-3"><p className="text-ink truncate text-sm font-semibold" title={item.friendName ?? '不明'}>{item.friendName ?? '不明'}</p><p className="text-ink-faint mt-1 truncate text-xs" title={valueText(Object.values(item.data as Record<string, unknown>)[0])}>{valueText(Object.values(item.data as Record<string, unknown>)[0])}</p>{/* 板 MKQyJ の後処理の札。終わり＝済み、未完あり＝未完。記録なしは何も出さない。 */}{item.postActions?.state === 'completed' ? <p className="mt-1"><StatusBadge tone="success">済み</StatusBadge></p> : postActionsNeedRetry(item.postActions) ? <p className="mt-1"><StatusBadge tone="danger">未完</StatusBadge></p> : null}</td>
                     <td className="text-ink-secondary px-3 py-3 text-xs whitespace-nowrap">{formatDateTime(item.createdAt)}</td>
                     {fieldKeys.slice(0, 3).map((key) => <td key={key} className="text-ink-secondary truncate px-3 py-3 text-sm" title={valueText((item.data as Record<string, unknown>)[key])}>{valueText((item.data as Record<string, unknown>)[key])}</td>)}
                     <td className="text-ink-faint px-3 py-3 text-center">•••</td>
@@ -893,7 +894,7 @@ function ResponseDetail({
             <dd className="text-ink mt-1 break-words text-sm whitespace-pre-wrap">{postActionsText(item.postActions)}</dd>
             {postActionsNeedRetry(item.postActions) && (
               <div className="mt-2">
-                <Button onClick={onRetryPostActions} disabled={retrying} busy={retrying} busyLabel="再実行しています">未完の工程だけ再実行する
+                <Button onClick={onRetryPostActions} disabled={retrying} busy={retrying} busyLabel="再実行しています">後処理をやり直す
                 </Button>
                 {retryError && <p className="text-danger mt-2 text-xs">{retryError}</p>}
               </div>
@@ -901,7 +902,7 @@ function ResponseDetail({
           </div>
           <Detail label="Webhook結果" value="—（回答単位の結果は未取得）" />
         </dl>
-        {item.friendId && <Button className="mt-6" href={`/chats?friend=${encodeURIComponent(item.friendId)}`}>友だち詳細を開く</Button>}
+        {item.friendId && <Button className="mt-6" href={`/chats?friend=${encodeURIComponent(item.friendId)}`}>友だちを開く</Button>}
       </aside>
     </div>
   )
