@@ -2975,6 +2975,36 @@
         }
       ]
     },
+    "slide-panel": {
+      "name": "V8 手順・タブの中身の移り変わり",
+      "pencilNodes": [],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/slide-panel.tsx",
+      "cssModule": "src/components/shared/slide-panel.module.css",
+      "components": [
+        "SlidePanel"
+      ],
+      "cssPrefix": "slide-panel",
+      "pencilUsage": "手順・タブの切り替えの中身",
+      "lastCheckedAt": "2026-10-04",
+      "note": "次へは右から24px＋薄く、戻るは逆（240ms glide）。V8 のときだけ。",
+      "routes": {
+        "active": [],
+        "impact": "手順・タブのある管理画面"
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1152
+        ],
+        "reason": "司令塔が録画で確かめる。"
+      },
+      "declarations": []
+    },
+    "notice": {
     "detail-panel": {
       "name": "V8 右から出る詳細パネル",
       "pencilNodes": [
@@ -3006,37 +3036,6 @@
       },
       "declarations": []
     },
-
-    "slide-panel": {
-      "name": "V8 手順・タブの中身の移り変わり",
-      "pencilNodes": [],
-      "role": "canonical",
-      "status": "active",
-      "reviewStatus": "confirmed",
-      "code": "src/components/shared/slide-panel.tsx",
-      "cssModule": "src/components/shared/slide-panel.module.css",
-      "components": [
-        "SlidePanel"
-      ],
-      "cssPrefix": "slide-panel",
-      "pencilUsage": "手順・タブの切り替えの中身",
-      "lastCheckedAt": "2026-10-04",
-      "note": "次へは右から24px＋薄く、戻るは逆（240ms glide）。V8 のときだけ。",
-      "routes": {
-        "active": [],
-        "impact": "手順・タブのある管理画面"
-      },
-      "visualVerification": {
-        "status": "unverified",
-        "requiredViewports": [
-          1440,
-          1152
-        ],
-        "reason": "司令塔が録画で確かめる。"
-      },
-      "declarations": []
-    },
-
     "context-menu": {
       "name": "V8 右クリックメニュー",
       "pencilNodes": [],
@@ -3066,7 +3065,6 @@
       },
       "declarations": []
     },
-
     "inline-edit": {
       "name": "V8 その場の書き換え",
       "pencilNodes": [],
@@ -3104,7 +3102,6 @@
         }
       ]
     },
-    "notice": {
       "name": "★V7 共通の帯（Notice）",
       "pencilNodes": [
         "uR9s8"
