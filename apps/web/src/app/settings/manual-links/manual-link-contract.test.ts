@@ -171,7 +171,7 @@ describe('失敗の表示', () => {
   // 描画は page.tsx、動き（確かめる・保存・競合の扱い）は use-manual-links.ts にある。
   const dir = dirname(fileURLToPath(import.meta.url))
   const page = [
-    readFileSync(join(dir, 'page.tsx'), 'utf8'),
+    readFileSync(join(dir, 'manual-links-v8.tsx'), 'utf8'),
     readFileSync(join(dir, 'use-manual-links.ts'), 'utf8'),
   ].join('\n')
 
