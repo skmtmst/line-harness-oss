@@ -168,7 +168,7 @@ export function PublishHistorySection({
       if (!res.success) throw new Error(res.error)
       setDiffs(res.data.diffs)
       if (res.data.diffs.length > 0) setReconcileConfirm(true)
-      else setNotice('管理画面の記録とLINE上の状態にずれはありませんでした。')
+      else setNotice(`管理画面の記録とLINE上の状態にずれはありませんでした（${formatDateTime(new Date().toISOString())}）。`)
     } catch {
       setReconcileError('LINEの状態を確認できませんでした。しばらくおいてから、もう一度お試しください。')
     } finally {
@@ -240,7 +240,7 @@ export function PublishHistorySection({
     <section aria-label="公開履歴と照合" className="border-hairline bg-canvas rounded-card mt-5 border p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-ink text-sm font-bold">公開の履歴とLINEとの照合</h2>
-        <Button type="button" onClick={() => void checkReconcile()} disabled={reconciling} busy={reconciling} busyLabel="確認中…">LINEとのずれを確認
+        <Button type="button" onClick={() => void checkReconcile()} disabled={reconciling} busy={reconciling} busyLabel="確認中…">もう一度照らし合わせる
         </Button>
       </div>
 
