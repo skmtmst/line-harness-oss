@@ -1,41 +1,99 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { AccountWithStats } from '@/contexts/account-context'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import type { HqBrowserAccount } from './account-browser-v8'
 import AccountBrowser from './account-browser-v8'
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 afterEach(cleanup)
-const accounts = Array.from({length: 23}, (_, i): AccountWithStats => ({id:`a${i}`,name:`店舗${String(i).padStart(2,'0')}`,channelId:`channel${i}`,basicId:`@shop${i}`,isActive:true,country:null,role:i === 11 ? 'viewer' : 'owner',displayOrder:i,connection:{status:i === 11 ? 'warn' : 'ok',checkedAt:null},stats:{friendCount:i,messagesThisMonth:i*2,activeScenarios:0,staffCount:1}}))
-describe('V8 統括のアカウントを探す', () => {
- it('2ページ目のアカウントへ入る時は表示した行のIDを渡す', () => {
-  const select = vi.fn()
-  render(<AccountBrowser accounts={accounts} onSelect={select} onSettings={vi.fn()} />)
-  expect(screen.queryByText('店舗10')).toBeNull()
-  fireEvent.click(screen.getByRole('button',{name:'2ページ目へ'}))
-  fireEvent.click(screen.getAllByRole('button',{name:'このアカウントへ入る'})[0])
-  expect(select).toHaveBeenCalledWith('a10')
-  expect(screen.getByText(/11〜20件/)).toBeTruthy()
- })
- it('LINE ID検索でページを戻し、閲覧者の設定ボタンを無効にする', () => {
-  const settings = vi.fn()
-  render(<AccountBrowser accounts={accounts} onSelect={vi.fn()} onSettings={settings} />)
-  fireEvent.click(screen.getByRole('button',{name:'3ページ目へ'}))
-  fireEvent.change(screen.getByRole('searchbox',{name:'アカウントを検索'}),{target:{value:'@shop11'}})
-  expect(screen.getByText('店舗11')).toBeTruthy()
-  expect(screen.getByRole('button',{name:'設定'}).hasAttribute('disabled')).toBe(true)
-  fireEvent.click(screen.getByRole('button',{name:'設定'}))
-  expect(settings).not.toHaveBeenCalled()
-  fireEvent.change(screen.getByRole('searchbox',{name:'アカウントを検索'}),{target:{value:''}})
-  expect(screen.getByText('店舗00')).toBeTruthy()
-  expect(screen.getByRole('button',{name:'1ページ目へ'}).getAttribute('aria-current')).toBe('page')
- })
- it('接続状態の絞り込みと表へ切り替えても同じアカウントを表示する', () => {
-  render(<AccountBrowser accounts={accounts} onSelect={vi.fn()} onSettings={vi.fn()} />)
-  fireEvent.click(screen.getByRole('button',{name:/^要確認/}))
-  fireEvent.click(screen.getByRole('button',{name:'表'}))
-  expect(screen.getAllByRole('row')).toHaveLength(2)
-  expect(screen.getByText('店舗11')).toBeTruthy()
-  expect(screen.queryByText('店舗00')).toBeNull()
- })
+const tagA = { id: 't1', name: '渋谷エリア', color: '#2563eb' }
+const tagB = { id: 't2', name: 'イベント', color: '#16a34a' }
+const base = (part: Partial<HqBrowserAccount> & { id: string; name: string }): HqBrowserAccount => ({
+  channelId: `channel-${part.id}`,
+  basicId: `@${part.id}`,
+  isActive: true,
+  country: null,
+  role: 'owner',
+  displayOrder: 0,
+  connection: { status: 'ok', checkedAt: null },
+  stats: { friendCount: 0, messagesThisMonth: 0, activeScenarios: 0, staffCount: 1 },
+  ...part,
+})
+const accounts: HqBrowserAccount[] = [
+  base({ id: 'honten', name: '本店', displayOrder: 0, stats: { friendCount: 1284, messagesThisMonth: 1820, activeScenarios: 0, staffCount: 4 }, tags: [tagA] }),
+  base({ id: 'shibuya', name: '渋谷店', displayOrder: 1, parentLineAccountId: 'honten', stats: { friendCount: 612, messagesThisMonth: 946, activeScenarios: 0, staffCount: 3 }, tags: [tagA] }),
+  base({ id: 'test', name: 'TEST', displayOrder: 2, role: 'viewer', connection: { status: 'warn', checkedAt: null }, stats: { friendCount: 14, messagesThisMonth: 12, activeScenarios: 0, staffCount: 2 } }),
+  base({ id: 'event', name: '2025年イベント', displayOrder: 3, stats: { friendCount: 238, messagesThisMonth: 634, activeScenarios: 0, staffCount: 2 }, tags: [tagB] }),
+  base({ id: 'old', name: '旧キャンペーン', displayOrder: 4, archivedAt: '2026-09-01T00:00:00+09:00', stats: { friendCount: 0, messagesThisMonth: 0, activeScenarios: 0, staffCount: 0 }, tags: [tagB] }),
+]
+const props = (over: Partial<Parameters<typeof AccountBrowser>[0]> = {}) => ({
+  accounts,
+  onSelect: vi.fn(),
+  onSettings: vi.fn(),
+  onShowDetails: vi.fn(),
+  onRestore: vi.fn(),
+  onRefresh: vi.fn(),
+  ...over,
+})
+describe('V8 統括のアカウント（板 JKjsE）', () => {
+  it('状態の札に数を出し、要確認だけに絞れる', () => {
+    render(<AccountBrowser {...props()} />)
+    const pills = within(screen.getByRole('group', { name: '状態で絞り込み' }))
+    const pill = (name: string) => pills.getByRole('button', { name })
+    expect(pill('すべて 5')).toBeTruthy()
+    expect(pill('正常 3')).toBeTruthy()
+    expect(pill('要確認 1')).toBeTruthy()
+    expect(pill('アーカイブ 1')).toBeTruthy()
+    fireEvent.click(pill('要確認 1'))
+    expect(screen.getByText('TEST')).toBeTruthy()
+    expect(screen.queryByText('本店')).toBeNull()
+  })
+  it('タグのフォルダで絞り、タグなしを出せる', () => {
+    render(<AccountBrowser {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: /渋谷エリア/ }))
+    expect(screen.getByText('本店')).toBeTruthy()
+    expect(screen.getByText('渋谷店')).toBeTruthy()
+    expect(screen.queryByText('2025年イベント')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /タグなし/ }))
+    expect(screen.getByText('TEST')).toBeTruthy()
+    expect(screen.queryByText('本店')).toBeNull()
+  })
+  it('アーカイブは詳細と戻すだけ出し、友だちを伏せる', () => {
+    const restore = vi.fn()
+    const details = vi.fn()
+    render(<AccountBrowser {...props({ onRestore: restore, onShowDetails: details })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'アーカイブ 1' }))
+    fireEvent.click(screen.getByRole('button', { name: '詳細' }))
+    expect(details).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: '戻す' }))
+    expect(restore).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: /このアカウントへ入る/ })).toBeNull()
+  })
+  it('要確認カードの更新するがその1件を渡す', () => {
+    const refresh = vi.fn()
+    render(<AccountBrowser {...props({ onRefresh: refresh })} />)
+    fireEvent.click(screen.getByRole('button', { name: '更新する' }))
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(refresh.mock.calls[0][0].id).toBe('test')
+  })
+  it('検索でタグ名も当たり、閲覧者の設定は押せない', () => {
+    const settings = vi.fn()
+    render(<AccountBrowser {...props({ onSettings: settings })} />)
+    fireEvent.change(screen.getByRole('searchbox', { name: 'アカウントを検索' }), { target: { value: 'イベント' } })
+    expect(screen.getByText('2025年イベント')).toBeTruthy()
+    expect(screen.queryByText('渋谷店')).toBeNull()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'アカウントを検索' }), { target: { value: '' } })
+    const testCard = screen.getByText('TEST').closest('article')!
+    const settingButtons = Array.from(testCard.querySelectorAll('button')).filter((button) => button.textContent === '設定')
+    expect(settingButtons).toHaveLength(1)
+    expect(settingButtons[0].hasAttribute('disabled')).toBe(true)
+    fireEvent.click(settingButtons[0])
+    expect(settings).not.toHaveBeenCalled()
+  })
+  it('表へ切り替えても同じ行が出る', () => {
+    render(<AccountBrowser {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: '表で表示' }))
+    expect(screen.getAllByRole('row')).toHaveLength(6)
+    expect(screen.getByText('旧キャンペーン')).toBeTruthy()
+  })
 })
