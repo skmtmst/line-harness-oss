@@ -562,17 +562,18 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phoneOpen, p
   const { data, store, selectedStoreId, busy, mutate, reload } = ctx
   const { selectedAccountId } = useAccount()
   const accountId = selectedAccountId || ''
+  const storeId = store?.id || ''
   const [todayRows, setTodayRows] = useState<RestaurantReservation[] | null>(null)
   useEffect(() => {
     let current = true
     setTodayRows(null)
-    if (view !== 'today' || !store || !accountId) return
+    if (view !== 'today' || !storeId || !accountId) return
     const date = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
-    const load = () => restaurantTestApi.reservationsDay(accountId, store.id, date).then(res => { if (current) setTodayRows(res.data.reservations) }).catch(() => { if (current) setTodayRows(null) })
+    const load = () => restaurantTestApi.reservationsDay(accountId, storeId, date).then(res => { if (current) setTodayRows(res.data.reservations) }).catch(() => { if (current) setTodayRows(null) })
     void load()
     const timer = setInterval(() => { void load() }, 30_000)
     return () => { current = false; clearInterval(timer) }
-  }, [view, store?.id, accountId, day, data.reservations])
+  }, [view, storeId, accountId, day, data.reservations])
   const [lineWarning, setLineWarning] = useState('')
   const [editingId, setEditingId] = useState('')
   const [editTouched, setEditTouched] = useState(false)
@@ -674,7 +675,6 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phoneOpen, p
 
   const editing = rows.find((r) => r.id === editingId) || null
   const cancelling = rows.find((r) => r.id === cancelId) || null
-  const storeId = store?.id || ''
 
   if (phoneOpen) {
     return (

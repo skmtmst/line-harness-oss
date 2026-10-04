@@ -5,7 +5,7 @@ import {afterEach,beforeEach,expect,it,vi} from 'vitest'
 const fixture=vi.hoisted(()=>({snapshot:vi.fn(),loginMembers:vi.fn(),linkMembershipLogin:vi.fn(),updateMembership:vi.fn(),gate:vi.fn(),cancel:vi.fn()}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'account-1',accounts:[]})}))
 vi.mock('@/lib/restaurant-test-api',()=>({restaurantTestApi:fixture}))
-vi.mock('@/components/step-up-prompt',()=>({useStepUpGate:()=>({gate:fixture.gate,cancel:fixture.cancel,prompt:null}),isStepUpRequired:(e:any)=>e.code==='STEP_UP_REQUIRED'}))
+vi.mock('@/components/step-up-prompt',()=>({useStepUpGate:()=>({gate:fixture.gate,cancel:fixture.cancel,prompt:null}),isStepUpRequired:(e:unknown)=>!!e && typeof e==='object' && 'code' in e && e.code==='STEP_UP_REQUIRED'}))
 import OrganizationV8 from './organization'
 const member={id:'member',organization_id:'org',store_id:'store',staff_name:'試験担当',email:null,role:'staff',status:'active',staff_id:'login',loginName:'試験ログイン',loginRole:'staff',loginPolicyVersion:3,loginAccountScope:'accounts',line_uid:null,google_email:null}
 const data={organization:{id:'org',name:'試験組織'},stores:[{id:'store',name:'試験店',code:'S',status:'active',line_account_id:'account-1'}],memberships:[member],tables:[],menuItems:[],reservations:[],inventory:[],approvals:[],connectors:[],reviews:[],posts:[],lineFlows:[]}

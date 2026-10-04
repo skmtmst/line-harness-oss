@@ -50,6 +50,7 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
     () => (store ? data.tables.filter((item) => item.store_id === store.id) : data.tables),
     [data.tables, store],
   )
+  const storeId = store?.id
   const [date, setDate] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: store?.timezone || 'Asia/Tokyo' }).format(new Date()))
   const [dayRows, setDayRows] = useState<RestaurantInventory[]>([])
   const [loadError, setLoadError] = useState('')
@@ -61,21 +62,21 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
   useEffect(() => {
     let current = true
     setDayRows([]); setLoadError('')
-    if (!selectedAccountId || !store) return
-    void restaurantTestApi.inventoryDay(selectedAccountId, store.id, date).then(res => {
+    if (!selectedAccountId || !storeId) return
+    void restaurantTestApi.inventoryDay(selectedAccountId, storeId, date).then(res => {
       if (current) setDayRows(res.data)
     }).catch(() => { if (current) setLoadError('在庫を取得できませんでした。再読込してください。') })
     return () => { current = false }
-  }, [selectedAccountId, store?.id, date, data.inventory, refresh])
+  }, [selectedAccountId, storeId, date, data.inventory, refresh])
   useEffect(() => {
     let current = true
     setOpening(null); setHoursDraft(null); setHoursError('')
-    if (!selectedAccountId || !store) return
-    void restaurantTestApi.openingHours(selectedAccountId, store.id).then(res => {
+    if (!selectedAccountId || !storeId) return
+    void restaurantTestApi.openingHours(selectedAccountId, storeId).then(res => {
       if (current) { setOpening(res.data); setHoursVersion(res.data.version); setHoursDraft(res.data.hours || Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: [] }))) }
     }).catch(() => { if (current) setHoursError('営業時間を取得できませんでした。再読込してください。') })
     return () => { current = false }
-  }, [selectedAccountId, store?.id])
+  }, [selectedAccountId, storeId])
   const rows = useMemo(() => dayRows.slice().sort((a,b) => a.starts_at.localeCompare(b.starts_at)), [dayRows])
   const reservations = useMemo(
     () => (store ? data.reservations.filter((item) => item.store_id === store.id) : data.reservations)
