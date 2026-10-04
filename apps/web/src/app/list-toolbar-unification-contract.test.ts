@@ -22,8 +22,7 @@ const read = (rel: string) => readFileSync(join(HERE, rel), 'utf8')
 // 道具を共通 ListToolbar へそろえた画面（友だちは例外。後述）。
 const TOOLBAR_PAGES = [
   'broadcasts/page.tsx',
-  'reminders/page.tsx',
-  'scenarios/page.tsx',
+  /* 完全切り替え：リマインダ・シナリオは V8 の絵どおりの道具段（ListToolbar は使わない）。 */
   'auto-replies/page.tsx',
   'form-submissions/page.tsx',
   'webinars/page.tsx',

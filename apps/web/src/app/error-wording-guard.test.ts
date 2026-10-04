@@ -73,7 +73,7 @@ const KNOWN_FILES: string[] = [
   'app/rich-menus/external-import.tsx',
   'app/rich-menus/page.tsx',
   'app/scenarios/detail/scenario-detail-client.tsx',
-  'app/scenarios/page.tsx',
+  // 2026-10-04 完全切り替え：v7 page を捨て、V8 の list-v8 にしたので外す。
   'app/scenarios/results/page.tsx',
   // ★V8 版も同じ持ち越し文言を使う（直すときは page.tsx と一緒に直す）
   'app/settings/feature-settings-v8.tsx',

@@ -11,10 +11,13 @@ const GRID_PAGES = [
   'form-submissions/page.tsx',
   'friend-add-settings/page.tsx',
   'inflow-links/page.tsx',
-  'reminders/page.tsx',
   'rich-menus/page.tsx',
-  'scenarios/page.tsx',
   'webinars/page.tsx',
+]
+/* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る（幅は CSS の `.split` で付ける）。 */
+const V8_FOLDER_PAGES = [
+  'reminders/list-v8.tsx',
+  'scenarios/list-v8.tsx',
 ]
 
 describe('オーナー指示 #582 のフォルダ欄', () => {
@@ -28,6 +31,13 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
   it.each(GRID_PAGES)('%s は追加操作をフォルダ欄へ渡す', (relativePath) => {
     const page = readFileSync(resolve(APP, relativePath), 'utf8')
     expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)/)
+  })
+
+  it.each(V8_FOLDER_PAGES)('%s は共通の FolderPanel と追加操作を使う', (relativePath) => {
+    const page = readFileSync(resolve(APP, relativePath), 'utf8')
+    const css = readFileSync(resolve(APP, relativePath.replace(/\.tsx$/, '.module.css')), 'utf8')
+    expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)/)
+    expect(css).toContain('.split')
   })
 
   it('テンプレートも同じ幅と欄内追加操作を使う', () => {

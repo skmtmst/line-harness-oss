@@ -18,7 +18,7 @@ const TARGETS = [
   'mileage/page.tsx',
   'nen-members/page.tsx',
   'rich-menus/connections/page.tsx',
-  'scenarios/page.tsx',
+  /* 完全切り替え：v7 page は捨てた。V8 の list-v8 は自前の1枚で読み直す。 */
   'scenarios/results/page.tsx',
   'tags/marks/edit/page.tsx',
   '../components/broadcasts/segment-preset-controls.tsx',
@@ -71,7 +71,8 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
     // V7 TargetMissing: 追加設定の公開・つながり・シナリオ結果の本体の
     //        失敗表示を TargetMissing の error へ寄せた（ListState 23＋
     //        TargetMissing 3で合計は変わらない）。
-    expect(errorCount).toBe(26)
+    // 2026-10-04 完全切り替え：シナリオ一覧の v7 ListState ぶん1減。
+    expect(errorCount).toBe(25)
   })
 
   it('URLだけでは対象を特定できない状態に、直らない再読み込みを出さない', () => {

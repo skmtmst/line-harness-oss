@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする61ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする60ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -179,7 +179,6 @@ describe('共通部品の影響範囲', () => {
       'app/reminders/detail/page.tsx',
       // ★V8 リマインダ一覧（apLqS）。表の下にページ送りを置く。
       'app/reminders/list-v8.tsx',
-      'app/reminders/page.tsx',
       // 2026-09-23: Googleビジネスの口コミ一覧（★V6 GB-2）。20件ずつのページ送り。
       'app/restaurant-test/google/google-business.tsx',
       // Googleビジネス第3段: 投稿一覧（GB-4 MAozg）の表の下にページ送りがある。
@@ -197,7 +196,6 @@ describe('共通部品の影響範囲', () => {
       'app/rich-menus/page.tsx',
       // ★V8 シナリオ一覧（axFrW）。表の下にページ送りを置く。
       'app/scenarios/list-v8.tsx',
-      'app/scenarios/page.tsx',
       // 監査 R132: ファイル検査の一覧が先頭50件固定で検索・ページ送りが
       // なかった。サーバが数えた総数でページ送りを出すため共通へ寄せた。
       // ★V8 ファイルの検査（PfA4o）。表の下にページ送りを置く。

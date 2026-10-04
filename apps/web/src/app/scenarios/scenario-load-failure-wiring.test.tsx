@@ -11,10 +11,8 @@ vi.hoisted(() => {
 import ScenariosPage from './page'
 
 /*
- * m23m: 読み込み失敗の配線。一覧口の失敗（403・429）が共通の1枚へ
- * 言い分けられて出ることを、実DOMで固定する。
- * - 403 … 権限の案内になり、押しても直らない再試行の口は出ない
- * - 429 … 待ち秒数（Retry-After）の案内になり、再試行の口は残る
+ * 読み込み失敗の配線（V8）。一覧口の失敗は種類によらず1枚の案内になり、
+ * 読み直しの口が残ることを、実DOMで固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -76,7 +74,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-test('一覧口の403は権限の案内になり再試行の口は出ない', async () => {
+test('一覧口の403は1枚の案内になり読み直しの口が残る', async () => {
   handler = (url) => {
     if (url.pathname === '/api/scenarios') {
       return response({ success: false, error: 'forbidden' }, 403)
@@ -86,17 +84,16 @@ test('一覧口の403は権限の案内になり再試行の口は出ない', as
   await act(async () => root.render(<ScenariosPage />))
   await settle()
   await eventually(() => {
-    expect(host.querySelector('[data-list-state="error"]')).toBeTruthy()
+    expect(host.textContent).toContain('表示できませんでした')
   })
-  expect(host.textContent).toContain('表示できませんでした')
-  expect(host.textContent).toContain('権限')
+  expect(host.textContent).toContain('登録したシナリオは消えていません')
   expect(host.textContent).not.toContain('API error')
   const retry = [...host.querySelectorAll('button')]
-    .find((item) => item.textContent?.trim() === 'もう一度読み込む')
-  expect(retry).toBeUndefined()
+    .find((item) => item.textContent?.trim() === '読み直す')
+  expect(retry).toBeTruthy()
 })
 
-test('一覧口の429は待ち秒数の案内になり再試行の口は残る', async () => {
+test('一覧口の429は1枚の案内になり読み直しの口が残る', async () => {
   handler = (url) => {
     if (url.pathname === '/api/scenarios') {
       return response({ success: false, error: 'rate_limited' }, 429, { 'Retry-After': '30' })
@@ -106,11 +103,9 @@ test('一覧口の429は待ち秒数の案内になり再試行の口は残る',
   await act(async () => root.render(<ScenariosPage />))
   await settle()
   await eventually(() => {
-    expect(host.querySelector('[data-list-state="error"]')).toBeTruthy()
+    expect(host.textContent).toContain('表示できませんでした')
   })
-  expect(host.textContent).toContain('表示できませんでした')
-  expect(host.textContent).toContain('30秒')
   const retry = [...host.querySelectorAll('button')]
-    .find((item) => item.textContent?.trim() === 'もう一度読み込む')
+    .find((item) => item.textContent?.trim() === '読み直す')
   expect(retry).toBeTruthy()
 })

@@ -68,8 +68,8 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
   })
 
   it('R12: リマインダは見出しの総数を「すべて」の行と重ねて出さない', () => {
-    const src = read('reminders/page.tsx')
-    expect(src).toContain("{ id: '', label: 'すべて', count: listTotal }")
+    const src = read('reminders/list-v8.tsx')
+    expect(src).toContain("{ id: '', label: 'すべて', count: reminderList.total ?? null, color: 'var(--color-accent)' }")
     expect(src).not.toContain('`${listTotal}件`')
   })
 })
