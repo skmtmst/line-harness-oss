@@ -541,7 +541,7 @@ export default function StaffNewV8() {
               busy={saving}
               busyLabel="登録しています…"
             >
-              {createdStaffId ? '割当をやり直す' : 'スタッフを登録する'}
+              {createdStaffId ? '割当をやり直す' : 'スタッフを追加する'}
             </Button>
           </div>
         </div>

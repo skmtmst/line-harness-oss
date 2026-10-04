@@ -995,7 +995,7 @@ export default function FormSubmissionsListV8() {
     },
     {
       id: 'duplicate',
-      label: '複製',
+      label: '複製する',
       onSelect: () => openDuplicate(form),
     },
     ...(form.isActive

@@ -863,9 +863,9 @@ export default function NewProxyBookingPage() {
                     size="full"
                   />
                 </Field>
-                <Field label="担当者">
+                <Field label="スタッフ">
                   <Select
-                    aria-label="担当者"
+                    aria-label="スタッフ"
                     value={staffId}
                     onChange={setStaffId}
                     options={[{ value: '', label: '選択してください' }, ...staff.map((item) => ({ value: item.id, label: item.display_name }))]}

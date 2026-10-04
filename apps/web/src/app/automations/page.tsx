@@ -198,7 +198,7 @@ function AutomationRowActions({
       {canManage ? (
         <>
           {/* #942 N-352: 編集・複製・保管を行から直接開けるようにする。 */}
-          <Button onClick={onEdit} disabled={busy} variant="secondary" size="compact" className="whitespace-nowrap">編集する</Button>
+          <Button onClick={onEdit} disabled={busy} variant="secondary" size="compact" className="whitespace-nowrap">編集</Button>
           <IconButton
             aria-label={`${automation.name}のその他操作`}
             aria-expanded={menuOpen}

@@ -563,7 +563,7 @@ export function OutgoingOverview({
                                   : (item.isActive ? '止める' : '動かす')}
                               </Button>
                               {/* N-363: 名前・URL・いつ送るか・送り直す回数を直す画面へ。 */}
-                              <Button variant="secondary" role="menuitem" href={`/webhooks/edit?id=${item.id}`}>直す</Button>
+                              <Button variant="secondary" role="menuitem" href={`/webhooks/edit?id=${item.id}`}>編集</Button>
                               <Button variant="secondary" role="menuitem" onClick={() => onRotate(item)}>合言葉</Button>
                               <Button variant="secondary" role="menuitem" onClick={() => onDelete(item)}>削除する</Button>
                             </>

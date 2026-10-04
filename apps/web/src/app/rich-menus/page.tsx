@@ -924,7 +924,7 @@ function RichMenusPageV7() {
                                   : []),
                                 {
                                   id: 'duplicate',
-                                  label: '複製',
+                                  label: '複製する',
                                   onSelect: () => { setDuplicateError(null); setDuplicateTarget(g) },
                                 },
                                 {

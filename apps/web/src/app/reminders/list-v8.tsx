@@ -534,13 +534,13 @@ export default function RemindersListV8() {
   const rowMenuItems = (row: ReminderRow): ActionMenuItem[] => {
     const status = statusKeyOf(row)
     return [
-      { id: 'detail', label: '詳細を見る', onSelect: () => router.push(detailHref(row.id)) },
+      { id: 'detail', label: '開く', onSelect: () => router.push(detailHref(row.id)) },
       { id: 'registrants', label: '登録者を管理', onSelect: () => router.push(detailHref(row.id)) },
       { id: 'planned', label: '配信予定を見る', onSelect: () => router.push(`${detailHref(row.id)}&status=planned`) },
       { id: 'runs', label: '実行結果を見る', onSelect: () => router.push(detailHref(row.id)) },
       {
         id: 'edit',
-        label: '編集する',
+        label: '編集',
         disabled: !canEdit,
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => router.push(`/reminders/edit?id=${encodeURIComponent(row.id)}`),

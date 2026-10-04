@@ -196,7 +196,7 @@ describe('予約スタッフ保存前検証（実React）', () => {
   test('専用の新規登録画面も空白名を同じ理由で止める', async () => {
     render(<NewBookingStaffPage />)
     fireEvent.change(screen.getByLabelText(/スタッフ名/), { target: { value: '   ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'スタッフを追加する' }))
     expect(await screen.findByText('スタッフ名を入力してください')).toBeTruthy()
     expect(fixture.createStaff).not.toHaveBeenCalled()
   })
@@ -217,7 +217,7 @@ describe('予約スタッフ保存前検証（実React）', () => {
     fireEvent.change(screen.getByLabelText(/顔写真/), { target: { value: '  https://example.test/tanaka.png  ' } })
     fireEvent.change(screen.getByLabelText(/紹介文/), { target: { value: '  丁寧に対応します。  ' } })
     fireEvent.click(await screen.findByRole('checkbox', { name: /カット/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'スタッフを追加する' }))
 
     await waitFor(() => expect(fixture.createStaff).toHaveBeenCalledWith('account-a', expect.objectContaining({
       name: '田中', display_name: 'たなか', role: '店長',

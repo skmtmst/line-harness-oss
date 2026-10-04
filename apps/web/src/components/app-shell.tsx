@@ -131,7 +131,7 @@ function SuspendedSupportWorkspace({ children }: { children: React.ReactNode }) 
               selectedAccountId=""
               onAccountChange={() => undefined}
               showAccountSwitcher={false}
-              roleLabel="統括"
+              roleLabel="オーナー"
               userName={staffName}
               onLogout={logoutAndGoToLogin}
             />

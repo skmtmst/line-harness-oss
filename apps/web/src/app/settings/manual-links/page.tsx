@@ -180,7 +180,7 @@ function ManualLinksPageV7() {
                       <Button disabled={saving} onClick={() => void saveEdit()}>保存する</Button>
                     </>
                   ) : (
-                    <Button onClick={() => startEdit(key)}>直す</Button>
+                    <Button onClick={() => startEdit(key)}>編集</Button>
                   )}
                 </Td>
               </Tr>

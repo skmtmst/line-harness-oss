@@ -2505,7 +2505,7 @@ export default function ScenarioDetailV8({
                               },
                               {
                                 id: 'duplicate',
-                                label: duplicatingStepId === step.id ? '複製中…' : '複製',
+                                label: duplicatingStepId === step.id ? '複製中…' : '複製する',
                                 disabled: duplicatingStepId === step.id,
                                 disabledReason: 'この通を複製しています',
                                 onSelect: () => {

@@ -136,10 +136,10 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'ほかの人と同じにする' }))
     fireEvent.click(screen.getByRole('button', { name: 'コピー元のログインユーザー' }))
-    fireEvent.click(screen.getByRole('button', { name: 'コピー元さん（見るだけ）' }))
+    fireEvent.click(screen.getByRole('button', { name: 'コピー元さん（閲覧のみ）' }))
 
     expect(fixture.updateStaff).not.toHaveBeenCalled()
-    expect(screen.getByRole('status').textContent).toContain('コピー元さんの「見るだけ」を下書きに反映しました')
+    expect(screen.getByRole('status').textContent).toContain('コピー元さんの「閲覧のみ」を下書きに反映しました')
 
     fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
     expect(fixture.updateStaff).not.toHaveBeenCalled()
@@ -175,8 +175,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ほかの人と同じにする' }))
     fireEvent.click(screen.getByRole('button', { name: 'コピー元のログインユーザー' }))
 
-    expect(screen.queryByRole('button', { name: '対象者（運用）' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'コピー元さん（見るだけ）' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '対象者（スタッフ）' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'コピー元さん（閲覧のみ）' })).toBeTruthy()
   })
 
   it('見せる範囲の保存を同一render内で二度押ししても更新は1回だけになる', async () => {

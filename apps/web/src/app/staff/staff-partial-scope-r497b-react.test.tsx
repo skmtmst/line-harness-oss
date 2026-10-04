@@ -145,7 +145,7 @@ describe('R497b 一部だけ許可の表示と保存', () => {
     // 分析は一部だけ許可なので、3択のどれも押さない。
     // 直す前は「出さない」が押されていた（保存内容と違う）。
     expect(pressed('分析：変えられる（承認・変更できる）')).toBe(false)
-    expect(pressed('分析：見えるだけ（見るだけ）')).toBe(false)
+    expect(pressed('分析：見えるだけ（閲覧のみ）')).toBe(false)
     expect(pressed('分析：出さない（見せない）')).toBe(false)
     // 行の下に内訳が出る。
     expect(screen.getByText(/一部だけ許可されています/)).toBeTruthy()

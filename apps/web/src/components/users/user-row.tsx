@@ -156,7 +156,7 @@ export default function UserRow({ row, onOpenMergedPerson }: Props) {
           */}
           <RowActions
             detail={{
-              label: expanded ? '閉じる' : '詳細を見る',
+              label: expanded ? '閉じる' : '開く',
               onClick: () => setExpanded((value) => !value),
             }}
             subjectName={row.displayName ?? undefined}

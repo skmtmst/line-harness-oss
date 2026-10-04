@@ -631,7 +631,7 @@ function ActiveMigration({
           */}
           <ActionCell><div className="flex flex-wrap items-center gap-2">
             {/* #641: 行操作は共通の枠つきボタン */}
-            <Button type="button" variant="secondary" disabled={busy || detailBusy} onClick={() => onShowDetail(item)}>詳細を見る</Button>
+            <Button type="button" variant="secondary" disabled={busy || detailBusy} onClick={() => onShowDetail(item)}>開く</Button>
             {!item.newUid && <span className="text-ink-faint text-xs">一致先なし（新規作成は「CSVで書き出す・取り込む」で行ってください）</span>}
           </div></ActionCell>
         </Tr>)}</tbody>

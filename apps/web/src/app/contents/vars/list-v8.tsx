@@ -915,7 +915,7 @@ function CommonVarsListV8Inner() {
                 「{firstEmpty.name}」が空のまま{typeof firstEmpty.usageCount === 'number' ? `${formatNumber(firstEmpty.usageCount)}か所` : '何か所か'}で使われています。差し込んだところが空欄のまま送られます。
               </span>
               <span className={styles.alertAction}>
-                <Button type="button" onClick={applyEmptyFilter}>直す</Button>
+                <Button type="button" onClick={applyEmptyFilter}>編集</Button>
               </span>
             </div>
           ) : null}
