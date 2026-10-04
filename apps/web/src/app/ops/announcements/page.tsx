@@ -16,7 +16,7 @@ import PageHeader from '@/components/shared/page-header'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import HelpTip from '@/components/shared/help-tip'
-import styles from './announcements-v8.module.css'
+import './announcements-v8.css'
 import '@/app/ops/readonly-v8.css'
 import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
 import { previewLabel, toLocalInput, toPublishAt } from './format'
@@ -270,49 +270,49 @@ export default function OpsAnnouncementsPage() {
   const scheduled = form.publishAt.trim().length > 0
 
   return (
-    <div data-design-node="tQ2MJ" className={styles.page}>
+    <div data-design-node="tQ2MJ" className="ops-ann-page">
       <PageHeader breadcrumb={[]} title="お知らせ" description="契約先へ、画面のお知らせ・メール・契約者専用LINE でお知らせを送ります。" />
       {notice ? <p role="status" className="text-caption text-accent-deep">{notice}</p> : null}
-      <div className={styles.columns}>
-        <section aria-label="作成" className={styles.form}>
+      <div className="ops-ann-columns">
+        <section aria-label="作成" className="ops-ann-form">
           <h2 className="text-label font-semibold text-ink">{editingId ? 'お知らせを直す' : '作成'}</h2>
           {formError ? <p role="alert" className="text-caption text-danger">{formError}</p> : null}
-          <label className={styles.field}>
+          <label className="ops-ann-field">
             <span>件名</span>
             <TextField value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} />
           </label>
-          <label className={styles.field}>
+          <label className="ops-ann-field">
             <span>本文</span>
-            <TextArea rows={4} className={styles.body} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} />
+            <TextArea rows={4} className="ops-ann-body" value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} />
           </label>
-          <div className={styles.field}>
+          <div className="ops-ann-field">
             <div className="flex items-center gap-2"><span>宛先</span><HelpTip label="宛先の見込み">{previewLabel(preview, form.channels)}</HelpTip></div>
-            <RadioCardGroup legend="宛先" className={styles.choices}>
-              {AUDIENCES.map((a) => <RadioCard key={a.key} name="announcement-audience" value={a.key} title={a.label} checked={form.audienceKind === a.key} disabled={busy} className={styles.radio} onChange={() => setForm((f) => ({ ...f, audienceKind: a.key }))} />)}
+            <RadioCardGroup legend="宛先" className="ops-ann-choices">
+              {AUDIENCES.map((a) => <RadioCard key={a.key} name="announcement-audience" value={a.key} title={a.label} checked={form.audienceKind === a.key} disabled={busy} className="ops-ann-radio" onChange={() => setForm((f) => ({ ...f, audienceKind: a.key }))} />)}
             </RadioCardGroup>
-            {form.audienceKind === 'plan' ? <div className={styles.choices}>{PLANS.map((p) => <FilterChip key={p.key} selected={form.audiencePlans.includes(p.key)} onChange={() => setForm((f) => ({ ...f, audiencePlans: toggle(f.audiencePlans, p.key) }))}>{p.label}</FilterChip>)}</div> : null}
+            {form.audienceKind === 'plan' ? <div className="ops-ann-choices">{PLANS.map((p) => <FilterChip key={p.key} selected={form.audiencePlans.includes(p.key)} onChange={() => setForm((f) => ({ ...f, audiencePlans: toggle(f.audiencePlans, p.key) }))}>{p.label}</FilterChip>)}</div> : null}
             {form.audienceKind === 'tenants' ? <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">{tenants.length === 0 ? <span className="text-micro text-ink-faint">契約先を読み込んでいます…</span> : tenants.map((t) => <FilterChip key={t.id} selected={form.audienceTenantIds.includes(t.id)} onChange={() => setForm((f) => ({ ...f, audienceTenantIds: toggle(f.audienceTenantIds, t.id) }))}>{t.name}</FilterChip>)}</div> : null}
           </div>
-          <div className={styles.field}>
+          <div className="ops-ann-field">
             <span>送り方</span>
-            <div className={styles.choices}>{CHANNELS.map((ch) => <Checkbox key={ch.key} checked={form.channels.includes(ch.key)} disabled={busy} onCheckedChange={() => setForm((f) => ({ ...f, channels: toggle(f.channels, ch.key) }))}>{ch.label}</Checkbox>)}</div>
+            <div className="ops-ann-choices">{CHANNELS.map((ch) => <Checkbox key={ch.key} checked={form.channels.includes(ch.key)} disabled={busy} onCheckedChange={() => setForm((f) => ({ ...f, channels: toggle(f.channels, ch.key) }))}>{ch.label}</Checkbox>)}</div>
           </div>
           {loaded && !lineConfigured ? <NoteBar tone="warn">契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定すると LINE で送れます。</NoteBar> : null}
-          <div className={styles.field}>
+          <div className="ops-ann-field">
             <div className="flex items-center gap-2"><span>配信日時（日本時間）</span><HelpTip label="配信日時の説明">空のままなら今すぐ送る。日時を入れると「配信を予約する」に変わります。</HelpTip></div>
             <DateTimeField value={form.publishAt} onChange={(v) => setForm((f) => ({ ...f, publishAt: v }))} aria-label="公開日時（日本時間）" placeholder="空のままなら今すぐ送る" disabled={busy} />
           </div>
-          <div className={styles.actions}>
+          <div className="ops-ann-actions">
             {editingId ? <Button onClick={cancelEdit} disabled={busy}>直すのをやめる</Button> : null}
             <Button onClick={() => void submit('draft')} disabled={busy}>下書きを保存する</Button>
             <Button variant="primary" onClick={() => (scheduled ? void submit('schedule') : setConfirmSend(true))} disabled={busy}><Send aria-hidden="true" className="h-4 w-4" />{scheduled ? '配信を予約する' : '今すぐ送る'}</Button>
           </div>
         </section>
-        <section aria-label="配信済みの表" className={styles.list}>
+        <section aria-label="配信済みの表" className="ops-ann-list">
           <header className="flex items-center gap-2"><h3 className="text-label font-semibold text-ink">配信済み・予約・下書き</h3><HelpTip label="契約者専用LINEの登録状況">{linked ? `契約者専用LINEの登録 ${linked.linked}人 / ${linked.total}人` : '登録状況を読み込んでいます'}</HelpTip></header>
           {!loaded ? <ListState kind="loading" title="読み込んでいます" /> : loadError ? <ListState kind="error" title="お知らせを表示できませんでした" description={loadDescription(loadError)} error={loadError ?? undefined} onRetry={() => void load()} /> : rows.length === 0 ? <ListState kind="empty" title="まだお知らせはありません" description="左で作って「今すぐ送る」か「配信を予約する」を押すと、ここに並びます。" /> : (
-            <DataTable className={styles.table}>
-              <thead><TableHeadRow><Th>件名</Th><Th className={styles.audience}>宛先</Th><Th className={styles.status}>状態</Th><Th align="right" className={styles.number}>画面で既読</Th><Th align="right" className={styles.number}>LINE送達</Th><Th className={styles.operation}>操作</Th></TableHeadRow></thead>
+            <DataTable className="ops-ann-table">
+              <thead><TableHeadRow><Th>件名</Th><Th className="ops-ann-audience">宛先</Th><Th className="ops-ann-status">状態</Th><Th align="right" className="ops-ann-number">画面で既読</Th><Th align="right" className="ops-ann-number">LINE送達</Th><Th className="ops-ann-operation">操作</Th></TableHeadRow></thead>
               <tbody>{rows.map((a) => <Tr key={a.id}>
                 <Td><span className="block truncate font-semibold" title={a.subject}>{a.subject}</span><span className="block truncate text-micro text-ink-faint" title={`${a.channelLabels.join('・')} ${formatDateTime(a.sentAt ?? a.publishAt)}${a.lastError ? `・${a.lastError}` : ''}`}>{formatDateTime(a.sentAt ?? a.publishAt)}{a.status === 'scheduled' ? ' 予約' : ''}{a.lastError ? `・${a.lastError}` : ''}</span></Td>
                 <Td><span className="block truncate" title={a.audienceLabel}>{a.audienceKind === 'all' ? 'すべて' : a.audienceLabel}</span></Td>
