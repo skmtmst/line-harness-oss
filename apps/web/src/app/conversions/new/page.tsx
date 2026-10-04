@@ -610,7 +610,7 @@ export default function NewConversionPointPage() {
         <RadioCardGroup legend="同じ人を何回まで数えるか" className="grid gap-2 sm:grid-cols-3">
           <RadioCard name="conversion-dedup" value="once_per_friend" checked={deduplicationMode === 'once_per_friend'} title="1人1回だけ" note="はじめての人だけを数えます" onChange={() => setDeduplicationMode('once_per_friend')} />
           <RadioCard name="conversion-dedup" value="window" checked={deduplicationMode === 'window'} title="30日に1回まで" note="短い間にくり返し起きるものに" onChange={() => setDeduplicationMode('window')} />
-          <RadioCard name="conversion-dedup" value="every" checked={deduplicationMode === 'every'} title="何回でも" note="買うたびに数えます。売上を追うときに" onChange={() => setDeduplicationMode('every')} />
+          <RadioCard name="conversion-dedup" value="every" checked={deduplicationMode === 'every'} title="何回でも数える" note="買うたびに数えます。売上を追うときに" onChange={() => setDeduplicationMode('every')} />
         </RadioCardGroup>
       </ConversionSection>
 
