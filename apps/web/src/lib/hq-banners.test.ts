@@ -103,7 +103,7 @@ describe('切り抜きの位置（R120）', () => {
 })
 
 describe('生成条件の手元の検査', () => {
-  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', cropPosition: 'center' as const, textLines: ['A'], baseColor: null, mainColor: null, subColor: null, accentColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, referenceImageId: null, referenceMode: 'edit' as const }
+  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', cropPosition: 'center' as const, textLines: ['A'], baseColor: null, mainColor: null, subColor: null, accentColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, references: [] }
 
   it('用途・テキスト・枚数がそろえば通る', () => {
     expect(validateGenerationInput(base, 4)).toBeNull()
@@ -210,23 +210,42 @@ describe('画像の表示', () => {
   })
 })
 
-describe('参照画像（35-2）', () => {
-  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', cropPosition: 'center' as const, textLines: [''], baseColor: null, mainColor: null, subColor: null, accentColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, referenceImageId: 'i1', referenceMode: 'edit' as const }
+describe('参照画像（★BG-B `L1ax1Y`・★BG-C `cOgWE`）', () => {
+  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', cropPosition: 'center' as const, textLines: [''], baseColor: null, mainColor: null, subColor: null, accentColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, references: [{ imageId: 'i1', mode: 'edit' as const }] }
 
-  it('土台に描き直すなら、テキストが無くても指示があれば通る', () => {
+  it('土台にする画像があれば、テキストが無くても通る', () => {
+    expect(validateGenerationInput(base, 4)).toBeNull()
     expect(validateGenerationInput({ ...base, customPrompt: '文字を秋にする' }, 4)).toBeNull()
-    expect(validateGenerationInput(base, 4)).toContain('描き直しの指示')
-    expect(validateGenerationInput({ ...base, referenceMode: 'inspire', customPrompt: 'x' }, 4)).toContain('テキスト')
-    expect(validateGenerationInput({ ...base, referenceImageId: null, customPrompt: 'x' }, 4)).toContain('テキスト')
+  })
+
+  it('土台にする画像が無いときは、テキストか追加の指示が要る', () => {
+    expect(validateGenerationInput({ ...base, references: [{ imageId: 'i1', mode: 'inspire' as const }] }, 4)).toContain('テキスト')
+    expect(validateGenerationInput({ ...base, references: [] }, 4)).toContain('テキスト')
+  })
+
+  it('3枚までで、同じ画像は2回選べない', () => {
+    const three = [
+      { imageId: 'i1', mode: 'edit' as const },
+      { imageId: 'i2', mode: 'parts' as const },
+      { imageId: 'i3', mode: 'inspire' as const },
+    ]
+    expect(validateGenerationInput({ ...base, references: three }, 4)).toBeNull()
+    expect(validateGenerationInput({ ...base, references: [...three, { imageId: 'i4', mode: 'inspire' as const }] }, 4)).toContain('3枚まで')
+    expect(
+      validateGenerationInput({ ...base, references: [{ imageId: 'i1', mode: 'edit' as const }, { imageId: 'i1', mode: 'inspire' as const }] }, 4),
+    ).toContain('同じ画像')
   })
 
   it('条件の表と「同じ設定でもう一度」に参照画像が乗る', () => {
-    const withRef = { ...image, generation: { ...generation, referenceImageId: 'i0', referenceMode: 'inspire' as const } }
+    const withRef = { ...image, generation: { ...generation, references: [{ imageId: 'i0', mode: 'inspire' as const }] } }
     expect(generationConditionRows(withRef, presets).find((r) => r.label === '参照画像')?.value).toBe('雰囲気を参考にする')
+    const withTwo = {
+      ...image,
+      generation: { ...generation, references: [{ imageId: 'i0', mode: 'inspire' as const }, { imageId: 'i2', mode: 'parts' as const }] },
+    }
+    expect(generationConditionRows(withTwo, presets).find((r) => r.label === '参照画像')?.value).toBe('2枚（雰囲気を参考にする・素材を一部使う）')
     expect(generationConditionRows(image, presets).some((r) => r.label === '参照画像')).toBe(false)
-    const input = inputFromGeneration(withRef.generation)
-    expect(input.referenceImageId).toBe('i0')
-    expect(input.referenceMode).toBe('inspire')
-    expect(inputFromGeneration(generation).referenceImageId).toBeNull()
+    expect(inputFromGeneration(withRef.generation).references).toEqual([{ imageId: 'i0', mode: 'inspire' }])
+    expect(inputFromGeneration(generation).references).toEqual([])
   })
 })

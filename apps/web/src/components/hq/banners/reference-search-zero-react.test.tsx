@@ -86,7 +86,7 @@ function open() {
       projectId="pj-a"
       presets={[]}
       projects={PROJECTS}
-      selectedId={null}
+      selected={[]}
       onClose={() => undefined}
       onPick={() => undefined}
       onUpload={() => undefined}

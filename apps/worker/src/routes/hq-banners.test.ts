@@ -618,9 +618,8 @@ describe('参照画像つき生成（35-2）', () => {
       referenceMode: 'edit',
     });
     expect(res.status).toBe(201);
-    const generation = (await res.json<{ data: { id: string; referenceImageId: string; referenceMode: string; finalPrompt: string } }>()).data;
-    expect(generation.referenceImageId).toBe(base.id);
-    expect(generation.referenceMode).toBe('edit');
+    const generation = (await res.json<{ data: { id: string; references: { imageId: string; mode: string }[]; finalPrompt: string } }>()).data;
+    expect(generation.references).toEqual([{ imageId: base.id, mode: 'edit' }]);
     expect(generation.finalPrompt).toContain('土台にして描き直して');
     expect(generation.finalPrompt).toContain('追加の指示: 文字を「秋の感謝祭」に変えて');
 
@@ -630,10 +629,11 @@ describe('参照画像つき生成（35-2）', () => {
     const run = (await res.json<{ data: { image: { id: string; source: string } } }>()).data;
     expect(run.image.source).toBe('edited');
 
-    const sent = openai.generate.mock.calls[0][0] as { referenceImage?: { bytes: Uint8Array; mimeType: string; filename: string } };
-    expect(sent.referenceImage?.mimeType).toBe('image/png');
-    expect(sent.referenceImage?.filename).toBe('chirashi.png');
-    expect(sent.referenceImage?.bytes).toEqual(PNG);
+    const sent = openai.generate.mock.calls[0][0] as { referenceImages?: { bytes: Uint8Array; mimeType: string; filename: string }[] };
+    expect(sent.referenceImages?.length).toBe(1);
+    expect(sent.referenceImages?.[0].mimeType).toBe('image/png');
+    expect(sent.referenceImages?.[0].filename).toBe('chirashi.png');
+    expect(sent.referenceImages?.[0].bytes).toEqual(PNG);
 
     const row = testDb.raw.prepare('SELECT parent_image_id, source FROM banner_images WHERE id = ?').get(run.image.id) as { parent_image_id: string; source: string };
     expect(row.parent_image_id).toBe(base.id);

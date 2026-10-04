@@ -67,8 +67,36 @@ export interface BannerProject {
 export type BannerGenerationStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled'
 export type BannerMode = 'banner' | 'free'
 export type BannerPersonOption = 'with' | 'without'
-/** 参照画像の使い方（★V6 35-2）。edit=土台に描き直す、inspire=雰囲気を参考にする。 */
-export type BannerReferenceMode = 'edit' | 'inspire'
+/**
+ * 参照画像の使い方（★V6 35-2・承認済み ★BG-C `cOgWE`）。
+ * edit=土台にする、parts=素材を一部使う、inspire=雰囲気を参考にする。
+ */
+export type BannerReferenceMode = 'edit' | 'parts' | 'inspire'
+
+/** 参照画像は最大3枚（承認済み ★BG-C `cOgWE`）。 */
+export const BANNER_MAX_REFERENCE_IMAGES = 3
+
+/** 画像1枚とその使い方の組。順番はプロンプトの「N枚目」と同じ。 */
+export interface BannerReference {
+  imageId: string
+  mode: BannerReferenceMode
+}
+
+/** 使い方の表示名（★BG-B `L1ax1Y` / ★BG-C `cOgWE` の文言）。 */
+export const BANNER_REFERENCE_MODE_LABEL: Record<BannerReferenceMode, string> = {
+  edit: '土台にする',
+  parts: '素材を一部使う',
+  inspire: '雰囲気を参考にする',
+}
+
+/** 使い方の説明（★BG-B `R6MBHf` の文言）。 */
+export const BANNER_REFERENCE_MODE_DESCRIPTION: Record<BannerReferenceMode, string> = {
+  edit: '構図と配色をそのまま残し、文字や背景だけを指示どおりに変えます。',
+  parts: 'ロゴや商品など、その画像の一部だけを取り込んで新しく組み立てます。',
+  inspire: '色とトーンだけを引き継ぎ、構図は写さずに新しく作ります。',
+}
+
+export const BANNER_REFERENCE_MODES: BannerReferenceMode[] = ['edit', 'parts', 'inspire']
 
 export interface BannerGeneration {
   id: string
@@ -97,8 +125,8 @@ export interface BannerGeneration {
   failedCount: number
   unitsPerImage: number
   errorMessage: string | null
-  referenceImageId?: string | null
-  referenceMode?: BannerReferenceMode | null
+  /** 参照画像（最大3枚）。古い生成は1枚組から作られる。 */
+  references?: BannerReference[] | null
   createdBy: string | null
   createdAt: string
   startedAt: string | null
@@ -181,9 +209,8 @@ export interface BannerGenerationInput {
   customPrompt: string
   freePrompt: string
   count: number
-  /** 参照画像（ライブラリの画像 ID）。無ければ null。 */
-  referenceImageId: string | null
-  referenceMode: BannerReferenceMode
+  /** 参照画像（ライブラリの画像 ID と使い方）。最大3枚。無ければ空。 */
+  references: BannerReference[]
 }
 
 /** 生成パネルの初期値。用途は一覧の先頭を画面側で入れる。 */
@@ -200,8 +227,7 @@ export const EMPTY_GENERATION_INPUT: BannerGenerationInput = {
   customPrompt: '',
   freePrompt: '',
   count: 1,
-  referenceImageId: null,
-  referenceMode: 'edit',
+  references: [],
 }
 
 /** 色を入れる4つの欄。 */
@@ -245,12 +271,19 @@ export function validateGenerationInput(
   if (!Number.isInteger(input.count) || input.count < 1 || input.count > maxCount) {
     return `枚数は 1〜${maxCount}枚で選んでください`
   }
+  // 参照画像は最大3枚で、同じ画像は選べない（★BG-C `cOgWE`）。
+  if (input.references.length > BANNER_MAX_REFERENCE_IMAGES) {
+    return `参照画像は${BANNER_MAX_REFERENCE_IMAGES}枚までにしてください`
+  }
+  if (new Set(input.references.map((reference) => reference.imageId)).size !== input.references.length) {
+    return '同じ画像を2回選べません'
+  }
   if (input.mode === 'banner') {
     const lines = input.textLines.map((line) => line.trim()).filter(Boolean)
-    // 「土台に描き直す」は指示だけでも成り立つ（文字を入れない差し替えもある）。
-    const editing = Boolean(input.referenceImageId) && input.referenceMode === 'edit'
-    if (lines.length === 0 && !(editing && input.customPrompt.trim())) {
-      return editing ? '描き直しの指示（追加の指示）か、画像に入れるテキストを入力してください' : '画像に入れるテキストを1行以上入力してください'
+    // 「土台にする」は指示だけでも成り立つ（文字を入れない差し替えもある）。
+    const editing = input.references.some((reference) => reference.mode === 'edit')
+    if (lines.length === 0 && !editing && !input.customPrompt.trim()) {
+      return '画像に入れるテキストか、追加の指示を入力してください'
     }
     if (lines.length > TEXT_LINE_MAX) return `テキストは${TEXT_LINE_MAX}行までです`
     if (lines.some((line) => line.length > TEXT_LINE_LENGTH_MAX)) {
@@ -432,8 +465,14 @@ export function generationConditionRows(
     rows.push({ label: '人物', value: g.personOption === 'with' ? '入れる' : '入れない' })
     rows.push({ label: '追加の指示', value: g.customPrompt || '（なし）' })
   }
-  if (g.referenceImageId) {
-    rows.push({ label: '参照画像', value: g.referenceMode === 'edit' ? '土台に描き直す' : '雰囲気を参考にする' })
+  const references = g.references ?? []
+  if (references.length > 0) {
+    // 1枚なら使い方だけ、複数なら枚数と使い方を並べる（★BG-C `cOgWE`）。
+    const usages = references.map((reference) => BANNER_REFERENCE_MODE_LABEL[reference.mode] ?? reference.mode)
+    rows.push({
+      label: '参照画像',
+      value: references.length === 1 ? usages[0] : `${references.length}枚（${usages.join('・')}）`,
+    })
   }
   rows.push({ label: '作成', value: shortDateTime(image.createdAt) })
   return rows
@@ -455,8 +494,7 @@ export function inputFromGeneration(g: BannerGeneration): BannerGenerationInput 
     customPrompt: g.customPrompt ?? '',
     freePrompt: g.freePrompt ?? '',
     count: 1,
-    referenceImageId: g.referenceImageId ?? null,
-    referenceMode: g.referenceMode ?? 'edit',
+    references: (g.references ?? []).map((reference) => ({ ...reference })),
   }
 }
 

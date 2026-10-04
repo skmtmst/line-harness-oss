@@ -24,6 +24,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
 import {
+  BANNER_MAX_REFERENCE_IMAGES,
   EMPTY_GENERATION_INPUT,
   activeGeneration,
   inputFromGeneration,
@@ -38,6 +39,7 @@ import {
   type BannerImage,
   type BannerPreset,
   type BannerProject,
+  type BannerReference,
   type BannerReferenceMode,
   type BannerUsage,
 } from '@/lib/hq-banners'
@@ -93,7 +95,8 @@ function ProjectInner() {
   const [archiveConfirm, setArchiveConfirm] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   // 参照画像（★V6 35-2 / 35-2-B）。実体は一覧かライブラリから引く。他プロジェクトの画像はここに置く。
-  const [referenceImage, setReferenceImage] = useState<BannerImage | null>(null)
+  // 参照に選んだ画像の実体。他プロジェクトの画像も選べるので、この一覧に関係なく手元に置く。
+  const [referencePool, setReferencePool] = useState<BannerImage[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [referenceBusy, setReferenceBusy] = useState(false)
   const [allProjects, setAllProjects] = useState<BannerProject[]>([])
@@ -337,10 +340,25 @@ function ProjectInner() {
     return res.data
   }
 
-  /** 参照画像として使う。実体を手元に置き、パネルの入力に ID と使い方を入れる。 */
-  const applyReference = (image: BannerImage, usage: BannerReferenceMode) => {
-    setReferenceImage(image)
-    setInput((cur) => ({ ...cur, referenceImageId: image.id, referenceMode: usage }))
+  /** 参照画像に 1 枚足す。実体を手元に置き、入力の参照一覧へ（3 枚まで）足す。 */
+  const addReference = (image: BannerImage, usage: BannerReferenceMode = 'inspire') => {
+    if (input.references.some((reference) => reference.imageId === image.id)) {
+      setPickerOpen(false)
+      return
+    }
+    if (input.references.length >= BANNER_MAX_REFERENCE_IMAGES) {
+      setGenerationError(`参照画像は ${BANNER_MAX_REFERENCE_IMAGES} 枚までです。入れ替えるときは、どれかを外してください。`)
+      return
+    }
+    setReferencePool((prev) => [image, ...prev.filter((candidate) => candidate.id !== image.id)])
+    setInput((cur) => ({ ...cur, references: [...cur.references, { imageId: image.id, mode: usage }] }))
+    setPickerOpen(false)
+  }
+
+  /** ★BG-C `cOgWE` で選び終わったとき。選んだ実体を手元に置き、入力をそのまま置き換える。 */
+  const applyReferences = (references: BannerReference[], picked: BannerImage[]) => {
+    setReferencePool((prev) => [...picked, ...prev.filter((candidate) => !picked.some((image) => image.id === candidate.id))])
+    setInput((cur) => ({ ...cur, references }))
     setPickerOpen(false)
   }
 
@@ -359,7 +377,7 @@ function ProjectInner() {
     try {
       const data = await readFileAsBase64(file)
       const uploaded = await upload({ filename: file.name, mimeType: file.type, data })
-      if (uploaded) applyReference(uploaded, input.referenceMode)
+      if (uploaded) addReference(uploaded)
     } catch (caught) {
       setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした')
     } finally {
@@ -376,10 +394,15 @@ function ProjectInner() {
     }
   }
 
-  // 入力の参照 ID に合う実体。一覧に無ければ（他プロジェクト）手元の実体を使う。ID が消えたら実体も消す。
-  const reference = input.referenceImageId
-    ? images.find((i) => i.id === input.referenceImageId) ?? (referenceImage?.id === input.referenceImageId ? referenceImage : null)
-    : null
+  // 入力の参照 ID に合う実体（並び順は入力のまま）。一覧に無ければ手元の実体を使う。
+  const referenceImages = useMemo(() => {
+    const byId = new Map<string, BannerImage>()
+    for (const image of referencePool) byId.set(image.id, image)
+    for (const image of images) byId.set(image.id, image)
+    return input.references
+      .map((reference) => byId.get(reference.imageId))
+      .filter((image): image is BannerImage => image !== undefined)
+  }, [images, input.references, referencePool])
 
   const pendingCount = running ? Math.max(running.requestedCount - running.doneCount - running.failedCount, 0) : 0
   const visible = useMemo(
@@ -547,7 +570,7 @@ function ProjectInner() {
             value={input}
             onChange={setInput}
             disabled={Boolean(running) || Boolean(project.archivedAt) || !engineReady}
-            reference={reference}
+            referenceImages={referenceImages}
             onPickReference={openPicker}
             onUploadReference={(file) => void uploadReference(file)}
             referenceBusy={referenceBusy}
@@ -660,7 +683,7 @@ function ProjectInner() {
               : undefined
           }
           onUseAsReference={() => {
-            applyReference(openImage, input.referenceMode)
+            addReference(openImage)
             setOpenImage(null)
             panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
           }}
@@ -672,10 +695,9 @@ function ProjectInner() {
         projectId={project.id}
         presets={presets}
         projects={allProjects.length > 0 ? allProjects : [project]}
-        selectedId={input.referenceImageId}
-        initialUsage={input.referenceMode}
+        selected={input.references}
         onClose={() => setPickerOpen(false)}
-        onPick={applyReference}
+        onPick={applyReferences}
         onUpload={(file) => {
           setPickerOpen(false)
           void uploadReference(file)

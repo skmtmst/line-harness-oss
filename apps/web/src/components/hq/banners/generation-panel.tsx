@@ -9,6 +9,10 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import {
+  BANNER_MAX_REFERENCE_IMAGES,
+  BANNER_REFERENCE_MODES,
+  BANNER_REFERENCE_MODE_DESCRIPTION,
+  BANNER_REFERENCE_MODE_LABEL,
   COLOR_ROLES,
   CROP_POSITION_OPTIONS,
   CUSTOM_PROMPT_MAX,
@@ -23,6 +27,7 @@ import {
   type BannerGenerationInput,
   type BannerImage,
   type BannerPreset,
+  type BannerReferenceMode,
 } from '@/lib/hq-banners'
 
 /**
@@ -39,7 +44,7 @@ export default function GenerationPanel({
   value,
   onChange,
   disabled,
-  reference,
+  referenceImages,
   onPickReference,
   onUploadReference,
   referenceBusy,
@@ -49,9 +54,9 @@ export default function GenerationPanel({
   value: BannerGenerationInput
   onChange: (next: BannerGenerationInput) => void
   disabled?: boolean
-  /** 選んでいる参照画像（`value.referenceImageId` の実体）。無ければ null。 */
-  reference: BannerImage | null
-  /** 「ライブラリから選ぶ」。親が 35-2-B のダイアログを開く。 */
+  /** 選んでいる参照画像の実体（`value.references` の画像）。無ければ空。 */
+  referenceImages: BannerImage[]
+  /** 「ライブラリから選ぶ」。親が ★BG-C `cOgWE` のダイアログを開く。 */
   onPickReference: () => void
   /** 「ファイルを選ぶ」。親がプロジェクトへ取り込んでから参照にする。 */
   onUploadReference: (file: File) => void
@@ -141,32 +146,59 @@ export default function GenerationPanel({
           </Field>
         ) : null}
 
-        <Field label="参照画像" note="任意・元にする画像を1枚">
-          <div data-design-node="jZi2W" className="flex flex-col gap-2">
-            {reference ? (
-              <>
-                <div data-design-node="hGpey" className="flex items-center gap-3 rounded-control border border-hairline bg-surface-pearl px-3 py-2.5">
+        {/*
+          参照画像（承認済み ★BG-B `L1ax1Y`）。最大 3 枚で、1 枚ずつ使い方を決める。
+          使い方の意味は下の説明（★BG-B `R6MBHf`）に出し、選ぶ前から読めるようにする。
+        */}
+        <Field label="参照画像" note={`任意・最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚`}>
+          <div data-design-node="L1ax1Y" className="flex flex-col gap-2">
+            {value.references.map((entry, index) => {
+              const image = referenceImages.find((candidate) => candidate.id === entry.imageId) ?? null
+              const name = image ? referenceTitle(image) : `${index + 1}枚目`
+              return (
+                <div
+                  key={entry.imageId}
+                  data-design-node="hGpey"
+                  className="flex flex-wrap items-center gap-3 rounded-control border border-hairline bg-surface-pearl px-3 py-2.5"
+                >
                   {/* 統括の画像は Worker から配信されるので next/image の最適化は使わない（image-tile と同じ） */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={reference.media.url} alt="" className="h-14 w-14 shrink-0 rounded-mini bg-step-idle object-cover" />
+                  {image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={image.media.url} alt="" className="h-12 w-12 shrink-0 rounded-mini bg-step-idle object-cover" />
+                  ) : (
+                    <span className="h-12 w-12 shrink-0 rounded-mini bg-step-idle" />
+                  )}
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <p className="truncate text-label font-medium text-ink">{referenceTitle(reference)}</p>
-                    <p className="truncate text-micro text-ink-faint">{tileCaption(reference, presets)}</p>
+                    <p className="truncate text-label font-medium text-ink">{name}</p>
+                    <p className="truncate text-micro text-ink-faint">{image ? tileCaption(image, presets) : `${index + 1}枚目`}</p>
                   </div>
-                  <Button disabled={disabled || referenceBusy} onClick={() => set('referenceImageId', null)}>
+                  <Select
+                    aria-label={`${name}の使い方`}
+                    className="w-44"
+                    value={entry.mode}
+                    disabled={disabled || referenceBusy}
+                    onChange={(next) =>
+                      set(
+                        'references',
+                        value.references.map((other) =>
+                          other.imageId === entry.imageId ? { ...other, mode: next as BannerReferenceMode } : other,
+                        ),
+                      )
+                    }
+                    options={BANNER_REFERENCE_MODES.map((mode) => ({ value: mode, label: BANNER_REFERENCE_MODE_LABEL[mode] }))}
+                  />
+                  <Button
+                    disabled={disabled || referenceBusy}
+                    aria-label={`${name}を外す`}
+                    onClick={() => set('references', value.references.filter((other) => other.imageId !== entry.imageId))}
+                  >
                     外す
                   </Button>
                 </div>
-                <fieldset data-design-node="RPm7W" className="grid grid-cols-2 gap-1.5" disabled={disabled}>
-                  <legend className="sr-only">参照画像の使い方</legend>
-                  <SegmentOption name={`${uid}-ref`} value="edit" checked={value.referenceMode === 'edit'} onSelect={() => set('referenceMode', 'edit')} label="土台に描き直す" />
-                  <SegmentOption name={`${uid}-ref`} value="inspire" checked={value.referenceMode === 'inspire'} onSelect={() => set('referenceMode', 'inspire')} label="雰囲気を参考にする" />
-                </fieldset>
-                <p className="text-micro text-ink-faint">
-                  描き直す: 構図と配色を保ったまま、文字や背景を指示で変えます。参考にする: 色やトーンだけ引き継いで新しく作ります。
-                </p>
-              </>
-            ) : (
+              )
+            })}
+
+            {value.references.length < BANNER_MAX_REFERENCE_IMAGES ? (
               <>
                 <div className="grid grid-cols-2 gap-2">
                   <Button disabled={disabled || referenceBusy} onClick={onPickReference} className="w-full">
@@ -189,9 +221,30 @@ export default function GenerationPanel({
                     }}
                   />
                 </div>
-                <p className="text-micro text-ink-faint">ライブラリの画像か、手元の画像（PNG・JPEG・WebP、10MB まで）を 1 枚選べます。</p>
+                {value.references.length === 0 ? (
+                  <p className="text-micro text-ink-faint">
+                    {`ライブラリの画像か、手元の画像（PNG・JPEG・WebP、10MB まで）を ${BANNER_MAX_REFERENCE_IMAGES} 枚まで選べます。`}
+                  </p>
+                ) : null}
               </>
+            ) : (
+              <p className="text-micro text-ink-faint">
+                {`参照画像は ${BANNER_MAX_REFERENCE_IMAGES} 枚までです。入れ替えるときは、どれかを外してください。`}
+              </p>
             )}
+
+            {/* 使い方の説明（★BG-B `R6MBHf`）。3 つの違いをここで読み切れるようにする。 */}
+            <div data-design-node="R6MBHf" className="flex flex-col gap-1 rounded-control bg-canvas-sunken p-3">
+              <p className="text-micro font-medium text-ink">{`使い方は ${BANNER_REFERENCE_MODES.length} つから選べます`}</p>
+              <ul className="flex flex-col gap-0.5">
+                {BANNER_REFERENCE_MODES.map((mode) => (
+                  <li key={mode} className="text-micro text-ink-faint">
+                    <span className="font-medium text-ink-secondary">{BANNER_REFERENCE_MODE_LABEL[mode]}</span>
+                    ：{BANNER_REFERENCE_MODE_DESCRIPTION[mode]}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </Field>
 

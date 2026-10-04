@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono';
 import {
+  bannerReferencesFromRow,
   createBannerGeneration,
   createBannerImage,
   createBannerImageDelivery,
@@ -205,8 +206,8 @@ function serializeGeneration(g: BannerGeneration) {
     failedCount: g.failed_count,
     unitsPerImage: g.units_per_image,
     errorMessage: g.error_message,
-    referenceImageId: g.reference_image_id ?? null,
-    referenceMode: g.reference_mode ?? null,
+    // 参照画像は最大3枚（★BG-C `cOgWE`）。前の版で作った1枚組もここで同じ形になる。
+    references: bannerReferencesFromRow(g),
     createdBy: g.created_by,
     createdAt: g.created_at,
     startedAt: g.started_at,
@@ -454,9 +455,9 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
     }
     const quality = resolveBannerQuality(c.env.BANNER_IMAGE_QUALITY);
 
-    // 参照画像はこの統括のライブラリにある、消していない画像だけ。
-    if (v.referenceImageId) {
-      const reference = await getBannerImageWithDetail(c.env.DB, v.referenceImageId, tenantId);
+    // 参照画像はこの統括のライブラリにある、消していない画像だけ（最大3枚）。
+    for (const entry of v.references) {
+      const reference = await getBannerImageWithDetail(c.env.DB, entry.imageId, tenantId);
       if (!reference || reference.deleted_at) {
         return c.json({ success: false, error: '参照画像が見つかりません。ライブラリから選び直してください' }, 400);
       }
@@ -468,7 +469,7 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
     const finalPrompt = buildBannerPrompt({
       mode: v.mode,
       preset: v.preset,
-      referenceMode: v.referenceMode,
+      references: v.references,
       textLines: v.textLines,
       baseColor: v.baseColor,
       mainColor: v.mainColor,
@@ -499,8 +500,7 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
       modelName: c.env.OPENAI_IMAGE_MODEL || DEFAULT_OPENAI_IMAGE_MODEL,
       requestedCount: v.count,
       unitsPerImage: 1,
-      referenceImageId: v.referenceImageId,
-      referenceMode: v.referenceMode,
+      references: v.references,
       createdBy: c.get('staff')?.id ?? null,
     });
     await touchBannerProject(c.env.DB, project.id);
@@ -563,19 +563,22 @@ hqBanners.post('/api/hq/banners/generations/:id/run', async (c) => {
   const sequence = generation.done_count + generation.failed_count + 1;
 
   try {
-    // 参照画像（★V6 35-2）。R2 から読んで OpenAI へ添える。消えていれば分かる言葉で止める。
-    let referenceImage: OpenAIReferenceImage | undefined;
-    if (generation.reference_image_id) {
-      const reference = await getBannerImageWithDetail(db, generation.reference_image_id, tenantId);
+    // 参照画像（★V6 35-2・★BG-C `cOgWE`）。最大3枚を R2 から読んで OpenAI へ添える。
+    // 添える順番はプロンプトの「N枚目」と同じ。消えていれば分かる言葉で止める。
+    const referenceEntries = bannerReferencesFromRow(generation);
+    const editedFrom = referenceEntries.find((entry) => entry.mode === 'edit')?.imageId ?? null;
+    const referenceImages: OpenAIReferenceImage[] = [];
+    for (const entry of referenceEntries) {
+      const reference = await getBannerImageWithDetail(db, entry.imageId, tenantId);
       const object = reference ? await c.env.IMAGES.get(reference.media.r2_key) : null;
       if (!reference || !object) {
         throw new ReferenceMissingError();
       }
-      referenceImage = {
+      referenceImages.push({
         bytes: new Uint8Array(await object.arrayBuffer()),
         mimeType: reference.media.mime_type,
         filename: reference.media.filename || 'reference',
-      };
+      });
     }
     const result = await generateOpenAIImage({
       apiKey: c.env.OPENAI_API_KEY,
@@ -583,7 +586,7 @@ hqBanners.post('/api/hq/banners/generations/:id/run', async (c) => {
       prompt: generation.final_prompt,
       size: generation.api_size as '1024x1024' | '1536x1024' | '1024x1536',
       quality: generation.quality,
-      referenceImage,
+      referenceImages,
     });
 
     // 生成は3種類の大きさだけなので、用途の指定寸法へ cover で整えてから
@@ -625,16 +628,17 @@ hqBanners.post('/api/hq/banners/generations/:id/run', async (c) => {
       generationId: generation.id,
       mediaId: media.id,
       sequence,
-      // 描き直しは「元の画像の派生」として source='edited'。参考は新しい画像だが元をたどれるよう parent を持つ。
-      source: generation.reference_mode === 'edit' ? 'edited' : 'generated',
-      parentImageId: generation.reference_image_id ?? null,
+      // 土台にする画像があれば「元の画像の派生」として source='edited'。
+      // 素材を一部使う・雰囲気を参考にするは新しい画像だが、元をたどれるよう parent を持つ。
+      source: editedFrom ? 'edited' : 'generated',
+      parentImageId: editedFrom ?? referenceEntries[0]?.imageId ?? null,
       createdBy: c.get('staff')?.id ?? null,
     });
     await recordBannerUsage(db, {
       tenantId,
       generationId: generation.id,
       units: 1,
-      reason: generation.reference_mode === 'edit' ? 'edit' : 'generate',
+      reason: editedFrom ? 'edit' : 'generate',
     });
     const nowDone = generation.done_count + 1;
     const isFinished = nowDone + generation.failed_count >= generation.requested_count;
