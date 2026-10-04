@@ -1,0 +1,98 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8 権限なし（板 `O5tUeE`）。
+ * API が 403 を返したときに出す共通の板。V8 のときだけ使う。
+ * 役割の仕組みは作らない——いまの役割・要る役割・管理者名は
+ * 呼ぶ側が知っている表示名だけを渡し、知らない欄は出さない。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 見出し：機能名＋一行の説明。 */
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 8px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 中央の札。白い板の中央に置く。 */
+.card {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  text-align: center;
+}
+
+.lockWrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+.title {
+  margin: 16px 0 0;
+  color: var(--color-ink);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.description {
+  margin: 8px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.roleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
+  margin: 16px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.roleBadge {
+  padding: 2px 8px;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 20px 0 0;
+}

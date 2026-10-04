@@ -41,9 +41,11 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListRange from '@/components/ui/list-range'
 import { notifyToast } from '@/components/shared/toast'
+import { runUndoable } from '@/lib/undoable'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
@@ -183,6 +185,63 @@ function referenceLabel(reference: FormDeleteImpact['references'][number]): stri
   return `「${name}」`
 }
 
+/**
+ * A. 読み込み中の骨組み（V8だけ）。本物の表と同じ見出し・列幅で5行出し、
+ * 入れ替わってもガタつかない。0.3秒以内に来たら出さない・出したら最低
+ * 0.4秒は `DelayedSkeleton` が面倒を見る（自前の骨組みはやめた）。
+ */
+function FormListSkeleton({ label }: { label: string }) {
+  return (
+    <div className={styles.tableWrap} aria-busy="true">
+      <span className="sr-only">{label}</span>
+      <DelayedSkeleton
+        loading
+        skeleton={
+          <table className={styles.table} aria-hidden="true" inert>
+            <FormListHead reviewMode={false} />
+            <tbody>
+              {[0, 1, 2, 3, 4].map((index) => (
+                <tr key={index}>
+                  <td>
+                    <Skeleton className="block h-3.5 w-2/3" />
+                    <span className="mt-1 block"><Skeleton className="block h-3 w-1/2" /></span>
+                  </td>
+                  <td className={styles.destCell}><Skeleton className="block h-3.5 w-20" /></td>
+                  <td><Skeleton className="block h-5.5 w-16" /></td>
+                  <td className={styles.answerCell}>
+                    <Skeleton className="block h-3.5 w-16" />
+                    <span className="mt-0.5 block"><Skeleton className="block h-3 w-24" /></span>
+                  </td>
+                  <td><Skeleton className="block h-8 w-13" /></td>
+                  <td><Skeleton className="ml-auto block h-8 w-8" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        }
+      />
+    </div>
+  )
+}
+
+/**
+ * 表の見出し（本物と骨組みで同じものを出す。2か所に書くとずれる）。
+ */
+function FormListHead({ reviewMode }: { reviewMode: boolean }) {
+  return (
+    <thead>
+      <tr>
+        <th>フォーム（質問の数）</th>
+        <th className={styles.colDest}>保存先</th>
+        <th className={styles.colStatus}>状態</th>
+        <th className={styles.colAnswers}>回答</th>
+        <th className={styles.colUrl}>URL</th>
+        {!reviewMode ? <th className={styles.menuCell} aria-label="操作" /> : null}
+      </tr>
+    </thead>
+  )
+}
+
 export default function FormSubmissionsListV8() {
   usePageTitle('回答フォーム')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -244,6 +303,12 @@ export default function FormSubmissionsListV8() {
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  /* 行の名前を変更。保存は編集保存と同じ口を通すので版を添える（v7 と同じ）。 */
+  const [renameTarget, setRenameTarget] = useState<Form | null>(null)
+  const [renameName, setRenameName] = useState('')
+  const [renameRevision, setRenameRevision] = useState<number | null>(null)
+  const [renaming, setRenaming] = useState(false)
+  const [renameError, setRenameError] = useState('')
   /* 「受付を止める」の確認。止めるにも編集の版が要るので影響口で読む(#723)。 */
   const [stopTarget, setStopTarget] = useState<Form | null>(null)
   const [stopRevision, setStopRevision] = useState<number | null>(null)
@@ -274,6 +339,7 @@ export default function FormSubmissionsListV8() {
     setStopTarget(null)
     setMoveTarget(null)
     setDuplicateTarget(null)
+    setRenameTarget(null)
     setOpenMenuId(null)
     setStats(null)
     setStatsFailed(false)
@@ -586,6 +652,70 @@ export default function FormSubmissionsListV8() {
   }
 
   /* 「受付を止める」の窓を開く。止める保存には編集の版が要るので影響口で読む。 */
+  /*
+   * R27: 名前の変更は「…」の中の操作（v7 と同じ）。保存は編集保存と同じ口を
+   * 通るので、確認した編集の版を添える。一覧は版を持っていないため、窓を
+   * 開くときに1件取得で読む。版なしで送ると口が 400 にする（#723）。
+   */
+  const openRename = async (form: Form) => {
+    setRenameTarget(form)
+    setRenameName(displayFormName(form.name))
+    setRenameError('')
+    setRenameRevision(null)
+    if (!selectedAccountId) {
+      setRenameError('LINE公式アカウントを選んでください。')
+      return
+    }
+    try {
+      const res = await fetchApi<{ success: boolean; data: { contentRevision?: number } }>(
+        `/api/forms/${form.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+      )
+      if (!res.success) throw new Error('rename_revision_failed')
+      const revision = res.data.contentRevision
+      if (!Number.isInteger(revision)) throw new Error('rename_revision_failed')
+      setRenameRevision(revision as number)
+    } catch {
+      setRenameError('フォームの状態を確認できませんでした。開き直してください。')
+    }
+  }
+
+  const saveRename = async () => {
+    if (!renameTarget || !renameName.trim() || renaming || !selectedAccountId) return
+    const name = displayFormName(renameName)
+    setRenaming(true)
+    setRenameError('')
+    try {
+      let revision = renameRevision
+      if (revision === null) {
+        const res = await fetchApi<{ success: boolean; data: { contentRevision?: number } }>(
+          `/api/forms/${renameTarget.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+        )
+        if (!res.success || !Number.isInteger(res.data.contentRevision)) {
+          throw new Error('rename_revision_failed')
+        }
+        revision = res.data.contentRevision as number
+        setRenameRevision(revision)
+      }
+      const res = await api.forms.update(renameTarget.id, selectedAccountId, {
+        name,
+        expectedContentRevision: revision,
+      })
+      if (!res.success) throw new Error('rename_failed')
+      setForms((current) => current.map((form) => (
+        form.id === renameTarget.id ? { ...form, name } : form
+      )))
+      setRenameTarget(null)
+      // 名前は検索・名前順の対象。サーバー側の絞り込み・並びとずれないよう読み直す。
+      void loadForms()
+    } catch (error) {
+      setRenameError(error instanceof ApiError && error.status === 409
+        ? 'ほかの人が先にこの回答フォームを保存しました。開き直して、もう一度お試しください。'
+        : 'フォーム名を変更できませんでした。もう一度お試しください。')
+    } finally {
+      setRenaming(false)
+    }
+  }
+
   const openStop = async (form: Form) => {
     setStopTarget(form)
     setStopRevision(null)
@@ -648,21 +778,32 @@ export default function FormSubmissionsListV8() {
   /*
    * R25: 箱の並び替え。2つの更新は口が1回で行う。途中で片方だけ変わらない。
    */
-  const moveFolder = async (index: number, direction: -1 | 1) => {
+  /*
+   * B. フォルダの並べ替えは押した瞬間に画面を変え、裏で保存する。
+   * 5秒は Toast の「元に戻す」で止められる（戻す口は同じ入れ替え）。
+   */
+  const moveFolder = (index: number, direction: -1 | 1) => {
     const target = folders[index]
     const neighbor = folders[index + direction]
     if (!target || !neighbor || folderBusy || !selectedAccountId) return
-    setFolderBusy(true)
+    const before = folders
+    const swapped = [...folders]
+    swapped[index] = neighbor
+    swapped[index + direction] = target
+    setFolders(swapped)
     setFolderError('')
-    try {
-      const result = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId)
-      if (!result.success) throw new Error(result.error)
-      await loadForms()
-    } catch {
-      setFolderError('並び順を変えられませんでした。')
-    } finally {
-      setFolderBusy(false)
-    }
+    runUndoable({
+      message: `フォルダ「${target.name}」の並び順を変えました`,
+      commit: async () => {
+        const result = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId)
+        if (!result.success) return { success: false, error: result.error }
+      },
+      undo: () => setFolders(before),
+      onCommitted: () => {
+        void loadForms()
+      },
+      failureMessage: '並び順を変えられませんでした。',
+    })
   }
 
   const openFolderDelete = async (folder: Folder) => {
@@ -838,12 +979,17 @@ export default function FormSubmissionsListV8() {
     },
   ]
 
-  /* ===== 行の「…」（I3L41O：編集・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・削除） ===== */
+  /* ===== 行の「…」（I3L41O：編集・名前を変更・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・削除） ===== */
   const rowMenuItems = (form: Form): ActionMenuItem[] => [
     {
       id: 'edit',
       label: '編集',
       onSelect: () => router.push(`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`),
+    },
+    {
+      id: 'rename',
+      label: '名前を変更',
+      onSelect: () => void openRename(form),
     },
     {
       id: 'responses',
@@ -922,13 +1068,7 @@ export default function FormSubmissionsListV8() {
   /* ===== 一覧の中身（読込中・失敗・空・0件・表を分ける） ===== */
   let listBody
   if (accountLoading) {
-    listBody = (
-      <div className={styles.skeletonRows} aria-label="読み込んでいます">
-        {[0, 1, 2, 3].map((index) => (
-          <div key={index} className={styles.skeletonRow}><span className={styles.skeletonBar} /></div>
-        ))}
-      </div>
-    )
+    listBody = <FormListSkeleton label="回答フォームの一覧を読み込んでいます" />
   } else if (!selectedAccountId) {
     listBody = (
       <div className={styles.stateCard}>
@@ -938,13 +1078,7 @@ export default function FormSubmissionsListV8() {
       </div>
     )
   } else if (loading) {
-    listBody = (
-      <div className={styles.skeletonRows} aria-label="読み込んでいます">
-        {[0, 1, 2, 3, 4].map((index) => (
-          <div key={index} className={styles.skeletonRow}><span className={styles.skeletonBar} /></div>
-        ))}
-      </div>
-    )
+    listBody = <FormListSkeleton label="回答フォームの一覧を読み込んでいます" />
   } else if (loadError) {
     listBody = (
       <div className={styles.stateCard}>
@@ -1000,20 +1134,13 @@ export default function FormSubmissionsListV8() {
     listBody = (
       <div className={styles.tableWrap}>
         <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>フォーム（質問の数）</th>
-              <th className={styles.colDest}>保存先</th>
-              <th className={styles.colStatus}>状態</th>
-              <th className={styles.colAnswers}>回答</th>
-              <th className={styles.colUrl}>URL</th>
-              {!reviewMode ? <th className={styles.menuCell} aria-label="操作" /> : null}
-            </tr>
-          </thead>
+          <FormListHead reviewMode={reviewMode} />
           <tbody>
             {visibleForms.map((form) => {
               const normalizedName = displayFormName(form.name)
               const answerCount = formAnswerCount(form)
+              /* 補足の行は1行のまま省略表示にするため、全文を title にも持つ。 */
+              const answerSubText = `今月 ${form.monthlySubmitCount == null ? '—' : formatNumber(form.monthlySubmitCount)}・完了 ${form.monthlyCompletionRate == null ? '—' : `${formatNumber(form.monthlyCompletionRate)}%`}`
               const pendingCount = form.pendingPostActionCount ?? 0
               const answerUrl = formAnswerUrl(selectedAccount?.liffId, form.id)
               return (
@@ -1068,9 +1195,8 @@ export default function FormSubmissionsListV8() {
                       今月開いた人。試しの回答は入れない。取れていない数は
                       「—」だけ出す（0 とは言わない）。
                     */}
-                    <p className={styles.answerSub}>
-                      今月 {form.monthlySubmitCount == null ? '—' : formatNumber(form.monthlySubmitCount)}
-                      ・完了 {form.monthlyCompletionRate == null ? '—' : `${formatNumber(form.monthlyCompletionRate)}%`}
+                    <p className={styles.answerSub} title={answerSubText}>
+                      {answerSubText}
                     </p>
                   </td>
                   <td>
@@ -1520,6 +1646,61 @@ export default function FormSubmissionsListV8() {
           </div>
         ) : null}
         {deleteError ? <p className={styles.dialogError} role="alert">{deleteError}</p> : null}
+      </Dialog>
+
+      {/*
+       * 行の名前を変更（v7 と同じ操作）。回答データやURLは変わらない。
+       */}
+      <Dialog
+        open={renameTarget !== null}
+        title="フォーム名を変更"
+        description="回答データやURLは変わりませんが、回答者に表示されるフォーム名も変わります。"
+        busy={renaming}
+        onCancel={() => {
+          if (renaming) return
+          setRenameTarget(null)
+          setRenameError('')
+        }}
+        footer={(
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex-1" />
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={renaming}
+              onClick={() => {
+                if (renaming) return
+                setRenameTarget(null)
+                setRenameError('')
+              }}
+            >
+              キャンセル
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              busy={renaming}
+              busyLabel="保存中"
+              disabled={renaming || !renameName.trim()}
+              onClick={() => void saveRename()}
+            >
+              保存する
+            </Button>
+          </div>
+        )}
+      >
+        <label className="block">
+          <span className="text-ink-secondary mb-1 block text-xs font-medium">フォーム名</span>
+          <input
+            type="text"
+            value={renameName}
+            onChange={(e) => setRenameName(e.target.value)}
+            disabled={renaming}
+            maxLength={100}
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+          />
+        </label>
+        {renameError ? <p className="text-sm text-danger" role="alert">{renameError}</p> : null}
       </Dialog>
     </div>
   )
