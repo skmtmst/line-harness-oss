@@ -4,6 +4,7 @@ import { Images, Plus, Sparkles, Upload, X } from 'lucide-react'
 import { useId, useRef, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
+import LimitState from './limit-state'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -23,6 +24,7 @@ import {
   type BannerGenerationInput,
   type BannerImage,
   type BannerPreset,
+  type BannerUsage,
 } from '@/lib/hq-banners'
 
 /**
@@ -43,6 +45,8 @@ export default function GenerationPanel({
   onPickReference,
   onUploadReference,
   referenceBusy,
+  usage,
+  onReloadUsage,
 }: {
   presets: BannerPreset[]
   maxCount: number
@@ -56,6 +60,9 @@ export default function GenerationPanel({
   /** 「ファイルを選ぶ」。親がプロジェクトへ取り込んでから参照にする。 */
   onUploadReference: (file: File) => void
   referenceBusy?: boolean
+  /** 上限の帯（板 zOpMG）。上限のときだけ出す。 */
+  usage?: BannerUsage | null
+  onReloadUsage?: () => void
 }) {
   const uid = useId()
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -314,6 +321,8 @@ export default function GenerationPanel({
             ))}
           </fieldset>
         </Field>
+
+        <LimitState usage={usage ?? null} onReload={onReloadUsage} compact />
       </div>
     </aside>
   )

@@ -551,6 +551,8 @@ function ProjectInner() {
             onPickReference={openPicker}
             onUploadReference={(file) => void uploadReference(file)}
             referenceBusy={referenceBusy}
+            usage={usage}
+            onReloadUsage={loadUsage}
           />
         </div>
       </div>
