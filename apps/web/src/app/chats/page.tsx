@@ -99,7 +99,7 @@ import { savedViewFailureMessage } from './saved-view-failure'
 import { savedViewSummary } from './saved-view-summary'
 import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic'
 import { describeSendFailure } from './send-failure'
-import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
+import { formatDateTime, formatNumber, formatRelative, formatTime } from '@/lib/format'
 
 type InboxSavedView = {
   id: string
@@ -229,6 +229,8 @@ function formatInboxDatetime(iso: string | null): string {
   if (!iso) return '—'
   return formatDateTime(iso)
 }
+
+
 
 /*
  * 予約時刻は「日本時間」が約束(INBOX-21)。入力欄も一覧も端末の
@@ -3126,7 +3128,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       className="mt-0.5 truncate text-xs text-ink-faint"
                       title={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・最終受信 ${formatInboxDatetime(chatDetail.lastMessageAt)}`}
                     >
-                      {chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・最終受信 {formatInboxDatetime(chatDetail.lastMessageAt)}
+                      {chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・{formatRelative(chatDetail.lastMessageAt)}
                     </p>
                   </div>
                 </div>
