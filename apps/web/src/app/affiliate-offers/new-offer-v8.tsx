@@ -5,7 +5,8 @@
  *
  * v7（affiliate-offers/new/page.tsx の器）とは別の器。データの口・動きは
  * v7 と同じ（作成・途中保存の更新・候補の取り直し・離脱の番兵）。
- * 何を成果として数えるか（成果地点）は口が無いので持たない。
+ * 何を成果として数えるか（成果地点）は口が無いので見た目だけ持つ
+ * （選んだ値は送らない。API待ち）。
  * 変える操作は器の外（共通の部品・API）へ触らない。
  * v7 を直す必要が出たら new/page.tsx 側も同じ判断を入れる。
  */
@@ -19,6 +20,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TextField, TextArea } from '@/components/shared/text-field'
+import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Toggle from '@/components/shared/toggle'
 import Select from '@/components/shared/select'
@@ -243,6 +245,29 @@ export function NewOfferV8() {
             </label>
           </section>
 
+          {/*
+            板 `Td4TN` の「何を成果として数えるか」。見た目だけ（API待ち）。
+            成果地点の候補を返す口が無いので、選んだ値はどこにも送らない。
+            口ができたらここを本物の選択肢に替える。
+          */}
+          <section className={styles.card} aria-label="何を成果として数えるか">
+            <h2 className={styles.cardTitle}>何を成果として数えるか</h2>
+            <p className={styles.cardNote}>コンバージョンで作った成果地点から選びます</p>
+            <label className={styles.fieldLabel} htmlFor="v8-offer-point">
+              成果地点
+              <Select
+                id="v8-offer-point"
+                aria-label="成果地点"
+                value=""
+                onChange={() => {}}
+                options={[{ value: '', label: '準備中' }]}
+                disabled
+                size="standard"
+              />
+            </label>
+            <p className={styles.footnote}>成果地点の選び方は準備中です。用意ができたらここで選べるようになります。</p>
+          </section>
+
           <section className={styles.card} aria-label="いくら払うか">
             <h2 className={styles.cardTitle}>いくら払うか</h2>
             <p className={styles.cardNote}>アフィリエイター側の決まりが「定額」のときにこの額を使います</p>
@@ -374,7 +399,7 @@ export function NewOfferV8() {
               保存して続けて作る
             </Button>
             <Button variant="primary" disabled={saving} busy={saving} busyLabel="保存中..." onClick={() => void runSave(true)}>
-              保存して公開
+              <Check size={15} aria-hidden="true" /> 保存して公開
             </Button>
           </>
         )}
