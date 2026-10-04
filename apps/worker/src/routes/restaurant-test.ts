@@ -1,3 +1,4 @@
+import { updateStaffPolicy } from './staff.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -238,9 +239,11 @@ async function storeBelongsTo(c: Context<Env>, organizationId: string, storeId: 
   const selected = await selectedRestaurantStore(c, organizationId);
   if (selected && selected.id !== storeId) return false;
   const row = await dbFor(c.env, storeId).prepare(
-    'SELECT 1 AS ok FROM rt_stores WHERE id = ? AND organization_id = ? LIMIT 1',
-  ).bind(storeId, organizationId).first<{ ok: number }>();
-  return Boolean(row?.ok);
+    'SELECT line_account_id FROM rt_stores WHERE id = ? AND organization_id = ? LIMIT 1',
+  ).bind(storeId, organizationId).first<{ line_account_id: string | null }>();
+  if (!row) return false;
+  const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
+  return row.line_account_id ? scope.ids.includes(row.line_account_id) : !scope.isAccountScoped;
 }
 
 function requiredAccount(c: Context<Env>) {
@@ -574,9 +577,12 @@ restaurantTest.get('/api/restaurant-test/snapshot', requireRole('owner', 'admin'
       LEFT JOIN line_accounts la ON la.id = s.line_account_id
       WHERE s.organization_id = ? AND (? IS NULL OR s.id = ?)
       ORDER BY s.code`).bind(orgId, scopedStoreId, scopedStoreId).all<RestaurantStoreRow>(),
-    dbFor(c.env).prepare(`SELECT * FROM rt_memberships
-      WHERE organization_id = ? AND (? IS NULL OR store_id = ?)
-      ORDER BY role, staff_name`).bind(orgId, scopedStoreId, scopedStoreId).all(),
+    dbFor(c.env).prepare(`SELECT m.*, sm.name AS loginName, sm.role AS loginRole, sm.access_level AS loginAccessLevel,
+      sm.is_active AS loginActive, sm.policy_version AS loginPolicyVersion, sm.account_scope AS loginAccountScope,
+      (SELECT json_group_array(line_account_id) FROM staff_account_scopes WHERE staff_id=m.staff_id) AS loginAccountIdsJson
+      FROM rt_memberships m LEFT JOIN staff_members sm ON sm.id=m.staff_id
+      WHERE m.organization_id = ? AND (? IS NULL OR m.store_id = ?)
+      ORDER BY m.role, m.staff_name`).bind(orgId, scopedStoreId, scopedStoreId).all(),
     dbFor(c.env).prepare(`SELECT * FROM rt_approval_requests
       WHERE organization_id = ? AND (? IS NULL OR store_id = ?)
       ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'returned' THEN 1 ELSE 2 END,
@@ -1215,6 +1221,7 @@ restaurantTest.patch('/api/restaurant-test/reservations/:id', requireRole('owner
       course_id: string | null; status: string; allergy_note: string | null; note: string | null; hold_expires_at: string | null;
     }>();
   if (!current) return c.json({ success: false, error: '予約が見つかりません' }, 404);
+  if (!await storeBelongsTo(c, organization.id, current.store_id)) return c.json({success:false,error:'この店舗を操作する権限がありません'},403);
   if (current.hold_expires_at && current.status === 'pending' && Date.parse(current.hold_expires_at) <= Date.now()) {
     await expireRestaurantHolds(dbFor(c.env, current.store_id), undefined, current.store_id);
     return c.json({ success: false, error: '仮押さえの期限が切れました。読み直してください' }, 409);
@@ -1516,6 +1523,21 @@ restaurantTest.patch('/api/restaurant-test/memberships/:id', requireRole('owner'
   }
   if ((role === 'super_admin' || current.role === 'super_admin') && c.get('staff')?.role !== 'owner') {
     return c.json({ success: false, error: 'SuperAdminを変更できるのはオーナーだけです' }, 403);
+  }
+  if (current.staff_id && (role !== current.role || status !== current.status || storeId !== current.store_id)) {
+    if (!Number.isSafeInteger(body.expectedPolicyVersion) || Number(body.expectedPolicyVersion) < 1) return c.json({success:false,error:'ログイン権限の版を読み直してください'},400);
+    if (role === 'super_admin' || current.role === 'super_admin') return c.json({success:false,error:'オーナーの権限と利用状態は統括メンバーで管理してください'},403);
+    if (status === 'invited') return c.json({success:false,error:'連携済みのログインメンバーを招待状態へ戻せません'},400);
+    const loginStore = storeId ? await dbFor(c.env).prepare('SELECT line_account_id FROM rt_stores WHERE id=?').bind(storeId).first<{line_account_id:string|null}>() : null;
+    if (storeId && !loginStore?.line_account_id) return c.json({success:false,error:'担当店舗にLINEアカウントを設定してください'},400);
+    // 既存の認可・再認証・最終管理者保護・セッション失効・版検査をそのまま使う。
+    const response = await updateStaffPolicy(c, current.staff_id, {
+      ...(role !== current.role ? {role: role === 'store_manager' ? 'admin' : 'staff'} : {}),
+      ...(status !== current.status ? {isActive: status === 'active'} : {}),
+      ...(storeId !== current.store_id ? {accountScope:storeId ? 'accounts' : 'all',scopedLineAccountIds:storeId ? [loginStore!.line_account_id!] : []} : {}),
+      expectedPolicyVersion:body.expectedPolicyVersion, idempotencyKey:body.idempotencyKey,
+    });
+    if (!response.ok) return response;
   }
   const optional = (value: string | null | undefined, old: string | null) => value === undefined ? old : typeof value === 'string' ? value.trim() || null : null;
   await dbFor(c.env, storeId || undefined).prepare(`UPDATE rt_memberships SET store_id = ?, staff_name = ?, email = ?, role = ?, line_uid = ?, google_email = ?, status = ?, updated_at = datetime('now') WHERE id = ?`)
@@ -1909,4 +1931,53 @@ restaurantTest.post('/api/restaurant-test/inventory/generate', requireRole('owne
     await adjustInventoryReservedCount(db, body.storeId, '', 0);
     return c.json({ success: true, data: { generated: results.reduce((sum,r)=>sum+r.meta.changes,0), slotMinutes: 30 } });
   } finally { await releaseLock(db,key,owner); }
+});
+
+
+restaurantTest.get('/api/restaurant-test/login-members', requireRole('owner','admin'), async c => {
+  if(!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization=await organizationFor(c);
+  if(!organization) return c.json({success:false,error:'組織が見つかりません'},404);
+  // ログイン用の鍵や秘密値は射影しない。
+  const rows=await dbFor(c.env).prepare(`SELECT sm.id,sm.name,sm.role,sm.access_level AS accessLevel,sm.is_active AS isActive,
+    sm.account_scope AS accountScope,sm.policy_version AS policyVersion,
+    (SELECT json_group_array(line_account_id) FROM staff_account_scopes WHERE staff_id=sm.id) AS accountIdsJson
+    FROM staff_members sm WHERE COALESCE(sm.tenant_id,?)=? ORDER BY sm.name`)
+    .bind(DEFAULT_TENANT_ID,organization.tenant_id??DEFAULT_TENANT_ID).all<{id:string;name:string;role:string;accessLevel:string;isActive:number;accountScope:string;policyVersion:number;accountIdsJson:string}>();
+  return c.json({success:true,data:rows.results.map(({accountIdsJson,...row})=>({...row,accountIds:JSON.parse(accountIdsJson)}))});
+});
+
+restaurantTest.put('/api/restaurant-test/memberships/:id/login', requireRole('owner','admin'), async c => {
+  if(!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization=await organizationFor(c);
+  if(!organization) return c.json({success:false,error:'組織が見つかりません'},404);
+  const db=dbFor(c.env);
+  const member=await db.prepare(`SELECT id,store_id,role FROM rt_memberships WHERE id=? AND organization_id=? AND (? IS NULL OR store_id=?)`)
+    .bind(c.req.param('id'),organization.id,organization.scopedStoreId,organization.scopedStoreId).first<{id:string;store_id:string|null;role:string}>();
+  if(!member) return c.json({success:false,error:'所属ユーザーが見つかりません'},404);
+  if(member.role==='super_admin' && c.get('staff')!.role!=='owner') return c.json({success:false,error:'オーナーとの連携はオーナーだけが変更できます'},403);
+  if(member.store_id && !await storeBelongsTo(c,organization.id,member.store_id)) return c.json({success:false,error:'所属ユーザーが見つかりません'},404);
+  const body=await c.req.json<{staffId?:string|null}>().catch(()=>null);
+  if(!body || (body.staffId!==null && (typeof body.staffId!=='string' || !body.staffId))) return c.json({success:false,error:'ログインメンバーを選んでください'},400);
+  if(body.staffId===null) {
+    await db.prepare('UPDATE rt_memberships SET staff_id=NULL,updated_at=datetime(\'now\') WHERE id=?').bind(member.id).run();
+    return c.json({success:true,data:{id:member.id,staffId:null}});
+  }
+  const login=await db.prepare(`SELECT id,role,is_active,invite_status,account_scope,assigned_line_account_id FROM staff_members
+    WHERE id=? AND COALESCE(tenant_id,?)=?`).bind(body.staffId,DEFAULT_TENANT_ID,organization.tenant_id??DEFAULT_TENANT_ID)
+    .first<{id:string;role:string;is_active:number;invite_status:string;account_scope:string;assigned_line_account_id:string|null}>();
+  if(!login) return c.json({success:false,error:'ログインメンバーが見つかりません'},404);
+  if((login.role==='owner' || member.role==='super_admin') && c.get('staff')!.role!=='owner') return c.json({success:false,error:'オーナーとの連携はオーナーだけが変更できます'},403);
+  const scopeIds=await db.prepare('SELECT line_account_id FROM staff_account_scopes WHERE staff_id=?').bind(login.id).all<{line_account_id:string}>();
+  const accountIds=scopeIds.results.map(s=>s.line_account_id);
+  const isAll=login.account_scope==='all';
+  const stores=await db.prepare('SELECT id,line_account_id FROM rt_stores WHERE organization_id=?').bind(organization.id).all<{id:string;line_account_id:string|null}>();
+  const matching=stores.results.filter(s=>s.line_account_id && accountIds.includes(s.line_account_id));
+  const storeId=isAll ? null : matching.find(s=>s.id===member.store_id)?.id || matching[0]?.id;
+  if(storeId===undefined || (organization.scopedStoreId && storeId!==organization.scopedStoreId)) return c.json({success:false,error:'ログインメンバーの担当店舗が合いません。先に統括メンバーで閲覧範囲を設定してください'},409);
+  try {
+    await db.prepare(`UPDATE rt_memberships SET staff_id=?,role=?,status=?,store_id=?,updated_at=datetime('now') WHERE id=?`)
+      .bind(login.id,login.role==='owner'?'super_admin':login.role==='admin'?'store_manager':'staff',login.is_active===0?'suspended':login.invite_status==='active'?'active':'invited',storeId,member.id).run();
+  }catch(error){if(/unique constraint/i.test(String(error)))return c.json({success:false,error:'このログインメンバーはすでに別の名簿へ連携されています'},409);throw error;}
+  return c.json({success:true,data:{id:member.id,staffId:login.id}});
 });

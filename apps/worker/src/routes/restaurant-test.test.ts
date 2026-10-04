@@ -1457,3 +1457,60 @@ describe('V8 新価格の開始日時',()=>{
   expect(testDb.raw.prepare('SELECT COUNT(*) AS total FROM rt_menu_change_requests').get()).toEqual({total:0});
  });
 });
+
+describe('V8 店の名簿とログイン権限',()=>{
+ function seedLogin(role='staff') {
+  seedRestaurantFixture();
+  testDb.raw.prepare(`INSERT INTO staff_members(id,name,role,api_key,account_scope,tenant_id) VALUES('login','試験',?,'login-key','accounts','00000000-0000-4000-8000-000000000001')`).run(role);
+  testDb.raw.exec("INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('login','account-2',datetime('now')); INSERT INTO rt_memberships(id,organization_id,store_id,staff_name,role) VALUES('member','org-fixture','store-ginza','試験','staff')");
+ }
+ it('同統括のログインメンバーとつなぎ、実際の役割と版を返す',async()=>{
+  seedLogin('admin');
+  expect((await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'})).status).toBe(200);
+  const res=await request('/api/restaurant-test/snapshot?account_id=account-1');
+  expect((await res.json() as any).data.memberships[0]).toMatchObject({staff_id:'login',role:'store_manager',loginRole:'admin',loginPolicyVersion:1});
+  const list=await request('/api/restaurant-test/login-members?account_id=account-1');
+  const text=await list.text(); expect(text).not.toContain('login-key'); expect(text).not.toContain('api_key');
+ });
+ it('連携後の役割変更は再認証なしで書き込まない',async()=>{
+  seedLogin();
+  await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'});
+  const res=await requestWithMethod('/api/restaurant-test/memberships/member?account_id=account-1','PATCH',{role:'store_manager',expectedPolicyVersion:1});
+  expect(res.status).toBe(428);
+  expect(testDb.raw.prepare("SELECT role FROM staff_members WHERE id='login'").get()).toEqual({role:'staff'});
+  expect(testDb.raw.prepare("SELECT role FROM rt_memberships WHERE id='member'").get()).toEqual({role:'staff'});
+ });
+ it('既存の本人確認を通ると役割を反映し、外側のログイン停止も名簿へ同期する',async()=>{
+  seedLogin();
+  await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'});
+  const token='verified-booking-session'; await createAdminSession(token);
+  testDb.raw.prepare('UPDATE admin_sessions SET step_up_at=? WHERE token_hash=?').run(new Date().toISOString(),await sha256Hex(token));
+  const res=await requestWithMethod('/api/restaurant-test/memberships/member?account_id=account-1','PATCH',{role:'store_manager',expectedPolicyVersion:1},`${ADMIN_SESSION_PREFIX}${token}`);
+  expect(res.status).toBe(200);
+  expect(testDb.raw.prepare("SELECT role FROM staff_members WHERE id='login'").get()).toEqual({role:'admin'});
+  testDb.raw.exec("UPDATE staff_members SET is_active=0 WHERE id='login'");
+  expect(testDb.raw.prepare("SELECT status FROM rt_memberships WHERE id='member'").get()).toEqual({status:'suspended'});
+ });
+ it('最後のログイン管理者を名簿から停止させない',async()=>{
+  seedLogin('admin');
+  await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'});
+  const res=await requestWithMethod('/api/restaurant-test/memberships/member?account_id=account-1','PATCH',{status:'suspended',expectedPolicyVersion:1});
+  expect(res.status).toBe(400);
+  expect(testDb.raw.prepare("SELECT is_active FROM staff_members WHERE id='login'").get()).toEqual({is_active:1});
+ });
+ it('別統括のログインメンバーを連携できず、スタッフは連携を変更できない',async()=>{
+  seedLogin();
+  testDb.raw.exec("INSERT INTO tenants(id,name) VALUES('other-tenant','別'); UPDATE staff_members SET tenant_id='other-tenant' WHERE id='login'");
+  expect((await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'})).status).toBe(404);
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'operator',name:'担当者',role:'staff',access_level:'full',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:0});
+  expect((await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'},'operator-key')).status).toBe(403);
+ });
+ it('担当者は予約入力と日付読取ができ、設定変更はできない',async()=>{
+  seedLogin();
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'login',name:'担当者',role:'staff',access_level:'full',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:0});
+  expect((await requestAs('/api/restaurant-test/reservations/holds?account_id=account-2','operator-key',{storeId:'store-ginza',startsAt:'2099-10-10T10:00:00Z',endsAt:'2099-10-10T12:00:00Z',guestCount:2,holdMinutes:15})).status).toBe(201);
+  expect((await requestAs('/api/restaurant-test/reservations/day?account_id=account-2&storeId=store-ginza&date=2099-10-10','operator-key')).status).toBe(200);
+  expect((await requestAs('/api/restaurant-test/reservations/day?account_id=account-2&storeId=store-yokohama&date=2099-10-10','operator-key')).status).toBe(400);
+  expect((await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-2','PUT',{},'operator-key')).status).toBe(403);
+ });
+});
