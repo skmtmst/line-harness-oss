@@ -4,16 +4,23 @@
  * ★V8-B 統括のアカウントの3つの窓（板 `HMpVx`・`D6ljr`・`HFsO9`）。
  * 統括ホーム（`hq/page.tsx`）のカードの「設定」・「戻す」から開く。
  * 名前・保存・復帰は今の口（`api.lineAccounts`）だけを使う。
- * タグの付け外しは口が無いため入れない。
+ * タグの付け外しは `PUT /api/line-accounts/:id/tags` を使う。
  * 本人確認は6桁コード（認証アプリ）を窓の中で受け、用途
  * `line_account.archive` で取り直した鍵を付けて送る。
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
-import { api } from '@/lib/api'
+import { api, fetchApi } from '@/lib/api'
+import type { ApiResponse } from '@line-crm/shared'
 import type { AccountWithStats } from '@/contexts/account-context'
+
+export interface AccountTagOption {
+  id: string
+  name: string
+  color: string | null
+}
 
 /* 6桁コードの升。貼り付けに対応し、動きは付けない（HANDOFF §8）。 */
 function CodeBoxes({ value, onChange, disabled, label }: {
@@ -70,11 +77,13 @@ async function stepUpToken(code: string): Promise<string> {
   return res.data.token
 }
 
-/* 板 `HMpVx`：アカウントの設定（名前・親・ほかの設定・アーカイブ）。 */
-export function AccountSettingsDialog({ account, accounts, archived, onClose, onSaved, onArchive, onShowDetails }: {
+/* 板 `HMpVx`：アカウントの設定（名前・親・タグ・ほかの設定・アーカイブ）。 */
+export function AccountSettingsDialog({ account, accounts, archived, accountTags, onClose, onSaved, onArchive, onShowDetails }: {
   account: AccountWithStats
   accounts: AccountWithStats[]
   archived: boolean
+  /* このアカウントに付いているタグ（付け外しの初期値）。 */
+  accountTags?: AccountTagOption[]
   onClose: () => void
   onSaved: () => void
   onArchive: () => void
@@ -84,6 +93,29 @@ export function AccountSettingsDialog({ account, accounts, archived, onClose, on
   const [parent, setParent] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [allTags, setAllTags] = useState<AccountTagOption[] | null>(null)
+  const [tagIds, setTagIds] = useState<string[]>(
+    (accountTags ?? []).map((tag) => tag.id),
+  )
+  useEffect(() => {
+    let cancelled = false
+    void fetchApi<ApiResponse<AccountTagOption[]>>('/api/line-account-tags')
+      .then((res) => {
+        if (!cancelled && res.success) setAllTags(res.data)
+      })
+      .catch(() => {
+        /* 読めないときは付け外しを出さない。 */
+      })
+    return () => { cancelled = true }
+  }, [])
+  const toggleTag = (id: string) => {
+    setTagIds((prev) => (prev.includes(id) ? prev.filter((tagId) => tagId !== id) : [...prev, id]))
+  }
+  const tagsChanged = (() => {
+    const before = new Set((accountTags ?? []).map((tag) => tag.id))
+    const after = new Set(tagIds)
+    return before.size !== after.size || [...after].some((id) => !before.has(id))
+  })()
   const save = async () => {
     if (busy) return
     if (!name.trim()) {
@@ -109,6 +141,16 @@ export function AccountSettingsDialog({ account, accounts, archived, onClose, on
           return
         }
       }
+      if (tagsChanged) {
+        const res = await fetchApi<ApiResponse<{ id: string }>>(`/api/line-accounts/${encodeURIComponent(account.id)}/tags`, {
+          method: 'PUT',
+          body: JSON.stringify({ tagIds }),
+        })
+        if (!res.success) {
+          setError(res.error)
+          return
+        }
+      }
       onSaved()
     } catch {
       setError('保存できませんでした。通信を確認して、もう一度お試しください。')
@@ -128,9 +170,14 @@ export function AccountSettingsDialog({ account, accounts, archived, onClose, on
       onConfirm={() => void save()}
       onCancel={onClose}
       footer={
-        <Button type="button" variant={archived ? 'secondary' : 'danger'} onClick={onArchive}>
-          {archived ? '戻す' : 'アーカイブ'}
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button type="button" variant={archived ? 'secondary' : 'danger'} onClick={onArchive} disabled={busy}>
+            {archived ? '戻す' : 'アーカイブ'}
+          </Button>
+          <Button type="button" variant="primary" onClick={() => void save()} disabled={busy} busy={busy} busyLabel="保存中…">
+            保存
+          </Button>
+        </div>
       }
     >
       <div className="flex flex-col gap-4">
@@ -159,6 +206,24 @@ export function AccountSettingsDialog({ account, accounts, archived, onClose, on
             ))}
           </select>
         </label>
+        {allTags && allTags.length > 0 ? (
+          <fieldset className="grid gap-2 text-sm">
+            <legend className="font-bold text-ink">タグの付け外し</legend>
+            <div className="flex flex-wrap gap-2">
+              {allTags.map((tag) => (
+                <label key={tag.id} className="v8-ro-hq-tagcheck">
+                  <input
+                    type="checkbox"
+                    checked={tagIds.includes(tag.id)}
+                    disabled={busy}
+                    onChange={() => toggleTag(tag.id)}
+                  />
+                  {tag.name}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
         <div className="grid gap-2 text-sm">
           <span className="font-bold text-ink">ほかの設定</span>
           <div className="flex flex-wrap gap-2">
@@ -170,9 +235,6 @@ export function AccountSettingsDialog({ account, accounts, archived, onClose, on
             </Button>
           </div>
         </div>
-        <p className="text-xs text-ink-faint">
-          タグの付け外しは口の用意ができてから入れます。
-        </p>
       </div>
     </Dialog>
   )
