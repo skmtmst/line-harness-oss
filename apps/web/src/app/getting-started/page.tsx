@@ -102,7 +102,7 @@ export default function GettingStartedPage() {
           <FeatureSetCard accountId={selectedAccountId} />
 
           <div className={styles.columns}>
-            <ol className={styles.steps} aria-label="はじめの設定の順路">
+            <ol className={styles.steps} aria-label="はじめの設定の順路" data-design-node={theme === 'v8' ? 'BOj1a' : undefined}>
               {steps.map((step) => (
                 <StepRow key={step.key} step={step} current={step.key === currentKey} />
               ))}

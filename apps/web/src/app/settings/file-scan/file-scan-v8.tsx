@@ -212,11 +212,18 @@ export function FileScanV8() {
       </div>
 
       {items.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="当てはまるファイルがありません"
-          description="状態の絞り込みを変えてください。"
-        />
+        <div data-design-node="bR6a1">
+          <ListState
+            kind="empty"
+            title="当てはまるファイルがありません"
+            description="状態の絞り込みを変えてください。"
+            action={query ? (
+              <Button variant="secondary" onClick={() => changeQuery('')}>
+                条件を外す
+              </Button>
+            ) : undefined}
+          />
+        </div>
       ) : (
         <div className={styles.tableCard}>
           <table>

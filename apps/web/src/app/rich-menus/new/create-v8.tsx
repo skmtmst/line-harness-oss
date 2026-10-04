@@ -1340,7 +1340,12 @@ export default function RichMenuCreateV8() {
   const busy = saving || publishing
 
   return (
-    <div className={styles.board} data-design-node="rich-menu-create-v8">
+    <div
+      className={styles.board}
+      data-design-node={
+        step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
+      }
+    >
       <Link href="/rich-menus" className={styles.backLink}>
         ← リッチメニューへ
       </Link>
