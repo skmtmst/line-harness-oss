@@ -54,6 +54,11 @@ export interface TopBarProps {
    */
   crumbs?: { label: string; href?: string }[] | null
   className?: string
+  /**
+   * G6 移し替え：「前の見た目に戻す」。渡したときだけ出す。
+   * 呼び出し側が V8 のときだけ渡す（v7 の絵は変えない）。
+   */
+  onRevertTheme?: () => void
 }
 
 /**
@@ -77,6 +82,7 @@ export default function TopBar({
   notificationUnreadCount = 0,
   v8Chrome = false,
   crumbs,
+  onRevertTheme,
   className,
 }: TopBarProps) {
   const classes = [styles.root, className].filter(Boolean).join(' ')
@@ -227,6 +233,12 @@ export default function TopBar({
         </div>
 
         <span className={styles.separator} aria-hidden="true" />
+
+        {onRevertTheme ? (
+          <button type="button" className={styles.revert} onClick={onRevertTheme}>
+            前の見た目に戻す
+          </button>
+        ) : null}
 
         <button type="button" className={styles.logout} onClick={onLogout} aria-label="ログアウト">
           <LogOutIcon /><span aria-hidden="true">ログアウト</span>

@@ -64,12 +64,36 @@
   background: var(--color-canvas-sunken);
 }
 
+/*
+ * G6 移し替え：「前の見た目に戻す」（V8 のときだけ出す）。
+ * 目立たせない文字ボタン。押せることが分かるよう乗せたら下線。
+ */
+.revert {
+  flex-shrink: 0;
+  background: none;
+  border: 0;
+  padding: 0 4px;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: 36px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.revert:hover {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .logout:hover {
   border-color: var(--color-accent);
 }
 
 .manual:focus-visible,
-.logout:focus-visible {
+.logout:focus-visible,
+.revert:focus-visible {
   outline: 2px solid var(--color-status-info);
   outline-offset: 2px;
 }
@@ -414,6 +438,23 @@
  */
 [data-theme="v8"] .accountName {
   max-width: 128px;
+}
+
+/*
+ * ★V8 1152 の帯（parity 1003-2106：1152 の 29/31 板で札が 20px に
+ * 潰れて見えなくなっていた）。札は縮めない（長い名前は 128px の
+ * 「…」で受ける）。代わりにパンくずと自分の名前が縮む（どちらも
+ * 「…」持ち）。v7 は今までどおり。
+ */
+[data-theme='v8'] .accountPill {
+  flex-shrink: 0;
+}
+
+[data-theme='v8'] .crumbCurrent,
+[data-theme='v8'] .crumbFrom,
+[data-theme='v8'] .crumbFromLink,
+[data-theme='v8'] .user {
+  min-width: 0;
 }
 
 [data-theme="v8"] .user {
