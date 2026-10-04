@@ -491,8 +491,12 @@ export function FeatureSettingsV8() {
       ) : loadFailed ? (
         <ListState
           kind="error"
-          title={error || '機能設定を読み込めませんでした'}
-          onRetry={() => void load()}
+          title={error || '設定を読み込めませんでした'}
+          action={(
+            <Button type="button" variant="secondary" onClick={() => void load()}>
+              もう一度試す
+            </Button>
+          )}
         />
       ) : (
         <>
@@ -527,8 +531,14 @@ export function FeatureSettingsV8() {
           {filteredGroups.length === 0 ? (
             <ListState
               kind="empty"
-              title="当てはまる機能がありません"
-              description="探す言葉を変えてください。"
+              emptyPreset="filtered"
+              title="条件に合うものはありません"
+              description="札や検索を外すと、すべて出ます。"
+              action={(
+                <Button type="button" variant="secondary" onClick={() => setQuery('')}>
+                  条件を外す
+                </Button>
+              )}
             />
           ) : (
             <div className={styles.cards}>
