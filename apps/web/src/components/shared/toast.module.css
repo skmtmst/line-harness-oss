@@ -139,3 +139,15 @@
   border-color: var(--color-border-soft);
 }
 }
+
+/* 正本 Q6cQB / tnWX9。閉じる操作と消える期限は残す。 */
+[data-theme='v8'] .host { max-width: min(380px, calc(100vw - 32px)); }
+[data-theme='v8'] .toast {
+  width: 380px; max-width: 100%; gap: 10px; padding: 12px 14px;
+  border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+  border-radius: 12px; box-shadow: var(--v8-parts-toast-shadow);
+  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
+  font-size: 13px; line-height: 20px; font-weight: 400;
+}
+[data-theme='v8'] .icon { width: 16px; height: 16px; }
+[data-theme='v8'] .undo { padding: 0; min-height: 0; font-weight: 600; text-decoration: none; line-height: 20px; }
