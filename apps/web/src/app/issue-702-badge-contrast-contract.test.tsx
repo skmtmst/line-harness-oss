@@ -5,7 +5,7 @@
  * すべて WCAG AA の 4.5:1 以上にする。色の実値は globals.css の正本から
  * 読み、WCAG の式で割り直す（決め打ちの比は書かない）。
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -82,14 +82,21 @@ describe('Issue #702: 危険バッジは濃い赤のトークンを指す', () =
 })
 
 describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
-  it('ウェビナー一覧の状態札は薄い背景＋濃い文字の3組（生の灰・緑・黄は使わない）', () => {
+  it('ウェビナー一覧のV8札は薄い背景＋濃い文字を使う', () => {
     const page = read('webinars/page.tsx')
-    expect(page).toContain("draft: 'bg-shell text-ink-secondary'")
-    expect(page).toContain("active: 'bg-success-bg text-success'")
-    expect(page).toContain("archived: 'bg-warning-bg text-warning'")
-    expect(page).not.toContain('bg-gray-100 text-gray-600')
-    expect(page).not.toContain('bg-green-100 text-green-700')
-    expect(page).not.toContain('bg-amber-100 text-amber-700')
+    const css = read('webinars/list-v8.module.css')
+    expect(page).toContain('className={statusPillClass(w)}')
+    for (const [name, bg, fg] of [
+      ['pillNeutral', 'shell', 'ink-secondary'],
+      ['pillActive', 'success-bg', 'success'],
+      ['pillScheduled', 'warning-bg', 'warning'],
+    ]) {
+      expect(page).toContain(`styles.${name}`)
+      const rule = css.match(new RegExp(`\\.${name}\\s*\\{[^}]*\\}`))?.[0]
+      expect(rule).toContain(`background: var(--color-${bg});`)
+      expect(rule).toContain(`color: var(--color-${fg});`)
+    }
+    expect(page).not.toMatch(/bg-(?:gray|green|amber)-100/)
   })
 
   it('自動応答の凡例の札は成功・注意トークン（生の緑700・黄700は使わない）', () => {
@@ -109,9 +116,9 @@ describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
   it('リッチメニュー編集のページ札も同じ規則（明るい緑の上書き・生の黄は使わない）', () => {
     const page = read('rich-menus/edit/page.tsx')
     expect(page).toContain('bg-accent-deep text-on-accent')
-    expect(page).toContain('bg-warning-bg p-2 text-[11px] text-warning')
+    expect(page).toContain('bg-warning-bg p-2 text-micro text-warning')
     expect(page).not.toContain("backgroundColor: 'var(--color-accent)'")
-    expect(page).not.toContain('bg-amber-50 p-2 text-[11px] text-amber-700')
+    expect(page).not.toContain('bg-amber-50 p-2 text-micro text-amber-700')
   })
 })
 

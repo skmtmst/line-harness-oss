@@ -1124,6 +1124,10 @@ function WebhooksPageHost() {
   )
 }
 
+/*
+ * ★V8-B の切り替え。v8 の器は別器（_components/webhooks-v8-*.tsx）に置き、
+ * v7 の器・動きはこの下の V7 のまま残す。
+ */
 export default function WebhooksPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (

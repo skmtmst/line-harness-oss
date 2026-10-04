@@ -760,7 +760,7 @@ function EditCommonVarV8Inner() {
             <Button type="button" onClick={() => setCompareOpen(true)}>
               違いを比べる
             </Button>
-            <Button type="button" variant="primary" onClick={adoptLatest}>
+            <Button type="button" variant="secondary" onClick={adoptLatest}>
               最新を読み込んで続ける
             </Button>
           </div>
@@ -1075,7 +1075,7 @@ function EditCommonVarV8Inner() {
                         </Button>
                       )}
                       {item.status === 'draft' && (
-                        <Button type="button" variant="primary" onClick={() => openStatusDialog('publish')}>
+                        <Button type="button" variant="secondary" onClick={() => openStatusDialog('publish')}>
                           公開する
                         </Button>
                       )}

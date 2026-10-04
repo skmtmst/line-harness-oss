@@ -62,7 +62,7 @@ export default function InboxKpis() {
         </span>
         <div>
           <p className="text-ink text-[17px] font-bold">要返信 {value(stats?.waiting)}</p>
-          <p className="text-status-warn-deep mt-0.5 text-[11px] font-semibold">
+          <p className="text-status-warn-deep mt-0.5 text-micro font-semibold">
             <DelayedSkeleton
               loading={loading}
               skeleton={<Skeleton className="h-3.5 w-24 align-middle" />}
@@ -84,13 +84,13 @@ export default function InboxKpis() {
           ['1時間以上待ち', value(stats?.waitingOverAnHour)],
         ] as [string, ReactNode][]).map(([label, count], index) => (
           <div key={label} className="min-w-0">
-            <p className={`whitespace-nowrap text-[11px] font-semibold ${index === 3 ? 'text-ink-secondary' : 'text-ink-faint'}`}>{label}</p>
-            <p className={`mt-0.5 text-[18px] font-bold tabular-nums ${index === 3 ? 'text-ink-secondary' : 'text-ink'}`}>{count}</p>
+            <p className={`whitespace-nowrap text-micro font-semibold ${index === 3 ? 'text-ink-secondary' : 'text-ink-faint'}`}>{label}</p>
+            <p className={`mt-0.5 text-heading font-bold tabular-nums ${index === 3 ? 'text-ink-secondary' : 'text-ink'}`}>{count}</p>
           </div>
         ))}
       </div>
 
-      <Button variant="secondary" className="text-action h-[38px] shrink-0 items-center gap-2 px-3.5 text-[13px] whitespace-normal" href="/tags?tab=marks">
+      <Button variant="secondary" className="text-action h-[38px] shrink-0 items-center gap-2 px-3.5 text-label whitespace-normal" href="/tags?tab=marks">
         <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6"/></svg>
         対応ルール
       </Button>

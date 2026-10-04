@@ -26,9 +26,9 @@ export function TagFormSkeleton() {
   )
 }
 
-export function TagRowsSkeleton({ rows = 5, narrow = [] as number[] }: { rows?: number; narrow?: number[] }) {
+export function TagRowsSkeleton({ rows = 5, narrow = [] as number[], designNode }: { rows?: number; narrow?: number[]; designNode?: string }) {
   return (
-    <div className={styles.skeletonRows} role="status">
+    <div className={styles.skeletonRows} role="status" data-design-node={designNode}>
       <span className="sr-only">読み込んでいます</span>
       {Array.from({ length: rows }, (_, row) => (
         <div key={row} className={styles.skeletonRow}>

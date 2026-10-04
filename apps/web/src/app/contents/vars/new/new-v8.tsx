@@ -105,6 +105,29 @@ function focusTargetForReason(message: string): string | null {
   return null
 }
 
+/* 1欄ぶんの確かめ。文は「何をすれば直るか」を1文で書く。 */
+function validateVarName(value: string): string | null {
+  return value.trim() ? null : '共通情報名を入力してください'
+}
+
+const VAR_KEY_PATTERN = /^[a-z][a-z0-9_]{0,31}$/
+
+function validateVarKey(value: string): string | null {
+  if (!value.trim()) return '差し込み名を入力してください'
+  return VAR_KEY_PATTERN.test(value.trim())
+    ? null
+    : '差し込み名は半角の英小文字で始め、英小文字・数字・下線だけで32文字までにしてください'
+}
+
+/*
+ * 欄の下の赤い1行。4欄で同じ形にするため1か所にまとめる。
+ * 直書きの className を欄ごとに増やさない（design-debt の計数）。
+ */
+function VarFieldError({ message }: { message: string }) {
+  if (!message) return null
+  return <p className={styles.fieldError} role="alert">{message}</p>
+}
+
 function suggestKey(name: string): string {
   const ascii = name
     .trim()
@@ -149,6 +172,9 @@ export default function NewCommonVarV8() {
   const [error, setError] = useState('')
   const [valueFieldError, setValueFieldError] = useState('')
   const [fallbackFieldError, setFallbackFieldError] = useState('')
+  /* 名前・差し込み名は欄から離れたとき（blur）に確かめ、直したらその場で消す。 */
+  const [nameFieldError, setNameFieldError] = useState('')
+  const [keyFieldError, setKeyFieldError] = useState('')
   const [secretWarningFields, setSecretWarningFields] = useState<string[] | null>(null)
   const valueRef = useRef<HTMLInputElement>(null)
   const memoRef = useRef<HTMLTextAreaElement>(null)
@@ -393,12 +419,17 @@ export default function NewCommonVarV8() {
                   maxLength={NAME_MAX}
                   value={name}
                   onChange={(e) => {
-                    setName(e.target.value)
-                    if (!keyTouched) setVarKey(suggestKey(e.target.value))
+                    const next = e.target.value
+                    setName(next)
+                    if (!keyTouched) setVarKey(suggestKey(next))
+                    if (nameFieldError && validateVarName(next) === null) setNameFieldError('')
                   }}
+                  onBlur={() => setNameFieldError(validateVarName(name) ?? '')}
                   placeholder="営業時間"
                   className={styles.fieldInput}
+                  aria-invalid={nameFieldError ? true : undefined}
                 />
+                <VarFieldError message={nameFieldError} />
                 <p className={styles.fieldCount}>{name.length}/{NAME_MAX}</p>
               </div>
               <div>
@@ -432,12 +463,17 @@ export default function NewCommonVarV8() {
                   type="text"
                   value={varKey}
                   onChange={(e) => {
+                    const next = e.target.value
                     setKeyTouched(true)
-                    setVarKey(e.target.value)
+                    setVarKey(next)
+                    if (keyFieldError && validateVarKey(next) === null) setKeyFieldError('')
                   }}
+                  onBlur={() => setKeyFieldError(validateVarKey(varKey) ?? '')}
                   placeholder="shop_hours"
                   className={styles.fieldInputMono}
+                  aria-invalid={keyFieldError ? true : undefined}
                 />
+                <VarFieldError message={keyFieldError} />
                 {varKey.trim() ? (
                   <CopyTextButton
                     value={`{{var.${varKey.trim()}}}`}
@@ -522,7 +558,7 @@ export default function NewCommonVarV8() {
                   className={styles.fieldInput}
                 />
               )}
-              {valueFieldError ? <p className={styles.fieldError} role="alert">{valueFieldError}</p> : null}
+              <VarFieldError message={valueFieldError} />
               {type !== 'number' && type !== 'boolean' && (
                 <p className={styles.fieldCount}>{value.length}/{type === 'long_text' ? 10000 : VALUE_MAX}</p>
               )}
@@ -564,7 +600,7 @@ export default function NewCommonVarV8() {
                     className={styles.fieldInput}
                   />
                 )}
-                {fallbackFieldError ? <p className={styles.fieldError} role="alert">{fallbackFieldError}</p> : null}
+                <VarFieldError message={fallbackFieldError} />
               </div>
             )}
           </section>

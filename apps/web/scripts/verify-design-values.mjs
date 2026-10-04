@@ -371,7 +371,8 @@ const V8_MEASURE = [
   { id: 'cfVyj', file: 'shared/line-preview.module.css', cls: 'phone', skipText: true },
   { id: 'clV5c', file: 'shared/tabs.module.css', cls: 'list', textCls: ['tab', 'current'] },
   { id: 'KVkPg', file: 'shared/color-well.module.css', cls: 'well', skipText: true },
-  { id: 'KjC1z', file: 'shared/help-tip.module.css', cls: 'button', textCls: 'mark' },
+  // V8 は当たり 28px を札（.button）、16px の正円を中の .mark が持つ（G3 はみ出し直し）。
+  { id: 'KjC1z', file: 'shared/help-tip.module.css', cls: 'mark', textCls: 'mark' },
   { id: 'mpVfY', file: 'shared/status-badge.module.css', cls: 'badge' },
 ]
 

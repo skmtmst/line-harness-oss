@@ -358,7 +358,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                     <p className="mt-1 truncate text-xs text-ink-faint">{item.preview}</p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className={`text-[11px] font-semibold ${isStaleUnresolved(item) ? 'text-status-warn-deep' : 'text-ink-faint'}`}>{elapsed(item.lastIncomingAt)}</p>
+                    <p className={`text-micro font-semibold ${isStaleUnresolved(item) ? 'text-status-warn-deep' : 'text-ink-faint'}`}>{elapsed(item.lastIncomingAt)}</p>
                     <StatusBadge
                       tone={item.status === 'resolved' ? 'success' : 'neutral'}
                       size="compact"
@@ -415,7 +415,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                   <div key={message.id} className={`flex ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[86%] rounded-card px-4 py-3 shadow-card sm:max-w-[72%] ${message.direction === 'outgoing' ? 'rounded-br-mini bg-success-bg text-ink' : 'rounded-bl-mini bg-canvas text-ink'}`}>
                       <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.body_text}</p>
-                      <p className="mt-2 text-right text-[10px] text-ink-faint">{dateTime(message.created_at)}{message.direction === 'outgoing' ? ' · 送信済み' : ''}</p>
+                      <p className="mt-2 text-right text-nano text-ink-faint">{dateTime(message.created_at)}{message.direction === 'outgoing' ? ' · 送信済み' : ''}</p>
                     </div>
                   </div>
                 ))}
@@ -424,7 +424,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
               <div className="border-t border-hairline bg-canvas p-4">
                 <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" aria-label="メールの返信を入力" rows={4} className="w-full resize-none rounded-card border border-hairline bg-canvas-sunken px-4 py-3 text-sm leading-6 focus:bg-canvas" />
                 <div className="mt-3 flex items-center justify-between gap-3">
-                  <p className="text-[11px] text-ink-faint">From: contact-shed@nen-petfood.com</p>
+                  <p className="text-micro text-ink-faint">From: contact-shed@nen-petfood.com</p>
                   <Button variant="primary" className="rounded-card px-6 py-2.5 font-bold shadow-card hover:brightness-90 border-0 h-auto whitespace-normal" onClick={() => void sendReply()} disabled={!reply.trim() || sending}>{sending ? '送信中…' : 'メールで返信'}</Button>
                 </div>
               </div>

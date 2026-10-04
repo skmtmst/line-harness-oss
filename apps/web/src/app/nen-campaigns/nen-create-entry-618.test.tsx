@@ -272,7 +272,7 @@ describe('NEN新規作成入口（#618）', () => {
     })
     await settle()
 
-    const save = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === '下書きを保存する')
+    const save = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === '下書きを保存')
     if (!save) throw new Error('下書きに保存ボタンが見つかりません')
     await click(save)
 

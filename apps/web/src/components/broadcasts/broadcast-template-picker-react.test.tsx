@@ -234,8 +234,7 @@ describe('一斉配信のテンプレート選択（IDEA-11）', () => {
     await renderPicker()
     await clickRow('初回来店のお礼')
 
-    const preview = [...container.querySelectorAll<HTMLElement>('section')]
-      .find((el) => el.textContent?.includes('メッセージプレビュー'))
+    const preview = container.querySelector<HTMLElement>('aside[aria-label="LINEの見え方"]')
     expect(preview, 'プレビューの領域がない').toBeDefined()
     // whitespace-pre-wrap の吹き出しで出るので、改行もそのまま確かめられる。
     const bubble = preview!.querySelector('.whitespace-pre-wrap')

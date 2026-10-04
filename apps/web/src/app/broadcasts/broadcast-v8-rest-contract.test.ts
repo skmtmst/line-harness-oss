@@ -13,14 +13,14 @@ const DETAIL_PAGE = readFileSync(join(HERE, 'detail', 'page.tsx'), 'utf8')
 
 /*
  * ★V8 一斉配信の残り2枚。
- * `FU2aU`（作る流れの5手順）は今の作りのまま、V8 だけ板IDを付ける。
+ * `FU2aU`（作る流れの5手順）はV8へ完全に切り替える。
  * `Q28Gb`（詳細の競合）は、ほかの人の更新に気づいたら帯で知らせ、
  * この画面は書き換えず「読み直す」だけ受け付ける。
  */
 describe('一斉配信の残り2枚（FU2aU・Q28Gb）', () => {
-  it('作る流れは V8 だけ板 FU2aU を付ける（v7 には付けない）', () => {
-    expect(FORM).toContain("data-design-node={v8 ? 'FU2aU' : undefined}")
-    expect(FORM).toContain("theme === 'v8'")
+  it('作る流れはV8の板FU2aUへ完全に切り替える', () => {
+    expect(FORM).toContain('data-design-node="FU2aU"')
+    expect(FORM).not.toContain("theme === 'v8'")
   })
 
   it('詳細の競合の帯は板 Q28Gb を持ち、読み直しだけ出す', () => {

@@ -149,7 +149,8 @@ describe('流入リンクの新規作成(実React)', () => {
 
     expect(api.create).not.toHaveBeenCalled()
     expect(routerPush).not.toHaveBeenCalled()
-    byExactText('p', 'LINEアカウントを選んでください（画面上部で選べます）')
+    // 理由は共通部品の帯（Notice）で出す。要素の種類ではなく文で見る。
+    expect(host.textContent).toContain('LINEアカウントを選んでください（画面上部で選べます）')
   })
 
   it('R39: 所属するアカウントが画面で分かる', async () => {

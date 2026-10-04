@@ -25,7 +25,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ecEventLabel } from '@line-crm/shared'
+import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -43,7 +43,11 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
 import styles from './new-v8.module.css'
 
-/* 見本にある出来事のうち、実際に購読できるものだけ出す。 */
+/*
+ * 送る出来事の正本は `packages/db/src/webhooks.ts` の
+ * KNOWN_OUTGOING_EVENT_TYPES（実際に発火する種別だけを載せる）。
+ * 見本に無い種別も購読できるので、ここでは省かない。
+ */
 const V8_EVENT_GROUPS: ReadonlyArray<{
   id: string
   label: string
@@ -51,29 +55,49 @@ const V8_EVENT_GROUPS: ReadonlyArray<{
 }> = [
   {
     id: 'friends',
-    label: '友だち',
+    label: '友だち・メッセージ',
     events: [
       { value: 'friend_add', label: '友だちになった' },
       { value: 'friend_unfollow', label: '友だちを解除された' },
-      { value: 'tag_change', label: 'タグが付いた' },
+      { value: 'message_received', label: 'メッセージを受け取った' },
+      { value: 'postback_received', label: 'ボタン操作を受け取った' },
     ],
   },
   {
     id: 'operation',
-    label: '運用',
-    events: [{ value: 'booking_created', label: '予約が入った' }],
+    label: '運用の動き',
+    events: [
+      { value: 'tag_change', label: 'タグが付いた・外れた' },
+      { value: 'staff_assigned', label: '担当が割り当てられた' },
+      { value: 'manual_reply_sent', label: '個別返信を送った' },
+      { value: 'cv_fire', label: '成果地点が起きた' },
+      { value: 'form_submitted', label: 'フォームが送られた' },
+      { value: 'booking_created', label: '予約が入った' },
+    ],
   },
   {
     id: 'ec',
-    label: 'EC',
-    events: [
-      { value: 'ec.order.confirmed', label: ecEventLabel('ec.order.confirmed') },
-      { value: 'ec.order.shipped', label: ecEventLabel('ec.order.shipped') },
-    ],
+    label: 'ECの出来事',
+    events: EC_EVENT_TYPES.map((value) => ({ value, label: ecEventLabel(value) })),
   },
 ]
 
 const ALL_V8_EVENTS = V8_EVENT_GROUPS.flatMap((group) => group.events.map((event) => event.value))
+
+/* 1欄ぶんの確かめ。文は「何をすれば直るか」を1文で書く。 */
+function validateName(value: string): string | null {
+  return value.trim() ? null : '名前を入力してください'
+}
+
+function validateUrl(value: string): string | null {
+  return /^https:\/\//.test(value.trim()) ? null : 'URLは https:// で始めてください'
+}
+
+function validateSecret(value: string): string | null {
+  return value.length >= MIN_SECRET_LENGTH
+    ? null
+    : `シークレットは${MIN_SECRET_LENGTH}文字以上にしてください`
+}
 
 const RETRY_OPTIONS = [
   { value: '0', label: '送り直さない' },
@@ -172,13 +196,36 @@ function NewOutgoingV8Inner() {
 
   const validate = (): Record<string, string> => {
     const errors: Record<string, string> = {}
-    if (!name.trim()) errors.name = '名前を入力してください'
-    if (!/^https:\/\//.test(url.trim())) errors.url = 'URLは https:// で始めてください'
-    if (secret.length < MIN_SECRET_LENGTH) errors.secret = `シークレットは${MIN_SECRET_LENGTH}文字以上にしてください`
+    const nameError = validateName(name)
+    if (nameError) errors.name = nameError
+    const urlError = validateUrl(url)
+    if (urlError) errors.url = urlError
+    const secretError = validateSecret(secret)
+    if (secretError) errors.secret = secretError
     if (!sendAllEvents && selectedEvents.length === 0 && !incomingSources.trim()) {
       errors.events = '送るものを選ぶか、「すべて送る」を選んでください'
     }
     return errors
+  }
+
+  /*
+   * 欄から離れたとき（blur）の確かめ。保存を押すまで赤くならないと
+   * 「どこが悪いか分からない」ので、触った欄だけその場で教える。
+   * 直したらその場で消える（onChange 側で消す）。
+   */
+  const blurField = (key: 'name' | 'url' | 'secret', value?: string) => {
+    const current = value ?? (key === 'name' ? name : key === 'url' ? url : secret)
+    const message =
+      key === 'name' ? validateName(current) : key === 'url' ? validateUrl(current) : validateSecret(current)
+    setFieldErrors((current) => {
+      if (!message) {
+        if (!(key in current)) return current
+        const next = { ...current }
+        delete next[key]
+        return next
+      }
+      return current[key] === message ? current : { ...current, [key]: message }
+    })
   }
 
   const toggleEvent = (value: string) => {
@@ -317,7 +364,12 @@ function NewOutgoingV8Inner() {
               <input
                 id="webhook-v8-name"
                 value={name}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {
+                  const next = event.target.value
+                  setName(next)
+                  if (fieldErrors.name && validateName(next) === null) blurField('name', next)
+                }}
+                onBlur={() => blurField('name')}
                 placeholder="顧客台帳（CRM）"
                 className={styles.input}
                 aria-invalid={fieldErrors.name ? true : undefined}
@@ -330,7 +382,12 @@ function NewOutgoingV8Inner() {
                 id="webhook-v8-url"
                 type="url"
                 value={url}
-                onChange={(event) => setUrl(event.target.value)}
+                onChange={(event) => {
+                  const next = event.target.value
+                  setUrl(next)
+                  if (fieldErrors.url && validateUrl(next) === null) blurField('url', next)
+                }}
+                onBlur={() => blurField('url')}
                 placeholder="https://crm.example.com/line/hook"
                 className={styles.input}
                 aria-invalid={fieldErrors.url ? true : undefined}
@@ -343,7 +400,12 @@ function NewOutgoingV8Inner() {
                 <input
                   id="webhook-v8-secret"
                   value={secret}
-                  onChange={(event) => setSecret(event.target.value)}
+                  onChange={(event) => {
+                    const next = event.target.value
+                    setSecret(next)
+                    if (fieldErrors.secret && validateSecret(next) === null) blurField('secret', next)
+                  }}
+                  onBlur={() => blurField('secret')}
                   className={styles.input}
                   aria-invalid={fieldErrors.secret ? true : undefined}
                 />

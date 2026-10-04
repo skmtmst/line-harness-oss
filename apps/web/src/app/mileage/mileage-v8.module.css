@@ -260,17 +260,14 @@
 
 /*
  * 表の器に収める固定割付。自動割付だと改行しない中身（見出し・札・操作）が
- * 表を器より広げ、行末の操作が見切れる（`OC0gy` で右端越え）。先頭列だけ
- * 伸び縮みし、残りは列幅の合計が 100 になるよう `colgroup` で渡す。
+ * 表を器より広げ、行末の操作が見切れる。先頭列だけ伸び縮みし、残りは列幅の
+ * 合計が 100 になるよう `colgroup` で渡す。
  */
 .tableFit {
   table-layout: fixed;
 }
 
-/*
- * 1列目は伸び縮み（余った幅を取る・狭いときは中の省略で縮む）。ほかは中身の幅。
- * 固定割付（.tableFit＋colgroup）の表には掛けない。colgroup の配分が崩れるため。
- */
+/* 固定割付の表は colgroup の配分を使い、先頭列の全幅指定を掛けない。 */
 .table:not(.tableFit) thead th:first-child,
 .table:not(.tableFit) tbody td:first-child {
   width: 100%;
@@ -282,7 +279,7 @@
   font-size: 12px;
   font-weight: 500;
   text-align: left;
-  padding: 13px 20px;
+  padding: 12px 20px;
   white-space: nowrap;
   border-bottom: 1px solid var(--color-hairline);
 }
@@ -491,7 +488,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 17px 20px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--color-hairline);
 }
 
@@ -710,15 +707,19 @@
     gap: 8px;
   }
 
-  .kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .kpi:nth-child(3) {
-    border-left: none;
-  }
-
-  .kpi:nth-child(n + 3) {
-    border-top: 1px solid var(--color-hairline);
-  }
+  /*
+   * 1152 の板（`ZJIyl`）でも数の帯は4列の1本帯のままにする。
+   * 2列にすると帯が2段になり見本とずれる。
+   */
 }
+
+/* 点数の変化の明細（R8NNi）: 4列と600pxの板。 */
+:global([data-theme='v8'] [data-design-node='R8NNi'] [role='dialog']):has(.dlgPerson) { width: min(600px, 100%); }
+.scoreHistoryTable { margin-top: 16px; table-layout: fixed; }
+.scoreHistoryTable th:first-child { width: 29%; }
+.scoreHistoryTable th:nth-child(2) { width: 45%; }
+.scoreHistoryTable th:nth-child(n + 3) { width: 13%; }
+.scoreHistoryTable td:nth-child(n + 3) { text-align: right; }
+.scoreHistoryTable td:nth-child(2) { overflow-wrap: anywhere; }
+.scoreHistoryTable [data-score-delta='positive'] { color: var(--color-accent-deep); }
+.scoreHistoryTable [data-score-delta='negative'] { color: var(--color-warning); }

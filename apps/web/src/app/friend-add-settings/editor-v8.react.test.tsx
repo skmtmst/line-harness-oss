@@ -105,7 +105,7 @@ test('v8 の作る①は板 wDzkc・手順の輪・設定内容・下の帯が�
   })
   expect(host.textContent).toContain('初回案内を作る')
   expect(host.textContent).toContain('設定内容')
-  expect(host.textContent).toContain('下書きを保存')
+  expect(host.textContent).toContain('下書きのまま保存')
   expect(host.textContent).toContain('次へ：流入リンク')
   expect(host.textContent).toContain('だれに送るか')
 })

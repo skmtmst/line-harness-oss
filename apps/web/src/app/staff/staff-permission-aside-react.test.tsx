@@ -107,7 +107,7 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('権限詳細の説明欄は選択中の権限から生成する (#983)', () => {
-  it('「運用」の説明はプリセットから項目数と名前を組み立て、人数は実集計を使う', async () => {
+  it('「スタッフ」の説明はプリセットから項目数と名前を組み立て、人数は実集計を使う', async () => {
     await openPermissionView()
 
     // 運用プリセット: settings だけ none。feature行10件のうち出るのは9項目。

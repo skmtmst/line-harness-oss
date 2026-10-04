@@ -750,7 +750,7 @@ export default function NewProxyBookingPage() {
   }
 
   return (
-    <div data-design-node={NODE_BY_STEP[step]} className="space-y-4 pb-24">
+    <div data-design-node={`${NODE_BY_STEP[step]} If9Mh`} className="space-y-4 pb-24">
       <nav data-design="Crumb" aria-label="現在位置" className="text-ink-faint text-xs">
         <Link href="/booking/bookings" className="text-action underline">予約</Link>
         <span className="mx-2">›</span>
@@ -863,9 +863,9 @@ export default function NewProxyBookingPage() {
                     size="full"
                   />
                 </Field>
-                <Field label="担当者">
+                <Field label="スタッフ">
                   <Select
-                    aria-label="担当者"
+                    aria-label="スタッフ"
                     value={staffId}
                     onChange={setStaffId}
                     options={[{ value: '', label: '選択してください' }, ...staff.map((item) => ({ value: item.id, label: item.display_name }))]}

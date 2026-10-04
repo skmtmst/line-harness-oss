@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import type { WebinarCtaCard } from '@/lib/api'
 import { ctaCardProblems } from './cta-card-validation'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, 'cta-v8.tsx'), 'utf8')
 
 function parseMinSec(v: string): number | null {
   const m = /^(\d+):([0-5]?\d)$/.exec(v.trim())
@@ -74,6 +74,6 @@ describe('CTAカードの保存前チェック (N-119)', () => {
     // 関数だけ直して配線を忘れると、不足のまま保存されて公開前検証で初めて止まる。
     expect(PAGE).toContain('ctaCardProblems(ctas, times, durationSeconds, parseMinSec)')
     expect(PAGE.indexOf('ctaCardProblems(ctas, times, durationSeconds, parseMinSec)'))
-      .toBeLessThan(PAGE.indexOf('webinarApi.saveCtas(webinarId, sorted)'))
+      .toBeLessThan(PAGE.indexOf('webinarApi.saveCtas(webinarId, next)'))
   })
 })

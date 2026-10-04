@@ -1,5 +1,7 @@
 'use client'
 
+import HelpTip from '@/components/shared/help-tip'
+import './analytics-v8.css'
 import type { WebinarAnalytics } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { percent } from './participants-shared'
@@ -15,8 +17,7 @@ import { percent } from './participants-shared'
  *   段ごとの減り（-N）と、いちばん減っている段を文で出す。
  */
 function thisMonthKey(now: Date = new Date()): string {
-  const jst = new Date(now.getTime() + 9 * 3_600_000)
-  return `${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, '0')}`
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
 export default function AnalyticsFunnelV8({
@@ -45,7 +46,7 @@ export default function AnalyticsFunnelV8({
     { label: 'CTAを押した', value: summary.ctaClicks, unit: '人' },
     { label: 'フォーム送信', value: summary.formSubmissions, unit: '件' },
   ]
-  const top = Math.max(1, stages[0].value)
+  const top = Math.max(1, ...stages.map((stage) => stage.value))
   let biggestDrop = 0
   let biggestFrom = ''
   let biggestTo = ''
@@ -61,10 +62,10 @@ export default function AnalyticsFunnelV8({
 
   return (
     <>
-      <section id="webinar-analytics-tiles" aria-label="数の帯" className="grid gap-3 scroll-mt-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section id="webinar-analytics-tiles" aria-label="数の帯" data-analytics-kpis>
         {tiles.map((tile) => (
-          <div key={tile.label} className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-            <p className="text-ink-faint text-xs">{tile.label}</p>
+          <div key={tile.label} >
+            <p className="text-ink-faint text-xs">{tile.label}<HelpTip label={`${tile.label}の説明`}>{tile.label === '視聴完了' ? '動画の9割以上を実際に見た人です。' : tile.label === '参加' ? '入場した人の数です。予約せず直接入場した人も含みます。' : tile.label === '申込' ? '予約した人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' : 'フォームを送信した件数です。各段の人数差は、同じ人が順番に進んだ割合を表すものではありません。'}</HelpTip></p>
             <p className="text-ink mt-2 text-2xl font-semibold tabular-nums">
               {formatNumber(tile.value)}
               <span className="ml-1 text-sm font-normal">{tile.unit}</span>
@@ -99,8 +100,8 @@ export default function AnalyticsFunnelV8({
                   {formatNumber(stage.value)}
                   <span className="ml-1 text-xs font-normal">{stage.unit}</span>
                 </span>
-                <span className="text-ink-faint w-12 shrink-0 text-right text-xs tabular-nums" aria-label={drop === null ? undefined : `${formatNumber(drop)}人減`}>
-                  {drop === null ? '' : `-${formatNumber(drop)}`}
+                <span className="text-ink-faint w-12 shrink-0 text-right text-xs tabular-nums" aria-label={drop === null ? undefined : `${formatNumber(Math.abs(drop))}${drop >= 0 ? '減' : '増'}`}>
+                  {drop === null ? '' : `${drop >= 0 ? '-' : '+'}${formatNumber(Math.abs(drop))}`}
                 </span>
               </li>
             )

@@ -9,7 +9,6 @@ import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { api } from '@/lib/api'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { qrToDataURL } from '@/lib/qr-image'
 import OtpInput from '@/components/shared/otp-input'
@@ -25,8 +24,6 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null }
 
 export default function OpsTwoFactorPage() {
-  const theme = useAdminTheme()
-  const v8 = theme === 'v8'
   const [session, setSession] = useState<Session | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'done' | 'denied'>('loading')
   const [uri, setUri] = useState('')
@@ -121,7 +118,7 @@ export default function OpsTwoFactorPage() {
 
   return (
     <AuthCard
-      node={v8 ? 'qod6X' : 'NAJKx'}
+      node="qod6X"
       cardNode="ckBzA"
       title="2要素認証を設定"
       description={
@@ -151,53 +148,32 @@ export default function OpsTwoFactorPage() {
           {error && !uri ? (
             <Button onClick={() => void load()} className="w-full">もう一度読み込む</Button>
           ) : null}
-          {v8 ? (
-            <div className="flex w-full items-start gap-4">
-              <div className="shrink-0">
-                {qr ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
-                  <img src={qr} alt="認証アプリ登録用のQRコード" className="h-36 w-36 rounded-control border border-hairline" />
-                ) : qrFailed ? (
-                  <div className="flex h-36 w-36 flex-col items-center justify-center gap-2 rounded-control border border-hairline px-2">
-                    <p role="alert" className="text-center text-micro text-danger">QRコードを表示できませんでした</p>
-                    <Button onClick={() => setQrAttempt((n) => n + 1)}>QRをもう一度表示する</Button>
-                  </div>
-                ) : (
-                  <DelayedSkeleton loading skeleton={<Skeleton className="block h-36 w-36 rounded-control" />} />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-micro text-ink-secondary">読み取れないときは、このキーを手で入力</p>
-                <p className="mt-1 break-all font-mono text-caption font-bold text-ink">{manualKey || '—'}</p>
-                <Button onClick={() => setQrAttempt((n) => n + 1)} className="mt-2">QRをもう一度表示する</Button>
-              </div>
-            </div>
-          ) : (
-            <>
+          <div className="flex w-full items-start gap-4">
+            <div className="shrink-0">
               {qr ? (
                 // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
-                <img src={qr} alt="認証アプリ登録用のQRコード" className="h-52 w-52 rounded-control border border-hairline" />
+                <img src={qr} alt="認証アプリ登録用のQRコード" className="h-36 w-36 rounded-control border border-hairline" />
               ) : qrFailed ? (
-                <div className="flex w-full flex-col items-center gap-2">
-                  <p role="alert" className="text-center text-caption text-danger">QRコードを表示できませんでした。接続を確かめて、もう一度お試しください。</p>
+                <div className="flex h-36 w-36 flex-col items-center justify-center gap-2 rounded-control border border-hairline px-2">
+                  <p role="alert" className="text-center text-micro text-danger">QRコードを表示できませんでした</p>
                   <Button onClick={() => setQrAttempt((n) => n + 1)}>QRをもう一度表示する</Button>
                 </div>
               ) : (
-                <DelayedSkeleton loading skeleton={<Skeleton className="block h-52 w-52 rounded-control" />} />
+                <DelayedSkeleton loading skeleton={<Skeleton className="block h-36 w-36 rounded-control" />} />
               )}
-              <div className="text-center">
-                <p className="text-micro text-ink-secondary">読み取れないときは、このキーを手で入力</p>
-                <p className="mt-1 break-all font-mono text-caption font-bold text-ink">{manualKey || '—'}</p>
-              </div>
-            </>
-          )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-micro text-ink-secondary">読み取れないときは、このキーを手で入力</p>
+              <p className="mt-1 break-all font-mono text-caption font-bold text-ink">{manualKey || '—'}</p>
+              <Button onClick={() => setQrAttempt((n) => n + 1)} className="mt-2">QRをもう一度表示する</Button>
+            </div>
+          </div>
           <div className="w-full">
-            <AuthField label={v8 ? '認証コード（6桁）' : '認証アプリの6桁の数字'} htmlFor="ops-totp-code">
-              {/* ★V7 共通 認証コード入力（xHzFK）。 */}
-              <OtpInput id="ops-totp-code" value={code} onChange={setCode} label="認証アプリの6桁の数字" invalid={Boolean(error)} disabled={busy} />
+            <AuthField label="認証コード（6桁）" htmlFor="ops-totp-code">
+              <OtpInput id="ops-totp-code" value={code} onChange={setCode} label="認証コード（6桁）" invalid={Boolean(error)} disabled={busy} />
             </AuthField>
           </div>
-          <Button type="submit" variant="primary" disabled={busy || !uri || (v8 && !codeComplete)} className="w-full" busy={busy} busyLabel="確認しています…">{v8 ? '登録する' : '確認して登録を完了する'}
+          <Button type="submit" variant="primary" disabled={busy || !uri || !codeComplete} className="w-full" busy={busy} busyLabel="確認しています…">登録する
           </Button>
           <p className="text-center text-caption text-ink-faint">
             確認が通ると、安全のため一度ログアウトします。メールとパスワード、次に6桁の数字でログインし直してください

@@ -67,10 +67,10 @@ describe('友だち詳細 監査#1011の契約', () => {
   it('FRIEND-31: 狭い画面では補助プロフィールを畳む', () => {
     expect(PAGE).toContain('profileExpanded')
     expect(PAGE).toContain('顧客情報をすべて表示')
-    expect(PAGE).toContain('max-lg:hidden')
+    expect(PAGE).toContain('{profileExpanded &&')
     // PC由来の固定高をスマートフォンへ持ち込まない（lg以上だけ scoped style）。
     expect(PAGE).not.toContain('style={{ minHeight: 1234 }}')
-    expect(PAGE).toContain('@media (min-width: 1024px)')
-    expect(PAGE).toContain('min-height: 1234px')
+    expect(PAGE).not.toContain('min-height: 1234px')
+
   })
 })

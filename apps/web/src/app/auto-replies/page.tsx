@@ -326,7 +326,7 @@ function AutoRepliesPageV7() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-[10px] bg-canvas-sunken text-ink-faint line-through"
+                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-nano bg-canvas-sunken text-ink-faint line-through"
                 title={title}
               >
                 {word.mark} {label}
@@ -337,7 +337,7 @@ function AutoRepliesPageV7() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-[10px] bg-success-bg text-success font-medium"
+                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-nano bg-success-bg text-success font-medium"
                 title={title}
               >
                 {word.mark} {label}{ea.via === 'automation' && <span className="text-success">⚙</span>}
@@ -347,7 +347,7 @@ function AutoRepliesPageV7() {
           return (
             <span
               key={ea.accountId}
-              className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-[10px] bg-warning-bg text-warning"
+              className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded-mini text-nano bg-warning-bg text-warning"
               title={title}
             >
               {word.mark} {label}
@@ -367,10 +367,10 @@ function AutoRepliesPageV7() {
           r.responseType === 'silent'
             ? 'text-ink-faint text-xs'
             : r.responseType === 'flex'
-              ? 'px-1.5 py-0.5 rounded-mini bg-chip-alt-soft text-chip-alt text-[10px] font-medium'
+              ? 'px-1.5 py-0.5 rounded-mini bg-chip-alt-soft text-chip-alt text-nano font-medium'
               : r.responseType === 'image'
-                ? 'px-1.5 py-0.5 rounded-mini bg-info-bg text-info text-[10px] font-medium'
-                : 'px-1.5 py-0.5 rounded-mini bg-canvas-sunken text-ink-secondary text-[10px] font-medium'
+                ? 'px-1.5 py-0.5 rounded-mini bg-info-bg text-info text-nano font-medium'
+                : 'px-1.5 py-0.5 rounded-mini bg-canvas-sunken text-ink-secondary text-nano font-medium'
         }
         title={word.note}
       >
@@ -387,7 +387,7 @@ function AutoRepliesPageV7() {
     )
     // 開く先が無いものはリンクにしない。押しても何も起きない導線を置かない。
     if (!word.linked) {
-      return <span className="text-[11px] text-ink-faint" title={word.note}>{word.label}</span>
+      return <span className="text-micro text-ink-faint" title={word.note}>{word.label}</span>
     }
     // R11: テンプレートはこの行の物とは別物のため、別画面へ飛ばさない。名前は黒文字。
     return (
@@ -695,10 +695,10 @@ function AutoRepliesPageV7() {
               <span
                 className={
                   row.status === 'reply'
-                    ? 'inline-flex items-center gap-0.5 rounded-mini bg-success-bg px-1.5 py-0.5 text-[10px] font-medium text-success'
+                    ? 'inline-flex items-center gap-0.5 rounded-mini bg-success-bg px-1.5 py-0.5 text-nano font-medium text-success'
                     : row.status === 'silent'
-                      ? 'inline-flex items-center gap-0.5 rounded-mini bg-warning-bg px-1.5 py-0.5 text-[10px] text-warning'
-                      : 'inline-flex items-center gap-0.5 rounded-mini bg-canvas-sunken px-1.5 py-0.5 text-[10px] text-ink-faint line-through'
+                      ? 'inline-flex items-center gap-0.5 rounded-mini bg-warning-bg px-1.5 py-0.5 text-nano text-warning'
+                      : 'inline-flex items-center gap-0.5 rounded-mini bg-canvas-sunken px-1.5 py-0.5 text-nano text-ink-faint line-through'
                 }
               >
                 {row.mark ? `${row.mark} ` : ''}アカウント名
@@ -885,14 +885,14 @@ function AutoRepliesPageV7() {
                       <span className="block truncate" title={r.name || r.keyword}>
                         {r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}
                       </span>
-                      <span className="text-ink-faint mt-0.5 block truncate text-[11px] font-normal" title={ruleSubtitle(r, templateById.get(r.templateId ?? '')?.name ?? null)}>
+                      <span className="text-ink-faint mt-0.5 block truncate text-micro font-normal" title={ruleSubtitle(r, templateById.get(r.templateId ?? '')?.name ?? null)}>
                         {ruleSubtitle(r, templateById.get(r.templateId ?? '')?.name ?? null)}
                       </span>
                     </td>
                     <td className="px-3 py-3">
                       {/* E-01: 止めた記録があれば、いつ・誰が・なぜを title で読める */}
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-pill text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-pill text-nano font-medium ${r.isActive ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}
                         title={stopNote(r) ?? undefined}
                       >
                         {r.isActive ? '有効' : '停止中'}
@@ -912,7 +912,7 @@ function AutoRepliesPageV7() {
                         {conditionChips(r).map((label) => (
                           <span
                             key={label}
-                            className="bg-canvas-sunken text-ink-secondary rounded-pill max-w-full truncate px-1.5 py-0.5 text-[10px] whitespace-nowrap"
+                            className="bg-canvas-sunken text-ink-secondary rounded-pill max-w-full truncate px-1.5 py-0.5 text-nano whitespace-nowrap"
                             title={label}
                           >
                             {label}
@@ -926,7 +926,7 @@ function AutoRepliesPageV7() {
                         {renderTemplateCell(r)}
                         {renderResponseCell(r)}
                         {actionSummary(r).length > 0 && (
-                          <p className="text-ink-faint truncate text-[11px]" title={actionSummary(r).join('・')}>
+                          <p className="text-ink-faint truncate text-micro" title={actionSummary(r).join('・')}>
                             ＋{actionSummary(r).join('・')}
                           </p>
                         )}
@@ -940,7 +940,7 @@ function AutoRepliesPageV7() {
                       <span className="text-ink text-sm tabular-nums">{r.hits?.period ?? '—'}</span>
                       <span className="text-ink-faint text-xs">回</span>
                       {/* 狭い列でも横に流さないよう、累計は1行で切る（全文は列の title） */}
-                      <span className="text-ink-faint mt-0.5 block max-w-full truncate text-[10px]">累計 {r.hits?.total ?? '—'}回</span>
+                      <span className="text-ink-faint mt-0.5 block max-w-full truncate text-nano">累計 {r.hits?.total ?? '—'}回</span>
                     </td>
                     {/* 狭い列でボタンが切れても、重ねるだけで操作の全部が
                         読めるように title を付ける（第5パス D-3）。 */}

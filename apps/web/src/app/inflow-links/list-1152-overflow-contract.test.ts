@@ -30,3 +30,26 @@ describe("inflow-links 一覧の1152幅", () => {
     }
   });
 });
+
+describe("inflow-links 広告費の表の1152幅（板 y1ztx の横展開）", () => {
+  const ADS = readFileSync(resolve(__dirname, "ad-integration.tsx"), "utf-8");
+
+  it("費用の表も横送りの殻に入れる", () => {
+    expect(ADS).toContain("data-scroll-x");
+    expect(ADS).toContain("min-w-[760px]");
+  });
+
+  it("列を削らない（7列すべて出す）", () => {
+    for (const head of [
+      "流入元",
+      "媒体",
+      "計測リンク",
+      "この30日の費用",
+      "友だち追加",
+      "1人あたり",
+      "取り込み",
+    ]) {
+      expect(ADS, `${head} が無い`).toContain(head);
+    }
+  });
+});

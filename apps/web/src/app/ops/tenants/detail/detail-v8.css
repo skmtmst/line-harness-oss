@@ -1,0 +1,9 @@
+@layer properties, theme, base, components, utilities;
+.ops-detail-page { min-width: 0; container-type: inline-size; }
+.ops-detail-page dl > div { padding-block: 10px; border-top: 1px solid var(--color-hairline); font-size: 12px; }
+.ops-detail-page dl dt { font-weight: 400; color: var(--color-ink-secondary); }
+.ops-detail-section { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); min-width: 0; }
+.ops-detail-section h3 { font-size: 14px; font-weight: 600; }
+.ops-detail-page table { width: 100%; table-layout: fixed; }
+.ops-detail-page th, .ops-detail-page td { padding: 9px 14px; font-size: 12px; }
+.ops-detail-page th { white-space: nowrap; }

@@ -1088,6 +1088,8 @@ async function getEditorPayload(c: Context<Env>, row: Webinar) {
     : null;
   return {
     version: settings.version,
+    /* 同時編集の帯（pvimJ）が読んだ版を見分ける更新日時。 */
+    updatedAt: settings.updated_at ?? null,
     deliveryKind: settings.delivery_kind,
     viewingCondition: parseJson(settings.viewing_condition_json, { kind: 'registered', label: '申込者向け' }),
     publicDescription: settings.public_description,
@@ -1306,7 +1308,7 @@ webinarRoutes.get('/api/webinars', async (c) => {
     const rawSort = c.req.query('sort');
     const sort = rawSort === 'created' || rawSort === 'name' ? rawSort : 'updated';
     const rawStatus = c.req.query('status');
-    const status = rawStatus === 'active' || rawStatus === 'draft' ? rawStatus : undefined;
+    const status = rawStatus === 'active' || rawStatus === 'draft' || rawStatus === 'archived' ? rawStatus : undefined;
     const rawFolder = c.req.query('folder');
     const folderId = !rawFolder ? undefined : rawFolder === '__unfiled__' ? null : rawFolder;
     const q = (c.req.query('q') || '').trim() || undefined;
@@ -1408,9 +1410,27 @@ webinarRoutes.put('/api/webinars/:id/editor', requireRole('owner', 'admin'), asy
   try {
     const row = await getWebinarById(c.env.DB, c.req.param('id'));
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
-    const body = await c.req.json<WebinarEditorSettingsInput & { expectedVersion?: unknown }>();
+    const body = await c.req.json<WebinarEditorSettingsInput & { expectedVersion?: unknown; expectedUpdatedAt?: unknown }>();
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
       return c.json({ success: false, error: 'expected_version_required' }, 400);
+    }
+    /*
+     * 同時編集の見分けは「最後に直した日時で比べる」。
+     * expectedUpdatedAt が送られてきたときだけ照合し、違えば409で止めて
+     * 今の中身を返す。送らなければ従来どおり版だけで比べる。
+     */
+    if (typeof body.expectedUpdatedAt === 'string') {
+      const editorRow = await c.env.DB.prepare(
+        `SELECT updated_at FROM webinar_editor_settings WHERE webinar_id = ?`,
+      ).bind(row.id).first<{ updated_at: string }>();
+      if (editorRow && editorRow.updated_at !== body.expectedUpdatedAt) {
+        return c.json({
+          success: false,
+          code: 'VERSION_CONFLICT',
+          error: 'ほかの人が先に変えました。最新の内容を確認してから保存し直してください。',
+          data: { latest: await getEditorPayload(c, row) },
+        }, 409);
+      }
     }
     if (body.deliveryKind && !['on_demand', 'scheduled', 'external'].includes(body.deliveryKind)) {
       return c.json({ success: false, error: 'invalid_delivery_kind' }, 400);

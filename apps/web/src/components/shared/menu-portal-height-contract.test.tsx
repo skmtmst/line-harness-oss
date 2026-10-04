@@ -12,7 +12,7 @@ import MenuPortal, { hasMoreBelow, MENU_PORTAL_MARGIN } from './menu-portal'
  * （画面 − ボタン − 余白8px）まで使い、入るなら全部出す。
  * 入りきらない時だけ中でスクロールし、下端に影（続きの目印）を付ける。
  *
- * 回答フォームの「＋ ブロックを追加（12種）」は器の中で
+ * 回答フォームの「＋ ブロックを追加（15種）」は器の中で
  * 20rem（約7項目）で切れていた。直しを戻す（器に上限なし・
  * メニューの portal 側に 20rem の上限あり）と赤くなる。
  */
@@ -33,7 +33,7 @@ beforeEach(() => {
   document.body.appendChild(host)
   root = createRoot(host)
   anchor = document.createElement('button')
-  anchor.textContent = '＋ ブロックを追加（12種）'
+  anchor.textContent = '＋ ブロックを追加（15種）'
   host.appendChild(anchor)
 })
 

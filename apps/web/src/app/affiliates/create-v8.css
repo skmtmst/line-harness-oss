@@ -1,0 +1,349 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8-B 成果とアフィリエイトの作る画面（`RaMf3`・`Td4TN`）。
+ * 左に本文、右に rails。下で作る画面の足元操作は共通の StickyBar。
+ * 色・角丸・影は直接書かず、名前（トークン）だけを使う。
+ */
+.af-create-board {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: -20px -24px -28px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.af-create-head {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--color-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.af-create-backLink {
+  color: var(--color-info);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.af-create-backLink:hover {
+  text-decoration: underline;
+}
+
+.af-create-headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.af-create-headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.af-create-columns {
+  padding: 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  min-width: 0;
+}
+
+.af-create-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.af-create-rail {
+  border-left: 1px solid var(--color-hairline);
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 32%;
+  flex: none;
+}
+
+.af-create-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: 20px;
+}
+
+.af-create-cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.af-create-cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.af-create-grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.af-create-fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.af-create-fieldNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+/* 報酬の決め方の札（3択）。選んだ札だけ縁を変える。 */
+.af-create-choiceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.af-create-choiceCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  cursor: pointer;
+  text-align: left;
+}
+
+.af-create-choiceCardSelected {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+}
+
+.af-create-choiceName {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.af-create-choiceNote {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 入力が無い札（金額は案件で決まる、など）。押せない印なので button にしない。 */
+.af-create-staticBox {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  padding: 10px 12px;
+}
+
+.af-create-staticLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.af-create-staticValue {
+  margin: 2px 0 0;
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.af-create-staticReason {
+  margin: 2px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 入り切り段（成果が出たとき・認めたとき）。札の中の1行。 */
+.af-create-switchRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  padding: 12px;
+}
+
+.af-create-switchBody {
+  min-width: 0;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.af-create-switchName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.af-create-switchNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+/* rails の決まり文の表。 */
+.af-create-kvList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.af-create-kvRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.af-create-kvRow + .af-create-kvRow {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.af-create-kvKey {
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  flex: none;
+}
+
+.af-create-kvValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.af-create-noteList {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.af-create-previewBox {
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.af-create-previewName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.af-create-previewReward {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.af-create-urlRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.af-create-urlText {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.af-create-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.af-create-errorText {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+.af-create-footnote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@container (max-width: 1100px) {
+  .af-create-columns {
+    flex-direction: column;
+  }
+
+  .af-create-main {
+    width: 100%;
+  }
+
+  .af-create-rail {
+    border-left: 0;
+    padding-left: 0;
+    width: 100%;
+  }
+
+
+}
+
+@container (max-width: 600px) {
+  .af-create-grid2, .af-create-choiceGrid { grid-template-columns: minmax(0, 1fr); }
+  .af-create-columns { padding: 16px; }
+}

@@ -99,7 +99,7 @@ export function TextField({
         required={required}
         className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
       />
-      {hint && <p className="text-[11px] text-ink-faint mt-1">{hint}</p>}
+      {hint && <p className="text-micro text-ink-faint mt-1">{hint}</p>}
     </div>
   )
 }
@@ -151,7 +151,7 @@ export function AccountFormSections({
               disabled
               className="w-full border border-hairline rounded-control px-3 py-2 text-sm font-mono bg-surface-pearl text-ink-faint cursor-not-allowed"
             />
-            <p className="text-[11px] text-ink-faint mt-1">
+            <p className="text-micro text-ink-faint mt-1">
               Channel ID は変更できません（LINE 側で固定の識別子）
             </p>
           </div>
@@ -229,7 +229,7 @@ export function AccountFormSections({
             onChange={(e) => update({ ogSiteName: e.target.value || null })}
             className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           />
-          <p className="text-[11px] text-ink-faint mt-1">
+          <p className="text-micro text-ink-faint mt-1">
             リンクプレビューでブランド名として表示されます。
           </p>
         </div>

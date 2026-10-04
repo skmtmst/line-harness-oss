@@ -117,7 +117,7 @@ export default function InboxFilterPanel({
           </div>
 
           <div>
-            <span className={labelClass}>担当者</span>
+            <span className={labelClass}>担当</span>
             <div className="mt-1.5">
               <Combobox
                 aria-label="担当者で絞り込む（パネル）"

@@ -1003,6 +1003,8 @@ export async function previewConversionDefinition(
   return {
     range: input.range,
     matchedCount,
+    uniqueFriendCount: uniqueFriends,
+    excludedCount: excludedPastCount,
     estimatedCount,
     estimatedValue: Math.round(estimatedCount * unitValue),
     duplicateExcludedCount: Math.max(0, matchedCount - estimatedCount),

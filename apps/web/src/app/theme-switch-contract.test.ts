@@ -6,7 +6,7 @@
  *   - 担当者の切り替え口が設定画面にある
  *   - 台帳スクリプトが部品・画面を数えられる
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { collectReport } from '../../scripts/theme-migration-report.mjs'

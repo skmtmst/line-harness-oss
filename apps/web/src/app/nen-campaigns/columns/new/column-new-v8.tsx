@@ -17,11 +17,15 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Disclosure from '@/components/shared/disclosure'
 import DateTimeField from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
+import LinePreview from '@/components/shared/line-preview'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { Check } from 'lucide-react'
 import { TextField } from '@/components/shared/text-field'
 import { api, ApiError } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -41,7 +45,7 @@ import {
   type ColumnDraft,
   type Failure,
 } from './column-form'
-import { ColumnLinePreview } from '../../line-preview'
+import { LineCard } from '../../line-preview'
 import { formatNumber } from '@/lib/format'
 import styles from './column-new-v8.module.css'
 
@@ -123,10 +127,10 @@ export default function ColumnNewV8() {
 
   return (
     <div data-design-node="yRDwW" className={styles.board}>
-      <nav className={styles.crumb} aria-label="パンくず">
-        <Link href="/nen-campaigns">← NEN配信へ</Link>
-      </nav>
       <div className={styles.head}>
+        <nav className={styles.crumb} aria-label="パンくず">
+          <Link href="/nen-campaigns">← NEN配信へ</Link>
+        </nav>
         <h1 className={styles.headTitle}>コラムを書く</h1>
         <p className={styles.headDesc}>外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。</p>
       </div>
@@ -138,7 +142,7 @@ export default function ColumnNewV8() {
 
       <div className={styles.split}>
         <div className={styles.main}>
-          <section className={styles.card} aria-label="題名と分類">
+          <section className={styles.card} aria-label="題名と分類" data-nen-part="title">
             <h2 className={styles.cardTitle}>題名と分類</h2>
             <label className={styles.fieldLabel}>
               題名
@@ -161,7 +165,7 @@ export default function ColumnNewV8() {
             </label>
           </section>
 
-          <section className={styles.card} aria-label="記事のリンク">
+          <section className={styles.card} aria-label="記事のリンク" data-nen-part="article">
             <h2 className={styles.cardTitle}>記事のリンク</h2>
             <label className={styles.fieldLabel}>
               記事の URL
@@ -174,14 +178,24 @@ export default function ColumnNewV8() {
             </label>
           </section>
 
-          <section className={styles.card} aria-label="いつ・だれに出しますか">
+          <section className={styles.card} aria-label="届く形">
+            <h2 className={styles.cardTitle}>届く形</h2>
+            <RadioCardGroup legend="届く形" className={styles.row2}>
+              <RadioCard name="column-kind" value="card" checked onChange={() => {}}
+                title="上の写真＋コラムを読む" note="写真の下に題名とボタン" />
+              <RadioCard name="column-kind" value="text" checked={false} onChange={() => {}}
+                title="文字だけ" note="題名と概要とリンク" disabled disabledReason="この配信では選べません" />
+            </RadioCardGroup>
+          </section>
+
+          <section className={styles.card} aria-label="いつ・だれに出しますか" data-nen-part="publish">
             <h2 className={styles.cardTitle}>いつ・だれに出しますか</h2>
             <p className={styles.note}>この日時は下書きに記録されます。実際の配信は、一覧で「この内容で予約する」を押したときだけ始まります。</p>
             <div className={styles.row2}>
-              <label className={styles.fieldLabel}>
-                配信日時（日本時間）
-                <DateTimeField aria-label="配信日時（日本時間）" value={draft.scheduledAt} invalid={Boolean(touched && errorFor('scheduledAt'))} onChange={(v) => set({ scheduledAt: v })} />
-              </label>
+              <div className={styles.fieldLabel}>
+                <label htmlFor="nen-schedule-v8">配信日時（日本時間）</label>
+                <DateTimeField id="nen-schedule-v8" aria-label="配信日時（日本時間）" value={draft.scheduledAt} invalid={Boolean(touched && errorFor('scheduledAt'))} onChange={(v) => set({ scheduledAt: v })} />
+              </div>
               <label className={styles.fieldLabel}>
                 配信対象
                 <Select
@@ -210,11 +224,13 @@ export default function ColumnNewV8() {
               </label>
             ) : null}
             <p className={styles.note}>この条件では {audienceCount == null ? '—' : formatNumber(audienceCount)}人に届きます。</p>
-            <label className={styles.fieldLabel}>
-              公開日時（日本時間）
-              <DateTimeField aria-label="公開日時（日本時間）" value={draft.publishedAt} invalid={Boolean(touched && errorFor('publishedAt'))} onChange={(v) => set({ publishedAt: v })} />
-            </label>
+            <Disclosure title="公開日時も記録する（任意）" size="compact">
+            <div className={styles.fieldLabel}>
+              <label htmlFor="nen-publish-v8">公開日時（日本時間）</label>
+              <DateTimeField id="nen-publish-v8" aria-label="公開日時（日本時間）" value={draft.publishedAt} invalid={Boolean(touched && errorFor('publishedAt'))} onChange={(v) => set({ publishedAt: v })} />
+            </div>
             <p className={styles.note}>空のままなら公開日時は入りません。日本時間で保存します。</p>
+            </Disclosure>
           </section>
 
           <section className={styles.card} aria-label="読んだ人にすること">
@@ -241,9 +257,12 @@ export default function ColumnNewV8() {
         </div>
 
         <aside className={styles.side}>
-          <section className={styles.card} aria-label="LINE での見え方">
+          <section className={styles.preview} aria-label="LINE での見え方" data-nen-part="preview">
             <h2 className={styles.cardTitle}>LINE での見え方</h2>
-            <ColumnLinePreview column={previewColumn} introText="" buttonLabel="コラムを読む" />
+            <LinePreview caption={draft.scheduledAt ? draft.scheduledAt.replace('T', ' ') : '配信日時は未設定'}>
+              <LineCard imageUrl={previewColumn.imageUrl} category={previewColumn.category}
+                title={previewColumn.title} body={previewColumn.excerpt} buttonLabel="コラムを読む" />
+            </LinePreview>
           </section>
           <section className={styles.card} aria-label="読まれるコラムの書きかた">
             <h2 className={styles.cardTitle}>読まれるコラムの書きかた</h2>
@@ -274,7 +293,7 @@ export default function ColumnNewV8() {
               busy={busy}
               busyLabel="保存しています…"
             >
-              下書きを保存
+              <Check size={14} aria-hidden="true" />下書きを保存
             </Button>
           </>
         )}

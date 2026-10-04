@@ -1,0 +1,266 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * 分析レポート作成・送信設定の V8（板 H5UoIu・競合 G83vi）。
+ * V8専用。名前をこの画面の中で分けて共通の殻へ影響させない。
+ */
+
+.report-v8-page {
+  min-width: 0;
+  margin: -20px -24px -28px;
+  padding-bottom: 80px;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.report-v8-head {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.report-v8-back {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-action);
+  text-decoration: none;
+}
+
+.report-v8-back:hover {
+  text-decoration: underline;
+}
+
+.report-v8-title {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.report-v8-lead {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.report-v8-required {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: var(--radius-tile-sm);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.report-v8-fieldError {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-danger);
+}
+
+/* 競合の帯（G83vi）。板の頭の下に置く。 */
+.report-v8-conflict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 24px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-warning-bg);
+}
+
+.report-v8-conflictTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.report-v8-conflictSub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.report-v8-conflictActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 見本は1列のカード並び。 */
+.report-v8-sectionCards {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* 見本は2×2。 */
+.report-v8-scheduleGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* 右の欄。板どおり幅 340〜380（親の列が持つ）。 */
+.report-v8-rail {
+  flex: 0 0 32%;
+  padding-left: 24px;
+  border-left: 1px solid var(--color-hairline);
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+
+.report-v8-railCard {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: 20px;
+  min-width: 0;
+}
+
+.report-v8-railTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.report-v8-railSub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.report-v8-preview {
+  margin-top: 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  padding: 12px;
+}
+
+.report-v8-previewTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.report-v8-previewRows {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.report-v8-previewRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.report-v8-previewRow strong {
+  font-weight: 600;
+  color: var(--color-ink);
+  text-align: right;
+}
+
+.report-v8-previewMore {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.report-v8-kvList {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  list-style: none;
+  padding: 0;
+}
+
+.report-v8-kvRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.report-v8-kvRow strong {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  color: var(--color-ink);
+  text-align: right;
+}
+
+.report-v8-notes {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.report-v8-notes li {
+  padding-left: 14px;
+  position: relative;
+}
+
+.report-v8-notes li::before {
+  content: "・";
+  position: absolute;
+  left: 0;
+}
+
+.report-v8-page a:focus-visible,
+.report-v8-page button:focus-visible,
+.report-v8-page input:focus-visible {
+  outline: 2px solid var(--color-accent-deep);
+  outline-offset: 2px;
+}
+
+
+.report-v8-columns { display: flex; align-items: flex-start; gap: 24px; padding: 24px 28px; min-width: 0; }
+.report-v8-fields { display: flex; flex: 1 1 0; flex-direction: column; gap: 16px; min-width: 0; border: 0; padding: 0; margin: 0; }
+.report-v8-card { display: flex; flex-direction: column; gap: 14px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); background: var(--color-canvas); padding: 20px; min-width: 0; }
+.report-v8-cardTitle { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--color-ink); font-size: 15px; font-weight: 600; }
+.report-v8-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: var(--color-ink-secondary); font-size: 13px; font-weight: 600; }
+.report-v8-label { display: flex; align-items: center; gap: 6px; }
+.report-v8-scheduleGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.report-v8-sectionCards, .report-v8-alerts { display: grid; gap: 14px; padding: 0; list-style: none; }
+.report-v8-selectionCard { display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); padding: 12px; min-width: 0; }
+.report-v8-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.report-v8-chips:empty { display: none; }
+.report-v8-chips > span { max-width: 100%; }
+.report-v8-chips > span > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-v8-chips button { padding: 0; width: 24px; height: 24px; min-height: 24px; border: 0; box-shadow: none; background: transparent; }
+.report-v8-recipients { border: 1px solid var(--color-hairline); border-radius: var(--radius-control); padding: 0; margin: 0 0 12px; list-style: none; }
+.report-v8-recipient { padding: 10px 12px; min-width: 0; }
+.report-v8-emailRow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.report-v8-emailRow > div { flex: 1 1 0; min-width: 0; }
+.report-v8-sub { margin: 0; font-size: 12px; color: var(--color-ink-secondary); }
+@container (max-width: 1099px) {
+  .report-v8-columns { flex-direction: column; }
+  .report-v8-fields, .report-v8-rail { width: 100%; }
+  .report-v8-rail { flex-basis: auto; border-left: 0; padding-left: 0; }
+}
+@container (max-width: 600px) {
+  .report-v8-columns { padding: 16px; }
+  .report-v8-card { padding: 16px; }
+  .report-v8-scheduleGrid { grid-template-columns: minmax(0, 1fr); }
+}

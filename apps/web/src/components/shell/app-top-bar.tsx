@@ -35,13 +35,13 @@ export function defaultTitleForPath(pathname: string): string {
 }
 
 /**
- * 権限の呼び名。**`owner` は「統括」**。
+ * 権限の呼び名。言葉の表（GLOSSARY.md）どおり **`owner` は「オーナー」**。
  *
- * 「オーナー」ではない。V6 の設計（Pencil `cBSCb`）が「統括」で、
- * 画面にもともと浮いていた「統括」ボタンは、この印へ畳んだ。
+ * V6 の設計（Pencil `cBSCb`）が「統括」だったが、2026-10-01 のオーナー決定で
+ * 「オーナー」にそろえた。「統括」は組織と統括コンソールの名前だけに使う。
  */
 const ROLE_LABELS: Record<string, string> = {
-  owner: '統括',
+  owner: 'オーナー',
   admin: '管理者',
   viewer: '閲覧のみ',
   staff: 'スタッフ',

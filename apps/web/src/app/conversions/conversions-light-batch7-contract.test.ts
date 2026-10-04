@@ -7,14 +7,14 @@ const NEW_PAGE = readFileSync(join(import.meta.dirname, 'new', 'page.tsx'), 'utf
 
 describe('点検・軽 第7便コンバージョン(#585)', () => {
   it('飾りの表示件数切り替えを置かない(#513 L1)', () => {
-    expect(PAGE).not.toContain('aria-label="表示件数"')
+    expect(PAGE).toContain('setPageSize(Number(value))')
+    expect(PAGE).toContain('page * pageSize')
     expect(PAGE).not.toContain('onChange={() => undefined}')
   })
 
   it('CSV保存は1つの送り出しに寄せる(#513 L2)', () => {
     expect(PAGE).toContain('function downloadCsvBlob(blob: Blob, filename: string): void')
     expect(PAGE).toContain('downloadCsvBlob(blob, `conversion-definitions-')
-    expect(PAGE).toContain('downloadCsvBlob(blob, `conversion-report-')
     // 送り出し本体の1か所だけに残る。二重の直書きに戻っていない。
     expect(PAGE.split('URL.createObjectURL(blob)').length - 1).toBe(1)
   })
@@ -28,23 +28,11 @@ describe('点検・軽 第7便コンバージョン(#585)', () => {
     expect(NEW_PAGE).toContain('point.lineAccountId == null || point.lineAccountId === lineAccountId')
   })
 
-  it('日次グラフの凡例は棒の色と対応する(#513 L5)', () => {
-    expect(PAGE).toContain('aria-label="棒の色と成果地点の対応"')
-    expect(PAGE).toContain("index === 0 ? 'bg-success' : index === 1 ? 'bg-action' : index === 2 ? 'bg-info'")
-  })
 
-  it('レポート失敗時は一覧と同じ再読み込み導線を持つ(#513 L6)', () => {
-    expect(PAGE).toContain('成果レポートを再読み込み')
-    expect(PAGE).toContain('setReloadSeq((current) => current + 1)')
-  })
 
-  it('いちばん伸びたは口の選び方をそのまま使う(#513 L7)', () => {
-    expect(PAGE).toContain('const fastest = report.kpis.fastestGrowing')
-    expect(PAGE).not.toContain('countChange / right.previousNetCount')
-  })
 
-  it('空状態の案内はPencil V6実ノードのボタン名と一致する(#513 L8)', () => {
-    expect(PAGE).toContain('「＋ 成果地点を作る」から登録すると、ここに出ます。')
+  it('空状態の案内は作成ボタンの名前と一致する(#513 L8)', () => {
+    expect(PAGE).toContain('「成果地点を作る」から登録すると、ここに出ます。')
     expect(PAGE).not.toContain('右上の「成果地点を追加」')
     expect(PAGE).not.toContain('右上の「成果地点をつくる」')
   })

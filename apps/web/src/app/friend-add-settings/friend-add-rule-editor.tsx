@@ -12,6 +12,7 @@ import LinePreview from '@/components/shared/line-preview'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
+import VersionCompare from '@/components/shared/version-compare'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -28,7 +29,7 @@ import type {
 } from '@/lib/api'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { pruneCondition } from '@/lib/segment-condition'
-import { api, describeSaveFailure } from '@/lib/api'
+import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { describeFriendAddFailure } from './friend-add-failure'
 import {
   addTimeWindow,
@@ -108,6 +109,14 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /*
+   * ★V8 `h5rm8t`：ほかの人が先に保存したら帯で知らせる。
+   * この画面は書き換えない（読み直すまで古い内容のまま）。
+   * 名前・時刻は API に無いので出さない。
+   */
+  const [conflict, setConflict] = useState(false)
+  const [conflictLatest, setConflictLatest] = useState<{ rule: FriendAddRule; definition: FriendAddRuleDefinition } | null>(null)
+  const [compareOpen, setCompareOpen] = useState(false)
   /*
    * テスト結果は「どのアカウント・どの設定・どの版で実行したか」を持たせる
    * （FRIENDADD-03）。設定変更やアカウント/ルール切替後に、別設定で取れた
@@ -321,6 +330,21 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
       if (!ruleId || nextStep) router.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
     } catch (error) {
+      // ★V8 `h5rm8t`：ほかの人が先に保存した（409）。入力は残したまま、
+      // 帯を出して最新を取り直す。比べる文に使う。
+      if (error instanceof ApiError && error.status === 409 && ruleId && selectedAccountId) {
+        setConflict(true)
+        setCompareOpen(false)
+        try {
+          const latest = await api.friendAddRules.get(selectedAccountId, ruleId)
+          if (latest.success) {
+            setConflictLatest({ rule: latest.data.rule, definition: latest.data.rule.definition })
+          }
+        } catch {
+          // 取り直しに失敗しても帯は出す。比べる文は出さない。
+        }
+        return null
+      }
       // R30: 失敗の文は原因どおりに出す。入力の直し方は欄の下にあり、
       // 「通信を確かめて」は通信のときだけ（describeSaveFailure の約束）。
       setError(describeSaveFailure(error))
@@ -426,6 +450,30 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
     : null
 
   const node = STEPS[currentIndex].node
+
+  /*
+   * ★V8 `h5rm8t`「違いを比べる」の比べる文。最新と入力中の
+   * 設定の要約（名前・初回案内・経路）で作る。
+   */
+  const describeRuleSummary = (input: { name: string; messageText: string | null; routeCount: number }): string =>
+    [
+      `設定名：${input.name || '（未入力）'}`,
+      `初回案内：${input.messageText ? input.messageText.slice(0, 20) : '未設定'}`,
+      `経路：${input.routeCount}件`,
+    ].join('\n')
+  const currentRuleSummary = describeRuleSummary({
+    name: rule.name,
+    messageText: definition.messageText ?? null,
+    routeCount: definition.routeIds.length,
+  })
+  const latestRuleSummary = conflictLatest
+    ? describeRuleSummary({
+        name: conflictLatest.rule.name,
+        messageText: conflictLatest.definition.messageText ?? null,
+        routeCount: conflictLatest.definition.routeIds.length,
+      })
+    : ''
+
   return (
     <div className={'friend-add-editor-page'} data-design-node={node}>
       <a className={'friend-add-editor-backLink'} href="/friend-add-settings">← 友だち追加時の配信</a>
@@ -440,6 +488,25 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
 
       {error && <div className={'friend-add-editor-error'} role="alert">{error}</div>}
       {notice && <div className={'friend-add-editor-notice'}>{notice}</div>}
+
+      {conflict && (
+        <div className={'friend-add-editor-conflictBar'} data-design-node="h5rm8t" role="alert">
+          <div>
+            <p className={'friend-add-editor-conflictTitle'}>ほかの人がこの初回案内を更新しました</p>
+            <p className={'friend-add-editor-conflictBody'}>
+              あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。
+            </p>
+          </div>
+          <div className={'friend-add-editor-conflictActions'}>
+            <Button type="button" variant="secondary" onClick={() => setCompareOpen(true)} disabled={!conflictLatest}>
+              違いを比べる
+            </Button>
+            <Button type="button" variant="primary" onClick={() => { setConflict(false); setConflictLatest(null); setCompareOpen(false); void load() }}>
+              最新を読み込んで続ける
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className={'friend-add-editor-layout'}>
         <div className={step === 'preview' ? 'friend-add-editor-panel friend-add-editor-panelSplit' : 'friend-add-editor-panel'}>
@@ -468,6 +535,26 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
             onCancel={() => router.replace(hrefFor('actions'))}
             onConfirm={addAction}
           />
+        </div>
+      )}
+
+      {/*
+       * ★V8 `h5rm8t`「違いを比べる」の比べる窓。最新の内容と
+       * 入力中の内容の設定の要約を並べます。入力はそのままで、
+       * 閉じても続きから直せます。
+       */}
+      {compareOpen && conflictLatest !== null && (
+        <div data-design-node="h5rm8t">
+          <Dialog
+            open
+            title="最新の内容と比べる"
+            description="ほかの人が保存した最新の内容と、入力中の内容の違いです。閉じても入力は残ります。"
+            cancelLabel="閉じる"
+            designNode="h5rm8t"
+            onCancel={() => setCompareOpen(false)}
+          >
+            <VersionCompare before={latestRuleSummary} after={currentRuleSummary} />
+          </Dialog>
         </div>
       )}
 
@@ -703,7 +790,12 @@ function PreviewStep({ rule, definition, options, result, resultStale, testInput
     status: rule.status,
     definition,
   })
-  return <><Section title="テスト対象" description="実際の友だちへは送信せず、保存済みの設定で判定を確認します。"><div className={'friend-add-editor-twoCols'}><Field label="送信先"><TextField value="送信しません（条件の確認のみ）" disabled /></Field><Field label="テスト方法"><TextField value="保存済みの設定で判定を確認" disabled /></Field><Field label="試す流入リンク"><Select aria-label="試す流入リンク" value={testInput.routeId} onChange={(value) => setTestInput((current) => ({ ...current, routeId: value }))} options={[{ value: '', label: '指定しない（どの経路でも）' }, ...options.routes.map((route) => ({ value: route.id, label: route.name }))]} /></Field><Field label="想定日時"><DateTimeField aria-label="想定日時" value={testInput.expectedAt} onChange={(value) => setTestInput((current) => ({ ...current, expectedAt: value }))} /><small>空欄は「いま」の曜日・時刻で確かめます。</small></Field><Field label="試す友だち"><FriendSearchField accountId={accountId} selectedName={testInput.friendName} onSelect={(friend) => setTestInput((current) => ({ ...current, friendId: friend.id, friendName: friend.displayName || friend.id }))} onClear={() => setTestInput((current) => ({ ...current, friendId: '', friendName: '' }))} /><small>選ぶと、その友だちの状態で友だち条件と二重送信防止まで確かめます。</small></Field></div></Section><Section title="確認内容" description="この経路から追加された人に起きることを順に確認します。"><div className={'friend-add-editor-sequence'}>{steps.map((item, index) => <div key={item.key}><span>{index + 1}</span><strong>{item.title}</strong><small>{item.detail}</small><ChevronRight size={16} /></div>)}</div><div className={'friend-add-editor-info'}><strong>再追加・ブロック解除のとき</strong><ul>{readdLines.map((line) => <li key={line}>{line}</li>)}</ul></div><p className={'friend-add-editor-helper'}>この確認は画面の説明だけです。実際の友だち追加・送信・属性の更新は行いません。</p>{resultStale && <p className={'friend-add-editor-helper'}>設定を変更したため、前回のテスト結果は表示していません。「テスト送信」は保存済みの設定で実行します。</p>}{result && <div className={result.matched ? 'friend-add-editor-testSuccess' : 'friend-add-editor-error'}><strong>{result.matched ? 'この設定が選ばれます' : '条件を確認してください'}</strong>{result.reasons.map((reason) => <p key={reason}>{reason}</p>)}</div>}</Section></>
+  /*
+   * ★V8 `sFwWf` 追加時配信の確認（テスト段）。実際の友だちへの
+   * 送信はせず、保存済みの設定で判定を確認するだけの同じ画面の
+   * 状態として、この段に板 ID を付けます。
+   */
+  return <div data-design-node="sFwWf"><Section title="テスト対象" description="実際の友だちへは送信せず、保存済みの設定で判定を確認します。"><div className={'friend-add-editor-twoCols'}><Field label="送信先"><TextField value="送信しません（条件の確認のみ）" disabled /></Field><Field label="テスト方法"><TextField value="保存済みの設定で判定を確認" disabled /></Field><Field label="試す流入リンク"><Select aria-label="試す流入リンク" value={testInput.routeId} onChange={(value) => setTestInput((current) => ({ ...current, routeId: value }))} options={[{ value: '', label: '指定しない（どの経路でも）' }, ...options.routes.map((route) => ({ value: route.id, label: route.name }))]} /></Field><Field label="想定日時"><DateTimeField aria-label="想定日時" value={testInput.expectedAt} onChange={(value) => setTestInput((current) => ({ ...current, expectedAt: value }))} /><small>空欄は「いま」の曜日・時刻で確かめます。</small></Field><Field label="試す友だち"><FriendSearchField accountId={accountId} selectedName={testInput.friendName} onSelect={(friend) => setTestInput((current) => ({ ...current, friendId: friend.id, friendName: friend.displayName || friend.id }))} onClear={() => setTestInput((current) => ({ ...current, friendId: '', friendName: '' }))} /><small>選ぶと、その友だちの状態で友だち条件と二重送信防止まで確かめます。</small></Field></div></Section><Section title="確認内容" description="この経路から追加された人に起きることを順に確認します。"><div className={'friend-add-editor-sequence'}>{steps.map((item, index) => <div key={item.key}><span>{index + 1}</span><strong>{item.title}</strong><small>{item.detail}</small><ChevronRight size={16} /></div>)}</div><div className={'friend-add-editor-info'}><strong>再追加・ブロック解除のとき</strong><ul>{readdLines.map((line) => <li key={line}>{line}</li>)}</ul></div><p className={'friend-add-editor-helper'}>この確認は画面の説明だけです。実際の友だち追加・送信・属性の更新は行いません。</p>{resultStale && <p className={'friend-add-editor-helper'}>設定を変更したため、前回のテスト結果は表示していません。「テスト送信」は保存済みの設定で実行します。</p>}{result && <div className={result.matched ? 'friend-add-editor-testSuccess' : 'friend-add-editor-error'}><strong>{result.matched ? 'この設定が選ばれます' : '条件を確認してください'}</strong>{result.reasons.map((reason) => <p key={reason}>{reason}</p>)}</div>}</Section></div>
 }
 
 function Summary({ step, rule, definition, options, matchedLast28Days, pendingAction }: { step: Step; rule: EditorRule; definition: FriendAddRuleDefinition; options: FriendAddRuleOptions; matchedLast28Days: number | null; pendingAction: boolean }) {

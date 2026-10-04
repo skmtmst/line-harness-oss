@@ -171,7 +171,7 @@ describe('一斉配信の下書き自動保存（★V7 sTJsh §5）', () => {
     await act(async () => { setValue(titleInput(), '秋の案内') })
     await act(async () => { setValue(messageInput(), '本文') })
 
-    await act(async () => { clickButton('一覧に戻る') })
+    await act(async () => { clickButton('← 一斉配信一覧') })
     // 離れず、確認の窓が出ている
     expect(onCancelSpy).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('保存していない変更があります')
@@ -189,7 +189,7 @@ describe('一斉配信の下書き自動保存（★V7 sTJsh §5）', () => {
     // 通せる形にするため本文も入れる（タイトルだけだと保存自体が検査で止まる）
     await act(async () => { setValue(messageInput(), '本文') })
 
-    await act(async () => { clickButton('一覧に戻る') })
+    await act(async () => { clickButton('← 一斉配信一覧') })
     expect(document.body.textContent).toContain('保存していない変更があります')
 
     await act(async () => { clickButton('保存して移る') })

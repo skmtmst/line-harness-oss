@@ -270,6 +270,7 @@ function InboundTrialPanel({ storeId, busy, onClose, onSubmit }: {
     onSubmit(new FormData(event.currentTarget))
   }
   return (
+    <div data-design-node="l4qsT">
     <Panel title="媒体受信シミュレーター（外部への書戻しなし）">
       <form onSubmit={submit}>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -299,6 +300,7 @@ function InboundTrialPanel({ storeId, busy, onClose, onSubmit }: {
         </div>
       </form>
     </Panel>
+    </div>
   )
 }
 
@@ -456,7 +458,7 @@ function TodayView({ rows, tables, busy, day, isToday, sideExtra, onAddPreset, o
                 <p className={ledger.nextFrom}>{sourceLabel[next.source] || next.source}から</p>
               </div>
               <div className={ledger.sideButtons}>
-                <Button size="compact" onClick={() => onEdit(next.id)}>詳細を見る</Button>
+                <Button size="compact" onClick={() => onEdit(next.id)}>開く</Button>
                 <Button size="compact" onClick={() => onEdit(next.id)}>卓を変える</Button>
               </div>
             </>

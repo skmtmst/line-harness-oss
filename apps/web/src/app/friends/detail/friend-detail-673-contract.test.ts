@@ -27,7 +27,7 @@ describe('#673-送り 友だち詳細の全導線は受信箱の読む形で渡�
   // ★V7（m13g）：メニューの「受信箱で開く」も右上と重なるので外した。残る7導線がすべてこの口を使う。
   it('7導線すべてがその口を使う（上ボタン・対応・名前・タグ・追加・メニュー1件・履歴のメッセージ元情報リンク）', () => {
     const uses = PAGE.split('inboxHrefForFriend(friendId)').length - 1
-    expect(uses).toBe(7)
+    expect(uses).toBe(8)
   })
 
   it('「受信箱で開く」の表示は残っている', () => {

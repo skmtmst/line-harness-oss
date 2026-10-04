@@ -1,7 +1,7 @@
 import type { Webinar, WebinarAnalytics } from '@/lib/api'
 
 /**
- * ウェビナー編集の段（設計 4-8 / `PV1Vh` `d3rFGD` `Xjk8q` `Ho8z4` `D6yO7e`）。
+ * ウェビナー編集の段（設計 4-8 / `VWNaA` `Q0Jrk` `E7iAYs` `XCUNf`）。
  *
  * 設計は「基本設定 → 動画 → CTA・フォーム → 通知 → 確認」の5段で、
  * **いま何段目で、あと何が残っているか**を上に出す。実装は横並びのタブで、
@@ -27,10 +27,10 @@ export const STEPS: ReadonlyArray<{
   notConnected?: string
 }> = [
   { key: 'basic', no: 1, title: '基本設定', mark: 'webinar-step-basic' },
-  { key: 'video', no: 2, title: '動画', mark: 'PV1Vh', node: 'PV1Vh' },
-  { key: 'cta', no: 3, title: 'CTA・フォーム', mark: 'd3rFGD', node: 'd3rFGD' },
-  { key: 'notifications', no: 4, title: '通知', mark: 'Ho8z4', node: 'Ho8z4' },
-  { key: 'review', no: 5, title: '確認', mark: 'D6yO7e', node: 'D6yO7e' },
+  { key: 'video', no: 2, title: '動画', mark: 'VWNaA', node: 'VWNaA' },
+  { key: 'cta', no: 3, title: 'CTA・フォーム', mark: 'Q0Jrk', node: 'Q0Jrk' },
+  { key: 'notifications', no: 4, title: '通知', mark: 'E7iAYs', node: 'E7iAYs' },
+  { key: 'review', no: 5, title: '確認', mark: 'XCUNf', node: 'XCUNf' },
 ]
 
 export type StepState = 'done' | 'current' | 'todo'

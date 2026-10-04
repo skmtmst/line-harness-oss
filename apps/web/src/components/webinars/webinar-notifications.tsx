@@ -8,7 +8,10 @@ import {
   type WebinarNotificationSettingsInput,
 } from '@/lib/api'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
+import HelpTip from '@/components/shared/help-tip'
+import Disclosure from '@/components/shared/disclosure'
+import './webinar-notifications.css'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -98,7 +101,10 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  const requestGeneration = useRef(0)
+  const saveLock = useRef(false)
   const load = useCallback(async () => {
+    const request = ++requestGeneration.current
     setState('loading')
     setError('')
     try {
@@ -108,18 +114,20 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         `settings.dayBeforeTime` で落ち、この面が白い画面になる。
       */
       if (!res.data || typeof res.data !== 'object') throw new Error('shape')
+      if (request !== requestGeneration.current) return
       setSettings(res.data.settings)
       setBaseline(res.data.settings)
       setOverview(res.data.overview ?? null)
       setState('ready')
       onLoaded?.({ settings: res.data.settings, overview: res.data.overview ?? null })
     } catch {
+      if (request !== requestGeneration.current) return
       setState('error')
       onLoaded?.(null)
     }
   }, [webinarId, onLoaded])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { void load(); return () => { requestGeneration.current += 1 } }, [load])
 
   const patch = (next: Partial<WebinarNotificationSettingsInput>) =>
     setSettings((prev) => (prev ? { ...prev, ...next } : prev))
@@ -129,7 +137,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
     保存済みと違うかどうかを親の固定バーへ伝える。
   */
   const dirty = settings !== null && baseline !== null &&
-    SETTINGS_KEYS.some((key) => settings[key] !== baseline[key])
+    (baseline.version === 0 || SETTINGS_KEYS.some((key) => settings[key] !== baseline[key]))
   useEffect(() => {
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
@@ -137,7 +145,8 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
 
   /** 保存が完了したら true。失敗したら入力を残したまま false を返す。 */
   const save = async (): Promise<boolean> => {
-    if (!settings || saving) return false
+    if (!settings || saveLock.current) return false
+    saveLock.current = true
     setSaving(true)
     setError('')
     try {
@@ -162,9 +171,10 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       await load()
       return true
     } catch {
-      setError('通知の設定を保存できませんでした。状態を読み直してから、もう一度お試しください。')
+      setError('通知の設定を保存できませんでした。入力を残しました。もう一度お試しください。')
       return false
     } finally {
+      saveLock.current = false
       setSaving(false)
     }
   }
@@ -303,12 +313,9 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
   const audience = audienceText(overview?.audience)
 
   return (
-    <section className="space-y-4" data-design-node="Ho8z4">
+    <section className="space-y-4" data-webinar-notifications="true">
       <div>
-        <h2 className="text-ink font-bold">通知・リマインド</h2>
-        <p className="text-ink-faint mt-1 text-xs">
-          申込から見終わったあとまで、届けるものを1つずつ決めます。切ったものは送りません。
-        </p>
+        <h2 className="text-ink font-bold">通知とリマインド <HelpTip label="通知とリマインドの説明">LINEで送るお知らせです。通知ごとに送るかどうかと時刻を決めます。</HelpTip></h2>
       </div>
 
       {/*
@@ -316,14 +323,11 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         待ち・送信済み・失敗・見送り・取消を分けて出す。
         読めていないときは `—`——「失敗 0 件」と「まだ数えていない」を混ぜない。
       */}
-      <dl className="border-hairline grid grid-cols-2 gap-px overflow-hidden rounded-card border bg-hairline sm:grid-cols-3">
+      <dl className="flex gap-5">
         {[
-          ['予定', overview?.pending],
-          ['送信済み', overview?.sent],
-          ['失敗', overview?.failed],
+          ['送った', overview?.sent],
+          ['届かなかった', overview?.failed],
           ['見送り', overview?.skipped],
-          ['取消', overview?.cancelled],
-          ['合計', overview?.total],
         ].map(([label, value]) => (
           <div key={String(label)} className="bg-canvas px-4 py-3">
             <dt className="text-ink-faint text-xs">{String(label)}</dt>
@@ -357,36 +361,22 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         <p className="text-ink-faint text-xs">送った結果はまだ読めていません。—（未取得）</p>
       )}
 
-      <div className="bg-canvas rounded-card border-hairline border px-4 py-3">
-        <div className="flex items-baseline justify-between gap-4">
-          <p className="text-ink-faint text-xs">通知の対象</p>
-          <p className="text-ink text-lg font-bold tabular-nums">{audience.people}</p>
-        </div>
-        <p className="text-ink-faint mt-1 text-xs">{audience.note}</p>
-      </div>
-
-      <ul className="border-hairline divide-hairline divide-y overflow-hidden rounded-card border">
-        {rows.map((row) => (
-          <li key={row.key} className="bg-canvas flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-            <Checkbox
-              checked={row.on}
-              onCheckedChange={row.toggle}
-              aria-label={`${row.label}を送る`}
-              description={row.note}
-              className="min-w-0 flex-1"
-            >{row.label}</Checkbox>
-            {/* 切っているものの細かい設定は出さない。押しても効かない欄を並べない。 */}
-            {row.on && row.extra ? <div className="shrink-0">{row.extra}</div> : null}
-          </li>
-        ))}
-      </ul>
+      <Disclosure title="その他の送信実績と通知の対象" size="compact"><p className="text-ink-secondary text-xs">予定 {countText(overview?.pending, available)}件・取消 {countText(overview?.cancelled, available)}件・合計 {countText(overview?.total, available)}件</p><p className="text-ink-secondary text-xs">通知の対象：{audience.people}<HelpTip label="通知の対象の説明">{audience.note}</HelpTip></p></Disclosure>
+      <fieldset disabled={saving} className="min-w-0">
+        <ul className="divide-hairline divide-y">
+          {rows.map((row) => (
+            <li key={row.key} data-notification-row="true">
+              <span className="text-ink flex items-center gap-1 text-sm font-semibold">{row.label}<HelpTip label={`${row.label}の説明`}>{row.note}</HelpTip></span>
+              <div className="text-ink-secondary min-w-0 text-xs">{row.extra ?? (row.key === 'registration' ? '申し込んだらすぐ' : row.key === 'start' ? '開始したとき' : '見終わったら')}</div>
+              <Toggle checked={row.on} onChange={row.toggle} label={row.label} />
+            </li>
+          ))}
+        </ul>
+      </fieldset>
 
       {error && <Notice tone="danger">{error}</Notice>}
 
-      <div className="flex justify-end">
-        <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving}>通知の設定を保存する
-        </Button>
-      </div>
+      {!registerSave ? <div className="flex justify-end"><Button onClick={() => void save()} disabled={saving} busy={saving}>通知の設定を保存する</Button></div> : null}
     </section>
   )
 }

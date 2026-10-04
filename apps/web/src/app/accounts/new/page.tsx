@@ -2,23 +2,26 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import Image from 'next/image'
+import { ArrowLeft, ArrowRight, Check, CircleHelp, Lock } from 'lucide-react'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import RadioCard from '@/components/shared/radio-card'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import PageHeader from '@/components/shared/page-header'
-import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import { CHECK_STATE_LABEL, canSave, stoppedAt, toSteps } from '../connection-check-view'
 import { isDuplicateChannelError, matchRegisteredAccountId } from './account-recovery'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import RegisterV8 from './register-v8'
 
+/* 手順の順番は絵が正本（板 JYfda・GwKE2）：LINE準備→チャネル設定→基本情報→接続確認→完了。 */
 const WIZARD_STEPS = [
-  { number: 1, label: '基本情報', designNode: 'a8qMXX' },
-  { number: 2, label: 'LINE準備', designNode: 'oeVQQ' },
-  { number: 3, label: 'チャネル設定', designNode: 'YEHCR' },
+  { number: 1, label: 'LINE準備', designNode: 'oeVQQ' },
+  { number: 2, label: 'チャネル設定', designNode: 'YEHCR' },
+  { number: 3, label: '基本情報', designNode: 'a8qMXX' },
   { number: 4, label: '接続確認', designNode: 'K1zHyx' },
   { number: 5, label: '完了', designNode: 'VPh1U' },
 ] as const
@@ -50,6 +53,7 @@ export default function NewLineAccountPage() {
   // R523: 応答消失・重複で見つけた登録済みアカウント。詳細へ復帰するために持つ。
   const [recoveredAccountId, setRecoveredAccountId] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
+  const theme = useAdminTheme()
   const busyLock = useRef(false)
   const stepPanelRef = useRef<HTMLDivElement>(null)
 
@@ -127,10 +131,10 @@ export default function NewLineAccountPage() {
   })
 
   const checkConnection = async () => {
-    const nextErrors = getStepErrors(3, form)
+    const nextErrors = getStepErrors(2, form)
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors((current) => ({ ...current, ...nextErrors }))
-      setCurrentStep(3)
+      setCurrentStep(2)
       setError('接続に必要な4項目を確認してください。')
       return
     }
@@ -232,15 +236,31 @@ export default function NewLineAccountPage() {
     </div>
   )
 
+  /*
+   * ★V8-B: data-theme="v8" のときだけ新しい登録ウィザード
+   *（板 `xj3zz` `JYfda` `GwKE2` `v2KMj` `qw80E` `TvXII`）を出す。
+   * 下の v7 はそのまま残す。
+   */
+  if (theme === 'v8') return <RegisterV8 />
+
   return (
     <div data-design-node="b2NGxk" className="flex w-full flex-col gap-4 pb-24">
       {/* ★V7: 登録専用の枠の幅いっぱいに広げる。中央寄せの狭い列にしない。 */}
       <div data-design="Head">
-        <div className="flex justify-end"><Button href="/hq">統括コンソールへ戻る</Button></div>
+        <div className="flex justify-end gap-2">
+          {!createdId ? <Button href="/accounts">キャンセル</Button> : null}
+          <Button href="/hq">統括コンソールへ戻る</Button>
+        </div>
         <PageHeader
-          breadcrumb={[{ label: 'LINEアカウント', href: '/accounts' }, { label: '登録' }]}
+          breadcrumb={[{ label: 'アカウント', href: '/hq' }, { label: 'LINEアカウントを登録' }]}
           title="LINEアカウントを登録"
-          description="4つのチャネル情報を入力すると、接続設定と既存友だちの取り込みを自動で行います。"
+          description={
+            currentStep === 1
+              ? '画面に出る名前と、だれがこのアカウントを扱うかを決めます。'
+              : currentStep === 3
+                ? 'LINE Developers の画面からコピーして貼り付けます。秘密値は保存後に画面へ表示されません。'
+                : '4つのチャネル情報を入力すると、接続設定と既存友だちの取り込みを自動で行います。'
+          }
         />
       </div>
 
@@ -254,10 +274,25 @@ export default function NewLineAccountPage() {
           {WIZARD_STEPS.map((step) => {
             const active = currentStep === step.number
             const complete = currentStep > step.number || Boolean(createdId)
-            return <li key={step.number} aria-current={active ? 'step' : undefined} className={`rounded-control border px-3 py-2 ${active ? 'border-action bg-action-soft' : 'border-hairline'}`}>
-              <span className="text-ink-faint block text-xs">手順 {step.number} / 5</span>
-              <span className="text-ink mt-0.5 block text-xs font-medium">{step.label}{complete ? '（完了）' : ''}</span>
-            </li>
+            return (
+              <li
+                key={step.number}
+                aria-current={active ? 'step' : undefined}
+                className={`flex items-center gap-2 rounded-control border px-3 py-2 ${active ? 'border-accent-deep' : complete ? 'border-hairline bg-accent-soft' : 'border-hairline'}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={
+                    complete || active
+                      ? 'grid h-5 w-5 shrink-0 place-items-center rounded-pill bg-accent-deep text-nano font-bold text-on-accent'
+                      : 'grid h-5 w-5 shrink-0 place-items-center rounded-pill bg-canvas-sunken text-nano font-bold text-ink-faint'
+                  }
+                >
+                  {complete ? <Check aria-hidden="true" className="h-3 w-3" /> : step.number}
+                </span>
+                <span className="text-ink block text-xs font-medium">{step.label}</span>
+              </li>
+            )
           })}
         </ol>
         <details className="sm:hidden">
@@ -283,14 +318,8 @@ export default function NewLineAccountPage() {
 
       <form onSubmit={submit} noValidate aria-busy={busyAction ? true : undefined}>
         <div data-design="Body" ref={stepPanelRef} tabIndex={-1} className="outline-none">
-          {currentStep === 1 && <div data-design-node="a8qMXX">
-            <SetupSection title="1. 基本情報" description="管理画面で見分ける名前を設定します。未入力でも登録できます。">
-              <Field id="account-name" label="表示名（任意）" value={form.name} onChange={(value) => update('name', value)} placeholder="未入力なら LINE公式アカウントの名前をそのまま使います" error={fieldErrors.name} />
-            </SetupSection>
-          </div>}
-
-          {currentStep === 2 && <div data-design-node="oeVQQ">
-            <SetupSection title="2. LINE側の準備" description="登録するLINE公式アカウントの用意方法を選びます。">
+          {currentStep === 1 && <div data-design-node="oeVQQ">
+            <SetupSection title="1. LINE側の準備" description="登録するLINE公式アカウントの用意方法を選びます。">
               <fieldset>
                 <legend className="text-ink-secondary mb-2 text-xs font-medium">アカウントの用意方法</legend>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -306,22 +335,32 @@ export default function NewLineAccountPage() {
             </SetupSection>
           </div>}
 
-          {currentStep === 3 && <div data-design-node="YEHCR" className="grid gap-4 lg:grid-cols-2">
-            <SetupSection title="Messaging API" description="アクセストークンはmusuboが自動で発行します。" action={<ManualLink anchor="m1" label="取得方法を見る" />}>
-              <Field id="channel-id" label="チャネルID" value={form.channelId} onChange={(value) => update('channelId', value)} inputMode="numeric" required error={fieldErrors.channelId} />
-              <Field id="channel-secret" label="チャネルシークレット" value={form.channelSecret} onChange={(value) => update('channelSecret', value)} type="password" required error={fieldErrors.channelSecret} />
+          {currentStep === 2 && <div data-design-node="YEHCR" className="space-y-4">
+            <h2 className="text-ink text-base font-bold">接続に必要な4項目</h2>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <SetupSection title="Messaging API" description="アクセストークンはmusuboが自動で発行します。" action={<ManualLink anchor="m1" label="取得方法を見る" />}>
+                <Field id="channel-id" label="チャネルID" value={form.channelId} onChange={(value) => update('channelId', value)} inputMode="numeric" required error={fieldErrors.channelId} />
+                <Field id="channel-secret" label="チャネルシークレット" value={form.channelSecret} onChange={(value) => update('channelSecret', value)} type="password" required error={fieldErrors.channelSecret} />
+              </SetupSection>
+              <SetupSection title="LINE Login" description="LIFFは自動で作成します。Messaging APIと同じプロバイダーのチャネルを入力してください。" action={<ManualLink anchor="m2" label="取得方法を見る" />}>
+                <Field id="login-channel-id" label="LoginチャネルID" value={form.loginChannelId} onChange={(value) => update('loginChannelId', value)} inputMode="numeric" required error={fieldErrors.loginChannelId} />
+                <Field id="login-channel-secret" label="Loginチャネルシークレット" value={form.loginChannelSecret} onChange={(value) => update('loginChannelSecret', value)} type="password" required error={fieldErrors.loginChannelSecret} />
+              </SetupSection>
+            </div>
+            <p className="text-ink-faint text-xs">秘密値は保存後に画面へ表示されません。</p>
+          </div>}
+
+          {currentStep === 3 && <div data-design-node="a8qMXX" className="space-y-4">
+            <SetupSection title="3. 基本情報" description="管理画面で見分ける名前を設定します。未入力でも登録できます。">
+              <Field id="account-name" label="表示名（任意）" value={form.name} onChange={(value) => update('name', value)} placeholder="未入力なら LINE公式アカウントの名前をそのまま使います" error={fieldErrors.name} />
             </SetupSection>
-            <SetupSection title="LINE Login" description="LIFFは自動で作成します。Messaging APIと同じプロバイダーのチャネルを入力してください。" action={<ManualLink anchor="m2" label="取得方法を見る" />}>
-              <Field id="login-channel-id" label="LoginチャネルID" value={form.loginChannelId} onChange={(value) => update('loginChannelId', value)} inputMode="numeric" required error={fieldErrors.loginChannelId} />
-              <Field id="login-channel-secret" label="Loginチャネルシークレット" value={form.loginChannelSecret} onChange={(value) => update('loginChannelSecret', value)} type="password" required error={fieldErrors.loginChannelSecret} />
+            <SetupSection title="LINE側の設定" description="LINE LoginチャネルへCallback URLを登録してください。" action={<ManualLink anchor="m3" label="設定方法を見る" />}>
+              <EndpointRow label="Callback URL" value={callbackUrl} help="LINE Login → Callback URL" />
             </SetupSection>
           </div>}
 
           {currentStep === 4 && <div data-design-node="K1zHyx" className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="space-y-4">
-              <SetupSection title="4. LINE側の設定" description="LINE LoginチャネルへCallback URLを登録してください。" action={<ManualLink anchor="m3" label="設定方法を見る" />}>
-                <EndpointRow label="Callback URL" value={callbackUrl} help="LINE Login → Callback URL" />
-              </SetupSection>
               <SetupSection title="接続確認" description="上から順に自動設定します。止まった段だけ直して再実行してください。">
                 <ol className="space-y-2" aria-label="接続確認項目">
                   {steps.map((item) => <li key={item.order} className="border-hairline rounded-control flex items-start gap-3 border p-3">
@@ -344,7 +383,7 @@ export default function NewLineAccountPage() {
 
           {currentStep === 5 && connection && <div data-design-node={importingIds ? 'VPh1U' : 't3Mlu'}>
             <SetupSection title="登録が完了しました" description="LINEアカウントの接続設定を自動で完了しました。">
-              {importingIds ? <Notice tone="info">認証済みアカウントのため、既存の友だちを取り込んでいます（{importState?.received ?? 0}人 / 確認中）。取り込みが終わるまで、この画面でお待ちください。</Notice> : <Notice tone="success" message="登録が完了しました" />}
+              {importingIds ? <Notice tone="info">認証済みアカウントのため、既存の友だちを取り込んでいます（{importState?.received ?? 0}人 / 確認中）。この画面を開いている間に取り込みます。閉じると止まり、もう一度開くと続きから取り込みます。</Notice> : <Notice tone="success" message="登録が完了しました" />}
               <ReviewGroup title="LINEアカウント">
                 <ReviewRow label="表示名" value={`${connection.displayName ?? form.name}（LINEから取得）`} />
                 <ReviewRow label="LINE ID" value={connection.basicId ?? '取得できませんでした'} />
@@ -375,17 +414,22 @@ export default function NewLineAccountPage() {
         ) : null}
         <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
         {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-        <div data-design="Actions">
-          <StickyBar
-            status={createdId ? (importingIds ? '既存の友だちを取り込んでいます' : '登録が完了しました') : busyAction === 'save' ? '接続して保存しています' : `手順 ${currentStep} / 5`}
-            actions={createdId ? <>
-              {importingIds ? <><Button type="button" disabled>登録したアカウントを見る</Button><Button type="button" variant="primary" disabled>統括コンソールへ</Button></> : <><Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button><Button href="/hq" variant="primary">統括コンソールへ</Button></>}
+        <div data-design="Actions" className="mt-4 border-t border-hairline pt-4">
+          {createdId ? (
+            <p role="status" className="mb-2 text-center text-caption text-ink-secondary">
+              {importingIds ? '既存の友だちを取り込んでいます' : '登録が完了しました'}
+            </p>
+          ) : null}
+          <div className="flex items-center justify-center gap-2">
+            {createdId ? <>
+              {importingIds
+                ? <><Button type="button" disabled>登録したアカウントを見る</Button><Button type="button" variant="primary" disabled>統括コンソールへ</Button></>
+                : <><Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button><Button href="/hq" variant="primary">統括コンソールへ</Button></>}
             </> : <>
-              <Button href="/accounts">キャンセル</Button>
-              {currentStep > 1 && <Button type="button" disabled={Boolean(busyAction)} onClick={() => { setError(''); setCurrentStep((currentStep - 1) as StepNumber) }}>戻る</Button>}
-              <Button type="submit" variant="primary" disabled={Boolean(busyAction) || (currentStep === 4 && !connectionPassed)} busy={currentStep === 4 && busyAction === 'save'} busyLabel="接続して保存しています…">{currentStep === 4 ? '接続して保存する' : '次へ'}</Button>
+              {currentStep > 1 && <Button type="button" disabled={Boolean(busyAction)} onClick={() => { setError(''); setCurrentStep((currentStep - 1) as StepNumber) }}><ArrowLeft aria-hidden="true" className="h-4 w-4" />戻る</Button>}
+              <Button type="submit" variant="primary" disabled={Boolean(busyAction) || (currentStep === 4 && !connectionPassed)} busy={currentStep === 4 && busyAction === 'save'} busyLabel="接続して保存しています…"><ArrowRight aria-hidden="true" className="h-4 w-4" />{currentStep === 4 ? '接続して保存する' : '次へ'}</Button>
             </>}
-          />
+          </div>
         </div>
       </form>
     </div>
@@ -394,8 +438,8 @@ export default function NewLineAccountPage() {
 
 function getStepErrors(step: StepNumber, form: FormState): FieldErrors {
   const errors: FieldErrors = {}
-  if (step === 1 && form.name.trim().length > 40) errors.name = '表示名は40文字以内で入力してください。'
-  if (step === 3) {
+  if (step === 3 && form.name.trim().length > 40) errors.name = '表示名は40文字以内で入力してください。'
+  if (step === 2) {
     if (!form.channelId.trim()) errors.channelId = 'チャネルIDを入力してください。'
     else if (!/^\d+$/.test(form.channelId.trim())) errors.channelId = 'チャネルIDは半角数字で入力してください。'
     if (!form.channelSecret) errors.channelSecret = 'チャネルシークレットを入力してください。'
@@ -415,7 +459,7 @@ function InfoSection({ title, children }: { title: string; children: ReactNode }
 }
 
 function ManualLink({ anchor, label }: { anchor: 'm1' | 'm2' | 'm3'; label: string }) {
-  return <a href={`/manuals/line-connect/index.html#${anchor}`} target="_blank" rel="noreferrer" className="text-action shrink-0 text-xs font-semibold hover:underline">{label}</a>
+  return <Button variant="secondary" href={`/manuals/line-connect/index.html#${anchor}`} target="_blank" rel="noreferrer" className="text-ink shrink-0 items-center gap-1.5 rounded-control border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold hover:bg-canvas-sunken"><CircleHelp aria-hidden="true" className="h-3.5 w-3.5" />{label}</Button>
 }
 
 function Choice({ checked, onChange, label, value }: { checked: boolean; onChange: () => void; label: string; value: string }) {

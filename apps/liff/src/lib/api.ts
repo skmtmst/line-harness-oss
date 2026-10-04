@@ -238,6 +238,24 @@ export interface PublicForm {
   isTest?: boolean;
 }
 
+/** F-11：郵便番号検索の結果。status が matched/multiple のとき候補から選ぶ。 */
+export interface PostalCodeCandidate {
+  postalCode: string;
+  prefecture: string;
+  city: string;
+  town: string;
+}
+
+export interface PostalCodeSearchResponse {
+  success: boolean;
+  data: {
+    query: string;
+    normalized: string | null;
+    status: 'invalid' | 'none' | 'matched' | 'multiple';
+    candidates: PostalCodeCandidate[];
+  };
+}
+
 /** フォーム回答の送信結果。未完のとき data.complete が false で返る。 */
 export interface FormSubmitResponse {
   success: boolean;
@@ -369,6 +387,26 @@ export const api = {
       `/api/forms/${id}/files${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`,
       file,
     ),
+  /**
+   * F-11：郵便番号から住所の候補を返す（外部通信なし・日本郵便の公開データ）。
+   * 候補が複数の番号は全部返す。選ばなければ手入力の住所はそのまま残す。
+   */
+  postalCodeSearch: (code: string) =>
+    get<PostalCodeSearchResponse>(`/api/postal-code/search?code=${encodeURIComponent(code)}`),
+
+  /**
+   * F11 郵便番号→住所の候補。選んだ候補だけ住所へ入れ、手入力は残す。
+   * 見つからない・通信失敗のときは投げず、その旨を状態で返す。
+   */
+  postalSearch: (code: string) =>
+    get<{
+      success: boolean;
+      data: {
+        status: 'matched' | 'multiple' | 'none' | 'invalid';
+        candidates: Array<{ postalCode: string; prefecture: string; city: string; town: string }>;
+        manualEntry: { note: string };
+      };
+    }>(`/api/postal-code/search?code=${encodeURIComponent(code)}`),
 
   // ===== Webinar =====
   webinarState: (slug: string) => get<WebinarState>(`/api/liff/webinars/${slug}`),

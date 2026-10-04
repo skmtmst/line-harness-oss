@@ -100,6 +100,15 @@ describe('健康日記 V8', () => {
     expect(screen.getByText('30日のまとめ', { selector: 'th' })).toBeTruthy()
   })
 
+  it('行の「…」に飼い主を開く・トークで声をかけるが出る', async () => {
+    health.health.mockResolvedValue({ success: true, data: listData })
+    render(<HealthPageV8 accountId="account-a" tab="logs" onChangeTab={() => undefined} />)
+    await screen.findByText('こむぎ')
+    fireEvent.click(screen.getByRole('button', { name: 'こむぎのその他操作' }))
+    expect(await screen.findByRole('menuitem', { name: '飼い主を開く' })).toBeTruthy()
+    expect(await screen.findByRole('menuitem', { name: '飼い主にトークで声をかける' })).toBeTruthy()
+  })
+
   it('行の「…」から30日のまとめ（BVuYh）を開く', async () => {
     health.health.mockResolvedValue({ success: true, data: listData })
     health.healthSummary.mockResolvedValue({ success: true, data: summaryData })

@@ -31,10 +31,11 @@
   flex-direction: column;
   gap: 4px;
 }
+/* 板の頭の題は `A0pDt` どおり 22px。 */
 .headTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -229,7 +230,7 @@
 
 /* 反応するメッセージの種類の押せる札。選んだものは濃く。 */
 .pickChip {
-  padding: 7px 14px;
+  padding: 8px 14px;
   border: 1px solid var(--color-control-border);
   border-radius: var(--radius-pill);
   background: var(--color-canvas);
@@ -706,7 +707,7 @@
   gap: 8px;
 }
 .insertChip {
-  padding: 5px 12px;
+  padding: 4px 12px;
   border: 1px solid var(--color-control-border);
   border-radius: var(--radius-pill);
   background: var(--color-canvas);
@@ -722,3 +723,5 @@
   color: var(--color-ink-faint);
   font-size: 12px;
 }
+
+/* 編集の競合の帯（`UGrd2`）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */

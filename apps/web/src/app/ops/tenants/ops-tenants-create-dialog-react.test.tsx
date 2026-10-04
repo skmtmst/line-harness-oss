@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsTenantsPage from './page'
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }))
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/ops/tenants', useRouter: () => ({ push: mockPush }) }))
 const mockPush = vi.fn()
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true

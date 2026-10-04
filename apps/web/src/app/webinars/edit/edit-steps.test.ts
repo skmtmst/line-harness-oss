@@ -125,7 +125,7 @@ describe('撮影の目印', () => {
     */
     expect(STEPS.find((s) => s.key === 'basic')?.node).toBeUndefined()
     expect(STEPS.find((s) => s.key === 'basic')?.mark).toBe('webinar-step-basic')
-    expect(STEPS.filter((s) => s.node).map((s) => s.node)).toEqual(['PV1Vh', 'd3rFGD', 'Ho8z4', 'D6yO7e'])
+    expect(STEPS.filter((s) => s.node).map((s) => s.node)).toEqual(['VWNaA', 'Q0Jrk', 'E7iAYs', 'XCUNf'])
   })
 
   it('目印は重ならない', () => {

@@ -19,7 +19,7 @@ const calls = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/api', () => ({ api: { hqSupport: calls } }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageChrome: () => ({}) }))
 vi.mock('@/components/tenant-access-context', () => ({ useTenantStatus: () => 'active' }))
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => <div data-line-guide /> }))
 
@@ -52,7 +52,7 @@ describe('形の違う表示用情報でもお問い合わせは落ちない', (
     await act(async () => { root.render(<HqSupportPage />) })
     await settle()
 
-    expect(host.textContent).toContain('問い合わせ内容')
+    expect(host.textContent).toContain('件名')
     expect(host.textContent).toContain('種類を選んでください')
     expect(host.textContent).toContain('送信者')
     expect(host.textContent).toContain('読み込めませんでした')

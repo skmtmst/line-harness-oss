@@ -40,7 +40,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Tabs } from '@/components/shared/tabs'
 import { ApiError } from '@/lib/api'
 import { usePageCrumbs } from '@/components/shell/page-chrome'
-import { formatJstDateTime } from '@/lib/presentation'
+import { formatJstShortDateTime } from '@/lib/presentation'
 import { formatNumber } from '@/lib/format'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -109,7 +109,8 @@ export default function MembersPageV8({
             ネットショップの会員と LINE の友だちを結びつけて、ランクやペットの情報を見ます。
           </p>
         </div>
-        {tab === 'members' && accountId ? <CsvExportButton accountId={accountId} /> : null}
+        {/* fb9NJ・e5yBLx：ランク設定の板にも「CSV で書き出す」がある。 */}
+        {(tab === 'members' || tab === 'ranks') && accountId ? <CsvExportButton accountId={accountId} /> : null}
       </header>
 
       <Tabs
@@ -286,6 +287,7 @@ function MembersTabV8({
   const [chipPet, setChipPet] = useState(false)
   const [chipUnlinked, setChipUnlinked] = useState(false)
   const [rank, setRank] = useState('')
+  const [sort, setSort] = useState<NenMemberSort>('annual_desc')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const requestRef = useRef(0)
@@ -316,7 +318,7 @@ function MembersTabV8({
         ranks: chipTopRanks && topTwoKeyQuery ? topTwoKeyQuery.split(',') : undefined,
         link: chipUnlinked ? 'unlinked' : undefined,
         pet: chipPet ? 'with' : 'any',
-        sort: 'annual_desc' as NenMemberSort,
+        sort,
         page,
         pageSize,
       })
@@ -328,7 +330,7 @@ function MembersTabV8({
       if (request !== requestRef.current) return
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId, query, rank, chipTopRanks, chipPet, chipUnlinked, page, pageSize, topTwoKeyQuery])
+  }, [accountId, query, rank, chipTopRanks, chipPet, chipUnlinked, page, pageSize, sort, topTwoKeyQuery])
 
   useEffect(() => {
     void load()
@@ -395,6 +397,17 @@ function MembersTabV8({
             options={[
               { value: '', label: 'よく使う絞り込み' },
               ...(data?.ranks ?? settings?.ranks ?? []).map((r) => ({ value: r.key, label: `ランク：${r.name}` })),
+            ]}
+          />
+          <Select
+            aria-label="並び順"
+            value={sort}
+            onChange={(value) => { setSort(value as NenMemberSort); setPage(1) }}
+            options={[
+              { value: 'annual_desc', label: '通年が多い順' },
+              { value: 'lifetime_desc', label: 'ライフタイムが多い順' },
+              { value: 'balance_desc', label: 'マイル残高が多い順' },
+              { value: 'recent', label: '最終購入が新しい順' },
             ]}
           />
           <PageSizeSelect
@@ -541,7 +554,7 @@ function MemberRowV8({
 
 type RankDraft = { id: string | null; name: string; threshold: string; rate: string; tagName: string | null; memberCount: number }
 
-function RankSettingsTabV8({
+export function RankSettingsTabV8({
   accountId,
   status,
   settings,
@@ -746,7 +759,7 @@ function RankSettingsTabV8({
             </span>
           )}
         >
-          {conflict.latest.rules ? `${formatJstDateTime(conflict.latest.rules.updatedAt)} にランク設定が保存されました。` : 'ランク設定が別の場所で保存されました。'}
+          {conflict.latest.rules ? `${formatJstShortDateTime(conflict.latest.rules.updatedAt)} にランク設定が保存されました。` : 'ランク設定が別の場所で保存されました。'}
           このまま保存すると、その変更が消えます。
         </NoteBar>
       ) : null}
@@ -793,7 +806,7 @@ function RankSettingsTabV8({
                         <Td className="w-36">
                           <span className="flex items-center gap-2">
                             <TextField aria-label={`しきい値 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly || isBase} onChange={(event) => update(index, { threshold: event.target.value })} />
-                            <span className="shrink-0 text-caption font-semibold text-ink-faint">円〜</span>
+                            <span className="shrink-0 text-caption font-semibold text-ink-faint">円〜{isBase ? '（固定）' : null}</span>
                           </span>
                         </Td>
                         <Td className="w-28">
@@ -837,7 +850,7 @@ function RankSettingsTabV8({
           <div className={styles.syncRow}>
             {rules?.syncStatus === 'synced' ? <Chip tone="ok">同期済み</Chip> : rules?.syncStatus === 'failed' ? <Chip tone="danger">失敗</Chip> : <Chip tone="warn">未同期</Chip>}
             <span className="text-caption text-ink-secondary">
-              {rules?.syncStatus === 'synced' && rules.syncedAt ? `最後に送った日時 ${formatJstDateTime(rules.syncedAt)}` : rules?.syncStatus === 'failed' ? rules.syncError ?? '理由は記録されていません' : 'まだECへ送っていません'}
+              {rules?.syncStatus === 'synced' && rules.syncedAt ? `最後に送った日時 ${formatJstShortDateTime(rules.syncedAt)}` : rules?.syncStatus === 'failed' ? rules.syncError ?? '理由は記録されていません' : 'まだECへ送っていません'}
             </span>
           </div>
           <div className="mt-3">
@@ -865,6 +878,7 @@ function RankSettingsTabV8({
 
       {/* 削除の確認：会員がいるランクには移す先が必須（API 側の決まりと同じ）。 */}
       <ConfirmDialog
+        designNode="dEv6G"
         open={removeTarget !== null && removeRow !== null && removeRow.id !== null}
         title={`「${removeRow?.name.trim() || `ランク ${(removeTarget ?? 0) + 1}`}」を削除しますか？`}
         description={
@@ -904,7 +918,7 @@ function RankSettingsTabV8({
         {conflict ? (
           <div className={styles.diffGrid}>
             <div>
-              <p className={styles.diffHead}>最新（{conflict.latest.rules ? formatJstDateTime(conflict.latest.rules.updatedAt) : '—'}）</p>
+              <p className={styles.diffHead}>最新（{conflict.latest.rules ? formatJstShortDateTime(conflict.latest.rules.updatedAt) : '—'}）</p>
               <ul className={styles.diffList}>
                 {conflict.latest.ranks.map((rank) => (
                   <li key={rank.id}>{rank.name} — {yen(rank.annualThresholdYen)}〜 / {rank.mileRatePercent}%</li>

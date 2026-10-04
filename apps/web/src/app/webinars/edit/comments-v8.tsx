@@ -1,19 +1,14 @@
 'use client'
 
-/*
- * ★V8 コメント演出（`Omqd4`）。
- * v7 の見た目は 1画素も変えない。編集画面で data-theme="v8" のときだけ、
- * コメントの段をこの部品で描く（V7 の CommentsTab は触らない）。
- *
- * 検証の決まり（上限・行の形）は CommentsTab と同じ。
- */
-import { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
+import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import { Th } from '@/components/shared/table'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
-import { webinarApi, type WebinarSakuraComment } from '@/lib/api'
+import { ApiError, webinarApi, type WebinarSakuraComment } from '@/lib/api'
 
 function validateImportRow(raw: unknown): WebinarSakuraComment | string {
   if (typeof raw !== 'object' || raw === null) return 'オブジェクトではありません'
@@ -29,9 +24,13 @@ function validateImportRow(raw: unknown): WebinarSakuraComment | string {
   return { atSeconds, authorName, body }
 }
 
-export default function CommentsV8({ webinarId }: { webinarId: string }) {
+export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: { webinarId: string; onDirtyChange?: (dirty: boolean) => void; registerSave?: (save: (() => Promise<boolean>) | null) => void }) {
   const [comments, setComments] = useState<WebinarSakuraComment[]>([])
-  const [loading, setLoading] = useState(true)
+  const [state, setState] = useState<'loading' | 'ready' | 'error' | 'denied'>('loading')
+  const [attempt, setAttempt] = useState(0)
+  const [baseline, setBaseline] = useState('[]')
+  const generation = useRef(0)
+  const locked = useRef(false)
   const [importJson, setImportJson] = useState('')
   const [showImport, setShowImport] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -39,41 +38,72 @@ export default function CommentsV8({ webinarId }: { webinarId: string }) {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    webinarApi
-      .comments(webinarId)
-      .then((res) => setComments(res.data))
-      .finally(() => setLoading(false))
-  }, [webinarId])
+    const request = ++generation.current
+    setState('loading')
+    setMessage(null)
+    setComments([])
+    setBaseline('[]')
+    setImportJson('')
+    void webinarApi.comments(webinarId).then((response) => {
+      if (!Array.isArray(response.data)) throw new Error('invalid_comments')
+      if (request !== generation.current) return
+      setComments(response.data)
+      setBaseline(JSON.stringify(response.data))
+      setState('ready')
+    }).catch((cause) => {
+      if (request === generation.current) setState(cause instanceof ApiError && cause.status === 403 ? 'denied' : 'error')
+    })
+    return () => { generation.current += 1 }
+  }, [webinarId, attempt])
+
+  const dirty = state === 'ready' && (JSON.stringify(comments) !== baseline || importJson.trim() !== '')
+  useEffect(() => { onDirtyChange?.(dirty) }, [onDirtyChange, dirty])
 
   const update = (i: number, patch: Partial<WebinarSakuraComment>) =>
     setComments((prev) => prev.map((c, j) => (j === i ? { ...c, ...patch } : c)))
 
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
+    if (state !== 'ready' || locked.current) return false
     setMessage(null)
+    setIsErrorMessage(true)
+    if (importJson.trim()) { setMessage('貼り付けたJSONを読み込んでから保存してください。'); return false }
     if (comments.length > WEBINAR_SAKURA_COMMENTS_MAX) {
-      setIsErrorMessage(true)
       setMessage(`コメントは${WEBINAR_SAKURA_COMMENTS_MAX}件までです（いま${comments.length}件）。減らしてから保存してください。`)
-      return
+      return false
     }
+    const cleaned: WebinarSakuraComment[] = []
+    for (let index = 0; index < comments.length; index += 1) {
+      const row = validateImportRow(comments[index])
+      if (typeof row === 'string') { setMessage(`${index + 1}行目を確認してください：${row}`); return false }
+      cleaned.push(row)
+    }
+    const request = generation.current
+    locked.current = true
     setSaving(true)
     try {
-      const sorted = [...comments].sort((a, b) => a.atSeconds - b.atSeconds)
-      const res = await webinarApi.saveComments(webinarId, sorted)
+      const sorted = cleaned.sort((a, b) => a.atSeconds - b.atSeconds)
+      const response = await webinarApi.saveComments(webinarId, sorted)
+      if (request !== generation.current) return false
       setComments(sorted)
+      setBaseline(JSON.stringify(sorted))
       setIsErrorMessage(false)
-      setMessage(`${res.data.count}件保存しました`)
-    } catch (err) {
-      setIsErrorMessage(true)
-      setMessage(`保存に失敗しました: ${webinarErrorText(err, '保存できませんでした。入力を見直してください。')}`)
+      setMessage(`${response.data.count}件保存しました`)
+      return true
+    } catch (cause) {
+      if (request === generation.current) setMessage(`保存できませんでした。入力を残しました。${webinarErrorText(cause, '通信を確認して、もう一度保存してください。')}`)
+      return false
     } finally {
-      setSaving(false)
+      locked.current = false
+      if (request === generation.current) setSaving(false)
     }
   }
+  useEffect(() => { registerSave?.(save); return () => registerSave?.(null) }, [registerSave, comments, importJson, state, webinarId])
 
   const doImport = () => {
     try {
       const parsed = JSON.parse(importJson) as unknown
       if (!Array.isArray(parsed)) throw new Error('配列ではありません')
+      if (parsed.length > WEBINAR_SAKURA_COMMENTS_MAX) throw new Error(`コメントは${WEBINAR_SAKURA_COMMENTS_MAX}件までです`)
       const rows: WebinarSakuraComment[] = []
       for (let i = 0; i < parsed.length; i++) {
         const result = validateImportRow(parsed[i])
@@ -94,26 +124,23 @@ export default function CommentsV8({ webinarId }: { webinarId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="Omqd4">
+    <div className="flex flex-col gap-4" data-design-node="Omqd4">
       <div className="min-w-0 flex-1 space-y-3">
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="コメント演出">
-          <h2 className="text-ink text-base font-bold">コメント演出</h2>
-          <p className="text-ink-faint mt-1 text-xs">
-            動画の途中で出すコメントをあらかじめ入れます。{WEBINAR_SAKURA_COMMENTS_MAX}件まで。
-          </p>
+          <h2 className="text-ink text-base font-bold">コメント演出<HelpTip label="コメント演出の説明">動画の途中で出すコメントをあらかじめ入れます。{WEBINAR_SAKURA_COMMENTS_MAX}件まで。</HelpTip></h2>
           {message ? <Notice tone={isErrorMessage ? 'danger' : 'info'}>{message}</Notice> : null}
-          {loading ? (
+          {state === 'error' ? <Notice tone="info" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>コメントを読み込めませんでした。保存前に読み直してください。</Notice> : state === 'denied' ? <Notice tone="info">コメントを編集する権限がありません。管理者に確認してください。</Notice> : state === 'loading' ? (
             <p className="text-ink-faint py-6 text-center text-sm">読み込んでいます。</p>
           ) : (
-            <>
+            <fieldset disabled={saving} className="min-w-0">
               <div className="mt-3 overflow-x-auto rounded-control border border-hairline">
-                <table className="w-full text-sm">
+                <table className="w-full table-fixed text-sm">
                   <thead>
                     <tr className="bg-canvas-sunken text-ink-secondary text-left text-xs">
-                      <Th className="w-24">出す秒数</Th>
+                      <Th className="w-28">出す秒数</Th>
                       <Th className="w-36">名前</Th>
                       <Th>コメント</Th>
-                      <Th>
+                      <Th className="w-12">
                         <span className="sr-only">削除</span>
                       </Th>
                     </tr>
@@ -178,9 +205,6 @@ export default function CommentsV8({ webinarId }: { webinarId: string }) {
                 >
                   JSONを貼り付ける
                 </Button>
-                <Button busy={saving} busyLabel="保存しています…" onClick={() => void save()}>
-                  保存する
-                </Button>
               </div>
               {showImport ? (
                 <div className="mt-3 space-y-2">
@@ -199,10 +223,11 @@ export default function CommentsV8({ webinarId }: { webinarId: string }) {
                   </Button>
                 </div>
               ) : null}
-            </>
+            </fieldset>
           )}
         </section>
       </div>
+      <StickyBar status={dirty ? '保存していない変更があります' : undefined} actions={<><Button href="/webinars">キャンセル</Button><Button disabled={state !== 'ready' || saving} busy={saving} busyLabel="保存しています…" onClick={() => void save()}>保存する</Button></>} />
     </div>
   )
 }

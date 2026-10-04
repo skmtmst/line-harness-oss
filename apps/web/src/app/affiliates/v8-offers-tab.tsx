@@ -35,7 +35,7 @@ import { OfferFormModal, listAllConversionApprovals } from './tabs'
 import OfferTermsDialog from './offer-terms'
 import { confirmedThisMonth, confirmedTotals, confirmedValue, confirmedUnit, confirmedDetail, type ConfirmedState } from './offer-kpi'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
-import styles from './list-v8.module.css'
+import './list-v8.css'
 
 function formatYen(n: number): string {
   return `¥${formatNumber(Math.round(n))}`
@@ -262,8 +262,8 @@ export default function OffersTabV8({
       ) : null}
 
       {/* フォルダ列＋一覧。板 h7dmB：左にグループ、右に表。 */}
-      <div className={styles.listBody}>
-        <nav aria-label="案件のグループ" className={styles.folderCol}>
+      <div className="af-list-listBody">
+        <nav aria-label="案件のグループ" className="af-list-folderCol">
           {/* 板 `h7dmB`：作るボタンはフォルダ列のいちばん上 */}
           <Button
             type="button"
@@ -274,7 +274,7 @@ export default function OffersTabV8({
           >
             <FileText size={15} aria-hidden="true" /> 案件を作る
           </Button>
-          <p className={styles.folderColTitle} style={{ marginTop: 12 }}>
+          <p className="af-list-folderColTitle" style={{ marginTop: 12 }}>
             フォルダ
           </p>
           {FOLDERS.map((f) => {
@@ -284,19 +284,19 @@ export default function OffersTabV8({
               <button
                 key={f.key}
                 type="button"
-                className={`${styles.folderItem} ${active ? styles.folderItemActive : ''}`}
+                className={`af-list-folderItem ${active ? 'af-list-folderItemActive' : ''}`}
                 onClick={() => { setFolder(f.key); setPage(1) }}
                 aria-current={active ? 'true' : undefined}
               >
-                <FolderOpen size={14} aria-hidden="true" className={styles.folderItemIcon} />
-                <span className={styles.folderItemLabel}>{f.label}</span>
-                <span className={styles.folderItemCount}>{formatNumber(count)}</span>
+                <FolderOpen size={14} aria-hidden="true" className="af-list-folderItemIcon" />
+                <span className="af-list-folderItemLabel">{f.label}</span>
+                <span className="af-list-folderItemCount">{formatNumber(count)}</span>
               </button>
             )
           })}
           {/* 案件をフォルダへ入れる口は API に無いので、動きの有無で自動で分けて
               いることを書く（押せない「追加」は置かない）。 */}
-          <p className={styles.footNote} style={{ padding: '8px 0 0' }}>
+          <p className="af-list-footNote" style={{ padding: '8px 0 0' }}>
             成果が出たときの動き（タグ・シナリオ・マイル）で自動で分けています
           </p>
         </nav>
@@ -305,9 +305,9 @@ export default function OffersTabV8({
           <NoticeBar>
             アフィリエイターは「紹介する人」、案件は「何を紹介すると、いくら払うか」の決まりです。1人のアフィリエイターが、いくつもの案件を紹介できます。
           </NoticeBar>
-          <div className={styles.tools} style={{ padding: '0 0 14px' }}>
+          <div className="af-list-tools" style={{ padding: '0 0 14px' }}>
             {/* 1152 ではフォルダ列を畳むので、作るボタンは道具の1段目の左へ（板 `KdFRI`） */}
-            <span className={styles.toolsCreate}>
+            <span className="af-list-toolsCreate">
               <Button
                 type="button"
                 variant="primary"
@@ -318,7 +318,7 @@ export default function OffersTabV8({
                 <FileText size={15} aria-hidden="true" /> 案件を作る
               </Button>
             </span>
-            <span className={styles.folderSelect}>
+            <span className="af-list-folderSelect">
               <Select
                 aria-label="案件のグループ"
                 value={folder}
@@ -332,7 +332,7 @@ export default function OffersTabV8({
               value={query}
               onChange={(value) => { setQuery(value); setPage(1) }}
               onClear={() => { setQuery(''); setPage(1) }}
-              className={styles.toolsSearch}
+              className="af-list-toolsSearch"
             />
             <FilterChip
               selected={filters.includes('open')}
@@ -354,7 +354,7 @@ export default function OffersTabV8({
             >
               下書き
             </FilterChip>
-            <span className={styles.toolsSpacer} />
+            <span className="af-list-toolsSpacer" />
             <Select
               aria-label="よく使う絞り込み"
               value=""
@@ -405,48 +405,48 @@ export default function OffersTabV8({
               <ZeroResultState onReset={resetConditions} />
             </div>
           ) : (
-            <div className={styles.tableWrap} style={{ margin: 0 }}>
-              <div className={styles.tableScroll}>
-                <table className={styles.table}>
+            <div className="af-list-tableWrap" style={{ margin: 0 }}>
+              <div className="af-list-tableScroll">
+                <table className="af-list-table">
                   <thead>
                     <tr>
                       <th>案件</th>
-                      <th className={styles.numRight}>報酬</th>
+                      <th className="af-list-numRight">報酬</th>
                       <th>成果が出たときの動き</th>
-                      <th className={styles.numRight}>紹介している人</th>
-                      <th className={styles.numRight}>成果</th>
-                      <th className={styles.numRight}>操作</th>
+                      <th className="af-list-numRight">紹介している人</th>
+                      <th className="af-list-numRight">成果</th>
+                      <th className="af-list-numRight">操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paged.map((offer) => (
                       <tr key={offer.id}>
                         <td>
-                          <span className={styles.cellMain} style={{ fontWeight: 600, color: 'var(--color-accent-deep)', maxWidth: 220 }} title={offer.name}>
+                          <span className="af-list-cellMain" style={{ fontWeight: 600, color: 'var(--color-accent-deep)', maxWidth: 220 }} title={offer.name}>
                             {offer.name}
                           </span>
-                          <span className={styles.cellSub} style={{ maxWidth: 220 }} title={offer.description ?? undefined}>
+                          <span className="af-list-cellSub" style={{ maxWidth: 220 }} title={offer.description ?? undefined}>
                             {offer.description ?? '説明はありません'}
                           </span>
                         </td>
-                        <td className={styles.numRight}>
+                        <td className="af-list-numRight">
                           <strong>{offer.rewardAmount != null ? formatYen(offer.rewardAmount) : '—'}</strong>
                           {offer.rewardMiles > 0 ? (
-                            <span className={styles.cellSub}>＋{formatNumber(offer.rewardMiles)}マイル</span>
+                            <span className="af-list-cellSub">＋{formatNumber(offer.rewardMiles)}マイル</span>
                           ) : null}
                         </td>
                         <td>
-                          <span className={styles.cellMain} style={{ color: offer.tagId || offer.scenarioId || offer.rewardMiles > 0 ? 'var(--color-ink-secondary)' : 'var(--color-warning)' }}>
+                          <span className="af-list-cellMain" style={{ color: offer.tagId || offer.scenarioId || offer.rewardMiles > 0 ? 'var(--color-ink-secondary)' : 'var(--color-warning)' }}>
                             {actionText(offer)}
                           </span>
                         </td>
-                        <td className={styles.numRight}>{formatNumber(offerStats.get(offer.id)?.introducers ?? 0)}人</td>
-                        <td className={styles.numRight}>
+                        <td className="af-list-numRight">{formatNumber(offerStats.get(offer.id)?.introducers ?? 0)}人</td>
+                        <td className="af-list-numRight">
                           <strong>{formatNumber(offerStats.get(offer.id)?.conversions ?? 0)}件</strong>
-                          <span className={styles.cellSub}>確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
+                          <span className="af-list-cellSub">確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
                         </td>
                         <td>
-                          <div className={styles.rowActions}>
+                          <div className="af-list-rowActions">
                             <Button
                               type="button"
                               size="compact"
@@ -456,8 +456,8 @@ export default function OffersTabV8({
                             >
                               編集
                             </Button>
-                            <span className={`${styles.statusBadge} ${offer.isActive ? styles.statusOk : styles.statusNeutral}`}>
-                              <span className={styles.statusDot} aria-hidden="true" />
+                            <span className={`af-list-statusBadge ${offer.isActive ? 'af-list-statusOk' : 'af-list-statusNeutral'}`}>
+                              <span className="af-list-statusDot" aria-hidden="true" />
                               {offer.isActive ? '公開中' : '下書き'}
                             </span>
                             <span style={{ position: 'relative', display: 'inline-flex' }}>
@@ -498,7 +498,7 @@ export default function OffersTabV8({
 
           {listState === 'ready' ? (
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 12 }}>
-              <p className={styles.footNote} style={{ padding: 0 }}>
+              <p className="af-list-footNote" style={{ padding: 0 }}>
                 {shown.length === offers.length ? `全 ${formatNumber(offers.length)}件` : `${formatNumber(shown.length)}件 / 全 ${formatNumber(offers.length)}件`}
               </p>
               {pageCount > 1 ? <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} /> : null}
@@ -507,7 +507,7 @@ export default function OffersTabV8({
         </div>
       </div>
 
-      <p className={styles.footNote}>
+      <p className="af-list-footNote">
         行の「…」から 編集・決まり。案件は「何をしたら成果になり、いくら払うか」の組み合わせです。成果が出たときのタグ付け・シナリオ開始・マイル付与は、案件ごとに決めます。
       </p>
 

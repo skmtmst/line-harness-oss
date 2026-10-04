@@ -12,6 +12,8 @@ import { clearFeatureSettingsCache } from '@/lib/feature-settings-cache'
 const fixture = vi.hoisted(() => ({
   accountId: 'account-a',
   hang: false,
+  conflict: false,
+  puts: [] as Record<string, unknown>[],
 }))
 
 vi.mock('next/link', () => ({
@@ -47,6 +49,8 @@ let root: Root
 beforeEach(() => {
   fixture.accountId = 'account-a'
   fixture.hang = false
+  fixture.conflict = false
+  fixture.puts = []
   clearFeatureSettingsCache()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('localStorage', {
@@ -64,6 +68,8 @@ beforeEach(() => {
       return response(featureResponse())
     }
     if (path.includes('/api/settings/features') && init?.method === 'PUT') {
+      fixture.puts.push(JSON.parse(String(init.body)))
+      if (fixture.conflict) { fixture.conflict = false; return response({ success: false, error: 'changed' }, 409) }
       return response({ success: true, data: featureResponse().data })
     }
     if (path.includes('/api/analytics/usage')) return response({ success: true, data: { categories: [] } })
@@ -143,4 +149,29 @@ describe('V8 設定のサクサク感', () => {
     await flush()
     expect(host.textContent).toContain('保存しました')
   })
+  it('先にほかの人が保存した時は編集を保ち、比べた後だけ再保存する', async () => {
+    await act(async () => { root.render(<SettingsPage />) })
+    await flush()
+    const firstSwitch = host.querySelector('[role="switch"]') as HTMLElement
+    await act(async () => { firstSwitch.click() })
+    const reason = host.querySelector('#feature-settings-reason') as HTMLInputElement
+    await act(async () => { setInputValue(reason, '使わない機能を止める') })
+    fixture.conflict = true
+    const findButton = (text: string) => [...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === text) as HTMLButtonElement
+    await act(async () => { findButton('機能設定を保存').click() })
+    await flush()
+    expect(fixture.puts).toHaveLength(1)
+    expect(host.querySelector('[data-design-node="ziYCN"]')).not.toBeNull()
+    expect(reason.value).toBe('使わない機能を止める')
+    await act(async () => { findButton('違いを比べる').click() })
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('保存済み オン → 編集中 オフ')
+    expect(fixture.puts).toHaveLength(1)
+    const confirm = document.body.querySelector('[role="dialog"]')?.querySelectorAll('button')
+    const button = [...confirm ?? []].find((b) => b.textContent?.trim() === '比べてから保存')!
+    await act(async () => { button.click() })
+    await flush()
+    expect(fixture.puts).toHaveLength(2)
+    expect(fixture.puts[1].reason).toBe('使わない機能を止める')
+  })
+
 })

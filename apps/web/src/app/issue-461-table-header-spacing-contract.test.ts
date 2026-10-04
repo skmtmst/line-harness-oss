@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -16,6 +16,11 @@ describe('Issue #461 表見出しの余白', () => {
   it.each(targets)('%s の全thを共通余白にそろえる', (path) => {
     const source = readFileSync(join(APP, path), 'utf8')
     const headers = [...source.matchAll(/<th\b[^>]*className="([^"]*)"/g)]
+
+    if (!/<(?:table|DataTable)\b/.test(source)) {
+      expect(source).not.toMatch(/<(?:th|Th)\b/)
+      return
+    }
 
     if (headers.length === 0) {
       // 共通 Th（shared/table）へ寄せた画面は、余白を部品が持つ。

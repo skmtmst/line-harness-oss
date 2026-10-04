@@ -13,7 +13,10 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
+import Link from 'next/link'
 import Button from '@/components/shared/button'
+import Disclosure from '@/components/shared/disclosure'
+import StickyBar from '@/components/shared/sticky-bar'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -91,7 +94,7 @@ function formOf(reward: MileageRewardSummary): FormState {
   }
 }
 
-function isSummary(value: unknown): value is MileageRewardSummary {
+function isMileageRewardSummary(value: unknown): value is MileageRewardSummary {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<MileageRewardSummary>
   return typeof candidate.id === 'string'
@@ -155,7 +158,7 @@ function RewardEditorInner() {
       const fallback = overview?.success
         ? overview.data.rewards.find((item) => item.id === rewardId)
         : undefined
-      const found = detail?.success && isSummary(detail.data) ? detail.data : fallback
+      const found = detail?.success && isMileageRewardSummary(detail.data) ? detail.data : fallback
       if (!found) throw new Error('failed')
       setReward(found)
       const loaded = formOf(found)
@@ -320,8 +323,8 @@ function RewardEditorInner() {
 
   return (
     <div data-design-node="L2Bzp" className={formStyles.page}>
-      <Button variant="secondary" href="/mileage?tab=rewards">← マイルへ</Button>
       <div className={formStyles.head}>
+        <Link className={formStyles.back} href="/mileage?tab=rewards">← マイルへ</Link>
         <h1 className={formStyles.title}>使い道を作る</h1>
         <p className={formStyles.description}>マイルと交換できる特典を決めます。出ると、お客さまのLINE（マイルの画面）に並びます。</p>
       </div>
@@ -347,7 +350,7 @@ function RewardEditorInner() {
             <div className={formStyles.grid2}>
               <label className={formStyles.field}>
                 <span className={formStyles.label}>名前 <span className={formStyles.required}>必須</span></span>
-                <TextInput value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="例：送料無料クーポン" aria-label="名前" />
+                <TextInput id="reward-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="例：送料無料クーポン" aria-label="名前" />
                 {touched && !form.name.trim() ? <span className={formStyles.required}>使い道の名前を入力してください</span> : null}
               </label>
               <label className={formStyles.field}>
@@ -356,17 +359,21 @@ function RewardEditorInner() {
                 {touched && errors.includes('必要マイルは1以上の整数で入力してください') ? <span className={formStyles.required}>必要マイルは1以上の整数で入力してください</span> : null}
               </label>
             </div>
-            <div className={formStyles.field}>
+            <Disclosure title="説明を添える（任意）" size="compact">
               <Field label="説明" htmlFor="reward-description-v8" note="一覧と交換の画面に出ます。空でも出せます">
                 <TextArea id="reward-description-v8" rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} />
               </Field>
-            </div>
+            </Disclosure>
           </section>
 
           <section className={formStyles.card} aria-label="渡すもの">
             <h2 className={formStyles.cardTitle}>渡すもの</h2>
             <div className={formStyles.field}>
-              <span className={formStyles.label}>交換後に渡すもの</span>
+              <span className={formStyles.label}>渡すものの種類</span>
+              <Select aria-label="渡すものの種類" size="full" value={form.rewardKind}
+                onChange={(next) => set('rewardKind', next as MileageRewardKind)}
+                options={KINDS.map((kind) => ({ value: kind.value, label: kind.label }))} />
+              <Disclosure title="種類ごとの説明" size="compact">
               <RadioCardGroup legend="交換後に渡すもの" className={formStyles.grid2}>
                 {KINDS.map((kind) => (
                   <RadioCard
@@ -380,11 +387,12 @@ function RewardEditorInner() {
                   />
                 ))}
               </RadioCardGroup>
+              </Disclosure>
               <span className={formStyles.hint}>{kindNote}</span>
             </div>
             <div className={formStyles.field}>
               <Field
-                label="共通アクションの公開版"
+                label="交換後に渡すもの"
                 htmlFor="reward-action-v8"
                 note={form.rewardKind === 'coupon'
                   ? 'クーポンは引換コードで渡すので、選ばなくても出せます'
@@ -420,11 +428,11 @@ function RewardEditorInner() {
                 />
               </Field>
             </div>
-            <div className={formStyles.field}>
+            <Disclosure title="交換したときの案内（任意）" size="compact">
               <Field label="交換したときの案内" htmlFor="reward-message-v8" note="お客様に届く文です。空なら既定の文を送ります">
                 <TextArea id="reward-message-v8" rows={2} value={form.customerMessage} onChange={(e) => set('customerMessage', e.target.value)} />
               </Field>
-            </div>
+            </Disclosure>
           </section>
 
           <section className={formStyles.card} aria-label="だれが交換できるか">
@@ -473,13 +481,12 @@ function RewardEditorInner() {
                 </Field>
               </div>
             </div>
-            <div className={formStyles.field}>
-              <Field label="交換開始・交換終了" htmlFor="reward-starts-v8" note="空欄ならいつでも" error={touched && errors.includes('交換終了は交換開始より後にしてください') ? '交換終了は交換開始より後にしてください' : undefined}>
-                <span className={formStyles.inlineRow}>
-                  <DateTimeField id="reward-starts-v8" value={form.startsAt} onChange={(v) => set('startsAt', v)} />
-                  <span className={formStyles.hint}>から</span>
-                  <DateTimeField aria-label="交換終了" value={form.endsAt} onChange={(v) => set('endsAt', v)} />
-                </span>
+            <div className={formStyles.grid2}>
+              <Field label="交換開始" htmlFor="reward-starts-v8" note="空欄ならいつでも" error={touched && errors.includes('交換終了は交換開始より後にしてください') ? '交換終了は交換開始より後にしてください' : undefined}>
+                <DateTimeField id="reward-starts-v8" aria-label="交換開始" value={form.startsAt} onChange={(v) => set('startsAt', v)} />
+              </Field>
+              <Field label="交換終了" htmlFor="reward-ends-v8" note="空欄なら期限なし">
+                <DateTimeField id="reward-ends-v8" aria-label="交換終了" value={form.endsAt} onChange={(v) => set('endsAt', v)} />
               </Field>
             </div>
             <div className={formStyles.field}>
@@ -504,7 +511,7 @@ function RewardEditorInner() {
                 <dd />
               </div>
               <p className={formStyles.hint}>
-                期限なし・お一人さま{perFriend}
+                {form.benefitExpiresDays.trim() ? `交換後${form.benefitExpiresDays}日間` : '期限なし'}・お一人さま{perFriend}
               </p>
             </div>
           </section>
@@ -519,7 +526,7 @@ function RewardEditorInner() {
         </aside>
       </div>
 
-      <div className={formStyles.stickyBar}>
+      <StickyBar actions={<>
         <Button variant="secondary" href="/mileage?tab=rewards">キャンセル</Button>
         <Button onClick={() => void save(false)} disabled={saving || testing} busy={saving} busyLabel="保存中">
           下書きを保存
@@ -527,7 +534,7 @@ function RewardEditorInner() {
         <Button variant="primary" onClick={requestPublish} disabled={saving || testing}>
           <Check size={14} aria-hidden="true" /> 保存して出す
         </Button>
-      </div>
+      </>} />
 
       <ConfirmDialog
         open={publishOpen}

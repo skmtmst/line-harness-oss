@@ -269,7 +269,7 @@ function ProjectInner() {
 
   const duplicate = async () => {
     if (!project) return
-    setBusyAction('複製')
+    setBusyAction('複製する')
     setActionError('')
     try {
       const res = await api.hqBanners.projects.duplicate(project.id)
@@ -460,7 +460,7 @@ function ProjectInner() {
         </Button>
         <Button onClick={() => void duplicate()} disabled={busy}>
           <Copy aria-hidden="true" className="h-4 w-4" />
-          複製
+          複製する
         </Button>
         <Button onClick={() => setFormOpen(true)} disabled={busy}>
           <Pencil aria-hidden="true" className="h-4 w-4" />

@@ -123,7 +123,7 @@ const typeBadgeColor: Record<string, string> = {
 /** 種別の札。一覧の表とスマホのカードで同じ顔にする。 */
 function TemplateKindBadge({ kind }: { kind: string }) {
   return (
-    <span className={`inline-flex items-center rounded-mini px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[kind] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+    <span className={`inline-flex items-center rounded-mini px-2 py-0.5 text-nano font-medium ${typeBadgeColor[kind] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
       {messageTypeText(kind)}
     </span>
   )
@@ -1231,13 +1231,13 @@ function TemplatesPageV7() {
             ) : !drawerData ? null : (
               <div className="flex flex-col gap-4 p-4">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-mini text-[10px] font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-mini text-nano font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
                     {messageTypeText(drawerData.question ? 'question' : drawerData.messageType)}
                   </span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-pill text-[10px] font-medium bg-info-bg text-info">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-pill text-nano font-medium bg-info-bg text-info">
                     {drawerData.category}
                   </span>
-                  <span className="text-[10px] text-ink-faint">
+                  <span className="text-nano text-ink-faint">
                     更新: {formatDate(drawerData.updatedAt)}
                   </span>
                   {/* 独立審査(指摘6): 公開状態と公開ボタン。版の確認つきで公開する。 */}
@@ -1262,7 +1262,7 @@ function TemplatesPageV7() {
                 <div>
                   {canMutateTemplates ? (
                     <>
-                      <label className="mb-1.5 block text-[11px] font-medium text-ink-faint" htmlFor="template-folder-select">
+                      <label className="mb-1.5 block text-micro font-medium text-ink-faint" htmlFor="template-folder-select">
                         置き場
                       </label>
                       <Select
@@ -1289,7 +1289,7 @@ function TemplatesPageV7() {
 
                 {/* Preview */}
                 <div>
-                  <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">プレビュー</h4>
+                  <h4 className="text-micro font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">プレビュー</h4>
                   <div className="border border-hairline rounded-control p-3 bg-canvas-sunken overflow-x-auto">
                     {drawerData.question ? (
                       <div className="space-y-2">
@@ -1354,7 +1354,7 @@ function TemplatesPageV7() {
                     </Button>
                   )
                 ) : <div>
-                  <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
+                  <h4 className="text-micro font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
                     rows={drawerData.messageType === 'flex' ? 12 : 4}
                     className="w-full border border-hairline rounded-control px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent resize-y"
@@ -1381,11 +1381,11 @@ function TemplatesPageV7() {
 
                 {/* Used by */}
                 <div>
-                  <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">
+                  <h4 className="text-micro font-semibold text-ink-faint mb-1.5 uppercase tracking-wide">
                     使用箇所 ({drawerUsageCount})
                   </h4>
                   {drawerUsageCount === 0 ? (
-                    <p className="text-[11px] text-ink-faint italic">どこからも使用されていません</p>
+                    <p className="text-micro text-ink-faint italic">どこからも使用されていません</p>
                   ) : (
                     <>
                       <ul className="space-y-1.5 text-xs">
@@ -1435,7 +1435,7 @@ function TemplatesPageV7() {
                         ))}
                       </ul>
                       {drawerUsageCount > 0 && (
-                        <p className="mt-2 text-[10px] text-warning">
+                        <p className="mt-2 text-nano text-warning">
                           このテンプレートは使用中です。削除する前に使用先を差し替えてください。
                         </p>
                       )}

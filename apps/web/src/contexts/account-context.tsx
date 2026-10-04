@@ -44,6 +44,10 @@ export interface AccountWithStats {
     messagesThisMonth: number
     staffCount: number
   }
+  /** 板 `JKjsE`：付けたタグ（`GET /api/line-accounts` の `tags`）。 */
+  tags?: Array<{ id: string; name: string; color: string | null }>
+  /** 板 `JKjsE`：アーカイブ日時。あるときはアーカイブ済み。 */
+  archivedAt?: string | null
   connection?: {
     status: 'ok' | 'warn' | 'unknown'
     checkedAt: string | null
