@@ -126,7 +126,7 @@ describe('受信箱V4の画面契約', () => {
   it('一括確認を画面に出さず、送信元と担当者を分けて表示する', () => {
     expect(PAGE).not.toContain('すべて確認済みにする')
     expect(PAGE).toContain('selectedAccount?.pictureUrl')
-    expect(PAGE).toContain("msg.sentByStaffName ?? 'スタッフ'")
+    expect(PAGE).toContain("msg.sentByStaffName ?? '担当者'")
   })
 
   it('担当変更では、絞り込み用の「すべて」を担当者として送らない', () => {
@@ -154,7 +154,7 @@ describe('受信箱V4の画面契約', () => {
 
   it('自分担当チップを外し、担当者プルダウンでLINEとメールを絞る', () => {
     expect(PAGE).not.toContain("{ key: 'mine' as const, label: '自分担当' }")
-    expect(PAGE).toContain('ariaLabel="担当で絞り込む"')
+    expect(PAGE).toContain('ariaLabel="担当者で絞り込む"')
     const lineParams = region(PAGE, 'const buildListParams = useCallback', 'return params')
     expect(lineParams).toContain("if (assigneeFilter !== 'all') params.operatorId = assigneeFilter")
     expect(lineParams).toContain('if (unreadOnly) params.unreadOnly = true')
@@ -241,7 +241,7 @@ describe('受信箱V4の画面契約', () => {
   })
 
   it('狭い画面でも対応状況の見出しを1行で表示する', () => {
-    expect(INBOX_KPIS).toContain('whitespace-nowrap text-[11px] font-semibold')
+    expect(INBOX_KPIS).toContain('whitespace-nowrap text-micro font-semibold')
   })
 
   it('顧客情報の操作と情報順をV4へそろえる', () => {
