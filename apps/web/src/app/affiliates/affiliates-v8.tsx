@@ -53,7 +53,7 @@ export default function AffiliatesV8() {
   const { selectedAccountId } = useAccount()
 
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
 
   // 成果地点はコンバージョンの画面へ返す（分かれたあとも古いURLを壊さない）。
   const rawTab = params.get('tab')
