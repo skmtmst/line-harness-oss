@@ -117,3 +117,14 @@
 :global([data-theme='v8']) .frame[data-has-footer] > .split,
 :global([data-theme='v8']) .frame[data-has-footer] > .settings { min-height: 0; overflow-y: auto; }
 :global([data-theme='v8']) .footer { flex-shrink: 0; }
+
+/* 入力と見え方は別々に送る。本文全体のスクロールバーで左右の列幅を削らない。 */
+:global([data-theme='v8']) [data-page-template='create'][data-has-footer] > .split { overflow: hidden; }
+:global([data-theme='v8']) [data-page-template='create'][data-has-footer] .createContent {
+  max-height: 100%; min-height: 0; overflow-y: auto;
+}
+:global([data-theme='v8']) [data-page-template='create'][data-has-footer] .preview {
+  min-height: 0; overflow-y: auto;
+}
+:global([data-theme='v8']) [data-page-template='create'][data-has-footer] .createContent > *,
+:global([data-theme='v8']) [data-page-template='create'][data-has-footer] .preview > * { flex-shrink: 0; }

@@ -1,1 +1,31 @@
-{"before":{"bottom":874,"height":72,"left":264,"right":1404,"top":802,"width":1140,"x":264,"y":802},"after":{"bottom":874,"height":72,"left":264,"right":1404,"top":802,"width":1140,"x":264,"y":802}}
+{
+  "before": {
+    "bottom": 874,
+    "height": 72,
+    "left": 264,
+    "right": 1404,
+    "top": 802,
+    "width": 1140,
+    "x": 264,
+    "y": 802
+  },
+  "after": {
+    "bottom": 874,
+    "height": 72,
+    "left": 264,
+    "right": 1404,
+    "top": 802,
+    "width": 1140,
+    "x": 264,
+    "y": 802
+  },
+  "preview": {
+    "clientHeight": 638,
+    "scrollHeight": 997,
+    "scrollTop": 359
+  },
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  }
+}
