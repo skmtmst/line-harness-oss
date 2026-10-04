@@ -192,7 +192,7 @@ describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・�
   });
 });
 
-describe('ウェビナーは暗い地のまま (7-webinar)、時刻の同期はそのまま', () => {
+describe('ウェビナーは白地 (⑤LINEらしい。夜の型はM2の型が入ってから)、時刻の同期はそのまま', () => {
   it('同期・補正・ハートビート・計測が残る', () => {
     const src = webinar();
     expect(src).toContain('expectedPosition');
@@ -203,9 +203,10 @@ describe('ウェビナーは暗い地のまま (7-webinar)、時刻の同期は�
     expect(src).toContain('webinarComment');
   });
 
-  it('地は暗く、ボタンと送信は濃い緑', () => {
+  it('地は白く、ボタンと送信は濃い緑', () => {
     const src = webinar();
-    expect(src).toContain('bg-night');
+    expect(src).toContain('bg-canvas');
+    expect(src).not.toContain('bg-night');
     expect(src).toContain('bg-accent-deep');
   });
 
@@ -228,7 +229,7 @@ describe('ウェビナーは暗い地のまま (7-webinar)、時刻の同期は�
 
   it('会話はほか・自分を文字色で分ける', () => {
     const src = webinar();
-    expect(src).toContain('text-night-name');
-    expect(src).toContain('text-night-mine');
+    expect(src).toContain('text-ink-secondary');
+    expect(src).toContain('text-liff-primary');
   });
 });

@@ -46,8 +46,8 @@ import Pagination from '@/components/shared/pagination'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
+import { notifyToast } from '@/components/shared/toast'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
-import { runOptimistic } from '@/lib/undoable'
 import { formatDateTime, formatNumber, formatYmd } from '@/lib/format'
 import styles from './list-v8.module.css'
 
@@ -271,24 +271,25 @@ export default function BroadcastListV8() {
    * ページ送りは口側の cursor（= オフセット）で行う。
    * ページ番号は画面だけの形で、口には (page-1)*limit を渡す。
    */
-  const load = useCallback(async (cursor = 0) => {
+  /*
+   * 速さ：条件を変えるたび3つの口を取り直していた。一覧だけが条件で
+   * 変わるので、一覧と名前解決（タグ・シナリオ）を分ける。条件変更・
+   * ページ送り・削除や移動の後の取り直しは一覧の口だけにする。
+   */
+  const loadList = useCallback(async (cursor = 0) => {
     setLoading(true)
     setError('')
     setForbidden(false)
     try {
       const chip = STATUS_CHIPS.find((item) => item.key === statusFilter)
-      const [broadcastsRes, tagsRes, scenariosRes] = await Promise.all([
-        api.broadcasts.list({
-          accountId: selectedAccountId || undefined,
-          limit: pageSize,
-          cursor,
-          displayStatus: chip && chip.query !== '' ? chip.query : undefined,
-          folderId: folderFilter === UNFILED ? 'unfiled' : folderFilter || undefined,
-          sort: sortKey,
-        }),
-        api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined),
-        api.scenarios.list(selectedAccountId ? { accountId: selectedAccountId } : undefined).catch(() => null),
-      ])
+      const broadcastsRes = await api.broadcasts.list({
+        accountId: selectedAccountId || undefined,
+        limit: pageSize,
+        cursor,
+        displayStatus: chip && chip.query !== '' ? chip.query : undefined,
+        folderId: folderFilter === UNFILED ? 'unfiled' : folderFilter || undefined,
+        sort: sortKey,
+      })
       if (broadcastsRes.success) {
         setBroadcasts(broadcastsRes.data)
         setListKpis(broadcastsRes.kpis)
@@ -296,10 +297,6 @@ export default function BroadcastListV8() {
         setListTotal(broadcastsRes.pagination?.total ?? null)
       } else {
         setError(broadcastsRes.error)
-      }
-      if (tagsRes && tagsRes.success) setTags(tagsRes.data)
-      if (scenariosRes && scenariosRes.success) {
-        setScenarios(scenariosRes.data.map((item) => ({ id: item.id, name: item.name })))
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
@@ -309,15 +306,39 @@ export default function BroadcastListV8() {
     }
   }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter])
 
-  /* 条件を変えたら1ページ目へ戻して取り直す。 */
+  /*
+   * 速さ：タグ・シナリオは宛先の名前解決にだけ使う。条件では変わらない
+   * ので、アカウントが変わったときだけ取り直す。失敗しても一覧は止めない。
+   */
+  const loadCandidates = useCallback(async () => {
+    try {
+      const [tagsRes, scenariosRes] = await Promise.all([
+        api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined),
+        api.scenarios.list(selectedAccountId ? { accountId: selectedAccountId } : undefined).catch(() => null),
+      ])
+      if (tagsRes && tagsRes.success) setTags(tagsRes.data)
+      if (scenariosRes && scenariosRes.success) {
+        setScenarios(scenariosRes.data.map((item) => ({ id: item.id, name: item.name })))
+      }
+    } catch {
+      // 名前が引けない行はID表示に倒す（一覧の取得とは別物）。
+    }
+  }, [selectedAccountId])
+
+  /* 条件を変えたら1ページ目へ戻して一覧だけ取り直す。 */
   useEffect(() => {
     setPage(1)
-    void load(0)
-  }, [load])
+    void loadList(0)
+  }, [loadList])
+
+  /* アカウントを変えたら名前解決も取り直す。 */
+  useEffect(() => {
+    void loadCandidates()
+  }, [loadCandidates])
 
   const goPage = (next: number) => {
     setPage(next)
-    void load((next - 1) * pageSize)
+    void loadList((next - 1) * pageSize)
   }
 
   /* 今月の送信枠（ダッシュボードの口から quota を借りる）。 */
@@ -429,7 +450,7 @@ export default function BroadcastListV8() {
       const res = await api.broadcasts.delete(targetId)
       if (!res.success) throw new Error(res.error)
       setDeleteTarget(null)
-      await load((page - 1) * pageSize)
+      await loadList((page - 1) * pageSize)
     } catch {
       setDeleteError('この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
@@ -440,30 +461,32 @@ export default function BroadcastListV8() {
   /*
    * 行の「…」→「フォルダへ移す」。宛先フォルダを同じメニューで選ぶ。
    * 軽い整理なので、押した瞬間に移した形を見せて裏で保存する（サクサク感 B）。
-   * 失敗したら元に戻して「もう一度」の知らせを出す。メニューはすぐ閉じる。
+   * 失敗したら元に戻して読み直しの案内を出す。メニューはすぐ閉じる。
    */
-  const moveBroadcastToFolder = (broadcast: ApiBroadcast, folderId: string | null) => {
+  const moveBroadcastToFolder = async (broadcast: ApiBroadcast, folderId: string | null) => {
     if (moving) return
     setMoving(true)
     const previous = broadcasts
     setBroadcasts((current) => current.map((item) => (item.id === broadcast.id ? { ...item, folderId } : item)))
     setOpenMenuId(null)
     setMenuMoveFor(null)
-    const retry = () => moveBroadcastToFolder(broadcast, folderId)
-    runOptimistic({
-      request: () => api.broadcasts.update(broadcast.id, {
+    try {
+      const res = await api.broadcasts.update(broadcast.id, {
         folderId,
         expectedVersion: broadcast.version ?? 0,
-      }),
-      revert: () => { setBroadcasts(previous); setMoving(false) },
-      failureMessage: 'フォルダへ移せませんでした。',
-      retry,
-      onSuccess: () => {
-        setMoving(false)
-        void load((page - 1) * pageSize)
-        void loadFolders()
-      },
-    })
+      })
+      if (!res.success) throw new Error(res.error)
+      await loadList((page - 1) * pageSize)
+      await loadFolders()
+    } catch {
+      /* 楽観更新を巻き戻し、知らせは読み直しの案内にする。 */
+      setBroadcasts(previous)
+      notifyToast('フォルダへ移せませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setMoving(false)
+      setOpenMenuId(null)
+      setMenuMoveFor(null)
+    }
   }
 
   const getTagName = (tagId: string | null) => {
@@ -866,8 +889,8 @@ export default function BroadcastListV8() {
           {showCreate && (
             <BroadcastForm
               tags={tags}
-              onSuccess={() => { setShowCreate(false); void load(); void loadFolders() }}
-              onDraftSaved={() => { void load(); void loadFolders() }}
+              onSuccess={() => { setShowCreate(false); void loadList(); void loadFolders() }}
+              onDraftSaved={() => { void loadList(); void loadFolders() }}
               onCancel={() => setShowCreate(false)}
               openTemplatePickerInitially={openTemplatePicker}
             />
@@ -923,7 +946,7 @@ export default function BroadcastListV8() {
                 <AlertCircle size={20} aria-hidden="true" />
               </span>
               <p className={styles.stateTitle}>一斉配信を読み込めませんでした</p>
-              <Button type="button" onClick={() => void load((page - 1) * pageSize)}>もう一度試す</Button>
+              <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度試す</Button>
             </div>
           ) : visibleBroadcasts.length === 0 ? (
             filterActive ? (
