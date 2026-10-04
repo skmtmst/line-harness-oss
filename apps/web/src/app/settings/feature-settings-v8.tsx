@@ -243,15 +243,24 @@ function FeatureCardV8({ group, features, usageByItemId, usageByFeatureId, usage
 }
 
 /** 並び替えダイアログ（★V8-B `ztgRD`）。下書きの並びを動かし、確定で反映する。 */
-export function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveItemInOrder }: {
+export function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveItemInOrder, features }: {
   groups: FeatureGroup[]
   initialOrder: MenuItemOrder
   onCancel: () => void
   onApply: (order: MenuItemOrder) => void
   moveItemInOrder: (order: MenuItemOrder, groupId: string, itemId: string, direction: -1 | 1) => MenuItemOrder
+  features?: Record<string, boolean>
 }) {
   const [draft, setDraft] = useState<MenuItemOrder>(initialOrder)
   const draftGroups = useMemo(() => applyItemOrder(groups, draft), [groups, draft])
+  /* 下書きの並びでのメニューの見え方（v7 の右の欄と同じ数え方）。 */
+  const hiddenCount = useMemo(() => {
+    let hidden = 0
+    for (const group of draftGroups) {
+      for (const item of group.items) if (!itemIsEnabled(item, features ?? {})) hidden += 1
+    }
+    return hidden
+  }, [draftGroups, features])
   /* 手書きの窓にも共通の窓の振る舞い（Esc で閉じる・Tab の閉じ込め）を付ける。 */
   const panelRef = useOverlayFocus(true, onCancel)
   return (
@@ -301,6 +310,27 @@ export function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveIte
               ))}
             </div>
           ))}
+          <div className={styles.previewWrap}>
+            <p className={styles.previewTitle}>サイドメニューの見え方</p>
+            {draftGroups.map((group) => (
+              <div key={group.id} className={styles.previewGroup}>
+                <p className={styles.previewGroupLabel}>{group.label}</p>
+                {group.items.map((item) => {
+                  const enabled = itemIsEnabled(item, features ?? {})
+                  return (
+                    <p key={item.id} className={`${styles.previewRow} ${enabled ? '' : styles.previewOff}`}>
+                      <span aria-hidden="true" className={`${styles.previewDot} ${enabled ? styles.previewDotOn : ''}`} />
+                      <span className={styles.previewLabel}>{item.label}</span>
+                      {!enabled ? <span className={styles.previewOffTag}>非表示</span> : null}
+                    </p>
+                  )
+                })}
+              </div>
+            ))}
+            <p className={styles.previewNote}>
+              {hiddenCount > 0 ? `${hiddenCount} 項目が非表示になります` : 'すべての項目が表示されます'}
+            </p>
+          </div>
         </div>
         <div className={styles.dialogFoot}>
           <span className={styles.dialogFootLead}>
@@ -679,6 +709,7 @@ export function FeatureSettingsV8() {
           groups={groups}
           initialOrder={itemOrder}
           moveItemInOrder={moveItemInOrder}
+          features={features}
           onCancel={() => setReorderOpen(false)}
           onApply={(order) => {
             setItemOrder(order)

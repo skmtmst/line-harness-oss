@@ -32,7 +32,7 @@
     "direct-th": 20
   },
   "app/affiliates/v8-affiliates-tab.tsx": {
-    "unresolved-classname": 27,
+    "unresolved-classname": 25,
     "direct-th": 7
   },
   "app/affiliates/v8-approvals-tab.tsx": {
@@ -40,8 +40,8 @@
     "direct-th": 8
   },
   "app/affiliates/v8-drawer.tsx": {
-    "unresolved-classname": 50,
-    "direct-th": 9
+    "unresolved-classname": 48,
+    "direct-th": 8
   },
   "app/affiliates/v8-offers-tab.tsx": {
     "unresolved-classname": 33,
@@ -177,8 +177,8 @@
     "unresolved-classname": 109
   },
   "app/contents/vars/list-v8.tsx": {
-    "unresolved-classname": 105,
-    "direct-th": 6
+    "unresolved-classname": 107,
+    "direct-th": 7
   },
   "app/contents/vars/new/new-v8.tsx": {
     "unresolved-classname": 55
@@ -533,8 +533,8 @@
     "direct-secondary-button": 1
   },
   "app/rich-menus/list-v8.tsx": {
-    "unresolved-classname": 81,
-    "direct-th": 6,
+    "unresolved-classname": 83,
+    "direct-th": 7,
     "arbitrary-value": 1
   },
   "app/rich-menus/new/create-v8.tsx": {
@@ -581,7 +581,7 @@
     "arbitrary-value": 2
   },
   "app/settings/feature-settings-v8.tsx": {
-    "unresolved-classname": 59
+    "unresolved-classname": 64
   },
   "app/settings/file-scan/file-scan-v8.tsx": {
     "unresolved-classname": 29,
@@ -688,18 +688,6 @@
   "app/users/users-v8.tsx": {
     "unresolved-classname": 55,
     "direct-th": 5
-  },
-  "app/webhooks/_components/webhooks-v8-outgoing.tsx": {
-    "unresolved-classname": 87
-  },
-  "app/webhooks/_components/webhooks-v8-samples.tsx": {
-    "unresolved-classname": 23
-  },
-  "app/webhooks/_components/webhooks-v8-sheets.tsx": {
-    "unresolved-classname": 58
-  },
-  "app/webhooks/_components/webhooks-v8-shell.tsx": {
-    "unresolved-classname": 7
   },
   "app/webhooks/apitokens-v8.tsx": {
     "unresolved-classname": 26,

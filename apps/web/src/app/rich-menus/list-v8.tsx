@@ -604,6 +604,8 @@ export default function RichMenusListV8() {
   }
 
   /* ===== 数の帯 ===== */
+  // 月の集計が無い行は期間の集計で補う（v7 と同じ。集計自体が無ければ「—」）。
+  const tapsByGroup = new Map((tapStats?.byGroup ?? []).map((g) => [g.groupId, g.taps]))
   const topArea = tapStats?.byArea[0] ?? null
   const topAreaGroupName = topArea
     ? groups.find((g) => g.id === topArea.groupId)?.name ?? null
@@ -797,6 +799,7 @@ export default function RichMenusListV8() {
             <col style={{ width: '18%' }} />
             <col style={{ width: 110 }} />
             <col style={{ width: 110 }} />
+            <col style={{ width: 110 }} />
             <col style={{ width: 44 }} />
           </colgroup>
           <thead>
@@ -806,6 +809,7 @@ export default function RichMenusListV8() {
               <th>誰に出すか</th>
               <th>状態</th>
               <th>今月押された</th>
+              <th>更新日</th>
               <th aria-label="操作" />
             </tr>
           </thead>
@@ -868,7 +872,7 @@ export default function RichMenusListV8() {
                         className={styles.cellSub}
                         title={`${menuShapeText(g)}・ボタン「${g.chatBarText}」`}
                       >
-                        {menuShapeText(g)}
+                        {menuShapeText(g)}・ボタン「{g.chatBarText}」
                       </span>
                     </span>
                   </div>
@@ -900,7 +904,11 @@ export default function RichMenusListV8() {
                 </td>
                 <td className={styles.countCell}>
                   <div className={styles.countMain}>
-                    {g.monthlyStats ? `${formatNumber(g.monthlyStats.taps)}回` : '—'}
+                    {g.monthlyStats
+                      ? `${formatNumber(g.monthlyStats.taps)}回`
+                      : tapStats
+                        ? `${formatNumber(tapsByGroup.get(g.id) ?? 0)}回`
+                        : '—'}
                   </div>
                   {g.monthlyStats?.uniqueAudience.value != null ? (
                     <div className={styles.countSub}>
@@ -908,6 +916,11 @@ export default function RichMenusListV8() {
                       {g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}
                     </div>
                   ) : null}
+                </td>
+                <td className={styles.countCell}>
+                  <span className={styles.countSub} title={formatDay(g.updatedAt)}>
+                    {formatDay(g.updatedAt)}
+                  </span>
                 </td>
                 <td className={styles.menuCellActions} onClick={(event) => event.stopPropagation()}>
                   <button

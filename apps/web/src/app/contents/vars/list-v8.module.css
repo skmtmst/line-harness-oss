@@ -256,7 +256,11 @@
   min-width: 160px;
 }
 
-/* 探す欄の幅（板 `FM94M`「検索」：幅 200・高さは共有部品）。 */
+/* 板が狭いときだけ出すフォルダの追加・名前変更・削除（v7 と同じ口）。 */
+.folderNarrowActions {
+  display: none;
+}
+
 .searchWrap {
   flex: 0 0 auto;
   width: 200px;
@@ -452,7 +456,16 @@
   white-space: nowrap;
 }
 
-/* ページ送りの段（板 `FM94M`「ページ送り」：余白 10/20・間 6。「件数」は 13/secondary）。 */
+/* 更新・次回の列：v7 と同じ情報。狭いときは省略し、全文は title で読む。 */
+.updateCell {
+  overflow: hidden;
+  max-width: 220px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .foot {
   display: flex;
   flex-wrap: wrap;
@@ -630,6 +643,13 @@
 
   .folderSelectWrap {
     display: block;
+  }
+
+  .folderNarrowActions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
   }
 
   .pageSizeWrap {
