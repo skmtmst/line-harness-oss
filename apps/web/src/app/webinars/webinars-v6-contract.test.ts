@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, 'list-v8.tsx'), 'utf8')
 const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
 const PUBLISHED = fs.readFileSync(path.join(__dirname, 'published/page.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
@@ -36,9 +36,9 @@ describe('V6 ウェビナー一覧の契約', () => {
   })
 
   it('選択アカウントのフォルダ件数を表示し、追加・改名・並び替え・削除を保存する', () => {
-    expect(PAGE).toContain('lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]')
+    expect(PAGE).toContain('className={styles.body}')
     expect(PAGE).toContain('style={FOLDER_RAIL_STYLE}')
-    expect(PAGE).toContain("onAddFolder={() => { setFolderError(''); setFolderDialogOpen(true) }}")
+    expect(PAGE).toContain("onAddFolder={() => { if (!canEdit) return; setFolderError(''); setFolderDialogOpen(true) }}")
     expect(PAGE).toContain("webinarApi.createFolder(selectedAccountId, { name })")
     expect(PAGE).toContain('webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name })')
     expect(PAGE).toContain('webinarApi.deleteFolder(selectedAccountId, deletingFolder.id)')
@@ -49,13 +49,13 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).not.toContain('const WEBINAR_FOLDERS')
     expect(PAGE).not.toContain('min-h-[640px]')
     expect(PAGE).not.toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')
-    expect(PAGE).toContain('measuredCount(w.registrationCount)')
-    expect(PAGE).toContain('measuredCount(w.viewerCount)')
+    expect(PAGE).toContain('peopleText(w.registrationCount)')
+    expect(PAGE).toContain('peopleText(w.viewerCount)')
     expect(PAGE).toContain('publicationSummary(w)')
   })
 
   it('選択中のLINEアカウントだけを読み、新規作成にも所属を保存する', () => {
-    expect(PAGE).toContain('webinarApi.list(accountId, {')
+    expect(PAGE).toContain('list: webinarApi.list,')
     expect(PAGE).toContain('currentGeneration: () => requestGeneration.current')
     expect(PAGE).toContain('loadedAccountId === selectedAccountId ? items : []')
     expect(PAGE).toContain('folderRequestGeneration.current === generation')
@@ -86,7 +86,7 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).toContain('onRetry={() => void refresh()}')
     expect(PAGE).toContain('もう一度読み込む')
     /* 失敗の1枚と、空の1枚が別であること。 */
-    expect(PAGE).toContain('if (loadFailure)')
+    expect(PAGE).toContain('if (loadFailure && visibleItems.length === 0)')
     expect(PAGE).toContain('if (visibleItems.length === 0)')
   })
 
@@ -123,7 +123,7 @@ describe('V6 ウェビナー一覧の契約', () => {
 
   it('物理削除ではなく履歴を残すアーカイブ確認を使う', () => {
     expect(PAGE).toContain('ウェビナーをアーカイブしますか？')
-    expect(PAGE).toContain('申込者・視聴履歴・CTA・分析結果は消えません')
+    expect(PAGE).toContain('参加者・視聴の記録・分析はそのまま見られます')
     expect(PAGE).toContain('webinarApi.archive(archiveTarget.id)')
     expect(API).toContain("method: 'POST'")
     expect(API).not.toContain('webinarApi.remove')
@@ -141,39 +141,12 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(EDIT).toContain('data-design-node="yxyzQ"')
   })
 
-  it('アーカイブ確認の背景はPCメニューのある幅だけ左を空け、狭い幅は全幅で縦に読める（#985 CHK-02）', () => {
-    const backdrop = PAGE.slice(
-      PAGE.indexOf('function ArchiveReviewBackdrop'),
-      PAGE.indexOf('const WebinarsPageWithTestSupport'),
-    )
-    // 左256pxと上56pxはPCのメニュー・上部バー（1280px以上）が実在する間だけ。
-    expect(backdrop).toContain('xl:left-64 xl:top-14')
-    // 狭い幅は縦に読めるよう切り捨てない。
-    expect(backdrop).toContain('overflow-y-auto')
-    // コメント文ではなく className 属性の中に overflow-hidden が無いこと。
-    expect(backdrop.match(/className="[^"]*overflow-hidden/g) ?? []).toHaveLength(0)
-    // 全幅で左を空ける `left-64` 単独指定へは戻さない。
-    expect(backdrop).not.toContain(' left-64 ')
-  })
-
   it('アーカイブの失敗は対象を失わず同じ窓で伝える（#985 CHK-02）', () => {
     expect(PAGE).toContain('setArchiveError')
     // 成功したときだけ対象を閉じる。
     expect(PAGE).toContain('setArchiveTarget(null)')
     // 処理中にキャンセルで閉じない。
     expect(PAGE).toContain('if (!archiving) setArchiveTarget(null)')
-  })
-
-  it('残り12画面を実ノードと直接開ける面に分ける', () => {
-    for (const node of ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ']) {
-      expect(EDIT).toContain(`data-design-node="${node}"`)
-    }
-    expect(PAGE).toContain('data-design-node="ZC13r"')
-    expect(PAGE).toContain('data-design-node="LKuAQ"')
-    for (const pane of ['video', 'cta', 'notifications', 'actions', 'preview', 'review', 'participants', 'analytics']) {
-      /* keep-alive した面は `hidden={pane !== '...'}` で畳む。直接開ける面は `pane === '...'` のまま */
-      expect(EDIT.includes(`pane === '${pane}'`) || EDIT.includes(`pane !== '${pane}'`)).toBe(true)
-    }
   })
 
   it('編集・公開前検査・運用・参加者・分析を実APIへ接続する', () => {

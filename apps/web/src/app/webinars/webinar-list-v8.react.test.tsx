@@ -13,9 +13,8 @@ import type { WebinarListItem } from '@/lib/api'
 
 /*
  * ★V8-B ウェビナー一覧（板 `UyUMw`・状態 `eAQ3t`・閲覧のみ `jiNg0`）の契約。
- * `<html data-theme="v8">` の下でだけ新しい一覧に切り替わり、
+ * V8だけの一覧で、
  * 見本が決めた帯・表・札・押せない形が出ることを実DOMで固定する。
- * v7 では従来の一覧が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -165,12 +164,7 @@ test('v8 の閲覧のみ（jiNg0）は作る・編集が押せない形になる
   expect(createButton?.disabled).toBe(true)
   const editButton = [...board!.querySelectorAll('button')].find((button) => button.textContent === '編集')
   expect(editButton?.disabled).toBe(true)
-})
-
-test('v7 では従来の一覧が出て UyUMw は出ない', async () => {
-  await renderPage()
-  expect(host.querySelector('[data-design-node="UyUMw"]')).toBeNull()
-  expect(host.querySelector('[data-design-node="ZC13r"]')).not.toBeNull()
+  expect(board?.textContent).toContain('閲覧のみで見ています')
 })
 
 test('v8 の読み込み中は骨組みで場所を取り「読み込み中」の文字は出さない', async () => {
