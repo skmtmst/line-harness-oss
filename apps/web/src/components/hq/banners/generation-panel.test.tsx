@@ -85,4 +85,29 @@ describe('zOpMG パネル内の上限の帯', () => {
     open()
     expect(screen.queryByText('今月の生成上限に達しました')).toBeNull()
   })
+
+  it('空きがあるときは今月・今日の残りの棒が出る', () => {
+    render(
+      <GenerationPanel
+        presets={presets}
+        maxCount={4}
+        value={{ ...EMPTY_GENERATION_INPUT, presetKey: 'line_rich_menu_small' }}
+        onChange={() => undefined}
+        reference={null}
+        onPickReference={() => undefined}
+        onUploadReference={() => undefined}
+        usage={{
+          month: { used: 40, limit: 150, remaining: 110 },
+          today: { used: 6, limit: 30, remaining: 24 },
+          paused: false,
+          pausedReason: null,
+          blocked: false,
+        }}
+        onReloadUsage={() => undefined}
+      />,
+    )
+    expect(screen.getByText('残り110/150枚')).toBeTruthy()
+    expect(screen.getByText('残り24/30枚')).toBeTruthy()
+    expect(screen.queryByText('今月の生成上限に達しました')).toBeNull()
+  })
 })

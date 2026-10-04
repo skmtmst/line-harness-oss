@@ -322,9 +322,37 @@ export default function GenerationPanel({
           </fieldset>
         </Field>
 
+        <UsageBars usage={usage ?? null} />
+
         <LimitState usage={usage ?? null} onReload={onReloadUsage} compact />
       </div>
     </aside>
+  )
+}
+
+/** パネル内の利用量の棒（板 iMnph）。空きがあるときだけ出す。上限のときは下の帯が出る。 */
+function UsageBars({ usage }: { usage: BannerUsage | null }) {
+  if (!usage) return null
+  if (usage.blocked || usage.paused || usage.month.remaining <= 0 || usage.today.remaining <= 0) return null
+  const rows = [
+    { label: '今月', bucket: usage.month },
+    { label: '今日', bucket: usage.today },
+  ]
+  return (
+    <div data-design-node="iMnph-usage" className="flex flex-col gap-1.5">
+      {rows.map(({ label, bucket }) => {
+        const pct = bucket.limit > 0 ? Math.max(0, Math.min(100, (bucket.remaining / bucket.limit) * 100)) : 0
+        return (
+          <div key={label} className="flex items-center gap-2">
+            <span className="w-8 shrink-0 text-micro text-ink-secondary">{label}</span>
+            <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-hairline">
+              <span className="block h-full rounded-full bg-success" style={{ width: `${pct}%` }} />
+            </span>
+            <span className="shrink-0 text-micro text-ink-secondary">残り{bucket.remaining}/{bucket.limit}枚</span>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
