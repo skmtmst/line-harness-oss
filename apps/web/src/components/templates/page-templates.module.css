@@ -1,0 +1,119 @@
+/* 正本: NbomF / x6BDY / d8X09 / I1E7Bt。外側の白い板は AppShell が持つ。
+   既存 AppShell の本文余白を型の入口で相殺し、各段が必要な余白を持つ。
+   このファイルは V8 以外へ見た目を適用しない。 */
+:global([data-theme='v8']) .frame {
+  display: flex; flex-direction: column; min-width: 0;
+  width: calc(100% + 48px); margin: -20px -24px -28px;
+  min-height: calc(100dvh - 74px); container: v8-page / inline-size;
+  color: var(--color-ink); background: var(--color-canvas);
+}
+:global([data-theme='v8']) .frame[data-standalone] { width: 100%; margin: 0; min-height: 100%; }
+:global([data-theme='v8']) .heading {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  padding: 20px 24px; flex-shrink: 0;
+}
+:global([data-theme='v8']) .headingText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+:global([data-theme='v8']) .titleRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
+:global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 20px; font-weight: 600; line-height: 27px; }
+:global([data-theme='v8']) .description { color: var(--color-ink-secondary); font-size: 13px; line-height: 20px; }
+:global([data-theme='v8']) .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
+:global([data-theme='v8']) .steps { min-width: 0; display: flex; align-items: center; gap: 14px; }
+:global([data-theme='v8']) .tabs { padding: 0 24px; flex-shrink: 0; }
+:global([data-theme='v8']) .stats { border-block: 1px solid var(--color-hairline); flex-shrink: 0; }
+:global([data-theme='v8']) .notice { padding: 0 24px 16px; }
+:global([data-theme='v8']) .section { padding: 18px 24px; min-width: 0; border-bottom: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .split { display: flex; flex: 1; min-width: 0; }
+:global([data-theme='v8']) .main { min-width: 0; flex: 1; }
+:global([data-theme='v8']) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 24px; }
+:global([data-theme='v8']) .content { min-width: 0; }
+:global([data-theme='v8']) .pagination { padding: 10px 20px; }
+:global([data-theme='v8']) .folders { width: 200px; flex-shrink: 0; padding: 16px 12px; border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: 2px; }
+:global([data-theme='v8']) .collapsedFolders { display: none; }
+:global([data-theme='v8']) .listBody { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+:global([data-theme='v8']) [data-page-template='list'] > .heading { padding-bottom: 12px; }
+:global([data-theme='v8']) [data-page-template='dashboard'] > .heading { padding-bottom: 16px; }
+:global([data-theme='v8']) .dashboardRow { display: flex; min-width: 0; border-bottom: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .dashboardCell { min-width: 0; flex: 1; padding: 18px 24px; }
+:global([data-theme='v8']) .dashboardCell + .dashboardCell { border-left: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .dashboardAside { width: 297px; flex-shrink: 0; border-left: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .createContent { padding: 24px 32px; display: flex; flex-direction: column; gap: 20px; min-width: 0; flex: 1; }
+:global([data-theme='v8']) .preview { width: 380px; flex-shrink: 0; padding: 24px 32px; border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
+:global([data-theme='v8']) [data-page-template='create'] > .heading { padding-block: 16px; gap: 14px; border-bottom: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .footer { position: sticky; bottom: 12px; z-index: 20; margin: 12px 24px; }
+:global([data-theme='v8']) .detailSummary { width: 320px; padding: 20px 24px; border-right: 1px solid var(--color-hairline); flex-shrink: 0; }
+:global([data-theme='v8']) .detailContent { padding: 20px 28px; display: flex; flex-direction: column; gap: 22px; flex: 1; min-width: 0; }
+:global([data-theme='v8']) .inbox { display: flex; flex: 1; min-height: 0; min-width: 0; }
+:global([data-theme='v8']) .inboxList { width: 372px; flex-shrink: 0; border-right: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .conversation { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-table-head); }
+:global([data-theme='v8']) .messages { flex: 1; min-height: 0; overflow-y: auto; }
+:global([data-theme='v8']) .composer { flex-shrink: 0; }
+:global([data-theme='v8']) .inboxSummary { width: 260px; flex-shrink: 0; padding: 20px; border-left: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: 16px; }
+:global([data-theme='v8']) .settings { display: flex; flex: 1; gap: 32px; padding: 8px 24px 24px; min-width: 0; }
+:global([data-theme='v8']) .settingsNav { width: 200px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; }
+:global([data-theme='v8']) .settingsContent { flex: 1; max-width: 720px; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+:global([data-theme='v8']) .period { padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+:global([data-theme='v8']) .analyticsContent { flex: 1; min-width: 0; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+:global([data-theme='v8']) .analyticsAside { width: 300px; flex-shrink: 0; padding: 20px; border-left: 1px solid var(--color-divider); display: flex; flex-direction: column; gap: 12px; }
+:global([data-theme='v8']) .asideToggle { display: none; padding: 12px 24px; }
+@container v8-page (max-width: 1099px) {
+  :global([data-theme='v8']) .folders { display: none; }
+  :global([data-theme='v8']) .collapsedFolders { display: flex; align-items: center; gap: 8px; }
+  :global([data-theme='v8']) .preview, :global([data-theme='v8']) .inboxSummary, :global([data-theme='v8']) .analyticsAside, :global([data-theme='v8']) .dashboardAside { display: none; }
+  :global([data-theme='v8']) .asideToggle { display: block; }
+  :global([data-theme='v8']) .inboxList { width: 348px; }
+  :global([data-theme='v8']) .settings { flex-direction: column; gap: 16px; }
+  :global([data-theme='v8']) .settingsNav { width: 100%; flex-direction: row; flex-wrap: wrap; }
+}
+@media (max-width: 1023px) {
+  :global([data-theme='v8']) .frame:not([data-standalone]) { margin: 0; width: 100%; min-height: 0; }
+  :global([data-theme='v8']) .split, :global([data-theme='v8']) .dashboardRow { flex-direction: column; }
+  :global([data-theme='v8']) .detailSummary { width: 100%; border-right: 0; border-bottom: 1px solid var(--color-hairline); }
+}
+
+:global([data-theme='v8']) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+
+:global([data-theme='v8']) .dashboardRow[data-row='trend'] { height: 300px; }
+:global([data-theme='v8']) .dashboardRow[data-row='inbox'] { height: 350px; }
+:global([data-theme='v8']) .dashboardRow[data-row='link'] { height: 172px; }
+
+:global([data-theme='v8']) [data-page-template='list'] .stats { border-top: 0; }
+
+:global([data-theme='v8']) .heading[data-heading-size='large'] .title { font-size: 22px; line-height: 33px; }
+:global([data-theme='v8']) [data-page-template='create'] .title { font-size: 18px; line-height: 24px; }
+:global([data-theme='v8']) [data-page-template='create'] .description { font-size: 12px; line-height: 18px; }
+:global([data-theme='v8']) [data-page-template='create'] .actions { gap: 14px; }
+:global([data-theme='v8']) [data-page-template='detail'] .tabs { border-bottom: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .dashboardColumns { min-height: 200px; }
+:global([data-theme='v8']) .dashboardColumns .dashboardCell { padding-inline: 20px; }
+:global([data-theme='v8']) .dashboardRow[data-row] .dashboardCell { display: flex; flex-direction: column; gap: 12px; }
+:global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+
+/* 頭の手順は中央、入力側と各段は中身の高さを保つ。 */
+:global([data-theme='v8']) [data-page-template='create'] > .heading .headingText { flex: 0 0 auto; }
+:global([data-theme='v8']) [data-page-template='create'] > .heading .steps { margin-inline: auto; }
+:global([data-theme='v8']) .preview { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+:global([data-theme='v8']) .detailSummary { display: flex; flex-direction: column; gap: 18px; }
+:global([data-theme='v8']) .heading[data-heading-size='large'] { gap: 16px; }
+:global([data-theme='v8']) .heading[data-heading-size='large'] .headingText { gap: 4px; }
+:global([data-theme='v8']) .heading[data-heading-size='large'] .description { font-size: 12px; line-height: 18px; }
+:global([data-theme='v8']) .dashboardRow { flex-shrink: 0; }
+
+@container v8-page (min-width: 1100px) {
+  :global([data-theme='v8']) [data-page-template='create'] > .heading[data-has-steps] { flex-wrap: nowrap; }
+}
+
+:global([data-theme='v8']) .dashboardColumns .dashboardCell { display: flex; flex-direction: column; gap: 8px; }
+
+:global([data-theme='v8']) [data-page-template='dashboard'] .actions { gap: 12px; }
+:global([data-theme='v8']) [data-page-template='detail'] .heading,
+:global([data-theme='v8']) [data-page-template='detail'] .actions { gap: 14px; }
+:global([data-theme='v8']) .createContent,
+:global([data-theme='v8']) .detailContent,
+:global([data-theme='v8']) .settingsNav { align-self: flex-start; }
+:global([data-theme='v8']) .messages { display: flex; flex-direction: column; }
+
+/* 保存の帯は短い画面でも見える。本文だけを縦に送り、帯を追い出さない。 */
+:global([data-theme='v8']) .frame[data-has-footer] { height: calc(100dvh - 74px); min-height: 0; }
+:global([data-theme='v8']) .frame[data-has-footer] > .split,
+:global([data-theme='v8']) .frame[data-has-footer] > .settings { min-height: 0; overflow-y: auto; }
+:global([data-theme='v8']) .footer { flex-shrink: 0; }
