@@ -162,3 +162,17 @@ describe('掲載閲覧数の受け口（F-20）', () => {
     expect(publicationViews().pub_views).toBeNull();
   });
 });
+
+ it('keeps dated counts separate, deduplicates daily snapshots, and retries a failed receipt', async () => {
+  const day=new Date().toISOString().slice(0,10);
+  const event=baseEvent({event_id:'daily-event-a',publication_views:[{photo_id:'photo-a',view_count:20,view_date:day}]});
+  expect((await post(event)).status).toBe(200);
+  expect((await post(event)).status).toBe(200);
+  expect(publicationViews().pub_views).toBeNull();
+  expect(sqlite.prepare('SELECT sum(view_count) AS n FROM nen_photo_publication_daily_views').get()).toEqual({n:20});
+  // A failed receipt must be retryable with the same stable event ID.
+  sqlite.prepare("UPDATE ec_events SET status='failed' WHERE external_event_id='daily-event-a'").run();
+  expect(await (await post(event)).json()).toMatchObject({success:true,status:'view_counts_saved'});
+  expect(sqlite.prepare('SELECT sum(view_count) AS n FROM nen_photo_publication_daily_views').get()).toEqual({n:20});
+  for(const view_date of ['2026-02-30','invalid','2999-01-01']) expect((await post(baseEvent({event_id:view_date,publication_views:[{photo_id:'photo-a',view_count:1,view_date}]}))).status).toBe(400);
+ });

@@ -4658,6 +4658,16 @@ CREATE TABLE nen_photo_original_download_grants (
   UNIQUE(line_account_id, requested_by, idempotency_key)
 );
 
+CREATE TABLE nen_photo_publication_daily_views (
+  publication_id TEXT NOT NULL REFERENCES nen_photo_publications(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  view_date TEXT NOT NULL CHECK (length(view_date) = 10),
+  placement_label TEXT NOT NULL DEFAULT '',
+  view_count INTEGER NOT NULL CHECK (view_count >= 0),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (publication_id, view_date, placement_label)
+);
+
 CREATE TABLE nen_photo_publication_placements (
   id TEXT PRIMARY KEY,
   publication_id TEXT NOT NULL REFERENCES nen_photo_publications(id) ON DELETE CASCADE,
@@ -8897,6 +8907,9 @@ CREATE INDEX idx_outgoing_webhook_deliveries_webhook
 
 CREATE INDEX idx_outgoing_webhooks_line_account
   ON outgoing_webhooks(line_account_id, is_active, updated_at DESC);
+
+CREATE INDEX idx_photo_daily_views_account_date
+  ON nen_photo_publication_daily_views(line_account_id, view_date);
 
 CREATE INDEX idx_photo_reward_policies_version
   ON photo_reward_policies (version_number DESC);

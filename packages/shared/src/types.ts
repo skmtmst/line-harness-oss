@@ -2587,3 +2587,12 @@ export interface EcIdentityCandidateSummary {
   /** pending候補の全件合計。同一EC会員は1回、金額未取得はnull。 */
   potentialRevenue: number | null;
 }
+
+/** ec.site.publication_viewed: 日付ありはその日の累計、なしは互換の生涯累計。 */
+export interface PublicationViewSample {
+  photo_id?: string | number | null;
+  view_count?: number | null;
+  placement_label?: string | null;
+  view_date?: string;
+}
+export interface PublicationThirtyDayCount { view_count_30_days?: number | null }

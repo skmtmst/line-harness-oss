@@ -2239,6 +2239,13 @@
       "column": "line_account_id"
     }
   },
+  "nen_photo_publication_daily_views": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "nen_photo_publication_placements": {
     "category": "purge",
     "scope": {

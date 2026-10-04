@@ -1,3 +1,4 @@
+import { getPublicationThirtyDayViews } from '@line-crm/db';
 import { Hono, type Context } from 'hono';
 import type { Message } from '@line-crm/line-sdk';
 import {
@@ -1573,8 +1574,9 @@ nenMembers.get(
       });
       placementsByPublication.set(key, list);
     }
+    const thirtyDayViews = await getPublicationThirtyDayViews(c.env.DB, accountId);
     const withPlacements = (row: Record<string, unknown>) => (
-      { ...row, placements: placementsByPublication.get(String(row.id)) ?? [] }
+      { ...row, view_count_30_days: thirtyDayViews.get(String(row.id)) ?? null, placements: placementsByPublication.get(String(row.id)) ?? [] }
     ) as Record<string, unknown> & { placements: Array<Record<string, unknown>> };
     const items = rows.results.map(withPlacements);
     const inactive = inactiveRows.results.map(withPlacements);
@@ -1589,6 +1591,7 @@ nenMembers.get(
         placementCount: new Set(items.flatMap((item) => (
           item.placements.filter((placement) => Number(placement.active ?? 1) === 1)
         ).map((placement) => `${placement.placement_type}:${placement.placement_label}`))).size,
+        topPhoto30Days: items.filter(item => item.view_count_30_days != null).reduce<Record<string,unknown> | null>((top,item) => !top || Number(item.view_count_30_days) > Number(top.view_count_30_days) ? item : top,null),
         topPhoto: measured.length
           ? measured.reduce((top, item) => Number(item.view_count) > Number(top.view_count) ? item : top)
           : null,

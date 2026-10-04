@@ -5283,6 +5283,7 @@ export type NenPhotoPublicationRecord = {
   photo_id?: string
   status: 'published' | 'withdrawn'
   view_count: number | null
+  view_count_30_days?: number | null
   version?: number
   published_at: string | null
   withdrawn_at: string | null
@@ -5340,6 +5341,7 @@ export type NenPhotoPublicationList = {
     publishedCount: number
     placementCount: number
     topPhoto: Record<string, unknown> | null
+    topPhoto30Days?: (Record<string, unknown> & import('@line-crm/shared').PublicationThirtyDayCount) | null
     consentedCount: number
     attentionCount: number
     withdrawnCount: number
