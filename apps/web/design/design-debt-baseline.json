@@ -615,7 +615,7 @@
     "unresolved-classname": 72
   },
   "app/tags/fields-tab-v8.tsx": {
-    "unresolved-classname": 53
+    "unresolved-classname": 69
   },
   "app/tags/fields/migrate/page.tsx": {
     "arbitrary-value": 1
@@ -630,13 +630,13 @@
     "unresolved-classname": 48
   },
   "app/tags/marks-v8.tsx": {
-    "unresolved-classname": 46
+    "unresolved-classname": 60
   },
   "app/tags/search-editor-v8.tsx": {
     "unresolved-classname": 53
   },
   "app/tags/searches-v8.tsx": {
-    "unresolved-classname": 54
+    "unresolved-classname": 69
   },
   "app/tags/tag-editor-v8.tsx": {
     "unresolved-classname": 113
@@ -645,7 +645,7 @@
     "unresolved-classname": 5
   },
   "app/tags/tags-tab-v8.tsx": {
-    "unresolved-classname": 61
+    "unresolved-classname": 79
   },
   "app/templates/asset-editor-v8.tsx": {
     "unresolved-classname": 63
