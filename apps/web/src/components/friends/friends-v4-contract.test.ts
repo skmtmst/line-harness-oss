@@ -111,7 +111,7 @@ describe('友だちV6の画面契約', () => {
     expect(ADVANCED).toContain('この条件で表示')
     expect(PAGE).toContain('友だち追加の新しい順')
     /* 「担当者：すべて」は共通Selectの label + option から組み立てる。 */
-    expect(PAGE).toContain('label="担当者"')
+    expect(PAGE).toContain('label="担当"')
     expect(PAGE).toContain('label="シナリオ"')
     expect(PAGE).toContain("{ value: '', label: 'すべて' }")
     expect(PAGE).toContain('注目のみ')

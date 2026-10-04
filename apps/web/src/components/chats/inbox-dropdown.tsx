@@ -136,7 +136,7 @@ export function OperatorDropdown({
   value,
   operators,
   onChange,
-  label = '担当者',
+  label = '担当',
   ariaLabel = '担当者を選ぶ',
   allowAll = true,
   compact = false,
@@ -205,7 +205,7 @@ export function OperatorDropdown({
           matchWidth="min"
           getAnchor={() => wrapRef.current}
           onClose={() => setOpen(false)}
-          label={ariaLabel ?? '担当者'}
+          label={ariaLabel ?? '担当'}
           panelClassName={panelClass}
         >
           {/* 担当が増えるほど縦に伸びる。探す手段が無いと使えない。 */}

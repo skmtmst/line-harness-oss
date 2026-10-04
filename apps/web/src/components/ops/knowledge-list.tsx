@@ -124,7 +124,7 @@ export default function KnowledgeList() {
             <Td data-label="役に立った">{article.helpfulCount ? `${article.helpfulCount}件` : '—'}</Td>
             <Td data-label="更新日">{knowledgeDate(article.updatedAt)}</Td>
             <Td><div className={styles.rowActions}>
-              <button type="button" disabled={busy} onClick={() => void open(article)}>{approved ? '直す' : label.label === '承認待ち' ? '内容を確認' : '理由を確認'}</button>
+              <button type="button" disabled={busy} onClick={() => void open(article)}>{approved ? '編集' : label.label === '承認待ち' ? '内容を確認' : '理由を確認'}</button>
               {article.reviewState !== 'dismissed' && <button type="button" disabled={busy} onClick={() => void review(article, approved ? 'disable' : 'dismiss')}>{approved ? '無効にする' : '見送る'}</button>}
             </div></Td>
           </Tr>

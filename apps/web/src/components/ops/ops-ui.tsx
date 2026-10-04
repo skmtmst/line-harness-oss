@@ -46,7 +46,7 @@ export const PLAN_STATUS_LABEL: Record<string, string> = {
   canceled: '請求解約',
 }
 
-export const ROLE_LABEL: Record<string, string> = { owner: 'オーナー', admin: '管理者', staff: '担当者' }
+export const ROLE_LABEL: Record<string, string> = { owner: 'オーナー', admin: '管理者', staff: 'スタッフ' }
 
 const JST_DATETIME = new Intl.DateTimeFormat('ja-JP', {
   timeZone: 'Asia/Tokyo',

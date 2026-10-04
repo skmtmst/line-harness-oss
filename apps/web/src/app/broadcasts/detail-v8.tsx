@@ -361,9 +361,9 @@ export default function BroadcastDetailV8({
                   approval.state == null
                     ? (approval.requesterName ? '—' : '要らない')
                     : approval.state.approval.status === 'pending'
-                      ? `${approval.approverName ?? '担当者'}さんの承認待ち`
+                      ? `${approval.approverName ?? 'スタッフ'}さんの承認待ち`
                       : approval.state.approval.status === 'approved'
-                        ? `${approval.approverName ?? '担当者'}（承認済み）`
+                        ? `${approval.approverName ?? 'スタッフ'}（承認済み）`
                         : '要らない'
                 }
               />

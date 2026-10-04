@@ -193,7 +193,7 @@ export function ManualLinksV8() {
                           <Button variant="primary" disabled={saving} onClick={() => void saveEdit()}>決める</Button>
                         </>
                       ) : (
-                        <Button variant="secondary" onClick={() => startEdit(key)}>直す</Button>
+                        <Button variant="secondary" onClick={() => startEdit(key)}>編集</Button>
                       )}
                     </td>
                   </tr>

@@ -48,12 +48,12 @@ import { formatDateTime } from '@/lib/format'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
-const ROLE_LABEL: Record<string, string> = { owner: '管理者', admin: '管理者', staff: '運用', viewer: '見るだけ' }
+const ROLE_LABEL: Record<string, string> = { owner: 'オーナー', admin: '管理者', staff: 'スタッフ', viewer: '閲覧のみ' }
 const ACCESS_ROLE_LABEL: Record<AccessRoleBundle, string> = {
   administrator: '管理者',
-  operations: '運用',
+  operations: 'スタッフ',
   reception: '受付',
-  view_only: '見るだけ',
+  view_only: '閲覧のみ',
   custom: '個別設定',
 }
 const EMPTY_ACCESS_SUMMARY: AccessUserSummary = {
@@ -249,17 +249,17 @@ function SessionsCard() {
 const SCOPE_LEVEL_LABELS = ['変えられる', '見えるだけ', '出さない'] as const
 const SCOPE_MASK_LEVEL_LABELS = ['そのまま見せる', '伏せて見せる', '見せない'] as const
 const SCOPE_ROWS = [
-  ['友だち', '名前・タグ・対応状況', '追加・変更できる', '見るだけ', '見せない'],
+  ['友だち', '名前・タグ・対応状況', '追加・変更できる', '閲覧のみ', '見せない'],
   ['個人情報', '電話番号・住所・メール', 'すべて表示', '一部を伏せて表示', '見せない'],
-  ['配信', '一斉配信・シナリオ・リマインダ', '作成・配信できる', '見るだけ', '見せない'],
-  ['受信箱', '友だちとのやりとり', '返信できる', '見るだけ', '見せない'],
-  ['予約', '予約・イベントの受付', '受付・変更できる', '見るだけ', '見せない'],
-  ['予約メニュー', 'メニューと担当の編集', '変更できる', '見るだけ', '見せない'],
-  ['予約設定', '受付枠・資源・予約スタッフ', '変更できる', '見るだけ', '見せない'],
-  ['本人の勤務', '自分のシフト・休憩・連携', '変更できる', '見るだけ', '見せない'],
-  ['分析', '成果・流入・レポート', '承認・変更できる', '見るだけ', '見せない'],
-  ['設定', 'LINE・外部連携・ユーザー', '変更できる', '見るだけ', '見せない'],
-  ['運用状態', '健全性・緊急停止・更新履歴', '操作できる', '見るだけ', '見せない'],
+  ['配信', '一斉配信・シナリオ・リマインダ', '作成・配信できる', '閲覧のみ', '見せない'],
+  ['受信箱', '友だちとのやりとり', '返信できる', '閲覧のみ', '見せない'],
+  ['予約', '予約・イベントの受付', '受付・変更できる', '閲覧のみ', '見せない'],
+  ['予約メニュー', 'メニューと担当の編集', '変更できる', '閲覧のみ', '見せない'],
+  ['予約設定', '受付枠・資源・予約スタッフ', '変更できる', '閲覧のみ', '見せない'],
+  ['本人の勤務', '自分のシフト・休憩・連携', '変更できる', '閲覧のみ', '見せない'],
+  ['分析', '成果・流入・レポート', '承認・変更できる', '閲覧のみ', '見せない'],
+  ['設定', 'LINE・外部連携・ユーザー', '変更できる', '閲覧のみ', '見せない'],
+  ['運用状態', '健全性・緊急停止・更新履歴', '操作できる', '閲覧のみ', '見せない'],
 ] as const
 
 /*
@@ -465,9 +465,9 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
    */
   const bundles = [
     ['administrator', '管理者', 'すべての設定と操作'],
-    ['operations', '運用', '配信と日々の運用'],
+    ['operations', 'スタッフ', '配信と日々の運用'],
     ['reception', '受付', '受信箱と予約を担当'],
-    ['view_only', '見るだけ', '変更せず確認だけ'],
+    ['view_only', '閲覧のみ', '変更せず確認だけ'],
   ] as const
   const copyBundle = (sourceId: string) => {
     const source = copyCandidates.find((candidate) => candidate.id === sourceId)
@@ -661,9 +661,9 @@ function StaffRoleGuide() {
   const rows = [
     { role: 'オーナー', body: 'すべて。お金・会社とロゴ・ほかの人の役割も変えられる' },
     { role: '管理者', body: 'すべての機能を作る・変える・送る。ログインユーザーの招待と役割' },
-    { role: '運用', body: '配信・受信箱・友だち・予約を作る・送る。設定は見るだけ' },
+    { role: 'スタッフ', body: '配信・受信箱・友だち・予約を作る・送る。設定は閲覧のみ' },
     { role: '受付', body: '受信箱の返信と予約の受付だけ' },
-    { role: '見るだけ', body: '全部見られるが、押せない（隠さない）' },
+    { role: '閲覧のみ', body: '全部見られるが、押せない（隠さない）' },
   ]
   return (
     <section aria-label="役割でできること" className="border-hairline bg-canvas rounded-card border p-5">
@@ -903,7 +903,7 @@ function StaffPageHost() {
       ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
       失敗は「読み込めませんでした」と言い分け、0（本当に0人）と混ぜない。
     */}
-    <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Kpi label="いまいる人" value={summaryReady ? `${accessSummary.active}` : '—'} unit="人" note={error ? '読み込めませんでした' : summaryReady ? `管理者 ${accessSummary.roleCounts.administrator}・運用 ${accessSummary.roleCounts.operations}・見るだけ ${accessSummary.roleCounts.view_only}` : '読み込んでいます'} /><Kpi label="招待して返事がない" value={summaryReady ? `${accessSummary.invited}` : '—'} unit="人" note={error ? '読み込めませんでした' : summaryReady ? `期限切れ ${accessSummary.expiredInvitations}人` : '読み込んでいます'} /><Kpi label="90日 入っていない" value={summaryReady ? `${accessSummary.unused90Days}` : '—'} unit="人" note={error ? '読み込めませんでした' : summaryReady ? '最終ログインから90日以上' : '読み込んでいます'} /><Kpi label="2段階の確認" value={summaryReady ? `${accessSummary.mfaEnabled} / ${accessSummary.active}` : '—'} unit="人" note={error ? '読み込めませんでした' : summaryReady ? `管理者は必ず入れてください${accessSummary.mfaRate === null ? '' : `（${accessSummary.mfaRate}%）`}` : '読み込んでいます'} /></div>
+    <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Kpi label="いまいる人" value={summaryReady ? `${accessSummary.active}` : '—'} unit="人" note={error ? '読み込めませんでした' : summaryReady ? `管理者 ${accessSummary.roleCounts.administrator}・スタッフ ${accessSummary.roleCounts.operations}・閲覧のみ ${accessSummary.roleCounts.view_only}` : '読み込んでいます'} /><Kpi label="招待して返事がない" value={summaryReady ? `${accessSummary.invited}` : '—'} unit="人" note={error ? '読み込めませんでした' : summaryReady ? `期限切れ ${accessSummary.expiredInvitations}人` : '読み込んでいます'} /><Kpi label="90日 入っていない" value={summaryReady ? `${accessSummary.unused90Days}` : '—'} unit="人" note={error ? '読み込めませんでした' : summaryReady ? '最終ログインから90日以上' : '読み込んでいます'} /><Kpi label="2段階の確認" value={summaryReady ? `${accessSummary.mfaEnabled} / ${accessSummary.active}` : '—'} unit="人" note={error ? '読み込めませんでした' : summaryReady ? `管理者は必ず入れてください${accessSummary.mfaRate === null ? '' : `（${accessSummary.mfaRate}%）`}` : '読み込んでいます'} /></div>
     <Notice tone="info" className="mb-4">「見せる範囲」は、画面ごとに決められます。電話番号や住所など、必要な情報だけを見せると事故が減ります。</Notice>
     {/*
       ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。表の中の
@@ -926,7 +926,7 @@ function StaffPageHost() {
         <Button href="/staff/new" variant="primary">＋ 人を作る</Button>
       </div>
     ) : null}
-    <div id="staff-list" className="overflow-hidden rounded-card border border-hairline bg-canvas"><DataTable className="rounded-none border-0"><thead><TableHeadRow><Th>人</Th><Th className="w-20">役わり</Th><Th>職位</Th><Th>見せる範囲</Th><Th className="w-44">最後に入った</Th><Th className="w-36">2段階の確認</Th><Th align="right" className="w-72">操作</Th></TableHeadRow></thead><tbody>{loading ? <TableStateRow colSpan={7} kind="loading" title="ログインユーザーを読み込んでいます…" /> : error ? <TableStateRow colSpan={7} kind="error" title="ログインユーザーを読み込めませんでした" description="登録した内容は消えていません。" onRetry={() => void load()} /> : shown.length === 0 ? <TableStateRow colSpan={7} kind="empty" title="条件に合うログインユーザーはいません。条件を変えてお試しください。" /> : shown.map((user) => { const member = memberById.get(user.id); const editable = member ? canEdit(member) : false; const canChangeOwnTwoFactor = Boolean(member && me?.id === member.id); const scope = accessScopeLabel(user, accountNames); const twoFactorLabel = user.mfaEnabled ? '入れています' : user.status === 'active' ? '入れていません' : '—'; const warning = !user.mfaEnabled || user.status === 'expired'; const resendable = tab === 'invited' && administrator && member !== undefined && member.inviteStatus !== 'active'; const staffMenuItems = [...(resendable && member ? [{ id: 'resend', label: resendingId === member.id ? '送信中…' : 'もう一度送る', disabled: resendingId !== null, onSelect: () => void runResend(member) }] : []), ...(administrator && member && member.id !== me?.id ? [{ id: 'remove', label: 'この人を外す', onSelect: () => { setRemoveError(''); setRemovingTarget(member) } }] : [])]; return <Tr key={user.id} interactive><Td className="min-w-0"><p className="truncate font-semibold" title={user.name}>{user.name}</p><p className="truncate text-xs text-ink-faint" title={user.email ?? ''}>{user.email ?? 'メール未登録'}</p>{tab === 'invited' && member && member.inviteStatus !== 'active' && <p className="mt-1 truncate text-xs text-ink-faint">招待の期限：{formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}</p>}{user.status === 'suspended' && <span className="mt-1 inline-block rounded-pill bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning">無効</span>}{warning && <span className="mt-1 inline-block rounded-pill bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning">確認が必要</span>}</Td><Td><span className={`whitespace-nowrap ${user.roleBundle === 'administrator' ? 'font-semibold text-ink' : 'text-ink-secondary'}`}>{ACCESS_ROLE_LABEL[user.roleBundle]}</span></Td><Td className="truncate text-xs text-ink-secondary" title={user.jobTitle ?? ''}>{user.jobTitle ?? '—'}</Td><Td><p className="truncate text-xs font-medium" title={`${accessFeatureLabel(user)}：${scope}`}>{accessFeatureLabel(user)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={scope}>{scope}</p></Td><Td><p className="whitespace-nowrap text-ink-secondary">{formatStaffDate(user.lastLoginAt ?? undefined)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : '操作記録なし'}>{user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : '操作記録なし'}</p></Td><Td>{canChangeOwnTwoFactor && member ? <Button onClick={() => openTwoFactor(member)}>{twoFactorLabel}</Button> : <span className="whitespace-nowrap text-xs text-ink-faint">{twoFactorLabel}</span>}</Td><ActionCell><div className="flex items-center justify-end gap-2">{editable && member ? <>{/* 中身を見るは撮影入口（data-qa-open="EOTS4"）のため共通RowActionsの外に残す。 */}<RowActionButton label="中身を見る" onClick={() => openPermissions(user)} /><RowActions edit={{ label: '変更する', onClick: () => setEditing(member) }} menuItems={staffMenuItems} subjectName={user.name} /></> : member || !administrator ? <span className="text-xs text-ink-faint">操作できません</span> : <span className="text-xs font-semibold text-warning" title="スタッフ情報と結び付いていないため操作できません。名前とメールを確認してください。">要確認</span>}{!(editable && member) && resendable && member ? <RowActions menuItems={[{ id: 'resend', label: resendingId === member.id ? '送信中…' : 'もう一度送る', disabled: resendingId !== null, onSelect: () => void runResend(member) }]} subjectName={user.name} /> : null}</div></ActionCell></Tr> })}</tbody></DataTable><p className="border-t border-hairline bg-info-bg px-4 py-3 text-xs text-ink-secondary">権限・担当範囲・職位・最終ログイン・2段階認証はアクセス API の最新状態です。確認が必要な人には注意札を表示します。</p></div>
+    <div id="staff-list" className="overflow-hidden rounded-card border border-hairline bg-canvas"><DataTable className="rounded-none border-0"><thead><TableHeadRow><Th>人</Th><Th className="w-20">役わり</Th><Th>職位</Th><Th>見せる範囲</Th><Th className="w-44">最後に入った</Th><Th className="w-36">2段階の確認</Th><Th align="right" className="w-72">操作</Th></TableHeadRow></thead><tbody>{loading ? <TableStateRow colSpan={7} kind="loading" title="ログインユーザーを読み込んでいます…" /> : error ? <TableStateRow colSpan={7} kind="error" title="ログインユーザーを読み込めませんでした" description="登録した内容は消えていません。" onRetry={() => void load()} /> : shown.length === 0 ? <TableStateRow colSpan={7} kind="empty" title="条件に合うログインユーザーはいません。条件を変えてお試しください。" /> : shown.map((user) => { const member = memberById.get(user.id); const editable = member ? canEdit(member) : false; const canChangeOwnTwoFactor = Boolean(member && me?.id === member.id); const scope = accessScopeLabel(user, accountNames); const twoFactorLabel = user.mfaEnabled ? '入れています' : user.status === 'active' ? '入れていません' : '—'; const warning = !user.mfaEnabled || user.status === 'expired'; const resendable = tab === 'invited' && administrator && member !== undefined && member.inviteStatus !== 'active'; const staffMenuItems = [...(resendable && member ? [{ id: 'resend', label: resendingId === member.id ? '送信中…' : 'もう一度送る', disabled: resendingId !== null, onSelect: () => void runResend(member) }] : []), ...(administrator && member && member.id !== me?.id ? [{ id: 'remove', label: 'この人を外す', onSelect: () => { setRemoveError(''); setRemovingTarget(member) } }] : [])]; return <Tr key={user.id} interactive><Td className="min-w-0"><p className="truncate font-semibold" title={user.name}>{user.name}</p><p className="truncate text-xs text-ink-faint" title={user.email ?? ''}>{user.email ?? 'メール未登録'}</p>{tab === 'invited' && member && member.inviteStatus !== 'active' && <p className="mt-1 truncate text-xs text-ink-faint">招待の期限：{formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}</p>}{user.status === 'suspended' && <span className="mt-1 inline-block rounded-pill bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning">無効</span>}{warning && <span className="mt-1 inline-block rounded-pill bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning">確認が必要</span>}</Td><Td><span className={`whitespace-nowrap ${user.roleBundle === 'administrator' ? 'font-semibold text-ink' : 'text-ink-secondary'}`}>{ACCESS_ROLE_LABEL[user.roleBundle]}</span></Td><Td className="truncate text-xs text-ink-secondary" title={user.jobTitle ?? ''}>{user.jobTitle ?? '—'}</Td><Td><p className="truncate text-xs font-medium" title={`${accessFeatureLabel(user)}：${scope}`}>{accessFeatureLabel(user)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={scope}>{scope}</p></Td><Td><p className="whitespace-nowrap text-ink-secondary">{formatStaffDate(user.lastLoginAt ?? undefined)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : '操作記録なし'}>{user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : '操作記録なし'}</p></Td><Td>{canChangeOwnTwoFactor && member ? <Button onClick={() => openTwoFactor(member)}>{twoFactorLabel}</Button> : <span className="whitespace-nowrap text-xs text-ink-faint">{twoFactorLabel}</span>}</Td><ActionCell><div className="flex items-center justify-end gap-2">{editable && member ? <>{/* 中身を見るは撮影入口（data-qa-open="EOTS4"）のため共通RowActionsの外に残す。 */}<RowActionButton label="中身を見る" onClick={() => openPermissions(user)} /><RowActions edit={{ label: '編集', onClick: () => setEditing(member) }} menuItems={staffMenuItems} subjectName={user.name} /></> : member || !administrator ? <span className="text-xs text-ink-faint">操作できません</span> : <span className="text-xs font-semibold text-warning" title="スタッフ情報と結び付いていないため操作できません。名前とメールを確認してください。">要確認</span>}{!(editable && member) && resendable && member ? <RowActions menuItems={[{ id: 'resend', label: resendingId === member.id ? '送信中…' : 'もう一度送る', disabled: resendingId !== null, onSelect: () => void runResend(member) }]} subjectName={user.name} /> : null}</div></ActionCell></Tr> })}</tbody></DataTable><p className="border-t border-hairline bg-info-bg px-4 py-3 text-xs text-ink-secondary">権限・担当範囲・職位・最終ログイン・2段階認証はアクセス API の最新状態です。確認が必要な人には注意札を表示します。</p></div>
     {/* 親の gap-4 で間隔を作るため mt は付けない。 */}
     {!loading && !error && <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-faint"><p>ログインユーザー {filteredUsers.length}人中 {shown.length}人を表示{usersTotal > accessUsers.length ? `（全${usersTotal}人中${accessUsers.length}人まで読み込み）` : ''}</p><Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} /></div>}
     {editing && <EditModal member={editing} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => setEditing(null)} onSaved={load} />}{settingTwoFactor && <TwoFactorModal member={settingTwoFactor} onClose={() => setSettingTwoFactor(null)} onSaved={load} />}</>}

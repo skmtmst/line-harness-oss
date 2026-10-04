@@ -164,7 +164,7 @@ const NEW_BASELINE = JSON.stringify([
   [], [], true, false, false, true, defaultAlertDrafts(true), [],
 ])
 
-const ROLE_LABEL = { owner: '統括', admin: '管理者', staff: '運用担当' } as const
+const ROLE_LABEL = { owner: 'オーナー', admin: '管理者', staff: 'スタッフ' } as const
 
 /*
  * メールアドレスの形の検査。裏側（apps/worker/src/routes/analytics.ts の

@@ -1337,7 +1337,7 @@ function HistoryPanel() {
       item.reason,
       item.resolvedAt ?? '',
     ])
-    const blob = new Blob([`\uFEFF${[['いつ・だれが', '担当者', '止めたもの', '対象', '理由', '戻した'], ...rows].map((row) => row.map(quote).join(',')).join('\n')}`], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob([`\uFEFF${[['いつ・だれが', 'スタッフ', '止めたもの', '対象', '理由', '戻した'], ...rows].map((row) => row.map(quote).join(',')).join('\n')}`], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url; anchor.download = 'operation-history.csv'; anchor.click(); URL.revokeObjectURL(url)

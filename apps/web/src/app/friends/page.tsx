@@ -617,9 +617,9 @@ function FriendsPageInner({
           </div>
           <div className="w-44 shrink-0" data-filter="operator">
             <Select
-              aria-label="担当者で絞り込む"
+              aria-label="担当で絞り込む"
               size="full"
-              label="担当者"
+              label="担当"
               value={operatorId}
               onChange={(value) => resetPageWith(() => setOperatorId(value))}
               options={[{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))]}

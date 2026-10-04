@@ -399,7 +399,7 @@ export default function OpsAnnouncementsPage() {
                     <Td align="right">
                       {a.status === 'draft' || a.status === 'scheduled' ? (
                         <span className="inline-flex gap-2">
-                          <Button size="field" onClick={() => edit(a)} disabled={busy}>直す</Button>
+                          <Button size="field" onClick={() => edit(a)} disabled={busy}>編集</Button>
                           <Button size="field" onClick={() => setDeleting(a)} disabled={busy}>削除する</Button>
                         </span>
                       ) : null}

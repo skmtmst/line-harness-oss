@@ -2630,8 +2630,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   value={assigneeFilter}
                   operators={operators}
                   onChange={(next) => { setAssigneeFilter(next); dropSavedViewParam() }}
-                  label="担当者"
-                  ariaLabel="担当者で絞り込む"
+                  label="担当"
+                  ariaLabel="担当で絞り込む"
                   unreadOf={unreadLookup(assigneeUnread)}
                   unreadUnavailable={assigneeUnreadStatus === 'error'}
                 />
@@ -3371,7 +3371,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                 <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-pill text-micro font-medium">
                                   {(msg.sentByStaffName ?? '担').charAt(0)}
                                 </span>
-                                <span className="truncate">{msg.sentByStaffName ?? '担当者'}</span>
+                                <span className="truncate">{msg.sentByStaffName ?? 'スタッフ'}</span>
                               </div>
                             </div>
                           )}

@@ -89,7 +89,7 @@ export default function KnowledgeEditor({ article: initial, ticket, onClose, onS
       {!editing && <section className={styles.evidence} data-design-node="mAjGu" aria-label="解決の根拠">
         <h3>解決の根拠</h3>
         {article.evidence.filter(e => e.role !== 'condition').map((e, i) => <p key={`${e.messageId}-${i}`}>
-          <time dateTime={e.createdAt} title={e.createdAt}>{knowledgeTime(e.createdAt)}</time> {e.authorKind === 'ops' ? '担当者' : 'お客様'}：「{e.quote}」
+          <time dateTime={e.createdAt} title={e.createdAt}>{knowledgeTime(e.createdAt)}</time> {e.authorKind === 'ops' ? 'スタッフ' : 'お客様'}：「{e.quote}」
         </p>)}
         {article.articleKind === 'verified'
           ? <p>適用条件：{article.evidence.filter(e => e.role === 'condition').map(e => e.quote).join('／') || '原文に明示なし'}。未確認の原因や途中の提案は記事に含めません。</p>

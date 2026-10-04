@@ -178,7 +178,7 @@ async function fillInput() {
   await click(byText('button', '予約者NY'))
   await setValue(byLabel('予約メニュー'), 'menu-ny')
   await act(async () => { await Promise.resolve() })
-  await setValue(byLabel('担当者'), 'staff-ny')
+  await setValue(byLabel('スタッフ'), 'staff-ny')
   await act(async () => { await Promise.resolve() })
   await pickDate('2026-11-02')
   await act(async () => { await Promise.resolve() })

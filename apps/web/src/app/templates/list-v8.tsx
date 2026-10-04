@@ -862,7 +862,7 @@ export default function TemplatesListV8() {
     const items: ActionMenuItem[] = [
       {
         id: 'edit',
-        label: '編集する',
+        label: '編集',
         disabled: readonly,
         disabledReason: readonly ? NO_MANAGE_NOTE : undefined,
         onSelect: () => withViewTransition(() => router.push(editHref(t))),

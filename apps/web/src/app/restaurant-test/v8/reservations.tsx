@@ -458,7 +458,7 @@ function TodayView({ rows, tables, busy, day, isToday, sideExtra, onAddPreset, o
                 <p className={ledger.nextFrom}>{sourceLabel[next.source] || next.source}から</p>
               </div>
               <div className={ledger.sideButtons}>
-                <Button size="compact" onClick={() => onEdit(next.id)}>詳細を見る</Button>
+                <Button size="compact" onClick={() => onEdit(next.id)}>開く</Button>
                 <Button size="compact" onClick={() => onEdit(next.id)}>卓を変える</Button>
               </div>
             </>

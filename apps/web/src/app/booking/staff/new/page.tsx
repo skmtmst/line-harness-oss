@@ -188,11 +188,11 @@ function NewBookingStaffV7() {
   return (
     <>
     <CreatePage
-      title="予約スタッフを登録する"
-      description="お客様が予約するときに指名できる担当者を登録します。"
+      title="予約スタッフを追加する"
+      description="お客様が予約するときに指名できるスタッフを追加します。"
       showHeader={false}
       parent={['予約設定', '/booking/menus?tab=staff']}
-      saveLabel={createdStaffId ? '割当をやり直す' : 'スタッフを登録する'}
+      saveLabel={createdStaffId ? '割当をやり直す' : 'スタッフを追加する'}
       variant="v6"
       statusLabel={
         createdStaffId
