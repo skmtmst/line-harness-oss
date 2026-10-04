@@ -480,7 +480,7 @@ export default function ScenarioFirstStepV8() {
   }
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node="U5rxyH">
       <div className={styles.head} data-design="Head">
         <div>
           <h2 className={styles.headTitle}>1通目を設定</h2>

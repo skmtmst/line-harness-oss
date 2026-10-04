@@ -270,6 +270,7 @@ function InboundTrialPanel({ storeId, busy, onClose, onSubmit }: {
     onSubmit(new FormData(event.currentTarget))
   }
   return (
+    <div data-design-node="l4qsT">
     <Panel title="媒体受信シミュレーター（外部への書戻しなし）">
       <form onSubmit={submit}>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -299,6 +300,7 @@ function InboundTrialPanel({ storeId, busy, onClose, onSubmit }: {
         </div>
       </form>
     </Panel>
+    </div>
   )
 }
 
