@@ -46,7 +46,7 @@ describe('N-113 ウェビナーの申込フォーム選択の契約', () => {
     /* 開き直し時は保存済みの registrationFormId を初期値にする。 */
     expect(PAGE).toContain('useState<string>(editor.registrationFormId ??')
     /* 二重保存を防ぐ。 */
-    expect(PAGE).toContain('disabled={savingRegistrationForm')
+    expect(PAGE).toContain('disabled={conflict || readingLatest || savingRegistrationForm')
     expect(PAGE).toContain('busy={savingRegistrationForm')
   })
 

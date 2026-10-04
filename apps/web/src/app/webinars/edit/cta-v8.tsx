@@ -2,6 +2,7 @@
 
 /* ★V8 CTA・フォーム（Q0Jrk）。入力は下書き保存と次の段からも保存する。 */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu from '@/components/shared/action-menu'
 import StatusBadge from '@/components/shared/status-badge'
 import ListState from '@/components/shared/list-state'
@@ -78,6 +79,12 @@ export default function CtaV8({
   const [savingRegistrationForm, setSavingRegistrationForm] = useState(false)
   const [registrationNotice, setRegistrationNotice] = useState('')
   const [registrationError, setRegistrationError] = useState('')
+  const [conflict, setConflict] = useState(false)
+  const [latestEditor, setLatestEditor] = useState<WebinarEditor | null>(null)
+  const [readingLatest, setReadingLatest] = useState(false)
+  const [replaceConfirm, setReplaceConfirm] = useState(false)
+  const scope = useRef(webinarId)
+  scope.current = webinarId
   const requestId = useRef(0)
   const formRequestId = useRef(0)
 
@@ -151,7 +158,7 @@ export default function CtaV8({
   }
 
   const save = async (): Promise<boolean> => {
-    if (ctas === null || savingRef.current) return false
+    if (ctas === null || savingRef.current || conflict) return false
     const problems = ctaCardProblems(ctas, times, durationSeconds, parseMinSec)
     if (problems.length > 0) {
       setMessage(problems[0])
@@ -180,7 +187,7 @@ export default function CtaV8({
   }
 
   const saveRegistrationForm = async (): Promise<boolean> => {
-    if (savingRef.current) return false
+    if (savingRef.current || conflict) return false
     if (formCandidates.state !== 'ready') {
       setRegistrationError('回答フォームの候補を読み込んでから保存してください。')
       return false
@@ -202,6 +209,12 @@ export default function CtaV8({
       setRegistrationNotice('申込フォームを保存しました。公開前確認で申込フォームが公開中か確認してください。')
       return true
     } catch (cause) {
+      if (cause instanceof ApiError && (cause.code === 'version_conflict' || (cause.status === 409 && !cause.code))) {
+        setConflict(true)
+        setLatestEditor(null)
+        setRegistrationError('')
+        return false
+      }
       if (cause instanceof ApiError && ['form_inactive_or_missing', 'form_account_mismatch'].includes(cause.code ?? '')) loadForms()
       setRegistrationError(webinarErrorText(cause, '申込フォームを保存できませんでした。入力は残っています。'))
       return false
@@ -209,6 +222,36 @@ export default function CtaV8({
       savingRef.current = false
       setSavingRegistrationForm(false)
     }
+  }
+
+  const compareLatest = async () => {
+    if (savingRef.current) return
+    savingRef.current = true
+    setReadingLatest(true)
+    setRegistrationError('')
+    try {
+      const response = await webinarApi.editor(webinarId)
+      if (scope.current !== webinarId) return
+      if (!Number.isInteger(response.data.version)) throw new Error('invalid_editor')
+      setLatestEditor(response.data)
+    } catch {
+      if (scope.current === webinarId) setRegistrationError('最新版を読み込めませんでした。入力は残っています。もう一度お試しください。')
+    } finally {
+      savingRef.current = false
+      if (scope.current === webinarId) setReadingLatest(false)
+    }
+  }
+
+  const acceptLatest = () => {
+    if (!latestEditor) return
+    onEditorChange(latestEditor)
+    setSelectedRegistrationFormId(latestEditor.registrationFormId ?? '')
+    setSavedForm(latestEditor.registrationFormId ?? '')
+    setConflict(false)
+    setLatestEditor(null)
+    setReplaceConfirm(false)
+    setRegistrationError('')
+    setRegistrationNotice('最新の申込フォームを読み込みました。CTAカードの入力は残しています。')
   }
 
   const publishedForms = formCandidates.items.filter((form) => form.isActive)
@@ -219,7 +262,7 @@ export default function CtaV8({
   const formDirty = selectedRegistrationFormId !== savedForm
   const saveCurrent = useRef<() => Promise<boolean>>(async () => false)
   saveCurrent.current = async () => {
-    if (ctas === null || savingRef.current) return false
+    if (ctas === null || savingRef.current || conflict) return false
     if (cardsDirty && !(await save())) return false
     if (formDirty && !(await saveRegistrationForm())) return false
     return true
@@ -231,6 +274,11 @@ export default function CtaV8({
   }, [registerSave])
 
   return (
+    <>
+      {conflict ? <div data-design-node="pvimJ"><Notice tone="warn" action={<Button disabled={readingLatest} busy={readingLatest} onClick={() => void compareLatest()}>違いを比べる</Button>}>別の画面でこのウェビナーが更新されました。申込フォームの入力は残しています。最新版を確認してから保存してください。</Notice>
+        {latestEditor ? <div className="border-hairline mt-3 rounded-control border p-3 text-sm"><p>保存されている申込フォーム：{latestEditor.publicPage.form?.name ?? (latestEditor.registrationFormId ? publishedForms.find((form) => form.id === latestEditor.registrationFormId)?.name ?? '選択済みのフォーム' : '未設定')}</p><p className="mt-2">この画面の入力：{publishedForms.find((form) => form.id === selectedRegistrationFormId)?.name ?? (selectedRegistrationFormId ? '選択済みのフォーム' : '未設定')}</p><Button className="mt-3" onClick={() => setReplaceConfirm(true)}>最新を読み込んで続ける</Button></div> : null}
+      </div> : null}
+
     <div className="min-w-0" data-webinar-pane="cta" data-design-node="Q0Jrk">
       <fieldset className="min-w-0 space-y-3" disabled={saving || savingRegistrationForm}>
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="CTAカード">
@@ -373,7 +421,7 @@ export default function CtaV8({
           <div className="mt-3">
             <Button
               variant="secondary"
-              disabled={savingRegistrationForm || formCandidates.state !== 'ready' || !accountId}
+              disabled={conflict || readingLatest || savingRegistrationForm || formCandidates.state !== 'ready' || !accountId}
               busy={savingRegistrationForm}
               busyLabel="保存しています…"
               onClick={saveRegistrationForm}
@@ -400,5 +448,7 @@ export default function CtaV8({
         </div>
       </aside>
     </div>
+    <ConfirmDialog open={replaceConfirm} title="最新の申込フォームを読み込みますか？" description="この画面で選んだ申込フォームを、保存されている最新版に置き換えます。CTAカードの入力は残します。" confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} onConfirm={acceptLatest} />
+    </>
   )
 }

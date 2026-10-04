@@ -9,6 +9,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const apiMocks = vi.hoisted(() => ({
+  editor: vi.fn(),
   ctas: vi.fn(),
   saveCtas: vi.fn(),
   saveEditor: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     fetchApi: apiMocks.fetchApi,
     webinarApi: {
+      editor: apiMocks.editor,
       ctas: apiMocks.ctas,
       saveCtas: apiMocks.saveCtas,
       saveEditor: apiMocks.saveEditor,
@@ -29,12 +31,12 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import CtaV8 from './cta-v8'
-import type { WebinarEditor } from '@/lib/api'
+import { ApiError, type WebinarEditor } from '@/lib/api'
 
 const EDITOR = { version: 5, registrationFormId: null } as WebinarEditor
 
 const roots: Root[] = []
-function render(props: Partial<Pick<React.ComponentProps<typeof CtaV8>, 'onDirtyChange' | 'registerSave'>> = {}): HTMLElement {
+function render(props: Partial<Pick<React.ComponentProps<typeof CtaV8>, 'onDirtyChange' | 'registerSave' | 'onEditorChange'>> = {}): HTMLElement {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
@@ -162,4 +164,37 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     const cards = apiMocks.saveCtas.mock.calls[0][1] as Array<{ atSeconds: number }>
     expect(cards).toHaveLength(2)
   })
+
+  it('版の競合で入力を残し、最新版との比較と置き換えの確認を挟む', async () => {
+    apiMocks.fetchApi.mockResolvedValue({ success: true, data: [{ id: 'form-1', name: 'この画面のフォーム', isActive: true }, { id: 'form-2', name: '保存済みのフォーム', isActive: true }] })
+    apiMocks.saveEditor.mockRejectedValueOnce(new ApiError(409, 'version_conflict'))
+    const latest = { ...EDITOR, version: 6, registrationFormId: 'form-2', publicPage: { form: { name: '保存済みのフォーム' } } } as WebinarEditor
+    apiMocks.editor.mockResolvedValue({ data: latest })
+    const changed = vi.fn()
+    let save: (() => Promise<boolean>) | null = null
+    const host = render({ onEditorChange: changed, registerSave: (callback) => { save = callback } })
+    await act(async () => undefined)
+    const selected = host.querySelector<HTMLButtonElement>('button[aria-label="申込に使う回答フォーム"]')!
+    await act(async () => selected.click())
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')].find((element) => element.textContent?.includes('この画面のフォーム'))!.click())
+    const title = host.querySelector('input') as HTMLInputElement
+    await act(async () => fireEvent.change(title, { target: { value: '入力を残すCTA' } }))
+    const click = async (label: string) => act(async () => { [...host.querySelectorAll('button')].find((element) => element.textContent === label)!.click() })
+    await click('申込フォームを保存する')
+    expect(host.querySelector('[data-design-node="pvimJ"]')).not.toBeNull()
+    expect(selected.textContent).toContain('この画面のフォーム')
+    await act(async () => { expect(await save!()).toBe(false) })
+    expect(apiMocks.saveCtas).not.toHaveBeenCalled()
+    await click('違いを比べる')
+    expect(host.textContent).toContain('保存されている申込フォーム：保存済みのフォーム')
+    expect(host.textContent).toContain('この画面の入力：この画面のフォーム')
+    expect(changed).not.toHaveBeenCalled()
+    await click('最新を読み込んで続ける')
+    expect(changed).not.toHaveBeenCalled()
+    await act(async () => { [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((element) => element.textContent === '最新を読み込んで続ける')!.click() })
+    expect(changed).toHaveBeenCalledWith(latest)
+    expect(selected.textContent).toContain('保存済みのフォーム')
+    expect(title.value).toBe('入力を残すCTA')
+  })
+
 })
