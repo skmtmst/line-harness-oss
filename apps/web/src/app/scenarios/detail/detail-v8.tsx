@@ -96,6 +96,7 @@ import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { notifyToast } from '@/components/shared/toast'
 import StatusChip from '@/components/shared/status-chip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -943,6 +944,7 @@ export default function ScenarioDetailV8({
       if (res.success) {
         setEditing(false)
         setRenameOpen(false)
+        notifyToast('保存しました')
         loadScenario(true)
       } else {
         setError(res.error)
@@ -971,6 +973,7 @@ export default function ScenarioDetailV8({
       }
       setStartOpen(false)
       setJustStarted(true)
+      notifyToast('配信を始めました')
       loadScenario(true)
       reloadStats()
     } catch {
@@ -997,6 +1000,7 @@ export default function ScenarioDetailV8({
         return
       }
       setStopOpen(false)
+      notifyToast('配信を一時停止しました')
       loadScenario(true)
       reloadStats()
     } catch {
@@ -1538,7 +1542,7 @@ export default function ScenarioDetailV8({
             }
             options={[
               { value: 'continue', label: '送信後：次のステップへ進む' },
-              { value: 'pause', label: '送信後：ここで一時停止する' },
+              { value: 'pause', label: '送信後：ここで止める' },
             ]}
             size="full"
           />
@@ -2271,7 +2275,7 @@ export default function ScenarioDetailV8({
                     disabled={!canEdit}
                     title={!canEdit ? readonlyReason : undefined}
                   >
-                    一時停止する
+                    止める
                   </Button>
                 ) : (
                   <Button
@@ -2883,7 +2887,7 @@ export default function ScenarioDetailV8({
       {/* 一時停止の確認（OPGU2）。板の「止める理由（任意）」は受け口が無いので置かない。 */}
       <ConfirmDialog
         open={stopOpen}
-        title="一時停止しますか"
+        title="止めますか"
         description={[
           stats?.activeNow === undefined
             ? '購読中の人数は確認できません。'
@@ -2894,7 +2898,7 @@ export default function ScenarioDetailV8({
           '止まっているあいだ、新しい人は入りません。',
         ].join(' ')}
         designNode="OPGU2"
-        confirmLabel="一時停止する"
+        confirmLabel="止める"
         destructive
         busy={stopBusy}
         error={stopError}

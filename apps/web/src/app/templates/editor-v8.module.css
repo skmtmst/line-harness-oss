@@ -394,8 +394,17 @@
   align-items: start;
 }
 
-/* 板が 1100px を切ったら右の欄を畳む */
-@container (max-width: 1099px) {
+/*
+ * 板が 1100px を切ったら（1152 幅の見本 `a1k3d`）右の欄を細くして横に残す。
+ * 720px を切ったら下へ畳む。
+ */
+@container (min-width: 720px) and (max-width: 1099px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr) 250px;
+  }
+}
+
+@container (max-width: 719px) {
   .split {
     grid-template-columns: minmax(0, 1fr);
   }
