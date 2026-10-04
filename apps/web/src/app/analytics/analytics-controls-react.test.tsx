@@ -331,7 +331,7 @@ describe('分析の対象者種別・期間選択(#835)', () => {
      * 閉じている間は短い状態だけが見え、開くと全文が読める。
      */
     expect(host.textContent).not.toContain('確認できた参照だけの合計です')
-    const descriptionButton = host.querySelector('button[aria-label="確認できた参照切れの説明"]') as HTMLButtonElement | null
+    const descriptionButton = host.querySelector('button[aria-label="作ったのに使っていないの説明"]') as HTMLButtonElement | null
     expect(descriptionButton, '説明アイコンが無い').not.toBeNull()
     await act(async () => { descriptionButton!.click(); await Promise.resolve() })
     expect(host.textContent).toContain('確認できた参照だけの合計です')

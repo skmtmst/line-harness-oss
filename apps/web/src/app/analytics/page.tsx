@@ -8,6 +8,8 @@ import ConversionReportV8 from './conversion-report-v8'
 import ReadonlyHeaderV8 from './readonly-header-v8'
 import Select from '@/components/shared/select'
 import SegmentedControl from '@/components/shared/segmented'
+import { RowActions } from '@/components/shared/row-actions'
+import SearchField from '@/components/shared/search-field'
 import { Suspense, createContext, useContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
@@ -128,7 +130,7 @@ function AnalyticsNotice({ children }: { children: ReactNode }) {
 type ExportAction = { onClick: () => void; disabled: boolean }
 const AnalyticsExportContext = createContext<((action: ExportAction | null) => void) | null>(null)
 
-function AnalyticsExportButton({ onClick, disabled, label }: { onClick: () => void; disabled: boolean; label?: string }) {
+function AnalyticsExportButton({ onClick, disabled, label, headerOnly = false }: { onClick: () => void; disabled: boolean; label?: string; headerOnly?: boolean }) {
   const register = useContext(AnalyticsExportContext)
   const action = useRef(onClick)
   action.current = onClick
@@ -136,6 +138,7 @@ function AnalyticsExportButton({ onClick, disabled, label }: { onClick: () => vo
     register?.({ onClick: () => action.current(), disabled })
     return () => register?.(null)
   }, [register, disabled])
+  if (headerOnly) return null
   return <Button onClick={onClick} disabled={disabled} variant="secondary">{label ?? 'CSV で書き出す'}</Button>
 }
 
@@ -2369,7 +2372,7 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
         {daysShown ? <BarChart items={toBarChartItems(overview.days, { campaigns: overview.campaigns, formatTitle: (date) => `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日（${analyticsWeekday(date)}）` }).map((item) => ({ ...item, axisLabel: `${item.axisLabel}（${analyticsWeekday(item.key)}）` }))} selectedKey={selectedDate} onSelect={setSelectedDate} /> : <div className="v8-ro-analytics-state" role="status"><p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] || '未取得') : pendingReason}</p>{overview.state === 'pending' && <p>日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p>}</div>}
         {daysShown && selectedDay && <p className="v8-ro-analytics-selection">{selectedDay.date}（{analyticsWeekday(selectedDay.date)}）　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net}人　{selectedCampaigns.map((item) => item.name).join('、') || '施策なし'}</p>}
         {daysShown && overview.campaigns.length > 0 && <div className="v8-ro-analytics-campaigns">{overview.campaigns.map((item) => <p key={item.id}>{formatAnalyticsDate(item.date)} {item.name}</p>)}</div>}
-        <div className="v8-ro-analytics-chartFooter"><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /><AnalyticsExportButton disabled={!daysShown} onClick={() => downloadCsv('analytics-friends.csv', [['日付', '増えた', '減った', '差し引き'], ...overview.days.map((day) => [day.date, day.added, day.removed, day.net])])} /></div>
+        <div className="v8-ro-analytics-chartFooter"><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /><AnalyticsExportButton headerOnly disabled={!daysShown} onClick={() => downloadCsv('analytics-friends.csv', [['日付', '増えた', '減った', '差し引き'], ...overview.days.map((day) => [day.date, day.added, day.removed, day.net])])} /></div>
       </section>
       <aside className="v8-ro-analytics-friendsAside"><section className="v8-ro-analytics-breakdown"><h2>どこから増えたか</h2><p>流入リンクごと・この{days}日</p><RouteBreakdown accountId={accountId} from={range.from} to={range.to} /><Link href="/inflow-links">流入と計測で詳しく見る →</Link></section><section className="v8-ro-analytics-breakdown"><h2>減った友だち</h2><p>ブロック・友だち解除の合計</p><strong>{metricText(overview.metrics.removed)}人</strong><p>ブロックの内訳は未取得です。現在の集計では、ブロック・友だち解除の合計を表示します。</p></section></aside>
     </div>
@@ -2534,27 +2537,17 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
     || overview.summary.estimatedHoursSaved.state === 'partial'
     ? overview.summary.estimatedHoursSaved.value
     : null
-  return <div data-design-node="QQ1SR" className="space-y-4">
-    <AnalyticsPeriodControl days={days} onChange={setDays} />
+  const exportUsage = () => downloadCsv('analytics-usage.csv', [
+    ['機能', '作成', '利用中', '未使用', '最終利用', '気づいたこと', '参照の状態'],
+    ...overview.categories.map((item) => [item.label, shownValue(item.created), shownValue(item.inUse), shownValue(item.unused), item.lastUsedAt.value, usageObservation(item).text, referenceHealthText(item.brokenReferences)]),
+  ])
+  return <div data-design-node="N8ZrUl" className="space-y-4">
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <KpiCard
         title="使っている機能"
         value={menuFeatures?.enabled ?? null}
         unit={menuFeatures ? ` / ${menuFeatures.total}` : ''}
         detail={menuFeaturesError || 'メニューに出している機能のうち'}
-      />
-      <KpiCard
-        title="作ったのに使っていない"
-        value={shownValue(overview.summary.unusedItems)}
-        unit="個"
-        {...metricCardState(overview.summary.unusedItems, { detail: '8分類の利用状況から集計' }, state.retry)}
-        action={(shownValue(overview.summary.unusedItems) ?? 0) > 0 ? { label: '片づける', href: '#usage-items' } : undefined}
-      />
-      <KpiCard
-        title="確認できた参照切れ"
-        value={shownValue(overview.summary.brokenReferences)}
-        unit="件"
-        {...metricCardState(overview.summary.brokenReferences, { detail: '対応済みの参照をすべて確認' }, state.retry)}
       />
       <KpiCard
         title="自動で動いた回数"
@@ -2570,6 +2563,12 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
         description={overview.summary.estimatedHoursSaved.reason ?? undefined}
         onRetry={overview.summary.estimatedHoursSaved.state === 'failed' ? state.retry : undefined}
       />
+      <KpiCard
+        title="作ったのに使っていない"
+        value={shownValue(overview.summary.unusedItems)}
+        unit="個"
+        {...metricCardState(overview.summary.unusedItems, { detail: `参照切れ ${metricText(overview.summary.brokenReferences)}件`, description: overview.summary.brokenReferences.reason ?? undefined }, state.retry)}
+      />
     </div>
     {overview.stateReason ? <Notice tone="warn">{overview.stateReason}</Notice> : <AnalyticsNotice>項目が多いほど良い、ではありません。使っていないものは使用先を確かめてから、下の「片づける」で整理できます。</AnalyticsNotice>}
     {menuFeaturesError && (
@@ -2581,12 +2580,17 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
       </Notice>
     )}
     <div id="usage-items" className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
-      <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th>気づいたこと</Th><Th align="right">操作</Th></TableHeadRow></thead>
+      <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th>最終利用</Th><Th align="right">操作</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.categories.map((item) => {
-        const observation = usageObservation(item)
-        return <tr key={item.key} className="text-sm"><td className="px-4 py-3"><p className="font-semibold">{item.label}</p><p className="text-ink-faint mt-1 truncate text-xs">最終利用 <DateTimeMetricCell metric={item.lastUsedAt} /></p></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3"><p className={`truncate ${observation.tone === 'warning' ? 'text-warning' : observation.tone === 'unknown' ? 'text-ink-faint' : 'text-success'}`} title={observation.text}>{observation.text}</p><p className="text-ink-faint mt-1 truncate text-xs" title={item.brokenReferences.reason ?? undefined}>{referenceHealthText(item.brokenReferences)}</p></td><td className="px-3 py-2"><div className="v8-ro-analytics-legacyActions"><div className="flex justify-end gap-2 whitespace-nowrap"><Button href={item.href} variant="secondary">中身を見る</Button>{canTidyUsage(item) && <Button href={item.href} variant="secondary" className="border-warning text-warning">片づける</Button>}</div></div><details className="v8-ro-analytics-rowMenu"><summary aria-label={`${item.label}の操作`}>…</summary><Link href={item.href}>中身を見る</Link>{canTidyUsage(item) && <Link href={item.href}>片づける</Link>}</details></td></tr>
+        return <tr key={item.key} className="text-sm"><td className="px-4 py-3"><p className="font-semibold">{item.label}</p></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3"><DateTimeMetricCell metric={item.lastUsedAt} /></td><td className="px-3 py-2"><RowActions subjectName={item.label} detail={{ label: '中身を見る', href: item.href }} menuItems={canTidyUsage(item) ? [{ id: 'tidy', label: '片づける', onSelect: () => window.location.assign(item.href) }] : []} /></td></tr>
       })}</tbody>
     </table></div>
+    <section className="v8-ro-analytics-observations"><div className="v8-ro-analytics-sectionHead"><h2>気づいたこと</h2><Button variant="secondary" onClick={() => { state.retry(); setMenuReload((value) => value + 1) }}>もう一度確認</Button></div><p className="mt-2 text-xs">確認できた参照切れ <MetricCell metric={overview.summary.brokenReferences} />件</p><ul>{overview.categories.map((item) => {
+      const observation = usageObservation(item)
+      return <li key={item.key}><span>{item.label}：{observation.text}</span><span title={item.brokenReferences.reason ?? undefined}> ／ {referenceHealthText(item.brokenReferences)}</span></li>
+    })}</ul></section>
+    <Disclosure title="集計期間を変える" hint={`この${days}日`} size="compact"><AnalyticsPeriodControl days={days} onChange={setDays} /></Disclosure>
+    <AnalyticsExportButton headerOnly onClick={exportUsage} disabled={overview.categories.length === 0} />
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
       <p className="text-ink-faint">未使用の項目は自動で削除しません。各機能の使用先を確認してから停止・削除します。</p>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

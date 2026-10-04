@@ -99,3 +99,10 @@
 [data-theme='v8'] .v8-ro-analytics-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 12px; }
 [data-theme='v8'] .v8-ro-analytics-toolbar > button:last-child { margin-left: auto; }
 [data-theme='v8'] .v8-ro-analytics-content > div:not(.v8-ro-analytics-friends) { padding-top: 0; }
+
+[data-theme='v8'] .v8-ro-analytics-observations { padding: 20px; background: var(--color-surface-pearl); border-radius: var(--radius-card); }
+[data-theme='v8'] .v8-ro-analytics-observations ul { display: grid; gap: 8px; margin-top: 12px; font-size: 13px; }
+[data-theme='v8'] #usage-items th:first-child { width: 25%; }
+[data-theme='v8'] #usage-items th:nth-child(5) { width: 24%; }
+[data-theme='v8'] #usage-items th:last-child { width: 16%; }
+[data-theme='v8'] #usage-items td:last-child { overflow: visible; }
