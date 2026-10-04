@@ -2,7 +2,11 @@
 
 import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { SettingsNavV8 } from '../settings/settings-nav-v8'
+import SearchField from '@/components/shared/search-field'
+import HelpTip from '@/components/shared/help-tip'
+import './ec-fidelity-v8.css'
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
@@ -12,8 +16,6 @@ import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
-import PageHeaderH2 from '@/components/layout/page-header-h2'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import KpiCard from '@/components/shared/kpi-card'
@@ -32,7 +34,6 @@ import {
   type EcCommerceOverview,
   type EcOrder,
 } from '@/lib/api'
-import ConnectorPanel from './connector-panel'
 import EcConnectorV8 from './ec-connector-v8'
 import EcTabs from './ec-tabs-view'
 import SubscriptionsPanel from './subscriptions-panel'
@@ -360,16 +361,10 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
     <>
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse data-ro-kpis="true" gridClassName={styles.kpis}>
-        <KpiCard variant="v6" title="今日 取り込んだ" value={overview?.last24h ?? null} unit="件" detail={overview?.byType.map((item) => `${item.label} ${formatNumber(item.count)}`).join('・') ?? '内訳は未取得'} />
-        <KpiCard variant="v6" title="つながっていない注文" value={overview?.identityPending ?? null} unit="件" detail="LINEの友だちが見つかりません" badge="つき合わせ" badgeTone="neutral" />
-        <KpiCard variant="v6" title="取り込みに失敗" value={overview?.failed ?? null} unit="件" detail="3回やり直しても入りませんでした" badge="確認" badgeTone="neutral" />
-        <div className="min-w-0 rounded-card border border-hairline bg-canvas p-4">
-          <p className="text-xs font-semibold text-ink-faint">最後に届いた</p>
-          <p className="mt-1 text-2xl font-bold text-ink tabular-nums">{dateTime(overview?.lastReceivedAt ?? null)}</p>
-          <p className="mt-1 text-xs text-ink-faint">{overview?.averageDeliverySeconds == null
-            ? '到着時間は測定できません'
-            : `直近24時間の平均 ${formatNumber(overview.averageDeliverySeconds)}秒（${formatNumber(overview.latencySampleCount)}件）`}</p>
-        </div>
+        <KpiCard variant="v6" title="処理完了" value={listedSummary?.succeeded} unit="件" detail="" help="LINE送信と、会員情報や取り消しの反映が完了した件数です。" />
+        <KpiCard variant="v6" title="処理中" value={listedSummary ? listedSummary.pending + listedSummary.processing : null} unit="件" detail="" />
+        <KpiCard variant="v6" title="送信なし" value={listedSummary?.skipped} unit="件" detail="" help="通知設定や会員のつき合わせにより送信を見送った件数です。" />
+        <KpiCard variant="v6" title="失敗" value={listedSummary ? listedSummary.retryable_failed + listedSummary.permanent_failed : null} unit="件" detail="" valueTone="warning" />
       </KpiCollapse>
       {/*
         ★V7 `x63W5x`：補助のデータ（集計）だけ取れないときは、その場所に
@@ -384,15 +379,14 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
           {overviewState === 'error' ? <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => void loadOverview(false)}>集計をもう一度読む</button> : null}
         </p>
       ) : null}
-      <NoteBar help="注文にはLINEの友だちが書かれていないため、メールアドレスか電話番号で結びつけます" helpLabel="つき合わせの仕方">ECの注文には、LINEの友だちが誰なのかが書かれていません。メールアドレスか電話番号で結びつけています。どちらも一致しなかった注文は「会員のつき合わせ」に並びます。</NoteBar>
       {notice ? <div className={notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError} role={notice.tone === 'success' ? 'status' : 'alert'}>{notice.text}</div> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <input
-          type="search"
-          className="min-w-80 flex-1 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink"
+        <SearchField
+          className="min-w-0 flex-1"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="注文番号・お名前・出来事で検索"
+          onChange={setQuery}
+          onClear={() => setQuery('')}
+          placeholder="取り込みの記録を探す"
           aria-label="取り込みの記録を検索"
         />
         <div className="w-full sm:w-64">
@@ -445,7 +439,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
           onRetry={listState === 'error' ? () => void loadRecords(false) : undefined}
         />
       ) : <DataTable>
-        <thead><TableHeadRow><Th>いつ・何が届いたか</Th><Th>お客様</Th><Th>中身</Th><Th>したこと</Th><Th>状態</Th>{/* 操作列は中身の幅で固定し、残りは本文の列で吸収する。 */}<Th align="right" className="w-44">操作</Th></TableHeadRow></thead>
+        <thead><TableHeadRow><Th>いつ・何が届いたか</Th><Th>お客さま</Th><Th>中身</Th><Th>したこと</Th><Th className="w-24">状態</Th>{/* 操作列は中身の幅で固定し、残りは本文の列で吸収する。 */}<Th align="right" className="w-12"><span className="sr-only">操作</span></Th></TableHeadRow></thead>
         <tbody>
           {actions.map((action) => {
             const order = action.order
@@ -459,9 +453,9 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                 : `¥${formatNumber(order.totalAmount)}`
             const statusInfo = ACTION_STATUS[action.status]
             return <Tr key={action.id}>
-              <Td><span className={styles.cellStack}><span className={styles.cellMain}>{dateTime(action.receivedAt)} ／ {action.eventLabel || ecEventLabel(action.eventType, action.eventType)}</span><span className={styles.cellSub}>{action.orderNumber ? `注文 ${action.orderNumber}${amount ? ` ／ ${amount}` : ''}` : '注文番号 —'}</span></span></Td>
-              <Td>{action.customerName ?? <span className="text-xs text-ink-faint">見つかりません</span>}</Td>
-              <Td><span className={order?.orderLines.length ? undefined : 'text-xs text-ink-faint'}>{contents}</span></Td>
+              <Td><span className={styles.cellStack}><span className={styles.cellMain} title={dateTime(action.receivedAt)}>{dateTime(action.receivedAt)}</span><span className={styles.cellSub} title={action.eventLabel || ecEventLabel(action.eventType, action.eventType)}>{action.eventLabel || ecEventLabel(action.eventType, action.eventType)}</span><span className={styles.cellSub} title={action.orderNumber ?? ''}>{action.orderNumber ? `注文 ${action.orderNumber}` : '注文番号 —'}</span></span></Td>
+              <Td><span className="block truncate" title={action.customerName ?? '見つかりません'}>{action.customerName ?? <span className="text-xs text-ink-faint">見つかりません</span>}</span></Td>
+              <Td><span className="block truncate" title={`${contents}${amount ? `・${amount}` : ''}`}>{contents}{amount ? `・${amount}` : ''}</span></Td>
               <Td>{action.status === 'retryable_failed' || action.status === 'permanent_failed'
                 ? action.errorMessage ?? `${action.attemptCount}回やり直しました`
                 : action.status === 'skipped'
@@ -488,11 +482,6 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
               <ActionCell>
                 {/* #641: 主操作は枠つきボタン、残りは「その他（…）」へ集約。 */}
                 {/* 友だち詳細は静的書き出しのため /friends/detail?id= 形。/friends/<id> は存在しない（IDEA-21 で修正）。 */}
-                {(action.friendId ?? order?.friendId)
-                  ? <Button href={`/friends/detail?id=${encodeURIComponent(action.friendId ?? order?.friendId ?? '')}`} variant="secondary">中身を見る</Button>
-                  : <Button href="/ec-commerce/identity-candidates" variant="secondary">つき合わせる</Button>}
-                {order || action.retryAvailable ? (
-                  <>
                     <IconButton
                       aria-label="この行のその他操作"
                       aria-expanded={openMenuId === action.id}
@@ -505,6 +494,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                       ariaLabel="この行の操作"
                       onClose={() => setOpenMenuId(null)}
                       items={[
+                        { id: 'friend', label: (action.friendId ?? order?.friendId) ? '中身を見る' : 'つき合わせる', onSelect: () => window.location.assign((action.friendId ?? order?.friendId) ? `/friends/detail?id=${encodeURIComponent(action.friendId ?? order?.friendId ?? '')}` : '/ec-commerce/identity-candidates') },
                         /*
                          * IDEA-23: 注文がある行は「注文の状況を見る」から出来事→通知→成果まで辿れる。
                          * #670 23: 隣の「中身を見る」と並んだときに「注文の状況中身を見る」と
@@ -523,8 +513,6 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                           : []),
                       ]}
                     />
-                  </>
-                ) : null}
               </ActionCell>
             </Tr>
           })}
@@ -533,7 +521,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
       {listState === 'ready' ? (
         <div className={styles.footer}>
           <p><ListRange label="取り込みの記録" total={actionTotal} first={actions.length === 0 ? 0 : 1} last={actions.length} /> 古い記録はページを進んで確認できます。</p>
-          <p>注文の本文や接続用の秘密値は表示しません。もう一度行うときも、成功済みの処理は重ねません。</p>
+          <p>「会員のつき合わせ」で、ネットショップの会員とLINEの友だちを結びつけると、送信なしが減ります。<HelpTip label="会員のつき合わせ">メールアドレスか電話番号が一致する友だちに結びつけます。もう一度行うときも、成功済みの処理は重ねません。</HelpTip></p>
         </div>
       ) : null}
       {listState === 'ready' && pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
@@ -549,30 +537,24 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 }
 
 function EcCommercePageInner() {
-  const theme = useAdminTheme()
+  usePageTitle('EC連携')
   const tab = useMergedTab(EC_TABS, 'tab', 'events')
   const { selectedAccountId } = useAccount()
-
+  if (tab === 'connector') return <EcConnectorV8 />
   return (
-    <div className={`${styles.root} ${tab === 'connector' ? '' : 'v8-ro-notifications-page'}`} data-design="Head" data-design-node={theme === 'v8' && tab !== 'connector' ? (tab === 'subscriptions' ? 'wqC8x' : 'GmVR5') : undefined}>
-      {theme === 'v8' && tab !== 'connector' && <ReadonlyHeaderV8 title="EC連携" description="取り込みの記録・会員のつき合わせ・定期便の状況を確認できます。" />}
-      {/* マニュアルは共通トップバーに置く。本文に「ECの注文・定期便を取り込み、LINEの配信や成果へつなげます。」という重複説明は置かない。 */}
-      <PageHeaderH2
-        /* 1段だけのパンくずは上の帯の画面名と重複するので出さない。 */
-        breadcrumb={[]}
-        title="EC連携"
-        description=""
-        actions={tab === 'events'
-          ? <Button href="/ec-commerce?tab=connector" variant="secondary">つなぎ先の設定</Button>
-          : tab === 'subscriptions'
-            ? <Button href="/broadcasts/new" variant="primary">対象を選んで送る</Button>
-            : undefined}
-      />
-      <EcTabs accountId={selectedAccountId} active={tab as typeof EC_TABS[number]['key']} />
-      {tab === 'events' ? <EventsPanel accountId={selectedAccountId} /> : null}
-      {tab === 'subscriptions' ? <SubscriptionsPanel accountId={selectedAccountId} /> : null}
-      {/* ★V8-B（板 `iLJmw`）：つなぎ先だけ v8 の枠に切り替える。 */}
-      {tab === 'connector' ? (theme === 'v8' ? <EcConnectorV8 /> : <ConnectorPanel accountId={selectedAccountId} />) : null}
+    <div className="ec-fid-page" data-design-node={tab === 'subscriptions' ? 'wqC8x' : 'GmVR5'}>
+      <div className="ec-fid-head">
+        <ReadonlyHeaderV8 title="EC連携" description="ネットショップから注文・発送・定期便の出来事を取り込み、LINEの友だちと結びつけます。" />
+        {tab === 'events' ? <Button href="/ec-commerce?tab=connector" variant="secondary">つなぎ先の設定</Button> : <Button href="/broadcasts/new" variant="primary">対象を選んで送る</Button>}
+      </div>
+      <div className="ec-fid-layout">
+        <SettingsNavV8 />
+        <div className="ec-fid-main">
+          <EcTabs accountId={selectedAccountId} active={tab as typeof EC_TABS[number]['key']} />
+          {tab === 'events' ? <EventsPanel accountId={selectedAccountId} /> : null}
+          {tab === 'subscriptions' ? <SubscriptionsPanel accountId={selectedAccountId} /> : null}
+        </div>
+      </div>
     </div>
   )
 }
