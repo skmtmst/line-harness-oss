@@ -898,7 +898,7 @@ describe('飲食店向けテストAPI', () => {
     const first = await request('/api/restaurant-test/reservations/manual?account_id=account-1', body);
     expect(first.status).toBe(201);
     const second = await request('/api/restaurant-test/reservations/manual?account_id=account-1', {
-      ...body, customerName: '重複 次郎',
+      ...body, customerName: '重複 次郎', tableId: 'table-2seat',
     });
     expect(second.status).toBe(409);
     const count = testDb.raw.prepare(
@@ -1346,5 +1346,48 @@ describe('V8-B 予約経路と隔離メール', () => {
     expect((await requestAs('/api/restaurant-test/channels?account_id=account-1&storeId=store-yokohama', token)).status).toBe(400);
     expect((await requestAs('/api/restaurant-test/inbound-emails?account_id=account-1&storeId=store-yokohama', token)).status).toBe(400);
     expect((await requestAs('/api/restaurant-test/inbound-emails/email-other/manual-import?account_id=account-1', token, {})).status).toBe(404);
+  });
+});
+
+describe('V8 仮押さえ・日付・来店履歴', () => {
+  const hold = { storeId: 'store-ginza', startsAt: '2099-10-10T10:00:00Z', endsAt: '2099-10-10T12:00:00Z', guestCount: 2, holdMinutes: 15 };
+  it('仮押さえは期限を保存し、重なる要求を409で止め、解除後は再登録できる', async () => {
+    seedRestaurantFixture();
+    const res = await request('/api/restaurant-test/reservations/holds?account_id=account-1', hold);
+    expect(res.status).toBe(201);
+    const saved = (await res.json() as any).data;
+    expect(Date.parse(saved.holdExpiresAt)).toBeGreaterThan(Date.now());
+    expect((await request('/api/restaurant-test/reservations/holds?account_id=account-1', hold)).status).toBe(409);
+    expect((await requestWithMethod(`/api/restaurant-test/reservations/${saved.id}?account_id=account-1`, 'PATCH', { status: 'cancelled' })).status).toBe(200);
+    expect((await request('/api/restaurant-test/reservations/holds?account_id=account-1', hold)).status).toBe(201);
+  });
+  it('期限が切れた押さえを再読込で解除し、確定させない', async () => {
+    seedRestaurantFixture();
+    const res = await request('/api/restaurant-test/reservations/holds?account_id=account-1', hold);
+    const { id } = (await res.json() as any).data;
+    testDb.raw.prepare("UPDATE rt_reservations SET hold_expires_at='2000-01-01T00:00:00Z' WHERE id=?").run(id);
+    expect((await requestWithMethod(`/api/restaurant-test/reservations/${id}?account_id=account-1`, 'PATCH', { status: 'confirmed' })).status).toBe(409);
+    expect(testDb.raw.prepare('SELECT status FROM rt_reservations WHERE id=?').get(id)).toEqual({ status: 'cancelled' });
+  });
+  it('店の暦日で500件を超えても全予約を返し、別店舗を混ぜない', async () => {
+    seedRestaurantFixture();
+    const insert = testDb.raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at) VALUES(?, 'store-ginza','phone','試験',1,'2099-10-09T15:00:00Z','2099-10-09T16:00:00Z')`);
+    for (let i=0;i<501;i++) insert.run(`day-${i}`);
+    const res = await request('/api/restaurant-test/reservations/day?account_id=account-1&storeId=store-ginza&date=2099-10-10');
+    expect(res.status).toBe(200);
+    expect((await res.json() as any).data.reservations).toHaveLength(501);
+    expect((await request('/api/restaurant-test/reservations/day?account_id=account-1&storeId=store-ginza&date=2099-02-30')).status).toBe(400);
+  });
+  it('来店履歴はvisitedのみ、名前の一致で別人を混ぜない', async () => {
+    seedRestaurantFixture();
+    testDb.raw.exec("UPDATE rt_reservations SET customer_phone='090-0000-0000',status='visited' WHERE id='reservation-ginza'");
+    let res = await request('/api/restaurant-test/customers/history?account_id=account-1&storeId=store-ginza&phone=09000000000');
+    expect((await res.json() as any).data.visitCount).toBe(1);
+    res = await request('/api/restaurant-test/customers/history?account_id=account-1&storeId=store-yokohama&phone=09000000000');
+    expect((await res.json() as any).data.visitCount).toBe(0);
+  });
+  it('存在しない店舗・不正な期限では保存しない', async () => {
+    seedRestaurantFixture();
+    for (const body of [{ ...hold, holdMinutes: 0 }, { ...hold, storeId: 'other' }]) expect((await request('/api/restaurant-test/reservations/holds?account_id=account-1', body)).status).toBe(400);
   });
 });

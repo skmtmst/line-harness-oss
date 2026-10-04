@@ -1,3 +1,4 @@
+import type { RestaurantHoldInput, RestaurantHoldResult, RestaurantCustomer, RestaurantCustomerHistory, RestaurantOpeningHours, RestaurantAllocation } from '@line-crm/shared'
 import { fetchApi } from './api'
 
 export type RestaurantStore = {
@@ -23,6 +24,7 @@ export type RestaurantReservation = {
   customer_name: string; customer_phone: string | null; line_uid: string | null; guest_count: number;
   starts_at: string; ends_at: string; table_id: string | null; table_label: string | null;
   course_id: string | null; course_name: string | null; status: string; allergy_note: string | null; note: string | null;
+  hold_expires_at?: string | null;
   sync_direction: 'inbound_only'
 }
 export type RestaurantTable = {
@@ -79,6 +81,10 @@ const withOptionalAccount = (path: string, accountId: string | null) =>
   accountId ? withAccount(path, accountId) : path
 
 export const restaurantTestApi = {
+  holdReservation: (accountId: string, body: RestaurantHoldInput) => fetchApi<{ success: true; data: RestaurantHoldResult }>(withAccount('/api/restaurant-test/reservations/holds', accountId), { method: 'POST', body: JSON.stringify(body) }),
+  reservationsDay: (accountId: string, storeId: string, date: string) => fetchApi<{ success: true; data: { date: string; reservations: RestaurantReservation[] } }>(withAccount(`/api/restaurant-test/reservations/day?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`, accountId)),
+  customerSearch: (accountId: string, storeId: string, q: string) => fetchApi<{ success: true; data: RestaurantCustomer[] }>(withAccount(`/api/restaurant-test/customers/search?storeId=${encodeURIComponent(storeId)}&q=${encodeURIComponent(q)}`, accountId)),
+  customerHistory: (accountId: string, storeId: string, contact: { phone?: string; lineUid?: string }) => fetchApi<{ success: true; data: RestaurantCustomerHistory }>(withAccount(`/api/restaurant-test/customers/history?${new URLSearchParams({ storeId, ...(contact.lineUid ? { lineUid: contact.lineUid } : { phone: contact.phone || '' }) })}`, accountId)),
   listStores: (accountId: string) => fetchApi<{ success: true; data: { organization: RestaurantSnapshot['organization']; stores: RestaurantStore[] } }>(withAccount('/api/restaurant-test/stores', accountId)),
   storeContext: (accountId: string) => fetchApi<{ success: true; data: { selectedStore: { id: string; name: string } | null } }>(withAccount('/api/restaurant-test/store-context', accountId)),
   selectStore: (accountId: string, storeId: string) => fetchApi<{ success: true; data: { selectedStore: { id: string; name: string } } }>(withAccount(`/api/restaurant-test/stores/${storeId}/select`, accountId), { method: 'POST', body: '{}' }),
@@ -101,7 +107,7 @@ export const restaurantTestApi = {
   listIntakeAddresses: (accountId: string, storeId: string) => fetchApi<{ success: true; data: RestaurantIntakeAddress[] }>(withAccount(`/api/restaurant-test/intake-addresses?storeId=${encodeURIComponent(storeId)}`, accountId)),
   issueIntakeAddress: (accountId: string, storeId: string) => fetchApi<{ success: true; data: { id: string; storeId: string; localPart: string; address: string; graceDays: number } }>(withAccount('/api/restaurant-test/intake-addresses', accountId), { method: 'POST', body: JSON.stringify({ storeId }) }),
   decideApproval: (accountId: string, id: string, action: 'approve' | 'return', comment?: string) => fetchApi(withAccount(`/api/restaurant-test/approvals/${id}`, accountId), { method: 'PATCH', body: JSON.stringify({ action, comment }) }),
-  createReservation: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/reservations/manual', accountId), { method: 'POST', body: JSON.stringify(body) }),
+  createReservation: (accountId: string, body: Record<string, unknown>) => fetchApi<{ success: true; data: { id: string; tableId: string | null; lineNotice: { sent: boolean; reason: string | null } } }>(withAccount('/api/restaurant-test/reservations/manual', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateReservation: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi(withAccount(`/api/restaurant-test/reservations/${id}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
   importReservation: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/inbound/reservations', accountId), { method: 'POST', body: JSON.stringify(body) }),
   createTable: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/tables', accountId), { method: 'POST', body: JSON.stringify(body) }),

@@ -30,6 +30,7 @@ import {
 import { fetchBotProfile } from '../lib/bot-profile.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { restaurantTableCapacity, validateRestaurantOpeningHours } from '../services/restaurant-inventory.js';
+import { expireRestaurantHolds, validateRestaurantHold, validRestaurantDate, restaurantCivilTime } from '../services/restaurant-booking.js';
 import { DEFAULT_STAY_MINUTES } from '../services/restaurant-reservation-email.js';
 import { restaurantChannelState, restaurantDayBounds } from '../services/restaurant-channels.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
@@ -47,6 +48,10 @@ import {
  * 手動予約の確認通知は、明示的に選んだときだけ既存のHarness経路で送る。
  */
 export const restaurantTest = new Hono<Env>();
+restaurantTest.onError((error, c) => {
+  if (String(error).includes('restaurant_table_conflict')) return c.json({ success: false, error: '同じ卓に重なる予約または仮押さえがあります' }, 409);
+  throw error;
+});
 
 const RESTAURANT_TERMS_DOCUMENT_KEY = 'musubo-terms';
 const RESTAURANT_TERMS_DOCUMENT_VERSION = 'v0.1-draft';
@@ -556,6 +561,7 @@ restaurantTest.get('/api/restaurant-test/snapshot', requireRole('owner', 'admin'
     });
   }
 
+  await expireRestaurantHolds(dbFor(c.env), undefined, organization.scopedStoreId ?? undefined, organization.id);
   const orgId = organization.id;
   const scopedStoreId = organization.scopedStoreId;
   // R103: 予約台帳の絞り込み（期間・状態）とページ切替。既定は従来どおり先頭300件。
@@ -1000,9 +1006,9 @@ restaurantTest.post('/api/restaurant-test/inbound-emails/:id/manual-import', req
           reservation.startsAt, reservation.endsAt, tableId, email.media_id, email.id, `担当者 ${c.get('staff')?.id || '管理者'} が手で取り込み`, email.id),
       db.prepare(`UPDATE rt_inbound_emails SET status = 'received', quarantine_reason = NULL WHERE id = ?
         AND EXISTS (SELECT 1 FROM rt_reservations WHERE inbound_email_id = ? AND parser_key = 'manual_import')`).bind(email.id, email.id),
-      db.prepare(`UPDATE rt_inventory_slots SET reserved_count = reserved_count + ?, updated_at = datetime('now')
+      db.prepare(`UPDATE rt_inventory_slots SET reserved_count = COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0), updated_at = datetime('now')
         WHERE store_id = ? AND datetime(starts_at) = datetime(?) AND EXISTS (SELECT 1 FROM rt_reservations WHERE id = ?)` )
-        .bind(reservation.guestCount, email.store_id, reservation.startsAt, id),
+        .bind(email.store_id, reservation.startsAt, id),
     ]);
     const saved = await db.prepare("SELECT id, table_id FROM rt_reservations WHERE inbound_email_id = ? AND parser_key = 'manual_import'").bind(email.id).first<{ id: string; table_id: string | null }>();
     if (!saved) return c.json({ success: false, error: 'メールの状態が変わりました。読み直してください' }, 409);
@@ -1119,19 +1125,11 @@ async function adjustInventoryReservedCount(
   startsAt: string,
   guestDelta: number,
 ): Promise<void> {
-  if (!guestDelta) return;
-  if (guestDelta > 0) {
-    await db.prepare(`UPDATE rt_inventory_slots SET reserved_count = reserved_count + ?,
-      updated_at = datetime('now') WHERE store_id = ? AND starts_at = ?`).bind(
-        guestDelta, storeId, startsAt,
-      ).run();
-    return;
-  }
-  await db.prepare(`UPDATE rt_inventory_slots SET
-      reserved_count = CASE WHEN reserved_count + ? < 0 THEN 0 ELSE reserved_count + ? END,
-      updated_at = datetime('now') WHERE store_id = ? AND starts_at = ?`).bind(
-      guestDelta, guestDelta, storeId, startsAt,
-    ).run();
+  // 予約そのものを正本にし、取消・枠をまたぐ滞在・再送で二重加算しない。
+  await db.prepare(`UPDATE rt_inventory_slots SET reserved_count = COALESCE((SELECT SUM(r.guest_count)
+    FROM rt_reservations r WHERE r.store_id = rt_inventory_slots.store_id AND r.status NOT IN ('cancelled', 'no_show')
+      AND datetime(r.starts_at) < datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes')
+      AND datetime(r.ends_at) > datetime(rt_inventory_slots.starts_at)), 0) WHERE store_id = ?`).bind(storeId).run();
 }
 
 restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('owner', 'admin', 'staff'), async (c) => {
@@ -1146,7 +1144,8 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
   if (!storeId || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
   const checked = validateInboundReservation({ ...body, externalId: `manual-${crypto.randomUUID()}` });
   if (!checked.ok) return c.json({ success: false, error: checked.error }, 400);
-  const lockKey = `reservation:${storeId}:${checked.value.startsAt}`;
+  await expireRestaurantHolds(dbFor(c.env, storeId), undefined, storeId);
+  const lockKey = `reservation:${storeId}`;
   const lockOwner = crypto.randomUUID();
   if (!await acquireLock(dbFor(c.env, storeId), lockKey, lockOwner)) return c.json({ success: false, error: '同じ時間帯を別の担当者が更新中です' }, 409);
   let saved: { id: string; tableId: string | null };
@@ -1159,15 +1158,22 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
       const course = await dbFor(c.env, storeId).prepare('SELECT id FROM rt_menu_items WHERE id = ? AND store_id = ? AND status = ?').bind(checked.value.courseId, storeId, 'active').first();
       if (!course) return c.json({ success: false, error: '停止中のコースは選べません' }, 400);
     }
-    const tableId = checked.value.tableId || chooseRestaurantTable(tables.results.map((row) => ({ id: row.id, minCapacity: row.min_capacity, maxCapacity: row.max_capacity, isActive: row.is_active === 1 })), checked.value.guestCount);
+    const freeTables = [];
+    for (const row of tables.results) {
+      if (!await overlappingReservationExists(dbFor(c.env, storeId), storeId, row.id, checked.value.startsAt, checked.value.endsAt)) freeTables.push(row);
+    }
+    const tableId = checked.value.tableId || chooseRestaurantTable(freeTables.map((row) => ({ id: row.id, minCapacity: row.min_capacity, maxCapacity: row.max_capacity, isActive: row.is_active === 1 })), checked.value.guestCount);
+    if (!tableId) return c.json({ success: false, error: '人数が入る空き卓がありません' }, 409);
+    const chosen = tables.results.find(t => t.id === tableId)!;
+    if (checked.value.guestCount < chosen.min_capacity || checked.value.guestCount > chosen.max_capacity) return c.json({ success: false, error: '卓の収容人数に合いません' }, 400);
     if (tableId && await overlappingReservationExists(dbFor(c.env, storeId), storeId, tableId, checked.value.startsAt, checked.value.endsAt)) {
       return c.json({ success: false, error: '同じ卓に重なる時間の予約があるため登録できません' }, 409);
     }
     const id = crypto.randomUUID();
     await dbFor(c.env, storeId).prepare(`INSERT INTO rt_reservations
       (id, store_id, source, external_id, customer_name, customer_phone, line_uid, guest_count, starts_at, ends_at, table_id, course_id, status, allergy_note, note)
-      VALUES (?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
-        id, storeId, checked.value.externalId, checked.value.customerName, checked.value.customerPhone,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+        id, storeId, body.source === 'phone' ? 'phone' : 'manual', checked.value.externalId, checked.value.customerName, checked.value.customerPhone,
         checked.value.lineUid, checked.value.guestCount, checked.value.startsAt, checked.value.endsAt,
         tableId, checked.value.courseId, checked.value.status, checked.value.allergyNote, checked.value.note,
       ).run();
@@ -1205,9 +1211,13 @@ restaurantTest.patch('/api/restaurant-test/reservations/:id', requireRole('owner
     ).first<{
       id: string; store_id: string; customer_name: string; customer_phone: string | null;
       guest_count: number; starts_at: string; ends_at: string; table_id: string | null;
-      course_id: string | null; status: string; allergy_note: string | null; note: string | null;
+      course_id: string | null; status: string; allergy_note: string | null; note: string | null; hold_expires_at: string | null;
     }>();
   if (!current) return c.json({ success: false, error: '予約が見つかりません' }, 404);
+  if (current.hold_expires_at && current.status === 'pending' && Date.parse(current.hold_expires_at) <= Date.now()) {
+    await expireRestaurantHolds(dbFor(c.env, current.store_id), undefined, current.store_id);
+    return c.json({ success: false, error: '仮押さえの期限が切れました。読み直してください' }, 409);
+  }
   const body: Record<string, unknown> = (await c.req.json().catch(() => null)) || {};
   const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
 
@@ -1720,3 +1730,94 @@ restaurantTest.put('/api/restaurant-test/line-flows/:id', requireRole('owner', '
   if (!result.meta.changes) return c.json({ success: false, error: '対象がありません' }, 404);
   return c.json({ success: true, data: { id: c.req.param('id'), deliveryMode: 'preview_only' } });
 });
+
+restaurantTest.post('/api/restaurant-test/reservations/holds', requireRole('owner', 'admin', 'staff'), async c => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '組織が見つかりません' }, 404);
+  const body = validateRestaurantHold(await c.req.json().catch(() => null));
+  if (!body) return c.json({ success: false, error: '日時・人数・仮押さえの期限（1〜120分）を確認してください' }, 400);
+  if (!await storeBelongsTo(c, organization.id, body.storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  const db = dbFor(c.env, body.storeId);
+  await expireRestaurantHolds(db, undefined, body.storeId);
+  const owner = crypto.randomUUID();
+  const key = `reservation:${body.storeId}`;
+  if (!await acquireLock(db, key, owner)) return c.json({ success: false, error: '同じ店舗で予約を更新中です。再度お試しください' }, 409);
+  try {
+    const tables = await db.prepare(`SELECT t.id, t.min_capacity, t.max_capacity FROM rt_tables t
+      WHERE t.store_id = ? AND t.is_active = 1 AND t.min_capacity <= ? AND t.max_capacity >= ?
+      AND NOT EXISTS (SELECT 1 FROM rt_reservations r WHERE r.store_id = t.store_id AND r.table_id = t.id
+        AND r.status NOT IN ('cancelled', 'no_show') AND datetime(r.starts_at) < datetime(?) AND datetime(r.ends_at) > datetime(?))
+      ORDER BY t.max_capacity, t.id`).bind(body.storeId, body.guestCount, body.guestCount, body.endsAt, body.startsAt)
+      .all<{ id: string }>();
+    const tableId = body.tableId ? tables.results.find(t => t.id === body.tableId)?.id : tables.results[0]?.id;
+    if (!tableId) return c.json({ success: false, error: '人数が入る空き卓がありません' }, 409);
+    const id = crypto.randomUUID();
+    const holdExpiresAt = new Date(Date.now() + body.holdMinutes * 60_000).toISOString();
+    await db.prepare(`INSERT INTO rt_reservations
+      (id, store_id, source, customer_name, guest_count, starts_at, ends_at, table_id, status, note, hold_expires_at)
+      VALUES (?, ?, 'manual', '押さえ', ?, ?, ?, ?, 'pending', ?, ?)`)
+      .bind(id, body.storeId, body.guestCount, body.startsAt, body.endsAt, tableId, body.note?.trim() || null, holdExpiresAt).run();
+    await adjustInventoryReservedCount(db, body.storeId, body.startsAt, body.guestCount);
+    return c.json({ success: true, data: { id, tableId, holdExpiresAt } }, 201);
+  } finally { await releaseLock(db, key, owner); }
+});
+
+/** 500件の一覧ページ上限を使わず、店舗の暦日に重なる予約をすべて取得する。 */
+restaurantTest.get('/api/restaurant-test/reservations/day', requireRole('owner', 'admin', 'staff'), async c => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '組織が見つかりません' }, 404);
+  const storeId = c.req.query('storeId') || organization.scopedStoreId || '';
+  const date = c.req.query('date') || '';
+  if (!validRestaurantDate(date) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗と日付を確認してください' }, 400);
+  const db = dbFor(c.env, storeId);
+  await expireRestaurantHolds(db, undefined, storeId);
+  const store = await db.prepare('SELECT timezone FROM rt_stores WHERE id = ?').bind(storeId).first<{ timezone: string }>();
+  const from = restaurantCivilTime(date, 0, store!.timezone);
+  const to = restaurantCivilTime(date, 1440, store!.timezone);
+  const rows = await db.prepare(`SELECT r.*, s.name AS store_name, t.label AS table_label, m.name AS course_name
+    FROM rt_reservations r JOIN rt_stores s ON s.id = r.store_id
+    LEFT JOIN rt_tables t ON t.id = r.table_id LEFT JOIN rt_menu_items m ON m.id = r.course_id
+    WHERE r.store_id = ? AND datetime(r.starts_at) < datetime(?) AND datetime(r.ends_at) > datetime(?)
+    ORDER BY r.starts_at, r.id`).bind(storeId, to, from).all();
+  return c.json({ success: true, data: { date, reservations: rows.results } });
+});
+
+restaurantTest.get('/api/restaurant-test/customers/history', requireRole('owner', 'admin', 'staff'), async c => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '組織が見つかりません' }, 404);
+  const storeId = c.req.query('storeId') || '';
+  const lineUid = c.req.query('lineUid')?.trim();
+  const phone = c.req.query('phone')?.replace(/[\s()-]/g, '');
+  if ((!lineUid && !phone) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗と連絡先を確認してください' }, 400);
+  const db = dbFor(c.env, storeId);
+  const where = `r.store_id = ? AND r.status = 'visited' AND ${lineUid ? 'r.line_uid = ?' : "REPLACE(REPLACE(REPLACE(REPLACE(r.customer_phone, '-', ''), ' ', ''), '(', ''), ')', '') = ?"}`;
+  const args = [storeId, lineUid || phone];
+  const count = await db.prepare(`SELECT COUNT(*) AS total FROM rt_reservations r WHERE ${where}`).bind(...args).first<{ total: number }>();
+  const rows = await db.prepare(`SELECT r.id, r.starts_at, r.guest_count, r.allergy_note, t.label AS table_label, m.name AS course_name
+    FROM rt_reservations r LEFT JOIN rt_tables t ON t.id = r.table_id LEFT JOIN rt_menu_items m ON m.id = r.course_id
+    WHERE ${where} ORDER BY r.starts_at DESC, r.id LIMIT 20`).bind(...args).all();
+  return c.json({ success: true, data: { visitCount: count!.total, visits: rows.results } });
+});
+
+restaurantTest.get('/api/restaurant-test/customers/search', requireRole('owner', 'admin', 'staff'), async c => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '組織が見つかりません' }, 404);
+  const storeId = c.req.query('storeId') || '';
+  const q = c.req.query('q')?.trim() || '';
+  if (q.length < 2 || q.length > 100 || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗と検索文字を確認してください' }, 400);
+  const rows = await dbFor(c.env, storeId).prepare(`SELECT customer_name AS name, customer_phone AS phone, line_uid AS lineUid
+    FROM rt_reservations WHERE store_id = ? AND hold_expires_at IS NULL
+      AND (INSTR(customer_name, ?) > 0 OR INSTR(COALESCE(customer_phone, ''), ?) > 0)
+      AND (customer_phone IS NOT NULL OR line_uid IS NOT NULL)
+    GROUP BY COALESCE(line_uid, customer_phone) UNION
+    SELECT COALESCE(f.display_name, 'LINEの友だち') AS name, NULL AS phone, f.line_user_id AS lineUid
+    FROM friends f JOIN rt_stores s ON s.line_account_id = f.line_account_id
+    WHERE s.id = ? AND f.is_following = 1 AND INSTR(COALESCE(f.display_name, ''), ?) > 0 LIMIT 20`)
+    .bind(storeId, q, q, storeId, q).all();
+  return c.json({ success: true, data: rows.results });
+});
+

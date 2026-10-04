@@ -154,6 +154,7 @@ import { analytics } from './routes/analytics.js';
 import { analyticsExports } from './routes/analytics-exports.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
+import { dbFor } from './services/db-router.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { restaurantGoogle } from './routes/restaurant-google.js';
 import { googleSheets } from './routes/google-sheets.js';
@@ -1651,6 +1652,13 @@ async function runFrequentHeavyJobs(
   }
 
   if (restaurantTestEnabled(env)) {
+    jobs.push({
+      name: 'restaurant hold expiry',
+      run: async () => {
+        const { expireRestaurantHolds } = await import('./services/restaurant-booking.js');
+        await expireRestaurantHolds(dbFor(env), new Date(event.scheduledTime).toISOString());
+      },
+    });
     jobs.push({
       // Googleビジネス第4段: 口コミ・投稿の再同期。5分レーンだが接続ごとの
       // 55分ゲートで実質1時間ごと。書き込み経路は手動syncと同じ関数を使う。

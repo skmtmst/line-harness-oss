@@ -9117,6 +9117,8 @@ CREATE INDEX idx_rt_organizations_tenant
 CREATE UNIQUE INDEX idx_rt_organizations_tenant_unique
   ON rt_organizations(tenant_id);
 
+CREATE INDEX idx_rt_reservation_hold_expiry ON rt_reservations(hold_expires_at) WHERE status = 'pending' AND hold_expires_at IS NOT NULL;
+
 CREATE UNIQUE INDEX idx_rt_reservations_external
   ON rt_reservations(store_id, source, external_id);
 
@@ -9651,6 +9653,22 @@ CREATE TRIGGER rt_menu_change_review AFTER UPDATE OF status ON rt_approval_reque
 CREATE TRIGGER rt_menu_published_insert AFTER INSERT ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
 
 CREATE TRIGGER rt_menu_published_update AFTER UPDATE OF status ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
+
+CREATE TRIGGER rt_reservation_hold_insert BEFORE INSERT ON rt_reservations
+WHEN NEW.table_id IS NOT NULL AND NEW.status NOT IN ('cancelled', 'no_show')
+ AND EXISTS (SELECT 1 FROM rt_reservations r WHERE r.store_id = NEW.store_id AND r.table_id = NEW.table_id
+  AND r.status NOT IN ('cancelled', 'no_show') AND datetime(r.starts_at) < datetime(NEW.ends_at) AND datetime(r.ends_at) > datetime(NEW.starts_at)
+  AND (NEW.hold_expires_at IS NOT NULL OR r.hold_expires_at IS NOT NULL)
+  AND (r.hold_expires_at IS NULL OR r.status <> 'pending' OR datetime(r.hold_expires_at) > datetime('now')))
+BEGIN SELECT RAISE(ABORT, 'restaurant_table_conflict'); END;
+
+CREATE TRIGGER rt_reservation_hold_update BEFORE UPDATE OF table_id, starts_at, ends_at, status ON rt_reservations
+WHEN NEW.table_id IS NOT NULL AND NEW.status NOT IN ('cancelled', 'no_show')
+ AND EXISTS (SELECT 1 FROM rt_reservations r WHERE r.id <> NEW.id AND r.store_id = NEW.store_id AND r.table_id = NEW.table_id
+  AND r.status NOT IN ('cancelled', 'no_show') AND datetime(r.starts_at) < datetime(NEW.ends_at) AND datetime(r.ends_at) > datetime(NEW.starts_at)
+  AND (NEW.hold_expires_at IS NOT NULL OR r.hold_expires_at IS NOT NULL)
+  AND (r.hold_expires_at IS NULL OR r.status <> 'pending' OR datetime(r.hold_expires_at) > datetime('now')))
+BEGIN SELECT RAISE(ABORT, 'restaurant_table_conflict'); END;
 
 CREATE TRIGGER trg_action_score_published_version_immutable
 BEFORE UPDATE ON action_score_rule_versions
