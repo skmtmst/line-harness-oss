@@ -94,6 +94,11 @@ import type {
   TrafficPool,
   PoolAccount,
   FormLayout,
+  LiffCalendarMode,
+  LiffFormAppearance,
+  LiffFormAppearanceMode,
+  LiffHeadingFont,
+  LiffTheme,
   MergedPersonDetail,
   UpdateMergedPersonRequest,
   UpdateMergedPersonDeliveryPrioritiesRequest,
@@ -7380,6 +7385,11 @@ export const api = {
           publishedVersionId: string | null
           /** 現在公開版の元になった編集版。 */
           publishedContentRevision: number | null
+          /**
+           * 見た目（M3）。既定は店の設定に合わせる。
+           * 古い応答には無いことがあるので読む側で既定に倒す。
+           */
+          liffAppearance?: LiffFormAppearance
         }>
       >(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`),
     create: (
@@ -7420,6 +7430,17 @@ export const api = {
         ogTitle?: string | null
         ogDescription?: string | null
         ogImageUrl?: string | null
+        /**
+         * 見た目（M3）。省いた項目は今の値を保つ。
+         * 色の null・空文字は「型の色・店の色」。
+         */
+        liffAppearance?: {
+          mode?: LiffFormAppearanceMode
+          theme?: LiffTheme
+          primaryColor?: string | null
+          backgroundColor?: string | null
+          headingFont?: LiffHeadingFont
+        }
         /**
          * 確認した編集の版(#723)。**必須。**
          *
@@ -13804,6 +13825,18 @@ export interface BookingSettings {
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
   /** LIFF 予約「日時を選ぶ」段の最初の形。 */
   liffDateView: 'list' | 'calendar';
+  /**
+   * お客さまの予約画面の見た目（M3）。型を選んでいない店は 'line'
+   * （今の見た目のまま）。色が null は「型の色」。
+   */
+  liffTheme: LiffTheme;
+  liffPrimaryColor: string | null;
+  liffBackgroundColor: string | null;
+  liffHeadingFont: LiffHeadingFont;
+  /** カレンダーの出し方。既定は週を先に。 */
+  liffCalendarMode: LiffCalendarMode;
+  /** 空きの点（緑＝空き・金＝残りわずか）を出すか。 */
+  liffVacancyDots: boolean;
   /** 前日お知らせの送信時刻（店舗タイムゾーン）。null は予約24時間前。 */
   reminderDayBeforeTime: string | null;
   /** 当日お知らせを開始の何時間前に送るか。 */
@@ -13834,6 +13867,16 @@ export type SaveBookingSettings = Pick<
   expectedVersion: number;
   /** LIFF 予約「日時を選ぶ」段の最初の形。省いたら今の値を保つ。 */
   liffDateView?: 'list' | 'calendar';
+  /**
+   * お客さまの予約画面の見た目。省いたら今の値を保つ。
+   * 色の null は「型の色に戻す」。
+   */
+  liffTheme?: LiffTheme;
+  liffPrimaryColor?: string | null;
+  liffBackgroundColor?: string | null;
+  liffHeadingFont?: LiffHeadingFont;
+  liffCalendarMode?: LiffCalendarMode;
+  liffVacancyDots?: boolean;
   /** 前日お知らせの送信時刻（HH:MM）。null で従来の24時間前。 */
   reminderDayBeforeTime: string | null;
   /** 当日お知らせを何時間前に送るか（1〜72）。null で従来の2時間前。 */

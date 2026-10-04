@@ -3,6 +3,7 @@
  * 同じものは同じ、違うものは違うと判定することを見る。
  */
 import { describe, expect, it } from 'vitest'
+import { normalizeLiffFormAppearance } from '@line-crm/shared'
 import { formSavedContentMatches, type FormSavedContent } from './form-save-reconcile'
 
 function content(overrides: Partial<FormSavedContent> = {}): FormSavedContent {
@@ -15,6 +16,7 @@ function content(overrides: Partial<FormSavedContent> = {}): FormSavedContent {
     ogTitle: null,
     ogDescription: null,
     ogImageUrl: null,
+    liffAppearance: normalizeLiffFormAppearance(undefined),
     ...overrides,
   }
 }
@@ -44,5 +46,14 @@ describe('formSavedContentMatches（M003：自分の再送の見分け）', () =
     const sent = content({ layout: { version: 2, header: [], sections: [] } })
     const current = content({ layout: { version: 2, header: [{ id: 'b1' }], sections: [] } })
     expect(formSavedContentMatches(sent, current)).toBe(false)
+  })
+
+  it('見た目だけの違いも他人の変更とみなす', () => {
+    const sent = content()
+    const current = content({
+      liffAppearance: normalizeLiffFormAppearance({ mode: 'custom', theme: 'night' }),
+    })
+    expect(formSavedContentMatches(sent, current)).toBe(false)
+    expect(formSavedContentMatches(sent, content())).toBe(true)
   })
 })

@@ -1,3 +1,15 @@
+import {
+  LIFF_CALENDAR_MODE_DEFAULT,
+  LIFF_HEADING_FONT_DEFAULT,
+  LIFF_THEME_DEFAULT,
+  normalizeLiffCalendarMode,
+  normalizeLiffColor,
+  normalizeLiffHeadingFont,
+  normalizeLiffTheme,
+  type LiffCalendarMode,
+  type LiffHeadingFont,
+  type LiffTheme,
+} from '@line-crm/shared';
 import { jstNow } from './utils.js';
 import { recordMenuVersion } from './menu-versions.js';
 
@@ -64,6 +76,19 @@ export interface BookingAdminSettings {
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
   /** LIFF 予約「日時を選ぶ」段の最初の形。migration 前の行も 'list'。 */
   liffDateView: LiffDateView;
+  /**
+   * お客さまの予約画面の見た目（M3・migration 562）。
+   * 型を選んでいない店は 'line'（今の見た目のまま）。
+   * 色が null は「型の色」。型を替えても店の色は残る。
+   */
+  liffTheme: LiffTheme;
+  liffPrimaryColor: string | null;
+  liffBackgroundColor: string | null;
+  liffHeadingFont: LiffHeadingFont;
+  /** カレンダーの出し方。既定は週を先に。 */
+  liffCalendarMode: LiffCalendarMode;
+  /** 空きの点（緑＝空き・金＝残りわずか）を出すか。既定は出す。 */
+  liffVacancyDots: boolean;
   /** 前日お知らせの送信時刻（店舗タイムゾーンの壁時刻）。null は予約24時間前。 */
   reminderDayBeforeTime: string | null;
   /** 当日お知らせを開始の何時間前に送るか。未設定の店舗は既定値。 */
@@ -93,6 +118,16 @@ export interface BookingAdminSettingsInput {
    * （初回作成だけ 'list'）。営業時間の保存で黙って戻さないため。
    */
   liffDateView?: LiffDateView;
+  /**
+   * お客さまの予約画面の見た目。省いたときは今の値を保つ
+   * （初回作成だけ既定値）。型を替えても店の色は残る。
+   */
+  liffTheme?: LiffTheme;
+  liffPrimaryColor?: string | null;
+  liffBackgroundColor?: string | null;
+  liffHeadingFont?: LiffHeadingFont;
+  liffCalendarMode?: LiffCalendarMode;
+  liffVacancyDots?: boolean;
   businessHours?: Array<{ weekday: number; intervals: BookingInterval[] }>;
 }
 
@@ -189,6 +224,12 @@ export async function getBookingAdminSettings(
         reminder_day_before_time: string | null;
         reminder_hours_before: number | null;
         liff_date_view?: string | null;
+        liff_theme?: string | null;
+        liff_primary_color?: string | null;
+        liff_background_color?: string | null;
+        liff_heading_font?: string | null;
+        liff_calendar_mode?: string | null;
+        liff_vacancy_dots?: number | null;
         business_hours_configured: number;
         version: number;
         updated_at: string;
@@ -213,6 +254,9 @@ export async function getBookingAdminSettings(
   ]);
   if (!account) return null;
 
+  // migration 562 前の行（列が無い）や壊れた値は既定に倒す。
+  const primaryColor = normalizeLiffColor(setting?.liff_primary_color);
+  const backgroundColor = normalizeLiffColor(setting?.liff_background_color);
   const grouped = new Map<number, BookingInterval[]>();
   for (let weekday = 0; weekday <= 6; weekday++) grouped.set(weekday, []);
   for (const row of hoursResult.results ?? []) {
@@ -243,6 +287,16 @@ export async function getBookingAdminSettings(
       setting?.reminder_hours_before ?? DEFAULT_SETTINGS.reminderHoursBefore,
     ),
     liffDateView: normalizeLiffDateView(setting?.liff_date_view),
+    liffTheme: normalizeLiffTheme(setting?.liff_theme ?? LIFF_THEME_DEFAULT),
+    liffPrimaryColor: primaryColor === 'invalid' ? null : primaryColor,
+    liffBackgroundColor: backgroundColor === 'invalid' ? null : backgroundColor,
+    liffHeadingFont: normalizeLiffHeadingFont(setting?.liff_heading_font ?? LIFF_HEADING_FONT_DEFAULT),
+    liffCalendarMode: normalizeLiffCalendarMode(
+      setting?.liff_calendar_mode ?? LIFF_CALENDAR_MODE_DEFAULT,
+    ),
+    liffVacancyDots: setting?.liff_vacancy_dots === undefined || setting?.liff_vacancy_dots === null
+      ? true
+      : setting.liff_vacancy_dots !== 0,
     menuCount,
     activeMenuCount,
     inactiveMenuCount: Math.max(0, menuCount - activeMenuCount),
@@ -261,6 +315,15 @@ export async function getBookingAdminSettings(
  * 孤立した設定行を作らない。既存行は line_account_id と version の両方を
  * UPDATE 条件に含め、読んだ後に別の保存が入った場合は上書きしない。
  */
+/**
+ * migration 562 の列が無い古い DB か。作るだけで適用は後なので、
+ * 見た目の指定が無い従来の保存は古い DB でも通す。見た目を指定した
+ * 保存が古い DB に来たら黙って捨てずに投げる（適用待ちが分かる）。
+ */
+function isMissingLiffLookColumn(error: unknown): boolean {
+  return error instanceof Error && /(?:no such column|has no column named)/i.test(error.message);
+}
+
 export async function saveBookingAdminSettings(
   db: D1Database,
   input: BookingAdminSettingsInput & {
@@ -273,42 +336,86 @@ export async function saveBookingAdminSettings(
   | { status: 'not_found' }
 > {
   const now = jstNow();
-  let changed = 0;
-  if (input.expectedVersion === 0) {
-    const settingsId = crypto.randomUUID();
-    const create = db.prepare(`INSERT INTO booking_settings
+  // 見た目の指定があるか（null も「型の色に戻す」という指定）。
+  const hasLiffLook = input.liffTheme !== undefined
+    || input.liffPrimaryColor !== undefined
+    || input.liffBackgroundColor !== undefined
+    || input.liffHeadingFont !== undefined
+    || input.liffCalendarMode !== undefined
+    || input.liffVacancyDots !== undefined;
+
+  // 省いた見た目は今の値を保つ（直書きで null を消せるよう COALESCE は使わない）。
+  const liffSetClauses: string[] = [];
+  const liffBinds: Array<string | number | null> = [];
+  const pushLiffSet = (column: string, value: string | number | null | undefined) => {
+    if (value === undefined) return;
+    liffSetClauses.push(`${column} = ?`);
+    liffBinds.push(value);
+  };
+  pushLiffSet('liff_theme', input.liffTheme);
+  pushLiffSet('liff_primary_color', input.liffPrimaryColor);
+  pushLiffSet('liff_background_color', input.liffBackgroundColor);
+  pushLiffSet('liff_heading_font', input.liffHeadingFont);
+  pushLiffSet('liff_calendar_mode', input.liffCalendarMode);
+  pushLiffSet(
+    'liff_vacancy_dots',
+    input.liffVacancyDots === undefined ? undefined : input.liffVacancyDots ? 1 : 0,
+  );
+  const liffSetSql = liffSetClauses.length > 0 ? `,\n          ${liffSetClauses.join(',\n          ')}` : '';
+
+  const attempt = async (withLiffLook: boolean): Promise<number> => {
+    const setSql = withLiffLook ? liffSetSql : '';
+    const binds = withLiffLook ? liffBinds : [];
+    if (input.expectedVersion === 0) {
+      const settingsId = crypto.randomUUID();
+      const createColumns = withLiffLook
+        ? `, liff_theme, liff_primary_color, liff_background_color,
+       liff_heading_font, liff_calendar_mode, liff_vacancy_dots`
+        : '';
+      const createValues = withLiffLook ? `, ?, ?, ?, ?, ?, ?` : '';
+      const create = db.prepare(`INSERT INTO booking_settings
       (id, line_account_id, timezone, booking_window_days, cutoff_minutes_before,
        cancel_deadline_minutes_before, max_active_bookings_per_friend,
        approval_mode, hold_minutes, slot_granularity_minutes,
        reminder_day_before_time, reminder_hours_before, liff_date_view,
-       business_hours_configured,
+       business_hours_configured${createColumns},
        created_at, updated_at)
-      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${createValues}, ?, ?
       FROM line_accounts
       WHERE id = ?
       ON CONFLICT(line_account_id) DO NOTHING`)
-      .bind(
-        settingsId,
-        input.timeZone,
-        input.bookingWindowDays,
-        input.cutoffMinutesBefore,
-        input.cancelDeadlineMinutesBefore,
-        input.maxActiveBookingsPerFriend,
-        input.approvalMode,
-        input.holdMinutes,
-        input.slotGranularityMinutes,
-        input.reminderDayBeforeTime,
-        input.reminderHoursBefore,
-        input.liffDateView ?? 'list',
-        input.businessHours === undefined ? 0 : 1,
-        now,
-        now,
-        input.lineAccountId,
-      );
-    if (input.businessHours === undefined) {
-      const result = await create.run();
-      changed = result.meta.changes ?? 0;
-    } else {
+        .bind(
+          settingsId,
+          input.timeZone,
+          input.bookingWindowDays,
+          input.cutoffMinutesBefore,
+          input.cancelDeadlineMinutesBefore,
+          input.maxActiveBookingsPerFriend,
+          input.approvalMode,
+          input.holdMinutes,
+          input.slotGranularityMinutes,
+          input.reminderDayBeforeTime,
+          input.reminderHoursBefore,
+          input.liffDateView ?? 'list',
+          input.businessHours === undefined ? 0 : 1,
+          ...(withLiffLook
+            ? [
+              input.liffTheme ?? 'line',
+              input.liffPrimaryColor ?? null,
+              input.liffBackgroundColor ?? null,
+              input.liffHeadingFont ?? 'default',
+              input.liffCalendarMode ?? 'week_first',
+              input.liffVacancyDots === undefined ? 1 : input.liffVacancyDots ? 1 : 0,
+            ]
+            : []),
+          now,
+          now,
+          input.lineAccountId,
+        );
+      if (input.businessHours === undefined) {
+        const result = await create.run();
+        return result.meta.changes ?? 0;
+      }
       const statements: D1PreparedStatement[] = [create];
       for (const day of input.businessHours) {
         for (const interval of day.intervals) {
@@ -323,60 +430,61 @@ export async function saveBookingAdminSettings(
         }
       }
       const results = await db.batch(statements);
-      changed = results[0]?.meta.changes ?? 0;
+      return results[0]?.meta.changes ?? 0;
     }
-  } else if (input.businessHours !== undefined) {
-    const statements: D1PreparedStatement[] = [
-      db.prepare(`DELETE FROM booking_business_hours
+    if (input.businessHours !== undefined) {
+      const statements: D1PreparedStatement[] = [
+        db.prepare(`DELETE FROM booking_business_hours
         WHERE booking_settings_id IN (
           SELECT id FROM booking_settings WHERE line_account_id = ? AND version = ?
         )`).bind(input.lineAccountId, input.expectedVersion),
-    ];
-    for (const day of input.businessHours) {
-      for (const interval of day.intervals) {
-        statements.push(db.prepare(`INSERT INTO booking_business_hours
+      ];
+      for (const day of input.businessHours) {
+        for (const interval of day.intervals) {
+          statements.push(db.prepare(`INSERT INTO booking_business_hours
           (id, booking_settings_id, weekday, start_time, end_time, capacity)
           SELECT ?, id, ?, ?, ?, ? FROM booking_settings
           WHERE line_account_id = ? AND version = ?`)
-          .bind(
-            crypto.randomUUID(), day.weekday, interval.start, interval.end,
-            interval.capacity ?? 1, input.lineAccountId, input.expectedVersion,
-          ));
+            .bind(
+              crypto.randomUUID(), day.weekday, interval.start, interval.end,
+              interval.capacity ?? 1, input.lineAccountId, input.expectedVersion,
+            ));
+        }
       }
-    }
-    statements.push(db.prepare(`UPDATE booking_settings
+      statements.push(db.prepare(`UPDATE booking_settings
       SET timezone = ?, booking_window_days = ?, cutoff_minutes_before = ?,
           cancel_deadline_minutes_before = ?, max_active_bookings_per_friend = ?,
           approval_mode = ?, hold_minutes = ?, slot_granularity_minutes = ?,
           reminder_day_before_time = ?, reminder_hours_before = ?,
-          liff_date_view = COALESCE(?, liff_date_view),
+          liff_date_view = COALESCE(?, liff_date_view)${setSql},
           business_hours_configured = 1, version = version + 1, updated_at = ?
       WHERE line_account_id = ? AND version = ?`)
-      .bind(
-        input.timeZone,
-        input.bookingWindowDays,
-        input.cutoffMinutesBefore,
-        input.cancelDeadlineMinutesBefore,
-        input.maxActiveBookingsPerFriend,
-        input.approvalMode,
-        input.holdMinutes,
-        input.slotGranularityMinutes,
-        input.reminderDayBeforeTime,
-        input.reminderHoursBefore,
-        input.liffDateView ?? null,
-        now,
-        input.lineAccountId,
-        input.expectedVersion,
-      ));
-    const results = await db.batch(statements);
-    changed = results[results.length - 1]?.meta.changes ?? 0;
-  } else {
+        .bind(
+          input.timeZone,
+          input.bookingWindowDays,
+          input.cutoffMinutesBefore,
+          input.cancelDeadlineMinutesBefore,
+          input.maxActiveBookingsPerFriend,
+          input.approvalMode,
+          input.holdMinutes,
+          input.slotGranularityMinutes,
+          input.reminderDayBeforeTime,
+          input.reminderHoursBefore,
+          input.liffDateView ?? null,
+          ...binds,
+          now,
+          input.lineAccountId,
+          input.expectedVersion,
+        ));
+      const results = await db.batch(statements);
+      return results[results.length - 1]?.meta.changes ?? 0;
+    }
     const result = await db.prepare(`UPDATE booking_settings
       SET timezone = ?, booking_window_days = ?, cutoff_minutes_before = ?,
           cancel_deadline_minutes_before = ?, max_active_bookings_per_friend = ?,
           approval_mode = ?, hold_minutes = ?, slot_granularity_minutes = ?,
           reminder_day_before_time = ?, reminder_hours_before = ?,
-          liff_date_view = COALESCE(?, liff_date_view),
+          liff_date_view = COALESCE(?, liff_date_view)${setSql},
           version = version + 1, updated_at = ?
       WHERE line_account_id = ? AND version = ?`)
       .bind(
@@ -391,12 +499,22 @@ export async function saveBookingAdminSettings(
         input.reminderDayBeforeTime,
         input.reminderHoursBefore,
         input.liffDateView ?? null,
+        ...binds,
         now,
         input.lineAccountId,
         input.expectedVersion,
       )
       .run();
-    changed = result.meta.changes ?? 0;
+    return result.meta.changes ?? 0;
+  };
+
+  let changed: number;
+  try {
+    changed = await attempt(true);
+  } catch (error) {
+    // migration 562 未適用の DB では見た目の指定が無い保存だけ通す。
+    if (!isMissingLiffLookColumn(error) || hasLiffLook) throw error;
+    changed = await attempt(false);
   }
 
   if (changed > 0) {

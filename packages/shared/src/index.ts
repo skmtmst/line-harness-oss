@@ -18,6 +18,7 @@ export * from "./template-message";
 export * from "./broadcast-asset-conversion";
 export * from "./feature-catalog";
 export * from "./rich-menu";
+export * from "./liff-look";
 export * from "./automation-labels";
 export * from "./automation-draft-options";
 export * from "./ec-events";
