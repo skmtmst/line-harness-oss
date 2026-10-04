@@ -51,11 +51,11 @@ describe('選んだ札6か所は白＋緑（黒をなくす #4）', () => {
     expectWhiteGreen(selectedRule(css, /\.phoneCatNow \{[^}]*\}/s, 'booking'), 'booking')
   })
 
-  it('共通の札', () => {
+  it('共通のV8札は書き出し正本 XGJDa の墨地・白文字に合わせる', () => {
     const css = readFileSync(join(HERE, 'filter-chip.css'), 'utf8')
-    expectWhiteGreen(
-      selectedRule(css, /\[data-theme='v8'\] \.v6-filter-chip\[aria-pressed='true'\] \{[^}]*\}/s, 'shared'),
-      'shared',
-    )
+    // 2026-10-05 controls：共通部品は最新の正本HTML優先。画面固有の札はこのレーンでは変更しない。
+    const rule = selectedRule(css, /\[data-theme='v8'\] \.v6-filter-chip\[aria-pressed='true'\] \{[^}]*\}/s, 'shared')
+    expect(rule).toMatch(/background:\s*var\(--color-ink\)/)
+    expect(rule).toMatch(/color:\s*var\(--color-on-accent\)/)
   })
 })
