@@ -725,8 +725,10 @@ export default function AutomationsPage() {
             title={automations.length === 0
               ? (tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。')
               : '条件に合うオートメーションはありません。'}
-            description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。' : '検索語や絞り込みを変えてください。'}
-            action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : undefined}
+            description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。見本から作ると、よくある決めごと（友だち追加のお礼など）がすぐ始められます。' : '検索や絞り込みの条件を外すと、すべて出ます。'}
+            action={automations.length === 0
+              ? (tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : undefined)
+              : <Button variant="secondary" onClick={() => { setSearchQuery(''); setPage(1) }}>条件を外す</Button>}
           />
         </div>
       ) : (
