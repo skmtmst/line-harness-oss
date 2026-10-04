@@ -11,7 +11,7 @@ import type { OpsSupportDetail } from '@/lib/api'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 const mocks = vi.hoisted(() => ({ list: vi.fn(), article: vi.fn(), update: vi.fn(), review: vi.fn(), feedback: vi.fn(), retry: vi.fn() }))
 vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/api')>(), api: { ops: { knowledge: mocks } } }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/ops/knowledge' }))
+vi.mock('next/navigation', () => ({ usePathname: () => '/ops/knowledge', useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 
 const article: OpsKnowledgeArticle = {
@@ -193,6 +193,16 @@ describe('V6 knowledge UI', () => {
 
 
 describe('V8 ナレッジの集計範囲', () => {
+  it('一覧から開くと記事画面になり、開いただけでは保存・承認しない', async () => {
+    await act(async () => root.render(<OpsKnowledgePage />)); await flush()
+    await act(async () => button('開く').click()); await flush()
+    expect(host.querySelector('[data-design-node="R5ckwJ"]')).not.toBeNull()
+    expect(host.querySelector('aside')?.textContent).toContain('解決の根拠')
+    expect(mocks.update).not.toHaveBeenCalled()
+    expect(mocks.review).not.toHaveBeenCalled()
+    await act(async () => button('保存して承認').click())
+    expect(document.querySelector('[data-design-node="eSXxA"]')).not.toBeNull()
+  })
   it('全件の総数とこのページの数を区別し、開いただけでは承認しない', async () => {
     document.documentElement.dataset.theme = 'v8'
     try {
