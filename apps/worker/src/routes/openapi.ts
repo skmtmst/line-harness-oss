@@ -6289,6 +6289,22 @@ const spec = {
           '200': { description: '前払いのみにした・外した結果' },
           '400': { description: 'account_id 未指定・印を外すとき理由が無い' },
           '404': { description: '対象が見つからない' },
+        },
+      },
+      delete: {
+        tags: ['Booking'],
+        summary: 'お客さまの前払いのみを手で外して自動に戻す',
+        parameters: [
+          { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '自動に戻した結果' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
     // ── Booking plus (booking-plus 1・2・6：繰り返し予約・待ち・今日の一覧) ──
     '/api/booking/admin/last-booking': {
       get: {
