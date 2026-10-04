@@ -840,9 +840,9 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
     return (
       <StateCard
         icon={<AccountIcon />}
-        title="メニューを読み込めませんでした"
+        title="予約設定を読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>読み直す</Button>}
+        action={<Button onClick={onReload}>もう一度試す</Button>}
       />
     )
   }
@@ -886,7 +886,8 @@ function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onRel
         <StateCard
           icon={<AccountIcon />}
           title="条件に合うメニューはありません"
-          description="探す言葉を変えるか、絞り込みを外してください。"
+          description="検索を外すと、すべて出ます。"
+          action={<Button variant="secondary" onClick={() => { setQuery(''); setPage(1) }}>条件を外す</Button>}
         />
       ) : (
         <section className={styles.section}>
