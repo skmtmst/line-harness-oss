@@ -14,6 +14,7 @@ import { hqTemplatesApi, type TemplateType, type TemplateDetail, type TemplateIn
 import styles from './template-console.module.css'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
 import TemplateDefinitionEditor, { definitionError, definitionForName, definitionName, freshDefinition, referenceCount } from './template-definition-editor'
+import TemplateMessageFormV8 from './template-message-v8'
 import { formatDateTime } from '@/lib/format'
 
 const LABELS: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム' }
@@ -390,7 +391,26 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
         <div className={styles.panel}><table className={styles.table}><thead><tr><Th style={{ width: '28%' }}>名前</Th><Th className={styles.optional}>参照先</Th><Th className={styles.optional}>更新日時</Th><Th>配布先</Th><Th style={{ width: '12%' }}>操作</Th></tr></thead><tbody>{templates.filter(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())).map(row => <tr key={row.id}><td data-label="名前"><span className={styles.name} title={row.name}>{row.name}</span><small className={styles.muted}>{LABELS[row.template_type]}</small></td><td data-label="参照先" className={styles.optional}><span className={styles.name} title={row.reference_summary}>{row.reference_summary ?? '—'}</span></td><td data-label="更新日時" className={styles.optional}>{formatDate(row.updated_at)}</td><td data-label="配布先">{row.distributed_account_count === undefined ? '—' : row.distributed_account_count ? `${row.distributed_account_count}アカウント` : '未配布'}</td><td data-label="操作"><TemplateRowMenu name={row.name} busy={busy} onEdit={() => open(row.id, 'edit')} onDistribute={() => open(row.id, 'accounts')} onRemove={() => setRemove(row)} /></td></tr>)}</tbody></table>{!templates.some(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && <p className={styles.empty}>{templates.length ? '検索に一致するひな形はありません。' : 'まだひな形がありません。最初のひな形を作成してください。'}</p>}</div>
       </>}
     </>}
-    {stage === 'edit' && <>
+    {stage === 'edit' && theme === 'v8' && type === 'template' && 'template' in definition && <>
+      {/* 板 X4JcOf（V8だけ）：絵の「ひな形の中身＋右に LINE の見え方＋一段のひな形を保存」。保存する中身は今の口のまま。 */}
+      <TemplateMessageFormV8
+        key={formKey}
+        name={name}
+        onNameChange={setName}
+        value={definition}
+        onChange={setDefinition}
+        disabled={busy || createUncertain}
+        busy={busy}
+        validation={validation}
+        createUncertain={createUncertain}
+        catalogFailed={catalogFailed}
+        onReloadCatalog={reloadCatalog}
+        onBusyChange={setUploadBusy}
+        onReceipt={noteSessionUpload}
+        onSave={() => save(false)}
+      />
+    </>}
+    {stage === 'edit' && !(theme === 'v8' && type === 'template') && <>
       {/* 正規エディタ（タグ/回答フォーム）は右asideを持たないため、空の260px段を残さない。谷間帯（1280〜1400px）で入力欄が潰れるのを防ぐ。 */}
       <div className={canonicalEditorOwnsSave ? styles.stack : styles.grid}><div className={styles.stack}><section className={styles.panel}>
         {catalogFailed ? (
