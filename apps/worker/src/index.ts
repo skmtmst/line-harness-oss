@@ -2226,15 +2226,19 @@ async function scheduled(
        * 採用直後・手動の再試行で届かなかった分を、期限の来た順に届け直す。
        * EC接続が未設定の環境では何もしない（行は「要対応」として一覧に残る）。
        */
-      const { processDuePhotoRewards, ecPhotoPointClientFromEnv } = await import('./services/photo-reward-sync.js');
+      const { processDuePhotoRewards, processDuePhotoPublicationRewards, ecPhotoPointClientFromEnv } = await import('./services/photo-reward-sync.js');
       const photoRewards = await processDuePhotoRewards(
         env.DB,
         ecPhotoPointClientFromEnv(env),
         { now: new Date() },
       );
+      const publicationRewards = await processDuePhotoPublicationRewards(
+        env.DB, ecPhotoPointClientFromEnv(env), { now: new Date() },
+      );
       if (birthday.queued + birthday.failed + result.sent + result.failed + result.skipped
-        + result.deferred + photoRewards.synced + photoRewards.failed + photoRewards.skipped > 0) {
-        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, photoRewardSynced: photoRewards.synced, photoRewardFailed: photoRewards.failed, ...result }));
+        + result.deferred + photoRewards.synced + photoRewards.failed + photoRewards.skipped
+        + publicationRewards.synced + publicationRewards.failed > 0) {
+        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, photoPublicationRewardSynced: publicationRewards.synced, photoPublicationRewardFailed: publicationRewards.failed, photoRewardSynced: photoRewards.synced, photoRewardFailed: photoRewards.failed, ...result }));
       }
     });
   } catch (e) {

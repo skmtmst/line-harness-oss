@@ -2585,3 +2585,10 @@ export interface LineAccountRegistrationTag { id: string; name: string; color: s
 export interface AdPlatformConnectResult { id: string; connected: true; verifiedAt: string }
 
 export interface AutoReplyOperatorNotificationConfig { notificationRuleId: string; notificationRuleVersion: number; message: string }
+
+/** V8: 全掲載の順序と、読み込んだ時点の版。 */
+export type PhotoPublicationOrderInput = {
+  accountId: string;
+  items: Array<{ id: string; expectedVersion: number }>;
+};
+export type PhotoPublicationPublishResult = { id: string; version: number; status: 'published' };

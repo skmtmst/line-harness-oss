@@ -1836,3 +1836,16 @@ describe('実行結果の期間指定', () => {
     }
   });
 });
+
+// V8: 掲載順と掲載の契約を実際のfetch引数で確かめる。
+it('掲載順と新規掲載のID・版・冪等キーをWorkerへ渡す', async () => {
+  const fetcher = vi.fn(async (_url: unknown, _init?: RequestInit) => new Response(JSON.stringify({success:true,data:{items:[]}}),{status:200,headers:{'Content-Type':'application/json'}}))
+  vi.stubGlobal('fetch',fetcher)
+  await api.nenMembers.photoPublicationOrder('account a')
+  await api.nenMembers.savePhotoPublicationOrder({accountId:'account a',items:[{id:'pub',expectedVersion:2}]})
+  await api.nenMembers.publishPhoto('photo/a',{accountId:'account a',expectedVersion:0},'publication-key')
+  expect(String(fetcher.mock.calls[0][0])).toContain('/publications/order?accountId=account%20a')
+  expect(fetcher.mock.calls[1][1]).toMatchObject({method:'PUT',body:JSON.stringify({accountId:'account a',items:[{id:'pub',expectedVersion:2}]})})
+  expect(String(fetcher.mock.calls[2][0])).toContain('/photos/photo%2Fa/publish')
+  expect(fetcher.mock.calls[2][1]).toMatchObject({method:'POST',headers:expect.objectContaining({'Idempotency-Key':'publication-key'})})
+})

@@ -157,3 +157,4 @@ export * from './integration-api-tokens';
 export * from './web-measurement';
 
 export * from './line-account-tags';
+export * from './photo-publications';

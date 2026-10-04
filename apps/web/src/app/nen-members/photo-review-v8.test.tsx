@@ -17,6 +17,10 @@ const nenMembers = vi.hoisted(() => ({
   bulkReviewPhotos: vi.fn(),
   retryPhotoReviewNotification: vi.fn(),
   withdrawPhotoPublication: vi.fn(),
+  photoPublicationOrder: vi.fn(),
+  savePhotoPublicationOrder: vi.fn(),
+  photo: vi.fn(),
+  publishPhoto: vi.fn(),
 }))
 const staffMe = vi.hoisted(() => ({ me: vi.fn() }))
 
@@ -137,4 +141,36 @@ describe('投稿 V8', () => {
     expect(screen.getByRole('button', { name: '掲載先から外す' })).toBeTruthy()
     expect(screen.getByText('出すときの決めごと')).toBeTruthy()
   })
+})
+
+it('V8の掲載順を動かして、読み込んだ版と全件を送る', async () => {
+  staffMe.me.mockResolvedValue({ success: true, data: { role: 'owner' } })
+  mockAll()
+  nenMembers.photoPublicationOrder.mockResolvedValue({success:true,data:{items:[{...publication,pet_name:'こむぎ'},{...publication,id:'pub2',pet_name:'あずき',version:4}]}})
+  nenMembers.savePhotoPublicationOrder.mockResolvedValue({success:true,data:{items:[]}})
+  render(<PhotoReviewV8 accountId="account-a" />)
+  await screen.findByText('散歩のあと', {exact:false})
+  fireEvent.click(screen.getByRole('tab',{name:'公式サイト掲載'}))
+  fireEvent.click(await screen.findByRole('button',{name:'並び順を変える'}))
+  fireEvent.click(await screen.findByRole('button',{name:'あずきを上へ'}))
+  fireEvent.click(screen.getByRole('button',{name:'並び順を保存する'}))
+  await flush()
+  expect(nenMembers.savePhotoPublicationOrder).toHaveBeenCalledWith({accountId:'account-a',items:[{id:'pub2',expectedVersion:4},{id:'pub1',expectedVersion:1}]})
+})
+
+it('採用済み写真は現在の掲載版を読み、確認してから新規掲載する', async () => {
+  staffMe.me.mockResolvedValue({ success: true, data: { role: 'owner' } })
+  mockAll()
+  fetchPhotos.mockResolvedValue({success:true,data:[{...photo,status:'adopted',publication_consent_at:'2026-10-01'}]})
+  nenMembers.photo.mockResolvedValue({success:true,data:{publication:null}})
+  nenMembers.publishPhoto.mockResolvedValue({success:true,data:{version:1}})
+  render(<PhotoReviewV8 accountId="account-a" />)
+  await flush()
+  fireEvent.click(await screen.findByRole('tab',{name:/採用/}))
+  fireEvent.click(await screen.findByRole('button',{name:'公式サイトに出す'}))
+  expect(await screen.findByText('公式サイトに掲載しますか？')).toBeTruthy()
+  expect(nenMembers.publishPhoto).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button',{name:'公式サイトに掲載する'}))
+  await flush()
+  expect(nenMembers.publishPhoto).toHaveBeenCalledWith('p1',{accountId:'account-a',expectedVersion:0},expect.any(String))
 })

@@ -506,7 +506,8 @@
     "556_f13_folder_kinds.sql",
     "564_form_versions_purge_delete.sql",
     "576_v8_event_venue_address.sql",
-    "577_v8_site_receipt.sql"
+    "577_v8_site_receipt.sql",
+    "578_v8_photo_publication_rewards.sql"
   ],
-  "migrationCount": 507
+  "migrationCount": 508
 }

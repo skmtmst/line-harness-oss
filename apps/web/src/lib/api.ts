@@ -5330,6 +5330,7 @@ export type NenPhotoDetail = Record<string, unknown> & {
 
 /** #817: 報酬の決まりの版の1行。 */
 export type PhotoRewardPolicyVersion = {
+  publicationPoints?: number
   versionNumber: number
   policyKey: string
   points: number
@@ -11449,6 +11450,19 @@ export const api = {
     photoPublications: (accountId: string) => fetchApi<ApiResponse<NenPhotoPublicationList>>(
       `/api/nen-members/photos/publications?accountId=${encodeURIComponent(accountId)}`,
     ),
+    photoPublicationOrder: (accountId: string) =>
+      fetchApi<ApiResponse<{ items: Array<{id: string; version: number; pet_name: string}> }>>(
+        `/api/nen-members/photos/publications/order?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    savePhotoPublicationOrder: (data: import('@line-crm/shared').PhotoPublicationOrderInput) =>
+      fetchApi<ApiResponse<{ items: Array<{id: string; version: number; sortOrder: number}> }>>(
+        '/api/nen-members/photos/publications/order', { method: 'PUT', body: JSON.stringify(data) },
+      ),
+    publishPhoto: (id: string, data: { accountId: string; expectedVersion: number }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<import('@line-crm/shared').PhotoPublicationPublishResult>>(
+        `/api/nen-members/photos/${encodeURIComponent(id)}/publish`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
+      ),
     withdrawPhotoPublication: (id: string, data: { accountId: string; expectedVersion: number }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ status: 'withdrawn'; version: number }>>(
         `/api/nen-members/photos/publications/${encodeURIComponent(id)}/withdraw`,
@@ -11493,6 +11507,7 @@ export const api = {
       '/api/nen-members/photo-reward-policy/versions',
     ),
     createPhotoRewardPolicyVersion: (data: {
+      publicationPoints?: number
       points: number
       summary?: string
       effectiveFrom?: string | null
