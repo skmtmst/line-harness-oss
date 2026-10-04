@@ -64,7 +64,8 @@ describe('ListRange 統一（監査6 #667）', () => {
   it.each(LIST_RANGE_USERS.map(([name, path]) => ({ name, path })))(
     '$name に旧い書き方の残骸がない',
     ({ path }) => {
-      const source = read(path)
+      // 説明コメントの「7つのうち」は件数表示ではない。
+      const source = read(path).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(?<!:)\/\/[^\n]*/g, '')
       for (const pattern of RAW_PATTERNS) {
         expect(source, `${path} が ${pattern} を含む`).not.toMatch(pattern)
       }
