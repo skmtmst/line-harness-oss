@@ -1061,7 +1061,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                       type="button"
                       onClick={() => setBreakRows((current) => current.filter((item) => item.key !== row.key))}
                       className={styles.trashButton}
-                      aria-label={`${weekdayName(row.weekday)} ${row.start}〜${row.end} の休憩を消す`}
+                      aria-label={`${weekdayName(row.weekday)} ${row.start}〜${row.end} の休憩を削除`}
                     >
                       <TrashIcon />
                     </button>
@@ -1124,7 +1124,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                           type="button"
                           onClick={() => setRemoveTarget(row)}
                           className={styles.trashButton}
-                          aria-label={`${formatDay(row.date)} の${row.kind === 'exception' ? '休み' : row.kind === 'shift' ? 'シフト' : '休憩'}を消す`}
+                          aria-label={`${formatDay(row.date)} の${row.kind === 'exception' ? '休み' : row.kind === 'shift' ? 'シフト' : '休憩'}を削除`}
                         >
                           <TrashIcon />
                         </button>
@@ -1328,10 +1328,10 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
           ? `「${formatDay(removeTarget.date)}」の${removeTarget.kind === 'exception' ? '休み' : removeTarget.kind === 'shift' ? 'シフト' : '休憩'}を消しますか？`
           : ''}
         description={removeTarget?.kind === 'exception'
-          ? 'この日の休みを消すと、いつもの勤務時間どおりに枠が出ます。この操作は取り消せません。'
+          ? 'この日の休みを削除と、いつもの勤務時間どおりに枠が出ます。この操作は取り消せません。'
           : removeTarget?.kind === 'break'
             ? 'この日だけの休憩を消します。この操作は取り消せません。'
-            : 'この日のシフトを消すと、いつもの勤務時間どおりに枠が出ます。この操作は取り消せません。'}
+            : 'この日のシフトを削除と、いつもの勤務時間どおりに枠が出ます。この操作は取り消せません。'}
         confirmLabel="削除する"
         destructive
         busy={deleting}
