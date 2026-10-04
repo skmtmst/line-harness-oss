@@ -86,10 +86,11 @@ describe('V8 移行④a — 基本の操作系', () => {
     expect(blocks).toContain('var(--motion-fast)')
   })
 
-  it('絞り込みの札：高さ30・選ぶと墨の地に白文字（緑ではない）', () => {
+  it('絞り込みの札：高さ30・選ぶと白＋緑（オーナー「黒がいや」）', () => {
     const blocks = v8Blocks(css('filter-chip.css'), 'filter-chip')
     expect(blocks).toContain('height: 30px')
-    expect(blocks).toContain('background: var(--color-ink)')
+    expect(blocks).toContain('background: var(--color-accent-soft)')
+    expect(blocks).toContain('color: var(--color-accent-deep)')
   })
 
   it('タグ：文字12・余白 2/8・中立は白地に ink-secondary', () => {

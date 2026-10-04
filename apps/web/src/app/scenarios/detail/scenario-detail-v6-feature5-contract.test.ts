@@ -254,7 +254,7 @@ describe('配信対象の言い表し方', () => {
     /*
      * R236: pause は人が再開するまで止まるだけ。返信で自動再開しないのに
      * 「返信まで」と書くと、返信を待てば続くと誤解される。編集欄の
-     * 「送信後：ここで一時停止する」と同じ意味の文言にそろえる。
+     * 「送信後：ここで止める」と同じ意味の文言にそろえる。
      */
     expect(describeAfterSend('pause')).toEqual({ label: '送信後に一時停止', paused: true })
   })
@@ -280,7 +280,7 @@ describe('通の編集を設計の段へ分ける', () => {
   it('「送信後」は配信タイミングの段に置く。到達タグと同じ束に戻さない', () => {
     const timing = slice(stepForm, 'node="xfYLn"', '</FormSection>')
     expect(timing).toContain('送信後：次のステップへ進む')
-    expect(timing).toContain('送信後：ここで一時停止する')
+    expect(timing).toContain('送信後：ここで止める')
     expect(timing).not.toContain('到達したらタグ付与')
 
     const afterSendSection = slice(stepForm, 'node="hz9ti"', '</FormSection>')

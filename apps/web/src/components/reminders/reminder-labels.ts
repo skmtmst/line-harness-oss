@@ -56,6 +56,8 @@ function placeholderSource(key: string): string {
   if (key === 'uid') return 'LINEユーザーID'
   if (key === 'friend_id') return '友だちID'
   if (key === 'ref') return '友だちの紹介コード'
+  if (key === 'meet_url') return '個別相談のMeet URL'
+  if (key === 'reservation_datetime') return '個別相談の予約日時'
   if (key.startsWith('field.')) return '友だち情報欄'
   if (key.startsWith('var.')) return '共通変数'
   if (key.startsWith('metadata.')) return '友だちのメタデータ'
@@ -67,7 +69,7 @@ function placeholderSource(key: string): string {
  * date は `{{date}}` のほか `{{date:ymd}}` などの書き方・`{{date+7}}` も
  * 届く日時に置き換わるので、確認表から落とさない。
  */
-const PLACEHOLDER_PATTERN = /\{\{(name|uid|friend_id|ref|date(?::[a-z_]+)?|date\+\d+|days_until:[^}]+|field\.[a-z0-9_]+|var\.[a-z0-9_]+|metadata\.[^}]+)\}\}/g
+const PLACEHOLDER_PATTERN = /\{\{(name|uid|friend_id|ref|date(?::[a-z_]+)?|date\+\d+|days_until:[^}]+|meet_url|reservation_datetime|field\.[a-z0-9_]+|var\.[a-z0-9_]+|metadata\.[^}]+)\}\}/g
 
 /*
  * 見本の基準日。2026-10-01 は木曜日。送信のたびに変わる値を
@@ -100,9 +102,11 @@ function formatSampleDate(base: Date, style: string | null): string {
  */
 export function renderReminderBodySample(content: string): string {
   return content.replace(
-    /\{\{(name|uid|friend_id|ref|date(?::[a-z_]+)?|date\+\d+|days_until:[^}]+|field\.[a-z0-9_]+|var\.[a-z0-9_]+|metadata\.[^}]+)\}\}/g,
+    /\{\{(name|uid|friend_id|ref|date(?::[a-z_]+)?|date\+\d+|days_until:[^}]+|meet_url|reservation_datetime|field\.[a-z0-9_]+|var\.[a-z0-9_]+|metadata\.[^}]+)\}\}/g,
     (token, key: string) => {
       if (key === 'name') return '山田花子'
+      if (key === 'meet_url') return 'https://meet.google.com/sample-0000'
+      if (key === 'reservation_datetime') return `${formatSampleDate(SAMPLE_BASE, null)} 10:00`
       if (key === 'uid') return 'U00000000000000000000000000000001'
       if (key === 'friend_id') return '11111111-1111-1111-1111-111111111111'
       if (key === 'ref') return 'mihon01'
