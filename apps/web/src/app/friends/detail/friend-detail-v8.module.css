@@ -1,0 +1,30 @@
+/* Q5F2QE.html: 名前 → タブ → 要点320px／概要 の順。 */
+.board { min-width: 0; container-type: inline-size; }
+.head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; padding-bottom: 20px; }
+.identity { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1; }
+.name { font-size: 20px; font-weight: 600; line-height: 27px; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subtitle { font-size: 13px; line-height: 20px; color: var(--color-ink-secondary); margin: 4px 0 0; overflow-wrap: anywhere; }
+.tabs { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--color-hairline); }
+.tabs a { padding: 0 0 12px; margin-right: 12px; font-size: 13px; }
+.overview { display: grid; grid-template-columns: 296px minmax(0, 1fr); }
+.profile { min-width: 0; border-right: 1px solid var(--color-hairline); padding: 20px 24px 20px 0; }
+.profile[hidden] { display: none; }
+.profileSections { display: flex; flex-direction: column; gap: 18px; }
+.profileSections > div { min-width: 0; }
+.profileSections > div > dl { margin-top: 8px; }
+.content { min-width: 0; padding: 20px 0 20px 28px; }
+.fullWidth > .content { padding-left: 0; }
+.summary { display: flex; flex-direction: column; gap: 22px; }
+.summarySections { display: flex; flex-direction: column; gap: 22px; }
+.section { min-width: 0; }
+.summarySections > section + section { padding: 12px 14px; border-radius: 12px; background: var(--color-surface-pearl); }
+@container (max-width: 950px) {
+  .overview { grid-template-columns: 256px minmax(0, 1fr); }
+  .profile { padding-right: 20px; }
+  .content { padding-left: 20px; }
+}
+@container (max-width: 660px) {
+  .overview { grid-template-columns: minmax(0, 1fr); }
+  .profile { border-right: 0; border-bottom: 1px solid var(--color-hairline); padding-right: 0; }
+  .content { padding-left: 0; }
+}
