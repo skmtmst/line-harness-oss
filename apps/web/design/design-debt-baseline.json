@@ -477,6 +477,9 @@
   "app/restaurant-test/v8/inventory.tsx": {
     "unresolved-classname": 46
   },
+  "app/restaurant-test/v8/line-followup.tsx": {
+    "unresolved-classname": 24
+  },
   "app/restaurant-test/v8/menu.tsx": {
     "unresolved-classname": 24
   },
