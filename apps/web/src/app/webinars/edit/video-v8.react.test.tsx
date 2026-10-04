@@ -11,6 +11,10 @@ const apiMocks = vi.hoisted(() => ({
   editor: vi.fn(),
   update: vi.fn(),
   saveEditor: vi.fn(),
+  videoAsset: vi.fn(),
+  advanceVideoAsset: vi.fn(),
+  webinarSession: vi.fn(),
+  setSessionCapacity: vi.fn(),
 }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -21,11 +25,16 @@ vi.mock('@/lib/api', async (importOriginal) => {
       editor: apiMocks.editor,
       update: apiMocks.update,
       saveEditor: apiMocks.saveEditor,
+      videoAsset: apiMocks.videoAsset,
+      advanceVideoAsset: apiMocks.advanceVideoAsset,
+      webinarSession: apiMocks.webinarSession,
+      setSessionCapacity: apiMocks.setSessionCapacity,
     },
   }
 })
 
 vi.mock('@/components/webinars/webinar-form', () => ({ default: () => <div>詳細フォーム</div> }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: () => true }))
 
 import VideoV8 from './video-v8'
 import type { Webinar, WebinarEditor } from '@/lib/api'
@@ -56,7 +65,7 @@ const EDITOR = {
   actionPolicy: { templateBody: '', missingResultPolicy: 'retry_next_day' },
 } as WebinarEditor
 
-function render(): HTMLElement {
+function render(editor = EDITOR): HTMLElement {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
@@ -64,13 +73,12 @@ function render(): HTMLElement {
     root.render(
       <VideoV8
         webinar={WEBINAR}
-        editor={EDITOR}
+        editor={editor}
         publicUrl={null}
         canOpenPublicPage={false}
         publicPageReason="公開すると見られます"
         completionLabel="最大視聴位置が動画の90%（12:00）以上"
         onWebinarSaved={() => undefined}
-        onEditVideo={() => undefined}
       />,
     )
   })
@@ -79,6 +87,7 @@ function render(): HTMLElement {
 
 describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
   beforeEach(() => {
+    apiMocks.videoAsset.mockResolvedValue({ data: { asset: null } })
     apiMocks.editor.mockResolvedValue({ data: { version: 3 } })
     apiMocks.update.mockImplementation(async (_id: string, input: Record<string, unknown>) => ({
       data: { ...WEBINAR, ...input },
@@ -139,5 +148,27 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
     expect(apiMocks.update).toHaveBeenCalledTimes(1)
     const input = apiMocks.update.mock.calls[0][1] as { schedule: unknown[] }
     expect(input.schedule).toHaveLength(1)
+  })
+
+  it('開催日時指定では既存の開催回の定員と申込を取得して表示する', async () => {
+    apiMocks.webinarSession.mockResolvedValue({ data: { session: { capacity: 80, reservedCount: 32, remaining: 48, state: 'open' } } })
+    let host!: HTMLElement
+    await act(async () => { host = render({ ...EDITOR, deliveryKind: 'scheduled' }) })
+    expect(host.querySelector('[data-design-node="LPOe7"]')).not.toBeNull()
+    expect(apiMocks.webinarSession).toHaveBeenCalledWith('webinar-1', Math.floor(Date.parse(WEBINAR.schedule[1].at!) / 1000))
+    expect(host.textContent).toContain('80人')
+    expect(host.textContent).toContain('32人')
+    expect(host.textContent).toContain('残り 48人')
+    expect(host.textContent).toContain('毎日')
+  })
+
+  it('動画の処理状況を取得し、差し替え操作は動画詳細を開く', async () => {
+    apiMocks.videoAsset.mockResolvedValue({ data: { asset: { stage: 'inspecting' } } })
+    let host!: HTMLElement
+    await act(async () => { host = render() })
+    expect(host.querySelector('[aria-current="step"]')?.textContent).toBe('検査')
+    const replace = [...host.querySelectorAll('button')].find((button) => button.textContent === '差し替える')!
+    await act(async () => replace.click())
+    expect(host.querySelector('details')?.open).toBe(true)
   })
 })

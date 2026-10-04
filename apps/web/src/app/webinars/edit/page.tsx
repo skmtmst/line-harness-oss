@@ -972,7 +972,7 @@ function EditWebinarInner() {
               onWebinarSaved={handleWebinarSaved}
               onDirtyChange={dirtyReporterFor('video')}
               registerSave={saveRegistrarFor('video')}
-              onEditVideo={() => goStep('basic')}
+              onEditorChange={setEditor}
             />
         </div>
       ) : null}

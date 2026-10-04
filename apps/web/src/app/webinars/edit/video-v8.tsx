@@ -9,6 +9,10 @@ import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import WebinarForm from '@/components/webinars/webinar-form'
 import Disclosure from '@/components/shared/disclosure'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import VideoStages from './video-stages'
+import ScheduledSessionRow from './scheduled-session-row'
 import {
   webinarApi,
   describeSaveFailure,
@@ -64,7 +68,7 @@ export default function VideoV8({
   onWebinarSaved,
   onDirtyChange,
   registerSave,
-  onEditVideo,
+  onEditorChange,
 }: {
   webinar: Webinar
   editor: WebinarEditor
@@ -75,8 +79,33 @@ export default function VideoV8({
   onWebinarSaved: (next: Webinar) => void
   onDirtyChange?: (dirty: boolean) => void
   registerSave?: (save: (() => Promise<boolean>) | null) => void
-  onEditVideo: () => void
+  onEditorChange?: (next: WebinarEditor) => void
 }) {
+  const canEdit = canManageRole(useStaffRole())
+  const scheduled = editor.deliveryKind === 'scheduled'
+  const detailsRoot = useRef<HTMLDivElement>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [sessionEdits, setSessionEdits] = useState<ReadonlySet<string>>(new Set())
+  const sessionReporters = useRef(new Map<string, (editing: boolean) => void>())
+  const sessionReporter = (key: string) => {
+    let reporter = sessionReporters.current.get(key)
+    if (!reporter) {
+      reporter = (editing) => setSessionEdits((current) => {
+        if (current.has(key) === editing) return current
+        const next = new Set(current)
+        if (editing) next.add(key); else next.delete(key)
+        return next
+      })
+      sessionReporters.current.set(key, reporter)
+    }
+    return reporter
+  }
+  useEffect(() => {
+    if (!detailsOpen) return
+    const inner = detailsRoot.current?.querySelectorAll('details')[1]
+    if (inner) inner.open = true
+    detailsRoot.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [detailsOpen])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [menuOpen, setMenuOpen] = useState<number | null>(null)
@@ -103,6 +132,7 @@ export default function VideoV8({
   const [policyError, setPolicyError] = useState('')
 
   const saveSchedule = async (schedule: WebinarScheduleRule[]): Promise<boolean> => {
+    if (!canEdit || busy) return false
     setBusy(true)
     setError('')
     try {
@@ -168,7 +198,7 @@ export default function VideoV8({
   }
 
   const savePeriod = async (): Promise<boolean> => {
-    if (periodBusy) return false
+    if (!canEdit || periodBusy) return false
     if (!noEnd && endsAt && startsAt && new Date(toJstIso(endsAt)) <= new Date(toJstIso(startsAt))) {
       setPeriodError('公開の終了は開始より後にしてください。')
       return false
@@ -195,14 +225,16 @@ export default function VideoV8({
   }
 
   const savePolicy = async (next: 'escalate' | 'retry_next_day') => {
+    if (!canEdit || policyBusy) return
     setPolicy(next)
     setPolicyBusy(true)
     setPolicyError('')
     try {
-      await webinarApi.saveEditor(webinar.id, {
+      const response = await webinarApi.saveEditor(webinar.id, {
         expectedVersion: editor.version,
         missingResultPolicy: next,
       })
+      onEditorChange?.(response.data)
     } catch {
       setPolicyError('保存できませんでした。時間をおいてもう一度お試しください。')
     } finally {
@@ -217,20 +249,21 @@ export default function VideoV8({
   const saveCurrent = useRef<() => Promise<boolean>>(async () => true)
   saveCurrent.current = async () => {
     if (adding || bulk) { setError('追加中の配信枠を保存するか、キャンセルしてから進んでください。'); return false }
+    if (sessionEdits.size > 0) { setError('編集中の定員を保存するか、やめてから進んでください。'); return false }
     if (periodDirty && !(await savePeriod())) return false
     if (detailsDirty && detailsSave.current) return detailsSave.current()
     return true
   }
   useEffect(() => {
-    onDirtyChange?.(periodDirty || detailsDirty || adding || bulk)
-  }, [periodDirty, detailsDirty, adding, bulk, onDirtyChange])
+    onDirtyChange?.(periodDirty || detailsDirty || adding || bulk || sessionEdits.size > 0)
+  }, [periodDirty, detailsDirty, adding, bulk, sessionEdits.size, onDirtyChange])
   useEffect(() => {
     registerSave?.(() => saveCurrent.current())
     return () => registerSave?.(null)
   }, [registerSave])
 
   return (
-    <div className="min-w-0" data-webinar-pane="video" data-design-node="VWNaA">
+    <div className="min-w-0" data-webinar-pane="video" data-design-node={scheduled ? 'LPOe7' : 'VWNaA'}>
       <div className="min-w-0 flex-1 space-y-3">
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="動画">
           <h2 className="text-ink text-base font-bold">動画</h2>
@@ -247,10 +280,11 @@ export default function VideoV8({
                 {webinar.videoPrefix ? '' : '・動画が選ばれていません'}
               </span>
             </span>
-            <Button variant="secondary" onClick={onEditVideo}>
+            <Button variant="secondary" disabled={!canEdit} onClick={() => { setDetailsOpen(true); const inner = detailsRoot.current?.querySelectorAll('details'); inner?.forEach((detail, index) => { if (index < 2) detail.open = true }); detailsRoot.current?.scrollIntoView?.({ block: 'nearest' }) }}>
               差し替える
             </Button>
           </div>
+          <VideoStages webinarId={webinar.id} hasVideo={Boolean(webinar.videoPrefix || webinar.videoMediaId)} canEdit={canEdit} />
         </section>
 
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="公開期間">
@@ -260,6 +294,7 @@ export default function VideoV8({
               <span className="text-ink-secondary mb-1 block text-xs font-medium">公開の開始</span>
               <input
                 type="datetime-local"
+                disabled={!canEdit}
                 value={startsAt}
                 onChange={(e) => setStartsAt(e.target.value)}
                 placeholder={webinar.publicationStartsAt ? formatDateTime(webinar.publicationStartsAt) : '2026/10/01 10:00'}
@@ -273,30 +308,41 @@ export default function VideoV8({
               <input
                 type="datetime-local"
                 value={endsAt}
-                disabled={noEnd}
+                disabled={noEnd || !canEdit}
                 onChange={(e) => setEndsAt(e.target.value)}
                 placeholder={webinar.publicationEndsAt ? formatDateTime(webinar.publicationEndsAt) : 'なし（いつでも）'}
                 className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm disabled:opacity-50"
               />
-              <Checkbox checked={noEnd} onCheckedChange={setNoEnd} className="mt-2 text-xs">
+              <Checkbox checked={noEnd} disabled={!canEdit} onCheckedChange={setNoEnd} className="mt-2 text-xs">
                 終わりを決めない（いつでも見られる）
               </Checkbox>
             </div>
           </div>
           {periodError ? <Notice tone="error" title="公開期間を保存できませんでした">{periodError}</Notice> : null}
           <div className="mt-3">
-            <Button variant="secondary" busy={periodBusy} busyLabel="保存しています…" onClick={savePeriod}>
+            <Button variant="secondary" disabled={!canEdit} busy={periodBusy} busyLabel="保存しています…" onClick={savePeriod}>
               公開期間を保存する
             </Button>
           </div>
         </section>
 
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="配信枠">
-          <h2 className="text-ink text-base font-bold">配信枠 {webinar.schedule.length}件</h2>
+          <h2 className="text-ink text-base font-bold">{scheduled ? '開催回' : '配信枠'} {webinar.schedule.length}件</h2>
           <p className="text-ink-faint mt-1 text-xs">視聴できる時間の枠です。枠が0だと公開できません。</p>
           {error ? <Notice tone="error" title="配信枠を保存できませんでした">{error}</Notice> : null}
+          {scheduled ? <table className="mt-3 w-full table-fixed">
+            <colgroup><col className="w-1/4" /><col className="w-1/4" /><col className="w-1/6" /><col /><col className="w-12" /></colgroup>
+            <thead><TableHeadRow><Th>日時</Th><Th help="空にすると無制限です。満員になると新しい申込は受け付けません。">定員</Th><Th align="right">申込</Th><Th>状態</Th><Th>操作</Th></TableHeadRow></thead>
+            <tbody>{webinar.schedule.map((rule, index) => {
+              const startAt = rule.type === 'once' && rule.at ? Math.floor(Date.parse(rule.at) / 1000) : NaN
+              if (!Number.isFinite(startAt)) return null
+              const key = `${rule.at}-${index}`
+              return <ScheduledSessionRow key={key} webinarId={webinar.id} startAt={startAt} canEdit={canEdit} busy={busy} onDuplicate={() => void duplicateRule(index)} onRemove={() => void removeRule(index)} onEditingChange={sessionReporter(key)} />
+            })}</tbody>
+          </table> : null}
           <ul className="divide-hairline mt-3 divide-y rounded-control border border-hairline">
             {webinar.schedule.map((rule, index) => {
+              if (scheduled && rule.type === 'once' && rule.at && Number.isFinite(Date.parse(rule.at))) return null
               const summary = ruleSummary(rule)
               return (
                 <li key={index} className="flex items-center gap-3 px-4 py-3">
@@ -308,6 +354,7 @@ export default function VideoV8({
                       size="compact"
                       aria-label={`枠${index + 1}の操作`}
                       aria-expanded={menuOpen === index}
+                      disabled={!canEdit}
                       onClick={() => setMenuOpen(menuOpen === index ? null : index)}
                     >
                       …
@@ -342,10 +389,10 @@ export default function VideoV8({
           ) : null}
           {!adding && !bulk ? (
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => setAdding(true)}>
+              <Button variant="secondary" disabled={!canEdit || busy} onClick={() => setAdding(true)}>
                 ＋ 枠を足す（毎日・毎週・単発）
               </Button>
-              <Button variant="secondary" onClick={() => setBulk(true)}>
+              <Button variant="secondary" disabled={!canEdit || busy} onClick={() => setBulk(true)}>
                 まとめて作る
               </Button>
             </div>
@@ -471,7 +518,7 @@ export default function VideoV8({
                 label="結果が取れないとき"
                 aria-label="結果が取れないとき"
                 value={policy}
-                disabled={policyBusy}
+                disabled={policyBusy || !canEdit}
                 onChange={(value) => savePolicy(value as 'escalate' | 'retry_next_day')}
                 options={[
                   { value: 'retry_next_day', label: '翌日に取り直す' },
@@ -483,7 +530,8 @@ export default function VideoV8({
           </div>
         </section>
 
-        <Disclosure title="動画・公開の詳細を編集する">
+        <div ref={detailsRoot}>
+        <Disclosure title="動画・公開の詳細を編集する" defaultOpen={detailsOpen}>
           <WebinarForm
             key={`${webinar.id}-${webinar.updatedAt}`}
             initial={webinar}
@@ -493,6 +541,7 @@ export default function VideoV8({
             registerSave={(save) => { detailsSave.current = save }}
           />
         </Disclosure>
+        </div>
       </div>
 
       <aside className="min-w-0" aria-label="公開ページでの見え方">
