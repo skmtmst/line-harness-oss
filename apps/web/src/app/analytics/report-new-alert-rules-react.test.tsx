@@ -334,6 +334,10 @@ describe('定期レポートの作成後(R76)', () => {
     await selectRecipient()
     await act(async () => { button('今すぐ1回だけ送る').click(); await Promise.resolve(); await Promise.resolve() })
 
+    expect(writeCalls('POST')).toHaveLength(0)
+    const confirm = Array.from(document.body.querySelectorAll('button')).find((item) => item.textContent?.trim() === '確認して1回だけ送る')!
+    await act(async () => { confirm.click(); await Promise.resolve(); await Promise.resolve() })
+
     expect(writeCalls('POST')).toHaveLength(1)
     expect((writeCalls('POST').at(-1)?.body as { sendOnce: boolean }).sendOnce).toBe(true)
     expect(fixture.pushes).toEqual(['/analytics/reports/new?id=report-new'])
@@ -362,7 +366,7 @@ describe('定期レポートの宛先(R228)', () => {
   it('形の合わないメール宛先は行のそばで理由を出し、送信しない', async () => {
     await render()
     await selectStaffRecipient()
-    await act(async () => { button('宛先を足す').click(); await Promise.resolve() })
+    await act(async () => { button('メールだけの宛先を足す').click(); await Promise.resolve() })
     await typeInto('宛先のメールアドレス 1行目', 'not-an-address')
 
     // どの行がなぜ止まったかが、その行に出る。
@@ -376,7 +380,7 @@ describe('定期レポートの宛先(R228)', () => {
   it('直すか消すと送れる。直した宛先は本文へ残る', async () => {
     await render()
     await selectStaffRecipient()
-    await act(async () => { button('宛先を足す').click(); await Promise.resolve() })
+    await act(async () => { button('メールだけの宛先を足す').click(); await Promise.resolve() })
     await typeInto('宛先のメールアドレス 1行目', 'broken')
     await typeInto('宛先のメールアドレス 1行目', 'ops@example.com')
 
@@ -392,7 +396,7 @@ describe('定期レポートの宛先(R228)', () => {
   it('行の「消す」で不備のある宛先だけ外せる', async () => {
     await render()
     await selectStaffRecipient()
-    await act(async () => { button('宛先を足す').click(); await Promise.resolve() })
+    await act(async () => { button('メールだけの宛先を足す').click(); await Promise.resolve() })
     await typeInto('宛先のメールアドレス 1行目', 'broken')
     expect(button('つくって動かす').disabled).toBe(true)
 

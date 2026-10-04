@@ -2,12 +2,11 @@
 /*
  * 分析レポート作成の V8（板 H5UoIu）と作成時の競合小窓（G83vi）。
  *
- * V8 テーマ（<html data-theme="v8">）のときだけ V8 の頭・帯・右欄を出し、
- * v7 の画素は変えない。既存の v7 試験はそのまま通す。
+ * V8 の頭・帯・右欄と、保存・競合時の入力保護を確認する。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('next/link', () => ({
@@ -16,6 +15,8 @@ vi.mock('next/link', () => ({
 
 const fixture = vi.hoisted(() => ({
   editId: null as string | null,
+  accountId: 'account-a',
+  role: 'owner',
   pushes: [] as string[],
 }))
 vi.mock('next/navigation', () => ({
@@ -24,7 +25,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/analytics/reports/new',
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
+  useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => undefined,
@@ -50,20 +51,36 @@ const OPTIONS = {
 }
 
 const net = vi.hoisted(() => ({
+  posts: [] as Array<{ body: { sendOnce: boolean }; key: string | null }>,
+  postMode: 'ok' as 'ok' | 'failure' | 'deferred',
   puts: [] as unknown[],
-  putMode: 'ok' as 'ok' | 'conflict-then-ok' | 'deferred',
+  putMode: 'ok' as 'ok' | 'conflict-then-ok' | 'deferred' | 'failure',
   deferred: [] as Array<(value: Response) => void>,
   gets: 0,
+  getMode: 'normal' as 'normal' | 'deferred' | 'failure',
+  getDeferred: [] as Array<(value: Response) => void>,
+  latestVersion: '2026-09-01T00:00:00.000Z',
+  latestName: null as string | null,
+  emailOnly: false,
 }))
 
 function installFetch() {
-  vi.stubGlobal('fetch', async (input: unknown, init?: { method?: string }) => {
+  vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : String(input)
     const url = new URL(raw.startsWith('http') ? raw : `https://worker.example.com${raw}`)
     if (url.pathname === '/api/staff/me') {
-      return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200 })
+      return new Response(JSON.stringify({ success: true, data: { role: fixture.role } }), { status: 200 })
+    }
+    if (url.pathname === '/api/analytics/report-schedules' && init?.method === 'POST') {
+      net.posts.push({ body: JSON.parse(String(init.body)), key: new Headers(init.headers).get('Idempotency-Key') })
+      if (net.postMode === 'failure') return new Response(JSON.stringify({ success: false, error: 'internal failure' }), { status: 500 })
+      if (net.postMode === 'deferred') return new Promise<Response>((resolve) => { net.deferred.push(resolve) })
+      return new Response(JSON.stringify({ success: true, data: { ...SCHEDULE, id: 'report-new', isOneTime: true } }), { status: 201 })
     }
     if (url.pathname.startsWith('/api/analytics/report-schedules/report-1') && (init?.method ?? 'GET') === 'PUT') {
+      if (net.putMode === 'failure') {
+        return new Response(JSON.stringify({ success: false, error: 'internal failure' }), { status: 500 })
+      }
       if (net.putMode === 'conflict-then-ok') {
         net.putMode = 'ok'
         return new Response(
@@ -74,16 +91,23 @@ function installFetch() {
       if (net.putMode === 'deferred') {
         return new Promise<Response>((resolve) => { net.deferred.push(resolve) })
       }
-      net.puts.push(1)
+      net.puts.push(JSON.parse(String(init.body)))
       return new Response(JSON.stringify({ success: true, data: { ...SCHEDULE, updatedAt: '2026-09-03T00:00:00.000Z' } }), { status: 200 })
     }
     if (url.pathname.startsWith('/api/analytics/report-schedules')) {
       // 初回の読み込みは保存済みの名前、取り直しはほかの人が変えた名前。
       net.gets += 1
-      const name = net.gets === 1 ? SCHEDULE.name : 'ほかの人が変えた名前'
+      if (net.getMode === 'failure') return new Response(JSON.stringify({ success: false, error: '取得できませんでした' }), { status: 500 })
+      if (net.getMode === 'deferred') return new Promise<Response>((resolve) => { net.getDeferred.push(resolve) })
+      const name = net.latestName ?? (net.gets === 1 ? SCHEDULE.name : 'ほかの人が変えた名前')
       return new Response(JSON.stringify({
         success: true,
-        data: { items: [{ ...SCHEDULE, name }], options: OPTIONS },
+        data: {
+          items: [{ ...SCHEDULE, name, updatedAt: net.latestVersion,
+            ...(net.emailOnly ? { recipients: [{ kind: 'email', email: 'report@example.com', label: 'report@example.com' }], channels: ['email'] } : {}),
+          }],
+          options: { ...OPTIONS, recipients: net.emailOnly ? [] : OPTIONS.recipients },
+        },
       }), { status: 200 })
     }
     return new Response(JSON.stringify({ success: false, error: '未設定' }), { status: 500 })
@@ -138,13 +162,23 @@ async function click(element: HTMLElement) {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   document.documentElement.dataset.theme = 'v8'
   fixture.editId = null
+  fixture.accountId = 'account-a'
+  fixture.role = 'owner'
   fixture.pushes.length = 0
   net.puts.length = 0
+  net.posts.length = 0
+  net.postMode = 'ok'
   net.putMode = 'ok'
   net.deferred.length = 0
   net.gets = 0
+  net.getMode = 'normal'
+  net.getDeferred.length = 0
+  net.latestVersion = SCHEDULE.updatedAt
+  net.latestName = null
+  net.emailOnly = false
   installFetch()
 })
 
@@ -156,6 +190,131 @@ afterEach(async () => {
 })
 
 describe('V8 レポート作成（H5UoIu）', () => {
+  it.each([false, true])('担当者候補が0人でもメール宛先だけで作成・1回送信できる（1回送信=%s）', async (sendOnce) => {
+    net.emailOnly = true
+    await mount()
+    await settle()
+    expect(buttonByText('つくって動かす').disabled).toBe(true)
+    await click([...container.querySelectorAll('summary')].find((item) => item.textContent?.includes('＋ 宛先を足す'))!)
+    await click(buttonByText('メールだけの宛先を足す'))
+    const email = container.querySelector('input[aria-label="宛先のメールアドレス 1行目"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(email, { target: { value: ' report@example.com ' } }) })
+    await click([...container.querySelectorAll('summary')].find((item) => item.textContent?.startsWith('通知方法'))!)
+    const dashboard = [...container.querySelectorAll('input[type="checkbox"]')].find((item) => item.closest('label')?.textContent?.includes('管理画面のお知らせにも出す'))!
+    const emailChannel = [...container.querySelectorAll('input[type="checkbox"]')].find((item) => item.closest('label')?.textContent?.includes('メールでも送る'))!
+    await act(async () => { fireEvent.click(dashboard); fireEvent.click(emailChannel) })
+    await click(buttonByText(sendOnce ? '今すぐ1回だけ送る' : 'つくって動かす'))
+    if (sendOnce) {
+      expect(document.querySelector('[role="dialog"]')!.textContent).toContain('宛先：report@example.com')
+      expect(net.posts).toHaveLength(0)
+      await click(overlayButtonByText('確認して1回だけ送る'))
+    }
+    expect(net.posts).toHaveLength(1)
+    expect(net.posts[0].body).toMatchObject({
+      sendOnce, channels: ['email'],
+      recipients: [{ kind: 'email', email: 'report@example.com', label: 'report@example.com' }],
+    })
+  })
+
+  it('担当者候補が0人でも保存済みのメール宛先を変えずに編集できる', async () => {
+    net.emailOnly = true
+    fixture.editId = 'report-1'
+    await mount()
+    await settle()
+    const name = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(name, { target: { value: 'メール向け週次まとめ' } }) })
+    await click(buttonByText('変更を保存する'))
+    expect(net.puts).toEqual([expect.objectContaining({
+      name: 'メール向け週次まとめ', channels: ['email'],
+      recipients: [{ kind: 'email', email: 'report@example.com', label: 'report@example.com' }],
+      expectedUpdatedAt: SCHEDULE.updatedAt,
+    })])
+  })
+
+  async function selectRecipient() {
+    const person = [...container.querySelectorAll('input[type="checkbox"]')].find(
+      (item) => item.closest('label')?.textContent?.includes('担当1'),
+    ) as HTMLInputElement
+    await act(async () => { fireEvent.click(person) })
+  }
+
+  it('1回送信は宛先と通知方法を確認してから実行し、取消では送らない', async () => {
+    await mount()
+    await settle()
+    await selectRecipient()
+    await click(buttonByText('今すぐ1回だけ送る'))
+    const dialog = document.querySelector('[role="dialog"]')!
+    expect(dialog.textContent).toContain('宛先：担当1')
+    expect(dialog.textContent).toContain('通知方法：管理画面のお知らせ')
+    expect(dialog.textContent).toContain('集計する期間：前の7日間')
+    expect(net.posts).toHaveLength(0)
+    await click(overlayButtonByText('キャンセル'))
+    expect(net.posts).toHaveLength(0)
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+    expect((container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('週次まとめ')
+
+    await click(buttonByText('今すぐ1回だけ送る'))
+    await click(overlayButtonByText('確認して1回だけ送る'))
+    await settle()
+    expect(net.posts).toHaveLength(1)
+    expect(net.posts[0].body.sendOnce).toBe(true)
+    expect(fixture.pushes).toEqual(['/analytics/reports/new?id=report-new'])
+    const afterSave = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterSave)
+    expect(afterSave.defaultPrevented).toBe(false)
+  })
+
+  it('送信の連続クリックを1回に止め、失敗時は窓と入力と同じ要求キーを残す', async () => {
+    await mount()
+    await settle()
+    await selectRecipient()
+    await click(buttonByText('今すぐ1回だけ送る'))
+    net.postMode = 'deferred'
+    const confirm = overlayButtonByText('確認して1回だけ送る')
+    await act(async () => { fireEvent.click(confirm); fireEvent.click(confirm) })
+    expect(net.posts).toHaveLength(1)
+    expect(net.deferred).toHaveLength(1)
+    await act(async () => { net.deferred.shift()!(new Response(JSON.stringify({ success: false, error: 'internal failure' }), { status: 500 })) })
+    expect(document.querySelector('[role="dialog"]')!.textContent).toContain('保存できませんでした')
+    expect(document.querySelector('[role="dialog"]')!.textContent).not.toContain('internal failure')
+    expect(fixture.pushes).toHaveLength(0)
+    const afterFailure = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterFailure)
+    expect(afterFailure.defaultPrevented).toBe(true)
+    net.postMode = 'ok'
+    await click(overlayButtonByText('確認して1回だけ送る'))
+    expect(net.posts).toHaveLength(2)
+    expect(net.posts[0].key).toBeTruthy()
+    expect(net.posts[1].key).toBe(net.posts[0].key)
+    expect(fixture.pushes).toEqual(['/analytics/reports/new?id=report-new'])
+  })
+
+  it('確認中にアカウントを切り替えると確認窓を閉じ、切替先へ送らない', async () => {
+    await mount()
+    await settle()
+    await selectRecipient()
+    await click(buttonByText('今すぐ1回だけ送る'))
+    fixture.accountId = 'account-b'
+    await act(async () => { root.render(<><AnalyticsReportNewPage /><ToastHost /></>) })
+    await settle()
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+    expect(net.posts).toHaveLength(0)
+  })
+
+  it.each(['staff', 'viewer'])('%s は作成と送信を実行できない', async (role) => {
+    fixture.role = role
+    await mount()
+    await settle()
+    const fields = container.querySelector('fieldset') as HTMLFieldSetElement
+    expect(fields.disabled).toBe(true)
+    expect(buttonByText('今すぐ1回だけ送る').disabled).toBe(true)
+    expect(buttonByText('つくって動かす').disabled).toBe(true)
+    await click(buttonByText('今すぐ1回だけ送る'))
+    await click(buttonByText('つくって動かす'))
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(net.posts).toHaveLength(0)
+  })
+
   it('板ID・題・必須・右欄の見本を出す', async () => {
     await mount()
     await settle()
@@ -191,6 +350,93 @@ describe('V8 レポート作成（H5UoIu）', () => {
 })
 
 describe('V8 作成時の競合小窓（G83vi）', () => {
+  it('通常の保存成功で離脱確認を解除し、次の編集では再び入力を守る', async () => {
+    fixture.editId = 'report-1'
+    await mount()
+    await settle()
+    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(nameField, { target: { value: '保存する名前' } }) })
+    const beforeSave = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(beforeSave)
+    expect(beforeSave.defaultPrevented).toBe(true)
+
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    expect(net.puts).toHaveLength(1)
+    const afterSave = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterSave)
+    expect(afterSave.defaultPrevented).toBe(false)
+    expect(nameField.value).toBe('保存する名前')
+
+    await act(async () => { fireEvent.change(nameField, { target: { value: '次の編集' } }) })
+    const afterEdit = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterEdit)
+    expect(afterEdit.defaultPrevented).toBe(true)
+  })
+
+  it('保存が失敗したら未保存の扱いと入力を残す', async () => {
+    fixture.editId = 'report-1'
+    net.putMode = 'failure'
+    await mount()
+    await settle()
+    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(nameField, { target: { value: '残す名前' } }) })
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    expect(container.textContent).toContain('保存できませんでした')
+    expect(container.textContent).not.toContain('API error:')
+    expect(container.textContent).not.toContain('internal failure')
+    expect(nameField.value).toBe('残す名前')
+    const afterFailure = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterFailure)
+    expect(afterFailure.defaultPrevented).toBe(true)
+
+    net.putMode = 'ok'
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    expect(net.puts).toHaveLength(1)
+    expect(container.textContent).not.toContain('保存できませんでした')
+    const afterRetry = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterRetry)
+    expect(afterRetry.defaultPrevented).toBe(false)
+  })
+
+  it('比較後の保存が失敗しても窓と入力を残し、同じ内容で再試行できる', async () => {
+    fixture.editId = 'report-1'
+    net.putMode = 'conflict-then-ok'
+    await mount()
+    await settle()
+    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(nameField, { target: { value: '比較して残す名前' } }) })
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    await click(buttonByText('違いを比べる'))
+
+    net.putMode = 'failure'
+    await click(overlayButtonByText('この内容で保存する'))
+    await settle()
+    expect(overlayText()).toContain('保存できませんでした')
+    expect(overlayText()).not.toContain('API error:')
+    expect(overlayText()).not.toContain('internal failure')
+    expect(nameField.value).toBe('比較して残す名前')
+    expect(container.querySelector('[data-design-node="G83vi"]')).toBeTruthy()
+    expect(overlayButtonByText('この内容で保存する').disabled).toBe(false)
+    const afterFailure = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterFailure)
+    expect(afterFailure.defaultPrevented).toBe(true)
+
+    net.putMode = 'ok'
+    await click(overlayButtonByText('この内容で保存する'))
+    await settle()
+    expect(net.puts).toHaveLength(1)
+    expect(container.querySelector('[data-design-node="G83vi"]')).toBeNull()
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+    expect(nameField.value).toBe('比較して残す名前')
+    const afterRetry = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterRetry)
+    expect(afterRetry.defaultPrevented).toBe(false)
+  })
+
   it('409で帯が出て入力が残り、比べたうえで保存できる', async () => {
     fixture.editId = 'report-1'
     net.putMode = 'conflict-then-ok'
@@ -209,7 +455,7 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     // 板が競合になり、帯が出る。入力は残る（最新の名前で上書きしない）。
     expect(container.querySelector('[data-design-node="G83vi"]')).toBeTruthy()
     expect(container.textContent).toContain('ほかの人がこのレポートを先に保存しました')
-    expect(container.textContent).toContain('このまま保存すると、相手の変更が消えます')
+    expect(container.textContent).toContain('入力は残っています。相手の変更を確認してから保存してください。')
     expect((container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('わたしの入力')
     // 下の帯の主ボタンは比べる向きになる
     expect(buttonByText('比べてから保存')).toBeTruthy()
@@ -245,6 +491,77 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     expect(buttonByText('変更を保存する')).toBeTruthy()
   })
 
+  it('比較を開いた後にさらに更新されていたら、未確認の内容を上書きしない', async () => {
+    fixture.editId = 'report-1'
+    net.putMode = 'conflict-then-ok'
+    await mount()
+    await settle()
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    await click(buttonByText('違いを比べる'))
+    net.latestVersion = '2026-09-05T00:00:00.000Z'
+    net.latestName = 'さらに新しい変更'
+    await click(overlayButtonByText('この内容で保存する'))
+    await settle()
+    expect(net.puts).toHaveLength(0)
+    expect(overlayText()).toContain('内容がさらに変更されました')
+    expect(overlayText()).toContain('名前: さらに新しい変更')
+    await click(overlayButtonByText('この内容で保存する'))
+    await settle()
+    expect(net.puts).toHaveLength(1)
+  })
+
+  it('最新の読み込みはその場で取り直し、失敗しても入力を消さない', async () => {
+    fixture.editId = 'report-1'
+    net.putMode = 'conflict-then-ok'
+    await mount()
+    await settle()
+    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(nameField, { target: { value: '残したい入力' } }) })
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    const reads = net.gets
+    net.getMode = 'failure'
+    await click(buttonByText('最新を読み込んで続ける'))
+    await settle()
+    expect(net.gets).toBe(reads + 1)
+    expect(nameField.value).toBe('残したい入力')
+    expect(container.textContent).toContain('最新の内容を読み込めませんでした。入力は残っています')
+    net.getMode = 'normal'
+    net.latestName = 'ボタンを押した時点の最新'
+    net.latestVersion = '2026-09-06T00:00:00.000Z'
+    await click(buttonByText('最新を読み込んで続ける'))
+    await settle()
+    expect(nameField.value).toBe('ボタンを押した時点の最新')
+  })
+
+  it('比較用の取得中にアカウントを往復しても、遅い結果で保存を始めない', async () => {
+    fixture.editId = 'report-1'
+    net.putMode = 'conflict-then-ok'
+    await mount()
+    await settle()
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    await click(buttonByText('違いを比べる'))
+    net.getMode = 'deferred'
+    await click(overlayButtonByText('この内容で保存する'))
+    await settle()
+    expect(net.getDeferred).toHaveLength(1)
+    net.getMode = 'normal'
+    for (const accountId of ['account-b', 'account-a']) {
+      fixture.accountId = accountId
+      await act(async () => { root.render(<><AnalyticsReportNewPage /><ToastHost /></>) })
+      await settle()
+    }
+    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(nameField, { target: { value: '新しい入力' } }) })
+    await act(async () => { net.getDeferred.splice(0).forEach((resolve) => resolve(new Response(JSON.stringify({ success: true, data: { items: [SCHEDULE], options: OPTIONS } }), { status: 200 }))) })
+    await settle()
+    expect(net.puts).toHaveLength(0)
+    expect(nameField.value).toBe('新しい入力')
+    expect(container.textContent).not.toContain('定期レポートを更新しました')
+  })
+
   it('保存中は押せない（二重押し防止）', async () => {
     fixture.editId = 'report-1'
     net.putMode = 'deferred'
@@ -262,5 +579,17 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     })
     await settle()
     expect(container.textContent).toContain('定期レポートを更新しました')
+  })
+
+  it('ボタンの表示が変わる前に続けて押しても保存は1回だけ', async () => {
+    fixture.editId = 'report-1'
+    net.putMode = 'deferred'
+    await mount()
+    await settle()
+    const save = buttonByText('変更を保存する')
+    await act(async () => { fireEvent.click(save); fireEvent.click(save) })
+    expect(net.deferred).toHaveLength(1)
+    await act(async () => { net.deferred.shift()!(new Response(JSON.stringify({ success: true, data: SCHEDULE }), { status: 200 })) })
+    expect(buttonByText('変更を保存する').disabled).toBe(false)
   })
 })
