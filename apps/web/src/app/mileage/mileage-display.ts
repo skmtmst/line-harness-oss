@@ -175,3 +175,25 @@ export function formatMileageDate(value: string | null): string {
   if (Number.isNaN(date.getTime())) return '—'
   return formatDateTime(date)
 }
+
+/*
+ * 短い日時（絵は「9/30 14:12」「10/2 15:20」）。日本時間に直して出す。
+ * 端末の時差に振られないよう +9 時間ずらして読む。
+ */
+/* 月日だけ（絵は「9/30」。時刻なし）。日本時間に直して出す。 */
+export function formatMileageMonthDay(value: string | null): string {
+  if (!value) return '—'
+  const time = new Date(value).getTime()
+  if (Number.isNaN(time)) return '—'
+  const jst = new Date(time + 9 * 60 * 60 * 1000)
+  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()}`
+}
+
+export function formatMileageShortDateTime(value: string | null): string {
+  if (!value) return '—'
+  const time = new Date(value).getTime()
+  if (Number.isNaN(time)) return '—'
+  const jst = new Date(time + 9 * 60 * 60 * 1000)
+  const minutes = String(jst.getUTCMinutes()).padStart(2, '0')
+  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${jst.getUTCHours()}:${minutes}`
+}

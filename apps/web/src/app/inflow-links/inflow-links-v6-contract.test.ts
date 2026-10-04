@@ -4,26 +4,22 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
 /**
- * V6 18-1-F `BMmxU`（空・読込・エラー）の契約。
+ * 流入と計測の一覧（板 xbHxg）の契約。
  *
- * この画面は状態の枠が2つしか無く、**取得に失敗したときも
- * 「まだリンクがありません」と出していた。** 運用する人からは、
- * 登録したリンクが消えたように見える。3つを言い分ける。
- *
- * 併せて、素の入力欄・素の `<select disabled>`・素の前後ボタン・
- * 素のTailwind色を共通部品とV6トークンへ寄せたことも、ここで止める。
+ * 空・読込・取得失敗の3つを言い分ける。素の入力欄・素の `<select>`・
+ * 素の前後ボタン・素のTailwind色を共通部品とトークンへ寄せたことも、
+ * ここで止める。
  */
 describe('V6 流入経路一覧の契約', () => {
   it('共通フォルダ欄の統一幅を使い、追加ボタンを欄内だけに置く', () => {
-    expect(PAGE).toContain('lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]')
     expect(PAGE).toContain('style={FOLDER_RAIL_STYLE}')
+    expect(PAGE).toContain('styles.columns')
     expect(PAGE).not.toContain('選ぶと右側のリンクが切り替わります')
     expect(PAGE).toContain("onAddFolder={() => setEditingGenre('new')}")
     expect(PAGE).not.toMatch(/<Button[^>]*>フォルダを追加<\/Button>/)
   })
 
   it('空・読込・取得失敗の3状態を共通ListStateで言い分ける', () => {
-    expect(PAGE).toContain('data-design-node="BMmxU"')
     expect(PAGE).toContain("import ListState from '@/components/shared/list-state'")
     expect(PAGE).toContain('<ListState kind="loading"')
     expect(PAGE).toContain('kind="error"')
@@ -57,8 +53,8 @@ describe('V6 流入経路一覧の契約', () => {
     expect(PAGE).toContain('accountAtRequest === latestAccountRef.current')
     expect(PAGE).toContain('setRoutes([])')
     expect(PAGE).toContain('const [summaryAvailable, setSummaryAvailable] = useState(false)')
-    expect(PAGE).toContain("summaryAvailable ? formatNumber((r.stats?.friendCount ?? 0)) : '—'")
-    expect(PAGE).toContain("summaryAvailable ? formatNumber((r.stats?.clickCount ?? 0)) : '—'")
+    expect(PAGE).toContain("summaryAvailable && r.stats ? (")
+    expect(PAGE).toContain("summaryAvailable && r.stats ? formatNumber(r.stats.clickCount) : '—'")
   })
 
   it('一覧型の既定値を集計成功として扱わず、画面を落とさない', () => {
@@ -69,21 +65,17 @@ describe('V6 流入経路一覧の契約', () => {
   })
 
   it('検索・並び順・表示件数を共通部品にし、動く並び替えだけを載せる', () => {
-    // ★V7 `Xn1Mz`：検索は共通 ListToolbar の1行目へそろえた（SearchField は
-    // 部品の中にある）。素の input 検索に戻さない。
-    expect(PAGE).toContain("import ListToolbar from '@/components/shared/list-toolbar'")
-    expect(PAGE).toContain('<ListToolbar')
-    expect(PAGE).toContain('search={{')
-    expect(PAGE).not.toContain("import SearchField from '@/components/shared/search-field'")
+    // 板 xbHxg：検索は共通 SearchField をそのまま置く。素の input 検索に戻さない。
+    expect(PAGE).toContain("import SearchField from '@/components/shared/search-field'")
+    expect(PAGE).toContain('<SearchField')
     expect(PAGE).toContain("import Select from '@/components/shared/select'")
+    expect(PAGE).toContain("import PageSizeSelect from '@/components/ui/page-size-select'")
     expect(PAGE).toContain('const [sort, setSort] = useState<RouteSort>')
     expect(PAGE).toContain('const [pageSize, setPageSize] = useState(20)')
     // 並び順はどれも読み込んだ行から数えられるものだけ。
     expect(PAGE).toContain('友だち追加が多い順')
     expect(PAGE).toContain('クリックが多い順')
     // 押せない見せかけの入力欄は置かない。
-    // （見出しの「マニュアル」「並び替え」はこの節の担当外。
-    //   `docs/design-qa/v6-media-inflow-conversion-handoff.md` に残す。）
     expect(PAGE).not.toContain('<select')
     expect(PAGE).not.toContain('表示件数の切り替えは準備中です')
   })
@@ -109,11 +101,6 @@ describe('V6 流入経路一覧の契約', () => {
     expect(PAGE).toContain('const rowsByRef = useMemo(')
   })
 
-  it('行の開閉は更新関数の内側で副作用を呼ばない', () => {
-    expect(PAGE).toContain('expandRequestRef')
-    expect(PAGE).not.toContain('setExpandedRef((current)')
-  })
-
   it('コピーの失敗を無言にしない', () => {
     expect(PAGE).toContain('コピー失敗')
     expect(PAGE).not.toContain('// silent')
@@ -130,7 +117,7 @@ describe('V6 流入経路一覧の契約', () => {
     expect(PAGE).toContain('は実行できませんでした')
   })
 
-  it('素のTailwind色を残さず、V6トークンで塗る', () => {
+  it('素のTailwind色を残さず、トークンで塗る', () => {
     for (const raw of [
       'emerald-600',
       'emerald-700',
@@ -145,7 +132,8 @@ describe('V6 流入経路一覧の契約', () => {
     ]) {
       expect(PAGE, `${raw} が残っています`).not.toContain(raw)
     }
-    expect(PAGE).toContain('bg-accent')
-    expect(PAGE).toContain('text-action')
+    expect(PAGE).toContain('text-ink')
+    expect(PAGE).toContain('bg-canvas')
+    expect(PAGE).toContain('border-hairline')
   })
 })

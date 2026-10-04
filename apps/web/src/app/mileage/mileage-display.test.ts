@@ -3,7 +3,9 @@ import {
   actionScoreReasonLabel,
   formatMileageChange,
   formatMileageDate,
+  formatMileageMonthDay,
   formatMileageNumber,
+  formatMileageShortDateTime,
   mileageEntryTypeLabel,
   mileageRankProgress,
   mileageSourceLabel,
@@ -39,6 +41,16 @@ describe('マイル履歴の表示', () => {
     expect(formatMileageChange(-50)).toBe('−50')
     expect(formatMileageDate('2026-08-25T11:00:00.000Z')).toContain('20:00')
     expect(formatMileageDate('invalid')).toBe('—')
+  })
+
+  it('短い日時は絵どおりに出す（9/30 14:12・9/30）', () => {
+    /* 絵の板 `oRbJi`・`R6kIG`・`IRPw8`。日本時間に直す。 */
+    expect(formatMileageShortDateTime('2026-09-30T05:12:00.000Z')).toBe('9/30 14:12')
+    expect(formatMileageShortDateTime('2026-10-02T06:20:00.000Z')).toBe('10/2 15:20')
+    expect(formatMileageShortDateTime(null)).toBe('—')
+    expect(formatMileageShortDateTime('invalid')).toBe('—')
+    expect(formatMileageMonthDay('2026-12-31T00:00:00.000Z')).toBe('12/31')
+    expect(formatMileageMonthDay(null)).toBe('—')
   })
 
   it('取れていない数・壊れた数を0にせず「—」で表示する', () => {

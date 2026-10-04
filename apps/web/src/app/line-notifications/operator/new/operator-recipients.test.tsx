@@ -21,7 +21,8 @@ vi.mock('next/link', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 vi.mock('@/lib/api', () => ({
   ApiError: class extends Error {
     status?: number
@@ -55,7 +56,7 @@ describe('operator/new の受け取る人', () => {
     await flush()
     await screen.findByText('受け取る人がいません')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+      fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     })
     expect(await screen.findByText('受け取る人がいません。先にログインユーザーでスタッフ登録とLINE連携を済ませてください。')).toBeTruthy()
   })
