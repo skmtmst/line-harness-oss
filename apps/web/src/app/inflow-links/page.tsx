@@ -217,6 +217,14 @@ function InflowLinksPageInner({
   */
   const [selectedRouteIds, setSelectedRouteIds] = useState<Set<string>>(() => new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
+  /*
+   * EMUl9（一覧・閲覧のみ）: staff は変える操作を隠して帯を出す。
+   * 役職が読めないときは管理者扱いのままにする（一覧の既存の動きを
+   * 変えない。止めるのは口の403が担う）。
+   */
+  const [canManage, setCanManage] = useState(true)
+  const [roleResolved, setRoleResolved] = useState(false)
+  const readonly = roleResolved && !canManage
 
   const load = async () => {
     const requestGeneration = ++loadRequestRef.current
@@ -323,6 +331,22 @@ function InflowLinksPageInner({
       loadRequestRef.current += 1
     }
   }, [selectedAccountId])
+
+  // EMUl9: 自分の役職だけを軽く取る。一覧の行を待たせない補助取得。
+  // staff（閲覧のみ）だけ変える操作を隠す。読めなければ管理者扱いのまま。
+  useEffect(() => {
+    let active = true
+    void api.staff.me().then((response) => {
+      if (!active) return
+      if (response.success && response.data.role !== undefined && response.data.role !== 'owner' && response.data.role !== 'admin') {
+        setCanManage(false)
+      }
+      setRoleResolved(true)
+    }).catch(() => {
+      if (active) setRoleResolved(true)
+    })
+    return () => { active = false }
+  }, [])
 
   // 広告とつないだ数だけを軽く取る。一覧の行を待たせない補助取得。
   // 失敗しても帯の4枚目が「—」になるだけで、一覧は巻き込まない。
@@ -774,7 +798,7 @@ function InflowLinksPageInner({
         void onCopy(row.refCode, row.refCode)
       },
     })
-    if (row.entryRouteId) {
+    if (!readonly && row.entryRouteId) {
       const target = routes.find((entry) => entry.id === row.entryRouteId) ?? null
       if (target) {
         items.push({
@@ -828,6 +852,13 @@ function InflowLinksPageInner({
       <p data-design="Head" className="sr-only">
         どこから友だちが来たかを計測します。発行したURLごとにクリック・友だち追加・その後の成果まで追えます。
       </p>
+      {readonly ? (
+        <div data-design-node="EMUl9">
+          <Notice tone="info">
+            閲覧のみで見ています。変える操作は管理者に頼んでください。
+          </Notice>
+        </div>
+      ) : null}
       {/*
         板 xbHxg の数の帯。項目は絵どおり、数は実データ。
         「今月の友だち追加」は月で絞る口が無いので、累計と分かる書き方にする。
@@ -899,14 +930,16 @@ function InflowLinksPageInner({
         </Notice>
       ) : null}
 
-      <div className={styles.createRow}>
-        <Button href="/inflow-links/new" variant="primary">＋ 流入リンクを作る</Button>
-        {selectedRouteIds.size > 0 ? (
-          <Button variant="secondary" onClick={() => setBulkOpen(true)}>
-            まとめて操作（{selectedRouteIds.size}件選択中）
-          </Button>
-        ) : null}
-      </div>
+      {!readonly ? (
+        <div className={styles.createRow}>
+          <Button href="/inflow-links/new" variant="primary">＋ 流入リンクを作る</Button>
+          {selectedRouteIds.size > 0 ? (
+            <Button variant="secondary" onClick={() => setBulkOpen(true)}>
+              まとめて操作（{selectedRouteIds.size}件選択中）
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div style={FOLDER_RAIL_STYLE} className={styles.columns}>
         <div className="min-w-0">
@@ -914,14 +947,14 @@ function InflowLinksPageInner({
             total={`${accountFilteredRows.length}件`}
             activeId={selectedGenre}
             onSelect={(id) => { setSelectedGenre(id); setPage(1) }}
-            onAddFolder={() => setEditingGenre('new')}
+            onAddFolder={readonly ? undefined : () => setEditingGenre('new')}
             rows={[
               { id: '', label: 'すべて', count: accountFilteredRows.length },
               ...availableGenres.map((genre) => ({
                 id: genre.name,
                 label: genre.name,
                 count: accountFilteredRows.filter((row) => row.genre === genre.name).length,
-                ...(!genre.id.startsWith('legacy-') ? { onEdit: () => setEditingGenre(genre) } : {}),
+                ...(!readonly && !genre.id.startsWith('legacy-') ? { onEdit: () => setEditingGenre(genre) } : {}),
               })),
               ...(hasUncategorized ? [{ id: UNCATEGORIZED, label: '未分類', count: accountFilteredRows.filter((row) => !row.genre).length }] : []),
             ]}
@@ -1067,18 +1100,20 @@ function InflowLinksPageInner({
           <table>
             <thead>
               <TableHeadRow>
-                <Th className="pl-5">
-                  <Checkbox
-                    aria-label="表示中の登録済み経路をすべて選ぶ"
-                    checked={allShownSelected}
-                    indeterminate={!allShownSelected && selectableIds.some((id) => selectedRouteIds.has(id))}
-                    disabled={selectableIds.length === 0}
-                    title={selectableIds.length === 0 ? 'まとめて操作できる登録済みの経路がありません' : undefined}
-                    onCheckedChange={(checked) => {
-                      setSelectedRouteIds(checked ? new Set(selectableIds) : new Set())
-                    }}
-                  />
-                </Th>
+                {readonly ? null : (
+                  <Th className="pl-5">
+                    <Checkbox
+                      aria-label="表示中の登録済み経路をすべて選ぶ"
+                      checked={allShownSelected}
+                      indeterminate={!allShownSelected && selectableIds.some((id) => selectedRouteIds.has(id))}
+                      disabled={selectableIds.length === 0}
+                      title={selectableIds.length === 0 ? 'まとめて操作できる登録済みの経路がありません' : undefined}
+                      onCheckedChange={(checked) => {
+                        setSelectedRouteIds(checked ? new Set(selectableIds) : new Set())
+                      }}
+                    />
+                  </Th>
+                )}
                 <Th>流入元名</Th>
                 <Th>追加先</Th>
                 <Th>友だちになったら</Th>
@@ -1087,7 +1122,9 @@ function InflowLinksPageInner({
                 <Th>最新追加</Th>
                 <Th>発行URL</Th>
                 <Th aria-label="その他の操作"><span className="sr-only">その他の操作</span></Th>
-                <Th align="right" className="pr-5">操作</Th>
+                {readonly ? null : (
+                  <Th align="right" className="pr-5">操作</Th>
+                )}
               </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-hairline">
@@ -1104,25 +1141,27 @@ function InflowLinksPageInner({
                 const menuItems = rowMenuItems(r)
                 return (
                   <tr key={r.refCode} className="hover:bg-canvas-sunken">
-                    <td className="py-3 pr-2 pl-5">
-                      {r.entryRouteId ? (
-                        <Checkbox
-                          aria-label={`${r.name}をまとめて操作の対象にする`}
-                          checked={selectedRouteIds.has(r.entryRouteId)}
-                          onCheckedChange={(checked) => {
-                            const id = r.entryRouteId!
-                            setSelectedRouteIds((current) => {
-                              const next = new Set(current)
-                              if (checked) next.add(id)
-                              else next.delete(id)
-                              return next
-                            })
-                          }}
-                        />
-                      ) : (
-                        <span className="sr-only">まとめて操作は登録済みの流入経路だけに使えます</span>
-                      )}
-                    </td>
+                    {readonly ? null : (
+                      <td className="py-3 pr-2 pl-5">
+                        {r.entryRouteId ? (
+                          <Checkbox
+                            aria-label={`${r.name}をまとめて操作の対象にする`}
+                            checked={selectedRouteIds.has(r.entryRouteId)}
+                            onCheckedChange={(checked) => {
+                              const id = r.entryRouteId!
+                              setSelectedRouteIds((current) => {
+                                const next = new Set(current)
+                                if (checked) next.add(id)
+                                else next.delete(id)
+                                return next
+                              })
+                            }}
+                          />
+                        ) : (
+                          <span className="sr-only">まとめて操作は登録済みの流入経路だけに使えます</span>
+                        )}
+                      </td>
+                    )}
                     <td className={`px-2 py-3 font-medium text-ink ${styles.nameCell}`}>
                       {r.source === 'entry_route' && r.entryRouteId ? (
                         <Link
@@ -1259,32 +1298,34 @@ function InflowLinksPageInner({
                         <span className="text-xs text-ink-faint">—</span>
                       )}
                     </td>
-                    <td className="py-3 pr-5 pl-2 text-right">
-                      {editTarget ? (
-                        <Button
-                          variant="secondary"
-                          onClick={() => setEditing(editTarget)}
-                          aria-label={`${r.name}のリンクを編集`}
-                        >
-                          編集
-                        </Button>
-                      ) : r.source === 'tracked_link' ? (
-                        // tracked_links は別管理 (Web app に編集 UI 未提供)。
-                        // entry_routes への "昇格登録" は worker 優先順位的に
-                        // tracked_link を上書きすることになり混乱の元なので、
-                        // ここではアクション非表示にして tracked_links 側の
-                        // 編集導線 (MCP / API) に委ねる。
-                        <span className="text-xs text-ink-faint">—</span>
-                      ) : (
-                        <Button
-                          variant="secondary"
-                          onClick={() => setEditing({ register: r.refCode })}
-                          title="未登録 ref を entry_routes に登録します。流入実績はそのまま引き継がれます。"
-                        >
-                          登録する
-                        </Button>
-                      )}
-                    </td>
+                    {readonly ? null : (
+                      <td className="py-3 pr-5 pl-2 text-right">
+                        {editTarget ? (
+                          <Button
+                            variant="secondary"
+                            onClick={() => setEditing(editTarget)}
+                            aria-label={`${r.name}のリンクを編集`}
+                          >
+                            編集
+                          </Button>
+                        ) : r.source === 'tracked_link' ? (
+                          // tracked_links は別管理 (Web app に編集 UI 未提供)。
+                          // entry_routes への "昇格登録" は worker 優先順位的に
+                          // tracked_link を上書きすることになり混乱の元なので、
+                          // ここではアクション非表示にして tracked_links 側の
+                          // 編集導線 (MCP / API) に委ねる。
+                          <span className="text-xs text-ink-faint">—</span>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            onClick={() => setEditing({ register: r.refCode })}
+                            title="未登録 ref を entry_routes に登録します。流入実績はそのまま引き継がれます。"
+                          >
+                            登録する
+                          </Button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 )
               })}
@@ -1293,7 +1334,9 @@ function InflowLinksPageInner({
         </div>
       )}
       <p className={styles.tableFoot}>
-        行の「…」からQRコードを表示・URLをコピー・リンクを編集・受付の停止と再開。左のチェックで、まとめて操作できます。
+        {readonly
+          ? '行の「…」からQRコードを表示・URLをコピーできます。'
+          : '行の「…」からQRコードを表示・URLをコピー・リンクを編集・受付の停止と再開。左のチェックで、まとめて操作できます。'}
       </p>
       <div data-design="tf" className={styles.pager}>
         <span className="tabular-nums">全 {sortedRows.length} 件</span>

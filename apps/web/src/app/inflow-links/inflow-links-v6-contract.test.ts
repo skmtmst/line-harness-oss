@@ -15,7 +15,8 @@ describe('V6 流入経路一覧の契約', () => {
     expect(PAGE).toContain('style={FOLDER_RAIL_STYLE}')
     expect(PAGE).toContain('styles.columns')
     expect(PAGE).not.toContain('選ぶと右側のリンクが切り替わります')
-    expect(PAGE).toContain("onAddFolder={() => setEditingGenre('new')}")
+    expect(PAGE).toContain("onAddFolder={readonly ? undefined : () => setEditingGenre('new')}")
+    // EMUl9: 閲覧のみは追加の口を渡さない（欄内の追加印も出ない）。
     expect(PAGE).not.toMatch(/<Button[^>]*>フォルダを追加<\/Button>/)
   })
 
