@@ -40,7 +40,11 @@ jobs:
         run: pnpm --filter web build
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-          NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'false'
+          # 'true' で左メニューの「Googleビジネス」と /restaurant-test 配下が表示される。
+          # Googleの機密スコープ審査（デモ動画と実運用）のため有効にしている。
+          # Worker側の RESTAURANT_TEST_ENABLED と必ず同じ値にする。片方だけ true だと
+          # 画面はあるのにAPIが404、またはAPIはあるのに画面が無い状態になる。
+          NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
           APP_BUILD_TIME: ${{ steps.build-meta.outputs.build_time }}
 
       - name: Deploy to Cloudflare Pages
