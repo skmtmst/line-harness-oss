@@ -197,6 +197,15 @@ export default function RichMenusListV8() {
   /* 消したときの影響（契約 #608）。窓を開けてから読む（v7 と同じ）。 */
   const [impact, setImpact] = useState<RichMenuDeleteImpact | null>(null)
   const [impactPhase, setImpactPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  /*
+   * 消せない理由があるとき（板 `yOyCg`）。見出しを「まだ消せません」にし、
+   * 実行ボタンを出さず、取消を「閉じる」にする。読み込み中・読み失敗の
+   * ときは従来の確認の形のままにする。
+   */
+  const blockedDelete = deleteTarget?.kind === 'managed'
+    && impactPhase === 'ready'
+    && impact !== null
+    && impact.blockers.length > 0
   const impactRequestRef = useRef<DeleteImpactRequest | null>(null)
   const impactRequestGenerationRef = useRef(0)
   const impactLoadGenerationRef = useRef(0)
@@ -1331,9 +1340,12 @@ export default function RichMenusListV8() {
         designNode="yOyCg"
         title={
           deleteTarget
-            ? `「${deleteTarget.kind === 'managed' ? deleteTarget.group.name : deleteTarget.menu.name}」を削除しますか？`
+            ? blockedDelete
+              ? `「${deleteTarget.group.name}」はまだ消せません`
+              : `「${deleteTarget.kind === 'managed' ? deleteTarget.group.name : deleteTarget.menu.name}」を削除しますか？`
             : 'リッチメニューを削除しますか？'
         }
+        cancelLabel={blockedDelete ? '閉じる' : 'キャンセル'}
         description={
           deleteTarget?.kind === 'managed'
             ? deleteTarget.group.status === 'published'
@@ -1412,9 +1424,13 @@ export default function RichMenusListV8() {
                         .map((ref) => `${referenceKindText(ref.kind)}「${ref.ownerName}」`)
                         .join('・')}
                 </p>
-                {blockerTexts(impact.blockers).map((text) => (
-                  <p key={text} className="font-semibold text-danger" role="alert">{text}</p>
-                ))}
+                {impact.blockers.length > 0 ? (
+                  <ol className="list-decimal space-y-1 pl-5 font-semibold text-danger" role="alert">
+                    {blockerTexts(impact.blockers).map((text) => (
+                      <li key={text}>{text}</li>
+                    ))}
+                  </ol>
+                ) : null}
                 {impact.blockers.length === 0 ? null : (
                   <p className="text-ink-faint">{recommendedActionText(impact.recommendedAction)}</p>
                 )}
