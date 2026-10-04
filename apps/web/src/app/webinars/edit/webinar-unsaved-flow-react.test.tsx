@@ -149,6 +149,7 @@ function installFetch() {
     const path = url.pathname + url.search
     const method = init?.method ?? 'GET'
     net.calls.push({ path, method })
+    if (path === '/api/staff/me') return json({ role: 'admin' })
     if (path.includes('/api/media')) return json({ items: [], nextCursor: null })
     if (path.includes('/api/webinars/webinar-1/participants')) {
       /* カーソルは offset。limit 指定があればその数だけ返す。 */

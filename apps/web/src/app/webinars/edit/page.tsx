@@ -26,7 +26,7 @@ import {
   stepStateOf,
   type StepKey,
 } from './edit-steps'
-import WebinarForm from '@/components/webinars/webinar-form'
+import BasicV8 from './basic-v8'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -956,7 +956,7 @@ function EditWebinarInner() {
       */}
       {visitedPanes.has('basic') ? (
         <div hidden={pane !== 'basic'}>
-          <WebinarForm key={`${webinar.id}-${webinar.updatedAt}`} initial={webinar} hideBar onSaved={handleWebinarSaved} onDirtyChange={dirtyReporterFor('basic')} registerSave={saveRegistrarFor('basic')} />
+          <BasicV8 key={webinar.id} webinar={webinar} editor={editor} onWebinarSaved={handleWebinarSaved} onEditorChange={setEditor} onDirtyChange={dirtyReporterFor('basic')} registerSave={saveRegistrarFor('basic')} />
         </div>
       ) : null}
       {visitedPanes.has('video') ? (
