@@ -252,6 +252,9 @@ export default function AdIntegration({
   const [newEventName, setNewEventName] = useState('')
   const [mappingBusy, setMappingBusy] = useState(false)
   const [mappingError, setMappingError] = useState('')
+  const [canManageMappings, setCanManageMappings] = useState(false)
+  const mappingLoadGenerationRef = useRef(0)
+  const mappingContextRef = useRef(0)
   /* F-22 やり直し。行ごとに1回だけ送る。 */
   const [resendingId, setResendingId] = useState<string | null>(null)
   const [resendError, setResendError] = useState('')
@@ -320,11 +323,14 @@ export default function AdIntegration({
   // R275: 手入力の取消は owner/admin だけ。staff は閲覧まで。
   // アカウント未選択では権限も取りにいかない（画面が通信しない約束）。
   useEffect(() => {
-    if (!selectedAccountId) { setCanManage(false); return }
+    setCanManage(false)
+    setCanManageMappings(false)
+    if (!selectedAccountId) return
     let active = true
     void api.staff.me().then((response) => {
       if (!active) return
       setCanManage(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
+      setCanManageMappings(response.success && response.data.role === 'owner')
     }).catch(() => undefined)
     return () => { active = false }
   }, [selectedAccountId])
@@ -437,12 +443,30 @@ export default function AdIntegration({
     }
   }, [importingId, load])
 
+  // 切替後に前アカウントの行・候補・保存結果を使わない。
+  useEffect(() => {
+    mappingContextRef.current += 1
+    mappingLoadGenerationRef.current += 1
+    setMappingRows([])
+    setMappingPoints([])
+    setMappingPlatforms([])
+    setMappingState('idle')
+    setNewPointId('')
+    setNewPlatformId('')
+    setNewEventName('')
+    setMappingBusy(false)
+    setMappingError('')
+  }, [selectedAccountId])
+
   /* F-21: 選んだLINEアカウントの対応表を読む。 */
   const loadMappings = useCallback(async () => {
-    if (!selectedAccountId) {
+    const accountAtRequest = selectedAccountId
+    const generation = ++mappingLoadGenerationRef.current
+    if (!accountAtRequest) {
       setMappingState('idle')
       return
     }
+    const isCurrent = () => generation === mappingLoadGenerationRef.current && accountAtRequest === latestAccountRef.current
     setMappingState('loading')
     try {
       const res = await fetchApi<
@@ -451,7 +475,8 @@ export default function AdIntegration({
           conversionPoints: Array<{ id: string; name: string }>
           adPlatforms: Array<{ id: string; name: string }>
         }>
-      >(`/api/ad-platforms/event-mappings?lineAccountId=${encodeURIComponent(selectedAccountId)}`)
+      >(`/api/ad-platforms/event-mappings?lineAccountId=${encodeURIComponent(accountAtRequest)}`)
+      if (!isCurrent()) return
       if (res.success) {
         setMappingRows(res.data.mappings)
         setMappingPoints(res.data.conversionPoints)
@@ -461,24 +486,28 @@ export default function AdIntegration({
         setMappingState('error')
       }
     } catch {
-      setMappingState('error')
+      if (isCurrent()) setMappingState('error')
     }
   }, [selectedAccountId])
 
   /* F-21: 接続の板を開いた時だけ対応表を読む。履歴の再読み込みでは読まない。 */
   useEffect(() => {
     if (view === 'connections' && selectedAccountId) void loadMappings()
+    return () => { mappingLoadGenerationRef.current += 1 }
   }, [view, selectedAccountId, loadMappings])
 
   /* F-21: 今の行をまとめて保存する(置き換え)。 */
   const saveMappings = useCallback(async () => {
-    if (!selectedAccountId || mappingBusy) return
+    if (!selectedAccountId || mappingBusy || !canManageMappings || mappingState !== 'ready') return
+    const accountAtRequest = selectedAccountId
+    const context = mappingContextRef.current
+    const isCurrent = () => context === mappingContextRef.current && accountAtRequest === latestAccountRef.current
     setMappingBusy(true)
     setMappingError('')
     try {
       const res = await fetchApi<
         ApiResponse<{ mappings: AdEventMappingRow[] }>
-      >(`/api/ad-platforms/event-mappings?lineAccountId=${encodeURIComponent(selectedAccountId)}`, {
+      >(`/api/ad-platforms/event-mappings?lineAccountId=${encodeURIComponent(accountAtRequest)}`, {
         method: 'PUT',
         body: JSON.stringify({
           mappings: mappingRows.map((row) => ({
@@ -488,17 +517,18 @@ export default function AdIntegration({
           })),
         }),
       })
+      if (!isCurrent()) return
       if (res.success) {
         setMappingRows(res.data.mappings)
       } else {
         setMappingError(res.error || '保存できませんでした')
       }
     } catch {
-      setMappingError('保存できませんでした。通信を確かめて、もう一度お試しください。')
+      if (isCurrent()) setMappingError('保存できませんでした。通信を確かめて、もう一度お試しください。')
     } finally {
-      setMappingBusy(false)
+      if (isCurrent()) setMappingBusy(false)
     }
-  }, [selectedAccountId, mappingBusy, mappingRows])
+  }, [selectedAccountId, mappingBusy, mappingRows, canManageMappings, mappingState])
 
   /* F-21: 行を1件足す。重なりは口が弾くので、ここでは弾かない。 */
   const addMappingRow = useCallback(() => {
@@ -786,7 +816,7 @@ export default function AdIntegration({
               <ListState
                 kind="empty"
                 title="広告側の名前の対応表はまだありません"
-                description="下の欄から1件ずつ足して、保存してください。"
+                description={canManageMappings ? '下の欄から1件ずつ足して、保存してください。' : 'オーナーが対応表を設定すると表示されます。'}
               />
             ) : (
               <div className="overflow-hidden rounded-card border border-hairline">
@@ -796,7 +826,7 @@ export default function AdIntegration({
                       <Th>成果地点</Th>
                       <Th>広告</Th>
                       <Th>広告側の名前</Th>
-                      {canManage ? <Th align="right">操作</Th> : null}
+                      {canManageMappings ? <Th align="right">操作</Th> : null}
                     </TableHeadRow>
                   </thead>
                   <tbody className="divide-y divide-hairline">
@@ -805,7 +835,7 @@ export default function AdIntegration({
                         <td className="px-4 py-3 text-ink">{row.conversionPointName}</td>
                         <td className="px-4 py-3 text-ink-secondary">{row.adPlatformName}</td>
                         <td className="px-4 py-3 text-ink-secondary">
-                          {canManage ? (
+                          {canManageMappings ? (
                             <TextField
                               aria-label={`${row.conversionPointName}の広告側の名前`}
                               value={row.eventName}
@@ -825,7 +855,7 @@ export default function AdIntegration({
                             row.eventName
                           )}
                         </td>
-                        {canManage ? (
+                        {canManageMappings ? (
                           <td className="px-4 py-3 text-right">
                             <Button
                               variant="secondary"
@@ -852,7 +882,7 @@ export default function AdIntegration({
               </div>
             )}
           </div>
-          {canManage && mappingState === 'ready' ? (
+          {canManageMappings && mappingState === 'ready' ? (
             <div className="mt-3 space-y-2">
               <div className="flex flex-wrap items-end gap-2">
                 <Select
