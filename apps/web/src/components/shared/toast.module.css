@@ -151,3 +151,6 @@
 }
 [data-theme='v8'] .icon { width: 16px; height: 16px; }
 [data-theme='v8'] .undo { padding: 0; min-height: 0; font-weight: 600; text-decoration: none; line-height: 20px; }
+
+/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+[data-theme='v8'] .toast { -webkit-font-smoothing: auto; }
