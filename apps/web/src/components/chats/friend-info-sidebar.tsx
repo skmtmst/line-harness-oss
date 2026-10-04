@@ -102,6 +102,19 @@ const statusLabels: Record<NonNullable<ChatStatusInfo['status']>, { label: strin
 }
 
 /*
+ * API の形が想定と違っても（一覧の形・null・項目の欠け）落ちないよう、
+ * 配列として読む値はここを通す。配列でなければ空として扱う。
+ */
+function asArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : []
+}
+
+function isFriendDetailShape(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    && typeof (value as { id?: unknown }).id === 'string'
+}
+
+/*
  * Render a metadata value safely as text.
  * INBOX-07: 配列やオブジェクトも生のJSONではなく読める形へ畳む。
  * 値の中身（URL・長文）はそのまま出し、枠の中で安全に折り返す。
@@ -329,7 +342,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
     setError(null)
     api.friends.get(friendId).then((res) => {
       if (cancelled) return
-      if (res.success && res.data) {
+      // 1人分の形（id を持つ1件）だけを受け取る。一覧の形などは取得失敗として扱う。
+      if (res.success && isFriendDetailShape(res.data)) {
         setFriend(res.data as unknown as FriendDetail)
       } else {
         // 内部の例外文字列はそのまま出さない。利用者向けの短い理由にする。
@@ -353,8 +367,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
     setMileage({ kind: 'loading' })
     api.friends.mileage(friendId, 10).then((res) => {
       if (cancelled) return
-      if (res.success && res.data) {
-        setMileage({ kind: 'data', ...res.data })
+      if (res.success && res.data && res.data.summary) {
+        setMileage({ kind: 'data', summary: res.data.summary, history: asArray(res.data.history) })
       } else {
         setMileage({ kind: 'error' })
       }
@@ -385,7 +399,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
     api.friendFields.forFriend(friendId, { suppressFeatureDisabledEvent: true }).then((res) => {
       if (cancelled) return
       if (res.success && res.data) {
-        setFriendFields({ kind: 'data', items: res.data.items })
+        setFriendFields({ kind: 'data', items: asArray(res.data.items) })
       } else {
         setFriendFields({ kind: 'error' })
       }
@@ -467,13 +481,16 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
       ? friendFields.items.find((field) => field.fieldKey === key)?.name
       : undefined
     if (fromField) return fromField
-    const fromForm = (friend?.formSubmissions ?? [])
-      .flatMap((submission) => submission.fields)
+    const fromForm = asArray(friend?.formSubmissions)
+      .flatMap((submission) => asArray(submission.fields))
       .find((field) => field.name === key)?.label
     return fromForm ?? key
   }
 
   if (!friendId) return null
+
+  const tags = asArray(friend?.tags)
+  const formSubmissions = asArray(friend?.formSubmissions)
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
@@ -816,7 +833,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   ＋ 追加
                 </a>
               </div>
-              {friend.tags.length === 0 ? (
+              {tags.length === 0 ? (
                 <p className="text-[11px] text-ink-faint italic">タグなし</p>
               ) : (
                 /*
@@ -825,7 +842,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   切れたまま読めない状態にしない。
                 */
                 <div className="flex flex-wrap gap-1">
-                  {friend.tags.map((tag) => (
+                  {tags.map((tag) => (
                     <span
                       key={tag.id}
                       className="inline-flex max-w-full items-center rounded-mini px-2 py-0.5 text-[10px] font-medium"
@@ -981,20 +998,20 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   INBOX-17: 取得するのは最新10件まで。続きがあるか、全部で
                   何件あるかを黙らせない。10件を超える分は友だち詳細へ誘導する。
                 */}
-                {typeof friend.formSubmissionTotal === 'number' && friend.formSubmissionTotal > 0 && (
+                {typeof friend.formSubmissionTotal === 'number' && friend.formSubmissionTotal > 0 && formSubmissions.length > 0 && (
                   <span className="text-[10px] text-ink-faint">
-                    {formatNumber(friend.formSubmissionTotal)}件中 1〜{formatNumber(friend.formSubmissions.length)}件を表示
+                    {formatNumber(friend.formSubmissionTotal)}件中 1〜{formatNumber(formSubmissions.length)}件を表示
                   </span>
                 )}
               </div>
-              {!friend.formSubmissions || friend.formSubmissions.length === 0 ? (
+              {formSubmissions.length === 0 ? (
                 <p className="text-[11px] text-ink-faint italic">回答はまだありません</p>
               ) : (
                 <div>
                 <div className="space-y-3">
-                  {friend.formSubmissions.map((submission) => {
-                    const labels = new Map(submission.fields.map((field) => [field.name, field.label]))
-                    const answers = Object.entries(submission.data).filter(([key]) => !key.startsWith('_'))
+                  {formSubmissions.map((submission) => {
+                    const labels = new Map(asArray(submission.fields).map((field) => [field.name, field.label]))
+                    const answers = Object.entries(submission.data ?? {}).filter(([key]) => !key.startsWith('_'))
                     return (
                       <div key={submission.id} className="rounded-control border border-divider-soft bg-surface-pearl p-3">
                         <div className="flex items-start justify-between gap-2">
@@ -1022,12 +1039,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   友だち詳細の回答一覧へ進む口を出す。
                 */}
                 {typeof friend.formSubmissionTotal === 'number'
-                  && friend.formSubmissions.length < friend.formSubmissionTotal && (
+                  && formSubmissions.length < friend.formSubmissionTotal && (
                   <a
                     href={`/friends/detail?id=${friend.id}`}
                     className="text-action mt-3 inline-flex text-[11px] font-semibold hover:underline"
                   >
-                    残り{friend.formSubmissionTotal - friend.formSubmissions.length}件は友だち詳細で見る
+                    残り{friend.formSubmissionTotal - formSubmissions.length}件は友だち詳細で見る
                   </a>
                 )}
                 </div>
