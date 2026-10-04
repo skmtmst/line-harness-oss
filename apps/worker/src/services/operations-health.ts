@@ -31,6 +31,8 @@ const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const CREDENTIAL_WARNING_DAYS = 14;
 const INFRA_SLOW_MS = 3_000;
 const INFRA_ALERT_AFTER = 3;
+/** 解消も3回連続の成功で確定する。1回の成功で閉じると「解消→再発」が繰り返される。 */
+const INFRA_RECOVER_AFTER = 3;
 const FRIEND_DECREASE_WARNING_RATIO = -0.05;
 const FRIEND_DECREASE_DANGER_RATIO = -0.1;
 const FRIEND_DECREASE_MIN_ABSOLUTE = 10;
@@ -53,12 +55,12 @@ function jstMonthBounds(nowIso: string): { monthStart: string; monthEnd: string;
  * 失敗した実行でも status は normal のまま残る。実際の失敗は value_json の
  * `failed` 印を見て数える（印の無い古い行は status で判断する）。
  */
-async function countRecentFailures(
+async function recentCheckResults(
   db: D1Database,
   lineAccountId: string,
   checkKey: OperationHealthResultInput['checkKey'],
   limit: number,
-): Promise<number> {
+): Promise<Array<{ status: OperationHealthStatus; failed: boolean }>> {
   const rows = await db.prepare(
     `SELECT r.status, r.value_json
        FROM operation_health_results r
@@ -67,8 +69,7 @@ async function countRecentFailures(
       ORDER BY r.observed_at DESC, r.id DESC
       LIMIT ?`,
   ).bind(lineAccountId, checkKey, limit).all<{ status: string; value_json: string | null }>();
-  let consecutive = 0;
-  for (const row of rows.results ?? []) {
+  return (rows.results ?? []).map((row) => {
     let failed = row.status !== 'normal';
     if (row.value_json) {
       try {
@@ -76,10 +77,35 @@ async function countRecentFailures(
         if (typeof value.failed === 'boolean') failed = value.failed;
       } catch { /* 壊れた行は status 側の判定を使う */ }
     }
-    if (!failed) break;
+    return { status: row.status as OperationHealthStatus, failed };
+  });
+}
+
+async function countRecentFailures(
+  db: D1Database,
+  lineAccountId: string,
+  checkKey: OperationHealthResultInput['checkKey'],
+  limit: number,
+): Promise<number> {
+  let consecutive = 0;
+  for (const row of await recentCheckResults(db, lineAccountId, checkKey, limit)) {
+    if (!row.failed) break;
     consecutive += 1;
   }
   return consecutive;
+}
+
+/**
+ * 知らせている最中かどうか。直前の記録が異常なら、その重さを引き継ぐ。
+ * 一度正常に戻った後の古い異常は見ない（戻った時点で知らせは閉じている）。
+ */
+function holdingSeverity(
+  recent: Array<{ status: OperationHealthStatus; failed: boolean }>,
+): 'warning' | 'danger' | null {
+  const latest = recent[0];
+  return latest && (latest.status === 'danger' || latest.status === 'warning')
+    ? latest.status
+    : null;
 }
 
 function result(
@@ -168,10 +194,15 @@ async function collectChecks(
       const sendable = lineRemaining === null ? harnessRemaining
         : harnessRemaining === null ? lineRemaining
         : Math.min(lineRemaining, harnessRemaining);
-      const bindingRatio = sendable === null ? null
-        : sendable === lineRemaining
-          ? quota.limit === 0 ? 1 : Number(quota.used) / Number(quota.limit)
-          : harnessLimit ? harnessUsed / harnessLimit : 0;
+      const lineRatio = quota.limit === null || quota.used === null ? null
+        : quota.limit === 0 ? 1 : Number(quota.used) / Number(quota.limit);
+      const harnessRatio = harnessLimit === null ? null
+        : harnessLimit === 0 ? 1 : harnessUsed / harnessLimit;
+      // 取得できた側のうち「使用率の高い方」で判定する。残数の小さい側で判定すると、
+      // 両側の残数が近いときに見る側が入れ替わるだけで、使用率が跳ねて
+      // 正常↔注意を5分ごとに往復する（通知のばたつきの原因）。
+      const ratios = [lineRatio, harnessRatio].filter((ratio): ratio is number => ratio !== null);
+      const bindingRatio = ratios.length === 0 ? null : Math.max(...ratios);
       const forecastRemaining = sendable === null ? null : sendable - scheduledPlanned;
       const status: OperationHealthStatus = bindingRatio === null
         ? 'unknown'
@@ -230,8 +261,27 @@ async function collectChecks(
         last_received_at: string | null; failed_count: number; event_count: number;
       }>();
       if (!row?.last_received_at) {
-        return result('webhook', 'unknown', '直近1時間のWebhook受信がありません', 'line_webhook_events', observedAt,
-          { eventCount: 0, failedCount: 0, lastReceivedAt: null });
+        // 受信が無いのは「誰も送ってこなかった」だけのことが多い。これを異常にすると
+        // 静かな時間帯ごとに知らせが鳴る。普段は受信があるのに1日止まった時だけ注意にする。
+        const span = await db.prepare(
+          `SELECT MAX(received_at) AS last_received_at,
+                  COALESCE(SUM(CASE WHEN received_at >= datetime(?, '-24 hour') THEN 1 ELSE 0 END), 0) AS day_count,
+                  COUNT(*) AS week_count
+             FROM line_webhook_events
+            WHERE line_account_id = ? AND received_at >= datetime(?, '-7 day')`,
+        ).bind(observedAt, account.id, observedAt).first<{
+          last_received_at: string | null; day_count: number; week_count: number;
+        }>();
+        const silent = Number(span?.day_count ?? 0) === 0 && Number(span?.week_count ?? 0) > 0;
+        return result('webhook', silent ? 'warning' : 'normal',
+          silent ? '24時間以上Webhookの受信がありません' : '直近1時間のWebhook受信はありません（普段どおりの範囲です）',
+          'line_webhook_events', observedAt,
+          {
+            eventCount: 0, failedCount: 0,
+            lastReceivedAt: span?.last_received_at ?? null,
+            received24h: Number(span?.day_count ?? 0), received7d: Number(span?.week_count ?? 0),
+          },
+          { silentHours: 24 });
       }
       const failed = Number(row.failed_count);
       const status: OperationHealthStatus = failed >= 3 ? 'danger' : failed > 0 ? 'warning' : 'normal';
@@ -347,21 +397,48 @@ async function collectChecks(
       targets.push({ kind: 'queue', ok: true, ms: 0, note: deps.queue ? '束縛あり（送信は既存の経路で観測）' : '束縛なし' });
       targets.push({ kind: 'kv', ok: true, ms: 0, note: '束縛なし' });
 
+      const thresholds = {
+        slowMs: INFRA_SLOW_MS,
+        alertAfter: INFRA_ALERT_AFTER,
+        recoverAfter: INFRA_RECOVER_AFTER,
+      };
       const failing = targets.filter((target) => !target.ok || target.ms >= INFRA_SLOW_MS);
+      // 知らせている最中かどうかを先に見る。開くのは3回連続の失敗、閉じるのは1回の成功、
+      // という左右の違いがあると、たまに失敗する不調で「異常→解消→再発」を5分ごとに
+      // 繰り返してしまう。開くのも閉じるのも3回連続で揃える。
+      const recent = await recentCheckResults(db, account.id, 'infra_canary', INFRA_RECOVER_AFTER - 1);
+      const holding = holdingSeverity(recent);
       if (failing.length === 0) {
+        let cleanStreak = 1;
+        for (const row of recent) {
+          if (row.failed) break;
+          cleanStreak += 1;
+        }
+        if (holding && cleanStreak < INFRA_RECOVER_AFTER) {
+          return result('infra_canary', holding,
+            `データの置き場の試しは回復しつつあります（${cleanStreak}/${INFRA_RECOVER_AFTER}回連続で成功）`,
+            'infra_canary', observedAt,
+            { targets, failed: false, cleanStreak }, thresholds);
+        }
         return result('infra_canary', 'normal', 'データの置き場への読み書きは正常です', 'infra_canary', observedAt,
-          { targets, failed: false }, { slowMs: INFRA_SLOW_MS, alertAfter: INFRA_ALERT_AFTER });
+          { targets, failed: false, cleanStreak }, thresholds);
       }
+      // 失敗（つながらない・読み書きできない）は「エラー」、遅いだけなら「注意」に分ける。
+      const severity: 'danger' | 'warning' = failing.some((target) => !target.ok) ? 'danger' : 'warning';
       const consecutive = await countRecentFailures(db, account.id, 'infra_canary', INFRA_ALERT_AFTER - 1) + 1;
       if (consecutive >= INFRA_ALERT_AFTER) {
-        return result('infra_canary', 'danger',
-          `データの置き場の試しが${consecutive}回続けて失敗しています`, 'infra_canary', observedAt,
-          { targets, consecutive, failed: true }, { slowMs: INFRA_SLOW_MS, alertAfter: INFRA_ALERT_AFTER });
+        return result('infra_canary', severity,
+          severity === 'danger'
+            ? `データの置き場の試しが${consecutive}回続けて失敗しています`
+            : `データの置き場の応答が${consecutive}回続けて遅くなっています`,
+          'infra_canary', observedAt,
+          { targets, consecutive, failed: true }, thresholds);
       }
-      return result('infra_canary', 'normal',
+      // まだ3回に達していない。ただし知らせている最中なら正常へ戻さない（上と同じ理由）。
+      return result('infra_canary', holding ?? 'normal',
         `データの置き場の試しで失敗・遅延を記録（${consecutive}回連続・${INFRA_ALERT_AFTER}回続くとお知らせ）`,
         'infra_canary', observedAt,
-        { targets, consecutive, failed: true }, { slowMs: INFRA_SLOW_MS, alertAfter: INFRA_ALERT_AFTER });
+        { targets, consecutive, failed: true }, thresholds);
     }),
     isolate('monitoring_heartbeat', observedAt, async () => {
       // 見張り自体が5分ごとに回っているか。直近の scheduled run の完了から
