@@ -77,6 +77,50 @@ function mockFetchOk(): void {
 }
 
 describe('広告設定ルートのアカウント境界(#638)', () => {
+  it('対応表を保存して読み直せる。選択肢は画面の契約で返し、広告設定は変えない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    testDb.raw.prepare(`INSERT INTO conversion_points (id, name, event_type, line_account_id, status)
+      VALUES ('point-1', '購入', 'purchase', 'a1', 'active')`).run();
+    const target = app(staff('owner-1', 'tenant-1'));
+    const env = { DB: testDb.db } as Env['Bindings'];
+    const before = testDb.raw.prepare(`SELECT config FROM ad_platforms WHERE id = 'p1'`).get();
+    const saved = await target.request('/api/ad-platforms/event-mappings?lineAccountId=a1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mappings: [{ conversionPointId: 'point-1', adPlatformId: 'p1', eventName: 'Purchase' }] }),
+    }, env);
+    expect(saved.status).toBe(200);
+    const loaded = await target.request('/api/ad-platforms/event-mappings?lineAccountId=a1', {}, env);
+    expect(loaded.status).toBe(200);
+    expect(await loaded.json()).toMatchObject({
+      success: true,
+      data: {
+        mappings: [{ conversionPointId: 'point-1', adPlatformId: 'p1', eventName: 'Purchase' }],
+        conversionPoints: [{ id: 'point-1', name: '購入' }],
+        adPlatforms: [{ id: 'p1', name: 'Meta広告' }],
+      },
+    });
+    expect(testDb.raw.prepare(`SELECT config FROM ad_platforms WHERE id = 'p1'`).get()).toEqual(before);
+  });
+
+  it('対応表は別統括から読めず、管理者・担当者は書き換えられない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const env = { DB: testDb.db } as Env['Bindings'];
+    expect((await app(staff('owner-1', 'tenant-1')).request(
+      '/api/ad-platforms/event-mappings?lineAccountId=b1', {}, env,
+    )).status).toBe(403);
+    for (const role of ['admin', 'staff'] as const) {
+      expect((await app(staff('owner-1', 'tenant-1', role)).request(
+        '/api/ad-platforms/event-mappings?lineAccountId=a1', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mappings: [] }),
+        }, env,
+      )).status).toBe(403);
+    }
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM ad_conversion_event_mappings').get()).toEqual({ count: 0 });
+  });
+
   it('一覧は自統括だけ。別統括の指定は403、未認証も403', async () => {
     const testDb = createTestD1();
     seed(testDb);

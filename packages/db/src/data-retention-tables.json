@@ -109,6 +109,13 @@
       "parentColumn": "id"
     }
   },
+  "ad_conversion_event_mappings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "ad_conversion_logs": {
     "category": "purge",
     "scope": {

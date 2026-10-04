@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
   AD_PLATFORM_SECRET_KEYS,
   getAdPlatforms,
@@ -19,6 +20,12 @@ import {
 } from '@line-crm/db';
 import type { AdConversionLog } from '@line-crm/db';
 import { sendAdConversions } from '../services/ad-conversion.js';
+import {
+  AdEventMappingError,
+  listAdEventMappings,
+  resendAdConversion,
+  saveAdEventMappings,
+} from '../services/ad-event-mappings.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -186,6 +193,46 @@ async function adPlatformWriteScope(
   const scope = await getVisibleLineAccountScope(db, staff);
   return { accountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned };
 }
+
+// 固定パスは :id より先に登録し、対応表の保存を広告設定の更新へ渡さない。
+// F-21 対応表の読み書き。保存はオーナーだけ（送信先を変える操作のため）。
+adPlatforms.get('/api/ad-platforms/event-mappings', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
+    const { mappings, points, platforms } = await listAdEventMappings(c.env.DB, lineAccountId);
+    return c.json({ success: true, data: { mappings, conversionPoints: points, adPlatforms: platforms } });
+  } catch (err) {
+    console.error('GET /api/ad-platforms/event-mappings error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+adPlatforms.put('/api/ad-platforms/event-mappings', requireRole('owner'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const body: { mappings?: unknown } = await c.req.json().catch(() => ({}));
+    const { mappings, points, platforms } = await saveAdEventMappings(c.env.DB, lineAccountId, body.mappings);
+    return c.json({ success: true, data: { mappings, conversionPoints: points, adPlatforms: platforms } });
+  } catch (err) {
+    if (err instanceof AdEventMappingError) {
+      return c.json({ success: false, error: err.message, code: err.code }, err.status as ContentfulStatusCode);
+    }
+    console.error('PUT /api/ad-platforms/event-mappings error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 
 // PUT /api/ad-platforms/:id - update
 adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
@@ -526,6 +573,30 @@ adPlatforms.get('/api/ad-platforms/:id/logs', requireRole('owner', 'admin', 'sta
     });
   } catch (err) {
     console.error('GET /api/ad-platforms/:id/logs error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// F-22 送信のやり直し。同じ目印で送り直す。90日を過ぎたら拒む。
+adPlatforms.post('/api/ad-platforms/logs/:id/resend', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const result = await resendAdConversion(c.env.DB, c.req.param('id'), lineAccountId, {
+      credentialKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    });
+    return c.json({ success: true, data: result }, 202);
+  } catch (err) {
+    if (err instanceof AdEventMappingError) {
+      const status = err.status === 404 ? 404 : err.status === 409 ? 409 : 400;
+      return c.json({ success: false, error: err.message, code: err.code }, status as ContentfulStatusCode);
+    }
+    console.error('POST /api/ad-platforms/logs/:id/resend error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
