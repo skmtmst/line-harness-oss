@@ -2,12 +2,11 @@
 /*
  * 分析レポート作成の V8（板 H5UoIu）と作成時の競合小窓（G83vi）。
  *
- * V8 テーマ（<html data-theme="v8">）のときだけ V8 の頭・帯・右欄を出し、
- * v7 の画素は変えない。既存の v7 試験はそのまま通す。
+ * V8 の頭・帯・右欄と、保存・競合時の入力保護を確認する。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('next/link', () => ({
@@ -52,7 +51,7 @@ const OPTIONS = {
 
 const net = vi.hoisted(() => ({
   puts: [] as unknown[],
-  putMode: 'ok' as 'ok' | 'conflict-then-ok' | 'deferred',
+  putMode: 'ok' as 'ok' | 'conflict-then-ok' | 'deferred' | 'failure',
   deferred: [] as Array<(value: Response) => void>,
   gets: 0,
   getMode: 'normal' as 'normal' | 'deferred' | 'failure',
@@ -69,6 +68,9 @@ function installFetch() {
       return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200 })
     }
     if (url.pathname.startsWith('/api/analytics/report-schedules/report-1') && (init?.method ?? 'GET') === 'PUT') {
+      if (net.putMode === 'failure') {
+        return new Response(JSON.stringify({ success: false, error: 'internal failure' }), { status: 500 })
+      }
       if (net.putMode === 'conflict-then-ok') {
         net.putMode = 'ok'
         return new Response(
@@ -145,6 +147,7 @@ async function click(element: HTMLElement) {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   document.documentElement.dataset.theme = 'v8'
   fixture.editId = null
   fixture.accountId = 'account-a'
@@ -203,6 +206,93 @@ describe('V8 レポート作成（H5UoIu）', () => {
 })
 
 describe('V8 作成時の競合小窓（G83vi）', () => {
+  it('通常の保存成功で離脱確認を解除し、次の編集では再び入力を守る', async () => {
+    fixture.editId = 'report-1'
+    await mount()
+    await settle()
+    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(nameField, { target: { value: '保存する名前' } }) })
+    const beforeSave = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(beforeSave)
+    expect(beforeSave.defaultPrevented).toBe(true)
+
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    expect(net.puts).toHaveLength(1)
+    const afterSave = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterSave)
+    expect(afterSave.defaultPrevented).toBe(false)
+    expect(nameField.value).toBe('保存する名前')
+
+    await act(async () => { fireEvent.change(nameField, { target: { value: '次の編集' } }) })
+    const afterEdit = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterEdit)
+    expect(afterEdit.defaultPrevented).toBe(true)
+  })
+
+  it('保存が失敗したら未保存の扱いと入力を残す', async () => {
+    fixture.editId = 'report-1'
+    net.putMode = 'failure'
+    await mount()
+    await settle()
+    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(nameField, { target: { value: '残す名前' } }) })
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    expect(container.textContent).toContain('保存できませんでした')
+    expect(container.textContent).not.toContain('API error:')
+    expect(container.textContent).not.toContain('internal failure')
+    expect(nameField.value).toBe('残す名前')
+    const afterFailure = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterFailure)
+    expect(afterFailure.defaultPrevented).toBe(true)
+
+    net.putMode = 'ok'
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    expect(net.puts).toHaveLength(1)
+    expect(container.textContent).not.toContain('保存できませんでした')
+    const afterRetry = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterRetry)
+    expect(afterRetry.defaultPrevented).toBe(false)
+  })
+
+  it('比較後の保存が失敗しても窓と入力を残し、同じ内容で再試行できる', async () => {
+    fixture.editId = 'report-1'
+    net.putMode = 'conflict-then-ok'
+    await mount()
+    await settle()
+    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(nameField, { target: { value: '比較して残す名前' } }) })
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    await click(buttonByText('違いを比べる'))
+
+    net.putMode = 'failure'
+    await click(overlayButtonByText('この内容で保存する'))
+    await settle()
+    expect(overlayText()).toContain('保存できませんでした')
+    expect(overlayText()).not.toContain('API error:')
+    expect(overlayText()).not.toContain('internal failure')
+    expect(nameField.value).toBe('比較して残す名前')
+    expect(container.querySelector('[data-design-node="G83vi"]')).toBeTruthy()
+    expect(overlayButtonByText('この内容で保存する').disabled).toBe(false)
+    const afterFailure = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterFailure)
+    expect(afterFailure.defaultPrevented).toBe(true)
+
+    net.putMode = 'ok'
+    await click(overlayButtonByText('この内容で保存する'))
+    await settle()
+    expect(net.puts).toHaveLength(1)
+    expect(container.querySelector('[data-design-node="G83vi"]')).toBeNull()
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+    expect(nameField.value).toBe('比較して残す名前')
+    const afterRetry = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterRetry)
+    expect(afterRetry.defaultPrevented).toBe(false)
+  })
+
   it('409で帯が出て入力が残り、比べたうえで保存できる', async () => {
     fixture.editId = 'report-1'
     net.putMode = 'conflict-then-ok'

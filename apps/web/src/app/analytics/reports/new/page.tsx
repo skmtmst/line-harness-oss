@@ -28,6 +28,7 @@ import ReportHeadV8 from './report-head-v8'
 import {
   api,
   ApiError,
+  describeSaveFailure,
   type AnalyticsReportRun,
   type AnalyticsReportSchedule,
   type AnalyticsReportScheduleOptions,
@@ -617,6 +618,7 @@ function AnalyticsReportFormPage() {
       return
     }
     const { payload } = built
+    const submittedSignature = signature
     setSaving(true)
     setError('')
     setNameError('')
@@ -685,6 +687,7 @@ function AnalyticsReportFormPage() {
         setUpdateConflict(false)
         setConflictLatest(null)
         setEditing(response.data)
+        setBaseline(submittedSignature)
         notifyToast(response.data.status === 'paused'
           ? '定期レポートを更新しました。止まっている間は届きません。再開すると次の予定から届きます。'
           : `定期レポートを更新しました。次は${nextLabel}に届きます。`)
@@ -741,7 +744,7 @@ function AnalyticsReportFormPage() {
       }
     } catch (caught) {
       if (!isFresh()) return
-      setError(caught instanceof Error ? caught.message : editing ? '定期レポートを更新できませんでした' : '定期レポートを作れませんでした')
+      setError(describeSaveFailure(caught))
     } finally {
       if (isFresh()) setSaving(false)
     }
@@ -883,7 +886,7 @@ function AnalyticsReportFormPage() {
         if (isCurrent()) setCompareError('ほかの人がさらに先に保存しました。比べ直してから、もう一度お試しください。')
         return
       }
-      setCompareError(caught instanceof Error ? caught.message : '定期レポートを更新できませんでした')
+      setCompareError(describeSaveFailure(caught))
     } finally {
       if (isCurrent()) {
         setCompareBusy(false)
