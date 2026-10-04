@@ -38,6 +38,8 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
+import { notifyToast } from '@/components/shared/toast'
 import FolderPanel from '@/components/shared/folder-panel'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
@@ -119,10 +121,58 @@ function statusTone(rule: FriendAddRule) {
   return rule.status === 'published' ? styles.statePillActive : styles.statePillDraft
 }
 
+/*
+ * 初回案内の一覧の骨組み（サクサク感 A）。見出しは本物、行は5行・
+ * 高さと列幅は本物の表と同じ。光は共通 `Skeleton`。
+ */
+function FriendAddListSkeleton() {
+  return (
+    <div className={styles.tableWrap} aria-hidden="true">
+      <table className={styles.table}>
+        <colgroup>
+          <col style={{ width: 72 }} />
+          <col />
+          <col style={{ width: 200 }} />
+          <col style={{ width: 96 }} />
+          <col style={{ width: 80 }} className={styles.recentCol} />
+          <col style={{ width: 44 }} />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>順</th>
+            <th>設定（対象の流入リンク）</th>
+            <th>最初に送るもの</th>
+            <th>状態</th>
+            <th className={styles.recentCol}>直近7日</th>
+            <th aria-label="操作" />
+          </tr>
+        </thead>
+        <tbody>
+          {[0, 1, 2, 3, 4].map((n) => (
+            <tr key={n}>
+              <td><Skeleton width={20} height={14} /></td>
+              <td>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <Skeleton width="45%" height={14} />
+                  <Skeleton width="60%" height={12} />
+                </span>
+              </td>
+              <td><Skeleton width="70%" height={13} /></td>
+              <td><Skeleton width="80%" height={13} /></td>
+              <td><Skeleton width="70%" height={13} /></td>
+              <td><Skeleton width={20} height={14} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export default function FriendAddListV8() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<FriendAddListSkeleton />}>
       <FriendAddListV8Inner />
     </Suspense>
   )
@@ -142,6 +192,10 @@ function FriendAddListV8Inner() {
 
   const [data, setData] = useState<FriendAddRuleListData | null>(null)
   const [loading, setLoading] = useState(true)
+  /* 数の帯の骨組み判定（0.3秒以内なら出さない・出したら最低0.4秒）。 */
+  const showKpiSkel = useDelayedSkeleton(loading)
+  /* 並べ替えの楽観表示（サーバの順に追いつくまでこっちを出す）。 */
+  const [orderOverride, setOrderOverride] = useState<string[] | null>(null)
   const [error, setError] = useState('')
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [search, setSearch] = useState('')
@@ -277,7 +331,12 @@ function FriendAddListV8Inner() {
   }
 
   const items = useMemo(() => data?.items ?? [], [data])
-  const regularItems = useMemo(() => items.filter((rule) => !rule.isFallback), [items])
+  const regularItems = useMemo(() => {
+    const list = items.filter((rule) => !rule.isFallback)
+    if (!orderOverride) return list
+    const rank = new Map(orderOverride.map((id, index) => [id, index]))
+    return [...list].sort((a, b) => (rank.get(a.id) ?? 9999) - (rank.get(b.id) ?? 9999))
+  }, [items, orderOverride])
   const sinkRule = useMemo(() => items.find((rule) => rule.isFallback) ?? null, [items])
   const filterActive = Boolean(appliedSearch.trim() || folder || statusFilter)
 
@@ -296,20 +355,34 @@ function FriendAddListV8Inner() {
         : undefined
   const canReorder = canEdit && listComplete
 
-  const runReorder = async (order: string[]) => {
+  /*
+   * 並べ替えは先に画面を変えて裏で保存する（サクサク感 B）。
+   * 成功したら Toast の「元に戻す」（前の順で同じ口を叩く）で戻せる。
+   * 失敗したら順を戻して Toast で理由と「もう一度」。
+   */
+  const runReorder = async (order: string[], previous: string[]) => {
     if (!selectedAccountId) return
+    setOrderOverride(order)
     setActionError('')
     try {
       const res = await api.friendAddRules.reorder(selectedAccountId, kind, order)
       if (!res.success) throw new Error(res.error)
+      await load().catch(() => {})
+      /* 保存した順と違えば上書きしない（連打の取りこぼし防止）。 */
+      setOrderOverride((current) => (current === order ? null : current))
+      notifyToast('並び替えました', {
+        actionLabel: '元に戻す',
+        onAction: () => void runReorder(previous, order),
+      })
     } catch (caught) {
-      setActionError(
+      setOrderOverride(null)
+      await load().catch(() => {})
+      notifyToast(
         caught instanceof Error && caught.message
           ? `並び替えを保存できませんでした。${caught.message}`
-          : '並び替えを保存できませんでした。状態を読み直してから、もう一度お試しください。',
+          : '並び替えを保存できませんでした。',
+        { tone: 'error', actionLabel: 'もう一度試す', onAction: () => void runReorder(order, previous) },
       )
-    } finally {
-      void load()
     }
   }
 
@@ -321,8 +394,9 @@ function FriendAddListV8Inner() {
     const fromIdx = order.indexOf(from)
     const toIdx = order.indexOf(targetId)
     if (fromIdx < 0 || toIdx < 0) return
+    const previous = [...order]
     order.splice(toIdx, 0, ...order.splice(fromIdx, 1))
-    void runReorder(order)
+    void runReorder(order, previous)
   }
 
   const keyboardMove = (id: string, direction: -1 | 1) => {
@@ -336,9 +410,10 @@ function FriendAddListV8Inner() {
       setMoveNotice(`「${name}」は${direction < 0 ? '先頭' : '末尾'}にあるため、これ以上動かせません`)
       return
     }
+    const previous = [...order]
     order.splice(toIdx, 0, ...order.splice(fromIdx, 1))
     setMoveNotice(`「${name}」を${direction < 0 ? '上' : '下'}へ移動しました。${toIdx + 1}番目です`)
-    void runReorder(order)
+    void runReorder(order, previous)
   }
 
   /* ===== 一時停止 ===== */
@@ -501,18 +576,10 @@ function FriendAddListV8Inner() {
 
   /* ===== 表の中身（kFz4b の状態ごとの見え方） ===== */
 
-  const tableBody = loading && items.length === 0 ? (
-    <div className={styles.skeletonRows} role="status">
-      <span className="sr-only">読み込んでいます</span>
-      {[0, 1, 2, 3, 4].map((n) => (
-        <div key={n} className={styles.skeletonRow}>
-          <span className={styles.skeletonDot} />
-          <span className={styles.skeletonBar} />
-          <span className={styles.skeletonBar} style={{ maxWidth: 120 }} />
-        </div>
-      ))}
-    </div>
-  ) : error ? (
+  const tableBody = (
+    <div aria-busy={loading}>
+      <DelayedSkeleton loading={loading && items.length === 0} skeleton={<FriendAddListSkeleton />}>
+        {error ? (
     <div className={styles.stateCard}>
       <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
         <AlertCircle size={18} aria-hidden="true" />
@@ -735,7 +802,10 @@ function FriendAddListV8Inner() {
           </div>
         </div>
       ) : null}
-    </>
+        </>
+      )}
+      </DelayedSkeleton>
+    </div>
   )
 
   return (
@@ -784,10 +854,9 @@ function FriendAddListV8Inner() {
               {kpi.title}
             </span>
             <p className={styles.kpiValue}>
-              {kpi.value === null ? '—' : formatNumber(kpi.value)}
-              <span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span>
+              {showKpiSkel && kpi.value === null ? <Skeleton width="6ch" height={22} /> : kpi.value === null ? '—' : (<>{formatNumber(kpi.value)}<span className={styles.kpiUnit}>{kpi.unit}</span></>)}
             </p>
-            <p className={styles.kpiDetail}>{kpi.detail}</p>
+            <p className={styles.kpiDetail}>{showKpiSkel && kpi.detail === '—' ? <Skeleton width="10ch" height={11} /> : kpi.detail}</p>
             {kpi.href ? (
               <a href={kpi.href} className={styles.kpiLink}>
                 流入リンクを見る →

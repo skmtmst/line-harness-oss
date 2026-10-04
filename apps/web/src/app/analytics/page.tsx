@@ -38,6 +38,7 @@ import {
 } from './report-run-state'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import MetricValue from '@/components/ui/metric-value'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { useSearchParams } from 'next/navigation'
@@ -1087,6 +1088,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
    */
   presetConversion?: { id: string; name: string } | null
 }) {
+  const theme = useAdminTheme()
   const [funnels, setFunnels] = useState<
     Array<{
       id: string
@@ -1385,7 +1387,28 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
   }, [measurable, result])
 
   // ★V7 `x63W5x`：素の「読み込み中...」ではなく ListState loading で出す。
+  // V8 は出来上がりと同じ段の形の骨組み（サクサク感 A）。
   if (loading) {
+    if (theme === 'v8') {
+      return (
+        <div aria-busy="true" aria-label="ファネルを読み込んでいます">
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true" className="flex flex-col gap-4">
+                {[0, 1, 2, 3].map((step) => (
+                  <div key={step}>
+                    <Skeleton width="12ch" height="1em" />
+                    <Skeleton width="60%" height="1.6em" />
+                    <Skeleton width="20ch" height="0.85em" />
+                  </div>
+                ))}
+              </div>
+            )}
+          />
+        </div>
+      )
+    }
     return (
       <ListState kind="loading" title="ファネルを読み込んでいます" />
     )
@@ -2312,7 +2335,36 @@ function DateTimeMetricCell({ metric }: { metric: AnalyticsMetric<string> }) {
  * 日本語（口の生文言は出さない）。
  */
 function OverviewState({ loading, error, onRetry }: { loading: boolean; error: string; onRetry?: () => void }) {
-  if (loading) return <ListState kind="loading" title="分析を読み込んでいます" />
+  const theme = useAdminTheme()
+  if (loading) {
+    // V8 は数の帯と表の形の骨組み（サクサク感 A）。v7 は従来のまま。
+    if (theme === 'v8') {
+      return (
+        <div aria-busy="true" aria-label="分析を読み込んでいます">
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true" className="flex flex-col gap-4">
+                <div className="grid grid-cols-4 gap-3">
+                  {[0, 1, 2, 3].map((tile) => (
+                    <div key={tile}>
+                      <Skeleton width="10ch" height="1em" />
+                      <Skeleton width="14ch" height="1.6em" />
+                      <Skeleton width="12ch" height="0.85em" />
+                    </div>
+                  ))}
+                </div>
+                {[0, 1, 2, 3, 4].map((row) => (
+                  <Skeleton key={row} width="100%" height="1.4em" />
+                ))}
+              </div>
+            )}
+          />
+        </div>
+      )
+    }
+    return <ListState kind="loading" title="分析を読み込んでいます" />
+  }
   // 一時的な取得失敗は開き直すしかなかった。同じ条件で読み直す導線をここに出す。
   if (error) {
     return (

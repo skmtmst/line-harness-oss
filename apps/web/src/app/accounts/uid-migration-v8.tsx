@@ -19,6 +19,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -95,7 +96,22 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
   } = m
 
   if (status === 'loading') {
-    return <ListState kind="loading" title="UID移行を読み込んでいます" description="移行履歴とアカウントを確認しています。" />
+    return (
+      <div aria-busy="true" aria-label="UID移行を読み込んでいます">
+        <DelayedSkeleton
+          loading
+          skeleton={(
+            <div aria-hidden="true">
+              <Skeleton width="12ch" height="1.5em" />
+              <Skeleton width="100%" height="0.9em" />
+              <Skeleton width="100%" height="0.9em" />
+              <Skeleton width="100%" height="2.5em" />
+              <Skeleton width="100%" height="2.5em" />
+            </div>
+          )}
+        />
+      </div>
+    )
   }
   if (status === 'error') {
     return <ListState kind="error" title="UID移行を表示できませんでした" description="登録した移行履歴は消えていません。" action={<Button onClick={() => void load()}>再読み込み</Button>} />

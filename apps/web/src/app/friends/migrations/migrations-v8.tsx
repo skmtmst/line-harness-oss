@@ -15,6 +15,7 @@ import Checkbox from '@/components/shared/checkbox'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -33,7 +34,34 @@ export default function FriendMigrationsV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち', href: '/friends' }])
   const m = useFriendMigrations()
 
-  if (m.status === 'loading') return <ListState kind="loading" title="書き出し・取り込みを読み込んでいます" />
+  /*
+   * 読み込み中は頭・2枚の板の形の骨組み（サクサク感 A）。
+   * 光は共通 `Skeleton`。出す・消すの判定は `DelayedSkeleton` が持つ。
+   */
+  if (m.status === 'loading') {
+    return (
+      <DelayedSkeleton
+        loading
+        skeleton={(
+          <div className={styles.board} role="status" aria-label="書き出し・取り込みを読み込んでいます">
+            <span className="sr-only">書き出し・取り込みを読み込んでいます</span>
+            <Skeleton width={220} height={24} />
+            <Skeleton width="60%" height={14} />
+            <div className={styles.duoCards} aria-hidden="true">
+              {[0, 1].map((n) => (
+                <section key={n} className={styles.section}>
+                  <Skeleton width={140} height={16} />
+                  <Skeleton width="85%" height={13} />
+                  <Skeleton width="100%" height={44} />
+                  <Skeleton width={120} height={36} />
+                </section>
+              ))}
+            </div>
+          </div>
+        )}
+      />
+    )
+  }
   if (m.status === 'forbidden') return <ListState kind="forbidden" title="書き出し・取り込みを見る権限がありません" description="見るには権限が要ります。オーナーか管理者の方に確認してください。" />
   if (m.status === 'error') return <ListState kind="error" title="書き出し・取り込みを表示できませんでした" description="履歴は消えていません。" action={<Button onClick={() => void m.load()}>もう一度試す</Button>} />
 

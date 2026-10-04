@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { petAnimalTypeLabel, type NenHealthSummaryData } from '@/lib/nen-pets-api'
 import type { SummaryStatus } from './page'
@@ -49,6 +51,7 @@ export default function SummaryDrawer({
   onRetry: () => void
   onPrint: () => void
 }) {
+  const theme = useAdminTheme()
   const ready = status === 'ready' && summary !== null
   const s = summary?.summary
   return (
@@ -60,7 +63,29 @@ export default function SummaryDrawer({
       footer={ready ? <Button type="button" variant="primary" onClick={onPrint}>印刷・PDFに保存する</Button> : undefined}
     >
       {status === 'loading' ? (
-        <ListState kind="loading" title="まとめを作っています" />
+        theme === 'v8' ? (
+          <div aria-busy="true" aria-label="まとめを作っています">
+            <DelayedSkeleton
+              loading
+              skeleton={(
+                <div aria-hidden="true" className="flex flex-col gap-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {[0, 1, 2, 3].map((tile) => (
+                      <div key={tile}>
+                        <Skeleton width="8ch" height="0.85em" />
+                        <Skeleton width="12ch" height="1.2em" />
+                      </div>
+                    ))}
+                  </div>
+                  <Skeleton width="100%" height="6em" />
+                  <Skeleton width="100%" height="4em" />
+                </div>
+              )}
+            />
+          </div>
+        ) : (
+          <ListState kind="loading" title="まとめを作っています" />
+        )
       ) : status === 'error' || !summary || !s ? (
         <ListState
           kind="error"
