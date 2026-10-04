@@ -19,8 +19,20 @@ function renderPanel(props?: Partial<React.ComponentProps<typeof DetailPanel>>) 
 describe('DetailPanel（右から出る詳細・C①）', () => {
   it('閉じているときは何も出さない', () => {
     renderPanel({ open: false })
-    expect(screen.queryByRole('complementary')).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByText('配信A')).toBeNull()
+  })
+
+  it('名前付きの詳細パネルへ焦点を移し、閉じると元の行へ戻す', () => {
+    const row = document.createElement('button')
+    document.body.append(row)
+    row.focus()
+    const rendered = renderPanel()
+    const panel = screen.getByRole('dialog', { name: '配信A' })
+    expect(document.activeElement).toBe(panel)
+    rendered.rerender(<DetailPanel open={false} title="配信A" onClose={() => {}} />)
+    expect(document.activeElement).toBe(row)
+    row.remove()
   })
 
   it('↑↓で前・次の行へ、端では押せない', () => {
