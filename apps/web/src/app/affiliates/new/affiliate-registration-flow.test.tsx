@@ -58,6 +58,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 
 const pushed = vi.hoisted(() => [] as string[])
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/affiliates/new',
   useRouter: () => ({ push: (href: string) => { pushed.push(href) } }),
 }))
 
@@ -184,7 +185,7 @@ function friendPage(params: { accountId?: string; offset?: string; limit?: numbe
 }
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
   pushed.length = 0
   account.id = 'account-a'
   account.name = '本店'
@@ -246,9 +247,9 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     await mount(<NewAffiliatePage />)
 
     await type(byId<HTMLInputElement>('af-name'), '紹介パートナー')
-    await click(buttonByText('売上に対する割合注文金額の◯%を報酬にします'))
+    await click(container.querySelector<HTMLInputElement>('input[type=radio][value=rate]')!)
     await type(byId<HTMLInputElement>('af-rate'), '0')
-    await click(buttonByText('登録して、紹介リンクを発行する'))
+    await click(buttonByText('登録して紹介リンクを発行する'))
 
     expect(affiliatesCreate).toHaveBeenCalledTimes(1)
     expect(affiliatesCreate.mock.calls[0][0]).toMatchObject({
@@ -266,7 +267,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     await mount(<NewAffiliatePage />)
 
     await type(byId<HTMLInputElement>('af-name'), '最初の名前')
-    await click(buttonByText('登録して、紹介リンクを発行する'))
+    await click(buttonByText('登録して紹介リンクを発行する'))
 
     // 基本情報は保存済み・追加情報は未保存、と画面に出る。
     expect(affiliatesCreate).toHaveBeenCalledTimes(1)
@@ -296,7 +297,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     await mount(<NewAffiliatePage />)
 
     await type(byId<HTMLInputElement>('af-name'), '計測ありのパートナー')
-    await click(buttonByText('登録して、紹介リンクを発行する'))
+    await click(buttonByText('登録して紹介リンクを発行する'))
 
     expect(affiliatesCreate.mock.calls[0][0]).toMatchObject({ isActive: true })
     expect(hasText('基本情報は保存済みです')).toBe(true)
@@ -306,9 +307,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     // やり直しの前にオフへ変えても、保存済みの真実は変わらない。
     // 知らせは「既に始まっています」のまま、再開の送り先だけを言う。
     // 「まだ始まっていない」とは言わない（R525残部）。
-    const tracking = [...container.querySelectorAll('label')]
-      .find((label) => (label.textContent ?? '').includes('すぐに計測を始める'))
-      ?.querySelector('input')
+    const tracking = container.querySelector<HTMLButtonElement>('[role=switch][aria-label="すぐに計測を始める"]')
     if (!tracking) throw new Error('「すぐに計測を始める」が見つかりません')
     await act(async () => { fireEvent.click(tracking) })
     expect(hasText('計測は既に始まっています')).toBe(true)
@@ -330,14 +329,12 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
     await mount(<NewAffiliatePage />)
 
-    const tracking = [...container.querySelectorAll('label')]
-      .find((label) => (label.textContent ?? '').includes('すぐに計測を始める'))
-      ?.querySelector('input')
+    const tracking = container.querySelector<HTMLButtonElement>('[role=switch][aria-label="すぐに計測を始める"]')
     if (!tracking) throw new Error('「すぐに計測を始める」が見つかりません')
     await act(async () => { fireEvent.click(tracking) })
 
     await type(byId<HTMLInputElement>('af-name'), '計測なしのパートナー')
-    await click(buttonByText('登録して、紹介リンクを発行する'))
+    await click(buttonByText('登録して紹介リンクを発行する'))
 
     // オフが作るときに渡り、行は止まったまま残る。
     expect(affiliatesCreate.mock.calls[0][0]).toMatchObject({ isActive: false })
@@ -366,7 +363,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     await mount(<NewAffiliatePage />)
 
     await type(byId<HTMLInputElement>('af-name'), 'A店のパートナー')
-    await click(buttonByText('登録して、紹介リンクを発行する'))
+    await click(buttonByText('登録して紹介リンクを発行する'))
     expect(hasText('基本情報は保存済みです')).toBe(true)
     const operationA = affiliatesCreate.mock.calls[0][0].operationId
 
@@ -378,10 +375,10 @@ describe('アフィリエイター登録の実操作（#686）', () => {
 
     // 作りかけは捨てられ、「再開する」ボタンは消えている。
     expect(hasText('基本情報は保存済みです')).toBe(false)
-    expect(buttonByText('登録して、紹介リンクを発行する')).toBeTruthy()
+    expect(buttonByText('登録して紹介リンクを発行する')).toBeTruthy()
 
     await type(byId<HTMLInputElement>('af-name'), 'B店のパートナー')
-    await click(buttonByText('登録して、紹介リンクを発行する'))
+    await click(buttonByText('登録して紹介リンクを発行する'))
 
     // 切替のあと、A店の紹介者(affiliate-1)へ PUT していない。
     // 新しく B店へ作りに行っている。

@@ -8,12 +8,15 @@
 .board {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
+  margin: -20px -24px -28px;
   min-width: 0;
   container-type: inline-size;
 }
 
 .head {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--color-hairline);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -47,9 +50,10 @@
 }
 
 .columns {
+  padding: 24px;
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: 24px;
   min-width: 0;
 }
 
@@ -62,10 +66,12 @@
 }
 
 .rail {
+  border-left: 1px solid var(--color-hairline);
+  padding-left: 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 300px;
+  width: 32%;
   flex: none;
 }
 
@@ -96,6 +102,7 @@
 
 .grid2 {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -323,11 +330,20 @@
     flex-direction: column;
   }
 
-  .rail {
+  .main {
     width: 100%;
   }
 
-  .choiceGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .rail {
+    border-left: 0;
+    padding-left: 0;
+    width: 100%;
   }
+
+
+}
+
+@container (max-width: 600px) {
+  .grid2, .choiceGrid { grid-template-columns: minmax(0, 1fr); }
+  .columns { padding: 16px; }
 }

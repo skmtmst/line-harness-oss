@@ -58,7 +58,7 @@ describe('Gqve5 作る画面の競合の絵合わせ', () => {
       expect(screen.getByText('アフィリエイターを作る')).toBeTruthy()
     })
     fireEvent.change(screen.getByLabelText(/名前（表示名）/), { target: { value: 'ペットライフ編集部' } })
-    fireEvent.change(screen.getByLabelText(/紹介コード/), { target: { value: 'petlife2026' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /紹介コード（/ }), { target: { value: 'petlife2026' } })
     fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
     await waitFor(() => {
       expect(screen.getByText('この紹介コードは既に使われています')).toBeTruthy()
