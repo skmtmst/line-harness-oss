@@ -88,3 +88,26 @@
   background: transparent;
 }
 }
+
+.iconWrap { display: contents; }
+/* 正本 hNXm7。空の表示以外の失敗・権限・読込の扱いは維持する。 */
+[data-theme='v8'] .root[data-list-state='empty'] {
+  justify-content: flex-start; min-height: 0; padding: 28px 24px;
+  border-radius: 12px; outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
+}
+[data-theme='v8'] [data-list-state='empty'] .iconWrap {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 32px; height: 32px; border-radius: 9px; background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+  color: var(--color-ink-secondary);
+}
+[data-theme='v8'] [data-list-state='empty'] .iconWrap svg { width: 17px; height: 17px; }
+[data-theme='v8'] [data-list-state='empty'] .title { width: 100%; font-size: 14px; line-height: 21px; }
+[data-theme='v8'] [data-list-state='empty'] .description { width: 100%; max-width: none; font-size: 12px; line-height: 18px; color: var(--color-ink-secondary); }
+[data-theme='v8'] [data-list-state='empty'] .action { margin: 0; }
+/* 空の表示の主操作を正本の枠なし36pxにする（ほかのボタンは変更しない）。 */
+[data-theme='v8'] [data-list-state='empty'] .action > :is(button, a) { border: 0; line-height: 20px; font-family: inherit; }
+[data-theme='v8'] [data-list-state='empty'] .action svg { width: 15px; height: 15px; }
+
+[data-theme='v8'] [data-list-state='empty'] .action { --shadow-primary-action: var(--v8-parts-primary-shadow); }
