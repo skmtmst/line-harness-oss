@@ -48,6 +48,7 @@ import {
   type BookingAvailabilitySlot,
   type BookingException,
   type BookingMenu,
+  type BookingNoshowSettings,
   type BookingResource,
   type BookingSettings,
   type BookingSlotCheckResult,
@@ -63,6 +64,7 @@ import { slotReasonLabel } from '../staff/shifts/slot-reason'
 import { bookingErrorMessage, bookingRulesErrorMessage } from './menu-validation'
 
 import MenuVersionHistory from './menu-version-history'
+import PaymentTabV8 from './payment-tab-v8'
 import { EMPTY_STAFF, StaffEditModal } from '../staff/staff-edit-dialog'
 import { LiffPhoneDatetimeStep, LiffPhoneMenuStep, LiffPhoneStaffStep } from './liff-phone-v8'
 import styles from './settings-v8.module.css'
@@ -75,6 +77,7 @@ const V8_TABS = [
   { key: 'holidays', label: '休業日', node: 'KRgTQ' },
   { key: 'rules', label: '予約のルール', node: 'x1OZS6' },
   { key: 'staff', label: '担当スタッフ', node: 'VLEaj' },
+  { key: 'payment', label: 'お支払い', node: 'i7Zkz' },
 ] as const
 type V8TabKey = (typeof V8_TABS)[number]['key']
 const V8_TAB_KEYS = new Set<string>(V8_TABS.map((tab) => tab.key))
@@ -84,6 +87,7 @@ const V8_TAB_NODE: Record<V8TabKey, string> = {
   holidays: 'KRgTQ',
   rules: 'x1OZS6',
   staff: 'VLEaj',
+  payment: 'i7Zkz',
 }
 
 const MENU_PAGE_SIZE = 6
@@ -660,6 +664,12 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
                 canEdit={canEditSettings}
                 onSaved={(next) => setSettings(next)}
                 onReload={() => void loadCore()}
+              />
+            ) : tab === 'payment' ? (
+              <PaymentTabV8
+                accountId={accountId}
+                menus={menus}
+                canEdit={canEditSettings}
               />
             ) : (
               <StaffTabV8
@@ -1912,6 +1922,17 @@ function HolidaysTabV8({ accountId, settings, status, error, exceptions, closedW
   )
 }
 
+/** プルダウンの候補。今の値が外にあれば足す（口は 1〜100・1〜120 まで受け付ける）。 */
+function noshowCountOptions(current: number): number[] {
+  const base = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  return base.includes(current) ? base : [...base, current].sort((a, b) => a - b)
+}
+
+function noshowWindowOptions(current: number): number[] {
+  const base = [1, 3, 6, 12]
+  return base.includes(current) ? base : [...base, current].sort((a, b) => a - b)
+}
+
 /* ==================== ④ 予約のルール（x1OZS6） ==================== */
 
 /* 候補は v7（/booking/menus の BookingRulesEditor）と同じ。 */
@@ -2010,6 +2031,9 @@ function RulesTabV8({ accountId, settings, status, error, staff, staffReady, can
   const [draft, setDraft] = useState<BookingSettings | null>(null)
   /* 「指名なし」を出すか。店舗の保存先は無く、スタッフの is_designation_optional に書く。 */
   const [noAssign, setNoAssign] = useState<boolean | null>(null)
+  /* 無断キャンセルの数え方（別の口。B-1 eih0r の段）。 */
+  const [noshow, setNoshow] = useState<BookingNoshowSettings | null>(null)
+  const [noshowDraft, setNoshowDraft] = useState<BookingNoshowSettings | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [cutoffEmpty, setCutoffEmpty] = useState(false)
@@ -2025,6 +2049,24 @@ function RulesTabV8({ accountId, settings, status, error, staff, staffReady, can
     if (settings) setDraft(settings)
   }, [settings])
   useEffect(() => {
+    let alive = true
+    setNoshow(null)
+    setNoshowDraft(null)
+    bookingApi.getNoshowSettings(accountId).then(
+      (response) => {
+        if (!alive) return
+        setNoshow(response.data)
+        setNoshowDraft(response.data)
+      },
+      () => {
+        if (!alive) return
+      },
+    )
+    return () => {
+      alive = false
+    }
+  }, [accountId])
+  useEffect(() => {
     if (staffReady) setNoAssign(initialNoAssign)
   }, [staffReady, initialNoAssign])
 
@@ -2033,6 +2075,7 @@ function RulesTabV8({ accountId, settings, status, error, staff, staffReady, can
     || cutoffEmpty
     || cancelEmpty
     || (noAssign !== null && noAssign !== initialNoAssign)
+    || (noshow !== null && noshowDraft !== null && JSON.stringify(noshowDraft) !== JSON.stringify(noshow))
   )
 
   useV8TabEdit({
@@ -2045,6 +2088,7 @@ function RulesTabV8({ accountId, settings, status, error, staff, staffReady, can
     onReset: () => {
       if (settings) setDraft(settings)
       setNoAssign(initialNoAssign)
+      if (noshow) setNoshowDraft(noshow)
       setCutoffEmpty(false)
       setCancelEmpty(false)
       setSaveError(null)
@@ -2090,6 +2134,12 @@ function RulesTabV8({ accountId, settings, status, error, staff, staffReady, can
         for (const person of targets) {
           await bookingApi.updateStaff(accountId, person.id, { is_designation_optional: noAssign ? 1 : 0 })
         }
+      }
+      if (noshowDraft && (!noshow || JSON.stringify(noshowDraft) !== JSON.stringify(noshow))) {
+        const noshowResponse = await bookingApi.saveNoshowSettings(accountId, noshowDraft)
+        if (!noshowResponse.success) throw new Error('noshow_settings_save_failed')
+        setNoshow(noshowResponse.data)
+        setNoshowDraft(noshowResponse.data)
       }
       setDraft(response.data)
       setCutoffEmpty(false)
@@ -2202,6 +2252,56 @@ function RulesTabV8({ accountId, settings, status, error, staff, staffReady, can
             />
           </div>
         </section>
+
+        {noshowDraft ? (
+          <section className={styles.section} aria-label="無断キャンセル">
+            <div className={styles.sectionHead}>
+              <h2 className={styles.sectionTitle}>無断キャンセル</h2>
+              <p className={styles.sectionDesc}>来なかった回数で、自動で前払いのみにする</p>
+            </div>
+            <div className={styles.toggleRow}>
+              <span className={styles.toggleRowLabel}>来なかった回数で、自動で前払いのみにする</span>
+              <Toggle
+                label="来なかった回数で、自動で前払いのみにする"
+                checked={noshowDraft.enabled}
+                onChange={(next) => setNoshowDraft((current) => current ? { ...current, enabled: next } : current)}
+              />
+            </div>
+            <div className={styles.toggleRow}>
+              <span className={styles.toggleRowLabel}>何回目から</span>
+              <Select
+                aria-label="何回目から前払いのみにするか"
+                value={String(noshowDraft.threshold)}
+                disabled={!noshowDraft.enabled}
+                onChange={(value) => setNoshowDraft((current) => current ? { ...current, threshold: Number(value) } : current)}
+                options={noshowCountOptions(noshowDraft.threshold).map((count) => ({ value: String(count), label: `${count}回目から` }))}
+              />
+            </div>
+            <div className={styles.toggleRow}>
+              <span className={styles.toggleRowLabel}>数える期間</span>
+              <Select
+                aria-label="来なかったを数える期間"
+                value={String(noshowDraft.windowMonths)}
+                disabled={!noshowDraft.enabled}
+                onChange={(value) => setNoshowDraft((current) => current ? { ...current, windowMonths: Number(value) } : current)}
+                options={noshowWindowOptions(noshowDraft.windowMonths).map((months) => ({ value: String(months), label: `直近${months}か月` }))}
+              />
+            </div>
+            <div className={styles.toggleRow}>
+              <span className={styles.toggleRowLabel}>決済が無い店では</span>
+              <Select
+                aria-label="決済が無い店の扱い"
+                value={noshowDraft.noPaymentMode}
+                disabled={!noshowDraft.enabled}
+                onChange={(value) => setNoshowDraft((current) => current ? { ...current, noPaymentMode: value as BookingNoshowSettings['noPaymentMode'] } : current)}
+                options={[
+                  { value: 'notice_call', label: '印だけ付けて、来店前に電話で確認する案内' },
+                  { value: 'notice', label: '印だけ付けて案内する' },
+                ]}
+              />
+            </div>
+          </section>
+        ) : null}
 
         <section className={styles.section}>
           <div className={styles.sectionHead}>

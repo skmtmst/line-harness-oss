@@ -2973,6 +2973,7 @@
       "sections": [
         "Crumb",
         "Left",
+        "PrepayBadge",
         "Right"
       ],
       "parts": [
