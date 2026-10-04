@@ -57,11 +57,11 @@ const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }
 async function enterSaveStep() {
   render(<NewLineAccountPage />)
   next()
-  next()
   fill('channel-id', '123456789')
   fill('channel-secret', 'synthetic-secret')
   fill('login-channel-id', '2007123456')
   fill('login-channel-secret', 'synthetic-login-secret')
+  next()
   next()
   fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
   await screen.findByText('5段すべて通りました。保存できます。')

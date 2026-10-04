@@ -15,10 +15,11 @@ import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialo
 import { CHECK_STATE_LABEL, canSave, stoppedAt, toSteps } from '../connection-check-view'
 import { isDuplicateChannelError, matchRegisteredAccountId } from './account-recovery'
 
+/* 手順の順番は絵が正本（板 JYfda・GwKE2）：LINE準備→チャネル設定→基本情報→接続確認→完了。 */
 const WIZARD_STEPS = [
-  { number: 1, label: '基本情報', designNode: 'a8qMXX' },
-  { number: 2, label: 'LINE準備', designNode: 'oeVQQ' },
-  { number: 3, label: 'チャネル設定', designNode: 'YEHCR' },
+  { number: 1, label: 'LINE準備', designNode: 'oeVQQ' },
+  { number: 2, label: 'チャネル設定', designNode: 'YEHCR' },
+  { number: 3, label: '基本情報', designNode: 'a8qMXX' },
   { number: 4, label: '接続確認', designNode: 'K1zHyx' },
   { number: 5, label: '完了', designNode: 'VPh1U' },
 ] as const
@@ -127,10 +128,10 @@ export default function NewLineAccountPage() {
   })
 
   const checkConnection = async () => {
-    const nextErrors = getStepErrors(3, form)
+    const nextErrors = getStepErrors(2, form)
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors((current) => ({ ...current, ...nextErrors }))
-      setCurrentStep(3)
+      setCurrentStep(2)
       setError('接続に必要な4項目を確認してください。')
       return
     }
@@ -283,14 +284,8 @@ export default function NewLineAccountPage() {
 
       <form onSubmit={submit} noValidate aria-busy={busyAction ? true : undefined}>
         <div data-design="Body" ref={stepPanelRef} tabIndex={-1} className="outline-none">
-          {currentStep === 1 && <div data-design-node="a8qMXX">
-            <SetupSection title="1. 基本情報" description="管理画面で見分ける名前を設定します。未入力でも登録できます。">
-              <Field id="account-name" label="表示名（任意）" value={form.name} onChange={(value) => update('name', value)} placeholder="未入力なら LINE公式アカウントの名前をそのまま使います" error={fieldErrors.name} />
-            </SetupSection>
-          </div>}
-
-          {currentStep === 2 && <div data-design-node="oeVQQ">
-            <SetupSection title="2. LINE側の準備" description="登録するLINE公式アカウントの用意方法を選びます。">
+          {currentStep === 1 && <div data-design-node="oeVQQ">
+            <SetupSection title="1. LINE側の準備" description="登録するLINE公式アカウントの用意方法を選びます。">
               <fieldset>
                 <legend className="text-ink-secondary mb-2 text-xs font-medium">アカウントの用意方法</legend>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -306,22 +301,32 @@ export default function NewLineAccountPage() {
             </SetupSection>
           </div>}
 
-          {currentStep === 3 && <div data-design-node="YEHCR" className="grid gap-4 lg:grid-cols-2">
-            <SetupSection title="Messaging API" description="アクセストークンはmusuboが自動で発行します。" action={<ManualLink anchor="m1" label="取得方法を見る" />}>
-              <Field id="channel-id" label="チャネルID" value={form.channelId} onChange={(value) => update('channelId', value)} inputMode="numeric" required error={fieldErrors.channelId} />
-              <Field id="channel-secret" label="チャネルシークレット" value={form.channelSecret} onChange={(value) => update('channelSecret', value)} type="password" required error={fieldErrors.channelSecret} />
+          {currentStep === 2 && <div data-design-node="YEHCR" className="space-y-4">
+            <h2 className="text-ink text-base font-bold">接続に必要な4項目</h2>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <SetupSection title="Messaging API" description="アクセストークンはmusuboが自動で発行します。" action={<ManualLink anchor="m1" label="取得方法を見る" />}>
+                <Field id="channel-id" label="チャネルID" value={form.channelId} onChange={(value) => update('channelId', value)} inputMode="numeric" required error={fieldErrors.channelId} />
+                <Field id="channel-secret" label="チャネルシークレット" value={form.channelSecret} onChange={(value) => update('channelSecret', value)} type="password" required error={fieldErrors.channelSecret} />
+              </SetupSection>
+              <SetupSection title="LINE Login" description="LIFFは自動で作成します。Messaging APIと同じプロバイダーのチャネルを入力してください。" action={<ManualLink anchor="m2" label="取得方法を見る" />}>
+                <Field id="login-channel-id" label="LoginチャネルID" value={form.loginChannelId} onChange={(value) => update('loginChannelId', value)} inputMode="numeric" required error={fieldErrors.loginChannelId} />
+                <Field id="login-channel-secret" label="Loginチャネルシークレット" value={form.loginChannelSecret} onChange={(value) => update('loginChannelSecret', value)} type="password" required error={fieldErrors.loginChannelSecret} />
+              </SetupSection>
+            </div>
+            <p className="text-ink-faint text-xs">秘密値は保存後に画面へ表示されません。</p>
+          </div>}
+
+          {currentStep === 3 && <div data-design-node="a8qMXX" className="space-y-4">
+            <SetupSection title="3. 基本情報" description="管理画面で見分ける名前を設定します。未入力でも登録できます。">
+              <Field id="account-name" label="表示名（任意）" value={form.name} onChange={(value) => update('name', value)} placeholder="未入力なら LINE公式アカウントの名前をそのまま使います" error={fieldErrors.name} />
             </SetupSection>
-            <SetupSection title="LINE Login" description="LIFFは自動で作成します。Messaging APIと同じプロバイダーのチャネルを入力してください。" action={<ManualLink anchor="m2" label="取得方法を見る" />}>
-              <Field id="login-channel-id" label="LoginチャネルID" value={form.loginChannelId} onChange={(value) => update('loginChannelId', value)} inputMode="numeric" required error={fieldErrors.loginChannelId} />
-              <Field id="login-channel-secret" label="Loginチャネルシークレット" value={form.loginChannelSecret} onChange={(value) => update('loginChannelSecret', value)} type="password" required error={fieldErrors.loginChannelSecret} />
+            <SetupSection title="LINE側の設定" description="LINE LoginチャネルへCallback URLを登録してください。" action={<ManualLink anchor="m3" label="設定方法を見る" />}>
+              <EndpointRow label="Callback URL" value={callbackUrl} help="LINE Login → Callback URL" />
             </SetupSection>
           </div>}
 
           {currentStep === 4 && <div data-design-node="K1zHyx" className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="space-y-4">
-              <SetupSection title="4. LINE側の設定" description="LINE LoginチャネルへCallback URLを登録してください。" action={<ManualLink anchor="m3" label="設定方法を見る" />}>
-                <EndpointRow label="Callback URL" value={callbackUrl} help="LINE Login → Callback URL" />
-              </SetupSection>
               <SetupSection title="接続確認" description="上から順に自動設定します。止まった段だけ直して再実行してください。">
                 <ol className="space-y-2" aria-label="接続確認項目">
                   {steps.map((item) => <li key={item.order} className="border-hairline rounded-control flex items-start gap-3 border p-3">
@@ -394,8 +399,8 @@ export default function NewLineAccountPage() {
 
 function getStepErrors(step: StepNumber, form: FormState): FieldErrors {
   const errors: FieldErrors = {}
-  if (step === 1 && form.name.trim().length > 40) errors.name = '表示名は40文字以内で入力してください。'
-  if (step === 3) {
+  if (step === 3 && form.name.trim().length > 40) errors.name = '表示名は40文字以内で入力してください。'
+  if (step === 2) {
     if (!form.channelId.trim()) errors.channelId = 'チャネルIDを入力してください。'
     else if (!/^\d+$/.test(form.channelId.trim())) errors.channelId = 'チャネルIDは半角数字で入力してください。'
     if (!form.channelSecret) errors.channelSecret = 'チャネルシークレットを入力してください。'
