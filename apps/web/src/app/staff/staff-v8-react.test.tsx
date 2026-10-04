@@ -81,10 +81,10 @@ describe('ログインユーザーV8（nku0f・A35Gh）', () => {
     expect(host.textContent).toContain('閲覧のみで見ています')
   })
 
-  it('v7はe3jz3のまま', async () => {
+  it('テーマ指定がなくてもV8で開く', async () => {
     delete document.documentElement.dataset.theme
     await render()
-    expect(host.querySelector('[data-design-node="e3jz3"]')).not.toBeNull()
-    expect(host.querySelector('[data-design-node="nku0f"]')).toBeNull()
+    expect(host.querySelector('[data-design-node="e3jz3"]')).toBeNull()
+    expect(host.querySelector('[data-design-node="nku0f"]')).not.toBeNull()
   })
 })

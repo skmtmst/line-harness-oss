@@ -259,7 +259,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     try {
       await mount()
 
-      expect(screen.getByText('いまいる人 3')).toBeTruthy()
+      expect(screen.getByRole('link', { name: 'いまいる人' })).toBeTruthy()
       expect(screen.queryByText('利用停止中の人')).toBeNull()
       expect(screen.getByText('ログインユーザー 3人中 3人を表示')).toBeTruthy()
     } finally {
