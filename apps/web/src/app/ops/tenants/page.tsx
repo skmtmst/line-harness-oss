@@ -237,7 +237,7 @@ export default function OpsTenantsPage() {
               {/* 列幅は画面が決める（部品は幅を持たない）。1,440px 幅で操作列まで収まるよう、日付系は狭く。 */}
               <Th>統括名</Th>
               <Th className="w-28">プラン</Th>
-              <Th className="w-40">利用 / 請求</Th>
+              <Th className="w-40 tenants-use-col">利用 / 請求</Th>
               <Th className="w-28">契約日</Th>
               <Th className="w-28">期限</Th>
               <Th className="w-16" align="right">店舗</Th>
@@ -245,7 +245,7 @@ export default function OpsTenantsPage() {
               <Th className="w-36">最終ログイン</Th>
               {/* 「代理ログイン」（5文字）が w-28 では右端で切れる。操作列は入る幅で固定する。 */}
               {/* 代理ログインボタンが列からはみ出さない幅にする。 */}
-                <Th className="w-36" align="right">操作</Th>
+                <Th className="w-36 tenants-op-col" align="right">操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>

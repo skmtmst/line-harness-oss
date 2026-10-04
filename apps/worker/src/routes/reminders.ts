@@ -8,6 +8,7 @@ import {
   createReminder,
   updateReminder,
   deleteReminder,
+  restoreReminder,
   getReminderSteps,
   createReminderStep,
   deleteReminderStep,
@@ -65,6 +66,22 @@ async function requireVisibleReminder(c: Context<Env>, next: () => Promise<void>
   // 今の所属だけで閉じると、所属変更後に旧登録が操作できなくなるため、
   // ここでは通して各 handler で行単位に判定する。
   if (isReminderRowScopedPath(c.req.path)) return next();
+  // B 元に戻す: 削除の取り消しは消えた行自体が対象。所属だけ確かめて通す。
+  if (c.req.path.endsWith('/restore')) {
+    const row = await c.env.DB
+      .prepare(`SELECT line_account_id FROM reminders WHERE id = ?`)
+      .bind(c.req.param('id')!)
+      .first<{ line_account_id: string | null }>();
+    if (!row || !await canAccessAllLineAccounts(
+      c.env.DB,
+      c.get('staff'),
+      [row.line_account_id ?? null],
+    )) {
+      return c.json({ success: false, error: 'Reminder not found' }, 404);
+    }
+    await next();
+    return;
+  }
   const reminder = await getReminderById(c.env.DB, c.req.param('id')!);
   if (!reminder || !await canAccessAllLineAccounts(
     c.env.DB,
@@ -1517,6 +1534,29 @@ reminders.delete('/api/reminders/:id', requireRole('owner', 'admin'), async (c) 
   } catch (err) {
     console.error('DELETE /api/reminders/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * POST /api/reminders/:id/restore — 削除の取り消し（B 元に戻す）。
+ *
+ * 定義の deleted_at だけを戻す。戻した直後は止めたまま。
+ * 削除時に取り消した登録・配信予定は戻さない（日時が過ぎた相手へ
+ * いきなり送らないため）。消していない行・無い行は 404。
+ */
+reminders.post('/api/reminders/:id/restore', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const restored = await restoreReminder(c.env.DB, c.req.param('id'));
+    if (!restored) {
+      return c.json({ success: false, error: 'Reminder not found' }, 404);
+    }
+    return c.json({
+      success: true,
+      data: { id: restored.id, name: restored.name, isActive: Boolean(restored.is_active) },
+    });
+  } catch (err) {
+    console.error('POST /api/reminders/:id/restore error:', err);
+    return c.json({ success: false, error: 'リマインダを元に戻せませんでした' }, 500);
   }
 });
 

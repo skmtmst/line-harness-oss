@@ -5,6 +5,8 @@ import type { Affiliate, Friend } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { NewAffiliateV8 } from '../new-affiliate-v8'
 import CreatePage, {
   AsideCard,
   ChoiceCard,
@@ -167,7 +169,17 @@ function ConflictCompare({
   )
 }
 
+/*
+ * ★V8-B の切り替え。v8 の器は別ファイル（new-affiliate-v8.tsx）に置き、
+ * v7 の器・動きはこの下の V7 のまま残す。
+ */
 export default function NewAffiliatePage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <NewAffiliateV8 />
+  return <NewAffiliatePageV7 />
+}
+
+function NewAffiliatePageV7() {
   /* ★V7: 画面名は共通トップバーにだけ置く。本文の重複見出しは出さない。 */
   usePageTitle('アフィリエイターを登録する')
   const { selectedAccountId, selectedAccount } = useAccount()
