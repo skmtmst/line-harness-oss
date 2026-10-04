@@ -14,7 +14,9 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 describe('情報欄タブのV8（Q5F2QE）', () => {
   it('V8の板IDを付ける', () => {
     expect(PAGE).toContain('data-design-node="Q5F2QE"')
-    expect(PAGE).not.toContain('useAdminTheme')
+    expect(PAGE).toContain('useAdminTheme()')
+    expect(PAGE).toContain("const v8 = adminTheme === 'v8'")
+    expect(PAGE).toContain("data-design-node={v8 ? 'Q5F2QE' : undefined}")
   })
 
   it('V8の項目を2列に並べる', () => {
