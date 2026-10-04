@@ -5,7 +5,8 @@ export function withTextOverride(definitionJson: string, text: string | null | u
   if (text==null) return definitionJson;
   const definition=parseMessageTemplateDefinition(JSON.parse(definitionJson));
   if (definition.template.messageType!=='text') throw new HqTemplateError('INVALID_TEXT_OVERRIDE',422);
-  return JSON.stringify(parseMessageTemplateDefinition({...definition,template:{...definition.template,messageContent:boundedText(text,5000)}}));
+  const content = boundedText(text,5000);
+  return JSON.stringify(parseMessageTemplateDefinition({...definition,...(definition.card ? {card:{...definition.card,title:'',body:content}} : {}),template:{...definition.template,messageContent:content}}));
 }
 export function parseTextOverrides(value: unknown, accountIds: string[], type: string): Map<string,string> {
   if(value===undefined) return new Map();

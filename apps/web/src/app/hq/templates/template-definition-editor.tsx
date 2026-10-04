@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { parseHqMessageCard, type HqMessageCard, type HqMessageReference } from '@line-crm/shared'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
 import { decodeImageSize } from './image-size'
-import { freshDefinition, withUploadedImage } from '@/lib/hq-template-authoring'
+import { freshDefinition, withUploadedImage, withMessageCard } from '@/lib/hq-template-authoring'
 import RichMenuCreateForm, { freshRichMenuCreateValue, type RichMenuOption } from '@/components/rich-menus/rich-menu-create-form'
 import HqTagDefinitionEditor from '@/components/friend-fields/hq-tag-definition-editor'
 import HqFormDefinitionEditor from '@/components/forms/hq-form-definition-editor'
@@ -50,7 +52,12 @@ export function definitionError(type: TemplateType, definition: TemplateDefiniti
   if (!definitionName(type, definition).trim()) return 'ひな形の名前を入力してください。'
   if (type === 'scenario' && 'scenario' in definition) return definition.steps.length && definition.steps.every(step=>step.messageContent.trim() && Number.isSafeInteger(step.delayMinutes) && step.delayMinutes>=0) ? null : '各ステップの本文と遅延を入力してください。'
   if (type === 'tag' && 'tag' in definition) return definition.folders.some(folder => !folder.name.trim()) ? 'タググループ名を入力してください。' : null
-  if (type === 'template' && 'template' in definition) return definition.template.messageContent.trim() ? null : '配信する本文を入力してください。'
+  if (type === 'template' && 'template' in definition) {
+    if (definition.card) {
+      try { parseHqMessageCard(definition.card) } catch (error) { return error instanceof Error ? error.message : '入力内容を確認してください。' }
+    }
+    return definition.template.messageContent.trim() ? null : '配信する本文を入力してください。'
+  }
   if (type === 'rich_menu' && 'richMenu' in definition) {
     if (!definition.richMenu.chatBarText.trim()) return 'トーク画面に表示する文字を入力してください。'
     if (!definition.richMenu.pages.length || definition.richMenu.pages.some(page => !page.name.trim() || !page.imageR2Key.trim())) return '各ページの名前と画像の保存先を入力してください。'
@@ -107,9 +114,49 @@ function ImageUpload({ purpose, disabled, expectedSize, onUploaded, onBusyChange
   return <div className={styles.field}><span>画像を登録</span><input aria-label={purpose === 'message' ? 'メッセージ画像を選ぶ' : 'リッチメニュー画像を選ぶ'} type="file" accept="image/png,image/jpeg" disabled={disabled || uploading} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; void upload(file) }} /><small className={styles.muted}>{purpose === 'message' ? 'PNG・JPEG、1件8 MiB以下。画像形式では本文に自動設定します。' : 'PNG・JPEG、1 MiB以下。幅2500px、高さ1686pxまたは843px。'}</small>{uploading && <p role="status">画像を登録しています…</p>}{error && <p role="alert">{error}</p>}</div>
 }
 
+function CardEditor({ value, disabled, onChange, onBusyChange, onReceipt }: { value: MessageTemplateDefinition; disabled: boolean; onChange: (next: MessageTemplateDefinition) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: MessageTemplateDefinition['media'][number]) => void }) {
+  const card: HqMessageCard = value.card ?? { format: 'text', title: '', body: value.template.messageContent, buttons: [] }
+  const [references, setReferences] = useState<HqMessageReference[]>([]), [referenceError, setReferenceError] = useState('')
+  const load = () => hqTemplatesApi.messageReferences().then(rows => { setReferences(rows); setReferenceError('') }).catch(() => setReferenceError('ボタンの参照先を取得できませんでした。入力を残したまま再読み込みできます。'))
+  useEffect(() => {
+    let alive = true
+    void hqTemplatesApi.messageReferences().then(rows => { if (alive) setReferences(rows) }).catch(() => { if (alive) setReferenceError('ボタンの参照先を取得できませんでした。入力を残したまま再読み込みできます。') })
+    return () => { alive = false }
+  }, [])
+  const update = (next: HqMessageCard) => onChange(withMessageCard(value, next))
+  const updateButton = (id: string, patch: Partial<HqMessageCard['buttons'][number]>) => update({ ...card, buttons: card.buttons.map(button => button.id === id ? { ...button, ...patch } : button) })
+  return <div className={styles.stack}>
+    <label className={styles.field}>形式<select className={styles.input} aria-label="ひな形の形式" value={card.format} disabled={disabled} onChange={event => update({ ...card, format: event.target.value as HqMessageCard['format'] })}><option value="text">テキスト</option><option value="flex">カード型</option></select></label>
+    <label className={styles.field}>タイトル<input className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={event => update({ ...card, title: event.target.value })} /></label>
+    <label className={styles.field}>本文<textarea className={styles.textarea} aria-label="配信する本文" maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={event => update({ ...card, body: event.target.value })} /></label>
+    {card.format === 'flex' && <>
+      <ImageUpload purpose="message" disabled={disabled} onBusyChange={onBusyChange} onReceipt={onReceipt} onUploaded={media => { const next = withUploadedImage(value, media); onChange(withMessageCard(next, { ...card, imageMediaId: media.id })) }} />
+      {card.imageMediaId && <button type="button" disabled={disabled} onClick={() => { const { imageMediaId: removed, ...next } = card; update(next) }}>画像を外す</button>}
+      <h2>ボタン</h2>
+      {referenceError && <p role="alert">{referenceError}<button type="button" disabled={disabled} onClick={() => void load()}>参照先を再読み込み</button></p>}
+      {card.buttons.map((button, index) => <div key={button.id} className={styles.stack}>
+        <label className={styles.field}>ボタン{index + 1}の文字<input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={event => updateButton(button.id, { label: event.target.value })} /></label>
+        <label className={styles.field}>押したとき<select className={styles.input} aria-label={`ボタン${index + 1}を押したとき`} disabled={disabled} value={button.action} onChange={event => updateButton(button.id, { action: event.target.value as typeof button.action, value: '' })}><option value="url">URLを開く</option><option value="message">メッセージを送る</option><option value="form">フォームを開く</option><option value="scenario">シナリオを開始</option></select></label>
+        {button.action === 'form' || button.action === 'scenario'
+          ? <label className={styles.field}>参照先<select className={styles.input} aria-label={`ボタン${index + 1}の参照先`} disabled={disabled || !!referenceError} value={button.value} onChange={event => updateButton(button.id, { value: event.target.value })}><option value="">選択してください</option>{button.value && !references.some(row => row.kind === button.action && row.id === button.value) && <option value={button.value}>保存済みの参照先（候補を確認してください）</option>}{references.filter(row => row.kind === button.action).map(row => <option key={row.id} value={row.id}>{row.name}（{row.accountName}）</option>)}</select></label>
+          : <label className={styles.field}>{button.action === 'url' ? 'URL' : 'メッセージ'}<input className={styles.input} aria-label={`ボタン${index + 1}の内容`} maxLength={button.action === 'message' ? 300 : 2000} disabled={disabled} value={button.value} onChange={event => updateButton(button.id, { value: event.target.value })} /></label>}
+        <button type="button" disabled={disabled} onClick={() => update({ ...card, buttons: card.buttons.filter(row => row.id !== button.id) })}>ボタン{index + 1}を外す</button>
+      </div>)}
+      <button type="button" disabled={disabled || card.buttons.length >= 3} onClick={() => update({ ...card, buttons: [...card.buttons, { id: crypto.randomUUID(), label: '', action: 'url', value: '' }] })}>ボタンを追加</button>
+      <p className={styles.muted}>フォームとシナリオは、配り先にある同じ名前のものにつなぎます。見つからない場合は配る前にお知らせします。</p>
+    </>}
+  </div>
+}
+
 function MessageEditor({ value, disabled, onChange, onBusyChange, onReceipt }: { value: MessageTemplateDefinition; disabled: boolean; onChange: (next: MessageTemplateDefinition) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: MessageTemplateDefinition['media'][number]) => void }) {
+  const theme = useAdminTheme()
   const current = value.template
   const [targetDate, setTargetDate] = useState('')
+  const [advanced, setAdvanced] = useState(false)
+  if (theme === 'v8' && (value.card || (!advanced && current.id === 'hq-authored-message' && current.messageType === 'text' && !current.carouselActionsJson && !current.questionJson))) return <>
+    <CardEditor value={value} disabled={disabled} onChange={onChange} onBusyChange={onBusyChange} onReceipt={onReceipt} />
+    {!value.card && <button type="button" disabled={disabled} onClick={() => setAdvanced(true)}>画像・カルーセルの詳細編集を使う</button>}
+  </>
   const messageTypeOptions = [
     { value: 'text', label: 'テキスト' },
     { value: 'flex', label: 'カード型' },
@@ -118,7 +165,9 @@ function MessageEditor({ value, disabled, onChange, onBusyChange, onReceipt }: {
     // 移されるまで、HQで作成済みのカルーセルも選択肢として保持する。
     { value: 'carousel', label: 'カルーセル' },
   ]
-  return (
+  const legacyDisabled = disabled || Boolean(value.card)
+  return (<>
+    {theme === 'v7' && value.card && <p role="status">タイトルとボタンをまとめて作ったひな形は、設定の「画面の見た目（試作）」をV8に切り替えて編集してください。</p>}
     <MessageTemplateEditor
       value={{ messageType: current.messageType, messageContent: current.messageContent }}
       onChange={(next) => onChange({
@@ -134,21 +183,21 @@ function MessageEditor({ value, disabled, onChange, onBusyChange, onReceipt }: {
       references={EMPTY_TEMPLATE_REFERENCES}
       referenceAccountId={null}
       referenceUnavailableHint="友だち情報と共通情報はアカウントごとに異なるため、配布先のLINEアカウントで設定してください。"
-      disabled={disabled}
+      disabled={legacyDisabled}
       typeOptions={messageTypeOptions}
       bodyAriaLabel="配信する本文"
       beforeType={(
         <>
           <label className={styles.field}>
             <span>分類</span>
-            <input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={event => onChange({ ...value, template: { ...current, category: event.target.value } })} />
+            <input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={legacyDisabled} onChange={event => onChange({ ...value, template: { ...current, category: event.target.value } })} />
           </label>
-          {current.id === 'hq-authored-message' && <ImageUpload purpose="message" disabled={disabled} onBusyChange={onBusyChange} onReceipt={onReceipt} onUploaded={media => onChange(withUploadedImage(value, media))} />}
+          {current.id === 'hq-authored-message' && <ImageUpload purpose="message" disabled={legacyDisabled} onBusyChange={onBusyChange} onReceipt={onReceipt} onUploaded={media => onChange(withUploadedImage(value, media))} />}
           {value.media.map(media => <p key={media.id} className={styles.muted}>{media.filename}（{Math.ceil(media.sizeBytes / 1024)} KB）<br /><span className={styles.name}>{media.publicUrl ?? media.r2Key}</span></p>)}
         </>
       )}
     />
-  )
+  </>)
 }
 
 export type RichMenuEditorReferences = {

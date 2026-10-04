@@ -186,6 +186,7 @@ function resultReason(status: string): string | null {
 }
 function rethrowR2(error: unknown): never {
   if (!(error instanceof HqR2RuntimeError)) throw error;
+  if (error.code === 'CARD_REFERENCE_UNAVAILABLE') throw new HqTemplateError('CARD_REFERENCE_UNAVAILABLE', 409);
   if (error.code === 'FORBIDDEN') throw new HqTemplateError('FORBIDDEN', 403);
   if (error.code === 'VERSION_CONFLICT' || error.code.includes('UNAVAILABLE') || error.code.startsWith('AMBIGUOUS_')) throw new HqTemplateError('VERSION_CONFLICT', 409);
   if (error.code.includes('UNSUPPORTED')) throw new HqTemplateError('UNSUPPORTED', 422);

@@ -1,4 +1,4 @@
-import { emptyLayout } from '@line-crm/shared'
+import { emptyLayout, composeHqMessageCard, type HqMessageCard } from '@line-crm/shared'
 import type { TemplateType, TemplateDefinition, MessageTemplateDefinition } from './hq-templates-api'
 
 export function freshDefinition(type: TemplateType): TemplateDefinition {
@@ -16,4 +16,9 @@ export function withUploadedImage(value: MessageTemplateDefinition, media: Messa
   const items = image ? [media] : [...value.media.filter(item => item.id !== media.id), media]
   if (items.reduce((sum, item) => sum + item.sizeBytes, 0) > 16 * 1024 * 1024) throw new Error('画像の合計は16 MiB以下にしてください。')
   return { ...value, media: items, template: { ...value.template, messageContent: image ? media.publicUrl ?? media.r2Key : value.template.messageContent } }
+}
+
+export function withMessageCard(value: MessageTemplateDefinition, card: HqMessageCard): MessageTemplateDefinition {
+  const image = value.media.find(item => item.id === card.imageMediaId)
+  return { ...value, card, template: { ...value.template, ...composeHqMessageCard(card, value.template.id, image?.publicUrl ?? undefined) } }
 }

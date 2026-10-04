@@ -20,6 +20,7 @@ export interface TagDefinition {
   folders: { id: string; name: string; parentId?: string | null; color?: string | null }[]
 }
 export interface MessageTemplateDefinition {
+  card?: import('@line-crm/shared').HqMessageCard
   schemaVersion: 1
   template: {
     id: string; name: string; category: string
@@ -173,6 +174,7 @@ export const hqTemplatesApi = {
   },
   duplicate: (id: string, name: string, expectedRevision: number, requestId: string) => request<TemplateDetail>(`${idPath(id)}/duplicate`, 'POST', { name, expectedRevision, requestId }),
   accounts: () => request<HqAccount[]>('/accounts'),
+  messageReferences: () => request<import('@line-crm/shared').HqMessageReference[]>('/message-references'),
   get: (id: string) => request<TemplateDetail>(idPath(id)),
   create: (input: TemplateInput, requestId: string) => request<TemplateDetail>(
     '',

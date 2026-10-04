@@ -1,3 +1,4 @@
+import { parseHqMessageCard } from '@line-crm/shared'
 import type { TemplateInput, TemplateType } from './hq-templates-api'
 import { normalizeLayout } from '@line-crm/shared'
 
@@ -34,6 +35,9 @@ function validAttempt(value: unknown): value is CreationAttempt {
   if (!object(input, ['type', 'name', 'description', 'definition', 'folderId']) || !['tag', 'template', 'rich_menu', 'form', 'scenario'].includes(String(input.type)) || !text(input.name, 200) || !input.name.trim() || !optionalText(input.description, 2000)) return false
   if (!(input.folderId === undefined || input.folderId === null || identifier(input.folderId))) return false
   const definition = input.definition
+  if (definition && typeof definition === 'object' && 'card' in definition && definition.card !== undefined) {
+    try { parseHqMessageCard(definition.card) } catch { return false }
+  }
   if (input.type === 'scenario') {
     if (!object(definition,['schemaVersion','scenario','steps']) || definition.schemaVersion!==1 || !object(definition.scenario,['name','description']) || !text(definition.scenario.name,200) || !definition.scenario.name.trim() || !(definition.scenario.description===null || optionalText(definition.scenario.description,2000)) || !Array.isArray(definition.steps) || !definition.steps.length || definition.steps.length>100) return false
     return definition.steps.every(step=>object(step,['id','delayMinutes','messageType','messageContent']) && identifier(step.id) && integerBetween(step.delayMinutes,0,525600) && ['text','flex'].includes(String(step.messageType)) && text(step.messageContent,step.messageType==='text'?5000:32000) && !!step.messageContent.trim())
@@ -52,7 +56,7 @@ function validAttempt(value: unknown): value is CreationAttempt {
       && (folder.parentId === null || folder.parentId === undefined || identifier(folder.parentId)) && (folder.color === null || folder.color === undefined || /^#[0-9a-f]{6}$/i.test(String(folder.color))))
   }
   if (input.type === 'template') {
-    if (!object(definition, ['schemaVersion', 'template', 'media']) || definition.schemaVersion !== 1 || !Array.isArray(definition.media) || definition.media.length > 50) return false
+    if (!object(definition, ['schemaVersion', 'template', 'media', 'card']) || definition.schemaVersion !== 1 || !Array.isArray(definition.media) || definition.media.length > 50) return false
     const template = definition.template
     if (!object(template, ['id', 'name', 'category', 'messageType', 'messageContent', 'carouselActionsJson', 'carouselTapLimitMode', 'carouselTapLimitText', 'questionJson', 'questionStatus'])
       || !identifier(template.id) || !text(template.name, 255) || !text(template.category, 100) || !['text', 'image', 'flex', 'carousel'].includes(String(template.messageType))

@@ -1,4 +1,5 @@
 import { listTemplateFolders, saveTemplateFolder, deleteTemplateFolder, duplicateTemplate } from '../services/hq-templates/folders.js';
+import { listMessageReferences } from '../services/hq-templates/message-card-references.js';
 import { deleteHqImage, uploadHqImage } from '../services/hq-templates/authoring-media.js';
 import { TemplateHqTemplateError } from '../services/hq-templates/template.js';
 import { Hono, type Context } from 'hono';
@@ -25,6 +26,7 @@ async function authority(c: Context<Env>): Promise<HqTemplateAuthority> {
   return auth.authority;
 }
 const reasons: Record<string, string> = {
+  CARD_REFERENCE_UNAVAILABLE: '配り先に同じ名前のフォーム・シナリオが1件だけあるか、フォーム用のLIFFが設定されているか確認してください',
   INVALID_REQUEST_ID: '作成依頼の識別情報を確認してください',
   IDEMPOTENCY_CONFLICT: '同じ作成依頼の内容が変わっています。元の内容で再確認してください',
   CREATE_RECEIPT_UNAVAILABLE: '作成済みの記録を確認できません。一覧から状態を確認してください',
@@ -80,6 +82,7 @@ hqTemplates.delete('/api/hq/templates/media', async c => {
   }
 });
 hqTemplates.get('/api/hq/templates/accounts', async c => c.json({ success: true, data: await listTemplateAccounts(dbFor(c.env), await authority(c)) }));
+hqTemplates.get('/api/hq/templates/message-references', async c => c.json({ success: true, data: await listMessageReferences(dbFor(c.env), await authority(c)) }));
 hqTemplates.get('/api/hq/templates', async c => {
   const type = c.req.query('type');
   if (type && !HQ_TEMPLATE_TYPES.includes(type as HqTemplateType)) throw new HqTemplateError('INVALID_TYPE');
