@@ -56,13 +56,30 @@ describe('「？」の正円', () => {
     expect(TSX).toContain('className={styles.mark}>?</span>')
     expect(CSS).not.toContain('.button svg')
     expect(CSS.match(/\.button\s*\{[^}]*\}/)?.[0]).not.toContain('background: transparent;')
-    expect(CSS).not.toMatch(/\.button\s*\{[^}]*border:\s*0;/)
+    const baseButton = CSS.match(/^\.button\s*\{[^}]*\}/m)?.[0]
+    expect(baseButton).toBeDefined()
+    expect(baseButton).not.toMatch(/border:\s*0;/)
   })
 
   it('カードの見出しは題と「？」をひとかたまりで縦の中央にそろえる', () => {
     expect(SIDE_CARDS).toContain('題と「？」・期間はひとかたまり')
     expect(SIDE_CARDS).toContain('items-center gap-1')
     expect(PAGE).toContain('題と「？」・期間はひとかたまり')
+  })
+})
+
+describe('V8の「？」は円と押せる範囲を分ける', () => {
+  it('16pxの円を28pxの当たりの中に置き、枠と背景は円が持つ', () => {
+    const button = CSS.match(/\[data-theme='v8'\] \.button\s*\{[^}]*\}/)?.[0]
+    const mark = CSS.match(/\[data-theme='v8'\] \.mark\s*\{[^}]*\}/)?.[0]
+    expect(button).toContain('width: 28px;')
+    expect(button).toContain('height: 28px;')
+    expect(button).toContain('background: transparent;')
+    expect(mark).toContain('width: 16px;')
+    expect(mark).toContain('height: 16px;')
+    expect(mark).toContain('border: 1.2px solid var(--color-ink-faint);')
+    expect(mark).toContain('border-radius: var(--radius-pill);')
+    expect(mark).toContain('background: var(--color-canvas);')
   })
 })
 
