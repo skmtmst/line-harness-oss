@@ -756,7 +756,7 @@ export default function BroadcastListV8() {
   )
 
   return (
-    <div className={styles.board} data-design-node="EML2F bIdqV">
+    <div className={styles.board} data-design-node={canEdit ? 'EML2F bIdqV' : 'NtCE3'}>
       {folderDialogOpen && (
         <FolderAddDialog
           kind="broadcast"

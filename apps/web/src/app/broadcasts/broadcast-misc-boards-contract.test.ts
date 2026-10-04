@@ -32,6 +32,8 @@ describe('一斉配信の細かい板', () => {
   it('取り消しの確かめは残す方を主にする', () => {
     expect(DETAIL).toContain('cancelLabel="予約のまま残す"')
     expect(DETAIL).toContain('primaryAction="cancel"')
-    expect(RESERVED).toContain('cancelLabel="予約のまま残す"')
+    // 予約後の窓は3操作を独自footerへ移した。残す操作を主ボタンにする。
+    expect(RESERVED).toMatch(/<Button[^>]*variant="primary"[^>]*onClick=\{closeCancel\}[^>]*>[\s\S]*?予約のまま残す/)
+    expect(RESERVED).toMatch(/variant="danger" onClick=\{confirmCancel\}/)
   })
 })

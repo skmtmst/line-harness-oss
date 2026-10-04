@@ -11,6 +11,8 @@ const PAGE = readFileSync(
   resolve(__dirname, "../automations/page.tsx"),
   "utf-8",
 );
+const LIST = readFileSync(resolve(__dirname, 'list-v8.tsx'), 'utf-8');
+const TABLE_CSS = readFileSync(resolve(__dirname, '../../components/shared/table.module.css'), 'utf-8');
 
 describe("automations 一覧の板の数字", () => {
   it("KPI見出しは13px・#131118・粗500 (text-xs font-medium text-ink)", () => {
@@ -30,7 +32,10 @@ describe("automations 一覧の板の数字", () => {
     for (const c of cards) expect(c).toContain("px-5 py-4");
   });
 
-  it("表の見出しは左右20・上下13・#3d3d3d・地table-head (px-5 py-[13px] text-ink-secondary bg-table-head)", () => {
-    expect(PAGE).toMatch(/bg-table-head px-5 py-\[13px\] text-xs font-semibold text-ink-secondary/);
+  it("V8表の見出しは共通Thで左右20・上下13・secondary・地table-headを使う", () => {
+    expect(LIST).toContain('<TableHeadRow>');
+    expect(LIST).toContain('<Th>ルール</Th>');
+    expect(TABLE_CSS).toMatch(/\[data-theme='v8'\] \.headRow \{[^}]*background: var\(--color-table-head\)/s);
+    expect(TABLE_CSS).toMatch(/\[data-theme='v8'\] \.headRow \.cell \{[^}]*padding: 13px 20px;[^}]*color: var\(--color-ink-secondary\)/s);
   });
 });

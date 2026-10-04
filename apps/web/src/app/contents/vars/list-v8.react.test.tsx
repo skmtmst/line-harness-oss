@@ -164,7 +164,7 @@ test('v8 では新しい一覧（FM94M）が出て、v7 は出ない', async () 
   await renderPage()
   expect(host?.querySelector('[data-design-node~="FM94M"]')).not.toBeNull()
   // 一覧（1152）の板 `XIzkJ` も同じ面に付く（数に入る印）。
-  expect(host?.querySelector('[data-design-node~="XIzkJ"]')).not.toBeNull()
+  expect(host?.querySelector('[data-design-node~="FM94M"][data-design-node~="XIzkJ"]')).not.toBeNull()
   expect(host?.querySelector('[data-design-node="WuKzU"]')).toBeNull()
   expect(host?.textContent).toContain('差し込んでいる所')
   expect(host?.textContent).toContain('問い合わせ先')

@@ -12,9 +12,10 @@ describe('V6 成果・アフィリエイトの契約', () => {
     expect(PAGE).not.toContain("import Header from")
     expect(PAGE).not.toContain('マニュアルは準備中です')
     expect(LEGACY_PAGE).not.toContain("import Header from")
-    // 旧URLは /conversions へ集約する。#1058: ?tab= は落とさず移転先へ引き継ぐ
-    // （/affiliate-offers → /affiliates?tab=offers → /conversions?tab=offers）。
-    expect(LEGACY_PAGE).toContain('router.replace(`/conversions?tab=')
+    // V8では独立した /affiliates が正本。古いCV内タブはクエリを保って移る。
+    expect(LEGACY_PAGE).toContain('<AffiliatesV8 />')
+    expect(PAGE).toContain('`/affiliates?${params.toString()}`')
+    expect(PAGE).toContain('router.replace(target)')
   })
 
   it('紹介者一覧の空・読込・失敗を言い分ける', () => {
