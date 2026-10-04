@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, type FriendStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import KpiCard from '@/components/shared/kpi-card'
@@ -10,6 +11,7 @@ import { formatNumber } from '@/lib/format'
 
 /** Pencil ★V6（`zZMNG`）の上部カード。数え方は既存APIのままにする。 */
 export default function FriendKpis() {
+  const theme = useAdminTheme()
   const { selectedAccountId } = useAccount()
   const [stats, setStats] = useState<FriendStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -57,7 +59,7 @@ export default function FriendKpis() {
       title: '有効友だち',
       value: stats?.active ?? null,
       unit: '人',
-      detail: stats ? `総友だち ${formatNumber(stats.total)}人` : '—',
+      detail: stats ? (theme !== 'v8' ? `総友だち ${formatNumber(stats.total)}人` : stats.activeMonthDelta == null ? `総友だち ${formatNumber(stats.total)}人・前月の記録なし` : `前月末 ${formatNumber(stats.activeLastMonth ?? 0)}人（${stats.activeMonthDelta >= 0 ? '+' : ''}${formatNumber(stats.activeMonthDelta)}）`) : '—',
       badge: stats?.total ? `${Math.round((stats.active / stats.total) * 100)}%` : undefined,
     },
     {

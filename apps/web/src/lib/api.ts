@@ -4387,6 +4387,9 @@ export type BroadcastListKpis = Pick<
 
 /** 友だち画面の上部に出す数（設計 `V2 2-2 友だち`）。 */
 export type FriendStats = {
+  activeLastMonth?: number | null
+  activeMonthDelta?: number | null
+  activeComparisonDate?: string
   active: number
   total: number
   blockedByThem: number

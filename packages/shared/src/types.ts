@@ -2545,3 +2545,10 @@ export interface AutoReplyRunsResponse {
     offset: number;
   };
 }
+
+/** 有効友だちの比較。記録が欠けている場合は推定せずnull。 */
+export interface FriendActiveMonthComparison {
+  activeLastMonth: number | null;
+  activeMonthDelta: number | null;
+  activeComparisonDate: string;
+}
