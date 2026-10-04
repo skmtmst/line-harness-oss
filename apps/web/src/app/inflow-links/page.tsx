@@ -967,7 +967,8 @@ function InflowLinksPageInner({
           <ListState
             kind="empty"
             title="条件に合う流入経路がありません"
-            description="検索や絞り込みの条件を変えてください。"
+            description="検索や絞り込みを外すと、すべて出ます。"
+            action={<Button variant="secondary" onClick={() => { setSearch(''); setFilter('all'); setSelectedGenre(''); setPage(1) }}>条件を外す</Button>}
           />
         ) : (
           <ListState
