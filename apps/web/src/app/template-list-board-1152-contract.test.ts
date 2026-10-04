@@ -16,4 +16,10 @@ describe('テンプレート一覧の板の印（L7zA7C）', () => {
     expect(source).toContain('L7zA7C')
     expect(source).toMatch(/data-design-node="[^"]*L7zA7C[^"]*"/)
   })
+
+  it('削除の確認窓に V6JFnd が付く', () => {
+    const source = readFileSync(join(SRC, 'app/templates/list-v8.tsx'), 'utf8')
+    expect(source).toContain('V6JFnd')
+    expect(source).toMatch(/designNode="V6JFnd"/)
+  })
 })

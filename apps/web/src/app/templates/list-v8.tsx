@@ -1461,6 +1461,7 @@ export default function TemplatesListV8() {
       {/* 削除の確認窓（`V6JFnd`：使っていないテンプレート）。 */}
       <ConfirmDialog
         open={pendingDelete !== null}
+        designNode="V6JFnd"
         title={`テンプレート「${pendingDelete?.item.name ?? ''}」を削除しますか？`}
         description={templateDeleteDescription(pendingDelete?.item.usageCount ?? 0)}
         confirmLabel="削除する"
