@@ -9,6 +9,7 @@ import Icon from '../components/ui/Icon.js';
 import Button from '../components/ui/Button.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 
 function nanoid(): string {
   return crypto.randomUUID();
@@ -149,7 +150,7 @@ export default function EventConfirm() {
 
   if (loadFailed || slotMissing || !event || !slot) {
     return (
-      <div className="min-h-screen bg-ground">
+      <LiffLookScope className="min-h-screen bg-ground">
         <LiffHeader title="申し込みの確認" />
         <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
           {loadFailed ? (
@@ -167,7 +168,7 @@ export default function EventConfirm() {
             <LoadingView />
           )}
         </div>
-      </div>
+      </LiffLookScope>
     );
   }
 
@@ -176,17 +177,17 @@ export default function EventConfirm() {
     : 'キャンセルは期限まで「自分のイベント」からできます（期限はイベントごとに違います）。';
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node="EscPA">
+    <LiffLookScope className="min-h-screen bg-ground" designNode="EscPA">
       <LiffHeader title="申し込みの確認" />
       <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-28">
         <h1 className="text-xl font-bold text-ink">内容を確かめてください</h1>
-        <dl className="space-y-3 rounded-xl border border-hairline bg-canvas p-4 text-sm">
+        <dl className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
           <Row label="イベント" value={event.name} />
           <Row label="日時" value={formatJstEventAt(slot.starts_at)} />
           {event.venue_name && <Row label="場所" value={event.venue_name} />}
         </dl>
 
-        <div className="flex gap-2 rounded-lg bg-info-bg p-3 text-xs leading-5 text-ink-secondary">
+        <div className="flex gap-2 rounded-lg bg-info-bg p-3 text-xs leading-5 text-ink">
           <Icon name="info" className="h-4 w-4 shrink-0" />
           <p>{infoText}</p>
         </div>
@@ -270,8 +271,8 @@ export default function EventConfirm() {
         )}
 
         <label className="block">
-          <span className="text-sm text-ink">
-            備考 <span className="text-xs text-ink-faint">任意</span>
+          <span className="text-sm font-bold text-ink">
+            備考 <span className="text-[11px] font-normal text-liff-sub">任意</span>
           </span>
           <textarea
             value={note}
@@ -279,7 +280,7 @@ export default function EventConfirm() {
             rows={4}
             maxLength={5000}
             placeholder="質問や伝えたいことがあれば..."
-            className="mt-1 min-h-24 w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-ink placeholder:text-ink-faint focus-visible:outline-2 focus-visible:outline-ink"
+            className="mt-1 min-h-24 w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3.5 py-3 text-sm text-ink placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
           />
         </label>
         <p className="text-right text-xs text-ink-faint">{note.length} / 5000</p>
@@ -297,20 +298,20 @@ export default function EventConfirm() {
         <button
           type="button"
           onClick={back}
-          className="self-center px-4 py-1 text-xs text-ink-secondary focus-visible:outline-2 focus-visible:outline-ink"
+          className="self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
         >
           ←戻る
         </button>
       </BottomBar>
-    </div>
+    </LiffLookScope>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="shrink-0 text-ink-secondary">{label}</dt>
-      <dd className="min-w-0 truncate font-medium text-ink" title={value}>
+    <div className="flex items-baseline gap-2 py-2.5">
+      <dt className="w-18 shrink-0 text-xs text-liff-sub">{label}</dt>
+      <dd className="min-w-0 flex-1 truncate text-sm font-semibold text-ink" title={value}>
         {value}
       </dd>
     </div>

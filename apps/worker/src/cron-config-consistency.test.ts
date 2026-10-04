@@ -64,6 +64,9 @@ describe('Cron Trigger設定', () => {
       'deleteExpiredRestaurantRawEmails',
       // Googleビジネス第4段: パフォーマンス指標の取り込み（JST日付ゲートで1日1回）。
       'processGoogleBusinessDailyMetrics',
+      // ★V6 36-2: 保存期限が切れた統括の顧客データ削除。cronから外すと
+      // 退会後の顧客データが誰にも消されずに残る。
+      'processTenantDataPurge',
     ];
     const deliveryCalls = [
       'processScheduledAutomationTriggers',

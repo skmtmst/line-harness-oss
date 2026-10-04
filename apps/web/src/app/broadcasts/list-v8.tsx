@@ -1,7 +1,8 @@
 'use client'
 
 /*
- * ★V8 一斉配信の一覧（Pencil `l5V9a`。1152 は `jjFNi`、状態別の見え方は `A8jzaQ`）。
+ * ★V8 一斉配信の一覧（Pencil `l5V9a`。1152 は `jjFNi`、状態別の見え方は `A8jzaQ`。
+ * 再撮の板 `EML2F`（一覧）・`bIdqV`（一覧の状態）を外枠に、`rfdmA`（一覧1152）を道具の段に付ける）。
  *
  * v7 の一覧（page.tsx の BroadcastList）とは別の部品として持つ。
  * データの口は同じ `/api/broadcasts`。違いは置き場と見せ方だけ——
@@ -264,24 +265,25 @@ export default function BroadcastListV8() {
    * ページ送りは口側の cursor（= オフセット）で行う。
    * ページ番号は画面だけの形で、口には (page-1)*limit を渡す。
    */
-  const load = useCallback(async (cursor = 0) => {
+  /*
+   * 速さ：条件を変えるたび3つの口を取り直していた。一覧だけが条件で
+   * 変わるので、一覧と名前解決（タグ・シナリオ）を分ける。条件変更・
+   * ページ送り・削除や移動の後の取り直しは一覧の口だけにする。
+   */
+  const loadList = useCallback(async (cursor = 0) => {
     setLoading(true)
     setError('')
     setForbidden(false)
     try {
       const chip = STATUS_CHIPS.find((item) => item.key === statusFilter)
-      const [broadcastsRes, tagsRes, scenariosRes] = await Promise.all([
-        api.broadcasts.list({
-          accountId: selectedAccountId || undefined,
-          limit: pageSize,
-          cursor,
-          displayStatus: chip && chip.query !== '' ? chip.query : undefined,
-          folderId: folderFilter === UNFILED ? 'unfiled' : folderFilter || undefined,
-          sort: sortKey,
-        }),
-        api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined),
-        api.scenarios.list(selectedAccountId ? { accountId: selectedAccountId } : undefined).catch(() => null),
-      ])
+      const broadcastsRes = await api.broadcasts.list({
+        accountId: selectedAccountId || undefined,
+        limit: pageSize,
+        cursor,
+        displayStatus: chip && chip.query !== '' ? chip.query : undefined,
+        folderId: folderFilter === UNFILED ? 'unfiled' : folderFilter || undefined,
+        sort: sortKey,
+      })
       if (broadcastsRes.success) {
         setBroadcasts(broadcastsRes.data)
         setListKpis(broadcastsRes.kpis)
@@ -289,10 +291,6 @@ export default function BroadcastListV8() {
         setListTotal(broadcastsRes.pagination?.total ?? null)
       } else {
         setError(broadcastsRes.error)
-      }
-      if (tagsRes && tagsRes.success) setTags(tagsRes.data)
-      if (scenariosRes && scenariosRes.success) {
-        setScenarios(scenariosRes.data.map((item) => ({ id: item.id, name: item.name })))
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
@@ -302,15 +300,39 @@ export default function BroadcastListV8() {
     }
   }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter])
 
-  /* 条件を変えたら1ページ目へ戻して取り直す。 */
+  /*
+   * 速さ：タグ・シナリオは宛先の名前解決にだけ使う。条件では変わらない
+   * ので、アカウントが変わったときだけ取り直す。失敗しても一覧は止めない。
+   */
+  const loadCandidates = useCallback(async () => {
+    try {
+      const [tagsRes, scenariosRes] = await Promise.all([
+        api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined),
+        api.scenarios.list(selectedAccountId ? { accountId: selectedAccountId } : undefined).catch(() => null),
+      ])
+      if (tagsRes && tagsRes.success) setTags(tagsRes.data)
+      if (scenariosRes && scenariosRes.success) {
+        setScenarios(scenariosRes.data.map((item) => ({ id: item.id, name: item.name })))
+      }
+    } catch {
+      // 名前が引けない行はID表示に倒す（一覧の取得とは別物）。
+    }
+  }, [selectedAccountId])
+
+  /* 条件を変えたら1ページ目へ戻して一覧だけ取り直す。 */
   useEffect(() => {
     setPage(1)
-    void load(0)
-  }, [load])
+    void loadList(0)
+  }, [loadList])
+
+  /* アカウントを変えたら名前解決も取り直す。 */
+  useEffect(() => {
+    void loadCandidates()
+  }, [loadCandidates])
 
   const goPage = (next: number) => {
     setPage(next)
-    void load((next - 1) * pageSize)
+    void loadList((next - 1) * pageSize)
   }
 
   /* 今月の送信枠（ダッシュボードの口から quota を借りる）。 */
@@ -422,7 +444,7 @@ export default function BroadcastListV8() {
       const res = await api.broadcasts.delete(targetId)
       if (!res.success) throw new Error(res.error)
       setDeleteTarget(null)
-      await load((page - 1) * pageSize)
+      await loadList((page - 1) * pageSize)
     } catch {
       setDeleteError('この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
@@ -440,7 +462,7 @@ export default function BroadcastListV8() {
         expectedVersion: broadcast.version ?? 0,
       })
       if (!res.success) throw new Error(res.error)
-      await load((page - 1) * pageSize)
+      await loadList((page - 1) * pageSize)
       await loadFolders()
     } catch {
       notifyToast('フォルダへ移せませんでした。状態を読み直してから、もう一度お試しください。')
@@ -610,7 +632,7 @@ export default function BroadcastListV8() {
   }
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node="EML2F bIdqV">
       {folderDialogOpen && (
         <FolderAddDialog
           kind="broadcast"
@@ -692,8 +714,8 @@ export default function BroadcastListV8() {
         </div>
 
         <div className={styles.listCol}>
-          {/* 道具の段。狭い板では「＋配信を作る」とフォルダ選びがここへ畳まれる。 */}
-          <div className={styles.toolbar}>
+          {/* 道具の段。狭い板では「＋配信を作る」とフォルダ選びがここへ畳まれる（1152 は `rfdmA`）。 */}
+          <div className={styles.toolbar} data-design-node="rfdmA">
             <Button
               type="button"
               variant="primary"
@@ -848,8 +870,8 @@ export default function BroadcastListV8() {
           {showCreate && (
             <BroadcastForm
               tags={tags}
-              onSuccess={() => { setShowCreate(false); void load(); void loadFolders() }}
-              onDraftSaved={() => { void load(); void loadFolders() }}
+              onSuccess={() => { setShowCreate(false); void loadList(); void loadFolders() }}
+              onDraftSaved={() => { void loadList(); void loadFolders() }}
               onCancel={() => setShowCreate(false)}
               openTemplatePickerInitially={openTemplatePicker}
             />
@@ -881,7 +903,7 @@ export default function BroadcastListV8() {
                 <AlertCircle size={20} aria-hidden="true" />
               </span>
               <p className={styles.stateTitle}>一斉配信を読み込めませんでした</p>
-              <Button type="button" onClick={() => void load((page - 1) * pageSize)}>もう一度試す</Button>
+              <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度試す</Button>
             </div>
           ) : visibleBroadcasts.length === 0 ? (
             filterActive ? (
@@ -904,7 +926,7 @@ export default function BroadcastListV8() {
             )
           ) : (
             <>
-              <div className={styles.tableWrap}>
+              <div className={styles.tableWrap} data-content-in="">
                 <table className={styles.table}>
                   <thead>
                     <TableHeadRow>
@@ -950,7 +972,7 @@ export default function BroadcastListV8() {
                             <p className={styles.cellSub}>{rowExcerpt(broadcast.messageType, broadcast.messageContent)}</p>
                             <p className={styles.cellAudience} title={audience}>{audience}</p>
                           </td>
-                          <td>
+                          <td className={styles.statusCell}>
                             {approvalDuplicatesStatus
                               ? <ApprovalBadge status={broadcast.approvalStatus} />
                               : statusBadge(broadcast)}

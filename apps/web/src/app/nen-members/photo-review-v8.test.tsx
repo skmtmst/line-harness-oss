@@ -1,0 +1,140 @@
+// @vitest-environment happy-dom
+/*
+ * ★V8-B 投稿（TkA4D・Jn95h・cniyw・SyQA1・ujcar・N1br7）の骨格。
+ * データの口は v7 と同じ（photos・metrics・review・publications）。
+ * 板の印・札・カードの操作・見送る窓・掲載の表を見る。
+ */
+import React from 'react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+const fetchPhotos = vi.hoisted(() => vi.fn())
+const nenMembers = vi.hoisted(() => ({
+  photoReviewMetrics: vi.fn(),
+  photoRewardPolicyVersions: vi.fn(),
+  photoPublications: vi.fn(),
+  reviewPhoto: vi.fn(),
+  bulkReviewPhotos: vi.fn(),
+  retryPhotoReviewNotification: vi.fn(),
+  withdrawPhotoPublication: vi.fn(),
+}))
+const staffMe = vi.hoisted(() => ({ me: vi.fn() }))
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}))
+vi.mock('@/lib/api', () => ({
+  ApiError: class extends Error { status?: number; code?: string },
+  api: { staff: staffMe, nenMembers },
+  fetchApi: (...args: unknown[]) => fetchPhotos(...args),
+}))
+
+import PhotoReviewV8 from './photo-review-v8'
+
+const flush = () => act(async () => { await Promise.resolve() })
+
+const photo = {
+  id: 'p1',
+  status: 'pending',
+  pet_name: 'こむぎ',
+  pet_call_name: 'こむぎ',
+  pet_gender: 'female',
+  owner_name: '田中 明子',
+  customer_id: '10234',
+  caption: '散歩のあと',
+  created_at: '2026-09-30T10:00:00Z',
+  image_url: null,
+  latest_risk_flag: 'none',
+  review_notification_status: 'sent',
+  point_sync_status: 'synced',
+  publication_consent_at: null,
+  publication_withdrawn_at: null,
+  review_version: 1,
+}
+
+const metrics = {
+  pendingCount: 1,
+  reviewedCount: 0,
+  attentionCount: 0,
+  averageReviewMinutes: null,
+  oldestPendingAt: null,
+}
+
+const versions = [
+  { versionNumber: 3, policyKey: 'default', points: 100, summary: '', effectiveFrom: null, createdBy: '高田 誠', createdAt: '2026-09-20T10:00:00Z', status: 'in_use' },
+]
+
+const publication = {
+  id: 'pub1',
+  version: 1,
+  pet_name: 'こむぎ',
+  owner_name: '',
+  image_url: null,
+  placements: [{ active: 1, placement_label: 'サイト（お客様の声）', placement_type: 'site' }],
+  view_count: 2140,
+  publication_consent_at: '2026-09-01T00:00:00Z',
+}
+
+function mockAll() {
+  fetchPhotos.mockResolvedValue({ success: true, data: [photo] })
+  nenMembers.photoReviewMetrics.mockResolvedValue({ success: true, data: metrics })
+  nenMembers.photoRewardPolicyVersions.mockResolvedValue({ success: true, data: versions })
+  nenMembers.photoPublications.mockResolvedValue({
+    success: true,
+    data: {
+      summary: { publishedCount: 1, placementCount: 1, topPhoto: null, consentedCount: 1 },
+      items: [publication],
+      pendingWithdrawals: [],
+      withdrawnItems: [],
+    },
+  })
+}
+
+afterEach(cleanup)
+
+describe('投稿 V8', () => {
+  it('審査待ちは TkA4D の印でカードと操作を出す', async () => {
+    staffMe.me.mockResolvedValue({ success: true, data: { role: 'owner' } })
+    mockAll()
+    const { container } = render(<PhotoReviewV8 accountId="account-a" />)
+    await screen.findByText('散歩のあと', { exact: false })
+    expect(container.querySelector('[data-design-node="TkA4D"]')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '✓ 採用する' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '× 見送る' })).toBeTruthy()
+    expect(screen.getByText('報酬の決まり')).toBeTruthy()
+    expect(screen.getByText('見送り理由の内訳（今月）')).toBeTruthy()
+  })
+
+  it('見るだけの権限は Jn95h の印で操作を押せなくする', async () => {
+    staffMe.me.mockResolvedValue({ success: true, data: { role: 'staff' } })
+    mockAll()
+    const { container } = render(<PhotoReviewV8 accountId="account-a" />)
+    await screen.findByText('散歩のあと', { exact: false })
+    expect(container.querySelector('[data-design-node="Jn95h"]')).toBeTruthy()
+    expect((screen.getByRole('button', { name: '✓ 採用する' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('見送るを押すと ujcar の窓が開く', async () => {
+    staffMe.me.mockResolvedValue({ success: true, data: { role: 'owner' } })
+    mockAll()
+    const { container } = render(<PhotoReviewV8 accountId="account-a" />)
+    await screen.findByText('散歩のあと', { exact: false })
+    fireEvent.click(screen.getByRole('button', { name: '× 見送る' }))
+    expect(await screen.findByText('この写真を見送りますか？')).toBeTruthy()
+    expect(container.querySelector('[data-design-node="ujcar"]')).toBeTruthy()
+    expect(screen.getByText('見送った理由')).toBeTruthy()
+  })
+
+  it('公式サイト掲載は SyQA1 の印で表を出す', async () => {
+    staffMe.me.mockResolvedValue({ success: true, data: { role: 'owner' } })
+    mockAll()
+    const { container } = render(<PhotoReviewV8 accountId="account-a" />)
+    await screen.findByText('散歩のあと', { exact: false })
+    fireEvent.click(screen.getByRole('tab', { name: '公式サイト掲載' }))
+    expect(await screen.findByText('どこで使っているか')).toBeTruthy()
+    expect(container.querySelector('[data-design-node="SyQA1"]')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '掲載先から外す' })).toBeTruthy()
+    expect(screen.getByText('出すときの決めごと')).toBeTruthy()
+  })
+})

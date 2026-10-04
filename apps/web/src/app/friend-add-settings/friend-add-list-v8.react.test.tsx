@@ -226,9 +226,9 @@ test('v8 の受け皿は一番下・操作に「削除する」がなく消せ�
     expect(labels).toContain('編集する')
     expect(labels).toContain('実行結果を見る')
     expect(labels).toContain('テストを送る')
-    expect(labels).toContain('一時停止する')
+    expect(labels).toContain('止める')
     expect(labels).not.toContain('削除する')
-    expect(menu!.textContent).toContain('この設定は消せません')
+    expect(menu!.textContent).toContain('この設定は削除できません')
   })
 })
 
@@ -247,7 +247,7 @@ test('v8 の受け皿を止める選択は「止められない」確かめの�
     expect(document.querySelector('[role="menu"]')).toBeTruthy()
   })
   const stop = [...document.querySelectorAll('[role="menuitem"]')]
-    .find((item) => item.textContent?.includes('一時停止する')) as HTMLElement
+    .find((item) => item.textContent?.includes('止める')) as HTMLElement
   await act(async () => { stop.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   await eventually(() => {
     // 板 cFo2p：止められない確かめ
@@ -269,6 +269,17 @@ test('v8 の閲覧のみは作る操作を押せない形にする（隠さな�
     .find((item) => item.textContent?.includes('初回案内を作る'))
   expect(create).toBeTruthy()
   expect(create!.disabled).toBe(true)
+})
+
+test('v8 の閲覧のみは見出しの下に閲覧のみの帯が出る（板 LEwkJ）', async () => {
+  staffRole = 'staff'
+  document.documentElement.dataset.theme = 'v8'
+  await act(async () => root.render(<FriendAddSettingsPage />))
+  await settle()
+  await eventually(() => {
+    expect(host.querySelector('[data-design-node="MRhef"]')).toBeTruthy()
+  })
+  expect(host.textContent).toContain('閲覧のみで見ています')
 })
 
 test('v7 の下では従来の一覧が出る（新しい一覧には切り替わらない）', async () => {

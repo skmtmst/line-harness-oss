@@ -1224,7 +1224,7 @@ function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resour
                     <button
                       type="button"
                       className={styles.iconRemove}
-                      aria-label={`${label}の${index + 1}区間目を消す`}
+                      aria-label={`${label}の${index + 1}区間目を削除`}
                       onClick={() => updateDay(weekday, (list) => list.filter((_, i) => i !== index))}
                     >
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" strokeLinecap="round" /></svg>
@@ -1913,7 +1913,7 @@ function HolidaysTabV8({ accountId, settings, status, error, exceptions, closedW
       <ConfirmDialog
         open={deleteTarget !== null}
         title="この休業日を消しますか？"
-        description="消すと、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
+        description="削除すると、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
         confirmLabel="休業日を削除する"
         destructive
         busy={busy}
@@ -2568,8 +2568,8 @@ const BOOKING_CHANNEL_META: Record<string, { name: string; sub: string; how: str
   line: { name: 'LINE（musubo の予約）', sub: '予約ページ・リッチメニュー', how: 'そのまま予約管理へ' },
   manual: { name: '電話・店頭', sub: 'スタッフが入れる', how: '予約管理で手入力' },
   hot_pepper_beauty: { name: 'Hot Pepper Beauty', sub: 'SALON BOARD', how: 'Google カレンダー経由（SALON BOARD が書き出せる場合・確認中）' },
-  google_reserve: { name: 'Google で予約', sub: 'Google ビジネス プロフィール', how: '予約通知メールを読む（準備中）' },
-  epark: { name: 'EPARK', sub: '予約通知メール', how: '予約通知メールを読む（準備中）' },
+  google_reserve: { name: 'Google で予約', sub: 'Google ビジネス プロフィール', how: '予約通知メールを読む（未対応）' },
+  epark: { name: 'EPARK', sub: '予約通知メール', how: '予約通知メールを読む（未対応）' },
 }
 
 function channelStatusBadge(status: string): { tone: 'success' | 'warning' | 'danger' | 'neutral'; label: string } {
@@ -2579,7 +2579,7 @@ function channelStatusBadge(status: string): { tone: 'success' | 'warning' | 'da
   if (status === 'expired') return { tone: 'danger', label: '期限切れ' }
   if (status === 'confirming') return { tone: 'warning', label: '確認中' }
   if (status === 'disconnected') return { tone: 'neutral', label: 'つないでいない' }
-  return { tone: 'neutral', label: '準備中' }
+  return { tone: 'neutral', label: '未確認' }
 }
 
 function ChannelsTabV8({ accountId, canEdit }: { accountId: string; canEdit: boolean }) {

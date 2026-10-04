@@ -337,6 +337,14 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'tenant data retention purge',
+    classification: { kind: 'core', reason: '退会後の顧客データ保存期限（★V6 36-2）' },
+    enforcement: {
+      mode: 'exempt',
+      reason: '契約が終わった統括のデータ削除で、機能スイッチのon/offに関係なく実行する',
+    },
+  },
+  {
     name: 'restaurant raw mail retention',
     classification: { kind: 'feature', featureId: 'restaurant_test' },
     enforcement: {

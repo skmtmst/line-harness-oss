@@ -674,12 +674,15 @@ const spec = {
         parameters: [
           { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
           { name: 'rank', in: 'query', schema: { type: 'string' } },
+          { name: 'ranks', in: 'query', schema: { type: 'string', description: '「○○以上」の札：区切りに合うランクキーをカンマ区切り。rank より優先' } },
+          { name: 'link', in: 'query', schema: { type: 'string', enum: ['linked', 'unlinked'] } },
           { name: 'pet', in: 'query', schema: { type: 'string', enum: ['any', 'with', 'without'] } },
           { name: 'q', in: 'query', schema: { type: 'string' } },
           { name: 'sort', in: 'query', schema: { type: 'string', enum: ['annual_desc', 'lifetime_desc', 'balance_desc', 'recent'] } },
           { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
+          { name: 'pageSize', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
         ],
-        responses: { '200': { description: 'Paged members with KPIs and rank definitions' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
+        responses: { '200': { description: 'Paged members with KPIs (petMembers, monthPurchaseYen, monthBuyers) and rank definitions' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
       },
     },
     '/api/nen/feeding-products': {
@@ -2387,6 +2390,13 @@ const spec = {
         },
       },
     },
+    '/api/reminders/{id}/restore': {
+      post: {
+        tags: ['Reminders'], summary: '削除したリマインダの定義を元に戻す（戻した直後は停止のまま。登録・配信予定は戻さない）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Reminder definition restored as stopped' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Reminder not found or not deleted' } },
+      },
+    },
     '/api/reminders/{id}/steps/{stepId}': {
       delete: {
         tags: ['Reminders'], summary: '指定したリマインダに属する通を削除',
@@ -2416,6 +2426,13 @@ const spec = {
         tags: ['Auto replies'], summary: 'LINEアカウント範囲内の自動応答一覧を取得',
         parameters: [{ name: 'accountId', in: 'query', schema: { type: 'string' } }],
         responses: { '200': { description: 'Visible auto replies' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
+      },
+    },
+    '/api/auto-replies/{id}/restore': {
+      post: {
+        tags: ['Auto replies'], summary: '削除した自動応答を元に戻す（戻した直後は停止のまま）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Auto reply restored as stopped' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Auto reply not found or not deleted' } },
       },
     },
     '/api/auto-replies/{id}/stop': {
@@ -2480,6 +2497,60 @@ const spec = {
           '403': { description: 'Owner or admin role required' },
           '404': { description: 'Account not in visible scope' },
           '409': { description: 'ORDER_CHANGED: list changed elsewhere; reload and retry' },
+        },
+      },
+    },
+    '/api/friend-add-rules/order': {
+      put: {
+        tags: ['Webhook'],
+        summary: '友だち追加時の配信の優先順位を版つきで一括更新（F8）',
+        description:
+          '対象IDの全部・所属・区分・expectedVersion の4点を厳密に見る。並びの版は一覧の orderVersion（受け皿以外の lock_version 合計）。どれか1つでも合わなければ書かず 409 で読み直しを促す。',
+        parameters: [{ name: 'account_id', in: 'query', required: false, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['friendKind', 'ids', 'expectedVersion'],
+                properties: {
+                  accountId: { type: 'string', description: '対象のLINEアカウント（query の account_id でも可）' },
+                  friendKind: { type: 'string', enum: ['first_time', 'returning'] },
+                  ids: { type: 'array', items: { type: 'string' }, maxItems: 500, description: '受け皿以外の全設定の新しい順' },
+                  expectedVersion: { type: 'integer', minimum: 0, description: '一覧の orderVersion' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Order updated with new orderVersion' },
+          '400': { description: 'account_id / friendKind / ids / expectedVersion missing or invalid' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Account not in visible scope' },
+          '409': { description: 'ORDER_CHANGED or ORDER_VERSION_CONFLICT: reload and retry with currentVersion' },
+        },
+      },
+    },
+    '/api/friend-add-rules/{id}/test-send': {
+      post: {
+        tags: ['Webhook'],
+        summary: '友だち追加時の配信を操作者本人だけへテスト送信（F12）',
+        description:
+          '保存済み版のテキスト本文で固定し、送り先は操作者のLINEだけ。本文・引数での送り先指定は受け付けない。手動扱いとして delivery_type=test・source=manual で記録する。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Test sent to self with fixed version' },
+          '400': { description: 'account_id or Idempotency-Key missing or invalid' },
+          '403': { description: 'Role or permission required' },
+          '404': { description: 'Rule or account not in visible scope' },
+          '409': { description: 'Operator LINE not found among friends' },
+          '422': { description: 'Saved version has no text body' },
+          '429': { description: 'Repeated too quickly; retry after 10 seconds' },
         },
       },
     },
@@ -4012,6 +4083,28 @@ const spec = {
         responses: { '200': { description: '詳細' }, '404': { description: 'Not found' } },
       },
     },
+    '/api/webhooks/incoming/{id}/restore': {
+      post: {
+        tags: ['Webhook'],
+        summary: '削除した受信Webhookを元に戻す（戻した直後は停止のまま）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Incoming webhook restored as stopped' }, '400': { description: 'LINE account is required' }, '403': { description: 'Owner role required' }, '404': { description: 'Webhook not found or not deleted' } },
+      },
+    },
+    '/api/webhooks/outgoing/{id}/restore': {
+      post: {
+        tags: ['Webhook'],
+        summary: '削除した送信Webhookを元に戻す（戻した直後は停止のまま）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Outgoing webhook restored as stopped' }, '400': { description: 'LINE account is required' }, '403': { description: 'Owner role required' }, '404': { description: 'Webhook not found or not deleted' } },
+      },
+    },
     '/api/webhooks/incoming/{id}/test': {
       post: {
         tags: ['Webhook'],
@@ -4138,6 +4231,41 @@ const spec = {
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
         ],
         responses: { '200': { description: '失効した' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/webhooks/interactions/{id}/payload': {
+      get: {
+        tags: ['Webhook'],
+        summary: 'やり取りの本文（伏せて返す）',
+        description: '送った・受け取った本文を伏せて返す(F-18)。'
+          + '名前・電話・メール・住所・トークンに当たる値は `***` に置き換える。'
+          + 'JSON でない・空の本文は body に null を返す。元やDBは変えない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '伏せた本文' },
+          '404': { description: 'Not found' },
+        },
+      },
+    },
+    '/api/webhooks/api-tokens/{id}/reactivate': {
+      post: {
+        tags: ['Webhook'],
+        summary: '止めた公開APIトークンを動かし直す',
+        description: '止めている行だけが対象。平文は保存していないが hash が残っているため、'
+          + '止める前の合言葉がそのまま使えるようになる（新しい発行はしない）。'
+          + '止めた人（revoked_by）は履歴として残し、動かし直しは監査記録へ残す(F-17)。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '動かし直した。止める前の合言葉が使える' },
+          '404': { description: 'Not found' },
+          '409': { description: '止められていない' },
+        },
       },
     },
     '/api/webhooks/api-tokens/{id}/rotate': {
@@ -6437,6 +6565,25 @@ const spec = {
           '201': { description: '複製した下書き（受付停止）' },
           '403': { description: 'フォームの編集権限が無い' },
           '404': { description: 'フォームが無い、または権限範囲外' },
+        },
+      },
+    },
+    '/api/forms/{id}/unarchive': {
+      post: {
+        tags: ['Forms'],
+        summary: '保管した回答フォームを元に戻す（戻した直後は受付停止のまま）',
+        description: '保管中の行だけ現行へ戻す。確認した版（expectedRevision）がずれたら409で読み直しを促す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision'], properties: { expectedRevision: { type: 'number' } } } } } },
+        responses: {
+          '200': { description: '現行へ戻した（status, revision, isActive）' },
+          '400': { description: '確認した版が必要' },
+          '403': { description: 'フォームの編集権限が無い' },
+          '404': { description: 'フォームが無い、または権限範囲外' },
+          '409': { description: '保管されていない、または版が変わった' },
         },
       },
     },

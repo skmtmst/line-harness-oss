@@ -1,7 +1,24 @@
 'use client'
 
 import Disclosure from '@/components/shared/disclosure'
+import CommentsV8 from './comments-v8'
+import ParticipantsV8 from './participants-v8'
+import CtaV8 from './cta-v8'
+import ReviewV8 from './review-v8'
+import NotificationsV8 from './notifications-v8'
+import VideoV8 from './video-v8'
+import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
+import {
+  fmtSec,
+  joinKindLabel,
+  ParticipantAvatar,
+  PARTICIPANT_FILTER_OPTIONS,
+  PARTICIPANTS_PAGE_SIZE,
+  participantStateLabel,
+  percent,
+} from './participants-shared'
 import RetentionSection from './retention-section'
+import AnalyticsFunnelV8 from './analytics-funnel-v8'
 import SessionCapacityCell from './session-capacity-cell'
 import VideoStages from './video-stages'
 import LinePreview from '@/components/shared/line-preview'
@@ -64,18 +81,6 @@ import {
   reviewTestSummaryBody,
 } from './review-text'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
-
-function fmtSec(sec: number): string {
-  // 負 = 開始前 (待機ルーム) の相対時刻。-330 → -5:30
-  const sign = sec < 0 ? '-' : ''
-  const abs = Math.abs(sec)
-  const h = Math.floor(abs / 3600)
-  const m = Math.floor((abs % 3600) / 60)
-  const s = abs % 60
-  return h > 0
-    ? `${sign}${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-    : `${sign}${m}:${String(s).padStart(2, '0')}`
-}
 
 function largestDropoffAt(segments: NonNullable<WebinarAnalytics['viewSegments']>): number | null {
   if (segments.length < 2) return null
@@ -336,10 +341,6 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
   )
 }
 
-function percent(value: number, total: number): string {
-  return total > 0 ? `${Math.round((value / total) * 100)}%` : '—'
-}
-
 /**
  * 視聴者コメントは分析の概要でだけ使う。**参加者管理では取らない。**
  * 取得・読込・失敗をここに閉じ込めるので、コメントの失敗で
@@ -396,85 +397,7 @@ function compactDateTime(value: string): string {
   return formatDateTime(value)
 }
 
-function ParticipantAvatar({
-  name,
-  pictureUrl,
-  size = 'md',
-}: {
-  name: string
-  pictureUrl: string | null
-  size?: 'sm' | 'md' | 'lg'
-}) {
-  const sizeClass = size === 'lg' ? 'h-11 w-11 text-sm' : size === 'sm' ? 'h-7 w-7 text-[10px]' : 'h-9 w-9 text-xs'
-  // 外部 URL は https だけ読み、http 等は頭文字表示に落とす。
-  if (pictureUrl && pictureUrl.startsWith('https://')) {
-    return (
-      <img
-        src={pictureUrl}
-        alt=""
-        referrerPolicy="no-referrer"
-        className={`${sizeClass} shrink-0 rounded-pill bg-canvas-sunken object-cover ring-2 ring-canvas`}
-      />
-    )
-  }
-  return (
-    <span className={`${sizeClass} flex shrink-0 items-center justify-center rounded-pill bg-info-bg font-bold text-info ring-2 ring-canvas`}>
-      {name.trim().charAt(0) || '?'}
-    </span>
-  )
-}
-
-/* 参加者一覧の1頁ぶん。サーバーは最大200件まで返す。 */
-const PARTICIPANTS_PAGE_SIZE = 50
-
-/*
- * 参加者の分類フィルタ（IDEA-10）。分類ルールはサーバーが持ち、
- * 画面はラベルだけを決める。計測外 = 外部動画などで個人の視聴を
- * 取得できず、視聴データが無いことを未視聴と断定しない区分。
- */
-const PARTICIPANT_FILTER_OPTIONS: Array<{ value: '' | WebinarParticipantClassification; label: string }> = [
-  { value: '', label: 'すべての申込・参加者' },
-  { value: 'unviewed', label: '未参加（申込のみ・入場記録なし）' },
-  { value: 'dropped_off', label: '途中離脱（入場したが未完了）' },
-  { value: 'completed', label: '視聴完了' },
-  { value: 'unmeasured', label: '計測外' },
-]
-
-type ParticipantRow = WebinarParticipantPage['items'][number]
-
-/**
- * 参加者行の分類表示。サーバーの classification を優先し、
- * 無い古い応答だけ従来の推測へ落とす。
- */
-function participantStateLabel(participant: ParticipantRow, durationSeconds: number): string {
-  const rate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, durationSeconds)) * 100))
-  const hasWatchError = participant.staffIntegrationStatus === 'needs_attention' || Boolean(participant.errorDetail)
-  if (participant.classification === undefined) {
-    return participant.maxWatchedSeconds === 0
-      ? hasWatchError ? '視聴エラー' : participant.latestJoinedAt ? '視聴開始直後' : '未視聴'
-      : rate >= 90 ? `視聴完了 ${rate}%` : rate > 0 ? `視聴中 ${rate}%` : '未視聴'
-  }
-  switch (participant.classification) {
-    case 'unmeasured': return '計測外'
-    case 'unviewed': return '未参加'
-    case 'completed': return `視聴完了 ${rate}%`
-    case 'dropped_off':
-      return participant.maxWatchedSeconds === 0
-        ? hasWatchError ? '視聴エラー' : '入場のみ（再生を確認できず）'
-        : `途中離脱 ${rate}%`
-  }
-}
-
-/** 入場がライブ時間内か終了後（録画）かを回数つきで短く示す。 */
-function joinKindLabel(participant: ParticipantRow): string {
-  const live = participant.liveSessions ?? 0
-  const replay = participant.replaySessions ?? 0
-  if (live === 0 && replay === 0) return ''
-  const parts: string[] = []
-  if (live > 0) parts.push(`ライブ${live}`)
-  if (replay > 0) parts.push(`録画${replay}`)
-  return `（${parts.join('・')}）`
-}
+/* 参加者の段の小物（分類フィルタ等）は `./participants-shared` に置く（v7 と V8 の両方から使う）。 */
 
 function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytics, analyticsState, webinarStatus, onRetry, onOpenParticipants }: { webinarId: string; durationSeconds: number; view?: 'participants' | 'analytics' | 'legacy'; analytics: WebinarAnalytics | null; analyticsState: 'idle' | 'loading' | 'ready' | 'error'; webinarStatus: Webinar['status']; onRetry: () => void; onOpenParticipants?: () => void }) {
   /*
@@ -666,18 +589,21 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
       5節（概要・視聴・離脱・CTA・申込）はこの段に出ないので入口も置かない。
     */
     const analyticsSections = [
-      { label: '視聴結果', href: '#webinar-analytics-result' },
-      { label: '視聴行動', href: '#webinar-analytics-behavior' },
+      { label: '数の帯', href: '#webinar-analytics-tiles' },
+      { label: 'どこで人数が減っているか', href: '#webinar-analytics-funnel' },
       { label: 'どこまで見られたか', href: '#webinar-analytics-retention' },
     ] as const
     return (
       <div className="space-y-4" data-design-node="yxyzQ">
         <div className="flex flex-wrap items-center justify-between gap-3"><nav aria-label="この段の見出しへ移動" className="flex flex-wrap gap-2">{analyticsSections.map((item) => <Button variant="secondary" className="text-ink-secondary px-3 py-2 hover:underline h-auto whitespace-normal" key={item.label} href={item.href}>{item.label}</Button>)}</nav>{participantsState === 'ready' ? <div className="flex gap-2">{onOpenParticipants ? <Button onClick={onOpenParticipants}>参加者一覧へ</Button> : null}<Button disabled={csvBusy} onClick={() => downloadParticipantsCsv()} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す</Button></div> : null}</div>
         {csvError ? <p className="text-danger text-xs" role="alert">{csvError}</p> : null}
-        <div className="flex flex-col gap-4 xl:flex-row">
+        {/*
+          ★V8-B 分析 `z2dgw`。数の帯・減りの棒・見られた所の線。
+          どこから申し込んだかは集計の口が無いので出さない。
+        */}
+        <div className="flex flex-col gap-4 xl:flex-row" data-design-node="z2dgw">
           <div className="min-w-0 flex-1 space-y-3">
-            <section id="webinar-analytics-result" className="border-hairline bg-canvas rounded-card scroll-mt-4 border p-4 shadow-card"><h2 className="text-ink text-base font-semibold">視聴結果</h2><p className="text-ink-faint mt-1 text-xs">申込・再生・完了率を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">申込</dt><dd className="text-ink text-sm font-semibold">{formatNumber(summary.reservations)}人</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">再生</dt><dd className="text-ink text-sm font-semibold">{formatNumber(summary.viewers)}人（{percent(summary.viewers, summary.reservations)}）</dd></div></dl></section>
-            <section id="webinar-analytics-behavior" className="border-hairline bg-canvas rounded-card scroll-mt-4 border p-4 shadow-card"><h2 className="text-ink text-base font-semibold">視聴行動</h2><p className="text-ink-faint mt-1 text-xs">離脱箇所とCTA反応を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">平均視聴時間</dt><dd className="text-ink text-sm font-semibold">{fmtSec(summary.avgWatchedSeconds)}（{avgRate}%）</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">最大離脱</dt><dd className="text-ink text-sm font-semibold">{largestDropoff !== null ? `${fmtSec(largestDropoff)}付近` : `—（${analytics.measurement?.reason ?? '区間未取得'}）`}</dd></div></dl></section>
+            <AnalyticsFunnelV8 summary={summary} daily={analytics.daily} />
             <RetentionSection
               retention={analytics.retention ?? { bucketSeconds: 60, started: 0, points: [] }}
               completed={summary.completed}
@@ -1462,6 +1388,7 @@ function emptyCtaEditing(webinarId: string): CtaEditing {
 function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, onCtasLoaded }: { webinarId: string; durationSeconds: number; forms: Array<{ id: string; name: string }>; formsState: FormCandidateState; onRetryForms: () => void; onCtasLoaded?: (ctas: WebinarCtaCard[] | null) => void }) {
   const [editing, setEditing] = useState<CtaEditing>(() => emptyCtaEditing(webinarId))
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   /* 取得の世代印。切替後に遅れて届いた前のウェビナーの応答はここで捨てる。 */
   const ctaRequestId = useRef(0)
 
@@ -1533,9 +1460,11 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
       atSeconds: parseMinSec(times[i] ?? '') as number,
     }))
     setSaving(true)
+    setSaved(false)
     try {
       const sorted = [...merged].sort((a, b) => a.atSeconds - b.atSeconds)
       await webinarApi.saveCtas(webinarId, sorted)
+      setSaved(true)
       editCurrent((prev) => ({ ...prev, ctas: sorted, times: sorted.map((c) => fmtMinSec(c.atSeconds)) }))
       /* 保存した中身を親の概要段へ流す。取り直しの GET は要らない。 */
       onCtasLoaded?.(sorted)
@@ -1654,13 +1583,15 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
         >
           + CTAカード追加
         </button>
-        <button
+        <Button
+          variant="primary"
           onClick={() => void save()}
-          disabled={saving || !loaded}
-          className="rounded-mini bg-action px-4 py-1 text-sm text-on-action disabled:opacity-50"
+          disabled={!loaded}
+          busy={saving}
+          done={saved}
         >
-          {saving ? '保存中...' : '保存する'}
-        </button>
+          保存する
+        </Button>
         </>
       )} />
     </div>
@@ -2227,6 +2158,25 @@ function EditWebinarInner() {
     : 'basic'
   const [pane, setPane] = useState<PaneKey>(initialPane)
   /*
+    ★V8 切替用。共通の useAdminTheme は使わない（node 実行の試験で
+    document が無いときに落ちるため）。ここでは document が読める
+    ときだけ読み、読めなければ v7 のままにする。
+  */
+  const readAdminTheme = (): 'v7' | 'v8' =>
+    typeof document === 'undefined'
+      ? 'v7'
+      : document.documentElement?.dataset?.theme === 'v8'
+        ? 'v8'
+        : 'v7'
+  const [adminTheme, setAdminTheme] = useState<'v7' | 'v8'>(readAdminTheme)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return
+    const update = () => setAdminTheme(readAdminTheme())
+    update()
+    window.addEventListener(ADMIN_THEME_CHANGED_EVENT, update)
+    return () => window.removeEventListener(ADMIN_THEME_CHANGED_EVENT, update)
+  }, [])
+  /*
     CTAの印と最終確認が見るカード件数。初期値はエディタ応答の ctaCount、
     CTAの段を開いた後は子タブが保存・再取得した結果を正本にする。
     「どのウェビナーの分か」を一緒に持ち、切替後に前の件数を出さない。
@@ -2643,23 +2593,76 @@ function EditWebinarInner() {
       ) : null}
       {visitedPanes.has('video') ? (
         <div hidden={pane !== 'video'}>
-          <VideoDesignStep webinar={webinar} editor={editor} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} onWebinarSaved={handleWebinarSaved} onDirtyChange={dirtyReporterFor('video')} registerSave={saveRegistrarFor('video')} />
+          {/*
+            ★V8 切替（動画 `VWNaA`・開催回 `LPOe7`）。v7 の見た目は
+            data-theme="v8" が付くまで 1画素も変えない。
+          */}
+          {adminTheme === 'v8' ? (
+            <VideoV8
+              webinar={webinar}
+              editor={editor}
+              publicUrl={publicUrl}
+              canOpenPublicPage={canOpenPublicPage}
+              publicPageReason={publicPageReason}
+              completionLabel={editor.viewingCondition.label || null}
+              onWebinarSaved={handleWebinarSaved}
+              onDirtyChange={dirtyReporterFor('video')}
+              registerSave={saveRegistrarFor('video')}
+              onEditVideo={() => goStep('basic')}
+            />
+          ) : (
+            <VideoDesignStep webinar={webinar} editor={editor} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} onWebinarSaved={handleWebinarSaved} onDirtyChange={dirtyReporterFor('video')} registerSave={saveRegistrarFor('video')} />
+          )}
         </div>
       ) : null}
       {visitedPanes.has('cta') ? (
         <div hidden={pane !== 'cta'}>
-          <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} registrations={registrations} onEditorChange={setEditor} onCtasReport={handleCtasReport} />
+          {/*
+            ★V8 切替（CTA・フォーム `Q0Jrk`）。v7 の見た目は
+            data-theme="v8" が付くまで 1画素も変えない。
+          */}
+          {adminTheme === 'v8' ? (
+            <CtaV8 webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} onEditorChange={setEditor} onCtasReport={handleCtasReport} />
+          ) : (
+            <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} registrations={registrations} onEditorChange={setEditor} onCtasReport={handleCtasReport} />
+          )}
         </div>
       ) : null}
       {visitedPanes.has('notifications') ? (
         <div hidden={pane !== 'notifications'}>
-          <NotificationDesignStep webinarId={webinar.id} webinarTitle={webinar.title} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} onDirtyChange={dirtyReporterFor('notifications')} registerSave={saveRegistrarFor('notifications')} />
+          {/*
+            ★V8 切替（通知 `E7iAYs`）。v7 の見た目は
+            data-theme="v8" が付くまで 1画素も変えない。
+          */}
+          {adminTheme === 'v8' ? (
+            <NotificationsV8 webinarId={webinar.id} webinarTitle={webinar.title} editor={editor} onOpenActions={() => goStep('actions')} />
+          ) : (
+            <NotificationDesignStep webinarId={webinar.id} webinarTitle={webinar.title} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} onDirtyChange={dirtyReporterFor('notifications')} registerSave={saveRegistrarFor('notifications')} />
+          )}
         </div>
       ) : null}
-      {pane === 'review' && <ReviewStep webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onBack={goStep} onPublished={disarm} />}
+      {pane === 'review' && (
+        /*
+          ★V8 切替（確認 `XCUNf`）。v7 の見た目は
+          data-theme="v8" が付くまで 1画素も変えない。
+        */
+        adminTheme === 'v8' ? (
+          <ReviewV8 webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onPublished={disarm} onTestNotifications={() => goStep('notifications')} />
+        ) : (
+          <ReviewStep webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onBack={goStep} onPublished={disarm} />
+        )
+      )}
       {visitedPanes.has('comments') ? (
         <div hidden={pane !== 'comments'}>
-          <CommentsTab webinarId={webinar.id} />
+          {/*
+            ★V8 切替（コメント演出 `Omqd4`）。v7 の見た目は
+            data-theme="v8" が付くまで 1画素も変えない。
+          */}
+          {adminTheme === 'v8' ? (
+            <CommentsV8 webinarId={webinar.id} />
+          ) : (
+            <CommentsTab webinarId={webinar.id} />
+          )}
         </div>
       ) : null}
       {visitedPanes.has('actions') ? (
@@ -2668,7 +2671,11 @@ function EditWebinarInner() {
         </div>
       ) : null}
       {pane === 'preview' && <PublicPreviewStep webinar={webinar} editor={editor} publicUrl={publicUrl} registrations={registrations} publicPageReason={publicPageReason} onEditorChange={setEditor} />}
-      {pane === 'participants' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" analytics={analytics} analyticsState={analyticsState} webinarStatus={webinar.status} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} />}
+      {/*
+        ★V8 切替（参加者管理 `uNsEy`）。v7 の見た目は
+        data-theme="v8" が付くまで 1画素も変えない。
+      */}
+      {pane === 'participants' && (adminTheme === 'v8' ? <ParticipantsV8 webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} /> : <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" analytics={analytics} analyticsState={analyticsState} webinarStatus={webinar.status} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} />)}
       {pane === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} webinarStatus={webinar.status} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} onOpenParticipants={() => goStep('participants')} />}
 
       {/* 保存はこの一段だけ。各段の中に別の保存バーは出さない。共通 StickyBar を使い、画面幅いっぱいの fixed 配置でサイドバーに重ねない。 */}

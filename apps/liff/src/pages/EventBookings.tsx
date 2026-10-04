@@ -11,6 +11,7 @@ import Button from '../components/ui/Button.js';
 import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 import Icon from '../components/ui/Icon.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 
 /** 札の文字は設計どおり (参加・承認待ち…)。意味は今の状態名のまま変えない。 */
@@ -189,7 +190,7 @@ export default function EventBookings() {
   }
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node="y1bs9A">
+    <LiffLookScope className="min-h-screen bg-ground" designNode="y1bs9A">
       <LiffHeader title="自分のイベント" />
       <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-10">
         <h1 className="text-xl font-bold text-ink">自分のイベント</h1>
@@ -200,7 +201,7 @@ export default function EventBookings() {
         ) : (
           <>
             <div
-              className="flex rounded-xl bg-hairline/40 p-1"
+              className="flex rounded-(--liff-radius) bg-liff-chip p-[3px]"
               role="tablist"
               aria-label="イベントの期間"
             >
@@ -216,10 +217,10 @@ export default function EventBookings() {
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
-                  className={`min-h-11 flex-1 rounded-lg px-2 text-sm focus-visible:outline-2 focus-visible:outline-ink ${
+                  className={`flex h-8 flex-1 items-center justify-center rounded-lg px-1 text-xs focus-visible:outline-2 focus-visible:outline-ink ${
                     tab === t.key
-                      ? 'bg-canvas font-bold text-ink shadow-sm'
-                      : 'text-ink-secondary'
+                      ? 'bg-canvas font-bold text-ink'
+                      : 'font-semibold text-liff-sub'
                   }`}
                 >
                   {t.label}
@@ -243,32 +244,32 @@ export default function EventBookings() {
                   const meta = statusMeta[b.status] ?? { text: b.status, tone: 'neutral' as const };
                   return (
                     <li key={b.id}>
-                      <Card className="p-4">
+                      <Card className="p-3.5">
                         <div className="flex items-center gap-3">
                           <div
-                            className="flex w-13 shrink-0 flex-col items-center"
+                            className="flex w-14 shrink-0 flex-col items-center"
                             aria-label={`${utcToJstMd(b.slot_starts_at)} ${utcToJstHm(b.slot_starts_at)}`}
                           >
-                            <span className="text-base font-bold whitespace-nowrap text-ink">
+                            <span className="text-[15px] font-bold whitespace-nowrap text-ink">
                               {utcToJstMd(b.slot_starts_at)}
                             </span>
-                            <span className="text-xs text-ink-secondary">
+                            <span className="text-[11px] text-liff-sub">
                               {utcToJstHm(b.slot_starts_at)}
                             </span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate font-semibold text-ink" title={b.event_name}>
+                            <div className="truncate text-sm font-semibold text-ink" title={b.event_name}>
                               {b.event_name}
                             </div>
                             {b.venue_name && (
                               <div
-                                className="mt-0.5 truncate text-sm text-ink-secondary"
+                                className="mt-[3px] truncate text-[11.5px] text-liff-sub"
                                 title={b.venue_name}
                               >
                                 {b.venue_name}
                               </div>
                             )}
-                            <div className="mt-1">
+                            <div className="mt-[3px]">
                               <Badge tone={meta.tone}>{meta.text}</Badge>
                             </div>
                           </div>
@@ -291,7 +292,7 @@ export default function EventBookings() {
                                 void openChange(b);
                               }}
                               disabled={busy}
-                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-hairline bg-canvas px-3 text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-hairline bg-canvas px-3 text-xs font-semibold text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
                             >
                               時間を変える
                             </button>
@@ -302,7 +303,7 @@ export default function EventBookings() {
                                 setPendingCancel(b);
                               }}
                               disabled={busy}
-                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-danger/30 bg-canvas px-3 text-sm font-semibold text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-danger/30 bg-canvas px-3 text-xs font-semibold text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
                             >
                               キャンセルする
                             </button>
@@ -390,7 +391,7 @@ export default function EventBookings() {
                             prev ? { ...prev, selectedSlotId: s.id, changeError: null } : prev,
                           )
                         }
-                        className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${
+                        className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-(--liff-radius) border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${
                           disabled
                             ? 'border-hairline bg-shell-gray'
                             : selected
@@ -399,13 +400,13 @@ export default function EventBookings() {
                         }`}
                       >
                         <span
-                          className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-white' : 'text-ink'}`}
+                          className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}
                         >
                           {utcToJstMd(s.starts_at)} {utcToJstHm(s.starts_at)}〜
                           {utcToJstHm(s.ends_at)}
                         </span>
                         <span
-                          className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-white' : 'text-ink-secondary'}`}
+                          className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-(--liff-on-primary)' : 'text-ink-secondary'}`}
                         >
                           {current ? '今の時間' : full ? '満席' : '空きあり'}
                         </span>
@@ -418,6 +419,6 @@ export default function EventBookings() {
           </div>
         )}
       </ConfirmDialog>
-    </div>
+    </LiffLookScope>
   );
 }

@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import Toggle from '@/components/shared/toggle'
@@ -239,7 +241,7 @@ function FeatureCardV8({ group, features, usageByItemId, usageByFeatureId, usage
 }
 
 /** 並び替えダイアログ（★V8-B `ztgRD`）。下書きの並びを動かし、確定で反映する。 */
-function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveItemInOrder }: {
+export function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveItemInOrder }: {
   groups: FeatureGroup[]
   initialOrder: MenuItemOrder
   onCancel: () => void
@@ -248,13 +250,17 @@ function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveItemInOrde
 }) {
   const [draft, setDraft] = useState<MenuItemOrder>(initialOrder)
   const draftGroups = useMemo(() => applyItemOrder(groups, draft), [groups, draft])
+  /* 手書きの窓にも共通の窓の振る舞い（Esc で閉じる・Tab の閉じ込め）を付ける。 */
+  const panelRef = useOverlayFocus(true, onCancel)
   return (
     <div className={styles.dialogOverlay} role="presentation" onClick={onCancel}>
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="左のメニューの並びを変える"
         className={styles.dialog}
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
         <div className={styles.dialogHead}>
@@ -394,6 +400,23 @@ export function FeatureSettingsV8() {
   const [query, setQuery] = useState('')
   const [reorderOpen, setReorderOpen] = useState(false)
   const [openGroups, setOpenGroups] = useState<Set<string> | null>(null)
+  /*
+   * B. 保存ボタンは「保存中 → ✓ 保存しました」でボタンの中だけ変わる。
+   * 保存が終わって未保存が無くなったら完了を出し、触ったら消す。
+   */
+  const [savedTick, setSavedTick] = useState(false)
+  const wasSavingRef = useRef(false)
+  useEffect(() => {
+    if (saving) {
+      wasSavingRef.current = true
+      return
+    }
+    if (wasSavingRef.current && !dirty) setSavedTick(true)
+    wasSavingRef.current = false
+  }, [saving, dirty])
+  useEffect(() => {
+    if (dirty) setSavedTick(false)
+  }, [dirty])
 
   const filteredGroups = useMemo(() => {
     const q = query.trim()
@@ -445,8 +468,25 @@ export function FeatureSettingsV8() {
           先に上部でLINEアカウントを選んでください。
         </p>
       ) : loading ? (
-        <div className={`${styles.card} ${styles.stateBox}`}>
-          読み込み中…
+        <div className={`${styles.card} ${styles.stateBox}`} aria-busy="true" aria-label="機能設定を読み込んでいます">
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true">
+                {[0, 1].map((card) => (
+                  <div key={card} style={{ padding: '16px 0', borderTop: card > 0 ? '1px solid var(--color-hairline)' : undefined }}>
+                    <Skeleton height={16} width="30%" />
+                    {[0, 1, 2].map((row) => (
+                      <div key={row} style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+                        <span style={{ flex: 1 }}><Skeleton height={14} width="45%" /></span>
+                        <Skeleton height={20} width={36} />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          />
         </div>
       ) : loadFailed ? (
         <ListState
@@ -559,6 +599,8 @@ export function FeatureSettingsV8() {
                 onClick={() => void save()}
                 disabled={saving || !dirty}
                 busy={saving}
+                done={savedTick}
+                doneLabel="保存しました"
                 title={!dirty ? '変更すると保存できます' : undefined}
               >
                 機能設定を保存

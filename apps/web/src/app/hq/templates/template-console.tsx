@@ -2,7 +2,7 @@
 
 import '@/app/hq/readonly-v8.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import MenuPortal from '@/components/shared/menu-portal'
@@ -26,7 +26,7 @@ const LIST_DESCRIPTIONS: Record<TemplateType, string> = {
   form: '回答フォームのひな形を作成し、各LINEアカウントへ配布します。',
 }
 const MODES: Record<DistributionMode, string> = { create: '新規作成', overwrite: '上書き', alias: '別名で作成' }
-const NODES = { list: 'rsyjI', edit: 'ZsLly', accounts: 'meBRB', duplicates: 'meBRB', result: 'FxHyL' }
+const NODES = { list: 'rsyjI', edit: 'X4JcOf', accounts: 'meBRB', duplicates: 'meBRB', result: 'FxHyL' }
 type Stage = keyof typeof NODES
 const STEPS: readonly { stage: Stage; label: string }[] = [
   { stage: 'list', label: '一覧' },
@@ -76,6 +76,16 @@ function TemplateRowMenu({ name, busy, onEdit, onDistribute, onRemove }: {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const close = () => setOpen(false)
+  // 矢印・Home・Endで中の押し口を移動する（共通ActionMenuと同じ動き）。
+  const moveMenuFocus = (event: KeyboardEvent<HTMLElement>) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled])'))
+    if (items.length === 0) return
+    event.preventDefault()
+    const current = items.indexOf(document.activeElement as HTMLElement)
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : event.key === 'ArrowDown' ? (current + 1) % items.length : (current - 1 + items.length) % items.length
+    items[next].focus()
+  }
   return (
     <>
       <button
@@ -90,7 +100,7 @@ function TemplateRowMenu({ name, busy, onEdit, onDistribute, onRemove }: {
         …
       </button>
       <MenuPortal open={open} align="end" getAnchor={() => triggerRef.current} onClose={close}>
-        <div role="menu" aria-label={`${name}の操作`} className={styles.rowMenuItems} style={{ position: 'static' }}>
+        <div role="menu" aria-label={`${name}の操作`} className={styles.rowMenuItems} style={{ position: 'static' }} onKeyDown={moveMenuFocus}>
           <Button disabled={busy} onClick={() => { onEdit(); close() }} aria-label={`${name}を編集`}>編集</Button>
           <Button disabled={busy} onClick={() => { onDistribute(); close() }} aria-label={`${name}を配布`}>配布</Button>
           <Button disabled={busy} onClick={() => { onRemove(); close() }} aria-label={`${name}を削除`}>削除する</Button>

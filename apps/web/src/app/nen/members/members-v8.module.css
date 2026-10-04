@@ -30,7 +30,7 @@
 .headTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -92,24 +92,32 @@
 }
 
 .kpiLabel {
-  color: var(--color-ink-secondary);
+  color: var(--color-ink);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .kpiValue {
   margin: 0;
   color: var(--color-ink);
   font-size: 22px;
-  font-weight: 700;
-  line-height: 1.25;
+  font-weight: 600;
+  line-height: 26px;
+  letter-spacing: -0.5px;
   font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .kpiSub {
   margin: 0;
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 

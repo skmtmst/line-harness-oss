@@ -7,6 +7,7 @@ import Button from '../components/ui/Button.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Icon from '../components/ui/Icon.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 
 type State = 'ready' | 'submitting' | 'confirmed' | 'expired' | 'unavailable' | 'error';
@@ -43,7 +44,7 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node="BjcuB">
+    <LiffLookScope className="min-h-screen bg-ground" designNode="BjcuB">
       <LiffHeader title="イベント" />
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
         {state === 'confirmed' ? (
@@ -105,7 +106,7 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
               >
                 <Icon name="circle-check" className="h-9 w-9" />
               </span>
-              <p className="mt-4 text-[17px] font-bold text-ink">空きが出ました</p>
+              <p className="mt-4 text-xl font-bold text-ink">空きが出ました</p>
               <p className="mt-2 text-[13px] leading-6 text-pretty text-liff-sub">
                 下のボタンを押すと予約が確定します。
                 <br />
@@ -123,6 +124,6 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
           </div>
         )}
       </div>
-    </div>
+    </LiffLookScope>
   );
 }

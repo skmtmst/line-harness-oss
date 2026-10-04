@@ -594,6 +594,13 @@ function BookingDetailInner() {
       await bookingApi.decideRequest(selectedAccountId, id, action)
       // R322: 承認中に別の予約へ移っていたら、今の画面を触らない。
       if (!isCurrentTarget(actionTarget)) return
+      notifyToast(
+        action === 'approve' ? '予約を確定しました'
+          : action === 'reject' ? '予約をお断りしました'
+          : action === 'cancel' ? '予約をキャンセルしました'
+          : action === 'complete' ? '予約を完了にしました'
+          : '来店なしにしました',
+      )
       void load()
     } catch (e) {
       // R322: 前の予約の失敗で今の画面を汚さない。
@@ -983,7 +990,7 @@ function BookingDetailInner() {
 
             {/* ---- 予約内容の変更 (N-389) ---- */}
             {editing ? (
-              <section className="bg-canvas rounded-card border-hairline border p-5">
+              <section className="bg-canvas rounded-card border-hairline border p-5" data-design-node="YXrF6">
                 <h2 className="text-ink mb-3 text-sm font-semibold">予約内容を変更する</h2>
                 <div className="grid gap-3 md:grid-cols-2">
                   <EditField label="予約メニュー">

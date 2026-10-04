@@ -17,6 +17,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   AlertCircle,
+  Eye,
   History,
   Link2,
   Lock,
@@ -415,7 +416,7 @@ function FriendAddListV8Inner() {
     ...(rule.isFallback
       ? [{
           id: 'stop-fallback',
-          label: '一時停止する',
+          label: '止める',
           disabled: !canEdit,
           disabledReason: canEdit ? undefined : readonlyReason,
           onSelect: () => setFallbackStop(true),
@@ -424,7 +425,7 @@ function FriendAddListV8Inner() {
           ...(rule.status === 'published'
             ? [{
                 id: 'stop',
-                label: '一時停止する',
+                label: '止める',
                 disabled: !canEdit,
                 disabledReason: canEdit ? undefined : readonlyReason,
                 onSelect: () => {
@@ -581,7 +582,7 @@ function FriendAddListV8Inner() {
             <col />
             <col style={{ width: 200 }} />
             <col style={{ width: 96 }} />
-            <col style={{ width: 80 }} />
+            <col style={{ width: 80 }} className={styles.recentCol} />
             <col style={{ width: 44 }} />
           </colgroup>
           <thead>
@@ -590,7 +591,7 @@ function FriendAddListV8Inner() {
               <th>設定（対象の流入リンク）</th>
               <th>最初に送るもの</th>
               <th>状態</th>
-              <th>直近7日</th>
+              <th className={styles.recentCol}>直近7日</th>
               <th aria-label="操作" />
             </tr>
           </thead>
@@ -638,7 +639,7 @@ function FriendAddListV8Inner() {
                     {statusLabel(rule)}
                   </span>
                 </td>
-                <td className={styles.countCell}>
+                <td className={`${styles.countCell} ${styles.recentCol}`}>
                   <span className={styles.countMain}>
                     {rule.status === 'draft' ? '—' : countText(rule.matchedLast7Days, '人')}
                   </span>
@@ -693,7 +694,7 @@ function FriendAddListV8Inner() {
                     常に有効
                   </span>
                 </td>
-                <td className={styles.countCell}>
+                <td className={`${styles.countCell} ${styles.recentCol}`}>
                   <span className={styles.countMain}>{countText(sinkRule.matchedLast7Days, '人')}</span>
                 </td>
                 <td className={styles.menuCell}>
@@ -714,7 +715,7 @@ function FriendAddListV8Inner() {
                     onClose={() => setOpenMenuId(null)}
                     ariaLabel={`設定「${sinkRule.name}」の操作`}
                     items={rowMenuItems(sinkRule)}
-                    note="この設定は消せません（いちばん最後の受け皿）"
+                    note="この設定は削除できません（いちばん最後の受け皿）"
                   />
                 </td>
               </tr>
@@ -751,6 +752,14 @@ function FriendAddListV8Inner() {
           実行結果を見る
         </Button>
       </div>
+
+      {/* 板 `LEwkJ`：閲覧のみの帯。操作は隠さず押せない形のまま。 */}
+      {!canEdit ? (
+        <p className={styles.readonlyBand} role="note">
+          <Eye size={14} aria-hidden="true" />
+          閲覧のみで見ています。変える操作は管理者に頼んでください。
+        </p>
+      ) : null}
 
       <div data-design="KindTabs">
         <Tabs
@@ -897,9 +906,9 @@ function FriendAddListV8Inner() {
       {/* 通常の設定の一時停止の確かめ。 */}
       <ConfirmDialog
         open={stopTarget !== null}
-        title={stopTarget ? `「${stopTarget.name}」を一時停止する` : ''}
+        title={stopTarget ? `「${stopTarget.name}」を止める` : ''}
         description="止めると、この流入リンクから来た人にはいちばん下の「経路が分からなかった人」の案内が動きます。"
-        confirmLabel="一時停止する"
+        confirmLabel="止める"
         busy={stopBusy}
         error={stopError}
         onConfirm={() => void runStop()}
