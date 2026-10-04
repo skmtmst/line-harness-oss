@@ -25,15 +25,19 @@ export function sameCreationScope(a: CreationScope, b: CreationScope): boolean {
   return a.tenantId === b.tenantId && a.actorId === b.actorId
 }
 export function creationStorageKey(scope: CreationScope, type: TemplateType): string {
-  if (!identifier(scope.tenantId) || !identifier(scope.actorId) || !['tag', 'template', 'rich_menu', 'form'].includes(type)) throw storageError()
+  if (!identifier(scope.tenantId) || !identifier(scope.actorId) || !['tag', 'template', 'rich_menu', 'form', 'scenario'].includes(type)) throw storageError()
   return `lh_hq_create_v1:${scope.tenantId}:${scope.actorId}:${type}`
 }
 function validAttempt(value: unknown): value is CreationAttempt {
   if (!object(value, ['requestId', 'input', 'distribute']) || !identifier(value.requestId) || typeof value.distribute !== 'boolean') return false
   const input = value.input
-  if (!object(input, ['type', 'name', 'description', 'definition', 'folderId']) || !['tag', 'template', 'rich_menu', 'form'].includes(String(input.type)) || !text(input.name, 200) || !input.name.trim() || !optionalText(input.description, 2000)) return false
+  if (!object(input, ['type', 'name', 'description', 'definition', 'folderId']) || !['tag', 'template', 'rich_menu', 'form', 'scenario'].includes(String(input.type)) || !text(input.name, 200) || !input.name.trim() || !optionalText(input.description, 2000)) return false
   if (!(input.folderId === undefined || input.folderId === null || identifier(input.folderId))) return false
   const definition = input.definition
+  if (input.type === 'scenario') {
+    if (!object(definition,['schemaVersion','scenario','steps']) || definition.schemaVersion!==1 || !object(definition.scenario,['name','description']) || !text(definition.scenario.name,200) || !definition.scenario.name.trim() || !(definition.scenario.description===null || optionalText(definition.scenario.description,2000)) || !Array.isArray(definition.steps) || !definition.steps.length || definition.steps.length>100) return false
+    return definition.steps.every(step=>object(step,['id','delayMinutes','messageType','messageContent']) && identifier(step.id) && integerBetween(step.delayMinutes,0,525600) && ['text','flex'].includes(String(step.messageType)) && text(step.messageContent,step.messageType==='text'?5000:32000) && !!step.messageContent.trim())
+  }
   if (input.type === 'tag') {
     if (!object(definition, ['schemaVersion', 'tag', 'folders']) || definition.schemaVersion !== 1 || !Array.isArray(definition.folders) || definition.folders.length > 8) return false
     const tag = definition.tag

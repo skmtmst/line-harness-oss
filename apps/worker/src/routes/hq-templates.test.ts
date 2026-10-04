@@ -383,3 +383,30 @@ describe('HQ folders authority', () => {
     expect((await request('/folders','POST',{name:'閲覧のみ'})).status).toBe(403);
   });
 });
+
+describe('V8 scenario templates',()=>{
+  const scenario={schemaVersion:1,scenario:{name:'3日間の案内',description:null},steps:[{id:'step-1',delayMinutes:0,messageType:'text',messageContent:'ようこそ'},{id:'step-2',delayMinutes:1440,messageType:'text',messageContent:'二日目の案内'}]};
+  test('save/replay/list, distribute inactive drafts, retry once and reject stale contents',async()=>{
+    const body={type:'scenario',name:'案内',definition:scenario,requestId:crypto.randomUUID()};
+    const first=await request('','POST',body);expect(first.status,JSON.stringify(first.body)).toBe(201);
+    expect(first.body.data.template.template_type).toBe('scenario');expect(await request('','POST',body)).toEqual(first);
+    expect((await request('?type=scenario')).body.data).toHaveLength(1);expect((await request('?type=template')).body.data).toHaveLength(0);
+    const id=first.body.data.template.id,p=await preflight(id,['a1','a2']);
+    const sent=await execute(id,p);expect(sent.status).toBe(200);expect(sent.body.data.status).toBe('completed');
+    expect((await execute(id,p)).body.data).toEqual(sent.body.data);
+    const targets=sql.prepare('SELECT id,is_active FROM scenarios').all() as {id:string;is_active:number}[];
+    expect(targets).toHaveLength(2);expect(targets.every(s=>s.is_active===0)).toBe(true);expect(count('scenario_steps')).toBe(4);
+    expect(count('friend_scenarios')).toBe(0);
+    const second=await preflight(id,['a1']);sql.prepare("UPDATE scenario_steps SET message_content='変更済み' WHERE scenario_id=? AND step_order=0").run(targets[0].id);
+    const conflict=await execute(id,second);expect(conflict.body.data.stores[0].status).toBe('version_conflict');
+  });
+  test('active duplicate offers alias only and invalid steps cannot save',async()=>{
+    sql.exec("INSERT INTO scenarios(id,name,trigger_type,is_active,line_account_id) VALUES ('active','3日間の案内','manual',1,'a1')");
+    const created=await request('','POST',{type:'scenario',name:'案内',definition:scenario,requestId:crypto.randomUUID()});
+    const p=await preflight(created.body.data.template.id,['a1']);expect(p.stores[0].items[0].allowedModes).toEqual(['alias']);
+    expect((await execute(created.body.data.template.id,p,selections(p,'overwrite'))).body.data.stores[0].status).toBe('failed');
+    const fresh=await preflight(created.body.data.template.id,['a1']);expect((await execute(created.body.data.template.id,fresh,selections(fresh,'alias'))).body.data.status).toBe('completed');
+    expect(sql.prepare("SELECT is_active FROM scenarios WHERE id='active'").get()).toEqual({is_active:1});
+    expect((await request('','POST',{type:'scenario',name:'不正',definition:{...scenario,steps:[{...scenario.steps[0],delayMinutes:-1}]},requestId:crypto.randomUUID()})).status).toBe(422);
+  });
+});

@@ -1,4 +1,4 @@
-export const HQ_TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form'] as const;
+export const HQ_TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form', 'scenario'] as const;
 export type HqTemplateType = (typeof HQ_TEMPLATE_TYPES)[number];
 
 export const HQ_TEMPLATE_DISTRIBUTION_MODES = ['create', 'overwrite', 'alias'] as const;
@@ -156,12 +156,13 @@ export async function createHqTemplate(
 ): Promise<HqTemplate> {
   await db.prepare(
     `INSERT INTO hq_templates
-       (id, tenant_id, template_type, name, description, created_by)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+       (id, tenant_id, template_type, extended_type, name, description, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     input.id,
     input.tenantId,
-    input.type,
+    input.type==='scenario'?'template':input.type,
+    input.type==='scenario'?'scenario':null,
     input.name,
     input.description ?? null,
     input.createdBy ?? null,
@@ -175,7 +176,7 @@ export async function getHqTemplate(
   id: string,
 ): Promise<HqTemplate | null> {
   return db.prepare(
-    `SELECT * FROM hq_templates WHERE tenant_id = ? AND id = ?`,
+    `SELECT *,COALESCE(extended_type,template_type) AS template_type FROM hq_templates WHERE tenant_id = ? AND id = ?`,
   ).bind(tenantId, id).first<HqTemplate>();
 }
 
@@ -186,12 +187,12 @@ export async function listHqTemplates(
 ): Promise<HqTemplate[]> {
   const query = type
     ? db.prepare(
-      `SELECT * FROM hq_templates
-       WHERE tenant_id = ? AND template_type = ? AND archived_at IS NULL
+      `SELECT *,COALESCE(extended_type,template_type) AS template_type FROM hq_templates
+       WHERE tenant_id = ? AND COALESCE(extended_type,template_type) = ? AND archived_at IS NULL
        ORDER BY updated_at DESC, id`,
     ).bind(tenantId, type)
     : db.prepare(
-      `SELECT * FROM hq_templates
+      `SELECT *,COALESCE(extended_type,template_type) AS template_type FROM hq_templates
        WHERE tenant_id = ? AND archived_at IS NULL ORDER BY updated_at DESC, id`,
     ).bind(tenantId);
   const result = await query.all<HqTemplate>();

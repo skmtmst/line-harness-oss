@@ -16,13 +16,14 @@ import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, same
 import TemplateDefinitionEditor, { definitionError, definitionForName, definitionName, freshDefinition, referenceCount } from './template-definition-editor'
 import { formatDateTime } from '@/lib/format'
 
-const LABELS: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム' }
-const PAGE_TITLES: Record<TemplateType, string> = { tag: '友だち属性', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム' }
-const CREATE_LABELS: Record<TemplateType, string> = { tag: '＋ タグを作る', template: 'テンプレートを作る', rich_menu: 'メニューを作る', form: 'フォームを作る' }
+const LABELS: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
+const PAGE_TITLES: Record<TemplateType, string> = { tag: '友だち属性', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
+const CREATE_LABELS: Record<TemplateType, string> = { tag: '＋ タグを作る', template: 'テンプレートを作る', rich_menu: 'メニューを作る', form: 'フォームを作る', scenario: 'シナリオを作る' }
 const LIST_DESCRIPTIONS: Record<TemplateType, string> = {
   tag: 'タグのひな形を作成し、各LINEアカウントへ配布します。',
   template: 'メッセージのひな形を作成し、各LINEアカウントへ配布します。',
   rich_menu: 'リッチメニューのひな形を作成し、各LINEアカウントへ配布します。',
+  scenario: 'シナリオのひな形を作り、停止中の下書きとして各LINEアカウントへ配布します。',
   form: '回答フォームのひな形を作成し、各LINEアカウントへ配布します。',
 }
 const MODES: Record<DistributionMode, string> = { create: '新規作成', overwrite: '上書き', alias: '別名で作成' }
@@ -399,6 +400,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     {error && <div role="alert" className={`${styles.notice} ${styles.error}`}><p>{error}</p>{conflict && detail && <Button disabled={busy} onClick={() => open(detail.template.id, 'edit')}>最新の内容を読み込む</Button>}</div>}
     {message && <p role="status" className={`${styles.notice} ${styles.success}`}>{message}</p>}
     {stage === 'list' && <>
+      {theme === 'v8' && <nav aria-label="ひな形の種類" className={styles.actions}>{Object.entries(LABELS).map(([key,label])=><a key={key} href={`/hq/templates?type=${key}`} aria-current={type===key?'page':undefined}>{label}</a>)}</nav>}
       {!ready ? <section className={`${styles.panel} ${styles.empty}`}><p role="status">{busy ? 'ひな形を読み込み中…' : '読み込めませんでした。権限や接続を確認し、ページを再読み込みしてください。'}</p></section> : <>
         {theme === 'v8' && <section className={styles.panel} aria-label="ひな形の分類">
           <div className={styles.actions}><Button onClick={() => setFolderFilter('all')} aria-pressed={folderFilter === 'all'}>すべて</Button><Button onClick={() => setFolderFilter('none')} aria-pressed={folderFilter === 'none'}>未分類</Button>{folders.map(folder => <Button key={folder.id} onClick={() => setFolderFilter(folder.id)} aria-pressed={folderFilter === folder.id}>{folder.name}</Button>)}</div>

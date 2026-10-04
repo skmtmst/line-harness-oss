@@ -29,6 +29,7 @@ import type {
 import styles from './template-console.module.css'
 
 export function definitionName(type: TemplateType, definition: TemplateDefinition): string {
+  if (type === 'scenario' && 'scenario' in definition) return definition.scenario.name
   if (type === 'tag' && 'tag' in definition) return definition.tag.name
   if (type === 'template' && 'template' in definition) return definition.template.name
   if (type === 'rich_menu' && 'richMenu' in definition) return definition.richMenu.name
@@ -37,6 +38,7 @@ export function definitionName(type: TemplateType, definition: TemplateDefinitio
 }
 
 export function definitionForName(type: TemplateType, definition: TemplateDefinition, name: string, description: string): TemplateDefinition {
+  if (type === 'scenario' && 'scenario' in definition) return {...definition,scenario:{name,description:description || null}}
   if (type === 'tag' && 'tag' in definition) return { ...definition, tag: { ...definition.tag, name, description: description || null } }
   if (type === 'template' && 'template' in definition) return { ...definition, template: { ...definition.template, name } }
   if (type === 'rich_menu' && 'richMenu' in definition) return { ...definition, richMenu: { ...definition.richMenu, name } }
@@ -46,6 +48,7 @@ export function definitionForName(type: TemplateType, definition: TemplateDefini
 
 export function definitionError(type: TemplateType, definition: TemplateDefinition, tenantId?: string): string | null {
   if (!definitionName(type, definition).trim()) return 'ひな形の名前を入力してください。'
+  if (type === 'scenario' && 'scenario' in definition) return definition.steps.length && definition.steps.every(step=>step.messageContent.trim() && Number.isSafeInteger(step.delayMinutes) && step.delayMinutes>=0) ? null : '各ステップの本文と遅延を入力してください。'
   if (type === 'tag' && 'tag' in definition) return definition.folders.some(folder => !folder.name.trim()) ? 'タググループ名を入力してください。' : null
   if (type === 'template' && 'template' in definition) return definition.template.messageContent.trim() ? null : '配信する本文を入力してください。'
   if (type === 'rich_menu' && 'richMenu' in definition) {
@@ -185,6 +188,7 @@ function RichMenuEditor({ value, disabled, onChange, onBusyChange, onNameChange,
 }
 
 export default function TemplateDefinitionEditor({ type, value, disabled, editing = false, tenantId, onChange, onBusyChange, onMediaUploaded, richMenuReferences, formReferences, onRichMenuNameChange, onCanonicalSave, onCanonicalCancel }: { type: TemplateType; value: TemplateDefinition; disabled: boolean; editing?: boolean; tenantId?: string; onChange: (next: TemplateDefinition) => void; onBusyChange?: (busy: boolean) => void; onMediaUploaded?: (media: MessageTemplateDefinition['media'][number]) => void; richMenuReferences?: RichMenuEditorReferences; formReferences?: FormRefs; onRichMenuNameChange?: (name: string) => void; onCanonicalSave?: (definition: TagDefinition | FormDefinition, andAnother?: boolean) => void | Promise<void>; onCanonicalCancel?: () => void }) {
+  if (type === 'scenario' && 'scenario' in value) return <div className={styles.stack}>{value.steps.map((step,index)=><section key={step.id} className={styles.panel}><h2>ステップ{index+1}</h2><label className={styles.field}>前のステップからの遅延（分）<input type="number" min={0} max={525600} aria-label={`ステップ${index+1}の遅延`} disabled={disabled} value={step.delayMinutes} onChange={e=>onChange({...value,steps:value.steps.map(s=>s.id===step.id?{...s,delayMinutes:Number(e.target.value)}:s)})}/></label><label className={styles.field}>形式<select disabled={disabled} value={step.messageType} onChange={e=>onChange({...value,steps:value.steps.map(s=>s.id===step.id?{...s,messageType:e.target.value as 'text'|'flex'}:s)})}><option value="text">テキスト</option><option value="flex">カード型</option></select></label><label className={styles.field}>本文<textarea className={styles.textarea} aria-label={`ステップ${index+1}の本文`} disabled={disabled} value={step.messageContent} onChange={e=>onChange({...value,steps:value.steps.map(s=>s.id===step.id?{...s,messageContent:e.target.value}:s)})}/></label><button type="button" disabled={disabled||value.steps.length===1} onClick={()=>onChange({...value,steps:value.steps.filter(s=>s.id!==step.id)})}>このステップを外す</button></section>)}<button type="button" disabled={disabled||value.steps.length>=100} onClick={()=>onChange({...value,steps:[...value.steps,{id:crypto.randomUUID(),delayMinutes:0,messageType:'text',messageContent:''}]})}>ステップを追加</button><p>配布先では停止中の下書きになります。内容を確認して公開してください。</p></div>
   if (type === 'tag' && 'tag' in value) return <HqTagDefinitionEditor definition={value} mode={editing ? 'edit' : 'create'} saving={disabled} onCancel={onCanonicalCancel ?? (() => undefined)} onSave={async (next, andAnother) => { onChange(next); await onCanonicalSave?.(next, andAnother) }} />
   if (type === 'template' && 'template' in value) return <MessageEditor value={value} disabled={disabled} onChange={onChange} onBusyChange={onBusyChange} onReceipt={onMediaUploaded} />
   if (type === 'rich_menu' && 'richMenu' in value) return <RichMenuEditor value={value} disabled={disabled} tenantId={tenantId} onChange={onChange} onBusyChange={onBusyChange} onNameChange={onRichMenuNameChange} onReceipt={onMediaUploaded} references={richMenuReferences} />

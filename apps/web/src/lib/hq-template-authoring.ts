@@ -2,6 +2,7 @@ import { emptyLayout } from '@line-crm/shared'
 import type { TemplateType, TemplateDefinition, MessageTemplateDefinition } from './hq-templates-api'
 
 export function freshDefinition(type: TemplateType): TemplateDefinition {
+  if (type === 'scenario') return {schemaVersion:1,scenario:{name:'',description:null},steps:[{id:'step-1',delayMinutes:0,messageType:'text',messageContent:''}]}
   if (type === 'tag') return { schemaVersion: 1, tag: { name: '', color: '#3B82F6', description: null, folderId: null, isStarred: false, manualAssignmentAllowed: true, reapplyPolicy: 'first_only', linkedEnabled: false, mileage: { self: 0, referrer: 0, multiplier: null, priority: 0 }, actions: [] }, folders: [] }
   if (type === 'template') return { schemaVersion: 1, template: { id: 'hq-authored-message', name: '', category: 'general', messageType: 'text', messageContent: '', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media: [] }
   if (type === 'rich_menu') return { schemaVersion: 1, richMenu: { id: 'rich-menu-main', name: '', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page-1', pages: [{ id: 'page-1', name: 'メイン', imageR2Key: '', areas: [] }] } }

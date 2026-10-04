@@ -1,7 +1,7 @@
 import { ApiError, fetchApi } from './api'
 import type { FormLayout } from '@line-crm/shared'
 
-export const TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form'] as const
+export const TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form', 'scenario'] as const
 export type TemplateType = typeof TEMPLATE_TYPES[number]
 export type DistributionMode = 'create' | 'overwrite' | 'alias'
 export interface HqTemplate {
@@ -63,6 +63,7 @@ export interface TemplateDefinitionByType {
   template: MessageTemplateDefinition
   rich_menu: RichMenuDefinition
   form: FormDefinition
+  scenario: import('@line-crm/shared').HqScenarioDefinition
 }
 export type TemplateDefinition = TemplateDefinitionByType[TemplateType]
 export type TemplateInput = {

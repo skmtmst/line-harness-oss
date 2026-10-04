@@ -2564,3 +2564,9 @@ export interface HqBannerImageQuery {
 export interface HqBannerImageCounts { all: number; favorite: number; delivered: number; unused: number }
 
 export interface HqTemplateFolder { id: string; name: string; revision: number }
+
+export interface HqScenarioDefinition {
+  schemaVersion: 1
+  scenario: { name: string; description: string | null }
+  steps: Array<{ id: string; delayMinutes: number; messageType: 'text' | 'flex'; messageContent: string }>
+}
