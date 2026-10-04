@@ -3171,7 +3171,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
               {/* Messages — LINE-style chat bubbles */}
               <div className="relative flex min-h-0 flex-1 flex-col">
-              <div ref={messagesScrollRef} className="flex-1 space-y-2 overflow-y-auto p-4" style={{ backgroundColor: 'var(--color-line-talk)' }}>
+              {/* 板 `M0393`：会話の地は #fafafb（LINE青の地は使わない）。 */}
+              <div ref={messagesScrollRef} className="flex-1 space-y-2 overflow-y-auto p-4" style={{ backgroundColor: '#fafafb' }}>
                 {/*
                   古い履歴の続き。直近100件だけ読んでいる会話で出す。
                   押すと今見えている最古の1件より古い分を上に足す。
@@ -3244,7 +3245,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <div key={msg.id}>
                         {showDateSep && (
                           <div className="flex justify-center my-3">
-                            <span className="text-[11px] text-on-accent/85 bg-ink/20 px-2.5 py-0.5 rounded-pill">
+                            {/* 板 `M0393`：日付の区切りは白い札＋濃い文字。 */}
+                            <span className="text-[11px] text-ink-secondary bg-canvas border border-hairline px-2.5 py-0.5 rounded-pill">
                               {formatYmdSlash(msg.createdAt)}
                             </span>
                           </div>
@@ -3268,18 +3270,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             <div
                               className={`max-w-[320px] px-3 py-2 text-sm break-words whitespace-pre-wrap ${
                                 isOutgoing
-                                  ? 'rounded-tl-card rounded-tr-mini rounded-bl-card rounded-br-card text-on-accent'
-                                  : 'min-w-64 rounded-tl-mini rounded-tr-card rounded-bl-card rounded-br-card bg-canvas text-ink'
+                                  /* 板 `M0393`：自分の吹き出しは薄い緑＋濃い文字。 */
+                                  ? 'rounded-tl-card rounded-tr-mini rounded-bl-card rounded-br-card bg-accent-soft text-ink'
+                                  : 'min-w-64 rounded-tl-mini rounded-tr-card rounded-bl-card rounded-br-card border border-hairline bg-canvas text-ink'
                               }`}
-                              style={isOutgoing ? { backgroundColor: 'var(--color-accent-deep)' } : undefined}
                             >
                               {/* N-025: 引用元の表示。取り消された引用元は本文を出さない。 */}
                               {msg.quoted && (
                                 <div
                                   data-inbox-v6="quoted-message"
-                                  className={`mb-1.5 rounded-mini border-l-2 py-0.5 pl-2 text-xs ${
-                                    isOutgoing ? 'border-on-accent/40 text-on-accent/80' : 'border-accent text-ink-faint'
-                                  }`}
+                                  className="border-accent text-ink-faint mb-1.5 rounded-mini border-l-2 py-0.5 pl-2 text-xs"
                                 >
                                   {msg.quoted.isUnsent
                                     ? '取り消されたメッセージ'
@@ -3292,7 +3292,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             </div>
                             {/* 時刻と引用操作 */}
                             <span className="mt-0.5 flex items-center gap-2 px-1">
-                              <span className="text-xs text-on-accent/50">
+                              <span className="text-ink-faint text-xs">
                                 {formatTime(msg.createdAt)}
                               </span>
                               {!msg.isUnsent && (
@@ -3303,7 +3303,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                     setQuotedMessage(msg)
                                     textareaRef.current?.focus()
                                   }}
-                                  className="text-caption text-on-accent/60 underline-offset-2 hover:text-on-accent hover:underline"
+                                  className="text-caption text-ink-faint underline-offset-2 hover:text-action hover:underline"
                                 >
                                   引用
                                 </button>
