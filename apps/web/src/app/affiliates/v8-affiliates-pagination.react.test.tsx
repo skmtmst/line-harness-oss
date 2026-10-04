@@ -46,7 +46,7 @@ async function renderTab() {
   calls.settlementPreview.mockRejectedValue(new Error('no settlement'))
   calls.linkBaseUrl.mockResolvedValue({ success: false })
   render(<AffiliatesTabV8 accountId="acc-1" canEdit registerHeaderActions={() => {}} />)
-  await waitFor(() => expect(screen.getByText(/25件中/)).toBeTruthy())
+  await waitFor(() => expect(screen.getByText(/全\s*25件/)).toBeTruthy())
 }
 
 describe('V8 アフィリエイター一覧の件数とページ送り', () => {

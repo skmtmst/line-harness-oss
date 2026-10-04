@@ -636,6 +636,17 @@ export default function AffiliatesTabV8({
         </div>
       )}
 
+      {listState === 'ready' ? (
+        <div className="pageFoot">
+          <p className="pageCount">
+            {shownRows.length === rows.length
+              ? `全 ${formatNumber(rows.length)}件`
+              : `${formatNumber(shownRows.length)}件 / 全 ${formatNumber(rows.length)}件`}
+          </p>
+          {pageCount > 1 ? <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} /> : null}
+        </div>
+      ) : null}
+
       <p className="af-list-footNote">
         行の「…」から 成果を見る・紹介リンクをコピー・編集・紹介を止める。止めると、その人の紹介リンクからの成果を数えなくなります。
       </p>
